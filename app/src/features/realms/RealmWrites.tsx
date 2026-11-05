@@ -4,9 +4,8 @@
 // reads the indexer once, for its fee line, when it opens, and Adena is asked nothing until its signature.
 import { callFields } from "@gnoworld/core";
 import { Button, Stack } from "@gnoworld/ui";
-import { callsIn } from "../calls/index.ts";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
-import { useApp, useAppStore } from "../../storeContext.tsx";
+import { useAppStore } from "../../storeContext.tsx";
 import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 import styles from "./RealmFunctions.module.css";
@@ -26,7 +25,6 @@ const carried = (each: Callable): boolean | undefined => {
 function WriteRow({ write, ...place }: CallPlace & { write: Callable }) {
   const store = useAppStore();
   const id = `${place.chain.chainId} ${place.realm}.${write.name}`;
-  const opened = useApp((state) => callsIn(state)?.calls[id] !== undefined);
   return (
     <FunctionRow
       name={write.name}
@@ -35,7 +33,7 @@ function WriteRow({ write, ...place }: CallPlace & { write: Callable }) {
         openCard(store, { id, place, write });
       }}
     >
-      {opened ? <InlineCard id={id} place={place} /> : null}
+      <InlineCard id={id} place={place} />
     </FunctionRow>
   );
 }
@@ -60,7 +58,7 @@ function GnowebRow({ name, href }: { name: string; href: string | undefined }) {
 function Rows({ functions, ...place }: RealmWritesProps & { functions: Callable[] }) {
   const href = gnowebLink(place.chain.gnoweb, place.realm);
   const { chain, realm, options } = place;
-  const here: CallPlace = { chain, realm, ...(options === undefined ? {} : { options }) };
+  const here: CallPlace = { chain, realm, options };
   return (
     <ul className={styles["list"]}>
       {functions.map((write) =>
@@ -85,7 +83,7 @@ function Body(props: RealmWritesProps) {
 /** A realm's write functions as rows, each opening its call card; read again, from nothing, when the realm or the chain change. */
 export function RealmWrites(props: RealmWritesProps) {
   return (
-    <section key={`${props.chain.chainId} ${props.chain.rpc} ${props.realm}`} aria-label="Write functions">
+    <section aria-label="Write functions">
       <Stack space="xs">
         <h2>Write functions</h2>
         <Body {...props} />

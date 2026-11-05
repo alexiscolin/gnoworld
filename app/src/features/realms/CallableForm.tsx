@@ -6,11 +6,10 @@
 import type { CallField, FormField } from "@gnoworld/core";
 import { Button, Cluster } from "@gnoworld/ui";
 import { useId } from "react";
-import { callsIn } from "../calls/index.ts";
-import { useApp, useAppStore } from "../../storeContext.tsx";
+import { useAppStore } from "../../storeContext.tsx";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 import { RealmForm } from "./RealmForm.tsx";
-import { useCallable, writeOf } from "./useCallable.ts";
+import { useCallable, writeOf, type Listing } from "./useCallable.ts";
 
 // The text for each of the function's fields, or none when the form is not one this function's call can be prefilled from.
 function textsOf(fields: readonly CallField[], form: readonly FormField[]): string[] | undefined {
@@ -21,6 +20,14 @@ function textsOf(fields: readonly CallField[], form: readonly FormField[]): stri
     seen.add(name);
   }
   return fields.map(({ name }) => form.find((each) => each.name === name)?.value ?? "");
+}
+
+// The function and the texts a Call opens its card with, when the chain confirms the form.
+function prefill(listing: Listing, exec: string, form: readonly FormField[]) {
+  const write = writeOf(listing, exec);
+  if (write === undefined) return undefined;
+  const texts = textsOf(write.fields, form);
+  return texts === undefined ? undefined : { write: write.function, texts };
 }
 
 /** The form of a page for the realm `call` names. */
@@ -41,11 +48,8 @@ export function CallableForm({
   const listing = useCallable(call.chain.rpc, call.realm, call.options);
   // A card of its own for each form: two forms of one function, or a form and a row, never share one.
   const id = `${call.chain.chainId} ${call.realm}.${exec}#${useId()}`;
-  const opened = useApp((state) => callsIn(state)?.calls[id] !== undefined);
-  const write = path === "" && left === 0 ? writeOf(listing, exec) : undefined;
-  const texts = write === undefined ? undefined : textsOf(write.fields, fields);
-  if (write === undefined || texts === undefined)
-    return <RealmForm exec={exec} path={path} fields={fields} left={left} />;
+  const prefilled = path === "" && left === 0 ? prefill(listing, exec, fields) : undefined;
+  if (prefilled === undefined) return <RealmForm exec={exec} path={path} fields={fields} left={left} />;
   return (
     <>
       <RealmForm exec={exec} path={path} fields={fields} left={left} note="a call you sign in Adena">
@@ -54,15 +58,15 @@ export function CallableForm({
             emphasis="outline"
             size="s"
             onClick={() => {
-              openCard(store, { id, place: call, write: write.function, texts });
+              openCard(store, { id, place: call, ...prefilled });
             }}
           >
             Call
-            <span className="visually-hidden"> {write.function.name}</span>
+            <span className="visually-hidden"> {exec}</span>
           </Button>
         </Cluster>
       </RealmForm>
-      {opened ? <InlineCard id={id} place={call} /> : null}
+      <InlineCard id={id} place={call} />
     </>
   );
 }

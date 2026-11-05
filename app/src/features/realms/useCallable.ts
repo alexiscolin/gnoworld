@@ -25,36 +25,31 @@ export interface Shared {
 }
 export const ListingContext = createContext<Shared | undefined>(undefined);
 
-const LOADING: Listing = { state: "loading" };
-
 /** The functions of `realm` on the chain at `rpc`, read again from nothing when any of the three changes, and an answer that comes
  * late for an earlier one dropped. Inside a realm view (`ListingContext`) the view's own listing when it is of this realm and
  * chain, with no read of its own. */
 export function useCallable(rpc: string, realm: string, options: ReadOptions | undefined): Listing {
-  const shared = use(ListingContext);
-  const mine = shared?.key === keyOf(rpc, realm);
-  const own = useRead({ rpc, realm, options, skip: mine });
-  return mine ? shared.listing : own.listing;
+  return useRead({ rpc, realm, options, shared: use(ListingContext) }).listing;
 }
 
-const keyOf = (rpc: string, realm: string): string => `${rpc} ${realm}`;
-
-/** The read itself, for a realm view to share (`ListingContext`) and for a reader outside one; `skip` leaves it unread. */
+/** The read itself, for a realm view to share (`ListingContext`) and for a reader outside one; a `shared` listing of this realm and
+ * chain is taken as it is, unread. */
 export function useRead({
   rpc,
   realm,
   options,
-  skip = false,
+  shared,
 }: {
   rpc: string;
   realm: string;
   options: ReadOptions | undefined;
-  skip?: boolean;
+  shared?: Shared | undefined;
 }): Shared {
-  const key = keyOf(rpc, realm);
+  const key = `${rpc} ${realm}`;
+  const mine = shared?.key === key;
   const [read, setRead] = useState<Shared | undefined>(undefined);
   useEffect(() => {
-    if (skip) return;
+    if (mine) return;
     let live = true;
     readCallable(rpc, realm, options)
       .then((answer) => {
@@ -68,8 +63,9 @@ export function useRead({
     return () => {
       live = false;
     };
-  }, [key, rpc, realm, options, skip]);
-  return read?.key === key ? read : { key, listing: LOADING };
+  }, [key, rpc, realm, options, mine]);
+  if (mine) return shared;
+  return read?.key === key ? read : { key, listing: { state: "loading" } };
 }
 
 /** The function `name` as a call carries it (a write, of the types a call carries) with its fields, or none: no such function,

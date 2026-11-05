@@ -5,8 +5,7 @@
 import { useId } from "react";
 import { HIDDEN, type FormField } from "@gnoworld/core";
 import { Button, Cluster, Stack } from "@gnoworld/ui";
-import { useApp, useAppStore } from "../../storeContext.tsx";
-import { callsIn } from "../calls/index.ts";
+import { useAppStore } from "../../storeContext.tsx";
 import { RealmForm } from "./RealmForm.tsx";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 import { useCallable, writeOf, type Listing } from "./useCallable.ts";
@@ -34,9 +33,10 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
   const write = writeOf(listing, name);
   if (write === undefined || !Object.keys(args).every((arg) => write.fields.some((field) => field.name === arg)))
     return undefined;
-  // Own keys only: a parameter the realm calls `constructor` must not find the object's own function.
-  const texts = write.fields.map((field) => (Object.hasOwn(args, field.name) ? (args[field.name] ?? "") : ""));
-  return { write, texts, fields: write.fields.map((field, index) => fieldOf(field.name, texts[index] ?? "")) };
+  // Own keys only (a Map of the entries): a parameter the realm calls `constructor` must not find the object's own function.
+  const given = new Map(Object.entries(args));
+  const fields = write.fields.map((field) => fieldOf(field.name, given.get(field.name) ?? ""));
+  return { write, texts: fields.map(({ value }) => value), fields };
 }
 
 // Jarvis's words, set left to right, as text and nothing else: a reason holding a control or format character (a bidi override
@@ -59,10 +59,9 @@ export function ActionForm({
   viewHref?: string;
 }) {
   const store = useAppStore();
-  const place: CallPlace = { realm: action.realm, chain, ...(options === undefined ? {} : { options }) };
+  const place: CallPlace = { realm: action.realm, chain, options };
   const listing = useCallable(chain.rpc, action.realm, options);
   const id = `${chain.chainId} ${action.realm}.${action.function}#${useId()}`;
-  const opened = useApp((state) => callsIn(state)?.calls[id] !== undefined);
   const checked = confirmed(listing, action);
   if (checked === undefined) return null;
   const { write, texts, fields } = checked;
@@ -102,7 +101,7 @@ export function ActionForm({
           </Cluster>
         </Stack>
       </RealmForm>
-      {opened && !compact ? <InlineCard id={id} place={place} /> : null}
+      {compact ? null : <InlineCard id={id} place={place} />}
     </>
   );
 }

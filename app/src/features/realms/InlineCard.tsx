@@ -5,6 +5,7 @@ import type { ReadOptions } from "@gnoworld/chain/read";
 import { useEffect, useState } from "react";
 import type { StoreApi } from "zustand/vanilla";
 import { CallCard, callsIn, ensureCalls, feeText, signInPage } from "../calls/index.ts";
+import type { CallCard as CallCardState } from "../../lib/calls.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import type { Callable } from "./useCallable.ts";
@@ -13,7 +14,7 @@ import type { Callable } from "./useCallable.ts";
 export interface CallPlace {
   realm: string;
   chain: { name: string; chainId: string; rpc: string; indexer: string };
-  options?: ReadOptions;
+  options?: ReadOptions | undefined;
 }
 
 // A rejection here is a bug, not a state: the browser's own report, as the other panels' are.
@@ -27,10 +28,10 @@ export function openCard(
   store: StoreApi<AppState>,
   card: { id: string; place: CallPlace; write: Callable; texts?: readonly string[] },
 ): void {
-  const { callsActions } = ensureCalls(store).getState();
+  const { callsActions, calls } = ensureCalls(store).getState();
   const { id, place, write } = card;
   // A card already open keeps what the person typed in it: the texts are the opening's, not the Call's every time.
-  const wasOpen = callsIn(store.getState())?.calls[id] !== undefined;
+  const wasOpen = calls[id] !== undefined;
   callsActions.open({ id, chainId: place.chain.chainId, realm: place.realm, func: write.name, params: write.params });
   if (wasOpen) return;
   (card.texts ?? []).forEach((text, index) => {
@@ -40,10 +41,14 @@ export function openCard(
 
 /** The card `id`, once opened: nothing before. */
 export function InlineCard({ id, place }: { id: string; place: CallPlace }) {
-  const store = useAppStore();
   const card = useApp((state) => callsIn(state)?.calls[id]);
+  return card === undefined ? null : <OpenCard card={card} place={place} />;
+}
+
+function OpenCard({ card, place }: { card: CallCardState; place: CallPlace }) {
+  const store = useAppStore();
   const [fees, setFees] = useState<CallFees | undefined>(undefined);
-  const { realm, func } = card ?? { realm: "", func: "" };
+  const { id, realm, func } = card;
   const { chain, options } = place;
   useEffect(() => {
     readCallFees(chain.indexer, { realm, func }, options)
@@ -52,8 +57,7 @@ export function InlineCard({ id, place }: { id: string; place: CallPlace }) {
       })
       .catch(report);
   }, [chain.indexer, realm, func, options]);
-  const callsActions = callsIn(store.getState())?.callsActions;
-  if (card === undefined || callsActions === undefined) return null;
+  const { callsActions } = ensureCalls(store).getState();
   const { name, chainId, rpc } = chain;
   return (
     <CallCard

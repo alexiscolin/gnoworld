@@ -105,7 +105,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
   const origin = chain.gnoweb;
   const link = gnowebLink(origin, realm);
   const state = useRealm({ rpc: chain.rpc, realm, origin }, options);
-  const place: CallPlace = { realm, chain, ...(options === undefined ? {} : { options }) };
+  const place: CallPlace = { realm, chain, options };
   const listing = useRead({ rpc: chain.rpc, realm, options });
   const navigate = useNavigate();
   const { key } = useLocation();
