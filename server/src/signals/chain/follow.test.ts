@@ -172,6 +172,37 @@ describe("the reconnection's backoff", () => {
     expect(waits).toEqual([1000, 2000, 1000]);
   });
 
+  it("keeps doubling to 30 s while every catch-up fails, and starts again from a second once one answers", async () => {
+    let answers = false;
+    const { socketN, waits, log, heights } = setup({
+      random: () => 1,
+      catchUp: () => (answers ? Promise.resolve([]) : Promise.reject(new Error("the indexer is down"))),
+    });
+    const first = await socketN(0);
+    first.ack();
+    first.emit("message", tx(100, "a"));
+    first.emit("close");
+    for (let n = 1; n <= 6; n += 1) {
+      (await socketN(n)).ack();
+      await vi.waitFor(() => {
+        expect(waits).toHaveLength(n + 1);
+      });
+    }
+    expect(waits).toEqual([1000, 2000, 4000, 8000, 16_000, 30_000, 30_000]);
+    expect(log).toHaveBeenCalledWith("chain_catch_up_failed");
+    answers = true;
+    const healed = await socketN(7);
+    healed.ack();
+    healed.emit("message", tx(101, "b"));
+    // The live frame is held until the catch-up has answered.
+    await vi.waitFor(() => {
+      expect(heights()).toContain(101);
+    });
+    healed.emit("close");
+    await socketN(8);
+    expect(waits.at(-1)).toBe(1000);
+  });
+
   it("reconnects after an error closes the socket too, and logs a refused subscription", async () => {
     const { socketN, log } = setup();
     const socket = await socketN(0);

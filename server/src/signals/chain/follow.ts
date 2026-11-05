@@ -149,6 +149,7 @@ function session({ options, context, emit, highest, reconnect, resetBackoff }: S
     askCatchUp(catchUp, from, after).then(
       (texts) => {
         if (over) return;
+        resetBackoff();
         for (const text of texts) emit(readChainMessage(text, context));
         const live = held ?? [];
         held = undefined;
@@ -179,11 +180,12 @@ function session({ options, context, emit, highest, reconnect, resetBackoff }: S
     if (control === "ping") socket.send(JSON.stringify({ type: "pong" }));
     else if (control !== "connection_ack") live(readChainMessage(text, context));
     else {
-      resetBackoff();
       for (const { id, query } of subscriptionsOf(watch.keys()))
         socket.send(JSON.stringify({ id, type: "subscribe", payload: { query } }));
+      // A socket that asks a catch-up has not worked until the catch-up answers: else a failing one would retry every second.
       const from = highest();
-      if (from !== undefined) catchingUp(from);
+      if (from === undefined) resetBackoff();
+      else catchingUp(from);
     }
     if (!over) arm(IDLE_MS);
   };
