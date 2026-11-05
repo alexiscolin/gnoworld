@@ -21,6 +21,25 @@ vi.mock("../../lib/api/verdicts.ts", () => ({
     },
   }),
 }));
+// The chunk that finds a link in a line, held back until a test opens it (the first import only: a module is loaded once), and the
+// times it was asked for.
+const chunk = vi.hoisted(() => {
+  let open: () => void = () => undefined;
+  return {
+    loads: 0,
+    gate: new Promise<void>((resolve) => {
+      open = resolve;
+    }),
+    open: () => {
+      open();
+    },
+  };
+});
+vi.mock(import("./linked.ts"), async (original) => {
+  chunk.loads += 1;
+  await chunk.gate;
+  return original();
+});
 const SINCE = { time: "2026-10-26T12:00:00.000Z" };
 
 const line = (id: string, text: string): Line => ({
@@ -51,10 +70,12 @@ const CALL = {
 
 let store = createAppStore();
 let root: Root | undefined;
-function Probe({ shown }: { shown: Shown }) {
-  useVerdicts(store, shown);
+function Probe({ shown, using }: { shown: Shown; using: typeof store }) {
+  useVerdicts(using, shown);
   return null;
 }
+// Draws the hook again with other lines, another saving choice or another store, as a page that changes would.
+let redraw: (change: Partial<Shown & { using: typeof store }>) => void = () => undefined;
 
 beforeEach(() => {
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
@@ -79,12 +100,70 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const host = document.createElement("div");
     root = createRoot(host);
     const mounted = root;
+    let now: Shown & { using: typeof store } = { room: "#bubble", lines, reader: undefined, saving, using: store };
+    redraw = (change) => {
+      now = { ...now, ...change };
+      mounted.render(<Probe shown={now} using={now.using} />);
+    };
     await act(async () => {
-      mounted.render(<Probe shown={{ room: "#bubble", lines, reader: undefined, saving }} />);
+      redraw({});
       await settled();
     });
     return sources;
   };
+
+  // The first two of the file: the code is loaded once, held back until the second test opens it, and every test after it finds it there.
+  it("never loads the code for a room that holds no line, and none for lines before there is one", async () => {
+    await draw(undefined);
+    await act(async () => {
+      redraw({ lines: [] });
+      await settled();
+    });
+    expect(chunk.loads).toBe(0);
+  });
+
+  it("does not follow a room it has left again when the code comes late", async () => {
+    const link = "https://youtu.be/dQw4w9WgXcQ";
+    const sources = await draw([line("a", link)]);
+    await act(async () => {
+      redraw({ room: "#other", lines: [line("x", link)] });
+      await settled();
+    });
+    expect(chunk.loads).toBe(1);
+    chunk.open();
+    await act(async () => {
+      await settled();
+    });
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble", "/api/stream?rooms=%23other"]);
+  });
+
+  it("asks of a new line at once when the code is there, and not of a line whose verdict the store holds", async () => {
+    const link = "https://youtu.be/dQw4w9WgXcQ";
+    store.getState().verdictActions.judged({ msgid: "held", room: "#bubble", state: "checked" });
+    const sources = await draw([line("a", link)]);
+    sources.opened[0]?.emit("since", SINCE);
+    await vi.waitFor(() => {
+      expect(asked).toEqual([["a"]]);
+    });
+    act(() => {
+      redraw({ lines: [line("a", link), line("held", link), line("c", link)] });
+    });
+    expect(asked).toEqual([["a"], ["c"]]);
+  });
+
+  it("follows again for another store, and stops following for a reader who saves data", async () => {
+    const sources = await draw([]);
+    const second = createAppStore();
+    act(() => {
+      redraw({ using: second, lines: [] });
+    });
+    expect(sources.opened.map(({ closed }) => closed)).toEqual([1, 0]);
+    act(() => {
+      redraw({ saving: true, lines: [] });
+    });
+    expect(sources.opened.map(({ closed }) => closed)).toEqual([1, 1]);
+    expect(sources.opened).toHaveLength(2);
+  });
 
   it("follows the room's stream before any line, and asks nothing", async () => {
     const sources = await draw([]);

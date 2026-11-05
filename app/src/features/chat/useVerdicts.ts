@@ -47,6 +47,8 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
     return () => {
       asker.stop();
       feed.stop();
+      // A stopped asker given a room follows it again: none is left for the lines' effect to find.
+      askerRef.current = undefined;
     };
   }, [store, saving]);
   useEffect(() => {
