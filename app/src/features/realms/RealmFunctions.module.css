@@ -11,11 +11,6 @@
     list-style: none;
   }
 
-  /* The frame's rows are told apart by a hairline, not by space (F5744). */
-  .item + .item {
-    border-block-start: var(--line-width) solid var(--color-line);
-  }
-
   .line {
     /* layout: the name and the button on one line, the name taking what is left */
     display: flex;
@@ -30,7 +25,9 @@
     font: var(--font-data);
   }
 
+  /* The frame's rows are told apart by a hairline above each, the first too, not by space (F5744, F5839). */
   .item {
+    border-block-start: var(--line-width) solid var(--color-line);
     padding-block: var(--space-2xs);
     /* layout: a function's button and its result, one under the other, from the start */
     display: grid;
