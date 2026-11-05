@@ -327,7 +327,7 @@ describe("First charted by", () => {
   it("names the account that charted it, by its short address, as plain text", async () => {
     await plate();
     await told(charted("fresh-mint"));
-    expect(text()).toBe("First charted by @g1jg8m…vsqf5");
+    expect(text()).toBe(" First charted by @g1jg8m…vsqf5.");
     expect(host?.querySelector("a, button, img")).toBeNull();
   });
 
@@ -336,7 +336,7 @@ describe("First charted by", () => {
     await told(charted("govdao"));
     expect(text()).toBe("");
     await told(charted("fresh-mint"));
-    expect(text()).toBe("First charted by @g1jg8m…vsqf5");
+    expect(text()).toBe(" First charted by @g1jg8m…vsqf5.");
   });
 
   it("says nothing of a world whose first words alone are known", async () => {

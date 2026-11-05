@@ -62,8 +62,10 @@ export default function World() {
               {/* The kind of place ("UNIVERSE > DAO") is not in the data yet: the universe alone says where this is. */}
               <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
-              <p>{world.description}</p>
-              <FirstCharted world={world.slug} />
+              <p>
+                {world.description}
+                <FirstCharted world={world.slug} />
+              </p>
               {/* Who is here comes from the chat once it has connected; no source gives the rate, nor a link to another world (Connected: a component test only). */}
               <Here />
               {/* No source yet for the history: the block says so. */}
