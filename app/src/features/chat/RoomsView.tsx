@@ -7,7 +7,8 @@ import { useRef, type ReactNode } from "react";
 import { Avatar, Button, Cluster, NavItem, Row, Stack } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
-import { dmHref, noticeDone, roomHref, roomLabel, shortAddress } from "./names.ts";
+import { dmHref, roomHref, roomLabel, shortAddress, whoIs } from "./names.ts";
+import { noticeDone } from "../../told.ts";
 import { badged } from "./unread.ts";
 import { RoomSections, RoomsNav } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
@@ -55,8 +56,9 @@ export interface DmsProps {
   present?: string | undefined;
 }
 
-// What a notice says moved to names.ts, which the bell shares (slice 8); its tests stay here.
-export { noticeSaid } from "./names.ts";
+/** What a screen reader is told of a notice: who did what, and where. */
+export const noticeSaid = (notice: Notice): string =>
+  `${noticeDone(whoIs(notice.by), notice.kind)}${notice.kind === "dm" ? "" : ` in ${roomLabel(notice.where)}`}`;
 
 // What the account was told, newest first, each a link to where.
 // The keyboard's place goes to the navigation as the list changes under it (Clear, a link followed): the button or the
@@ -92,7 +94,7 @@ function Notices({
         {list.toReversed().map((notice) => (
           <li key={notice.id}>
             <Row
-              title={noticeDone(notice)}
+              title={noticeDone(whoIs(notice.by), notice.kind)}
               subtitle={notice.kind === "dm" ? "Direct message" : roomLabel(notice.where)}
               href={notice.kind === "dm" ? dmHref(world, notice.where, full) : roomHref(notice.where, full)}
             />

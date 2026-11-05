@@ -5,7 +5,8 @@ import type { Notice } from "@gnoworld/core";
 import { useLocation } from "react-router";
 import { unseenNotices } from "../../store/notices.ts";
 import { useApp } from "../../storeContext.tsx";
-import { dmHref, noticeDone, roomHref, roomLabel, roomWorld } from "../chat/index.ts";
+import { noticeDone } from "../../told.ts";
+import { dmHref, roomHref, roomLabel, roomWorld, whoIs } from "../chat/index.ts";
 import { isLive, placeOf, universeAt } from "../events/index.ts";
 import { worldsFollowedIn } from "../follow/index.ts";
 import { feedOf, type Item, type Naming, type Sources } from "./feed.ts";
@@ -22,13 +23,13 @@ export function useFeed(now: number, here: Sources["here"]) {
     notice: (notice: Notice) =>
       notice.kind === "dm"
         ? {
-            text: noticeDone(notice),
+            text: noticeDone(whoIs(notice.by), notice.kind),
             where: "Direct message",
             world: undefined,
             href: dmHref(EARTH, notice.where, false),
           }
         : {
-            text: noticeDone(notice),
+            text: noticeDone(whoIs(notice.by), notice.kind),
             where: roomLabel(notice.where),
             world: roomWorld(notice.where),
             href: roomHref(notice.where),

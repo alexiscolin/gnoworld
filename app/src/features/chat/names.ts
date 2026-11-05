@@ -1,5 +1,5 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { firstGraphemes, worldRoute, type Line, type Notice } from "@gnoworld/core";
+import { firstGraphemes, worldRoute, type Line } from "@gnoworld/core";
 import { Address, shortAddress, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 import { withFull } from "./full.ts";
@@ -25,20 +25,8 @@ export const roomLabel = (room: string): string => {
   return `#${name ?? (world === EARTH ? "general" : world)}`;
 };
 
-const WORDS = {
-  mention: "mentioned you",
-  group: "mentioned the room",
-  reply: "replied to you",
-  dm: "wrote to you",
-} as const;
-const whoIs = (by: string) => (isAccount(by) ? shortAddress(by) : by);
-
-/** Who did what of a notice: a row's title in the notices' list and the bell. */
-export const noticeDone = ({ kind, by }: Pick<Notice, "kind" | "by">): string => `${whoIs(by)} ${WORDS[kind]}`;
-
-/** What a screen reader is told of a notice: who did what, and where. */
-export const noticeSaid = (notice: Notice): string =>
-  `${noticeDone(notice)}${notice.kind === "dm" ? "" : ` in ${roomLabel(notice.where)}`}`;
+/** A sender as a list names it: an account by its short address, a guest by its nick. */
+export const whoIs = (by: string): string => (isAccount(by) ? shortAddress(by) : by);
 
 /** The world a room is in, by its slug: #bubble/games's is bubble. */
 export const roomWorld = (room: string): string => partsOf(room).world;
