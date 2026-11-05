@@ -447,6 +447,29 @@ describe("signLogin", () => {
   });
 });
 
+describe("signLogin and the extension's version (sign-in needs 1.22.2)", () => {
+  // A wallet that says its version; SignArbitrary is there, as a version that predates it has none.
+  const versioned = (version: unknown) => Object.assign(new Wallet(), { version });
+
+  it.each(["1.22.1", "1.9.0", "0.1.0"])("asks for an update from %s, before any call", async (version) => {
+    const adena = versioned(version);
+    expect(await signLogin(adena, login(TEXT))).toEqual({ ok: false, reason: "outdated" });
+    expect(adena.asked).toEqual([]);
+  });
+
+  it.each(["1.22.2", "1.22.10", "1.23.0", "2.0.0"])("signs from %s", async (version) => {
+    expect(await signLogin(versioned(version), login(TEXT))).toMatchObject({ ok: true });
+  });
+
+  it("asks for an update when the version cannot be read: nothing is guessed", async () => {
+    expect(await signLogin(versioned("one"), login(TEXT))).toEqual({ ok: false, reason: "outdated" });
+  });
+
+  it("signs when the extension says no version: its method is the proof it can", async () => {
+    expect(await signLogin(versioned(undefined), login(TEXT))).toMatchObject({ ok: true });
+  });
+});
+
 describe("pageAdena", () => {
   it("reads the page's window.adena, as it is, whatever it holds", () => {
     const marker = { AddEstablish: () => undefined };

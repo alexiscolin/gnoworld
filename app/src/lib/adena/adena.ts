@@ -5,6 +5,8 @@
 // resolves to a result: a getter or a proxy that throws included.
 import { Address, ADDRESS_PROBLEMS, ChallengeRequest, Proof, type AddressProblem } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
+import { detect, isOlder, method, MIN_SIGN_IN } from "./detect.ts";
+import { serially } from "./queue.ts";
 
 /** The most Adena signs, in UTF-8 bytes: it carries the text in its popup's URL (the SDK's MAX_ARBITRARY_MESSAGE_BYTES). */
 export const MAX_TEXT_BYTES = 4096;
@@ -61,17 +63,6 @@ class Failure extends Error {
     super(reason);
     this.reason = reason;
   }
-}
-
-// One read of a method: an object's key read twice may answer twice differently.
-function method(adena: unknown, name: string): ((...args: unknown[]) => unknown) | undefined {
-  if (typeof adena !== "object" || adena === null) return undefined;
-  const found: unknown = Reflect.get(adena, name);
-  if (typeof found !== "function") return undefined;
-  return (...args: unknown[]): unknown => {
-    const result: unknown = Reflect.apply(found, adena, args);
-    return result;
-  };
 }
 
 // A call's answer, by its type: one of the call's own successes, a failure the person can act on, or Adena's.
@@ -131,12 +122,14 @@ function connected(account: unknown, network: unknown): ConnectResult {
 
 /** Lets gnoworld in, then reads the account and the chain Adena is on: the network's, which it signs for. */
 export function connect(adena: unknown): Promise<ConnectResult> {
-  return guarded<ConnectResult>(
-    async () => {
-      const answers = await ask(adena);
-      return answers.ok ? connected(answers.account, answers.network) : answers;
-    },
-    (reason) => ({ ok: false, reason }),
+  return serially(() =>
+    guarded<ConnectResult>(
+      async () => {
+        const answers = await ask(adena);
+        return answers.ok ? connected(answers.account, answers.network) : answers;
+      },
+      (reason) => ({ ok: false, reason }),
+    ),
   );
 }
 
@@ -147,21 +140,27 @@ const isProblem = (message: string | undefined): message is AddressProblem =>
 /** Has Adena sign the server's text, unchanged, as the account on the chain; the proof is checked to be of that. */
 export function signLogin(adena: unknown, login: Login): Promise<SignResult> {
   const { address, text } = login;
-  return guarded<SignResult>(
-    async () => {
-      if (method(adena, "AddEstablish") === undefined) return { ok: false, reason: "missing" };
-      const sign = method(adena, "SignArbitrary");
-      if (sign === undefined) return { ok: false, reason: "outdated" };
-      if (text === "" || !text.isWellFormed()) return { ok: false, reason: "malformed" };
-      const bytes = new TextEncoder().encode(text);
-      if (bytes.length > MAX_TEXT_BYTES) return { ok: false, reason: "too-long" };
-      const signed = await call(() => sign({ signer: address, data: text }), ["SIGN_ARBITRARY"]);
-      if (!signed.ok) return { ok: false, reason: signed.reason };
-      const proof = Proof.safeParse(signed.data);
-      if (!proof.success) return { ok: false, reason: "malformed" };
-      return isProofOf(proof.data, login, bytes) ? { ok: true, proof: proof.data } : { ok: false, reason: "mismatch" };
-    },
-    (reason) => ({ ok: false, reason }),
+  return serially(() =>
+    guarded<SignResult>(
+      async () => {
+        const found = detect(adena);
+        if (!found.ok) return found;
+        if (isOlder(found.version, MIN_SIGN_IN)) return { ok: false, reason: "outdated" };
+        const sign = method(adena, "SignArbitrary");
+        if (sign === undefined) return { ok: false, reason: "outdated" };
+        if (text === "" || !text.isWellFormed()) return { ok: false, reason: "malformed" };
+        const bytes = new TextEncoder().encode(text);
+        if (bytes.length > MAX_TEXT_BYTES) return { ok: false, reason: "too-long" };
+        const signed = await call(() => sign({ signer: address, data: text }), ["SIGN_ARBITRARY"]);
+        if (!signed.ok) return { ok: false, reason: signed.reason };
+        const proof = Proof.safeParse(signed.data);
+        if (!proof.success) return { ok: false, reason: "malformed" };
+        return isProofOf(proof.data, login, bytes)
+          ? { ok: true, proof: proof.data }
+          : { ok: false, reason: "mismatch" };
+      },
+      (reason) => ({ ok: false, reason }),
+    ),
   );
 }
 
