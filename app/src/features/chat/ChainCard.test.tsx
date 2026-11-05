@@ -68,4 +68,26 @@ describe("the chain's lines in a room", () => {
       expect(all(item, "h3 > *")).toHaveLength(0);
     }
   });
+
+  // Whole lines: a hostile name is stripped and capped, not replaced by text, and an address is cut only past 12 characters.
+  it.each([
+    ["a bidi override", `Vote${bidi}`, "g10gh7…y5tv called Vote"],
+    ["a control character", "Vo\u0007te", "g10gh7…y5tv called Vote"],
+    ["a name of 10 KB", "A".repeat(10_000), `g10gh7…y5tv called ${"A".repeat(64)}`],
+  ])("draws the title of a function with %s as one whole line", (_, func, title) => {
+    expect(one(mountLine(line(1, func)).item, "h3").textContent).toBe(title);
+  });
+
+  it.each([
+    ["12 characters whole", "g1abcdefghij", "g1abcdefghij"],
+    ["13 characters by its ends", "g1abcdefghijk", "g1abcd…hijk"],
+  ])("draws an actor of %s", (_, actor, shown) => {
+    const { item } = mountLine({ ...line(1), actor: actor as ChainCall["actor"] });
+    expect(one(item, "h3").textContent).toBe(`${shown} called MustVoteOnProposal`);
+  });
+
+  it("draws a realm of 100 characters capped at 64 with its path, and with no gno.land prefix", () => {
+    const { item } = mountLine({ ...line(1), realm: `gno.land/r/${"a".repeat(100)}` });
+    expect(one(item, "p").textContent).toBe(`on chain, r/${"a".repeat(53)} · block 1`);
+  });
 });
