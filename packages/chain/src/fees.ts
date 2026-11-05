@@ -22,6 +22,8 @@ export interface CallFees {
 
 /** The most calls an estimate is made from. */
 const LATEST = 20;
+/** The newest rows asked for, a few more than LATEST: the filter lets other messages through, and each row is checked again. */
+const ASKED = 60;
 /** The blocks under the tip a read looks back, narrowest first, each tried when the one before gave too few calls.
  * ponytail: a function with fewer than 20 calls in the last million blocks gives fewer; a time-bound index would widen it. */
 const WINDOWS = [1_000, 10_000, 100_000, 1_000_000];
@@ -40,10 +42,9 @@ function callOf(row: Row, call: Call): { fee: number; height: number } | undefin
   return height !== undefined && Number.isSafeInteger(height) && height > 0 ? { fee: fee.amount, height } : undefined;
 }
 
-const QUERY =
-  "query($path: String!, $func: String!, $from: Int!) { getTransactions(where: { success: { eq: true }, block_height: { gt: $from }, messages: { value: { MsgCall: { pkg_path: { eq: $path }, func: { eq: $func } } } } }) { success block_height gas_fee { amount denom } messages { value { ... on MsgCall { pkg_path func } } } } }";
+const QUERY = `query($path: String!, $func: String!, $from: Int!) { getTransactions(where: { success: { eq: true }, block_height: { gt: $from }, messages: { value: { MsgCall: { pkg_path: { eq: $path }, func: { eq: $func } } } } }, order: { heightAndIndex: DESC }, limit: ${String(ASKED)}) { success block_height gas_fee { amount denom } messages { value { ... on MsgCall { pkg_path func } } } } }`;
 
-// The newest calls above `from`, as the fees they paid.
+// The newest calls above `from`, as the fees they paid; the answer holds ASKED rows at most, newest first (F5729).
 async function above(asked: string, call: Call, options: ReadOptions): Promise<ChainRead<CallFees>> {
   const answer = await readChain(asked, CallFeesAnswer, options);
   if (!answer.ok) return answer;

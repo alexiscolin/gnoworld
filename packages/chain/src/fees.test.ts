@@ -3,8 +3,8 @@ import type { ChainFetch } from "./read.ts";
 import { readCallFees } from "./fees.ts";
 
 // Answer 9d-1: the fee line is an estimate from the last successful calls of one function, its block named. The wire is the
-// recording's field names (SHARED/recordings/README.md), not a recorded answer; no `order` or `limit` argument is recorded, so
-// the newest are chosen here, by block, whatever order the indexer answers in.
+// recording's field names (SHARED/recordings/README.md), not a recorded answer. The indexer's `order` and `limit` arguments were
+// read from its live schema (F5729), so the newest are still chosen here, by block, whatever order it answers in.
 const INDEXER = "https://indexer.onyx.testnets.gno.land/graphql/query";
 const REALM = "gno.land/r/sys/namereg/v0";
 interface Over {
@@ -121,6 +121,18 @@ describe("readCallFees", () => {
     expect(read).toMatchObject({ ok: true, value: { height: TIP - 76 } });
     expect(read.ok && read.value.fees).toHaveLength(20);
     expect(sent(fetch)).toEqual([TIP - 1_000]);
+  });
+
+  it("asks the indexer for the newest 60 only, in the query: its answer has a bound whatever the function's history (F5729)", async () => {
+    const fetch = holding([row(7)]);
+    await readCallFees(INDEXER, { realm: REALM, func: "Register" }, { fetch });
+    const queries = fetch.mock.calls.map(([url]) => new URL(url).searchParams.get("query") ?? "");
+    const transactions = queries.filter((query) => query.includes("getTransactions"));
+    expect(transactions.length).toBeGreaterThan(0);
+    for (const query of transactions) {
+      expect(query).toContain("order: { heightAndIndex: DESC }");
+      expect(query).toContain("limit: 60");
+    }
   });
 
   it("widens the window while fewer than 20 calls come back, and gives up past a million blocks (F5724)", async () => {
