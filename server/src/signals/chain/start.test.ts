@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../../app.ts";
 import { makeStream, type Stream } from "../../stream/stream.ts";
 import { NAMEREG, registration } from "../../testing/chainRecorded.ts";
-import { CATCH_UP_MS, POLL_MS } from "./poll.ts";
+import { POLL_MS } from "./poll.ts";
 import { readChainData, RETRY_MS, startChain } from "./start.ts";
 
 // Slice 9g: the server's wiring, from the data's files to a page's stream, with a fake indexer behind `send`: a recorded call to
@@ -127,8 +127,8 @@ function setup(
     };
     return { until, cancel: () => reader?.cancel() };
   };
-  // The timers waiting for their time: the day's count asked again and the round's own limit apart, the next round's.
-  const waiting = () => timers.filter(({ ms, cancelled }) => !cancelled && ms !== RETRY_MS && ms !== CATCH_UP_MS);
+  // The timers waiting for their time: the day's count asked again apart, the next round's.
+  const waiting = () => timers.filter(({ ms, cancelled }) => !cancelled && ms !== RETRY_MS);
   const nextRound = async (): Promise<number> => {
     await vi.waitFor(() => {
       expect(waiting()).toHaveLength(1);
@@ -153,7 +153,7 @@ describe("the chain on the server", () => {
     const { chain, open, nextRound } = setup(
       [universe("onyx", "https://indexer.example.test/graphql/query")],
       [],
-      serve({ tips: [7000, 7000, 7001], rows: () => [rowOf(registration(0))] }),
+      serve({ tips: [60_000, 60_000, 60_001], rows: () => [{ ...(rowOf(registration(0)) as object), index: 0 }] }),
     );
     const room = await open("#govdao");
     const earth = await open("#earth");
@@ -338,7 +338,7 @@ describe("the catch-up after the day's history", () => {
       expect(catchUps(queries)).toHaveLength(1);
     });
     // Never from the newest deploy: a restart would tell the rooms every call since it as heard now.
-    expect(catchUps(queries)[0]).toContain("gt: 6999");
+    expect(catchUps(queries)[0]).toContain("gt: 7000");
     expect(queries.findIndex((query) => query.includes("latestBlockHeight"))).toBeLessThan(
       queries.findIndex((query) => query.includes("heightAndIndex: DESC")),
     );
@@ -354,7 +354,7 @@ describe("the catch-up after the day's history", () => {
     await vi.waitFor(() => {
       expect(catchUps(queries)).toHaveLength(1);
     });
-    expect(catchUps(queries)[0]).toContain("gt: 6999");
+    expect(catchUps(queries)[0]).toContain("gt: 7000");
     chain.stop();
   });
 
@@ -375,7 +375,7 @@ describe("the catch-up after the day's history", () => {
     await vi.waitFor(() => {
       expect(catchUps(queries)).toHaveLength(1);
     });
-    expect(catchUps(queries)[0]).toContain("gt: 6999");
+    expect(catchUps(queries)[0]).toContain("gt: 7000");
     chain.stop();
   });
 });

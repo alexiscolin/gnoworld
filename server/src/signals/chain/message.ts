@@ -1,7 +1,6 @@
-// One text of the indexer's answer (a `next` of `graphql-transport-ws`, as the catch-up gives it, slice 9g) read into the events a room shows. Outside data: every
-// text through Zod with caps; the filter the server asks for lets other messages through, so each message's realm and
-// function are checked again here; what a transaction's args or memo hold never leaves this file.
-import { jsonOf } from "@gnoworld/core";
+// One transaction row of the indexer's answer (slice 9g) read into the events a room shows. Outside data: every row through Zod with
+// caps; the filter the server asks for lets other messages through, so each message's realm and function are checked again here;
+// what a transaction's args or memo hold never leaves this file.
 import { ChainEvent } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
 
@@ -18,37 +17,28 @@ export interface ChainContext {
   log: (what: "chain_message_bad") => void;
 }
 
-/** What one text told: the events for the rooms, a transaction's hash and height, or a block's height and time (a transaction has none). */
+/** What one row told: the events for the rooms and the transaction's hash, or (made by the poll) a block's height and time, a transaction having none. */
 export interface ChainRead {
   events: ChainEvent[];
   hash?: string;
-  height?: number;
   block?: { height: number; time: string };
   /** The chain's newest height, read by a poll round. */
   tip?: number;
 }
 
-/** The most a text may hold, in characters: a transaction of a few messages is far less. */
-const MAX_TEXT = 1_000_000;
 const MAX_MESSAGES = 1000;
 const NOTHING: ChainRead = { events: [] };
 
-// What a `next` holds, each part as the indexer gives it; Zod's own object drops the fields not named.
+// What a transaction holds, each part as the indexer gives it; Zod's own object drops the fields not named.
 function schemas() {
   const whole = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
   return {
-    frame: z.object({ type: z.literal("next"), payload: z.unknown().optional() }),
-    answer: z.object({
-      data: z.object({ getTransactions: z.unknown().optional(), getBlocks: z.unknown().optional() }),
-      errors: z.unknown().optional(),
-    }),
     tx: z.object({
       hash: z.string().max(128),
       block_height: whole,
       success: z.boolean(),
       messages: z.array(z.unknown()).max(MAX_MESSAGES),
     }),
-    block: z.object({ height: whole, time: z.iso.datetime() }),
     message: z.object({ value: z.object({ __typename: z.string() }).loose() }),
     call: z.object({ caller: z.string(), pkg_path: z.string(), func: z.string() }),
     add: z.object({ creator: z.string(), package: z.object({ path: z.string() }) }),
@@ -96,25 +86,13 @@ function eventsOf(tx: z.infer<Schemas["tx"]>, context: ChainContext, parts: Sche
   return events;
 }
 
-/** One text read; a text that fails its schema is dropped and said, one that is no business of a room is silent. */
-export function readChainMessage(text: string, context: ChainContext): ChainRead {
+/** One row read; a row that fails its schema is dropped and said, one that is no business of a room is silent. */
+export function readChainRow(row: unknown, context: ChainContext): ChainRead {
   const parts = schemas();
-  const bad = (): ChainRead => {
+  const tx = parts.tx.safeParse(row);
+  if (!tx.success) {
     context.log("chain_message_bad");
     return NOTHING;
-  };
-  if (text.length > MAX_TEXT) return bad();
-  const frame = parts.frame.safeParse(jsonOf(text));
-  if (!frame.success) return bad();
-  const answer = parts.answer.safeParse(frame.data.payload);
-  if (!answer.success || answer.data.errors !== undefined) return bad();
-  const { getTransactions, getBlocks } = answer.data.data;
-  if (getBlocks !== undefined) {
-    const block = parts.block.safeParse(getBlocks);
-    if (!block.success) return bad();
-    return { events: [], block: { height: block.data.height, time: new Date(block.data.time).toISOString() } };
   }
-  const tx = parts.tx.safeParse(getTransactions);
-  if (!tx.success) return bad();
-  return { events: eventsOf(tx.data, context, parts), hash: tx.data.hash, height: tx.data.block_height };
+  return { events: eventsOf(tx.data, context, parts), hash: tx.data.hash };
 }

@@ -89,8 +89,8 @@ export function startChain(options: ChainOptions): { stop: () => void } {
         const poll = pollChain({
           universe: universe.id,
           watch,
-          tip: () => readers.tip(),
-          catchUp: (from) => readers.catchUp(from),
+          tip: (signal) => readers.tip(signal),
+          catchUp: (after, tip, signal) => readers.catchUp(after, tip, signal),
           random,
           deliver: makeRelay({ stream, count, universe: universe.id, now }),
           from: reached,

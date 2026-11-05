@@ -11,12 +11,11 @@ const CALL =
   '{"type": "next", "id": "tx", "payload": {"data": {"getTransactions": {"hash": "pNEF3v29QakxcFL1b744oq1dZ0Q7xV2hAXywGj5Yd/s=", "block_height": 900030, "success": true, "gas_wanted": 4072728, "gas_used": 3132928, "gas_fee": {"amount": 8146, "denom": "ugnot"}, "messages": [{"typeUrl": "exec", "route": "vm", "value": {"__typename": "MsgCall", "caller": "g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j", "pkg_path": "gno.land/r/g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j/access", "func": "SetQuote", "args": ["422749053"], "send": ""}}], "response": {"error": "", "log": "msg:0,success:true,log:,events:[]", "events": [{"__typename": "GnoEvent", "type": "SetQuote", "pkg_path": "gno.land/r/g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j/access", "attrs": [{"key": "ugnot", "value": "422749053"}, {"key": "usdCents", "value": "2500"}, {"key": "expiresAt", "value": "1793825404"}]}]}}}}}';
 const DEPLOY =
   '{"type": "next", "id": "tx", "payload": {"data": {"getTransactions": {"hash": "gmVEDlIQzgG65Fk21gcZeKAmGPc0p4rqdxd/fW02IWM=", "block_height": 887427, "success": true, "gas_wanted": 6475518, "gas_used": 4316992, "gas_fee": {"amount": 7123, "denom": "ugnot"}, "messages": [{"typeUrl": "add_package", "route": "vm", "value": {"__typename": "MsgAddPackage", "creator": "g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y", "deposit": "", "package": {"path": "gno.land/r/g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y/smoke/s5f26c0fe/counter", "name": "counter"}}}], "response": {"error": "", "log": "msg:0,success:true,log:,events:[]", "events": []}}}}}';
-const BLOCKS: readonly string[] = [
-  '{"type": "next", "id": "blocks", "payload": {"data": {"getBlocks": {"height": 908297, "time": "2026-11-05T05:01:49.01165399Z", "num_txs": 0}}}}',
-  '{"type": "next", "id": "blocks", "payload": {"data": {"getBlocks": {"height": 908298, "time": "2026-11-05T05:01:52.414534021Z", "num_txs": 0}}}}',
-];
 export const registration = (n: 0 | 1): string => registrations[n] ?? "";
 export const call: string = CALL;
 export const deploy: string = DEPLOY;
-// The first blocks of the recorded `getBlocks` subscription: height and time (a block has one, a transaction none).
-export const blocks: readonly string[] = BLOCKS;
+/** The transaction a recorded frame holds, as the indexer's `getTransactions` gives a row (a copy, which a test may change). */
+export function rowOf(frame: string): Record<string, unknown> {
+  return (JSON.parse(frame) as { payload: { data: { getTransactions: Record<string, unknown> } } }).payload.data
+    .getTransactions;
+}

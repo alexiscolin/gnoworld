@@ -1,21 +1,25 @@
 // A universe's one poll of its public indexer over HTTP (slice 9g, answer 9g-4, by Alexis): once a block it asks the tip, and when
-// the tip moved it asks the transactions from the cursor on (indexer.ts), each text read by message.ts. A failed round backs off with
-// a jitter and leaves the cursor, so the next good one reads the gap; a transaction is read once by its hash. Nothing is kept that
-// the indexer can give again: the hashes are bounded. One round at a time, each with its time limit; no socket, no held frames.
-import { readChainMessage, type ChainContext, type ChainRead } from "./message.ts";
+// the tip moved it asks the transactions after the cursor, a page at a time, each row read by message.ts. The cursor is a place,
+// (height, index), moved as each row is delivered, so a block of any size is read across pages and rounds and a slow indexer still
+// advances. A failed round backs off with a jitter and leaves the cursor; a transaction is read once by its hash (the hashes are
+// bounded). One round at a time; each request has its own time limit, and a stop aborts the round's requests.
+import type { Place } from "@gnoworld/chain/transactions";
+import type { Page } from "./indexer.ts";
+import { readChainRow, type ChainContext, type ChainRead } from "./message.ts";
 
-type PollLog = "chain_message_bad" | "chain_poll_failed";
+type PollLog =
+  "chain_message_bad" | "chain_poll_failed" | "chain_height_ahead" | "chain_tip_back" | "chain_catch_up_capped";
 
 export interface PollOptions {
   universe: string;
   watch: ChainContext["watch"];
   /** The newest block the indexer holds. */
-  tip: () => Promise<number>;
-  /** The transactions from this height on, as the subscription's own texts. */
-  catchUp: (from: number) => Promise<string[]>;
+  tip: (signal: AbortSignal) => Promise<number>;
+  /** A page of the transactions after a place, up to a tip. */
+  catchUp: (after: Place, tip: number, signal: AbortSignal) => Promise<Page>;
   random: () => number;
   deliver: (read: ChainRead) => void;
-  /** The height already read before the first round (the day's history reached it): the first catch-up starts from it. */
+  /** The block the day's history reached, whose rows were all read: the first catch-up starts after it. */
   from?: number | undefined;
   log: (what: PollLog) => void;
   /** Runs `run` in `ms` unless the returned function is called first. */
@@ -24,12 +28,20 @@ export interface PollOptions {
 
 /** A block every 3.4 s on Onyx: a round starts this long after the last one ended. */
 export const POLL_MS = 3400;
-/** A round that does not end within this is given up, like one that fails. */
-export const CATCH_UP_MS = 30_000;
+/** The pages a round asks at most (a gap longer than that is read over the next rounds). */
+export const PAGES = 5;
 /** The hashes kept to read a transaction once. */
 export const SEEN = 10_000;
 const BACKOFF_MS = 1000;
 const BACKOFF_MAX_MS = 30_000;
+
+// Where the poll stands: the place of the last row passed, and the tip last caught up to (a tip that did not move asks nothing).
+interface State {
+  cursor: Place;
+  caught: number;
+}
+
+const stopped = (signal: AbortSignal): boolean => signal.aborted;
 
 /** A timer that can be cancelled: `after`'s default. */
 export const timer = (ms: number, run: () => void): (() => void) => {
@@ -39,70 +51,100 @@ export const timer = (ms: number, run: () => void): (() => void) => {
   };
 };
 
-const heightOf = (read: ChainRead): number => read.block?.height ?? read.height ?? 0;
-
-// What was delivered: a transaction once by its hash, the last SEEN of them (the oldest hash goes first), and the highest height.
-function delivery(deliver: PollOptions["deliver"], from: number | undefined) {
+// Whether a transaction is new: once by its hash, the last SEEN of them (the oldest hash goes first).
+function fresh() {
   const seen = new Set<string>();
-  let highest = from;
-  return {
-    emit: (read: ChainRead): void => {
-      if (read.hash !== undefined) {
-        if (seen.has(read.hash)) return;
-        seen.add(read.hash);
-        if (seen.size > SEEN) seen.delete(seen.values().next().value ?? "");
+  return (hash: string): boolean => {
+    if (seen.has(hash)) return false;
+    seen.add(hash);
+    if (seen.size > SEEN) {
+      const [oldest = hash] = seen;
+      seen.delete(oldest);
+    }
+    return true;
+  };
+}
+
+// One page's rows, each delivered and the cursor moved as it comes; a row above the tip is said and passed over.
+function taker(deliver: PollOptions["deliver"], context: ChainContext, log: PollOptions["log"]) {
+  const isNew = fresh();
+  return (got: Page, height: number, place: Place): Place => {
+    let at = got.skipped ?? place;
+    const times = new Map(got.times);
+    for (const row of got.rows) {
+      if (row.height > height) {
+        log("chain_height_ahead");
+        continue;
       }
-      if (read.block !== undefined || read.height !== undefined) highest = Math.max(highest ?? 0, heightOf(read));
-      deliver(read);
-    },
-    highest: (): number | undefined => highest,
+      const time = times.get(row.height);
+      if (time !== undefined) {
+        deliver({ events: [], block: { height: row.height, time: new Date(time).toISOString() } });
+        times.delete(row.height);
+      }
+      const read = readChainRow(row.row, context);
+      if (read.hash !== undefined && isNew(read.hash)) deliver(read);
+      at = { height: row.height, index: row.index };
+    }
+    return at;
   };
 }
 
 export function pollChain(options: PollOptions): { stop: () => void } {
   const { tip, catchUp, random, deliver, log, after = timer } = options;
   const context: ChainContext = { universe: options.universe, watch: options.watch, log };
-  const { emit, highest } = delivery(deliver, options.from);
-  // The height the tip was last caught up to, and the one the next catch-up starts from (this block read again, once by its hash).
-  let asked = options.from;
+  const take = taker(deliver, context, log);
+  const start = (height: number): State => ({ cursor: { height }, caught: height });
+  let state = options.from === undefined ? undefined : start(options.from);
   let attempt = 0;
   // Always set: the first round starts before pollChain returns.
   let cancel: () => void;
 
-  // One round: its reads and deliveries, none once `alive` says the round was given up or the poll stopped.
-  async function read(alive: () => boolean): Promise<void> {
-    const height = await tip();
-    if (!alive()) return;
-    if (asked === undefined) asked = height;
-    else if (height > asked) {
-      const texts = await catchUp(highest() ?? asked);
-      if (!alive()) return;
-      for (const text of texts) emit(readChainMessage(text, context));
-      asked = height;
+  // The pages of one catch-up, up to the tip: each page's rows delivered and the cursor moved as it comes.
+  async function catchUpTo(at: State, height: number, signal: AbortSignal): Promise<void> {
+    for (let pages = 0; pages < PAGES; pages += 1) {
+      const got = await catchUp(at.cursor, height, signal);
+      if (stopped(signal)) return;
+      const moved = take(got, height, at.cursor);
+      const stuck = moved === at.cursor && got.rows.length > 0;
+      at.cursor = moved;
+      if (!got.more) {
+        at.caught = height;
+        return;
+      }
+      if (stuck) return;
+    }
+    log("chain_catch_up_capped");
+  }
+
+  // One round: its reads and deliveries, none once the round was aborted (the poll was stopped).
+  async function read(signal: AbortSignal): Promise<void> {
+    const height = await tip(signal);
+    if (stopped(signal)) return;
+    if (state === undefined) state = start(height);
+    else if (height < Math.max(state.caught, state.cursor.height)) {
+      log("chain_tip_back");
+      state = start(height);
+    } else if (height > state.caught) {
+      await catchUpTo(state, height, signal);
+      if (stopped(signal)) return;
     }
     deliver({ events: [], tip: height });
   }
 
   function round(): void {
-    let live = true;
+    const controller = new AbortController();
+    cancel = () => {
+      controller.abort();
+    };
     const end = (worked: boolean): void => {
-      if (!live) return;
-      live = false;
-      cancelLimit();
+      if (controller.signal.aborted) return;
       if (worked) attempt = 0;
       else log("chain_poll_failed");
       const base = Math.min(BACKOFF_MAX_MS, BACKOFF_MS * 2 ** attempt);
       if (!worked) attempt += 1;
       cancel = after(worked ? POLL_MS : base / 2 + (base / 2) * random(), round);
     };
-    const cancelLimit = after(CATCH_UP_MS, () => {
-      end(false);
-    });
-    cancel = () => {
-      live = false;
-      cancelLimit();
-    };
-    read(() => live).then(
+    read(controller.signal).then(
       () => {
         end(true);
       },
