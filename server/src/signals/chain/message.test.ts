@@ -213,3 +213,69 @@ describe("what is not a message to read", () => {
     expect(log).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("a message of a matching transaction that fails its schema", () => {
+  const without = (key: string) => (tx: Record<string, unknown>) => {
+    Reflect.deleteProperty(valueOf(tx), key);
+  };
+  const set = (key: string, value: unknown) => (tx: Record<string, unknown>) => {
+    valueOf(tx)[key] = value;
+  };
+  it.each([
+    ["a call with no caller", registration(1), without("caller")],
+    ["a call with no pkg_path", registration(1), without("pkg_path")],
+    ["a call with no func", registration(1), without("func")],
+    ["a call whose func is a number", registration(1), set("func", 7)],
+    ["a call whose caller is an object", registration(1), set("caller", {})],
+    ["a deploy with no package", deploy, without("package")],
+    ["a deploy with no creator", deploy, without("creator")],
+    ["a deploy whose package has no path", deploy, set("package", {})],
+  ])("is dropped and logged once, never thrown, for %s", (_, frame, change) => {
+    const { context, log } = setup();
+    const text = changed(frame, change);
+    expect(() => readChainMessage(text, context)).not.toThrow();
+    log.mockClear();
+    expect(readChainMessage(text, context).events).toEqual([]);
+    expect(log).toHaveBeenCalledWith("chain_message_bad");
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it("is dropped and logged when it has no kind at all", () => {
+    const { context, log } = setup();
+    expect(readChainMessage(changed(registration(1), without("__typename")), context).events).toEqual([]);
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+
+  it("is no realm, and no fault, when a deploy's path is a pure package's", () => {
+    const { context, log } = setup();
+    const text = changed(deploy, (tx) => {
+      valueOf(tx)["package"] = { path: "gno.land/p/someone/lib" };
+    });
+    expect(readChainMessage(text, context)).toMatchObject({ events: [] });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("is no business of a room, and no fault, when it is of another kind", () => {
+    const { context, log } = setup();
+    const text = changed(registration(1), set("__typename", "BankMsgSend"));
+    expect(readChainMessage(text, context)).toMatchObject({ events: [] });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("is a refusal, told as it is and not logged here, when the indexer sends an error", () => {
+    const { context, log } = setup();
+    expect(readChainMessage('{"type":"error","id":"tx","payload":[{"message":"no"}]}', context)).toEqual({
+      events: [],
+      refused: true,
+    });
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("is dropped, said, when a next carries data and errors together", () => {
+    const { context, log } = setup();
+    const text =
+      '{"type":"next","id":"blocks","payload":{"data":{"getBlocks":{"height":1,"time":"2026-11-05T05:00:00Z"}},"errors":[{"message":"x"}]}}';
+    expect(readChainMessage(text, context)).toEqual({ events: [] });
+    expect(log).toHaveBeenCalledTimes(1);
+  });
+});
