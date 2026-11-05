@@ -2,12 +2,10 @@ import { callArgs, callFields, realmType, textProblem } from "@gnoworld/core";
 import { Address, CallRequest } from "@gnoworld/schemas";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { transaction } from "../../lib/adena/call.ts";
-import { callRequest, preview } from "./request.ts";
+import { callRequest } from "./request.ts";
 
 // 9d: the preview and the message are made from one CallRequest, so the card cannot show one call and sign another.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
-const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 const CUR = { Name: "cur", Type: realmType() };
 const PARAMS = [CUR, { Name: "bio", Type: "string" }, { Name: "times", Type: "int64" }, { Name: "loud", Type: "bool" }];
 const CARD = { realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
@@ -71,50 +69,6 @@ describe("callRequest: the card's texts as the one CallRequest", () => {
 });
 
 describe("preview: what the card shows, from the request", () => {
-  it("names the realm, the function, the arguments, the network (its name and chain) and the fee, as the message has them", () => {
-    const request = CallRequest.parse({
-      chainId: "onyx-1",
-      caller: CALLER,
-      realm: CARD.realm,
-      func: "SetBio",
-      args: ["hi", "1", "false"],
-    });
-    expect(preview(request, ONYX, "≈ 0.05 GNOT")).toEqual({
-      realm: CARD.realm,
-      func: "SetBio",
-      args: ["hi", "1", "false"],
-      network: "Onyx (onyx-1)",
-      fee: "≈ 0.05 GNOT",
-    });
-  });
-
-  it("equals the message Adena is sent, whatever is typed: realm, function, arguments in order, and the chain", () => {
-    const run = fc.check(
-      fc.property(
-        fc.string({ unit: "grapheme", maxLength: 40 }),
-        fc.bigInt({ min: -(2n ** 63n), max: 2n ** 63n - 1n }),
-        fc.boolean(),
-        (bio, times, loud) => {
-          const texts = [bio, String(times), String(loud)];
-          const built = callRequest({ ...CARD, texts }, WHO);
-          // A text a CallRequest refuses is no request; every other one is previewed as it is signed.
-          if (!built.ok) return true;
-          const shown = preview(built.request, ONYX, "x");
-          const sent = transaction(built.request, ONYX);
-          const [message] = sent.messages;
-          return (
-            shown.realm === message?.value.pkg_path &&
-            shown.func === message.value.func &&
-            JSON.stringify(shown.args) === JSON.stringify(message.value.args) &&
-            shown.network.includes(sent.networkInfo.chainId) &&
-            JSON.stringify(shown.args) === JSON.stringify(texts)
-          );
-        },
-      ),
-    );
-    expect(run.failed).toBe(false);
-  });
-
   it("agrees with the CallRequest on any text: what the card calls a problem, the request refuses, and no other", () => {
     const run = fc.check(
       fc.property(fc.string({ unit: "binary", maxLength: 30 }), (text) => {

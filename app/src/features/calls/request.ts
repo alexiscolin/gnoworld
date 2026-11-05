@@ -22,9 +22,3 @@ export function callRequest(card: Typed, { chainId, caller }: { chainId: string;
     return { ok: false, problems };
   return { ok: true, request: { chainId, caller, realm: card.realm, func: card.func, args: [...card.texts] } };
 }
-
-/** What the card shows of a request, from the request: the same realm, function and arguments the message carries. */
-export function preview(request: CallRequest, network: { name: string; chainId: string }, fee: string) {
-  const { realm, func, args } = request;
-  return { realm, func, args, network: `${network.name} (${network.chainId})`, fee };
-}
