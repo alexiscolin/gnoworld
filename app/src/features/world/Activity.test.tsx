@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 import { createRoot } from "react-dom/client";
 import { act } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Activity } from "./Activity.tsx";
 
 // Slice 5j (frames 26 and 40), 8g: "ACTIVITY · LAST 24 H" and the rate now over the bars, "24 H AGO", the peak with its hour and "NOW" under
-// them, from the server's hours (useHours.ts). With no history the block says so in words and draws no chart.
+// them, from the server's hours (useHours.ts). With no history the chart is drawn flat, named as no activity yet.
 const FROM = Date.UTC(2026, 10, 3, 16);
 const day = Array.from({ length: 24 }, (_, hour) => (hour === 18 ? 43 : hour));
 const hoursOf = (counts: (number | null)[], now: number | null = null) => ({ from: FROM, hours: counts, now });
@@ -16,7 +15,7 @@ afterEach(() => {
   host = undefined;
 });
 // The bars load apart (Activity.tsx): a history is drawn once they have.
-async function draw(counts: (number | null)[] | undefined, now: number | null = null) {
+async function draw(counts: (number | null)[] | undefined, now: number | null = null, always = false) {
   host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
@@ -24,7 +23,7 @@ async function draw(counts: (number | null)[] | undefined, now: number | null = 
     root.render(<Activity hours={counts === undefined ? undefined : hoursOf(counts, now)} />);
     await Promise.resolve();
   });
-  if (counts !== undefined && counts.length > 0)
+  if (always || (counts !== undefined && counts.length > 0))
     await vi.waitFor(() => {
       expect(host?.querySelector("svg")).not.toBeNull();
     });
@@ -62,11 +61,20 @@ describe("a world's activity", () => {
     expect(text).not.toMatch(/NaN|-1|undefined|null/);
   });
 
-  it("says in words that no activity is known, and draws no chart, with no history", () => {
-    for (const hours of [undefined, hoursOf([])]) {
-      const html = renderToStaticMarkup(<Activity hours={hours} />);
-      expect(html).toMatch(/no activity (recorded|known) yet/i);
-      expect(html).not.toMatch(/<svg|data-hour|<table/);
+  it("draws the chart flat, with its words, a rate of 0 and no peak hour, with no history", async () => {
+    for (const counts of [undefined, []]) {
+      const el = await draw(counts, null, true);
+      expect(el.textContent).toMatch(/activity\s*·\s*last 24 h/i);
+      expect(el.textContent).toMatch(/0 msgs\/h now/i);
+      expect(el.textContent).toMatch(/24 h ago/i);
+      expect(el.textContent).toMatch(/now$/i);
+      expect(el.textContent).toMatch(/peak 0\/h/i);
+      expect(el.querySelector("time")).toBeNull();
+      const bars = [...el.querySelectorAll("svg [data-hour]")];
+      expect(bars).toHaveLength(24);
+      expect(bars.every((bar) => bar.getAttribute("height") === "0")).toBe(true);
+      expect(el.querySelector('[role="group"]')?.getAttribute("aria-label")).toMatch(/no activity recorded yet/i);
+      host?.remove();
     }
   });
 });

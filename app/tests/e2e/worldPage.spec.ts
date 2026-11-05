@@ -55,7 +55,7 @@ test.describe("a world's page at the video's size", () => {
 
   // F2869: each block at its place. Frame 26's description line stands at y 316 (its centre); Bubble's has two lines, the first at
   // the frame's place. The frame's facts, chart (479) and actions (574) have the data Bubble lacks (no source for who is here, no
-  // history), so below the description the page is pinned at what it lays: the words of no history, then the actions under them.
+  // history), so below the description the page is pinned at what it lays: the flat chart of no history, then the actions under it.
   test("the title, the line, the activity's words and the actions stand at their y (frames 26, 90)", async ({
     page,
   }) => {
@@ -66,18 +66,18 @@ test.describe("a world's page at the video's size", () => {
     const title = await box(page, "[data-look='plate'] h1");
     const line = await box(page, "[data-look='plate'] h1 + p");
     // The activity's words by what they say: from 1,280 px nobody counted holds no place over them (Alexis, 2026-11-03, "retire le vide").
-    const activity = await box(page, "[data-look='plate'] p:text-is('No activity recorded yet')");
+    const activity = await box(page, "[data-look='plate'] .label:has-text('Activity · last 24 h')");
     const main = await box(page, "[data-look='plate'] a[href='#chat']");
     near(title.y, 172, "the title's top");
     near(line.y + 12.4, 316, "the line's first line's middle");
     near(line.x, 100, "the line's left");
-    near(activity.y, 371, "the activity words' top");
+    near(activity.y, 371, "the activity title's top");
     // Frame 26: the actions' top 30 px under the chart's last words' ink (544 to 574); a label's box ends 2 px under its ink.
     // 8g: the activity holds the chart's room while it has no history, so the actions stand under that room as frame 26's under its chart.
-    const room = await box(page, "[data-look='plate'] div:has(> p:text-is('No activity recorded yet'))");
-    near(room.y, activity.y, "the room's top, the words'");
+    const room = await box(page, "[data-look='plate'] div:has(> div > .label:has-text('Activity · last 24 h'))");
+    near(room.y, activity.y, "the room's top, the title's");
     near(main.y - (room.y + room.height), 574 - 544 - 2, "the actions under the activity's room");
-    expect(main.y, "the actions come after the activity's words").toBeGreaterThan(activity.y + activity.height);
+    expect(main.y, "the actions come after the activity's title").toBeGreaterThan(activity.y + activity.height);
   });
 
   test("the actions are 56 px tall from the column's left, Follow 10 px after the main one, Share 10 px after Follow (frames 26, 92)", async ({
@@ -106,13 +106,11 @@ test.describe("a world's page at the video's size", () => {
     near(third.y, first.y, "Share's top");
   });
 
-  test("the activity block says in words that no history is known, and draws no chart or rate for Bubble", async ({
-    page,
-  }) => {
+  test("the activity block draws its chart flat and names it as no activity yet for Bubble", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect(page.getByText(/no activity (recorded|known) yet/i)).toBeVisible();
-    await expect(page.locator("[data-look='plate'] [data-hour]")).toHaveCount(0);
+    await expect(page.getByRole("group", { name: /no activity recorded yet/i })).toBeVisible();
+    await expect(page.locator("[data-look='plate'] [data-hour]")).toHaveCount(24);
     await expect(page.getByText("messages now")).toHaveCount(0);
     await expect(page.getByText(/connected worlds/i)).toHaveCount(0);
   });
@@ -157,7 +155,7 @@ test.describe("who is here right now", () => {
       const half = Number.parseFloat(await line.evaluate((node) => getComputedStyle(node).lineHeight)) / 2;
       const words = await box(page, "[data-look='plate'] h1 + p");
       const figure = await box(page, "[data-look='plate'] [data-value]");
-      const activity = await box(page, "[data-look='plate'] p:text-is('No activity recorded yet')");
+      const activity = await box(page, "[data-look='plate'] .label:has-text('Activity · last 24 h')");
       near(figure.y - (words.y + words.height), 364 - (316 + half), "the figure under the line");
       expect(activity.y, "the activity's words under the fact").toBeGreaterThan(figure.y + figure.height);
     });
@@ -342,7 +340,7 @@ for (const width of [390, 1280] as const) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect(page.getByText(/no activity (recorded|known) yet/i)).toBeVisible();
+    await expect(page.getByRole("group", { name: /no activity recorded yet/i })).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations).toHaveLength(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

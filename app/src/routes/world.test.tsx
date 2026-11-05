@@ -227,9 +227,11 @@ describe("a world's plate", () => {
     expect(html).not.toMatch(/connected worlds/i);
   });
 
-  test("says in words that no activity is known, with no chart, until the chat has history", async () => {
+  test("pre-renders the activity's frame with its rate of 0 and no bars, which come with the client", async () => {
     const { html } = await plateOf();
-    expect(html).toMatch(/no activity (recorded|known) yet/i);
+    expect(html).toMatch(/activity · last 24 h/i);
+    expect(html).toMatch(/0 msgs\/h now/i);
+    expect(html).not.toMatch(/data-hour/);
   });
 
   // The main action is the link to the world's chat, named for what it does: it fails while the plate's only link is a trail.
