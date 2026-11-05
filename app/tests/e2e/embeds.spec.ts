@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { lineOf, lines } from "./chat.ts";
+import { buttonsOf, lineOf, lines } from "./chat.ts";
 import type { WebSocketRoute } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { MEMBER, scriptedErgo, type HistoryLine } from "./scripted.ts";
@@ -86,7 +86,7 @@ test.describe("a link's player", () => {
     let said = "";
     const { away, asked } = await room(page, () => said);
     await expect(lineOf(page, "watch").getByRole("status")).toHaveText("Waiting for the moderation check…");
-    await expect(lineOf(page, "watch").getByRole("button")).toHaveCount(0);
+    await expect(buttonsOf(lineOf(page, "watch"))).toHaveCount(0);
     expect(asked[0]).toBe(`${SITE}/api/stream?rooms=%23bubble%2Fgames`);
     said = event("v1", "checked");
     await expect(play(page)).toBeEnabled();
@@ -101,8 +101,8 @@ test.describe("a link's player", () => {
   test("shows none for a line the moderation hid, nor for a host it does not accept", async ({ page }) => {
     const { away } = await room(page, () => event("v1", "hidden"));
     await expect(lineOf(page, "watch")).not.toContainText("Waiting for the moderation check");
-    await expect(lineOf(page, "watch").getByRole("button")).toHaveCount(0);
-    await expect(lineOf(page, "imgur").getByRole("button")).toHaveCount(0);
+    await expect(buttonsOf(lineOf(page, "watch"))).toHaveCount(0);
+    await expect(buttonsOf(lineOf(page, "imgur"))).toHaveCount(0);
     await expect(lineOf(page, "imgur").getByRole("link", { name: "https://imgur.com/gallery/abcdefg" })).toBeVisible();
     expect(away).toEqual([]);
   });
@@ -232,7 +232,7 @@ test.describe("a link's player", () => {
     });
     const { asked, say } = await room(page, () => event("v1", "checked"));
     await expect(lineOf(page, "watch").getByRole("link")).toBeVisible();
-    await expect(lineOf(page, "watch").getByRole("button")).toHaveCount(0);
+    await expect(buttonsOf(lineOf(page, "watch"))).toHaveCount(0);
     // A line said after, by when the page would have asked of the first ones.
     say("v3", "then https://vimeo.com/76979871", "2026-10-25T10:02:00.000Z");
     await expect(lineOf(page, "then")).toBeVisible();
@@ -256,7 +256,7 @@ test.describe("a link's player", () => {
     await page.evaluate(() => Reflect.set(window, "saving", false));
     say("v3", "then https://vimeo.com/76979871");
     await expect(lineOf(page, "then").getByRole("link")).toBeVisible();
-    await expect(lineOf(page, "then").getByRole("button")).toHaveCount(0);
+    await expect(buttonsOf(lineOf(page, "then"))).toHaveCount(0);
   });
 
   test("passes axe with a player waiting and one playing, on a computer's and a phone's screen", async ({ page }) => {

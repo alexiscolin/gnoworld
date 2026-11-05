@@ -1,4 +1,4 @@
-import { lineOf, lines, word } from "./chat.ts";
+import { buttonsOf, lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine } from "./scripted.ts";
@@ -33,7 +33,7 @@ test.describe("reactions", () => {
     await expect(lineOf(page, "the first line")).not.toContainText("😂");
     await expect(lineOf(page, "the first line")).not.toContainText("❤️");
     await expect(lineOf(page, "the second")).not.toContainText("buy");
-    await expect(lines(page).getByRole("button")).toHaveCount(0);
+    await expect(buttonsOf(lines(page))).toHaveCount(0);
   });
 
   test("react from the bar, which Ergo's echo shows pressed under the line, and take it back from the bar", async ({
@@ -164,7 +164,7 @@ test.describe("reactions", () => {
       ),
     }));
     const line = lineOf(page, "the first line");
-    await expect(line.getByRole("button")).toHaveCount(20);
+    await expect(buttonsOf(line)).toHaveCount(20);
     await line.focus();
     expect(await tabsTo(page, barOf(page, 0).getByRole("button", { name: "Reply" }), 24)).toBe(4);
     expect(await tabsTo(page, line.getByRole("button", { name: "😀, 1" }), 3)).toBe(2);
