@@ -35,7 +35,6 @@ const MSG_TYPE = "sign/MsgSignData";
 // Typed by Refusal, so a reason ConnectResult does not have cannot be added.
 function refusal(reason: CallFailure): Refusal {
   const REASONS: Partial<Record<CallFailure, Refusal>> = {
-    missing: "missing",
     declined: "declined",
     locked: "locked",
     "no-account": "no-account",
