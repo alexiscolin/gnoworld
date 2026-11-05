@@ -17,7 +17,12 @@ export type AppState = LoginSlice &
   VerdictsSlice &
   KeepSlice &
   PinsSlice &
-  SignalsSlice;
+  SignalsSlice & {
+    /** The page's Adena, set by a call card's first gesture so the login follows its account (F5651). Absent until then. */
+    wallet?: unknown;
+  };
+// The calls' slice (lib/calls.ts) is added when a realm view draws its first card, so it is not in this type: features/calls/slice.ts
+// reads it through `callsIn`, which says when it is absent.
 
 /** A store of its own: the page makes one, each test another. */
 export const createAppStore = () => {

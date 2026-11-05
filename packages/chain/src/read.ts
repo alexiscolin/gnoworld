@@ -63,6 +63,7 @@ const NEXT: Record<FailureKind, string> = {
   "bad-name": "This name cannot be read from here. Open it on gnoweb.",
   "other-chain":
     "The node answering is not this universe's chain, so nothing of it was read. Check the universe's RPC in the data.",
+  "not-landed": "The chain has not put this transaction in a block yet. It may still be on its way.",
 };
 
 /** A failed read of a kind of ours, for a layer above the transport: the failure carries our sentence, never the answer's. */

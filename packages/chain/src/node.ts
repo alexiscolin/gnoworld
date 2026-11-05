@@ -34,7 +34,7 @@ const hexOf = (text: string): string =>
   Array.from(new TextEncoder().encode(text), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 // The text of a base64 body, or null when it is no base64 or no UTF-8.
-function textOf(base64: string): string | null {
+export function textOf(base64: string): string | null {
   try {
     const binary = atob(base64);
     const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
@@ -50,7 +50,7 @@ function kindOf(type: string): FailureKind {
   return "chain-refused";
 }
 
-const withoutSlash = (rpc: string): string => (rpc.endsWith("/") ? rpc.slice(0, -1) : rpc);
+export const withoutSlash = (rpc: string): string => (rpc.endsWith("/") ? rpc.slice(0, -1) : rpc);
 
 // What an answer's body gives: its text, or the kind of failure it is.
 function bodyText(answer: QueryAnswer): { text: string } | { kind: FailureKind } {
@@ -95,7 +95,7 @@ async function statusOf(rpc: string, options: NodeOptions): Promise<ChainRead<St
 
 // A read of an https RPC, or a refusal without a request; with a chain named, its node's status first unless its caller
 // saw it on that chain within a minute, the two requests under the read's one time limit and its caller's signal (V1).
-function guarded<T>(
+export function guarded<T>(
   rpc: string,
   options: NodeOptions,
   run: (options: ReadOptions) => Promise<ChainRead<T>>,

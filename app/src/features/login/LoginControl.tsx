@@ -5,13 +5,16 @@ import { useApp, useAppStore } from "../../storeContext.tsx";
 import { knowSession, logIn, logOut, type SessionDeps } from "./logIn.ts";
 import { LoginView } from "./LoginView.tsx";
 
+// Adena's account followed, loaded with the first gesture that needs a wallet: a login's click, a call card's (F5651).
+async function follow(deps: SessionDeps, adena: unknown): Promise<void> {
+  const { listen, watchAccount } = await import("./watch.ts");
+  watchAccount(adena, { ...deps, listen });
+}
+
 // Adena's calls come with the first click that logs in: a page that never logs in does not load them.
 async function logInWithAdena(deps: SessionDeps): Promise<void> {
-  const [{ connect, pageAdena, signLogin }, { listen, watchAccount }] = await Promise.all([
-    import("../../lib/adena/adena.ts"),
-    import("./watch.ts"),
-  ]);
-  watchAccount(pageAdena(), { ...deps, listen });
+  const { connect, pageAdena, signLogin } = await import("../../lib/adena/adena.ts");
+  await follow(deps, pageAdena());
   await logIn(pageAdena(), { ...deps, connect, sign: signLogin });
 }
 
@@ -19,6 +22,10 @@ export function LoginControl() {
   const store = useAppStore();
   const [deps] = useState<SessionDeps>(() => ({ api: pageLoginApi(), store }));
   const login = useApp((state) => state.login);
+  const wallet = useApp((state) => state.wallet);
+  useEffect(() => {
+    if (wallet !== undefined) follow(deps, wallet).catch(reportError);
+  }, [deps, wallet]);
   useEffect(() => {
     // A wait the page's leaving cancels: the session is then asked no more.
     let timer: ReturnType<typeof setTimeout> | undefined;

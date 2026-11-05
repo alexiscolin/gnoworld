@@ -35,7 +35,7 @@ async function arriveAs(page: Page, as: string, path = "/w/govdao"): Promise<unk
   await page.goto(path);
   await hydrated(page);
   const call = answered(page, "POST", "/api/signals/chart");
-  await page.getByRole("button", { name: "Log in with Adena" }).click();
+  await page.getByRole("button", { name: "Connect Adena" }).click();
   const answer: unknown = await (await call).json();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
   return answer;

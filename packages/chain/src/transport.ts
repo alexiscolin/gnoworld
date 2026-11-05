@@ -19,7 +19,8 @@ export type FailureKind =
   | "no-page"
   | "chain-refused"
   | "bad-name"
-  | "other-chain";
+  | "other-chain"
+  | "not-landed";
 
 // A stream not read to its end is cancelled, so its connection is freed; one already closed or broken has nothing to free.
 async function drop(stream: { cancel(): Promise<void> } | null | undefined): Promise<void> {

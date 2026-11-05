@@ -138,7 +138,7 @@ async function loggedIn() {
   const adena = wallet();
   const { store } = mountControl();
   await sessionIs(store, { kind: "out" });
-  click("Log in with Adena");
+  click("Connect Adena");
   await sessionIs(store, { kind: "in", address: ADDRESS });
   return { paths, adena, store };
 }
@@ -165,6 +165,23 @@ describe("LoginControl", () => {
       problem: undefined,
       chat: "off",
     });
+  });
+
+  it("follows Adena's account once a call card's first gesture hands the page's Adena over, with no login click (F5651)", async () => {
+    const { paths } = server();
+    const adena = wallet();
+    const { store } = mountControl();
+    await sessionIs(store, { kind: "out" });
+    act(() => {
+      store().getState().loginActions.signedIn(ADDRESS);
+      store().setState({ wallet: Reflect.get(globalThis, "adena") });
+    });
+    await vi.waitFor(() => {
+      expect([...adena.listeners.keys()].sort()).toEqual(["changedAccount", "changedNetwork"]);
+    });
+    adena.emit("changedAccount", OTHER);
+    await sessionIs(store, { kind: "out" });
+    expect(count(paths, "logout")).toBe(1);
   });
 
   it("logs out on the server when the person clicks Log out", async () => {

@@ -14,7 +14,7 @@ import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain
 import { evalCall } from "./evalCall.ts";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
 import { readHeight } from "@gnoworld/chain/node";
-import { readEval, readFunctions, readPage } from "./rpc.ts";
+import { readCallable, readEval, readFunctions, readPage } from "./rpc.ts";
 
 // 5g-reads: the four reads of a chain (vm/qrender, vm/qeval, vm/qfuncs, the block height), through read.ts. chainFixture.ts says
 // which answers are RECORDED through gnomcp and which are READ from gno's source at v1.5.0; a title says "recorded" or "read".
@@ -121,6 +121,56 @@ describe.each(CHAINS)("the reads on %s", (chain) => {
         source: { url, at: NOW.toISOString() },
       });
       expect(askedOf(fetcher)).toEqual([url]);
+    });
+  });
+
+  describe("readCallable (read: FUNCTIONS is written from source, not recorded)", () => {
+    it("gives every exported name with its parameters in order, one request, and none for a name that is no realm's", async () => {
+      const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
+      const result = await readCallable(rpc, WUGNOT, options(fetcher));
+      expect(result.ok ? result.value.map(({ name }) => name) : []).toEqual(FUNCTIONS.map(({ FuncName }) => FuncName));
+      expect(result.ok ? result.value[0]?.params : undefined).toEqual(
+        (FUNCTIONS[0]?.Params ?? []).map(({ Name, Type }) => ({ Name, Type })),
+      );
+      expect(askedOf(fetcher)).toEqual([queryUrl(rpc, "vm/qfuncs", WUGNOT)]);
+      expect(await readCallable(rpc, "../x", options(fetcher))).toMatchObject({
+        ok: false,
+        failure: { kind: "bad-name" },
+      });
+      expect(askedOf(fetcher)).toHaveLength(1);
+    });
+  });
+
+  describe("two panels of one view asking for a realm's functions in the same moment", () => {
+    it("share one request when they ask with the same options, and a read that has ended is asked again", async () => {
+      const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
+      const shared = options(fetcher);
+      const [names, params] = await Promise.all([
+        readFunctions(rpc, WUGNOT, shared),
+        readCallable(rpc, WUGNOT, shared),
+      ]);
+      expect([names.ok, params.ok]).toEqual([true, true]);
+      expect(askedOf(fetcher)).toHaveLength(1);
+      await readFunctions(rpc, WUGNOT, shared);
+      expect(askedOf(fetcher)).toHaveLength(2);
+    });
+
+    it("do not share one with options of another read, nor across two realms", async () => {
+      const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
+      await Promise.all([
+        readFunctions(rpc, WUGNOT, options(fetcher)),
+        readFunctions(rpc, WUGNOT, options(fetcher)),
+        readFunctions(rpc, "gno.land/r/demo/other", options(fetcher)),
+      ]);
+      expect(askedOf(fetcher)).toHaveLength(3);
+    });
+
+    it("share one request when no options are given, as the page asks", async () => {
+      const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
+      vi.stubGlobal("fetch", fetcher);
+      await Promise.all([readFunctions(rpc, WUGNOT), readCallable(rpc, WUGNOT)]);
+      expect(askedOf(fetcher)).toHaveLength(1);
+      vi.unstubAllGlobals();
     });
   });
 
