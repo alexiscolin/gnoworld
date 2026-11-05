@@ -463,9 +463,31 @@ func TestTakedownLeavesAnEndedRental(cur realm, t *testing.T) {
 	uassert.Equal(t, "jupiter", payers.Get(alice.String()))
 }
 
-// F5057: until the end it was paid for, a taken-down rental is closed, or its
-// world rented, by its payer only, who so gets its storage deposit back: the one
-// taking it down, like anyone else, waits for that end, as for any rental.
+// F5312 (G1, Alexis): a taken-down world stays empty until the end it was paid
+// for, its payer included, who could else put the text taken down back at once.
+func TestTakedownKeepsTheWorldEmptyFromItsPayerToo(cur realm, t *testing.T) {
+	fresh()
+	testing.SetRealm(testing.NewUserRealm(alice))
+	pay(3 * p0)
+	Rent(cross(cur), "mars", "hello", 3)
+	testing.SetRealm(testing.NewUserRealm(mod))
+	Takedown(cross(cur), "mars", "r1")
+	at(t0 + 3*oneDay - 1)
+	testing.SetRealm(testing.NewUserRealm(alice))
+	offer(chain.Coins{{"ugnot", p0}})
+	uassert.AbortsWithMessage(t, cur, "this world has a satellite", func() { Rent(cross(cur), "mars", "again", 1) })
+
+	at(t0 + 3*oneDay)
+	pay(p0)
+	Rent(cross(cur), "mars", "again", 1)
+	_, text, _, ok := Rental("mars")
+	uassert.True(t, ok)
+	uassert.Equal(t, "again", text)
+}
+
+// F5057: until the end it was paid for, a taken-down rental is closed by its
+// payer only, who so gets its storage deposit back: the one taking it down, like
+// anyone else, waits for that end, as for any rental.
 func TestTakedownLeavesTheDepositToThePayer(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(alice))

@@ -63,10 +63,10 @@ func (r rental) end() int            { return r.start + r.days*day }
 func (r rental) paid() int           { return r.days * r.price }
 func (r rental) liveAt(now int) bool { return now < r.end() }
 
-// heldFrom reports whether the rental keeps its world from by at now: from
-// anyone while it is live; once taken down, from all but its payer until the end
-// it was paid for, so the one taking it down cannot free its bytes first and take
-// its payer's storage deposit (F5057). No rental holds a world from anyone.
+// heldFrom reports whether the rental may not be closed by by at now: by anyone
+// while it is live; once taken down, by all but its payer until the end it was
+// paid for, so the one taking it down cannot free its bytes first and take its
+// payer's storage deposit (F5057). No rental holds a world from anyone.
 func (r rental) heldFrom(by address, now int) bool {
 	return r.liveAt(now) || now < r.until && by != r.payer
 }
@@ -137,7 +137,8 @@ func Rent(cur realm, world, text string, days int) {
 	}
 	now := clock()
 	payer := cur.Previous().Address()
-	if r, _ := get(world); r.heldFrom(payer, now) {
+	// A world taken down stays empty until its paid end, its payer included (G1).
+	if r, _ := get(world); r.liveAt(now) || now < r.until {
 		panic("this world has a satellite")
 	}
 	live, ended := countLive(payer, now)
@@ -218,10 +219,11 @@ func closeEnded(world string, r rental) {
 // Takedown ends a live satellite now, after the report it answers, and refunds
 // its payer the whole days not yet begun, at the price that rental paid; the
 // day under way counts as begun (D12), so a rental's last day refunds nothing.
-// The rental stays, ended, for the days begun: until the end it was paid for,
-// only its payer may close it or rent its world, and so get its storage deposit
-// back, never the one taking it down (F5042, F5057); then anyone, as for any
-// ended rental (D28). The owner or the operator only.
+// The rental stays, ended, for the days begun: until the end it was paid for, no
+// one rents its world, its payer included (G1), and only its payer may close it,
+// and so get its storage deposit back, never the one taking it down (F5042,
+// F5057); then anyone, as for any ended rental (D28). The owner or the operator
+// only.
 func Takedown(cur realm, world, report string) {
 	by := cur.Previous().Address()
 	if by != owner && by != operator {
