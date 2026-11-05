@@ -251,6 +251,22 @@ describe("a question to Jarvis", () => {
     expect(sent).toHaveLength(5);
   });
 
+  it.each([
+    ["spent", { ok: true, answer: { status: "spent" } }, 200],
+    ["off", { ok: true, answer: { status: "off" } }, 200],
+    ["refused", { ok: false, error: "refused" }, 400],
+  ] as const)(
+    "gives the question back when jarvis made nothing for it, %s, as the digest does (F5311)",
+    async (_, called, status) => {
+      const { ask, sent, counted } = setup({ perMinute: 100, named: false, answer: () => Promise.resolve(called) });
+      const statuses = [];
+      for (let at = 0; at < 6; at += 1) statuses.push((await ask()).status);
+      expect(statuses).toEqual(Array.from({ length: 6 }, () => status));
+      expect(sent).toHaveLength(6);
+      expect(counted()).toEqual([expect.objectContaining({ count: 0 })]);
+    },
+  );
+
   it("passes on jarvis's spent, so the client shows its form", async () => {
     const { ask, events } = setup({ answer: () => Promise.resolve({ ok: true, answer: { status: "spent" } }) });
     expect(await answerOf(await ask())).toEqual([200, { status: "spent" }]);

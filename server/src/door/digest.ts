@@ -8,7 +8,7 @@ import type { Jarvis } from "./jarvis.ts";
 import type { Counted } from "./quota.ts";
 import { JarvisDigestRequest, type JarvisDigest, type JarvisMadeDigest } from "@gnoworld/schemas";
 import { json, type Guarded } from "../guard.ts";
-import { frontOf, type Front } from "./front.ts";
+import { frontOf, madeNothing, type Front } from "./front.ts";
 
 // The questions' quota, by the account's mainnet name.
 interface Options extends Front, Counted<"take" | "giveBack"> {
@@ -29,8 +29,7 @@ export function digestRoutes(options: Options): Hono<Guarded> {
     const started = now();
     if (!quota.take(who, await named(who), started)) return refuse(c, "quota", { account: who });
     const called = await jarvis.digest(body.data, c.req.raw.signal);
-    const nothing = called.ok ? !("made" in called.answer && called.answer.made) : called.error === "refused";
-    if (nothing) quota.giveBack(who, started);
+    if (madeNothing(called)) quota.giveBack(who, started);
     return relay(c, called.ok ? { ok: true, answer: shown(called.answer) } : called, { started, account: who });
   });
   return app;

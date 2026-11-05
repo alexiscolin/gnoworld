@@ -53,6 +53,14 @@ interface Asked {
   readonly account: string;
 }
 
+/** Whether jarvis made nothing for a question, which is then given back (V4, Alexis; D195): its budget spent, switched
+ * off, its refusal, or a digest from its cache. */
+export function madeNothing<A extends { status: string; made?: boolean }>(called: Called<A>): boolean {
+  if (!called.ok) return called.error === "refused";
+  const { status, made } = called.answer;
+  return made === false || status === "spent" || status === "off";
+}
+
 /** A door route's app at `path` under /api/jarvis, with its rate a minute: its refusal, its first steps and its relay. */
 export function frontOf(front: Front, { path, perMinute }: { path: string; perMinute: number }) {
   const { session, origins, on, log, now } = front;
