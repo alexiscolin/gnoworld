@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import styles from "./CallCard.module.css";
 import { problemsOf } from "./problems.ts";
-import { NOT_CHECKED, networkOf, publicForever, sayFailure, sayProblem, shown } from "./say.ts";
+import { networkOf, publicForever, sayFailure, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
 export interface CallCardProps {
@@ -204,7 +204,13 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
           <Row label="NETWORK">{networkOf(network)}</Row>
           <Row label="FEE">{fee}</Row>
         </dl>
-        {preview ? <p className={styles["note"]}>{NOT_CHECKED}</p> : null}
+        {preview
+          ? warningsOf(card).map((warning) => (
+              <p key={warning} className={styles["note"]}>
+                {warning}
+              </p>
+            ))
+          : null}
         <Status card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>

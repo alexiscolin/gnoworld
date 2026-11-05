@@ -5,7 +5,7 @@ import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { expect, vi } from "vitest";
-import { button, click, one } from "./mount.tsx";
+import { button, click, follows, one } from "./mount.tsx";
 
 export const CHAIN = {
   name: "Onyx",
@@ -79,4 +79,16 @@ export function prefilled(card: HTMLElement, values: readonly string[], call: { 
   expect(inputs(card).map((input) => input.value)).toEqual(values);
   expect(card.textContent).toContain(call.realm);
   expect(card.textContent).toContain(call.func);
+}
+
+/** What a GovDAO vote's card says before Adena opens (Alexis, D272): r/gov/dao refuses a vote from anyone but its members. */
+export const MEMBERS_ONLY =
+  "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost.";
+
+/** That `card` says MEMBERS_ONLY once, as its own line, before its Sign in Adena. */
+export function warnsMembers(card: HTMLElement): void {
+  const lines = [...card.querySelectorAll("p")].filter((line) => line.textContent === MEMBERS_ONLY);
+  expect(lines).toHaveLength(1);
+  const sign = button(card, "Sign in Adena");
+  expect(lines[0] !== undefined && sign !== undefined && follows(lines[0], sign)).toBe(true);
 }

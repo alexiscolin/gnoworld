@@ -4,7 +4,16 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, click, mount, one } from "../../../tests/mount.tsx";
-import { calling, CUR, field, listing, onGnoland, openedUnsigned, prefilled } from "../../../tests/callFixtures.ts";
+import {
+  calling,
+  CUR,
+  field,
+  listing,
+  onGnoland,
+  openedUnsigned,
+  prefilled,
+  warnsMembers,
+} from "../../../tests/callFixtures.ts";
 import { PinnedForms } from "./Pinned.tsx";
 
 // 9e-1 (Alexis, 2026-11-06): a world's pinned actions on its page, under Read the proposals, each a Form block under its label once
@@ -45,6 +54,7 @@ describe("a world's pinned actions on its page", () => {
     click(await calling(box, "Vote"));
     const card = one(box, "article");
     prefilled(card, ["15", ""], { realm: DAO, func: "MustVoteOnProposalSimple" });
+    warnsMembers(card);
   });
 
   it("reads the functions from the chain the realm view names: onyx's for /r/…", async () => {
