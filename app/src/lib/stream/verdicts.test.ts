@@ -1,5 +1,6 @@
 import { Address, type Signal, type StreamEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakeStream } from "../../../tests/fakeStream.ts";
 import { followVerdicts, pageVerdicts, type VerdictSource } from "./verdicts.ts";
 
 // A stand-in for the page's EventSource: the URL it opened, its listeners, whether it was closed.
@@ -113,6 +114,14 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     expect(source.closed()).toBe(1);
   });
 
+  it("ends quietly when the browser gives up and the page asked to hear no end", () => {
+    const source = fakeSource();
+    followVerdicts(["#bubble"], () => undefined, { open: source.open, log: () => undefined });
+    expect(() => {
+      source.error(2);
+    }).not.toThrow();
+  });
+
   it("opens no stream for no room", () => {
     const source = fakeSource();
     followVerdicts([], () => undefined, { open: source.open, log: () => undefined })();
@@ -212,5 +221,34 @@ describe("pageVerdicts: the page's own stream", () => {
     listeners.get("signal")?.({ data: JSON.stringify(CHART) });
     expect(opened).toEqual(["/api/stream?rooms=%23fresh-mint"]);
     expect(heard).toEqual([CHART]);
+  });
+
+  it("listens to the events it has a handler for and to no other, handing the chain's on unread", () => {
+    const sources = fakeStream();
+    pageVerdicts(["#a"], { verdict: () => undefined, since: () => undefined, dead: () => undefined });
+    expect(sources.opened[0]?.heard()).toEqual(["error", "since", "verdict"]);
+    const told: unknown[] = [];
+    pageVerdicts(["#b"], {
+      verdict: () => undefined,
+      since: () => undefined,
+      dead: () => undefined,
+      chain: (data) => told.push(data),
+      realms: (data) => told.push(data),
+    });
+    sources.opened[1]?.emit("chain", { kind: "x" });
+    sources.opened[1]?.emit("realms", { count: 1 });
+    expect(sources.opened[1]?.heard()).toEqual(["chain", "error", "realms", "since", "verdict"]);
+    expect(told).toEqual(['{"kind":"x"}', '{"count":1}']);
+  });
+
+  it("reports a frame it does not know once, as an error of the page", () => {
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const sources = fakeStream();
+    pageVerdicts(["#a"], { verdict: () => undefined, since: () => undefined, dead: () => undefined });
+    sources.opened[0]?.emit("verdict", { state: "gone" });
+    sources.opened[0]?.emit("verdict", { state: "gone" });
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(String(report.mock.calls[0]?.[0])).toBe("Error: verdicts: verdict_unknown");
   });
 });
