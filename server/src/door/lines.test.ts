@@ -1,4 +1,6 @@
+import { parseLine } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
+import { said as said_ } from "../irc/lines.ts";
 import type { Said } from "../irc/link.ts";
 import { makeRecentLines } from "./lines.ts";
 
@@ -90,6 +92,22 @@ describe("the recent lines of a room", () => {
     expect(texts(recent.recent("#bubble", ASKER))).toEqual(["kept"]);
     recent.passed(said("m3", "z".repeat(8192 - 4)));
     expect(texts(recent.recent("#bubble", ASKER))).toEqual(["kept", "z".repeat(8188)]);
+  });
+
+  it("never keeps a line sent to a room's operators or voices alone (@#room, +#room), nor gives its text by id (F5308)", () => {
+    const recent = setup();
+    const heard = (msgid: string, target: string, text: string): Said | undefined => {
+      const parsed = parseLine(`@account=${ALICE};msgid=${msgid} :alice!u@h PRIVMSG ${target} :${text}`);
+      return parsed.ok ? said_(parsed.message, new Set(["#bubble"])) : undefined;
+    };
+    for (const line of [
+      heard("m1", "@#bubble", "ops only"),
+      heard("m2", "+#bubble", "voices only"),
+      heard("m3", "#bubble", "to everyone"),
+    ])
+      if (line !== undefined) recent.passed(line);
+    expect(texts(recent.recent("#bubble", ASKER))).toEqual(["to everyone"]);
+    expect([recent.line("#bubble", "m1"), recent.line("#bubble", "m2")]).toEqual([undefined, undefined]);
   });
 
   it("never keeps a line of a members room, nor of a members-write room", () => {

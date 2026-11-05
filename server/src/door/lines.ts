@@ -49,8 +49,9 @@ export function makeRecentLines({ isPublic }: { isPublic: (room: string) => bool
     kept.lines.splice(kept.lines.indexOf(line), 1);
     kept.bytes -= line.bytes;
   };
-  // A public room's line, not taken nor replaced by its author before it came, within a room's bytes.
-  const admits = ({ room, msgid, account, text }: Said): boolean =>
+  // A public room's line to the whole room, not taken nor replaced by its author before it came, within a room's bytes.
+  const admits = ({ room, msgid, account, text, few }: Said): boolean =>
+    few === undefined &&
     isPublic(room) &&
     !gone.has(key(room, msgid)) &&
     !gone.has(key(room, msgid, account)) &&
