@@ -47,6 +47,12 @@ const view = (over: Partial<CallCardProps> = {}) =>
     />,
   );
 const buttons = (box: HTMLElement) => all(box, "button").map((b) => said(b));
+// The wait's look: Sign in Adena kept, pressed, with no Cancel, and the ring before the words (F5736, F5737).
+function expectWaiting(box: HTMLElement) {
+  expect(buttons(box)).toEqual(["Sign in Adena"]);
+  expect(all(box, "button")[0]?.getAttribute("aria-busy")).toBe("true");
+  expect(all(box, '[role="status"] [data-mark="ring"]')).toHaveLength(1);
+}
 const withState = (state: Card["state"]) => view({ card: { ...preview, state } });
 
 describe("CallCard, the preview", () => {
@@ -157,7 +163,7 @@ describe("CallCard, the states after the click", () => {
   it("says it waits for the signature in Adena while Adena's popup is open: no Sign and no Cancel, the fields not editable", () => {
     const box = withState({ kind: "signing" });
     expect(said(box)).toContain("Waiting for your signature in Adena…");
-    expect(buttons(box)).toEqual([]);
+    expectWaiting(box);
     expect(all(box, "input, textarea").every((i) => i.hasAttribute("disabled") || i.hasAttribute("readonly"))).toBe(
       true,
     );
@@ -168,7 +174,7 @@ describe("CallCard, the states after the click", () => {
     expect(said(box)).toMatch(/landing in a block/i);
     expect(said(box)).toContain(HASH.slice(0, 6));
     expect(said(box)).not.toMatch(/signed ·|done/i);
-    expect(buttons(box)).toEqual([]);
+    expectWaiting(box);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
   });
 
@@ -360,6 +366,19 @@ describe("CallCard and the message Adena is sent", () => {
       { numRuns: 25 },
     );
     expect(run.failed).toBe(false);
+  });
+});
+
+describe("CallCard, the marks of the status line (F5737)", () => {
+  it("draws a dot before the words once it is done, and no ring", () => {
+    const box = withState({ kind: "done", hash: HASH, height: 9, value: "" });
+    expect(all(box, '[role="status"] [data-mark="dot"]')).toHaveLength(1);
+    expect(all(box, "[data-mark=ring]")).toHaveLength(0);
+  });
+
+  it("draws no mark in the preview or a failure: words with their next step only", () => {
+    expect(all(view(), "[data-mark]")).toHaveLength(0);
+    expect(all(withState({ kind: "failed", reason: "failed" }), "[data-mark]")).toHaveLength(0);
   });
 });
 

@@ -33,25 +33,44 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+// The mark before a wait's words, a ring turning, and before the result's, a dot: drawn by the stylesheet.
+const Mark = ({ kind }: { kind: "ring" | "dot" }) => (
+  <span className={styles["mark"]} data-mark={kind} aria-hidden="true" />
+);
+
 // A transaction's hash, short, whole in its title.
 const Tx = ({ hash }: { hash: string }) => <span title={hash}>tx {hash.slice(0, 6)}…</span>;
 
 // The result of the call as the card says it: the state's words in the one status region, and what the chain gave.
 function Status({ card }: { card: Card_ }) {
   const { state } = card;
-  if (state.kind === "signing") return <p role="status">Waiting for your signature in Adena…</p>;
+  if (state.kind === "signing") {
+    return (
+      <p role="status" className={styles["line"]}>
+        <Mark kind="ring" />
+        <span>Waiting for your signature in Adena…</span>
+      </p>
+    );
+  }
   if (state.kind === "landing") {
     return (
-      <p role="status">
-        Landing in a block… <Tx hash={state.hash} />
+      <p role="status" className={styles["line"]}>
+        <Mark kind="ring" />
+        <span>
+          Landing in a block… <Tx hash={state.hash} />
+        </span>
       </p>
     );
   }
   if (state.kind === "done") {
     return (
       <Stack space="2xs">
-        <p role="status">
-          <span title={state.hash}>Signed · tx {state.hash.slice(0, 6)}…</span>, in block {COUNT.format(state.height)}.
+        <p role="status" className={styles["line"]}>
+          <Mark kind="dot" />
+          <span>
+            <span title={state.hash}>Signed · tx {state.hash.slice(0, 6)}…</span>, in block {COUNT.format(state.height)}
+            .
+          </span>
         </p>
         {state.value === "" ? null : <p className={styles["value"]}>Returned {shown(state.value)}</p>}
       </Stack>
@@ -146,7 +165,14 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
       </Card.Actions>
     );
   }
-  return null;
+  // Signing and landing keep the signature button where it was, pressed; the call cannot be withdrawn.
+  return (
+    <Card.Actions>
+      <Button emphasis="solid" busy>
+        Sign in Adena
+      </Button>
+    </Card.Actions>
+  );
 }
 
 export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry }: CallCardProps) {
