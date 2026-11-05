@@ -18,7 +18,16 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 // 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena built from the
 // recording, the hash followed to its block. Nothing shows as done before the chain's answer.
 const card = (page: Page) => calls(page).getByRole("article");
-const violations = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
+// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
+// transitions running end first (a cancelled one too); the spinner's endless animation is no transition.
+async function violations(page: Page) {
+  await page.evaluate(async () => {
+    const settled = () => undefined;
+    const running = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
+    await Promise.all(running.map((transition) => transition.finished.then(settled, settled)));
+  });
+  return (await new AxeBuilder({ page }).analyze()).violations;
+}
 
 interface World {
   landing?: "now" | "never" | "later";
