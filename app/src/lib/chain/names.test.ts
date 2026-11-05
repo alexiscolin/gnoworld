@@ -94,15 +94,20 @@ describe("readName", () => {
     expect(await readName(RPC, on, options(fetcher))).toMatchObject({ ok: false, failure: { kind: "wrong-shape" } });
   });
 
-  it.each(['g1x"); os.Exit(1); ("', "not-an-address", "", `${ACCOUNT}")`, ACCOUNT.toUpperCase()])(
-    "asks nothing for %j: only an address the schema proves is put in an expression",
-    async (account) => {
-      const { fetcher } = node({});
-      const read = await readName(RPC, { chainId: "onyx-1", account }, options(fetcher));
-      expect(read).toMatchObject({ ok: false, failure: { kind: "bad-name" } });
-      expect(fetcher).not.toHaveBeenCalled();
-    },
-  );
+  it.each([
+    'g1x"); os.Exit(1); ("',
+    "not-an-address",
+    "",
+    `${ACCOUNT}")`,
+    `${ACCOUNT}\n`,
+    `${ACCOUNT}x`,
+    ACCOUNT.toUpperCase(),
+  ])("asks nothing for %j: only an address the schema proves is put in an expression", async (account) => {
+    const { fetcher } = node({});
+    const read = await readName(RPC, { chainId: "onyx-1", account }, options(fetcher));
+    expect(read).toMatchObject({ ok: false, failure: { kind: "bad-name" } });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
 });
 
 describe("shownName: mainnet's name, else Onyx's, else the short address", () => {

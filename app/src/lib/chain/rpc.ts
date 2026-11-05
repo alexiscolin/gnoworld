@@ -1,6 +1,7 @@
 // The app's three reads of a realm (slice 5 part 2, 5g-reads) around the chain package's (D112, D114): a realm's page
 // (vm/qrender), its functions (vm/qfuncs) and one call (vm/qeval), each asked only for a name evalCall.ts's checks pass, the
-// tier-1 builder of the one expression sent. One request a call. What the realm wrote is returned as text and never interpreted.
+// tier-1 builder of the one expression sent, bar readUser's two fixed expressions below (D283). One request a call. What the
+// realm wrote is returned as text and never interpreted.
 // The app names no universe's chain to its reads yet (D118): each states null.
 import { readEvaluated, readFunctionList, readRender } from "@gnoworld/chain/node";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
@@ -41,7 +42,9 @@ export function readUser(
 ): Promise<ChainRead<string>> {
   const proved = Address.safeParse(account);
   if (!proved.success) return badName(rpc, options);
-  return readEvaluated(rpc, `gno.land/r/sys/users.ResolveAddress("${proved.data}").${call}()`, {
+  // One of two whole strings, whatever `call` holds at run time: a type is no check on data.
+  const tail = call === "Name" ? "Name()" : "IsDeleted()";
+  return readEvaluated(rpc, `gno.land/r/sys/users.ResolveAddress("${proved.data}").${tail}`, {
     ...options,
     chainId: null,
   });
