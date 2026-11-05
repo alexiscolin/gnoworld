@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { MASS, MASS_KIND, massOf, type Mass, type MassNamespace, type MassWorld } from "./mass.ts";
+import { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./mass.ts";
 
 const world = (
   id: string,
@@ -59,6 +59,17 @@ const byKey = (mass: Mass) =>
 const kindOf = (mass: Mass, key: string) => mass.sizes[3 * mass.keys.indexOf(key) + 1];
 const reachOf = ({ clumps }: Mass) =>
   Math.max(...clumps.map(({ centre, radius }) => Math.hypot(centre.x, centre.y, centre.z) + radius));
+
+// Each clump of `before` stands in `after` where it stood, scaled by the factor its `sized`th clump's size read.
+function keptTo(before: readonly Clump[], after: readonly Clump[], sized: number) {
+  const scale = (after[sized]?.radius ?? NaN) / (before[sized]?.radius ?? NaN);
+  before.forEach((clump, at) => {
+    const moved = after[at];
+    expect(moved?.radius, clump.id).toBeCloseTo(clump.radius * scale, 6);
+    for (const axis of ["x", "y", "z"] as const)
+      expect(moved?.centre[axis], `${clump.id} ${axis}`).toBeCloseTo(clump.centre[axis] * scale, 6);
+  });
+}
 
 describe("massOf", () => {
   it("gives the same data the same mass, in whatever order the namespaces and their worlds come", () => {
@@ -133,6 +144,32 @@ describe("massOf", () => {
     expect(size("a/mid") / size("a/quiet")).toBeCloseTo(1 + Math.log2(16) / 4, 6);
   });
 
+  // A golden, worked out once by this code (8n, after the push of the less used alone): any change to the layout's rule shows here.
+  it("lays a small cosmos where it always has", () => {
+    const mass = massOf([
+      space("gnoland", [world("gnoland/home", 90), world("gnoland/blog", 20)], ["gno.land/p/gnoland/ui"]),
+      space("demo", [world("demo/boards", 40)]),
+      space("samcrew", [world("samcrew/a", 5), world("samcrew/b", 1)]),
+    ]);
+    const golden = [
+      ["gnoland", 89.622, -139.025, 164.441, 66.76],
+      ["demo", -76.82, 195.518, -106.649, 46.289],
+      ["samcrew", -26.486, 216.595, 93.31, 58.321],
+    ] as const;
+    mass.clumps.forEach(({ id, centre, radius }, at) => {
+      const [name, x, y, z, reach] = golden[at] ?? ["", NaN, NaN, NaN, NaN];
+      expect(id).toBe(name);
+      for (const [got, want] of [
+        [centre.x, x],
+        [centre.y, y],
+        [centre.z, z],
+        [radius, reach],
+      ] as const)
+        expect(got).toBeCloseTo(want, 2);
+    });
+    expect(mass.keys).toHaveLength(55);
+  });
+
   it("fits the farthest clump's edge to the dive's first view, whatever it holds", () => {
     fc.assert(
       fc.property(namespaces(30), (list) => {
@@ -154,6 +191,29 @@ describe("massOf", () => {
           }
       }),
       { numRuns: 30, seed: 20261105 },
+    );
+  });
+
+  it("moves, with a new world, only the clumps ranked after its own: the ones before keep their places to the fit", () => {
+    fc.assert(
+      fc.property(namespaces(20), fc.nat(), (list, pick) => {
+        const before = massOf(list);
+        const grown = before.clumps[pick % before.clumps.length]?.id ?? "";
+        const rank = before.clumps.findIndex(({ id }) => id === grown);
+        const after = massOf(
+          list.map((one) =>
+            one.id === grown
+              ? space(one.id, [...one.worlds, world(`${one.id}/new`, 0, { fresh: true })], one.packages)
+              : one,
+          ),
+        );
+        expect(after.clumps.map(({ id }) => id)).toEqual(before.clumps.map(({ id }) => id));
+        // Each clump before it keeps its place up to the fit's one factor, read from a size no world changed (an empty one has none).
+        const sized = before.clumps.slice(0, rank).findIndex(({ radius }) => radius > 0);
+        fc.pre(sized >= 0);
+        keptTo(before.clumps.slice(0, rank), after.clumps, sized);
+      }),
+      { numRuns: 60, seed: 20261105 },
     );
   });
 

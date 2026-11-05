@@ -80,6 +80,14 @@ describe("the mass's glide", () => {
 });
 
 describe("the mass's palette", () => {
+  // F5467: three's Color() is white, so "on black" drew the ground white.
+  it("is a mid grey on black with no page", () => {
+    const palette = paletteOf(undefined);
+    expect(palette.ground.getHex()).toBe(0x000000);
+    expect(palette.kinds.every((kind) => kind.r === 0.5 && kind.g === 0.5 && kind.b === 0.5)).toBe(true);
+    expect(palette.touch).toBe(0);
+  });
+
   it("reads the design system's tokens on the page, low-key, a touch of each kind's colour at the rim", () => {
     document.documentElement.setAttribute(
       "style",
