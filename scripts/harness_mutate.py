@@ -65,7 +65,7 @@ SECTIONS = {
     "scripts/check_docs.py": "check_docs", "scripts/hidden.py": "check_docs", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
-    ".githooks/records.sh": "outside,installed,wiring,worktree_script",".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
+    ".githooks/records.sh": "outside,installed,wiring,worktree_script,pre_commit",".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock", ".claude/settings.json": "wiring", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate", "scripts/prove_fix.py": "prove_fix",
@@ -533,7 +533,7 @@ def mutants():
     yield from each(".claude/workflows/branch.js", "if (open.length)\n", "if (false)\n", "hooks", "the branch loop stops on a finding its fixer left open")
     yield from each(".claude/workflows/branch.js", "if (round === 4)\n", "if (false)\n", "hooks", "the branch loop stops after three rounds")
     yield from each(".claude/workflows/branch.js", 'const TIER1 = [\n  "scripts/",\n  ".githooks/",\n  ".github/",\n  ".claude/",\n  "gno/",\n', "const TIER1 = [\n", "hooks", "the harness and realms bring the security review whatever the arguments")
-    for entry in ("app/src/csp.ts", "app/src/cspOrigins.ts", "app/src/cspForms.ts", "app/src/lib/chain/evalCall.ts", "deploy/", "packages/core/src/markdown/", "app/src/lib/adena/", "server/src/login/", "server/src/roles/", "server/roles.json", "app/src/sw/", "server/src/ergo/", "app/src/features/login/", "app/src/lib/api/login.ts", "app/src/lib/ergo/"):
+    for entry in ("app/src/csp.ts", "app/src/cspOrigins.ts", "app/src/cspForms.ts", "app/src/lib/chain/evalCall.ts", "deploy/", "packages/core/src/markdown/", "packages/core/src/args/", "app/src/lib/adena/", "server/src/login/", "server/src/roles/", "server/roles.json", "app/src/sw/", "server/src/ergo/", "app/src/features/login/", "app/src/lib/api/login.ts", "app/src/lib/ergo/"):
         yield from each(".claude/workflows/branch.js", f'  "{entry}",\n', "", "hooks", f"{entry} brings the security review by itself")
     yield from each(".claude/workflows/branch.js", 'const BASE = A.base || "main";', 'const BASE = "main";', "hooks", "the branch loop reads from the base it is given")
     yield from each(".claude/workflows/branch.js", "let since = BASE;", 'let since = "main";', "hooks", "the branch loop's first round reads since the base")
@@ -854,6 +854,32 @@ def mutants():
     yield from each(rec, 'grep -qxF "$(review_print "$1")"', "grep -q .", "hooks", "records.sh wants the review pass of this tree")
     pc = ".githooks/pre-commit"
     yield from each(pc, 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-commit runs no gate outside the sandbox")
+    yield from each(pc, 'if [ -n "${SANDBOX_RUNTIME:-}" ] || ! { : >>"$0"; } 2>/dev/null; then', 'if ! { : >>"$0"; } 2>/dev/null; then', "hooks", "pre-commit refuses a harness file in the sandbox, its hook writable or not (D241)")
+    yield from each(pc, 'if [ -n "${SANDBOX_RUNTIME:-}" ] || ! { : >>"$0"; } 2>/dev/null; then', 'if [ -n "${SANDBOX_RUNTIME:-}" ]; then', "hooks", "pre-commit refuses a harness file with SANDBOX_RUNTIME unset in the sandbox (D241)")
+    yield from each(pc, "held=$(harness --cached --name-only) || {", "held=$(harness --cached --name-only) || true || {", "hooks", "pre-commit refuses when git cannot list the staged harness files (D241)")
+    yield from each(pc, "held=$(harness --cached --name-only) ||", "held=$(git diff --cached --name-only -- scripts) ||", "hooks", "pre-commit reads the whole harness list, blind to case (D241)")
+    yield from each(pc, '(F164)}" >&2\n\t\texit 1', '(F164)}" >&2', "hooks", "pre-commit refuses a staged harness file outside Alexis's Terminal (D241)")
+    yield from each("scripts/check.sh", " --update-snapshots=none", "", "hooks", "check.sh's journeys write no missing picture, so a second run never passes on the first's (F5625)")
+    yield from each("scripts/guard.py", '"agent_id" in event and ', "", "hooks", "guard lets the session edit the harness, a subagent never (D240)")
+    yield from each("scripts/guard.py", '"agent_id" in event and ', 'event.get("agent_id") and ', "hooks", "guard refuses a subagent whose agent_id is empty (D240)")
+    yield from each("scripts/guard.py", "os.path.realpath(os.path.join(", "os.path.abspath(os.path.join(", "hooks", "guard reads a harness path through links and dots (D240)")
+    yield from each("scripts/guard.py", "cwd if isinstance(cwd, str) else ROOT", "ROOT", "hooks", "guard reads a relative path from the agent's folder (D240)")
+    yield from each("scripts/guard.py", "os.path.relpath(full, t).lower() for", "os.path.relpath(full, t) for", "hooks", "guard reads a harness path blind to case (F151, D240)")
+    yield from each("scripts/guard.py", 'if top == ROOT or os.path.lexists(os.path.join(top, ".git")):', 'if top == ROOT or os.path.isdir(os.path.join(top, ".git")):', "hooks", "guard finds the tree a file sits in, a worktree's .git a file (D240)")
+    yield from each("scripts/guard.py", 'if top == ROOT or os.path.lexists', 'if os.path.lexists', "hooks", "guard takes its own tree for one with no .git, as pre-commit's copy (D240)")
+    yield from each("scripts/guard.py", " for t in tops]", " for t in tops[:1]]", "hooks", "guard reads a file as every tree above it names it, so a planted .git hides nothing (D240)")
+    yield from each("scripts/guard.py", "not name.startswith(\".claude/tmp/\") and ", "", "hooks", "guard lets an agent write its report under .claude/tmp (D240)")
+    yield from each("scripts/guard.py", " or fnmatch.fnmatchcase(name, s)", "", "hooks", "guard reads the harness list's globs (D240)")
+    yield from each("scripts/guard.py", ' or name.startswith(s + "/")', "", "hooks", "guard reads the harness list's folders (D240)")
+    yield from each("scripts/guard.py", "return any(not name.isascii() or ", "return any(", "hooks", "guard takes a path with a folded letter for a harness file (F164, D240)")
+    yield from each("scripts/guard.py", '    if not specs:\n        raise ValueError("no harness list")\n', "", "hooks", "guard refuses a subagent's write with no harness list to read (D240)")
+    yield from each("scripts/guard.py", "    harnessed = True\n", "    harnessed = False\n", "hooks", "guard refuses a subagent's write when records.sh cannot be read (D240)")
+    yield from each(pc, " || foreign --cached; then", "; then", "hooks", "pre-commit refuses a path with a folded letter in the sandbox (F164, D241)")
+    for path in ("app/tsconfig.json", "packages/*/tsconfig.json", "app/*.config.ts", "lint/*.config.ts", ".claude/CLAUDE.md", "app/tests/stories/pictures.spec.ts", "deploy/test.sh"):
+        yield from each(".claude/settings.json", f'        "{path}",\n', "", "hooks", f"settings keep a shell from writing {path} (D242)")
+    yield from each(".claude/settings.json", '"lint/*.config.ts"', '"**/*.config.ts"', "hooks", "settings ban no StrykerJS copy of a config file, which a merge check writes (F111, D242)")
+    for name in ("GIT_NOGLOB_PATHSPECS", "GIT_GLOB_PATHSPECS"):
+        yield from each(".githooks/records.sh", f"-u {name} ", "", "hooks", f"the harness list is read as globs whatever {name} says (D241)")
     yield from each(pc, '	sh "$(dirname "$0")/scan_secrets.sh" --staged', "	:", "hooks", "pre-commit scans outside the sandbox")
     yield from each(pc, '[ "$prose" -le 1 ] ||', "true ||", "hooks", "pre-commit refuses a failing code_changed.sh (F133)")
     yield from each(pc, 'if [ "$prose" = 0 ] && ! green "$(git write-tree)" fast; then', "if false; then", "hooks", "pre-commit wants recorded code outside the sandbox")
@@ -900,8 +926,6 @@ def mutants():
     yield from each(".githooks/pre-commit", 'sh "$s/scan_secrets.sh" --staged', ":", "hooks", "pre-commit secret scan")
     yield from each(".githooks/pre-commit", 'sh "$s/borrow_node_modules.sh" "$staged"', 'sh scripts/borrow_node_modules.sh "$staged"', "hooks", "pre-commit runs the staged helpers")
     yield from each("scripts/borrow_node_modules.sh", 'else cp -RP "$m" "$copy/$m"; fi', 'else ln -s "$PWD/$m" "$copy/$m"; fi', "hooks", "a copy reads its own workspace packages (F344)")
-    yield from each(".githooks/pre-commit", 'if [ -n "$differ" ]; then', "if false; then", "hooks", "pre-commit refuses a staged harness unlike the working tree")
-    yield from each(".githooks/pre-commit", "--name-only -z --", "--name-only --", "hooks", "pre-commit keeps a harness file's name whole")
     yield from each("scripts/guard.py", 'if sub in ("send-pack", "http-push", "receive-pack"):', "if False:", "hooks", "guard refuses send-pack")
     yield from each("scripts/guard.py", 'w.lower().startswith("alias.") or', "False or", "hooks", "guard refuses git aliases")
     yield from each("scripts/guard.py", "not (at_root and alone):", "not at_root:", "hooks", "guard runs worktree.sh alone, its words plain (F5058)")

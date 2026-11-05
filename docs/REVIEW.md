@@ -10,7 +10,7 @@ Review by risk, not line by line everywhere.
 | 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builder (`app/src/lib/chain/evalCall.ts`, the one place an expression sent to a chain is built) | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
 | 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop, Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
-| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
+| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), a call's arguments (`packages/core/src/args/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
 | 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |

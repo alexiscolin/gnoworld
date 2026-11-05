@@ -276,6 +276,35 @@ try:
                     ok = out.returncode != 0 and refusal in said and not os.path.exists(log)
                     expect(ok, f"unsteady {case}: refuses with {refusal!r}, logging nothing" + ("" if ok else f": {said[-200:]}"))
 
+    if part("missing_picture"):
+        # A journey whose picture has no approved file fails check.sh's run and its second run alike, and neither writes it
+        # (F5625): both pass --update-snapshots=none (test_hooks' gate_lanes holds check.sh to it). Without it, the control, the
+        # first run wrote the missing picture and failed, and the second, through unsteady.py, passed on what the first wrote
+        # (Playwright 1.64.1's default off CI; CI emptied, as a CI's default writes none).
+        unsteady = os.path.realpath("scripts/unsteady.py")
+        playwright = os.path.realpath("app/node_modules/@playwright/test/cli.js")
+        config = 'import { defineConfig } from "@playwright/test";\n\nexport default defineConfig({\n  testDir: "tests",\n  use: { launchOptions: { args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : [] } },\n});\n'
+        spec = 'import { expect, test } from "@playwright/test";\n\ntest("look", async ({ page }) => {\n  await page.setContent("<p>probe</p>");\n  await expect(page).toHaveScreenshot("look.png");\n});\n'
+        for flags, fails in ((["--update-snapshots=none"], True), ([], False)):
+            with tempfile.TemporaryDirectory() as root:
+                where = os.path.realpath(root)
+                plant({"playwright.config.ts": config, "tests/a.spec.ts": spec}, where=where)
+                os.symlink(os.path.realpath("app/node_modules"), f"{where}/node_modules")
+                report, output, log = f"{where}/report.json", f"{where}/output.txt", f"{where}/unsteady.log"
+                journeys = ["node", playwright, "test", "-c", "playwright.config.ts", *flags]
+                first = run([*journeys, "--reporter=dot,json"], cwd=where, env={"PLAYWRIGHT_JSON_OUTPUT_NAME": report, "CI": ""})
+                with open(output, "w") as f:
+                    f.write(first.stdout + first.stderr)
+                again = run([sys.executable, "-I", unsteady, "playwright", report, output, log, "10 160", "--", *journeys, "--reporter=dot"], cwd=where, env={"CI": ""})
+                written = [n for _, _, names in os.walk(f"{where}/tests") for n in names if n.endswith(".png")]
+                said = (first.stdout + first.stderr)[-300:] + (again.stdout + again.stderr)[-300:]
+                if fails:
+                    ok = first.returncode != 0 and again.returncode != 0 and "failed twice" in again.stderr and not written
+                    expect(ok, "missing_picture: with --update-snapshots=none a missing picture fails twice and is never written" + ("" if ok else f": {written} {said}"))
+                else:
+                    ok = first.returncode != 0 and again.returncode == 0 and written != []
+                    expect(ok, "missing_picture: the control, with no flag, writes it on the first run and passes the second" + ("" if ok else f": {written} {said}"))
+
     if part("pinned_node"):
         # Every Vitest run is on the Node .node-version pins, whatever it runs: vitest.config.ts refuses another Node as every
         # run reads it (a whole run, one project, `list`; StrykerJS's dry run and `bench` start Vitest the same way, through

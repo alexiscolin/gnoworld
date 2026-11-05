@@ -7,12 +7,17 @@
 - gno only through gnomcp (.claude/rules/gno.md): no gnokey, no fetched realm page or RPC node,
   and no .gno file written, by any tool, before the session loaded the gno skill and called a
   gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list;
+- a subagent's Edit or Write of a harness file (.githooks/records.sh's list, in the tree the file sits in, its path read
+  through links, dots and the disk's case; .claude/tmp/, where reports go, is none): the sandbox stops a shell, never a file
+  tool, and two agents wrote stryker.config.json with Edit after their shell was refused (D240). The session's own edits
+  pass here: pre-commit refuses a harness file committed outside Alexis's Terminal (D241);
 - worktree.sh, which settings.json lets out of the sandbox, run alone as `sh scripts/worktree.sh` and plain words,
   from the project's root: from a subfolder those words run a script there, which the session can write, and behind
   a cd, an assignment, a redirect or another command they would run something else outside the sandbox (F5058).
 Each command is split into its simple commands, looking inside `sh -c`, `eval`, `$(...)` and
 wrappers (env, xargs, timeout...), so none hides a call; a word that only mentions one (grep
 gnokey) is no call. A seatbelt, not a wall: exit 2 blocks, and settings.json blocks on a crash."""
+import fnmatch
 import itertools
 import json
 import os
@@ -152,6 +157,35 @@ def runs_worktree_sh(words):
     return bool(words) and os.path.basename(words[0]) == "worktree.sh"
 
 
+def harness_file(path, cwd):
+    """Whether `path` is a harness file of the tree it sits in, as .githooks/records.sh's harness() lists them: a folder, a file,
+    or a glob whose * crosses folders as git's pathspec does, blind to case as the disk is (F151); relative paths from `cwd`."""
+    if not isinstance(path, str) or not path:
+        return False
+    full = os.path.realpath(os.path.join(cwd if isinstance(cwd, str) else ROOT, path))
+    # Every tree above the file names its harness files: the guard's own, which has no .git in pre-commit's copy of the staged
+    # files, and each folder with a .git (a worktree's is a file), so a .git a shell plants inside a tree makes no other tree of it.
+    tops, top = [], os.path.dirname(full)
+    while True:
+        if top == ROOT or os.path.lexists(os.path.join(top, ".git")):
+            tops.append(top)
+        if top == os.path.dirname(top):
+            break
+        top = os.path.dirname(top)
+    if not tops:
+        return False
+    names = [os.path.relpath(full, t).lower() for t in tops]
+    with open(os.path.join(ROOT, ".githooks", "records.sh")) as f:
+        found = re.search(r"^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$", f.read(), re.S | re.M)
+    listed = found.group(1) if found else ""
+    specs = [s.lower() for s in shlex.split(listed.replace("\\\n", " ")) if s]
+    if not specs:
+        raise ValueError("no harness list")
+    # A letter the disk folds (ſ is s on APFS) matches no list: a path with one is taken for a harness file (F164).
+    return any(not name.isascii() or not name.startswith(".claude/tmp/") and any(name == s or name.startswith(s + "/") or fnmatch.fnmatchcase(name, s) for s in specs)
+               for name in names)
+
+
 def ready_for_gno(transcript):
     """Whether the session loaded the gno skill and called a gnomcp tool; a mention in text counts for neither."""
     found = set()
@@ -189,6 +223,12 @@ except (ValueError, KeyError, TypeError):
 
 UNREAD = "no .gno before the gno skill is loaded and the chain read: the skill, then gno_packages or gno_read on a realm of the same shape"
 push = False
+try:
+    harnessed = tool in ("Edit", "Write") and "agent_id" in event and harness_file(given.get("file_path"), event.get("cwd"))
+except (OSError, ValueError):  # no list to read is no harness: a subagent's write is refused
+    harnessed = True
+if harnessed:
+    refuse("a subagent writes no harness file, by any tool: it reports the change it needs, and its session asks Alexis, whose Terminal applies it (D240)")
 if tool in ("Edit", "Write") and str(given.get("file_path", "")).endswith(".gno"):
     if not ready_for_gno(event.get("transcript_path", "")):
         refuse(UNREAD)

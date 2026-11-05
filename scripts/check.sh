@@ -362,8 +362,9 @@ lane_ts() {
 	E2E_PORT=$(free_ports 3)
 	export E2E_PORT
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
-		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
+	# Neither run writes a missing picture: the second compared with what the first wrote, and passed (F5625; probe's missing_picture).
+	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --update-snapshots=none --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
+		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --update-snapshots=none --reporter=dot
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
 

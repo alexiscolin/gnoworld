@@ -5,6 +5,18 @@ set -eu
 # so a new code folder or a settings change is gated; scripts/test_hooks.sh checks the hooks.
 # Every script it runs comes from the staged copy, the one the commit holds (finding F067).
 . "$(dirname "$0")/records.sh"
+# A harness file is committed in Alexis's Terminal alone, never from Claude Code's sandbox (D241): the sandbox stops a shell's
+# writes, not the file tools', and an agent's Edit of stryker.config.json passed its commit (f792bf47). A sandboxed command can
+# unset SANDBOX_RUNTIME, never the sandbox's ban on writing the installed hooks: a hook that cannot open itself for writing runs
+# in the sandbox too.
+if [ -n "${SANDBOX_RUNTIME:-}" ] || ! { : >>"$0"; } 2>/dev/null; then
+	held=$(harness --cached --name-only) || { echo "pre-commit: git could not list the staged harness files; nothing is committed unchecked" >&2; exit 1; }
+	# A letter the disk folds names a harness file no list can match (ſ is s on APFS): a path with one is refused too (F164).
+	if [ -n "$held" ] || foreign --cached; then
+		echo "pre-commit: a harness file is committed in Alexis's Terminal alone, never from Claude Code's sandbox (D241): ${held:-a path with a non-ASCII character, which this disk may read as the name of a harness file (F164)}" >&2
+		exit 1
+	fi
+fi
 if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 	# Outside Claude Code's sandbox, in Alexis's shell, no gate runs, so no code Claude can edit
 	# runs with his access (F076): only the scripts installed beside the hooks, where no branch
@@ -50,12 +62,6 @@ if [ "$prose" = 1 ]; then
 	python3 -I "$s/check_docs.py" # docs only: the files they name must still exist
 	finished=1
 	exit 0
-fi
-# The staged gate is the one that runs; -z keeps a name with a space or an accent whole.
-differ=$(git diff --cached --name-only -z -- scripts .githooks .github .claude/settings.json | xargs -0 -r git -c core.quotePath=false diff --name-only --)
-if [ -n "$differ" ]; then
-	echo "pre-commit: staged harness files differ from the working tree's; stage them as they are on disk: $differ" >&2
-	exit 1
 fi
 sh "$s/borrow_node_modules.sh" "$staged" # the staged copy has no installed packages
 # What the commit changes, one path a line, so check.sh checks those areas alone: the copy has no
