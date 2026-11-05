@@ -17,22 +17,23 @@ export interface LoginViewProps {
 const STEPS = { wallet: "Opening Adena…", signing: "Sign the text in Adena…", verifying: "Checking your signature…" };
 
 export function LoginView({ session, step, problem, onLogIn }: LoginViewProps) {
+  // There from the start, empty: a screen reader announces a region's change. Alone once the session is known or awaited, so no empty box
+  // holds a gap after the account's pill (frame 17's right edge).
+  const status = (
+    <p role="status" className={styles["problem"]}>
+      {problem === undefined ? null : sayProblem(problem)}
+    </p>
+  );
+  if (session.kind !== "out") return status;
   return (
     <Cluster>
-      {session.kind === "out" ? (
-        <>
-          <span className={styles["computer"]}>
-            <Button busy={step !== "idle"} onClick={onLogIn}>
-              {step === "idle" ? "Connect Adena" : STEPS[step]}
-            </Button>
-          </span>
-          <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>
-        </>
-      ) : null}
-      {/* There from the start, empty: a screen reader announces a region's change. */}
-      <p role="status" className={styles["problem"]}>
-        {problem === undefined ? null : sayProblem(problem)}
-      </p>
+      <span className={styles["computer"]}>
+        <Button busy={step !== "idle"} onClick={onLogIn}>
+          {step === "idle" ? "Connect Adena" : STEPS[step]}
+        </Button>
+      </span>
+      <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>
+      {status}
     </Cluster>
   );
 }

@@ -41,6 +41,14 @@ describe("LoginView", () => {
     expect(html).toMatch(/<button[^>]*aria-busy="true"/);
   });
 
+  it.each(["in", "unknown"] as const)(
+    "is its status region alone, no box round it, while the session is %s: an empty box would hold a gap in the header's row (8p's review)",
+    (kind) => {
+      const html = view({ session: kind === "in" ? { kind, address: ADDRESS } : { kind } });
+      expect(html).toMatch(/^<p role="status"[^>]*><\/p>$/);
+    },
+  );
+
   it("draws nothing but its status region once logged in: the account's pill and its menu hold the address and the way out (frame 17)", () => {
     const html = view({ session: { kind: "in", address: ADDRESS } });
     expect(buttons(html)).toEqual([]);
