@@ -1,6 +1,9 @@
+// @vitest-environment jsdom
 import { isRouteErrorResponse, type MetaArgs, type RouteObject } from "react-router";
-import { describe, expect, test } from "vitest";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { fakeStream } from "../../tests/fakeStream.ts";
 import { expectClientAsBuild, render, routeError } from "../../tests/render.tsx";
+import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
 import Earth, { clientLoader, ErrorBoundary, loader, meta } from "./earth.tsx";
 
 const route = (path: string): RouteObject => ({ path, Component: Earth, loader, ErrorBoundary });
@@ -112,5 +115,41 @@ describe("the Earth's plate", () => {
   test("offers neither Follow nor Share: nothing behind them yet", async () => {
     const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
     expect(html).not.toMatch(/>Follow<|>Share</);
+  });
+});
+
+// Slice 9g (F5784, frame 38): the page follows the Earth's room once it has run, and draws the count the stream tells, for its own universe.
+describe("the Earth's page and the chain's stream", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const drawn = () => {
+    const sources = fakeStream();
+    // The figure counts up only where motion is welcome: jsdom has no media query, so none.
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    const page = drawRoute({ path: "/net/:network/earth", Component: Earth, loader: clientLoader }, "/net/onyx/earth");
+    return { sources, ...page };
+  };
+
+  test("follows #earth, draws the count of its universe from a realms frame, and ignores another universe's", async () => {
+    const { sources, box } = drawn();
+    await vi.waitFor(() => {
+      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth"]);
+    });
+    expect(box.textContent).not.toContain("deployed in 24 h");
+    sources.opened[0]?.emit("realms", { universe: "gnoland", count: 99, height: 5 });
+    expect(box.textContent).not.toContain("deployed in 24 h");
+    sources.opened[0]?.emit("realms", { universe: "onyx", count: 17, height: 908297 });
+    await vi.waitFor(() => {
+      expect(box.textContent).toContain("17");
+    });
+    expect(box.textContent).toContain("deployed in 24 h · block 908297");
+  });
+
+  test("closes the stream when the page is left", async () => {
+    await expectStreamClosedOnLeave(
+      { path: "/net/:network/earth", Component: Earth, loader: clientLoader },
+      "/net/onyx/earth",
+    );
   });
 });

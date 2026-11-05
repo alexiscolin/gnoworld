@@ -1,6 +1,9 @@
+// @vitest-environment jsdom
 import { afterEach, describe, expect, test, vi } from "vitest";
 import events from "../../data/events.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
+import { fakeStream } from "../../tests/fakeStream.ts";
+import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
 import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
 
@@ -143,4 +146,39 @@ describe("home's ticker", () => {
 
 afterEach(() => {
   vi.useRealTimers();
+});
+
+// Slice 9g (F5784, frame 6): the page follows the Earth's room once it has run, and the strip draws the deploys the stream tells.
+describe("home and the chain's stream", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const deploy = (universe: string, name: string, height: number) => ({
+    id: `h${String(height)}:0`,
+    kind: "deploy",
+    universe,
+    realm: `gno.land/r/${ALICE}/${name}`,
+    actor: ALICE,
+    height,
+  });
+
+  test("follows #earth, draws a deploy of its universe in the strip as a signal, and none of another's", async () => {
+    const sources = fakeStream();
+    const { box } = drawRoute({ path: "/", Component: Home, loader }, "/");
+    await vi.waitFor(() => {
+      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth"]);
+    });
+    sources.opened[0]?.emit("chain", deploy("gnoland", "theirs", 11));
+    sources.opened[0]?.emit("chain", deploy("onyx", "mine", 10));
+    await vi.waitFor(() => {
+      expect(box.textContent).toContain("r/g10gh7…y5tv/mine deployed · block 10");
+    });
+    expect(box.textContent).not.toContain("theirs");
+    expect(box.textContent).toContain("Signal");
+  });
+
+  test("closes the stream when the page is left", async () => {
+    await expectStreamClosedOnLeave({ path: "/", Component: Home, loader }, "/");
+  });
 });
