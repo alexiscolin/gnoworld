@@ -212,7 +212,7 @@ vi.mock(import("./great.ts"), async (original) => {
   const real = await original();
   return { ...real, greatWheelOf: vi.fn(real.greatWheelOf), shellOf: vi.fn(real.shellOf) };
 });
-describe("what stationOf joins, by count and share (8r)", () => {
+describe("what stationOf joins, by count and share", () => {
   // A station of `seed` and `size`, with what it was joined from.
   function built(seed: string, size: number) {
     vi.clearAllMocks();

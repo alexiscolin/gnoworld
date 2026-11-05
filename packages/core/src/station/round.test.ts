@@ -21,6 +21,17 @@ function phaseOf({ orbit: { tilt, node }, place }: Placed): number {
 }
 const quarters = (phases: readonly number[]) =>
   [0, 1, 2, 3].map((quarter) => phases.filter((phase) => Math.floor(phase / (Math.PI / 2)) === quarter).length);
+// Whether a lone station `seed`, at a size among the 401 floats round `near`, stands where `exactly` holds.
+function standsOn(seed: string, near: number, exactly: (one: Placed) => boolean): boolean {
+  const float = new Float64Array([near]);
+  const bits = new BigInt64Array(float.buffer);
+  const start = (bits[0] ?? 0n) - 200n;
+  return Array.from({ length: 401 }, (_, at) => {
+    bits[0] = start + BigInt(at);
+    const [one] = stationsRound([{ seed, size: float[0] ?? NaN }], ring).close;
+    return one !== undefined && exactly(one);
+  }).some(Boolean);
+}
 const files = (count: number, length: number) =>
   Array.from({ length: count }, (_, file) =>
     Array.from({ length }, (_, n) => ({ seed: `set ${String(file)} ${String(n)}`, size: ((n * 7 + file) % 11) / 10 })),
@@ -72,18 +83,21 @@ describe("stationsRound", () => {
     for (const count of quarters(belt.map(phaseOf))) expect(count).toBeGreaterThan(belt.length / 8);
   });
 
-  // Sizes found by a search so that a lone station's nearest clear place stands exactly on a bound: a bound is kept, never passed. Exact
-  // to the last bit of V8's own Math functions, so a change of engine may move them: search again (8r's report says how).
+  // Near sizes found by a search, a lone station's nearest clear place stands on a bound: a bound is kept, never passed. Which float hits
+  // it exactly hangs on the engine's Math functions (Chromium's and Node's differ by a bit), so each run scans the floats round the size.
   it("stands a body exactly at the Earth's least gap, and on a phone exactly at the screen's right edge", () => {
-    const [atEarth] = stationsRound([{ seed: "edge 3", size: 0.05540347923023921 }], ring).close;
     const [look] = looksFrom(earthCamera());
-    if (atEarth === undefined || look === undefined) throw new Error("no body placed");
-    const seen = look.ball(atEarth.place, atEarth.radius);
+    const phone = new Look(earthCamera(), { width: 390, height: 844 });
+    if (look === undefined) throw new Error("no screen");
     const { earth } = look;
-    expect(Math.hypot(seen.x - earth.x, seen.y - earth.y) - seen.radius - earth.radius).toBe(0.4 * earth.radius + 24);
-    const [atEdge] = stationsRound([{ seed: "edge 3", size: 0.6178026516015254 }], ring).close;
-    if (atEdge === undefined) throw new Error("no body placed");
-    expect(new Look(earthCamera(), { width: 390, height: 844 }).ball(atEdge.place, atEdge.radius).right).toBe(390);
+    const gap = ({ place, radius }: Placed) => {
+      const seen = look.ball(place, radius);
+      return Math.hypot(seen.x - earth.x, seen.y - earth.y) - seen.radius - earth.radius;
+    };
+    expect(standsOn("edge 3", 0.05540347923023921, (one) => gap(one) === 0.4 * earth.radius + 24)).toBe(true);
+    expect(standsOn("edge 3", 0.6178026516015254, ({ place, radius }) => phone.ball(place, radius).right === 390)).toBe(
+      true,
+    );
   });
 
   // 7x: every rule a body stands by, on each of the video's screens, with what was placed before it: the files where each decides.

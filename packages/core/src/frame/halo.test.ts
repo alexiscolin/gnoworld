@@ -72,7 +72,7 @@ describe("a sun's size", () => {
 
 // 8r: halo.ts's numbers, pinned where StrykerJS found them loose (8n's run, 2026-11-05). A star of size 4 reaches 7.5 * 2 + 2 = 17 on
 // the map; a point is 10 pixels of radius; the main light's halo is 320 pixels at its widest.
-describe("a sun's reach in numbers (8r)", () => {
+describe("a sun's reach in numbers", () => {
   const sized = (star: number): StarSystem => ({
     id: "test",
     place: { x: 0, y: 0, z: 0 },

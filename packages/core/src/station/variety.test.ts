@@ -57,9 +57,11 @@ describe("a station's look (variety.ts)", () => {
     expect(lookOf(station([part("module", centre, 0.9)])).shape[2]).toBe(0);
   });
 
-  it("a shape a tenth apart is a station apart", () => {
+  it("a shape a tenth apart, or a shape with less to it, is a station apart", () => {
     const counts = PART_KINDS.map(() => 1);
     expect(alikeStations({ counts, shape: [0.1, 0, 0] }, { counts, shape: [0, 0, 0] })).toBe(false);
     expect(alikeStations({ counts, shape: [0.05, 0, 0] }, { counts, shape: [0, 0, 0] })).toBe(true);
+    expect(alikeStations({ counts, shape: [0.095, 0, 0] }, { counts, shape: [0, 0, 0] })).toBe(true);
+    expect(alikeStations({ counts, shape: [0, 0, 0] }, { counts, shape: [0, 0] })).toBe(false);
   });
 });

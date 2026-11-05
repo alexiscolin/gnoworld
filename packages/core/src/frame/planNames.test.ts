@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { systemsOf } from "../cosmos/system.ts";
 import { planOf } from "./plan.ts";
-import { boxOf, MARGIN, meet, namesOf } from "./planNames.ts";
+import { boxOf, meet, namesOf } from "./planNames.ts";
 import { along, cameraTowards, looksFrom, placeOf } from "./restLook.ts";
 
 // A Plan's names, pinned where StrykerJS found planNames.ts loose (8r, 2026-11-05): plan.test.ts reads them through planOf; these call
@@ -78,18 +78,32 @@ describe("namesOf", () => {
     expect(named.has(ids(17, [5])[0] ?? "")).toBe(true);
   });
 
-  it("names a world only where its name stands whole on every screen, the eye turned off the Plan's centre", () => {
+  // crowd26's largest world is w9 (0.071).
+  it("names no world where none stands on a screen, and gives the +N the largest's place", () => {
+    const { system, worlds, camera, lens, plan } = crowdPlan(26);
+    const distance = Math.hypot(plan.eye.x - plan.look.x, plan.eye.y - plan.look.y, plan.eye.z - plan.look.z);
+    const away = cameraTowards(plan.eye, along(plan.look, camera.right, 5 * distance), plan.up);
+    const { named, host } = namesOf(system, worlds, { camera: away, lens, crowded: true });
+    expect(named.size).toBe(0);
+    expect(host).toBe(ids(26, [9])[0]);
+  });
+
+  // The eye turned aside, some names and +N's places stand whole on the wide screen alone. The +N's room under its world is a name's room
+  // under a point at the foot of the world's disc.
+  it("names a world and stands the +N only where they stand whole on every screen, the eye turned off the Plan's centre", () => {
     const { system, worlds, camera, lens, plan } = crowdPlan(0);
     const distance = Math.hypot(plan.eye.x - plan.look.x, plan.eye.y - plan.look.y, plan.eye.z - plan.look.z);
     const aside = cameraTowards(plan.eye, along(plan.look, camera.right, -0.15 * 0.6 * distance), plan.up);
-    const { named } = namesOf(system, worlds, { camera: aside, lens, crowded: true });
+    const { named, host } = namesOf(system, worlds, { camera: aside, lens, crowded: true });
     expect(named.size).toBeGreaterThan(0);
+    expect(host).toBeDefined();
     for (const look of looksFrom(aside, lens))
-      for (const world of worlds.filter(({ id }) => named.has(id))) {
+      for (const world of worlds) {
         const spot = look.seen(placeOf(system, world, 0), world.radius);
-        expect(look.whole({ ...boxOf(spot), depth: spot.depth }, MARGIN), `${world.id} on ${String(look.width)}`).toBe(
-          true,
-        );
+        const name = `${world.id} on ${String(look.width)}`;
+        if (named.has(world.id)) expect(look.whole({ ...boxOf(spot), depth: spot.depth }, 16), name).toBe(true);
+        const under = boxOf({ x: spot.x, y: spot.y + spot.radius, radius: 0 });
+        if (world.id === host) expect(look.whole({ ...under, depth: spot.depth }, 16), name).toBe(true);
       }
   });
 });
