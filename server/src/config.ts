@@ -43,6 +43,8 @@ export interface Config {
   markets: string | undefined;
   // The universes' data file: its default universe's RPC is where the prices timer reads the block height; none, no height.
   universes: string | undefined;
+  // The hubs' data file (slice 9g): with the universes' it starts the chain's subscriptions, one a universe; none, no chain.
+  hubs: string | undefined;
   moderation: {
     openaiKey: Secret | undefined;
     thresholds: Thresholds;
@@ -111,6 +113,7 @@ const settingsSchema = () =>
       // The prices timer's file (5l), written as ERGO_DATA is: no trailing slash, so a file's name.
       MARKETS_FILE: absolute.optional(),
       UNIVERSES_FILE: absolute.optional(),
+      HUBS_FILE: absolute.optional(),
       OPENAI_API_KEY_FILE: z.string().min(1).optional(),
       // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
       MODERATION_THRESHOLDS: z
@@ -160,6 +163,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
     markets: settings.MARKETS_FILE,
     universes: settings.UNIVERSES_FILE,
+    hubs: hubsOf(env, settings.HUBS_FILE),
     moderation: {
       openaiKey:
         OPENAI_API_KEY_FILE === undefined
@@ -172,6 +176,13 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     jarvis: doorOf(env, settings),
     admin: adminOf(env, settings),
   };
+}
+
+// The hubs' file, or none. Without the universes' file it names no indexer: the server stops rather than run without the
+// chain it was asked for.
+function hubsOf(env: Record<string, string | undefined>, file: string | undefined): string | undefined {
+  if (file !== undefined && env["UNIVERSES_FILE"] === undefined) throw new Error("setting UNIVERSES_FILE: required");
+  return file;
 }
 
 // The link to Ergo, or none without the password's file. Ergo's listener named with no password is a link
