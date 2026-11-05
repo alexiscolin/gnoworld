@@ -14,6 +14,12 @@ describe("the indexer's queries for the chain's rooms", () => {
     expect(blocks).toEqual({ id: "blocks", query: "subscription { getBlocks(where: {}) { height time } }" });
   });
 
+  it("separates the filters of the deploys and of each realm", () => {
+    expect(subscriptionsOf(["gno.land/r/a", "gno.land/r/b"])[0]?.query).toContain(
+      '"add_package" } } }, { messages: { value: { MsgCall: { pkg_path: { eq: "gno.land/r/a" } } } } }, { messages: { value: { MsgCall: { pkg_path: { eq: "gno.land/r/b" }',
+    );
+  });
+
   it("asks only the deploys when no realm is watched", () => {
     expect(subscriptionsOf([])[0]?.query).toContain('_or: [{ messages: { typeUrl: { eq: "add_package" } } }]');
   });
@@ -27,6 +33,7 @@ describe("the indexer's queries for the chain's rooms", () => {
 
   it("asks the deploys newest first, below a block when it is given one", () => {
     expect(deploysQuery(undefined, 100)).not.toContain("block_height: {");
+    expect(deploysQuery(undefined, 100)).toContain("where: { success: { eq: true }, _or: [{ messages: { typeUrl");
     expect(deploysQuery(41, 100)).toContain("block_height: { lt: 41 }");
     expect(deploysQuery(41, 100)).toContain("heightAndIndex: DESC");
   });
