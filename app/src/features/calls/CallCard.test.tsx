@@ -1,10 +1,17 @@
 // @vitest-environment jsdom
 import { realmType } from "@gnoworld/core";
+import { Address } from "@gnoworld/schemas";
+import fc from "fast-check";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, follows, markup, mount } from "../../../tests/mount.tsx";
+import { recordedAdena } from "../../../tests/recordedAdena.ts";
+import { callContract } from "../../lib/adena/call.ts";
 import type { CallCard as Card } from "../../lib/calls.ts";
+import { createAppStore } from "../../store/index.ts";
 import { CallCard, type CallCardProps } from "./CallCard.tsx";
+import { signCall } from "./signCall.ts";
+import { ensureCalls } from "./slice.ts";
 
 // 9d: the card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
 // REALM / FUNCTION / ARGUMENTS / NETWORK / FEE block, the warnings, then "Sign in Adena" and "Cancel" and, once signed, the
@@ -284,5 +291,70 @@ describe("CallCard, its buttons and fields call their handlers", () => {
     });
     expect(on.onEdit).toHaveBeenCalledExactlyOnceWith(1, "42");
     for (const other of [on.onSign, on.onCancel, on.onRetry]) expect(other).not.toHaveBeenCalled();
+  });
+});
+
+// F5723: what the card draws is what Adena is sent. The card is drawn as the page draws it, from the store's card, and the same
+// card is signed through signCall with the recording's stand-in for Adena: the drawn fields and network are compared with
+// DoContract's message, not with a helper only a test calls.
+const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
+const LANDED = {
+  ok: true as const,
+  value: { height: 9, failed: false, data: "", log: "" },
+  source: { url: ONYX.rpc, at: "2026-11-05T05:00:00.000Z" },
+};
+interface Sent {
+  messages: { value: Record<string, unknown> }[];
+  networkInfo: { chainId: string };
+}
+const NOTHING = {
+  onEdit: () => undefined,
+  onSign: () => undefined,
+  onCancel: () => undefined,
+  onRetry: () => undefined,
+};
+
+// What the card drew for these texts, and what DoContract was sent for the same card.
+async function drawnAndSent(texts: string[]) {
+  const store = createAppStore();
+  ensureCalls(store);
+  store.getState().loginActions.signedIn(CALLER);
+  const { open, edit } = store.getState().callsActions;
+  open({ id: "a", chainId: ONYX.chainId, realm: REALM, func: "SetBio", params: PARAMS });
+  texts.forEach((text, index) => {
+    edit("a", index, text);
+  });
+  const box = mount(<CallCard card={store.getState().calls["a"] ?? preview} network={ONYX} fee="x" {...NOTHING} />);
+  const wallet = recordedAdena({ account: CALLER });
+  await signCall("a", {
+    store,
+    adena: wallet.adena,
+    universe: ONYX,
+    call: callContract,
+    read: () => Promise.resolve(LANDED),
+    wait: () => Promise.resolve(),
+    watch: () => undefined,
+  });
+  const sent = wallet.asked.find((a) => a.call === "DoContract")?.arg as Sent | undefined;
+  return { drawn: all(box, "input").map((input) => (input as HTMLInputElement).value), text: box.textContent, sent };
+}
+
+describe("CallCard and the message Adena is sent", () => {
+  it("draw the same realm, function, arguments in order and chain, whatever is typed", async () => {
+    const run = await fc.check(
+      fc.asyncProperty(fc.string({ unit: "grapheme", maxLength: 40 }), fc.integer(), async (bio, times) => {
+        const { drawn, text, sent } = await drawnAndSent([bio, String(times)]);
+        // A text a CallRequest refuses is no message: the card shows its problem, which other tests read.
+        if (sent === undefined) return true;
+        const value = sent.messages[0]?.value;
+        return (
+          JSON.stringify(drawn) === JSON.stringify(value?.["args"]) &&
+          [value?.["pkg_path"], value?.["func"], sent.networkInfo.chainId].every((part) => text.includes(String(part)))
+        );
+      }),
+      { numRuns: 25 },
+    );
+    expect(run.failed).toBe(false);
   });
 });
