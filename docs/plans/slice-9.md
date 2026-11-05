@@ -23,10 +23,10 @@ Phones that sign (phase 1: Adena has no mobile signing); sessions and the sponso
 | A name on the wrong chain | Spending real GNOT while testing | The name registers on the universe's own chain, named in the card with its fee (answer 2) | The card names the chain; Onyx's universe never asks gnoland-1 |
 
 ## 4. Cost
-The queue and the card: O(1) a request, no polling while Adena's popup is open; once Adena answers, one `tx` read of the hash for its height and result. Chain events: one subscription a universe for the whole server (answer 4), fanned out on the existing stream, coalesced to 4 a second a room at most; bench: 1,000 events a minute into 100 rooms keeps the store's update under 2 ms a batch on the 4× slowed CPU. The first screen's JS budget is unchanged: the call card and `lib/adena`'s calls load on the first wallet gesture (ADR-0002 §4).
+The queue and the card: O(1) a request, no polling while Adena's popup is open; once Adena answers, one `tx` read of the hash for its height and result. Chain events: one HTTP read a universe once a block (answer 9g-4: a poll, no WebSocket), for the whole server (answer 4), fanned out on the existing stream, coalesced to 4 a second a room at most; bench: 1,000 events a minute into 100 rooms keeps the store's update under 2 ms a batch on the 4× slowed CPU. The first screen's JS budget is unchanged: the call card and `lib/adena`'s calls load on the first wallet gesture (ADR-0002 §4).
 
 ## 5. Scale
-The first limit is the public indexer: one subscription a client would be N sockets to a host we do not run; one on the server is one. Next: the server's stream fan-out, sized by row 12's capacity test. Adena allows one popup, so a person's calls are serial by nature.
+The first limit is the public indexer: one reader a client would be N readers on a host we do not run; one on the server is one, polling once a block. Next: the server's stream fan-out, sized by row 12's capacity test. Adena allows one popup, so a person's calls are serial by nature.
 
 ## 6. Tests, by level
 Apply: unit and property (`core/args` with fast-check; the queue; the error map), contract (Adena's answers from the SDK's types, then one recording of the real extension on Onyx; `r/sys/namereg/v0` on Onyx and mainnet and the indexers' events recorded through gnomcp from this MacBook once its network is open, answer 5; Adena's real answers recorded by Alexis on Onyx at 9b's end, answer 6), component (the card's four steps and every failure, with axe), feature (realm view's write functions, `<gno-form>` to card, the name dialog, the banners), end-to-end with a fake `window.adena` at 390 and 1280 px, faults (Adena missing, locked, popup already open, refused, tx failed, node down after the hash), security (planted proposal, wrong network, preview equals message), mutation, visual (the card, the dialog, the banners, on the Mac Studio). Not: realms, AI, load beyond the fan-out bench.
@@ -42,7 +42,7 @@ Shared with 7 and 8, kept small and apart: `store/index.ts` (7 adds a camera sta
 | 9c | `core/args`: a call's typed fields to its arguments, per gno's kinds | Every kind's edges, property-tested | nothing |
 | 9h | The server's first signals: who charted first, first words; the two arrival banners (90 to 97) | One per world under a race; the rate; the banner from the signal only | nothing |
 | 9d | The call card: preview with the fee as an estimate, sign in Adena, landing in a block, the result; the warnings; the network switched or added (31 to 33, 108 to 114 for the look) | Preview equals message; nothing done before the chain event; every failure state | 9b, 9c |
-| 9g | Chain events: the server's subscription to each universe's indexer, relayed on its stream; activity lines in rooms, the ticker's chain events, new realms as signals, the Earth's realms of 24 h | Recorded events; flood and hostile text; height on every line | answer 5's recording |
+| 9g | Chain events: the server reads each universe's indexer by HTTP once a block (answer 9g-4), relayed on its stream; activity lines in rooms, the ticker's chain events, new realms as signals, the Earth's realms of 24 h | Recorded events; flood and hostile text; height on every line | answer 5's recording |
 | 9e | The realm view's write functions, calls with more than two fields, `<gno-form>` as a Form block then a card, votes, quick and pinned actions that call (20 to 35) | A planted proposal shows nothing; a non-primitive type says "open in gnoweb" | 9d |
 | 9f | Registering a name on the universe's chain: the dialog, `r/sys/namereg/v0.Register`, the astronaut as the face (9 to 15); the name shown, mainnet else Onyx | The `nym-` format before Adena opens; the name shown only once the chain has it; the chain is the universe's | 9d, answer 5's recording |
 | 9i | Quest steps that call | A step done only from its chain event | 9d, slice 8's merge |
@@ -55,6 +55,6 @@ None. The browser talks to `window.adena` directly through `lib/adena` (ADR-0002
 1. The call card sits in the thread or on the plate, with the video's look; never a dialog.
 2. Two universes, one for Onyx (later the other devnets), one for mainnet, the main one: a name registers on the universe's chain; the name shown is mainnet's, else Onyx's, else the short address.
 3. Claude writes `core/args`; Alexis reads it.
-4. The server subscribes to the indexers and relays; the CSP is unchanged.
+4. The server reads the indexers and relays; the CSP is unchanged. Amended 2026-11-06 (9g-4): by HTTP once a block through the existing capped read, no WebSocket.
 5. The recordings are made from this MacBook once Alexis opens gnomcp's network here (his sandbox setting).
 6. Alexis records Adena's real answers once, on Onyx, at 9b's end.
