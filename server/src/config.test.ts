@@ -227,6 +227,7 @@ describe("loadConfig", () => {
     ["ERGO_PORT", { ERGO_PORT: "0" }],
     ["ERGO_PORT", { ERGO_PORT: "06667" }],
     ["ERGO_PORT", { ERGO_PORT: "6667x" }],
+    ["ERGO_PORT", { ERGO_PORT: "6667 " }],
     ["ERGO_PORT", { ERGO_PORT: "-1" }],
     ["ERGO_HOST", { ERGO_HOST: "" }],
     ["ERGO_HOST", { ERGO_HOST: "h".repeat(254) }],
