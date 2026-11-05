@@ -13,8 +13,8 @@ const WORKING = { signing: "Waiting for your signature in Adena…", landing: "L
 
 /** The phase of a registration card, or the empty form for none. */
 export function phaseOf(card: Pick<CallCard, "state" | "texts"> | undefined): Phase {
-  const state = card?.state;
-  if (card === undefined || state === undefined || state.kind === "preview") return { kind: "typing" };
+  if (card === undefined || card.state.kind === "preview") return { kind: "typing" };
+  const { state } = card;
   if (state.kind === "done") return { kind: "done", name: card.texts[0] ?? "", height: state.height };
   if (state.kind !== "failed") return { kind: "working", text: WORKING[state.kind] };
   // A call that may have been sent has no way back to a second signature; one the chain ran and refused changed nothing.

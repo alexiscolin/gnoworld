@@ -4,7 +4,7 @@
 import { realmType } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
 import { callsIn, ensureCalls, signWith, type SignDeps } from "../calls/index.ts";
-import type { CallCard, CardState } from "../../lib/calls.ts";
+import type { CallCard } from "../../lib/calls.ts";
 import { NAMEREG, NYM_PREFIX, nymProblem } from "./nym.ts";
 
 export const REGISTER_ID = "register-name";
@@ -13,7 +13,9 @@ export type Registered = { ok: true } | { ok: false; problem: string };
 
 // Who each store's registration card was opened for, by the store's own actions object (stable, and in the state a view reads).
 const owners = new WeakMap<object, string>();
-const ownerOf = (account: string, chainId: string) => `${account} ${chainId}`;
+function ownerOf(account: string, chainId: string): string {
+  return `${account} ${chainId}`;
+}
 
 /** The registration's card when it is this account's on this chain, and nothing for a card of anyone else's. */
 export function registrationOf(state: AppState, account: string, chainId: string): CallCard | undefined {
@@ -24,29 +26,25 @@ export function registrationOf(state: AppState, account: string, chainId: string
     : undefined;
 }
 
-const SENT =
-  "A registration may already have been sent from this account. Check Adena's recent transactions before you register again.";
-const WAIT = "A registration is already under way. Wait for it to end.";
-const DONE = "This account has just registered a name.";
-
-type Plan = { go: "keep" | "retry" | "restart" } | { refuse: string };
-
-const RESTART: Plan = { go: "restart" };
-
-// A failed card: a call the chain ran and refused changed nothing and may be tried again; one that may have been sent may not.
-function afterFailure(state: Extract<CardState, { kind: "failed" }>): Plan {
-  if (state.reason === "chain") return RESTART;
-  return state.hash !== undefined || state.reason === "maybe-sent" ? { refuse: SENT } : { go: "retry" };
+// A failed card that may have been sent has no way back to a second signature; one the chain ran and refused changed nothing.
+function mayBeSent(state: CallCard["state"]): boolean {
+  return (
+    state.kind === "failed" && state.reason !== "chain" && (state.hash !== undefined || state.reason === "maybe-sent")
+  );
 }
 
-// What a card already in the store means for a new registration. `mine`: it was opened for this account on this chain.
-function planOf(card: CallCard | undefined, mine: boolean): Plan {
-  const state = card?.state;
-  if (state === undefined) return RESTART;
-  if (state.kind === "signing" || state.kind === "landing") return { refuse: WAIT };
-  if (!mine) return RESTART;
-  if (state.kind === "done") return { refuse: DONE };
-  return state.kind === "preview" ? { go: "keep" } : afterFailure(state);
+// What a card already in the store means for a new registration, in the person's words when it forbids one. `mine`: it was opened for
+// this account on this chain. Any other card is closed first: a call the chain ran and refused, or one declined, changed nothing.
+function refusal(card: CallCard | undefined, mine: boolean): string | undefined {
+  if (card === undefined) return undefined;
+  const { state } = card;
+  if (state.kind === "signing" || state.kind === "landing")
+    return "A registration is already under way. Wait for it to end.";
+  if (!mine) return undefined;
+  if (state.kind === "done") return "This account has just registered a name.";
+  return mayBeSent(state)
+    ? "A registration may already have been sent from this account. Check Adena's recent transactions before you register again."
+    : undefined;
 }
 
 /** Signs Register for `typed` on the universe's chain. `ok` says the course ran (the card holds how it ended); a refusal says why
@@ -56,13 +54,12 @@ export async function registerName(typed: string, deps: SignDeps): Promise<Regis
   if (problem !== undefined) return { ok: false, problem };
   const { store, universe } = deps;
   const { calls, callsActions, login } = ensureCalls(store).getState();
-  const owner = ownerOf(login.session.kind === "in" ? login.session.address : "", universe.chainId);
-  const card = calls[REGISTER_ID];
-  const plan = planOf(card, card?.chainId === universe.chainId && owners.get(callsActions) === owner);
-  if ("refuse" in plan) return { ok: false, problem: plan.refuse };
-  if (plan.go === "retry") callsActions.retry(REGISTER_ID);
-  if (plan.go === "restart") callsActions.close(REGISTER_ID);
-  owners.set(callsActions, owner);
+  const account = login.session.kind === "in" ? login.session.address : "";
+  const mine = registrationOf(store.getState(), account, universe.chainId) !== undefined;
+  const refused = refusal(calls[REGISTER_ID], mine);
+  if (refused !== undefined) return { ok: false, problem: refused };
+  callsActions.close(REGISTER_ID);
+  owners.set(callsActions, ownerOf(account, universe.chainId));
   callsActions.open({
     id: REGISTER_ID,
     chainId: universe.chainId,
