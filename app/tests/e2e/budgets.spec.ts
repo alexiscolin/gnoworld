@@ -53,8 +53,23 @@ const withoutProposals = (page: Page, urls: readonly string[], skip: string) =>
     [[...urls], skip] as const,
   );
 
-for (const path of PAGES) {
-  test(`${path} stays within its budgets`, async ({ page }) => {
+// A world someone charted (slice 9h, D210): its plate names who, from the stream, so a guest's first screen also asks for the
+// plate's line; the stream is handed the signal here, as no journey charts Bubble (D218).
+const CHARTED = "/w/bubble";
+const signalFrame = () =>
+  `event: signal\ndata: ${JSON.stringify({
+    kind: "chart",
+    world: "bubble",
+    account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
+    at: new Date().toISOString(),
+  })}\n\nevent: since\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`;
+
+for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [CHARTED, true] as const]) {
+  test(`${path}${charted ? ", charted," : ""} stays within its budgets`, async ({ page }) => {
+    if (charted)
+      await page.route("**/api/stream?*", (route) =>
+        route.fulfill({ contentType: "text/event-stream", body: signalFrame() }),
+      );
     const scripts = new Set<string>();
     const all = new Set<string>();
     const pending = new Set<unknown>();
@@ -79,6 +94,7 @@ for (const path of PAGES) {
     await hydrated(page);
     await stream;
     await chat;
+    if (charted) await expect(page.getByText(/^First charted by @g1jg8m/)).toBeVisible();
     await expect.poll(() => pending.size, "the scripts the chat's code asks for come").toBe(0);
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.

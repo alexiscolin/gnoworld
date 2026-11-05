@@ -92,7 +92,7 @@ const arrive = async (page: { draw: () => Promise<void> }) => {
 
 // The first signals' chunk, loaded once ahead: the page waits for the network, a test only for React.
 beforeAll(async () => {
-  await import("./Banners.tsx");
+  await Promise.all([import("./Banners.tsx"), import("./ChartedBy.tsx")]);
 });
 beforeEach(() => {
   Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
