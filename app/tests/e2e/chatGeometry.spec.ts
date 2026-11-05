@@ -214,20 +214,26 @@ test.describe("the chat at the video's size", () => {
   test("draws the worlds' planets at 44 px, the format bar's two rules, the thread at 13.5 px", async ({ page }) => {
     await logIn(page, "geometry-last");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
-    // The planet: 44 px, the first 23 px under the region's top (frame 66: 76 - 53). Onyx holds one world, so no step is measured.
-    const first = await page.locator('[data-region="worlds"] a > span').first().boundingBox();
-    if (first === null) throw new Error("no planet");
+    // The planet: 44 px, the first 23 px under the region's top (frame 66: 76 - 53), one planet to a 52 px step, no text under it.
+    const [first, second] = await Promise.all(
+      [0, 1].map((at) => page.locator('[data-region="worlds"] a > span').nth(at).boundingBox()),
+    );
+    if (first === null || first === undefined || second === null || second === undefined) throw new Error("no planet");
     near(first.width, 44);
     near(first.height, 44);
+    near(second.y - first.y, 52, 1);
     const worlds = await page.locator('[data-region="worlds"]').boundingBox();
     if (worlds === null) throw new Error("no worlds");
     near(first.y - worlds.y, 23, 2);
-    // The ring of the world in view stands 4 px off its planet, a line wide (frame 66: 54 px round a 44 px planet).
-    const ring = await page.locator('[data-region="worlds"] a[aria-current="page"]').evaluate((link) => {
-      const css = getComputedStyle(link);
+    const link = await page.locator('[data-region="worlds"] a').first().boundingBox();
+    if (link === null) throw new Error("no link");
+    near(link.height, 44);
+    // The ring of the world in view: 2 px wide, 3 px off its planet (frame 80: 54 px round a 44 px planet).
+    const ring = await page.locator('[data-region="worlds"] a[aria-current="page"] > span').evaluate((planet) => {
+      const css = getComputedStyle(planet);
       return { width: css.outlineWidth, offset: css.outlineOffset, style: css.outlineStyle };
     });
-    expect(ring).toEqual({ width: "1px", offset: "4px", style: "solid" });
+    expect(ring).toEqual({ width: "2px", offset: "3px", style: "solid" });
     // The format bar: three groups, two rules of 1 px by 12 px between them (prototype #fmtBar .sep).
     const rules = page.getByRole("group", { name: "Format" }).getByRole("separator");
     await expect(rules).toHaveCount(2);
