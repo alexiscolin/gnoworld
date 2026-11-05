@@ -23,7 +23,7 @@ describe("SUCCESSES: what each Adena method answers when it succeeds", () => {
     ["DoContract", ["TRANSACTION_SUCCESS"]],
   ];
 
-  it("names exactly these methods and these types: Adena answers GET_NETWORK (app/recording/adena-recording.json, entry 1), never GET_NETWORK_SUCCESS (D210)", () => {
+  it("names exactly these methods and these types: Adena answers GET_NETWORK (app/recording/adena-recording.json, entry 1), never GET_NETWORK_SUCCESS (D230)", () => {
     expect(Object.fromEntries(Object.entries(SUCCESSES))).toEqual(Object.fromEntries(table));
   });
 

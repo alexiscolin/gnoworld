@@ -112,7 +112,7 @@ describe("connect", () => {
     });
   });
 
-  it("refuses the network's answer under a name Adena never gives it (D210)", async () => {
+  it("refuses the network's answer under a name Adena never gives it (D230)", async () => {
     expect(await connect(new Wallet({ GetNetwork: () => ok("GET_NETWORK_SUCCESS", NETWORK) }))).toMatchObject({
       ok: false,
       reason: "malformed",
