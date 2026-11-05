@@ -267,7 +267,7 @@ describe("callModel: one model request, each attempt reserved and settled", () =
 
   it("retries a 500 two times at most, each attempt its own hold, each failed one charged its worst", async () => {
     const run = attempts(45 * DOLLAR);
-    const { send, requests } = script(statusError(500), statusError(503), statusError(529));
+    const { send, requests } = script(statusError(500), statusError(503), statusError(502));
     expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: false, reason: "failed" });
     expect(requests).toHaveLength(3);
     const worst = worstOf(requests[0] ?? ask());
@@ -310,7 +310,7 @@ describe("callModel: one model request, each attempt reserved and settled", () =
   it("takes the answer of a retry, the failed attempt charged its worst and the answer its real cost", async () => {
     const run = attempts(45 * DOLLAR);
     const answer = message({ content: [text("Block 42.")], stop: "end_turn" });
-    const { send, requests } = script(statusError(429), answer);
+    const { send, requests } = script(statusError(500), answer);
     expect(await callModel({ ...run.parts, send }, ask())).toEqual({ ok: true, answer });
     const worst = worstOf(requests[0] ?? ask());
     expect(run.budget.state("ask").spent).toBe(worst + Number(cost(MODEL, answer.usage)));
