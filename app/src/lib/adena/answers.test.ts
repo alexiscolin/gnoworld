@@ -104,6 +104,63 @@ describe("ask: one reader of Adena's answers, for the login and for a call", () 
   });
 });
 
+// Each row on its own: a type with a code that names nothing, then a code under a type nobody knows (bin/index.js:785-985).
+describe("a failure's reason, by its type first and by its code for a type nobody knows", () => {
+  it.each([
+    ["NOT_CONNECTED", "not-connected"],
+    ["UNRESOLVED_TRANSACTION_EXISTS", "busy"],
+    ["WALLET_LOCKED", "locked"],
+    ["ACCOUNT_MISMATCH", "wrong-account"],
+    ["NO_ACCOUNT", "no-account"],
+    ["TRANSACTION_REJECTED", "declined"],
+    ["SIGN_REJECTED", "declined"],
+    ["SWITCH_NETWORK_REJECTED", "declined"],
+    ["ADD_NETWORK_REJECTED", "declined"],
+    ["CONNECTION_REJECTED", "declined"],
+    ["UNSUPPORTED_TYPE", "unsupported"],
+  ])("reads %s as %s whatever its code", async (type, reason) => {
+    expect(await ask(() => answer("failure", type, { code: 7777 }), "DoContract")).toStrictEqual({
+      ok: false,
+      reason,
+      type,
+    });
+  });
+
+  it.each(["TRANSACTION_FAILED", "INVALID_FORMAT", "UNEXPECTED_ERROR"])(
+    "reads %s as failed with Adena's message, even under a code that names a refusal",
+    async (type) => {
+      const failed = { ...answer("failure", type, { code: 4000 }), message: "out of gas" };
+      expect(await ask(() => failed, "DoContract")).toStrictEqual({
+        ok: false,
+        reason: "failed",
+        type,
+        log: "out of gas",
+      });
+    },
+  );
+
+  it.each([
+    [1000, "not-connected"],
+    [1001, "busy"],
+    [2000, "locked"],
+    [3001, "wrong-account"],
+    [3002, "no-account"],
+    [4000, "declined"],
+    [4005, "unsupported"],
+  ])("reads code %i under a type nobody knows as %s", async (code, reason) => {
+    expect(await ask(() => answer("failure", "A_NEW_TYPE", { code }), "DoContract")).toStrictEqual({
+      ok: false,
+      reason,
+      type: "A_NEW_TYPE",
+    });
+  });
+
+  it("is failed with no log for a type and a code nobody knows, and for a failure with no message", async () => {
+    const bare = { status: "failure", type: "A_NEW_TYPE", data: {} };
+    expect(await ask(() => bare, "DoContract")).toStrictEqual({ ok: false, reason: "failed", type: "A_NEW_TYPE" });
+  });
+});
+
 describe("the account and the network as both callers read them", () => {
   it.each(["", " ", "\t"])("takes no chain id of %j, in an account or a network", (chainId) => {
     expect(Network.safeParse({ chainId }).success).toBe(false);

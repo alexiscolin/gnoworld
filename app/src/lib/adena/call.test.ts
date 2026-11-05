@@ -585,6 +585,12 @@ describe("callContract: every failure is a state with its next step", () => {
     expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual(SIGNED);
   });
 
+  it("is malformed for a success with no error key: Adena always sends one, null when all went well", async () => {
+    const data = { hash: SENT.hash, Log: "counter is 1" };
+    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "malformed" });
+  });
+
   it("takes a hash in capitals, as hex may be written", async () => {
     const data = { ...SENT, hash: SENT.hash.toUpperCase() };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
