@@ -15,7 +15,7 @@ const DEPLOYS = 20;
 const WORLDS = 200;
 
 /** The key a world's lines are kept under. */
-export const chainKey = (_universe: string, world: string): string => world;
+export const chainKey = (universe: string, world: string): string => `${universe}/${world}`;
 
 export interface ChainSlice {
   chainByWorld: Readonly<Record<string, readonly ChainHeard[]>>;
