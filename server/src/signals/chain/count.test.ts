@@ -90,3 +90,27 @@ describe("the 24 h count", () => {
     expect(count.count()).toBe(100_000);
   });
 });
+
+// Survivors of StrykerJS: the edge of the day, and the cap that old deploys must not use up.
+describe("the 24 h count's edges", () => {
+  const DAY = 24 * HOUR;
+
+  it("counts a live deploy whose block is exactly 24 h old, and a deploy until its block is a day and a millisecond old", async () => {
+    let time = NOW;
+    const count = await loadRealmCount({ history: () => Promise.resolve([]), now: () => time });
+    count.deployed(deploy(1, DAY));
+    expect(count.count()).toBe(1);
+    count.deployed({ height: 2, time: new Date(NOW).toISOString() });
+    time = NOW + DAY;
+    expect(count.count()).toBe(1);
+    time = NOW + DAY + 1;
+    expect(count.count()).toBe(0);
+  });
+
+  it("holds no deploy older than the day, so a flood of old ones does not push a good one out", async () => {
+    const count = await loadRealmCount({ history: () => Promise.resolve([]), now: () => NOW });
+    count.deployed(deploy(1, HOUR));
+    for (let n = 2; n < 100_003; n += 1) count.deployed({ height: n, time: ago(DAY + HOUR), id: `old${String(n)}` });
+    expect(count.count()).toBe(1);
+  });
+});
