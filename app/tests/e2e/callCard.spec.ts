@@ -139,13 +139,16 @@ test.describe("a write function's call card", () => {
     expect(await done(page)).toBe(0);
   });
 
-  test("a signature declined in Adena is a state with its next step, and the card can try again", async ({ page }) => {
+  test("a signature declined in Adena may still have gone: the card says so and offers only Close (F5747)", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { wallet: { declines: true } });
     await callAndSign(page);
-    await expect(card(page).getByRole("status")).toContainText(/declined/i);
-    await card(page).getByRole("button", { name: "Try again" }).click();
-    await expect(card(page).getByRole("button", { name: "Sign in Adena" })).toBeVisible();
+    await expect(card(page).getByRole("status")).toContainText(/declined.*recent transactions/i);
+    await expect(card(page).getByRole("button", { name: "Try again" })).toBeHidden();
+    await card(page).getByRole("button", { name: "Close" }).click();
+    await expect(card(page)).toBeHidden();
   });
 
   test("a call that never lands is said unseen after a bound, with its hash", async ({ page }) => {
@@ -209,11 +212,11 @@ test.describe("a write function's call card", () => {
     await touch.close();
   });
 
-  test("has no accessibility violation on a failure: the declined signature and its way back", async ({ page }) => {
+  test("has no accessibility violation on a failure: the declined signature and its way out", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { wallet: { declines: true } });
     await callAndSign(page);
-    await expect(card(page).getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(card(page).getByRole("button", { name: "Close" })).toBeVisible();
     expect(await violations(page)).toEqual([]);
   });
 

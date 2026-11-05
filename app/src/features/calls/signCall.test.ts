@@ -110,7 +110,7 @@ describe("signCall: the card's course", () => {
     expect(read).not.toHaveBeenCalled();
     gate.resolve({ status: "failure", type: "TRANSACTION_REJECTED", code: 4000, message: "", data: {} });
     await running;
-    expect(stateOf(store)).toEqual({ kind: "failed", reason: "declined" });
+    expect(stateOf(store)).toEqual({ kind: "failed", reason: "declined-maybe-sent" });
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -397,7 +397,7 @@ describe("signCall: a second request waits for the first", () => {
     await Promise.all([first, second]);
     expect(signed).toBe(2);
     expect(stateOf(store)?.kind).toBe("done");
-    expect(store.getState().calls["SetName"]?.state).toEqual({ kind: "failed", reason: "declined" });
+    expect(store.getState().calls["SetName"]?.state).toEqual({ kind: "failed", reason: "declined-maybe-sent" });
   });
 });
 

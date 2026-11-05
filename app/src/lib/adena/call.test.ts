@@ -134,7 +134,7 @@ class Fake {
   }
 }
 
-// The one argument DoContract receives, whole: the message, the SDK's default gas and fee, the pinned network.
+// What DoContract receives, whole: the message, the SDK's default gas and fee, the pinned network; then its options.
 const params = (request: CallRequest, universe = ONYX) => [
   {
     messages: [
@@ -154,6 +154,7 @@ const params = (request: CallRequest, universe = ONYX) => [
     gasWanted: 10_000_000,
     networkInfo: { chainId: universe.chainId, rpcUrl: universe.rpc },
   },
+  { isVisibleResult: false },
 ];
 const [GA, GN, SN, AN] = ["GetAccount", "GetNetwork", "SwitchNetwork", "AddNetwork"];
 const sent = (adena: Fake) => adena.asked.filter((a) => a.call === "DoContract");
@@ -165,12 +166,23 @@ describe("callContract: the way through", () => {
     expect(adena.names).toEqual(["GetAccount", "GetNetwork", "DoContract"]);
   });
 
-  it("sends one MsgCall, the whole argument of DoContract and no other: no memo, no options, no coins", async () => {
+  it("sends one MsgCall and Adena's result screen off, and nothing else: no memo, no coins", async () => {
     const adena = new Fake();
     const request = { ...REQUEST, args: ["1", "two", ""] };
     await callContract(adena, request, ONYX);
     expect(sent(adena)).toHaveLength(1);
     expect(sent(adena)[0]?.args).toEqual(params(request));
+  });
+
+  it("asks Adena to close on its own once sent, with no result screen a cross could close as a refusal (F5747)", async () => {
+    const adena = new Fake();
+    await callContract(adena, REQUEST, ONYX);
+    expect(sent(adena)[0]?.args[1]).toStrictEqual({ isVisibleResult: false });
+  });
+
+  it("is declined-maybe-sent, never declined, when Adena refuses once DoContract was asked: closing its window after Confirm reads as a refusal (F5747)", async () => {
+    const adena = new Fake({ DoContract: () => no("TRANSACTION_REJECTED") });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined-maybe-sent" });
   });
 
   it("uses the SDK's default gas and fee, and pins the transaction to the universe's chain and node", async () => {
@@ -427,7 +439,7 @@ describe("callContract: every failure is a state with its next step", () => {
     ["WALLET_LOCKED", "locked"],
     ["ACCOUNT_MISMATCH", "wrong-account"],
     ["NO_ACCOUNT", "no-account"],
-    ["TRANSACTION_REJECTED", "declined"],
+    ["TRANSACTION_REJECTED", "declined-maybe-sent"],
     ["TRANSACTION_FAILED", "maybe-sent"],
     ["UNSUPPORTED_TYPE", "unsupported"],
     ["INVALID_FORMAT", "maybe-sent"],
@@ -469,7 +481,7 @@ describe("callContract: every failure is a state with its next step", () => {
       log: "",
     });
     const refused = new Fake({ DoContract: () => Promise.resolve(recorded(5)) });
-    expect(await callContract(refused, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined" });
+    expect(await callContract(refused, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined-maybe-sent" });
   });
 
   it("reads GetAccount, GetNetwork and a switch to the chain it is on as Adena recorded them (D209)", async () => {
@@ -548,7 +560,7 @@ describe("callContract: every failure is a state with its next step", () => {
     [2000, "locked"],
     [3001, "wrong-account"],
     [3002, "no-account"],
-    [4000, "declined"],
+    [4000, "declined-maybe-sent"],
     [4001, "maybe-sent"],
     [4005, "unsupported"],
     [9000, "maybe-sent"],
@@ -919,7 +931,7 @@ describe("callContract: a failure after DoContract was asked may have been sent 
     },
   );
 
-  it.each([["TRANSACTION_REJECTED"], ["WALLET_LOCKED"], ["UNRESOLVED_TRANSACTION_EXISTS"], ["ACCOUNT_MISMATCH"]])(
+  it.each([["WALLET_LOCKED"], ["UNRESOLVED_TRANSACTION_EXISTS"], ["ACCOUNT_MISMATCH"]])(
     "keeps its reason for %s: the popup sent nothing, so the person may try again",
     async (type) => {
       const adena = new Fake({ DoContract: () => no(type) });

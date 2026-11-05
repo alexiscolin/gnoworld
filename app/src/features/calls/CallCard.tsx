@@ -9,6 +9,7 @@ import type { CallCard as Card_ } from "../../lib/calls.ts";
 import styles from "./CallCard.module.css";
 import { problemsOf } from "./problems.ts";
 import { sayFailure, sayProblem, shown } from "./say.ts";
+import { retryable } from "./slice.ts";
 
 export interface CallCardProps {
   card: Card_;
@@ -152,8 +153,8 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
       </Card.Actions>
     );
   }
-  // A call that may have been sent has no way back to a signature: it could be signed twice (F5728).
-  if (state.kind === "failed" && state.hash === undefined && state.reason !== "maybe-sent") {
+  // A call that may have been sent has no way back to a signature: it could be signed twice (F5728, F5747).
+  if (retryable(state)) {
     return (
       <Card.Actions>
         <Button emphasis="solid" onClick={onRetry}>

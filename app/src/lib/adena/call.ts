@@ -125,9 +125,14 @@ export const transaction = (request: CallRequest, { chainId, rpc }: Universe) =>
 });
 
 // Once DoContract was asked, the popup may have signed and broadcast the call whatever came back: a failure that is not Adena's
-// refusal to start (a rejection, a lock, a pending request) says so (F5728), with the hash when Adena named one.
-const maybeSent = (failure: Failed): Failed =>
-  failure.reason === "failed" || failure.reason === "malformed" ? { ...failure, reason: "maybe-sent" } : failure;
+// refusal to start (a lock, a pending request) says so (F5728), with the hash when Adena named one. Its refusal too: closing
+// the window after Confirm answers TRANSACTION_REJECTED (approve-transaction-main/index.tsx:841-844, F5747, Alexis 9d-2).
+const maybeSent = (failure: Failed): Failed => {
+  if (failure.reason === "declined") return { ...failure, reason: "declined-maybe-sent" };
+  return failure.reason === "failed" || failure.reason === "malformed" ? { ...failure, reason: "maybe-sent" } : failure;
+};
+/** DoContract's options: no result screen, so the popup closes itself once sent and no cross can close it then (F5747). */
+export const CONTRACT_OPTIONS = { isVisibleResult: false } as const;
 
 async function send(
   doContract: (...args: unknown[]) => unknown,
@@ -138,8 +143,8 @@ async function send(
   // and the realm's Log, with no height and no check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
   // Reading the answer can throw too (a hostile getter): once asked, any throw is maybe-sent, never a call to try again (F5747).
-  const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent).catch(() =>
-    refusal("maybe-sent"),
+  const done = await read(() => doContract(transaction(request, universe), CONTRACT_OPTIONS), "DoContract", Sent).catch(
+    () => refusal("maybe-sent"),
   );
   if (!done.ok) return maybeSent(done);
   const { hash, Log, error } = done.value;

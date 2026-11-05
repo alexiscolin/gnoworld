@@ -14,6 +14,7 @@ export type CallFailure =
   | "declined"
   | "failed"
   | "maybe-sent"
+  | "declined-maybe-sent"
   | "unsupported"
   | "wrong-network"
   | "malformed";
