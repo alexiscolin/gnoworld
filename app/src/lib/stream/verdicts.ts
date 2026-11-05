@@ -5,11 +5,14 @@
 // stream says when it began following, on the server's clock (F890). An answer not 200 (a 429, a restart's 502)
 // ends it for good, which the page is told (F888).
 import { jsonOf } from "@gnoworld/core";
-import { StreamEvent, StreamSince } from "@gnoworld/schemas";
+import { Signal, StreamEvent, StreamSince } from "@gnoworld/schemas";
 
 /** What the page's EventSource offers, so a test hands its own. */
 export interface VerdictSource {
-  addEventListener: (type: "verdict" | "since" | "error", listener: (event: { data: unknown }) => void) => void;
+  addEventListener: (
+    type: "verdict" | "since" | "signal" | "error",
+    listener: (event: { data: unknown }) => void,
+  ) => void;
   close: () => void;
   /** EventSource's: 2, CLOSED, once it gives up; it reconnects by itself from any other. */
   readonly readyState: number;
@@ -19,7 +22,9 @@ const CLOSED = 2;
 
 export interface VerdictOptions {
   open: (url: string) => VerdictSource;
-  log: (what: "verdict_unknown" | "since_unknown") => void;
+  log: (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => void;
+  /** A first signal of a world the rooms belong to (slice 9h). */
+  signal?: (signal: Signal) => void;
   /** The stream's word of when it began following, in ms. */
   since?: (time: number) => void;
   /** The stream ended for good: the browser will not reconnect it. */
@@ -40,12 +45,12 @@ function read<T>(
 export function followVerdicts(
   rooms: readonly string[],
   onVerdict: (event: StreamEvent) => void,
-  { open, log, since, dead }: VerdictOptions,
+  { open, log, signal, since, dead }: VerdictOptions,
 ): () => void {
   if (rooms.length === 0) return () => undefined;
   const source = open(`/api/stream?rooms=${encodeURIComponent(rooms.join(","))}`);
   const told = new Set<string>();
-  const once = (what: "verdict_unknown" | "since_unknown") => {
+  const once = (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => {
     if (told.has(what)) return;
     told.add(what);
     log(what);
@@ -55,6 +60,12 @@ export function followVerdicts(
     if (event !== undefined) onVerdict(event);
     else once("verdict_unknown");
   });
+  if (signal !== undefined)
+    source.addEventListener("signal", ({ data }) => {
+      const event = read(data, Signal);
+      if (event !== undefined) signal(event);
+      else once("signal_unknown");
+    });
   source.addEventListener("since", ({ data }) => {
     const word = read(data, StreamSince);
     if (word === undefined) once("since_unknown");
@@ -77,10 +88,16 @@ export function followVerdicts(
 /** The page's own stream, on its EventSource; an unknown event reported once, as the page reports an error. */
 export const pageVerdicts = (
   rooms: readonly string[],
-  on: { verdict: (event: StreamEvent) => void; since: (time: number) => void; dead: () => void },
+  on: {
+    verdict: (event: StreamEvent) => void;
+    signal?: ((signal: Signal) => void) | undefined;
+    since: (time: number) => void;
+    dead: () => void;
+  },
 ) =>
   followVerdicts(rooms, on.verdict, {
     open: (url) => new EventSource(url),
+    ...(on.signal === undefined ? {} : { signal: on.signal }),
     log: (what) => {
       reportError(new Error(`verdicts: ${what}`));
     },

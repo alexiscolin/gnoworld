@@ -7,7 +7,7 @@ import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
-import { Actions, Activity, Here } from "../features/world/index.ts";
+import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
 import styles from "./world.module.css";
 
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
@@ -57,10 +57,13 @@ export default function World() {
         <Panel label={world.name} look="plate" caption="gnoworld · hub atlas">
           <Panel.Body>
             <Stack>
+              {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
+              <Arrival world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
               {/* The kind of place ("UNIVERSE > DAO") is not in the data yet: the universe alone says where this is. */}
               <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
               <p>{world.description}</p>
+              <FirstCharted world={world.slug} />
               {/* Who is here comes from the chat once it has connected; no source gives the rate, nor a link to another world (Connected: a component test only). */}
               <Here />
               {/* No source yet for the history: the block says so. */}

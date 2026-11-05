@@ -7,9 +7,17 @@ import { keepSlice, type KeepSlice } from "./keep.ts";
 import { loginSlice, type LoginSlice } from "./login.ts";
 import { noticeSlice, type NoticeSlice } from "./notices.ts";
 import { pinsSlice, type PinsSlice } from "./pins.ts";
+import { signalsSlice, type SignalsSlice } from "./signals.ts";
 import { verdictsSlice, type VerdictsSlice } from "./verdicts.ts";
 
-export type AppState = LoginSlice & ChatSlice & DmSlice & NoticeSlice & VerdictsSlice & KeepSlice & PinsSlice;
+export type AppState = LoginSlice &
+  ChatSlice &
+  DmSlice &
+  NoticeSlice &
+  VerdictsSlice &
+  KeepSlice &
+  PinsSlice &
+  SignalsSlice;
 
 /** A store of its own: the page makes one, each test another. */
 export const createAppStore = () => {
@@ -21,8 +29,9 @@ export const createAppStore = () => {
     ...verdictsSlice(...args),
     ...keepSlice(...args),
     ...pinsSlice(...args),
+    ...signalsSlice(...args),
   }));
-  // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines or pins,
+  // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines, pins or arrival banners,
   // whether or not the chat is open to begin the new one (the link then reads its account's device). The first session,
   // from none, has none to leave. This is the one place that ends a session's state (F2091).
   const who = ({ login }: AppState) => (login.session.kind === "in" ? login.session.address : login.session.kind);
@@ -32,6 +41,7 @@ export const createAppStore = () => {
     state.chatActions.follow([]);
     state.keepActions.begin(undefined);
     state.pinsActions.forget();
+    state.signalActions.forget();
     state.dmActions.begin();
     state.noticeActions.begin();
   });

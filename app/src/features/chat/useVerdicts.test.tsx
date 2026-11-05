@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import type { Line } from "@gnoworld/core";
+import { Address, type Signal } from "@gnoworld/schemas";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -10,6 +11,8 @@ import { useVerdicts, type Shown } from "./useVerdicts.ts";
 // with the first screen (ADR-0001 §12), while the room's stream is followed as the room is shown.
 const asked: string[][] = [];
 const followed: string[][] = [];
+// The signals the page's stream hands on, when it is followed.
+const toSay: Signal[] = [];
 vi.mock("../../lib/api/verdicts.ts", () => ({
   pageVerdictsApi: () => ({
     verdicts: (_room: string, ids: readonly string[]) => {
@@ -19,8 +22,9 @@ vi.mock("../../lib/api/verdicts.ts", () => ({
   }),
 }));
 vi.mock("../../lib/stream/verdicts.ts", () => ({
-  pageVerdicts: (rooms: string[], on: { since: (time: number) => void }) => {
+  pageVerdicts: (rooms: string[], on: { since: (time: number) => void; signal?: (signal: Signal) => void }) => {
     followed.push(rooms);
+    for (const signal of toSay) on.signal?.(signal);
     on.since(Date.parse("2026-10-26T12:00:00.000Z"));
     return () => undefined;
   },
@@ -47,6 +51,7 @@ beforeEach(() => {
 afterEach(() => {
   asked.length = 0;
   followed.length = 0;
+  toSay.length = 0;
 });
 
 describe("useVerdicts: the code that finds a link in a line, asked with the first lines", () => {
@@ -73,5 +78,18 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
       expect(asked).toEqual([["a"]]);
     });
     expect(followed).toEqual([["#bubble"]]);
+  });
+
+  // Slice 9h (D215): the world's arrival banners ride the stream this follows, so the page holds one stream, not two.
+  it("hands the stream's first signals to the store, through the one stream it follows", async () => {
+    toSay.push({
+      kind: "chart",
+      world: "bubble",
+      account: Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv"),
+      at: "2026-11-05T12:00:00.000Z",
+    });
+    await draw([]);
+    expect(followed).toEqual([["#bubble"]]);
+    expect(store.getState().signals.arrivals["bubble"]?.chart?.kind).toBe("chart");
   });
 });

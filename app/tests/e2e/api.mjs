@@ -128,11 +128,41 @@ export async function startBackend(origins) {
       ergo.port,
       worlds.flatMap(({ slug, rooms = [] }) => [`#${slug}`, ...rooms.map(({ room }) => room)]),
     );
+    await chartFirst(api, origins[0], ["earth", "bubble"]);
     return { api, ws: ergo.wsPort };
   } catch (error) {
     await stop();
     throw error;
   }
+}
+
+// D210 (slice 9h): the first logged-in account to open a world gets a banner, and 130 journeys log in on /w/bubble: a wallet of
+// its own charts Earth and Bubble first, through the server's login and route. /w/govdao stays free for arrival.spec.ts.
+async function chartFirst(port, origin, slugs) {
+  const post = async (path, body, cookie = "") => {
+    const answer = await fetch(`http://127.0.0.1:${String(port)}${path}`, {
+      method: "POST",
+      headers: {
+        origin,
+        "content-type": "application/json",
+        "x-real-ip": "198.51.100.250",
+        ...(cookie === "" ? {} : { cookie }),
+      },
+      body: JSON.stringify(body),
+    });
+    if (!answer.ok)
+      throw new Error(`serve.mjs: ${path} answered ${String(answer.status)} while charting the first worlds`);
+    return answer;
+  };
+  const who = wallet();
+  const made = await (await post("/api/login/challenge", { chainId: "onyx-1" })).json();
+  const verified = await post("/api/login/verify", {
+    nonce: made.nonce,
+    address: who.address,
+    proof: who.sign("onyx-1", made.text),
+  });
+  const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0];
+  for (const world of slugs) await post("/api/signals/chart", { world }, cookie);
 }
 
 // Waits until a guest can join each room: the server's bot has made it, and its reconciler has opened it (a room
