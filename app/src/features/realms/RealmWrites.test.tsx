@@ -5,12 +5,14 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
+import { Grab, state } from "../../../tests/grabStore.tsx";
+import { callsIn } from "../calls/index.ts";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import { RealmWrites } from "./RealmWrites.tsx";
 
-// 9d, the call card's first place: a realm's write functions with one or two fields, each a "Call" row that opens the card
-// under it, never a modal (frame 33). The read functions are the other panel's; more than two fields, a type a call does not
-// carry and `<gno-form>` are 9e's. NOT recorded: the function list is written in the shape of vm/qfuncs.
+// 9d, widened by 9e: every write function a call can carry is a "Call" row that opens the card under it, never a modal (frame
+// 33): any count of fields, none too (D254); a type a call does not carry gets a way to gnoweb. NOT recorded: the function list is
+// written in the shape of vm/qfuncs.
 const CHAIN = {
   name: "Onyx",
   chainId: "onyx-1",
@@ -34,7 +36,7 @@ const FUNCTIONS = [
   { FuncName: "TotalSupply", Params: null, Results: [field(".res.0", "int64")] },
   { FuncName: "Render", Params: [field("path", "string")], Results: [field(".res.0", "string")] },
   { FuncName: "Foo.Bar", Params: [CUR, field("x", "string")], Results: null },
-  // No field: a click that signs with nothing to fill is a quick action, 9e's (the brief says one or two fields).
+  // No field: a click that signs with nothing to fill (D254, 9e).
   { FuncName: "Deposit", Params: [CUR], Results: null },
 ];
 const chain = (functions: unknown = FUNCTIONS) =>
@@ -57,12 +59,69 @@ const listed = (box: HTMLElement) =>
   all(box, "button").flatMap((b) => (b.textContent.startsWith("Call ") ? [b.textContent.slice(5)] : []));
 
 describe("a realm's write functions, with the call card inline", () => {
-  it("lists the write functions with one or two fields, each a Call button, and nothing else: no read, no 3 fields, no 0 fields, no type a call does not carry, no hostile name", async () => {
-    expect(listed(await panel())).toEqual(["SetBio", "SetProfile"]);
+  // 9e changes this test (it said "no 3 fields, no 0 fields"): the card is for every write a call can carry.
+  it("lists every write function a call can carry, each a Call button: three fields and none too, and no read, no type a call does not carry, no hostile name", async () => {
+    expect(listed(await panel())).toEqual(["SetBio", "SetProfile", "SetThree", "Deposit"]);
   });
 
-  it("lists nothing, and says so, for a realm with no such function", async () => {
-    const box = await panel(chain([FUNCTIONS[5], FUNCTIONS[2], FUNCTIONS[8]]));
+  it("opens a call of three fields in the realm view: its card under its own row, a field each, never a dialog (9e)", async () => {
+    const box = await panel();
+    const caller = button(box, "Call SetThree");
+    click(caller);
+    const card = one(box, "article");
+    expect(
+      all(box, "li")
+        .find((li) => li.contains(caller ?? null))
+        ?.contains(card),
+    ).toBe(true);
+    expect(all(card, "input")).toHaveLength(3);
+    for (const name of ["a", "b", "c"])
+      expect(all(card, "label").some((l) => l.textContent.startsWith(name))).toBe(true);
+    expect(all(box, "dialog, [role=dialog], [aria-modal]")).toHaveLength(0);
+  });
+
+  it("opens a write with no field as a card with nothing to fill and a Sign button that is enabled, and asks Adena nothing yet (D254)", async () => {
+    const touched = vi.fn(() => undefined);
+    Object.defineProperty(globalThis, "adena", { get: touched, configurable: true });
+    try {
+      const box = await panel();
+      click(button(box, "Call Deposit"));
+      const card = one(box, "article");
+      expect(all(card, "input, textarea")).toHaveLength(0);
+      expect(card.textContent).toContain("Deposit");
+      expect(button(card, "Sign in Adena")?.hasAttribute("disabled")).toBe(false);
+      expect(touched).not.toHaveBeenCalled();
+    } finally {
+      Reflect.deleteProperty(globalThis, "adena");
+    }
+  });
+
+  it("gives a function with a type a call does not carry no Call, and a link to the realm on gnoweb in its row, never a hidden one (9e)", async () => {
+    const box = await panel();
+    for (const name of ["Upload", "Configure"]) {
+      const row = all(box, "li").find((li) => li.textContent.includes(name));
+      expect(row, name).toBeDefined();
+      expect(row ? all(row, "button") : []).toHaveLength(0);
+      const link = row?.querySelector("a");
+      expect(link?.textContent).toContain("Open in gnoweb");
+      expect(link?.getAttribute("href")).toBe(`${CHAIN.gnoweb}/r/demo/profile`);
+      // The realm view's own "Open it on gnoweb" is the same Button href: a plain anchor, which opens in no other window.
+      expect(link?.getAttribute("target")).toBeNull();
+    }
+    expect(all(box, "li").some((li) => li.textContent.includes("Foo.Bar"))).toBe(false);
+    expect(all(box, "li").some((li) => li.textContent.includes("TotalSupply"))).toBe(false);
+  });
+
+  it("lists a realm of functions no call carries as rows with their way to gnoweb, and does not say there is none to call", async () => {
+    const box = await panel(chain([FUNCTIONS[3], FUNCTIONS[4]]));
+    expect(listed(box)).toEqual([]);
+    expect(all(box, "li")).toHaveLength(2);
+    expect(all(box, "li a")).toHaveLength(2);
+    expect(box.textContent).not.toContain("There is no write function to call here.");
+  });
+
+  it("lists nothing, and says so, for a realm with no write function", async () => {
+    const box = await panel(chain([FUNCTIONS[5], FUNCTIONS[6]]));
     expect(listed(box)).toEqual([]);
     expect(box.textContent).toContain("There is no write function to call here.");
   });
@@ -221,5 +280,54 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(name?.className).toContain("name");
     expect(name?.parentElement?.className).toContain("line");
     expect(name?.parentElement?.contains(call ?? null)).toBe(true);
+  });
+});
+
+// GovDAO's vote (frames 28 to 33): the realm card's Call on the vote function, then the card. Nothing shows as voted before the
+// chain's own answer; the course holds that (9d), here the vote's card must keep to it. NOT recorded: written in qfuncs' shape.
+describe("a vote on GovDAO", () => {
+  const DAO = "gno.land/r/gov/dao";
+  const VOTE = {
+    FuncName: "MustVoteOnProposalSimple",
+    Params: [CUR, field("pid", "int64"), field("option", "string")],
+    Results: null,
+  };
+  async function dao() {
+    const box = mount(
+      <StoreProvider>
+        <Grab />
+        <RealmWrites realm={DAO} chain={CHAIN} options={{ fetch: chain([VOTE]) }} />
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(box.querySelector("[aria-busy]")).toBeNull();
+    });
+    return box;
+  }
+
+  it("lists the vote function with a Call, and its card asks the proposal and the option, naming the realm and the function", async () => {
+    const box = await dao();
+    click(button(box, "Call MustVoteOnProposalSimple"));
+    const card = one(box, "article");
+    expect(all(card, "input")).toHaveLength(2);
+    expect(card.textContent).toContain(DAO);
+    expect(card.textContent).toContain("MustVoteOnProposalSimple");
+  });
+
+  it("shows the vote as voted only once the chain has answered, never when Adena has signed", async () => {
+    const box = await dao();
+    click(button(box, "Call MustVoteOnProposalSimple"));
+    const id = `${CHAIN.chainId} ${DAO}.MustVoteOnProposalSimple`;
+    const actions = callsIn(state())?.callsActions;
+    act(() => {
+      actions?.signing(id);
+      actions?.landing(id, "ab".repeat(32));
+    });
+    expect(one(box, "article").textContent).toContain("Landing in a block");
+    expect(one(box, "article").textContent).not.toMatch(/signed ·|voted/i);
+    act(() => {
+      actions?.done(id, { height: 12, value: "" });
+    });
+    expect(one(box, "article").textContent).toContain("Signed ·");
   });
 });

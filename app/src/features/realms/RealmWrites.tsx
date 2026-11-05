@@ -1,151 +1,89 @@
-// A realm's write functions with one or two fields (9d, the call card's first place, frame 33): each a row with a "Call" button
-// that opens the call card under it, in the thread and never in a modal. The read functions are RealmFunctions'; a call of more
-// fields, of a type a call does not carry, of none, `<gno-form>`, votes and quick actions are 9e's. The list is read once from
-// `vm/qfuncs`; a card reads the indexer once, for its fee line, when it opens, and Adena is asked nothing until its signature.
+// A realm's write functions (9d, 9e; the call card's first place, frame 33): each a row with a "Call" button that opens the call card
+// under it, in the thread and never in a modal; one field, two, more, or none (D254). A function with a type a call does not carry
+// has no Call, but a way to the realm on gnoweb. The read functions are RealmFunctions'. The list is read once from `vm/qfuncs`; a card
+// reads the indexer once, for its fee line, when it opens, and Adena is asked nothing until its signature.
 import { callFields } from "@gnoworld/core";
-import { readCallFees, type CallFees } from "@gnoworld/chain/fees";
-import type { ReadOptions } from "@gnoworld/chain/read";
-import { Stack } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
-import { CallCard, callsIn, ensureCalls, feeText, signInPage } from "../calls/index.ts";
-import { readCallable } from "../../lib/chain/rpc.ts";
+import { Button, Stack } from "@gnoworld/ui";
+import { callsIn } from "../calls/index.ts";
+import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
+import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
 import styles from "./RealmFunctions.module.css";
+import { useCallable, type Callable } from "./useCallable.ts";
 
-export interface RealmWritesProps {
-  realm: string;
-  /** The universe it is read from and signed on. */
-  chain: { name: string; chainId: string; rpc: string; indexer: string };
-  options?: ReadOptions;
+export interface RealmWritesProps extends CallPlace {
+  chain: CallPlace["chain"] & { gnoweb: string };
 }
 
-// A rejection here is a bug, not a state: the browser's own report, as the other panels' are.
-const report = (error: unknown): void => {
-  reportError(error);
+// The functions a call can carry, and the write ones it cannot (a type it does not carry); a read, or a hostile name, is neither.
+const carried = (each: Callable): boolean | undefined => {
+  const fields = callFields(each.params);
+  return fields.ok ? true : fields.why === "gnoweb" ? false : undefined;
 };
-
-interface Write {
-  name: string;
-  params: { Name: string; Type: string }[];
-}
-type Listing = { state: "loading" } | { state: "listed"; writes: Write[] } | { state: "failed"; next: string };
-
-// The functions a card calls: one or two fields, of the types a call carries; none of a read, of three, or of none.
-const hasOneOrTwoFields = (params: Write["params"]): boolean => {
-  const fields = callFields(params);
-  return fields.ok && fields.fields.length >= 1 && fields.fields.length <= 2;
-};
-
-function useWrites({ chain, realm, options }: RealmWritesProps): Listing {
-  const [listing, setListing] = useState<Listing>({ state: "loading" });
-  useEffect(() => {
-    readCallable(chain.rpc, realm, options)
-      .then((read) => {
-        setListing(
-          read.ok
-            ? { state: "listed", writes: read.value.filter(({ params }) => hasOneOrTwoFields(params)) }
-            : { state: "failed", next: read.failure.next },
-        );
-      })
-      .catch(report);
-  }, [chain.rpc, realm, options]);
-  return listing;
-}
-
-// The card of a row: the fee read once when it opens, its words from the course the store holds.
-function Card({
-  id,
-  chain,
-  options,
-}: {
-  id: string;
-  chain: RealmWritesProps["chain"];
-  options?: ReadOptions | undefined;
-}) {
-  const store = useAppStore();
-  const card = useApp((state) => callsIn(state)?.calls[id]);
-  const [fees, setFees] = useState<CallFees | undefined>(undefined);
-  const { realm, func } = card ?? { realm: "", func: "" };
-  useEffect(() => {
-    readCallFees(chain.indexer, { realm, func }, options)
-      .then((read) => {
-        setFees(read.ok ? read.value : undefined);
-      })
-      .catch(report);
-  }, [chain.indexer, realm, func, options]);
-  const callsActions = callsIn(store.getState())?.callsActions;
-  if (card === undefined || callsActions === undefined) return null;
-  const { name, chainId, rpc } = chain;
-  return (
-    <CallCard
-      card={card}
-      network={{ name, chainId }}
-      fee={feeText(fees)}
-      onEdit={(index, text) => {
-        callsActions.edit(id, index, text);
-      }}
-      onSign={() => {
-        signInPage(id, store, { chainId, name, rpc }).catch(report);
-      }}
-      onCancel={() => {
-        callsActions.close(id);
-      }}
-      onRetry={() => {
-        callsActions.retry(id);
-      }}
-    />
-  );
-}
 
 // One function: its Call button, and its card under it once opened.
-function WriteRow({ write, realm, chain, options }: RealmWritesProps & { write: Write }) {
+function WriteRow({ write, ...place }: CallPlace & { write: Callable }) {
   const store = useAppStore();
-  const id = `${chain.chainId} ${realm}.${write.name}`;
+  const id = `${place.chain.chainId} ${place.realm}.${write.name}`;
   const opened = useApp((state) => callsIn(state)?.calls[id] !== undefined);
   return (
     <FunctionRow
       name={write.name}
       verb="Call"
       onClick={() => {
-        callsIn(store.getState())?.callsActions.open({
-          id,
-          chainId: chain.chainId,
-          realm,
-          func: write.name,
-          params: write.params,
-        });
+        openCard(store, { id, place, write });
       }}
     >
-      {opened ? <Card id={id} chain={chain} options={options} /> : null}
+      {opened ? <InlineCard id={id} place={place} /> : null}
     </FunctionRow>
   );
 }
 
-function Rows({ writes, ...rest }: RealmWritesProps & { writes: Write[] }) {
+// A function a call cannot carry: no Call, and the realm on gnoweb, which can.
+function GnowebRow({ name, href }: { name: string; href: string | undefined }) {
+  return (
+    <li className={styles["item"]}>
+      <div className={styles["line"]}>
+        <span className={styles["name"]}>{name}</span>
+        {href === undefined ? null : (
+          <Button emphasis="outline" size="s" href={href}>
+            Open in gnoweb
+            <span className="visually-hidden"> for {name}</span>
+          </Button>
+        )}
+      </div>
+    </li>
+  );
+}
+
+function Rows({ functions, ...place }: RealmWritesProps & { functions: Callable[] }) {
+  const href = gnowebLink(place.chain.gnoweb, place.realm);
+  const { chain, realm, options } = place;
+  const here: CallPlace = { chain, realm, ...(options === undefined ? {} : { options }) };
   return (
     <ul className={styles["list"]}>
-      {writes.map((write) => (
-        <WriteRow key={write.name} write={write} {...rest} />
-      ))}
+      {functions.map((write) =>
+        carried(write) === true ? (
+          <WriteRow key={write.name} write={write} {...here} />
+        ) : (
+          <GnowebRow key={write.name} name={write.name} href={href} />
+        ),
+      )}
     </ul>
   );
 }
 
 function Body(props: RealmWritesProps) {
-  const listing = useWrites(props);
+  const listing = useCallable(props.chain.rpc, props.realm, props.options);
   if (listing.state !== "listed") return <Unlisted listing={listing} />;
-  if (listing.writes.length === 0) return <p>There is no write function to call here.</p>;
-  return <Rows {...props} writes={listing.writes} />;
+  const functions = listing.functions.filter((each) => carried(each) !== undefined);
+  if (functions.length === 0) return <p>There is no write function to call here.</p>;
+  return <Rows {...props} functions={functions} />;
 }
 
 /** A realm's write functions as rows, each opening its call card; read again, from nothing, when the realm or the chain change. */
 export function RealmWrites(props: RealmWritesProps) {
-  const store = useAppStore();
-  // The rows come once the list is read, after this has run: they find the slice there.
-  useEffect(() => {
-    ensureCalls(store);
-  }, [store]);
   return (
     <section key={`${props.chain.chainId} ${props.chain.rpc} ${props.realm}`} aria-label="Write functions">
       <Stack space="xs">

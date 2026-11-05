@@ -1,0 +1,65 @@
+// A page's `<gno-form exec="Func">` that a call can carry (9e, ADR-0002 section 4): the form as RealmForm draws it, every field in
+// view, and a "Call" that opens the call card under it, prefilled from the form, every field editable (a hidden one shows as a field,
+// the form still says it is hidden). What the chain does not confirm leaves the read-only form: `vm/qfuncs` has no such write
+// function, a type no call carries, a field no parameter is named for, two of one name, a line that is no field, fields left
+// out of the drawing, or a `path`, which names the realm gnoweb sends to and which this form does not follow.
+import type { CallField, FormField } from "@gnoworld/core";
+import { Button, Stack } from "@gnoworld/ui";
+import { useId } from "react";
+import { callsIn } from "../calls/index.ts";
+import { useApp, useAppStore } from "../../storeContext.tsx";
+import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
+import { RealmForm } from "./RealmForm.tsx";
+import { useCallable, writeOf } from "./useCallable.ts";
+
+// The text for each of the function's fields, or none when the form is not one this function's call can be prefilled from.
+function textsOf(fields: readonly CallField[], form: readonly FormField[]): string[] | undefined {
+  const names = new Set(fields.map(({ name }) => name));
+  const seen = new Set<string>();
+  for (const { tag, name } of form) {
+    if (tag === "other" || name === "" || !names.has(name) || seen.has(name)) return undefined;
+    seen.add(name);
+  }
+  return fields.map(({ name }) => form.find((each) => each.name === name)?.value ?? "");
+}
+
+/** The form of a page for the realm `call` names. */
+export function CallableForm({
+  exec,
+  path,
+  fields,
+  left,
+  call,
+}: {
+  exec: string;
+  path: string;
+  fields: readonly FormField[];
+  left: number;
+  call: CallPlace;
+}) {
+  const store = useAppStore();
+  const listing = useCallable(call.chain.rpc, call.realm, call.options);
+  // A card of its own for each form: two forms of one function, or a form and a row, never share one.
+  const id = `${call.chain.chainId} ${call.realm}.${exec}#${useId()}`;
+  const opened = useApp((state) => callsIn(state)?.calls[id] !== undefined);
+  const write = path === "" && left === 0 ? writeOf(listing, exec) : undefined;
+  const texts = write === undefined ? undefined : textsOf(write.fields, fields);
+  if (write === undefined || texts === undefined)
+    return <RealmForm exec={exec} path={path} fields={fields} left={left} />;
+  return (
+    <RealmForm exec={exec} path={path} fields={fields} left={left} note="a call you sign in Adena">
+      <Stack space="xs">
+        <Button
+          emphasis="outline"
+          size="s"
+          onClick={() => {
+            openCard(store, { id, place: call, write: write.function, texts });
+          }}
+        >
+          {`Call ${write.function.name}`}
+        </Button>
+        {opened ? <InlineCard id={id} place={call} /> : null}
+      </Stack>
+    </RealmForm>
+  );
+}

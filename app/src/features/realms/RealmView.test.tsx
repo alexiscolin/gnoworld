@@ -6,6 +6,7 @@ import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "@gnoworld/chain/read";
+import { realmType } from "@gnoworld/core";
 import { StoreProvider } from "../../storeContext.tsx";
 import { RealmView } from "./RealmView.tsx";
 
@@ -20,6 +21,8 @@ const CHAIN = {
   gnoweb: "https://onyx.testnets.gno.land",
   indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
 };
+// The input fields under `box`, as the inputs they are.
+const inputs = (box: ParentNode): HTMLInputElement[] => [...box.querySelectorAll("input")];
 
 // 5k: the facts the indexer gives for the realm, in the shape the schema takes (synthetic: nothing is recorded, F2950).
 const FACTS = {
@@ -289,3 +292,54 @@ describe("a realm's view", () => {
 function Here() {
   return <p data-at="">{useLocation().pathname}</p>;
 }
+
+// 9e: a page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
+describe("a realm's view, with a form on its page", () => {
+  const CUR = { Name: "cur", Type: realmType() };
+  const WRITES = [{ FuncName: "SetBio", Params: [CUR, { Name: "bio", Type: "string" }], Results: null }];
+  const form = (exec: string) =>
+    `# Bio\n\n<gno-form exec="${exec}">\n<gno-input name="bio" type="text" value="hi" />\n</gno-form>`;
+  const fetcher = (page: string) =>
+    vi.fn<ChainFetch>((url) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes("/status")
+              ? statusEnvelope(786661, "2026-10-30T23:43:10Z")
+              : queryEnvelope({ data: url.includes("vm%2Fqfuncs") ? JSON.stringify(WRITES) : page }),
+          ),
+        ),
+      ),
+    );
+  const callOf = (box: HTMLElement) =>
+    vi.waitFor(() => {
+      const found = button(one(box, "figure"), "Call SetBio");
+      if (found === undefined) throw new Error("no Call yet");
+      return found;
+    });
+
+  test("shows a Call on a page's form for a write function the chain lists, and opens its card prefilled in the view", async () => {
+    const box = await view(fetcher(form("SetBio")));
+    click(await callOf(box));
+    expect(inputs(one(box, "figure")).map((i) => i.value)).toEqual(["hi"]);
+  });
+
+  test("keeps the form read only for a function the chain does not list", async () => {
+    const box = await view(fetcher(form("Drain")));
+    // The write rows below the page are drawn from the same list: the form had its answer by then.
+    await vi.waitFor(() => {
+      expect(button(box, "Call SetBio")).toBeDefined();
+    });
+    expect(all(one(box, "figure"), "button")).toHaveLength(0);
+    expect(one(box, "figure").textContent).toContain("read only");
+  });
+
+  test("gives the form and the write row of one function a card each, with the form's own texts", async () => {
+    const box = await view(fetcher(form("SetBio")));
+    const formCall = await callOf(box);
+    click(all(box, '[aria-label="Write functions"] button').find((b) => b.textContent === "Call SetBio"));
+    click(formCall);
+    expect(inputs(one(box, "figure")).map((i) => i.value)).toEqual(["hi"]);
+    expect(all(box, "article")).toHaveLength(2);
+  });
+});
