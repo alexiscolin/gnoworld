@@ -1,5 +1,7 @@
 // How the whole cosmos's mass is drawn (web.ts; 7u): each particle a small opaque sphere lit from one side, so a near one hides a far
-// one, its colour its kind's from the palette, fading towards the ground with distance; it glides from where the last mass held it. The ground behind it, and the chosen clump's line of light, a thin horizontal band.
+// one, its colour its kind's from the palette, fading towards the ground with distance; it glides from where the last mass held it. Near
+// the page's text it thins out, each particle kept by its world's own draw against the text's field, and smaller (offTheBox.ts, 8m). The
+// ground behind it, and the chosen clump's line of light, a thin horizontal band.
 import { AdditiveBlending, Color, Mesh, PlaneGeometry, ShaderMaterial } from "three";
 
 const POINT_VERTEX = /* glsl */ `
@@ -32,6 +34,9 @@ void main() {
   vDepth = mix(1.0, uFarLight, smoothstep(uNear, uFar, distance)) * min(1.0, size / 0.8);
   gl_Position = projectionMatrix * seen;
   gl_PointSize = 2.0 * max(size, 0.8) * uRatio;
+  float kept = offField((gl_Position.xy / gl_Position.w * 0.5 + 0.5) * offBuffer, gl_PointSize * 0.5);
+  if (fract(aSize.z * 113.0) >= kept) gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+  gl_PointSize *= mix(0.6, 1.0, kept);
 }`;
 
 // A sphere's disc, lit from the upper left, `uShadow` of the light on its far side from the mass around it, its kind's touch at its rim;
@@ -121,7 +126,7 @@ export const massUniforms = () => ({
   ...{ uShadow: { value: 0 }, uFarLight: { value: 1 } },
 });
 
-/** The particles' material: depth-tested and written, its light whole but where the page's text's box fades it (offTheBox.ts). */
+/** The particles' material: depth-tested and written, its light whole, thinned out round the page's text (offTheBox.ts). */
 export const massLook = (uniforms: Uniforms) =>
   new ShaderMaterial({ uniforms, vertexShader: POINT_VERTEX, fragmentShader: POINT_FRAGMENT, transparent: true });
 

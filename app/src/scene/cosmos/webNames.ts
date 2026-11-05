@@ -1,8 +1,10 @@
 // The whole cosmos's names (web.ts; 7u): the cosmos's own pills (labels.module.css, the video's) over the biggest clumps, each its
 // namespace and its worlds; on a phone the four biggest alone (the chief, 2026-11-04), so none crowds or runs off its edge. A pill that
-// would cover another, or the page's text, stays hidden, the biggest first. Over the canvas, taking no pointer.
+// would cover another, or the page's text, or name a clump thinned out round it (8m), stays hidden, the biggest first. Over the canvas, taking
+// no pointer.
 import type { ClearBox, Clump, Point } from "@gnoworld/core";
 import type { Vector3 } from "three";
+import { THIN } from "../offTheBox.ts";
 import styles from "./labels.module.css";
 
 const NAMED = 12;
@@ -21,7 +23,7 @@ interface Screen {
   readonly height: number;
   readonly box: ClearBox | undefined;
 }
-const over = (rect: DOMRect, box: ClearBox | undefined) =>
+const over = (rect: ClearBox, box: ClearBox | undefined) =>
   box !== undefined && rect.left < box.right && rect.right > box.left && rect.top < box.bottom && rect.bottom > box.top;
 
 export class WebNames {
@@ -71,7 +73,11 @@ export class WebNames {
       box.style.transform = `translate(${String(Math.round(x))}px, ${String(Math.round(y))}px) translate(-50%, -100%)`;
       const rect = box.getBoundingClientRect();
       const inside = rect.left >= 0 && rect.right <= width && at.z < 1;
-      const shown = rank < most && inside && !taken.some((other) => overlaps(rect, other)) && !over(rect, clear);
+      const centre = project(clump.centre);
+      const [cx, cy] = [((centre.x + 1) * width) / 2, ((1 - centre.y) * height) / 2];
+      const thinned = over({ left: cx - THIN, right: cx + THIN, top: cy - THIN, bottom: cy + THIN }, clear);
+      const shown =
+        rank < most && inside && !taken.some((other) => overlaps(rect, other)) && !over(rect, clear) && !thinned;
       // The pill's own display outweighs the hidden attribute: it goes by its style.
       box.style.display = shown ? "" : "none";
       if (shown) taken.push(rect);
