@@ -34,6 +34,20 @@ describe("the coalescer", () => {
     expect(passed.length).toBeGreaterThanOrEqual(36);
   });
 
+  it("keeps a room's stamps through the once-a-second purge: 4 just before it and 4 just after are 4, not 8", () => {
+    let time = 0;
+    const coalescer = makeCoalescer({ now: () => time });
+    coalescer.admit("elsewhere");
+    const passed: number[] = [];
+    for (time = 900; time < 1100; time += 10) {
+      if (coalescer.admit("govdao")) passed.push(time);
+    }
+    expect(passed).toEqual([900, 910, 920, 930]);
+    // 1,000 ms after the first four, the first is out of the window and the next one in.
+    time = 1900;
+    expect(coalescer.admit("govdao")).toBe(true);
+  });
+
   it("forgets a room that has been quiet for a second, so the rooms it holds stay bounded", () => {
     let time = 0;
     const coalescer = makeCoalescer({ now: () => time });
@@ -42,6 +56,25 @@ describe("the coalescer", () => {
     time = 2000;
     coalescer.admit("fresh");
     expect(coalescer.size()).toBe(1);
+  });
+
+  it("purges once a second at most, at the second's edge, and judges a room by its newest stamp", () => {
+    const coalescer = makeCoalescer({ now: () => time });
+    let time = 0;
+    coalescer.admit("quiet");
+    // A purge at exactly a second forgets a room whose newest stamp is exactly a second old.
+    time = 1000;
+    coalescer.admit("fresh");
+    expect(coalescer.size()).toBe(1);
+    // A room with old early stamps and a young newest one stays through the next purge.
+    for (time of [1100, 1110, 1900]) coalescer.admit("busy");
+    time = 2110;
+    coalescer.admit("z");
+    expect(coalescer.size()).toBe(2);
+    // The purge ran at 2,110: none runs again before 3,110, though "busy" is a second old at 2,900.
+    time = 2900;
+    coalescer.admit("w");
+    expect(coalescer.size()).toBe(3);
   });
 
   it("holds 10,000 rooms at most: a room past them is refused rather than grown", () => {

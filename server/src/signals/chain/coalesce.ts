@@ -17,10 +17,7 @@ export function makeCoalescer({ now }: { now: () => number }) {
         for (const [name, stamps] of rooms) if ((stamps.at(-1) ?? 0) <= time - WINDOW_MS) rooms.delete(name);
       }
       const held = (rooms.get(room) ?? []).filter((stamp) => stamp > time - WINDOW_MS);
-      if (held.length >= PER_SECOND || (!rooms.has(room) && rooms.size >= ROOMS)) {
-        if (rooms.has(room)) rooms.set(room, held);
-        return false;
-      }
+      if (held.length >= PER_SECOND || (!rooms.has(room) && rooms.size >= ROOMS)) return false;
       rooms.set(room, [...held, time]);
       return true;
     },
