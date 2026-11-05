@@ -30,6 +30,19 @@ describe("CallRequest", () => {
     expect(CallRequest.parse(multi)).toEqual(multi);
   });
 
+  // One character of each UTF-8 width (2, 3 and 4 bytes) fills the cap to the byte, and one more byte is refused.
+  it.each([
+    ["2-byte", "\u00e9", 2],
+    ["3-byte", "\u20ac", 3],
+    ["4-byte", "\u{1f600}", 4],
+  ])("counts %s characters in bytes: 8,192 are taken, 8,193 are refused", (_, char, width) => {
+    const count = Math.floor(8191 / width);
+    const fits = char.repeat(count) + "a".repeat(8192 - count * width);
+    const over = `${fits}a`;
+    expect(CallRequest.safeParse({ ...REQUEST, args: [fits] }).success).toBe(true);
+    expect(CallRequest.safeParse({ ...REQUEST, args: [over] }).success).toBe(false);
+  });
+
   it("keeps every argument as it was written, empty, spaced or unicode", () => {
     const args = ["", " 12 ", "1e3", "café \u{1f600}", "line\nbreak"];
     expect(CallRequest.parse({ ...REQUEST, args }).args).toEqual(args);
