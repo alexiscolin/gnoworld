@@ -11,7 +11,7 @@ import {
   Vector2,
   Vector3,
 } from "three";
-import type { Point } from "@gnoworld/core";
+import { GOLDEN, type Point } from "@gnoworld/core";
 
 const COUNT = 1500;
 // The box they wrap in, in world units, and how long a moment their tails keep, in seconds.
@@ -21,7 +21,6 @@ const TAIL = 0.013;
 const FULL = 30;
 // A low-discrepancy sequence spreads them evenly with no chance in it (R3's constants), and the golden ratio their light.
 const SPREAD = [0.8191725133961645, 0.6710436067037893, 0.5497004779019703] as const;
-const GOLDEN = 0.6180339887498949;
 // A dash's six corners, as two triangles: which end of it each stands at (0 now, 1 a moment ago), and which side of its line.
 const TAILS = [0, 0, 1, 0, 1, 1] as const;
 const SIDES = [-1, 1, 1, -1, 1, -1] as const;

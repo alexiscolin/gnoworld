@@ -139,12 +139,17 @@ def worktree(rev):
             git("worktree", "remove", "--force", tree)
 
 
-def listed(root, suffixes, skip=frozenset()):
-    """The files git would track under root (so .gitignore holds), or every file when root is not
-    in a repository; a file deleted but still in the index is left out."""
+def repo_paths(root):
+    """The paths git would track under root (so .gitignore holds), each as git names it: a link whether it leads anywhere or not, a
+    file deleted but still in the index. Every path when root is not in a repository, but what it borrows."""
     try:
-        paths = [root / line for line in git("-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard").splitlines()]
+        return [root / line for line in git("-C", str(root), "ls-files", "--cached", "--others", "--exclude-standard").splitlines()]
     except (OSError, subprocess.CalledProcessError):
         # Outside a repository (the pre-commit's staged copy holds only tracked files), skip what it borrows.
-        paths = [p for p in root.rglob("*") if "node_modules" not in p.relative_to(root).parts]
-    return [p for p in paths if p.suffix in suffixes and p.is_file() and not skip & set(p.relative_to(root).parts)]
+        return [p for p in root.rglob("*") if "node_modules" not in p.relative_to(root).parts]
+
+
+def listed(root, suffixes, skip=frozenset()):
+    """The files of repo_paths with one of suffixes and no folder of skip on their way; a file deleted but still in the index, or a
+    link that leads to no file, is left out."""
+    return [p for p in repo_paths(root) if p.suffix in suffixes and p.is_file() and not skip & set(p.relative_to(root).parts)]

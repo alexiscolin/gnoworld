@@ -37,16 +37,22 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   the slice's integration branch, runs the full gate and the slice's last `/pre-merge`, with the `design-reviewer` once more over every 3D view, then the dream.
   In slice 7 alone the parts follow each other with one full verification before the demo: a part runs neither `--merge` nor the Workflow
   (`docs/decisions.md`, `docs/plans/slice-7.md`).
+  From 7w3 the worktrees live beside the main checkout, in `~/Server/gnoworld-wt/`, which no part's sandbox writes: the
+  chief's session starts with that folder added (`claude --add-dir ~/Server/gnoworld-wt` in the main checkout, or Alexis
+  types `/add-dir ~/Server/gnoworld-wt` once in it), for its worktrees and its merges there; never in a settings file,
+  which every part's session would read too. Its sandbox writes no folder outside its checkout, the temp folder and the caches, so
+  it needs it from the move on, not only once `main` holds the write block (F5324).
 - **A branch session**, one per branch, two at most at once, works in its own worktree, made by
-  `scripts/worktree.sh` and never by hand (one store of packages, a real `.bin`, F2127). Its
+  `scripts/worktree.sh` in `~/Server/gnoworld-wt/` and never by hand (one store of packages, a real `.bin`, F2127). Its
   pipeline is the Workflow `branch` (`.claude/workflows/branch.js`): the failing tests, the red
   pass, the code, the merge check, one combined review, the high and medium fixes, the merge check
   again; it returns its commits, the low findings for Alexis, the lines that loosen the net and its tokens.
   An agent that gives no report blocks it; the harness's and the realms' files bring their reviews
   whatever its arguments say, and so does every tier-1 path of `docs/REVIEW.md`'s table that exists (the relay's auth script,
   the CSP, `deploy/`, `core/markdown`, `lib/adena`, the login of the server and of the client, the server's roles, the worker): the
-  table writes each path in backticks, and a `workflow_branch` case fails when the table names one its `TIER1` lacks, or `TIER1` holds
-  one the table does not name. Its argument `base` (`main` when absent) is the branch the
+  table writes each path in backticks, and `scripts/check_docs.py`, which pre-commit runs on every commit, prose alone included, fails
+  when the table names one its `TIER1` lacks, or `TIER1` holds one the table does not name (F4928: a commit of the table alone was
+  prose, and the `workflow_branch` case that held it never ran). Its argument `base` (`main` when absent) is the branch the
   work is cut from: the merge check's file list, the reviewer's diff and `since` read from it. The merge check
   reports the `survivor: ` lines `check.sh --merge` prints, pass or fail, and the reviewer gets them: StrykerJS's survivors on the
   files the branch changed, one `survivors not listed:` count for the rest, and every harness mutant. With a base the loop runs
@@ -76,7 +82,13 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    behind, which the sandbox cannot see: a node process naming a folder `gnoworld/` whose parent
    is gone for 30 minutes (2 hours while a gate runs), or a test tool's 3 hours old or more but a
    dev or watch mode, each logged to `~/Library/Logs/gnoworld-reaped.log`, where the sandbox
-   cannot write.
+   cannot write. Its one exception is the ping-pong (`pingpong`; Alexis, 2026-11-04): while
+   Alexis's own `pnpm workshop` serves this checkout, the turn ends with no gate (docs/DEVELOPMENT.md,
+   "The workshop"). Its sign is one no sandboxed command plants: a shell running this checkout's
+   `scripts/workshop.sh` from its folder, its parent alive, that macOS's `sandbox_check` finds in no
+   sandbox, read with `/bin/ps`, `/usr/sbin/lsof` and `/usr/bin/python3 -I`; no file of the tree.
+   A workshop left running keeps every turn of that checkout gate-free; pre-commit still gates each
+   commit.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
    (F129). `commit-msg` holds the subject's form, refuses attribution lines and a `fix` of the
@@ -92,7 +104,8 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    by the `reviewer` agent (with the `security-reviewer` for a tier-1 file or the harness, the
    `gno-auditor` for a realm), each finding reproduced, high and medium fixed,
    low ones listed for Alexis, then a recorded review pass (`scripts/review_pass.py`).
-8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch. It takes a lock per Docker project
+8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch, from a copy of the commit he reviewed
+   whose commit and files hash to its name (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed"), never from a worktree. It takes a lock per Docker project
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
    command that removes it. `test_hooks.sh`'s section `deploy_lock` runs it against stubbed Docker.
@@ -167,6 +180,17 @@ in a run of the related tests and, as `related.py --check`, in a run of every on
 copy of pre-commit gets the related tests too, from its list (the command, given the paths, needs no git). The whole suite runs when
 the change holds a path no area places, when nothing changed, at a part's end (`check.sh --tests-all`, the fast gate with every test of
 its projects, before its report; the slow project and core's in Chromium wait for the merge check) and in the merge check and `--full`.
+
+**The timing tests** (Alexis, 2026-11-04, "Oui, les deux"): a test that reads a clock ("in 100 ms or less", a cost that grows
+with its input and not its square) carries Vitest's tag `timing` (`{ tags: ["timing"] }`, defined in vitest.config.ts). The fast
+gate leaves those, related, `--tests-all` and a failed file's second run alike (`--tags-filter=!timing`); the merge check and
+`--full` run them in the coverage, as every test. Three carry it: rest.test.ts's two search costs (202 times in the worktrees'
+unsteady logs) and search.test.ts's square. A behaviour test that failed only on its timeout under load is no clock's: it keeps
+its place in every commit's related tests, with a timeout that holds at a load of 80, a minute (main.test.ts's 3k, LineView's
+country, Here's two counts, whose waits get 30 s, arrival's seven views and same arrival, cosmos.test.ts's close world,
+space.test.ts's shells, useSpace's three, ladder's two past the cap; the chief's reading of the decision, lot 2's R2). So do the
+guards against overload (the markdown scanner's linear-in-bytes cases, tier 1; the guards' property tests). Run the tagged alone:
+`pnpm exec vitest run --tags-filter=timing`.
 
 **A commit's gate walks no journey** (Alexis, 2026-10-31; harness-c): the speed audit measured 487 and 505 CPU s of Playwright
 journeys against 67 to 91 for the rest of a commit's gate, and scoping them to the change (the former journey scoper,
@@ -262,7 +286,10 @@ fails before StrykerJS's own phase runs (a coverage run that failed leaves no re
 the first phase with a failure (C.5, F823). Its coverage runs after the probe and the benches, alone, and before the stories and
 `prove_fix` (F3384); a failed Vitest file runs once more, as in the fast gate, but the second run is the whole coverage, so that the
 85% and 100% floors are measured on it (a single file cannot meet them). A commit's gate that builds the app also reads the first screen's
-budget with the budget spec alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip).
+budget with the budget spec's tests tagged `@gate` alone (`app/tests/e2e/budgets.spec.ts`, the browser's gzip), and the late chunks'
+caps from the built files with no page (`app/tests/e2e/chunks.ts`, Node's gzip, the browser's bytes; Alexis, 2026-11-04): the late
+chunks' journeys, which draw the scene on a software GPU to see which chunk a page asks, timed out at a load of 60 and run at the merge
+check and in `--full`, each checking that the chunk the page asked is the file weighed.
 
 **Full** (`--full`: the slice's last merge and a push of `main`; `--merge`: each branch's
 `/pre-merge`, with the harness mutants of the lines it changed, and without the stories,
@@ -351,8 +378,37 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
 - **The instructions at a tree's root and above it** (7z, S4): Claude Code reads `CLAUDE.md` and `CLAUDE.local.md` in every
   folder above the one it starts in (its memory page), and `.claude`'s own `CLAUDE.md` and `.claude/rules/` there by its source.
   Closed: to commands in `/private/tmp/claude-501/` and `gnoworld-wt/`, the folders above every worktree a command may write; to
-  the file tools there, in `/private/tmp/` (by both spellings), in `~` and in `~/Server/`. Not closed: those below a tree's root,
-  the memory and the imports (Known limits).
+  the file tools there, in `/private/tmp/` (by both spellings), in `~` and in `~/Server/`, and above the next parts' trees in
+  `~/Server/gnoworld-wt/` (7w3); `AGENTS.md` and `.claude`'s own beside them everywhere (7w3, F5323: read there where no
+  `CLAUDE.md` stands, or when the settings ask for both kinds). Not closed: the memory and the imports (Known limits).
+- **The instructions below a tree's root** (7w3, S2-3, F5321, F5323): Claude Code loads a subfolder's `CLAUDE.md` and
+  `CLAUDE.local.md`, an `AGENTS.md` where no `CLAUDE.md` stands, and a subfolder's `.claude` rules and skills, once it reads
+  a file there (its memory and skills pages). Closed at any depth (`**/`), to commands and the file tools, in a session's own tree, in
+  every sibling's and the main checkout's; StrykerJS's `ignorePatterns` leave those names out of its copies, which the denies would
+  refuse. `scripts/check_docs.py`, which every commit runs, refuses one committed or on disk and not ignored (case folded, a link by
+  its name, any `.claude` below the root), and at the root a `CLAUDE.local.md` or an `AGENTS.md`.
+- **The file tools write the session's folders alone** (7w3, F5320, Alexis's "Oui, pour gnoworld"): the committed settings set
+  `permissions.blockWritesOutsideWorkingDirectories`, so Write, Edit and NotebookEdit refuse every path outside the working
+  directories, in every mode, bypass included (Claude Code's settings reference, 2.1.314 and later), whatever the deny lists name: they
+  name some places, never all (7w2's reviews found thirteen more). The working directories: the session's tree, and each running
+  slice's `reports/` folder in the main checkout's `.claude/tmp/` (slice 7's and 8's), which the main checkout's local settings name
+  (`settings.local.json` in its `.claude/`: a folder only a repository's settings name does not count, unless git tracks that file
+  not, and Alexis's global excludes hold it, F5326); never the whole `.claude/tmp/`, which holds the chief's gate records and the
+  briefs (the review's S1, R1). A part's state line goes in `reports/` too; a new slice's folder is a line Alexis adds there. That
+  local file also closes the instruction files below the main checkout's root to every gnoworld session, the old folder's parts and
+  the chief's included, whose trees lack 7w3's denies. Claude Code's own files stay open (the scratchpad, plan files, this project's
+  auto memory). Settings files are refused everywhere, and
+  `EnterWorktree` goes. It holds the file tools alone: commands are the sandbox's, and MCP tools and hooks are neither's. A session
+  holds it once its tree's settings do; the chief's, once `main`'s do.
+- **The next parts' worktrees, out of the temp folder** (7w3, F5322, F4893's remedy a): `~/Server/gnoworld-wt/`, beside
+  the main checkout. No part's sandbox has a write root there but its own tree, so its commands write no sibling's files, move none
+  and plant no folder there (a sibling's git state, its index and HEAD in the shared `.git`, stays theirs to write: F152, F4897);
+  the chief's session, which adds the folder, is held by 7z's twins there, by one spelling (no link on the way), and above the
+  trees by the instructions' rules, once `main` holds 7w3: until then its commands and file tools write every part's tree, as they
+  do in the temp folder today (F4896). The folder's own `.claude` is closed whole: an added folder's skills, commands and agents
+  load into the session that adds it (lot 2's S2-2). `scripts/worktree.sh` makes a tree there alone, the folder read
+  from git's common folder, a caller's git folders dropped; herdr's `open.sh` opens a part only in a folder there that is no link
+  and that the main checkout's `git worktree list` names. The old folder's twins stay while a part runs there.
 - **What a session holding the twins no longer writes in another worktree** (7z): everything closed in its own tree,
   in every worktree under `gnoworld-wt/`. By command: `CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`, `scripts/`,
   `.githooks/`, `.github/`, the settings, agents, commands, workflows, skills, rules and hooks in `.claude/`, every
@@ -369,10 +425,54 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   commit. Prettier run from a worktree loads a config a session can plant beside the file (a `prettier.config.mjs` in `.claude/`, run
   with Alexis's rights, reproduced).
 - **`scripts/guard.py`,** before each Bash call, web fetch and edit: no git hook skipped, no
-  forced push, no recursive delete of a path a variable may leave empty (only `${name:?}`), no
+  forced push, no git pointed at folders of the command's own (`GIT_DIR`, `GIT_COMMON_DIR`,
+  `GIT_WORK_TREE` given a value or exported, `--git-dir`, `--work-tree`, `core.worktree`: their hooks
+  run, or none), no recursive delete of a path a variable may leave empty (only `${name:?}`), no
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used. It reads through wrappers, `sh -c`, `eval` and `$(...)`; if it crashes,
-  the call is blocked.
+  and gnomcp was used. Every check reads the command from every word on, so a wrapper it does not know
+  runs nothing past it (git-core's dashed programs read as git): it fails closed, refusing a bare `gnokey`
+  word (the Grep tool searches for one) and asking before `echo git push`. It reads a shell's `-c`
+  wherever it stands among the options, `eval`, env's `-S` line, `$(...)`, `<(...)`, backticks, `${...}`,
+  a function's body and a command whose quotes hold a newline, takes a quoted mark for a word, and reads
+  past git's global options that take their argument apart; it refuses a shell or `source` reading a pipe,
+  a file, a here-string or a process (`=(…)` and stdin by any path included; a heredoc's lines are read), and a
+  zsh glob qualifier after any word. What it cannot read it refuses (7w4, reports/slice-7w4.md):
+  - a program a substitution's output names, a variable alone, a glob or a brace naming one (`/usr/bin/gi?`,
+    `""{zsh,-s}`), find's `-exec {}`; a program a variable names is otherwise read as git, rm and curl;
+  - in git: a list's words (`"$@"`), a subcommand, a `-c` value or a config key from an expansion, an expansion
+    in a commit, merge or pull but as `-m`'s or `-F`'s value (strict too when commit follows a variable behind a
+    wrapper), a brace no quote holds, a glob in a commit's, merge's, pull's or push's words, `-nm"…"`; git `am`,
+    `cherry-pick`, `rebase`, `revert`, `filter-branch`, `replay`, `update-ref`, a commit made by hash-object,
+    subtree add/merge/pull/split, stash create/store, the stash named by a command that moves a branch,
+    `pull --reb[ase]`, a config key making a pull rebase: commits no pre-commit saw;
+  - xargs or parallel feeding git or a shell, or running a program none of `FED`;
+  - a shell's `-c` line (read wherever the shell stands, and the words after it), `eval`, `trap`, `let`,
+    `sched`, `zpty`, `zstyle`, `bind`, `complete`, `compgen` and `parallel` holding an expansion (their words are
+    read as eval's); zregexparse;
+  - an alias or a hashed name (given by a variable too), zsh's `aliases`, `commands`, `functions`, `options`,
+    `histchars` and `HISTCHARS` given a value, by assignment, `${…::=…}`, `set -A`, `read -A`, `printf -v`,
+    `zparseopts` or `typeset`;
+  - zsh's ways of running a value's code: `${~x}`, `$~x`, the `(e)`, `(%)`, `(P)` and `(#)` flags, globsubst,
+    promptsubst, braceccl, extendedglob, shwordsplit, `setopt -m`, an option a variable names (to setopt or a
+    shell's `-o`), emulate, `print -P`, a `$'…'` escape by code, a value whose subscript assembles a `$(`;
+  - a NUL byte.
+  A value given is read as words, its substitutions as commands, and each line's substitutions are read too, its
+  quotes read as quotes and as characters, a command's comment skipped. A heredoc's body no shell reads (its line's
+  programs all of `READS_TEXT`) and a quote's later lines are text: kept from the qualifiers' check, a quoted
+  body's substitutions unread; the reader that finds them ends at any form it cannot settle (a continued line, a
+  `case`, a `<<` inside backticks, a mark it cannot read or never finds), what follows staying commands. If it
+  crashes, the call is blocked.
+  `.githooks/pre-commit` drops a caller's `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY`, which served
+  the staged copy a planted object under a staged file's name (F4923).
+- **Alexis's user settings** (`~/.claude/settings.json`, every project; 7w2's `apply-7w2-user.sh`): the
+  file tools, which the sandbox does not hold and bypass mode does not ask for, are denied the programs that
+  run outside the sandbox with his rights: the folders on `PATH` he owns and where their links lead (`~/.local`,
+  `~/.opencode`, `/opt/homebrew`, `~/.orbstack`, `/Applications`), what those settings run (`~/.claude/skills`,
+  `hooks`, `statusline.sh`, `plugins`, `dev-mods`, `agents`, `commands`, the file itself, `~/.claude.json`), the
+  same of the second profile `~/.claude-work`, launchd's agents, zsh's startup files and what they source, the
+  tools' config (`~/.config`, `~/.npmrc`, `~/.gitconfig`, `~/.docker`), python3's user site, `~/.ssh`, `~/.nvm`,
+  every project's settings under `~/Server`, and the main checkout's git config and hooks. A deny holds in every
+  mode, bypass included.
 
 The guard and the hooks are a seatbelt, not a wall: what holds whatever happens is `main`
 protected with the CI required, which this repository's plan does not offer yet (below).
@@ -413,8 +513,18 @@ costs context in every session.
   rule's fixed part and of a literal rule's folders, not of the folder a `*` stands for: a command can move a whole worktree out
   of `gnoworld-wt/`, write its closed files there and move it back (probed on `packages/core`, whose `package.json` only a glob
   holds; the section `siblings` prints it as a known gap), or plant a whole folder there for herdr's `open.sh`, which opens a
-  session in any folder of the part's name. What closes it is the worktrees out of the temp folder, each session writing only
-  its own, their making and merging out of the sandbox, or a literal rule per worktree written at its making: Alexis's decision.
+  session in any folder of the part's name. Alexis chose the worktrees out of the temp folder (7w3): in
+  `~/Server/gnoworld-wt/` no part's command reaches a sibling, and `open.sh` opens a folder git made there alone. It stays
+  open in the old folder while a part runs there, and for the chief's own session, whose `--add-dir` gives it the new folder: a
+  folder there moves out and back by its commands (the live probe prints it). And until every session holds the write block, the
+  file tools of one that does not (the old folder's parts, the chief) still write the next parts' trees, plant a folder there that
+  `open.sh` would open (a part's command forges the list git keeps of its worktrees), and rewrite the briefs (lot 2's S2-1, F5333):
+  the local settings close a tree's own `settings.local.json` and the folder's `.claude` to them, not the rest. The block in the
+  local settings would close it at once, the chief's included, at its cost: Alexis's call.
+- **A folder carrying an instruction file moves into a tree** (F5325, from Claude Code 2.1.318's source): `**/CLAUDE.md` and its
+  kin refuse a write or a rename onto such a name, not a folder made in the temp folder and renamed in, which the glob holds
+  nothing of; the live probe prints it. `check_docs.py` refuses it at every commit, so it reaches no other tree but by the session's
+  own working tree, which only that session reads.
 - **The file tools still edit another worktree's files that only the sandbox closes** (F4895): `scripts/check.sh`,
   `scripts/test_hooks.sh`, the tools' configs. The Edit list holds what runs outside the sandbox and the instructions, and no
   rule tells a session's own tree from another's: one closing a sibling's would close its own. A worktree outside `gnoworld-wt/`
@@ -425,17 +535,27 @@ costs context in every session.
   `shasum -a 256` the chief's message gives, never a file's, and runs the copy (S2-5).
 - **What Alexis runs from a checkout is any session's to rewrite** (7z's round 2, S2-1; F204's class): `deploy/test.sh` and
   `deploy/`'s compose files are open, in the integration worktree too, so an uncommitted line any session adds there runs with
-  his rights and Docker's socket. Safe only from a tree no session writes: `git archive <sha> | tar -x -C "$(mktemp -d)"`, the sha
-  from the chief's message.
+  his rights and Docker's socket. Safe only from a tree no session writes: `CLAUDE.md` sends him to `docs/OPERATIONS.md`'s checked
+  copy of the commit he reviewed (7w3, F5329; 7w2's recipe, which lands with 7w2's merge), never a worktree; until then
+  `git archive <sha> | tar -x -C "$(mktemp -d)"`, the sha from the chief's message.
 - **In bypass mode the file tools write the programs that run outside the sandbox** (S2-2, claimed, the writes not run):
   `~/.local/bin` comes first on PATH (gnomcp, which Claude Code starts by name, lives there), then `~/.opencode/bin` and
   `/opt/homebrew/bin` (the hooks' `python3`); herdr's `open.sh`, the hooks and Alexis's scripts call programs by name; no deny
   names those folders, nor `~/.claude/skills/` (the two excluded scripts) or `~/Library/LaunchAgents/`. Closing them is Alexis's
   user settings' to do; `apply-7z.sh` calls only `/usr/bin` and `/bin`.
-- **Instructions below a tree's root and Claude Code's memory stay open** (S2-3, S2-4): a `CLAUDE.md` in any folder of a tree,
-  which Claude Code attaches when it reads a file there (its memory page: subdirectories load on demand), its `.claude/rules/` and
-  skills; the auto memory every worktree session loads (`~/.claude/projects/…/memory/`); `~/.claude/RTK.md`, which
-  `~/.claude/CLAUDE.md` imports. Closing the nested ones needs StrykerJS to leave `CLAUDE.md` out of its copies.
+- **Claude Code's memory stays open** (S2-4; 7w3's S3, F5331): the auto memory every gnoworld session loads, the chief's included
+  (`~/.claude/projects/…/memory/`), which the write block leaves to the file tools by design and no settings file can close (a
+  memory folder only a repository names loses the exemption, and that key is ignored there): the widest channel from one session
+  to the next once the block holds. `~/.claude/RTK.md`, which `~/.claude/CLAUDE.md` imports. Below a tree's root
+  the instructions are closed (7w3, "The boundary") but for F5325, and for the installed packages' own: `node_modules` holds
+  `AGENTS.md` files (`@cosmjs`'s), Alexis's install's, which Claude Code reads only where no `CLAUDE.md` stands at or above a
+  session's folder, or when his settings ask for both kinds (its memory page, F5327).
+- **The write block stands on the main checkout's local settings staying untracked** (F5326): an index entry for that
+  `settings.local.json` in the main checkout's (one `git update-index` from any session, whose sandbox writes the shared `.git`)
+  makes it the repository's, whose folders do not count, and Claude Code remembers it in `~/.claude.json`
+  (`localSettingsSeenGitTracked` under the project), even once the index is mended: the parts' reports are refused, loudly, until
+  Alexis sets it back with no session running (the review's S5). The reports folders it names are working directories of every
+  gnoworld session, to the sandbox too: their commands write each other's reports.
 - **Two commands leave the sandbox** by Alexis's user settings (`sandbox.excludedCommands`): his captures' `fetch.sh` and
   herdr's `open.sh`, each taking arguments it validates; what they write is theirs to keep in bounds.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
@@ -472,8 +592,24 @@ costs context in every session.
 - **The three-round limit is a written rule;** nothing counts the rounds.
 - **The review pass is recorded by the agent that ran the review;** the pre-push hook checks it
   matches the tree, not who wrote it.
-- **Product files Claude writes run outside the sandbox** (F204): `deploy/test.sh`, the compose
-  file, and the app's code that `pnpm dev` runs in Alexis's shell.
+- **Product files Claude writes run outside the sandbox** (F204): the compose file the demo starts
+  from, and the app's code that `pnpm dev` and the workshop run in Alexis's shell; `deploy/test.sh`
+  runs from a checked copy of the commit he reviewed, so what it runs is what he read.
+- **The file tools write anywhere else Alexis can** (F4926): the user settings deny a list of places
+  (above), not every place outside the sessions' folders. `permissions.blockWritesOutsideWorkingDirectories`
+  would refuse them all, in every mode; it is Alexis's choice, for what it costs (7w2's report).
+- **The guard reads a command's text** (F4924, 7w4): a variable set with `set -a` and `read`, `for`, `printf -v`
+  or a substitution's output (`y=$(printf 'a[\x24(…)]'); echo $((y))`), a word an expansion yields
+  (`v=GIT_DIR=x; env "$v" git commit`; zsh's array or an unquoted `$(...)` as `-m`'s value, which the shell may
+  split into flags), a program a variable names behind a wrapper the guard does not know before a subcommand a
+  variable gives too (read for its literal flags alone), a shell reading a pipe behind such a wrapper (F5362), a
+  script that sets git's folders itself, a script or a module run from a file (`sh f`, `source f`, `enable -f`,
+  `zmodload`, `python3 -c` calling git, a copy of git under another name), a commit no hook saw put on a branch
+  by its hash (`git reset --soft <hash>`, F5369's S7-7), a subscript assembled character by character (S7-8),
+  and a crafted `.git` found by discovery after a `cd` (F152's class) pass it. The guard is a speed bump, not the
+  wall: skipped hooks close with a record of each gated tree that no session can write (the chief's next part,
+  reports/slice-7w4.md). A heredoc's line that reads as a refused command is refused, a heredoc inside backticks
+  too: a commit message goes in a file (`git commit -F`).
 
 ## Files
 
@@ -490,7 +626,7 @@ costs context in every session.
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
 | `scripts/lint_scope.py`, `scripts/stryker_lines.py` | the files a commit's lint reads, from the type check's graph; the code a merge check's StrykerJS mutates |
-| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages; a copy borrowing the installed packages, a workspace's `.bin` its own |
+| `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, in the folder beside the main checkout; a copy borrowing the installed packages, a workspace's `.bin` its own |
 | `.github/workflows/gate.yml` | the full gate on GitHub's machines |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
@@ -503,7 +639,7 @@ costs context in every session.
 | `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets |
-| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet (DEVELOPMENT.md, "The workshop") |
+| `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in the merge check; the pinned binary's checksum |
 | `docs/review/findings.md`, `docs/review-log.md` | every finding; what Alexis caught and missed, each branch's cost |
 | `docs/harness.html`, `docs/harness.png` | the picture above, and its source |

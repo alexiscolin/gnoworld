@@ -22,10 +22,13 @@ export interface CosmosStats {
   nebulae: number;
   worlds: number;
   eye: { x: number; y: number; z: number };
-  web?: { points: number; lines: number; gold: number; share: number };
+  web?: { points: number; particles: number; clumps: number; chosen?: string; share: number };
   sky: { share: number; eye: { x: number; y: number; z: number } };
   /** The home's dive (7d7): how far along it is, 1 at rest, and how much of the dissolve's picture still shows. */
   dive: { along: number; veil: number };
+  /** The Earth's view (7x2), once its chunk came: its stations as bodies and as the belt's lights, their parts and draws, the scenery's
+   * planets, and whether the orbits show. */
+  stations?: { close: number; belt: number; parts: number; draws: number; scenery: number; orbits: boolean };
 }
 /** The flights (7g): how many started, one under way or not, how far along, its veil and streaks, where it goes, and the eye's way so far. */
 export interface FlightStats {
@@ -113,6 +116,19 @@ export const landed = (page: Page) =>
       async () => {
         const dive = (await stats(page)).cosmos?.dive;
         return dive?.along === 1 && dive.veil === 0;
+      },
+      { timeout: 90_000 },
+    )
+    .toBe(true);
+
+/** The Earth's view standing (7x2): the Earth and its stations drawn. The view at rest draws no system's body (decisions 698 and 701), so
+ * a journey that waits for the cosmos to stand waits for this. */
+export const earthStanding = (page: Page) =>
+  expect
+    .poll(
+      async () => {
+        const cosmos = (await stats(page)).cosmos;
+        return cosmos?.earth === true && (cosmos.stations?.close ?? 0) > 0;
       },
       { timeout: 90_000 },
     )

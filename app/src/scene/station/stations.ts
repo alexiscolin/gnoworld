@@ -53,11 +53,22 @@ interface Placed {
   mesh: InstancedMesh | undefined;
 }
 
-// A station's frame: at its place, its spine turned its way and turned round it, scaled to its reach.
-function frameOf({ station, at, radius }: Standing): Matrix4 {
+// A station's pose: at its place, its spine turned its way and turned round it, its reach; its frame, scaled to the reach and to the share
+// of it the page's text leaves (`room`).
+interface Pose {
+  readonly at: Vector3;
+  readonly turn: Quaternion;
+  readonly radius: number;
+  readonly frame: Matrix4;
+  room: number;
+}
+
+function standingOf({ station, at, radius }: Standing): Pose {
   const turn = new Quaternion().setFromUnitVectors(Y, new Vector3(station.spine.x, station.spine.y, station.spine.z));
   turn.multiply(new Quaternion().setFromAxisAngle(Y, station.turn));
-  return new Matrix4().compose(new Vector3(at.x, at.y, at.z), turn, new Vector3(radius, radius, radius));
+  const made = { at: new Vector3(at.x, at.y, at.z), turn, radius, frame: new Matrix4(), room: 1 };
+  made.frame.compose(made.at, turn, new Vector3(radius, radius, radius));
+  return made;
 }
 
 export class StationsDrawn {
@@ -66,14 +77,17 @@ export class StationsDrawn {
   readonly #coverings = coveringsOf();
   #meshes: InstancedMesh[] = [];
   #placed: Placed[] = [];
+  #poses: Pose[] = [];
+  readonly #scale = new Vector3();
   readonly #wheel = new Matrix4();
   readonly #matrix = new Matrix4();
 
   /** Stands `list`, in place of what stood. */
   stand(list: readonly Standing[]): void {
     this.#clear();
-    this.#placed = list.flatMap((standing) => {
-      const frame = frameOf(standing);
+    this.#poses = list.map(standingOf);
+    this.#placed = list.flatMap((standing, at) => {
+      const frame = this.#poses[at]?.frame ?? new Matrix4();
       return standing.station.parts.map((part) => ({
         kind: part.kind,
         frame,
@@ -109,6 +123,15 @@ export class StationsDrawn {
     }
     this.#meshes.push(mesh);
     this.group.add(mesh);
+  }
+
+  /** Station `at` drawn at `room` of its reach, 0 to 1: what the page's text leaves of it, as a body's (cosmos/bodies.ts). */
+  room(at: number, room: number): void {
+    const pose = this.#poses[at];
+    if (pose === undefined || pose.room === room) return;
+    pose.room = room;
+    const reach = pose.radius * room;
+    pose.frame.compose(pose.at, pose.turn, this.#scale.set(reach, reach, reach));
   }
 
   /** The stations `seconds` on: each wheel turned round its spine. */

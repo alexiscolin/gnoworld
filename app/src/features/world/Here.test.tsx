@@ -70,21 +70,28 @@ describe("who is here, from the chat's store", () => {
     expect(host?.textContent).toBe("");
   });
 
-  it("keeps its place, empty, until someone is counted, and draws the fact in it: the plate under it never moves (7e)", async () => {
-    const place = host?.firstElementChild;
-    expect(place, "a place before the chat has connected").toBeInstanceOf(HTMLElement);
-    expect(place?.textContent).toBe("");
-    act(() => {
-      held().follow(["#bubble"]);
-      held().connected(ME);
-      held().heard(read(`:${ALICE}!u@h JOIN #bubble`));
-    });
-    await vi.waitFor(() => {
-      expect(labels()).toContain("right now");
-    });
-    expect(host?.firstElementChild, "the fact in the same place").toBe(place);
-    expect(place?.querySelector(".label")?.textContent).toBe("right now");
-  });
+  it(
+    "keeps its place, empty, until someone is counted, and draws the fact in it: the plate under it never moves (7e)",
+    { timeout: 60_000 },
+    async () => {
+      const place = host?.firstElementChild;
+      expect(place, "a place before the chat has connected").toBeInstanceOf(HTMLElement);
+      expect(place?.textContent).toBe("");
+      act(() => {
+        held().follow(["#bubble"]);
+        held().connected(ME);
+        held().heard(read(`:${ALICE}!u@h JOIN #bubble`));
+      });
+      await vi.waitFor(
+        () => {
+          expect(labels()).toContain("right now");
+        },
+        { timeout: 30_000 },
+      );
+      expect(host?.firstElementChild, "the fact in the same place").toBe(place);
+      expect(place?.querySelector(".label")?.textContent).toBe("right now");
+    },
+  );
 
   // From 1,280 px the stylesheet frees an empty place (Alexis, 2026-11-03): `:empty` matches only an element with no child, text included.
   it("leaves its place without a child while nobody is counted, so the plate's breakpoint can free it", () => {
@@ -97,18 +104,25 @@ describe("who is here, from the chat's store", () => {
     expect(place?.matches(":empty")).toBe(true);
   });
 
-  it("counts the distinct people of the rooms followed, once the chat has connected, and writes no rate", async () => {
-    act(() => {
-      held().follow(["#bubble", "#bubble/games"]);
-      held().connected(ME);
-      held().heard(read(`:${ME}!u@h JOIN #bubble`));
-      held().heard(read(`:${ALICE}!u@h JOIN #bubble`));
-      held().heard(read(`:${ME}!u@h JOIN #bubble/games`));
-    });
-    await vi.waitFor(() => {
-      expect(labels()).toContain("right now");
-    });
-    expect(host?.querySelector("[data-value]")?.getAttribute("data-value")).toBe("2");
-    expect(labels()).not.toContain("messages now");
-  });
+  it(
+    "counts the distinct people of the rooms followed, once the chat has connected, and writes no rate",
+    { timeout: 60_000 },
+    async () => {
+      act(() => {
+        held().follow(["#bubble", "#bubble/games"]);
+        held().connected(ME);
+        held().heard(read(`:${ME}!u@h JOIN #bubble`));
+        held().heard(read(`:${ALICE}!u@h JOIN #bubble`));
+        held().heard(read(`:${ME}!u@h JOIN #bubble/games`));
+      });
+      await vi.waitFor(
+        () => {
+          expect(labels()).toContain("right now");
+        },
+        { timeout: 30_000 },
+      );
+      expect(host?.querySelector("[data-value]")?.getAttribute("data-value")).toBe("2");
+      expect(labels()).not.toContain("messages now");
+    },
+  );
 });

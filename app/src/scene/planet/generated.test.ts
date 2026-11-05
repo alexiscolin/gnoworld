@@ -379,9 +379,7 @@ describe("the generated program", () => {
 
   // F4233: no minor, or a banded world, reads no minor's map; nor a world of continents, whose bare ground its climate places (7b8).
   it("reads the minor's map only where a minor shows on a ground", () => {
-    expect(GENERATED_FRAGMENT).toMatch(
-      /if \(minorShare > 0\.002 && banded < 0\.5 && !continents\) \{[^}]*detailOf\(minorMap/,
-    );
+    expect(GENERATED_FRAGMENT).toMatch(/if \(minorRead > 0\.5\) \{[^}]*detailOf\(minorMap/);
   });
 
   // F4238: relief shaded from screen derivatives comes out in 2x2 blocks wherever it holds detail under a few pixels: the relief keeps

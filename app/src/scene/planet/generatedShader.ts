@@ -18,7 +18,7 @@ uniform Shape shape;
 uniform sampler2D minorMap;
 uniform vec3 offset, minorOffset, low, mid, high, minorLow, minorMid, minorHigh, seaShallow, seaDeep, glowColour;
 uniform vec3 sulfurLow, sulfurMid, sulfurHigh;
-uniform float minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style, grooved;
+uniform float minorRead, minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style, grooved;
 `;
 
 export const GENERATED_FRAGMENT = /* glsl */ `
@@ -46,7 +46,7 @@ void main() {
   vec3 own = detailOf(surface, place);
   vec3 other = own;
   bool continents = shape.sea > 0.0 && shape.sea < ${String(CONTINENTS_SEA)};
-  if (minorShare > 0.002 && banded < 0.5 && !continents) {
+  if (minorRead > 0.5) {
     Lookup elsewhere = lookupOf(spin * normalize(turned(axis, 2.1) + warpAmount * flow.zxy));
     other = detailOf(minorMap, elsewhere);
   }

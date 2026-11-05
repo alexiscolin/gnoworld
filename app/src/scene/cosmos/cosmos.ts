@@ -58,13 +58,13 @@ export class Cosmos {
     this.#disc = new Disc(this.#owner);
     this.#maps = new BodyMaps(device, this.#mapCame);
     this.#bodies = new Bodies(this.#maps, this.#owner, { ...device, moved: this.#mapCame });
-    this.#home = new Home(device, this.#bodies.group);
+    this.#home = new Home(device, this.#bodies.group, { owner: this.#owner, sight: () => this.#bodies.sight });
     this.#nebulae = new LazyNebulae(device, this.#owner);
     this.#ahead = new Ahead(device, this.#disc.group, () => {
       this.#setShown(this.#wanted);
       this.#device.moved();
     });
-    this.#whole = new Whole(device, this.#owner, this.#mapCame);
+    this.#whole = new Whole(device, this.#owner, { came: this.#mapCame, box: () => this.#box });
     this.seen = { projector: this.#bodies, earth: () => this.#home.at, earthRadius: this.#home.radius };
     this.#setShown(false);
     device.stage.add(this.#nebulae.group, this.#disc.group, this.#bodies.group);
@@ -75,6 +75,7 @@ export class Cosmos {
     this.#disc.group.visible = shown && this.#ahead.done && this.#shown > 0;
     this.#bodies.show(shown && this.#shown === 1);
     this.#nebulae.show(shown);
+    this.#home.show(shown);
     if (!shown) this.#whole.hide();
   }
 
@@ -209,8 +210,7 @@ export class Cosmos {
     clearTimeout(this.#timer);
     clearTimeout(this.#release);
     this.#releaseMaps();
-    this.#disc.group.removeFromParent();
-    this.#bodies.group.removeFromParent();
+    this.#device.stage.remove(this.#disc.group, this.#bodies.group);
     this.#owner.dispose();
   }
 
@@ -225,7 +225,7 @@ export class Cosmos {
       ...this.#disc.stats(shown),
       maps: this.#maps.size,
       looks: this.#looks,
-      earth: this.#home.stood,
+      ...this.#home.stats(),
       nebulae: shown ? this.#nebulae.stats().sheets : 0,
       // Counted from the systems it holds, apart from the hero's count of the file (7d6's review).
       worlds: this.#systems.reduce((sum, { worlds }) => sum + worlds.length, 1),

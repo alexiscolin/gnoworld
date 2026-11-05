@@ -11,16 +11,14 @@ export {
   Ecosystems,
   EMBED_PREFIXES,
   Events,
-  Expedition,
   Genres,
   Hubs,
   News,
-  Quests,
   RealmPath,
-  Stations,
   UNDATED_EVENT,
   Universes,
 } from "./data.ts";
+export { Expedition, Quests } from "./discovery.ts";
 export { OnAir, XPosts } from "./feeds.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";

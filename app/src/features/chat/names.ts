@@ -1,5 +1,5 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { firstGraphemes, type Line, type Notice } from "@gnoworld/core";
+import { firstGraphemes, worldRoute, type Line, type Notice } from "@gnoworld/core";
 import { Address, shortAddress, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 import { withFull } from "./full.ts";
@@ -52,7 +52,7 @@ export function roomHref(room: string, full = false): string {
 // A world's page at `params`, the full chat asked for or not.
 function hrefOf(world: string, params: URLSearchParams, full: boolean): string {
   const search = withFull(params, full).toString();
-  const page = world === EARTH ? "/earth" : `/w/${world}`;
+  const page = world === EARTH ? "/earth" : worldRoute(world);
   return search === "" ? page : `${page}?${search}`;
 }
 

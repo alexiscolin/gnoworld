@@ -16,7 +16,6 @@ export function sitemapXml(data: {
   universes: { id: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
   hubs: Row[];
   ecosystems: Row[];
-  stations: Row[];
 }): string {
   const mainnet = new Set(
     data.universes.filter((universe) => universe.testnet !== true).map((universe) => universe.id),

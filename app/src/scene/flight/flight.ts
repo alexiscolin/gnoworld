@@ -1,13 +1,14 @@
 // The flights (7g; ADR-0001 §7, "travel like a ship"; ADR-0002 §1, "Flight panel"): the jump to a star the reader aims at, the way back to
 // the view at rest, a page's flight with its body brought from afar; Escape or a click lands at once, and under reduced motion each is a
 // crossfade. Their own chunk, with camera-controls, asked once the scene runs. The camera stays at the origin: a flight writes the eye's way,
-// what it looks at and how far the page's body stands, and the panel hears it ten times a second at most.
+// what it looks at and how far the page's body stands, and the panel hears it ten times a second at most. A star's flight lands on its
+// system's arrival, the eye handed over in the frame it lands (7g2).
 import { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt } from "@gnoworld/core";
 import { Vector2 } from "three";
 import { Dissolve, veilAhead } from "../dissolve.ts";
 import type { FlightDevice, FlightGoal, FlightSaid } from "./goal.ts";
 import { listen } from "./keys.ts";
-import { planWay } from "./plan.ts";
+import { bindStar, landStar, planWay } from "./plan.ts";
 import { Streaks } from "./streaks.ts";
 import { Way } from "./way.ts";
 
@@ -20,6 +21,8 @@ const SAID_EVERY = 0.1;
 const VEIL_UNTIL = 0.25;
 const VEIL_ZOOM = 0.6;
 
+type Said = { -readonly [K in keyof FlightSaid]: FlightSaid[K] };
+
 export class Flights {
   readonly #device: FlightDevice;
   readonly #leaving = new AbortController();
@@ -30,15 +33,10 @@ export class Flights {
   readonly #was = { x: 0, y: 0, z: 0 };
   readonly #moved = { x: 0, y: 0, z: 0 };
   readonly #flight = { distance: 0, seconds: 0 };
-  readonly #said: { -readonly [K in keyof FlightSaid]: FlightSaid[K] } = {
-    target: "",
-    phase: "leaving",
-    distance: 0,
-    speed: 0,
-    eta: 0,
-    along: 0,
-  };
-  #kind: FlightGoal["kind"] = "rest";
+  readonly #said: Said = { target: "", phase: "leaving", distance: 0, speed: 0, eta: 0, along: 0 };
+  #goal: FlightGoal = { kind: "rest" };
+  // A later flight asked wins over a star's still binding its arrival.
+  #asked = 0;
   #flying = false;
   #still = false;
   #ready = true;
@@ -66,10 +64,23 @@ export class Flights {
     listen(this, device, this.#leaving.signal);
   }
 
-  /** Flies to `goal`, from wherever the eye is: a goal it cannot reach starts nothing. */
-  fly(goal: FlightGoal): void {
-    const target = this.#leaving.signal.aborted ? undefined : planWay(goal, this.#device, this.#way);
-    if (target === undefined) return;
+  /** Flies to `goal`, from wherever the eye is, and says whether it does: a goal it cannot reach starts nothing. A star's flight starts once
+   * its arrival is bound, its drawing coming as the eye does (7g2). */
+  fly(goal: FlightGoal): boolean {
+    if (this.#leaving.signal.aborted) return false;
+    this.#asked += 1;
+    const asked = this.#asked;
+    if (goal.kind !== "star") return this.#start(goal, planWay(goal, this.#device, this.#way));
+    return bindStar(this.#device, goal.id, {
+      way: this.#way,
+      current: () => asked === this.#asked && !this.#leaving.signal.aborted,
+      start: (target) => this.#start(goal, target),
+    });
+  }
+
+  // Starts the way planned to `target`, as the panel calls it; none, a goal it cannot reach.
+  #start(goal: FlightGoal, target: string | undefined): boolean {
+    if (target === undefined) return false;
     this.#said.target = target;
     this.#flight.distance = this.#way.length;
     this.#dropVeil();
@@ -77,18 +88,16 @@ export class Flights {
     if (this.#still || goal.kind === "body" || goal.kind === "cosmos") this.#veil = this.#copy();
     this.#veil?.fade(1);
     this.#veiled = 0;
-    const { eye } = this.#device;
-    this.#kind = goal.kind;
+    this.#goal = goal;
     this.#flying = true;
     this.#ready = goal.kind !== "body";
     this.#flight.seconds = this.#still ? 0 : flightSeconds(this.#flight.distance);
     [this.#along, this.#elapsed, this.#waited, this.#heard] = [0, 0, 0, -SAID_EVERY];
     this.#flights += 1;
-    this.#was.x = eye.travel.x;
-    this.#was.y = eye.travel.y;
-    this.#was.z = eye.travel.z;
+    Object.assign(this.#was, this.#device.eye.travel);
     this.#device.moved();
     this.#sayOn(0);
+    return true;
   }
 
   // The frame drawn now, copied before the place it shows goes: a page's flight starts as the next page is shown, its last frame still
@@ -137,7 +146,7 @@ export class Flights {
     }
     this.#along = planned > 0 ? Math.min(this.#elapsed / planned, 1) : 1;
     if (this.#along === 1) {
-      this.#land();
+      this.#land(true);
       return;
     }
     const { travel } = this.#device.eye;
@@ -183,15 +192,19 @@ export class Flights {
 
   /** Lands the flight under way at once, where it would have ended. */
   land(): void {
-    if (this.#flying) this.#land();
+    if (this.#flying) this.#land(false);
   }
 
-  #land(): void {
+  // At its way's end; a star's flight on its arrival, the eye handed over where it came to its end with motion on, else at once (7g2).
+  #land(ended: boolean): void {
     this.#way.end(this.#device);
     this.#flying = false;
     this.#along = 1;
     this.#streaks.hide();
     if (!this.#still) this.#dropVeil();
+    // Gone with the scene, it tells nothing.
+    if (this.#goal.kind === "star" && !this.#leaving.signal.aborted)
+      landStar(this.#device, this.#goal.id, ended && !this.#still);
     this.#device.said(undefined);
   }
 
@@ -225,7 +238,7 @@ export class Flights {
       along: this.#along,
       veil: this.#veil?.veil ?? 0,
       streaks: this.#streaks.shown,
-      kind: this.#kind,
+      kind: this.#goal.kind,
       target: this.#said.target,
       seconds: this.#flight.seconds,
       waited: this.#waited,

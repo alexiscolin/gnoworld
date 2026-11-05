@@ -1,12 +1,11 @@
 // The places the app knows, from the data files (slice 5's 5c and 5d; the bundle holds a copy of app/data's lists, which
 // the build's config checked first: GNOWORLD_DATA names another directory, vite.config.ts). A page is found by its
 // request's path, exactly as written: the path's case is part of the address (F376), a trailing slash is not.
-import { placeAt, REALM_PREFIX, type Place, type PlaceKind } from "@gnoworld/core";
+import { placeAt, realmRoute, type Place, type PlaceKind } from "@gnoworld/core";
 import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
 import genres from "../data/genres.json" with { type: "json" };
 import hubs from "../data/hubs.json" with { type: "json" };
-import stations from "../data/stations.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
 
@@ -65,7 +64,6 @@ interface Source {
   }[];
   hubs: Row[];
   ecosystems: Row[];
-  stations: Row[];
   genres: { slug: string; name: string }[];
 }
 
@@ -171,7 +169,7 @@ function build(source: Source) {
         : [listedFrom({ ...row, genre: genres.get(row.genre ?? "") }, testnets.has(universe), { path, canonical })];
     });
   };
-  const worlds = listed("world", [...source.hubs, ...source.stations]);
+  const worlds = listed("world", source.hubs);
   const ecosystemList = listed("ecosystem", source.ecosystems);
   const views = source.universes.map((universe): UniverseView => {
     const at = (kind: PlaceKind): Place => {
@@ -240,11 +238,11 @@ function build(source: Source) {
   };
 }
 
-export const site = siteOf({ universes, hubs, ecosystems, stations, genres });
+export const site = siteOf({ universes, hubs, ecosystems, genres });
 
 /** A world's realm's view on the site: /r/<path> in the default universe, /net/<id>/r/<path> in another. */
 export const realmView = (realm: string, universe: Pick<UniverseView, "id" | "isDefault">): string =>
-  `${universe.isDefault ? "" : `/net/${universe.id}`}${realmPath(realm)}`;
+  realmRoute(realm, universe.isDefault ? "" : `/net/${universe.id}`);
 
 // A realm's path on a site or on gnoweb, `gno.land/r/gov/dao` -> `/r/gov/dao`: the data's realms, which dataFiles.ts checks.
-export const realmPath = (realm: string): string => `/r/${realm.slice(REALM_PREFIX.length)}`;
+export const realmPath = (realm: string): string => realmRoute(realm);

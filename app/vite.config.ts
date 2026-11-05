@@ -97,6 +97,24 @@ export const workshopServer = () => ({
   },
 });
 
+// The workshop's backend behind the app's dev server (scripts/workshop.sh starts it): its server's /api and Ergo's /ws on this machine, as
+// nginx's are, the visitor's address set here and never the browser's. Vite's proxy is a dev server's, which no build reads; both ports,
+// written plainly, or none.
+export const workshopBackend = () => {
+  const [api, ws] = [process.env["WORKSHOP_API_PORT"], process.env["WORKSHOP_WS_PORT"]].map((text) =>
+    text !== undefined && /^\d{1,5}$/.test(text) && Number(text) >= 1 && Number(text) <= 65535 ? text : undefined,
+  );
+  if (api === undefined || ws === undefined) return undefined;
+  return {
+    "^/api/": { target: `http://127.0.0.1:${api}`, headers: { "x-real-ip": "127.0.0.1" } },
+    "^/ws$": {
+      target: `ws://127.0.0.1:${ws}`,
+      ws: true,
+      headers: { "x-forwarded-for": "127.0.0.1", "x-real-ip": "127.0.0.1" },
+    },
+  };
+};
+
 /** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
 export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 
@@ -110,5 +128,5 @@ export default defineConfig({
     serviceWorker,
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
-  server: workshopServer(),
+  server: { ...workshopServer(), proxy: workshopBackend() },
 });

@@ -1,6 +1,6 @@
 // A Plan's names in the file's words (part 7v), for the Plan's chunk: each world's name as the page gives it, a link to its page where it
 // has one, the site's own or a hand-made project's https address and nothing else, and who is here.
-import { REALM_PREFIX, type Planned } from "@gnoworld/core";
+import { realmRoute, type Planned } from "@gnoworld/core";
 import { RealmPath } from "@gnoworld/schemas";
 import { isOwnPage } from "../../pagePath.ts";
 import type { CosmosWorld, LabelSignals } from "./cosmosWorld.ts";
@@ -20,7 +20,7 @@ export const linkable = (href: string | undefined): href is string =>
   href !== undefined && (external(href) || isOwnPage(href));
 // A world's page, its first realm's view, where the file's path is a realm's of gno.land; none for any other path.
 const realmPage = (path: string | undefined) =>
-  path !== undefined && RealmPath.safeParse(path).success ? `/r/${path.slice(REALM_PREFIX.length)}` : undefined;
+  path !== undefined && RealmPath.safeParse(path).success ? realmRoute(path) : undefined;
 
 /** `plan` in the file's `words`: a world's page where the Plan knows none, who is here, the name the page gives. */
 export function namedOf(plan: Planned, { worlds, signals }: Words): Named {

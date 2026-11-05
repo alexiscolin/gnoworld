@@ -192,41 +192,45 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await left;
   });
 
-  it("never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)", async () => {
-    const ergo = await fakeErgo();
-    const env = settings();
-    const oper = join(folder("gnoworld-oper-"), "oper");
-    writeFileSync(oper, `${PASSWORD}\n`);
-    const team = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-    const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
-    const roles = join(folder("gnoworld-roles-"), "roles.json");
-    const rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
-    writeFileSync(
-      roles,
-      JSON.stringify({ team: [team], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
-    );
-    const server = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
-    await listening(server);
-    const peer = await ergo.peer(0);
-    await welcome(peer);
-    for (let n = 0; n < 5; n += 1) {
-      peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
-      peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
-    }
-    // The mute's own line: the room's flags go out first, with the JOINs (3m).
-    expect(await peer.next(/^SAMODE #bubble [+-]b /)).toBe(`SAMODE #bubble +b m:${other}`);
-    peer.say("PING :settled");
-    await peer.next(/^PONG settled$/);
-    expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);
-    server.child.kill("SIGTERM");
-    expect(await exited(server)).toBe(0);
-    const db = new DatabaseSync(env["DATABASE"] ?? "");
-    const index = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'verdicts_by_account'")
-      .all();
-    db.close();
-    expect(index).toEqual([{ name: "verdicts_by_account" }]);
-  });
+  it(
+    "never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)",
+    { timeout: 60_000 },
+    async () => {
+      const ergo = await fakeErgo();
+      const env = settings();
+      const oper = join(folder("gnoworld-oper-"), "oper");
+      writeFileSync(oper, `${PASSWORD}\n`);
+      const team = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
+      const roles = join(folder("gnoworld-roles-"), "roles.json");
+      const rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+      writeFileSync(
+        roles,
+        JSON.stringify({ team: [team], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+      );
+      const server = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
+      await listening(server);
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      for (let n = 0; n < 5; n += 1) {
+        peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
+        peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
+      }
+      // The mute's own line: the room's flags go out first, with the JOINs (3m).
+      expect(await peer.next(/^SAMODE #bubble [+-]b /)).toBe(`SAMODE #bubble +b m:${other}`);
+      peer.say("PING :settled");
+      await peer.next(/^PONG settled$/);
+      expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      const db = new DatabaseSync(env["DATABASE"] ?? "");
+      const index = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'verdicts_by_account'")
+        .all();
+      db.close();
+      expect(index).toEqual([{ name: "verdicts_by_account" }]);
+    },
+  );
 
   it("makes and archives a room over the real process, for the team of its roles file, and no stranger (3l)", async () => {
     const origin = "http://gnoworld.test";

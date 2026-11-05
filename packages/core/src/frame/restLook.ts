@@ -2,6 +2,7 @@
 // covers on the screens the view is composed for. Plain numbers, for the search reads thousands of them.
 import { EARTH_PLACE, EARTH_RADIUS, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
+import { BANDS } from "./bands.ts";
 import { orbitPlace } from "./disc.ts";
 import { outlineOf, type Outline } from "./outline.ts";
 
@@ -22,12 +23,6 @@ export const CARD_ZONE = { right: 0.25, bottom: 0.2 } as const;
 /** The great star's heart, in pixels: no body stands on it. */
 export const STAR_HEART = 40;
 
-// The header's band, a share of the height: a whole body stands under it.
-const HEADER = 0.09;
-// The great star stands 100 pixels right of the Earth or more, and this share of the height from the middle at most.
-const STAR_RIGHT = 100;
-const STAR_HEIGHT = 0.3;
-
 /** An eye at rest: its distance from the Earth, its slant over the disc and its turn round from the map's z, in radians. */
 export interface Candidate {
   readonly distance: number;
@@ -35,36 +30,7 @@ export interface Candidate {
   readonly turn: number;
 }
 
-/** A system the view may draw: its index, its worlds of a body's size, those it draws as a postcard, how far its worlds reach. */
-export interface Held {
-  readonly index: number;
-  readonly system: StarSystem;
-  readonly bodies: readonly Orbiter[];
-  readonly postcard: readonly Orbiter[];
-  readonly reach: number;
-}
-
-/** A world passing close to the eye, and its system. */
-export interface Close {
-  readonly held: Held;
-  readonly world: Orbiter;
-}
-
 export const DEGREE = Math.PI / 180;
-/** The eye's distances from the Earth, the plain one first: the Earth about 130 pixels across through the home's lens, 121 to 142 (Alexis,
- * 2026-11-02 and 2026-11-03). */
-export const DISTANCES = [26, 25, 27, 24, 28];
-// The share of the Earth's disc in day, at the least: frame 4's, about 45%.
-const LIT_LEAST = 0.45;
-const SLANT_LEAST = 6;
-const SLANT_MOST = 30;
-const TURN_MOST = 60;
-/** The slants and turns, in degrees, the plain views take, with the steps between. */
-export const RANGE = { slant: [SLANT_LEAST, SLANT_MOST, 2], turn: [-TURN_MOST, TURN_MOST, 3] } as const;
-
-/** Whether an eye stands where the view allows: 6 to 30 degrees over the disc, 60 degrees round at most, the great star staying beside. */
-export const within = ({ slant, turn }: Candidate): boolean =>
-  slant >= SLANT_LEAST * DEGREE && slant <= SLANT_MOST * DEGREE && Math.abs(turn) <= TURN_MOST * DEGREE;
 
 export interface Camera {
   readonly eye: Point;
@@ -195,25 +161,6 @@ export class Look {
     return { ...seen, radius: ((reach * this.#focal) / Math.max(seen.depth - reach, 1e-9)) * Math.hypot(1, out) };
   }
 
-  /** Whether the great star lights `LIT_LEAST` of the Earth's disc or more, as the eye sees it: its day faces the eye that much. */
-  lit(): boolean {
-    const [toEye, toStar] = [minus(this.camera.eye, EARTH_PLACE), minus({ x: 0, y: 0, z: 0 }, EARTH_PLACE)];
-    const facing =
-      dot(toEye, toStar) / Math.hypot(toEye.x, toEye.y, toEye.z) / Math.hypot(toStar.x, toStar.y, toStar.z);
-    return (1 + facing) / 2 >= LIT_LEAST;
-  }
-
-  /** The great star in front, right of the Earth, near the middle's height. */
-  starBeside(): boolean {
-    const { star, width, height } = this;
-    return (
-      star.depth > 0 &&
-      star.x - width / 2 >= STAR_RIGHT &&
-      star.x < width - STAR_HEART &&
-      Math.abs(star.y - height / 2) <= STAR_HEIGHT * height
-    );
-  }
-
   #gap(at: Seen, to: Seen, reach: number): number {
     return Math.hypot(at.x - to.x, at.y - to.y) - at.radius - reach;
   }
@@ -234,22 +181,15 @@ export class Look {
   }
 
   /** Whether a body there stands whole on the screen, under the header, `margin` pixels in. */
-  whole(at: Seen, margin: number): boolean {
+  whole(at: Pick<Seen, "left" | "right" | "top" | "bottom" | "depth">, margin: number): boolean {
     const across = at.left >= margin && at.right <= this.width - margin;
-    return at.depth > 0 && across && at.top >= HEADER * this.height && at.bottom <= this.height - margin;
+    return at.depth > 0 && across && at.top >= BANDS.header * this.height && at.bottom <= this.height - margin;
   }
 
   /** Whether a body there shows nothing on the screen. */
   off(at: Seen): boolean {
     const beside = at.right < 0 || at.left > this.width;
     return at.depth <= 0 || beside || at.bottom < 0 || at.top > this.height;
-  }
-
-  /** Whether a body there is cut by exactly one side, `least` of its width shown, whole from top to bottom. */
-  cutBySide(at: Seen, least: number): boolean {
-    const sides = Number(at.left < 0) + Number(at.right > this.width);
-    const shown = Math.min(at.right, this.width) - Math.max(at.left, 0);
-    return sides === 1 && shown >= least * (at.right - at.left) && at.top >= 0 && at.bottom <= this.height;
   }
 }
 

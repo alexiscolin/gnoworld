@@ -435,10 +435,11 @@ lane_ts() {
 		run build:app
 		[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 		# And the first screen's budget, read with the budget spec's own measure, the browser's gzip, and nothing else of the journeys: the build
-		# alone let a broken budget through to the merge check, 30 minutes later (the dream of 2026-11-01, 6).
+		# alone let a broken budget through to the merge check, 30 minutes later (the dream of 2026-11-01, 6). Its @gate tests alone, with the
+		# late chunks weighed from the built files with no page (Alexis, 2026-11-04: their journeys timed out at a load of 60).
 		E2E_PORT=$(free_ports 3)
 		export E2E_PORT
-		node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts
+		node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate
 		return 0
 	fi
 	# Three free ports from a base of this run's own (the journeys' hosts), so gates of several worktrees run at once;
@@ -499,8 +500,10 @@ lane_tests() {
 		else
 			python3 -I scripts/related.py --check </dev/null # the map's own test: a read it cannot follow refuses, whatever runs
 		fi
-		sh -c "$tests --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
-			retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") \"\$@\"" sh
+		# The tests tagged `timing`, a bound in wall-clock time, wait for the merge check and --full (Alexis, 2026-11-04, "Oui, les deux":
+		# other gates' load failed them for nothing; vitest.config.ts's tags).
+		sh -c "$tests --tags-filter=!timing --reporter=default --reporter=json --outputFile.json=$logs/vitest.json" >"$logs/vitest.out" 2>&1 ||
+			retry vitest "$logs/vitest.json" "$logs/vitest.out" sh -c "$(node -p "require('./package.json').scripts.test") --tags-filter=!timing \"\$@\"" sh
 	fi
 	# The coverage run leaves the compiled project out (its memo cache checks are branches nothing takes, F1350): the
 	# render counts run here instead, once, beside the coverage lane's work.

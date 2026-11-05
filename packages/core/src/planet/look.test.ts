@@ -541,8 +541,8 @@ describe("a look, as 7b5 draws it", () => {
       if (at !== 15) expect(moved.size, `byte ${String(at)} feeds nothing`).toBeGreaterThan(0);
     }
     for (const seed of seeds) {
-      expect(seededRecipe(flipped(seed, 15), "rocky", NO_TURN).minorShare).not.toBe(
-        seededRecipe(seed, "rocky", NO_TURN).minorShare,
+      expect(seededRecipe(flipped(seed, 15), "rocky", { turn: NO_TURN }).minorShare).not.toBe(
+        seededRecipe(seed, "rocky", { turn: NO_TURN }).minorShare,
       );
       for (const at of [18, 20, 22]) expect([...movedBy(seed, at)], `byte ${String(at)}`).toEqual(["minorOffset"]);
     }

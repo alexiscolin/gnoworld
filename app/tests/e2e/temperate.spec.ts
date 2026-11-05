@@ -3,7 +3,7 @@
 // a hash each, never a chosen few), the Earth's own number beside it (its view at realism.spec's instant at a close world's zoom; its day
 // map, unlit, by latitude). Each main bound failed on 81e07949, whose numbers the comments give; "held" marks one that passed there too.
 
-import { ANCHORS, type Surface } from "@gnoworld/core";
+import { ANCHORS, asciiBytes, planetSeed, type Surface } from "@gnoworld/core";
 import { climatesOn, mapClimateOn, type Climate, type Pole } from "./climates.ts";
 import { shoresOn, type Shore } from "./coasts.ts";
 import { expect, test, type Page } from "./fixtures.ts";
@@ -11,6 +11,10 @@ import { askLab, circles, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, t
 import { landDetailsOn, type LandDetail } from "./landDetail.ts";
 import { seaLightsOn } from "./seaLight.ts";
 import { facesApart, facesOn, GLANCE, type Face } from "./textures.ts";
+import { starWarmth } from "../../../packages/core/src/cosmos/warmth.ts";
+import { plantsOf } from "../../../packages/core/src/planet/recipe.ts";
+import { ROWS } from "../../../packages/core/src/planet/rows.ts";
+import { sha256 } from "../../../packages/core/src/planet/sha256.ts";
 import { correlation } from "../../../packages/core/src/testing.ts";
 
 // Coasts at a close world's zoom (radius 350 px, the Earth's view 356), the median world's: the coast's length over its smoothed copy's,
@@ -62,6 +66,11 @@ const ENOUGH = 64;
 const quantile = (values: readonly number[], at: number) =>
   [...values].sort((a, b) => a - b)[Math.min(values.length - 1, Math.floor(at * values.length))] ?? 0;
 const hueOf = ([, a, b]: readonly number[]) => (Math.atan2(b ?? 0, a ?? 0) * 180) / Math.PI;
+// Whether a world of the lab grows the Earth's plants, not its star's other ones (7b9; Alexis, 2026-11-03, "Les deux, surtout naturel"):
+// what reads the Earth's greens, or land and sea apart by colour, reads those; every world keeps the low-key bounds.
+const earthPlants = (path: string) =>
+  plantsOf(sha256(planetSeed(asciiBytes(path))), "temperate", starWarmth(path.split("/")[2] ?? "")) ===
+  ROWS.temperate.palettes;
 
 interface Earth {
   readonly shore: Shore;
@@ -95,10 +104,17 @@ async function earthOf(page: Page): Promise<Earth> {
   return earthRead;
 }
 
-/** The classes' view of temperate worlds at three seeds, without clouds: 72 worlds, each with its place, its pole, its surface and its
- * minor's share. */
-async function seventyTwo(page: Page, light = "") {
-  const views: { shot: Buffer; places: Circle[]; poles: Pole[]; surfaces: Surface[]; minors: number[] }[] = [];
+/** The classes' view of temperate worlds at three seeds, without clouds: 72 worlds, each with its place, its pole, its surface, its
+ * minor's share and whether it grows the Earth's plants. */
+async function classViews(page: Page, light = "") {
+  const views: {
+    shot: Buffer;
+    places: Circle[];
+    poles: Pole[];
+    surfaces: Surface[];
+    minors: number[];
+    earth: boolean[];
+  }[] = [];
   for (let seed = 0; seed < VIEWS; seed += 1) {
     await open(page, `?view=class24&world=${String(WORLD)}&clouds=off${light}&seed=${String(seed)}`);
     const view = {
@@ -107,10 +123,12 @@ async function seventyTwo(page: Page, light = "") {
       poles: await askLab<Pole[]>(page, "poles"),
       surfaces: await askLab<Surface[]>(page, "surfaces"),
       minors: await askLab<number[]>(page, "minors"),
+      earth: (await askLab<string[]>(page, "paths")).map(earthPlants),
     };
-    expect([view.poles.length, view.surfaces.length, view.minors.length], "a pole, a surface, a minor a world").toEqual(
-      Array.from({ length: 3 }, () => view.places.length),
-    );
+    expect(
+      [view.poles.length, view.surfaces.length, view.minors.length, view.earth.length],
+      "a pole, a surface, a minor, plants a world",
+    ).toEqual(Array.from({ length: 4 }, () => view.places.length));
     views.push(view);
   }
   return views;
@@ -119,7 +137,7 @@ async function seventyTwo(page: Page, light = "") {
 const climatesOf = async (page: Page) =>
   (
     await Promise.all(
-      (await seventyTwo(page)).map(async ({ shot, places, poles, surfaces, minors }) => {
+      (await classViews(page)).map(async ({ shot, places, poles, surfaces, minors, earth }) => {
         const faces = await facesOn(page, shot, places);
         return (
           await climatesOn(
@@ -132,6 +150,7 @@ const climatesOf = async (page: Page) =>
           sea: faces[at]?.sea ?? null,
           caps: surfaces[at]?.caps ?? 0,
           minor: minors[at] ?? 0,
+          earth: earth[at] ?? true,
         }));
       }),
     )
@@ -149,8 +168,10 @@ test.describe("temperate worlds varied and real at the coast", () => {
       test.setTimeout(300_000);
       const earth = await earthOf(page);
       const [shores, faces]: [Shore[], Face[]] = [[], []];
-      for (let seed = part * PER_PART; seed < (part + 1) * PER_PART; seed += 1) {
+      // Sixteen worlds of the Earth's plants from its first seed on, the others' land read apart (7b9): within twice as many seeds.
+      for (let seed = part * PER_PART; shores.length < PER_PART && seed < (part + 2) * PER_PART; seed += 1) {
         await open(page, `?view=close&world=${String(WORLD)}&seed=${String(seed)}`);
+        if (!(await askLab<string[]>(page, "paths")).every(earthPlants)) continue;
         const [shot, places] = [await picture(page), await circles(page)];
         shores.push(...(await shoresOn(page, shot, places)));
         faces.push(...(await facesOn(page, shot, places)));
@@ -249,9 +270,15 @@ test.describe("temperate worlds varied and real at the coast", () => {
     page,
   }) => {
     const earth = await earthOf(page);
-    const views = await seventyTwo(page, "&light=front");
-    const shores = (await Promise.all(views.map(({ shot, places }) => shoresOn(page, shot, places)))).flat();
-    const seas = views.flatMap(({ surfaces }) => surfaces.map(({ sea }) => 1 - sea));
+    const views = await classViews(page, "&light=front");
+    const shores = (
+      await Promise.all(
+        views.map(async ({ shot, places, earth }) => (await shoresOn(page, shot, places)).filter((_, at) => earth[at])),
+      )
+    ).flat();
+    const seas = views.flatMap(({ surfaces, earth }) =>
+      surfaces.filter((_, at) => earth[at]).map(({ sea }) => 1 - sea),
+    );
     const largest = shores.map(({ pieces }) => pieces[0] ?? 0);
     const share = (count: number) => count / shores.length;
     const drawn = shores.map((shore) => shore.share);
@@ -273,7 +300,7 @@ test.describe("temperate worlds varied and real at the coast", () => {
     test
       .info()
       .annotations.push({ type: "shapes", description: JSON.stringify({ earth: earth.shore, read, shores, seas }) });
-    expect(shores.length, "worlds read").toBeGreaterThanOrEqual(ENOUGH);
+    expect(views.flatMap(({ places }) => places).length, "worlds read").toBeGreaterThanOrEqual(ENOUGH);
     expect(read.largest[1], "the largest piece no longer near one shape").toBeLessThanOrEqual(LARGEST.median);
     expect(read.largest[0], "small on some").toBeLessThanOrEqual(LARGEST.low);
     expect(read.largest[2], "nearly the whole land on others").toBeGreaterThanOrEqual(LARGEST.high);
@@ -293,7 +320,7 @@ test.describe("temperate worlds varied and real at the coast", () => {
     page,
   }) => {
     const earth = await earthOf(page);
-    const worlds = await climatesOf(page);
+    const worlds = (await climatesOf(page)).filter(({ earth }) => earth);
     const greener = worlds.flatMap(
       ({
         climate: {
@@ -321,7 +348,7 @@ test.describe("temperate worlds varied and real at the coast", () => {
     page,
   }) => {
     const earth = await earthOf(page);
-    const worlds = await climatesOf(page);
+    const worlds = (await climatesOf(page)).filter(({ earth }) => earth);
     const lighter = worlds.flatMap(({ climate: { greenLight }, sea }) =>
       greenLight === null || sea === null ? [] : [greenLight - sea[0]],
     );
@@ -349,14 +376,15 @@ test.describe("temperate worlds varied and real at the coast", () => {
     page,
   }) => {
     const earth = await earthOf(page);
-    const lands = (await climatesOf(page)).flatMap(({ climate: { land, chroma } }) =>
-      land === null ? [] : [{ hue: hueOf(land), chroma }],
+    const lands = (await climatesOf(page)).flatMap(({ climate: { land, chroma }, earth }) =>
+      land === null ? [] : [{ hue: hueOf(land), chroma, earth }],
     );
-    const [hues, chromas] = [lands.map(({ hue }) => hue), lands.map(({ chroma }) => chroma)];
+    const earths = lands.filter(({ earth }) => earth);
+    const [hues, chromas] = [earths.map(({ hue }) => hue), lands.map(({ chroma }) => chroma)];
     const read = {
       spread: quantile(hues, 0.9) - quantile(hues, 0.1),
       median: quantile(chromas, 0.5),
-      least: Math.min(...chromas),
+      least: Math.min(...earths.map(({ chroma }) => chroma)),
       most: Math.max(...chromas),
     };
     test

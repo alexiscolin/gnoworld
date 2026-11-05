@@ -50,6 +50,12 @@ const planetOf = (id: string) => {
 
 vi.mock("./planet/generated.ts", () => ({
   worldOf: (id: string) => ({ id, look: { map: id === "gov/dao" ? "mars" : "venus" }, recipe: { minorMap: "moon" } }),
+  mapNamesOf: ({ look, recipe }: { look: { map: string }; recipe: { minorMap: string } }) => [
+    look.map,
+    recipe.minorMap,
+    "clouds",
+    "ring",
+  ],
   createWorld: (world: { id: string }) => made.create(world),
 }));
 

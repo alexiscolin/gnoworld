@@ -1,5 +1,5 @@
-// The links the worlds' file holds between worlds (ADR-0002 §10): a realm of one importing a realm of another. The whole cosmos draws them as
-// lines (web.ts), a plate lists a world's (8g); a link means an import the file holds and nothing else.
+// The links the worlds' file holds between worlds (ADR-0002 §10): a realm of one importing a realm of another. The whole cosmos was to draw them as
+// lines (7u2, put off), a plate lists a world's (8g); a link means an import the file holds and nothing else.
 
 /** A world of the file, as its links read it: its realms' paths and what each imports. */
 export interface LinkedWorld {
@@ -10,7 +10,7 @@ export interface LinkedWorld {
 const REALM = "gno.land/r/";
 
 // Which world holds each realm the file names: of two that name one, the first by id, in any order.
-export function holders(worlds: readonly LinkedWorld[]): Map<string, number> {
+function holders(worlds: readonly LinkedWorld[]): Map<string, number> {
   const held = new Map<string, number>();
   worlds.forEach(({ id, realms }, at) => {
     for (const { path } of realms) {
@@ -22,7 +22,7 @@ export function holders(worlds: readonly LinkedWorld[]): Map<string, number> {
 }
 
 // The worlds a world's realms import, by index: realms only, each one the file holds.
-export const importsOf = (realms: LinkedWorld["realms"], held: ReadonlyMap<string, number>): number[] =>
+const importsOf = (realms: LinkedWorld["realms"], held: ReadonlyMap<string, number>): number[] =>
   realms.flatMap(({ imports = [] }) =>
     imports.flatMap((path) => {
       const to = path.startsWith(REALM) ? held.get(path) : undefined;

@@ -235,9 +235,10 @@ export class SceneHost {
       .finally(settled);
   }
 
-  /** A step back from the system the eye rests at, to the cosmos's view at rest (7v): the crumb's first step, and Escape. */
+  /** A step back from the system the eye rests at, to the cosmos's view at rest (7v): the crumb's first step, and Escape. A flight takes the
+   * eye there (7g2); with none, from a Plan or with no flights' chunk, it goes there at once. */
   readonly back = (): void => {
-    this.#scene?.arrive(undefined);
+    if (this.#scene?.fly({ kind: "rest" }) !== true) this.#scene?.arrive(undefined);
   };
 
   #started(scene: Scene): void {

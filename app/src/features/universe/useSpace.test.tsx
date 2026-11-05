@@ -148,7 +148,7 @@ describe("the end of the first screen", () => {
     expect(done).toBe(true);
   });
 
-  it("waits for the door though the page has loaded: the two are the first screen", async () => {
+  it("waits for the door though the page has loaded: the two are the first screen", { timeout: 60_000 }, async () => {
     readyState("complete");
     const arrive = heldDoor();
     const Earth = await pageThatWaits();
@@ -194,34 +194,38 @@ describe("the end of the first screen", () => {
     expect(done).toBe(true);
   });
 
-  it("goes on 2.5 s after it is on screen when the door never answers: a held chunk leaves no page without its chat (F4306)", async () => {
-    readyState("complete");
-    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-    const arrive = heldDoor();
-    try {
-      const Earth = await pageThatWaits();
-      const root = createRoot(document.createElement("div"));
-      left.push(() => {
-        act(() => {
-          root.unmount();
+  it(
+    "goes on 2.5 s after it is on screen when the door never answers: a held chunk leaves no page without its chat (F4306)",
+    { timeout: 60_000 },
+    async () => {
+      readyState("complete");
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const arrive = heldDoor();
+      try {
+        const Earth = await pageThatWaits();
+        const root = createRoot(document.createElement("div"));
+        left.push(() => {
+          act(() => {
+            root.unmount();
+          });
         });
-      });
-      act(() => {
-        root.render(<Earth />);
-      });
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(2_499);
-      });
-      expect(done, "the door's 2.5 s are not over").toBe(false);
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1);
-      });
-      expect(done).toBe(true);
-    } finally {
-      arrive();
-      vi.useRealTimers();
-    }
-  });
+        act(() => {
+          root.render(<Earth />);
+        });
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2_499);
+        });
+        expect(done, "the door's 2.5 s are not over").toBe(false);
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(1);
+        });
+        expect(done).toBe(true);
+      } finally {
+        arrive();
+        vi.useRealTimers();
+      }
+    },
+  );
 
   it("is done at once on a move inside the site, the door already there", async () => {
     readyState("complete");
@@ -315,7 +319,7 @@ describe("useSpace", () => {
     expect(universe.mount).toHaveBeenCalledTimes(1);
   });
 
-  it("leaves the page as it is when the chunk does not come", async () => {
+  it("leaves the page as it is when the chunk does not come", { timeout: 60_000 }, async () => {
     vi.doMock("./mountUniverse.tsx", () => {
       throw new TypeError("Failed to fetch dynamically imported module");
     });

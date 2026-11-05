@@ -63,28 +63,19 @@ export {
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export { earthLinksOf, earthSystemOf, type Project } from "./frame/earthOrbit.ts";
 export { PART_KINDS, type Finish, type Part, type PartKind } from "./station/parts.ts";
 export { stationOf, type Station } from "./station/station.ts";
-export { earthCamera, earthEye, sceneryOf, type Scenery } from "./station/scenery.ts";
-export { stationsRound, type Placed as PlacedStation } from "./station/round.ts";
+export { earthCamera, earthEye, earthTopEye, offEarthViews, sceneryOf, type Scenery } from "./station/scenery.ts";
+export { onOrbit, stationsRound, type Placed as PlacedStation } from "./station/round.ts";
 export { alikeStations, lookOf as stationLookOf } from "./station/variety.ts";
-export { earthPlanOf, planOf, plannedOf } from "./frame/plan.ts";
-export { deepOf, judgeOf, projectsOf, type Deep, type Judge } from "./frame/deep.ts";
+export { planOf, plannedOf } from "./frame/plan.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
-export { rocksAt, rocksOf } from "./frame/rocks.ts";
+export { rocksAt } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
 export * from "./frame/flight.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
-export {
-  FIELD_OF_VIEW,
-  HERO_ZONE,
-  REST_DISTANCE,
-  REST_SCREENS,
-  restView,
-  STAR_HEART,
-  type RestView,
-} from "./frame/rest.ts";
+export { FIELD_OF_VIEW, HERO_ZONE, REST_DISTANCE, REST_SCREENS, STAR_HEART, type RestView } from "./frame/rest.ts";
+export { BANDS } from "./frame/bands.ts";
 export {
   anchorOf,
   ANCHORS,
@@ -106,11 +97,14 @@ export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
-export { LINKS_MOST, linksOf, pointTint, softPoint, type LinkedWorld, type Soft } from "./cosmos/web.ts";
 export { neighboursOf, type Neighbour } from "./cosmos/links.ts";
+export { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./space/mass.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
+export { realmRoute, worldRoute } from "./places/route.ts";
+export { GOLDEN } from "./space/golden.ts";
 export { NATURES } from "./planet/choice.ts";
-export { CONTINENTS_SEA, planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
+export { CONTINENTS_SEA, readsMinorMap } from "./planet/continents.ts";
+export { planetRecipe, worldRecipe, type Recipe } from "./planet/recipe.ts";
 export { labOf, type Lab, type Palette } from "./planet/palette.ts";
 export { SURFACE, type SurfaceName } from "./planet/spans.ts";
 export { FINEST, type Surface } from "./planet/surface.ts";

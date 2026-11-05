@@ -99,30 +99,34 @@ describe("searchPlaces", () => {
   });
 
   // Its limit is its own: the ratio below holds under load, and five seconds stopped StrykerJS's whole dry run on its slower copy (F2592).
-  it("scales with the list, not with its square: 16 times the places cost far less than 64 times the time", () => {
-    const universe = (count: number): SearchItem[] =>
-      Array.from({ length: count }, (_, n) => ({
-        name: `World number ${String(n)}`,
-        kind: (["world", "ecosystem"] as const)[n % 2] ?? "world",
-        universe: "onyx",
-        path: `/w/world-${String(n)}`,
-      }));
-    // The least of several runs, after a warm-up: a busy machine only makes a run slower.
-    const least = (items: SearchItem[], query: string) => {
-      searchPlaces(items, query);
-      let best = Infinity;
-      for (let run = 0; run < 7; run++) {
-        const start = performance.now();
+  it(
+    "scales with the list, not with its square: 16 times the places cost far less than 64 times the time",
+    { tags: ["timing"], timeout: 30_000 },
+    () => {
+      const universe = (count: number): SearchItem[] =>
+        Array.from({ length: count }, (_, n) => ({
+          name: `World number ${String(n)}`,
+          kind: (["world", "ecosystem"] as const)[n % 2] ?? "world",
+          universe: "onyx",
+          path: `/w/world-${String(n)}`,
+        }));
+      // The least of several runs, after a warm-up: a busy machine only makes a run slower.
+      const least = (items: SearchItem[], query: string) => {
         searchPlaces(items, query);
-        best = Math.min(best, performance.now() - start);
-      }
-      return best;
-    };
-    const small = universe(5000);
-    const large = universe(80_000);
-    for (const query of ["", "number 1", "zzz"])
-      expect(least(large, query) / Math.max(least(small, query), 0.01)).toBeLessThan(64);
-  }, 30_000);
+        let best = Infinity;
+        for (let run = 0; run < 7; run++) {
+          const start = performance.now();
+          searchPlaces(items, query);
+          best = Math.min(best, performance.now() - start);
+        }
+        return best;
+      };
+      const small = universe(5000);
+      const large = universe(80_000);
+      for (const query of ["", "number 1", "zzz"])
+        expect(least(large, query) / Math.max(least(small, query), 0.01)).toBeLessThan(64);
+    },
+  );
 
   it("counts every item of the list in the empty query's groups", () => {
     fc.assert(
@@ -178,7 +182,7 @@ describe("searchItemsOf, one name in two universes", () => {
     description: "Tokens, a place of the fixture, described at more than fifty characters, as the schema asks.",
     universe,
   });
-  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")], stations: [] }));
+  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")] }));
 
   it("gives two places of one name, in two universes, two names that tell them apart", () => {
     const found = items.filter((i) => i.kind === "ecosystem");

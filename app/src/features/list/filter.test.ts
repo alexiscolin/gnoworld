@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { filterByGenre, type ListedPlace } from "./filter.ts";
 
-// The genre of a place is not in the data files yet (the hubs' and stations' schema has no such field): the list's
+// The genre of a place is not in the data files yet (the hubs' schema has no such field): the list's
 // view model carries it, and the question of where it comes from is put to Alexis (brief 5d).
 const place = (slug: string, genres: string[]): ListedPlace => ({
   slug,

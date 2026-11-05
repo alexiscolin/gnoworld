@@ -8,6 +8,7 @@ import { OPEN } from "../openEvent.ts";
 import type { Projector } from "./labels.ts";
 import labelStyles from "./labels.module.css";
 import styles from "./orbits.module.css";
+import { Placed } from "./placed.ts";
 import { external, linkable, namedOf, type Named, type Words } from "./planWords.ts";
 import { watchScene } from "./sceneRuns.ts";
 
@@ -39,8 +40,7 @@ export class Orbits {
   readonly #projector: Pick<Projector, "seen" | "fromEye">;
   readonly #open: (href: string) => void;
   readonly #at = new Vector3();
-  // Where each name was written last, across and down, in the page's pixels to a tenth: a name is written only when it moved.
-  #written = new Float64Array(0);
+  readonly #placed = new Placed();
   #plan: Named | undefined;
   #shown: { plan: Planned | undefined; words: Words | undefined } = { plan: undefined, words: undefined };
   #names: HTMLAnchorElement[] = [];
@@ -102,7 +102,7 @@ export class Orbits {
     this.#lines.visible = plan !== undefined;
     this.#named = undefined;
     this.#names = plan === undefined ? [] : plan.worlds.map(({ id }) => this.#nameOf(plan, id));
-    this.#written = new Float64Array(2 * this.#names.length).fill(NaN);
+    this.#placed.set(this.#names);
     this.#layer.replaceChildren(...this.#names);
     this.#hide();
     if (plan !== undefined) this.#ellipses(plan);
@@ -111,7 +111,7 @@ export class Orbits {
   // Each world's orbit, its ring of points round the star on the map, from the star on the stage (the map turned, toScene being linear):
   // the lines stand at the star, so a frame moves one place. A segment by a world is left out (7v's design review, F4470): seen 30
   // degrees over its plane, a line through a planet's centre crosses its disc within twice its radius.
-  #ellipses({ rings, system, places, worlds }: Planned): void {
+  #ellipses({ rings, ringOf, system, places, worlds }: Planned): void {
     const none = { x: 0, y: 0, z: 0 };
     const origin = this.#projector.fromEye(none, none, new Vector3());
     const points: number[] = [];
@@ -120,7 +120,7 @@ export class Orbits {
       points.push(this.#at.x, this.#at.y, this.#at.z);
     };
     const { x, y, z } = system.place;
-    // By its own world alone: another's ring passing near a world stays whole (the design review's second pass).
+    // By its own worlds alone: another's ring passing near a world stays whole (the design review's second pass).
     const byWorld = (from: Point, to: Point, index: number) => {
       const at = places[index] ?? from;
       const away = Math.hypot(
@@ -133,7 +133,7 @@ export class Orbits {
     rings.forEach((ring, index) => {
       ring.forEach((at, step) => {
         const next = ring[(step + 1) % ring.length] ?? at;
-        if (byWorld(at, next, index)) return;
+        if (ringOf.some((ring, world) => ring === index && byWorld(at, next, world))) return;
         push(at);
         push(next);
       });
@@ -203,16 +203,8 @@ export class Orbits {
       if (name === undefined || world === undefined || place === undefined) continue;
       const spot = this.#projector.seen(this.#projector.fromEye(place, eye, this.#at), world.radius);
       name.hidden = spot.depth <= 0;
-      this.#placeName(at, spot.x, spot.y + spot.radius + UNDER);
+      this.#placed.place(at, spot.x, spot.y + spot.radius + UNDER);
     }
-  }
-
-  #placeName(at: number, x: number, y: number): void {
-    const [left, top] = [Math.round(x * 10) / 10, Math.round(y * 10) / 10];
-    if (this.#written[2 * at] === left && this.#written[2 * at + 1] === top) return;
-    this.#written[2 * at] = left;
-    this.#written[2 * at + 1] = top;
-    this.#names[at]?.style.setProperty("transform", "translate(" + String(left) + "px, " + String(top) + "px)");
   }
 
   /** Off the stage and the page, its buffers and program freed. */

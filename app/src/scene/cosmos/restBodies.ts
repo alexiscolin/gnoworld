@@ -1,6 +1,6 @@
-// What the view at rest draws of the worlds (slice 7d6): its postcards' worlds and its close world as bodies, while each is large enough to
-// tell from a point where the eye is (the ladder's rule), and as points the postcards' others; every other system is a distant star. A
-// system's arrival (7d3) is such a view, of one postcard. Away from the view, the ladder's bodies.
+// What the view at rest draws of the worlds (slice 7d6): its postcards' worlds as bodies, while each is large enough to tell from a point
+// where the eye is (the ladder's rule), and as points the postcards' others; every other system is a distant star. A system's arrival
+// (7d3) is such a view, of one postcard; the Earth's view has none (7x2). Away from the view, the ladder's bodies.
 import {
   BODY_PIXELS,
   distanceOf as away,
@@ -9,12 +9,11 @@ import {
   easedOf,
   EARTH_RADIUS,
   GRAIN,
+  offEarthViews,
   smoothstep,
-  type Deep,
   type Drawn,
   type Planned,
   type Rock,
-  postcardOf,
   screenRadius,
   type Postcard,
   type Orbiter,
@@ -31,34 +30,18 @@ const GLINT = 0.12;
 const REST_REACH = 5;
 const EASED_BY = 10 * REST_REACH;
 const WHOLE = () => 1;
+const NO_POINTS = () => 0;
 const NONE_HIDDEN: ReadonlySet<string> = new Set();
 
 /** A view as drawn: the view at rest's or a system's arrival, its postcards by their system's index, its main light's system, and, once
- * found, the real worlds of other nearby systems the view at rest draws for depth and the home's rocks (7p), and the Earth's projects
- * where they stand clear (7v); a Plan's, for the labels' chunk to draw. */
+ * laid, a system's dynamic view's rocks (7v); a Plan's, for the labels' chunk to draw. */
 export interface Shown {
   readonly view: RestView;
   readonly postcards: ReadonlyMap<number, Postcard>;
   readonly index: number;
-  readonly deep?: readonly Deep[];
-  readonly earth?: StarSystem | undefined;
   readonly rocks?: readonly Rock[];
   readonly plan?: Planned | undefined;
 }
-
-/** The close world's system, by its index, as drawn wherever the eye stands: held still, so none of its worlds jumps to its orbit's place
- * as the ladder takes the view (7d9; Alexis, 2026-11-03, "la grosse planète à gauche disparaît si on bouge"). */
-interface Still {
-  readonly index: number;
-  readonly system: StarSystem;
-}
-
-const stillOf = (systems: readonly StarSystem[], { close }: RestView): Still | undefined => {
-  const system = close === undefined ? undefined : systems[close.system];
-  return system === undefined || close === undefined
-    ? undefined
-    : { index: close.system, system: { ...system, spin: 0 } };
-};
 
 // A star with no halo standing behind the Earth, its point a few pixels off the limb, reads as a glitch on it (the chief, 2026-11-03): it
 // fades out there. The camera looks at the Earth, so a place's distance on screen from its centre is the lens times its angle's tangent.
@@ -80,18 +63,6 @@ export const limbOf =
     return smoothstep(LIMB_GONE, LIMB_CLEAR, offCentre - (EARTH_RADIUS * focal) / earth);
   };
 
-/** The view's postcards as drawn, by their system's index: each laid out once, from the eye at rest. */
-export const postcardsOf = (
-  systems: readonly StarSystem[],
-  { eye, postcards }: RestView,
-): ReadonlyMap<number, Postcard> =>
-  new Map(
-    postcards.flatMap((index) => {
-      const system = systems[index];
-      return system === undefined ? [] : [[index, postcardOf(system, eye)] as const];
-    }),
-  );
-
 // Each postcard's worlds, at their drawn size, judged by their own: a world's own size is its system's, for a Plan draws its worlds at a
 // map's scale (7v), a postcard at its own; the Earth's projects stand in no system of the file. ponytail: a Plan's twelve looked up among
 // its system's worlds, 200 at most a system.
@@ -108,21 +79,10 @@ function offerPostcards(
   }
 }
 
-/** The view's bodies, from `eye` on the map with a lens of `focal` pixels: its postcards', its close world's system's, its depth's, and the
- * Earth's projects that stand clear (7v). */
+/** The view's bodies, its postcards', from `eye` on the map with a lens of `focal` pixels. */
 function restBodies(
   systems: readonly StarSystem[],
-  {
-    postcards,
-    still,
-    deep,
-    earth,
-  }: {
-    postcards: ReadonlyMap<number, Postcard>;
-    still: Still | undefined;
-    deep: readonly Deep[];
-    earth: StarSystem | undefined;
-  },
+  postcards: ReadonlyMap<number, Postcard>,
   sight: { eye: Point; focal: number },
 ): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
@@ -134,15 +94,8 @@ function restBodies(
     if (screenRadius(world.radius, away, sight.focal) >= BODY_PIXELS) wanted.set(world.id, [system, world]);
   };
   // A postcard's bodies stand spread round its star, in its plane as drawn, each at its drawn size (7p), from the eye at rest: the same
-  // view, the same spread. The close world's system stands its worlds as the ladder would off the rest, so none changes as the eye leaves it.
+  // view, the same spread.
   offerPostcards(systems, postcards, offer);
-  if (still !== undefined) for (const world of still.system.worlds) offer(still.system, world);
-  for (const { system, world } of deep) {
-    const held = systems[system];
-    const own = held?.worlds[world];
-    if (held !== undefined && own !== undefined) offer(held, own);
-  }
-  if (earth !== undefined) for (const world of earth.worlds) offer(earth, world);
   return wanted;
 }
 
@@ -152,10 +105,9 @@ function haloNeeds({ postcards }: RestView): (system: number) => boolean {
   return (system) => kept.has(system);
 }
 
-/** How large a system's worlds stand as points, by its index: whole for a postcard and for the close world's system, whose world is a
- * point until it is a body (7d9), a glint for any other. */
-function pointShares({ postcards, close }: RestView): (system: number) => number {
-  const kept = new Set([...postcards, close?.system]);
+/** How large a system's worlds stand as points, by its index: whole for a postcard, a glint for any other. */
+function pointShares({ postcards }: RestView): (system: number) => number {
+  const kept = new Set(postcards);
   return (system) => (kept.has(system) ? 1 : GLINT);
 }
 
@@ -163,9 +115,8 @@ function pointShares({ postcards, close }: RestView): (system: number) => number
 const asDrawn = (card: Postcard | undefined, world: Orbiter): Orbiter =>
   card === undefined ? world : (drawnOf(card)[card.worlds.findIndex(({ id }) => id === world.id)] ?? world);
 
-// The view's systems as drawn, by their index: the close world's held still, each postcard's plane as drawn (7d9, 7p); none for another.
-const planesOf = (postcards: ReadonlyMap<number, Postcard>, still: Still | undefined) => (system: number) =>
-  postcards.get(system)?.system ?? (system === still?.index ? still.system : undefined);
+// The view's systems as drawn, by their index: each postcard's plane as drawn (7d9, 7p); none for another.
+const planesOf = (postcards: ReadonlyMap<number, Postcard>) => (system: number) => postcards.get(system)?.system;
 
 // Off the rest, `back` of the way from the view's drawing to the ladder's: each postcard eased back to its own system (7p's review).
 const easedFrom = (systems: readonly StarSystem[], postcards: ReadonlyMap<number, Postcard>, back: number) =>
@@ -176,14 +127,10 @@ const easedFrom = (systems: readonly StarSystem[], postcards: ReadonlyMap<number
       );
 
 // Anywhere but at a view: the worlds the ladder stands as bodies, each large enough on screen to tell from a point, its others whole points;
-// the close world's system held still, and the postcards as `postcards` draws them, so none jumps as the eye leaves it.
-function everywhere(
-  systems: readonly StarSystem[],
-  drawn: Drawn,
-  { still, postcards }: { still: Still | undefined; postcards: ReadonlyMap<number, Postcard> },
-): Wanted {
+// the postcards as `postcards` draws them, so none jumps as the eye leaves it.
+function everywhere(systems: readonly StarSystem[], drawn: Drawn, postcards: ReadonlyMap<number, Postcard>): Wanted {
   const wanted = new Map<string, readonly [StarSystem, Orbiter]>();
-  const planeOf = planesOf(postcards, still);
+  const planeOf = planesOf(postcards);
   for (let at = 0; at < drawn.bodyCount; at += 1) {
     const index = drawn.bodySystems[at] ?? -1;
     const system = planeOf(index) ?? systems[index];
@@ -194,47 +141,59 @@ function everywhere(
   return wanted;
 }
 
-/** What is drawn from `sight`: `shown`'s bodies, points, halos and planes where the eye rests at it (`resting`, the eye less the glide and
- * the sway), the ladder's `drawn` elsewhere, the close world held still and the postcards as drawn in both (7d9, 7p); the main light, the
- * specks left out for they would stand on a body, and whether the bodies are lit as up close, as at a system's arrival (7d3). */
+/** What is drawn from `sight`: `shown`'s, or off the Earth's views the arrival a flight is `coming` to, as though shown: its postcard comes
+ * as the eye nears it, and stands whole before the eye lands (7g2). */
 export function drawnFrom(
+  systems: readonly StarSystem[],
+  { shown, drawn, coming }: { shown: Shown; drawn: Drawn; coming?: Shown | undefined },
+  sight: { eye: Point; focal: number; resting: Point },
+): ReturnType<typeof drawnAt> {
+  const off = shown.postcards.size === 0 ? offEarthViews(sight.resting) : 0;
+  return drawnAt(systems, { shown: coming !== undefined && off > REST_REACH ? coming : shown, drawn }, sight);
+}
+
+// `shown`'s bodies, points, halos and planes where the eye rests at it (`resting`, the eye less the glide and the sway), the ladder's
+// `drawn` elsewhere, the postcards as drawn in both (7d9, 7p); the main light, the specks left out for they would stand on a body, and
+// whether the bodies are lit as up close, as at a system's arrival (7d3).
+function drawnAt(
   systems: readonly StarSystem[],
   { shown, drawn }: { shown: Shown; drawn: Drawn },
   sight: { eye: Point; focal: number; resting: Point },
 ) {
-  const { view, postcards, index: main, deep = [], earth } = shown;
+  const { view, postcards, index: main } = shown;
   // The rocks stand in space wherever the eye is, for the labels' chunk to draw (7p), and a Plan's ellipses and names (7v).
   drawn.rocks = shown.rocks ?? [];
   drawn.plan = shown.plan;
   const [{ eye }, { resting }] = [view, sight];
-  const still = stillOf(systems, view);
   // At an arrival its own star alone is needed: any other keeps the halo its distance leaves it.
   const lead = (system: number) => system === main;
-  const off = Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z);
+  // The Earth's view, at rest or from above, holds all along the way between its two eyes (7x2): nothing comes as the eye glides.
+  const earth = postcards.size === 0;
+  const off = earth ? offEarthViews(resting) : Math.hypot(resting.x - eye.x, resting.y - eye.y, resting.z - eye.z);
   if (off > REST_REACH) {
     // Off the rest, the postcards ease back to their own over ten times its reach: the eye can cross it by units in one step (7d9's walk).
     const eased = easedFrom(systems, postcards, smoothstep(REST_REACH, EASED_BY, off));
     return {
-      bodies: everywhere(systems, drawn, { still, postcards: eased }),
+      bodies: everywhere(systems, drawn, eased),
       pointShare: WHOLE,
       needsHalo: lead,
-      planeOf: planesOf(eased, still),
-      still: still?.index,
+      planeOf: planesOf(eased),
       limb: limbOf(sight),
       main,
       hidden: NONE_HIDDEN,
       near: false,
     };
   }
+  // The Earth's view draws no postcard: no other system is seen there (Alexis, 2026-11-04, "Seulement le décor"), each of their stars a
+  // point as in a chart, none of their worlds.
   return {
-    bodies: restBodies(systems, { postcards, still, deep, earth }, sight),
-    pointShare: pointShares(view),
+    bodies: restBodies(systems, postcards, sight),
+    pointShare: earth ? NO_POINTS : pointShares(view),
     needsHalo: main === 0 ? haloNeeds(view) : lead,
-    planeOf: planesOf(postcards, still),
-    still: still?.index,
+    planeOf: planesOf(postcards),
     limb: limbOf(sight),
     main,
-    chart: shown.plan !== undefined,
+    chart: earth || shown.plan !== undefined,
     hidden: new Set([...postcards.values()].flatMap(({ hidden }) => [...hidden])),
     near: main !== 0,
   };

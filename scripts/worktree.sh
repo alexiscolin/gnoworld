@@ -13,6 +13,20 @@ dir=$1 branch=$2 base=$3
 for arg in "$dir" "$branch" "$base"; do
 	case $arg in -*) echo "worktree.sh: $arg starts with -, which git would read as an option" >&2; exit 2 ;; esac
 done
+# The tree goes in the worktrees' folder alone: beside the main checkout, under its name and -wt (~/Server/gnoworld-wt),
+# out of the temp folder every command may write, so no part's session writes a sibling, moves one or plants one there (7w3, F4893's
+# remedy a). Alexis makes it once; the chief writes it, by --add-dir. It is read from the repository's own common folder, a caller's
+# git folders dropped; the tree's folder is that one by its own path, no link on the way (a -wt folder that is a link is none), and
+# git registers the tree by it, as herdr's open.sh finds it in `git worktree list`.
+unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
+common=$(git rev-parse --path-format=absolute --git-common-dir) # the main checkout's .git
+folder="$(cd "$common/.." && pwd -P)-wt"
+[ -d "$folder" ] || { echo "worktree.sh: no folder $folder; Alexis makes it once: mkdir $folder" >&2; exit 1; }
+name=${dir##*/}
+case $name in
+'' | .* | *[!A-Za-z0-9._-]*) echo "worktree.sh: $dir: a worktree is a plain name (letters, digits, . _ -) in $folder" >&2; exit 1 ;;
+esac
+[ "$(cd "$(dirname "$dir")" 2>/dev/null && pwd -P)" = "$folder" ] || { echo "worktree.sh: $dir is not in $folder, the worktrees' folder, by its own path" >&2; exit 1; }
 [ ! -e "$dir" ] || { echo "worktree.sh: $dir exists; name a new folder" >&2; exit 1; }
 git rev-parse --verify --quiet "$base^{commit}" >/dev/null || { echo "worktree.sh: $base is no commit" >&2; exit 1; }
 src=$(pwd -P)

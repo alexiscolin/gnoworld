@@ -11,10 +11,11 @@ import {
   type StarSystem,
 } from "@gnoworld/core";
 
-/** A system asked for, in its Plan or not (7v), and who moves the scene's eye to it, and through which lens: the home's where none. */
+/** A system asked for, in its Plan or not (7v), and who moves the scene's eye to it, and through which lens: the home's where none; gliding
+ * there where asked, between the Earth's two views (7x2). */
 export interface Asking {
   readonly id: string | undefined;
-  readonly go: (eye: Point, lens?: number) => void;
+  readonly go: (eye: Point, lens?: number, glide?: boolean) => void;
   readonly plan: boolean;
 }
 
@@ -40,7 +41,7 @@ export function landingAt(systems: readonly StarSystem[], id: string): Landing |
   const { eye, look, postcard, room } = arrivalOf(system, systems);
   return {
     index,
-    view: { eye, postcards: [index], close: undefined },
+    view: { eye, postcards: [index] },
     look,
     postcards: new Map([[index, postcard]]),
     room,

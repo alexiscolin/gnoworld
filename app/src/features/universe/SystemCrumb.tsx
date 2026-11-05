@@ -27,7 +27,10 @@ export function SystemCrumb({ back }: { back: () => void }) {
     document.addEventListener(
       "keydown",
       (event) => {
-        if (event.key === "Escape" && !event.defaultPrevented && !keyHeld(event)) back();
+        if (event.key !== "Escape" || event.defaultPrevented || keyHeld(event)) return;
+        // Taken here: the flights' own Escape would land the way back it starts (7g2).
+        event.preventDefault();
+        back();
       },
       { signal: controller.signal },
     );

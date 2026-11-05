@@ -110,7 +110,6 @@ describe("loadData", () => {
         "news",
         "onAir",
         "quests",
-        "stations",
         "universes",
         "xPosts",
       ]);
@@ -218,7 +217,7 @@ describe("loadData", () => {
     // The crumbs' one genre (8g, frame 104: "GAMES › DAPP").
     expect(data.genres).toEqual([{ slug: "games", name: "Games" }]);
     // events and news hold the ticker's placeholders, listed below.
-    for (const empty of ["ecosystems", "stations"] as const) expect(data[empty]).toEqual([]);
+    for (const empty of ["ecosystems"] as const) expect(data[empty]).toEqual([]);
   });
 
   it("refuses a list of universes that is empty: no default, so no build", () => {
@@ -258,7 +257,7 @@ describe("earthOrbit.json", () => {
   });
 
   it("ships gnosh.ai, Alexis's own link, among the projects", () => {
-    expect(orbiting).toContainEqual({ name: "gnosh.ai", url: "https://gnosh.ai" });
+    expect(orbiting).toContainEqual(expect.objectContaining({ name: "gnosh.ai", url: "https://gnosh.ai" }));
     expect(() => EarthOrbit.parse(orbiting)).not.toThrow();
   });
 });

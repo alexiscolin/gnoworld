@@ -1,37 +1,13 @@
-// The Earth's system in the lab (part 7x), for Alexis's eye before any product code: the Earth of the home with its Moon, the real planets
-// as scenery, the stations each built from its name, at the home's view at rest ("earthsys") or zoomed down on the Earth ("earthtop").
-// `count` stations stand (gnosh.ai first), `size` sets gnosh.ai's; `scenery=off` leaves the planets out, for a frame's cost without them.
-import { EARTH_PLACE, FIELD_OF_VIEW } from "@gnoworld/core";
-import { earthCamera, earthEye, sceneryOf, stationOf, stationsRound } from "@gnoworld/core";
-import { Group, PerspectiveCamera, Scene, Vector2 } from "three";
+// The Earth's system in the lab (part 7x): the site's Earth view (station/earthView.ts) with the home's Earth and Moon, at the view at rest
+// ("earthsys") or the top view ("earthtop"), for Alexis's eye: `count` sample stations stand (gnosh.ai first), `size` sets gnosh.ai's;
+// `scenery=off` leaves the planets out, for a frame's cost without them.
+import { EARTH_PLACE, earthCamera, earthEye, earthTopEye, FIELD_OF_VIEW } from "@gnoworld/core";
+import { Group, PerspectiveCamera, Scene } from "three";
 import { Home } from "../src/scene/cosmos/home.ts";
-import { SMALL_RING } from "../src/scene/earth/orbit.ts";
-import { beltOf } from "../src/scene/station/belt.ts";
-import { SceneryDrawn } from "../src/scene/station/scenery.ts";
-import { StationsDrawn } from "../src/scene/station/stations.ts";
-import { lightsOf, nameOf, namesOf, orbitsOf, scene, sizeOf, studyView } from "./earthParts.ts";
+import { EarthView } from "../src/scene/station/earthView.ts";
+import { nameOf, scene, sizeOf, studyView } from "./earthParts.ts";
 import { starField, starSprite } from "./sky.ts";
 import type { Device, View } from "./views.ts";
-
-// The stage, its camera at the origin looking at the Earth from the view at rest or from above, and the world's group round the Earth.
-function staged(top: boolean, ratio: number) {
-  const stage = new Scene();
-  const camera = new PerspectiveCamera(FIELD_OF_VIEW, 1.6, 0.05, 6000);
-  const earth = scene(EARTH_PLACE);
-  const eyeMap = top
-    ? { x: EARTH_PLACE.x, y: EARTH_PLACE.y + 30 * Math.sin(1.25), z: EARTH_PLACE.z + 30 * Math.cos(1.25) }
-    : earthEye();
-  const eye = scene(eyeMap);
-  const world = new Group();
-  world.position.copy(earth).sub(eye);
-  stage.add(starField(ratio), world);
-  const up = scene({ x: 0, y: 1, z: 0 }).sub(scene({ x: 0, y: 0, z: 0 }));
-  camera.up.copy(up);
-  camera.lookAt(world.position);
-  stage.add(starSprite(camera, scene({ x: 0, y: 0, z: 0 }).sub(eye).normalize()));
-  world.add(...lightsOf(scene({ x: 0, y: 0, z: 0 }).sub(earth).normalize()));
-  return { stage, camera, earth, eyeMap, eye, world, up };
-}
 
 export interface Asked {
   readonly top: boolean;
@@ -41,75 +17,60 @@ export interface Asked {
 
 /** The Earth's system, from the view at rest or from above. */
 export async function earthSystem({ renderer, base, ratio }: Device, { top, count, size }: Asked): Promise<View> {
-  const { stage, camera, earth, eyeMap, eye, world, up } = staged(top, ratio);
+  const stage = new Scene();
+  const camera = new PerspectiveCamera(FIELD_OF_VIEW, 1.6, 0.05, 6000);
+  const eye = scene(top ? earthTopEye() : earthEye());
+  const at = scene(EARTH_PLACE).sub(eye);
+  stage.add(starField(ratio));
+  camera.up.copy(scene({ x: 0, y: 1, z: 0 }).sub(scene({ x: 0, y: 0, z: 0 })));
+  camera.lookAt(at);
+  stage.add(starSprite(camera, scene({ x: 0, y: 0, z: 0 }).sub(eye).normalize()));
   const origin = new Group();
   stage.add(origin);
-  const home = new Home(
-    { renderer, stage, camera, halved: () => false, base, moved: () => undefined, stood: () => undefined },
-    origin,
-  );
+  const moved = () => undefined;
+  const home = new Home({ renderer, stage, camera, halved: () => false, base, moved, stood: moved }, origin);
   home.stand();
-  const asked = Array.from({ length: count }, (_, index) => ({ seed: nameOf(index), size: sizeOf(index, size) }));
-  const round = stationsRound(asked, SMALL_RING);
-  const stations = new StationsDrawn();
-  stations.stand(
-    round.close.map((placed) => ({
-      station: stationOf(placed.seed, placed.size),
-      at: scene(placed.place).sub(earth),
-      radius: placed.radius,
-    })),
-  );
-  world.add(stations.group);
-  const beltPlaces = new Float32Array(round.belt.flatMap(({ place }) => scene(place).sub(earth).toArray()));
-  const belt = beltOf(beltPlaces, new Float32Array(round.belt.map(({ radius }) => radius * 0.6)));
-  world.add(belt);
-  const orbits = top ? orbitsOf(round.close, earth) : undefined;
-  if (orbits !== undefined) world.add(orbits);
-  const scenery = new SceneryDrawn();
   const plain = new URLSearchParams(location.search).get("scenery") === "off";
-  await scenery.stand(plain ? [] : sceneryOf(), {
-    eye: eyeMap,
-    base,
-    anisotropy: Math.min(renderer.capabilities.getMaxAnisotropy(), 8),
-  });
-  world.add(scenery.group);
-  // The Earth comes on its own: the view is drawn once it stands.
+  const projects = Array.from({ length: count }, (_, index) => ({
+    name: nameOf(index),
+    url: "https://gno.land",
+    size: sizeOf(index, size),
+  }));
+  const sight = { width: innerWidth, height: innerHeight, focal: 1 };
+  const view = new EarthView(
+    { renderer, base, moved, camera },
+    { projects, document, sight: () => sight, scenery: !plain },
+  );
+  stage.add(view.group);
+  view.stand();
+  // The view is drawn once the Earth and the scenery stand.
   await new Promise<void>((done) => {
     const wait = () => {
-      if (home.stood) done();
+      if (home.stood && (plain || view.stats().scenery > 0)) done();
       else setTimeout(wait, 50);
     };
     wait();
   });
-  const names = namesOf(round.close, { eye, up });
-  Reflect.set(globalThis, "__earthSystem", {
-    close: round.close.map(({ seed, size: one }) => ({ seed, size: one })),
-    belt: round.belt.length,
-    parts: stations.stats(),
-    camera: earthCamera(),
-  });
+  Reflect.set(globalThis, "__earthSystem", { ...view.stats(), camera: earthCamera() });
   return studyView(
     { stage, camera },
     {
       looked() {
-        const scale = belt.material.uniforms["scale"];
-        if (scale !== undefined)
-          scale.value =
-            renderer.getDrawingBufferSize(new Vector2()).y / (2 * Math.tan((FIELD_OF_VIEW * Math.PI) / 360));
-        names.place(camera);
+        Object.assign(sight, {
+          width: innerWidth,
+          height: innerHeight,
+          focal: innerHeight / (2 * Math.tan((FIELD_OF_VIEW * Math.PI) / 360)),
+        });
+        camera.updateMatrixWorld();
+        view.tick(eye, 0, true);
       },
       tick(seconds) {
         home.tick(eye, seconds, camera.quaternion);
-        stations.tick(seconds);
+        view.tick(eye, seconds, true);
       },
       dispose() {
         home.drop();
-        stations.dispose();
-        scenery.dispose();
-        belt.geometry.dispose();
-        belt.material.dispose();
-        orbits?.geometry.dispose();
-        names.remove();
+        view.dispose();
       },
     },
   );

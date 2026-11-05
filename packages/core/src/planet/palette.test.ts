@@ -1,8 +1,10 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
+import type { AnchorRow } from "./anchors.ts";
 import { ANCHORS, asciiBytes, planetSeed, type Anchor } from "./look.ts";
 import { labOf, linearOf, type Lab } from "./palette.ts";
-import { planetRecipe } from "./recipe.ts";
+import { starWarmth } from "../cosmos/warmth.ts";
+import { plantsOf, planetRecipe } from "./recipe.ts";
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 
@@ -48,13 +50,13 @@ const anyPath = fc.oneof(
   fc.stringMatching(/^[a-z0-9_-]{1,24}(?:\/[a-z0-9_-]{1,24}){0,2}$/).map((id) => asciiBytes(`gno.land/r/${id}`)),
 );
 
-// The ungraded, unturned colour of a row's palette at a seed: what the grade and the hue then move.
-const plainLab = (anchor: Anchor, seed: Uint8Array, at: 0 | 1 | 2): Lab => {
-  const [one, other] = ROWS[anchor].palettes;
+// The ungraded, unturned colour of two ramps (a row's palette, or the plants a world grows) at a seed: what the grade and the hue move.
+const plainOf = ([one, other]: AnchorRow["palettes"], seed: Uint8Array, at: 0 | 1 | 2): Lab => {
   const [from, to] = [cieLab(one[at]), cieLab(other[at])];
   const blend = word(seed, 6);
   return [lerp(from[0], to[0], blend), lerp(from[1], to[1], blend), lerp(from[2], to[2], blend)];
 };
+const plainLab = (anchor: Anchor, seed: Uint8Array, at: 0 | 1 | 2): Lab => plainOf(ROWS[anchor].palettes, seed, at);
 // The grade a seed gives: its lightness and its chroma, from the second hash's bytes 28 and 29.
 const gradeOf = (seed: Uint8Array) => {
   const more = sha256(seed);
@@ -198,9 +200,14 @@ describe("a namespace's hue (ADR-0002 §3)", () => {
       const anchor = anchors[at % anchors.length] ?? "rocky";
       const seed = planetSeed(path);
       const { palette } = planetRecipe(path, anchor);
+      const plants = plantsOf(sha256(seed), anchor, starWarmth(namespace));
       return ([0, 1, 2] as const)
-        .filter((index) => chroma(plainLab(anchor, seed, index)) > 4)
-        .map((index) => ({ plain: plainLab(anchor, seed, index), got: palette.lab[index], grade: gradeOf(seed) }));
+        .filter((index) => chroma(plainOf(plants, seed, index)) > 4)
+        .map((index) => ({
+          plain: plainOf(plants, seed, index),
+          got: palette.lab[index],
+          grade: gradeOf(seed),
+        }));
     });
   const turns = (namespace: string, anchors: readonly Anchor[]) =>
     turned(namespace, anchors).map(({ plain, got }) => turnBetween(plain, got));

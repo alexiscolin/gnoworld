@@ -13,7 +13,6 @@ const SOURCE: PlaceSource = {
     { slug: "bubble", universe: "gnoland" },
   ],
   ecosystems: [{ slug: "tokens", universe: "onyx" }],
-  stations: [{ slug: "moon", universe: "gnoland" }],
 };
 
 const find = (places: ReturnType<typeof placesOf>) => (kind: string, universe: string, slug?: string) =>
@@ -23,7 +22,7 @@ describe("placesOf", () => {
   const places = () => placesOf(SOURCE);
 
   it("gives the cosmos and the Earth to every universe, whatever the files hold", () => {
-    expect(placesOf({ ...SOURCE, hubs: [], ecosystems: [], stations: [] }).map((p) => p.canonical)).toEqual(
+    expect(placesOf({ ...SOURCE, hubs: [], ecosystems: [] }).map((p) => p.canonical)).toEqual(
       expect.arrayContaining(["/net/onyx/", "/net/onyx/earth", "/net/gnoland/", "/net/gnoland/earth"]),
     );
   });
@@ -32,10 +31,6 @@ describe("placesOf", () => {
     expect(find(places())("world", "onyx", "bubble")?.canonical).toBe("/net/onyx/w/bubble");
     expect(find(places())("world", "gnoland", "bubble")?.canonical).toBe("/net/gnoland/w/bubble");
     expect(find(places())("ecosystem", "onyx", "tokens")?.canonical).toBe("/net/onyx/e/tokens");
-  });
-
-  it("makes a station a world: /w/<slug>", () => {
-    expect(find(places())("world", "gnoland", "moon")?.canonical).toBe("/net/gnoland/w/moon");
   });
 
   it("keeps the default universe's pages unprefixed and the others' under /net", () => {
@@ -47,7 +42,7 @@ describe("placesOf", () => {
   });
 
   it("is empty-proof: universes listed, no world, no ecosystem: the cosmos and the Earth alone", () => {
-    expect(placesOf({ ...SOURCE, hubs: [], ecosystems: [], stations: [] }).map((p) => p.kind)).toEqual([
+    expect(placesOf({ ...SOURCE, hubs: [], ecosystems: [] }).map((p) => p.kind)).toEqual([
       "cosmos",
       "earth",
       "cosmos",
@@ -59,7 +54,7 @@ describe("placesOf", () => {
     expect(() => placesOf({ ...SOURCE, defaultUniverse: "nowhere" })).toThrow(
       /default universe "nowhere" is not listed/,
     );
-    expect(() => placesOf({ ...SOURCE, universes: [], hubs: [], ecosystems: [], stations: [] })).toThrow(
+    expect(() => placesOf({ ...SOURCE, universes: [], hubs: [], ecosystems: [] })).toThrow(
       /default universe "onyx" is not listed/,
     );
   });
@@ -67,31 +62,15 @@ describe("placesOf", () => {
   it.each([
     ["hub", { hubs: [{ slug: "x", universe: "mars" }] }],
     ["ecosystem", { ecosystems: [{ slug: "x", universe: "mars" }] }],
-    ["world", { stations: [{ slug: "x", universe: "mars" }] }],
   ])("refuses a %s of a universe that is not listed", (_, change) => {
     expect(() => placesOf({ ...SOURCE, ...change })).toThrow(/"x" is in "mars", which is not listed/);
   });
 
   it.each([
     [
-      "a hub and a station",
-      { stations: [{ slug: "bubble", universe: "onyx" }] },
-      /two worlds named "bubble" in "onyx"/,
-    ],
-    [
       "two hubs",
       {
         hubs: [
-          { slug: "a", universe: "onyx" },
-          { slug: "a", universe: "onyx" },
-        ],
-      },
-      /two worlds named "a" in "onyx"/,
-    ],
-    [
-      "two stations",
-      {
-        stations: [
           { slug: "a", universe: "onyx" },
           { slug: "a", universe: "onyx" },
         ],
@@ -116,8 +95,10 @@ describe("placesOf", () => {
   it("takes one slug in two universes, and a world and an ecosystem of one slug", () => {
     const taken = placesOf({
       ...SOURCE,
-      hubs: [{ slug: "a", universe: "onyx" }],
-      stations: [{ slug: "a", universe: "gnoland" }],
+      hubs: [
+        { slug: "a", universe: "onyx" },
+        { slug: "a", universe: "gnoland" },
+      ],
       ecosystems: [{ slug: "a", universe: "onyx" }],
     });
     expect(taken.filter((p) => p.slug === "a").map((p) => p.canonical)).toEqual([
@@ -153,17 +134,14 @@ const keyed = (ids: string[], maxLength: number) =>
     maxLength,
     selector: (h) => `${h.universe}/${h.slug}`,
   });
-// Hubs and stations are worlds of one namespace: one list of worlds, cut in two.
+// The hubs are the worlds: one list of them.
 const source = fc.uniqueArray(slug, { minLength: 1, maxLength: 4 }).chain((ids) =>
-  fc
-    .record({
-      defaultUniverse: fc.constantFrom(...ids),
-      universes: fc.constant(ids.map((id) => ({ id }))),
-      worlds: keyed(ids, 8),
-      cut: fc.nat(8),
-      ecosystems: keyed(ids, 4),
-    })
-    .map(({ worlds, cut, ...rest }) => ({ ...rest, hubs: worlds.slice(0, cut), stations: worlds.slice(cut) })),
+  fc.record({
+    defaultUniverse: fc.constantFrom(...ids),
+    universes: fc.constant(ids.map((id) => ({ id }))),
+    hubs: keyed(ids, 8),
+    ecosystems: keyed(ids, 4),
+  }),
 );
 
 describe("the places, as properties", () => {
@@ -233,7 +211,6 @@ describe("the cost of the places, at n, 4n and 16n", () => {
       universes: [{ id: "onyx" }, { id: "gnoland" }],
       hubs: Array.from({ length: n }, (_, i) => row(`h${String(i)}`, i % 2 ? "onyx" : "gnoland")),
       ecosystems: Array.from({ length: n }, (_, i) => row(`e${String(i)}`, "onyx")),
-      stations: Array.from({ length: n }, (_, i) => row(`s${String(i)}`, "gnoland")),
     };
   };
 
@@ -241,7 +218,7 @@ describe("the cost of the places, at n, 4n and 16n", () => {
     const perRow = [100, 400, 1600].map((n) => {
       const reads = { count: 0 };
       placesOf(sourceOf(n, reads));
-      return reads.count / (3 * n);
+      return reads.count / (2 * n);
     });
     expect(perRow[1]).toBeLessThanOrEqual(perRow[0] ?? 0);
     expect(perRow[2]).toBeLessThanOrEqual(perRow[0] ?? 0);

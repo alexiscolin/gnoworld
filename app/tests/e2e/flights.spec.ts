@@ -138,17 +138,49 @@ const watchPanel = (page: Page) =>
   });
 const panelSeen = (page: Page) => page.evaluate(() => Reflect.get(globalThis, "__panelSeen") as PanelSeen);
 
-// The great star on screen, which the view at rest always holds: the star a reader aims at here.
+// The great star on screen, which the view at rest always holds: the star a reader aims at here. The page's frames are held from the read
+// to the click: the view sways, and under load the frames between them took the star past a click's 24 px reach (7g2's report, F5400).
 async function aimAtTheGreatStar(page: Page) {
-  const sun = (await stats(page)).cosmos?.screen.sun;
-  if (sun === undefined) throw new Error("no great star on screen");
-  await page.mouse.click(sun.x, sun.y);
+  const sun = await page.evaluate(
+    () =>
+      new Promise<{ x: number; y: number } | undefined>((resolve) => {
+        const ask = globalThis.requestAnimationFrame.bind(globalThis);
+        const held: FrameRequestCallback[] = [];
+        globalThis.requestAnimationFrame = (run) => {
+          held.push(run);
+          return 0;
+        };
+        Reflect.set(globalThis, "__release", () => {
+          globalThis.requestAnimationFrame = ask;
+          for (const run of held.splice(0)) ask(run);
+        });
+        // The frame the scene asked before the hold runs first; this reads what it drew.
+        ask(() => {
+          const scene = Reflect.get(globalThis, "__gnoworldScene") as {
+            stats: () => { cosmos?: { screen: { sun: { x: number; y: number } } } };
+          };
+          resolve(scene.stats().cosmos?.screen.sun);
+        });
+      }),
+  );
+  try {
+    if (sun === undefined) throw new Error("no great star on screen");
+    await page.mouse.click(sun.x, sun.y);
+  } finally {
+    await page.evaluate(() => {
+      (Reflect.get(globalThis, "__release") as () => void)();
+    });
+  }
 }
 
-const fly = (page: Page, goal: unknown) =>
-  page.evaluate((to) => {
+// Asks a flight of the scene and waits till it starts: a star's starts once its arrival is bound (7g2).
+async function fly(page: Page, goal: unknown) {
+  const before = (await flightOf(page))?.flights ?? 0;
+  await page.evaluate((to) => {
     (Reflect.get(globalThis, "__gnoworldScene") as { fly: (goal: unknown) => void }).fly(to);
   }, goal);
+  await expect.poll(async () => (await flightOf(page))?.flights ?? 0, SLOW).toBeGreaterThan(before);
+}
 
 const flown = (page: Page) => expect.poll(async () => (await flightOf(page))?.flying, SLOW).toBe(false);
 
@@ -279,8 +311,11 @@ test("jumps to the star aimed at, lands at once on Escape, and comes back on Esc
   expect(await flightOf(page)).toMatchObject({ kind: "star", target: "gno.land" });
   expect(before).toBeLessThan(1);
   expect({ flying, along }).toEqual({ flying: false, along: 1 });
+  // Landed on the star's arrival, the page told where it is (7g2): with no world in the file, no view at rest takes the eye over, which
+  // stays at the arrival's eye, its way kept.
   const there = (await flightOf(page))?.travel ?? { x: 0, y: 0, z: 0 };
   expect(Math.hypot(there.x, there.y, there.z)).toBeGreaterThan(1);
+  await expect(page.getByRole("navigation", { name: "Where you are" })).toBeVisible();
   await page.keyboard.press("Escape");
   await expect.poll(async () => (await flightOf(page))?.kind).toBe("rest");
   await flown(page);
@@ -369,9 +404,9 @@ test("flies from the cosmos to a world's page: the panel names it, and lands as 
   await expect(page.locator("[data-look='plate']")).toBeVisible();
 });
 
-// Row 7's test, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (Playwright's CDP
-// session, slice 7 §9, question 17). Every kind of flight, half of them pages' flights, which copy a frame each, driven through the scene: a
-// world page's own warming (its code compiled, its style sheets) is no flight's (heap snapshots, 2026-11-03). The baseline after one round.
+// Row 7's test, word for word: "After 20 flights, GPU resources are at their baseline and the JS heap is within 10%" (CDP; slice 7 §9, Q17).
+// Every kind of flight, half pages' flights, driven through the scene; a world page's own warming is no flight's (heap snapshots, 2026-11-03).
+// The baseline once a round adds nothing: three counts a geometry from its first draw, which a loaded first round can miss (F5404).
 test("leaves the GPU's resources at their baseline and the heap within a tenth after twenty flights there and back", async ({
   page,
 }) => {
@@ -408,7 +443,20 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   };
   await test.step("one round of each kind first", round);
   await steady();
-  const before = { ...(await gpu()), heap: await heap(), flights: (await flightOf(page))?.flights ?? NaN };
+  // A round that adds each time is a leak: three rounds at most before the baseline.
+  let warmed = await gpu();
+  for (let rounds = 2; ; rounds += 1) {
+    await test.step(`round ${String(rounds)}, till one adds nothing`, round);
+    await steady();
+    const now = await gpu();
+    if (JSON.stringify(now) === JSON.stringify(warmed)) break;
+    expect(
+      rounds,
+      `round ${String(rounds)} added: ${JSON.stringify(warmed)}, then ${JSON.stringify(now)}`,
+    ).toBeLessThan(3);
+    warmed = now;
+  }
+  const before = { ...warmed, heap: await heap(), flights: (await flightOf(page))?.flights ?? NaN };
   for (let flight = 0; flight < 20; flight += 4)
     await test.step(`flights ${String(flight + 1)} to ${String(flight + 4)}`, round);
   await steady();

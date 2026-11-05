@@ -3,6 +3,7 @@
 import {
   planetLook,
   planetRecipe,
+  readsMinorMap,
   worldLook,
   worldRecipe,
   type Anchor,
@@ -40,6 +41,14 @@ const SULFUR: readonly [Rgb, Rgb, Rgb] = [
 export const styleOf = ({ look }: World): number =>
   look.anchor === "volcanic" ? Math.round((look.minorOffset[0] * 255) / 16) % STYLES : 0;
 
+/** The maps a generated world reads: its minor's only where its program reads it (F4586), by the rule its `minorRead` takes. */
+export const mapNamesOf = ({ look, recipe }: World): string[] => [
+  look.map,
+  ...(readsMinorMap(recipe) ? [recipe.minorMap] : []),
+  "clouds",
+  "ring",
+];
+
 /** What a generated world's program reads: its look's and its recipe's values, and its maps. */
 export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<string, IUniform> {
   const [low, mid, high] = recipe.palette.linear;
@@ -67,6 +76,7 @@ export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<str
     sulfurLow: { value: working(SULFUR[0]) },
     sulfurMid: { value: working(SULFUR[1]) },
     sulfurHigh: { value: working(SULFUR[2]) },
+    minorRead: { value: Number(readsMinorMap(recipe)) },
     minorShare: { value: recipe.minorShare },
     warpAmount: { value: Math.min(warp.amount, MAX_STRETCH / warp.frequency) },
     warpFrequency: { value: warp.frequency },

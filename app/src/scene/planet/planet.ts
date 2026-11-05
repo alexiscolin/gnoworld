@@ -57,7 +57,7 @@ interface Parts {
 /** How hard the Earth lights the edge of its air: the bright limb of frame 39. */
 export const LIMB_LIGHT = 1.05;
 
-function airMaterial(rim: NonNullable<PlanetLook["rim"]>): ShaderMaterial {
+function airMaterial(rim: NonNullable<PlanetLook["rim"]>, glow: PlanetLook["glow"]): ShaderMaterial {
   return new ShaderMaterial({
     vertexShader: AIR_VERTEX,
     fragmentShader: AIR_FRAGMENT,
@@ -71,6 +71,7 @@ function airMaterial(rim: NonNullable<PlanetLook["rim"]>): ShaderMaterial {
       rimColour: { value: working(rim.colour) },
       rimThickness: { value: rim.thickness },
       limbLight: { value: 0 },
+      selfLight: { value: glow?.level ?? 0 },
       faraway: { value: 0 },
     },
   });
@@ -129,7 +130,7 @@ class LivePlanet implements Planet {
     this.surface = surface;
     this.#add(new Mesh(sphere, this.surface));
     if (look.rim !== null) {
-      const air = this.#add(new Mesh(sphere, airMaterial(look.rim)));
+      const air = this.#add(new Mesh(sphere, airMaterial(look.rim, look.glow)));
       air.scale.setScalar(1 + look.rim.thickness);
       air.renderOrder = AIR_ORDER;
     }

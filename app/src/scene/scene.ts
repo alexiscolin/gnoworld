@@ -81,6 +81,8 @@ class LiveScene implements Scene {
       halved: () => this.#touch || tierOf(this.#tier) === "low",
       base: import.meta.env.BASE_URL,
       moved: this.#redraw,
+      go: this.moveTo,
+      rests: options.onSystem,
       // The Earth or the worlds stood: the first frames timed a bare sky, and what the page draws is timed once more.
       stood: () => {
         this.#probe.earthStood(auto && this.#tier !== "low" && !this.#motion.matches);
@@ -92,9 +94,7 @@ class LiveScene implements Scene {
       this.#viewport.changed();
     });
     this.ground = this.#earth;
-    this.fly = this.#parts.fly;
-    ({ arrive: this.arrive, see: this.see } = this.#parts.viewsOf(this.moveTo, options.onSystem));
-    this.portraits = this.#parts.portraits;
+    ({ arrive: this.arrive, see: this.see, fly: this.fly, portraits: this.portraits } = this.#parts);
     this.#viewport = new Viewport({
       canvas,
       renderer: this.#renderer,
@@ -134,6 +134,7 @@ class LiveScene implements Scene {
     this.#parts.flights.part?.advance(delta);
     this.#viewport.settle();
     this.#eye.advance(delta, this.#motion.matches);
+    if (this.#eye.gliding) this.#loop.redraw();
     this.#camera.rotation.set(this.#eye.turn.pitch, this.#eye.turn.yaw, 0);
     this.#space.follow(this.#eye.at, this.#eye.seconds);
     this.#seconds += delta / 1000;
@@ -174,8 +175,8 @@ class LiveScene implements Scene {
     this.#stopOrGo();
   }
 
-  readonly moveTo = (to: Point, lens?: number): void => {
-    this.#eye.moveTo(to);
+  readonly moveTo = (to: Point, lens?: number, glide?: boolean): void => {
+    this.#eye.moveTo(to, glide);
     this.#viewport.view(lens);
     this.#loop.redraw();
   };

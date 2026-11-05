@@ -4,7 +4,8 @@ import { TUNABLES } from "../../src/scene/tuning.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { brightness } from "./geometry.ts";
 import { askLab, circles, heldQuiet, lit, open, PAGE, picture, SOFTWARE, stats } from "./lab.ts";
-import { landed, running, stats as sceneStats } from "./sceneStage.ts";
+import { earthStanding, landed, running, stats as sceneStats } from "./sceneStage.ts";
+import { BUILD } from "./sites.ts";
 
 // The workshop's tuning panel (docs/DEVELOPMENT.md, "The workshop"): T shows it on either lab page, its controls change what the real
 // renderer draws at once, "Copy" lists what changed and "Reset" puts back the code's values. Under reduced motion the page draws once a change,
@@ -19,10 +20,7 @@ const PRIMITIVES = [
 ].map(([, name = "", value = ""]) => ({ name, value }));
 // What a site's build would hold of the workshop: its values' names, and its registry's own state, whose names minification keeps.
 const TRACES = [...TUNABLES, "workshopValues"];
-const BUILD =
-  process.env["GNOWORLD_BUILD"] === undefined
-    ? new URL("../../build/client/", import.meta.url)
-    : new URL(`file://${process.env["GNOWORLD_BUILD"]}/client/`);
+const CLIENT = new URL("client/", BUILD);
 
 const panel = (page: Page) => page.getByRole("complementary", { name: "Tuning" });
 const control = (page: Page, name: string) => panel(page).getByLabel(name, { exact: true });
@@ -79,8 +77,8 @@ test.describe("the workshop's tuning panel", () => {
   heldQuiet();
 
   test("leaves nothing of the workshop in the site's build, and the lab's build holds all of it", () => {
-    const files = readdirSync(BUILD, { recursive: true }).filter((name) => /\.(?:js|html|data)$/.test(name));
-    const holds = (name: string, trace: string) => readFileSync(new URL(name, BUILD), "utf8").includes(trace);
+    const files = readdirSync(CLIENT, { recursive: true }).filter((name) => /\.(?:js|html|data)$/.test(name));
+    const holds = (name: string, trace: string) => readFileSync(new URL(name, CLIENT), "utf8").includes(trace);
     const site = files.filter((name) => !name.startsWith("lab/"));
     const lab = files.filter((name) => name.startsWith("lab/"));
     expect(site.length, "the site's build").toBeGreaterThan(0);
@@ -201,7 +199,7 @@ test.describe("the workshop's tuning panel", () => {
   }) => {
     test.setTimeout(180_000);
     await onTheCosmos(page, "");
-    await expect.poll(async () => (await sceneStats(page)).cosmos?.bodies ?? 0, { timeout: 90_000 }).toBeGreaterThan(2);
+    await earthStanding(page);
     const whole: [number, number, number, number] = [0, 0, 1728, 1080];
     const [before = 0] = await brightness(page, await picture(page), [whole]);
     const { eye } = await sceneStats(page);

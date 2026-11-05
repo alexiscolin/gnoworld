@@ -1,8 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { systemsOf, type StarSystem, type WorldHeld } from "../cosmos/system.ts";
-import { distanceOf, type Point } from "../space/cell.ts";
-import { stopNear, ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt, type Figures } from "./flight.ts";
+import { ENTERS, figuresOf, FLIGHT, flightSeconds, phaseOf, wayAt, type Figures } from "./flight.ts";
 
 // A flight (7g; ADR-0001 §7, "travel like a ship"; docs/DESIGN-SYSTEM.md, "Motion"): 1.3 to 3.2 s by distance, a slow start out of orbit, a
 // crossing and a slow arrival, and the panel's instruments read from it (frames 18, 36, 88, 89, 101, 128, 142).
@@ -132,109 +130,5 @@ describe("the panel's instruments", () => {
     const flight = { distance: 100, seconds: 2 };
     expect(read(flight, -1)).toEqual(read(flight, 0));
     expect(read(flight, 3)).toEqual(read(flight, 1));
-  });
-});
-
-// A few systems as the map places them, some with worlds and one without.
-const held = (systems: number, each: number): WorldHeld[] =>
-  Array.from({ length: systems }, (_, system) =>
-    Array.from({ length: each }, (__, world) => ({
-      id: `s${String(system)}/w${String(world)}`,
-      namespace: `s${String(system)}`,
-      use: 1 + ((system * 7 + world * 3) % 11) * 15,
-    })),
-  ).flat();
-// Built inside each test, as StrykerJS needs (F2356).
-const someSystems = () => systemsOf(held(40, 3));
-// The plane's normal, the way core's onPlane turns `up`.
-const normalOf = ({ tilt, node }: StarSystem): Point => ({
-  x: -Math.sin(node) * Math.sin(tilt),
-  y: Math.cos(tilt),
-  z: Math.cos(node) * Math.sin(tilt),
-});
-const minus = (a: Point, b: Point): Point => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
-const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y + a.z * b.z;
-const arrive = (system: StarSystem, from: Point): Point => {
-  const out = { x: NaN, y: NaN, z: NaN };
-  stopNear(system, from, out);
-  return out;
-};
-const FROMS: Point[] = [
-  { x: 0, y: 30, z: 120 },
-  { x: -400, y: -12, z: 15 },
-  { x: 37, y: 2, z: -260 },
-];
-const reachOf = ({ worlds }: StarSystem) => Math.max(0, ...worlds.map(({ orbit, radius }) => orbit + radius));
-
-describe("where a flight to a star stops", () => {
-  it("stands the eye far enough from the star for its whole system in view, and near enough to read it: 6 to 16 units", () => {
-    for (const system of someSystems())
-      for (const from of FROMS) {
-        const away = distanceOf(arrive(system, from), system.place);
-        expect(away).toBeGreaterThanOrEqual(6);
-        expect(away).toBeLessThanOrEqual(16);
-        expect(away).toBeGreaterThanOrEqual(Math.min(16, 2 * reachOf(system)));
-      }
-  });
-
-  it("comes in on the side it came from, a little over the system's plane, never on its edge or over its pole", () => {
-    for (const system of someSystems())
-      for (const from of FROMS) {
-        const offset = minus(arrive(system, from), system.place);
-        const normal = normalOf(system);
-        const height = dot(offset, normal) / Math.hypot(offset.x, offset.y, offset.z);
-        // 20 degrees off the plane, on the side of the plane the eye came from.
-        expect(Math.abs(height)).toBeCloseTo(Math.sin((20 * Math.PI) / 180), 9);
-        expect(Math.sign(height)).toBe(Math.sign(dot(minus(from, system.place), normal)) || 1);
-        // Seen round from the way it came: its part in the plane points to the eye's.
-        const inPlane = (point: Point) => {
-          const along = dot(point, normal);
-          return { x: point.x - along * normal.x, y: point.y - along * normal.y, z: point.z - along * normal.z };
-        };
-        const [a, b] = [inPlane(offset), inPlane(minus(from, system.place))];
-        expect(dot(a, b) / Math.hypot(a.x, a.y, a.z) / Math.hypot(b.x, b.y, b.z)).toBeCloseTo(1, 9);
-      }
-  });
-
-  it("is the same stop for the same system from the same place", () => {
-    const [system] = someSystems();
-    if (system === undefined) throw new Error("no system");
-    expect(arrive(system, { x: 5, y: 6, z: 7 })).toEqual(arrive(system, { x: 5, y: 6, z: 7 }));
-  });
-
-  it("stops at 6 units by a bare star and at 16 by a system as wide as a cell, the two bounds", () => {
-    const [lone] = systemsOf([{ id: "solo/w", namespace: "solo", use: 1 }]);
-    if (lone === undefined) throw new Error("no system");
-    const bare = { ...lone, worlds: [] };
-    const wide = { ...lone, worlds: [{ id: "solo/far", radius: 1, orbit: 9, phase: 0 }] };
-    expect(distanceOf(arrive(bare, FROMS[0] ?? lone.place), bare.place)).toBeCloseTo(6, 9);
-    expect(distanceOf(arrive(wide, FROMS[0] ?? lone.place), wide.place)).toBeCloseTo(16, 9);
-  });
-
-  it("comes in from over the pole as from anywhere: finite, in its bounds, 20 degrees off the plane", () => {
-    for (const system of someSystems().slice(0, 5)) {
-      const normal = normalOf(system);
-      const from = {
-        x: system.place.x + 50 * normal.x,
-        y: system.place.y + 50 * normal.y,
-        z: system.place.z + 50 * normal.z,
-      };
-      const offset = minus(arrive(system, from), system.place);
-      const length = Math.hypot(offset.x, offset.y, offset.z);
-      expect(length).toBeGreaterThanOrEqual(6);
-      expect(length).toBeLessThanOrEqual(16);
-      expect(dot(offset, normal) / length).toBeCloseTo(Math.sin((20 * Math.PI) / 180), 9);
-    }
-  });
-
-  it("stops by a lone star, and by one the eye is already at", () => {
-    const [lone] = systemsOf([{ id: "solo/w", namespace: "solo", use: 1 }]);
-    if (lone === undefined) throw new Error("no system");
-    const bare = { ...lone, worlds: [] };
-    for (const from of [...FROMS, bare.place]) {
-      const at = arrive(bare, from);
-      expect(Number.isFinite(at.x + at.y + at.z)).toBe(true);
-      expect(distanceOf(at, bare.place)).toBeGreaterThanOrEqual(6);
-    }
   });
 });

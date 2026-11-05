@@ -17,7 +17,6 @@ import {
   News,
   OnAir,
   Quests,
-  Stations,
   Universes,
   XPosts,
 } from "@gnoworld/schemas";
@@ -26,7 +25,6 @@ const SCHEMAS = {
   universes: Universes,
   hubs: Hubs,
   ecosystems: Ecosystems,
-  stations: Stations,
   genres: Genres,
   events: Events,
   expedition: Expedition,
@@ -44,7 +42,7 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };
 
-/** The fourteen files of a directory, checked; throws every fault found in the first file that has one. */
+/** The thirteen files of a directory, checked; throws every fault found in the first file that has one. */
 export function loadData(dir: string): Data {
   const found: Record<string, unknown> = {};
   for (const [name, schema] of Object.entries(SCHEMAS)) {
@@ -72,7 +70,7 @@ export function loadData(dir: string): Data {
   }
   const data = found as Data;
   const universes = new Set(data.universes.map((universe) => universe.id));
-  for (const name of ["hubs", "ecosystems", "stations"] as const) {
+  for (const name of ["hubs", "ecosystems"] as const) {
     const faults = data[name].flatMap((row, index) =>
       universes.has(row.universe)
         ? []
@@ -89,27 +87,25 @@ export function loadData(dir: string): Data {
   );
   // A world's genre names one of genres.json, which its crumb says by name.
   const genres = new Set(data.genres.map(({ slug }) => slug));
-  const noGenre = (["hubs", "stations"] as const).flatMap((name) =>
-    data[name].flatMap(({ genre }, index) =>
-      genre === undefined || genres.has(genre)
-        ? []
-        : [`${name}.json: [${String(index)}].genre: no genre of genres.json is named "${genre}"`],
-    ),
+  const noGenre = data.hubs.flatMap(({ genre }, index) =>
+    genre === undefined || genres.has(genre)
+      ? []
+      : [`hubs.json: [${String(index)}].genre: no genre of genres.json is named "${genre}"`],
   );
   const faults = [...unknown, ...noGenre, ...discoveryFaults(data, universes), ...eventsNowhere(data.events, hubs)];
   if (faults.length > 0) throw new Error(faults.join("\n"));
   return data;
 }
 
-// The expedition's stops, the quests' steps and what is on air name worlds the site holds: a universe of universes.json, a hub or a station of it by its slug;
+// The expedition's stops, the quests' steps and what is on air name worlds the site holds: a universe of universes.json, a hub of it by its slug;
 // two stops of one world would make one visit reach both.
 function discoveryFaults(data: Data, universes: ReadonlySet<string>): string[] {
-  const worlds = new Map([...data.hubs, ...data.stations].map((world) => [`${world.universe}/${world.slug}`, world]));
+  const worlds = new Map(data.hubs.map((world) => [`${world.universe}/${world.slug}`, world]));
   const faults: string[] = [];
   const check = (at: string, universe: string, hub: string | undefined) => {
     if (!universes.has(universe)) faults.push(`${at}.universe: no universe of universes.json is named "${universe}"`);
     else if (hub !== undefined && !worlds.has(`${universe}/${hub}`))
-      faults.push(`${at}.hub: no hub or station of "${universe}" is named "${hub}"`);
+      faults.push(`${at}.hub: no hub of "${universe}" is named "${hub}"`);
   };
   const seen = new Set<string>();
   data.expedition.forEach((stop, index) => {

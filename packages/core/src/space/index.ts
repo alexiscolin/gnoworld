@@ -3,7 +3,7 @@ export { distanceOf, textHash, unitOf, type Point } from "./cell.ts";
 export { beatAt } from "./beat.ts";
 export { ARRIVAL_LEAN, driftAt, glideAt, HOME, LEAN, orbitTime, SWAY, swayAt, turnAt } from "./drift.ts";
 export { heightField, MAX_HEIGHT, MOOD_SCALE, MOOD_SIDE, MOOD_STEP, moodCells } from "./mood.ts";
-export { smoothstep } from "./smooth.ts";
+export { smootherstep, smoothstep } from "./smooth.ts";
 export {
   NEBULA_IMAGES,
   NEBULA_LAYERS,

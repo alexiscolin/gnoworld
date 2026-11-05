@@ -8,14 +8,12 @@ import {
   Ecosystems,
   EMBED_PREFIXES,
   Events,
-  Expedition,
   Genres,
   Hubs,
   News,
-  Quests,
-  Stations,
   Universes,
 } from "./data.ts";
+import { Expedition, Quests } from "./discovery.ts";
 
 // Slice 5's 5c: the data files' schemas (ADR-0002 §8 row 10), checked when the app builds. Every list accepts the empty
 // list but the universes', which names the default one. The caps (DATA_CAPS) are tested at the cap and one past it.
@@ -29,7 +27,6 @@ const universe = {
   testnet: true,
 };
 const hub = { slug: "bubble", name: "Bubble", description: "d".repeat(60), universe: "onyx" };
-const world = { slug: "moon", name: "Moon", description: "d".repeat(60), universe: "onyx" };
 const eco = { slug: "tokens", name: "Tokens", description: "Tokens.", universe: "onyx" };
 const genre = { slug: "game", name: "Game" };
 const event = { id: "launch", title: "Launch", start: "2026-11-01T18:00:00.000Z", link: "https://gno.land/" };
@@ -55,7 +52,6 @@ interface Schema {
 const LISTS: readonly (readonly [string, Schema, Row])[] = [
   ["Hubs", Hubs, hub],
   ["Ecosystems", Ecosystems, eco],
-  ["Stations", Stations, world],
   ["Genres", Genres, genre],
   ["Events", Events, event],
   ["Expedition", Expedition, stop],
@@ -66,9 +62,9 @@ const LISTS: readonly (readonly [string, Schema, Row])[] = [
 /** The same row as another one: its id or slug changed. */
 const other = (row: Row, name = "b"): Row => ({ ...row, ["id" in row ? "id" : "slug"]: name });
 
-/** The longest a string field of a list may be (DATA_CAPS), a hub's or a station's description 160. */
+/** The longest a string field of a list may be (DATA_CAPS), a hub's description 160. */
 const capOf = (list: string, field: string): number | undefined =>
-  field === "description" && (list === "Hubs" || list === "Stations")
+  field === "description" && list === "Hubs"
     ? DATA_CAPS.seoDescription
     : field === "id" || field === "slug" || field === "universe"
       ? DATA_CAPS.key
@@ -127,7 +123,6 @@ describe("a world's key in a universe", () => {
   it.each([
     ["Hubs", Hubs, hub],
     ["Ecosystems", Ecosystems, eco],
-    ["Stations", Stations, world],
   ] as const)("is unique to a universe in %s: the same name in another is taken", (_, schema, row) => {
     expect(schema.safeParse([row, { ...row, universe: "gnoland" }]).success).toBe(true);
     expect(schema.safeParse([row, { ...row }]).success).toBe(false);
@@ -140,8 +135,6 @@ describe("a name in a path", () => {
     ["Hubs.universe", (universe) => Hubs.safeParse([{ ...hub, universe }]).success],
     ["Ecosystems.slug", (slug) => Ecosystems.safeParse([{ ...eco, slug }]).success],
     ["Ecosystems.universe", (universe) => Ecosystems.safeParse([{ ...eco, universe }]).success],
-    ["Stations.slug", (slug) => Stations.safeParse([{ ...world, slug }]).success],
-    ["Stations.universe", (universe) => Stations.safeParse([{ ...world, universe }]).success],
     ["Genres.slug", (slug) => Genres.safeParse([{ ...genre, slug }]).success],
     ["Universes.id", (id) => Universes.safeParse([{ ...universe, id, default: true }]).success],
   ];
@@ -169,10 +162,7 @@ describe("a name in a path", () => {
 });
 
 describe("a hub's and a station's description", () => {
-  it.each([
-    ["Hubs", Hubs, hub],
-    ["Stations", Stations, world],
-  ] as const)("in %s", (_, schema, row) => {
+  it.each([["Hubs", Hubs, hub]] as const)("in %s", (_, schema, row) => {
     for (const [n, ok] of [
       [49, false],
       [50, true],

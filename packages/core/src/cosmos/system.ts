@@ -1,12 +1,13 @@
 // A namespace's worlds around its star (ADR-0002 §3, §10). Places come from the set alone, so the same file is the same picture. Each world
 // holds a slot of a sunflower's lattice: its hash picks the slot, so an arrival moves only a world it meets, and the lattice keeps any
 // number of worlds apart in the room a cell leaves. A system turns as one, so none ever crosses another. The disc lies tilted on the stage.
-import { cellHash, nextState, textHash, unitOf, type Point } from "../space/cell.ts";
+import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
+import { GOLDEN } from "../space/golden.ts";
 import { lerp } from "../space/smooth.ts";
 import { CELL, placeSystems, starSize, stepOf, type SystemPlace } from "./cosmos.ts";
+import { GNO_LAND, starDraws, starWarmth } from "./warmth.ts";
 
-/** gno.land's star, at the centre: a slug holds no dot, so no namespace is it. */
-export const GNO_LAND = "gno.land";
+export { GNO_LAND };
 /** How far a system reaches from its star: two systems stand a cell apart at the least. */
 export const ROOM = CELL / 2;
 /** Where a far belt's room starts: no world goes past it, a postcard's widened ones included (7d3). */
@@ -20,7 +21,8 @@ export const EARTH_RADIUS = 1.2176;
 const WORLD_LEAST = 1.05;
 const WORLD_MOST = 1.7;
 const STAR_MOST = 1024;
-const GOLDEN = 2.399963229728653;
+// The golden angle, a turn's share past the golden ratio's: 2.39996 radians.
+const GOLDEN_ANGLE = 2 * Math.PI * (1 - GOLDEN);
 // A lattice's closest two stand this many times sqrt(its area / pi / its count) apart, measured from 4 to 2,048 slots; a world takes under half of that.
 const PACKING = (0.49 * 1.65) ** 2;
 /** Under this radius a world is grain: dust round its star, never a body. */
@@ -41,9 +43,8 @@ const SPIN_SPAN = 0.1;
 // A plane leans 15 to 45 degrees off the disc's: none lies in it, and none stands face on to the rest's 15-degree slant (7d6).
 const TILT_LEAST = Math.PI / 12;
 const TILT_SPAN = Math.PI / 6;
-const SALT = 2;
 
-export { WORLD_MOST };
+export { WORLD_LEAST, WORLD_MOST };
 
 /** A world of the file: its id, its namespace, and how much it is used. */
 export interface WorldHeld {
@@ -137,7 +138,7 @@ function latticeOf(
   return ranked(worlds).map(({ id, use }) => {
     const slot = places.get(id) ?? 0;
     const orbit = Math.sqrt(inner ** 2 + ((outer ** 2 - inner ** 2) * (slot + 0.5)) / slots);
-    const placed = { orbit, phase: start + slot * GOLDEN };
+    const placed = { orbit, phase: start + slot * GOLDEN_ANGLE };
     const own = worldSize(use);
     return { id, ...sized(own, Math.min(own, most)), ...(crowd ? scattered(id, placed, { start, outer }) : placed) };
   });
@@ -163,13 +164,12 @@ function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): 
 
 function systemOf(id: string, place: SystemPlace, worlds: readonly WorldHeld[]): StarSystem {
   const star = starSize(worlds.length);
-  const seed = textHash(`star ${id}`);
-  const unit = (step: number) => unitOf(nextState(cellHash(SALT, { x: seed, y: step, z: 0 })));
+  const unit = starDraws(id);
   return {
     id,
     place,
     star,
-    warmth: unit(0),
+    warmth: starWarmth(id),
     spin: (SPIN_LEAST + SPIN_SPAN * unit(1)) * (unit(2) < 0.5 ? -1 : 1),
     tilt: TILT_LEAST + TILT_SPAN * unit(5),
     node: 2 * Math.PI * unit(6),
@@ -182,7 +182,7 @@ const greatStar = (): StarSystem => ({
   id: GNO_LAND,
   place: { x: 0, y: 0, z: 0 },
   star: starSize(STAR_MOST),
-  warmth: 0.45,
+  warmth: starWarmth(GNO_LAND),
   spin: SPIN_LEAST,
   tilt: 0,
   node: 0,
