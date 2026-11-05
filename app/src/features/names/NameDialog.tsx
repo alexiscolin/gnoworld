@@ -4,7 +4,7 @@
 import { Avatar, Button, Cluster, Dialog, Field, Kicker, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
 import styles from "./NameDialog.module.css";
-import { nymProblem, NYM_RULE } from "./nym.ts";
+import { NYM_PREFIX, nymProblem, NYM_RULE } from "./nym.ts";
 import type { Phase } from "./phase.ts";
 
 export interface NameDialogProps {
@@ -62,7 +62,7 @@ export function NameDialog({ open, account, network, phase, onRegister, onClose 
             <Stack space="s">
               <Field
                 label="Name"
-                prefix="nym-"
+                prefix={NYM_PREFIX}
                 value={typed}
                 onChange={setTyped}
                 help={NYM_RULE}

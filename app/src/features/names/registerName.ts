@@ -5,7 +5,7 @@ import { realmType } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
 import { callsIn, ensureCalls, signWith, type SignDeps } from "../calls/index.ts";
 import type { CallCard, CardState } from "../../lib/calls.ts";
-import { nymProblem } from "./nym.ts";
+import { NYM_PREFIX, nymProblem } from "./nym.ts";
 
 export const REGISTER_ID = "register-name";
 const REALM = "gno.land/r/sys/namereg/v0";
@@ -74,7 +74,7 @@ export async function registerName(typed: string, deps: SignDeps): Promise<Regis
       { Name: "username", Type: "string" },
     ],
   });
-  callsActions.edit(REGISTER_ID, 0, `nym-${typed}`);
+  callsActions.edit(REGISTER_ID, 0, `${NYM_PREFIX}${typed}`);
   await signWith(REGISTER_ID, deps);
   return { ok: true };
 }

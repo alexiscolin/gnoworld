@@ -208,11 +208,17 @@ describe("registerName: a store that already holds a registration", () => {
   });
 
   it("shows a paused registry's refusal as the chain's own log: no read of IsPaused is made before Adena opens", async () => {
-    const read = () => Promise.resolve(found({ ...LANDED, failed: true, log: "namereg: paused" }));
-    const { store, deps, adena } = setup({ read });
+    const hashes: string[] = [];
+    const read = (hash: string) => {
+      hashes.push(hash);
+      return Promise.resolve(found({ ...LANDED, failed: true, log: "namereg: paused" }));
+    };
+    const { store, deps } = setup({ read });
     await registerName("alexis042", deps);
     expect(stateOf(store)).toMatchObject({ kind: "failed", reason: "chain", log: "namereg: paused" });
-    expect(adena.asked.map((entry) => entry.call)).not.toContain("IsPaused");
+    // The only read a registration can make is of its own transaction, by hash; there is no read to ask IsPaused with.
+    expect(hashes.length).toBeGreaterThan(0);
+    expect(hashes.every((hash) => hash === SIGNED_HASH)).toBe(true);
   });
 
   it("starts the next account's registration afresh: a card done for the first is closed, whatever it said", async () => {

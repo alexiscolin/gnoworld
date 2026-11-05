@@ -3,8 +3,11 @@
 // The reserved role names and the canonical collisions are the chain's answer, shown as its error, never guessed here.
 // Each pattern is built inside its function (typescript.md).
 
-/** The words of the one rule, shown under the field before anything is asked. */
-export const NYM_RULE = "5 to 13 letters, then 3 digits, in lowercase a to z and 0 to 9, such as alexis042.";
+/** What every name starts with: the field shows it, and the message signed is it and what was typed. */
+export const NYM_PREFIX = "nym-";
+
+/** The words of the one rule, shown under the field before anything is asked: the frames' line. */
+export const NYM_RULE = `5 to 13 letters, then 3 digits. Example: ${NYM_PREFIX}alexis042.`;
 
 /** What is wrong with `typed`, in words, or nothing when Register would take it as to its form. */
 export function nymProblem(typed: string): string | undefined {
