@@ -1,5 +1,14 @@
 import { Markets } from "@gnoworld/schemas";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
@@ -177,6 +186,28 @@ describe("the prices timer: a good answer", () => {
     expect(statSync(file).ino).not.toBe(before);
     // The prices' day beside it (8i), and no temporary.
     expect(readdirSync(folder)).toEqual(["markets-history.json", "markets.json"]);
+  });
+
+  it("appends each read's prices to the history beside it, and hands the day to the server", async () => {
+    const { file, folder, timer } = setup([json(ANSWER)]);
+    await wrote(file);
+    const day: unknown = JSON.parse(readFileSync(join(folder, "markets-history.json"), "utf8"));
+    expect(day).toEqual({
+      updated: new Date(NOW).toISOString(),
+      tokens: TOKENS.map(({ symbol, usd }) => ({ symbol, usd: [usd] })),
+    });
+    expect(timer.history()).toEqual(day);
+  });
+
+  it("writes markets.json even when the history's file refuses, and says so", async () => {
+    const folder = fresh();
+    mkdirSync(join(folder, "markets-history.json"));
+    const { file, lines } = setup([json(ANSWER)], { folder });
+    await wrote(file);
+    await failed(lines);
+    expect(Markets.parse(JSON.parse(written(file))).tokens).toEqual(TOKENS);
+    expect(lines.map(kindOf)).toContain("history_write");
+    expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 
   it("creates the file when there is none, and leaves no temporary file next to it", async () => {

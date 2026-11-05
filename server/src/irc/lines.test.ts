@@ -1,6 +1,7 @@
+import { parseLine } from "@gnoworld/core";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { allowed, line } from "./lines.ts";
+import { allowed, line, said } from "./lines.ts";
 
 describe("the link's own lines (3j's green pass)", () => {
   // Words near the forms, and any text.
@@ -88,5 +89,22 @@ describe("the link's own lines (3j's green pass)", () => {
       allowed("KICK", ["#bubble", "g1a", "not on this room's list"]),
       allowed("KICK", ["#bubble", "g1a", "not on this room's list", "extra"]),
     ]).toEqual([true, false]);
+  });
+});
+
+describe("the speaker's country on a line (8i)", () => {
+  const countryOf = (tag: string | undefined): string | undefined => {
+    const tags = `account=ada;msgid=m1${tag === undefined ? "" : `;+gnoworld/country=${tag}`}`;
+    const parsed = parseLine(`@${tags} :ada!u@h PRIVMSG #bubble :hi`);
+    return parsed.ok ? said(parsed.message, new Set(["#bubble"]))?.country : "unparsed";
+  };
+
+  it("reads a country from two capitals alone", () => {
+    expect(countryOf("FR")).toBe("FR");
+  });
+
+  it("declares none when the tag is absent, lower case, too long, too short, or no letters", () => {
+    const refused = [undefined, "", "fr", "Fr", "FRA", "F", "F1", "1F", String.raw`F\sR`, String.raw`FR\n`];
+    expect(refused.map(countryOf)).toEqual(Array<undefined>(refused.length).fill(undefined));
   });
 });

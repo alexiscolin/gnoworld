@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import type { ShownLine } from "@gnoworld/core";
-import { act } from "react";
+import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { Embed, PlayerFrame } from "./Embed.tsx";
 import { LineView } from "./LineView.tsx";
 
@@ -167,5 +168,64 @@ describe("Embed", () => {
       expect(host.querySelector("iframe")).toBeNull();
       expect(host.textContent).toContain("Ready to play");
     });
+  });
+});
+
+function Late() {
+  const [verdict, setVerdict] = useState<"checked">();
+  return (
+    <>
+      <Embed embed={YOUTUBE} verdict={verdict} />
+      <a
+        href="#verdict"
+        onClick={() => {
+          setVerdict("checked");
+        }}
+      >
+        verdict
+      </a>
+    </>
+  );
+}
+
+// What the card says as time passes, and where the focus goes as the player closes.
+describe("Embed's wait and its close", () => {
+  const wait = (ms: number) => {
+    act(() => {
+      vi.advanceTimersByTime(ms);
+    });
+  };
+  const status = (box: HTMLElement) => one(box, "[role=status]").textContent;
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("says it could not check the link once the verdict is awaited past 15 s, and offers no Play", () => {
+    vi.useFakeTimers();
+    const box = mount(<Embed embed={YOUTUBE} verdict={undefined} />);
+    wait(14_999);
+    expect(status(box)).toBe("Waiting for the moderation check…");
+    wait(1);
+    expect(status(box)).toBe("Couldn't check this link");
+    expect(all(box, "iframe, button:not([aria-haspopup])")).toEqual([]);
+  });
+
+  it("offers Play, with no late word, when the verdict comes after the wait ran out", () => {
+    vi.useFakeTimers();
+    const box = mount(<Late />);
+    wait(15_000);
+    click(one(box, "a"));
+    expect(status(box)).toBe("Ready to play");
+    expect(button(box, `Play the ${YOUTUBE.title}`)).toBeDefined();
+  });
+
+  it("closes the player on the reader's word and gives the focus back to Play", () => {
+    Element.prototype.scrollIntoView = () => undefined;
+    const box = mount(<Embed embed={YOUTUBE} verdict="checked" />);
+    click(button(box, `Play the ${YOUTUBE.title}`));
+    expect(all(box, "iframe")).toHaveLength(1);
+    click(button(box, "Close the player"));
+    expect(all(box, "iframe")).toEqual([]);
+    expect(document.activeElement).toBe(button(box, `Play the ${YOUTUBE.title}`));
   });
 });

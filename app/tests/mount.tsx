@@ -115,3 +115,9 @@ export function modals(): void {
     this.dispatchEvent(new Event("close"));
   };
 }
+
+/** jsdom has no popover API: a panel shown or hidden by its methods stays in the page as it is drawn. Its top layer, light dismiss and
+ * placement are the journeys'. */
+export function popovers(): void {
+  Object.assign(HTMLElement.prototype, { showPopover: () => undefined, hidePopover: () => undefined });
+}
