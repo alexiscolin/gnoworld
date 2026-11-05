@@ -24,7 +24,16 @@ const WRITES = [
     Params: [CUR, field("a", "string"), field("b", "string"), field("c", "string")],
     Results: null,
   },
+  // A type a call does not carry: a row that sends to gnoweb, with no Call.
+  { FuncName: "Upload", Params: [CUR, field("data", "[]uint8")], Results: null },
 ];
+// The realm's page: a form of SetProfile with a hidden field, which the card must show as a field.
+const PAGE = `## Profile
+
+<gno-form exec="SetProfile">
+<gno-input name="name" type="text" value="bob" />
+<gno-input name="times" type="hidden" value="3" />
+</gno-form>`;
 
 export interface Wallet {
   /** Whether a switch to onyx-1 moves Adena there; `setNetwork(page, id)` puts it on another chain. */
@@ -154,7 +163,8 @@ export async function writeChain(
         },
       });
     }
-    return send(queryEnvelope({ data: JSON.stringify(WRITES) }));
+    const asked = decodeURIComponent(url.searchParams.get("path") ?? "");
+    return send(queryEnvelope({ data: asked.includes("qrender") ? PAGE : JSON.stringify(WRITES) }));
   });
   return {
     release: () => {
