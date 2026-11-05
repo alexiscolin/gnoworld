@@ -32,6 +32,8 @@ export interface FollowOptions {
   wait: (ms: number) => Promise<void>;
   random: () => number;
   deliver: (read: ChainRead) => void;
+  /** The height already read before the first socket (the day's history reached it): the first connection catches up from it. */
+  from?: number;
   log: (what: FollowLog) => void;
   /** Runs `run` in `ms` unless the returned function is called first. */
   after?: (ms: number, run: () => void) => () => void;
@@ -94,9 +96,9 @@ function askCatchUp(
 const heightOf = (read: ChainRead): number => read.block?.height ?? read.height ?? 0;
 
 // What was delivered: a transaction once by its hash, the last SEEN of them (the oldest hash goes first), and the highest height.
-function delivery(deliver: FollowOptions["deliver"]) {
+function delivery(deliver: FollowOptions["deliver"], from: number | undefined) {
   const seen = new Set<string>();
-  let highest: number | undefined;
+  let highest = from;
   return {
     emit: (read: ChainRead): void => {
       if (read.hash !== undefined) {
@@ -205,7 +207,7 @@ function session({ options, context, emit, highest, reconnect, resetBackoff }: S
 export function followChain(options: FollowOptions): { stop: () => void } {
   const { wait, random } = options;
   const context: ChainContext = { universe: options.universe, watch: options.watch, log: options.log };
-  const { emit, highest } = delivery(options.deliver);
+  const { emit, highest } = delivery(options.deliver, options.from);
   let stopped = false;
   let attempt = 0;
   let end: (() => void) | undefined;

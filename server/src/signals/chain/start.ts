@@ -6,7 +6,7 @@ import { Hubs, Universes } from "@gnoworld/schemas";
 import { readDataFile } from "@gnoworld/service/files";
 import type { Log } from "@gnoworld/service/log";
 import type { Send } from "@gnoworld/service/net";
-import { loadRealmCount } from "./count.ts";
+import { loadRealmCount, type Deploy } from "./count.ts";
 import { followChain, timer, type ChainSocket, type FollowOptions } from "./follow.ts";
 import { indexerReaders } from "./indexer.ts";
 import { makeRelay, type RelayOptions } from "./relay.ts";
@@ -73,13 +73,20 @@ export function startChain(options: ChainOptions): { stop: () => void } {
       continue;
     }
     const watch = watchOf(hubs, universe.id);
+    // The newest deploy the day's history read: the follower starts from it, so a first socket that fails before any frame loses nothing.
+    let reached: number | undefined;
     const readers = indexerReaders({
       url: universe.indexer,
       watch,
       log: said,
       ...(send === undefined ? {} : { send }),
     });
-    loadRealmCount({ history: (since) => readers.history(since), now, log: said }).then(
+    const history = async (since: string): Promise<Deploy[]> => {
+      const deploys = await readers.history(since);
+      reached ??= deploys.reduce<number | undefined>((top, { height }) => Math.max(top ?? height, height), undefined);
+      return deploys;
+    };
+    loadRealmCount({ history, now, log: said }).then(
       (count) => {
         if (stopped) return;
         // A history that could not load is asked again, so the Earth is not left without its count until a restart.
@@ -100,6 +107,7 @@ export function startChain(options: ChainOptions): { stop: () => void } {
           wait,
           random,
           deliver: makeRelay({ stream, count, universe: universe.id, now }),
+          ...(reached === undefined ? {} : { from: reached }),
           log: said,
           after,
         });

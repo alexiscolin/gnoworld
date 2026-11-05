@@ -61,14 +61,19 @@ afterEach(() => {
 });
 
 // A stream a client reads, and the chain started on it with a fake socket for each universe and an indexer with an empty day.
-function setup(universes: ReturnType<typeof universe>[], plain: string[] = [], down = false) {
+function setup(
+  universes: ReturnType<typeof universe>[],
+  plain: string[] = [],
+  indexer?: "down" | ((query: string) => Response),
+) {
   const stream = makeStream();
   streams.push(stream);
   const log = vi.fn();
   const sockets: FakeSocket[] = [];
+  const queries: string[] = [];
   const timers: { ms: number; run: () => void }[] = [];
   const day = () => new Response(JSON.stringify({ data: { getTransactions: [] } }));
-  let history: () => Response = down ? () => new Response("no", { status: 500 }) : day;
+  let history: () => Response = indexer === "down" ? () => new Response("no", { status: 500 }) : day;
   const chain = startChain({
     // An address the data's schema refuses (http) is set after it: the wiring does not trust the schema's work alone.
     universes: Universes.parse(universes).map((each) =>
@@ -83,7 +88,11 @@ function setup(universes: ReturnType<typeof universe>[], plain: string[] = [], d
       sockets.push(socket);
       return socket;
     },
-    send: () => Promise.resolve(history()),
+    send: (_url, init) => {
+      const query = (JSON.parse(typeof init.body === "string" ? init.body : "") as { query: string }).query;
+      queries.push(query);
+      return Promise.resolve(typeof indexer === "function" ? indexer(query) : history());
+    },
     wait: () => new Promise<undefined>(() => undefined),
     random: () => 0.5,
     after: (ms, run) => {
@@ -114,7 +123,7 @@ function setup(universes: ReturnType<typeof universe>[], plain: string[] = [], d
     };
     return { until, cancel: () => reader?.cancel() };
   };
-  return { chain, log, sockets, timers, open, heal: () => (history = day) };
+  return { chain, log, sockets, timers, open, queries, heal: () => (history = day) };
 }
 const first = (sockets: FakeSocket[]): FakeSocket => {
   const socket = sockets[0];
@@ -193,7 +202,7 @@ describe("the chain on the server", () => {
     const { chain, sockets, timers, heal, log, open } = setup(
       [universe("onyx", "https://indexer.example.test/q")],
       [],
-      true,
+      "down",
     );
     const earth = await open("#earth");
     await vi.waitFor(() => {
@@ -212,6 +221,60 @@ describe("the chain on the server", () => {
     expect(await earth.until("event: realms")).toContain('"count":0');
     chain.stop();
     await earth.cancel();
+  });
+});
+
+// F5773: a socket that fails before any frame at boot must not lose what came between the history read and its first frame.
+describe("the catch-up after the day's history", () => {
+  const deployAt = (height: number) => ({
+    hash: `h${String(height)}`,
+    block_height: height,
+    success: true,
+    messages: [
+      {
+        value: {
+          __typename: "MsgAddPackage",
+          creator: "g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y",
+          package: { path: "gno.land/r/g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y/counter" },
+        },
+      },
+    ],
+  });
+  const indexerOf = (rows: unknown[]) => (query: string) =>
+    new Response(
+      JSON.stringify({
+        data: query.includes("getBlocks")
+          ? { getBlocks: [{ height: 4999, time: "2026-11-05T04:00:00Z" }] }
+          : { getTransactions: query.includes("heightAndIndex: DESC") ? rows : [] },
+      }),
+    );
+
+  it("starts from the newest deploy's height: the first connection catches up, though no frame was heard", async () => {
+    const { chain, sockets, queries } = setup(
+      [universe("onyx", "https://indexer.example.test/q")],
+      [],
+      indexerOf([deployAt(4999), deployAt(4000)]),
+    );
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    ack(first(sockets));
+    await vi.waitFor(() => {
+      expect(queries.filter((query) => query.includes("heightAndIndex: ASC"))).toHaveLength(1);
+    });
+    expect(queries.find((query) => query.includes("heightAndIndex: ASC"))).toContain("gt: 4998");
+    chain.stop();
+  });
+
+  it("asks no catch-up on the first connection when the day held no deploy", async () => {
+    const { chain, sockets, queries } = setup([universe("onyx", "https://indexer.example.test/q")], [], indexerOf([]));
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    ack(first(sockets));
+    await Promise.resolve();
+    expect(queries.some((query) => query.includes("heightAndIndex: ASC"))).toBe(false);
+    chain.stop();
   });
 });
 
