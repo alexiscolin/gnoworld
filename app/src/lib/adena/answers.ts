@@ -99,8 +99,10 @@ export async function ask(run: () => unknown, method: Method): Promise<Answered>
   const named = (SUCCESSES[method] as readonly string[]).includes(type);
   // "Already connected" is a failure in the SDK's table, and the SDK reads it as connected.
   if (named && (status === "success" || type === "ALREADY_CONNECTED")) return { ok: true, data };
-  // A malformed answer keeps no type: a caller that branches on one must not read it as a real failure.
-  return status === "success" || named ? refusal("malformed") : failure(type, code, message);
+  // A success type of any method, typed as a failure or by another method, has no business there: malformed, and it keeps
+  // no type, so a caller that branches on one must not read it as a real failure (F5666).
+  const anySuccess = Object.values(SUCCESSES).some((types) => (types as readonly string[]).includes(type));
+  return status === "success" || anySuccess ? refusal("malformed") : failure(type, code, message);
 }
 
 export type Read<T> = { ok: true; value: T } | Failed;
