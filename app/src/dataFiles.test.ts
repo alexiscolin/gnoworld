@@ -266,6 +266,113 @@ describe("earthOrbit.json", () => {
   });
 });
 
+// Slice 8: the expedition's stops, the quests' steps, what is on air and the events name worlds the site holds, each fault stopping the
+// build with its file, its row and what it names; two stops of one world would make one visit reach both.
+describe("the discovery's files", () => {
+  const loads = (change: (f: Record<string, unknown>) => void) => {
+    const dir = plant(change);
+    try {
+      loadData(dir);
+      return "";
+    } catch (error) {
+      return error instanceof Error ? error.message : String(error);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  };
+  const stop = (over: Record<string, unknown>) => ({
+    id: "s",
+    universe: "onyx",
+    why: "Why go.",
+    hub: "bubble",
+    ...over,
+  });
+  const steps = (first: Record<string, unknown>) => [
+    { id: "a", kind: "visit", title: "Go", ...first },
+    { id: "z", kind: "call", title: "Do", realm: "gno.land/r/demo/x", function: "Do" },
+  ];
+  const quest = (first: Record<string, unknown>, universe = "onyx") => ({
+    id: "q",
+    universe,
+    title: "Q",
+    description: "D.",
+    reward: "R",
+    steps: steps(first),
+  });
+
+  it("takes stops and steps that name the site's hubs and realms", () => {
+    expect(
+      loads((f) => {
+        f["expedition.json"] = [stop({}), stop({ id: "r", hub: undefined, realm: "gno.land/r/demo/x", name: "X" })];
+        f["quests.json"] = [quest({ hub: "bubble" })];
+      }),
+    ).toBe("");
+  });
+
+  it("stops the build on a stop of a universe the site does not hold", () => {
+    expect(loads((f) => void (f["expedition.json"] = [stop({ universe: "mars" })]))).toMatch(
+      /^expedition\.json: \[0\]\.universe: no universe of universes\.json is named "mars"/,
+    );
+  });
+
+  it("stops the build on a stop of a hub its universe does not hold, another universe's included", () => {
+    expect(loads((f) => void (f["expedition.json"] = [stop({ hub: "mars" })]))).toMatch(
+      /^expedition\.json: \[0\]\.hub: no hub of "onyx" is named "mars"/,
+    );
+    expect(loads((f) => void (f["expedition.json"] = [stop({ universe: "gnoland" })]))).toMatch(
+      /^expedition\.json: \[0\]\.hub: no hub of "gnoland" is named "bubble"/,
+    );
+  });
+
+  it("stops the build on two stops of one realm's world", () => {
+    expect(
+      loads(
+        (f) =>
+          void (f["expedition.json"] = [
+            stop({ id: "a", hub: undefined, realm: "gno.land/r/demo/x", name: "X" }),
+            stop({ id: "b", hub: undefined, realm: "gno.land/r/demo/x", name: "Y" }),
+          ]),
+      ),
+    ).toMatch(/^expedition\.json: \[1\]: a second stop of the world "/);
+  });
+
+  it("stops the build on a quest of a universe the site does not hold, or a step of a hub it does not", () => {
+    expect(loads((f) => void (f["quests.json"] = [quest({ hub: "bubble" }, "mars")]))).toMatch(
+      /quests\.json: \[0\]\.universe: no universe/,
+    );
+    expect(loads((f) => void (f["quests.json"] = [quest({ hub: "mars" })]))).toMatch(
+      /^quests\.json: \[0\]\.steps\[0\]\.hub: no hub of "onyx" is named "mars"/,
+    );
+  });
+
+  it("stops the build on an event in a world no hub holds, and takes the Earth's and none", () => {
+    const event = (world?: string) => ({
+      id: "e",
+      title: "E",
+      start: "2026-11-05T18:00:00.000Z",
+      link: "https://gno.land/",
+      ...(world === undefined ? {} : { world }),
+    });
+    expect(loads((f) => void (f["events.json"] = [event("mars")]))).toMatch(
+      /^events\.json: \[0\]\.world: no hub of hubs\.json is named "mars"/,
+    );
+    expect(
+      loads(
+        (f) => void (f["events.json"] = [event("earth"), { ...event("bubble"), id: "f" }, { ...event(), id: "g" }]),
+      ),
+    ).toBe("");
+  });
+
+  it("names every fault at once", () => {
+    const said = loads((f) => {
+      f["expedition.json"] = [stop({ hub: "mars" })];
+      f["quests.json"] = [quest({ hub: "venus" })];
+    });
+    expect(said).toMatch(/"mars"/);
+    expect(said).toMatch(/"venus"/);
+  });
+});
+
 // 7f2: the places of the Earth's side rooms, one row a room, checked when the app builds.
 describe("earthRooms.json", () => {
   it("stops the build on a place off the globe, and names the file", () => {

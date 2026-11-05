@@ -312,3 +312,46 @@ describe("a world's name on the rail", () => {
     expect(ids([EARTH, trend(ADDRESS, 50)])).toEqual(["earth"]);
   });
 });
+
+// Slice 8: the worlds the reader follows come right after the Earth, the last followed first, whatever they do now; ten at most, each once;
+// the Earth never moves.
+describe("the rail's followed worlds", () => {
+  const follow = (asks: readonly RailAsk[], followed: readonly string[]) => chooseRail(asks, [], followed);
+
+  it("come after the Earth, in the order followed, before the busiest trend", () => {
+    const asks = [EARTH, trend("busy", 90), trend("quiet", 0), trend("calm", 2)];
+    const rail = follow(asks, ["quiet", "calm"]);
+    expect(rail.map(({ id, section }) => [id, section])).toEqual([
+      ["earth", "earth"],
+      ["quiet", "followed"],
+      ["calm", "followed"],
+      ["busy", "trend"],
+    ]);
+  });
+
+  it("never move the Earth, followed or not, and show each world once", () => {
+    const rail = follow([trend("a", 3), EARTH, trend("b", 1)], ["earth", "b", "b"]);
+    expect(rail.map(({ id }) => id)).toEqual(["earth", "b", "a"]);
+  });
+
+  it("leave out a followed world the rail does not hold", () => {
+    expect(follow([EARTH, trend("a", 3)], ["gone", "a"]).map(({ id }) => id)).toEqual(["earth", "a"]);
+  });
+
+  it("put ten at most first: the rest stays the moment's", () => {
+    const asks = [EARTH, ...many(12, (at) => trend(`w${String(at).padStart(2, "0")}`, 12 - at))];
+    const followed = Array.from({ length: 12 }, (_, at) => `w${String(11 - at).padStart(2, "0")}`);
+    const rail = follow(asks, followed);
+    expect(rail.filter(({ section }) => section === "followed").map(({ id }) => id)).toEqual(followed.slice(0, 10));
+    expect(rail.filter(({ section }) => section === "trend").map(({ id }) => id)).toEqual(["w00", "w01"]);
+  });
+
+  it("follow a seed or a rising world first too, out of its own section", () => {
+    const rail = follow([EARTH, seed("fresh", 1), rising("climb", 2)], ["climb", "fresh"]);
+    expect(rail.map(({ id, section }) => [id, section])).toEqual([
+      ["earth", "earth"],
+      ["climb", "followed"],
+      ["fresh", "followed"],
+    ]);
+  });
+});
