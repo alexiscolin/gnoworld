@@ -1,0 +1,8 @@
+@layer components {
+  .lines {
+    /* layout: a list with no bullet and no indent of its own */
+    padding-inline-start: 0;
+    list-style: none;
+    color: var(--color-text-muted);
+  }
+}

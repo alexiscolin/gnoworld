@@ -8,9 +8,14 @@ import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
+import { useApp } from "../storeContext.tsx";
 import styles from "./world.module.css";
 
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
+// The chain's lines come in a chunk of their own, once the stream has told a call of this world: the first screen holds none of it.
+const ChainLines = lazy(() =>
+  import("../features/world/ChainLines.tsx").then(({ ChainLines }) => ({ default: ChainLines })),
+);
 const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
 
 export function loader({ request }: { request: Request }) {
@@ -44,6 +49,7 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   const realm = world.realms?.[0];
+  const calls = useApp((app) => app.chainByWorld[world.slug]);
   const realmPath =
     realm === undefined
       ? undefined
@@ -70,6 +76,12 @@ export default function World() {
               <Here />
               {/* No source yet for the history: the block says so. */}
               <Activity />
+              {/* What the chain told of this world's realms, from its events alone. */}
+              {calls === undefined ? null : (
+                <Suspense fallback={null}>
+                  <ChainLines lines={calls} universe={world.universe} />
+                </Suspense>
+              )}
               <Actions
                 address={ORIGIN + world.canonical}
                 {...(realmPath === undefined ? {} : { proposals: realmPath })}

@@ -2,7 +2,7 @@
 // most six. An event that has begun is news of the past, so it is dropped.
 export interface TickerItem {
   id: string;
-  kind: "news" | "event";
+  kind: "news" | "event" | "chain";
   text: string;
   link: string;
 }
@@ -11,7 +11,7 @@ interface Row {
   title: string;
   link: string;
 }
-const MOST = 6;
+export const MOST = 6;
 
 export function tickerItems(
   news: readonly (Row & { date: string })[],

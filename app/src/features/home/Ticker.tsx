@@ -5,6 +5,8 @@ import { useState } from "react";
 import styles from "./Ticker.module.css";
 import type { TickerItem } from "./ticker.ts";
 
+const KINDS = { news: "News", event: "Event", chain: "Chain" } as const;
+
 export function Ticker({ items }: { items: TickerItem[] }) {
   const [paused, setPaused] = useState(false);
   if (items.length === 0) return null;
@@ -26,9 +28,14 @@ export function Ticker({ items }: { items: TickerItem[] }) {
           {items.map((item) => (
             <li key={item.id} className={styles["item"]}>
               <b className={styles["kind"]} data-kind={item.kind}>
-                {item.kind === "news" ? "News" : "Event"}
+                {KINDS[item.kind]}
               </b>
-              <a href={item.link} target="_blank" rel="noopener noreferrer" className={styles["link"]}>
+              {/* A realm of the chain opens its page in the app; a news or an event is another site's, opened apart. */}
+              <a
+                href={item.link}
+                className={styles["link"]}
+                {...(item.kind === "chain" ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+              >
                 {item.text}
               </a>
             </li>
