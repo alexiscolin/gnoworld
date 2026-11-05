@@ -166,10 +166,13 @@ send("https://far.test/", {}, 5000).then(() => console.log("answered"), (error) 
     return `http://127.0.0.1:${String((server.address() as AddressInfo).port)}`;
   };
 
-  it("names a way out with no address yet, one where nothing listens, and one that refuses the host", async () => {
-    expect(await kindThrough("http://guard.invalid:4750")).toBe("unresolved");
-    expect(await kindThrough(await closedAddress())).toBe("refused");
-    expect(await kindThrough(await refusing())).toBe("proxy");
+  // A Node started cold under the gate's load takes its time: each row gives its child all of its 15 s.
+  it.each([
+    ["with no address yet", () => Promise.resolve("http://guard.invalid:4750"), "unresolved"],
+    ["where nothing listens", closedAddress, "refused"],
+    ["that refuses the host", refusing, "proxy"],
+  ])("names a way out %s", { timeout: 20_000 }, async (_name, proxy, kind) => {
+    expect(await kindThrough(await proxy())).toBe(kind);
   });
 });
 
