@@ -14,11 +14,15 @@ import { visitedIn } from "../../lib/visits.ts";
 /** The labels' signals from the server's answer, read at `now`. */
 export function signalsOf({ worlds }: Presence, now: number): LabelSignals {
   const universe = universes.find((each) => each.default === true)?.id ?? "";
-  const ours = hubs.filter((hub) => hub.universe === universe);
+  // A station's world stands round the Earth, never in the cloud (Alexis, 2026-11-05): it names no label, and its people count on none.
+  const stations = new Set(hubs.filter((hub) => hub.kind === "station").map(({ slug }) => slug));
+  const ours = hubs.filter((hub) => hub.universe === universe && !stations.has(hub.slug));
   const bySlug = new Map(ours.map((hub) => [hub.slug, hubWorldOf(hub)]));
   return {
     present: new Map(
-      worlds.map(({ world, here, perHour, rise }) => [bySlug.get(world) ?? world, { here, perHour, rise }]),
+      worlds.flatMap(({ world, here, perHour, rise }) =>
+        stations.has(world) ? [] : [[bySlug.get(world) ?? world, { here, perHour, rise }] as const],
+      ),
     ),
     names: new Map(ours.map((hub) => [hubWorldOf(hub), hub.name])),
     visited: visitedIn(universe),

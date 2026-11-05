@@ -189,13 +189,17 @@ describe("loadData", () => {
   });
 
   // What worlds.ts held, moved and nothing more (the brief: "nothing invented"): one world, and the two networks it needs.
-  it("reads the files the repository ships: Bubble and GovDAO in Onyx, the build's default, and nothing else", () => {
+  it("reads the files the repository ships: Bubble, GovDAO and the stations round the Earth (8l) in Onyx, the build's default", () => {
     const data = loadData(new URL("../data", import.meta.url).pathname);
     expect(data.universes.map((u) => [u.id, u.default === true])).toEqual([
       ["onyx", true],
       ["gnoland", false],
     ]);
-    expect(data.hubs).toEqual([
+    // Each station round the Earth is a world of its own kind, at its slug (8l).
+    expect(data.hubs.slice(2).map(({ slug, kind }) => [slug, kind])).toEqual(
+      data.earthOrbit.map(({ slug }) => [slug, "station"]),
+    );
+    expect(data.hubs.slice(0, 2)).toEqual([
       {
         slug: "bubble",
         name: "Bubble",

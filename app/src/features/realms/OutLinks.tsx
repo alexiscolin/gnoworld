@@ -1,5 +1,6 @@
-// A plate's links out (frames 40, 93): "VIEW ON GNOWEB ↗", "EXPLORER ↗", "DOCS ↗", in the label's capitals. Each address is the site's own
-// (the data's gnoweb, the explorer and the docs), never a realm's words, so each opens in a tab of its own with no warning.
+// A plate's links out (frames 40, 93): "VIEW ON GNOWEB ↗", "EXPLORER ↗", "DOCS ↗", in the label's capitals. Each address is the team's data
+// (a station's site, https only, checked at build) or the site's own (the gnoweb, the explorer, the docs), never a realm's words, so each
+// opens in a tab of its own with no warning.
 import { Cluster, Icon } from "@gnoworld/ui";
 import styles from "./OutLinks.module.css";
 

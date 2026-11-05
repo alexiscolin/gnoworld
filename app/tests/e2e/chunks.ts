@@ -17,8 +17,8 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
  * absent: the chunk alone. Each cap's history is here or beside its chunk's pattern in budgets.spec.ts, before 7y's steady names. */
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // 159,847 B in this measure with the Earth's stations' three classes (Alexis, 2026-11-04, "Oui, 160 256"); 160,325 B once 7v2, 7b9,
-  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening).
-  { chunk: "scene", after: ["mountUniverse"], cap: 160_325 },
+  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening); 160,357 B with 8l's restIn.
+  { chunk: "scene", after: ["mountUniverse"], cap: 160_357 },
   // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
   // 7x2's loader and text box, 7v2's ratio, bands and a Plan half lit, 7b9's star's warmth (the night's +1 KiB, the chief), measured.
   { chunk: "cosmos", after: ["scene"], cap: 17_345 },
@@ -36,15 +36,17 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "restArrival", after: ["scene", "cosmos", "restSearch"], cap: 2304 },
   // The rocks' laying, what is left of the depth (7p) once the Earth's view took the home's far worlds (7x2): 1,445 B, 1.5 KiB.
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
-  // The Earth's view (7x2): stations, scenery, belt, names, caption; 13,442 B with the fourteen stations Alexis approved (night-caps.md);
-  // 7v2's route and bands, 7b9's chunks' names, 7f5's eye held; 13,815 B with 7u's hero box shared with web (night-caps.md); 14,065 B
-  // with 8m's soft field round the text, shared with web (the chief, 2026-11-05, inside the 256 B margin).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 14_065 },
+  // The Earth's view (7x2): its stations, scenery, belt, names and caption; 13,815 B with 7v2, 7b9, 7f5 and 7u (night-caps.md); then 8m's
+  // soft field and 8l's stations shared with a station's page (Alexis, 2026-11-05, "oui, monte-la"), summed on their merge.
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 14_604 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
   // 2,417 B on 7u's merge: labels.module.css split with the pills' chunk (7u alone 2,408), inside the 256 B margin over 2,401.
   { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2417 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
-  { chunk: "part", after: ["scene"], cap: 12_066 },
+  // 12,607 B with the loader of a station's page's view (8l), the night's +1 KiB (night-caps.md; the chief, 2026-11-05).
+  { chunk: "part", after: ["scene"], cap: 12_607 },
+  // A station's page's view (8l): its station in the planet's place; a new limit at its size (the chief, 2026-11-05), 5,170 B.
+  { chunk: "stationView", after: ["scene", "part"], cap: 5170 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
   // cream veins took 9,325 B, 109 past 9 KiB; their size plus a tenth passes 10 KiB, the most he gave.
   { chunk: "generated", cap: 10_189 },

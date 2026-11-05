@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, test, vi } from "vitest";
 import events from "../../data/events.json" with { type: "json" };
+import orbit from "../../data/earthOrbit.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
 import { BACK_HOME, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
@@ -94,6 +95,8 @@ test("hands the cosmos the places its rail links to and the page's router", asyn
     worlds: [
       expect.objectContaining({ slug: "bubble", path: "/w/bubble" }),
       expect.objectContaining({ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }),
+      // The stations round the Earth are worlds of the page too (8l).
+      ...orbit.map(({ slug }): unknown => expect.objectContaining({ slug, path: `/w/${slug}` })),
     ],
   });
   expect(page?.open).toBeTypeOf("function");

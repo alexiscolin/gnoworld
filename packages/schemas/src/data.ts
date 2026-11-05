@@ -79,7 +79,7 @@ export const RealmPath = z
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
 /** What a world of the data may be, as its plate's crumb says it. */
-const WORLD_KINDS = ["hub", "dao", "dapp"] as const;
+const WORLD_KINDS = ["hub", "dao", "dapp", "station"] as const;
 
 const World = z.strictObject({
   slug: Key,
@@ -88,7 +88,8 @@ const World = z.strictObject({
   universe: Key,
   /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
   realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
-  /** What the world is, its plate's crumb (8g, frames 22 and 104: "UNIVERSE › DAO", "UNIVERSE › GAMES › DAPP"): a hub unless the team says. */
+  /** What the world is, its plate's crumb (8g, frames 22 and 104: "UNIVERSE › DAO", "UNIVERSE › GAMES › DAPP"): a hub unless the team says; a
+   * station round the Earth (8l) is a world of its own kind. */
   kind: z.optional(z.enum(WORLD_KINDS)),
   /** The genre it belongs to, a slug of genres.json, the crumb's step before its kind. */
   genre: z.optional(Key),

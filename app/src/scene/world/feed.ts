@@ -24,6 +24,8 @@ export interface WorldPage {
   readonly room: string | null;
   /** What its realm reports, for the status ring. */
   readonly ring?: { readonly lit: number; readonly mark: number } | undefined;
+  /** A station round the Earth (8l): the station its name builds at its size stands in the planet's place. */
+  readonly station?: { readonly name: string; readonly size: number } | undefined;
 }
 
 export interface FeedOptions {

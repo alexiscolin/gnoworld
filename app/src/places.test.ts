@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import orbit from "../data/earthOrbit.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { site, siteOf } from "./places.ts";
 import { FIXTURE } from "./placesFixture.ts";
@@ -75,8 +76,12 @@ describe("the site's worlds, by request", () => {
 });
 
 describe("the worlds of the data files", () => {
-  test("hold Bubble and GovDAO, at /w/<slug>, each canonical under /net/onyx", () => {
-    expect(site.worlds).toEqual([
+  test("hold Bubble and GovDAO, then each station round the Earth (8l), at /w/<slug>, each canonical under /net/onyx", () => {
+    const stations = new Map(orbit.map(({ slug, name }) => [slug, name]));
+    expect(site.worlds.slice(2).map(({ slug, name, kind, path }) => ({ slug, name, kind, path }))).toEqual(
+      [...stations].map(([slug, name]) => ({ slug, name, kind: "station", path: `/w/${slug}` })),
+    );
+    expect(site.worlds.slice(0, 2)).toEqual([
       {
         slug: "bubble",
         name: "Bubble",

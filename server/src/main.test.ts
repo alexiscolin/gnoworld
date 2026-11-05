@@ -12,6 +12,7 @@ import { Challenge, Ticket } from "@gnoworld/schemas";
 import { Presence, Trends } from "@gnoworld/schemas/indexer";
 import { afterEach, describe, expect, it } from "vitest";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
+import { loadRoles } from "./roles/roles.ts";
 import { wallet } from "./testing/signer.ts";
 
 interface Server {
@@ -21,6 +22,8 @@ interface Server {
 
 const SERVER = fileURLToPath(new URL("..", import.meta.url));
 const ENTRY = fileURLToPath(new URL("main.ts", import.meta.url));
+// The worlds of the roles file the server ships, by name, as its rooms are listed.
+const shippedWorlds = () => [...loadRoles(join(SERVER, "roles.json")).worlds.keys()].toSorted();
 // As the image starts it (ADR-0002 §7).
 const FLAGS = ["--disallow-code-generation-from-strings"];
 const started: Server[] = [];
@@ -185,7 +188,9 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await listening(server);
     const peer = await ergo.peer(0);
     await welcome(peer, { echo: false });
-    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual(["JOIN #bubble,#earth,#govdao"]);
+    // Every world of the roles file the server ships, the stations round the Earth among them (8l), by name.
+    const rooms = shippedWorlds().map((world) => `#${world}`);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual([`JOIN ${rooms.join(",")}`]);
     const left = once(peer.socket, "close");
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
@@ -599,7 +604,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     const port = await listening(server);
     const answer = await fetch(`http://127.0.0.1:${String(port)}/api/presence`);
     expect(answer.status).toBe(200);
-    expect(Presence.parse(await answer.json()).worlds.map(({ world }) => world)).toEqual(["bubble", "earth", "govdao"]);
+    expect(Presence.parse(await answer.json()).worlds.map(({ world }) => world)).toEqual(shippedWorlds());
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
