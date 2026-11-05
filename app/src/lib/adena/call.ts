@@ -3,7 +3,7 @@
 // its reason, and nothing is asked of Adena for the request until those asked before it have answered (queue.ts).
 import { Address, CallRequest } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
-import { detect, method } from "./detect.ts";
+import { method } from "./detect.ts";
 import {
   Account,
   ask,
@@ -42,8 +42,6 @@ interface Wallet {
 
 // The extension and the methods every call needs; the ones only some steps need are asked for by `need`.
 function open(adena: unknown): Wallet | Failed {
-  const found = detect(adena);
-  if (!found.ok) return refusal(found.reason);
   const establish = method(adena, "AddEstablish");
   const getAccount = method(adena, "GetAccount");
   const getNetwork = method(adena, "GetNetwork");

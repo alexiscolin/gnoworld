@@ -90,6 +90,8 @@ describe("isOlder", () => {
     ["1.22.10", "1.22.2", false],
     ["1.9.0", "1.22.2", true],
     ["2.0.0", "1.22.2", false],
+    ["10.0.0", "1.22.2", false],
+    ["1.22.2", "10.0.0", true],
     ["0.99.99", "1.0.0", true],
   ])("%s against %s: %s", (version, minimum, older) => {
     expect(isOlder(version, minimum)).toBe(older);
