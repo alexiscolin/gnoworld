@@ -9,11 +9,11 @@ import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
 // worker's precache; steps in docs/decisions.md. A plate's page, within the +4 KiB over 183,128 B Alexis gave the plates' pages: the
-// stations' worlds (8l) and the hero's box measured again (8m), both "oui" on 2026-11-05, summed on their merge.
-const FIRST_SCREEN_JS = 186_404;
+// stations' worlds (8l), the hero's box measured again (8m), 8p's header and the scene's door (2026-11-05, "oui", "Oui aux deux").
+const FIRST_SCREEN_JS = 187_449;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
-// met slice-8, the stations' worlds (8l), the hero's box measured again (8m), 8p's ticker events, chat dock and header pills ("Oui, 185 805").
-const PLAIN_FIRST_SCREEN_JS = 185_805;
+// met slice-8, the stations' worlds (8l), the hero's box measured again (8m), 8p's ticker events, chat dock and header pills ("Oui aux deux").
+const PLAIN_FIRST_SCREEN_JS = 185_878;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 

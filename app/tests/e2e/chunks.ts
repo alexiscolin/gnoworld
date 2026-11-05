@@ -37,8 +37,8 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   // The rocks' laying, what is left of the depth (7p) once the Earth's view took the home's far worlds (7x2): 1,445 B, 1.5 KiB.
   { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
   // The Earth's view (7x2): its stations, scenery, belt, names and caption; 13,815 B with 7v2, 7b9, 7f5 and 7u (night-caps.md); then 8m's
-  // soft field and 8l's stations shared with a station's page (Alexis, 2026-11-05, "oui, monte-la"), summed on their merge.
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 14_604 },
+  // soft field and 8l's stations shared with a station's page (Alexis, 2026-11-05, "oui, monte-la"), summed; 8p's label chips.
+  { chunk: "earthView", after: ["scene", "cosmos"], cap: 14_623 },
   { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
   // 2,417 B on 7u's merge: labels.module.css split with the pills' chunk (7u alone 2,408), inside the 256 B margin over 2,401.
   { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2417 },
