@@ -236,7 +236,12 @@ describe("what stationOf joins, by count and share", () => {
     };
   }
   const NAMES = 600;
-  const many = (size: number) => Array.from({ length: NAMES }, (_, n) => built(`project ${String(n)}`, size));
+  const built600 = new Map<number, ReturnType<typeof built>[]>();
+  const many = (size: number) => {
+    const kept = built600.get(size) ?? Array.from({ length: NAMES }, (_, n) => built(`project ${String(n)}`, size));
+    built600.set(size, kept);
+    return kept;
+  };
   const share = <T>(list: readonly T[], test: (one: T) => boolean) => list.filter(test).length / list.length;
   const most = <T>(list: readonly T[], of: (one: T) => number) => Math.max(...list.map(of));
 

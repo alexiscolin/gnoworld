@@ -7,7 +7,7 @@ import { onOrbit, stationsRound, type Placed } from "./round.ts";
 import { earthCamera, sceneryOf } from "./scenery.ts";
 
 // Where the stations stand, pinned where StrykerJS found round.ts loose (8n's run, 2026-11-05): the rules on inputs where each decides,
-// found by running every survivor on many asked files. The survivors no input tells apart are in 8r's report, with the reason.
+// found by running every survivor on many asked files. The survivors no input tells apart are in the ledger, F5518.
 const ring: MoonRing = { reach: 2.2, tilt: 0.3, roll: 0.2, moon: 0.27, rest: 1 };
 const TURN = 2 * Math.PI;
 
@@ -83,7 +83,7 @@ describe("stationsRound", () => {
     for (const count of quarters(belt.map(phaseOf))) expect(count).toBeGreaterThan(belt.length / 8);
   });
 
-  // Near sizes found by a search, a lone station's nearest clear place stands on a bound: a bound is kept, never passed. Which float hits
+  // Near sizes found by a search (names `edge 0` to `edge 2999`, each try's size solved for its bound), a lone station's nearest clear place stands on a bound: a bound is kept, never passed. Which float hits
   // it exactly hangs on the engine's Math functions (Chromium's and Node's differ by a bit), so each run scans the floats round the size.
   it("stands a body exactly at the Earth's least gap, and on a phone exactly at the screen's right edge", () => {
     const [look] = looksFrom(earthCamera());

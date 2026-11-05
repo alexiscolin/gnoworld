@@ -5,7 +5,8 @@ import { boxOf, meet, namesOf } from "./planNames.ts";
 import { along, cameraTowards, looksFrom, placeOf } from "./restLook.ts";
 
 // A Plan's names, pinned where StrykerJS found planNames.ts loose (8r, 2026-11-05): plan.test.ts reads them through planOf; these call
-// namesOf on the Plans of systems named crowd<n>, found by a search where each rule decides.
+// namesOf on the Plans of systems named crowd<n>, found by a search over crowd0 to crowd299 (and the eye turned aside by up to 0.6
+// of its distance) where each rule decides.
 describe("a name's box", () => {
   const box = (left: number, top: number) => ({ left, right: left + 10, top, bottom: top + 10 });
 

@@ -240,7 +240,7 @@ describe("massOf", () => {
   });
 });
 
-// 8r: where StrykerJS found massOf loose (8n's run, 2026-11-05). The survivors no input tells apart are in 8r's report, with the reason.
+// 8r: where StrykerJS found massOf loose (8n's run, 2026-11-05). The survivors no input tells apart are in the ledger, F5518.
 describe("massOf's particles: their spread, sizes, tones and pushes", () => {
   // A particle's place, size and tone, by its key, read through byKey.
   const particlesOf = (mass: Mass) => {
@@ -335,7 +335,7 @@ describe("massOf's particles: their spread, sizes, tones and pushes", () => {
   });
 
   it("pushes the less used of two overlapping clumps out just far enough to touch, along the line between them", () => {
-    // Found by a search: these two namespaces' clumps overlap before the push.
+    // Found by a search over n0 to n399 beside six worlds of use 9: these two namespaces' clumps overlap before the push.
     const worlds = (id: string, use: number) =>
       Array.from({ length: 6 }, (_, at) => world(`${id}/w${String(at)}`, use));
     const [first, second] = massOf([space("first", worlds("first", 9)), space("n18", worlds("n18", 1))]).clumps;
