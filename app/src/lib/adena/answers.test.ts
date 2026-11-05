@@ -36,9 +36,10 @@ describe("SUCCESSES: what each Adena method answers when it succeeds", () => {
   );
 
   it("refuses GET_NETWORK_SUCCESS: the recording shows Adena never sends it", async () => {
-    expect(await ask(() => answer("success", "GET_NETWORK_SUCCESS"), "GetNetwork")).toMatchObject({
+    expect(await ask(() => answer("success", "GET_NETWORK_SUCCESS"), "GetNetwork")).toStrictEqual({
       ok: false,
       reason: "malformed",
+      type: "",
     });
   });
 });
@@ -60,18 +61,32 @@ describe("ask: one reader of Adena's answers, for the login and for a call", () 
   });
 
   it("is malformed for a success of another type than the call's", async () => {
-    expect(await ask(() => answer("success", "GET_NETWORK"), "GetAccount")).toMatchObject({
+    expect(await ask(() => answer("success", "GET_NETWORK"), "GetAccount")).toStrictEqual({
       ok: false,
       reason: "malformed",
+      type: "",
     });
   });
 
   it("is malformed for the call's own success type that comes as a failure", async () => {
-    expect(await ask(() => answer("failure", "GET_ACCOUNT"), "GetAccount")).toMatchObject({
+    expect(await ask(() => answer("failure", "GET_ACCOUNT"), "GetAccount")).toStrictEqual({
       ok: false,
       reason: "malformed",
+      type: "",
     });
   });
+
+  // A malformed answer has no type: a caller that branches on the type (switchTo) must not take it for a real one (F5664).
+  it.each(["REDUNDANT_CHANGE_REQUEST", "UNADDED_NETWORK"])(
+    "gives a success typed %s no type: it is malformed",
+    async (type) => {
+      expect(await ask(() => answer("success", type), "SwitchNetwork")).toStrictEqual({
+        ok: false,
+        reason: "malformed",
+        type: "",
+      });
+    },
+  );
 
   it("reads SIGN_REJECTED by its type, whatever its code: a refusal", async () => {
     expect(await ask(() => answer("failure", "SIGN_REJECTED"), "SignArbitrary")).toMatchObject({

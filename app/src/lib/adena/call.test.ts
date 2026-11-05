@@ -364,6 +364,30 @@ describe("callContract: a call on the wrong network is stopped before signing", 
     expect(adena.names).toEqual([GA, GN, SN, AN, SN, GN, "DoContract"]);
   });
 
+  // A success-status answer typed as a failure is malformed, whatever its type says (F5664): it ends the call.
+  it.each(["REDUNDANT_CHANGE_REQUEST", "UNADDED_NETWORK"])(
+    "stops, signing nothing, on a switch answered as a success typed %s",
+    async (type) => {
+      const adena = new Fake({ SwitchNetwork: () => answer("success", type) }, "gnoland-1");
+      expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "malformed" });
+      expect(adena.names).toEqual([GA, GN, SN]);
+    },
+  );
+
+  it.each(["REDUNDANT_CHANGE_REQUEST", "UNADDED_NETWORK"])(
+    "stops, signing nothing, on the second switch answered as a success typed %s",
+    async (type) => {
+      let switches = 0;
+      const adena = new Fake(
+        { SwitchNetwork: () => (++switches === 1 ? no("UNADDED_NETWORK") : answer("success", type)) },
+        "gnoland-1",
+        ["gnoland-1"],
+      );
+      expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "malformed" });
+      expect(adena.names).toEqual([GA, GN, SN, AN, SN]);
+    },
+  );
+
   it("stops on a second GetNetwork that fails, after a switch: no DoContract", async () => {
     let reads = 0;
     const adena = new Fake(
