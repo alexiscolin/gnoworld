@@ -7,6 +7,7 @@ import {
   HELD,
   IDLE_MS,
   SEEN,
+  timer,
   type ChainSocket,
   type FollowOptions,
 } from "./follow.ts";
@@ -100,7 +101,7 @@ function setup(over: Partial<FollowOptions> = {}) {
     return socket;
   };
   const heights = () => delivered.flatMap((read) => read.events.map((event) => event.height));
-  return { follow, sockets, socketN, delivered, waits, log, heights, fire };
+  return { follow, sockets, socketN, delivered, waits, log, heights, fire, timers };
 }
 
 describe("the subscription", () => {
@@ -597,5 +598,76 @@ describe("a catch-up that ends after the socket did", () => {
     await Promise.resolve();
     expect(heights()).toEqual([100]);
     expect(delivered.every((read) => typeof read === "object" && "events" in read)).toBe(true);
+  });
+});
+
+// Survivors of StrykerJS: the default timer, the catch-up's own timer, the control frame's size, the hashes' edge.
+describe("the default timer", () => {
+  it("runs after its time, and not at all once the function it gave is called", () => {
+    vi.useFakeTimers();
+    try {
+      const run = vi.fn();
+      timer(1000, run);
+      vi.advanceTimersByTime(999);
+      expect(run).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(run).toHaveBeenCalledTimes(1);
+      const cancelled = vi.fn();
+      timer(1000, cancelled)();
+      vi.advanceTimersByTime(5000);
+      expect(cancelled).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe("the catch-up's own timer", () => {
+  it.each([
+    ["answers", () => Promise.resolve<string[]>([])],
+    ["fails", () => Promise.reject(new Error("down"))],
+  ])("is cancelled once the catch-up %s", async (_, catchUp) => {
+    const { socketN, timers, log } = setup({ catchUp });
+    const first = await socketN(0);
+    first.ack();
+    first.emit("message", tx(100, "a"));
+    first.emit("close");
+    (await socketN(1)).ack();
+    await vi.waitFor(() => {
+      expect(timers.filter(({ ms }) => ms === CATCH_UP_MS).map(({ live }) => live)).toEqual([false]);
+    });
+    expect(log).not.toHaveBeenCalledWith("chain_socket_timeout");
+  });
+});
+
+describe("a control frame's size", () => {
+  const padded = (type: string, length: number): string => {
+    const base = JSON.stringify({ type, pad: "" });
+    return JSON.stringify({ type, pad: "x".repeat(length - base.length) });
+  };
+
+  it("is read up to 256 characters and no further: a longer text is data, never an acknowledgement", async () => {
+    const { socketN } = setup();
+    const socket = await socketN(0);
+    socket.emit("open");
+    expect(padded("connection_ack", 256)).toHaveLength(256);
+    socket.emit("message", padded("connection_ack", 257));
+    expect(socket.types()).toEqual(["connection_init"]);
+    socket.emit("message", padded("connection_ack", 256));
+    expect(socket.types()).toEqual(["connection_init", "subscribe", "subscribe"]);
+  });
+});
+
+describe("the hashes kept", () => {
+  it("are 10,000: the oldest of exactly that many is still known, and goes with the next one", async () => {
+    const { socketN, heights } = setup();
+    const socket = await socketN(0);
+    socket.ack();
+    for (let n = 0; n < SEEN; n += 1) socket.emit("message", tx(n, `h${String(n)}`));
+    socket.emit("message", tx(0, "h0"));
+    expect(heights()).toHaveLength(SEEN);
+    socket.emit("message", tx(SEEN, `h${String(SEEN)}`));
+    socket.emit("message", tx(0, "h0"));
+    expect(heights()).toHaveLength(SEEN + 2);
   });
 });
