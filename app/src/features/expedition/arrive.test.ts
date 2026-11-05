@@ -118,6 +118,29 @@ describe("an arrival on the day's expedition", () => {
     expect(gap.fields.streak).toEqual({ day: NEXT, count: 1, best: 4 });
   });
 
+  it("changes neither the streak nor the count of a later day when the clock is set back", () => {
+    const keys = stopsOn("onyx", DAY).map(({ key }) => key);
+    const streak = { day: NEXT, count: 3, best: 5 };
+    const { fields, change } = device({ streak });
+    const said = keys.map((key) => arrive(at(key, DAY), change));
+    expect(said.at(-1)).toBe("Today's expedition done · 3-day streak");
+    expect(fields.streak).toEqual(streak);
+  });
+
+  it("starts the earlier day's record over a later day's when the clock is set back, as reach does", () => {
+    const keys = stopsOn("onyx", DAY).map(({ key }) => key);
+    const { fields, change } = device({ expedition: { day: NEXT, reached: keys } });
+    expect(arrive(at(keys[0] ?? "", DAY), change)).toBe("Today's expedition · 1 of 3");
+    expect(fields.expedition).toEqual({ day: DAY, reached: [keys[0]] });
+  });
+
+  it("counts a stop on a new day for an arrival at a world already stamped", () => {
+    const [one] = stopsOn("onyx", NEXT);
+    const { fields, change } = device({ expedition: { day: DAY, reached: [] } });
+    expect(arrive({ ...at(one?.key ?? "", NEXT), stamped: false }, change)).toBe("Today's expedition · 1 of 3");
+    expect(fields.expedition).toEqual({ day: NEXT, reached: [one?.key] });
+  });
+
   it("starts the day again: yesterday's stops reached count for nothing today", () => {
     const keys = stopsOn("onyx", NEXT).map(({ key }) => key);
     const { fields, change } = device({ expedition: { day: DAY, reached: keys } });

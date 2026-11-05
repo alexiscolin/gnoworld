@@ -119,6 +119,28 @@ describe("a field read from the device", () => {
     expect(pageDevice().read("stamps")).toEqual({});
   });
 
+  it("reads a key of 256 characters and refuses one of 257", () => {
+    const at = (length: number) => `g:${"k".repeat(length - 2)}`;
+    put("stamps", { [at(256)]: "2026-11-01", [at(257)]: "2026-11-02" });
+    expect(pageDevice().read("stamps")).toEqual({ [at(256)]: "2026-11-01" });
+  });
+
+  it("reads a __proto__ key with a stamp as an own entry, and keeps a hostile value aside without polluting any prototype", () => {
+    held.words.set("gnoworld:device:stamps", '{"__proto__":{"polluted":1}}');
+    const device = pageDevice();
+    const read = device.read("stamps") ?? {};
+    expect(Object.getPrototypeOf(read)).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+    expect(read).toEqual({});
+    device.write("stamps", { "gnoland:a": "2026-11-01" });
+    expect(Object.getPrototypeOf(stored("stamps"))).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+    held.words.set("gnoworld:device:stamps", '{"__proto__":"2026-11-01"}');
+    const own = pageDevice().read("stamps") ?? {};
+    expect(Object.getPrototypeOf(own)).toBe(Object.prototype);
+    expect(Object.keys(own)).toEqual(["__proto__"]);
+  });
+
   it("keeps 10,000 stamps at most, the rest kept aside", () => {
     const many = Object.fromEntries(Array.from({ length: 10_001 }, (_, i) => [`gnoland:w${String(i)}`, "2026-11-01"]));
     put("stamps", many);
@@ -250,6 +272,28 @@ describe("the passport's file", () => {
     ["one charted key that is none", () => passportFile({ stamps: {}, charted: { "bad key": "2026-11-01" } })],
   ])("reads nothing from %s", (_, file) => {
     expect(readPassportFile(file())).toBeUndefined();
+  });
+
+  it("reads a key of 256 characters and refuses one of 257, whole or not at all", () => {
+    const at = (length: number) => `g:${"k".repeat(length - 2)}`;
+    expect(readPassportFile(passportFile({ stamps: { [at(256)]: "2026-11-01" }, charted: {} }))?.stamps).toEqual({
+      [at(256)]: "2026-11-01",
+    });
+    expect(readPassportFile(passportFile({ stamps: {}, charted: { [at(257)]: "2026-11-01" } }))).toBeUndefined();
+  });
+
+  it("pollutes no prototype and reads plain objects from a hostile __proto__ value", () => {
+    const file = '{"gnoworld":"passport","version":1,"stamps":{"__proto__":{"polluted":1}},"charted":{}}';
+    const read = readPassportFile(file);
+    expect(Object.getPrototypeOf(read?.stamps)).toBe(Object.prototype);
+    expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+  });
+
+  it("reads a __proto__ key with a day as an own entry of a plain object", () => {
+    const file = '{"gnoworld":"passport","version":1,"stamps":{"__proto__":"2026-11-01"},"charted":{}}';
+    const read = readPassportFile(file);
+    expect(Object.getPrototypeOf(read?.stamps)).toBe(Object.prototype);
+    expect(Object.keys(read?.stamps ?? {})).toEqual(["__proto__"]);
   });
 
   it("reads nothing from a file over 2,000,000 characters, and reads one at the bound", () => {

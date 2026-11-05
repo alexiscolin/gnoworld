@@ -6,7 +6,7 @@ import { visitedIn, visitKey } from "../../lib/visits.ts";
 import { worldAsk } from "./globe.ts";
 
 // What a world's page asks of the scene (8g, 8l): this reader's visit is kept on the device, as a flag the passport and the labels read, and
-// a world this visit woke is stamped as charted by this device. A station keeps its visit as any world does, never the charting.
+// a world this visit woke is stamped as charted by this device. A visit that woke nothing (fresh false) is kept as a visit and charts nothing; the code names no station.
 const CIRCLE = { x: 0, y: 0, radius: 100 };
 const askOf = (id: string) => {
   const store = createAppStore();

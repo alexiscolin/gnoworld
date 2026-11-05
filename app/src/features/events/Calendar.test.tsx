@@ -131,6 +131,30 @@ describe("the calendar's worlds", () => {
   });
 });
 
+describe("an event's link off the site", () => {
+  it("opens the warning naming the event's host, holds the link only inside it, and goes nowhere unasked", async () => {
+    const link = "https://talks.example.org/e/net?x=1";
+    data.events = [{ ...event("net", local(5, "18:00")), link }];
+    const open = vi.spyOn(window, "open").mockReturnValue(null);
+    const { page } = await opened();
+    const linksTo = () => all(page, "a").filter((each) => each.getAttribute("href") === link);
+    expect(linksTo()).toHaveLength(0);
+    expect(all(page, "dialog").filter((dialog) => dialog.textContent.includes("Leaving this page"))).toHaveLength(0);
+    click(button(page, "Open Event net"));
+    const warnings = all(page, "dialog").filter(
+      (dialog) => dialog.querySelector("dialog") === null && dialog.textContent.includes("Leaving this page"),
+    );
+    expect(warnings).toHaveLength(1);
+    const warning = warnings[0];
+    expect(warning?.hasAttribute("open")).toBe(true);
+    expect(warning?.textContent).toContain(new URL(link).host);
+    const links = linksTo();
+    expect(links).toHaveLength(1);
+    expect(warning?.contains(links[0] ?? null)).toBe(true);
+    expect(open).not.toHaveBeenCalled();
+  });
+});
+
 describe("Remind me", () => {
   it("keeps the reminder on the device, unfired, and takes it off on a second press", async () => {
     data.events = [event("r", local(5, "18:00"))];

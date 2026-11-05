@@ -50,6 +50,19 @@ afterEach(() => {
 });
 
 describe("an arrival", () => {
+  it.each([
+    ["2026-11-05T23:30:00Z", "2026-11-05"],
+    ["2026-11-06T00:00:00Z", "2026-11-06"],
+  ])("stamps at %s with the UTC day %s, never the local one", async (now, day) => {
+    vi.useFakeTimers({ now: new Date(now), toFake: ["Date"] });
+    try {
+      await arrive();
+    } finally {
+      vi.useRealTimers();
+    }
+    expect(stamps()).toEqual({ [stampKey("onyx", "bubble")]: day });
+  });
+
   it("stamps a first visit with today's UTC day, and says so in one pill with the passport a press away", async () => {
     await arrive();
     const key = stampKey("onyx", "bubble");

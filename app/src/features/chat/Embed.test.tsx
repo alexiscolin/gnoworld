@@ -3,10 +3,17 @@ import type { ShownLine } from "@gnoworld/core";
 import { act, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { Embed, PlayerFrame } from "./Embed.tsx";
 import { LineView } from "./LineView.tsx";
+
+// The prototype is set for the whole file (jsdom has none): put back after it.
+const original = Object.getOwnPropertyDescriptor(Element.prototype, "scrollIntoView");
+afterAll(() => {
+  if (original === undefined) Reflect.deleteProperty(Element.prototype, "scrollIntoView");
+  else Object.defineProperty(Element.prototype, "scrollIntoView", original);
+});
 
 const YOUTUBE = {
   service: "YouTube",

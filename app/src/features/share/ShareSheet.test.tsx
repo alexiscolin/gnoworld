@@ -19,6 +19,7 @@ const give = (name: string, value: unknown) => {
   owned.push(name);
 };
 afterEach(() => {
+  vi.useRealTimers();
   for (const name of owned.splice(0)) Reflect.deleteProperty(navigator, name);
   for (const canvas of all(document, "canvas")) canvas.remove();
 });
@@ -37,6 +38,21 @@ async function opened(shared = place) {
   const dialogs = all(document, "dialog").filter((dialog) => dialog.hasAttribute("open"));
   expect(dialogs).toHaveLength(1);
   return dialogs[0] ?? document.body;
+}
+// A scene that is on and answers with a frame whose picture is a one-byte JPEG.
+function answeringScene() {
+  const scene = document.createElement("canvas");
+  scene.dataset["scene"] = "on";
+  document.body.append(scene);
+  const frame = document.createElement("canvas");
+  vi.spyOn(frame, "toDataURL").mockReturnValue("data:image/jpeg;base64,AAAA");
+  vi.spyOn(frame, "toBlob").mockImplementation((done) => {
+    done(new Blob(["x"], { type: "image/jpeg" }));
+  });
+  scene.addEventListener(SNAPSHOT_EVENT, () => {
+    scene.dispatchEvent(new CustomEvent(SNAPSHOT_TAKEN, { detail: frame }));
+  });
+  return scene;
 }
 const pressed = async (sheet: HTMLElement, words: string) => {
   const found = all(sheet, "button").find((each) => each.textContent.includes(words));
@@ -64,17 +80,7 @@ describe("the share sheet", () => {
   });
 
   it("takes the scene's canvas alone as its picture, never the page around it", async () => {
-    const scene = document.createElement("canvas");
-    scene.dataset["scene"] = "on";
-    document.body.append(scene);
-    const frame = document.createElement("canvas");
-    vi.spyOn(frame, "toDataURL").mockReturnValue("data:image/jpeg;base64,AAAA");
-    vi.spyOn(frame, "toBlob").mockImplementation((done) => {
-      done(new Blob(["x"], { type: "image/jpeg" }));
-    });
-    scene.addEventListener(SNAPSHOT_EVENT, () => {
-      scene.dispatchEvent(new CustomEvent(SNAPSHOT_TAKEN, { detail: frame }));
-    });
+    answeringScene();
     const sheet = await opened();
     expect(one(sheet, "img").getAttribute("src")).toBe("data:image/jpeg;base64,AAAA");
     expect(one(sheet, "figcaption").textContent).toContain("Bubble");
@@ -127,6 +133,74 @@ describe("the share sheet", () => {
     give("share", share);
     const sheet = await opened();
     await pressed(sheet, "Share…");
+    expect(share).toHaveBeenCalledWith({ title: "Bubble", text: "Bubble on gnoworld", url: `${ORIGIN}/w/bubble` });
+  });
+
+  it.each([
+    ["Bubble", "bubble.jpg"],
+    ["GovDAO Hub!", "govdao-hub.jpg"],
+    ["★ ☆", "gnoworld.jpg"],
+  ])("shares the picture as a file named from %s when the device can share files", async (name, file) => {
+    answeringScene();
+    const share = vi.fn<(data: ShareData) => Promise<void>>(() => Promise.resolve());
+    const canShare = vi.fn(() => true);
+    give("share", share);
+    give("canShare", canShare);
+    const sheet = await opened({ name, path: "/w/x" });
+    await pressed(sheet, "Share…");
+    const data: unknown = share.mock.calls[0]?.[0];
+    expect(data).toEqual({
+      title: name,
+      text: `${name} on gnoworld`,
+      url: `${ORIGIN}/w/x`,
+      files: [expect.objectContaining({ name: file, type: "image/jpeg" })],
+    });
+    expect(canShare).toHaveBeenCalledWith(data);
+  });
+
+  it("shares no file when the device cannot share one", async () => {
+    answeringScene();
+    const share = vi.fn(() => Promise.resolve());
+    give("share", share);
+    give("canShare", () => false);
+    const sheet = await opened();
+    await pressed(sheet, "Share…");
+    expect(share).toHaveBeenCalledWith({ title: "Bubble", text: "Bubble on gnoworld", url: `${ORIGIN}/w/bubble` });
+  });
+
+  it("waits 1,500 ms for a scene that never answers, then shows no picture and shares the link alone", async () => {
+    const scene = document.createElement("canvas");
+    scene.dataset["scene"] = "on";
+    document.body.append(scene);
+    const share = vi.fn(() => Promise.resolve());
+    give("share", share);
+    vi.useFakeTimers();
+    await act(async () => {
+      openShare(place);
+      await vi.advanceTimersByTimeAsync(0);
+    });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1_499);
+    });
+    const sheet = one(document, "dialog[open]");
+    const press = () =>
+      act(async () => {
+        all(sheet, "button")
+          .find((each) => each.textContent.includes("Share…"))
+          ?.click();
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    const button = () => one(sheet, "button[aria-busy]");
+    expect(all(sheet, "figure")).toHaveLength(1);
+    expect(button().getAttribute("aria-busy")).toBe("true");
+    await press();
+    expect(share).not.toHaveBeenCalled();
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(all(sheet, "figure")).toHaveLength(0);
+    expect(button().getAttribute("aria-busy")).not.toBe("true");
+    await press();
     expect(share).toHaveBeenCalledWith({ title: "Bubble", text: "Bubble on gnoworld", url: `${ORIGIN}/w/bubble` });
   });
 

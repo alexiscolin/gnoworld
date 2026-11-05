@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, one, settled } from "../../../tests/mount.tsx";
 import { mountInStore, type AppStore } from "../../../tests/inStore.tsx";
 import { passportFile } from "../../lib/keep/device.ts";
+import { keep } from "../../lib/keep/keep.ts";
 import { DeviceSection } from "./DeviceSection.tsx";
 
 // The settings' "this device" (slice 8; plan §6: "clear removes what it names and nothing else"; the threat model's "an import is size-capped,
@@ -51,6 +52,7 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 async function imported(box: HTMLElement, text: string) {
@@ -86,6 +88,57 @@ describe("this device's settings", () => {
     expect(localStorage.getItem(`gnoworld:draft:${ALICE}:#bubble`)).toBeNull();
     expect(localStorage.getItem(`gnoworld:draft:${BOB}:#bubble`)).toBe("bob's");
     expect(held("gnoworld:device:stamps")).toEqual({ "onyx:a": "2026-11-01", "onyx:b": "2026-11-02" });
+  });
+
+  it("clear an account's saved messages alone, never its drafts, the passport, the settings nor another device field", async () => {
+    const mine = keep(() => localStorage, ALICE);
+    const bobs = keep(() => localStorage, BOB);
+    const saved = (account: Address, id: string) => ({
+      room: "#bubble",
+      id,
+      time: "2026-11-05T10:00:00.000Z",
+      from: account,
+      account,
+      text: `kept ${id}`,
+    });
+    mine.setSaved([saved(ALICE, "m1"), saved(ALICE, "m2")]);
+    bobs.setSaved([saved(BOB, "m3")]);
+    const box = await section(ALICE);
+    act(() => {
+      store?.getState().keepActions.begin(mine);
+    });
+    expect(store?.getState().keep.saved).toHaveLength(2);
+    const before = Object.fromEntries(Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]));
+    press(box, "Clear saved messages");
+    expect(said(box)).toBe("Saved messages cleared.");
+    expect(store?.getState().keep.saved).toEqual([]);
+    expect(mine.saved()).toEqual([]);
+    expect(localStorage.getItem(`gnoworld:saved:${ALICE}`)).toBeNull();
+    const after = Object.fromEntries(Object.keys(localStorage).map((key) => [key, localStorage.getItem(key)]));
+    expect(after).toEqual(
+      Object.fromEntries(Object.entries(before).filter(([key]) => key !== `gnoworld:saved:${ALICE}`)),
+    );
+    expect(bobs.saved()).toEqual([saved(BOB, "m3")]);
+  });
+
+  it("leave the saved messages intact when the passport is cleared", async () => {
+    const mine = keep(() => localStorage, ALICE);
+    const line = {
+      room: "#bubble",
+      id: "m1",
+      time: "2026-11-05T10:00:00.000Z",
+      from: ALICE,
+      account: ALICE,
+      text: "kept",
+    };
+    mine.setSaved([line]);
+    const box = await section(ALICE);
+    act(() => {
+      store?.getState().keepActions.begin(mine);
+    });
+    press(box, "Clear the passport");
+    expect(mine.saved()).toEqual([line]);
+    expect(store?.getState().keep.saved).toEqual([line]);
   });
 
   it("offer no clear of saved messages or drafts to a guest", async () => {
@@ -131,7 +184,6 @@ describe("this device's settings", () => {
     });
     const clicked = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     press(box, "Export the passport");
-    vi.unstubAllGlobals();
     expect(clicked).toHaveBeenCalledOnce();
     expect(JSON.parse((await made[0]?.text()) ?? "{}")).toEqual({
       gnoworld: "passport",
