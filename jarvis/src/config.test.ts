@@ -543,6 +543,7 @@ describe("the jarvis service", () => {
   it("overrides nothing the lock or the image sets: its root, its command, its privileges", () => {
     const keys = keysOf(service("jarvis"), 4);
     expect(keys).toEqual([
+      "profiles",
       "build",
       "user",
       "init",
@@ -665,7 +666,22 @@ describe("the operator's settings", () => {
 });
 
 describe("the demo's ceiling", () => {
-  it("holds every service's caps, jarvis's and its way out's with them, under 2.4 cores and 2 GB (question 10j-4)", () => {
+  // A service with no profile starts in every one (Compose's rule): the demo's are those and its own.
+  const profilesOf = (name: string) =>
+    /^ {4}profiles: \[([^\]]*)\]$/m
+      .exec(service(name))?.[1]
+      ?.split(",")
+      .map((one) => one.trim()) ?? [];
+  const inDemo = (name: string) => profilesOf(name).length === 0 || profilesOf(name).includes("demo");
+
+  it("puts jarvis and its way out in a profile of their own, jarvis, and nothing else there (10j-4)", () => {
+    expect(profilesOf("jarvis")).toEqual(["jarvis"]);
+    expect(profilesOf("egress_jarvis")).toEqual(["jarvis"]);
+    expect(names().filter((name) => profilesOf(name).includes("jarvis"))).toEqual(["jarvis", "egress_jarvis"]);
+    expect(names().filter(inDemo)).toEqual(["web", "ergo", "server", "guard", "egress", "tailscale"]);
+  });
+
+  it("holds the demo profile's caps under 2 cores and 2 GB (ADR-0002 §7), jarvis out of it (10j-4)", () => {
     const units = new Map([
       ["", 1],
       ["k", 2 ** 10],
@@ -677,18 +693,66 @@ describe("the demo's ceiling", () => {
       return Number(number) * (units.get(unit) ?? Number.NaN);
     };
     const capOf = (name: string, key: string) => new RegExp(`^ {4}${key}: (\\S+)$`, "m").exec(service(name))?.[1];
-    expect(names()).toEqual(expect.arrayContaining(["jarvis", "egress_jarvis"]));
+    const demo = names().filter(inDemo);
     for (const name of names()) expect(capOf(name, "cpus"), name).toBeDefined();
-    const cores = names().reduce((sum, name) => sum + Number(capOf(name, "cpus")), 0);
-    const bytes = names().reduce((sum, name) => sum + size(capOf(name, "mem_limit") ?? "0"), 0);
-    expect(cores).toBeLessThanOrEqual(2.4 + 1e-9);
+    const cores = demo.reduce((sum, name) => sum + Number(capOf(name, "cpus")), 0);
+    const bytes = demo.reduce((sum, name) => sum + size(capOf(name, "mem_limit") ?? "0"), 0);
+    expect(cores).toBeLessThanOrEqual(2 + 1e-9);
     expect(bytes).toBeLessThanOrEqual(2 ** 31);
-    expect(read("deploy/test.sh")).toContain("sys.exit(float(c) > 2.4 or int(m) > 2**31)");
-    // And the running demo's, which counts the containers it finds.
+    expect(read("deploy/test.sh")).toContain("sys.exit(float(c) > 2 or int(m) > 2**31)");
+    expect(read("deploy/test.sh")).toContain(`pass "the demo's caps fit 2 cores and 2 GB ($caps)"`);
+    // And the running demo's, which counts the containers it finds: the demo profile's alone.
+    expect(read("deploy/test.sh")).toContain("for id in $ts $guard $web $ergo $server $egress; do");
+    expect(read("deploy/test.sh")).toContain(`[ "$cpus" -le 2000000000 ]`);
+    expect(read("deploy/test.sh")).not.toMatch(/2\.4|2400000000/);
+    // A demo without jarvis is the demo (red pass, R1): its start needs the six alone.
     expect(read("deploy/test.sh")).toContain(
-      "for id in $ts $guard $web $ergo $server $egress $jarvis $egress_jarvis; do",
+      `if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ]; then\n\t\techo "test.sh: the demo is not running`,
     );
-    expect(read("deploy/test.sh")).toContain(`[ "$cpus" -le 2400000000 ]`);
+  });
+
+  it("holds a running jarvis, switched on, to both containers, locked, under their own caps (F5159)", () => {
+    const demo = read("deploy/test.sh").slice(read("deploy/test.sh").indexOf("\t# The running demo."));
+    expect(demo).toContain(`jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis)`);
+    expect(demo).toContain(`if [ -n "$jarvis$egress_jarvis" ]; then`);
+    expect(demo).toContain(`fail "jarvis and its way out run together or not at all"`);
+    expect(demo).toMatch(/^\t\t\thardened "\$jarvis" jarvis$/m);
+    expect(demo).toMatch(/^\t\t\thardened "\$egress_jarvis" egress_jarvis network$/m);
+    expect(demo).toContain("for id in $jarvis $egress_jarvis; do");
+    // 448 MiB and 0.4 core, the file's caps (D184), apart from the demo's 2 cores.
+    expect(demo).toContain(`[ "$jarvis_memory" -le ${String(448 * 2 ** 20)} ] && [ "$jarvis_cpus" -le 400000000 ]`);
+  });
+
+  it("keeps jarvis's and its way out's caps as measured, out of the demo's (D184; red pass, R5)", () => {
+    const caps = (name: string) =>
+      ["cpus", "mem_limit", "pids_limit"].map(
+        (key) => new RegExp(`^ {4}${key}: (\\S+)$`, "m").exec(service(name))?.[1],
+      );
+    expect(caps("jarvis")).toEqual(["0.3", "384m", "128"]);
+    expect(caps("egress_jarvis")).toEqual(["0.1", "64m", "64"]);
+  });
+
+  it("says so in the runbook: 2 cores, jarvis under its own profile", () => {
+    const runbook = read("docs/OPERATIONS.md");
+    expect(runbook).not.toMatch(/2\.4 cores|1,952 MB/);
+    expect(runbook).toContain("`egress_jarvis` (profile `jarvis`)");
+    expect(runbook).toContain("`jarvis` (profile `jarvis`)");
+    // Started with Jarvis switched on, and taken by every stop, so no jarvis outlives the demo (red pass, R2).
+    for (const command of ["up -d --build", "down", "down -v"])
+      expect(runbook, command).toContain(
+        `docker compose -f deploy/compose.yaml --profile demo --profile jarvis ${command}\``,
+      );
+    const env = read("deploy/.env.example");
+    expect(env.slice(env.indexOf("# Jarvis"), env.indexOf("# JARVIS=on"))).toContain("--profile jarvis");
+    // Ops, without the demo's profile, start jarvis by its name, which switches its profile on (F5157).
+    expect(runbook).toContain("`docker compose up -d jarvis`");
+    expect(env.slice(env.indexOf("# Jarvis"), env.indexOf("# JARVIS=on"))).toContain("up -d jarvis");
+    // No stop or restart of the demo's alone, which leaves a running jarvis up (F5158).
+    expect(runbook).not.toMatch(/--profile demo\s+(down|restart)/);
+    expect(runbook).not.toContain("then `down -v` and `up`");
+    // What the door answers without jarvis (question 10l-1): off when switched off, not ready when on without it.
+    expect(runbook).not.toMatch(/door answering internal/);
+    expect(runbook).toContain("the door answers `not_ready` (503)");
   });
 });
 
@@ -781,7 +845,7 @@ describe("jarvis's way out", () => {
   it("is a proxy of its own, locked as the server's, in the guard's network, on its own port and list", () => {
     const egress = service("egress_jarvis");
     expect(egress).toMatch(/^ {4}<<: \*locked$/m);
-    expect(egress).toMatch(/^ {4}profiles: \[demo\]$/m);
+    expect(egress).toMatch(/^ {4}profiles: \[jarvis\]$/m);
     expect(egress).toMatch(/^ {4}user: "65532:65532"$/m);
     expect(egress).toMatch(/^ {4}network_mode: service:guard$/m);
     expect(egress).toMatch(/^ {6}guard: \{ condition: service_healthy, restart: true \}$/m);
@@ -887,13 +951,52 @@ describe("the guard's rules", () => {
 describe("deploy/test.sh", () => {
   const script = () => read("deploy/test.sh");
   const jarvis = () => read("deploy/test-jarvis.sh");
-  it("starts jarvis and its way out with a made-up key, and runs jarvis's proofs", () => {
+  it("starts the demo without jarvis, proves it absent, then runs jarvis's proofs, which start it (10j-4)", () => {
     expect(script()).toContain(`export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key"`);
     expect(script()).toMatch(/for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key; do/);
-    expect(script()).toMatch(/up -d --build --wait web guard ergo server egress jarvis egress_jarvis/);
-    expect(script()).toContain(`. "$here/test-jarvis.sh"`);
+    expect(script()).toMatch(/up -d --build --wait web guard ergo server egress; then$/m);
+    expect(script()).not.toMatch(/up -d --build --wait [^\n]*jarvis/);
+    const plain = script().slice(0, script().indexOf("\t# The running demo."));
+    expect(plain).not.toMatch(/hardened "\$jarvis"|ps -q jarvis|ps -q egress_jarvis/);
+    for (const check of ["the demo profile holds no jarvis, nor its way out", "the server finds no jarvis in the demo"])
+      expect(script(), check).toContain(check);
+    // A search of containers the start never names proves nothing (F5301).
+    expect(script()).not.toContain("the demo starts no");
+    expect(script()).toContain(`config --services | grep -cxE 'jarvis|egress_jarvis' || true)" 0`);
     expect(script()).toContain(`"$here/jarvis/Dockerfile"; do`);
-    expect(script()).toMatch(/hardened "\$jarvis" jarvis$/m);
+    // Its stop takes jarvis's profile too, which a down of the demo's alone leaves up.
+    expect(script()).toContain(
+      `docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 ||\n\t\t\techo "test.sh: the project`,
+    );
+    expect(script()).toContain(
+      `docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 || true #`,
+    );
+    // The proofs of its absence, by commands no profile switches on, before jarvis's own start (red pass, R4).
+    const at = (text: string) => script().indexOf(text);
+    const sourced = script().lastIndexOf(`\t. "$here/test-jarvis.sh"\n`);
+    for (const command of [
+      `docker compose -p "$project" $files config --services`,
+      `fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))`,
+    ]) {
+      expect(at(command), command).toBeGreaterThan(-1);
+      expect(at(command), command).toBeLessThan(sourced);
+    }
+    // Sourced twice: among the mutants, once their helpers exist, and at the plain run's end (red pass, R3).
+    const mutants = at(`\t. "$here/test-jarvis.sh"\n`);
+    expect(mutants).toBeGreaterThan(at("\tover() {"));
+    expect(mutants).toBeGreaterThan(at("\tmutant() {"));
+    expect(mutants).toBeLessThan(at(`elif [ "\${1:-}" != --demo ]; then`));
+    expect(sourced).toBeGreaterThan(at("go test ./..."));
+    expect(sourced).toBeLessThan(at("\t# The running demo."));
+    // Its start fails as the demo's does, once, with exit 3 (red pass, R6).
+    expect(jarvis()).toContain(
+      `if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis; then`,
+    );
+    expect(jarvis()).toMatch(/test-jarvis\.sh: jarvis did not start: [^\n]*\n\texit 3\nfi$/m);
+    expect(jarvis()).toMatch(/^hardened "\$jarvis" jarvis$/m);
+    // In --mutants it plants its faults and returns, starting nothing (F5300).
+    expect(jarvis()).toMatch(/mutant "jarvis back in the demo" [^\n]*\n\treturn 0\nfi\n/);
+    expect(jarvis()).toMatch(/^hardened "\$egress_jarvis" egress_jarvis network$/m);
   });
 
   it("proves jarvis's networks, its way out, its file, its key and its image on the running stack", () => {
@@ -938,9 +1041,10 @@ describe("deploy/test.sh", () => {
     expect(jarvis()).not.toContain(`answering "container:$guard" "$out_address:8081"`);
   });
 
-  it("plants each of jarvis's faults in `--mutants`, each killed by its own check", () => {
+  it("plants each of jarvis's faults in `--mutants` from test-jarvis.sh, each killed by its own check", () => {
     const faults: [string, string][] = [
       ["a host added to jarvis's way out", "jarvis's way out lets six hosts out"],
+      ["Anthropic's API dropped from jarvis's way out", "jarvis reaches Anthropic's API through its way out"],
       ["jarvis's way out open to the internal network", "the guard's rules refuse 4751 but from jarvis's network"],
       ["the guard drops jarvis's replies", "jarvis reaches Anthropic's API through its way out"],
       ["jarvis on the internal network", "jarvis sits on its two networks only"],
@@ -948,8 +1052,17 @@ describe("deploy/test.sh", () => {
       ["jarvis's key given to the server", "the server holds no Anthropic key"],
       ["jarvis killed before its drain ends", "jarvis waits 35 s for its drain"],
       ["jarvis listening on all its networks", "jarvis's way out's network reaches no listener of jarvis's"],
-      ["the admin API on the loopback alone", "the admin API answers on its own network"],
+      ["jarvis back in the demo", "the demo profile holds no jarvis, nor its way out"],
     ];
-    for (const [fault, by] of faults) expect(script()).toContain(`mutant "${fault}" "${by}"`);
+    for (const [fault, by] of faults) {
+      expect(jarvis(), fault).toContain(`mutant "${fault}" "${by}"`);
+      expect(script(), fault).not.toContain(`mutant "${fault}"`);
+    }
+    expect(script()).toContain(
+      `mutant "the admin API on the loopback alone" "the admin API answers on its own network"`,
+    );
+    // Its mutants are planted from the --mutants run, which sources it before its checks run.
+    expect(jarvis()).toMatch(/^if \[ "\$\{1:-\}" = --mutants \]; then$/m);
+    expect(script().match(/\. "\$here\/test-jarvis\.sh"/g)).toHaveLength(2);
   });
 });

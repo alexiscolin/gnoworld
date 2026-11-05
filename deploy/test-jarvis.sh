@@ -1,7 +1,33 @@
-# deploy/test-jarvis.sh: jarvis's proofs in the stack (10j; ADR-0002 §5, §7), sourced by deploy/test.sh once the
-# server's way out is proven, with its helpers and the running stack's containers ($jarvis, $egress_jarvis, $server,
-# $guard). jarvis stays off (JARVIS unset): it serves its budgets and answers off, reads no key and starts no gnomcp.
+# deploy/test-jarvis.sh: jarvis's proofs (10j; ADR-0002 §5, §7), sourced by deploy/test.sh with its helpers: in
+# --mutants, its faults; else, once the demo is proven without it, it starts jarvis under its own profile (10j-4) and
+# proves it. jarvis stays off (JARVIS unset): it serves its budgets and answers off, reads no key and starts no gnomcp.
 # jarvis/src/config.test.ts and main.test.ts read the same files as text; this proves them on Docker.
+if [ "${1:-}" = --mutants ]; then
+	jarvis_acl() { over egress_jarvis /etc/smokescreen/jarvis-acl.yaml "$here/egress/jarvis-acl.yaml" "$@"; }
+	# Its list widened or emptied, its proxy open to the internal network, its replies dropped, itself on a network others
+	# share, its root writable, its key given to the server, its stop cut short, itself back in the demo's profile.
+	mutant "a host added to jarvis's way out" "jarvis's way out lets six hosts out" jarvis_acl awk '{ print } /- api.anthropic.com/ { print "    - api.openai.com" }'
+	mutant "Anthropic's API dropped from jarvis's way out" "jarvis reaches Anthropic's API through its way out" jarvis_acl sed '/- api.anthropic.com/d'
+	mutant "jarvis's way out open to the internal network" "the guard's rules refuse 4751 but from jarvis's network" guard sed '/--dport 4751 -j REJECT/d'
+	mutant "the guard drops jarvis's replies" "jarvis reaches Anthropic's API through its way out" guard sed '/--sport 4751/d'
+	mutant "jarvis on the internal network" "jarvis sits on its two networks only" compose 'services: { jarvis: { networks: { inside: {} } } }'
+	mutant "jarvis's root writable" "jarvis: read-only root" compose 'services: { jarvis: { read_only: false } }'
+	mutant "jarvis's key given to the server" "the server holds no Anthropic key" compose 'services: { server: { secrets: [log_pepper, ergo_oper_password, openai_api_key, anthropic_api_key] } }'
+	mutant "jarvis killed before its drain ends" "jarvis waits 35 s for its drain" compose 'services: { jarvis: { stop_grace_period: 10s } }'
+	mutant "jarvis listening on all its networks" "jarvis's way out's network reaches no listener of jarvis's" compose 'services: { jarvis: { environment: { JARVIS_HOST: 0.0.0.0 } } }'
+	# Compose appends an override's list to the file's: jarvis's profiles become [jarvis, demo].
+	mutant "jarvis back in the demo" "the demo profile holds no jarvis, nor its way out" compose 'services: { jarvis: { profiles: [demo] } }'
+	return 0
+fi
+# --no-deps: the demo's services, proven already, are neither rebuilt nor recreated under the checks (F5302).
+if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis; then
+	echo "test-jarvis.sh: jarvis did not start: $(docker compose -p "$project" $files --profile jarvis logs --no-log-prefix --tail 1 jarvis egress_jarvis 2>&1 | tr '\n' ' ')" >&2
+	exit 3
+fi
+jarvis=$(docker compose -p "$project" $files --profile jarvis ps -q jarvis)
+egress_jarvis=$(docker compose -p "$project" $files --profile jarvis ps -q egress_jarvis)
+hardened "$jarvis" jarvis
+hardened "$egress_jarvis" egress_jarvis network
 jarvis_net=${project}_jarvis
 jarvis_out=${project}_jarvis_out
 admin_net=${project}_admin

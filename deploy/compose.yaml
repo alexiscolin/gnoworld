@@ -1,5 +1,6 @@
 # The demo stack (docs/plans/slice-1c.md, ADR-0002 §7). Run it, from the repository's root:
 #   docker compose -f deploy/compose.yaml --profile demo up -d --build
+# and with Jarvis switched on (JARVIS=on), its profile too: --profile demo --profile jarvis (10j-4).
 # Ops runs the same file with its own settings (.env) and secrets. deploy/test.sh proves it.
 name: gnoworld-demo
 
@@ -158,8 +159,10 @@ services:
   # Jarvis (slice 10; ADR-0002 §5, §7): its own image and user, off unless JARVIS=on (then it reads its key and starts
   # gnomcp, its child, which init reaps). It listens on its address of the network it shares with the server alone,
   # and goes out through a proxy of its own (egress_jarvis). /ask and /budgets ask no session: the network walls them.
+  # Its profile alone, out of the demo's cap (10j-4): without it the door answers off, or not_ready when on (10l-1).
   jarvis:
     <<: *locked
+    profiles: [jarvis]
     build:
       context: ..
       dockerfile: deploy/jarvis/Dockerfile
@@ -277,7 +280,7 @@ services:
   # take 4751 from jarvis's network alone (guard.sh): the server's list and jarvis's never mix.
   egress_jarvis:
     <<: *locked
-    profiles: [demo]
+    profiles: [jarvis]
     build:
       context: ..
       dockerfile: deploy/egress/Dockerfile
