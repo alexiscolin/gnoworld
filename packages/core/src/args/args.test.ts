@@ -92,6 +92,9 @@ describe("isCarried", () => {
     "[3]int",
     "[]uint16",
     "[x]uint8",
+    "[3]uint8x",
+    "x[3]uint8",
+    "[007]uint8",
     "[-1]uint8",
     "[1.5]uint8",
     "[ ]uint8",
@@ -212,6 +215,7 @@ describe("callArgs", () => {
   it("throws a RangeError, a caller's bug, when the texts are not as many as the fields", () => {
     const params = [cur(), param("string"), param("int")];
     expect(() => callArgs(params, ["a"])).toThrow(RangeError);
+    expect(() => callArgs(params, ["a"])).toThrow("a text for each field");
     expect(() => callArgs(params, ["a", "1", "2"])).toThrow(RangeError);
     expect(() => callArgs(params, [])).toThrow(RangeError);
     expect(() => callArgs([cur()], ["a"])).toThrow(RangeError);
@@ -617,6 +621,7 @@ describe("bytes", () => {
   });
 
   it.each([
+    ["[0]uint8", ""],
     ["[1]uint8", "AA=="],
     ["[2]uint8", "AAA="],
     ["[3]uint8", "AAAA"],

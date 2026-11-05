@@ -60,9 +60,10 @@ function shapeOf(type: string): Shape | undefined {
 
 function bytesShape(type: string): Shape | undefined {
   if (type === "[]uint8") return { kind: "bytes" };
-  const length = /^\[(0|[1-9][0-9]*)\]uint8$/.exec(type)?.[1];
-  if (length !== undefined && Number.isSafeInteger(Number(length))) return { kind: "bytes", length: Number(length) };
-  return undefined;
+  const match = /^\[(0|[1-9][0-9]*)\]uint8$/.exec(type);
+  if (match === null) return undefined;
+  const length = Number(match[1]);
+  return Number.isSafeInteger(length) ? { kind: "bytes", length } : undefined;
 }
 
 /** Whether a call carries a parameter of this `vm/qfuncs` type as text. */
@@ -141,7 +142,7 @@ export function callArgs(params: Params, texts: readonly string[]): Args {
   const done = resolve(params);
   if (!done.ok) return done;
   if (texts.length !== done.fields.length) throw new RangeError("a text for each field");
-  const problems = done.fields.map(({ shape }, index) => problemOf(shape, texts[index] ?? ""));
+  const problems = done.fields.map(({ shape }, index) => problemOf(shape, String(texts[index])));
   return problems.every((problem) => problem === undefined)
     ? { ok: true, args: [...texts] }
     : { ok: false, why: "fields", problems };
