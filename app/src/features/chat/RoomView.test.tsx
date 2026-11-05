@@ -2,6 +2,7 @@ import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { prerender } from "react-dom/static";
 import { beforeAll, describe, expect, it } from "vitest";
+import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { MEMBERS_SHOWN, People, type PeopleProps } from "./People.tsx";
 import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 
@@ -79,6 +80,36 @@ beforeAll(async () => {
 });
 
 describe("RoomView", () => {
+  // Slice 9g: a room the chain told a call of holds a card of its thread even with no message: the list is not the empty one.
+  it("draws a card of the chain in a world's main room that holds no message, and nothing in another room", () => {
+    const call = {
+      kind: "call" as const,
+      universe: "onyx",
+      world: "govdao",
+      realm: "gno.land/r/gov/dao",
+      func: "MustVoteOnProposal",
+      actor: ALICE as never,
+      height: 900030,
+      at: T0,
+    };
+    const html = (room: string) =>
+      renderToStaticMarkup(
+        <ChainPlaceContext value={{ slug: "govdao", universe: "onyx" }}>
+          <ChainCallsContext value={[call]}>
+            <RoomView
+              room={room}
+              chat="connected"
+              state={{ lines: [], members: [] }}
+              onDelete={() => false}
+              onDismiss={() => undefined}
+            />
+          </ChainCallsContext>
+        </ChainPlaceContext>,
+      );
+    expect(said(part(html("#govdao"), "Messages"))).toContain("called MustVoteOnProposal");
+    expect(said(part(html("#bubble"), "Messages"))).toBe("");
+  });
+
   // 4g: a line's first link to an accepted service gets its player, waiting on the line's verdict; another host none.
   it("puts a player under a line linking an accepted service, waiting on its verdict, and none under another", () => {
     const lines = [

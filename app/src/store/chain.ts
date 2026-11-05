@@ -7,7 +7,7 @@ import type { StateCreator } from "zustand/vanilla";
 export type ChainCall = Extract<ChainEvent, { kind: "call" }>;
 export type ChainDeploy = Extract<ChainEvent, { kind: "deploy" }>;
 /** A call as the page heard it: with the time of its hearing, which places it among a room's messages (a chain event has no time). */
-type ChainHeard = ChainCall & { at: string };
+export type ChainHeard = ChainCall & { at: string };
 
 /** The most a world keeps, the most the ticker keeps, and the worlds kept: a session holds no more than it shows. */
 const LINES = 50;

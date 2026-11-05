@@ -30,17 +30,19 @@ const streamOf = (page: Page, body: string) =>
 const streamAnswered = (page: Page) => page.waitForResponse((r) => r.url().includes("/api/stream?"));
 
 for (const [size, width, height] of SIZES) {
-  test(`a call to GovDAO's realm is a line of its room with its block, on a ${size}, with no axe violation`, async ({
+  test(`a call to GovDAO's realm is a card of its room's thread with its block, on a ${size}, with no axe violation`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height });
     await streamOf(page, `${frame("chain", CALL)}${SINCE}`);
     await page.goto("/w/govdao");
     await hydrated(page);
-    const lines = page.getByRole("list", { name: "On chain" });
-    await expect(lines).toBeVisible();
-    await expect(lines.getByText("MustVoteOnProposal")).toBeVisible();
-    await expect(lines.getByText("block 900030")).toBeVisible();
+    // A card of the room's thread in the chat, not a line of the plate (frames 25 and 27).
+    const card = page.locator("#chat [data-chain]");
+    await expect(card).toBeVisible();
+    await expect(card.getByText(/MustVoteOnProposal/)).toBeVisible();
+    await expect(card.getByText(/block 900030/)).toBeVisible();
+    await expect(page.locator("#chat").getByRole("list", { name: "Messages" }).locator("[data-chain]")).toHaveCount(1);
     expect(await violations(page)).toEqual([]);
     expect(await sideways(page)).toBeLessThanOrEqual(0);
   });
@@ -52,7 +54,7 @@ test("a room shows no chain line before its chain event, and a hostile frame is 
   await page.goto("/w/govdao");
   await hydrated(page);
   await stream;
-  await expect(page.getByRole("list", { name: "On chain" })).toHaveCount(0);
+  await expect(page.locator("[data-chain]")).toHaveCount(0);
   await expect(page.locator("img[src='x']")).toHaveCount(0);
 });
 
@@ -60,8 +62,7 @@ test("a call to another world's realm is not a line of this room", async ({ page
   await streamOf(page, `${frame("chain", { ...CALL, world: "bubble" })}${frame("chain", CALL)}${SINCE}`);
   await page.goto("/w/govdao");
   await hydrated(page);
-  const items = page.getByRole("list", { name: "On chain" }).getByRole("listitem");
-  await expect(items).toHaveCount(1);
+  await expect(page.locator("[data-chain]")).toHaveCount(1);
 });
 
 // Red pass: the Earth and the ticker are walked at both sizes, with no sideways scroll, the ticker's strip among them.
