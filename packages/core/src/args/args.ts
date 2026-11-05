@@ -103,8 +103,7 @@ function canonicalBase64(text: string): boolean {
 function bytesProblem(text: string, length: number | undefined): Problem | undefined {
   if (!canonicalBase64(text)) return "format";
   // `...uint8` is written `[]uint8` and the chain converts each argument as a uint8: ParseUint takes "0042" as 42, base64 as three bytes.
-  const digits = /^0*([0-9]{1,3})$/.exec(text)?.[1];
-  if (length === undefined && digits !== undefined && Number(digits) < 256) return "format";
+  if (length === undefined && /^0*[0-9]{1,3}$/.test(text) && Number(text) < 256) return "format";
   const pad = text.endsWith("==") ? 2 : Number(text.endsWith("="));
   return length !== undefined && (text.length / 4) * 3 - pad !== length ? "length" : undefined;
 }

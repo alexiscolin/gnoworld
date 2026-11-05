@@ -18,9 +18,10 @@ export function checkProposal(proposal: unknown, functions: FunctionList): Check
   const { function: name, args } = parsed.data;
   const found = functions?.find(({ FuncName }) => FuncName === name);
   if (found === undefined) return { ok: false, reason: "missing" };
-  const fields = callFields(found.Params);
+  const params = found.Params ?? [];
+  const fields = callFields(params);
   if (!fields.ok && fields.why === "read") return { ok: false, reason: "read" };
-  const wanted = new Set(found.Params?.slice(1).map(({ Name }) => Name));
+  const wanted = new Set(params.slice(1).map(({ Name }) => Name));
   const given = Object.keys(args);
   if (given.length !== wanted.size || !given.every((key) => wanted.has(key))) return { ok: false, reason: "arguments" };
   if (!fields.ok) return { ok: false, reason: "type" };
