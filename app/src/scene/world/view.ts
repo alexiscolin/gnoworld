@@ -4,7 +4,7 @@
 import type { StatusOrbit, WorldSigns } from "@gnoworld/core";
 import { Object3D, Vector3, Vector4 } from "three";
 import type { Circle, EarthDevice, EarthState } from "../earth/device.ts";
-import { broughtTo, projector, standIn } from "../lens.ts";
+import { broughtTo, projector, restIn } from "../lens.ts";
 import { sideLight } from "../planet/light.ts";
 import { motionOf } from "../watch.ts";
 import type { MoonMark } from "./orbiting.ts";
@@ -132,8 +132,7 @@ export class WorldView {
   #place(): void {
     const body = this.#standing?.body;
     if (body === undefined || this.#circle === undefined) return;
-    this.#rest.set(0, 0, -standIn(this.#device.camera, this.#screen, this.#circle));
-    body.group.position.copy(this.#rest);
+    restIn(body.group, this.#rest, { camera: this.#device.camera, screen: this.#screen, circle: this.#circle });
     body.ground.show(this.#circle.plate);
     body.resize(this.#screen.height, this.#screen.ratio);
     this.#sight.words = this.#circle.plate?.right ?? -Infinity;

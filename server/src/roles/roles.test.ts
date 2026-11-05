@@ -1,9 +1,9 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { inspect } from "node:util";
-import { Address, toAddress } from "@gnoworld/schemas";
+import { inspect, isDeepStrictEqual } from "node:util";
+import { Address, Hubs, toAddress } from "@gnoworld/schemas";
 import fc from "fast-check";
 import { afterAll, describe, expect, it } from "vitest";
 import { isTeam, isTrusted, loadRoles, mayCreateRoom, moderates, type Roles, spared } from "./roles.ts";
@@ -59,6 +59,28 @@ describe("loadRoles", () => {
 
   it("reads the file the server ships, with the Earth among its worlds", () => {
     expect(loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url))).worlds.has("earth")).toBe(true);
+  });
+
+  it("ships a world for the Earth and each hub of app/data/hubs.json, and no other, so every hub's page has its chat (8l)", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    const hubs = Hubs.parse(
+      JSON.parse(readFileSync(fileURLToPath(new URL("../../../app/data/hubs.json", import.meta.url)), "utf8")),
+    );
+    expect([...shipped.worlds.keys()].sort()).toEqual(["earth", ...hubs.map(({ slug }) => slug)].sort());
+  });
+
+  it("gives every world the server ships no moderator, group or typed room and the default rules (8l)", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    const plain = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    const given = [...shipped.worlds].map(([slug, { moderators, groups, rooms, rules }]) => ({
+      slug,
+      held: [moderators.size, groups?.size, rooms?.size],
+      rules,
+    }));
+    expect(given.length).toBeGreaterThan(0);
+    expect(
+      given.filter(({ held, rules }) => held.some((size) => size !== 0) || !isDeepStrictEqual(rules, plain)),
+    ).toEqual([]);
   });
 
   it("takes the smallest values each field allows", () => {

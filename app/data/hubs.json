@@ -14,5 +14,103 @@
     "universe": "onyx",
     "realms": ["gno.land/r/gov/dao"],
     "kind": "dao"
+  },
+  {
+    "slug": "adena",
+    "name": "Adena",
+    "description": "Adena, a station round the Earth: the web3 wallet of gno.land, which sends and receives tokens and connects to its dApps.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnoscan",
+    "name": "Gnoscan",
+    "description": "Gnoscan, a station round the Earth: the blockchain explorer of gno.land, its blocks, transactions and accounts.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnoswap",
+    "name": "GnoSwap",
+    "description": "GnoSwap, a station round the Earth: token swaps on gno.land, and the people who trade there.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gno-playground",
+    "name": "Gno Playground",
+    "description": "Gno Playground, a station round the Earth: gno code written and run in the browser, and shared.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gno-faucet-hub",
+    "name": "Gno Faucet Hub",
+    "description": "Gno Faucet Hub, a station round the Earth: the faucets that give test tokens to gno.land's accounts.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnodev",
+    "name": "gnodev",
+    "description": "gnodev, a station round the Earth: the development tool for gno packages, with immediate feedback on each change.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "tx-indexer",
+    "name": "tx-indexer",
+    "description": "tx-indexer, a station round the Earth: the tool that indexes a TM2 chain's data and serves it over RPC.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnopls",
+    "name": "gnopls",
+    "description": "gnopls, a station round the Earth: the gno language server, IDE features for any editor that speaks LSP.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnomcp",
+    "name": "gnomcp",
+    "description": "gnomcp, a station round the Earth: the MCP server that lets an AI agent read, audit and build on gno.land.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gno-native-kit",
+    "name": "Gno Native Kit",
+    "description": "Gno Native Kit, a station round the Earth: the framework to build and port gno.land dApps in their native language.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "zenao",
+    "name": "Zenao",
+    "description": "Zenao, a station round the Earth: events organized in seconds, their communities and their tickets.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnosh-ai",
+    "name": "gnosh.ai",
+    "description": "gnosh.ai, a station round the Earth: an AI harness that thinks in gno, running gno code for its planning and memory.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "gnobro",
+    "name": "gnobro",
+    "description": "gnobro, a station round the Earth: a terminal UI to explore realms, beside gnoweb.",
+    "universe": "onyx",
+    "kind": "station"
+  },
+  {
+    "slug": "supernova",
+    "name": "Supernova",
+    "description": "Supernova, a station round the Earth: the command-line tool that stress-tests Gno Tendermint 2 networks.",
+    "universe": "onyx",
+    "kind": "station"
   }
 ]

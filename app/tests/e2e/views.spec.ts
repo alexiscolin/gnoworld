@@ -54,14 +54,13 @@ test("offers space's two views in the header's pill, V toggling them, and the Ea
     expect(await shapeOf(views(page).getByRole("button", { name }))).toEqual(view);
   await page.keyboard.press("v");
   expect(await pressed(page)).toEqual(["false", "true"]);
-  // The Earth's top view (7x2): its stations' orbits drawn, and gnosh.ai's station named among the team's projects, a link that opens its
-  // own address in a tab of its own at once (brief-7x's label rule, F4649's open part), not a system's Plan's first click that names.
+  // The Earth's top view (7x2): its stations' orbits drawn, and gnosh.ai's station named among the team's projects, a link to its world's
+  // page in this tab, never the project's site (8l; Alexis, 2026-11-05), not a system's Plan's first click that names.
   await expect.poll(async () => (await stats(page)).cosmos?.stations?.orbits, SLOW).toBe(true);
   const gnosh = stations(page).getByRole("link", { name: "gnosh.ai", exact: true });
   await expect(gnosh).toBeVisible(SLOW);
-  await expect(gnosh).toHaveAttribute("href", "https://gnosh.ai");
-  await expect(gnosh).toHaveAttribute("target", "_blank");
-  await expect(gnosh).toHaveAttribute("rel", "noopener noreferrer");
+  await expect(gnosh).toHaveAttribute("href", "/w/gnosh-ai");
+  await expect(gnosh).not.toHaveAttribute("target", /./);
   await views(page).getByRole("button", { name: "Dynamic view" }).click();
   expect(await pressed(page)).toEqual(["true", "false"]);
   await expect.poll(async () => (await stats(page)).cosmos?.stations?.orbits, SLOW).toBe(false);

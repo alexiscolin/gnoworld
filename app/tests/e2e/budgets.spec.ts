@@ -8,12 +8,12 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
-// worker's precache; steps in docs/decisions.md. A plate's page: 185,765 B on /earth when slice-7 met slice-8, under the +4 KiB over
-// 183,128 B Alexis gave the plates' pages (2026-11-04, "Charger avec leur donnée").
-const FIRST_SCREEN_JS = 185_765;
-// A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B: 8c's bell, Share, Follow at first paint), and
-// 183,464 B when slice-7 met slice-8 (Alexis, 2026-11-05, docs/decisions.md): the plates' grant is the plates' pages' alone.
-const PLAIN_FIRST_SCREEN_JS = 183_464;
+// worker's precache; steps in docs/decisions.md. A plate's page: within the +4 KiB over 183,128 B Alexis gave the plates' pages (2026-11-04,
+// "Charger avec leur donnée"); 186,359 B with the fourteen stations' worlds (8l; Alexis, 2026-11-05, "oui aux trois pour 8l").
+const FIRST_SCREEN_JS = 186_359;
+// A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B: 8c's bell, Share, Follow at first paint), 183,464
+// B when slice-7 met slice-8, 184,211 B with the stations' worlds (Alexis, 2026-11-05): the plates' grant is the plates' pages' alone.
+const PLAIN_FIRST_SCREEN_JS = 184_211;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 

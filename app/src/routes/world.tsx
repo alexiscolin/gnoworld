@@ -4,12 +4,14 @@ import { lazy, Suspense, useState } from "react";
 import { useLoaderData, useNavigate, useRouteError, useSearchParams, type MetaArgs } from "react-router";
 import { hubWorldOf, stampKey } from "@gnoworld/core";
 import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
+import stations from "../../data/earthOrbit.json" with { type: "json" };
 import { failedWorldMeta, worldMeta } from "../meta.ts";
 import { chatPlace } from "../chatPlace.ts";
 import { pageOf, realmView, site } from "../places.ts";
 import { Chat, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
+import { OutLinks } from "../features/realms/OutLinks.tsx";
 import { platePreview } from "../features/previews/plate.ts";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { Actions, Activity, Here, type Ring } from "../features/world/index.ts";
@@ -26,7 +28,7 @@ const Linked = lazy(() => import("../features/world/Linked.tsx"));
 const FromExplorer = lazy(() => import("../features/realms/FromExplorer.tsx"));
 
 // A world's kind as its crumb says it (frames 22, 93, 104); a world the data says nothing of is a hub.
-const KINDS: Record<string, string> = { hub: "Hub", dao: "DAO", dapp: "dApp" };
+const KINDS: Record<string, string> = { hub: "Hub", dao: "DAO", dapp: "dApp", station: "Station" };
 // A world's page's capture (8f, frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
 const Preview = lazy(async () => ({ default: (await import("../features/previews/Preview.tsx")).Preview }));
 
@@ -45,8 +47,13 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
 }
 
-// What the world's planet in space needs of the page: its store and router for the moons, the room it shows, and its realm's ring.
+// A station round the Earth (8l), by its world's slug: its name, its size and its project's own site.
+const stationOf = (slug: string) => stations.find((station) => station.slug === slug);
+
+// What the world's planet in space needs of the page: its store and router for the moons, the room it shows, and its realm's ring; a station's
+// page, its station in the planet's place.
 function useWorldSpace(world: ReturnType<typeof site.world>, universe: string, ring: Ring | undefined) {
+  const station = stationOf(world.slug);
   const store = useAppStore();
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -60,6 +67,7 @@ function useWorldSpace(world: ReturnType<typeof site.world>, universe: string, r
     path: world.path,
     room: params.get("room"),
     ring,
+    ...(station === undefined ? {} : { station: { name: station.name, size: station.size } }),
   };
   // The chat comes once the door to space has: this page holds both, and the first screen's budget carries the door (budgets.spec.ts).
   return useSpace({ world: hubWorldOf(world), name: world.name }, page);
@@ -123,6 +131,8 @@ export default function World() {
   // Who is here names a hub by its slug: its rooms' world (7h).
   const hours = useHours(world.slug);
   const preview = platePreview(world.realms, universe);
+  // A station round the Earth (8l) keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
+  const own = stationOf(world.slug)?.url;
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -138,6 +148,7 @@ export default function World() {
                 <Breadcrumb label="You are here" items={crumbOf(world, universe.home.path)} />
                 <h1>{world.name}</h1>
                 <p>{world.description}</p>
+                <OutLinks links={[{ label: "Website", href: own }]} />
                 {/* Who is here comes from the chat once it has connected; the rate and the day's history from the server's hours. */}
                 <Here perHour={paceOf(hours)} />
                 <Activity hours={hours} />
