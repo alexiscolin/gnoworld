@@ -29,7 +29,10 @@ export function openCard(
 ): void {
   const { callsActions } = ensureCalls(store).getState();
   const { id, place, write } = card;
+  // A card already open keeps what the person typed in it: the texts are the opening's, not the Call's every time.
+  const wasOpen = callsIn(store.getState())?.calls[id] !== undefined;
   callsActions.open({ id, chainId: place.chain.chainId, realm: place.realm, func: write.name, params: write.params });
+  if (wasOpen) return;
   (card.texts ?? []).forEach((text, index) => {
     if (text !== "") callsActions.edit(id, index, text);
   });

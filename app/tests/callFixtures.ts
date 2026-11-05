@@ -3,6 +3,7 @@
 import { realmType } from "@gnoworld/core";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
+import { act } from "react";
 import { expect, vi } from "vitest";
 import { button } from "./mount.tsx";
 
@@ -40,4 +41,12 @@ export async function after(under: ReturnType<typeof vi.fn<ChainFetch>>, answer:
   await Promise.allSettled(under.mock.results.map((result) => result.value as unknown));
   await new Promise((resolve) => setTimeout(resolve, 0));
   return answer();
+}
+
+/** Types `text` into `box` as a person does: the value set, then the input event. */
+export function typed(box: HTMLInputElement | undefined, text: string): void {
+  act(() => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(box, text);
+    box?.dispatchEvent(new Event("input", { bubbles: true }));
+  });
 }

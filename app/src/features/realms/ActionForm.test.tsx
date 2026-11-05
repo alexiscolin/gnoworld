@@ -4,7 +4,7 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
-import { after, calling, CHAIN, CUR, field, inputs, listing } from "../../../tests/callFixtures.ts";
+import { after, calling, CHAIN, CUR, field, inputs, listing, typed } from "../../../tests/callFixtures.ts";
 import { ActionForm } from "./ActionForm.tsx";
 
 // 9e, ADR-0002 section 4, "Proposed actions": a pinned or proposed action shows only once vm/qfuncs confirms its function, types
@@ -83,6 +83,15 @@ describe("a checked action as a Form block", () => {
     expect(inputs(card).every((i) => !i.readOnly && !i.disabled && i.type !== "hidden")).toBe(true);
     expect(card.textContent).toContain(DAO);
     expect(card.textContent).toContain("MustVoteOnProposalSimple");
+  });
+
+  it("keeps what was typed in the open card when its Call is clicked again: a vote changed to NO is not sent as YES", async () => {
+    const box = await draw(VOTE);
+    const caller = await calling(box, "Call MustVoteOnProposalSimple");
+    click(caller);
+    typed(inputs(one(box, "article"))[1], "NO");
+    click(caller);
+    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["15", "NO"]);
   });
 
   it("draws a team's pinned action under its label, and its card names the realm and function the data says", async () => {

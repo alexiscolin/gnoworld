@@ -4,7 +4,7 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
-import { after, calling, CHAIN, CUR, field, inputs, listing } from "../../../tests/callFixtures.ts";
+import { after, calling, CHAIN, CUR, field, inputs, listing, typed } from "../../../tests/callFixtures.ts";
 import { drawing } from "../chat/index.ts";
 import { DRAW_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
 
@@ -70,6 +70,15 @@ describe("a page's gno-form as a Form block with a Call", () => {
     expect(inputs(card).map((i) => i.value)).toEqual(["bob", "3"]);
     expect(card.textContent).toContain(REALM);
     expect(all(box, "dialog, [role=dialog], [aria-modal]")).toHaveLength(0);
+  });
+
+  it("keeps what was typed in the open card when its Call is clicked again", async () => {
+    const box = await form(gnoForm("SetProfile", input("name", 'value="bob" '), input("times", 'value="3" ')));
+    const caller = await calling(box, "Call SetProfile");
+    click(caller);
+    typed(inputs(one(box, "article"))[1], "9");
+    click(caller);
+    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["bob", "9"]);
   });
 
   it("shows a hidden field in the card as a field to read and edit, and the form still says it is hidden", async () => {
