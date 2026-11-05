@@ -91,15 +91,18 @@ function seenBy(c: Context, rooms: ReadonlySet<string>, { visible, session }: Se
   return new Set([...rooms].filter((room) => visible(room, reader)));
 }
 
-const Rooms = z
-  .string()
-  .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
-  .transform((list) => new Set(list.split(",")));
-const LastId = z
-  .string()
-  .regex(/^\d{1,15}$/)
-  .transform(Number)
-  .optional();
+// Built at each read, not at import: StrykerJS mutates only what runs inside a test.
+const Rooms = () =>
+  z
+    .string()
+    .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
+    .transform((list) => new Set(list.split(",")));
+const LastId = () =>
+  z
+    .string()
+    .regex(/^\d{1,15}$/)
+    .transform(Number)
+    .optional();
 const frame = (id: number, event: StreamEvent): string =>
   `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
 
@@ -141,8 +144,8 @@ export function makeStream(options: Options = {}): Stream {
       app.get("/", (c) => {
         // Hono runs a HEAD through this handler: refused before any slot is taken, a stream no HEAD can read (F709).
         if (c.req.method !== "GET") return c.json({ error: "refused" } satisfies ApiError, 405, { allow: "GET" });
-        const rooms = Rooms.safeParse(once(c.req.queries("rooms")));
-        const last = LastId.safeParse(c.req.header("last-event-id"));
+        const rooms = Rooms().safeParse(once(c.req.queries("rooms")));
+        const last = LastId().safeParse(c.req.header("last-event-id"));
         if (!rooms.success || !last.success) return c.json({ error: "refused" } satisfies ApiError, 400);
         const who = visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
         const held = byVisitor.get(who) ?? 0;

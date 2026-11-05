@@ -29,9 +29,9 @@ export interface Signals {
   firsts: (world: string) => WorldFirsts;
 }
 
-const Row = z.object({ kind: z.enum(["chart", "words"]), account: Address, at: z.number() });
-
 export function makeSignals(db: DatabaseSync, { now }: { now: () => number }): Signals {
+  // Read at each call, not at import: StrykerJS mutates only what runs inside a test.
+  const Row = z.object({ kind: z.enum(["chart", "words"]), account: Address, at: z.number() });
   const insert = db.prepare("INSERT OR IGNORE INTO first_signals (world, kind, account, at) VALUES (?, ?, ?, ?)");
   const read = db.prepare("SELECT kind, account, at FROM first_signals WHERE world = ?");
   // The unique key decides, not this process: a second writer's insert changes no row.
