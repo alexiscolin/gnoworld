@@ -2,7 +2,7 @@
 // actions"): the action passes its schema, names a write function of the realm's `vm/qfuncs` and gives exactly that
 // function's other parameters, each of a type a call carries as text. Anything else is none, a value and never a throw,
 // so a planted message cannot forge a button. The client checks the arguments' values against their types.
-import { isCarried, realmType } from "@gnoworld/core";
+import { callFields } from "@gnoworld/core";
 import { ProposedAction } from "@gnoworld/schemas";
 import type { FunctionList } from "@gnoworld/schemas/functions";
 
@@ -18,11 +18,11 @@ export function checkProposal(proposal: unknown, functions: FunctionList): Check
   const { function: name, args } = parsed.data;
   const found = functions?.find(({ FuncName }) => FuncName === name);
   if (found === undefined) return { ok: false, reason: "missing" };
-  const params = found.Params;
-  if (params?.[0]?.Type !== realmType()) return { ok: false, reason: "read" };
-  const wanted = new Set(params.slice(1).map(({ Name }) => Name));
+  const fields = callFields(found.Params);
+  if (!fields.ok && fields.why === "read") return { ok: false, reason: "read" };
+  const wanted = new Set(found.Params?.slice(1).map(({ Name }) => Name));
   const given = Object.keys(args);
   if (given.length !== wanted.size || !given.every((key) => wanted.has(key))) return { ok: false, reason: "arguments" };
-  if (!params.slice(1).every(({ Type }) => isCarried(Type))) return { ok: false, reason: "type" };
+  if (!fields.ok) return { ok: false, reason: "type" };
   return { ok: true, proposal: parsed.data };
 }
