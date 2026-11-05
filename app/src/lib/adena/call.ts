@@ -105,31 +105,33 @@ async function switchTo(need: Need, { chainId, name, rpc }: Universe): Promise<F
   return again.type === "UNADDED_NETWORK" ? refusal("wrong-network") : again;
 }
 
-// The one MsgCall: the request's own fields, no coins, no memo; pinned to the universe's chain and node.
+/** What DoContract is given: the request's one MsgCall, no coins, no memo; pinned to the universe's chain and node. */
+export const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
+  messages: [
+    {
+      type: "/vm.m_call",
+      value: {
+        caller: request.caller,
+        send: "",
+        max_deposit: "",
+        pkg_path: request.realm,
+        func: request.func,
+        args: [...request.args],
+      },
+    },
+  ],
+  gasFee: GAS_FEE,
+  gasWanted: GAS_WANTED,
+  networkInfo: { chainId, rpcUrl: rpc },
+});
+
 async function send(
   doContract: (...args: unknown[]) => unknown,
   request: CallRequest,
-  { chainId, rpc }: Universe,
+  universe: Universe,
 ): Promise<CallResult | Failed> {
-  const message = {
-    type: "/vm.m_call",
-    value: {
-      caller: request.caller,
-      send: "",
-      max_deposit: "",
-      pkg_path: request.realm,
-      func: request.func,
-      args: [...request.args],
-    },
-  };
   const done = await read(
-    () =>
-      doContract({
-        messages: [message],
-        gasFee: GAS_FEE,
-        gasWanted: GAS_WANTED,
-        networkInfo: { chainId, rpcUrl: rpc },
-      }),
+    () => doContract(transaction(request, universe)),
     ["TRANSACTION_SENT", "TRANSACTION_SUCCESS"],
     Sent,
   );
