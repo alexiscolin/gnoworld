@@ -2,7 +2,7 @@
 // that passed moderation, each recorded once a world by a unique key in SQLite. The store is the truth: the routes and the
 // stream only tell it. An account is an address and nothing else; a guest's nick or any other text is never recorded.
 import type { DatabaseSync } from "node:sqlite";
-import { Address, ChartRequest, type Signal, type WorldFirsts } from "@gnoworld/schemas";
+import { Address, ChartRequest, type Signal } from "@gnoworld/schemas";
 import { z } from "zod";
 import type { RecentLines } from "../door/lines.ts";
 import type { Said } from "../irc/link.ts";
@@ -19,6 +19,13 @@ CREATE TABLE first_signals (
   PRIMARY KEY (world, kind)
 ) STRICT;
 `;
+
+/** Who is first in a world, each or none: the account and the time of each. */
+interface WorldFirsts {
+  world: string;
+  charted: { account: Address; at: string } | null;
+  words: { account: Address; at: string } | null;
+}
 
 export interface Signals {
   /** Records the account as the world's first to chart; whether this call was it. A guest, or what is no address, never is. */

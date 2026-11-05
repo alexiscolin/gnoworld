@@ -21,9 +21,3 @@ export type ChartRequest = z.infer<typeof ChartRequest>;
 /** The answer to a chart call: the world, and whether this call was the first. */
 export const ChartAnswer = z.strictObject({ world: Slug, first: z.boolean() });
 export type ChartAnswer = z.infer<typeof ChartAnswer>;
-
-const First = z.strictObject({ account: Address, at: Time });
-
-/** Who is first in a world, each or none: GET /api/signals's answer, for anyone. */
-export const WorldFirsts = z.strictObject({ world: Slug, charted: z.nullable(First), words: z.nullable(First) });
-export type WorldFirsts = z.infer<typeof WorldFirsts>;

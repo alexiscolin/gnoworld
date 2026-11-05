@@ -1,5 +1,5 @@
 import type { DatabaseSync } from "node:sqlite";
-import { Address, ChartAnswer, WorldFirsts, type Signal } from "@gnoworld/schemas";
+import { Address, ChartAnswer, type Signal } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
@@ -8,7 +8,7 @@ import type { Roles } from "../roles/roles.ts";
 import { makeSignals, SIGNAL_TABLES } from "./signals.ts";
 import { signalRoutes } from "./routes.ts";
 
-// Slice 9h: POST /api/signals/chart (a logged-in account opens a world) and GET /api/signals?world= (who is first).
+// Slice 9h: POST /api/signals/chart (a logged-in account opens a world) (who is first is told on the stream alone).
 // Authorization is checked before any work; a guest never charts; an account has a rate (D211: 20 a hour, every
 // call counted, a refused one included); the winner's signal is published once, never the answer's word alone.
 const T0 = Date.parse("2026-11-05T12:00:00.000Z");
@@ -77,13 +77,7 @@ const setup = (chartable?: ReadonlySet<string>) => {
       },
       { incoming: { socket: { remoteAddress: PEER } } },
     );
-  const get = (query: string, who?: string) =>
-    app.request(
-      `/api/signals?${query}`,
-      { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
-      { incoming: { socket: { remoteAddress: PEER } } },
-    );
-  return { clock, db, published, signals, post, get };
+  return { clock, db, published, signals, post };
 };
 
 describe("charting a world", () => {
@@ -197,31 +191,5 @@ describe("charting a world", () => {
     const { post } = setup();
     for (let n = 0; n < 50; n += 1) await post({ world: "earth" });
     expect((await post({ world: "earth" }, { who: "alice" })).status).toBe(200);
-  });
-});
-
-describe("who is first, as anyone may read it", () => {
-  it("answers a guest the two firsts of a world, none while nobody is", async () => {
-    const { get, post, signals } = setup();
-    expect(WorldFirsts.parse(await (await get("world=govdao")).json())).toEqual({
-      world: "govdao",
-      charted: null,
-      words: null,
-    });
-    await post({ world: "govdao" }, { who: "alice" });
-    signals.words("govdao", BOB);
-    expect(await (await get("world=govdao")).json()).toEqual({
-      world: "govdao",
-      charted: { account: ALICE, at: "2026-11-05T12:00:00.000Z" },
-      words: { account: BOB, at: "2026-11-05T12:00:00.000Z" },
-    });
-  });
-
-  it("refuses a world asked twice, a bad one, none, and 404s one the server does not list", async () => {
-    const { get } = setup();
-    expect((await get("world=govdao&world=earth")).status).toBe(400);
-    expect((await get("world=Govdao")).status).toBe(400);
-    expect((await get("")).status).toBe(400);
-    expect((await get("world=fresh-mint")).status).toBe(404);
   });
 });

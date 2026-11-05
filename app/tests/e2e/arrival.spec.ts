@@ -14,6 +14,21 @@ const sideways = (page: Page) =>
 const answered = (page: Page, method: "POST", url: string) =>
   page.waitForResponse((r) => r.url().endsWith(url) && r.request().method() === method);
 
+// The first signals the server tells a reader of the world's main room, read up to the stream's `since`, which follows its
+// replay: the page's own source of who is first (D215).
+const told = (page: Page, world: string) =>
+  page.evaluate(async (slug) => {
+    const reader = (await fetch(`/api/stream?rooms=${encodeURIComponent(`#${slug}`)}`)).body?.getReader();
+    let text = "";
+    while (!text.includes("event: since")) {
+      const chunk = await reader?.read();
+      if (chunk === undefined || chunk.done) break;
+      text += new TextDecoder().decode(chunk.value);
+    }
+    await reader?.cancel();
+    return [...text.matchAll(/event: signal\ndata: (.*)/g)].map(([, data = ""]) => data);
+  }, world);
+
 // Logs in on a world as the wallet `as`, and gives the server's answer to the chart call the page made.
 async function arriveAs(page: Page, as: string, path = "/w/govdao"): Promise<unknown> {
   await adena(page, "signs", as);
@@ -31,8 +46,7 @@ test("a guest sees no banner and a plate that names nobody before anyone has cha
   await page.goto("/w/govdao");
   await hydrated(page);
   await stream;
-  const firsts: unknown = await (await page.request.get("/api/signals?world=govdao")).json();
-  expect(firsts).toEqual({ world: "govdao", charted: null, words: null });
+  expect(await told(page, "govdao")).toEqual([]);
   await expect(chartBanner(page)).toHaveCount(0);
   await expect(page.getByText(/^First charted by/)).toHaveCount(0);
 });
@@ -65,8 +79,7 @@ test("the worlds the other journeys open are never charted: no banner and no fir
 }) => {
   expect(await arriveAs(page, "third-charter", "/w/bubble")).toEqual({ world: "bubble", first: false });
   await expect(page.getByText(/^First to chart/)).toHaveCount(0);
-  const firsts: unknown = await (await page.request.get("/api/signals?world=bubble")).json();
-  expect(firsts).toEqual({ world: "bubble", charted: null, words: null });
+  expect(await told(page, "bubble")).toEqual([]);
   await expect(page.getByText(/^First charted by/)).toHaveCount(0);
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ChartAnswer, ChartRequest, Signal, WorldFirsts } from "./signals.ts";
+import { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
 
 // Slice 9h (D210 to D219): the server's first signals, each read through its schema on both sides. The account is an
 // address and nothing else, so no name, hostile or not, ever travels as a signal's text.
@@ -45,23 +45,5 @@ describe("the chart request and its answer", () => {
     expect(ChartAnswer.parse({ world: "fresh-mint", first: true })).toEqual({ world: "fresh-mint", first: true });
     expect(ChartAnswer.safeParse({ world: "fresh-mint", first: "yes" }).success).toBe(false);
     expect(ChartAnswer.safeParse({ world: "a".repeat(41), first: true }).success).toBe(false);
-  });
-});
-
-describe("a world's firsts", () => {
-  it("holds who charted it and who spoke first, each or none", () => {
-    const firsts = { world: "fresh-mint", charted: { account: ALICE, at: AT }, words: null };
-    expect(WorldFirsts.parse(firsts)).toEqual(firsts);
-    expect(WorldFirsts.parse({ world: "w", charted: null, words: null }).charted).toBeNull();
-  });
-
-  it("refuses a world past the slug's 40 characters", () => {
-    expect(WorldFirsts.safeParse({ world: "a".repeat(41), charted: null, words: null }).success).toBe(false);
-  });
-
-  it("refuses an account that is no address", () => {
-    expect(WorldFirsts.safeParse({ world: "w", charted: { account: "nym-x", at: AT }, words: null }).success).toBe(
-      false,
-    );
   });
 });

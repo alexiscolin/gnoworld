@@ -212,7 +212,7 @@ describe("first words", () => {
     expect(signals.firsts("bubble").words).toBeNull();
   });
 
-  // D214: the record is served to anyone by GET /api/signals and drawn as a banner, so only a line said to everyone in an
+  // D214: the record is told to anyone on the stream and drawn as a banner, so only a line said to everyone in an
   // open, listed room is first words: never a line to the operators alone, an edit, or a room that is not open to all.
   it("takes no line said to the operators alone, no edit, and no line of a room that is not public: the next one is first", () => {
     const told: unknown[] = [];

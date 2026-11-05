@@ -1,16 +1,9 @@
-// The first signals over HTTP (slice 9h, D210 to D219): POST /api/signals/chart is a logged-in account opening a world,
-// GET /api/signals?world= says who is first there, for anyone. A POST comes from a listed site in JSON (guard.ts); the
+// The first signals over HTTP (slice 9h, D210 to D218): POST /api/signals/chart is a logged-in account opening a world; who
+// is first is told on the stream alone (D215). A POST comes from a listed site in JSON (guard.ts); the
 // order is the origin, the session, the account's count, then the body and the world, so authorization stands before any
 // work and every call of an account is counted, a refused one too (D211, D216): 20 an hour. The winner's signal is told
 // once on the stream, never the answer's word alone.
-import {
-  ChartRequest,
-  type Address,
-  type ApiError,
-  type ChartAnswer,
-  type Signal,
-  type WorldFirsts,
-} from "@gnoworld/schemas";
+import { ChartRequest, type Address, type ApiError, type ChartAnswer, type Signal } from "@gnoworld/schemas";
 import { type Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { routePath } from "hono/route";
@@ -18,7 +11,6 @@ import type { Log } from "@gnoworld/service/log";
 import { guard, json, type Guarded } from "../guard.ts";
 import type { Roles } from "../roles/roles.ts";
 import { limiter } from "../limit.ts";
-import { once } from "../stream/stream.ts";
 import type { Signals } from "./signals.ts";
 
 // An account's chart calls an hour (docs/decisions.md, D211).
@@ -79,13 +71,6 @@ export function signalRoutes({
     const charted = first ? signals.firsts(world).charted : null;
     if (charted !== null) publish({ kind: "chart", world, account: charted.account, at: charted.at });
     return c.json({ world, first } satisfies ChartAnswer);
-  });
-
-  app.get("/", (c) => {
-    const asked = ChartRequest.safeParse({ world: once(c.req.queries("world")) });
-    if (!asked.success) return refuse(c, "body");
-    if (!roles.worlds.has(asked.data.world)) return refuse(c, "not_found");
-    return c.json(signals.firsts(asked.data.world) satisfies WorldFirsts);
   });
 
   return app;

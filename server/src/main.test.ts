@@ -972,10 +972,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
           headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
           body: JSON.stringify(body),
         });
-      const firsts = async () => (await fetch(at("/api/signals?world=bubble"))).json();
-      expect(await firsts()).toEqual({ world: "bubble", charted: null, words: null });
       expect((await posted("/api/signals/chart", { world: "bubble" })).status).toBe(401);
-      expect((await fetch(at("/api/signals?world=earth"))).status).toBe(404);
       const stream = await fetch(at("/api/stream?rooms=%23bubble"));
       const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = stream.body?.getReader();
       let heard = "";
@@ -1007,9 +1004,9 @@ describe("the server's process", { timeout: 30_000 }, () => {
       });
       const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
       peer.say(message(`account=${other};msgid=m1;time=2026-11-04T12:00:00.000Z`, `${other}!u@h`, ["#bubble", "gm"]));
-      await expect.poll(async () => ((await firsts()) as { words: unknown }).words).not.toBeNull();
-      expect(await firsts()).toMatchObject({ charted: { account: who.address }, words: { account: other } });
       expect(await told()).toEqual(["chart", "words"]);
+      expect(heard).toContain(`"kind":"chart","world":"bubble","account":"${who.address}"`);
+      expect(heard).toContain(`"kind":"words","world":"bubble","account":"${other}"`);
       // A restart: the page's plate learns who is first from the stream alone, so the new server tells the database's
       // firsts to a reader who comes after, before its `since`.
       await reader?.cancel();
