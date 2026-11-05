@@ -22,6 +22,7 @@ test.describe("the login with Adena", () => {
   test("signs the server's text unchanged, and the server takes the proof: logged in, across a reload", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
     await adena(page);
     await page.goto("/");
     await hydrated(page);
@@ -33,6 +34,9 @@ test.describe("the login with Adena", () => {
     expect(asked.map((params) => params.data)).toEqual([text]);
     const { address } = (await (await page.request.get("/__wallet")).json()) as { address: string };
     await expect(page.getByTitle(address)).toBeVisible();
+    // F5745 (a display choice taken by default, to confirm): the account is the frame's bordered pill, 40 px tall.
+    expect((await page.getByTitle(address).boundingBox())?.height).toBe(40);
+    expect(await page.getByTitle(address).evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
     await page.reload();
     await hydrated(page);
     await expect(page.getByTitle(address)).toBeVisible();

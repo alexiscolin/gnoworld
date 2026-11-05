@@ -52,6 +52,7 @@ describe("LoginView", () => {
     const html = view({ session: { kind: "in", address: ADDRESS } });
     expect(said(html)).toContain("g1jg8m…vsqf5");
     expect(html).toContain(`title="${ADDRESS}"`);
+    expect(html).toMatch(/<span class="_account_\w+" title=/);
     expect(buttons(html)).toEqual(["Log out"]);
     expect(said(html)).not.toContain("To speak");
   });

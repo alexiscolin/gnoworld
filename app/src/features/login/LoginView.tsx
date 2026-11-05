@@ -24,7 +24,9 @@ export function LoginView({ session, step, problem, onLogIn, onLogOut }: LoginVi
     <Cluster>
       {session.kind === "in" ? (
         <>
-          <span title={session.address}>{short(session.address)}</span>
+          <span className={styles["account"]} title={session.address}>
+            {short(session.address)}
+          </span>
           <Button size="s" emphasis="quiet" onClick={onLogOut}>
             Log out
           </Button>
