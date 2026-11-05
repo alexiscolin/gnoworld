@@ -83,7 +83,7 @@ test.describe("a world's rooms", () => {
     const history = word("history");
     await say(page, { address, room: "#bubble/games" }, [history]);
     await page.getByRole("button", { name: "Log out" }).click();
-    await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
     const nicks = guestNicks(page);
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
@@ -191,7 +191,7 @@ test.describe("a world's rooms", () => {
     await page.getByRole("button", { name: "Shrink the chat" }).click();
     await page.getByRole("button", { name: "Log out" }).click();
     await page.getByRole("button", { name: "Expand the chat" }).click();
-    await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
     await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
     await expect(heading(page, "#games")).toBeVisible();
     await expect.poll(() => nicks.length).toBeGreaterThan(0);

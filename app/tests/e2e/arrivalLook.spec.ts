@@ -26,7 +26,7 @@ async function arriveWith(page: Page, kinds: readonly ("chart" | "words")[]): Pr
   await page.route("**/api/signals/chart", (route) => route.fulfill({ json: { world: "bubble", first: true } }));
   await page.goto("/w/bubble");
   await hydrated(page);
-  await page.getByRole("button", { name: "Log in with Adena" }).click();
+  await page.getByRole("button", { name: "Connect Adena" }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
 }
 

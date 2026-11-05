@@ -6,6 +6,7 @@ import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "@gnoworld/chain/read";
+import { StoreProvider } from "../../storeContext.tsx";
 import { RealmView } from "./RealmView.tsx";
 
 // 5h: a realm's view reads its page and the block height once through lib/chain, and shows what it read, the cap's state or the
@@ -54,9 +55,11 @@ function chain(
 
 async function view(fetcher: ChainFetch, realm = "gno.land/r/gnoland/wugnot", chainOf = CHAIN) {
   const box = mount(
-    <MemoryRouter>
-      <RealmView realm={realm} chain={chainOf} home="/" options={{ fetch: fetcher }} />
-    </MemoryRouter>,
+    <StoreProvider>
+      <MemoryRouter>
+        <RealmView realm={realm} chain={chainOf} home="/" options={{ fetch: fetcher }} />
+      </MemoryRouter>
+    </StoreProvider>,
   );
   // The page, the height and the chat's drawing arrive as promises: let them settle inside act.
   for (let turn = 0; turn < 40 && box.querySelector("[aria-busy]") !== null; turn += 1) {
@@ -92,9 +95,11 @@ describe("a realm's view", () => {
     vi.useFakeTimers();
     const fetcher = chain(WUGNOT?.body ?? null);
     mount(
-      <MemoryRouter>
-        <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/" options={{ fetch: fetcher }} />
-      </MemoryRouter>,
+      <StoreProvider>
+        <MemoryRouter>
+          <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/" options={{ fetch: fetcher }} />
+        </MemoryRouter>
+      </StoreProvider>,
     );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
@@ -251,17 +256,19 @@ describe("a realm's view", () => {
   async function backFrom(entries: string[], index: number) {
     const fetcher = chain(WUGNOT?.body ?? null);
     const box = mount(
-      <MemoryRouter initialEntries={entries} initialIndex={index}>
-        <Routes>
-          <Route
-            path="/r/*"
-            element={
-              <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/home" options={{ fetch: fetcher }} />
-            }
-          />
-          <Route path="*" element={<Here />} />
-        </Routes>
-      </MemoryRouter>,
+      <StoreProvider>
+        <MemoryRouter initialEntries={entries} initialIndex={index}>
+          <Routes>
+            <Route
+              path="/r/*"
+              element={
+                <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/home" options={{ fetch: fetcher }} />
+              }
+            />
+            <Route path="*" element={<Here />} />
+          </Routes>
+        </MemoryRouter>
+      </StoreProvider>,
     );
     click(button(box, "Back"));
     await act(async () => {

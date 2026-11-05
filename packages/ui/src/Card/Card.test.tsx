@@ -25,6 +25,18 @@ describe("Card", () => {
     expect(card.textContent).toBe("PollWhich realm next?LiveThree answersVote");
   });
 
+  // F5730: a card may set its title large, the light title-size of the frames; by default it is the body's.
+  it("sets its title large when asked, and leaves it at the body's size otherwise", () => {
+    render(
+      <Card>
+        <Card.Header title="Plain" />
+        <Card.Header title="Big" size="large" />
+      </Card>,
+    );
+    expect(screen.getByRole("heading", { name: "Plain" }).dataset["size"]).toBeUndefined();
+    expect(screen.getByRole("heading", { name: "Big" }).dataset["size"]).toBe("large");
+  });
+
   // The card drawn with these props, and its tone, edge and density as its attributes say them.
   function look(props: Omit<ComponentProps<typeof Card>, "children">) {
     render(

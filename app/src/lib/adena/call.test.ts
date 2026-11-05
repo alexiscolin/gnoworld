@@ -134,7 +134,7 @@ class Fake {
   }
 }
 
-// The one argument DoContract receives, whole: the message, the SDK's default gas and fee, the pinned network.
+// What DoContract receives, whole: the message, the SDK's default gas and fee, the pinned network; then its options.
 const params = (request: CallRequest, universe = ONYX) => [
   {
     messages: [
@@ -154,6 +154,7 @@ const params = (request: CallRequest, universe = ONYX) => [
     gasWanted: 10_000_000,
     networkInfo: { chainId: universe.chainId, rpcUrl: universe.rpc },
   },
+  { isVisibleResult: false },
 ];
 const [GA, GN, SN, AN] = ["GetAccount", "GetNetwork", "SwitchNetwork", "AddNetwork"];
 const sent = (adena: Fake) => adena.asked.filter((a) => a.call === "DoContract");
@@ -165,12 +166,23 @@ describe("callContract: the way through", () => {
     expect(adena.names).toEqual(["GetAccount", "GetNetwork", "DoContract"]);
   });
 
-  it("sends one MsgCall, the whole argument of DoContract and no other: no memo, no options, no coins", async () => {
+  it("sends one MsgCall and Adena's result screen off, and nothing else: no memo, no coins", async () => {
     const adena = new Fake();
     const request = { ...REQUEST, args: ["1", "two", ""] };
     await callContract(adena, request, ONYX);
     expect(sent(adena)).toHaveLength(1);
     expect(sent(adena)[0]?.args).toEqual(params(request));
+  });
+
+  it("asks Adena to close on its own once sent, with no result screen a cross could close as a refusal (F5747)", async () => {
+    const adena = new Fake();
+    await callContract(adena, REQUEST, ONYX);
+    expect(sent(adena)[0]?.args[1]).toStrictEqual({ isVisibleResult: false });
+  });
+
+  it("is declined-maybe-sent, never declined, when Adena refuses once DoContract was asked: closing its window after Confirm reads as a refusal (F5747)", async () => {
+    const adena = new Fake({ DoContract: () => no("TRANSACTION_REJECTED") });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined-maybe-sent" });
   });
 
   it("uses the SDK's default gas and fee, and pins the transaction to the universe's chain and node", async () => {
@@ -425,17 +437,16 @@ describe("callContract: every failure is a state with its next step", () => {
     ["NOT_CONNECTED", "not-connected"],
     ["UNRESOLVED_TRANSACTION_EXISTS", "busy"],
     ["WALLET_LOCKED", "locked"],
-    ["ACCOUNT_MISMATCH", "wrong-account"],
     ["NO_ACCOUNT", "no-account"],
-    ["TRANSACTION_REJECTED", "declined"],
-    ["TRANSACTION_FAILED", "failed"],
+    ["TRANSACTION_REJECTED", "declined-maybe-sent"],
+    ["TRANSACTION_FAILED", "maybe-sent"],
     ["UNSUPPORTED_TYPE", "unsupported"],
-    ["INVALID_FORMAT", "failed"],
-    ["UNEXPECTED_ERROR", "failed"],
-    ["A_TYPE_NOBODY_KNOWS", "failed"],
+    ["INVALID_FORMAT", "maybe-sent"],
+    ["UNEXPECTED_ERROR", "maybe-sent"],
+    ["A_TYPE_NOBODY_KNOWS", "maybe-sent"],
   ])("DoContract's %s is the state %s", async (type, reason) => {
     const adena = new Fake({ DoContract: () => no(type) });
-    const log = reason === "failed" ? MESSAGES[type] : undefined;
+    const log = reason === "maybe-sent" ? MESSAGES[type] : undefined;
     expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual(
       log === undefined ? { ok: false, reason } : { ok: false, reason, log },
     );
@@ -445,18 +456,19 @@ describe("callContract: every failure is a state with its next step", () => {
     const adena = new Fake({ DoContract: () => no("TRANSACTION_FAILED", "out of gas in location") });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({
       ok: false,
-      reason: "failed",
+      reason: "maybe-sent",
       log: "out of gas in location",
     });
   });
 
-  it("is a failure, with its log, when the chain ran the transaction and the realm failed it", async () => {
+  it("is maybe-sent, with its log and hash, when Adena says the transaction ran and the realm failed it", async () => {
     const data = { ...SENT, error: { "@type": "/vm.m_call_error" }, Log: "panic: not allowed" };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({
       ok: false,
-      reason: "failed",
+      reason: "maybe-sent",
       log: "panic: not allowed",
+      hash: SENT.hash,
     });
   });
 
@@ -468,7 +480,7 @@ describe("callContract: every failure is a state with its next step", () => {
       log: "",
     });
     const refused = new Fake({ DoContract: () => Promise.resolve(recorded(5)) });
-    expect(await callContract(refused, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined" });
+    expect(await callContract(refused, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined-maybe-sent" });
   });
 
   it("reads GetAccount, GetNetwork and a switch to the chain it is on as Adena recorded them (D209)", async () => {
@@ -501,7 +513,7 @@ describe("callContract: every failure is a state with its next step", () => {
   ])("is a result, never a rejection, for %s", async (_, doContract) => {
     expect(await callContract(new Fake({ DoContract: doContract }), REQUEST, ONYX)).toEqual({
       ok: false,
-      reason: "failed",
+      reason: "maybe-sent",
     });
   });
 
@@ -545,13 +557,13 @@ describe("callContract: every failure is a state with its next step", () => {
     [1000, "not-connected"],
     [1001, "busy"],
     [2000, "locked"],
-    [3001, "wrong-account"],
+    [3001, "maybe-sent"],
     [3002, "no-account"],
-    [4000, "declined"],
-    [4001, "failed"],
+    [4000, "declined-maybe-sent"],
+    [4001, "maybe-sent"],
     [4005, "unsupported"],
-    [9000, "failed"],
-    [12345, "failed"],
+    [9000, "maybe-sent"],
+    [12345, "maybe-sent"],
   ])("an unknown type with the code %i is the state %s", async (code, reason) => {
     const adena = new Fake({
       DoContract: () =>
@@ -565,15 +577,15 @@ describe("callContract: every failure is a state with its next step", () => {
       DoContract: () =>
         Promise.resolve({ code: 1001, status: "failure", type: "TRANSACTION_FAILED", message: "", data: {} }),
     });
-    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "failed" });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
   });
 
   it("keeps a log of 2,048 characters whole and cuts one past it to 2,048, in a failure and in a success", async () => {
     const at = "a".repeat(2048);
     const past = `${at}b`;
     const failed = (message: string) => new Fake({ DoContract: () => no("TRANSACTION_FAILED", message) });
-    expect(await callContract(failed(at), REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "failed", log: at });
-    expect(await callContract(failed(past), REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "failed", log: at });
+    expect(await callContract(failed(at), REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent", log: at });
+    expect(await callContract(failed(past), REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent", log: at });
     const sentLog = (Log: string) => new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", { ...SENT, Log }) });
     expect(await callContract(sentLog(at), REQUEST, ONYX)).toMatchObject({ ok: true, log: at });
     expect(await callContract(sentLog(past), REQUEST, ONYX)).toMatchObject({ ok: true, log: at });
@@ -588,7 +600,7 @@ describe("callContract: every failure is a state with its next step", () => {
   it("is malformed for a success with no error key: Adena always sends one, null when all went well", async () => {
     const data = { hash: SENT.hash, Log: "counter is 1" };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
-    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "malformed" });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
   });
 
   it("takes a hash in capitals, as hex may be written", async () => {
@@ -626,7 +638,7 @@ describe("callContract: Adena's answers that fail their schema become an error s
   ])("%s", async (_, doContract) => {
     expect(await callContract(new Fake({ DoContract: doContract }), REQUEST, ONYX)).toEqual({
       ok: false,
-      reason: "malformed",
+      reason: "maybe-sent",
     });
   });
 });
@@ -834,4 +846,122 @@ describe("callContract: one request at a time, whoever asks Adena", () => {
     expect(await login).toMatchObject({ ok: false });
     expect(adena.names.at(-1)).toBe("SignArbitrary");
   });
+});
+
+// F5728: once DoContract was asked the popup may have sent the call whatever Adena answers (adena-wallet bc5a7b5a,
+// approve-transaction-main/index.tsx:584-660: the hash exists before the broadcast); such a failure is `maybe-sent`.
+describe("callContract: a failure after DoContract was asked may have been sent (F5728)", () => {
+  const HASH = SENT.hash;
+  const failedWith =
+    (data: unknown, message = "") =>
+    () =>
+      Promise.resolve({ code: 4001, status: "failure", type: "TRANSACTION_FAILED", message, data });
+
+  it("is maybe-sent, with Adena's message as its log, for a TRANSACTION_FAILED with no hash", async () => {
+    const adena = new Fake({ DoContract: failedWith({}, "broadcast failed") });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({
+      ok: false,
+      reason: "maybe-sent",
+      log: "broadcast failed",
+    });
+  });
+
+  it("keeps the hash Adena gave with a TRANSACTION_FAILED, so the chain can be asked about it", async () => {
+    const adena = new Fake({
+      DoContract: failedWith({ hash: HASH, error: "tx failed", log: "tx failed" }, "tx failed"),
+    });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({
+      ok: false,
+      reason: "maybe-sent",
+      log: "tx failed",
+      hash: HASH,
+    });
+  });
+
+  it("drops a hash that is not 64 hex characters: nothing is followed by a made-up value", async () => {
+    const adena = new Fake({ DoContract: failedWith({ hash: "../etc" }) });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+  });
+
+  it("is maybe-sent for an answer that cannot be read, and for a DoContract that throws, after the popup", async () => {
+    const odd = new Fake({ DoContract: () => Promise.resolve({ status: "success" }) });
+    expect(await callContract(odd, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+    const throws = new Fake({ DoContract: () => Promise.reject(new Error("closed")) });
+    expect(await callContract(throws, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+  });
+
+  it("is maybe-sent for any throw once DoContract was asked, reading its answer included (F5747-B)", async () => {
+    const hostile = new Fake({
+      DoContract: () =>
+        Promise.resolve({
+          get status(): string {
+            throw new Error("getter");
+          },
+        }),
+    });
+    expect(await callContract(hostile, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+    const sync = new Fake({
+      DoContract: () => {
+        throw new Error("sync");
+      },
+    });
+    expect(await callContract(sync, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+  });
+
+  it("is maybe-sent with the hash when Adena says signed with an error set: the chain says what became of it", async () => {
+    const data = { ...SENT, error: { message: "out of gas" }, Log: "out of gas" };
+    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
+    expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({
+      ok: false,
+      reason: "maybe-sent",
+      log: "out of gas",
+      hash: HASH,
+    });
+  });
+
+  it.each(["failed", "malformed"])(
+    "keeps %s for a failure before DoContract was asked: nothing was signed",
+    async (r) => {
+      const adena = new Fake({
+        GetNetwork: () => (r === "failed" ? no("UNEXPECTED_ERROR") : Promise.resolve(undefined)),
+      });
+      expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({ ok: false, reason: r });
+      expect(sent(adena)).toEqual([]);
+    },
+  );
+
+  it.each([["WALLET_LOCKED"], ["UNRESOLVED_TRANSACTION_EXISTS"]])(
+    "keeps its reason for %s: the popup sent nothing, so the person may try again",
+    async (type) => {
+      const adena = new Fake({ DoContract: () => no(type) });
+      const result = await callContract(adena, REQUEST, ONYX);
+      expect(result).toMatchObject({ ok: false });
+      expect(result).not.toMatchObject({ reason: "maybe-sent" });
+    },
+  );
+
+  it("is maybe-sent for ACCOUNT_MISMATCH once DoContract was asked: an account switched in Adena's popup while it sends (F5751)", async () => {
+    const adena = new Fake({ DoContract: () => no("ACCOUNT_MISMATCH") });
+    expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({ ok: false, reason: "maybe-sent" });
+  });
+
+  it.each([
+    "WALLET_LOCKED",
+    "ACCOUNT_MISMATCH",
+    "UNRESOLVED_TRANSACTION_EXISTS",
+    "NOT_CONNECTED",
+    "UNSUPPORTED_TYPE",
+    "TRANSACTION_REJECTED",
+  ])(
+    "is maybe-sent with its hash for a %s that names a hash: a signed call, followed on the chain (F5750)",
+    async (type) => {
+      const named = { code: CODES[type] ?? 4001, status: "failure", type, message: "", data: { hash: SENT.hash } };
+      const adena = new Fake({ DoContract: () => Promise.resolve(named) });
+      expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({
+        ok: false,
+        reason: "maybe-sent",
+        hash: SENT.hash,
+      });
+    },
+  );
 });

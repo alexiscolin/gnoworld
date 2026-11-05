@@ -19,7 +19,8 @@ import {
 } from "./answers.ts";
 import { serially } from "./queue.ts";
 
-export type CallResult = { ok: true; hash: string; log: string } | { ok: false; reason: CallFailure; log?: string };
+export type CallResult =
+  { ok: true; hash: string; log: string } | { ok: false; reason: CallFailure; log?: string; hash?: string };
 /** The chain a call is for, as app/data/universes.json names it: what AddNetwork needs. */
 export interface Universe {
   chainId: string;
@@ -123,6 +124,17 @@ export const transaction = (request: CallRequest, { chainId, rpc }: Universe) =>
   networkInfo: { chainId, rpcUrl: rpc },
 });
 
+// Once DoContract was asked, the popup may have broadcast whatever came back (F5728): so says a failure but a lock or a pending
+// request, any naming a hash (followed then, F5750), an account switched mid-send (F5751), and a refusal, as closing the window
+// after Confirm answers TRANSACTION_REJECTED (approve-transaction-main/index.tsx:841-844, F5747, Alexis 9d-2).
+const SENT_MAYBE: readonly CallFailure[] = ["failed", "malformed", "wrong-account"];
+const maybeSent = (failure: Failed): Failed => {
+  if (failure.hash !== undefined || SENT_MAYBE.includes(failure.reason)) return { ...failure, reason: "maybe-sent" };
+  return failure.reason === "declined" ? { ...failure, reason: "declined-maybe-sent" } : failure;
+};
+/** DoContract's options: no result screen, so the popup closes itself once sent and no cross can close it then (F5747). */
+export const CONTRACT_OPTIONS = { isVisibleResult: false } as const;
+
 async function send(
   doContract: (...args: unknown[]) => unknown,
   request: CallRequest,
@@ -131,10 +143,13 @@ async function send(
   // As Adena answered on Onyx (app/recording/adena-recording.json, D209), not as the SDK's types say: a hex hash
   // and the realm's Log, with no height and no check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
-  const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent);
-  if (!done.ok) return done;
+  // Reading the answer can throw too (a hostile getter): once asked, any throw is maybe-sent, never a call to try again (F5747).
+  const done = await read(() => doContract(transaction(request, universe), CONTRACT_OPTIONS), "DoContract", Sent).catch(
+    () => refusal("maybe-sent"),
+  );
+  if (!done.ok) return maybeSent(done);
   const { hash, Log, error } = done.value;
-  return error === null ? { ok: true, hash, log: capped(Log) } : refusal("failed", "", Log);
+  return error === null ? { ok: true, hash, log: capped(Log) } : { ...refusal("maybe-sent", "", Log), hash };
 }
 
 /** Asks Adena, once the requests before it are done, to sign and send this call, as the account on the universe's chain. */
@@ -147,9 +162,8 @@ export function callContract(adena: unknown, request: CallRequest, universe: Uni
     try {
       const result = await work(adena, parsed.data, universe);
       if (result.ok) return result;
-      return result.log === undefined
-        ? { ok: false, reason: result.reason }
-        : { ok: false, reason: result.reason, log: result.log };
+      const { reason, log, hash } = result;
+      return { ok: false, reason, ...(log === undefined ? {} : { log }), ...(hash === undefined ? {} : { hash }) };
     } catch {
       return { ok: false, reason: "failed" };
     }

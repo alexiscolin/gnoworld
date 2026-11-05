@@ -54,8 +54,10 @@ export { jsonOf, placeIn } from "./json/json.ts";
 export {
   callArgs,
   callFields,
+  HIDDEN,
   isCarried,
   realmType,
+  textProblem,
   type Args,
   type CallField,
   type Fields,

@@ -9,6 +9,9 @@ import { detect, isOlder, method, MIN_SIGN_IN } from "./detect.ts";
 import { Account, ask, Network, SITE, type CallFailure } from "./answers.ts";
 import { serially } from "./queue.ts";
 
+// The calls of a call card come with the login's: one file loaded by the first wallet gesture, whichever it is.
+export { callContract } from "./call.ts";
+
 /** The most Adena signs, in UTF-8 bytes: it carries the text in its popup's URL (the SDK's MAX_ARBITRARY_MESSAGE_BYTES). */
 export const MAX_TEXT_BYTES = 4096;
 
