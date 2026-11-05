@@ -3,7 +3,7 @@
 // once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
 // given is asked again (F874).
 import type { Line } from "@gnoworld/core";
-import { type LineVerdicts, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
+import { type LineVerdicts, type Signal, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import { own } from "../../store/record.ts";
 
@@ -21,6 +21,8 @@ export interface Asking {
   follow: (room: string, on: Told) => () => void;
   /** Whether a line's text holds a link a player is shown for (linked.ts). */
   linked: (text: string) => boolean;
+  /** A first signal the same stream gave (slice 9h): the page follows one stream, not one for each thing it hears. */
+  signal?: ((signal: Signal) => void) | undefined;
 }
 
 // A room's lines in view, the verdicts the page holds of them, and when it began following the room's stream.
@@ -55,6 +57,7 @@ const PASSING: ReadonlySet<string> = new Set(["network", "unavailable", "interna
 /** What the room's stream tells the asker. */
 interface Told {
   verdict: (event: StreamEvent) => void;
+  signal?: ((signal: Signal) => void) | undefined;
   since: (time: number) => void;
   dead: () => void;
 }
@@ -136,7 +139,7 @@ function serverAsker({ verdicts, judgedAll, linked }: Pick<Asking, "verdicts" | 
   };
 }
 
-export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked }: Asking) {
+export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked, signal }: Asking) {
   const server = serverAsker({ verdicts, judgedAll, linked });
   let following: Following | undefined;
   // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
@@ -175,7 +178,7 @@ export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked
     // A new stream (a room, a reader, one followed again) asks of what it shows afresh (F891).
     server.forget(room);
     following = mine;
-    mine.stop = follow(room, { verdict: judged, since, dead });
+    mine.stop = follow(room, { verdict: judged, signal, since, dead });
   };
   return {
     /** Follows the room's stream for its reader, the stream before stopped; then asks of its lines in view, once

@@ -3,12 +3,13 @@
 // reader may not read (3m); bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
 // events kept for a late client or one coming back.
 import { getConnInfo } from "@hono/node-server/conninfo";
-import type { ApiError, StreamEvent, StreamSince } from "@gnoworld/schemas";
+import type { ApiError, Signal, StreamEvent, StreamSince } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { z } from "zod";
 import { visitor } from "../visitor.ts";
+import { follows, signalRing } from "./signals.ts";
 
 // A room's name as the stream and GET /api/verdicts take it: # and one word with no comma, 64 characters at most.
 const ROOM = String.raw`#[^\s,#\0-\x1f\x7f]{1,63}`;
@@ -27,6 +28,8 @@ export function stateOf(action: string): StreamEvent["state"] | undefined {
 
 export interface Stream {
   publish: (event: StreamEvent) => void;
+  // A first signal (slice 9h) to the readers of any room of its world they may read, in the verdicts' sequence of ids.
+  signal: (signal: Signal) => void;
   // visible and session as activity/routes.ts's (3m): a room the reader may not see sends it nothing.
   routes: (options: {
     proxy: string | undefined;
@@ -88,21 +91,41 @@ function seenBy(c: Context, rooms: ReadonlySet<string>, { visible, session }: Se
   return new Set([...rooms].filter((room) => visible(room, reader)));
 }
 
-export function makeStream(options: Options = {}): Stream {
-  const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
-  const Rooms = z
+// Built at each read, not at import: StrykerJS mutates only what runs inside a test.
+const Rooms = () =>
+  z
     .string()
     .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
     .transform((list) => new Set(list.split(",")));
-  const LastId = z
+const LastId = () =>
+  z
     .string()
     .regex(/^\d{1,15}$/)
     .transform(Number)
     .optional();
+const frame = (id: number, event: StreamEvent): string =>
+  `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
+
+interface Framed {
+  id: number;
+  text: string;
+}
+
+// What a stream replays, in id order, `pending` at most: the world's firsts whole (two a world, which the page reads nowhere
+// else), then the newest verdicts in the room left.
+function replay(verdicts: readonly Framed[], firsts: readonly Framed[], pending: number): string[] {
+  const room = Math.max(0, pending - firsts.length);
+  const newest = verdicts.toSorted((a, b) => a.id - b.id).slice(Math.max(0, verdicts.length - room));
+  return [...newest, ...firsts].toSorted((a, b) => a.id - b.id).map(({ text }) => text);
+}
+
+export function makeStream(options: Options = {}): Stream {
+  const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
   // From the clock, so the ids a server gave before a restart stay below the next one's.
   let sequence = Date.now();
   // Each room's last events, oldest first; a room past the cap of rooms is not kept.
   const rings = new Map<string, { id: number; event: StreamEvent }[]>();
+  const ring = signalRing();
   const clients = new Set<Client>();
   const byVisitor = new Map<string, number>();
   let admitted = 0;
@@ -110,8 +133,6 @@ export function makeStream(options: Options = {}): Stream {
   const write = (client: Client, text: string): void => {
     writeTo(client, text, pending);
   };
-  const frame = (id: number, event: StreamEvent): string =>
-    `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
 
   return {
     publish(event) {
@@ -126,13 +147,18 @@ export function makeStream(options: Options = {}): Stream {
       const text = frame(sequence, event);
       for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
     },
+    signal(signal) {
+      sequence += 1;
+      const text = ring.keep(sequence, signal);
+      for (const client of clients) if (follows(client.rooms, signal.world)) write(client, text);
+    },
     routes: ({ proxy, visible, session = () => undefined }) => {
       const app = new Hono();
       app.get("/", (c) => {
         // Hono runs a HEAD through this handler: refused before any slot is taken, a stream no HEAD can read (F709).
         if (c.req.method !== "GET") return c.json({ error: "refused" } satisfies ApiError, 405, { allow: "GET" });
-        const rooms = Rooms.safeParse(once(c.req.queries("rooms")));
-        const last = LastId.safeParse(c.req.header("last-event-id"));
+        const rooms = Rooms().safeParse(once(c.req.queries("rooms")));
+        const last = LastId().safeParse(c.req.header("last-event-id"));
         if (!rooms.success || !last.success) return c.json({ error: "refused" } satisfies ApiError, 400);
         const who = visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
         const held = byVisitor.get(who) ?? 0;
@@ -152,9 +178,11 @@ export function makeStream(options: Options = {}): Stream {
           // The newest it missed, or the rooms' last events for a new client, as many as it may leave unread:
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).
           const after = (last.data ?? 0) > sequence ? 0 : (last.data ?? 0);
-          const missed = [...client.rooms].flatMap((room) => rings.get(room) ?? []).filter(({ id }) => id > after);
-          for (const { id, event } of missed.toSorted((a, b) => a.id - b.id).slice(-pending))
-            write(client, frame(id, event));
+          const verdicts = [...client.rooms]
+            .flatMap((room) => rings.get(room) ?? [])
+            .filter(({ id }) => id > after)
+            .map(({ id, event }) => ({ id, text: frame(id, event) }));
+          for (const text of replay(verdicts, ring.missed(client.rooms, after), pending)) write(client, text);
           tellSince(stream, now());
           // A comment line, which keeps a proxy from closing a quiet stream.
           const beat = setInterval(() => {

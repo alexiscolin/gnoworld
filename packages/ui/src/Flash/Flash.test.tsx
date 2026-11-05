@@ -84,6 +84,16 @@ describe("Flash", () => {
     expect(document.querySelector("[popover]")?.hasAttribute("data-stays")).toBe(true);
   });
 
+  // DESIGN-SYSTEM.md, Flash: the arrival banners are its variant, drawn in the top centre slot over the scene (frames 90 to 97).
+  it("marks only an arrival as one in the arrival look", () => {
+    const { rerender } = render(<Flash message={saved} onClose={vi.fn()} />);
+    expect(document.querySelector("[popover]")?.hasAttribute("data-look")).toBe(false);
+    rerender(<Flash message={saved} onClose={vi.fn()} look="arrival" />);
+    expect(document.querySelector("[popover]")?.getAttribute("data-look")).toBe("arrival");
+    // Its line is the label's capitals (frames 91 and 96), the design system's one label style.
+    expect(screen.getByText(saved.line).classList.contains("label")).toBe(true);
+  });
+
   it("is a status region on the page from the start, empty while it has nothing to say: no text, no button", () => {
     const { container } = render(<Flash message={null} onClose={vi.fn()} />);
     expect(screen.getByRole("status").textContent).toBe("");

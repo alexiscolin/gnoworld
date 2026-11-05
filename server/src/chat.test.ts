@@ -8,6 +8,7 @@ import { z } from "zod";
 import { makeApp } from "./app.ts";
 import { startChat, type Chat } from "./chat.ts";
 import { PIN_TABLES } from "./pins/pins.ts";
+import { makeSignals, SIGNAL_TABLES } from "./signals/signals.ts";
 import { pinsRoutes } from "./pins/routes.ts";
 import { loadConfig } from "./config.ts";
 import { openDatabase } from "@gnoworld/service/db";
@@ -53,12 +54,15 @@ const setup = (
     tickMs,
     session,
     redactRetryMs,
+    signals: withSignals,
   }: {
     now?: () => number;
     provider?: (text: string) => Promise<Answer | "unchecked">;
     tickMs?: number;
     session?: (token: string | undefined) => string | undefined;
     redactRetryMs?: number;
+    // The first signals' store, as main hands it to the chat (slice 9h).
+    signals?: boolean;
   } = {},
 ) => {
   const db = openDatabase(":memory:", [
@@ -69,7 +73,9 @@ const setup = (
     MUTE_TABLES,
     ROOM_STATE,
     PIN_TABLES,
+    SIGNAL_TABLES,
   ]);
+  const signals = withSignals ? makeSignals(db, { now: now ?? Date.now }) : undefined;
   const options = {
     log,
     pepper: PEPPER,
@@ -78,6 +84,7 @@ const setup = (
     ...(tickMs === undefined ? {} : { tickMs }),
     ...(session === undefined ? {} : { session }),
     ...(redactRetryMs === undefined ? {} : { redactRetryMs }),
+    signals,
   };
   const chat = startChat(db, settings, options);
   started.push({ db, chat });
@@ -85,7 +92,7 @@ const setup = (
   app.route("/api/activity", chat.activity);
   app.route("/api/stream", chat.stream);
   const rooms = async (worlds: string) => (await app.request(`/api/activity?worlds=${worlds}`)).text();
-  return { db, rooms, app, chat };
+  return { db, rooms, app, chat, signals };
 };
 
 describe("the chat, as the server starts it", () => {
@@ -1738,6 +1745,89 @@ describe("the chat, as the server starts it", () => {
         { msgid: "m2", action: "pass", reason: "members_room" },
       ]);
       expect([chat.recent("#bubble/crew", "g1a"), chat.recent("#bubble/desk", "g1a")]).toEqual([[], []]);
+    });
+  });
+
+  // Slice 9h: first words through the chat's own wiring. The unit tests hand firstWords to moderate() themselves; here the
+  // line goes the way a line goes (Ergo, the bot's check, the verdict), and the signal comes out of the page's stream.
+  describe("the chat's first words (9h)", () => {
+    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+    const passing = { provider: () => Promise.resolve(OFF_ANSWER), signals: true };
+    const said = (id: string, [account, text]: readonly [string, string], room = "#bubble") =>
+      message(`account=${account};msgid=${id};time=2026-10-22T12:00:00.000Z`, `${account}!u@h`, [room, text]);
+    // The stream of #bubble as a page reads it, through the chat's own route: the signals it has heard so far.
+    const follow = async (app: { request: ReturnType<typeof makeApp>["request"] }) => {
+      const response = await app.request(
+        "/api/stream?rooms=%23bubble",
+        {},
+        { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+      );
+      const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
+      let text = "";
+      const heard = (): unknown[] =>
+        [...text.matchAll(/event: signal\ndata: (.*)\n/g)].map(([, json = ""]) => JSON.parse(json) as unknown);
+      const until = async (count: number): Promise<unknown[]> => {
+        while (heard().length < count) {
+          const chunk = await reader?.read();
+          if (chunk === undefined || chunk.done) break;
+          text += new TextDecoder().decode(chunk.value);
+        }
+        return heard();
+      };
+      return { until, text: () => text };
+    };
+
+    it("tells the first line that passed on the stream, records it, and still hands it to the recent lines", async () => {
+      const { chat, peer, verdicts, app, signals } = await linked(
+        { worlds: worlds("bubble"), moderation: OFF },
+        passing,
+      );
+      const page = await follow(app);
+      peer.say(said("m1", [ALICE, "hello"]));
+      peer.say(said("m2", [BOB, "second"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      expect(await page.until(1)).toEqual([
+        { kind: "words", world: "bubble", account: ALICE, at: signals?.firsts("bubble").words?.at },
+      ]);
+      expect(signals?.firsts("bubble").words?.account).toBe(ALICE);
+      expect(chat.recent("#bubble", "g1x").map(({ text }) => text)).toEqual(["hello", "second"]);
+    });
+
+    it("takes no hidden line for the first words: the next line that passed is", async () => {
+      const { peer, verdicts, app, signals } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
+      const page = await follow(app);
+      peer.say(said("m1", [ALICE, "buy spam"]));
+      peer.say(said("m2", [BOB, "hello"]));
+      await expect.poll(verdicts).toEqual([
+        { msgid: "m1", action: "hide", reason: "banned_word" },
+        { msgid: "m2", action: "pass", reason: null },
+      ]);
+      const [heard] = await page.until(1);
+      expect(heard).toMatchObject({ kind: "words", account: BOB });
+      expect(signals?.firsts("bubble").words?.account).toBe(BOB);
+    });
+
+    it("takes no line of a members room, said between its members: the main room's next line is the first", async () => {
+      const crew = new Map<string, World>([
+        [
+          "bubble",
+          {
+            rules: RULES,
+            groups: new Map([["crew", new Set([ALICE])]]),
+            rooms: new Map<string, Room>([["#bubble/crew", { type: "members", readers: "crew", hidden: false }]]),
+          },
+        ],
+      ]);
+      const { peer, verdicts, app, signals } = await linked({ worlds: crew, moderation: OFF }, passing);
+      const page = await follow(app);
+      peer.say(said("m1", [ALICE, "between us"], "#bubble/crew"));
+      await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "pass", reason: "members_room" }]);
+      expect(signals?.firsts("bubble").words).toBeNull();
+      peer.say(said("m2", [BOB, "hello"]));
+      const [heard] = await page.until(1);
+      expect(heard).toMatchObject({ kind: "words", account: BOB });
+      expect(page.text()).not.toContain(ALICE);
     });
   });
 });

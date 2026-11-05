@@ -34,6 +34,7 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
     const asker = verdictAsker({
       verdicts: api.verdicts,
       ...store.getState().verdictActions,
+      signal: store.getState().signalActions.signaled,
       held: (room) => store.getState().verdicts[room],
       follow: (room, on) => pageVerdicts([room], on),
       linked: (text) => linkedRef.current?.(text) ?? false,

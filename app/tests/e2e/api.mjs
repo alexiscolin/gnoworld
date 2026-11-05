@@ -75,6 +75,9 @@ export async function startBackend(origins) {
       ERGO_PORT: String(ergo.port),
       ERGO_OPER_PASSWORD_FILE: join(dir, "oper"),
       ROLES_FILE: join(dir, "roles.json"),
+      // D218: only GovDAO can be first charted, which arrival.spec.ts owns: the worlds the other journeys open, Bubble and
+      // Earth, are never charted, so their plates and pictures stay as they were and no journey earns a banner by its order.
+      FIRST_TO_CHART_WORLDS: "govdao",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });

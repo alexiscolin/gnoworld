@@ -1,13 +1,16 @@
 // The data files' schemas (slice 5's 5c; ADR-0002 §8 row 10): the lists in app/data, checked when the app builds, so a
 // malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
 // no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
+import { Slug, SLUG_CAP } from "./slug.ts";
 import { z } from "./zod.ts";
+
+export { Slug } from "./slug.ts";
 
 /** The most a data file may hold: rows in a list, and each kind of string, in characters. */
 export const DATA_CAPS = {
   rows: 1000,
   universes: 20,
-  key: 40,
+  key: SLUG_CAP,
   name: 80,
   title: 120,
   description: 500,
@@ -16,9 +19,6 @@ export const DATA_CAPS = {
 } as const;
 
 const text = (max: number) => z.string().check(z.minLength(1), z.maxLength(max));
-
-/** A name in a path, and the id of a universe: lower case, digits, single hyphens. */
-export const Slug = z.string().check(z.regex(/^[a-z0-9]+(-[a-z0-9]+)*$/), z.maxLength(DATA_CAPS.key));
 
 /** A link: https alone, a host, no credentials, no space (a `javascript:`, `data:` or `http:` link never gets in). */
 const Link = z.string().check(z.maxLength(DATA_CAPS.link), z.regex(/^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/));

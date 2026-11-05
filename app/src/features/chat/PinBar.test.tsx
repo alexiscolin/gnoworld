@@ -6,6 +6,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import type { Done } from "./askPins.ts";
 import { PinBar, PinStack, type PinStackProps } from "./PinBar.tsx";
+import { standInPopovers } from "../../../tests/popover.ts";
 
 // The room's pins above its lines (slice 4's 4d; the prototype's #pinBar): one line, the newest pin with a count, which
 // opens into the stack; each pin's author, its words drawn from Markdown as a line's are (nothing from Ergo reaches
@@ -117,9 +118,7 @@ describe("the pin bar, used", () => {
   const bars: Root[] = [];
   beforeEach(() => {
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
-    // jsdom has no popover API, which the Flash and the buttons' names use: a stand-in that does nothing.
-    for (const method of ["showPopover", "hidePopover", "togglePopover"])
-      Object.defineProperty(HTMLElement.prototype, method, { configurable: true, value: () => undefined });
+    standInPopovers();
   });
   afterEach(() => {
     act(() => {

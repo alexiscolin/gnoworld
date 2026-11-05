@@ -29,6 +29,22 @@
     padding-block-start: var(--flash-room);
   }
 
+  /* An arrival banner (DESIGN-SYSTEM.md, Top centre): from 1400 px, where the scene's free area holds its one line, under the
+     header and centred in that area, over the scene alone, so the page makes no room for it while no other flash shows.
+     Narrower, it is a flash like any other. */
+  /* raw: the dock's own width from 1400 px (Panel.module.css) */
+  @media (width >= 1400px) {
+    .flash[data-look="arrival"] {
+      /* raw: 20 px under the outline's top at 98 px; centred at frame 91's 973 px between 604 px and the dock, 24 px in */
+      inset: 118px calc(var(--chat-dock) + var(--space-m)) auto 604px;
+    }
+
+    :root:has(.flash[data-look="arrival"]:popover-open):not(:has(.flash:not([data-look="arrival"]):popover-open)) {
+      --flash-room: 0px;
+      scroll-padding-block-start: 0;
+    }
+  }
+
   .title {
     font: var(--font-ui);
   }
@@ -36,5 +52,10 @@
   .line {
     color: var(--color-text-muted);
     font: var(--font-meta);
+  }
+
+  /* The banner's title in the body's type, as frames 91 and 95 set it; its line is the label utility's. */
+  .flash[data-look="arrival"] .title {
+    font: var(--font-body);
   }
 }

@@ -1,5 +1,5 @@
 import type { Line } from "@gnoworld/core";
-import type { LineVerdicts, StreamEvent } from "@gnoworld/schemas";
+import { Address, type LineVerdicts, type Signal, type StreamEvent } from "@gnoworld/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import { linked } from "./linked.ts";
@@ -450,5 +450,37 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
     expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["e1"]);
     expect(unjudged(lines, { held: { a: "checked" }, asked: new Set() }, linked)).toEqual(["e1"]);
     expect(unjudged(lines, { held: { e1: "checked" }, asked: new Set() }, linked)).toEqual([]);
+  });
+});
+
+// Slice 9h (D215): the page follows one stream for its shown room; a first signal that stream gives goes to the store through
+// the same follower, so the page opens no second stream for the arrival banners.
+describe("verdictAsker: the first signals on the room's one stream", () => {
+  const CHART: Signal = {
+    kind: "chart",
+    world: "bubble",
+    account: Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv"),
+    at: "2026-11-05T12:00:00.000Z",
+  };
+
+  it("hands the follower a way to give a signal on, and gives it to the store the page named", () => {
+    const heard: Signal[] = [];
+    let given: ((signal: Signal) => void) | undefined;
+    const asker = verdictAsker({
+      verdicts: () => Promise.resolve(NONE),
+      judged: () => undefined,
+      judgedAll: () => undefined,
+      held: () => undefined,
+      linked,
+      signal: (signal) => heard.push(signal),
+      follow: (_room, on) => {
+        given = on.signal;
+        return () => undefined;
+      },
+    });
+    asker.show("#bubble", []);
+    given?.(CHART);
+    expect(heard).toEqual([CHART]);
+    asker.stop();
   });
 });

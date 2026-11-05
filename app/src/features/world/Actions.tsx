@@ -2,16 +2,8 @@
 // does not exist. Share is drawn only where the browser can copy the page's address, so none on the server; the build's page
 // has none, and hydration adds it. No dead button.
 import { Button, Cluster } from "@gnoworld/ui";
-import { useEffect, useState, useSyncExternalStore } from "react";
-
-// How long the answer to a click stays, in milliseconds.
-const SAID_FOR = 2_500;
-
-const unchanging = () => () => undefined;
-// A browser may have no clipboard at all, or one with no `writeText` (a page that is not secure): it is not typed as absent.
-const clipboard = (): Clipboard | undefined => navigator.clipboard;
-const canCopy = () => typeof clipboard()?.writeText === "function";
-const cannotKnow = () => false;
+import { useEffect } from "react";
+import { Share } from "./Share.tsx";
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once (F2864). The composer is the
 // chat's own textarea: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
@@ -31,19 +23,6 @@ const isSitePath = (path: string): boolean => /^(?:\/[A-Za-z0-9][A-Za-z0-9_-]*)+
 
 export function Actions({ address, proposals }: { address: string; proposals?: string }) {
   const reading = proposals !== undefined && isSitePath(proposals);
-  // false in the pre-render and while hydrating, then what the browser says: the same words are drawn first.
-  const copying = useSyncExternalStore(unchanging, canCopy, cannotKnow);
-  // An object, so each answer is a new value: the timer starts again with each click, even when the words are the same.
-  const [said, setSaid] = useState<{ words: string } | null>(null);
-  useEffect(() => {
-    if (said === null) return;
-    const timer = setTimeout(() => {
-      setSaid(null);
-    }, SAID_FOR);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [said]);
   // The focus follows the link to the chat's composer (F2864).
   useEffect(() => {
     document.addEventListener("click", focusComposer);
@@ -63,26 +42,7 @@ export function Actions({ address, proposals }: { address: string; proposals?: s
       <Button href="#chat" emphasis={reading ? "outline" : "solid"} size="l" icon="arrow">
         Say hi in the chat
       </Button>
-      {copying ? (
-        <Button
-          size="l"
-          onClick={() => {
-            navigator.clipboard.writeText(address).then(
-              () => {
-                setSaid({ words: "Copied" });
-              },
-              () => {
-                setSaid({ words: "Could not copy the address" });
-              },
-            );
-          }}
-        >
-          Share
-        </Button>
-      ) : null}
-      <span role="status" className="label">
-        {said?.words}
-      </span>
+      <Share address={address} />
     </Cluster>
   );
 }
