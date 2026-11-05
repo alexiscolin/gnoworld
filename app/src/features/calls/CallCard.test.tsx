@@ -172,7 +172,7 @@ describe("CallCard, the states after the click", () => {
   it("says it is landing in a block, with the hash, once it is sent: nothing yet says done", () => {
     const box = withState({ kind: "landing", hash: HASH });
     expect(said(box)).toMatch(/landing in a block/i);
-    expect(said(box)).toContain(HASH.slice(0, 6));
+    expect(said(box)).toContain("tx 785c…d058");
     expect(said(box)).not.toMatch(/signed ·|done/i);
     expectWaiting(box);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
@@ -180,7 +180,7 @@ describe("CallCard, the states after the click", () => {
 
   it("is done, 'Signed · tx …', with the block's height and the returned value, only from the chain's answer", () => {
     const box = withState({ kind: "done", hash: HASH, height: 55414, value: "(42 int)" });
-    expect(said(box)).toMatch(/Signed · tx 785c18/);
+    expect(said(box)).toMatch(/Signed · tx 785c…d058/);
     expect(said(box)).toContain("55,414");
     expect(said(box)).toContain("(42 int)");
     expect(buttons(box)).toEqual(["Close"]);
@@ -208,7 +208,7 @@ describe("CallCard, the states after the click", () => {
   it("says a failure after the hash with the hash and the chain's log, and only 'Close'", () => {
     const box = withState({ kind: "failed", reason: "chain", log: "panic: name taken", hash: HASH });
     expect(said(box)).toContain("panic: name taken");
-    expect(said(box)).toContain(HASH.slice(0, 6));
+    expect(said(box)).toContain("tx 785c…d058");
     expect(said(box)).not.toMatch(/Signed · tx/);
     expect(buttons(box)).toEqual(["Close"]);
   });

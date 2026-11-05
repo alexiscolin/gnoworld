@@ -38,8 +38,12 @@ const Mark = ({ kind }: { kind: "ring" | "dot" }) => (
   <span className={styles["mark"]} data-mark={kind} aria-hidden="true" />
 );
 
-// A transaction's hash, short, whole in its title.
-const Tx = ({ hash }: { hash: string }) => <span title={hash}>tx {hash.slice(0, 6)}…</span>;
+// A transaction's hash, short as the frame draws it (its first and last four), whole in its title.
+const Tx = ({ hash }: { hash: string }) => (
+  <span title={hash}>
+    tx {hash.slice(0, 4)}…{hash.slice(-4)}
+  </span>
+);
 
 // The result of the call as the card says it: the state's words in the one status region, and what the chain gave.
 function Status({ card }: { card: Card_ }) {
@@ -68,8 +72,7 @@ function Status({ card }: { card: Card_ }) {
         <p role="status" className={styles["line"]}>
           <Mark kind="dot" />
           <span>
-            <span title={state.hash}>Signed · tx {state.hash.slice(0, 6)}…</span>, in block {COUNT.format(state.height)}
-            .
+            Signed · <Tx hash={state.hash} />, in block {COUNT.format(state.height)}.
           </span>
         </p>
         {state.value === "" ? null : <p className={styles["value"]}>Returned {shown(state.value)}</p>}

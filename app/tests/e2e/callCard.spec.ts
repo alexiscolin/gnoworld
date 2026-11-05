@@ -56,7 +56,7 @@ test.describe("a write function's call card", () => {
     await expect(card(page)).not.toContainText("Signed · tx");
     expect(await done(page)).toBe(1);
     chain.release();
-    await expect(card(page)).toContainText(`Signed · tx ${HASH.slice(0, 6)}`);
+    await expect(card(page)).toContainText(`Signed · tx ${HASH.slice(0, 4)}…${HASH.slice(-4)}`);
     await expect(card(page)).toContainText("55,414");
     await expect(card(page)).toContainText("(42 int)");
     const sent = await page.evaluate(() => JSON.stringify((Reflect.get(window, "__done") as unknown[])[0]));
