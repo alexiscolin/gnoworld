@@ -129,6 +129,21 @@ describe("the bell's panel", () => {
     expect(read !== undefined && isUnread(followed, read)).toBe(false);
   });
 
+  it("keeps the ids read before, shown or not, and stores by id only the lines its time does not cover", async () => {
+    localStorage.setItem(
+      "gnoworld:device:notificationsRead",
+      JSON.stringify({ through: null, ids: ["notice:read-on-another-page"] }),
+    );
+    const page = await opened();
+    press(page, "Mark all read");
+    const ids = pageDevice().read("notificationsRead")?.ids ?? [];
+    expect(ids).toContain("notice:read-on-another-page");
+    // The followed world's row has no time and the events are to come: by id; today's news is under `through`.
+    expect(ids.toSorted()).toEqual(
+      ["event:e-bubble", "event:e-online", "here:bubble", "notice:read-on-another-page"].toSorted(),
+    );
+  });
+
   it("closes on Esc and on a press outside it", async () => {
     const onClose = vi.fn();
     await opened(onClose);
