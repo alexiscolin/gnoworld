@@ -3,15 +3,18 @@
 // dead button. The answer to a click stays a moment, in words: that it was copied, or that it could not be.
 import { Button, type ButtonProps } from "@gnoworld/ui";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { canCopy, copyAddress } from "../../lib/copy.ts";
 
 // How long the answer to a click stays, in milliseconds.
 const SAID_FOR = 2_500;
 
 const unchanging = () => () => undefined;
-// A browser may have no clipboard at all, or one with no `writeText` (a page that is not secure): it is not typed as absent.
-const clipboard = (): Clipboard | undefined => navigator.clipboard;
-const canCopy = () => typeof clipboard()?.writeText === "function";
 const cannotKnow = () => false;
+
+// A rejection here is a bug, not a state (the calls answer in words or a Result): the browser's own report, read only then.
+const report = (error: unknown): void => {
+  reportError(error);
+};
 
 export function Share({ address, size = "l" }: { address: string; size?: ButtonProps["size"] }) {
   // false in the pre-render and while hydrating, then what the browser says: the same words are drawn first.
@@ -33,14 +36,9 @@ export function Share({ address, size = "l" }: { address: string; size?: ButtonP
         <Button
           size={size}
           onClick={() => {
-            navigator.clipboard.writeText(address).then(
-              () => {
-                setSaid({ words: "Copied" });
-              },
-              () => {
-                setSaid({ words: "Could not copy the address" });
-              },
-            );
+            copyAddress(address).then((words) => {
+              setSaid({ words });
+            }, report);
           }}
         >
           Share

@@ -6,16 +6,13 @@ import type { Signal } from "@gnoworld/schemas";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
 import { pageSignalsApi, type signalsApi } from "../../lib/api/signals.ts";
+import { canCopy, copyAddress } from "../../lib/copy.ts";
 import { useApp } from "../../storeContext.tsx";
 import { useFirst } from "./ChartedBy.tsx";
 
 // How long a banner stays after the signal that made it: the label's day, the server's to say (the record carries its time).
 const DAY = 24 * 60 * 60_000;
-// The call answers with a Result and never rejects: nothing to do on either side of it.
-const nothing = (): void => undefined;
 type Kind = Signal["kind"];
-// A browser may have no clipboard at all: it is not typed as absent.
-const clipboard = (): Clipboard | undefined => navigator.clipboard;
 
 const WORDS = {
   chart: (name: string) => ({ title: `First to chart · ${name}`, line: "Your name stays on it" }),
@@ -32,13 +29,19 @@ interface Props {
   now?: () => number;
 }
 
+// A rejection here is a bug, not a state (the calls answer in words or a Result): the browser's own report, read only then.
+const report = (error: unknown): void => {
+  reportError(error);
+};
+
 export function Arrived({ world, name, address, api, now = Date.now }: Props) {
   const [client] = useState(() => api ?? pageSignalsApi());
   const me = useApp(({ login }) => (login.session.kind === "in" ? login.session.address : undefined));
   const firsts = { chart: useFirst(world, "chart"), words: useFirst(world, "words") };
-  // The answer is not read, so no banner comes from it, and a refusal (the rate, a network failure) leaves the page as it is.
+  // The answer is not read, so no banner comes from it, and a refusal (the rate, a network failure) leaves the page as it is;
+  // the call answers with a Result, so only a fault of the code rejects, and is reported as the page reports one.
   useEffect(() => {
-    if (me !== undefined) void client.chart(world).then(nothing, nothing);
+    if (me !== undefined) client.chart(world).then(() => undefined, report);
   }, [client, me, world]);
   const earned = (["chart", "words"] as const).filter((kind) => {
     const signal = firsts[kind];
@@ -48,21 +51,15 @@ export function Arrived({ world, name, address, api, now = Date.now }: Props) {
 }
 
 function Banners({ kinds, name, address }: { kinds: readonly Kind[]; name: string; address: string }) {
-  // Drawn only in the browser, after hydration, so it reads the clipboard at once, as Share.tsx does once hydrated; a browser
-  // may have none, or one without `writeText` (a page that is not secure), and gets no dead Share.
-  const copying = typeof clipboard()?.writeText === "function";
+  // Drawn only in the browser, after hydration, so it asks the clipboard at once, as Share.tsx does once hydrated.
+  const copying = canCopy();
   const [closed, setClosed] = useState<readonly Kind[]>([]);
   const [said, setSaid] = useState<FlashMessage | null>(null);
   const kind = kinds.find((each) => !closed.includes(each));
   const share = () => {
-    navigator.clipboard.writeText(address).then(
-      () => {
-        setSaid({ title: "Copied" });
-      },
-      () => {
-        setSaid({ title: "Could not copy the address" });
-      },
-    );
+    copyAddress(address).then((title) => {
+      setSaid({ title });
+    }, report);
   };
   const banner = (shown: Kind): FlashMessage => ({
     ...WORDS[shown](name),
