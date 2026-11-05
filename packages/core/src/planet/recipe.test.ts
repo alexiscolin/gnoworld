@@ -360,3 +360,39 @@ describe("a world's values", () => {
     expect(worlds()).toEqual(plain);
   });
 });
+
+// 7b9: about one temperate world in four grows plants by its own star's warmth, near black under a dim red star, purple, then rust under a
+// white one; never more saturated than the Earth's greens, and only a temperate world.
+describe("a temperate world's other plants", () => {
+  const seeds = (count: number) =>
+    Array.from({ length: count }, (_, at) =>
+      sha256(planetSeed(asciiBytes(`gno.land/r/n${String(at % 97)}/w${String(at)}`))),
+    );
+
+  it("grows on about a quarter of temperate worlds, by its star's warmth, under the Earth's greens' chroma", () => {
+    const own = ROWS.temperate.palettes;
+    const grown = seeds(4000).map((seed) => plantsOf(seed, "temperate", 0.5));
+    const share = grown.filter((plants) => plants !== own).length / grown.length;
+    expect(share).toBeGreaterThan(0.22);
+    expect(share).toBeLessThan(0.28);
+    const other = seeds(400).find((seed) => plantsOf(seed, "temperate", 0.5) !== own);
+    if (other === undefined) throw new Error("no world of other plants");
+    const [red, purple, white] = [0.1, 0.5, 0.9].map((warmth) => plantsOf(other, "temperate", warmth));
+    expect(new Set([red, purple, white, own]).size).toBe(4);
+    expect(plantsOf(other, "temperate", 0.3)).toBe(red);
+    expect(plantsOf(other, "temperate", 0.99)).toBe(white);
+    for (const plants of [red, purple, white])
+      for (const ramp of plants ?? [])
+        for (const colour of ramp) expect(chroma(labOf(colour))).toBeLessThanOrEqual(25.1);
+    // Near black under the dim red star, purple (red and blue, a > 0 > b), rust under the white one (red and yellow, a and b > 0).
+    const centre = (plants: typeof red) => labOf(plants?.[0]?.[1] ?? [NaN, NaN, NaN]);
+    expect(centre(red)[0]).toBeLessThan(15);
+    expect(centre(purple)[1]).toBeGreaterThan(0);
+    expect(centre(purple)[2]).toBeLessThan(0);
+    expect(centre(white)[1]).toBeGreaterThan(0);
+    expect(centre(white)[2]).toBeGreaterThan(0);
+    expect(centre(white)[0]).toBeGreaterThan(centre(red)[0]);
+    expect(plantsOf(other, "temperate", undefined)).toBe(own);
+    expect(plantsOf(other, "rocky", 0.5)).toBe(ROWS.rocky.palettes);
+  });
+});

@@ -312,3 +312,17 @@ describe("a world's name on the rail", () => {
     expect(ids([EARTH, trend(ADDRESS, 50)])).toEqual(["earth"]);
   });
 });
+
+// 7i: the newest seeds first, one of unknown age after every known one, two of an age by their ids.
+describe("the seeds' order", () => {
+  it("puts a seed of unknown age last and two of one age by id", () => {
+    const unknown = world("aged", { uncharted: true });
+    const rail = chooseRail([EARTH, seed("zeta", 3), unknown, seed("alpha", 3), seed("young", 1)]);
+    expect(rail.filter(({ section }) => section === "seed").map(({ id }) => id)).toEqual([
+      "young",
+      "alpha",
+      "zeta",
+      "aged",
+    ]);
+  });
+});

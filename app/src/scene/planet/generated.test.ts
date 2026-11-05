@@ -4,6 +4,7 @@ import {
   planetLook,
   planetRecipe,
   planetSeed,
+  readsMinorMap,
   SURFACE,
   worldLook,
   worldRecipe,
@@ -13,7 +14,7 @@ import {
 } from "@gnoworld/core";
 import { Color, Mesh, RingGeometry, ShaderMaterial, SphereGeometry, Texture, Vector3 } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { createWorld, styleOf, worldOf, worldUniforms, type World } from "./generated.ts";
+import { createWorld, mapNamesOf, styleOf, worldOf, worldUniforms, type World } from "./generated.ts";
 import { GENERATED_FRAGMENT } from "./generatedShader.ts";
 import type { MapSet, Planet } from "./planet.ts";
 import { SHADE } from "./surfaceParts.ts";
@@ -667,5 +668,29 @@ describe("the generated program", () => {
     const tone = GENERATED_FRAGMENT.indexOf("#include <tonemapping_fragment>");
     expect(tone).toBeGreaterThan(0);
     expect(GENERATED_FRAGMENT.indexOf("#include <colorspace_fragment>")).toBeGreaterThan(tone);
+  });
+});
+
+// F4586 (7b9): a world asks its minor's map only where its program reads it, by core's one rule, and its program is told the same: a world
+// of continents or bands, or a minor that does not show, waits on no map it never draws.
+describe("a world's minor map", () => {
+  it("is asked and read by one rule, on every class", () => {
+    let [reading, unread] = [0, 0];
+    for (const anchor of ANCHORS)
+      for (let at = 0; at < 60; at += 1) {
+        const world = worldAt(anchor, asciiBytes(`gno.land/r/minor${String(at)}/w${String(at)}`));
+        const reads = readsMinorMap(world.recipe);
+        expect(mapNamesOf(world)).toEqual([
+          world.look.map,
+          ...(reads ? [world.recipe.minorMap] : []),
+          "clouds",
+          "ring",
+        ]);
+        expect(read(drawn(world).surface, "minorRead")).toBe(Number(reads));
+        if (reads) reading += 1;
+        else unread += 1;
+      }
+    expect(reading).toBeGreaterThan(0);
+    expect(unread).toBeGreaterThan(0);
   });
 });
