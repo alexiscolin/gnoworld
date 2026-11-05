@@ -1,7 +1,6 @@
 import { Address, CallRequest } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { transaction } from "./call.ts";
-import { record } from "./record.ts";
+import { accountOf, record, recordCall } from "./record.ts";
 
 // Every source the app builds, as text: tests and stories are no build.
 const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.{test,stories}.*"], {
@@ -9,8 +8,6 @@ const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.{t
   import: "default",
   eager: true,
 });
-// The recording page, as text: it runs in Alexis's browser, with his Adena, not in a test.
-const PAGE = (await import("../../../recording/index.html?raw")).default;
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 const REQUEST = CallRequest.parse({
@@ -20,6 +17,26 @@ const REQUEST = CallRequest.parse({
   func: "Increment",
   args: [],
 });
+
+// What DoContract is given for REQUEST on Onyx, written out: the message, no coins, no memo, the fee and the pinned network.
+const message = (args: string[]) => ({
+  type: "/vm.m_call",
+  value: {
+    caller: CALLER,
+    send: "",
+    max_deposit: "",
+    pkg_path: "gno.land/r/demo/counter",
+    func: "Increment",
+    args,
+  },
+});
+const transactionOf = (args: string[]) => ({
+  messages: [message(args)],
+  gasFee: 1_000_000,
+  gasWanted: 10_000_000,
+  networkInfo: { chainId: "onyx-1", rpcUrl: "https://rpc.onyx.testnets.gno.land:443" },
+});
+const TRANSACTION = transactionOf([]);
 
 // An extension that records each call it is asked and answers as told.
 const wallet = (answers: Record<string, unknown>) => {
@@ -67,7 +84,7 @@ describe("record", () => {
     await record(adena, "call", { call: "DoContract", request: REQUEST, universe: ONYX });
     expect(asked).toEqual([
       { call: "SwitchNetwork", args: ["onyx-1"] },
-      { call: "DoContract", args: [transaction(REQUEST, ONYX)] },
+      { call: "DoContract", args: [TRANSACTION] },
     ]);
   });
 
@@ -91,12 +108,6 @@ describe("record", () => {
     expect(await record(adena, "network", { call: "GetNetwork" })).toMatchObject({ answer: null });
   });
 
-  it("has the page connect first, and refuse to call while it knows no account (F5645)", () => {
-    expect(PAGE).toContain('call: "AddEstablish"');
-    expect(PAGE).toMatch(/if \(account === ""\) return/);
-    expect(PAGE).not.toContain('caller: ""');
-  });
-
   it("is imported by no page of the app: it is in no build", () => {
     const users = Object.entries(SOURCES)
       .filter(([name, text]) =>
@@ -104,5 +115,68 @@ describe("record", () => {
       )
       .map(([name]) => name);
     expect(users).toEqual([]);
+  });
+});
+
+// The recording page's call step, run on a fake wallet (F5667, F5668, F5652).
+describe("recordCall", () => {
+  const ACCOUNT = { status: "success", type: "GET_ACCOUNT", data: { address: CALLER, chainId: "onyx-1" } };
+  const FORM = { account: "", realm: "gno.land/r/demo/counter", func: "Increment", args: "", universe: ONYX };
+
+  it("reads the account first when none is known, then calls as it with the form's fields", async () => {
+    const { adena, asked } = wallet({ GetAccount: ACCOUNT, DoContract: { status: "success" } });
+    const done = await recordCall(adena, "call, signed", FORM);
+    expect(done.account).toBe(CALLER);
+    expect(done.entries.map((e) => [e.label, e.call])).toEqual([
+      ["account", "GetAccount"],
+      ["call, signed", "DoContract"],
+    ]);
+    expect(asked).toEqual([
+      { call: "GetAccount", args: [] },
+      { call: "DoContract", args: [TRANSACTION] },
+    ]);
+  });
+
+  it("calls as the account it knows, reading nothing first, one argument a line", async () => {
+    const { adena, asked } = wallet({ DoContract: { status: "success" } });
+    await recordCall(adena, "call", { ...FORM, account: CALLER, args: "1\ntwo" });
+    expect(asked).toEqual([{ call: "DoContract", args: [transactionOf(["1", "two"])] }]);
+  });
+
+  it("records no call, and asks for none, while Adena gives no account: it has not let the page in", async () => {
+    const { adena, asked } = wallet({ GetAccount: { status: "failure", type: "NOT_CONNECTED", data: {} } });
+    const done = await recordCall(adena, "call", FORM);
+    expect(done.account).toBe("");
+    expect(done.entries.map((e) => e.call)).toEqual(["GetAccount"]);
+    expect(asked.map((a) => a.call)).toEqual(["GetAccount"]);
+  });
+
+  it.each([
+    ["a realm that is a package", { realm: "gno.land/p/demo/avl" }],
+    ["a function that is not exported", { func: "lower" }],
+    ["an argument past 8,192 bytes", { args: "x".repeat(20_000) }],
+    ["a control character in an argument", { args: `a${String.fromCodePoint(0x202e)}b` }],
+  ])("records %s as malformed, and asks Adena nothing to sign", async (_, change) => {
+    const { adena, asked } = wallet({ DoContract: { status: "success" } });
+    const done = await recordCall(adena, "call", { ...FORM, account: CALLER, ...change });
+    expect(done.entries).toStrictEqual([{ label: "call", call: "DoContract", args: [], threw: "malformed" }]);
+    expect(asked).toEqual([]);
+  });
+
+  it("records a caller that is no address as malformed: Adena's answer is read as outside data", async () => {
+    const { adena, asked } = wallet({ GetAccount: { data: { address: "nobody" } } });
+    const done = await recordCall(adena, "call", FORM);
+    expect(done.entries.at(-1)).toMatchObject({ call: "DoContract", threw: "malformed" });
+    expect(asked.map((a) => a.call)).toEqual(["GetAccount"]);
+  });
+});
+
+describe("accountOf", () => {
+  it("reads the address of a GetAccount entry, and is empty for any other answer", () => {
+    const entry = (answer: unknown) => ({ label: "account", call: "GetAccount", args: [], answer });
+    expect(accountOf(entry({ data: { address: CALLER } }))).toBe(CALLER);
+    expect(accountOf(entry({ data: {} }))).toBe("");
+    expect(accountOf(entry(null))).toBe("");
+    expect(accountOf({ label: "account", call: "GetAccount", args: [], threw: "no such method" })).toBe("");
   });
 });

@@ -31,30 +31,28 @@ gnoworld test</textarea>
     const universe = __UNIVERSE__;
     const entries = [];
     let account = "";
-    async function run(label, step) {
-      const entry = await Recorder.record(window.adena, label, step);
-      entries.push(entry);
-      const data = entry.answer && entry.answer.data;
-      if (step.call === "GetAccount" && data && typeof data.address === "string") account = data.address;
+    async function keep(added) {
+      entries.push(...added);
       document.getElementById("log").textContent = JSON.stringify(entries, null, 2);
       await fetch("/save", { method: "POST", body: JSON.stringify(entries, null, 2) });
     }
+    async function run(label, step) {
+      const entry = await Recorder.record(window.adena, label, step);
+      if (step.call === "GetAccount") account = Recorder.accountOf(entry) || account;
+      await keep([entry]);
+    }
+    // The step itself lives in record.ts (recordCall): it reads the account, parses the request, calls nothing without one.
     const call = (label) => async () => {
-      if (account === "") await run("account", { call: "GetAccount" });
-      // Without an account, Adena has not let this page in: press button 1 first.
-      if (account === "") return;
-      const text = document.getElementById("args").value;
-      await run(label, {
-        call: "DoContract",
+      const form = {
+        account,
         universe: { chainId: universe.chainId, name: universe.name, rpc: universe.rpc },
-        request: {
-          chainId: universe.chainId,
-          caller: account,
-          realm: document.getElementById("realm").value,
-          func: document.getElementById("func").value,
-          args: text === "" ? [] : text.split("\n"),
-        },
-      });
+        realm: document.getElementById("realm").value,
+        func: document.getElementById("func").value,
+        args: document.getElementById("args").value,
+      };
+      const done = await Recorder.recordCall(window.adena, label, form);
+      account = done.account;
+      await keep(done.entries);
     };
     document.getElementById("connect").onclick = () => run("connect", { call: "AddEstablish" });
     document.getElementById("read").onclick = async () => {
