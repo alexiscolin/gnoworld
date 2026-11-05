@@ -205,6 +205,8 @@ describe("callFields", () => {
     }
     for (const text of ["0000", "0042", "0255"]) expect(accepts("[3]uint8", text)).toBe(true);
     expect(accepts("[]uint8", "0256")).toBe(true);
+    expect(accepts("[]uint8", "0x10")).toBe(true);
+    expect(accepts("[]uint8", "1e00")).toBe(true);
     expect(accepts("[]uint8", "1234")).toBe(true);
   });
 
