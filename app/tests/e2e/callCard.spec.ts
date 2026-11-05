@@ -65,6 +65,17 @@ test.describe("a write function's call card", () => {
     await expect(page.getByRole("dialog")).toHaveCount(0);
   });
 
+  test("draws each label on its value's baseline, as the frame does (F5739)", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setup(page);
+    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    expect(
+      await card(page)
+        .locator("dl")
+        .evaluate((el) => getComputedStyle(el).alignItems),
+    ).toBe("baseline");
+  });
+
   test("says Adena sets the fee when the indexer cannot give one", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { fees: "down" });
