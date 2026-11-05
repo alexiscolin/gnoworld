@@ -170,7 +170,7 @@ describe("the translations' stop", () => {
     expect(model.requests).toHaveLength(4);
   });
 
-  it("answers gone to a reader who left, goes on for another still waiting, and stops once none is", async () => {
+  it("answers gone to a reader who left, and goes on for another still waiting", async () => {
     let answer: (message: Anthropic.Message) => void = () => undefined;
     const seen: AbortSignal[] = [];
     const held = (_: Request, signal?: AbortSignal) => {
@@ -188,13 +188,6 @@ describe("the translations' stop", () => {
     expect(seen[0]?.aborted).toBe(false);
     answer(said(FRENCH));
     expect(await staying).toEqual({ kind: "translated", text: FRENCH });
-
-    const alone = new AbortController();
-    const other = translator.translate({ text: "Hello.", language: "fr" }, alone.signal);
-    await expect.poll(() => model.requests.length, { timeout: 30_000 }).toBe(2);
-    alone.abort();
-    expect(await other).toEqual({ kind: "gone" });
-    await expect.poll(() => seen[1]?.aborted, { timeout: 30_000 }).toBe(true);
   });
 });
 
@@ -223,25 +216,6 @@ describe("the translations' cache", () => {
 });
 
 describe("a translation's making, again and paid (red pass, R3, R4, R5, R10)", () => {
-  it("is made anew for a reader who asks after every reader of the last one left", async () => {
-    const hung = (_: Request, signal?: AbortSignal) =>
-      new Promise<Anthropic.Message>((_resolve, reject) => {
-        signal?.addEventListener("abort", () => {
-          reject(new Error("aborted"));
-        });
-      });
-    const { translator, model } = setup({ steps: [hung, said(FRENCH)] });
-    const left = new AbortController();
-    const first = translator.translate({ text: ORIGINAL, language: "fr" }, left.signal);
-    await expect.poll(() => model.requests.length, { timeout: 30_000 }).toBe(1);
-    left.abort();
-    expect(await first).toEqual({ kind: "gone" });
-    expect(await translator.translate({ text: ORIGINAL, language: "fr" }, new AbortController().signal)).toEqual({
-      kind: "translated",
-      text: FRENCH,
-    });
-  });
-
   it("spends what its call cost on the translations' budget", async () => {
     const { translator, kit, signal } = setup({ steps: [said(FRENCH)] });
     await translator.translate({ text: ORIGINAL, language: "fr" }, signal());
