@@ -154,6 +154,25 @@ describe("signCall: the card's course", () => {
     expect(stateOf(store)?.kind).toBe("failed");
   });
 
+  it("follows the hash of a refusal that names one, never offering Try again: it was signed (F5750)", async () => {
+    const wallet = recordedAdena({
+      account: CALLER,
+      doContract: () =>
+        Promise.resolve({
+          status: "failure",
+          type: "WALLET_LOCKED",
+          code: 2000,
+          message: "",
+          data: { hash: SIGNED_HASH },
+        }),
+    });
+    const read = vi.fn(() => Promise.resolve(found(LANDED)));
+    const { store, deps } = setup({ adena: wallet.adena, read });
+    await signCall("SetBio", deps);
+    expect(read).toHaveBeenCalled();
+    expect(stateOf(store)).toMatchObject({ kind: "done", hash: SIGNED_HASH });
+  });
+
   describe("a call Adena says failed after it named the hash (F5749)", () => {
     const refused = () => {
       const wallet = recordedAdena({

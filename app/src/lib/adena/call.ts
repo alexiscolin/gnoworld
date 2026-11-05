@@ -124,12 +124,13 @@ export const transaction = (request: CallRequest, { chainId, rpc }: Universe) =>
   networkInfo: { chainId, rpcUrl: rpc },
 });
 
-// Once DoContract was asked, the popup may have signed and broadcast the call whatever came back: a failure that is not Adena's
-// refusal to start (a lock, a pending request) says so (F5728), with the hash when Adena named one. Its refusal too: closing
-// the window after Confirm answers TRANSACTION_REJECTED (approve-transaction-main/index.tsx:841-844, F5747, Alexis 9d-2).
+// Once DoContract was asked, the popup may have broadcast whatever came back (F5728): so says a failure but a lock or a pending
+// request, any naming a hash (followed then, F5750), an account switched mid-send (F5751), and a refusal, as closing the window
+// after Confirm answers TRANSACTION_REJECTED (approve-transaction-main/index.tsx:841-844, F5747, Alexis 9d-2).
+const SENT_MAYBE: readonly CallFailure[] = ["failed", "malformed", "wrong-account"];
 const maybeSent = (failure: Failed): Failed => {
-  if (failure.reason === "declined") return { ...failure, reason: "declined-maybe-sent" };
-  return failure.reason === "failed" || failure.reason === "malformed" ? { ...failure, reason: "maybe-sent" } : failure;
+  if (failure.hash !== undefined || SENT_MAYBE.includes(failure.reason)) return { ...failure, reason: "maybe-sent" };
+  return failure.reason === "declined" ? { ...failure, reason: "declined-maybe-sent" } : failure;
 };
 /** DoContract's options: no result screen, so the popup closes itself once sent and no cross can close it then (F5747). */
 export const CONTRACT_OPTIONS = { isVisibleResult: false } as const;

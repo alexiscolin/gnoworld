@@ -437,7 +437,6 @@ describe("callContract: every failure is a state with its next step", () => {
     ["NOT_CONNECTED", "not-connected"],
     ["UNRESOLVED_TRANSACTION_EXISTS", "busy"],
     ["WALLET_LOCKED", "locked"],
-    ["ACCOUNT_MISMATCH", "wrong-account"],
     ["NO_ACCOUNT", "no-account"],
     ["TRANSACTION_REJECTED", "declined-maybe-sent"],
     ["TRANSACTION_FAILED", "maybe-sent"],
@@ -558,7 +557,7 @@ describe("callContract: every failure is a state with its next step", () => {
     [1000, "not-connected"],
     [1001, "busy"],
     [2000, "locked"],
-    [3001, "wrong-account"],
+    [3001, "maybe-sent"],
     [3002, "no-account"],
     [4000, "declined-maybe-sent"],
     [4001, "maybe-sent"],
@@ -931,13 +930,38 @@ describe("callContract: a failure after DoContract was asked may have been sent 
     },
   );
 
-  it.each([["WALLET_LOCKED"], ["UNRESOLVED_TRANSACTION_EXISTS"], ["ACCOUNT_MISMATCH"]])(
+  it.each([["WALLET_LOCKED"], ["UNRESOLVED_TRANSACTION_EXISTS"]])(
     "keeps its reason for %s: the popup sent nothing, so the person may try again",
     async (type) => {
       const adena = new Fake({ DoContract: () => no(type) });
       const result = await callContract(adena, REQUEST, ONYX);
       expect(result).toMatchObject({ ok: false });
       expect(result).not.toMatchObject({ reason: "maybe-sent" });
+    },
+  );
+
+  it("is maybe-sent for ACCOUNT_MISMATCH once DoContract was asked: an account switched in Adena's popup while it sends (F5751)", async () => {
+    const adena = new Fake({ DoContract: () => no("ACCOUNT_MISMATCH") });
+    expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({ ok: false, reason: "maybe-sent" });
+  });
+
+  it.each([
+    "WALLET_LOCKED",
+    "ACCOUNT_MISMATCH",
+    "UNRESOLVED_TRANSACTION_EXISTS",
+    "NOT_CONNECTED",
+    "UNSUPPORTED_TYPE",
+    "TRANSACTION_REJECTED",
+  ])(
+    "is maybe-sent with its hash for a %s that names a hash: a signed call, followed on the chain (F5750)",
+    async (type) => {
+      const named = { code: CODES[type] ?? 4001, status: "failure", type, message: "", data: { hash: SENT.hash } };
+      const adena = new Fake({ DoContract: () => Promise.resolve(named) });
+      expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({
+        ok: false,
+        reason: "maybe-sent",
+        hash: SENT.hash,
+      });
     },
   );
 });
