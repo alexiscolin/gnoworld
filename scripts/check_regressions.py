@@ -52,15 +52,13 @@ def removed_tests(before, after, excused):
 
 
 def floors(vitest_config, stryker_config):
-    """Each floor by name: the coverage thresholds per scope, and StrykerJS's break."""
-    found, scope = {}, "everywhere"
-    for line in vitest_config.splitlines():
-        if m := re.search(r'"([^"]+)":\s*\{', line):
-            scope = m.group(1)
-        for key, value in re.findall(r"\b(lines|functions|branches|statements):\s*(\d+)", line):
-            found[f"coverage {scope} {key}"] = int(value)
-        if "}" in line and "{" not in line:
-            scope = "everywhere"
+    """Each floor by name: the coverage thresholds per scope, and StrykerJS's break. A scope's braces may start on the line after its
+    key, and a floor may hold decimals (F5538): the text is read whole, each scope's block first, the rest as everywhere's."""
+    found, number = {}, r"\b(lines|functions|branches|statements):\s*(\d+(?:\.\d+)?)"
+    scoped = re.compile(r'"([^"]+)":\s*\{([^}]*)\}')
+    for scope, block in [(m.group(1), m.group(2)) for m in scoped.finditer(vitest_config)] + [("everywhere", scoped.sub("", vitest_config))]:
+        for key, value in re.findall(number, block):
+            found[f"coverage {scope} {key}"] = float(value) if "." in value else int(value)
     if stryker_config:
         found["mutation break"] = json.loads(stryker_config).get("thresholds", {}).get("break") or 0
     return found
@@ -368,6 +366,14 @@ def self_test():
     assert lowered_floors(before, after, set()) == ["coverage packages/core/** branches 95 -> 90", "mutation break 80 -> 0"]
     assert lowered_floors(before, after, declared(log[:1], "Lowered-floor")) == lowered_floors(before, after, set()), "a sentence excused a floor"
     assert lowered_floors(before, after, {"mutation break", "coverage packages/core/** branches"}) == []
+    # A key whose braces start on the next line, and a decimal floor (a7de4dc9's shape, F5538): read whole, each under its own glob.
+    wrapped = 'thresholds: {\n  lines: 85,\n  "packages/core/**": { lines: 99.9, branches: 92.3 },\n  "{a,b}/**":\n    { lines: 100,\n      branches: 97.2 },\n}'
+    seen = floors(wrapped, "")
+    assert seen == {"coverage everywhere lines": 85, "coverage packages/core/** lines": 99.9, "coverage packages/core/** branches": 92.3,
+                    "coverage {a,b}/** lines": 100, "coverage {a,b}/** branches": 97.2}, seen
+    lower = floors(wrapped.replace("92.3", "92.0").replace("97.2", "90"), "")
+    assert lowered_floors(seen, lower, set()) == ["coverage packages/core/** branches 92.3 -> 92.0", "coverage {a,b}/** branches 97.2 -> 90"], lower
+    assert lowered_floors(seen, lower, {"coverage packages/core/** branches", "coverage {a,b}/** branches"}) == []
     old = {"scripts/mutate.py": 'GAPS = {\n    "a": "why",\n}\n', ".jscpd.json": '{"ignore": ["docs/**"], "exitCode": 1}',
            "eslint.config.ts": 'globalIgnores(["docs/"]),\n  { ignores: ["packages/core/**"] }', ".prettierignore": "# x\n*.md\n"}
     new = {**old, "scripts/mutate.py": 'GAPS = {\n    "a": "why",\n    "b": "no test yet",\n}\n', ".jscpd.json": '{"ignore": ["docs/**", "app/**"]}',

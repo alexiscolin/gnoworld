@@ -1105,6 +1105,8 @@ def mutants():
     yield from each("scripts/check_regressions.py", "n <= 0x10FFFF and ", "", "hooks", "check_regressions reads a number past Unicode as text (D125, F5280)")
     yield from each("scripts/check_regressions.py", "([0-9A-F]{4,6})>", "([0-9A-F]{2,6})>", "hooks", "check_regressions reads four hex digits at least (D117)")
     yield from each("scripts/check_regressions.py", "after.get(name, 0) < old", "False", "hooks", "check_regressions floors")
+    yield from each("scripts/check_regressions.py", r"(\d+(?:\.\d+)?)", r"(\d+)", "hooks", "check_regressions reads a decimal floor (F5538)")
+    yield from each("scripts/check_regressions.py", r'"([^"]+)":\s*\{([^}]*)\}', r'"([^"]+)": ?\{([^}]*)\}', "hooks", "check_regressions reads a scope whose braces start on the next line (F5538)")
     yield from each("scripts/check_regressions.py", 'status[0] in "MDR"', "False", "hooks", "check_regressions baselines")
     yield from each("scripts/check_regressions.py", 're.fullmatch(rf"{key}: (.+) - \\S.*", line.strip())', 're.search(rf"{key}: (.+?)(?: - |$)", line.strip())', "hooks", "check_regressions wants a reason")
     yield from each("scripts/check_regressions.py", 'rf"{key}: (.+) - \\S.*"', 'rf"{key}: (.+?) - \\S.*"', "hooks", "check_regressions reads an item holding ' - ' (F5000)")
