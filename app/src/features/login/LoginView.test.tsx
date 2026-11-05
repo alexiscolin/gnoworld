@@ -33,7 +33,7 @@ describe("LoginView", () => {
 
   it("offers a login with Adena to nobody logged in, and tells a phone to log in on a computer, then that it can write from there", () => {
     const html = view();
-    expect(buttons(html)).toEqual(["Log in with Adena"]);
+    expect(buttons(html)).toEqual(["Connect Adena"]);
     expect(said(html)).toContain("To log in, use a computer; once logged in you can write from here.");
     expect(said(html)).not.toContain("To speak");
   });

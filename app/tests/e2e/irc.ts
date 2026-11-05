@@ -58,7 +58,7 @@ export async function logIn(page: Page, as = ""): Promise<string> {
   await adena(page, "signs", as);
   await page.goto("/");
   await hydrated(page);
-  await page.getByRole("button", { name: "Log in with Adena" }).click();
+  await page.getByRole("button", { name: "Connect Adena" }).click();
   await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
   const named = `/__wallet?as=${encodeURIComponent(as)}`;
   const wallet = z.object({ address: Address }).parse(await (await page.request.get(named)).json());

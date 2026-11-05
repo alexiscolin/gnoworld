@@ -3,9 +3,22 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // The login, end to end (slice 4's 4a): the page, a stand-in for Adena (adena.ts), the static host and the real
 // server behind its /api.
-const logInButton = (page: Page) => page.getByRole("button", { name: "Log in with Adena" });
+const logInButton = (page: Page) => page.getByRole("button", { name: "Connect Adena" });
 
 test.describe("the login with Adena", () => {
+  // F5655 and F5656 (decision of 2026-11-05): the video's control, 44 px tall, reading "Connect Adena".
+  test("offers a control 44 px tall reading 'Connect Adena' to nobody logged in, on a computer's screen", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await adena(page);
+    await page.goto("/");
+    await hydrated(page);
+    const box = await logInButton(page).boundingBox();
+    expect(box?.height).toBe(44);
+    await expect(logInButton(page)).toHaveText("Connect Adena");
+  });
+
   test("signs the server's text unchanged, and the server takes the proof: logged in, across a reload", async ({
     page,
   }) => {

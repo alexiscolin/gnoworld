@@ -4,6 +4,12 @@
     display: none;
   }
 
+  /* The video's control is 44 px tall on a computer too: the token's touch height. */
+  .computer {
+    /* raw: 44 px is --control-m under a coarse pointer (tokens.css); the logged-out control wears it on every screen (F5655) */
+    --control-m: 44px;
+  }
+
   .problem:empty {
     display: none;
   }

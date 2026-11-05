@@ -138,7 +138,7 @@ async function loggedIn() {
   const adena = wallet();
   const { store } = mountControl();
   await sessionIs(store, { kind: "out" });
-  click("Log in with Adena");
+  click("Connect Adena");
   await sessionIs(store, { kind: "in", address: ADDRESS });
   return { paths, adena, store };
 }
