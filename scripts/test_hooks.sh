@@ -5085,7 +5085,7 @@ done
 for cmd in 'HOME=/tmp/h git commit -m x' 'XDG_CONFIG_HOME=/tmp/h git commit -m x' 'env HOME=/tmp/h git commit -m x' 'env -i HOME=/tmp/h git commit -m x' \
 	'export HOME=/tmp/h; git commit -m x' 'HOME=/tmp/h; git commit -m x' 'export XDG_CONFIG_HOME=/tmp/h && git commit -m x' 'declare -x HOME=/tmp/h; git commit -m x' \
 	'HOME=/tmp/h git status' 'HOME=/tmp/h git push origin x' "HOME=/tmp/h sh -c 'git commit -m x'" 'HOME=/tmp/h; (git commit -m x)' 'HOME=/tmp/h /usr/bin/git commit -m x' \
-	'HOME+=/x git commit -m x' 'f() { local HOME=/tmp/h; git commit -m x; }; f' 'timeout 60 env XDG_CONFIG_HOME=/tmp/h git commit -m x' 'g=git; HOME=/tmp/h $g commit -m x' \
+	'HOME+=/x git commit -m x' 'f() { local HOME=/tmp/h; git commit -m x; }; f' 'timeout 60 env XDG_CONFIG_HOME=/tmp/h git commit -m x' 'g=git; HOME=/tmp/h $g commit -m x' 'HOME=/tmp/h $G commit -m x' \
 	"env -S 'HOME=/tmp/h git commit -m x'" 'HOME="/tmp/h" git commit -m x' 'git commit -m x; HOME=/tmp/h true'; do
 	sh_ "$cmd" 2
 done
@@ -9382,6 +9382,10 @@ refused "a tree whose common git folder is the home folder's" "the home folder"
 printf 'gitdir: /nowhere\n' >"$root/.git"
 refused "a .git that names no folder" "no git checkout"
 mv "$w/git.away" "$root/.git"
+# A main checkout, its .git a folder of its own (R2-4): its node_modules must lead into its own, not into another checkout's.
+mv "$root/.git" "$w/git.away" && mkdir "$root/.git"
+refused "a main checkout whose node_modules/.pnpm leads to another checkout's" "leads outside"
+rmdir "$root/.git" && mv "$w/git.away" "$root/.git"
 mv "$root/.node-version" "$w/nv.away"
 for bad in "24.22.0/../../../../x" "24.22" "v24.22.0" "24.22.0 " "24.22.0
 24.22.1" ""; do

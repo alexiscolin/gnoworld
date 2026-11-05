@@ -36,7 +36,6 @@ from suite_parts import code, parts, select
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
 GAPS = {  # label -> why no test can notice it yet
-    "guard takes a program a variable names for git when HOME is given (F5541) #1": "equivalent for what a line can write: a variable given on the line shows its value as a word named git, and the guard reads every word as a program; one from the environment is unseen",
     "workshop.sh takes a Node that is the user's own file #1": "no second user to own a file in a test: the check needs a file of another owner",
     "workshop.sh waits for the last run's script to end before it serves #1": "a timing: the old script's cleanup races the new run's by under a second, and no stub makes it slower",
     "check.sh: a git that cannot list the change fails the gate #1": "equivalent: under sh, set -e already holds inside the command substitution, so the && only says it",
