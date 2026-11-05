@@ -1255,7 +1255,11 @@ setTimeout(() => {
 	# connections, the visitor's and Ergo's, which nginx never reclaims (a silent one it closes when short, which
 	# 256 already survived), so these hold 1,280, past 1,024. Sixteen each, Ergo's max-concurrent-connections for
 	# one address (ircd.yaml.tmpl): past it Ergo closes the rest, which freed web's room and let 1,024 survive
-	# (F2137). How many were upgraded, then the other's code, within 4 s.
+	# (F2137). The other goes once each of the 640 has settled, its first answer, an error or a close, 6 s at most:
+	# opened at once, they meet nginx's listen backlog, 511 on Linux, and a loaded host counted 638 at a fixed 3 s
+	# (F5486). Counted are the 101s still held when it goes (Ergo's registration waits 60 s), then its code within
+	# 4 s; any other answer is printed by its status, an error by its code, a 101 closed before it as such (Ergo's
+	# way past 16 an address, F2137), the sockets still waiting by their number.
 	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
 const { randomBytes } = require("node:crypto");
@@ -1263,17 +1267,50 @@ const [user, origin] = process.argv.slice(1);
 const auth = `Basic ${Buffer.from(user).toString("base64")}`;
 const proxy = (ip) => `PROXY TCP4 ${ip} 192.0.2.1 40000 8080\r\n`;
 const upgrade = `GET /ws HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nOrigin: ${origin}\r\nConnection: Upgrade\r\nUpgrade: websocket\r\nSec-WebSocket-Version: 13\r\nSec-WebSocket-Key: ${randomBytes(16).toString("base64")}\r\n\r\n`;
+const crowd = 640;
+const others = new Map();
+let settled = 0;
 let upgraded = 0;
-for (let visitor = 0; visitor < 40; visitor += 1) {
+let asked = false;
+const tally = (what) => others.set(what, (others.get(what) ?? 0) + 1);
+const settle = (what) => {
+  if (asked) return;
+  settled += 1;
+  if (what === "101") upgraded += 1;
+  else tally(what);
+  if (settled === crowd) ask();
+};
+for (let visitor = 0; visitor < crowd / 16; visitor += 1) {
   for (let i = 0; i < 16; i += 1) {
+    let done = false;
+    const once = (what) => {
+      if (!done) {
+        done = true;
+        settle(what);
+      }
+    };
     const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(130 + visitor)}`)}${upgrade}`));
+    let held = false;
     socket.once("data", (chunk) => {
-      if (chunk.toString().startsWith("HTTP/1.1 101")) upgraded += 1;
+      const line = chunk.toString().split("\r\n")[0];
+      held = line.startsWith("HTTP/1.1 101");
+      once(held ? "101" : `answered ${line.split(" ")[1] ?? line}`);
     });
-    socket.on("error", () => {});
+    socket.on("error", (error) => once(error.code ?? error.message));
+    socket.on("close", () => {
+      if (held && !asked) {
+        upgraded -= 1;
+        tally("closed after a 101");
+      }
+      once("closed before an answer");
+    });
   }
 }
-setTimeout(() => {
+function ask() {
+  if (asked) return;
+  asked = true;
+  if (settled < crowd) others.set("unanswered after 6 s", crowd - settled);
+  const besides = others.size ? ` (${[...others].map(([what, n]) => `${String(n)} ${what}`).join(", ")})` : "";
   const other = net.connect(8080, "web", () =>
     other.write(`${proxy("203.0.113.99")}GET / HTTP/1.1\r\nHost: web\r\nAuthorization: ${auth}\r\nConnection: close\r\n\r\n`),
   );
@@ -1281,14 +1318,15 @@ setTimeout(() => {
   other.on("data", (chunk) => (answer += chunk));
   other.on("error", () => {});
   other.on("close", () => {
-    console.log(`${String(upgraded)} ${answer.split(" ")[1] ?? "none"}`);
+    console.log(`${String(upgraded)} ${answer.split(" ")[1] ?? "none"}${besides}`);
     process.exit(0);
   });
-}, 3000);
-setTimeout(() => {
-  console.log(`${String(upgraded)} not served within 4 s`);
-  process.exit(0);
-}, 7000);' "$auth" "$ORIGINS" 2>&1 || true)
+  setTimeout(() => {
+    console.log(`${String(upgraded)} not served within 4 s${besides}`);
+    process.exit(0);
+  }, 4000);
+}
+setTimeout(ask, 6000);' "$auth" "$ORIGINS" 2>&1 || true)
 	expect "forty visitors at their 16 WebSockets each, and another is served" "$crowded" "640 200"
 	# The server reads Ergo's volume and never writes it (3n-b): mounted read-only, named, and read with no fault.
 	expect "the server holds Ergo's volume read-only" \
@@ -1301,17 +1339,18 @@ setTimeout(() => {
 	expect "and it is Ergo's own volume" "$(mounted "$server" /ergo) $(mounted "$ergo" /data)" "${project}_ergo ${project}_ergo"
 	wait "$timing" || true
 	timed=$(cat "$tmp/timed.out")
-	closes() { # $1 the probe, $2 the seconds web waits, $3 what the connection did
+	closes() { # $1 the probe, $2 the seconds web waits, $3 the most a run may measure, $4 what the connection did
 		seconds=$(printf '%s\n' "$timed" | sed -n "s/^$1=//p")
-		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le $(($2 + 1)) ]; then
-			pass "web closes a connection that $3 after $2 s"
+		if [ -n "$seconds" ] && [ "$seconds" -ge "$2" ] && [ "$seconds" -le "$3" ]; then
+			pass "web closes a connection that $4 after $2 s ($seconds s measured)"
 		else
-			fail "web closes a connection that $3 after $2 s: [$timed]"
+			fail "web closes a connection that $4 after $2 s, by $3 s at most: [$timed]"
 		fi
 	}
-	closes headers 10 "never ends its headers"
-	closes body 10 "never sends its body"
-	closes idle 15 "stays idle between requests"
+	closes headers 10 11 "never ends its headers"
+	closes body 10 11 "never sends its body"
+	# nginx's keepalive_timeout stays 15 s; a host at a load of about 90 measured 19 (F5486): up to 20 s passes, its seconds printed.
+	closes idle 15 20 "stays idle between requests"
 	# What web hands its upstreams, seen in their place by an echo: no password, the visitor's own address. A
 	# second web of the same image and live settings, whose upstreams' names lead to the echo; high addresses of
 	# the internal network, which Docker hands out from its low end.
