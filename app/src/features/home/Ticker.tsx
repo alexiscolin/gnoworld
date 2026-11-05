@@ -5,7 +5,7 @@ import { useState } from "react";
 import styles from "./Ticker.module.css";
 import type { TickerItem } from "./ticker.ts";
 
-const KINDS = { news: "News", event: "Event", chain: "Chain" } as const;
+const KINDS = { news: "News", event: "Event", chain: "Signal" } as const;
 
 export function Ticker({ items }: { items: TickerItem[] }) {
   const [paused, setPaused] = useState(false);

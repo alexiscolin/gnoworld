@@ -69,6 +69,8 @@ describe("the ticker with the chain's deploys", () => {
     const kinds = all(box, "[data-kind]").filter((each) => each.closest("[aria-hidden='true']") === null);
     expect(kinds.map((each) => each.getAttribute("data-kind"))).toEqual(["chain"]);
     expect(box.textContent).toContain("block 10");
+    // The video calls a deploy a signal; the strip draws it in capitals, in the mint of the ticker's kinds.
+    expect(kinds.map((each) => each.textContent)).toEqual(["Signal"]);
     const link = all(box, "a").find((each) => each.closest("[aria-hidden='true']") === null);
     expect(link?.getAttribute("href")).toBe(`/r/${ALICE}/counter`);
     expect(link?.getAttribute("target")).toBeNull();

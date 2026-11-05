@@ -88,6 +88,12 @@
     color: var(--color-warm);
   }
 
+  /* The video's deploy item reads SIGNAL, in capitals and mint (frames 143 and 144). */
+  .kind[data-kind="chain"] {
+    color: var(--color-mine);
+    text-transform: uppercase;
+  }
+
   .link {
     color: var(--color-text-muted);
     text-decoration: none;
