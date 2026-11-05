@@ -48,6 +48,7 @@ export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./ro
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export { ChartAnswer, ChartRequest, Signal, WorldFirsts } from "./signals.ts";
+export { Slug } from "./slug.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 

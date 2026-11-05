@@ -69,6 +69,18 @@ describe("loadConfig", () => {
     });
   });
 
+  // D218: every world can be first charted (D210) unless the setting names the worlds that can; the journeys' server names
+  // govdao alone, so the worlds the other journeys open are never charted.
+  it("reads the worlds that can be first charted: every world when unset, else the slugs named, refusing any other word", () => {
+    expect(loadConfig(ENV).firstToChart).toBeUndefined();
+    expect(loadConfig({ ...ENV, FIRST_TO_CHART_WORLDS: "govdao" }).firstToChart).toEqual(new Set(["govdao"]));
+    expect(loadConfig({ ...ENV, FIRST_TO_CHART_WORLDS: "govdao,fresh-mint" }).firstToChart).toEqual(
+      new Set(["govdao", "fresh-mint"]),
+    );
+    for (const bad of ["", "GovDAO", "govdao,", "gov dao", "a".repeat(41)])
+      expect(failure({ ...ENV, FIRST_TO_CHART_WORLDS: bad })).toMatch(/setting FIRST_TO_CHART_WORLDS: /);
+  });
+
   it("reads the socket Ergo's auth script dials, an absolute path a socket can hold; none by default", () => {
     expect(loadConfig(ENV).authSocket).toBeUndefined();
     expect(loadConfig({ ...ENV, AUTH_SOCKET: "/run/gnoworld/auth.sock" }).authSocket).toBe("/run/gnoworld/auth.sock");

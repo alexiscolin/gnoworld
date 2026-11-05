@@ -188,6 +188,16 @@ Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
   log in, guests still read. A socket left by a crash is removed at the next start, never a file. The
   sandbox binds no Unix socket, so the tests reach the same handler over TCP: the bind itself is proven
   by 3e's operator tests.
+
+Slice 9h, the first signals (`docs/decisions.md`, D210 to D218):
+
+- **First to chart.** The first logged-in account to open a world is recorded once, in `first_signals`
+  (its own migration), with the first line of a public room that passed moderation (first words).
+  `FIRST_TO_CHART_WORLDS` names the worlds that can be charted, slugs separated by commas: unset,
+  every listed world can (D210); the journeys' server names `govdao` alone (D218). An account's
+  chart calls are 20 an hour, a refused one counted (D211).
+- **A restart** tells the stream every first the database holds, so a page opened after it still
+  names who charted; a banner's day is counted from the record's own time (D213).
 - **Failed IRC logins** count per visitor, 10 a minute, never per account; lines Ergo sends with no
   address share one count, so a burst of them refuses all such lines for a minute (logged as `limit`).
 - **A relayed login.** Another site, or its server, can ask for our text, show it to a person

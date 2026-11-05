@@ -35,6 +35,8 @@ interface Options {
   now: () => number;
   // Tells a signal on the stream.
   publish: (signal: Signal) => void;
+  // The worlds that can be charted (FIRST_TO_CHART_WORLDS, D218); every listed world when none.
+  chartable?: ReadonlySet<string> | undefined;
 }
 
 const refusals = {
@@ -46,7 +48,16 @@ const refusals = {
   not_found: ["not_found", 404],
 } as const satisfies Record<string, readonly [ApiError["error"], 400 | 401 | 403 | 404 | 415 | 429]>;
 
-export function signalRoutes({ signals, roles, session, origins, log, now, publish }: Options): Hono<Guarded> {
+export function signalRoutes({
+  signals,
+  roles,
+  session,
+  origins,
+  log,
+  now,
+  publish,
+  chartable,
+}: Options): Hono<Guarded> {
   const calls = limiter({ max: CALLS_PER_HOUR, windowMs: 60 * 60_000, keys: 100_000 });
   const refuse = (c: Context, cause: keyof typeof refusals): Response => {
     const [error, status] = refusals[cause];
@@ -64,7 +75,7 @@ export function signalRoutes({ signals, roles, session, origins, log, now, publi
     if (!body.success) return refuse(c, "body");
     const { world } = body.data;
     if (!roles.worlds.has(world)) return refuse(c, "not_found");
-    const first = signals.chart(world, who);
+    const first = (chartable === undefined || chartable.has(world)) && signals.chart(world, who);
     const charted = first ? signals.firsts(world).charted : null;
     if (charted !== null) publish({ kind: "chart", world, account: charted.account, at: charted.at });
     return c.json({ world, first } satisfies ChartAnswer);

@@ -1,6 +1,7 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
 import { jsonOf } from "@gnoworld/core";
+import { Slug } from "@gnoworld/schemas";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -31,6 +32,8 @@ export interface Config {
   chains: string[];
   origins: string[];
   newAccountsPerHour: number;
+  // The worlds that can be first charted (D218): every world when none is named.
+  firstToChart: ReadonlySet<string> | undefined;
   authSocket: string | undefined;
   // Ergo's internal listener and its operator's password; no IRC link without the password's file.
   ergo: { host: string; port: number; password: string } | undefined;
@@ -81,6 +84,12 @@ const settingsSchema = () =>
         .transform(Number)
         .pipe(z.number().max(1000))
         .default(5),
+      // The worlds that can be first charted (D218): unset, every world (D210); else slugs, at least one.
+      FIRST_TO_CHART_WORLDS: z
+        .string()
+        .transform((text) => text.split(","))
+        .pipe(z.array(z.string().refine((slug) => Slug.safeParse(slug).success)))
+        .optional(),
       // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
       AUTH_SOCKET: z
         .string()
@@ -145,6 +154,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     chains: CHAINS,
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
+    firstToChart: settings.FIRST_TO_CHART_WORLDS === undefined ? undefined : new Set(settings.FIRST_TO_CHART_WORLDS),
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),

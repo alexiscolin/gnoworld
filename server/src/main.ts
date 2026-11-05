@@ -75,7 +75,16 @@ app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
 app.route(
   "/api/signals",
-  signalRoutes({ signals, roles, session, origins: config.origins, log, now: Date.now, publish: stream.signal }),
+  signalRoutes({
+    signals,
+    roles,
+    session,
+    origins: config.origins,
+    log,
+    now: Date.now,
+    publish: stream.signal,
+    chartable: config.firstToChart,
+  }),
 );
 app.route(
   "/api/rooms",

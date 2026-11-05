@@ -35,7 +35,7 @@ afterEach(() => {
   for (const db of opened.splice(0)) db.close();
 });
 
-const setup = () => {
+const setup = (chartable?: ReadonlySet<string>) => {
   const db = openDatabase(":memory:", [SIGNAL_TABLES]);
   opened.push(db);
   const clock = { now: T0 };
@@ -55,6 +55,7 @@ const setup = () => {
       log: () => undefined,
       now: () => clock.now,
       publish: (signal) => published.push(signal),
+      chartable,
     }),
   );
   interface Ask {
@@ -93,6 +94,17 @@ describe("charting a world", () => {
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(ChartAnswer.parse(await response.json())).toEqual({ world: "govdao", first: true });
     expect(published).toEqual([{ kind: "chart", world: "govdao", account: ALICE, at: "2026-11-05T12:00:00.000Z" }]);
+  });
+
+  // D218: FIRST_TO_CHART_WORLDS names the worlds that can be charted; any other listed world answers "not first" and records
+  // nothing, as quietly as a later account's call.
+  it("charts only the worlds the setting names, and answers not first for another listed world, recording nothing", async () => {
+    const { post, published, signals } = setup(new Set(["govdao"]));
+    expect(await (await post({ world: "bubble" }, { who: "alice" })).json()).toEqual({ world: "bubble", first: false });
+    expect(signals.firsts("bubble").charted).toBeNull();
+    expect(published).toEqual([]);
+    expect(await (await post({ world: "govdao" }, { who: "bob" })).json()).toEqual({ world: "govdao", first: true });
+    expect(published.map(({ world }) => world)).toEqual(["govdao"]);
   });
 
   it("tells every later account, the first one included, that it is not first, and publishes nothing more", async () => {
