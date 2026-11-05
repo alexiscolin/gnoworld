@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
+import { saveRefusal, saveTooBig } from "../src/lib/adena/saveGuard.ts";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const file = process.argv[2] ?? "adena-recording.json";
@@ -28,9 +29,18 @@ const bundle =
 
 createServer((request, response) => {
   if (request.method === "POST" && request.url === "/save") {
+    const refused = saveRefusal(request.headers.origin, request.headers.host, port);
+    if (refused !== undefined) return void response.writeHead(refused).end("refused");
     const body = [];
-    request.on("data", (chunk) => body.push(chunk));
+    let size = 0;
+    request.on("data", (chunk) => {
+      if (response.headersSent) return;
+      size += chunk.length;
+      if (saveTooBig(size) !== undefined) return void response.writeHead(413).end("too big", () => request.destroy());
+      body.push(chunk);
+    });
     request.on("end", () => {
+      if (response.writableEnded) return;
       writeFileSync(file, Buffer.concat(body));
       response.end("saved");
     });
