@@ -73,6 +73,8 @@ export function isCarried(type: string): boolean {
 
 function integerProblem(text: string, bits: number, signed: boolean): Problem | undefined {
   if (!/^-?(0|[1-9][0-9]*)$/.test(text) || text === "-0") return "format";
+  // No canonical 64-bit text is longer ("-9223372036854775808", "18446744073709551615"): a longer one is never parsed.
+  if (text.length > 20) return "range";
   const value = BigInt(text);
   const max = signed ? 2n ** BigInt(bits - 1) - 1n : 2n ** BigInt(bits) - 1n;
   const min = signed ? -(2n ** BigInt(bits - 1)) : 0n;
@@ -101,7 +103,8 @@ function canonicalBase64(text: string): boolean {
 function bytesProblem(text: string, length: number | undefined): Problem | undefined {
   if (!canonicalBase64(text)) return "format";
   // `...uint8` is written `[]uint8` and the chain converts each argument as a uint8: ParseUint takes "0042" as 42, base64 as three bytes.
-  if (length === undefined && /^[0-9]+$/.test(text) && BigInt(text) < 256n) return "format";
+  const digits = /^0*([0-9]{1,3})$/.exec(text)?.[1];
+  if (length === undefined && digits !== undefined && Number(digits) < 256) return "format";
   const pad = text.endsWith("==") ? 2 : Number(text.endsWith("="));
   return length !== undefined && (text.length / 4) * 3 - pad !== length ? "length" : undefined;
 }

@@ -1,5 +1,5 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import * as core from "../index.ts";
 import { callArgs, callFields, isCarried, realmType } from "./args.ts";
 
@@ -619,6 +619,17 @@ describe("bytes", () => {
     for (const [type] of WIDTHS) expect(problemOf(type, "9".repeat(100_000))).toBe("range");
     expect(problemOf("int", "x".repeat(1_000_000))).toBe("format");
     expect(accepts("string", "é".repeat(1_000_000))).toBe(true);
+  });
+
+  it("never parses a long digit text as a number: a canonical int64 or uint64 is 20 characters at most, a uint8 3 after its zeros (F5683)", () => {
+    const parse = vi.spyOn(globalThis, "BigInt");
+    try {
+      for (const [type] of WIDTHS) expect(problemOf(type, "9".repeat(21))).toBe("range");
+      expect(problemOf("[]uint8", `${"0".repeat(399)}9`)).toBe("format");
+      expect(parse.mock.calls.filter(([text]) => String(text).length > 20)).toEqual([]);
+    } finally {
+      parse.mockRestore();
+    }
   });
 
   it("is a [N]uint8 of exactly N bytes: the text's length is EncodedLen(N) and it decodes to N", () => {
