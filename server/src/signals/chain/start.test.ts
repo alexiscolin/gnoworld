@@ -328,45 +328,76 @@ describe("the catch-up after the day's history", () => {
       },
     ],
   });
-  const indexerOf = (rows: unknown[]) => (query: string) =>
+  const indexerOf = (rows: unknown[], tip?: number) => (query: string) =>
     new Response(
       JSON.stringify({
-        data: query.includes("getBlocks")
-          ? {
-              getBlocks: [...query.matchAll(/eq: (\d+)/g)].map(([, height = ""]) => ({
-                height: Number(height),
-                time: "2026-11-05T04:00:00Z",
-              })),
-            }
-          : { getTransactions: query.includes("heightAndIndex: DESC") ? rows : [] },
+        data: query.includes("latestBlockHeight")
+          ? { latestBlockHeight: tip ?? "none" }
+          : query.includes("getBlocks")
+            ? {
+                getBlocks: [...query.matchAll(/eq: (\d+)/g)].map(([, height = ""]) => ({
+                  height: Number(height),
+                  time: "2026-11-05T04:00:00Z",
+                })),
+              }
+            : { getTransactions: query.includes("heightAndIndex: DESC") ? rows : [] },
       }),
     );
 
-  it("starts from the newest deploy's height: the first connection catches up, though no frame was heard", async () => {
+  const catchUps = (queries: string[]) => queries.filter((query) => query.includes("heightAndIndex: ASC"));
+
+  it("starts from the chain's tip, read with the day's history: the first connection catches up, though no frame was heard", async () => {
     const { chain, sockets, queries } = setup(
       [universe("onyx", "https://indexer.example.test/q")],
       [],
-      indexerOf([deployAt(4999), deployAt(4000)]),
+      indexerOf([deployAt(4999), deployAt(4000)], 7000),
     );
     await vi.waitFor(() => {
       expect(sockets).toHaveLength(1);
     });
     ack(first(sockets));
     await vi.waitFor(() => {
-      expect(queries.filter((query) => query.includes("heightAndIndex: ASC"))).toHaveLength(1);
+      expect(catchUps(queries)).toHaveLength(1);
     });
-    expect(queries.find((query) => query.includes("heightAndIndex: ASC"))).toContain("gt: 4998");
+    // Never from the newest deploy: a restart would tell the rooms every call since it as heard now.
+    expect(catchUps(queries)[0]).toContain("gt: 6999");
+    expect(queries.findIndex((query) => query.includes("latestBlockHeight"))).toBeLessThan(
+      queries.findIndex((query) => query.includes("heightAndIndex: DESC")),
+    );
     chain.stop();
   });
 
-  it("asks no catch-up on the first connection when the day held no deploy", async () => {
-    const { chain, sockets, queries } = setup([universe("onyx", "https://indexer.example.test/q")], [], indexerOf([]));
+  it("starts from the tip on a day that held no deploy", async () => {
+    const { chain, sockets, queries } = setup(
+      [universe("onyx", "https://indexer.example.test/q")],
+      [],
+      indexerOf([], 7000),
+    );
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    ack(first(sockets));
+    await vi.waitFor(() => {
+      expect(catchUps(queries)).toHaveLength(1);
+    });
+    expect(catchUps(queries)[0]).toContain("gt: 6999");
+    chain.stop();
+  });
+
+  it("asks no catch-up on the first connection when the indexer gave no tip, said, and still counts the day", async () => {
+    const { chain, sockets, queries, log } = setup(
+      [universe("onyx", "https://indexer.example.test/q")],
+      [],
+      indexerOf([deployAt(4999)]),
+    );
     await vi.waitFor(() => {
       expect(sockets).toHaveLength(1);
     });
     ack(first(sockets));
     await Promise.resolve();
-    expect(queries.some((query) => query.includes("heightAndIndex: ASC"))).toBe(false);
+    expect(catchUps(queries)).toHaveLength(0);
+    expect(log).toHaveBeenCalledWith("chain_tip_unknown", { reason: "onyx" });
+    expect(queries.some((query) => query.includes("heightAndIndex: DESC"))).toBe(true);
     chain.stop();
   });
 });

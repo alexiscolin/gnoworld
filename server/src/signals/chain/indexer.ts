@@ -2,7 +2,7 @@
 // reconnection's catch-up) and the realms deployed in the last 24 h (the Earth's count at start). The answer is outside data:
 // every call has its timeout and no redirect (service/net), an answer is read up to a size, goes through Zod, and a row that
 // fails is dropped and said. Every loop has its cap; a count that would stand on a capped history is no count (it fails).
-import { blocksQuery, catchUpQuery, deploysQuery } from "@gnoworld/chain/transactions";
+import { blocksQuery, catchUpQuery, deploysQuery, tipQuery } from "@gnoworld/chain/transactions";
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 import { z } from "zod";
 import type { Deploy } from "./count.ts";
@@ -94,6 +94,12 @@ async function blockTimes(ask: Ask, heights: number[]): Promise<Map<number, stri
 export function indexerReaders({ url, watch, log, send = netSend }: IndexerOptions) {
   const ask = asker(url, send);
   return {
+    /** The newest block the indexer holds. */
+    async tip(): Promise<number> {
+      const height = z.object({ latestBlockHeight: z.number().int().nonnegative() }).safeParse(await ask(tipQuery));
+      if (!height.success) throw new Error("the indexer gave no height");
+      return height.data.latestBlockHeight;
+    },
     /** The transactions from this height on (this block included: the follower reads one once by its hash), as the subscription's own texts. */
     async catchUp(from: number): Promise<string[]> {
       const texts: string[] = [];

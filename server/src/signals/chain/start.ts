@@ -73,7 +73,8 @@ export function startChain(options: ChainOptions): { stop: () => void } {
       continue;
     }
     const watch = watchOf(hubs, universe.id);
-    // The newest deploy the day's history read: the follower starts from it, so a first socket that fails before any frame loses nothing.
+    // The chain's tip, read before the day's history: the follower starts from it, so a first socket that fails before any frame
+    // loses nothing, and a restart tells the rooms no call older than it.
     let reached: number | undefined;
     const readers = indexerReaders({
       url: universe.indexer,
@@ -82,9 +83,11 @@ export function startChain(options: ChainOptions): { stop: () => void } {
       send,
     });
     const history = async (since: string): Promise<Deploy[]> => {
-      const deploys = await readers.history(since);
-      reached ??= deploys.reduce<number | undefined>((top, { height }) => Math.max(top ?? height, height), undefined);
-      return deploys;
+      reached ??= await readers.tip().catch(() => {
+        said("chain_tip_unknown");
+        return undefined;
+      });
+      return readers.history(since);
     };
     loadRealmCount({ history, now, log: said }).then(
       (count) => {

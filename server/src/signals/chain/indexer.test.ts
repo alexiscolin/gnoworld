@@ -174,6 +174,22 @@ describe("the catch-up", () => {
   });
 });
 
+describe("the tip", () => {
+  it("asks, with a timeout, for the newest block the indexer holds", async () => {
+    const { readers, queries, send } = setup(() => answer({ latestBlockHeight: 924852 }));
+    await expect(readers.tip()).resolves.toBe(924852);
+    expect(queries).toEqual(["{ latestBlockHeight }"]);
+    expect(send.mock.calls[0]?.[2]).toBe(TIMEOUT_MS);
+  });
+
+  it("fails on a height of no shape: none, a text, a fraction, below zero", async () => {
+    for (const height of [undefined, "924852", 1.5, -1]) {
+      const { readers } = setup(() => answer({ latestBlockHeight: height }));
+      await expect(readers.tip()).rejects.toThrow("the indexer gave no height");
+    }
+  });
+});
+
 describe("the 24 h history", () => {
   const SINCE = "2026-11-05T12:00:00.000Z";
   const fresh = (): string => "2026-11-06T00:00:00.000Z";
