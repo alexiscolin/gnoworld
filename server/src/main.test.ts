@@ -520,30 +520,36 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(server.out.stderr).toContain(universes);
   });
 
+  // The chain's two data files: one good universe, and the hubs file's text as given.
+  const chainFiles = (hubsText: string) => {
+    const dir = folder("gnoworld-chain-");
+    const universes = join(dir, "universes.json");
+    const hubs = join(dir, "hubs.json");
+    writeFileSync(
+      universes,
+      JSON.stringify([
+        {
+          id: "b",
+          name: "U",
+          chainId: "b-1",
+          rpc: "https://rpc.example:443",
+          gnoweb: "https://gnoweb.example",
+          indexer: "https://indexer.the-chain.example/graphql/query",
+          testnet: true,
+          default: true,
+        },
+      ]),
+    );
+    writeFileSync(hubs, hubsText);
+    return { universes, hubs };
+  };
+
   // Slice 9g: the chain's rooms. The data's two files start one subscription to each universe's indexer, which the egress way
   // sees as a tunnel; SIGTERM stops it with the rest.
   it("follows each universe's indexer when UNIVERSES_FILE and HUBS_FILE name the data, and stops on SIGTERM", async () => {
     const way = await tunnels();
     try {
-      const dir = folder("gnoworld-chain-");
-      const universes = join(dir, "universes.json");
-      const hubs = join(dir, "hubs.json");
-      writeFileSync(
-        universes,
-        JSON.stringify([
-          {
-            id: "b",
-            name: "U",
-            chainId: "b-1",
-            rpc: "https://rpc.example:443",
-            gnoweb: "https://gnoweb.example",
-            indexer: "https://indexer.the-chain.example/graphql/query",
-            testnet: true,
-            default: true,
-          },
-        ]),
-      );
-      writeFileSync(hubs, "[]");
+      const { universes, hubs } = chainFiles("[]");
       const server = start({
         ...settings(),
         UNIVERSES_FILE: universes,
@@ -561,14 +567,12 @@ describe("the server's process", { timeout: 30_000 }, () => {
   });
 
   it("does not start with a HUBS_FILE that is no good list: it fails closed, naming the file", async () => {
-    const dir = folder("gnoworld-chain-");
-    const hubs = join(dir, "hubs.json");
-    const universes = join(dir, "universes.json");
-    writeFileSync(hubs, '{"not":"a list"}');
-    writeFileSync(universes, "[]");
+    // The universes are good, so it is the hubs that are judged.
+    const { universes, hubs } = chainFiles('{"not":"a list"}');
     const server = start({ ...settings(), UNIVERSES_FILE: universes, HUBS_FILE: hubs });
     expect(await exited(server)).not.toBe(0);
-    expect(server.out.stderr).toMatch(/universes|hubs/);
+    expect(server.out.stderr).toMatch(/hubs: .*hubs\.json does not hold a good list/);
+    expect(server.out.stderr).not.toMatch(/universes: /);
   });
 
   it("exits on SIGTERM within a bound even with a price read still open on a proxy that never answers (F2758)", async () => {

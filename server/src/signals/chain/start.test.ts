@@ -239,7 +239,10 @@ describe("the chain's data", () => {
     expect(() => readChainData(universes, hubs)).toThrow(universes);
     expect(() => readChainData(universes, hubs)).not.toThrow(/secret/);
     expect(() => readChainData("/nowhere/universes.json", hubs)).toThrow("/nowhere/universes.json");
-    const [good] = files([universe("onyx", "https://indexer.example.test/q")], [{ slug: "<b>" }]);
+    const [good, badHubs] = files([universe("onyx", "https://indexer.example.test/q")], [{ slug: "<b>" }]);
     expect(() => readChainData(good, hubs)).not.toThrow();
+    // Good universes with a hubs file that is no good: the hubs are judged, and named, not what they held.
+    expect(() => readChainData(good, badHubs)).toThrow(badHubs);
+    expect(() => readChainData(good, badHubs)).not.toThrow(/<b>/);
   });
 });
