@@ -42,7 +42,10 @@ test.describe("the chat's fixes", () => {
       .first()
       .click();
     await expect(page.getByRole("heading", { level: 2, name: /^Direct message with/ })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button")).toHaveText(["Who's here"]);
+    await expect(page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button")).toHaveText([
+      "Who's here",
+      "Quiz",
+    ]);
     const [box, talk] = await Promise.all([
       message(page).boundingBox(),
       page.locator('[data-region="conversation"]').boundingBox(),

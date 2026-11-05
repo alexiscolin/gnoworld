@@ -104,7 +104,7 @@ test.describe("the chat as the video shows it", () => {
     await logIn(page, "screen-composer");
     await open(page, { width: 1280, as: ACCOUNT });
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
-    await expect(bar.getByRole("button")).toHaveText(["Who's here"]);
+    await expect(bar.getByRole("button")).toHaveText(["Who's here", "Play", "Events", "Catch up", "Poll"]);
     const message = page.getByRole("group", { name: "Message box" });
     await expect(message.getByRole("textbox")).toBeVisible();
     await expect(message.getByRole("button", { name: "Send" })).toBeVisible();
