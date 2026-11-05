@@ -36,6 +36,8 @@ from suite_parts import code, parts, select
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
 GAPS = {  # label -> why no test can notice it yet
+    "workshop.sh takes a Node that is the user's own file #1": "no second user to own a file in a test: the check needs a file of another owner",
+    "workshop.sh waits for the last run's script to end before it serves #1": "a timing: the old script's cleanup races the new run's by under a second, and no stub makes it slower",
     "check.sh: a git that cannot list the change fails the gate #1": "equivalent: under sh, set -e already holds inside the command substitution, so the && only says it",
 }
 
@@ -599,7 +601,9 @@ def mutants():
     ws = "scripts/workshop.sh"
     yield from each(ws, '\tlsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 || return 0\n', "\treturn 0\n", "hooks", "workshop.sh never takes a port another process holds")
     yield from each(ws, 'held "$api_port" && held "$irc_port" && held "$ws_port"\n', "", "hooks", "workshop.sh says its backend's ports are held before anything starts")
-    yield from each(ws, '\t\tkill "$old_script" 2>/dev/null || kill "$old_server" 2>/dev/null || :\n', "", "hooks", "workshop.sh stops its checkout's last run")
+    yield from each(ws, '\t\tkill "$old_server" 2>/dev/null || :\n', "", "hooks", "workshop.sh stops its checkout's last run")
+    yield from each(ws, '\t\tkill "$old_server" 2>/dev/null || :\n', '\t\tkill "$old_script" 2>/dev/null || kill "$old_server" 2>/dev/null || :\n', "hooks", "workshop.sh never kills the pid file's script pid (H9)")
+    yield from each(ws, ' || kill -0 "$old_script" 2>/dev/null; }', "; }", "hooks", "workshop.sh waits for the last run's script to end before it serves")
     yield from each(ws, ' && lsof -a -p "$old_server" -d cwd -Fn 2>/dev/null | grep -qxF "n$root/app" || continue', " || continue", "hooks", "workshop.sh stops no process of another folder its pid file names")
     yield from each(ws, '\tfor name in $names; do (cd / && "$preview" down "workshop-$name") >/dev/null 2>&1 || :; done\n', "", "hooks", "workshop.sh takes its servers off the tailnet at its end")
     yield from each(ws, '(cd / && "$preview" down "workshop-$name")', '("$preview" down "workshop-$name")', "hooks", "workshop.sh takes its names down from /, where the preview's python3 -c imports nothing planted (F4962)")
@@ -617,10 +621,17 @@ def mutants():
     yield from each(ws, 'home=$(cd "$HOME" && pwd -P)', 'home=$HOME', "hooks", "workshop.sh gives the profile the home folder's real path")
     yield from each(ws, '-D HOME="$home"', '-D HOME="$root"', "hooks", "workshop.sh keeps its processes from reading the home folder")
     yield from each(ws, '-D MAIN="$main"', '-D MAIN="$root"', "hooks", "workshop.sh lets its processes read the checkout their node_modules lead to")
-    yield from each(ws, 'main=$(cd -P "$root/node_modules/.pnpm/../.."', 'main=$(cd "$root/node_modules/.pnpm/../.."', "hooks", "workshop.sh finds the checkout node_modules lead to through their link")
+    yield from each(ws, 'case $pnpm in "$main"/node_modules/*) ;;', "case $pnpm in *) ;;", "hooks", "workshop.sh refuses a node_modules/.pnpm that leads outside the checkout's (F5539)")
+    yield from each(ws, 'case "$home/" in "$main"/*)', 'case "$home/" in "$main"/NO/*)', "hooks", "workshop.sh refuses a checkout that is the home folder or holds it (F5539)")
+    yield from each(ws, '|| { echo "workshop: no git checkout of this repository behind $root/.git" >&2; exit 1; }', "|| :", "hooks", "workshop.sh refuses a .git that names no checkout (F5539)")
+    yield from each(ws, 'if [ -d "$root/.git" ]; then common=$root/.git', 'if false; then common=$root/.git', "hooks", "workshop.sh reads a main checkout's own .git folder (F5539)")
+    yield from each(ws, "printf '%s\\n' \"$version\" | grep -qxE '[0-9]+\\.[0-9]+\\.[0-9]+' && ", "", "hooks", ".node-version must be x.y.z for workshop.sh (F5540)")
+    yield from each(ws, ' && [ "$(cat .node-version)" = "$version" ]', "", "hooks", "workshop.sh reads a .node-version of one line (F5540)")
+    yield from each(ws, ' && [ ! -L "$node_bin/node" ]', "", "hooks", "workshop.sh takes no Node that is a link (F5540)")
+    yield from each(ws, ' && [ -O "$node_bin/node" ]', "", "hooks", "workshop.sh takes a Node that is the user's own file (F5540)")
     yield from each(ws, '|| { echo "workshop: no node_modules here: pnpm install first" >&2; exit 1; }', "|| :", "hooks", "workshop.sh says node_modules are missing before anything starts")
     yield from each(ws, '-D NODE="$node_dir"', '-D NODE="$home"', "hooks", "workshop.sh lets its processes read Node's own folder alone")
-    yield from each(ws, 'node_dir=$(cd -P "$(dirname "$(command -v node)")/.." && pwd -P)', 'node_dir=$NVM_DIR', "hooks", "workshop.sh gives the profile the real folder of the Node it runs")
+    yield from each(ws, 'node_dir=$(cd -P "$node_bin/.." && pwd -P)', 'node_dir=$NVM_DIR', "hooks", "workshop.sh gives the profile the real folder of the Node it runs")
     yield from each(ws, '-D TOOLS="$tools"', '-D TOOLS="$home"', "hooks", "workshop.sh lets its processes read the tools' cache alone")
     yield from each(ws, 'tools=${GNOWORLD_TOOLS:-$HOME/.cache/gnoworld-tools}', 'tools=$HOME/.cache/gnoworld-tools', "hooks", "workshop.sh's tools' cache is ergo.sh's, GNOWORLD_TOOLS when set")
     yield from each(ws, ' && mkdir -p "$tools" && tools=$(cd "$tools" && pwd -P)', '', "hooks", "workshop.sh gives the profile the tools' cache's real path, made when missing")

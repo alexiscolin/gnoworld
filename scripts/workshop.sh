@@ -17,12 +17,27 @@ home=$(cd "$HOME" && pwd -P)
 # The tailnet-preview skill's script, run from /: its python3 -c, as this script's own would without -I, imports first a module a
 # session planted in the folder it runs from (F4962).
 preview="$HOME/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
-want="v$(cat .node-version)"
-PATH="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin:$PATH"
-[ "$(node -v 2>/dev/null)" = "$want" ] || { echo "workshop: Node $want is needed (.node-version)" >&2; exit 1; }
-node_dir=$(cd -P "$(dirname "$(command -v node)")/.." && pwd -P) # Node's own folder, its binary and its modules
-# The checkout its node_modules lead to, a worktree's the main checkout's; the tools' cache, where ergo.sh keeps the Ergo a gate built.
-main=$(cd -P "$root/node_modules/.pnpm/../.." 2>/dev/null && pwd -P) || { echo "workshop: no node_modules here: pnpm install first" >&2; exit 1; }
+# This runs out of the sandbox, and a session writes .node-version: it is a version and nothing else (a `24.22.0/../../x` led PATH, and every
+# bare command after it, to a planted Node, F5540), and its Node a file of the user's own, never a link, found under nvm's folder.
+version=$(head -n 1 .node-version 2>/dev/null || :) want="v$version"
+printf '%s\n' "$version" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' && [ "$(cat .node-version)" = "$version" ] || { echo "workshop: .node-version must be a version, as 24.22.0" >&2; exit 1; }
+node_bin="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
+[ -f "$node_bin/node" ] && [ ! -L "$node_bin/node" ] && [ -O "$node_bin/node" ] && [ "$("$node_bin/node" -v 2>/dev/null)" = "$want" ] ||
+	{ echo "workshop: Node $want is needed (.node-version), as a file of yours at $node_bin/node" >&2; exit 1; }
+PATH="$node_bin:$PATH"
+node_dir=$(cd -P "$node_bin/.." && pwd -P) # Node's own folder, its binary and its modules
+# The checkout the profile may read whole: the main one, a worktree's node_modules leading to its own. It is the parent of git's common
+# folder, found as worktree.sh finds it from this tree's .git (a folder here, or the file of a worktree naming <common>/worktrees/<id>),
+# never where node_modules/.pnpm leads, a link any session writes: one to a folder two levels under the home folder, or under /, made MAIN
+# the home folder or /, and the profile read the keys (F5539). It is a git checkout holding the profile, and neither the home folder nor above.
+if [ -d "$root/.git" ]; then common=$root/.git
+else common=$(gitdir=$(sed -n 's/^gitdir: //p' "$root/.git" 2>/dev/null) && [ -n "$gitdir" ] && cd "$gitdir/../.." 2>/dev/null && pwd -P) || common=; fi
+case $common in */.git) main=${common%/.git} ;; *) main= ;; esac
+[ -n "$main" ] && [ -d "$main/.git" ] && [ -f "$main/scripts/workshop.sb" ] || { echo "workshop: no git checkout of this repository behind $root/.git" >&2; exit 1; }
+case "$home/" in "$main"/*) echo "workshop: $main is the home folder or holds it, which the profile must not read whole" >&2; exit 1 ;; esac
+# Its node_modules lead into that checkout's, a worktree's to the main one's; the tools' cache, where ergo.sh keeps the Ergo a gate built.
+pnpm=$(cd -P "$root/node_modules/.pnpm" 2>/dev/null && pwd -P) || { echo "workshop: no node_modules here: pnpm install first" >&2; exit 1; }
+case $pnpm in "$main"/node_modules/*) ;; *) echo "workshop: node_modules/.pnpm leads outside $main/node_modules: pnpm install here" >&2; exit 1 ;; esac
 tools=${GNOWORLD_TOOLS:-$HOME/.cache/gnoworld-tools} && mkdir -p "$tools" && tools=$(cd "$tools" && pwd -P)
 # boxed <command...>: the command exec'd under the profile, from a subshell of its caller's.
 boxed() {
@@ -47,13 +62,14 @@ listens() {
 	return 1
 }
 
-# The last run of this checkout, while a process of it still serves: its script stopped (its end stops the rest and the tailnet), then the process.
+# The last run of this checkout, while a process of it still serves: stopped, which ends its script (its end stops the rest and the tailnet).
+# The script's own pid is never killed: any session writes the pid file, and a pid in it may be anything of the user's (H9).
 if [ -f "$pidfile" ]; then
 	while read -r old_script old_server old_port; do
 		[ -n "${old_port:-}" ] && listens "$old_server" "$old_port" && lsof -a -p "$old_server" -d cwd -Fn 2>/dev/null | grep -qxF "n$root/app" || continue
-		kill "$old_script" 2>/dev/null || kill "$old_server" 2>/dev/null || :
+		kill "$old_server" 2>/dev/null || :
 		tries=0
-		while listens "$old_server" "$old_port" && [ "$tries" -lt 40 ]; do sleep 0.25 && tries=$((tries + 1)); done
+		while { listens "$old_server" "$old_port" || kill -0 "$old_script" 2>/dev/null; } && [ "$tries" -lt 40 ]; do sleep 0.25 && tries=$((tries + 1)); done
 	done <"$pidfile"
 fi
 

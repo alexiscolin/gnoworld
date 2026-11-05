@@ -9167,6 +9167,7 @@ mkdir -p "$w/root/scripts" "$w/root/app/node_modules/.bin" "$w/home/.claude/skil
 # The profile is given real paths, the home folder's, Node's, the tools' cache's and the checkout a worktree's node_modules lead to: each
 # reached here through a link. A json.py planted in the checkout says whether a Python of the script imported it (F4962).
 ln -s "$w/main/node_modules/.pnpm" "$w/root/node_modules/.pnpm" && ln -s home "$w/home-link" && ln -s nvm "$w/nvm-link" && ln -s tools "$w/tools-link"
+mkdir -p "$w/main/.git/worktrees/root" "$w/main/scripts" && : >"$w/main/scripts/workshop.sb" && printf 'gitdir: %s/main/.git/worktrees/root\n' "$w" >"$w/root/.git"
 w_home=$(cd "$w/home" && pwd -P) w_main=$(cd "$w/main" && pwd -P) w_node=$(cd "$w/nvm/versions/node/$want" && pwd -P) w_tools=$(cd "$w/tools" && pwd -P)
 printf 'import os\nopen(os.environ["W_LOG"] + ".planted", "w").write("ran")\n' >"$w/root/json.py"
 # The script as it is but for the system's sandbox-exec, which cannot nest in Claude Code's sandbox: a stub that says how it was asked and
@@ -9291,6 +9292,17 @@ for which in app lab api; do
 	grep -qx "down workshop-app" "$w/log.preview" && grep -qx "down workshop-lab" "$w/log.preview" || fail "workshop.sh did not take both off the tailnet at its end: $(cat "$w/log.preview")"
 	[ ! -e "$root/.claude/tmp/workshop.pid" ] || fail "workshop.sh left its pid file at its end"
 done
+# The pid file is any session's to write, and its first pid, the script's, is never killed (H9): a line naming an unrelated process as the script
+# and a listener of this checkout's app as the server stops that listener alone, and the new run serves in its place.
+sleep 300 & victim=$!
+listener=$(cd "$root/app" && listen_on "$app_port" && echo $!)
+until_ 'lsof -nP -iTCP:"$app_port" -sTCP:LISTEN >/dev/null 2>&1' || { kill "$victim" "$listener" 2>/dev/null; fail "the listener of the pid file's line did not start"; }
+printf '%s %s %s\n' "$victim" "$listener" "$app_port" >"$root/.claude/tmp/workshop.pid"
+: >"$w/log.preview" && shop victim && third=$shop
+up || { kill "$victim" "$third" 2>/dev/null; fail "workshop.sh did not serve in place of a listener its pid file named: $(cat "$w/victim.out")"; }
+kill "$third" && ended "$third" || fail "workshop.sh left a process after a TERM"
+kill -0 "$victim" 2>/dev/null || fail "workshop.sh killed a process its pid file named as the script, which it never started (H9)"
+kill "$victim"
 # With no profile, sandbox-exec refuses, and the run ends before anything serves.
 mv "$root/scripts/workshop.sb" "$w/profile.away" && : >"$w/log.preview" && shop unboxed && unboxed=$shop
 ended "$unboxed" || fail "workshop.sh lived on, or left a process, with no profile"
@@ -9302,6 +9314,38 @@ until_ '! kill -0 "$nomodules" 2>/dev/null' || fail "workshop.sh waited with no 
 mv "$w/pnpm.away" "$root/node_modules/.pnpm"
 grep -q "no node_modules here: pnpm install first" "$w/nomodules.out" || fail "workshop.sh did not say node_modules are missing: $(cat "$w/nomodules.out")"
 [ -z "$(serving "$app_port")" ] || fail "workshop.sh started a server with no node_modules"
+# The checkout the profile may read is git's (F5539): the parent of the common folder this tree names, never where node_modules/.pnpm leads,
+# a link any session writes. A link planted to a folder two levels under the home folder, or under /, made the profile's MAIN the home
+# folder or /, which holds the keys; a .node-version that is more than a version led PATH to a planted Node, run out of the sandbox (F5540).
+refused() { # $1: what was planted, $2: the words the run must say; no server starts, and it exits 1
+	: >"$w/log.preview" && shop "refused" && refused_=$shop
+	until_ '! kill -0 "$refused_" 2>/dev/null' || { kill "$refused_" 2>/dev/null; fail "workshop.sh waited, and served, with $1"; }
+	wait "$refused_" && fail "workshop.sh ran with $1"
+	grep -qF "$2" "$w/refused.out" || fail "workshop.sh did not say '$2' with $1: $(cat "$w/refused.out")"
+	[ -z "$(serving "$app_port")" ] || fail "workshop.sh started a server with $1"
+}
+mkdir -p "$w/home/.cache/gnoworld-tools" && mv "$root/node_modules/.pnpm" "$w/pnpm.away" && ln -s "$w/home/.cache/gnoworld-tools" "$root/node_modules/.pnpm"
+refused "a node_modules/.pnpm link to two folders under the home folder" "leads outside"
+rm "$root/node_modules/.pnpm" && ln -s /usr/bin "$root/node_modules/.pnpm"
+refused "a node_modules/.pnpm link to /usr/bin" "leads outside"
+rm "$root/node_modules/.pnpm" && mv "$w/pnpm.away" "$root/node_modules/.pnpm"
+mv "$root/.git" "$w/git.away" && mkdir -p "$w/home/.git/worktrees/root" "$w/home/scripts" && : >"$w/home/scripts/workshop.sb" &&
+	printf 'gitdir: %s/home/.git/worktrees/root\n' "$w" >"$root/.git"
+refused "a tree whose common git folder is the home folder's" "the home folder"
+printf 'gitdir: /nowhere\n' >"$root/.git"
+refused "a .git that names no folder" "no git checkout"
+mv "$w/git.away" "$root/.git"
+mv "$root/.node-version" "$w/nv.away"
+for bad in "24.22.0/../../../../x" "24.22" "v24.22.0" "24.22.0 " "24.22.0
+24.22.1" ""; do
+	printf '%s\n' "$bad" >"$root/.node-version"
+	refused "a .node-version of '$bad'" "must be a version"
+done
+printf '%s\n' "${want#v}" >"$root/.node-version"
+mv "$w/nvm/versions/node/$want/bin/node" "$w/node.away" && ln -s "$w/node.away" "$w/nvm/versions/node/$want/bin/node"
+refused "a Node that is a link" "Node $want is needed"
+rm "$w/nvm/versions/node/$want/bin/node" && mv "$w/node.away" "$w/nvm/versions/node/$want/bin/node"
+mv "$w/nv.away" "$root/.node-version"
 # A backend that dies before it listens, or an Ergo that does not build, ends the run, saying so, and stops the servers.
 for fault in DIE=backend ERGO_FAILS=1; do
 	: >"$w/log.preview" && export "${fault?}" && shop faulty && faulty=$shop
