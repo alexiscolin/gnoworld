@@ -2,20 +2,28 @@
 import type { PlaceKind } from "@gnoworld/core";
 import type { siteOf } from "../../places.ts";
 
+/** A group of the drawer: a kind of place, or the stations, worlds of a kind of their own round the Earth (8l). */
+export type SearchKind = PlaceKind | "station";
 export interface SearchItem {
   name: string;
-  kind: PlaceKind;
+  kind: SearchKind;
   universe: string;
   path: string;
+  /** What a world is when it is no plain hub, as frame 98's "DAO · 96" says it. */
+  tag?: string;
 }
 export interface SearchGroup {
-  kind: PlaceKind;
+  kind: SearchKind;
   count: number;
   items: SearchItem[];
 }
 
-/** The groups' order in the drawer, as frame 98 lists them: the ecosystems, the hubs, the Earth, then the universes. */
-const ORDER: PlaceKind[] = ["ecosystem", "world", "earth", "cosmos"];
+/** The groups' order in the drawer, as frame 98 lists them: the ecosystems, the hubs, the Earth, the universes, then the stations at its
+ * foot. */
+const ORDER: SearchKind[] = ["ecosystem", "world", "earth", "cosmos", "station"];
+
+// A world's kind as its row's tag says it; a hub is the plain kind and says none, a station has its own group.
+const TAGS: Readonly<Record<string, string>> = { dao: "DAO", dapp: "dApp" };
 
 /** The places whose name holds the query, whatever the case, in groups by kind; the names that start with it come first
  * in a group. A query is text, never a pattern; the empty one finds every place. */
@@ -35,15 +43,24 @@ export function searchPlaces(items: SearchItem[], query: string): SearchGroup[] 
   });
 }
 
+// A world's item: a station in its own group, a DAO or a dApp with its tag.
+function worldItem(item: SearchItem, kind: string | undefined): SearchItem {
+  const tag = TAGS[kind ?? ""];
+  return { ...item, kind: kind === "station" ? "station" : "world", ...(tag === undefined ? {} : { tag }) };
+}
+
 /** One item for each place of the site: a world or an ecosystem by its name, a universe's cosmos by the universe's name
  * and its Earth by that name too, so none is mistaken for another universe's. */
 export function searchItemsOf(site: ReturnType<typeof siteOf>): SearchItem[] {
   const names = new Map(site.universes.map((universe) => [universe.id, universe.name]));
-  const listed = new Map([...site.worlds, ...site.ecosystems].map((each) => [each.path, each.name]));
-  const items = site.places.map(({ kind, universe, path }) => {
+  const listed = new Map([...site.worlds, ...site.ecosystems].map((each) => [each.path, each]));
+  const items = site.places.map(({ kind, universe, path }): SearchItem => {
     const home = names.get(universe) ?? universe;
-    const name = kind === "cosmos" ? home : kind === "earth" ? `Earth of ${home}` : (listed.get(path) ?? path);
-    return { name, kind, universe, path };
+    const row = listed.get(path);
+    if (kind === "cosmos") return { name: home, kind, universe, path };
+    if (kind === "earth") return { name: `Earth of ${home}`, kind, universe, path };
+    const name = row?.name ?? path;
+    return kind === "world" ? worldItem({ name, kind, universe, path }, row?.kind) : { name, kind, universe, path };
   });
   // The schema lets two universes hold the same name: the option then says which universe it leads to.
   const seen = new Map<string, number>();
