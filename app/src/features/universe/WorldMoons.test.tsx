@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { moonSize } from "@gnoworld/core";
-import type { RoomList } from "@gnoworld/schemas";
+import { shortAddress, type RoomList } from "@gnoworld/schemas";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -15,22 +15,24 @@ const listed = (...rooms: string[]): RoomList["sections"] => [
   { name: null, rooms: rooms.map((room) => ({ room, type: "open" as const })) },
 ];
 
+// Each followed room's people, by its id.
+function seat(store: ReturnType<typeof createAppStore>, membersOf: (id: string) => string[]) {
+  store.setState((state) => ({
+    chat: {
+      ...state.chat,
+      rooms: Object.fromEntries(
+        Object.entries(state.chat.rooms).map(([id, held]) => [id, { ...held, members: membersOf(id) }]),
+      ),
+    },
+  }));
+}
+
 function world(rooms: Record<string, number>, room: string | null = null) {
   const store = createAppStore();
   const ids = Object.keys(rooms);
   store.getState().chatActions.follow(ids);
   store.getState().chatActions.listed(listed(...ids));
-  store.setState((state) => ({
-    chat: {
-      ...state.chat,
-      rooms: Object.fromEntries(
-        Object.entries(state.chat.rooms).map(([id, held]) => [
-          id,
-          { ...held, members: Array.from({ length: rooms[id] ?? 0 }, (_, at) => `guest-${String(at)}`) },
-        ]),
-      ),
-    },
-  }));
+  seat(store, (id) => Array.from({ length: rooms[id] ?? 0 }, (_, at) => `guest-${String(at)}`));
   const open = vi.fn<(href: string) => void>();
   const moons = vi.fn<(marks: readonly MoonMark[]) => void>();
   const box = mount(
@@ -199,5 +201,39 @@ describe("a world's rooms as moons", () => {
       store.getState().chatActions.listed(listed("#bubble", "#bubble/games"));
     });
     expect(moons.mock.calls.length).toBe(after);
+  });
+});
+
+// "noor is here" (slice 8): a followed account among a room's people puts a chip on its moon, from what the page already holds.
+describe("a followed person on a room's moon", () => {
+  const NOOR = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  const ALI = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+  const withPeople = (follows: string[], members: Record<string, string[]>) => {
+    const made = world({ "#bubble": 1, "#bubble/games": 1 });
+    act(() => {
+      made.store.getState().deviceActions.change("follows", (held) => ({ ...held, people: follows }));
+      seat(made.store, (id) => members[id] ?? []);
+    });
+    return links(made.box).map((link) => link.textContent);
+  };
+
+  it("says who is here on the moon of the room they are in, and on no other", () => {
+    expect(withPeople([NOOR], { "#bubble": ["guest-1", NOOR], "#bubble/games": ["guest-2"] })).toEqual([
+      `#bubble · 2 here ${shortAddress(NOOR)} is here`,
+      "#games · 1 here",
+    ]);
+  });
+
+  it("names the first of the people followed when several are in the room", () => {
+    const here = { "#bubble": [NOOR, ALI], "#bubble/games": [] };
+    expect(withPeople([ALI, NOOR], here)[0]).toContain(shortAddress(ALI));
+    expect(withPeople([NOOR, ALI], here)[0]).toContain(shortAddress(NOOR));
+  });
+
+  it("says nothing of a guest's nick or of a person not followed", () => {
+    expect(withPeople([NOOR], { "#bubble": ["guest-1", ALI], "#bubble/games": [] })).toEqual([
+      "#bubble · 2 here",
+      "#games · 0 here",
+    ]);
   });
 });

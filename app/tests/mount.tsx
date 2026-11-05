@@ -3,7 +3,7 @@
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeAll } from "vitest";
+import { afterEach, beforeAll, vi } from "vitest";
 
 const roots: { root: Root; host: HTMLElement }[] = [];
 // React flushes an update inside act only in an environment that says so; restored as the file ends.
@@ -120,4 +120,12 @@ export function modals(): void {
  * placement are the journeys'. */
 export function popovers(): void {
   Object.assign(HTMLElement.prototype, { showPopover: () => undefined, hidePopover: () => undefined });
+}
+
+/** jsdom has no matchMedia: every query answers no, until the test unstubs its globals. */
+export function noMedia(): void {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined })),
+  );
 }

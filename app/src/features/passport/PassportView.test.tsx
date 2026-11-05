@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, modals, settled } from "../../../tests/mount.tsx";
+import { all, modals, noMedia, settled } from "../../../tests/mount.tsx";
 import { mountInStore, type AppStore } from "../../../tests/inStore.tsx";
 import { PassportCounter } from "./Counter.tsx";
 import { PassportView } from "./PassportView.tsx";
@@ -18,10 +18,7 @@ vi.mock("../../worldsFile.ts", () => ({ useWorldsFile: () => listed.worlds }));
 
 beforeAll(modals);
 beforeEach(() => {
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined })),
-  );
+  noMedia();
   localStorage.clear();
   listed.count = undefined;
   listed.worlds = undefined;

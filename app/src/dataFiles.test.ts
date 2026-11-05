@@ -22,6 +22,19 @@ import { at, FAULTS, plant } from "./dataFixture.ts";
 import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
 import { headingOf } from "../tests/render.tsx";
 
+/** The fault a planted change to the files makes `loadData` throw, or an empty string when the files load. */
+const loads = (change: (f: Record<string, unknown>) => void) => {
+  const dir = plant(change);
+  try {
+    loadData(dir);
+    return "";
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+};
+
 // 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
 const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
 // R-F3: and of their chains' public indexers, which the data names too (`indexer`).
@@ -269,17 +282,6 @@ describe("earthOrbit.json", () => {
 // Slice 8: the expedition's stops, the quests' steps, what is on air and the events name worlds the site holds, each fault stopping the
 // build with its file, its row and what it names; two stops of one world would make one visit reach both.
 describe("the discovery's files", () => {
-  const loads = (change: (f: Record<string, unknown>) => void) => {
-    const dir = plant(change);
-    try {
-      loadData(dir);
-      return "";
-    } catch (error) {
-      return error instanceof Error ? error.message : String(error);
-    } finally {
-      rmSync(dir, { recursive: true });
-    }
-  };
   const stop = (over: Record<string, unknown>) => ({
     id: "s",
     universe: "onyx",
@@ -361,6 +363,14 @@ describe("the discovery's files", () => {
         (f) => void (f["events.json"] = [event("earth"), { ...event("bubble"), id: "f" }, { ...event(), id: "g" }]),
       ),
     ).toBe("");
+  });
+
+  it("stops the build on an on-air line of a hub its universe does not hold", () => {
+    const row = (hub: string) => [{ id: "a", universe: "onyx", title: "Live", hub }];
+    expect(loads((f) => void (f["onAir.json"] = row("mars")))).toMatch(
+      /^onAir\.json: \[0\]\.hub: no hub of "onyx" is named "mars"/,
+    );
+    expect(loads((f) => void (f["onAir.json"] = row("bubble")))).toBe("");
   });
 
   it("names every fault at once", () => {
@@ -1059,5 +1069,40 @@ describe("the ticker's placeholders", () => {
     const today = new Date().toISOString().slice(0, 10);
     for (const row of news) expect(row.date ?? "", row.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     for (const row of news) expect((row.date ?? "") <= today, `${row.id}: ${row.date ?? ""}`).toBe(true);
+  });
+});
+
+// 8g (frames 22 and 104): a world's kind and genre are its plate's crumb; a genre names one of genres.json.
+describe("hubs.json's kind and genre", () => {
+  const hub = (extra: Record<string, unknown>) => [
+    { slug: "bubble", name: "Bubble", description: "B".repeat(60), universe: "onyx", ...extra },
+  ];
+
+  it("stops the build on a genre no genre of genres.json names, with its one-line fault", () => {
+    expect(loads((f) => void (f["hubs.json"] = hub({ genre: "games" })))).toBe(
+      'hubs.json: [0].genre: no genre of genres.json is named "games"',
+    );
+  });
+
+  it("takes a genre genres.json names, and a world with none", () => {
+    const named = (f: Record<string, unknown>) => {
+      f["genres.json"] = [{ slug: "games", name: "Games" }];
+      f["hubs.json"] = hub({ genre: "games", kind: "dapp" });
+    };
+    expect(loads(named)).toBe("");
+    expect(loads((f) => void (f["hubs.json"] = hub({})))).toBe("");
+  });
+
+  it("names the row of each world whose genre is unknown", () => {
+    const two = [...hub({}), { ...hub({ genre: "mars" })[0], slug: "other" }];
+    expect(loads((f) => void (f["hubs.json"] = two))).toMatch(/^hubs\.json: \[1\]\.genre: /);
+  });
+
+  it.each(["hub", "dao", "dapp", "station"])("takes the kind %s", (kind) => {
+    expect(loads((f) => void (f["hubs.json"] = hub({ kind })))).toBe("");
+  });
+
+  it("stops the build on a kind the crumb does not know, naming the file and the field", () => {
+    expect(loads((f) => void (f["hubs.json"] = hub({ kind: "planet" })))).toMatch(/^hubs\.json: \[0\]\.kind/);
   });
 });

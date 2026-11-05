@@ -3,7 +3,7 @@ import { Address } from "@gnoworld/schemas";
 import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
-import { all, popovers, settled } from "../../../tests/mount.tsx";
+import { all, noMedia, popovers, settled } from "../../../tests/mount.tsx";
 import { AccountMenu } from "./AccountMenu.tsx";
 
 // The header's menu (slice 8, 8a; ADR-0002 §1, Menu and settings): the passport and the settings for every visitor, the saved messages for
@@ -14,10 +14,7 @@ const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 beforeAll(popovers);
 beforeEach(() => {
   localStorage.clear();
-  vi.stubGlobal(
-    "matchMedia",
-    vi.fn(() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined })),
-  );
+  noMedia();
 });
 afterEach(() => {
   vi.unstubAllGlobals();
