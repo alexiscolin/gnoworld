@@ -5,13 +5,21 @@ import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
-import { Chat, type ChatPlace } from "../features/chat/index.ts";
+import { Chat, type ChatPlace, type Pinned as ChatPinned } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
 import styles from "./world.module.css";
 
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
 const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
+// A world's pinned actions (D271) are drawn on the plate by the proposals' chunk and in the chat's bar from a chunk this route hands the
+// chat (the chat reaches no realm code of its own); one that cannot be fetched leaves the bar alone (F1763).
+const none = () => ({ default: () => null });
+const pinned = () => import("../features/world/Pinned.tsx");
+const PINNED_BAR: Pick<ChatPinned, "Pills" | "Cards"> = {
+  Pills: lazy<ChatPinned["Pills"]>(() => pinned().then((chunk) => ({ default: chunk.Pills }), none)),
+  Cards: lazy<ChatPinned["Cards"]>(() => pinned().then((chunk) => ({ default: chunk.Cards }), none)),
+};
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -37,6 +45,7 @@ function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): Cha
     kicker: `${universe.name} · ${world.name}`,
     home: universe.home.path,
     worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
+    ...(world.actions === undefined ? {} : { pinned: { actions: world.actions, universe, ...PINNED_BAR } }),
   };
 }
 
@@ -76,7 +85,10 @@ export default function World() {
               />
               {realmPath === undefined ? null : (
                 <Suspense fallback={null}>
-                  <Proposals path={realmPath} />
+                  <Proposals
+                    path={realmPath}
+                    {...(world.actions === undefined ? {} : { pinned: { actions: world.actions, universe } })}
+                  />
                 </Suspense>
               )}
             </Stack>

@@ -5,7 +5,7 @@ import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { expect, vi } from "vitest";
-import { button } from "./mount.tsx";
+import { button, click, one } from "./mount.tsx";
 
 export const CHAIN = {
   name: "Onyx",
@@ -49,4 +49,34 @@ export function typed(box: HTMLInputElement | undefined, text: string): void {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(box, text);
     box?.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+/** Clicks `name` under `box` with no wallet asked: the card it opens leaves its Sign in Adena to the person. The card, opened. */
+export async function openedUnsigned(box: HTMLElement, name: string): Promise<HTMLElement> {
+  const touched = vi.fn(() => undefined);
+  Object.defineProperty(globalThis, "adena", { get: touched, configurable: true });
+  try {
+    click(await calling(box, name));
+    expect(touched).not.toHaveBeenCalled();
+    const card = one(box, "article");
+    expect(card.textContent).toContain("Sign in Adena");
+    return card;
+  } finally {
+    Reflect.deleteProperty(globalThis, "adena");
+  }
+}
+
+/** That a card was read from gno.land's own chain, never onyx's, and names gnoland-1: `urls` are the reads made. */
+export function onGnoland(urls: readonly string[], card: HTMLElement): void {
+  const hosts = urls.map((url) => new URL(url).host);
+  expect(hosts).toContain("rpc.gno.land");
+  expect(hosts).not.toContain("rpc.onyx.testnets.gno.land");
+  expect(card.textContent).toContain("(gnoland-1)");
+}
+
+/** That `card` is prefilled with `values` and names the realm and the function it calls (`call`). */
+export function prefilled(card: HTMLElement, values: readonly string[], call: { realm: string; func: string }): void {
+  expect(inputs(card).map((input) => input.value)).toEqual(values);
+  expect(card.textContent).toContain(call.realm);
+  expect(card.textContent).toContain(call.func);
 }

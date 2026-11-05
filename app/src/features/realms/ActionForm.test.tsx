@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { act } from "react";
+import { MemoryRouter } from "react-router";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { after, calling, CHAIN, CUR, field, inputs, listing, typed } from "../../../tests/callFixtures.ts";
 import { ActionForm } from "./ActionForm.tsx";
+import { InlineCard } from "./InlineCard.tsx";
 
 // 9e, ADR-0002 section 4, "Proposed actions": a pinned or proposed action shows only once vm/qfuncs confirms its function, types
 // and argument names: a card prefilled, every field editable, naming the realm and function it says; else nothing, so a planted
@@ -312,5 +314,90 @@ describe("a checked action, as parts", () => {
     click(await calling(first ?? box, "Call MustVoteOnProposalSimple"));
     expect(all(second ?? box, "article")).toHaveLength(0);
     expect(inputs(first ?? box).map((i) => i.value)).toEqual(["15", "YES"]);
+  });
+});
+
+// 9e-1 (Alexis): a team's pinned action in the chat's quick actions bar is one pill under its label, beside Who's here; the card it
+// opens is the bar's own (`bar.card`), drawn where the bar puts it. A call of more than two fields is a link to the realm view.
+describe("a pinned action in the quick actions bar", () => {
+  const PLACE = { realm: DAO, chain: CHAIN };
+  function inBar(action: Action, under = vi.fn<ChainFetch>(FUNCTIONS_ANSWER), viewHref?: string) {
+    return mount(
+      <MemoryRouter>
+        <StoreProvider>
+          <div data-test="cards">
+            <InlineCard id="pinned 0" place={PLACE} />
+          </div>
+          <div data-test="bar">
+            <ActionForm
+              action={action}
+              label="Vote"
+              chain={CHAIN}
+              options={{ fetch: under }}
+              {...(viewHref === undefined ? {} : { viewHref })}
+              bar={{ card: "pinned 0", className: "pill" }}
+            />
+          </div>
+        </StoreProvider>
+      </MemoryRouter>,
+    );
+  }
+
+  it("is one pill under its label, with the bar's class, and no form, why or card of its own", async () => {
+    const box = inBar(VOTE);
+    const pill = await calling(box, "Vote");
+    const bar = one(box, '[data-test="bar"]');
+    expect(pill.className).toBe("pill");
+    expect(pill.getAttribute("type")).toBe("button");
+    expect([...bar.children]).toEqual([pill]);
+    expect(all(box, "figure, form, article, input")).toHaveLength(0);
+  });
+
+  it("opens the bar's card, prefilled, naming the realm and the function the data says", async () => {
+    const box = inBar(VOTE);
+    click(await calling(box, "Vote"));
+    const card = one(one(box, '[data-test="cards"]'), "article");
+    expect(inputs(card).map((i) => i.value)).toEqual(["15", "YES"]);
+    expect(card.textContent).toContain(DAO);
+    expect(card.textContent).toContain("MustVoteOnProposalSimple");
+  });
+
+  it("is a link to the realm view under its label for a call of more than two fields, opening no card", async () => {
+    const wide = () =>
+      listing([
+        {
+          FuncName: "Grant",
+          Params: [CUR, field("a", "string"), field("b", "string"), field("c", "string")],
+          Results: null,
+        },
+      ]);
+    const box = inBar({ realm: DAO, function: "Grant", args: {} }, vi.fn<ChainFetch>(wide), "/r/gov/dao");
+    await vi.waitFor(() => {
+      expect(all(box, "a").map((a) => [a.textContent, a.getAttribute("href"), a.className])).toEqual([
+        ["Vote", "/r/gov/dao", "pill"],
+      ]);
+    });
+    expect(all(box, "button, article")).toHaveLength(0);
+  });
+
+  it.each([
+    ["a function qfuncs does not list", { ...VOTE, function: "Drain" }, FUNCTIONS_ANSWER],
+    ["an argument that is no parameter", { ...VOTE, args: { nope: "1" } }, FUNCTIONS_ANSWER],
+    ["a type a call does not carry", { ...VOTE, function: "Configure", args: {} }, FUNCTIONS_ANSWER],
+    ["qfuncs down", VOTE, () => Promise.resolve(new Response("down", { status: 503 }))],
+  ])("draws no pill for %s", async (_name, action, read) => {
+    const under = vi.fn<ChainFetch>(read);
+    const box = inBar(action, under);
+    const sibling = mount(
+      <StoreProvider>
+        <ActionForm
+          action={VOTE}
+          chain={CHAIN}
+          options={{ fetch: vi.fn<ChainFetch>(() => after(under, FUNCTIONS_ANSWER)) }}
+        />
+      </StoreProvider>,
+    );
+    await calling(sibling, "Call MustVoteOnProposalSimple");
+    expect(one(box, '[data-test="bar"]').childElementCount).toBe(0);
   });
 });

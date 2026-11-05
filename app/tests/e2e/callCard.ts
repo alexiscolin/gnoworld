@@ -1,3 +1,4 @@
+import AxeBuilder from "@axe-core/playwright";
 import { realmType } from "@gnoworld/core";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { indexer } from "../chain/indexerRoute.ts";
@@ -196,4 +197,11 @@ export async function connect(page: Page): Promise<void> {
 export async function callAndSign(page: Page): Promise<void> {
   await calls(page).getByRole("button", { name: "Call SetBio" }).click();
   await calls(page).getByRole("article").getByRole("button", { name: "Sign in Adena" }).click();
+}
+
+/** What every call journey asks of the page it ends on: no dialog, no accessibility violation, no sideways scroll. */
+export async function sound(page: Page): Promise<void> {
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }

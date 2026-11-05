@@ -10,6 +10,9 @@ import { readProposals } from "../../lib/chain/proposal.ts";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { ProposalCard, ReadFailed } from "../realms/index.ts";
+import type { PinnedBarProps } from "../chat/index.ts";
+import { pinnedOf } from "../../pinned.ts";
+import { PinnedForms } from "./Pinned.tsx";
 import styles from "./Proposals.module.css";
 import { ringOf } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";
@@ -23,6 +26,8 @@ export interface ProposalsProps {
   /** The realm's view on this site, `/r/gov/dao` or `/net/<universe>/r/gov/dao`: which realm and which chain it is read from. */
   path: string;
   options?: ReadOptions;
+  /** The world's pinned actions (D271), drawn first, under Read the proposals. */
+  pinned?: Pick<PinnedBarProps, "actions" | "universe">;
 }
 
 // The ring of a proposal that gave its tally: the lit share of the orbit and the mark of the threshold, a circle of 1 unit's
@@ -120,25 +125,30 @@ function useProposals(path: string, options: ReadOptions) {
   return { read, realm, origin };
 }
 
-export default function Proposals({ path, options = NO_OPTIONS }: ProposalsProps) {
+export default function Proposals({ path, options = NO_OPTIONS, pinned }: ProposalsProps) {
   const { read, realm, origin } = useProposals(path, options);
   const home = origin === undefined || realm === undefined ? undefined : gnowebLink(origin, realm);
   return (
-    <section aria-labelledby="proposals-title">
-      <Stack space="xs">
-        <h2 id="proposals-title" className="label">
-          Proposals
-        </h2>
-        {read === undefined || realm === undefined ? (
-          <p className="label" role="status">
-            Reading the proposals
-          </p>
-        ) : read.ok ? (
-          <Read read={read} realm={realm} origin={origin} />
-        ) : (
-          <Failed read={read} home={home} />
-        )}
-      </Stack>
-    </section>
+    <>
+      {pinned === undefined ? null : (
+        <PinnedForms pinned={pinnedOf(pinned.actions, pinned.universe)} options={options} />
+      )}
+      <section aria-labelledby="proposals-title">
+        <Stack space="xs">
+          <h2 id="proposals-title" className="label">
+            Proposals
+          </h2>
+          {read === undefined || realm === undefined ? (
+            <p className="label" role="status">
+              Reading the proposals
+            </p>
+          ) : read.ok ? (
+            <Read read={read} realm={realm} origin={origin} />
+          ) : (
+            <Failed read={read} home={home} />
+          )}
+        </Stack>
+      </section>
+    </>
   );
 }

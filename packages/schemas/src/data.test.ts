@@ -498,3 +498,102 @@ describe("BubbleRules", () => {
     );
   });
 });
+
+// 9e-1 (Alexis, 2026-11-06): a world's pinned actions, at most 3, each a call on one of the world's own realms, its texts capped as a
+// proposal's; the client checks each against vm/qfuncs before it shows. A label is drawn on a button: no control or format character.
+describe("a world's pinned actions", () => {
+  const DAO = "gno.land/r/gov/dao";
+  const vote = () => ({ label: "Vote", realm: DAO, function: "MustVoteOnProposalSimple", args: { pid: "15" } });
+  const withActions = (actions: unknown, realms: unknown = [DAO]) => [{ ...hub, realms, actions }];
+
+  it.each([
+    ["Hubs", Hubs],
+    ["Stations", Stations],
+  ] as const)("in %s, takes one to three actions on the world's realms, and none at all", (_, schema) => {
+    expect(schema.safeParse([hub]).success).toBe(true);
+    expect(schema.safeParse(withActions([vote()])).success).toBe(true);
+    const labelled = (n: number) => Array.from({ length: n }, (_, i) => ({ ...vote(), label: `Vote ${String(i)}` }));
+    expect(schema.safeParse(withActions(labelled(3))).success).toBe(true);
+    expect(schema.safeParse(withActions(labelled(4))).success).toBe(false);
+    expect(schema.safeParse(withActions([])).success).toBe(false);
+  });
+
+  it("refuses an action on a realm the world is not about, and an action on a world with no realm", () => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), realm: "gno.land/r/demo/boards" }])).success).toBe(false);
+    expect(Hubs.safeParse([{ ...hub, actions: [vote()] }]).success).toBe(false);
+    expect(
+      Hubs.safeParse(withActions([{ ...vote(), realm: "gno.land/r/demo/boards" }], [DAO, "gno.land/r/demo/boards"]))
+        .success,
+    ).toBe(true);
+  });
+
+  it("says which row, action and field refuse a realm outside the world's", () => {
+    const parsed = Hubs.safeParse([
+      hub,
+      { ...hub, slug: "dao", realms: [DAO], actions: [vote(), { ...vote(), label: "Other", realm: "gno.land/r/x" }] },
+    ]);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map((issue) => issue.path)).toEqual([[1, "actions", 1, "realm"]]);
+  });
+
+  it("refuses a realm that is no realm's path, a field it does not know, and a missing one", () => {
+    expect(
+      Hubs.safeParse(withActions([{ ...vote(), realm: "gno.land/p/demo/avl" }], ["gno.land/p/demo/avl"])).success,
+    ).toBe(false);
+    expect(Hubs.safeParse(withActions([{ ...vote(), why: "Closes tonight." }])).success).toBe(false);
+    for (const key of ["label", "realm", "function", "args"] as const) {
+      const action: Record<string, unknown> = vote();
+      Reflect.deleteProperty(action, key);
+      expect(Hubs.safeParse(withActions([action])).success, key).toBe(false);
+    }
+  });
+
+  it("caps a label at 80 characters, a function's name at 128, an argument at 1000 and the arguments at 16, as a proposal's", () => {
+    const ok = (action: Record<string, unknown>) => Hubs.safeParse(withActions([{ ...vote(), ...action }])).success;
+    expect([ok({ label: "v".repeat(80) }), ok({ label: "v".repeat(81) }), ok({ label: "" })]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect([ok({ function: "F".repeat(128) }), ok({ function: "F".repeat(129) }), ok({ function: "" })]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect([
+      ok({ args: { pid: "1".repeat(1000) } }),
+      ok({ args: { pid: "1".repeat(1001) } }),
+      ok({ args: { pid: "" } }),
+    ]).toEqual([true, false, true]);
+    const many = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`a${String(i)}`, "x"]));
+    expect([ok({ args: many(16) }), ok({ args: many(17) }), ok({ args: {} })]).toEqual([true, false, true]);
+    expect([
+      ok({ args: { ["n".repeat(128)]: "x" } }),
+      ok({ args: { ["n".repeat(129)]: "x" } }),
+      ok({ args: { "": "x" } }),
+    ]).toEqual([true, false, false]);
+  });
+
+  // Code points, not escapes typed here: a right-to-left override, a zero-width space and a line feed.
+  it.each([[0x202e], [0x200b], [0x0a], [0x2066], [0x2069], [0xfeff], [0x2028], [0x00], [0x09], [0xad]])(
+    "refuses a label holding the control, format or separator character %i",
+    (point) => {
+      const label = `Vote${String.fromCodePoint(point)}`;
+      expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success).toBe(false);
+    },
+  );
+
+  it("refuses a label of spaces alone, two actions of one label, and a label that reads as Who's here", () => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), label: "   " }])).success).toBe(false);
+    expect(Hubs.safeParse(withActions([vote(), { ...vote(), args: { pid: "16" } }])).success).toBe(false);
+    expect(Hubs.safeParse(withActions([vote(), { ...vote(), label: "Vote on 16" }])).success).toBe(true);
+    for (const label of ["Who's here", "who's here", " Who's here "])
+      expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success, label).toBe(false);
+  });
+
+  // JSON.parse makes "__proto__" an own key, which a parsed object would drop: the argument would vanish unseen.
+  it("refuses an argument named __proto__ from a file, which would vanish from the action", () => {
+    const rows: unknown = JSON.parse(JSON.stringify(withActions([vote()])).replace('"pid"', '"__proto__"'));
+    expect(Hubs.safeParse(rows).success).toBe(false);
+  });
+});

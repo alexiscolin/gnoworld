@@ -24,10 +24,13 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk is asked after the first
 // screen, and the scripts only it needs with it. The first screen counts the scripts the others need.
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
+// A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk asked after hydration by a world that
+// pins one alone; the scripts only it needs come with it.
+const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 
 // The scripts the page's others import, as each file's own static imports say (`from"./x.js"`, `import"./x.js"`, never a dynamic
-// `import("./x.js")`), from the roots that are no other's import, the proposals' chunk apart.
-const withoutProposals = (page: Page, urls: readonly string[], skip: string) =>
+// `import("./x.js")`), from the roots that are no other's import, the chunks asked after the first screen apart.
+const withoutLater = (page: Page, urls: readonly string[], skip: readonly string[]) =>
   page.evaluate(
     async ([list, skipped]) => {
       const edges = new Map<string, string[]>();
@@ -47,7 +50,7 @@ const withoutProposals = (page: Page, urls: readonly string[], skip: string) =>
         kept.add(url);
         for (const next of edges.get(url) ?? []) walk(next);
       };
-      for (const url of list) if (url !== skipped && !imported.has(url)) walk(url);
+      for (const url of list) if (!skipped.includes(url) && !imported.has(url)) walk(url);
       return [...kept];
     },
     [[...urls], skip] as const,
@@ -99,7 +102,13 @@ for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
-    const firstScreen = asked[0] === undefined ? [...scripts] : await withoutProposals(page, [...scripts], asked[0]);
+    const pinned = [...scripts].filter((url) => PINNED.test(url));
+    // Only a world that pins an action asks for their code: GovDAO.
+    expect(pinned.length, "a world asks for the pinned actions' code when it pins one").toBe(
+      path.includes("govdao") ? 1 : 0,
+    );
+    const later = [...asked, ...pinned];
+    const firstScreen = later.length === 0 ? [...scripts] : await withoutLater(page, [...scripts], later);
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),

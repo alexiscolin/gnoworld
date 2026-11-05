@@ -9,6 +9,7 @@ import hubs from "../data/hubs.json" with { type: "json" };
 import stations from "../data/stations.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
+import type { PinnedRow } from "./pinned.ts";
 
 /** A world or an ecosystem: what the site shows of it, with its one address. */
 export interface Listed {
@@ -24,6 +25,8 @@ export interface Listed {
   canonical: string;
   /** The realms a world is about, on its universe's chain: the first is the one its page reads proposals from. */
   realms?: readonly string[];
+  /** The calls its team pins (D271), as the data file holds them. */
+  actions?: readonly PinnedRow[];
 }
 export type World = Listed;
 export type Ecosystem = Listed;
@@ -47,6 +50,7 @@ interface Row {
   description: string;
   universe: string;
   realms?: readonly string[] | undefined;
+  actions?: readonly PinnedRow[] | undefined;
 }
 interface Source {
   universes: { id: string; name: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
@@ -136,6 +140,7 @@ function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: s
     testnet,
     ...at,
     ...(row.realms === undefined ? {} : { realms: row.realms }),
+    ...(row.actions === undefined ? {} : { actions: row.actions }),
   };
 }
 

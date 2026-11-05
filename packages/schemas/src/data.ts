@@ -77,14 +77,75 @@ export const RealmPath = z
   .string()
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
-const World = z.strictObject({
-  slug: Slug,
-  name: text(DATA_CAPS.name),
-  description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
-  universe: Slug,
-  /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
-  realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
+/** The most a call's arguments may hold, as a Jarvis proposal and a world's pinned action give them, in code points. */
+const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
+
+/** A call's arguments by the parameter's name, as text: what a call carries. */
+const CallArgs = z.pipe(
+  // Zod drops a key `__proto__` (an own key from JSON.parse) without a word: its argument would vanish unseen.
+  z
+    .unknown()
+    .check(
+      z.refine(
+        (args) => typeof args !== "object" || args === null || !Object.hasOwn(args, "__proto__"),
+        "no argument is named __proto__",
+      ),
+    ),
+  z
+    .record(text(CALL_CAPS.name), z.string().check(z.maxLength(CALL_CAPS.arg)))
+    .check(z.refine((args) => Object.keys(args).length <= CALL_CAPS.args, "too many arguments")),
+);
+
+// A label drawn on a button that leads to a signature: words a reader sees as they are (no control, format or separator character,
+// not spaces alone), never the bar's own Who's here.
+const Label = text(CALL_CAPS.label).check(
+  z.refine((label) => !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(label), "a label holds no control or format character"),
+  z.refine((label) => label.trim() !== "", "a label is more than spaces"),
+  z.refine((label) => label.trim().toLowerCase() !== "who's here", "a label is not the bar's Who's here"),
+);
+
+/** A call the team pins in a world (D271): the realm one of the world's own, checked against vm/qfuncs before it shows. */
+const PinnedAction = z.strictObject({
+  label: Label,
+  realm: RealmPath,
+  function: text(CALL_CAPS.name),
+  args: CallArgs,
 });
+
+const World = z
+  .strictObject({
+    slug: Slug,
+    name: text(DATA_CAPS.name),
+    description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
+    universe: Slug,
+    /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
+    realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
+    /** Up to 3 calls the team pins, shown in the world's chat bar and on its page (D271). */
+    actions: z.optional(z.array(PinnedAction).check(z.minLength(1), z.maxLength(3))),
+  })
+  .check(
+    z.check((ctx) => {
+      const realms = new Set(ctx.value.realms);
+      const labels = new Set<string>();
+      ctx.value.actions?.forEach((action, index) => {
+        if (!realms.has(action.realm))
+          ctx.issues.push({
+            code: "custom",
+            input: action.realm,
+            path: ["actions", index, "realm"],
+            message: "an action's realm is one of the world's realms",
+          });
+        if (labels.has(action.label))
+          ctx.issues.push({
+            code: "custom",
+            input: action.label,
+            path: ["actions", index, "label"],
+            message: `duplicate label ${JSON.stringify(action.label)}`,
+          });
+        labels.add(action.label);
+      });
+    }),
+  );
 
 export const Hubs = inUniverse(World);
 export const Stations = inUniverse(World);

@@ -215,6 +215,7 @@ describe("loadData", () => {
         description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
         universe: "onyx",
         realms: ["gno.land/r/gov/dao"],
+        actions: [{ label: "Vote", realm: "gno.land/r/gov/dao", function: "MustVoteOnProposalSimple", args: {} }],
       },
     ]);
     // events and news hold the ticker's placeholders, listed below.

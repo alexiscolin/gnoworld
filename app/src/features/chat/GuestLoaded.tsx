@@ -57,11 +57,13 @@ function GuestRoom({
   shown,
   view,
   onWhoIsHere,
+  pinned,
 }: {
   asksDm: boolean;
   shown: Shown | undefined;
   view: RoomViewOver;
   onWhoIsHere: () => void;
+  pinned: ChatPlace["pinned"];
 }) {
   return (
     <>
@@ -72,7 +74,7 @@ function GuestRoom({
           {...shown.view}
           {...view}
           composer={
-            <Dock onWhoIsHere={onWhoIsHere}>
+            <Dock onWhoIsHere={onWhoIsHere} pinned={pinned}>
               <p>{LOG_IN_TO_WRITE}</p>
             </Dock>
           }
@@ -134,6 +136,7 @@ export function GuestLoaded({
           shown={shown}
           view={{ ...threads.view, chat, verdicts, saving, keeping, pins }}
           onWhoIsHere={ask}
+          pinned={place.pinned}
         />
       )}
     </ChatScreen>

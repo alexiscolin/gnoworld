@@ -96,6 +96,7 @@ describe("the worlds of the data files", () => {
         path: "/w/govdao",
         canonical: "/net/onyx/w/govdao",
         realms: ["gno.land/r/gov/dao"],
+        actions: [{ label: "Vote", realm: "gno.land/r/gov/dao", function: "MustVoteOnProposalSimple", args: {} }],
       },
     ]);
   });
