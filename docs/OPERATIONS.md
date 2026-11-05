@@ -2,7 +2,7 @@
 
 The runbook (ADR-0002 §7). It holds the demo: the client behind a password, published through
 Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login, the rooms, the bot)
-and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis`, off by default, comes with slice 10 (10j), and
+and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis`, off by default and under a profile of its own, comes with slice 10 (10j, 10j-4), and
 Grafana later (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
 and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
 later, Docker Desktop, or OrbStack.
@@ -17,8 +17,8 @@ later, Docker Desktop, or OrbStack.
 | `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and a probe for its health; its auth script is the server's socket | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 512 MB, 1,024 processes (Go's threads count) | the `ergo` volume (accounts, history) | `ergo_oper_password` |
 | `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`) on its own address of `inside` (`SERVER_ADDRESS`); the `auth` volume's socket | `SERVER_ADDRESS:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
 | `egress` (profile `demo`) | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
-| `jarvis` | built from `deploy/jarvis/Dockerfile`: its package, the packages it imports and gnomcp 0.11.0 (its release image, by digest), on distroless Node 24 | 8081 on its address of `jarvis` (`JARVIS_ADDRESS`), the network it shares with the server alone | `GET /budgets`, by the name `jarvis` | 0.3 core, 384 MB, 128 processes | the `jarvis` volume (its budgets, its caches) | `anthropic_api_key`, read only when on |
-| `egress_jarvis` (profile `demo`) | the same image as `egress` | 4751 in `guard`'s network, reached from `jarvis_out` alone | its 4751 answers | 0.1 core, 64 MB, 64 processes | none | none |
+| `jarvis` (profile `jarvis`) | built from `deploy/jarvis/Dockerfile`: its package, the packages it imports and gnomcp 0.11.0 (its release image, by digest), on distroless Node 24 | 8081 on its address of `jarvis` (`JARVIS_ADDRESS`), the network it shares with the server alone | `GET /budgets`, by the name `jarvis` | 0.3 core, 384 MB, 128 processes | the `jarvis` volume (its budgets, its caches) | `anthropic_api_key`, read only when on |
+| `egress_jarvis` (profile `jarvis`) | the same image as `egress` | 4751 in `guard`'s network, reached from `jarvis_out` alone | its 4751 answers | 0.1 core, 64 MB, 64 processes | none | none |
 
 All eight have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
 and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `egress` and `egress_jarvis` run as
@@ -42,7 +42,8 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (`JARVIS_NAMES_RPC`, D120).
 - `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
-  serves its budgets and answers `off`, reads no key and starts no gnomcp. It listens on its fixed address of
+  serves its budgets and answers `off`, reads no key and starts no gnomcp. It and `egress_jarvis` sit in the profile
+  `jarvis`, out of the demo's (10j-4): started only with Jarvis switched on, `--profile demo --profile jarvis`. It listens on its fixed address of
   `jarvis` (`JARVIS_ADDRESS`, in `JARVIS_SUBNET`), a network it shares with the server alone; its `/ask` and
   `/budgets` ask no session, so that network is their wall (10i). It goes out through `egress_jarvis` alone, a
   smokescreen of its own on 4751 in `guard`'s network, which takes 4751 from `jarvis_out` alone and sends that network
@@ -51,7 +52,8 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
 - The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
   jarvis's network reaches no port of the server's (10j's review, V12); web and the tests ask it as `server:8080`.
   The guard finds `jarvis_out` by its own address there (`GUARD_JARVIS_ADDRESS`, in `JARVIS_OUT_SUBNET`) and waits for
-  no jarvis: a jarvis that fails to start leaves the demo up, the door answering internal.
+  no jarvis: without it, the demo runs, and the door answers `off` while Jarvis is off, never asking jarvis; switched
+  on without jarvis's profile, or with a jarvis that fails to start, the door answers `not_ready` (503) (10l-1).
 - The admin API (10g) listens on 8082 at the server's address of `admin` (`ADMIN_ADDRESS`, in `ADMIN_SUBNET`), a
   network nobody else joins: the admin console joins it (slice 12); its sites are `ADMIN_ORIGINS`.
 
@@ -100,12 +102,13 @@ tailnet; keep it so.
 | What | Command, from the repository's root |
 |---|---|
 | Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
-| Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh` |
+| The same with Jarvis switched on (`JARVIS=on`) | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis up -d --build` |
+| Test the stack: web, the guard, Ergo, the server and the way out, then jarvis under its profile (no secret needed) | `sh deploy/test.sh` |
 | Test that each check catches its fault | `sh deploy/test.sh --mutants` |
 | Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
-| Its logs | `docker compose -f deploy/compose.yaml --profile demo logs -f` |
-| Stop | `docker compose -f deploy/compose.yaml --profile demo down` |
-| Remove it all | `docker compose -f deploy/compose.yaml --profile demo down -v`, then delete the machine in the admin console |
+| Its logs, jarvis's with them if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis logs -f` |
+| Stop, jarvis with it if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down` |
+| Remove it all | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down -v`, then delete the machine in the admin console |
 
 Run `sh deploy/test.sh` after every change to `deploy/`, and when the app changes what it serves
 (a new kind of file, many more files on a first load); `--mutants` in `/pre-merge` of a branch
@@ -116,9 +119,9 @@ socket. Their output names the host's addresses and ports: never commit it, nor 
 
 ## When something goes wrong: cut the public URL
 
-A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2.4
-cores and 1,952 MB in all with jarvis and its way out, at and under the 2.4 cores and 2 GB the test holds as a
-ceiling, question 10j-4: Docker stops a container at its cap, not the host). To cut the public URL at once:
+A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2
+cores and 1,504 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
+cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.4 core and 448 MB more when on. To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|

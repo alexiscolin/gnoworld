@@ -160,8 +160,9 @@ cleanup() {
 	kill "$canary_pid" 2>/dev/null || true
 	wait "$canary_pid" 2>/dev/null || true
 	if [ -n "${started:-}" ]; then
-		docker compose -p "$project" $files down -v >/dev/null 2>&1 ||
-			echo "test.sh: the project $project is still up: docker compose -p $project --profile demo down -v" >&2
+		# jarvis's profile too, which test-jarvis.sh starts (10j-4): a down of the demo's alone leaves it up.
+		docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 ||
+			echo "test.sh: the project $project is still up: docker compose -p $project --profile demo --profile jarvis down -v" >&2
 	fi
 	rm -r "$tmp"
 }
@@ -390,7 +391,6 @@ if [ "${1:-}" = --mutants ]; then
 	template() { over ergo /ergo/ircd.yaml.tmpl "$here/ergo/ircd.yaml.tmpl" "$@"; }
 	render_sh() { over ergo /ergo/render.sh "$here/ergo/render.sh" "$@"; }
 	acl() { over egress /etc/smokescreen/acl.yaml "$here/egress/acl.yaml" "$@"; }
-	jarvis_acl() { over egress_jarvis /etc/smokescreen/jarvis-acl.yaml "$here/egress/jarvis-acl.yaml" "$@"; }
 	proxy_config() { over egress /etc/smokescreen/config.yaml "$here/egress/config.yaml" "$@"; }
 	mutant "Ergo's WebSocket open to another site" "a WebSocket from another site is refused" \
 		compose 'services: { ergo: { environment: { ORIGINS: "http://gnoworld.test,https://evil.test" } } }'
@@ -464,17 +464,8 @@ if [ "${1:-}" = --mutants ]; then
 		acl awk '{ print } /- rpc\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
 	# The door's mainnet names (D120): its node's line gone.
 	mutant "the names' node dropped from the way out" "the server does not reach the names' node" acl sed '/- rpc\.gno\.land/d'
-	# jarvis (10j): its list widened or emptied, its proxy open to the internal network, its replies dropped, itself on a
-	# network others share, its root writable, its key given to the server, its stop cut short.
-	mutant "a host added to jarvis's way out" "jarvis's way out lets six hosts out" jarvis_acl awk '{ print } /- api.anthropic.com/ { print "    - api.openai.com" }'
-	mutant "Anthropic's API dropped from jarvis's way out" "jarvis reaches Anthropic's API through its way out" jarvis_acl sed '/- api.anthropic.com/d'
-	mutant "jarvis's way out open to the internal network" "the guard's rules refuse 4751 but from jarvis's network" guard sed '/--dport 4751 -j REJECT/d'
-	mutant "the guard drops jarvis's replies" "jarvis reaches Anthropic's API through its way out" guard sed '/--sport 4751/d'
-	mutant "jarvis on the internal network" "jarvis sits on its two networks only" compose 'services: { jarvis: { networks: { inside: {} } } }'
-	mutant "jarvis's root writable" "jarvis: read-only root" compose 'services: { jarvis: { read_only: false } }'
-	mutant "jarvis's key given to the server" "the server holds no Anthropic key" compose 'services: { server: { secrets: [log_pepper, ergo_oper_password, openai_api_key, anthropic_api_key] } }'
-	mutant "jarvis killed before its drain ends" "jarvis waits 35 s for its drain" compose 'services: { jarvis: { stop_grace_period: 10s } }'
-	mutant "jarvis listening on all its networks" "jarvis's way out's network reaches no listener of jarvis's" compose 'services: { jarvis: { environment: { JARVIS_HOST: 0.0.0.0 } } }'
+	# jarvis's faults (10j, 10j-4), planted from the file that holds its checks.
+	. "$here/test-jarvis.sh"
 	mutant "the admin API on the loopback alone" "the admin API answers on its own network" compose 'services: { server: { environment: { ADMIN_HOST: 127.0.0.1 } } }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
@@ -599,9 +590,10 @@ FAKE
 	done
 	[ "$failed" = "$before" ] || exit 1
 	started=yes
-	docker compose -p "$project" $files down -v >/dev/null 2>&1 || true # what an interrupted run left
-	if ! docker compose -p "$project" $files up -d --build --wait web guard ergo server egress jarvis egress_jarvis; then
-		echo "test.sh: the stack did not start: $(docker compose -p "$project" $files logs --no-log-prefix --tail 1 guard web ergo server egress jarvis egress_jarvis 2>&1 | tr '\n' ' ')" >&2
+	docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 || true # what an interrupted run left
+	# The demo without jarvis, which test-jarvis.sh starts under its own profile at the end (10j-4).
+	if ! docker compose -p "$project" $files up -d --build --wait web guard ergo server egress; then
+		echo "test.sh: the stack did not start: $(docker compose -p "$project" $files logs --no-log-prefix --tail 1 guard web ergo server egress 2>&1 | tr '\n' ' ')" >&2
 		exit 3
 	fi
 	web=$(docker compose -p "$project" $files ps -q web)
@@ -833,10 +825,16 @@ PY
 	hardened "$ergo" ergo
 	hardened "$server" server
 	hardened "$egress" egress network
-	jarvis=$(docker compose -p "$project" $files ps -q jarvis)
-	egress_jarvis=$(docker compose -p "$project" $files ps -q egress_jarvis)
-	hardened "$jarvis" jarvis
-	hardened "$egress_jarvis" egress_jarvis network
+	# jarvis and its way out sit in a profile of their own (10j-4): the demo holds neither, starts neither, and the
+	# server's name for jarvis answers nothing, so its door answers off, or not_ready when on (10l-1).
+	expect "the demo profile holds no jarvis, nor its way out" \
+		"$(docker compose -p "$project" $files config --services | grep -cxE 'jarvis|egress_jarvis' || true)" 0
+	for name in jarvis egress_jarvis; do
+		expect "the demo starts no $name" \
+			"$(docker ps -aq --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$name")" ""
+	done
+	expect "the server finds no jarvis in the demo" "$(docker exec "$server" /nodejs/bin/node -e \
+		"fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" refused
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "
 	expect "the server sits on the internal network, jarvis's and the admin API's" "$(networks_of "$server")" "${project}_admin $inside ${project}_jarvis "
 	expect "the way out holds the guard's network, behind its rules" \
@@ -854,10 +852,10 @@ def size(value):
     return int(number) * units[unit]
 services = list(json.load(sys.stdin)["services"].values())
 print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.get("mem_limit", 0)) for s in services)))')
-	if python3 -c 'import sys; c, m = sys.argv[1].split(); sys.exit(float(c) > 2.4 or int(m) > 2**31)' "$caps"; then
-		pass "the demo's caps fit 2.4 cores and 2 GB ($caps)"
+	if python3 -c 'import sys; c, m = sys.argv[1].split(); sys.exit(float(c) > 2 or int(m) > 2**31)' "$caps"; then
+		pass "the demo's caps fit 2 cores and 2 GB ($caps)"
 	else
-		fail "the demo's caps pass 2.4 cores or 2 GB ($caps)"
+		fail "the demo's caps pass 2 cores or 2 GB ($caps)"
 	fi
 	expect "the server's image installs the lockfile's versions" "$(grep -c -- '--frozen-lockfile' "$here/server/Dockerfile")" 1
 
@@ -1452,7 +1450,7 @@ print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default")))
 	# The probe of Ergo's and the way out's health checks (deploy/probe), tested where Go is.
 	expect "the health probe passes its tests" "$(docker run --rm -v "$here/probe:/src:ro" -w /src -e GOCACHE=/tmp \
 		"$GOLANG" go test ./... 2>&1 | tail -n 1 | cut -c1-2)" ok
-	# jarvis's own proofs (10j): its networks, its way out, its file, its key and its image, beside the server's.
+	# jarvis's own proofs (10j), which start it under its profile on the demo: its networks, way out, file, key, image.
 	. "$here/test-jarvis.sh"
 else
 	# The running demo.
@@ -1468,9 +1466,8 @@ else
 	ts=$(of tailscale)
 	guard=$(of guard)
 	web=$(of web)
-	ergo=$(of ergo) server=$(of server) egress=$(of egress) jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis)
-	if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ] ||
-		[ -z "$jarvis" ] || [ -z "$egress_jarvis" ]; then
+	ergo=$(of ergo) server=$(of server) egress=$(of egress)
+	if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ]; then
 		echo "test.sh: the demo is not running (docker compose -f deploy/compose.yaml --profile demo up -d --build)" >&2
 		exit 3
 	fi
@@ -1478,11 +1475,12 @@ else
 	expect "Tailscale's network is the guard's" "$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$ts")" "container:$(docker inspect --format '{{.Id}}' "$guard")"
 	reach "container:$ts" "Tailscale's network" yes "$(guard_dns)"
 	memory=0 cpus=0
-	for id in $ts $guard $web $ergo $server $egress $jarvis $egress_jarvis; do
+	# The demo profile's six; jarvis, under its own profile, is out of the demo's cap (10j-4).
+	for id in $ts $guard $web $ergo $server $egress; do
 		memory=$((memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
 		cpus=$((cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
 	done
-	if [ "$memory" -le 2147483648 ] && [ "$cpus" -le 2400000000 ]; then pass "the demo stays under 2 GB and 2.4 cores"; else fail "the demo: $memory bytes, $cpus nano-cpus"; fi
+	if [ "$memory" -le 2147483648 ] && [ "$cpus" -le 2000000000 ]; then pass "the demo stays under 2 GB and 2 cores"; else fail "the demo: $memory bytes, $cpus nano-cpus"; fi
 
 	json=$(docker exec "$ts" tailscale --socket=/tmp/tailscaled.sock status --json)
 	read_json() { printf '%s' "$json" | python3 -c "import json, sys; d = json.load(sys.stdin); print($1)"; }
