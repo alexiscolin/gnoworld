@@ -112,9 +112,10 @@ describe("connect", () => {
     });
   });
 
-  it("takes the network's answer under either name the SDK gives it", async () => {
+  it("refuses the network's answer under a name Adena never gives it (D230)", async () => {
     expect(await connect(new Wallet({ GetNetwork: () => ok("GET_NETWORK_SUCCESS", NETWORK) }))).toMatchObject({
-      ok: true,
+      ok: false,
+      reason: "malformed",
     });
   });
 
@@ -444,6 +445,124 @@ describe("signLogin", () => {
     ["a success whose type is another call's", { SignArbitrary: () => ok("SIGN_TX", proofOf(TEXT)) }, "malformed"],
   ])("says so when %s", async (_, over, reason) => {
     expect(await signLogin(new Wallet(over), login(TEXT))).toEqual({ ok: false, reason });
+  });
+});
+
+describe("signLogin and the extension's version (sign-in needs 1.22.2)", () => {
+  // A wallet that says its version; SignArbitrary is there, as a version that predates it has none.
+  const versioned = (version: unknown) => Object.assign(new Wallet(), { version });
+
+  it.each(["1.22.1", "1.9.0", "0.1.0"])("asks for an update from %s, before any call", async (version) => {
+    const adena = versioned(version);
+    expect(await signLogin(adena, login(TEXT))).toEqual({ ok: false, reason: "outdated" });
+    expect(adena.asked).toEqual([]);
+  });
+
+  it.each(["1.22.2", "1.22.10", "1.23.0", "2.0.0"])("signs from %s", async (version) => {
+    expect(await signLogin(versioned(version), login(TEXT))).toMatchObject({ ok: true });
+  });
+
+  it("asks for an update when the version cannot be read: nothing is guessed", async () => {
+    expect(await signLogin(versioned("one"), login(TEXT))).toEqual({ ok: false, reason: "outdated" });
+  });
+
+  it("signs when the extension says no version: its method is the proof it can", async () => {
+    expect(await signLogin(versioned(undefined), login(TEXT))).toMatchObject({ ok: true });
+  });
+});
+
+// Each hostile wallet ends in one named result, for the login's two calls alike (F5665).
+describe("a wallet that throws or lacks a method ends in one result", () => {
+  const whole: Record<string, (...args: unknown[]) => unknown> = {
+    AddEstablish: () => ok("CONNECTION_SUCCESS", {}),
+    GetAccount: () => ok("GET_ACCOUNT", ACCOUNT),
+    GetNetwork: () => ok("GET_NETWORK", NETWORK),
+    SignArbitrary: (params: unknown) => {
+      const { data, signer } = params as { data: string; signer: string };
+      return ok("SIGN_ARBITRARY", proofOf(data, signer));
+    },
+  };
+  const throwing = (name: string) =>
+    Object.defineProperty({ ...whole }, name, {
+      get(): never {
+        throw new Error("trap");
+      },
+    });
+  const revoked = () => {
+    const proxy = Proxy.revocable({}, {});
+    proxy.revoke();
+    return proxy.proxy;
+  };
+  const trap = (): never => {
+    throw new Error("trap");
+  };
+  const trapped = () => new Proxy({}, { has: trap, ownKeys: trap, get: trap });
+
+  it.each([
+    ["a SignArbitrary getter that throws", () => throwing("SignArbitrary"), "failed"],
+    ["an AddEstablish getter that throws", () => throwing("AddEstablish"), "failed"],
+    ["a revoked proxy", revoked, "failed"],
+    ["a proxy whose every trap throws", trapped, "failed"],
+  ])("signLogin with %s is %s", async (_, make, reason) => {
+    expect(await signLogin(make(), login(TEXT))).toStrictEqual({ ok: false, reason });
+  });
+
+  it.each([
+    ["an AddEstablish getter that throws", () => throwing("AddEstablish")],
+    ["a GetAccount getter that throws", () => throwing("GetAccount")],
+    ["a GetNetwork getter that throws", () => throwing("GetNetwork")],
+  ])("connect with %s is failed", async (_, make) => {
+    expect(await connect(make())).toStrictEqual({ ok: false, reason: "failed" });
+  });
+
+  it.each(["AddEstablish", "GetAccount", "GetNetwork"])(
+    "connect with no %s is missing, and Adena is asked nothing",
+    async (name) => {
+      const asked: string[] = [];
+      const adena = Object.fromEntries(
+        Object.entries(whole)
+          .filter(([method]) => method !== name)
+          .map(([method, answering]) => [
+            method,
+            (...args: unknown[]) => {
+              asked.push(method);
+              return answering(...args);
+            },
+          ]),
+      );
+      expect(await connect(adena)).toStrictEqual({ ok: false, reason: "missing" });
+      expect(asked).toEqual([]);
+    },
+  );
+});
+
+// What commit e0cae601 changed without a test (F5666): a failure of a type nobody knows is read by its code, and a failure
+// typed as another call's success is a plain failed answer; only its own success type as a failure is malformed.
+describe("a failure's type and code, for the login's calls", () => {
+  const failure = (type: string, code: number) =>
+    Promise.resolve({ code, status: "failure", type, message: "", data: {} });
+  const reads = {
+    connect: (over: Record<string, () => unknown>) => connect(new Wallet(over)),
+    signLogin: (over: Record<string, () => unknown>) => signLogin(new Wallet(over), login(TEXT)),
+  };
+  const failing = { connect: "GetAccount", signLogin: "SignArbitrary" } as const;
+
+  describe.each(["connect", "signLogin"] as const)("%s", (call) => {
+    it.each([
+      [2000, "locked"],
+      [4000, "declined"],
+      [3002, "no-account"],
+      [4001, "failed"],
+      [12345, "failed"],
+    ])("an unknown type with the code %i is %s", async (code, reason) => {
+      const result = await reads[call]({ [failing[call]]: () => failure("A_TYPE_NOBODY_KNOWS", code) });
+      expect(result).toStrictEqual({ ok: false, reason });
+    });
+
+    it("a failure typed as another call's success is failed, read by its code like an unknown type", async () => {
+      const result = await reads[call]({ [failing[call]]: () => failure("GET_NETWORK", 4001) });
+      expect(result).toStrictEqual({ ok: false, reason: "failed" });
+    });
   });
 });
 

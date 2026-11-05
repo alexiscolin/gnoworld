@@ -7,7 +7,11 @@ import { LoginView } from "./LoginView.tsx";
 
 // Adena's calls come with the first click that logs in: a page that never logs in does not load them.
 async function logInWithAdena(deps: SessionDeps): Promise<void> {
-  const { connect, pageAdena, signLogin } = await import("../../lib/adena/adena.ts");
+  const [{ connect, pageAdena, signLogin }, { listen, watchAccount }] = await Promise.all([
+    import("../../lib/adena/adena.ts"),
+    import("./watch.ts"),
+  ]);
+  watchAccount(pageAdena(), { ...deps, listen });
   await logIn(pageAdena(), { ...deps, connect, sign: signLogin });
 }
 
