@@ -1,6 +1,6 @@
 /* The rail (frames 4 and 16): a dark glass column at the right edge, under the header, as tall as its worlds down to over the ticker
    (DESIGN-SYSTEM.md, Rail), its planets one under the other, 98 px apart, each with its name in the label style under it; past that, the
-   column scrolls under the panel's foot, which fades it, and See all ends it. Its width comes from its footprint, which the labels keep
+   column scrolls to its last planet under the panel's foot, which fades it (frames 6, 17: no link ends it). Its width comes from its footprint, which the labels keep
    clear (core's RAIL), and which the rail writes on itself. */
 @layer components {
   .rail {
@@ -26,7 +26,7 @@
   .column {
     /* raw: the panel down to 1,024 px of 1,080 at most, frame 4's foot, over the ticker and its air */
     max-block-size: calc(100vb - 154px);
-    /* layout: the planets and See all scroll inside the panel, which keeps its edge */
+    /* layout: the planets scroll inside the panel, which keeps its edge */
     overflow: auto;
     /* raw: a planet the dock or the scroll moves past the panel's top fades over 12 px, under its edge */
     mask-image: linear-gradient(transparent, #000 12px);
@@ -45,8 +45,8 @@
     flex-direction: column;
     /* layout: a list with no margin of its own */
     margin: 0;
-    /* raw: frame 4's first planet 18 px under the panel's top, with no view tabs above it */
-    padding: 18px 0 0;
+    /* raw: frame 4's first planet 18 px under the panel's top, with no view tabs above it; the last one a larger step above the panel's foot */
+    padding: 18px 0 var(--space-l);
     list-style-type: none;
   }
 
@@ -74,17 +74,8 @@
     text-align: center;
   }
 
-  .world:is(:hover, :focus-visible) .name,
-  .all:is(:hover, :focus-visible) {
+  .world:is(:hover, :focus-visible) .name {
     color: var(--color-text);
-  }
-
-  .all {
-    /* layout: See all ends the column, a step under the last planet */
-    display: block;
-    /* layout: in the middle of the column, a step under the last planet, a larger one above the panel's foot */
-    margin: var(--space-xs) auto var(--space-l);
-    inline-size: fit-content;
   }
 
   /* The rail is a computer's: a phone keeps the page's list (Hero's Worlds). */
