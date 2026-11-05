@@ -67,6 +67,8 @@ interface Options {
   random?: () => number;
   guests?: (string | Error)[];
   refusedOpens?: number;
+  // The state whose first report throws in the caller's onState, once it has been recorded.
+  throwingOn?: ErgoState;
 }
 const setup = (options: Options = {}) => {
   const sockets: FakeSocket[] = [];
@@ -75,6 +77,7 @@ const setup = (options: Options = {}) => {
   const waits: { ms: number; run: () => void; cancelled: boolean }[] = [];
   let mints = 0;
   let opensRefused = 0;
+  let thrown = false;
   const client = connectErgo({
     url: ERGO,
     // A guest draws its nicks from the test's list, an Error thrown; an account asks a ticket for each connection.
@@ -105,7 +108,13 @@ const setup = (options: Options = {}) => {
       sockets.push(socket);
       return socket;
     },
-    onState: (state) => states.push(state),
+    onState: (state) => {
+      states.push(state);
+      if (state === options.throwingOn && !thrown) {
+        thrown = true;
+        throw new Error("onState broke");
+      }
+    },
     onLine: (line) => lines.push(line),
     random: options.random ?? (() => 0.5),
     after: (ms, run) => {
@@ -429,6 +438,13 @@ describe("connectErgo's handshake", () => {
     expect(t.backoffs()).toHaveLength(1);
     await t.run(t.backoffs()[0]);
     expect(t.sockets).toHaveLength(1);
+  });
+
+  it("says waiting once when its caller's onState throws on it, and still waits to try again", async () => {
+    const t = setup({ throwingOn: "waiting", tickets: [() => Promise.resolve({ ok: false, reason: "network" })] });
+    await t.settle();
+    expect(t.states).toEqual(["connecting", "waiting"]);
+    expect(t.backoffs()).toHaveLength(1);
   });
 
   it("names an account by the nick Ergo welcomed it with, though it sent its address", async () => {

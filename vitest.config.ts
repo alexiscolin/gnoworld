@@ -109,13 +109,19 @@ export default defineConfig({
         "server/src/main.ts",
       ],
       reporter: ["text-summary", "json"],
-      // 85% everywhere (Alexis, 2026-10-17); core's rules at 100%, branches 95%.
+      // 85% everywhere (Alexis, 2026-10-17). Core at what slices 7 and 8's hardening measured, never under 90 (Alexis, 2026-11-05);
+      // docs/REVIEW.md's tier-1 files at 100% of lines, functions and statements, their branches as measured (the rest are `??` no
+      // input reaches: 8n's and 8r's lists). A glob's thresholds hold its files together, so 100 there is 100 for each file.
       thresholds: {
         lines: 85,
         functions: 85,
         branches: 85,
         statements: 85,
-        "packages/core/**": { lines: 100, functions: 100, branches: 95, statements: 100 },
+        "packages/core/**": { lines: 99.9, functions: 100, branches: 92.3, statements: 99.7 },
+        "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,packages/core/src/chain,packages/core/src/markdown,app/src/sw,server/src/ergo}/**":
+          { lines: 100, functions: 100, statements: 100, branches: 97.2 },
+        "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}":
+          { lines: 100, functions: 100, statements: 100, branches: 97.3 },
       },
     },
   },
