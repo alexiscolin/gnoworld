@@ -31,13 +31,15 @@ export function makeHistory(file: string, now: () => number): History {
   return {
     add(tokens, at) {
       const lines = new Map((day?.tokens ?? []).map(({ symbol, usd }) => [symbol, usd]));
-      // A token that had no price at a read keeps its line as it was; the lines keep the tokens' order.
+      const read = new Map(tokens.map(({ symbol, usd }) => [symbol, usd]));
+      // A token that had no price at a read keeps its line as it was; the lines keep the tokens' order, the day's first.
       day = MarketsHistory.parse({
         updated: new Date(at).toISOString(),
-        tokens: tokens.map(({ symbol, usd }) => ({
-          symbol,
-          usd: [...(lines.get(symbol) ?? []), usd].slice(-MARKETS_HISTORY_MOST),
-        })),
+        tokens: [...new Set([...lines.keys(), ...read.keys()])].map((symbol) => {
+          const usd = read.get(symbol);
+          const line = lines.get(symbol) ?? [];
+          return { symbol, usd: usd === undefined ? line : [...line, usd].slice(-MARKETS_HISTORY_MOST) };
+        }),
       });
       return replaceFile(file, `${JSON.stringify(day)}\n`);
     },

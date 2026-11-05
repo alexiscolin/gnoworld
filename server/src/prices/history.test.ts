@@ -53,6 +53,14 @@ describe("the prices' history", () => {
     expect(line.at(-1)).toBe(MARKETS_HISTORY_MOST + 2);
   });
 
+  it("keeps a token's line as it was when a read brings no price for it", () => {
+    const history = makeHistory(fileOf(), () => T0);
+    history.add([token("GNOT", 1), token("BTC", 100)], T0);
+    history.add([token("BTC", 90)], T0 + STEP);
+    expect(lineOf(history, "BTC")).toEqual([100, 90]);
+    expect(lineOf(history, "GNOT")).toEqual([1]);
+  });
+
   it("keeps the day over a restart, and goes on from it", () => {
     const file = fileOf();
     makeHistory(file, () => T0).add([token("GNOT", 1)], T0);
