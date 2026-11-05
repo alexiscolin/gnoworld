@@ -214,6 +214,20 @@ describe("the reconnection's backoff", () => {
   });
 });
 
+// F5785: a `complete` frame ends a subscription the follower still needs: the socket is ended and replaced, said.
+describe("a subscription the indexer completes", () => {
+  it("ends the socket, said, and connects again, though the blocks and the pings go on", async () => {
+    const { socketN, log, waits } = setup();
+    const socket = await socketN(0);
+    socket.ack();
+    socket.emit("message", '{"type":"complete","id":"tx"}');
+    expect(log).toHaveBeenCalledWith("chain_subscription_complete");
+    expect(socket.closed).toBe(true);
+    await socketN(1);
+    expect(waits).toHaveLength(1);
+  });
+});
+
 describe("the catch-up by block height", () => {
   it("asks for what came after the highest height it delivered, before any live frame, and misses nothing", async () => {
     const asked = vi.fn((after: number) =>

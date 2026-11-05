@@ -21,6 +21,7 @@ type FollowLog =
   | "chain_message_bad"
   | "chain_catch_up_failed"
   | "chain_subscription_refused"
+  | "chain_subscription_complete"
   | "chain_socket_timeout"
   | "chain_held_dropped";
 
@@ -176,7 +177,10 @@ function session({ options, context, emit, highest, reconnect, resetBackoff }: S
   const hear = (text: string): void => {
     const control = controlOf(text);
     if (control === "ping") socket.send(JSON.stringify({ type: "pong" }));
-    else if (control !== "connection_ack") live(readChainMessage(text, context));
+    else if (control === "complete") {
+      log("chain_subscription_complete");
+      close();
+    } else if (control !== "connection_ack") live(readChainMessage(text, context));
     else {
       for (const { id, query } of subscriptionsOf(watch.keys()))
         socket.send(JSON.stringify({ id, type: "subscribe", payload: { query } }));
