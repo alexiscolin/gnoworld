@@ -196,17 +196,8 @@ describe("a block's frame", () => {
 
 describe("what is not a message to read", () => {
   it.each([
-    ["an ack", '{"type":"connection_ack"}'],
-    ["a ping", '{"type":"ping"}'],
-    ["a complete", '{"type":"complete","id":"tx"}'],
-  ])("lets %s through with nothing to tell and nothing logged", (_, text) => {
-    const { context, log } = setup();
-    expect(readChainMessage(text, context)).toEqual({ events: [] });
-    expect(log).not.toHaveBeenCalled();
-  });
-
-  it.each([
     ["no JSON", "not json {"],
+    ["a frame that is no next", '{"type":"complete","id":"tx"}'],
     [
       "a next whose payload is no answer",
       '{"type":"next","id":"tx","payload":{"data":{"getTransactions":{"hash":7}}}}',
@@ -273,15 +264,6 @@ describe("a message of a matching transaction that fails its schema", () => {
     const { context, log } = setup();
     const text = changed(registration(1), set("__typename", "BankMsgSend"));
     expect(readChainMessage(text, context)).toMatchObject({ events: [] });
-    expect(log).not.toHaveBeenCalled();
-  });
-
-  it("is a refusal, told as it is and not logged here, when the indexer sends an error", () => {
-    const { context, log } = setup();
-    expect(readChainMessage('{"type":"error","id":"tx","payload":[{"message":"no"}]}', context)).toEqual({
-      events: [],
-      refused: true,
-    });
     expect(log).not.toHaveBeenCalled();
   });
 

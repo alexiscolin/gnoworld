@@ -1,4 +1,4 @@
-// One text of the indexer's subscription (`graphql-transport-ws`, slice 9g) read into the events a room shows. Outside data: every
+// One text of the indexer's answer (a `next` of `graphql-transport-ws`, as the catch-up gives it, slice 9g) read into the events a room shows. Outside data: every
 // text through Zod with caps; the filter the server asks for lets other messages through, so each message's realm and
 // function are checked again here; what a transaction's args or memo hold never leaves this file.
 import { jsonOf } from "@gnoworld/core";
@@ -26,8 +26,6 @@ export interface ChainRead {
   block?: { height: number; time: string };
   /** The chain's newest height, read by a poll round. */
   tip?: number;
-  /** The indexer refused the subscription. */
-  refused?: true;
 }
 
 /** The most a text may hold, in characters: a transaction of a few messages is far less. */
@@ -35,11 +33,11 @@ const MAX_TEXT = 1_000_000;
 const MAX_MESSAGES = 1000;
 const NOTHING: ChainRead = { events: [] };
 
-// What a `next` of the subscription holds, each part as the indexer gives it; Zod's own object drops the fields not named.
+// What a `next` holds, each part as the indexer gives it; Zod's own object drops the fields not named.
 function schemas() {
   const whole = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
   return {
-    frame: z.object({ type: z.string(), payload: z.unknown().optional() }),
+    frame: z.object({ type: z.literal("next"), payload: z.unknown().optional() }),
     answer: z.object({
       data: z.object({ getTransactions: z.unknown().optional(), getBlocks: z.unknown().optional() }),
       errors: z.unknown().optional(),
@@ -98,7 +96,7 @@ function eventsOf(tx: z.infer<Schemas["tx"]>, context: ChainContext, parts: Sche
   return events;
 }
 
-/** One text of the subscription read; a text that fails its schema is dropped and said, one that is no business of a room is silent. */
+/** One text read; a text that fails its schema is dropped and said, one that is no business of a room is silent. */
 export function readChainMessage(text: string, context: ChainContext): ChainRead {
   const parts = schemas();
   const bad = (): ChainRead => {
@@ -108,8 +106,6 @@ export function readChainMessage(text: string, context: ChainContext): ChainRead
   if (text.length > MAX_TEXT) return bad();
   const frame = parts.frame.safeParse(jsonOf(text));
   if (!frame.success) return bad();
-  if (frame.data.type === "error") return { events: [], refused: true };
-  if (frame.data.type !== "next") return NOTHING;
   const answer = parts.answer.safeParse(frame.data.payload);
   if (!answer.success || answer.data.errors !== undefined) return bad();
   const { getTransactions, getBlocks } = answer.data.data;
