@@ -196,6 +196,15 @@ describe("callFields", () => {
     }
   });
 
+  it("refuses, for an unsized []uint8, a text the chain also takes as a uint8 (0042 is base64 and the byte 42): leading zeros included", () => {
+    for (const text of ["0000", "0042", "0255", "00000", "000000042"]) {
+      expect(problemOf("[]uint8", text)).toBe("format");
+    }
+    for (const text of ["0000", "0042", "0255"]) expect(accepts("[3]uint8", text)).toBe(true);
+    expect(accepts("[]uint8", "0256")).toBe(true);
+    expect(accepts("[]uint8", "1234")).toBe(true);
+  });
+
   it("never throws, whatever the types", () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { maxLength: 4 }), (types) => {

@@ -89,13 +89,20 @@ function floatProblem(text: string, bits: number): Problem | undefined {
 }
 
 // Go ignores line breaks and unused trailing bits; here one byte string has one spelling.
-function bytesProblem(text: string, length: number | undefined): Problem | undefined {
+function canonicalBase64(text: string): boolean {
   const pad = text.endsWith("==") ? 2 : Number(text.endsWith("="));
   const body = text.slice(0, text.length - pad);
-  if (text.length % 4 !== 0 || !/^[A-Za-z0-9+/]*$/.test(body)) return "format";
+  if (text.length % 4 !== 0 || !/^[A-Za-z0-9+/]*$/.test(body)) return false;
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   const last = alphabet.indexOf(body.charAt(body.length - 1));
-  if (pad > 0 && last % (pad === 1 ? 4 : 16) !== 0) return "format";
+  return pad === 0 || last % (pad === 1 ? 4 : 16) === 0;
+}
+
+function bytesProblem(text: string, length: number | undefined): Problem | undefined {
+  if (!canonicalBase64(text)) return "format";
+  // `...uint8` is written `[]uint8` and the chain converts each argument as a uint8: ParseUint takes "0042" as 42, base64 as three bytes.
+  if (length === undefined && /^[0-9]+$/.test(text) && BigInt(text) < 256n) return "format";
+  const pad = text.endsWith("==") ? 2 : Number(text.endsWith("="));
   return length !== undefined && (text.length / 4) * 3 - pad !== length ? "length" : undefined;
 }
 
