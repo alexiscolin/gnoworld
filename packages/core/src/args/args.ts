@@ -102,8 +102,6 @@ function canonicalBase64(text: string): boolean {
 
 function bytesProblem(text: string, length: number | undefined): Problem | undefined {
   if (!canonicalBase64(text)) return "format";
-  // `...uint8` is written `[]uint8` and the chain converts each argument as a uint8: ParseUint takes "0042" as 42, base64 as three bytes.
-  if (length === undefined && /^0*[0-9]{1,3}$/.test(text) && Number(text) < 256) return "format";
   const pad = text.endsWith("==") ? 2 : Number(text.endsWith("="));
   return length !== undefined && (text.length / 4) * 3 - pad !== length ? "length" : undefined;
 }
@@ -128,6 +126,8 @@ type Resolved = { ok: true; fields: { field: CallField; shape: Shape }[] } | { o
 
 function resolve(params: Params): Resolved {
   if (params?.[0]?.Type !== realmType()) return { ok: false, why: "read" };
+  // `...byte` is written `[]uint8` too, and the chain would refuse its call once signed and paid (answer 9c-1).
+  if (params.at(-1)?.Type === "[]uint8") return { ok: false, why: "gnoweb" };
   const fields: { field: CallField; shape: Shape }[] = [];
   for (const { Name, Type } of params.slice(1)) {
     const shape = shapeOf(Type);

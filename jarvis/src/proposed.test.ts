@@ -129,6 +129,11 @@ describe("checkProposal", () => {
     expect(check({}, list).ok).toBe(true);
   });
 
+  it("gives none for a function whose last parameter is []uint8, which may be `...byte` (answer 9c-1, F5686)", () => {
+    const list = [{ FuncName: "Seal", Params: [cur(), named("hash", "[32]uint8"), named("blob", "[]uint8")] }];
+    expect(check({ function: "Seal", args: { hash: "AAAA", blob: "" } }, list)).toEqual(none("type"));
+  });
+
   it("gives none for an amount anywhere: a field of coins, an argument no parameter has, an amount as an object", () => {
     for (const key of ["send", "coins", "amount", "funds", "deposit"])
       expect(check({ [key]: "1000000ugnot" })).toEqual(none("shape"));

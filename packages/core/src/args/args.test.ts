@@ -188,6 +188,28 @@ describe("callFields", () => {
     expect(callFields(params)).toEqual({ ok: false, why: "gnoweb" });
   });
 
+  it("opens in gnoweb a call whose last parameter is []uint8, which may be `...byte` (answer 9c-1, F5686)", () => {
+    for (const params of [
+      [cur(), param("[]uint8")],
+      [cur(), param("string", "a"), param("[]uint8", "b")],
+      [cur(), param("[]uint8", "a"), param("[]uint8", "b")],
+    ]) {
+      expect(callFields(params)).toEqual({ ok: false, why: "gnoweb" });
+      expect(
+        callArgs(
+          params,
+          params.slice(1).map(() => ""),
+        ),
+      ).toEqual({ ok: false, why: "gnoweb" });
+    }
+    expect(callFields([cur(), param("[]uint8", "a"), param("int", "b")]).ok).toBe(true);
+    expect(callFields([cur(), param("int", "a"), param("[32]uint8", "b")]).ok).toBe(true);
+  });
+
+  it("takes as bytes a []uint8 text the chain could read as a uint8, once no []uint8 field can be variadic (F5686)", () => {
+    for (const text of ["0000", "0042", "0255", "00000042"]) expect(accepts("[]uint8", text)).toBe(true);
+  });
+
   it("never throws, whatever the types", () => {
     fc.assert(
       fc.property(fc.array(fc.string(), { maxLength: 4 }), (types) => {
