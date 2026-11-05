@@ -159,6 +159,49 @@ describe("the chain on the server", () => {
     await Promise.all([room.cancel(), earth.cancel()]);
   });
 
+  it("says it follows a universe once it does", async () => {
+    const { chain, sockets, log } = setup([universe("onyx", "https://indexer.example.test/q")]);
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    expect(log).toHaveBeenCalledWith("chain_following", { reason: "onyx" });
+    chain.stop();
+  });
+
+  it("reconnects after the backoff's own wait, on the real timer, when none is given", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout"] });
+    try {
+      const sockets: FakeSocket[] = [];
+      const stream = makeStream();
+      streams.push(stream);
+      const chain = startChain({
+        universes: Universes.parse([universe("onyx", "https://indexer.example.test/q")]),
+        hubs: Hubs.parse([world("govdao", "onyx", [NAMEREG])]),
+        stream,
+        log: vi.fn(),
+        now: () => Date.parse("2026-11-05T05:02:00Z"),
+        open: (url) => {
+          const socket = new FakeSocket(url);
+          sockets.push(socket);
+          return socket;
+        },
+        send: () => Promise.resolve(new Response(JSON.stringify({ data: { getTransactions: [] } }))),
+        random: () => 0.5,
+      });
+      await vi.waitFor(() => {
+        expect(sockets).toHaveLength(1);
+      });
+      first(sockets).emit("close");
+      await vi.advanceTimersByTimeAsync(749);
+      expect(sockets).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(sockets).toHaveLength(2);
+      chain.stop();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("follows each universe on its own indexer, a call of one never a line of the other's world", async () => {
     const { chain, sockets } = setup([
       universe("onyx", "https://indexer.example.test/q"),
@@ -280,7 +323,7 @@ describe("the catch-up after the day's history", () => {
         value: {
           __typename: "MsgAddPackage",
           creator: "g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y",
-          package: { path: "gno.land/r/g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y/counter" },
+          package: { path: `gno.land/r/g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y/counter${String(height)}` },
         },
       },
     ],
@@ -289,7 +332,12 @@ describe("the catch-up after the day's history", () => {
     new Response(
       JSON.stringify({
         data: query.includes("getBlocks")
-          ? { getBlocks: [{ height: 4999, time: "2026-11-05T04:00:00Z" }] }
+          ? {
+              getBlocks: [...query.matchAll(/eq: (\d+)/g)].map(([, height = ""]) => ({
+                height: Number(height),
+                time: "2026-11-05T04:00:00Z",
+              })),
+            }
           : { getTransactions: query.includes("heightAndIndex: DESC") ? rows : [] },
       }),
     );
@@ -347,6 +395,14 @@ describe("the chain's data", () => {
     expect(() => readChainData(universes, hubs)).toThrow(universes);
     expect(() => readChainData(universes, hubs)).not.toThrow(/secret/);
     expect(() => readChainData("/nowhere/universes.json", hubs)).toThrow("/nowhere/universes.json");
+    // A file that cannot be read says which list and keeps the cause; a list that is no good says so otherwise.
+    expect(() => readChainData("/nowhere/universes.json", hubs)).toThrow(
+      "universes: /nowhere/universes.json cannot be read",
+    );
+    expect(() => readChainData(universes, "/nowhere/hubs.json")).toThrow("hubs: /nowhere/hubs.json cannot be read");
+    expect(() => readChainData(universes, "/nowhere/hubs.json")).toThrow(
+      expect.objectContaining({ cause: expect.any(Error) as unknown }),
+    );
     const [good, badHubs] = files([universe("onyx", "https://indexer.example.test/q")], [{ slug: "<b>" }]);
     expect(() => readChainData(good, hubs)).not.toThrow();
     // Good universes with a hubs file that is no good: the hubs are judged, and named, not what they held.
