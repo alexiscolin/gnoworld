@@ -64,7 +64,7 @@ SECTIONS = {
     ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed,gate_checks",
     ".githooks/records.sh": "outside,installed,wiring", ".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring",
+    "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines,gate_timing", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring", "scripts/prove_fix.py": "prove_fix",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
 }
@@ -1686,6 +1686,17 @@ def seven_mutants():
         ("*\"$STOP_AT\"*) exit 1 ;;", "*) exit 1 ;;", "ends a mutant's run at its expected check only"),
         ("\t\tSTOP_AT=$wanted TEST_PROJECT=", "\t\tTEST_PROJECT=", "tells a mutant's run the check that must catch it"),
         ("\tSTOP_AT= TEST_PROJECT=gnoworld-demo-mutant-$$", "\tTEST_PROJECT=gnoworld-demo-mutant-$$", "lets the first run of --mutants go through every check"),
+        # The two checks a loaded host failed (F5486, part 8q): test_hooks.sh's deploy_checks runs them on planted answers.
+        ("setTimeout(ask, 6000);", "setTimeout(ask, 4000);", "waits up to 6 s for the 640 WebSockets to settle before the 641st"),
+        ("  if (asked) return;\n  settled += 1;", "  settled += 1;", "counts only the 101s that came before the 641st was asked"),
+        ("  if (settled < crowd) others.set(\"unanswered after 6 s\", crowd - settled);\n", "", "prints the WebSockets still waiting at 6 s"),
+        ("once(error.code ?? error.message)", "once(\"ECONNRESET\")", "prints an error by its code"),
+        ("`answered ${line.split(\" \")[1] ?? line}`", "\"answered\"", "prints another answer than a 101 by its status"),
+        ("      if (!done) {\n        done = true;\n        settle(what);\n      }", "      settle(what);", "settles a WebSocket once, a 101 then its close"),
+        ("  }, 4000);\n}\nsetTimeout(ask", "  }, 40000);\n}\nsetTimeout(ask", "gives the 641st 4 s, no more"),
+        ("closes idle 15 20 ", "closes idle 15 21 ", "accepts an idle connection closed by 20 s, no later"),
+        ("closes headers 10 11 ", "closes headers 10 12 ", "keeps the headers' close to its one second of margin"),
+        ("[ \"$seconds\" -ge \"$2\" ] && ", "", "refuses a connection closed before web's own setting"),
     ))
     n = "scripts/check_nginx.py"
     yield from swaps(n, "check_nginx.py", (

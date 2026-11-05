@@ -8140,6 +8140,120 @@ out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deplo
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
 fi
 
+if part deploy_checks; then
+# Two checks of deploy/test.sh that a loaded host failed (F5486, part 8q; Alexis, 2026-11-05), each run here on planted answers, with no
+# Docker. The crowd's script, read from deploy/test.sh and run by this Node against a web of its own on 127.0.0.1: the 641st request waits
+# until each of the 640 WebSockets has settled, 6 s at most, and counts only the 101s that came before it; every other answer is printed by
+# its status, every error by its code, every socket still waiting by their number. And closes(), read with its three calls: nginx's 15 s
+# idle accepted up to 20 s on a loaded host, its seconds printed; the headers' and the body's 10 s kept to their one second of margin.
+ds="$here/../deploy/test.sh"
+dc="$t/deploy_checks" && mkdir -p "$dc"
+command -v node >/dev/null || fail "deploy_checks runs deploy/test.sh's crowd with Node, and node is missing"
+awk -v q="'" '/^\tcrowded=\$\(docker run / { on = 1; next }
+	on && index($0, q " \"$auth\" \"$ORIGINS\"") { print substr($0, 1, index($0, q) - 1); exit }
+	on { print }' "$ds" >"$dc/crowd.js"
+[ "$(grep -c 'net\.connect(8080, "web"' "$dc/crowd.js")" = 2 ] ||
+	fail "deploy/test.sh's crowd is no longer the script after crowded=\$(docker run, with two connections to web's 8080: update test_hooks.sh's deploy_checks"
+# web's place: each WebSocket, in the order they come, answers as the plan says (late: a 101 at 3.5 s, past the old fixed 3 s; slow: a
+# 101 at 5 s, under the 6 s cap; closing: a 101 then a close, as Ergo past 16 a visitor; 503; reset; closed with no answer; silent: never;
+# verylate: a 101 at 7 s, after the 641st request went), the others a 101 at once; any other request a 200, `other` ms later. Each
+# margin is a second or more, against a loaded host (F2503's class). It ends itself after a minute, should the suite be stopped mid-case.
+cat >"$dc/web.js" <<'JS'
+const net = require("node:net");
+const fs = require("node:fs");
+const [portFile, planText] = process.argv.slice(2);
+const plan = Object.fromEntries(planText.split(",").map((part) => part.split("=")));
+const kinds = ["late", "slow", "closing", "503", "reset", "closed", "silent", "verylate"].flatMap((kind) => Array(Number(plan[kind] ?? 0)).fill(kind));
+const upgraded = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n";
+let crowd = 0;
+const server = net.createServer((socket) => {
+  let text = "";
+  socket.on("error", () => {});
+  socket.on("data", (chunk) => {
+    if (text.includes("\r\n\r\n")) return;
+    text += chunk;
+    if (!text.includes("\r\n\r\n")) return;
+    if (!text.includes("GET /ws ")) {
+      setTimeout(() => socket.end("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), Number(plan.other ?? 0));
+      return;
+    }
+    const kind = kinds[crowd] ?? "101";
+    crowd += 1;
+    if (kind === "101") socket.write(upgraded);
+    if (kind === "late") setTimeout(() => socket.write(upgraded), 3500);
+    if (kind === "slow") setTimeout(() => socket.write(upgraded), 5000);
+    if (kind === "closing") socket.end(upgraded);
+    if (kind === "verylate") setTimeout(() => socket.write(upgraded), 7000);
+    if (kind === "503") socket.write("HTTP/1.1 503 Service Temporarily Unavailable\r\nContent-Length: 0\r\n\r\n");
+    if (kind === "reset") socket.resetAndDestroy();
+    if (kind === "closed") socket.end();
+  });
+});
+server.listen({ port: 0, host: "127.0.0.1", backlog: 1024 }, () => fs.writeFileSync(portFile, String(server.address().port)));
+setTimeout(() => process.exit(0), 60_000);
+JS
+start_web() { # $1 the plan; its pid in $web, its port in $port
+	rm -f "$dc/port"
+	node "$dc/web.js" "$dc/port" "$1" &
+	web=$!
+	tries=0
+	until [ -s "$dc/port" ]; do
+		tries=$((tries + 1))
+		[ "$tries" -lt 300 ] || { kill "$web"; fail "deploy_checks' own web never listened"; }
+		sleep 0.1
+	done
+	port=$(cat "$dc/port")
+}
+stop_web() { kill "$web" 2>/dev/null || :; wait "$web" 2>/dev/null || :; }
+crowd() { out=$(node -e "$(sed "s/net\.connect(8080, \"web\"/net.connect($port, \"127.0.0.1\"/" "$dc/crowd.js")" user http://gnoworld.test 2>&1) || :; }
+start_web late=1,slow=1,closing=3
+crowd
+stop_web
+[ "$out" = "640 200" ] ||
+	fail "deploy/test.sh's crowd asked its 641st before the 640 WebSockets had settled (101s at 3.5 and 5 s, three closed after theirs; F5486): [$out]"
+start_web 503=2,reset=2,closed=1,silent=1,verylate=1,other=8000
+crowd
+stop_web
+[ "${out%% (*}" = "633 not served within 4 s" ] ||
+	fail "deploy/test.sh's crowd counted a 101 that came after its 641st was asked, lost one, or waited past 6 s and 4 s: [$out]"
+tallied=$(printf '%s' "${out#* (}" | tr -d ')' | tr ',' '\n' | sed 's/^ *//' | LC_ALL=C sort | paste -sd, -)
+[ "$tallied" = "1 closed before an answer,2 ECONNRESET,2 answered 503,2 unanswered after 6 s" ] ||
+	fail "deploy/test.sh's crowd did not print each other answer by its status, each error by its code and the sockets still waiting (F5486): [$out]"
+start_web ""
+stop_web
+crowd
+[ "$out" = "0 none (640 ECONNREFUSED)" ] || fail "deploy/test.sh's crowd did not print the code of an error it met, web's port closed: [$out]"
+sed -n '/^pass() {/,/^is_public() {/p' "$ds" | sed '$d' >"$dc/fns"
+sed -n '/^\tcloses() {/,/^\t}$/p' "$ds" >>"$dc/fns"
+sed -n '/^\tcloses /p' "$ds" >"$dc/calls"
+[ "$(grep -c '^	closes() {' "$dc/fns") $(grep -c . "$dc/calls")" = "1 3" ] ||
+	fail "deploy/test.sh no longer defines closes() and calls it three times as deploy_checks expects: update test_hooks.sh's deploy_checks"
+closes_case() { # $1 the probes' seconds, as the timing script prints them; the lines of the three checks in $out
+	{ printf 'set -eu\nfailed=0\ntimed=%s\n' "'$1'"; cat "$dc/fns" "$dc/calls"; } >"$dc/closes.sh"
+	out=$(sh "$dc/closes.sh" 2>&1) || :
+}
+nl='
+'
+closes_case "body=10${nl}headers=11${nl}idle=19"
+[ "$out" = "ok    web closes a connection that never ends its headers after 10 s (11 s measured)
+ok    web closes a connection that never sends its body after 10 s (10 s measured)
+ok    web closes a connection that stays idle between requests after 15 s (19 s measured)" ] ||
+	fail "deploy/test.sh's closes failed a close at 10, 11 or 19 s, or did not print the seconds it measured (F5486): $out"
+for idle in 15 20; do
+	closes_case "body=10${nl}headers=10${nl}idle=$idle"
+	printf '%s\n' "$out" | grep -q '^ok    web closes a connection that stays idle between requests' || fail "deploy/test.sh's idle check failed a close at $idle s: $out"
+done
+for idle in 14 21; do
+	closes_case "body=10${nl}headers=10${nl}idle=$idle"
+	printf '%s\n' "$out" | grep -q '^FAIL  web closes a connection that stays idle between requests' || fail "deploy/test.sh's idle check passed a close at $idle s: $out"
+done
+closes_case "body=12${nl}headers=12${nl}idle=15"
+[ "$(printf '%s\n' "$out" | grep -c '^FAIL  web closes a connection that never \(ends its headers\|sends its body\)')" = 2 ] ||
+	fail "deploy/test.sh's headers' or body's check passed a close at 12 s, past its one second of margin: $out"
+closes_case "still open after 40 s"
+[ "$(printf '%s\n' "$out" | grep -c '^FAIL ')" = 3 ] || fail "deploy/test.sh's closes passed a probe that never closed: $out"
+fi
+
 if part workshop; then
 # pnpm workshop (scripts/workshop.sh) serves the app's screens and the lab's pages, each on its dev server at 127.0.0.1, both put on the
 # tailnet through the tailnet-preview skill's script under a name each (workshop-app, workshop-lab), each link said beside its name
