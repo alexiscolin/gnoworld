@@ -4,6 +4,8 @@
 // Nothing is kept that the indexer can give again: the hashes and the live frames held during a catch-up are bounded.
 import { readChainMessage, type ChainContext, type ChainRead } from "./message.ts";
 import { subscriptionsOf } from "@gnoworld/chain/transactions";
+import { jsonOf } from "@gnoworld/core";
+import { z } from "zod";
 
 /** What of a WebSocket the follower uses, so a test hands its own. */
 export interface ChainSocket {
@@ -60,14 +62,8 @@ export const timer = (ms: number, run: () => void): (() => void) => {
 // A control frame is a few bytes: a longer text is a transaction or a block, which message.ts reads.
 function controlOf(text: string): string | undefined {
   if (text.length > 256) return undefined;
-  try {
-    const frame: unknown = JSON.parse(text);
-    return typeof frame === "object" && frame !== null && "type" in frame && typeof frame.type === "string"
-      ? frame.type
-      : undefined;
-  } catch {
-    return undefined;
-  }
+  const frame = z.object({ type: z.string() }).safeParse(jsonOf(text));
+  return frame.success ? frame.data.type : undefined;
 }
 
 /** The catch-up asked within its time: a catch-up that never answers fails like one that refuses. */
