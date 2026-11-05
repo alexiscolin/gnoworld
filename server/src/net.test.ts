@@ -174,12 +174,12 @@ send("https://far.test/", {}, 5000).then(() => console.log("answered"), (error) 
 });
 
 describe("reachedNothing", () => {
-  it("is a name with no address, nothing listening, or a fault of no known cause, and no other kind", () => {
+  it("is a name with no address or nothing listening, never a fault that may have reached the host, and no other kind", () => {
     // Every kind, so a new one is a choice made here.
     const nothing: Record<Kind, boolean> = {
       unresolved: true,
       refused: true,
-      request: true,
+      request: false,
       proxy: false,
       timeout: false,
       status: false,

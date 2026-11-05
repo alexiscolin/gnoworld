@@ -9,7 +9,7 @@ import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { send as netSend, publicUrl } from "../net.ts";
-import { repeat, waitAfterOutcome, type Outcome } from "../repeat.ts";
+import { repeat, waitsAfterOutcome, type Outcome } from "../repeat.ts";
 import { besideOf, replaceFiles } from "../replaceFile.ts";
 import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
@@ -203,7 +203,7 @@ export function startWorlds(
     failed: () => {
       options.log("worlds_failed", { error: "internal" });
     },
-    waitMs: waitAfterOutcome(everyMs),
+    waitMs: waitsAfterOutcome(everyMs),
   });
   return {
     stop() {

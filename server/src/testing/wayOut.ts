@@ -1,6 +1,7 @@
 // The way out as the server's timers meet it at the stack's start (F4872): what fetch throws when a call reaches nothing, as Node 24.22.0
-// (the server's image) and 26.12.0 give it, measured on 2026-11-05 (a TypeError whose causes carry a code, the way out's refusal of a tunnel
-// two causes down; their messages name the host, which nothing reads), a way out that fails a job's first call, and the waits it then asks.
+// (.node-version's, the server's build stage) and 26.12.0 give it, measured on 2026-11-05 (a TypeError whose causes carry a code, the way
+// out's refusal of a tunnel two causes down; their messages name the host, which nothing reads), a way out that fails a job's first call,
+// and the waits it then asks.
 import { vi } from "vitest";
 import type { Send } from "../net.ts";
 

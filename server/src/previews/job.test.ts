@@ -322,7 +322,6 @@ describe("a pass of the preview job", () => {
     ["the way out's name with no address yet", [unresolved, unresolved], ["unresolved", "unresolved"]],
     ["nothing listening where the way out will be", [refused, refused], ["refused", "refused"]],
     ["the way out starting between two reads", [unresolved, refused], ["unresolved", "refused"]],
-    ["a fault of no known cause", [fetchFault, fetchFault], ["request", "request"]],
   ] as const)(
     "writes nothing on %s, when no read reached anyone, keeps the last file byte for byte, and says the last read's kind (F4872)",
     async (_name, [govdao, memba], [first, last]) => {
@@ -343,6 +342,21 @@ describe("a pass of the preview job", () => {
       ]);
     },
   );
+
+  it("writes as ever after reads whose cause has no name: a reset or a bad certificate reached the host", async () => {
+    const file = fresh();
+    lastFile(file, [earlier(GOVDAO)]);
+    const { outcome, lines } = await run(renders({ [GOVDAO]: fetchFault(), [MEMBA]: fetchFault() }), {
+      file,
+      pages: [GOVDAO, MEMBA],
+    });
+    expect(outcome).toEqual({ wrote: true });
+    expect(read(file).previews).toEqual([earlier(GOVDAO)]);
+    expect(lines.slice(0, 2)).toEqual([
+      JSON.stringify({ event: "previews_skipped", error: "request" }),
+      JSON.stringify({ event: "previews_skipped", error: "request" }),
+    ]);
+  });
 
   it("leaves no file at all after a first pass that reached nothing, as at the stack's start", async () => {
     const file = fresh();
@@ -566,6 +580,25 @@ describe("startPreviews", () => {
       ["previews_failed", { error: "unresolved" }],
     ]);
     expect(logged.slice(2).map(([event]) => event)).toEqual(["previews_written"]);
+  });
+
+  it("asks a way out that never comes ever less often: 15 s, then 30 s", async () => {
+    const waits = timerWaits();
+    const job = startPreviews({
+      file: fresh(),
+      log: () => undefined,
+      universe: UNIVERSE,
+      pages: [GOVDAO],
+      check: passes,
+      send: () => Promise.reject(unresolved()),
+    });
+    try {
+      await until(() => waits.length >= 2);
+    } finally {
+      job.stop();
+      vi.restoreAllMocks();
+    }
+    expect(waits.slice(0, 2)).toEqual([15_000, 30_000]);
   });
 
   it("waits the whole interval after a pass that threw, and says so as internal", async () => {

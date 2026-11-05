@@ -68,9 +68,9 @@ export function kindOf(error: unknown): Kind {
   return "request";
 }
 
-/** A call that reached no one: no address for its name, nothing listening there, or a cause that has no name here. */
-export const reachedNothing = (kind: Kind): boolean =>
-  kind === "unresolved" || kind === "refused" || kind === "request";
+/** A call that reached no one: no address for its name, or nothing listening there. A cause with no name here (a reset, a bad
+ * certificate) may have reached the host. */
+export const reachedNothing = (kind: Kind): boolean => kind === "unresolved" || kind === "refused";
 
 /** What a call may take and give back: the time it has and the most bytes of the answer it reads. */
 export interface Limits {

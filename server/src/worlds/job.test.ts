@@ -1102,6 +1102,18 @@ describe("startWorlds", () => {
     },
   );
 
+  it("waits the whole interval after a list fault whose cause has no name (a reset, a bad certificate): it reached the host", async () => {
+    const waits = timerWaits();
+    const send: Send = () => Promise.reject(new TypeError("fetch failed"));
+    const job = startWorlds({ ...base, ...quick, send, file: fresh(), universe, everyMs: 1_800_000 });
+    try {
+      await until(() => waits.length > 0);
+    } finally {
+      job.stop();
+    }
+    expect(waits.slice(0, 1)).toEqual([1_800_000]);
+  });
+
   it("waits the whole interval after the way out refused the chain's host: asking again soon would change nothing", async () => {
     const waits = timerWaits();
     const logged: unknown[][] = [];

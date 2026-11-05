@@ -4,19 +4,28 @@ import { reachedNothing, type Kind } from "./net.ts";
  * finds none. */
 const RETRY_MS = 15_000;
 
-/** The wait after a pass that ended with the fault `kind`, none when it went well: RETRY_MS after a call that reached nothing, never past
- * `everyMs`, and the whole interval after anything else. */
-export const waitAfter = (kind: Kind | undefined, everyMs: number): number =>
-  kind !== undefined && reachedNothing(kind) ? Math.min(RETRY_MS, everyMs) : everyMs;
+/** A timer's waits, pass after pass, told each pass's fault (none when it went well): after one that `soon` names (by default a call that
+ * reached nothing), RETRY_MS doubled for each such pass in a row, never past `everyMs`; after any other, `everyMs`. So a way out that never
+ * comes is asked ever less often, and a host that answers badly no sooner than the plan says (F4872). */
+export function waits(
+  everyMs: number,
+  soon: (kind: Kind) => boolean = reachedNothing,
+): (kind: Kind | undefined) => number {
+  let inARow = 0;
+  return (kind) => {
+    inARow = kind !== undefined && soon(kind) ? inARow + 1 : 0;
+    return inARow === 0 ? everyMs : Math.min(RETRY_MS * 2 ** (inARow - 1), everyMs);
+  };
+}
 
 /** What a job's pass gives back, never throwing: it wrote its file, or the kind of fault that kept the last one. */
 export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
 
-/** `repeat`'s wait for a job whose pass gives an Outcome: waitAfter its fault, and the whole interval after a pass that threw. */
-export const waitAfterOutcome =
-  (everyMs: number) =>
-  (_error?: unknown, outcome?: Outcome): number =>
-    waitAfter(outcome?.wrote === false ? outcome.kind : undefined, everyMs);
+/** `repeat`'s waits for a job whose pass gives an Outcome: `waits` by its fault, and the whole interval after a pass that threw. */
+export function waitsAfterOutcome(everyMs: number): (error?: unknown, outcome?: Outcome) => number {
+  const wait = waits(everyMs);
+  return (_error, outcome) => wait(outcome?.wrote === false ? outcome.kind : undefined);
+}
 
 /** What a timer gives back: `stop` ends the waiting, and a pass under way is told. */
 export interface Repeating {

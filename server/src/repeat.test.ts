@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { repeat, waitAfter } from "./repeat.ts";
+import { repeat, waits } from "./repeat.ts";
 
 beforeEach(() => {
   vi.useFakeTimers();
@@ -118,15 +118,30 @@ describe("repeat", () => {
   });
 });
 
-describe("waitAfter (F4872)", () => {
-  it("waits 15 s after a pass that reached nothing: the stack starts the server before its way out", () => {
-    for (const kind of ["unresolved", "refused", "request"] as const) expect(waitAfter(kind, 1_800_000)).toBe(15_000);
+describe("waits, a timer's waits pass after pass (F4872)", () => {
+  it("waits 15 s after a pass that reached nothing, then twice as long for each such pass in a row, never past the interval", () => {
+    const wait = waits(1_800_000);
+    const row = Array.from({ length: 9 }, (_, i) => wait(i % 2 === 0 ? "unresolved" : "refused"));
+    expect(row).toEqual([15_000, 30_000, 60_000, 120_000, 240_000, 480_000, 960_000, 1_800_000, 1_800_000]);
   });
 
-  it("never waits past the interval, and waits all of it after a pass that went well or reached someone", () => {
-    expect(waitAfter("refused", 10)).toBe(10);
-    expect(waitAfter(undefined, 1_800_000)).toBe(1_800_000);
-    for (const kind of ["proxy", "timeout", "status", "rate_limited", "shape", "write"] as const)
-      expect(waitAfter(kind, 1_800_000)).toBe(1_800_000);
+  it("starts again at 15 s after a pass that went well or reached someone", () => {
+    const wait = waits(1_800_000);
+    expect([wait("unresolved"), wait("refused"), wait(undefined), wait("refused")]).toEqual([
+      15_000, 30_000, 1_800_000, 15_000,
+    ]);
+    expect([wait("proxy"), wait("unresolved")]).toEqual([1_800_000, 15_000]);
+  });
+
+  it("waits the whole interval after a fault that reached someone, or whose cause has no name (a reset, a bad certificate)", () => {
+    const wait = waits(1_800_000);
+    for (const kind of ["request", "proxy", "timeout", "status", "rate_limited", "shape", "write"] as const)
+      expect(wait(kind)).toBe(1_800_000);
+  });
+
+  it("never waits past a short interval, and asks soon again after the faults it is told", () => {
+    expect(waits(10)("refused")).toBe(10);
+    const soon = waits(300_000, (kind) => kind === "request");
+    expect([soon("request"), soon("request"), soon("refused")]).toEqual([15_000, 30_000, 300_000]);
   });
 });

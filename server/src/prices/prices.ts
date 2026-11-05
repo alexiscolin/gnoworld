@@ -6,8 +6,8 @@
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
-import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, type Send } from "../net.ts";
-import { repeat, waitAfter } from "../repeat.ts";
+import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, reachedNothing, type Send } from "../net.ts";
+import { repeat, waits } from "../repeat.ts";
 import { besideOf, replaceFile } from "../replaceFile.ts";
 import { makeHistory, type History } from "./history.ts";
 
@@ -114,13 +114,15 @@ export function startPrices(options: Options): Prices {
     if (!history.add(markets.tokens, Date.parse(markets.updated))) log("prices_failed", { error: "history_write" });
   }
 
-  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
+  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one; as before
+  // F4872, one whose cause has no name is asked again soon too, for it is one call.
+  const wait = waits(everyMs, (kind) => kind === "request" || reachedNothing(kind));
   const timer = repeat({
     pass: read,
     failed: (error) => {
       log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
     },
-    waitMs: (error) => waitAfter(error instanceof Failure ? error.kind : undefined, everyMs),
+    waitMs: (error) => wait(error instanceof Failure ? error.kind : undefined),
   });
   return { stop: timer.stop, history: history.current };
 }

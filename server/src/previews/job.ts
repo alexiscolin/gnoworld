@@ -16,7 +16,7 @@ import type { Log } from "../log.ts";
 import { decide, type Thresholds } from "../moderation/decide.ts";
 import { moderationClient, type Answer } from "../moderation/provider.ts";
 import { publicUrl, reachedNothing, send as netSend } from "../net.ts";
-import { repeat, waitAfterOutcome, type Outcome, type Repeating } from "../repeat.ts";
+import { repeat, waitsAfterOutcome, type Outcome, type Repeating } from "../repeat.ts";
 import { replaceFile } from "../replaceFile.ts";
 import { abciQuery, Absent, isDown, kindOf, pacer, type Kind, type Send } from "../worlds/remote.ts";
 
@@ -184,7 +184,7 @@ export async function runPreviews(options: PreviewsOptions): Promise<Outcome> {
       if (capture !== undefined) kept.push(capture);
     }
     if (isStopped()) return fail("stopped");
-    // No read reached anyone (the way out not there yet): the last file stays, and the pass runs again 15 s later (F4872).
+    // No read reached anyone (the way out not there yet): the last file stays, and the pass runs again soon (repeat.ts's waits, F4872).
     if (!pass.reached && pass.unreached !== undefined) return fail(pass.unreached);
     const kind = written(settled, kept);
     if (kind !== undefined) return fail(kind);
@@ -221,6 +221,6 @@ export function startPreviews(options: PreviewsOptions & { everyMs?: number }): 
     failed: () => {
       options.log("previews_failed", { error: "internal" });
     },
-    waitMs: waitAfterOutcome(everyMs),
+    waitMs: waitsAfterOutcome(everyMs),
   });
 }

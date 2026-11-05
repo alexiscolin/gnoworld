@@ -15,7 +15,12 @@ export class Absent extends Failure {
 
 /** A fault that says the chain, the network or the way out is not answering, which ends a pass; any other is about one read. */
 export const isDown = (kind: Kind): boolean =>
-  reachedNothing(kind) || kind === "proxy" || kind === "timeout" || kind === "status" || kind === "rate_limited";
+  reachedNothing(kind) ||
+  kind === "request" ||
+  kind === "proxy" ||
+  kind === "timeout" ||
+  kind === "status" ||
+  kind === "rate_limited";
 
 /** One call: the body's bytes as UTF-8 text, or a Failure. */
 export async function fetchText(

@@ -372,7 +372,8 @@ Slice 3, the server's retention (3n):
   `status`, `timeout`, `unresolved` (no address for a name: the way out's, before it starts), `refused` (nothing listening there yet),
   `proxy` (the way out refused the host, or could not reach it), `request` (a fault whose cause has no name), `too_large`, `not_json`,
   `shape`, `no_price` or `write` (the volume): never the answer, nor an error's message. One that reached nothing (`unresolved`,
-  `refused`, `request`) is asked again 15 s later: the stack starts the server before its way out (F4872).
+  `refused`) or whose cause has no name (`request`) is asked again 15 s later, then twice as long for each such failure in a row, up to
+  the five minutes: the stack starts the server before its way out (F4872).
   A file that stops changing means the failures repeat in the log; `updated` in the file is the time of the last good read.
   With `UNIVERSES_FILE` (`/app/app/data/universes.json`, copied into the image) the same read also asks the default universe's RPC
   for `/status` and writes the latest block's `height`, `time` and `host` as `block`, which the home draws: no visitor's browser asks a
@@ -386,9 +387,9 @@ Slice 3, the server's retention (3n):
   (`/markets/worlds-count.json`, served at `/worlds-count.json`, 7n2): the file's universe and time and the worlds the cosmos draws
   with the Earth, which the home's hero reads, so a phone asks nothing of the cosmos before View in space. Both temporaries are written
   before either is renamed: a failed write keeps both last files and logs `write`. A failed list keeps the last file and logs
-  `{"event":"worlds_failed","error":"<kind>"}`, and a pass whose list reached nothing (`unresolved`, `refused`, `request`) runs again
-  15 s later, not half an hour (F4872: Compose starts the server before its way out); a list the chain cuts at its limit is read by
-  prefix, up to 2,000 requests. A world
+  `{"event":"worlds_failed","error":"<kind>"}`, and a pass whose list reached nothing (`unresolved`, `refused`) runs again 15 s later,
+  then twice as long for each such pass in a row, up to the half hour (F4872: Compose starts the server before its way out); a list the
+  chain cuts at its limit is read by prefix, up to 2,000 requests. A world
   keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
   `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of any indexer request (the network, an answer of the
   wrong shape, a page past 4 MiB even at one transaction, more than 500 requests) logs `worlds_indexer_failed` once and every realm
@@ -413,9 +414,9 @@ Slice 3, the server's retention (3n):
   check could not read keeps its last checked capture, with its own time; each logs `{"event":"previews_skipped","error":"<kind>"}`, the
   kind one of `hidden`, `unchecked`, `empty`, `unresolved`, `refused`, `proxy`, `request` (as the prices'), `timeout`, `status`,
   `rate_limited`, `too_large`, `shape` or `chain_refused`. A
-  pass none of whose reads reached anyone (`unresolved`, `refused`, `request`: the way out not there yet) writes nothing, keeps the last
-  file, logs `previews_failed` with that kind and runs again 15 s later, not six hours (F4872); one read that reached the chain is a pass
-  as any other. A pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the
+  pass none of whose reads reached anyone (`unresolved`, `refused`: the way out not there yet) writes nothing, keeps the last file, logs
+  `previews_failed` with that kind and runs again 15 s later, then twice as long for each such pass in a row, up to the six hours
+  (F4872); one read that reached the chain, or whose cause has no name (`request`), makes it a pass as any other. A pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the
   last file. No
   capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
   a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
