@@ -86,6 +86,20 @@ describe("the relay", () => {
     ).toEqual([0, 1, 2, 3]);
   });
 
+  // F5792: the cap keeps the first four of a second, so one account at the head of each block must not fill a room alone.
+  it("shows one call of an account in a room's second: four of an attacker's, then a visitor's, are two lines", () => {
+    const { relay, chain } = setup();
+    const KAITO = Address.parse("g1cvr48r7l7lkmvp77cr6zg2zhu26jgfwr0y8pew");
+    relay(events(call(1), call(1), call(1), call(1), call(1, "govdao", KAITO)));
+    expect(chain.mock.calls.map(([event]) => event.actor)).toEqual([ALICE, KAITO]);
+  });
+
+  it("shows one deploy of an account in the ticker's second: three of one creator's are one line", () => {
+    const { relay, chain } = setup();
+    relay(events(deploy(1, "a"), deploy(1, "b"), deploy(1, "c")));
+    expect(chain.mock.calls).toHaveLength(1);
+  });
+
   it("keeps the deploys to the ticker's budget apart from a world's: a flood of calls does not starve it", () => {
     const { relay, chain } = setup();
     for (let n = 0; n < 50; n += 1) relay(events(call(n, "govdao", actorN(n))));

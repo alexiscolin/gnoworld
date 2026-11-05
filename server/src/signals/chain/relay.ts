@@ -55,10 +55,10 @@ export function makeRelay({ stream, count, universe, now }: RelayOptions): (read
     let counted: number | undefined;
     for (const event of events) {
       if (event.kind === "call") {
-        if (room.admit(event.world)) stream.chain(event);
+        if (room.admit(event.world, event.actor)) stream.chain(event);
         continue;
       }
-      if (room.admit(DEPLOYS)) stream.chain(event);
+      if (room.admit(DEPLOYS, event.actor)) stream.chain(event);
       counted = countDeploy(event) ?? counted;
     }
     if (block !== undefined) arrived(block);

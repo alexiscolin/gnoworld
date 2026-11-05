@@ -84,3 +84,48 @@ describe("the coalescer", () => {
     expect(coalescer.size()).toBe(10_000);
   });
 });
+
+// F5792: an account that puts four cheap events at the head of each second must not decide what a room shows: one event an
+// actor in a room's second, the four-cap kept.
+describe("the coalescer's fairness between actors", () => {
+  it("lets one event of an actor through in a room's second, and the others' after it", () => {
+    let time = 0;
+    const coalescer = makeCoalescer({ now: () => time });
+    const attacker = Array.from({ length: 4 }, () => coalescer.admit("govdao", "g1attacker"));
+    expect(attacker).toEqual([true, false, false, false]);
+    expect(coalescer.admit("govdao", "g1kaito")).toBe(true);
+    expect(coalescer.admit("govdao", "g1alice")).toBe(true);
+    expect(coalescer.admit("govdao", "g1bob")).toBe(true);
+    // The four-cap holds for others too.
+    expect(coalescer.admit("govdao", "g1carol")).toBe(false);
+    time = 1000;
+    expect(coalescer.admit("govdao", "g1attacker")).toBe(true);
+  });
+
+  it("counts an actor a room at a time: another room's event of the same actor goes through", () => {
+    const coalescer = makeCoalescer({ now: () => 0 });
+    expect(coalescer.admit("govdao", "g1attacker")).toBe(true);
+    expect(coalescer.admit("bubble", "g1attacker")).toBe(true);
+  });
+
+  it("does not count a refused event: an actor refused for its repeat does not use up a slot", () => {
+    const coalescer = makeCoalescer({ now: () => 0 });
+    for (let n = 0; n < 10; n += 1) coalescer.admit("govdao", "g1attacker");
+    expect(["a", "b", "c"].map((actor) => coalescer.admit("govdao", actor))).toEqual([true, true, true]);
+  });
+
+  it("keeps the actor's second a window of a second, not a clock second", () => {
+    let time = 0;
+    const coalescer = makeCoalescer({ now: () => time });
+    expect(coalescer.admit("govdao", "g1attacker")).toBe(true);
+    time = 999;
+    expect(coalescer.admit("govdao", "g1attacker")).toBe(false);
+    time = 1000;
+    expect(coalescer.admit("govdao", "g1attacker")).toBe(true);
+  });
+
+  it("asks nothing of an event that names no actor: the count's budget is the room's four alone", () => {
+    const coalescer = makeCoalescer({ now: () => 0 });
+    expect(Array.from({ length: 5 }, () => coalescer.admit("#count"))).toEqual([true, true, true, true, false]);
+  });
+});
