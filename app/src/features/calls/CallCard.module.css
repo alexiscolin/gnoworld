@@ -1,0 +1,35 @@
+/* The call card (9d): the block that names the call, in the frame the video draws, and a phone's words in place of the signature. */
+@layer components {
+  .block {
+    padding: var(--space-s);
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-m);
+  }
+
+  .value {
+    min-inline-size: 0;
+    font: var(--font-data);
+    /* layout: a realm's path or a long text breaks where it must, so the card never scrolls sideways */
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+  }
+
+  .status:empty {
+    display: none;
+  }
+
+  /* A phone reads and fills the card and signs on a computer (U6): a coarse pointer gets the words, a computer the button. */
+  .phone {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .phone {
+      display: block;
+    }
+
+    .computer {
+      display: none;
+    }
+  }
+}
