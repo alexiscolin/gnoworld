@@ -10,6 +10,14 @@ import { box, near } from "./geometry.ts";
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
+// Bubble has no history here: the plate's hours (8g) come from the server's rooms, where the other journeys of the run have said lines, so
+// each test below answers them as a server with none does, and reads no rate it did not plant.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/presence/hours*", (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not_ready" }) }),
+  );
+});
+
 test.describe("a world's page at the video's size", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
@@ -51,6 +59,8 @@ test.describe("a world's page at the video's size", () => {
   test("the title, the line, the activity's words and the actions stand at their y (frames 26, 90)", async ({
     page,
   }) => {
+    // The demo's rooms hold people: nobody is counted here, as the test's premise says.
+    await page.routeWebSocket(/\/ws$/, () => undefined);
     await page.goto("/w/bubble");
     await hydrated(page);
     const title = await box(page, "[data-look='plate'] h1");
@@ -70,23 +80,30 @@ test.describe("a world's page at the video's size", () => {
     expect(main.y, "the actions come after the activity's words").toBeGreaterThan(activity.y + activity.height);
   });
 
-  test("the actions are 56 px tall from the column's left, Share 10 px after the main one, and no Follow (frames 26, 92)", async ({
+  test("the actions are 56 px tall from the column's left, Follow 10 px after the main one, Share 10 px after Follow (frames 26, 92)", async ({
     page,
   }) => {
+    await page.routeWebSocket(/\/ws$/, () => undefined);
     await page.goto("/w/bubble");
     await hydrated(page);
     const plate = page.locator("[data-look='plate']");
     const main = plate.getByRole("link", { name: "Say hi in the chat" });
     const share = plate.getByRole("button", { name: "Share" });
     await expect(share).toBeVisible();
-    await expect(plate.getByRole("button", { name: "Follow" })).toHaveCount(0);
-    const first = (await main.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
-    const second = (await share.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+    const follow = plate.getByRole("button", { name: "Follow" });
+    await expect(follow).toBeVisible();
+    const none = { x: 0, y: 0, width: 0, height: 0 };
+    const first = (await main.boundingBox()) ?? none;
+    const second = (await follow.boundingBox()) ?? none;
+    const third = (await share.boundingBox()) ?? none;
     near(first.x, 100, "the main action's left");
     near(first.height, 56, "the main action's height");
-    near(second.height, 56, "Share's height");
-    near(second.x - (first.x + first.width), 10, "the gap between the two actions");
-    near(second.y, first.y, "Share's top");
+    near(second.height, 56, "Follow's height");
+    near(third.height, 56, "Share's height");
+    near(second.x - (first.x + first.width), 10, "the gap between the main action and Follow");
+    near(third.x - (second.x + second.width), 10, "the gap between Follow and Share");
+    near(second.y, first.y, "Follow's top");
+    near(third.y, first.y, "Share's top");
   });
 
   test("the activity block says in words that no history is known, and draws no chart or rate for Bubble", async ({
@@ -222,24 +239,30 @@ test.describe("who is here while nobody is counted", () => {
 test.describe("Share", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
+  // 8c: Share opens a sheet (the link, a picture, Copy link); the copy and its answer are the sheet's.
   test("copies the world's canonical address and says it did", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
     await page.getByRole("button", { name: "Share" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByText(/copied/i)).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("https://gno.world/net/onyx/w/bubble");
   });
 });
 
 test.describe("Share where the browser cannot copy", () => {
-  test("is not drawn: no dead button", async ({ page }) => {
+  test("shows the link to select, and says it could not copy: no dead button", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "clipboard", { value: undefined });
     });
     await page.goto("/w/bubble");
     await hydrated(page);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Share" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Share" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByText("https://gno.world/net/onyx/w/bubble")).toBeVisible();
+    await sheet.getByRole("button", { name: "Copy link" }).click();
+    await expect(sheet.getByText("Could not copy: select the link above")).toBeVisible();
   });
 });
 

@@ -33,32 +33,39 @@ test.describe("every place of the data files", () => {
 });
 
 test.describe("the pages added in 5d", () => {
+  // 8g (d4fb504a): the Earth's plate lists no world, the List does; its way to the worlds is the crumb's Universe, a link to the cosmos.
   test("/earth is the Earth, its heading and a way to the worlds", async ({ page }) => {
     await page.goto("/earth");
     await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Bubble" })).toBeVisible();
+    await expect(
+      page.locator("[data-look='plate'] nav[aria-label='You are here']").getByRole("link", { name: "Universe" }),
+    ).toBeVisible();
   });
 
-  test("a universe with no world says so plainly", async ({ page }) => {
+  test("a universe with no world draws its Earth and says nothing of worlds", async ({ page }) => {
     await page.goto("/net/gnoland/earth");
-    await expect(page.getByText(/no world yet/i)).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible();
+    await expect(page.getByText(/no world yet/i)).toHaveCount(0);
   });
 
-  // Slice 5j: the kicker over the title says where the world is, in place of the trail (frame 26): one way to say it.
-  test("a world's page names its universe in a kicker over its title, with no trail", async ({ page }) => {
+  // 8g (frame 104): the crumb over the title, "Universe > Games > dApp", says where the world is, in place of a kicker: one way to say it.
+  test("a world's page names its universe in a crumb over its title, and in no other trail", async ({ page }) => {
     await page.goto("/w/bubble");
-    await expect(page.locator("[data-look='plate'] p.label:not([data-orientation])").first()).toHaveText("Onyx");
-    await expect(page.getByRole("navigation", { name: /breadcrumb|you are here/i })).toHaveCount(0);
+    const crumb = page.locator("[data-look='plate'] nav[aria-label='You are here']");
+    await expect(crumb).toHaveCount(1);
+    await expect(crumb.locator("li").first()).toHaveText("Universe");
+    await expect(page.getByRole("navigation", { name: /breadcrumb/i })).toHaveCount(0);
   });
 
   test("a link from the Earth to a world changes the page without a reload", async ({ page }) => {
-    await page.goto("/earth");
+    // The full chat's worlds list is the Earth's way to a world (8g); beside the dock it is hidden.
+    await page.goto("/earth?chat=full");
     await hydrated(page);
     await page.evaluate(() => {
       Object.assign(window, { stayed: true });
     });
     await page.getByRole("link", { name: "Bubble" }).click();
-    await expect(page).toHaveURL("/w/bubble");
+    await expect(page).toHaveURL(/\/w\/bubble/);
     expect(await page.evaluate(() => "stayed" in window)).toBe(true);
   });
 
