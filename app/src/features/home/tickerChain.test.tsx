@@ -68,7 +68,7 @@ describe("the ticker with the chain's deploys", () => {
     const box = mount(<Ticker items={items} />);
     const kinds = all(box, "[data-kind]").filter((each) => each.closest("[aria-hidden='true']") === null);
     expect(kinds.map((each) => each.getAttribute("data-kind"))).toEqual(["chain"]);
-    expect(box.textContent).toMatch(/chain/i);
+    expect(box.textContent).toContain("block 10");
     const link = all(box, "a").find((each) => each.closest("[aria-hidden='true']") === null);
     expect(link?.getAttribute("href")).toBe(`/r/${ALICE}/counter`);
     expect(link?.getAttribute("target")).toBeNull();
