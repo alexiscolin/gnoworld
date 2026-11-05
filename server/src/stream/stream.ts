@@ -106,6 +106,19 @@ const LastId = () =>
 const frame = (id: number, event: StreamEvent): string =>
   `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
 
+interface Framed {
+  id: number;
+  text: string;
+}
+
+// What a stream replays, in id order, `pending` at most: the world's firsts whole (two a world, which the page reads nowhere
+// else), then the newest verdicts in the room left.
+function replay(verdicts: readonly Framed[], firsts: readonly Framed[], pending: number): string[] {
+  const room = Math.max(0, pending - firsts.length);
+  const newest = verdicts.toSorted((a, b) => a.id - b.id).slice(Math.max(0, verdicts.length - room));
+  return [...newest, ...firsts].toSorted((a, b) => a.id - b.id).map(({ text }) => text);
+}
+
 export function makeStream(options: Options = {}): Stream {
   const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
   // From the clock, so the ids a server gave before a restart stay below the next one's.
@@ -169,10 +182,7 @@ export function makeStream(options: Options = {}): Stream {
             .flatMap((room) => rings.get(room) ?? [])
             .filter(({ id }) => id > after)
             .map(({ id, event }) => ({ id, text: frame(id, event) }));
-          for (const { text } of [...verdicts, ...ring.missed(client.rooms, after)]
-            .toSorted((a, b) => a.id - b.id)
-            .slice(-pending))
-            write(client, text);
+          for (const text of replay(verdicts, ring.missed(client.rooms, after), pending)) write(client, text);
           tellSince(stream, now());
           // A comment line, which keeps a proxy from closing a quiet stream.
           const beat = setInterval(() => {

@@ -113,6 +113,39 @@ describe("the stream's signal event", () => {
     await late.cancel();
   });
 
+  // The review's high finding: the replay's cap of 64 events must not cut the world's firsts, which the page reads nowhere
+  // else, however many verdicts its rooms had since.
+  it("replays it to a reader who comes after 64 verdicts of the world's room, and the newest verdicts with it", async () => {
+    const { stream, open } = setup();
+    stream.signal(CHART);
+    stream.signal(WORDS);
+    for (let line = 0; line < 64; line += 1)
+      stream.publish({ msgid: `m${String(line)}`, room: "#fresh-mint", state: "checked" });
+    const late = await open("#fresh-mint");
+    const text = await late.settled();
+    expect(signals(text)).toEqual([CHART, WORDS]);
+    const verdicts = [...text.matchAll(/event: verdict\ndata: .*"msgid":"(m\d+)"/g)].map(([, msgid = ""]) => msgid);
+    expect(verdicts).toHaveLength(62);
+    expect(verdicts.at(-1)).toBe("m63");
+    await late.cancel();
+  });
+
+  it("keeps 5,000 worlds' firsts, a world past them told live alone, and a kept world's other first still kept", async () => {
+    const { stream, open } = setup();
+    for (let world = 0; world < 5000; world += 1) stream.signal({ ...CHART, world: `w${String(world)}` });
+    stream.signal({ ...CHART, world: "w5000" });
+    stream.signal({ ...WORDS, world: "w0" });
+    const past = await open("#w5000");
+    expect(signals(await past.settled())).toEqual([]);
+    await past.cancel();
+    const kept = await open("#w0");
+    expect(signals(await kept.settled())).toEqual([
+      { ...CHART, world: "w0" },
+      { ...WORDS, world: "w0" },
+    ]);
+    await kept.cancel();
+  });
+
   // How a signal finds its readers is the world's, by the room's world: a slug that is another's prefix is another world.
   it("tells no reader of a world whose slug only starts like this one's", async () => {
     const { stream, open } = setup();

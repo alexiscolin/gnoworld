@@ -11,22 +11,24 @@ const signalFrame = (id: number, signal: Signal): string =>
 export const follows = (rooms: ReadonlySet<string>, world: string): boolean =>
   [...rooms].some((room) => worldOf(room) === world);
 
-// A world and a kind each have one slot: 5,000 worlds at most, a world past the cap is told live alone.
-const KEPT = 10_000;
+// A world and a kind each have one slot: 5,000 worlds at most, a world past the cap is told live alone. Kept by world, so a
+// stream that opens looks up its rooms' worlds, never every world kept.
+const WORLDS = 5000;
 
 export function signalRing() {
-  const kept = new Map<string, { id: number; signal: Signal }>();
+  const kept = new Map<string, Map<Signal["kind"], { id: number; signal: Signal }>>();
   return {
     /** Keeps the signal under its id, and gives its frame. */
     keep(id: number, signal: Signal): string {
-      const key = `${signal.world} ${signal.kind}`;
-      if (kept.has(key) || kept.size < KEPT) kept.set(key, { id, signal });
+      const world = kept.get(signal.world) ?? new Map<Signal["kind"], { id: number; signal: Signal }>();
+      if (kept.has(signal.world) || kept.size < WORLDS) kept.set(signal.world, world.set(signal.kind, { id, signal }));
       return signalFrame(id, signal);
     },
     /** The kept signals of the worlds these rooms belong to, newer than `after`, as frames. */
     missed(rooms: ReadonlySet<string>, after: number): { id: number; text: string }[] {
-      return [...kept.values()]
-        .filter(({ id, signal }) => id > after && follows(rooms, signal.world))
+      return [...new Set([...rooms].map(worldOf))]
+        .flatMap((world) => [...(kept.get(world)?.values() ?? [])])
+        .filter(({ id }) => id > after)
         .map(({ id, signal }) => ({ id, text: signalFrame(id, signal) }));
     },
   };
