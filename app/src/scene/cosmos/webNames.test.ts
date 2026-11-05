@@ -84,4 +84,23 @@ describe("the whole cosmos's pills", () => {
     names.place(project, { width: SIZE, height: SIZE, box: { left: 0, top: 0, right: 400, bottom: 380 } });
     expect(shown()).toEqual(["twelve"]);
   });
+
+  // G5: twelve at most on a computer, the biggest kept; the biggest first, whatever order the clumps come in.
+  it("names twelve at most on a computer, the biggest, and the biggest first where two meet", () => {
+    const names = new WebNames(document);
+    const many = Array.from({ length: 13 }, (_, n) =>
+      clump(`c${String(n)}`, [at(80 + 70 * n), -at(100 + 60 * n)], 20 + n),
+    );
+    names.stand(many);
+    names.place(project, { width: SIZE, height: SIZE, box: undefined });
+    expect(shown().sort()).toEqual(
+      many
+        .slice(1)
+        .map(({ id }) => id)
+        .sort(),
+    );
+    names.stand([clump("small", [at(700), -at(700)], 30), clump("big", [at(720), -at(705)], 90)]);
+    names.place(project, { width: SIZE, height: SIZE, box: undefined });
+    expect(shown()).toEqual(["big"]);
+  });
 });

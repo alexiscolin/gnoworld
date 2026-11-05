@@ -23,8 +23,10 @@ vi.mock("node:fs", async (actual) => {
     ...fs,
     lstatSync: (...args: Parameters<typeof fs.lstatSync>) =>
       files.lstat.stale ? { isSocket: () => true } : fs.lstatSync(...args),
+    // Only a stale socket is the test's: every other unlink is the real one, so a file that is no socket is still seen kept.
     unlinkSync: (path: string) => {
-      files.unlinked.push(path);
+      if (files.lstat.stale) files.unlinked.push(path);
+      else fs.unlinkSync(path);
     },
   };
 });

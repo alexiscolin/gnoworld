@@ -2,7 +2,7 @@
 import { massOf } from "@gnoworld/core";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CosmosWorld } from "./cosmosWorld.ts";
-import { glideFrom, namespacesOf, paletteOf } from "./webHeld.ts";
+import { glideFrom, livelyOf, namespacesOf, paletteOf } from "./webHeld.ts";
 
 // The whole cosmos's matter (7u): the file's worlds by namespace as core's mass reads them, a world new for the week marked; where each
 // particle glides from as the mass changes; and the palette from the design system's tokens, a grey one with no page.
@@ -105,5 +105,32 @@ describe("the mass's palette", () => {
     const touch = palette.touches[0];
     expect(touch?.r ?? 0).toBeGreaterThan(touch?.g ?? 1);
     expect(touch?.g ?? 0).toBeGreaterThan(0);
+  });
+});
+
+// G6: the clump the cosmos marks, the one holding the most live worlds now, else the first, the most used; none with no clump. And a
+// world new for exactly a week no more.
+describe("the mass's liveliest clump and its new worlds", () => {
+  const universe = { calls: 100, newest: 1000, written: WRITTEN };
+  const now = Date.parse(WRITTEN);
+  const called = (id: string, calls: number | null, lastHeight: number | null) =>
+    world(id, null, [{ callers: 1, path: `gno.land/r/${id}`, calls, lastHeight }]);
+
+  it("marks the clump with the most live worlds, else the first, and none with no clump", () => {
+    const clumps = [{ id: "quiet" }, { id: "busy" }];
+    const worlds = [called("quiet/a", null, null), called("busy/a", 60, 1000), called("busy/b", 30, 999)];
+    expect(livelyOf(clumps, worlds, { universe, now })).toBe(1);
+    expect(livelyOf(clumps, [called("quiet/a", null, null)], { universe, now })).toBe(0);
+    expect(livelyOf([], worlds, { universe, now })).toBe(-1);
+  });
+
+  it("calls a world new until a week after the file first saw it, not at a week", () => {
+    const week = 7 * 86_400_000;
+    const seenAt = (ms: number) => new Date(now - ms).toISOString();
+    const [space] = namespacesOf([world("gno/edge", seenAt(week)), world("gno/inside", seenAt(week - 1000))], WRITTEN);
+    expect(space?.worlds.map(({ id, fresh }) => [id, fresh])).toEqual([
+      ["gno/edge", false],
+      ["gno/inside", true],
+    ]);
   });
 });
