@@ -1,7 +1,7 @@
 // One call to a realm through Adena (slice 9's plan, 9b): the request the card drew, the account and the network
 // read again right before signing, one MsgCall, and the answer read as outside data. Every end is a result with
 // its reason, and nothing is asked of Adena for the request until those asked before it have answered (queue.ts).
-import { Address, type CallRequest } from "@gnoworld/schemas";
+import { Address, CallRequest } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 import { detect, method } from "./detect.ts";
 import { ask, capped, read, refusal, type Answered, type CallFailure, type Failed } from "./answers.ts";
@@ -148,10 +148,13 @@ async function send(
 
 /** Asks Adena, once the requests before it are done, to sign and send this call, as the account on the universe's chain. */
 export function callContract(adena: unknown, request: CallRequest, universe: Universe): Promise<CallResult> {
-  if (request.chainId !== universe.chainId) return Promise.resolve({ ok: false, reason: "wrong-network" });
+  // A typed request is not a checked one: the caps and the shapes the card shows are read again where Adena is asked.
+  const parsed = CallRequest.safeParse(request);
+  if (!parsed.success) return Promise.resolve({ ok: false, reason: "malformed" });
+  if (parsed.data.chainId !== universe.chainId) return Promise.resolve({ ok: false, reason: "wrong-network" });
   return serially(async () => {
     try {
-      const result = await work(adena, request, universe);
+      const result = await work(adena, parsed.data, universe);
       if (result.ok) return result;
       return result.log === undefined
         ? { ok: false, reason: result.reason }

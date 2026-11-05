@@ -189,6 +189,23 @@ describe("callContract: the way through", () => {
   });
 });
 
+describe("callContract: a request that is not a CallRequest reaches no Adena call (F5642)", () => {
+  // Typed objects built by hand, past the schema: the guard lives in the function that signs.
+  const forged = (change: Record<string, unknown>) => ({ ...REQUEST, ...change });
+  it.each([
+    ["a package path", forged({ realm: "gno.land/p/demo/avl" })],
+    ["an unexported function", forged({ func: "lower" })],
+    ["an argument past 8,192 bytes", forged({ args: ["x".repeat(20_000)] })],
+    ["a caller that is no address", forged({ caller: "" })],
+    ["a field the request does not have", forged({ memo: "hi" })],
+    ["no arguments array", forged({ args: undefined })],
+  ])("%s", async (_, request) => {
+    const adena = new Fake();
+    expect(await callContract(adena, request, ONYX)).toEqual({ ok: false, reason: "malformed" });
+    expect(adena.names).toEqual([]);
+  });
+});
+
 describe("callContract: the account", () => {
   it("connects first when gnoworld is not let in, then reads the account again", async () => {
     const adena = new Fake();
