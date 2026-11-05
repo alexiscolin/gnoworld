@@ -7204,6 +7204,9 @@ out=$(wt "$wr/frommain" frommain HEAD 2>&1) || :
 rm "$ws/src/.git/commondir"
 [ ! -e "$ws/pwned" ] || fail "worktree.sh, run from the main checkout, took its config from a commondir planted there: its fsmonitor ran (F5097): $out"
 [ -d "$wr/frommain" ] || fail "worktree.sh, run from the main checkout beside a planted commondir, made no tree: $out"
+# Its fsmonitor is off whatever the config says, so the planted folder shows only where git recorded the tree: in this one.
+git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/frommain" ||
+	fail "worktree.sh, run from the main checkout beside a planted commondir, recorded its tree in the folder that commondir names (F5097): $out"
 # Nor does it run a hook or an fsmonitor of this repository's common folder, which the file tools can still write (F5095): a
 # post-checkout hook ran when the tree was made, an fsmonitor when the base was compared (security-reviewer, third review).
 printf '#!/bin/sh\ntouch "%s"\n' "$ws/hookran" >"$ws/src/.git/hooks/post-checkout" && chmod +x "$ws/src/.git/hooks/post-checkout"
