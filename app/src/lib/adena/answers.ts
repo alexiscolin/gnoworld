@@ -35,40 +35,6 @@ export const SUCCESSES = {
 } as const;
 export type Method = keyof typeof SUCCESSES;
 
-// A failure's type says what it is; a type nobody knows is read by its code (bin/index.js:785-985).
-const BY_TYPE = new Map<string, CallFailure>([
-  ["NOT_CONNECTED", "not-connected"],
-  ["UNRESOLVED_TRANSACTION_EXISTS", "busy"],
-  ["WALLET_LOCKED", "locked"],
-  ["ACCOUNT_MISMATCH", "wrong-account"],
-  ["NO_ACCOUNT", "no-account"],
-  ["TRANSACTION_REJECTED", "declined"],
-  ["SIGN_REJECTED", "declined"],
-  ["SWITCH_NETWORK_REJECTED", "declined"],
-  ["ADD_NETWORK_REJECTED", "declined"],
-  ["CONNECTION_REJECTED", "declined"],
-  ["UNSUPPORTED_TYPE", "unsupported"],
-  ["TRANSACTION_FAILED", "failed"],
-  ["INVALID_FORMAT", "failed"],
-  ["UNEXPECTED_ERROR", "failed"],
-]);
-const BY_CODE = new Map<number, CallFailure>([
-  [1000, "not-connected"],
-  [1001, "busy"],
-  [2000, "locked"],
-  [3001, "wrong-account"],
-  [3002, "no-account"],
-  [4000, "declined"],
-  [4005, "unsupported"],
-]);
-
-const Answer = z.object({
-  status: z.enum(["success", "failure"]),
-  type: z.string(),
-  code: z.optional(z.number()),
-  message: z.optional(z.string()),
-  data: z.unknown(),
-});
 export interface Failed {
   ok: false;
   reason: CallFailure;
@@ -82,12 +48,45 @@ export const refusal = (reason: CallFailure, type = "", log = ""): Failed =>
 
 // A failure's reason: its type's, else its code's; only a plain failure carries Adena's message, as the log.
 function failure(type: string, code: number | undefined, message: string | undefined): Failed {
+  // A failure's type says what it is; a type nobody knows is read by its code (bin/index.js:785-985).
+  const BY_TYPE = new Map<string, CallFailure>([
+    ["NOT_CONNECTED", "not-connected"],
+    ["UNRESOLVED_TRANSACTION_EXISTS", "busy"],
+    ["WALLET_LOCKED", "locked"],
+    ["ACCOUNT_MISMATCH", "wrong-account"],
+    ["NO_ACCOUNT", "no-account"],
+    ["TRANSACTION_REJECTED", "declined"],
+    ["SIGN_REJECTED", "declined"],
+    ["SWITCH_NETWORK_REJECTED", "declined"],
+    ["ADD_NETWORK_REJECTED", "declined"],
+    ["CONNECTION_REJECTED", "declined"],
+    ["UNSUPPORTED_TYPE", "unsupported"],
+    ["TRANSACTION_FAILED", "failed"],
+    ["INVALID_FORMAT", "failed"],
+    ["UNEXPECTED_ERROR", "failed"],
+  ]);
+  const BY_CODE = new Map<number, CallFailure>([
+    [1000, "not-connected"],
+    [1001, "busy"],
+    [2000, "locked"],
+    [3001, "wrong-account"],
+    [3002, "no-account"],
+    [4000, "declined"],
+    [4005, "unsupported"],
+  ]);
   const reason = BY_TYPE.get(type) ?? BY_CODE.get(code ?? 0) ?? "failed";
   return refusal(reason, type, reason === "failed" ? (message ?? "") : "");
 }
 
 // One call to the extension, its answer read by its type: one of the method's successes, or a failure with its reason.
 export async function ask(run: () => unknown, method: Method): Promise<Answered> {
+  const Answer = z.object({
+    status: z.enum(["success", "failure"]),
+    type: z.string(),
+    code: z.optional(z.number()),
+    message: z.optional(z.string()),
+    data: z.unknown(),
+  });
   let raw: unknown;
   try {
     raw = await run();
