@@ -133,6 +133,11 @@
     text-align: center;
   }
 
+  /* The bell's count (frames 6, 86, 87): what is new to the reader, in the coral of new things; every other count stays mint. */
+  .badge[data-tone="new"] {
+    background: var(--color-new);
+  }
+
   .count {
     position: absolute;
     inset-block-start: calc(var(--space-3xs) * -1);
