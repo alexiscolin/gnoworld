@@ -107,9 +107,12 @@ describe("isCarried", () => {
     "func()",
     "struct{}",
     "",
-    realmType(),
   ])("does not carry %j", (type) => {
     expect(isCarried(type)).toBe(false);
+  });
+
+  it("does not carry the realm type", () => {
+    expect(isCarried(realmType())).toBe(false);
   });
 });
 
