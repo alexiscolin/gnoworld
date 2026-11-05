@@ -6,7 +6,7 @@ describe("isPublicOrigin", () => {
     "https://rpc.example.org",
     "https://rpc.example.org:8443",
     "https://rpc.example.org:65535",
-    "https://a-b.c-d.example",
+    "https://a-b.c-d.example.org",
     "https://rpc.example.org:1",
   ])("takes %s", (origin) => {
     expect(isPublicOrigin(origin)).toBe(true);
