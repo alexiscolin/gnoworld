@@ -38,12 +38,15 @@ export function CallableForm({
   fields,
   left,
   call,
+  level,
 }: {
   exec: string;
   path: string;
   fields: readonly FormField[];
   left: number;
   call: CallPlace;
+  /** The level of the card's title: one under the heading before the form. */
+  level?: 2 | 3 | 4 | undefined;
 }) {
   const store = useAppStore();
   const listing = useCallable(call.chain.rpc, call.realm, call.options);
@@ -67,7 +70,7 @@ export function CallableForm({
           </Button>
         </Cluster>
       </RealmForm>
-      <InlineCard id={id} place={call} />
+      <InlineCard id={id} place={call} level={level} />
     </>
   );
 }

@@ -20,6 +20,8 @@ export interface CallCardProps {
   onSign: () => void;
   onCancel: () => void;
   onRetry: () => void;
+  /** The title's level under the page's headings: 3 unless the page says. */
+  level?: 2 | 3 | 4;
 }
 
 const COUNT = new Intl.NumberFormat("en-US");
@@ -180,11 +182,16 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
   );
 }
 
-export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry }: CallCardProps) {
+export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level }: CallCardProps) {
   const preview = card.state.kind === "preview";
   return (
     <Card>
-      <Card.Header kicker="SIGNATURE REQUEST · ADENA" title={card.func} size="large" />
+      <Card.Header
+        kicker="SIGNATURE REQUEST · ADENA"
+        title={card.func}
+        size="large"
+        {...(level === undefined ? {} : { level })}
+      />
       <Card.Body>
         <p className={styles["lede"]}>A call to {card.realm}. Adena asks you to sign it.</p>
         <dl className={styles["block"]}>

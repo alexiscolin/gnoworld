@@ -40,12 +40,12 @@ export function openCard(
 }
 
 /** The card `id`, once opened: nothing before. */
-export function InlineCard({ id, place }: { id: string; place: CallPlace }) {
+export function InlineCard({ id, place, level }: { id: string; place: CallPlace; level?: 2 | 3 | 4 | undefined }) {
   const card = useApp((state) => callsIn(state)?.calls[id]);
-  return card === undefined ? null : <OpenCard card={card} place={place} />;
+  return card === undefined ? null : <OpenCard card={card} place={place} level={level} />;
 }
 
-function OpenCard({ card, place }: { card: CallCardState; place: CallPlace }) {
+function OpenCard({ card, place, level }: { card: CallCardState; place: CallPlace; level: 2 | 3 | 4 | undefined }) {
   const store = useAppStore();
   const [fees, setFees] = useState<CallFees | undefined>(undefined);
   const { id, realm, func } = card;
@@ -62,6 +62,7 @@ function OpenCard({ card, place }: { card: CallCardState; place: CallPlace }) {
   return (
     <CallCard
       card={card}
+      {...(level === undefined ? {} : { level })}
       network={{ name, chainId }}
       fee={feeText(fees)}
       onEdit={(index, text) => {

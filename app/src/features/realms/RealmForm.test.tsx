@@ -233,3 +233,21 @@ describe("a form whose drawing left fields out", () => {
     expect(all(one(box, '[data-test="under"]'), "button")).toHaveLength(0);
   });
 });
+
+describe("a form's card among a page's headings", () => {
+  const FORM = gnoForm("SetProfile", input("name"), input("times"));
+  it.each([
+    ["", "H2"],
+    ["# Profile\n\n", "H2"],
+    ["## Profile\n\n", "H3"],
+    ["### Profile\n\n", "H4"],
+    ["###### Profile\n\n", "H4"],
+  ])(
+    "titles the card one level under the heading before its form (%j), so no level is skipped: %s",
+    async (before, level) => {
+      const box = await form(`${before}${FORM}`);
+      click(await calling(box, "Call SetProfile"));
+      expect(one(one(box, "article"), "h2, h3, h4").tagName).toBe(level);
+    },
+  );
+});
