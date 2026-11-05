@@ -84,18 +84,14 @@
     gap: 8px;
   }
 
+  /* The video's kinds (TRENDING, AMA, SIGNAL) are in capitals and mint, its titles in near-white text (frames 4, 143 and 144). */
   .kind {
-    color: var(--color-warm);
-  }
-
-  /* The video's deploy item reads SIGNAL, in capitals and mint (frames 143 and 144). */
-  .kind[data-kind="chain"] {
     color: var(--color-mine);
     text-transform: uppercase;
   }
 
   .link {
-    color: var(--color-text-muted);
+    color: var(--color-text);
     text-decoration: none;
   }
 
