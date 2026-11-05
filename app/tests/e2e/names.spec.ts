@@ -114,18 +114,18 @@ test.describe("the name dialog", () => {
     await expect(dialog(page)).toContainText(/is registered/i);
   });
 
-  test("waits for the signature with the dialog readable, and offers Register again after a declined one", async ({
+  test("waits for the signature with the dialog readable, and after a declined one offers no second Register (9d-2)", async ({
     page,
   }) => {
     await logIn(page, [1280, 900], { wallet: { declines: true } });
     await pick(page).click();
     await page.getByRole("textbox", { name: "Name" }).fill("alexis042");
     await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
-    await expect(dialog(page)).toContainText(/declined in Adena/);
-    await expect(dialog(page).getByRole("button", { name: "Register · 0 GNOT" })).toBeVisible();
+    await expect(dialog(page)).toContainText(/the signature was declined/);
+    await expect(dialog(page)).toContainText(/check Adena's recent transactions/);
+    await expect(dialog(page).getByRole("button", { name: "Register · 0 GNOT" })).toHaveCount(0);
     expect(await violations(page)).toEqual([]);
-    await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
-    await expect.poll(() => done(page)).toBe(2);
+    expect(await done(page)).toBe(1);
   });
 
   test("has no accessibility violation while Adena holds the signature", async ({ page }) => {
