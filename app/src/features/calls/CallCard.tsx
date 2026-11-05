@@ -21,7 +21,7 @@ export interface CallCardProps {
   onCancel: () => void;
   onRetry: () => void;
   /** The title's level under the page's headings: 3 unless the page says. */
-  level?: 2 | 3 | 4;
+  level?: 2 | 3 | 4 | undefined;
 }
 
 const COUNT = new Intl.NumberFormat("en-US");

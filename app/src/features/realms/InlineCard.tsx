@@ -62,7 +62,7 @@ function OpenCard({ card, place, level }: { card: CallCardState; place: CallPlac
   return (
     <CallCard
       card={card}
-      {...(level === undefined ? {} : { level })}
+      level={level}
       network={{ name, chainId }}
       fee={feeText(fees)}
       onEdit={(index, text) => {
