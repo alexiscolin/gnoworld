@@ -1,4 +1,4 @@
-import { Address, type ChainEvent, type RealmsDeployed } from "@gnoworld/schemas";
+import { Address, toAddress, type ChainEvent, type RealmsDeployed } from "@gnoworld/schemas";
 import { describe, expect, it, vi } from "vitest";
 import { loadRealmCount } from "./count.ts";
 import { makeRelay } from "./relay.ts";
@@ -7,20 +7,22 @@ import type { ChainRead } from "./message.ts";
 // Slice 9g: what the subscription's reads become on the stream: coalesced to 4 a second a room, each event with its block
 // height; the Earth's count from block times only (a transaction carries none, so a deploy waits for its block).
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
-const call = (height: number, world = "govdao"): ChainEvent => ({
+// A flood is of many accounts: each has its own address.
+const actorN = (n: number): Address => Address.parse(toAddress(new Uint8Array(20).fill(n % 256)));
+const call = (height: number, world = "govdao", actor: Address = ALICE): ChainEvent => ({
   kind: "call",
   universe: "onyx",
   world,
   realm: "gno.land/r/gov/dao",
   func: "MustVoteOnProposal",
-  actor: ALICE,
+  actor,
   height,
 });
-const deploy = (height: number, name = `r${String(height)}`): ChainEvent => ({
+const deploy = (height: number, name = `r${String(height)}`, actor: Address = ALICE): ChainEvent => ({
   kind: "deploy",
   universe: "onyx",
   realm: `gno.land/r/${ALICE}/${name}`,
-  actor: ALICE,
+  actor,
   height,
 });
 const events = (...list: ChainEvent[]): ChainRead => ({ events: list });
@@ -73,7 +75,7 @@ describe("the relay", () => {
 
   it("lets 4 events a second a room through in a flood of 100, and each room has its own", () => {
     const { relay, chain } = setup();
-    for (let n = 0; n < 100; n += 1) relay(events(call(n), call(n, "bubble")));
+    for (let n = 0; n < 100; n += 1) relay(events(call(n, "govdao", actorN(n)), call(n, "bubble", actorN(n))));
     expect(chain.mock.calls.filter(([event]) => event.kind === "call" && event.world === "govdao")).toHaveLength(4);
     expect(chain.mock.calls.filter(([event]) => event.kind === "call" && event.world === "bubble")).toHaveLength(4);
     // The first four are kept: the heights tell a reader where a gap is.
@@ -86,7 +88,7 @@ describe("the relay", () => {
 
   it("keeps the deploys to the ticker's budget apart from a world's: a flood of calls does not starve it", () => {
     const { relay, chain } = setup();
-    for (let n = 0; n < 50; n += 1) relay(events(call(n)));
+    for (let n = 0; n < 50; n += 1) relay(events(call(n, "govdao", actorN(n))));
     relay(events(deploy(900)));
     expect(chain.mock.calls.at(-1)?.[0]).toEqual(deploy(900));
   });
@@ -123,12 +125,12 @@ describe("the relay", () => {
   // Red pass: a bot deploying 100 realms a second is 4 events a second to every ticker, and every deploy is still counted.
   it("tells the ticker 4 deploys a second in a flood of 100, counts all 100 once their blocks come, and admits a new one the second after", () => {
     const { relay, chain, deployed, at } = setup();
-    for (let n = 0; n < 100; n += 1) relay(events(deploy(n)));
+    for (let n = 0; n < 100; n += 1) relay(events(deploy(n, `r${String(n)}`, actorN(n))));
     expect(chain.mock.calls.filter(([event]) => event.kind === "deploy")).toHaveLength(4);
     for (let n = 0; n < 100; n += 1) relay(block(n));
     expect(deployed).toHaveBeenCalledTimes(100);
     at(1000);
-    relay(events(deploy(500)));
+    relay(events(deploy(500, "r500", actorN(500))));
     expect(chain.mock.calls.filter(([event]) => event.kind === "deploy")).toHaveLength(5);
   });
 
