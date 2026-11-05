@@ -68,6 +68,27 @@ describe("readName", () => {
     expect(read).toMatchObject({ ok: false, failure: { kind: "chain-refused" } });
   });
 
+  it("gives the failure of the record's first read as it is, and asks no name", async () => {
+    const { fetcher, expressions } = node({});
+    const read = await readName(RPC, on, options(fetcher));
+    expect(read).toMatchObject({ ok: false, failure: { kind: "chain-refused" } });
+    expect(expressions()).toEqual([DELETED]);
+  });
+
+  it("reads the answers whole: a line's end is no part of them, and nothing may come before or after the text", async () => {
+    const { fetcher } = node({ [DELETED]: "(false bool)\n", [NAME]: '("aeddi" string)\n' });
+    expect(await readName(RPC, on, options(fetcher))).toMatchObject({ ok: true, value: { name: "aeddi" } });
+    const gone = node({ [DELETED]: "(true bool)\n" });
+    expect(await readName(RPC, on, options(gone.fetcher))).toMatchObject({ ok: true, value: { name: null } });
+    for (const text of ['x ("aeddi" string)', '("aeddi" string) ("b" string)']) {
+      const bad = node({ [DELETED]: "(false bool)", [NAME]: text });
+      expect(await readName(RPC, on, options(bad.fetcher))).toMatchObject({
+        ok: false,
+        failure: { kind: "wrong-shape" },
+      });
+    }
+  });
+
   it("is a failure when the node is on another chain than the universe's (a name of Onyx is never taken for mainnet's)", async () => {
     const { fetcher } = node({ [DELETED]: "(false bool)", [NAME]: '("nym-alexiscolin000" string)' });
     const read = await readName(RPC, { chainId: "gnoland-1", account: ACCOUNT }, options(fetcher));

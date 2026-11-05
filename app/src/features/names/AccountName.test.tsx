@@ -4,7 +4,7 @@ import { Address } from "@gnoworld/schemas";
 import { Avatar } from "@gnoworld/ui";
 import type { Landed } from "@gnoworld/chain/tx";
 import { act, useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { all, button, click, faceOf, mount, one } from "../../../tests/mount.tsx";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
@@ -428,5 +428,100 @@ describe("AccountName: whose name, whose card", () => {
     await settled();
     expect(said(one(box, "dialog"))).not.toMatch(/is registered/);
     expect(box.querySelectorAll("input")).toHaveLength(1);
+  });
+});
+
+describe("AccountName: the pill and its title", () => {
+  const classesOf = (element: Element) => element.className.split(" ").filter((each) => each !== "");
+  it("draws the way in with its own class and nothing else when the page gives no pill, and the page's pill before it when it does", async () => {
+    const { box } = control(ONYX_UNIVERSE, NONE);
+    await settled();
+    expect(classesOf(button(box, PICK) ?? box)).toEqual([expect.stringMatching(/^_opener_/)]);
+    expect(classesOf(one(box, "[data-account] > span"))).toEqual([expect.stringMatching(/^_row_/)]);
+    const piled = mount(
+      <StoreProvider>
+        <AccountName account={ACCOUNT} universe={ONYX_UNIVERSE} chains={CHAINS} read={reader(NONE).read} pill="login" />
+      </StoreProvider>,
+    );
+    await settled();
+    expect(classesOf(button(piled, PICK) ?? piled)).toEqual(["login", expect.stringMatching(/^_opener_/)]);
+  });
+
+  it("titles a name with the chain it was read on and its block, and the short address with the whole address", async () => {
+    const onyx = control(ONYX_UNIVERSE, {
+      "gnoland-1": () => named("gnoland-1", null),
+      "onyx-1": () => named("onyx-1", "nym-onyxname042"),
+    });
+    await settled();
+    expect(one(onyx.box, "[data-account]").title).toBe("Onyx · block 55,420");
+    const main = control(ONYX_UNIVERSE, { "gnoland-1": () => named("gnoland-1", "nym-mainname042", 1_325_774) });
+    await settled();
+    expect(one(main.box, "[data-account]").title).toBe("gno.land · block 1,325,774");
+    const none = control(ONYX_UNIVERSE, NONE);
+    await settled();
+    expect(one(none.box, "[data-account]").title).toBe(ACCOUNT);
+  });
+
+  it("shows no name of the old account while the new account's reads are not answered", async () => {
+    const read: typeof readName = (_rpc, { chainId, account }) =>
+      account === ACCOUNT ? Promise.resolve(named(chainId, "nym-alicename042")) : new Promise(() => undefined);
+    const { box, switchTo } = control(ONYX_UNIVERSE, {}, { read });
+    await settled();
+    expect(said(box)).toContain("nym-alicename042");
+    switchTo({ account: OTHER });
+    await settled();
+    expect(said(box)).not.toContain("alicename");
+    expect(said(box)).toContain("g10gh7…3y5tv");
+  });
+});
+
+describe("AccountName: reads again, and what goes wrong", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("reads both chains again after each registration that ran, the second time as the first", async () => {
+    const wallet = recordedAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
+    const { box, asked } = control(ONYX_UNIVERSE, NONE, { wallet });
+    await settled();
+    await pick(box);
+    expect(asked).toHaveLength(2);
+    register(box);
+    await vi.waitFor(() => {
+      expect(asked).toHaveLength(4);
+    });
+    register(box);
+    await vi.waitFor(() => {
+      expect(asked).toHaveLength(6);
+    });
+  });
+
+  it("reports a read that threw, and a dialog that did not load, and still shows the short address", async () => {
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const boom = new Error("boom");
+    const { box } = control(ONYX_UNIVERSE, {}, { read: () => Promise.reject(boom) });
+    await settled();
+    expect(report).toHaveBeenCalledWith(boom);
+    expect(said(box)).toContain(SHORT);
+    vi.doMock("./RegisterFlow.tsx", () => {
+      throw new Error("chunk");
+    });
+    try {
+      const picked = control(ONYX_UNIVERSE, NONE);
+      await settled();
+      click(button(picked.box, PICK));
+      await vi.waitFor(() => {
+        expect(
+          report.mock.calls.some(
+            ([error]) => error instanceof Error && error.cause instanceof Error && error.cause.message === "chunk",
+          ),
+        ).toBe(true);
+      });
+      expect(all(picked.box, "dialog")).toHaveLength(0);
+    } finally {
+      await settled();
+      vi.doUnmock("./RegisterFlow.tsx");
+    }
   });
 });

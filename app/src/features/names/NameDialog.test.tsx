@@ -183,3 +183,43 @@ describe("NameDialog: nothing is registered until the chain says so", () => {
     expect(button(box, "Later")).toBeDefined();
   });
 });
+
+describe("NameDialog: what the form holds and how it is drawn", () => {
+  it("starts with an empty field and no complaint about it, and complains once something wrong is typed", () => {
+    const { box } = view();
+    const input = one(box, "input");
+    expect(Reflect.get(input, "value")).toBe("");
+    expect(input.getAttribute("aria-invalid")).not.toBe("true");
+    type(box, "alex");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    type(box, "");
+    expect(input.getAttribute("aria-invalid")).not.toBe("true");
+  });
+
+  it("registers nothing when the form is sent with a name that does not hold, and keeps the page where it is when it does", () => {
+    const { box, onRegister } = view();
+    const form = one(box, "form");
+    type(box, "alex");
+    act(() => {
+      form.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
+    });
+    expect(onRegister).not.toHaveBeenCalled();
+    type(box, "alexis042");
+    const sent = new Event("submit", { bubbles: true, cancelable: true });
+    act(() => {
+      form.dispatchEvent(sent);
+    });
+    expect(sent.defaultPrevented).toBe(true);
+    expect(onRegister).toHaveBeenCalledExactlyOnceWith("alexis042");
+  });
+
+  it("names each part by its own class: the status, the notes, the Register button's computer-only span, the phone's line", () => {
+    const { box } = view();
+    const named = (each: Element, ...parts: string[]) =>
+      new RegExp(`^${parts.map((part) => `_${part}_\\w+`).join(" ")}$`).test(each.className);
+    expect(named(one(box, "p[role=status]"), "state")).toBe(true);
+    expect(all(box, "p").filter((each) => named(each, "note"))).toHaveLength(3);
+    expect(named(one(box, "button[type=submit]").closest("span") ?? box, "computer")).toBe(true);
+    expect(all(box, "p").filter((each) => named(each, "phone", "note"))).toHaveLength(1);
+  });
+});

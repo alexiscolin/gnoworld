@@ -64,4 +64,30 @@ describe("InPage", () => {
     expect(main).toContain("gno.land (gnoland-1)");
     expect(main).toMatch(/real GNOT/);
   });
+
+  it("takes each chain's name from its own node: a name only gno.land's node knows is shown as gno.land's", async () => {
+    vi.stubGlobal("fetch", (url: string) => {
+      const { host, pathname } = new URL(url);
+      const hex = /data=0x([0-9a-f]*)/.exec(url)?.[1] ?? "";
+      const asked = new TextDecoder().decode(
+        Uint8Array.from(hex.match(/../g) ?? [], (pair) => Number.parseInt(pair, 16)),
+      );
+      const onyx = host.startsWith("rpc.onyx.");
+      const data = asked.endsWith(".Name()") ? '("nym-mainname042" string)' : onyx ? "(true bool)" : "(false bool)";
+      const body =
+        pathname === "/status"
+          ? statusEnvelope(55_420, "2026-11-06T05:00:00Z", onyx ? "onyx-1" : "gnoland-1")
+          : queryEnvelope({ data });
+      return Promise.resolve(new Response(JSON.stringify(body)));
+    });
+    const box = mount(
+      <StoreProvider>
+        <InPage account={ACCOUNT} universe={undefined} pill="pill" />
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(one(box, "[data-account]").title).toBe("gno.land · block 55,420");
+    });
+    expect(one(box, "[data-account]").textContent).toContain("nym-mainname042");
+  });
 });

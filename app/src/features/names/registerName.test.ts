@@ -1,4 +1,5 @@
 import type { ChainRead } from "@gnoworld/chain/read";
+import { realmType } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it, vi } from "vitest";
 import { recordedAdena, SIGNED_HASH } from "../../../tests/recordedAdena.ts";
@@ -232,6 +233,52 @@ describe("registerName: a store that already holds a registration", () => {
     expect(registrationOf(store.getState(), other, "onyx-1")).toBeUndefined();
     expect(await registerName("bobname043", { ...deps, adena: second.adena })).toEqual({ ok: true });
     expect(registrationOf(store.getState(), other, "onyx-1")?.texts).toEqual(["nym-bobname043"]);
+    expect(registrationOf(store.getState(), ACCOUNT, "onyx-1")).toBeUndefined();
+  });
+});
+
+describe("registerName: while Adena is asked, and whose card it is", () => {
+  it("refuses a second Register while Adena still holds the signature, and asks it once", async () => {
+    const gate = Promise.withResolvers<unknown>();
+    const adena = recordedAdena({ account: ACCOUNT, doContract: () => gate.promise });
+    const { store, deps } = setup({}, adena);
+    const first = registerName("alexis042", deps);
+    await vi.waitFor(() => {
+      expect(adena.asked.some((entry) => entry.call === "DoContract")).toBe(true);
+    });
+    expect(stateOf(store)).toEqual({ kind: "signing" });
+    const second = await registerName("alexis043", deps);
+    expect(second.ok ? "" : second.problem).toMatch(/already under way/);
+    expect(adena.asked.filter((entry) => entry.call === "DoContract")).toHaveLength(1);
+    gate.resolve({ status: "failure", type: "TRANSACTION_REJECTED", message: "", data: {} });
+    await first;
+  });
+
+  it("opens the card with Register's two parameters, the realm first and the name second", async () => {
+    const { store, deps } = setup();
+    await registerName("alexis042", deps);
+    expect(callsIn(store.getState())?.calls[REGISTER_ID]?.params).toEqual([
+      { Name: "cur", Type: realmType() },
+      { Name: "username", Type: "string" },
+    ]);
+  });
+
+  it("gives no card where the store holds no calls yet, and none for a card another chain took the place of", async () => {
+    expect(registrationOf(createAppStore().getState(), ACCOUNT, "onyx-1")).toBeUndefined();
+    const { store, deps } = setup();
+    await registerName("alexis042", deps);
+    const actions = callsIn(store.getState())?.callsActions;
+    actions?.close(REGISTER_ID);
+    actions?.open({ id: REGISTER_ID, chainId: "gnoland-1", realm: "r", func: "Register", params: [] });
+    expect(registrationOf(store.getState(), ACCOUNT, "onyx-1")).toBeUndefined();
+    expect(registrationOf(store.getState(), ACCOUNT, "gnoland-1")).toBeUndefined();
+  });
+
+  it("keeps a card opened with nobody logged in to no account", async () => {
+    const { store, deps } = setup();
+    store.getState().loginActions.signedOut();
+    await registerName("alexis042", deps);
+    expect(registrationOf(store.getState(), "", "onyx-1")?.state).toMatchObject({ reason: "logged-out" });
     expect(registrationOf(store.getState(), ACCOUNT, "onyx-1")).toBeUndefined();
   });
 });
