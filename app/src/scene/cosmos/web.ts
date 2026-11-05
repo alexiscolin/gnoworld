@@ -76,7 +76,8 @@ export class Web {
     // The hero's box and, on a phone, the list of worlds under it, as the Earth's view keeps them (7x2's TextBox).
     const text = new TextBox();
     this.#box = page === undefined ? () => box?.() : () => text.of(box?.());
-    for (const look of [this.#look, this.#line.mesh.material, this.#rings.look]) offTheBox(look, this.#box);
+    offTheBox(this.#look, this.#box, "thin");
+    for (const look of [this.#line.mesh.material, this.#rings.look]) offTheBox(look, this.#box);
     this.#page = page;
     this.#camera = camera;
     this.group.name = "web";

@@ -179,6 +179,13 @@ export class WorldsFeed {
     };
     window.addEventListener("resize", measure, { signal: clearing.signal });
     measure();
+    // The hero and the list under it grow after the first measure, as the count, the faces and the worlds come (8m): the box was left short.
+    if (typeof ResizeObserver === "undefined") return;
+    const watch = new ResizeObserver(measure);
+    for (const element of document.querySelectorAll("[data-clear], nav[data-rail]")) watch.observe(element);
+    clearing.signal.addEventListener("abort", () => {
+      watch.disconnect();
+    });
   }
 
   // The scene's own read, under its signal: a file that comes as the scene goes for good is let go here.
