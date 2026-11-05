@@ -437,9 +437,13 @@ costs context in every session.
   never the checkout's code, `~/.claude` or `~/.local`; of the home folder it reads the code alone it runs (the checkout, the one
   its `node_modules` lead to, Node, the tools' cache), never `deploy/secrets`, `.env`, `~/.ssh`, `~/.config`, `~/.claude.json`,
   gnokey's or gnomcp's keys; it reaches no keychain daemon, opens and scripts no other app, starts no launchd job, connects to no
-  Unix socket but the system's logs and name resolver (Docker's, an SSH agent's, Claude Code's sessions' among them), and listens
-  on localhost alone. Its limits: outbound network stays open (the backend reads the chain and the prices), and so do TCP services
-  on localhost; outside the home folder it reads everything (`/private/tmp`, Claude Code's scratch folders among them); its
+  Unix socket but the system's logs and name resolver (Docker's, an SSH agent's, Claude Code's sessions' among them). Its limits:
+  where its processes listen, no rule holds. They listen on 127.0.0.1 because the code they run says so (`app/vite.config.ts`'s
+  `workshopServer`, the server's `HOST`, the Ergo config of `server/src/testing/ergo.ts`), code a session can write, and Seatbelt
+  cannot keep a program a session wrote from listening on every address: its compiler takes no host but `*` and `localhost`, and
+  on this Mac every bind or inbound rule on a local `localhost` let 0.0.0.0, `::` and the LAN's address through, every other
+  refused 127.0.0.1 too (F4977, the probe's table, 2026-11-05). The wall against the LAN is macOS's firewall, Alexis's machine
+  setting, outside the code. Outbound network stays open (the backend reads the chain and the prices), and so do TCP services on localhost; outside the home folder it reads everything (`/private/tmp`, Claude Code's scratch folders among them); its
   processes keep Alexis's environment, and what macOS's privacy settings grant his terminal; the keychain's daemons are denied
   by name, and the data-protection keychain's is untried. `workshop.sh` itself runs as Alexis does, and so does `pnpm`, which runs
   what the checkout's `package.json` and `.npmrc` say: a session that edits them is read before he starts it. `sandbox-exec` is

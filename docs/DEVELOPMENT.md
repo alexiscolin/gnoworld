@@ -137,8 +137,9 @@ review come once the batch is accepted, and pre-commit still gates every commit.
 running this checkout's `scripts/workshop.sh` from it, in its terminal's foreground group and outside every sandbox: a session's
 sandboxed command cannot start one that counts. The code the workshop runs is outside Claude's sandbox, under a profile of its
 own (`scripts/workshop.sb`): it writes its own folders and caches alone, reads of the home folder the code alone it runs, reaches
-no keychain, no other app and no Unix socket but the system's, and listens on localhost alone; its outbound network stays open
-(HARNESS.md's known limits, F204). Stop the workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that
+no keychain, no other app and no Unix socket but the system's. It cannot hold where that code listens, and its outbound network
+stays open (HARNESS.md's known limits, F204, F4977): the servers listen on 127.0.0.1 because their configs say so, and macOS's
+firewall is the wall against the LAN. Stop the workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that
 checkout's turns gate-free.
 
 Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,

@@ -2,8 +2,10 @@
 ; The workshop's processes (scripts/workshop.sh): Vite's two dev servers, the chat's backend (the server and Ergo) and ergo.sh's check, which
 ; run code a session can write, Vite's again at each edit (lot 2's S1, F4962; Alexis, 2026-11-04, "Oui, avant le ping-pong"). They write
 ; their own folders and caches alone, read of the home folder the code alone they run, reach no keychain, no other app, no launchd job and
-; no Unix socket but the system's, and listen on this machine alone. Their outbound network stays open: the backend reads the chain and
-; the prices (docs/HARNESS.md, F204).
+; no Unix socket but the system's. Their outbound network stays open: the backend reads the chain and the prices (docs/HARNESS.md, F204).
+; No rule holds where they listen: Seatbelt names no host but * and localhost, and a bind or inbound rule on a local localhost lets
+; every address through (F4977). They listen on 127.0.0.1 as the code they run says (vite.config.ts's workshopServer, the server's and
+; Ergo's configs), code a session can write; macOS's firewall is the wall against the LAN (docs/HARNESS.md).
 (allow default)
 (deny file-write*)
 (allow file-write*
@@ -56,5 +58,3 @@
   (remote unix-socket (path-literal "/private/var/run/syslog"))
   (remote unix-socket (path-literal "/private/var/run/asl_input"))
   (remote unix-socket (path-literal "/private/var/run/mDNSResponder")))
-(deny network-bind)
-(allow network-bind (local ip "localhost:*"))

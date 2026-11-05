@@ -6788,6 +6788,12 @@ printf 'import os\nopen(os.environ["W_LOG"] + ".planted", "w").write("ran")\n' >
 grep -qF '/usr/bin/sandbox-exec -f "$seatbelt"' "$here/workshop.sh" || fail "workshop.sh starts its processes under no /usr/bin/sandbox-exec (F4962)"
 sed "s|/usr/bin/sandbox-exec |$w/bin/sandbox-exec |" "$here/workshop.sh" >"$w/root/scripts/workshop.sh"
 cp "$here/workshop.sb" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
+# The profile holds no rule on where its processes listen, which would read as a wall and be none: Seatbelt names no host but * and
+# localhost, and a bind or inbound rule on a local localhost lets a listener on 0.0.0.0, :: or the LAN's address through as on 127.0.0.1
+# (F4977, the probe's table). They listen on 127.0.0.1 as their configs say; macOS's firewall is the wall against the LAN.
+sed 's/;.*//' "$here/workshop.sb" | tr '\n' ' ' | awk '{ n = split($0, rule, /[(](allow|deny)[ \t]+/)
+	for (i = 2; i <= n; i++) if (rule[i] ~ /^[^(]*network(-bind|-inbound|[*])/ && rule[i] ~ /[(]local[ \t][^)]*localhost/) exit 1 }' ||
+	fail "workshop.sb holds a bind or inbound rule on a local localhost, which lets a listener on every address through (F4977)"
 cat >"$w/bin/sandbox-exec" <<'SH'
 #!/bin/sh
 [ "$1" = -f ] && [ -f "$2" ] || { echo "sandbox-exec: no profile: $2" >&2; exit 71; }

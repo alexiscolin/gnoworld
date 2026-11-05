@@ -9,8 +9,9 @@ root=$(cd "$(dirname "$0")/.." && pwd -P)
 cd "$root"
 pidfile="$root/.claude/tmp/workshop.pid" # a line a process: this script's pid, the process's, its port
 # Each process it starts runs under the workshop's own Seatbelt profile, by the system's sandbox-exec: Vite's servers, the backend and
-# ergo.sh's check run code a session writes, Vite's again at each edit (lot 2's S1, F4962). They write their own folders alone, read of
-# the home folder the code alone they run, and listen on this machine alone; the profile is given its folders as their real paths.
+# ergo.sh's check run code a session writes, Vite's again at each edit (lot 2's S1, F4962). They write their own folders alone and read of
+# the home folder the code alone they run; the profile is given its folders as their real paths. It cannot hold where they listen
+# (F4977): 127.0.0.1 is their configs' (app/vite.config.ts's workshopServer, the server's and Ergo's).
 seatbelt="$root/scripts/workshop.sb" scratch=$(cd "${TMPDIR:-/tmp}" && pwd -P)
 home=$(cd "$HOME" && pwd -P)
 # The tailnet-preview skill's script, run from /: its python3 -c, as this script's own would without -I, imports first a module a
