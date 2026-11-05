@@ -187,6 +187,26 @@ describe("the verdicts' stream", () => {
     expect((await rooms("#bubble", { peer: "192.0.2.1" })).response.status).toBe(429);
   });
 
+  it("gives a stream of the Earth's room alone a budget of its own, so the landing page never takes a chat's place (F5775)", async () => {
+    const { rooms } = setup({ total: 2, earthTotal: 3 });
+    for (const peer of ["198.51.100.1", "198.51.100.2", "198.51.100.3"])
+      expect((await rooms("#earth", { peer })).response.status).toBe(200);
+    expect((await rooms("#earth", { peer: "198.51.100.4" })).response.status).toBe(429);
+    // The chat's two places are untouched, and the Earth's streams did not use a visitor's four.
+    expect((await rooms("#bubble", { peer: "198.51.100.1" })).response.status).toBe(200);
+    expect((await rooms("#bubble", { peer: "198.51.100.2" })).response.status).toBe(200);
+    expect((await rooms("#bubble", { peer: "198.51.100.5" })).response.status).toBe(429);
+  });
+
+  it("counts a stream of the Earth's room and another room against the chat's places, and frees the Earth's on its end", async () => {
+    const { rooms } = setup({ total: 1, earthTotal: 1 });
+    const alone = await rooms("#earth", { peer: "198.51.100.1" });
+    expect((await rooms("#earth,#bubble", { peer: "198.51.100.2" })).response.status).toBe(200);
+    expect((await rooms("#bubble", { peer: "198.51.100.3" })).response.status).toBe(429);
+    await alone.cancel();
+    await expect.poll(async () => (await rooms("#earth", { peer: "198.51.100.4" })).response.status).toBe(200);
+  });
+
   it("counts a visitor by the proxy's X-Real-IP only from the proxy, and an IPv6 visitor by its /64", async () => {
     const forged = setup();
     for (let n = 0; n < 4; n += 1) await forged.rooms("#bubble", { realIp: `192.0.2.${String(n)}` });

@@ -55,6 +55,9 @@ interface Seeing {
 interface Options {
   perVisitor?: number;
   total?: number;
+  // The places of the streams that follow the Earth's room alone (the landing page's ticker and count): they carry no chat, so
+  // they have a budget of their own and cannot fill the chat's (F5775).
+  earthTotal?: number;
   heartbeatMs?: number;
   // Events a client may leave unread before it is dropped, and each room's last events kept.
   pending?: number;
@@ -147,27 +150,34 @@ function slots(perVisitor: number, total: number) {
   };
 }
 
+// The chat's places and the Earth's apart: a stream that follows the Earth's room alone takes the Earth's (F5775).
+function admission({ perVisitor = 4, total = 1000, earthTotal = 1000 }: Options) {
+  const chat = slots(perVisitor, total);
+  const earth = slots(perVisitor, earthTotal);
+  return {
+    of: (rooms: Iterable<string>) => ([...rooms].every((room) => worldOf(room) === EARTH) ? earth : chat),
+    visitors: (): number => chat.visitors() + earth.visitors(),
+  };
+}
+
 export function makeStream(options: Options = {}): Stream {
-  const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
+  const { heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
   // From the clock, so the ids a server gave before a restart stay below the next one's.
   let sequence = Date.now();
   // Each room's last events, oldest first; a room past the cap of rooms is not kept.
   const rings = new Map<string, { id: number; event: StreamEvent }[]>();
   const ring = signalRing();
   const clients = new Set<Client>();
-  const places = slots(perVisitor, total);
-
+  const places = admission(options);
   const write = (client: Client, text: string): void => {
     writeTo(client, text, pending);
   };
 
   // An event with the next id, to the readers of any room of the world.
   const tell = (world: string, framed: (id: number) => string): void => {
-    sequence += 1;
-    const text = framed(sequence);
+    const text = framed((sequence += 1));
     for (const client of clients) if (client.worlds.has(world)) write(client, text);
   };
-
   const side = chainSide(tell, (rooms) => follows(rooms, EARTH));
 
   return {
@@ -196,11 +206,12 @@ export function makeStream(options: Options = {}): Stream {
         const last = LastId().safeParse(c.req.header("last-event-id"));
         if (!rooms.success || !last.success) return c.json({ error: "refused" } satisfies ApiError, 400);
         const who = visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
-        if (!places.free(who)) return c.json({ error: "too_many" } satisfies ApiError, 429);
+        const place = places.of(rooms.data);
+        if (!place.free(who)) return c.json({ error: "too_many" } satisfies ApiError, 429);
         // Read before a slot is taken: a session that fails (its renewal writes) is the app's 500, and inside
         // the stream it would end the stream with its slot held for good (F653).
         const seen = seenBy(c, rooms.data, { visible, session });
-        places.take(who);
+        place.take(who);
         return streamSSE(c, async (stream) => {
           // Listened to first: an abort fires only the listeners it finds.
           const ended = new Promise<void>((resolve) => {
@@ -229,7 +240,7 @@ export function makeStream(options: Options = {}): Stream {
           await ended;
           clearInterval(beat);
           clients.delete(client);
-          places.release(who);
+          place.release(who);
         });
       });
     },
