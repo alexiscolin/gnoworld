@@ -369,3 +369,32 @@ describe("a vote on GovDAO", () => {
     }
   });
 });
+
+describe("a realm's write rows, as parts", () => {
+  it("draws a row that has no Call with the rows' own list, item, line and name, and a Call row's fee read through the view's options", async () => {
+    const fetcher = chain();
+    const box = await panel(fetcher);
+    const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
+    expect(row?.className).toMatch(/item/);
+    expect(row?.firstElementChild?.className).toMatch(/line/);
+    expect(row?.querySelector("span")?.className).toMatch(/name/);
+    expect(one(box, "ul").className).toMatch(/list/);
+    click(button(box, "Call SetBio"));
+    await vi.waitFor(() => {
+      expect(fetcher.mock.calls.some(([url]) => url.startsWith(CHAIN.indexer))).toBe(true);
+    });
+  });
+
+  it("gives a row of a function no call carries no link at all when the realm has no address on gnoweb", async () => {
+    const box = mount(
+      <StoreProvider>
+        <RealmWrites realm={REALM} chain={{ ...CHAIN, gnoweb: "not an origin" }} options={{ fetch: chain() }} />
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(all(box, "li").length).toBeGreaterThan(0);
+    });
+    const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
+    expect(row?.querySelector("a, button")).toBeNull();
+  });
+});

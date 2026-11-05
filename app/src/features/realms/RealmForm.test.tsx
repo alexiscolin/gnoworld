@@ -6,6 +6,7 @@ import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import { after, calling, CHAIN, CUR, field, inputs, listing, typed } from "../../../tests/callFixtures.ts";
 import { drawing } from "../chat/index.ts";
+import { CallableForm } from "./CallableForm.tsx";
 import { DRAW_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
 
 // 9e: a page's `<gno-form exec="Func">` is a Form block whose "Call" opens the call card prefilled from the form, every field
@@ -17,6 +18,7 @@ const FUNCTIONS = [
   { FuncName: "SetProfile", Params: [CUR, field("name", "string"), field("times", "int64")], Results: null },
   { FuncName: "Configure", Params: [CUR, field("settings", "map[string]string")], Results: null },
   { FuncName: "TotalSupply", Params: null, Results: [field(".res.0", "int64")] },
+  { FuncName: "Anon", Params: [CUR, field("", "string")], Results: null },
 ];
 
 const answer = () => listing(FUNCTIONS);
@@ -171,6 +173,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
       gnoForm("SetProfile", input("name", 'value="a" '), input("name", 'value="b" ', "hidden")),
     ],
     ["a field with no name", gnoForm("SetProfile", '<gno-input type="text" value="x" />')],
+    ["a field with no name, for a parameter with none", gnoForm("Anon", '<gno-input type="text" value="x" />')],
   ])("shows %s as the read-only form, with no Call", async (_name, source) => {
     const box = await form(source);
     expect(all(box, "button")).toHaveLength(0);
@@ -193,5 +196,40 @@ describe("a page's gno-form as a Form block with a Call", () => {
     const box = await form(gnoForm("SetProfile", input("name")), read);
     expect(all(box, "button")).toHaveLength(0);
     expect(one(box, "figure").textContent).toContain("read only");
+  });
+});
+
+describe("a form whose drawing left fields out", () => {
+  const input = (name: string) => ({
+    tag: "input" as const,
+    name,
+    inputType: "",
+    value: "",
+    placeholder: "",
+    description: "",
+    flags: "",
+  });
+  it("is the read-only form with no Call though what is drawn fits the function: a hidden field may be among those left out", async () => {
+    const under = vi.fn<ChainFetch>(answer);
+    const sibling = vi.fn<ChainFetch>(() => after(under, answer));
+    const at = (fetch: ChainFetch, left: number) => (
+      <CallableForm
+        exec="SetProfile"
+        path=""
+        left={left}
+        fields={[input("name"), input("times")]}
+        call={{ realm: REALM, chain: CHAIN, options: { fetch } }}
+      />
+    );
+    const box = mount(
+      <StoreProvider>
+        <div data-test="under">{at(under, 1)}</div>
+        <div data-test="sibling">{at(sibling, 0)}</div>
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(button(one(box, '[data-test="sibling"]'), "Call SetProfile")).toBeDefined();
+    });
+    expect(all(one(box, '[data-test="under"]'), "button")).toHaveLength(0);
   });
 });

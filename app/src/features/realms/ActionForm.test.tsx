@@ -269,3 +269,48 @@ describe("a checked action in the chat", () => {
     expect(all(box, "a")).toHaveLength(0);
   });
 });
+
+describe("a checked action, as parts", () => {
+  it("draws no paragraph at all for an action with no why", async () => {
+    const box = await draw({ realm: DAO, function: "MustVoteOnProposalSimple", args: { pid: "15" } });
+    await calling(box, "Call MustVoteOnProposalSimple");
+    expect(box.querySelector("p[dir]")).toBeNull();
+  });
+
+  it("leaves a parameter the action gives no argument for empty in its card, and fills the one it gives", async () => {
+    const box = await draw({ realm: DAO, function: "MustVoteOnProposalSimple", args: { pid: "15" } });
+    click(await calling(box, "Call MustVoteOnProposalSimple"));
+    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["15", ""]);
+  });
+
+  it("reads the card's fees through the options it was given", async () => {
+    const under = vi.fn<ChainFetch>(FUNCTIONS_ANSWER);
+    const box = mount(
+      <StoreProvider>
+        <ActionForm action={VOTE} chain={CHAIN} options={{ fetch: under }} />
+      </StoreProvider>,
+    );
+    click(await calling(box, "Call MustVoteOnProposalSimple"));
+    await vi.waitFor(() => {
+      expect(under.mock.calls.some(([url]) => url.startsWith(CHAIN.indexer))).toBe(true);
+    });
+  });
+
+  it("gives two actions of one page a card each: a click on one opens that one's card only", async () => {
+    const read = vi.fn<ChainFetch>(FUNCTIONS_ANSWER);
+    const box = mount(
+      <StoreProvider>
+        <div data-test="first">
+          <ActionForm action={VOTE} chain={CHAIN} options={{ fetch: read }} />
+        </div>
+        <div data-test="second">
+          <ActionForm action={{ ...VOTE, args: { pid: "99", option: "NO" } }} chain={CHAIN} options={{ fetch: read }} />
+        </div>
+      </StoreProvider>,
+    );
+    const [first, second] = ['[data-test="first"]', '[data-test="second"]'].map((at) => one(box, at));
+    click(await calling(first ?? box, "Call MustVoteOnProposalSimple"));
+    expect(all(second ?? box, "article")).toHaveLength(0);
+    expect(inputs(first ?? box).map((i) => i.value)).toEqual(["15", "YES"]);
+  });
+});
