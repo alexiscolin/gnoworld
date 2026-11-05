@@ -195,7 +195,9 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
           <Row label="NETWORK">{`${network.name} (${network.chainId})`}</Row>
           <Row label="FEE">{fee}</Row>
         </dl>
-        {preview ? <p>gnoworld does not check what this realm does. Read it on gnoweb first.</p> : null}
+        {preview ? (
+          <p className={styles["note"]}>gnoworld does not check what this realm does. Read it on gnoweb first.</p>
+        ) : null}
         <Status card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>

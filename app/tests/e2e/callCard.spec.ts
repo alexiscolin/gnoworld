@@ -76,6 +76,19 @@ test.describe("a write function's call card", () => {
     ).toBe("baseline");
   });
 
+  test("draws the note small and muted, as the frame does (F5740)", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setup(page);
+    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    const style = (text: string, property: string) =>
+      card(page)
+        .getByText(text)
+        .first()
+        .evaluate((el, name) => getComputedStyle(el).getPropertyValue(name), property);
+    expect(await style("gnoworld does not check", "font-size")).toBe("12px");
+    expect(await style("gnoworld does not check", "color")).toBe(await style("A call to", "color"));
+  });
+
   test("says Adena sets the fee when the indexer cannot give one", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { fees: "down" });

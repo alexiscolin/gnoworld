@@ -50,6 +50,12 @@
     }
   }
 
+  /* The frame's small note: 12 px, muted. */
+  .note {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
+
   .lede {
     color: var(--color-text-muted);
   }
@@ -80,6 +86,8 @@
   /* A phone reads and fills the card and signs on a computer (U6): a coarse pointer gets the words, a computer the button. */
   .phone {
     display: none;
+    font: var(--font-meta);
+    color: var(--color-text-muted);
   }
 
   @media (pointer: coarse) {
