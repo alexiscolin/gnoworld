@@ -216,6 +216,29 @@ describe("the translations' cache", () => {
 });
 
 describe("a translation's making, again and paid (red pass, R3, R4, R5, R10)", () => {
+  it("finishes a making sent once every reader left, kept and paid its real cost, never stopped at its worst (F5310)", async () => {
+    let answer: (message: Anthropic.Message) => void = () => undefined;
+    const seen: AbortSignal[] = [];
+    const held = (_: Request, signal?: AbortSignal) => {
+      if (signal !== undefined) seen.push(signal);
+      return new Promise<Anthropic.Message>((resolve) => (answer = resolve));
+    };
+    const { translator, model, kit } = setup({ steps: [held] });
+    const asked = { text: ORIGINAL, language: "fr" } as const;
+    const left = new AbortController();
+    const leaving = translator.translate(asked, left.signal);
+    await expect.poll(() => model.requests.length, { timeout: 30_000 }).toBe(1);
+    left.abort();
+    expect(await leaving).toEqual({ kind: "gone" });
+    const next = translator.translate(asked, new AbortController().signal);
+    answer(said(FRENCH));
+    expect(await next).toEqual({ kind: "translated", text: FRENCH });
+    expect(seen[0]?.aborted).toBe(false);
+    expect(model.requests).toHaveLength(1);
+    // Haiku 5.5: 300 input tokens at 100 and 60 output tokens at 500 nano-dollars.
+    expect(kit.budget.state("translate").spent).toBe(300 * 100 + 60 * 500);
+  });
+
   it("spends what its call cost on the translations' budget", async () => {
     const { translator, kit, signal } = setup({ steps: [said(FRENCH)] });
     await translator.translate({ text: ORIGINAL, language: "fr" }, signal());

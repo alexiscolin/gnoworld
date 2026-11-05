@@ -74,8 +74,8 @@ interface Making<T> {
 }
 
 /** One making a key for every reader who asks for it while it runs, each answered `gone` once its own signal fires;
- * the making's signal fires once none of its readers waits. */
-export function together<T>() {
+ * the making's signal fires once none of its readers waits, unless it `finishes`: then it runs on, shared, to be kept. */
+export function together<T>({ finishes = false }: { finishes?: boolean } = {}) {
   // ponytail: one entry a making in flight, as many as the requests jarvis serves at once.
   const running = new Map<string, Making<T>>();
   const start = (key: string, work: (signal: AbortSignal) => Promise<T>): Making<T> => {
@@ -98,7 +98,7 @@ export function together<T>() {
       const leave = (): void => {
         making.waiting -= 1;
         // A reader asking next starts a making of its own, never one stopped.
-        if (making.waiting === 0) {
+        if (making.waiting === 0 && !finishes) {
           if (running.get(key) === making) running.delete(key);
           making.stop.abort();
         }

@@ -2,8 +2,8 @@
 // by the fast model on the translations' own budget with the same hard stop, kept in jarvis's file by the SHA-256 of
 // the text and the language so it serves every reader; readers asking at once share one call. The line reaches the
 // model inside an untrusted block; a translation that adds a link, an account, `@room` or a number, or that the wire
-// could not carry, is dropped and kept so: the original shows. A failure, a stop or a reader gone keeps nothing. A
-// translation lives a day: the door's record of a room holds no older line (D191).
+// could not carry, is dropped and kept so: the original shows. A failure or a stop keeps nothing; a reader gone stops
+// nothing (S1). A translation lives a day: the door's record of a room holds no older line (D191).
 import { createHash, randomBytes } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import type Anthropic from "@anthropic-ai/sdk";
@@ -97,7 +97,8 @@ export function makeTranslator(parts: Parts) {
     ),
   };
   const bound = boundOf(parts.db, "translations", parts.keepBytes ?? CACHE_BYTES);
-  const shared = together<Translated>();
+  // A making sent finishes though its readers left, kept and paid its real cost (S1, Alexis): stopped, it cost its worst.
+  const shared = together<Translated>({ finishes: true });
   const keep = (hash: string, language: string, text: string | null): void => {
     const bytes = Buffer.byteLength(hash + language + (text ?? ""));
     bound.expire(parts.now() - LIFE_MS);
