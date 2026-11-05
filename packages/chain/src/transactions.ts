@@ -5,7 +5,7 @@ const TX_FIELDS =
   "hash block_height success messages { value { __typename ... on MsgCall { caller pkg_path func } ... on MsgAddPackage { creator package { path } } } }";
 
 /** The transactions the rooms need: the calls to these realms and every deploy, that succeeded; the filter lets other messages of the same transaction through, so each is checked again on reading. */
-function whereOf(realms: Iterable<string>, bound = ""): string {
+function whereOf(realms: Iterable<string>, bound: string): string {
   const calls = [...realms].map(
     (realm) => `{ messages: { value: { MsgCall: { pkg_path: { eq: ${JSON.stringify(realm)} } } } } }`,
   );
