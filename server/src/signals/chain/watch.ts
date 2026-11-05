@@ -1,4 +1,4 @@
-// Which realms tie to which world, from the data's own hubs, and where a universe's subscription goes (slice 9g).
+// Which realms tie to which world, from the data's own hubs, and which indexer addresses are read (slice 9g).
 import type { Hubs } from "@gnoworld/schemas";
 import type { Watched } from "./message.ts";
 
@@ -11,8 +11,7 @@ export function watchOf(hubs: ReturnType<typeof Hubs.parse>, universe: string): 
   );
 }
 
-/** The indexer's address on wss, or none: a socket goes out over TLS to an address the data names, nothing else. */
-export function socketUrl(address: string): string | undefined {
-  const url = URL.canParse(address) ? new URL(address) : undefined;
-  return url?.protocol === "https:" ? `wss:${address.slice("https:".length)}` : undefined;
+/** Whether the indexer's address is https: the server reads only over TLS an address the data names, nothing else. */
+export function secure(address: string): boolean {
+  return URL.canParse(address) && new URL(address).protocol === "https:";
 }

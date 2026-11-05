@@ -1,16 +1,16 @@
-// The chain's rooms on the server (slice 9g): for each universe of the data with a public indexer, one subscription (follow.ts),
+// The chain's rooms on the server (slice 9g): for each universe of the data with a public indexer, one poll once a block (poll.ts),
 // its catch-up and its 24 h count (indexer.ts, count.ts), relayed on the stream (relay.ts). Nothing is stored; a universe whose
-// indexer has no address a socket may go to over TLS is skipped, said. Stopped with the server: every socket closed.
+// indexer has no https address is skipped, said. Stopped with the server: every timer cancelled, no round delivers after it.
 import { jsonOf } from "@gnoworld/core";
 import { Hubs, Universes } from "@gnoworld/schemas";
 import { readDataFile } from "@gnoworld/service/files";
 import type { Log } from "@gnoworld/service/log";
 import type { Send } from "@gnoworld/service/net";
 import { loadRealmCount, type Deploy } from "./count.ts";
-import { followChain, timer, type ChainSocket, type FollowOptions } from "./follow.ts";
 import { indexerReaders } from "./indexer.ts";
+import { pollChain, timer, type PollOptions } from "./poll.ts";
 import { makeRelay, type RelayOptions } from "./relay.ts";
-import { socketUrl, watchOf } from "./watch.ts";
+import { secure, watchOf } from "./watch.ts";
 
 type Universe = ReturnType<typeof Universes.parse>[number];
 
@@ -20,11 +20,9 @@ export interface ChainOptions {
   stream: RelayOptions["stream"];
   log: Log;
   now: () => number;
-  open?: FollowOptions["open"];
   send?: Send;
-  wait?: FollowOptions["wait"];
   random?: () => number;
-  after?: NonNullable<FollowOptions["after"]>;
+  after?: NonNullable<PollOptions["after"]>;
 }
 
 /** The count is asked again this often while the indexer could not give it. */
@@ -46,34 +44,20 @@ export function readChainData(universes: string, hubs: string): Pick<ChainOption
   return { universes: parsedUniverses.data, hubs: parsedHubs.data };
 }
 
-const openSocket = (url: string, protocol: string): ChainSocket => new WebSocket(url, protocol);
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 export function startChain(options: ChainOptions): { stop: () => void } {
-  const {
-    stream,
-    log,
-    now,
-    hubs,
-    open = openSocket,
-    send,
-    wait = sleep,
-    random = Math.random,
-    after = timer,
-  } = options;
+  const { stream, log, now, hubs, send, random = Math.random, after = timer } = options;
   const stops: (() => void)[] = [];
   let stopped = false;
   for (const universe of options.universes) {
-    const url = socketUrl(universe.indexer);
     const said = (what: string): void => {
       log(what, { reason: universe.id });
     };
-    if (url === undefined) {
+    if (!secure(universe.indexer)) {
       said("chain_universe_skipped");
       continue;
     }
     const watch = watchOf(hubs, universe.id);
-    // The chain's tip, read before the day's history: the follower starts from it, so a first socket that fails before any frame
+    // The chain's tip, read before the day's history: the poll starts from it, so a first round that fails
     // loses nothing, and a restart tells the rooms no call older than it.
     let reached: number | undefined;
     const readers = indexerReaders({
@@ -102,20 +86,18 @@ export function startChain(options: ChainOptions): { stop: () => void } {
         };
         stops.push(() => retry?.());
         again();
-        const follow = followChain({
+        const poll = pollChain({
           universe: universe.id,
-          url,
           watch,
-          open,
+          tip: () => readers.tip(),
           catchUp: (from) => readers.catchUp(from),
-          wait,
           random,
           deliver: makeRelay({ stream, count, universe: universe.id, now }),
           from: reached,
           log: said,
           after,
         });
-        stops.push(follow.stop);
+        stops.push(poll.stop);
         said("chain_following");
       },
       () => undefined,
