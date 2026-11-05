@@ -1,12 +1,11 @@
 // In Claude Code's sandbox Chromium runs as one process (playwright.config.ts), where closing a
 // context ends the browser, so each test gets a browser of its own; elsewhere, Playwright's own.
-import { worldsDrawn } from "@gnoworld/core";
-import { WorldsCount } from "@gnoworld/schemas";
-import { Worlds } from "@gnoworld/schemas/indexer";
 import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
-import { readFileSync } from "node:fs";
 import { VIOLATION } from "../../src/sw/report.ts";
 import { site } from "../../src/places.ts";
+import { serveJobs } from "./deployed.ts";
+
+export { COUNTED } from "./deployed.ts";
 
 export { expect, type Answer, type Page };
 
@@ -27,18 +26,6 @@ const ownBrowser = base.extend({
     await browser.close();
   },
 });
-
-/** The worlds' count as the deployment serves it once the job has run (7n2, nginx's /worlds-count.json): the recorded chain's file counted as
- * the job counts it, through the schema the home reads it by. */
-const RECORDED = Worlds.parse(JSON.parse(readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8")));
-export const COUNTED = JSON.stringify(
-  WorldsCount.parse({
-    version: 1,
-    universe: RECORDED.universe,
-    updated: RECORDED.updated,
-    count: worldsDrawn(RECORDED.worlds),
-  }),
-);
 
 const FLUSH = "https://flush.invalid/";
 const MARK = "csp-violation";
@@ -156,13 +143,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         await context.route(pattern, (route) =>
           route.fulfill({ status: 404, headers: cors, body: JSON.stringify({ error: "not_ready" }) }),
         );
-      if (counted)
-        await context.route("**/worlds-count.json", (route) =>
-          route.fulfill({
-            headers: { "content-type": "application/json", "cache-control": "public, max-age=60" },
-            body: COUNTED,
-          }),
-        );
+      if (counted) await serveJobs(context, cors);
       await use(undefined);
     },
     { auto: true },

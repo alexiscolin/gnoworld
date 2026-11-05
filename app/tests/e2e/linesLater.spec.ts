@@ -41,7 +41,9 @@ test.describe("the lines view, loaded after the page", () => {
     await page.getByRole("button", { name: "Saved" }).focus();
     await page.keyboard.press("Tab");
     await expect(page.getByRole("button", { name: "Who's here" })).toBeFocused();
-    await page.keyboard.press("Tab");
+    // The quick actions are a row of five since 5a1e8335 (frame 104): the keys pass the rest of it, then the composer.
+    for (let presses = 0; presses < 6 && (await form.locator(":focus").count()) === 0; presses += 1)
+      await page.keyboard.press("Tab");
     await expect(form.locator(":focus")).toHaveCount(1);
     release();
     await expect(lines(page)).toHaveCount(2);
