@@ -119,7 +119,7 @@ describe("a checked action as a Form block", () => {
     expect(inputs(card).map((i) => i.value)).toEqual(["", ""]);
   });
 
-  it("keeps a prefilled value the type refuses as the card's problem, with Sign disabled: it signs exactly what its fields show (F5801)", async () => {
+  it("keeps a prefilled value the type refuses as the card's problem, with Sign disabled: it signs exactly what its fields show", async () => {
     const box = await draw({ ...VOTE, args: { pid: "1e3", option: "YES" } });
     click(await calling(box, "Call MustVoteOnProposalSimple"));
     const card = one(box, "article");
@@ -128,7 +128,7 @@ describe("a checked action as a Form block", () => {
     expect(button(card, "Sign in Adena")?.hasAttribute("disabled")).toBe(true);
   });
 
-  it("gives the same action drawn twice a card each: a click on one opens that one's card only (F5800)", async () => {
+  it("gives the same action drawn twice a card each: a click on one opens that one's card only", async () => {
     const box = await draw(VOTE);
     const again = mount(
       <StoreProvider>

@@ -126,7 +126,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
     expect(one(box, "figure").textContent).not.toContain("nothing here sends anything");
   });
 
-  it("gives two forms of one function a card each, with its own form's texts: the second's Call never shows the first's (F5800)", async () => {
+  it("gives two forms of one function a card each, with its own form's texts: the second's Call never shows the first's", async () => {
     const box = await form(
       `${gnoForm("SetProfile", input("name", 'value="benign" '))}\n\n${gnoForm("SetProfile", input("name", 'value="hostile" '))}`,
     );
@@ -145,7 +145,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
     expect(cardOf(second)).toEqual(["hostile", ""]);
   });
 
-  it("keeps the prefilled text's problem, with the Sign button disabled: a form's value the type refuses is not signed (F5801)", async () => {
+  it("keeps the prefilled text's problem, with the Sign button disabled: a form's value the type refuses is not signed", async () => {
     const box = await form(gnoForm("SetProfile", input("name", 'value="bob" '), input("times", 'value="1e3" ')));
     click(await calling(box, "Call SetProfile"));
     const card = one(box, "article");

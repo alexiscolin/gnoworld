@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 import { realmType } from "@gnoworld/core";
-import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
+import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Grab, state } from "../../../tests/grabStore.tsx";
-import { callsIn } from "../calls/index.ts";
+import { Address } from "@gnoworld/schemas";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
+import { typed } from "../../../tests/callFixtures.ts";
+import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { RealmWrites } from "./RealmWrites.tsx";
 
 // 9d, widened by 9e: every write function a call can carry is a "Call" row that opens the card under it, never a modal (frame
@@ -286,6 +288,23 @@ describe("a realm's write functions, with the call card inline", () => {
 // GovDAO's vote (frames 28 to 33): the realm card's Call on the vote function, then the card. Nothing shows as voted before the
 // chain's own answer; the course holds that (9d), here the vote's card must keep to it. NOT recorded: written in qfuncs' shape.
 describe("a vote on GovDAO", () => {
+  const ME = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
+  // tm2's ResultTx for the recording's hash, a call that landed at block 55414 (written from the source, as chain's tx.test is).
+  const TX = {
+    jsonrpc: "2.0",
+    id: "",
+    result: {
+      hash: "eFwYnlgr7KfDvMsmr6ntZ5vCoe/JcHLddE0pzi+D0Fg=",
+      height: "55414",
+      index: 0,
+      tx_result: {
+        ResponseBase: { Error: null, Data: null, Events: null, Log: "ok", Info: "" },
+        GasWanted: "1",
+        GasUsed: "1",
+      },
+      tx: "AA==",
+    },
+  };
   const DAO = "gno.land/r/gov/dao";
   const VOTE = {
     FuncName: "MustVoteOnProposalSimple",
@@ -316,18 +335,37 @@ describe("a vote on GovDAO", () => {
 
   it("shows the vote as voted only once the chain has answered, never when Adena has signed", async () => {
     const box = await dao();
-    click(button(box, "Call MustVoteOnProposalSimple"));
-    const id = `${CHAIN.chainId} ${DAO}.MustVoteOnProposalSimple`;
-    const actions = callsIn(state())?.callsActions;
     act(() => {
-      actions?.signing(id);
-      actions?.landing(id, "ab".repeat(32));
+      state().loginActions.signedIn(ME);
     });
-    expect(one(box, "article").textContent).toContain("Landing in a block");
-    expect(one(box, "article").textContent).not.toMatch(/signed ·|voted/i);
-    act(() => {
-      actions?.done(id, { height: 12, value: "" });
-    });
-    expect(one(box, "article").textContent).toContain("Signed ·");
+    // Adena signs at once; the chain's tx read is held, so the card can be seen between the two.
+    const held = Promise.withResolvers<Response>();
+    vi.stubGlobal("fetch", (url: string) =>
+      url.includes("/status")
+        ? Promise.resolve(new Response(JSON.stringify(statusEnvelope(55420, "2026-11-05T05:00:00Z", "onyx-1"))))
+        : held.promise,
+    );
+    Object.defineProperty(globalThis, "adena", { value: recordedAdena({ account: ME }).adena, configurable: true });
+    try {
+      click(button(box, "Call MustVoteOnProposalSimple"));
+      const [pid, option] = all(one(box, "article"), "input") as HTMLInputElement[];
+      typed(pid, "15");
+      typed(option, "YES");
+      click(button(one(box, "article"), "Sign in Adena"));
+      await vi.waitFor(() => {
+        expect(one(box, "article").textContent).toContain("Landing in a block");
+      });
+      expect(one(box, "article").textContent).not.toMatch(/signed ·|voted/i);
+      await act(async () => {
+        held.resolve(new Response(JSON.stringify(TX)));
+        await Promise.resolve();
+      });
+      await vi.waitFor(() => {
+        expect(one(box, "article").textContent).toContain("Signed ·");
+      });
+    } finally {
+      vi.unstubAllGlobals();
+      Reflect.deleteProperty(globalThis, "adena");
+    }
   });
 });
