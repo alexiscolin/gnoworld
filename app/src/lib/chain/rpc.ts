@@ -1,10 +1,11 @@
 // The app's three reads of a realm (slice 5 part 2, 5g-reads) around the chain package's (D112, D114): a realm's page
 // (vm/qrender), its functions (vm/qfuncs) and one call (vm/qeval), each asked only for a name evalCall.ts's checks pass, the
-// tier-1 builder of the one expression sent. One request a call. What the realm wrote is returned as text and never interpreted.
+// tier-1 builder of every expression sent (readUser's two included, D283). One request a call. What the realm wrote is returned
+// as text and never interpreted.
 // The app names no universe's chain to its reads yet (D118): each states null.
 import { readEvaluated, readFunctionList, readRender } from "@gnoworld/chain/node";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
-import { evalCall, isExportedName, isRealmPath } from "./evalCall.ts";
+import { evalCall, isExportedName, isRealmPath, userCall } from "./evalCall.ts";
 
 const badName = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
   Promise.resolve(failedRead("bad-name", sourceOf(rpc, options)));
@@ -28,6 +29,18 @@ export function readEval(
   const call = evalCall(realm, name);
   if (call === null) return badName(rpc, options);
   return readEvaluated(rpc, call, { ...options, chainId: null });
+}
+
+/** The typed text of one of the two calls on r/sys/users's record of `account` (D92, D283: evalCall.ts builds the expression).
+ * `IsDeleted` answers for a missing record, which `Name` would panic on. Nothing is asked for what is no address. */
+export function readUser(
+  rpc: string,
+  { account, call }: { account: string; call: "IsDeleted" | "Name" },
+  options: ReadOptions = {},
+): Promise<ChainRead<string>> {
+  const expression = userCall(account, call);
+  if (expression === null) return badName(rpc, options);
+  return readEvaluated(rpc, expression, { ...options, chainId: null });
 }
 
 type Listing = (Awaited<ReturnType<typeof readFunctionList>> & { ok: true })["value"][number];

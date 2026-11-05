@@ -3,6 +3,47 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
 import { LoginView, type LoginViewProps } from "./LoginView.tsx";
 
+// The first screen has bytes to spare for no one: the name of the account (9f) is a chunk of its own, reached only by `import()`.
+const FIRST_SCREEN = import.meta.glob<string>(
+  ["./Login{View,Control}.tsx", "../../shellHeader.tsx", "../../store/*.ts"],
+  {
+    query: "?raw",
+    import: "default",
+    eager: true,
+  },
+);
+// Every source of the app, to follow the static imports of the first screen's files through the files they reach (F5847).
+const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.test.{ts,tsx}"], {
+  query: "?raw",
+  import: "default",
+  eager: true,
+});
+const HERE = "../../features/login/LoginView.test.tsx";
+const STATIC = /^(?:import|export)\s(?!type\b)[^;]*?from\s+["'](\.[^"']*)["']/gm;
+const isNames = (file: string) => /\/features\/names\/|\/lib\/chain\/names\.ts$/.test(file);
+
+// `spec` as a path of the glob's kind, from the file that imports it.
+function resolve(from: string, spec: string): string {
+  const parts = from.split("/").slice(0, -1);
+  for (const part of spec.split("/")) {
+    if (part === "..") parts.pop();
+    else if (part !== ".") parts.push(part);
+  }
+  return parts.join("/");
+}
+// Every file `start` reaches through imports that run when it loads: a dynamic `import()` is the way out, and starts none.
+function reached(sources: Record<string, string>, start: string): Set<string> {
+  const seen = new Set<string>();
+  const queue = [start];
+  for (let file = queue.pop(); file !== undefined; file = queue.pop()) {
+    const text = sources[file];
+    if (seen.has(file) || text === undefined) continue;
+    seen.add(file);
+    for (const [, spec = ""] of text.matchAll(STATIC)) queue.push(resolve(file, spec));
+  }
+  return seen;
+}
+
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 // The words a page says, its markup taken off.
 const said = (html: string) =>
@@ -60,5 +101,37 @@ describe("LoginView", () => {
   it("says why the last login stopped, in its status region", () => {
     const html = view({ problem: { reason: "address", problem: "checksum" } });
     expect(html).toMatch(/role="status"[^>]*>[^<]*Adena&#x27;s address does not match its checksum/);
+  });
+});
+
+describe("the first screen and the account's name", () => {
+  it("reads the first screen's files, the login's view among them", () => {
+    expect(Object.keys(FIRST_SCREEN)).toEqual(
+      expect.arrayContaining(["./LoginView.tsx", "./LoginControl.tsx", "../../shellHeader.tsx"]),
+    );
+  });
+
+  it.each(Object.keys(FIRST_SCREEN))("%s imports nothing of features/names or lib/chain/names statically", (file) => {
+    expect([...reached(SOURCES, resolve(HERE, file))].filter(isNames)).toEqual([]);
+  });
+
+  it("finds a file of names through a file between, and not through a dynamic import", () => {
+    const plant = {
+      "./a.ts": 'import { b } from "./b.ts";',
+      "./b.ts": 'export { c } from "./features/names/c.ts";',
+      "./features/names/c.ts": "export const c = 1;",
+      "./d.ts": 'const later = () => import("./features/names/c.ts");',
+    };
+    expect([...reached(plant, "./a.ts")].filter(isNames)).toEqual(["./features/names/c.ts"]);
+    expect([...reached(plant, "./d.ts")].filter(isNames)).toEqual([]);
+  });
+
+  it("draws the short address from the one place the app has it", () => {
+    expect(FIRST_SCREEN["./LoginView.tsx"]).toMatch(/from "\.\.\/\.\.\/lib\/shortAddress\.ts"/);
+    expect(FIRST_SCREEN["./LoginView.tsx"]).not.toMatch(/slice\(0, 6\)/);
+  });
+
+  it("holds the dynamic import the login's view reaches the name by", () => {
+    expect(FIRST_SCREEN["./LoginView.tsx"]).toMatch(/import\("\.\.\/names\/index\.ts"\)/);
   });
 });

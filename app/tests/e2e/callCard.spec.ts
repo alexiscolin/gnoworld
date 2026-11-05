@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { adena, changeAccount } from "./adena.ts";
 import {
   callAndSign,
@@ -8,9 +7,11 @@ import {
   done,
   HASH,
   openRealm,
+  phoneOf,
   REALM,
   setNetwork,
   writeChain,
+  violations,
   type Wallet,
 } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -18,17 +19,6 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 // 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena built from the
 // recording, the hash followed to its block. Nothing shows as done before the chain's answer.
 const card = (page: Page) => calls(page).getByRole("article");
-// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
-// transitions running end first (a cancelled one too); the spinner's endless animation is no transition.
-async function violations(page: Page) {
-  await page.evaluate(async () => {
-    const settled = () => undefined;
-    const running = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
-    await Promise.all(running.map((transition) => transition.finished.then(settled, settled)));
-  });
-  return (await new AxeBuilder({ page }).analyze()).violations;
-}
-
 interface World {
   landing?: "now" | "never" | "later";
   wallet?: Wallet;
@@ -139,13 +129,16 @@ test.describe("a write function's call card", () => {
     expect(await done(page)).toBe(0);
   });
 
-  test("a signature declined in Adena is a state with its next step, and the card can try again", async ({ page }) => {
+  test("a signature declined in Adena may still have gone: the card says so and offers only Close (F5747)", async ({
+    page,
+  }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { wallet: { declines: true } });
     await callAndSign(page);
-    await expect(card(page).getByRole("status")).toContainText(/declined/i);
-    await card(page).getByRole("button", { name: "Try again" }).click();
-    await expect(card(page).getByRole("button", { name: "Sign in Adena" })).toBeVisible();
+    await expect(card(page).getByRole("status")).toContainText(/declined.*recent transactions/i);
+    await expect(card(page).getByRole("button", { name: "Try again" })).toBeHidden();
+    await card(page).getByRole("button", { name: "Close" }).click();
+    await expect(card(page)).toBeHidden();
   });
 
   test("a call that never lands is said unseen after a bound, with its hash", async ({ page }) => {
@@ -187,16 +180,7 @@ test.describe("a write function's call card", () => {
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    const session = await page.context().storageState();
-    const touch = await playwright.chromium.launch(launchOptions);
-    const phone = await (
-      await touch.newContext({
-        baseURL: new URL(page.url()).origin,
-        storageState: session,
-        hasTouch: true,
-        viewport: { width: 390, height: 844 },
-      })
-    ).newPage();
+    const { phone, browser: touch } = await phoneOf(page, { playwright, launchOptions });
     await adena(phone);
     await callWallet(phone);
     await writeChain(phone);
@@ -209,11 +193,11 @@ test.describe("a write function's call card", () => {
     await touch.close();
   });
 
-  test("has no accessibility violation on a failure: the declined signature and its way back", async ({ page }) => {
+  test("has no accessibility violation on a failure: the declined signature and its way out", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { wallet: { declines: true } });
     await callAndSign(page);
-    await expect(card(page).getByRole("button", { name: "Try again" })).toBeVisible();
+    await expect(card(page).getByRole("button", { name: "Close" })).toBeVisible();
     expect(await violations(page)).toEqual([]);
   });
 

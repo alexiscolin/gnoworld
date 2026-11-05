@@ -13,6 +13,15 @@ export function shown(text: string): string {
   );
 }
 
+/** The help under a free-text argument: where it goes, and for how long. */
+export const publicForever = (realm: string): string => `This text goes to ${realm} on gno.land, publicly and forever.`;
+
+/** The warning every call carries (ADR-0002 section 1). */
+export const NOT_CHECKED = "gnoworld does not check what this realm does. Read it on gnoweb first.";
+
+/** A chain as the card names it. */
+export const networkOf = ({ name, chainId }: { name: string; chainId: string }): string => `${name} (${chainId})`;
+
 export interface Said {
   reason: CardFailure;
   log?: string | undefined;
@@ -38,6 +47,8 @@ export function sayFailure({ reason, log, hash, adena }: Said): string {
     failed: "Adena could not send this call. Try again in a moment.",
     "maybe-sent":
       "Adena did not say whether this call went through, so it may have been sent. Check Adena's recent transactions before you call again.",
+    "declined-maybe-sent":
+      "Adena says the signature was declined. If you closed Adena's window after confirming, the call may have been sent: check Adena's recent transactions before you call again.",
     unsupported: "This version of Adena does not support this call. Open the realm on gnoweb to make it.",
     "wrong-network":
       "Adena is not on this universe's network and did not switch. Switch the network in Adena, then try again.",

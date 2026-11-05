@@ -110,7 +110,7 @@ describe("signCall: the card's course", () => {
     expect(read).not.toHaveBeenCalled();
     gate.resolve({ status: "failure", type: "TRANSACTION_REJECTED", code: 4000, message: "", data: {} });
     await running;
-    expect(stateOf(store)).toEqual({ kind: "failed", reason: "declined" });
+    expect(stateOf(store)).toEqual({ kind: "failed", reason: "declined-maybe-sent" });
     expect(read).not.toHaveBeenCalled();
   });
 
@@ -152,6 +152,25 @@ describe("signCall: the card's course", () => {
     expect(read).not.toHaveBeenCalled();
     store.getState().callsActions.retry("SetBio");
     expect(stateOf(store)?.kind).toBe("failed");
+  });
+
+  it("follows the hash of a refusal that names one, never offering Try again: it was signed (F5750)", async () => {
+    const wallet = recordedAdena({
+      account: CALLER,
+      doContract: () =>
+        Promise.resolve({
+          status: "failure",
+          type: "WALLET_LOCKED",
+          code: 2000,
+          message: "",
+          data: { hash: SIGNED_HASH },
+        }),
+    });
+    const read = vi.fn(() => Promise.resolve(found(LANDED)));
+    const { store, deps } = setup({ adena: wallet.adena, read });
+    await signCall("SetBio", deps);
+    expect(read).toHaveBeenCalled();
+    expect(stateOf(store)).toMatchObject({ kind: "done", hash: SIGNED_HASH });
   });
 
   describe("a call Adena says failed after it named the hash (F5749)", () => {
@@ -397,7 +416,7 @@ describe("signCall: a second request waits for the first", () => {
     await Promise.all([first, second]);
     expect(signed).toBe(2);
     expect(stateOf(store)?.kind).toBe("done");
-    expect(store.getState().calls["SetName"]?.state).toEqual({ kind: "failed", reason: "declined" });
+    expect(store.getState().calls["SetName"]?.state).toEqual({ kind: "failed", reason: "declined-maybe-sent" });
   });
 });
 

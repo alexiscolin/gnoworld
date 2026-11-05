@@ -18,6 +18,7 @@ const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain" | "not-loa
   "wrong-network": /network/i,
   malformed: /unexpected|report/i,
   "maybe-sent": /may have been sent.*recent transactions/i,
+  "declined-maybe-sent": /declined.*closed Adena's window.*may have been sent.*recent transactions/i,
   "not-loaded": /reload/i,
   "logged-out": /connect adena/i,
   unseen: /block/i,

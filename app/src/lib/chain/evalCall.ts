@@ -1,5 +1,7 @@
-// Tier 1 (docs/REVIEW.md). The only place a `vm/qeval` expression is built. The chain runs ANY expression it is sent, so the
-// defence is here: one `<realm>.<Name>()` or nothing. Each pattern is built inside its function (typescript.md, F412).
+// Tier 1 (docs/REVIEW.md). The app's only place a `vm/qeval` expression is built (the server's door has its own, D92). The chain
+// runs ANY expression it is sent, so the defence is here: one `<realm>.<Name>()`, one of r/sys/users's two calls on a proved
+// address (D283), or nothing. Each pattern is built inside its function (typescript.md, F412).
+import { Address } from "@gnoworld/schemas";
 
 /** gno's grammar for a realm's path (mempackage.go:49-54,67-70,81-90 at v1.5.0), `_test` paths left out. */
 export function isRealmPath(path: string): boolean {
@@ -18,4 +20,12 @@ export function isExportedName(name: string): boolean {
  * first slash (handler.go:289), which is why a realm path may hold no dot past its domain. */
 export function evalCall(realm: string, name: string): string | null {
   return isRealmPath(realm) && isExportedName(name) ? `${realm}.${name}()` : null;
+}
+
+/** The data `vm/qeval` is asked for one of r/sys/users's two calls on the record of `account`, or null: the address goes in only
+ * once the schema proved it, and `call` picks one of two whole strings, whatever it holds at run time. */
+export function userCall(account: string, call: "IsDeleted" | "Name"): string | null {
+  const proved = Address.safeParse(account);
+  if (!proved.success) return null;
+  return `gno.land/r/sys/users.ResolveAddress("${proved.data}").${call === "Name" ? "Name()" : "IsDeleted()"}`;
 }

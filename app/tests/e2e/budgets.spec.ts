@@ -1,9 +1,9 @@
 import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
 
 // ADR-0001 §12's budgets: compressed JavaScript before the first usable screen (the page
-// hydrated; its steps in docs/decisions.md, the last D217 on 2026-11-05), 3 MB in all, the worker's
+// hydrated; its steps in docs/decisions.md, the last 176 KiB for slice 9 on 2026-11-06), 3 MB in all, the worker's
 // precache included, as gzip sends them.
-const FIRST_SCREEN_JS = 174 * 1024;
+const FIRST_SCREEN_JS = 176 * 1024;
 const TOTAL = 3 * 1024 * 1024;
 
 const compressed = (page: Page, urls: readonly string[]) =>

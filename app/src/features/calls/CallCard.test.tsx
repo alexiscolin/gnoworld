@@ -204,6 +204,12 @@ describe("CallCard, the states after the click", () => {
     expect(buttons(box)).toEqual(["Try again", "Cancel"]);
   });
 
+  it("offers only 'Close' after Adena's refusal of a signature it was asked for, and says the call may have gone (F5747)", () => {
+    const box = withState({ kind: "failed", reason: "declined-maybe-sent" });
+    expect(said(box)).toMatch(/closed Adena's window.*may have been sent.*recent transactions/i);
+    expect(buttons(box)).toEqual(["Close"]);
+  });
+
   it("offers only 'Close' after a call that may have been sent, with no hash: never 'Try again' (F5728)", () => {
     const box = withState({ kind: "failed", reason: "maybe-sent" });
     expect(said(box)).toMatch(/recent transactions/i);

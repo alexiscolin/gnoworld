@@ -3,7 +3,7 @@
 // nothing itself, Adena asks the person. No page of the app imports it (record.test.ts holds that).
 import { CallRequest } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
-import { transaction, type Universe } from "./call.ts";
+import { CONTRACT_OPTIONS, transaction, type Universe } from "./call.ts";
 import { SITE } from "./answers.ts";
 import { method } from "./detect.ts";
 
@@ -23,7 +23,7 @@ export interface Entry {
 const argsOf = (step: Step): unknown[] => {
   if (step.call === "AddEstablish") return [SITE];
   if (step.call === "SwitchNetwork") return [step.chainId];
-  if (step.call === "DoContract") return [transaction(step.request, step.universe)];
+  if (step.call === "DoContract") return [transaction(step.request, step.universe), CONTRACT_OPTIONS];
   return [];
 };
 

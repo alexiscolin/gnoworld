@@ -3,6 +3,7 @@ import { realmType } from "@gnoworld/core";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { indexer } from "../chain/indexerRoute.ts";
 import recording from "../../recording/adena-recording.json" with { type: "json" };
+import type { Browser, BrowserType, LaunchOptions } from "@playwright/test";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 
 // The call card's journeys' world (9d): Adena's stand-in (adena.ts) given the calls a signature needs, with the recorded
@@ -199,9 +200,36 @@ export async function callAndSign(page: Page): Promise<void> {
   await calls(page).getByRole("article").getByRole("button", { name: "Sign in Adena" }).click();
 }
 
+// Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
+// transitions running end first (a cancelled one too); the spinner's endless animation is no transition.
+export async function violations(page: Page) {
+  await page.evaluate(async () => {
+    const settled = () => undefined;
+    const running = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
+    await Promise.all(running.map((transition) => transition.finished.then(settled, settled)));
+  });
+  return (await new AxeBuilder({ page }).analyze()).violations;
+}
+
+/** A touch phone in a browser of its own, with the session of `page`'s login: a phone cannot log in (its pointer is coarse), but an
+ * account logged in writes there. Playwright here runs one process, so a second context would end the first's browser. */
+export async function phoneOf(
+  page: Page,
+  { playwright, launchOptions }: { playwright: { chromium: BrowserType }; launchOptions: LaunchOptions },
+) {
+  const browser: Browser = await playwright.chromium.launch(launchOptions);
+  const context = await browser.newContext({
+    baseURL: new URL(page.url()).origin,
+    storageState: await page.context().storageState(),
+    hasTouch: true,
+    viewport: { width: 390, height: 844 },
+  });
+  return { phone: await context.newPage(), browser };
+}
+
 /** What every call journey asks of the page it ends on: no dialog, no accessibility violation, no sideways scroll. */
 export async function sound(page: Page): Promise<void> {
   await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect(await violations(page)).toEqual([]);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }

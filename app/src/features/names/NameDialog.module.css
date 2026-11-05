@@ -1,0 +1,31 @@
+/* The name dialog (9f, frames 9 to 15): the face beside its words, and a phone's words in place of the signature. */
+@layer components {
+  .note {
+    font: var(--font-meta);
+    color: var(--color-text-muted);
+  }
+
+  .state {
+    /* layout: a state's words keep the dialog's width and break where they must */
+    overflow-wrap: anywhere;
+  }
+
+  .state:empty {
+    display: none;
+  }
+
+  /* A phone reads and signs on a computer (U6): a coarse pointer gets the words, a computer the button. */
+  .phone {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .phone {
+      display: block;
+    }
+
+    .computer {
+      display: none;
+    }
+  }
+}
