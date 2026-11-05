@@ -440,3 +440,162 @@ describe("the registration recorded on the same watch", () => {
     expect(log).not.toHaveBeenCalled();
   });
 });
+
+// F5780: the lifecycle of a socket, each case a mutant that every test passed with.
+describe("a socket's end", () => {
+  it("is one reconnection when an error and the close that follows it both come", async () => {
+    const { socketN, sockets, waits } = setup();
+    const socket = await socketN(0);
+    socket.emit("error");
+    socket.emit("close");
+    await socketN(1);
+    await Promise.resolve();
+    expect(sockets).toHaveLength(2);
+    expect(waits).toHaveLength(1);
+  });
+
+  it("is a reconnection on an error alone, and on a refused subscription alone, the socket closed", async () => {
+    const { socketN } = setup();
+    (await socketN(0)).emit("error");
+    const second = await socketN(1);
+    second.ack();
+    second.emit("message", '{"type":"error","id":"tx","payload":[{"message":"no"}]}');
+    expect(second.closed).toBe(true);
+    await socketN(2);
+  });
+
+  it("starts no idle timer once it is over: nothing is said, and none is replaced, a second time", async () => {
+    const { socketN, fire, log, waits } = setup();
+    const socket = await socketN(0);
+    socket.ack();
+    socket.emit("message", '{"type":"error","id":"tx","payload":[{"message":"no"}]}');
+    fire(IDLE_MS);
+    fire(ACK_MS);
+    expect(log).not.toHaveBeenCalledWith("chain_socket_timeout");
+    expect(waits).toHaveLength(1);
+  });
+
+  it("hears nothing after it is over", async () => {
+    const { socketN, heights, log } = setup();
+    const socket = await socketN(0);
+    socket.ack();
+    socket.emit("close");
+    socket.emit("message", call);
+    socket.emit("message", "not json at all");
+    expect(heights()).toEqual([]);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("hears a text only: a binary frame is no business of the follower", async () => {
+    const { socketN, heights, log } = setup();
+    const socket = await socketN(0);
+    socket.ack();
+    socket.emit("message", new TextEncoder().encode(call));
+    socket.emit("message", new TextEncoder().encode('{"type":"ping"}'));
+    socket.emit("message", undefined);
+    expect(heights()).toEqual([]);
+    expect(socket.types()).toEqual(["connection_init", "subscribe", "subscribe"]);
+    expect(log).not.toHaveBeenCalled();
+  });
+
+  it("is ended before it is open when its close is already known, without a throw", async () => {
+    const sockets: FakeSocket[] = [];
+    setup({
+      open: (url, protocol) => {
+        const socket = new FakeSocket(url, protocol);
+        const first = sockets.push(socket) === 1;
+        const add = socket.addEventListener.bind(socket);
+        socket.addEventListener = (type, listener) => {
+          add(type, listener);
+          if (first && type === "close") listener({});
+        };
+        return socket;
+      },
+    });
+    await vi.waitFor(() => {
+      expect(sockets.length).toBeGreaterThan(1);
+    });
+  });
+
+  it("opens no socket after a stop, and waits for none", async () => {
+    const { socketN, follow, sockets, waits } = setup();
+    await socketN(0);
+    follow.stop();
+    await Promise.resolve();
+    expect(waits).toEqual([]);
+    expect(sockets).toHaveLength(1);
+  });
+});
+
+describe("what a frame without a height leaves", () => {
+  it("is no height reached: a socket that heard only other frames asks no catch-up when it reconnects", async () => {
+    const asked = vi.fn(() => Promise.resolve<string[]>([]));
+    const { socketN } = setup({ catchUp: asked });
+    const first = await socketN(0);
+    first.ack();
+    first.emit("message", '{"type":"subscribe","id":"tx"}');
+    first.emit("close");
+    (await socketN(1)).ack();
+    expect(asked).not.toHaveBeenCalled();
+  });
+});
+
+describe("a catch-up that ends after the socket did", () => {
+  it("says nothing and connects once, whether it fails or answers", async () => {
+    const answer = Promise.withResolvers<string[]>();
+    const { socketN, sockets, log, heights } = setup({ catchUp: () => answer.promise });
+    const first = await socketN(0);
+    first.ack();
+    first.emit("message", tx(100, "a"));
+    first.emit("close");
+    const second = await socketN(1);
+    second.ack();
+    second.emit("close");
+    await socketN(2);
+    answer.reject(new Error("late"));
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(log).not.toHaveBeenCalledWith("chain_catch_up_failed");
+    expect(sockets).toHaveLength(3);
+    expect(heights()).toEqual([100]);
+  });
+
+  it("delivers the frames held in height order, the lowest first", async () => {
+    const answer = Promise.withResolvers<string[]>();
+    const { socketN, heights } = setup({ catchUp: () => answer.promise });
+    const first = await socketN(0);
+    first.ack();
+    first.emit("message", tx(100, "a"));
+    first.emit("close");
+    const second = await socketN(1);
+    second.ack();
+    for (const [height, hash] of [
+      [105, "e"],
+      [103, "c"],
+      [104, "d"],
+    ] as const)
+      second.emit("message", tx(height, hash));
+    answer.resolve([]);
+    await vi.waitFor(() => {
+      expect(heights()).toEqual([100, 103, 104, 105]);
+    });
+  });
+
+  it("holds nothing back when the server acknowledges twice: the second catch-up has no frames held", async () => {
+    const { socketN, delivered, heights } = setup({ catchUp: () => Promise.resolve([]) });
+    const first = await socketN(0);
+    first.ack();
+    first.emit("message", tx(100, "a"));
+    first.emit("close");
+    const second = await socketN(1);
+    second.ack();
+    second.emit("message", '{"type":"connection_ack"}');
+    await vi.waitFor(() => {
+      expect(second.types().filter((type) => type === "subscribe")).toHaveLength(4);
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(heights()).toEqual([100]);
+    expect(delivered.every((read) => typeof read === "object" && "events" in read)).toBe(true);
+  });
+});
