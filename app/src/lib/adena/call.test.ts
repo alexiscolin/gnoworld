@@ -135,6 +135,7 @@ const params = (request: CallRequest, universe = ONYX) => [
     networkInfo: { chainId: universe.chainId, rpcUrl: universe.rpc },
   },
 ];
+const [GA, GN, SN, AN] = ["GetAccount", "GetNetwork", "SwitchNetwork", "AddNetwork"];
 const sent = (adena: Fake) => adena.asked.filter((a) => a.call === "DoContract");
 
 describe("callContract: the way through", () => {
@@ -217,14 +218,14 @@ describe("callContract: the account", () => {
     const adena = new Fake({ AddEstablish: () => no("CONNECTION_REJECTED") });
     adena.connected = false;
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "declined" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "AddEstablish"]);
   });
 
   it("stops when Adena is on another account than the call's caller: the person chose that account in gnoworld", async () => {
     const adena = new Fake();
     adena.account = OTHER;
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "wrong-account" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount"]);
   });
 
   it.each([
@@ -233,7 +234,7 @@ describe("callContract: the account", () => {
   ])("stops when Adena is %s", async (_, type, reason) => {
     const adena = new Fake({ GetAccount: () => no(type) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount"]);
   });
 });
 
@@ -263,7 +264,7 @@ describe("callContract: a call on the wrong network is stopped before signing", 
   it("stops when Adena still is on another chain after the switch: no DoContract", async () => {
     const adena = new Fake({ SwitchNetwork: () => ok("SWITCH_NETWORK_SUCCESS", { chainId: "onyx-1" }) }, "gnoland-1");
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "wrong-network" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork", "GetNetwork"]);
   });
 
   it("stops when it is still wrong after adding and switching", async () => {
@@ -273,43 +274,94 @@ describe("callContract: a call on the wrong network is stopped before signing", 
       [],
     );
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "wrong-network" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork", "AddNetwork", "SwitchNetwork"]);
     expect(adena.names.filter((n) => n === "AddNetwork")).toHaveLength(1);
   });
 
   it.each([
-    ["refuses the switch", { SwitchNetwork: () => no("SWITCH_NETWORK_REJECTED") }, "declined"],
+    [
+      "refuses the switch",
+      { SwitchNetwork: () => no("SWITCH_NETWORK_REJECTED") },
+      { reason: "declined", names: [GA, GN, SN] },
+    ],
     [
       "refuses the add",
       { SwitchNetwork: () => no("UNADDED_NETWORK"), AddNetwork: () => no("ADD_NETWORK_REJECTED") },
-      "declined",
+      { reason: "declined", names: [GA, GN, SN, AN] },
     ],
-    ["fails the switch", { SwitchNetwork: () => no("UNEXPECTED_ERROR") }, "failed"],
-    ["throws on the switch", { SwitchNetwork: () => Promise.reject(new Error("gone")) }, "failed"],
-  ])("stops, with no DoContract, when the person %s", async (_, over, reason) => {
+    ["fails the switch", { SwitchNetwork: () => no("UNEXPECTED_ERROR") }, { reason: "failed", names: [GA, GN, SN] }],
+    [
+      "throws on the switch",
+      { SwitchNetwork: () => Promise.reject(new Error("gone")) },
+      { reason: "failed", names: [GA, GN, SN] },
+    ],
+  ])("stops, with no DoContract, when the person %s", async (_, over, { reason, names }) => {
     const adena = new Fake(over, "gnoland-1", ["gnoland-1"]);
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(names);
+  });
+
+  // After AddNetwork: the second switch is read as the first is, and a second GetNetwork that fails ends the call.
+  it.each([
+    ["is declined", () => no("SWITCH_NETWORK_REJECTED"), { reason: "declined", names: [GA, GN, SN, AN, SN] }],
+    ["is unadded still", () => no("UNADDED_NETWORK"), { reason: "wrong-network", names: [GA, GN, SN, AN, SN] }],
+    [
+      "is redundant, the chain still wrong",
+      () => no("REDUNDANT_CHANGE_REQUEST"),
+      { reason: "wrong-network", names: [GA, GN, SN, AN, SN, GN] },
+    ],
+  ])("stops, with no DoContract, when the switch after the add %s", async (_, second, { reason, names }) => {
+    let switches = 0;
+    const adena = new Fake({ SwitchNetwork: () => (++switches === 1 ? no("UNADDED_NETWORK") : second()) }, "gnoland-1");
+    expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason });
+    expect(adena.names).toEqual(names);
+  });
+
+  it("goes on after a second switch that is redundant when the chain read again is the universe's", async () => {
+    let switches = 0;
+    const adena: Fake = new Fake(
+      {
+        SwitchNetwork: () => {
+          if (++switches === 1) return no("UNADDED_NETWORK");
+          adena.chain = "onyx-1";
+          return no("REDUNDANT_CHANGE_REQUEST");
+        },
+      },
+      "gnoland-1",
+      ["gnoland-1"],
+    );
+    expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({ ok: true });
+    expect(adena.names).toEqual([GA, GN, SN, AN, SN, GN, "DoContract"]);
+  });
+
+  it("stops on a second GetNetwork that fails, after a switch: no DoContract", async () => {
+    let reads = 0;
+    const adena = new Fake(
+      { GetNetwork: () => (++reads === 1 ? ok("GET_NETWORK", { chainId: "gnoland-1" }) : no("WALLET_LOCKED")) },
+      "gnoland-1",
+    );
+    expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "locked" });
+    expect(adena.names).toEqual([GA, GN, SN, GN]);
   });
 
   it("stops on a redundant switch answer when the network read after it is still wrong", async () => {
     const adena = new Fake({ SwitchNetwork: () => no("REDUNDANT_CHANGE_REQUEST") }, "gnoland-1");
     const result = await callContract(adena, REQUEST, ONYX);
     expect(result).toEqual({ ok: false, reason: "wrong-network" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork", "GetNetwork"]);
   });
 
   it("stops on a network answer that fails its schema, with no DoContract", async () => {
     const adena = new Fake({ GetNetwork: () => ok("GET_NETWORK", { networkName: "no chain" }) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "malformed" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork"]);
   });
 
   it("compares the whole chain id, not a prefix or a case: onyx-10 and ONYX-1 are other chains", async () => {
     for (const chain of ["onyx-10", "ONYX-1", "onyx-1 "]) {
       const adena = new Fake({ SwitchNetwork: () => ok("SWITCH_NETWORK_SUCCESS", {}) }, chain);
       expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "wrong-network" });
-      expect(sent(adena)).toEqual([]);
+      expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork", "GetNetwork"]);
     }
   });
 });
@@ -577,7 +629,7 @@ describe("callContract: Adena's other answers fail their schema or their code", 
   ])("a GetAccount with %s is malformed, with no DoContract", async (_, data) => {
     const adena = new Fake(account(data));
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "malformed" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount"]);
   });
 
   it.each([
@@ -588,7 +640,7 @@ describe("callContract: Adena's other answers fail their schema or their code", 
   ])("a GetNetwork that fails with %s is the state %s, with no DoContract", async (type, reason) => {
     const adena = new Fake({ GetNetwork: () => no(type) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork"]);
   });
 
   it("a GetNetwork that rejects, or answers nothing, is a result with no DoContract", async () => {
@@ -596,8 +648,8 @@ describe("callContract: Adena's other answers fail their schema or their code", 
     expect(await callContract(rejects, REQUEST, ONYX)).toEqual({ ok: false, reason: "failed" });
     const nothing = new Fake({ GetNetwork: () => Promise.resolve(undefined) });
     expect(await callContract(nothing, REQUEST, ONYX)).toEqual({ ok: false, reason: "malformed" });
-    expect(sent(rejects)).toEqual([]);
-    expect(sent(nothing)).toEqual([]);
+    expect(rejects.names).toEqual([GA, GN]);
+    expect(nothing.names).toEqual([GA, GN]);
   });
 
   it.each([
@@ -607,13 +659,13 @@ describe("callContract: Adena's other answers fail their schema or their code", 
   ])("a SwitchNetwork that fails with %s is the state %s, with no DoContract", async (type, reason) => {
     const adena = new Fake({ SwitchNetwork: () => no(type) }, "gnoland-1");
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork"]);
   });
 
   it("a SwitchNetwork that answers nothing is malformed, with no DoContract", async () => {
     const adena = new Fake({ SwitchNetwork: () => Promise.resolve(undefined) }, "gnoland-1");
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "malformed" });
-    expect(sent(adena)).toEqual([]);
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork"]);
   });
 });
 
