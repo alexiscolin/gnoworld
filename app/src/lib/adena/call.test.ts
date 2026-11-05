@@ -856,7 +856,9 @@ describe("callContract: a failure after DoContract was asked may have been sent 
   });
 
   it("keeps the hash Adena gave with a TRANSACTION_FAILED, so the chain can be asked about it", async () => {
-    const adena = new Fake({ DoContract: failedWith({ hash: HASH, error: "tx failed", log: "x" }, "tx failed") });
+    const adena = new Fake({
+      DoContract: failedWith({ hash: HASH, error: "tx failed", log: "tx failed" }, "tx failed"),
+    });
     expect(await callContract(adena, REQUEST, ONYX)).toStrictEqual({
       ok: false,
       reason: "maybe-sent",
