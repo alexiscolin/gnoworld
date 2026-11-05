@@ -9,6 +9,8 @@ const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.{t
   import: "default",
   eager: true,
 });
+// The recording page, as text: it runs in Alexis's browser, with his Adena, not in a test.
+const PAGE = (await import("../../../recording/index.html?raw")).default;
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 const REQUEST = CallRequest.parse({
@@ -23,7 +25,7 @@ const REQUEST = CallRequest.parse({
 const wallet = (answers: Record<string, unknown>) => {
   const asked: { call: string; args: unknown[] }[] = [];
   const adena = Object.fromEntries(
-    ["GetAccount", "GetNetwork", "SwitchNetwork", "DoContract", "SignArbitrary"].map((call) => [
+    ["AddEstablish", "GetAccount", "GetNetwork", "SwitchNetwork", "DoContract", "SignArbitrary"].map((call) => [
       call,
       (...args: unknown[]) => {
         asked.push({ call, args });
@@ -69,12 +71,30 @@ describe("record", () => {
     ]);
   });
 
+  it("asks Adena to let gnoworld in, by its name, and keeps the answer: the first step of a run (F5645)", async () => {
+    const answer = { code: 0, status: "success", type: "CONNECTION_SUCCESS", message: "", data: {} };
+    const { adena, asked } = wallet({ AddEstablish: answer });
+    expect(await record(adena, "connect", { call: "AddEstablish" })).toEqual({
+      label: "connect",
+      call: "AddEstablish",
+      args: ["gnoworld"],
+      answer,
+    });
+    expect(asked).toEqual([{ call: "AddEstablish", args: ["gnoworld"] }]);
+  });
+
   it("keeps a refusal, a rejection and a missing method as entries, never as a throw", async () => {
     const { adena } = wallet({});
     const rejecting = { GetNetwork: () => Promise.reject(new Error("gone")) };
     expect(await record(rejecting, "network", { call: "GetNetwork" })).toMatchObject({ threw: "Error: gone" });
     expect(await record({}, "network", { call: "GetNetwork" })).toMatchObject({ threw: "no such method" });
     expect(await record(adena, "network", { call: "GetNetwork" })).toMatchObject({ answer: null });
+  });
+
+  it("has the page connect first, and refuse to call while it knows no account (F5645)", () => {
+    expect(PAGE).toContain('call: "AddEstablish"');
+    expect(PAGE).toMatch(/if \(account === ""\) return/);
+    expect(PAGE).not.toContain('caller: ""');
   });
 
   it("is imported by no page of the app: it is in no build", () => {

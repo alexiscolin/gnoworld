@@ -3,10 +3,11 @@
 // nothing itself, Adena asks the person. No page of the app imports it (record.test.ts holds that).
 import type { CallRequest } from "@gnoworld/schemas";
 import { transaction, type Universe } from "./call.ts";
+import { SITE } from "./answers.ts";
 import { method } from "./detect.ts";
 
 export type Step =
-  | { call: "GetAccount" | "GetNetwork" }
+  | { call: "AddEstablish" | "GetAccount" | "GetNetwork" }
   | { call: "SwitchNetwork"; chainId: string }
   | { call: "DoContract"; request: CallRequest; universe: Universe };
 /** What one call was given and what Adena answered, or how it failed to. */
@@ -19,6 +20,7 @@ export interface Entry {
 }
 
 const argsOf = (step: Step): unknown[] => {
+  if (step.call === "AddEstablish") return [SITE];
   if (step.call === "SwitchNetwork") return [step.chainId];
   if (step.call === "DoContract") return [transaction(step.request, step.universe)];
   return [];

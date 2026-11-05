@@ -5,8 +5,8 @@
 <body style="font: 16px system-ui; max-width: 42rem; margin: 2rem auto; padding: 0 1rem">
   <h1>Adena recording (test only)</h1>
   <p>
-    Nothing is asked of Adena until you press a button. Only the buttons 3 and 4 ask it to send a transaction, and Adena
-    then asks you: this page signs nothing.
+    Nothing is asked of Adena until you press a button. Press them in order. Only the buttons 4 and 5 ask it to send a
+    transaction, and Adena then asks you: this page signs nothing.
   </p>
   <p>
     <label>Realm <input id="realm" size="40" value="gno.land/r/demo/profile" /></label><br />
@@ -19,10 +19,11 @@ gnoworld test</textarea>
     </label>
   </p>
   <p>
-    <button id="read">1. Read the account and the network</button>
-    <button id="switch">2. Switch to Onyx</button>
-    <button id="sign">3. Call, and sign it in Adena</button>
-    <button id="refuse">4. Call, and reject it in Adena</button>
+    <button id="connect">1. Let this page in (Adena asks you)</button>
+    <button id="read">2. Read the account and the network</button>
+    <button id="switch">3. Switch to Onyx</button>
+    <button id="sign">4. Call, and sign it in Adena</button>
+    <button id="refuse">5. Call, and reject it in Adena</button>
   </p>
   <pre id="log"></pre>
   <script src="/recorder.js"></script>
@@ -40,6 +41,8 @@ gnoworld test</textarea>
     }
     const call = (label) => async () => {
       if (account === "") await run("account", { call: "GetAccount" });
+      // Without an account, Adena has not let this page in: press button 1 first.
+      if (account === "") return;
       const text = document.getElementById("args").value;
       await run(label, {
         call: "DoContract",
@@ -53,6 +56,7 @@ gnoworld test</textarea>
         },
       });
     };
+    document.getElementById("connect").onclick = () => run("connect", { call: "AddEstablish" });
     document.getElementById("read").onclick = async () => {
       await run("account", { call: "GetAccount" });
       await run("network", { call: "GetNetwork" });
