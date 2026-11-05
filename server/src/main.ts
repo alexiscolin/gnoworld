@@ -24,6 +24,9 @@ import { startPrices } from "./prices/prices.ts";
 import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
+import { signalRoutes } from "./signals/routes.ts";
+import { makeSignals } from "./signals/signals.ts";
+import { makeStream } from "./stream/stream.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -50,6 +53,9 @@ const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
 // The login's sessions, read for the rooms' routes (3l) and the rooms a reader may see (3m).
 const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
+// The first signals (9h): the chat records the first words and the routes the first charts, each told on the one stream.
+const stream = makeStream();
+const signals = makeSignals(db, { now: Date.now });
 const chat = startChat(
   db,
   {
@@ -60,12 +66,16 @@ const chat = startChat(
     trustedProxy: config.trustedProxy,
     spared: spared(roles),
   },
-  { log, pepper: config.pepper, session },
+  { log, pepper: config.pepper, session, stream, signals },
 );
 app.route("/api/activity", chat.activity);
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
+app.route(
+  "/api/signals",
+  signalRoutes({ signals, roles, session, origins: config.origins, log, now: Date.now, publish: stream.signal }),
+);
 app.route(
   "/api/rooms",
   roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),

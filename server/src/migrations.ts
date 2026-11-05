@@ -11,6 +11,7 @@ import { STRIKE_TABLES } from "./moderation/strikes.ts";
 import { PIN_TABLES } from "./pins/pins.ts";
 import { ROOM_STATE } from "./rooms/create.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
+import { SIGNAL_TABLES } from "./signals/signals.ts";
 
 export const migrations: readonly string[] = [
   LOGIN_TABLES,
@@ -25,4 +26,5 @@ export const migrations: readonly string[] = [
   PIN_TABLES,
   NONCE_ACTION,
   QUOTA_TABLES,
+  SIGNAL_TABLES,
 ];

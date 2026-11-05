@@ -3,12 +3,13 @@
 // reader may not read (3m); bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
 // events kept for a late client or one coming back.
 import { getConnInfo } from "@hono/node-server/conninfo";
-import type { ApiError, StreamEvent, StreamSince } from "@gnoworld/schemas";
+import type { ApiError, Signal, StreamEvent, StreamSince } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { z } from "zod";
 import { visitor } from "../visitor.ts";
+import { follows, signalRing } from "./signals.ts";
 
 // A room's name as the stream and GET /api/verdicts take it: # and one word with no comma, 64 characters at most.
 const ROOM = String.raw`#[^\s,#\0-\x1f\x7f]{1,63}`;
@@ -27,6 +28,8 @@ export function stateOf(action: string): StreamEvent["state"] | undefined {
 
 export interface Stream {
   publish: (event: StreamEvent) => void;
+  // A first signal (slice 9h) to the readers of any room of its world they may read, in the verdicts' sequence of ids.
+  signal: (signal: Signal) => void;
   // visible and session as activity/routes.ts's (3m): a room the reader may not see sends it nothing.
   routes: (options: {
     proxy: string | undefined;
@@ -88,21 +91,25 @@ function seenBy(c: Context, rooms: ReadonlySet<string>, { visible, session }: Se
   return new Set([...rooms].filter((room) => visible(room, reader)));
 }
 
+const Rooms = z
+  .string()
+  .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
+  .transform((list) => new Set(list.split(",")));
+const LastId = z
+  .string()
+  .regex(/^\d{1,15}$/)
+  .transform(Number)
+  .optional();
+const frame = (id: number, event: StreamEvent): string =>
+  `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
+
 export function makeStream(options: Options = {}): Stream {
   const { perVisitor = 4, total = 1000, heartbeatMs = 15_000, pending = 64, now = Date.now } = options;
-  const Rooms = z
-    .string()
-    .regex(new RegExp(`^${ROOM}(?:,${ROOM}){0,24}$`))
-    .transform((list) => new Set(list.split(",")));
-  const LastId = z
-    .string()
-    .regex(/^\d{1,15}$/)
-    .transform(Number)
-    .optional();
   // From the clock, so the ids a server gave before a restart stay below the next one's.
   let sequence = Date.now();
   // Each room's last events, oldest first; a room past the cap of rooms is not kept.
   const rings = new Map<string, { id: number; event: StreamEvent }[]>();
+  const ring = signalRing();
   const clients = new Set<Client>();
   const byVisitor = new Map<string, number>();
   let admitted = 0;
@@ -110,8 +117,6 @@ export function makeStream(options: Options = {}): Stream {
   const write = (client: Client, text: string): void => {
     writeTo(client, text, pending);
   };
-  const frame = (id: number, event: StreamEvent): string =>
-    `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
 
   return {
     publish(event) {
@@ -125,6 +130,11 @@ export function makeStream(options: Options = {}): Stream {
       // the clients by room if the total grows.
       const text = frame(sequence, event);
       for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
+    },
+    signal(signal) {
+      sequence += 1;
+      const text = ring.keep(sequence, signal);
+      for (const client of clients) if (follows(client.rooms, signal.world)) write(client, text);
     },
     routes: ({ proxy, visible, session = () => undefined }) => {
       const app = new Hono();
@@ -152,9 +162,14 @@ export function makeStream(options: Options = {}): Stream {
           // The newest it missed, or the rooms' last events for a new client, as many as it may leave unread:
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).
           const after = (last.data ?? 0) > sequence ? 0 : (last.data ?? 0);
-          const missed = [...client.rooms].flatMap((room) => rings.get(room) ?? []).filter(({ id }) => id > after);
-          for (const { id, event } of missed.toSorted((a, b) => a.id - b.id).slice(-pending))
-            write(client, frame(id, event));
+          const verdicts = [...client.rooms]
+            .flatMap((room) => rings.get(room) ?? [])
+            .filter(({ id }) => id > after)
+            .map(({ id, event }) => ({ id, text: frame(id, event) }));
+          for (const { text } of [...verdicts, ...ring.missed(client.rooms, after)]
+            .toSorted((a, b) => a.id - b.id)
+            .slice(-pending))
+            write(client, text);
           tellSince(stream, now());
           // A comment line, which keeps a proxy from closing a quiet stream.
           const beat = setInterval(() => {
