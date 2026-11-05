@@ -3,6 +3,7 @@
 // computer for that, and that it writes once logged in (U6).
 import { Button, Cluster } from "@gnoworld/ui";
 import { lazy, Suspense } from "react";
+import { shortAddress } from "../../lib/shortAddress.ts";
 import type { LoginSlice } from "../../store/login.ts";
 import styles from "./LoginView.module.css";
 import { sayProblem } from "./problem.ts";
@@ -22,8 +23,6 @@ export interface LoginViewProps {
 const AccountName = lazy(() => import("../names/index.ts"));
 
 const STEPS = { wallet: "Opening Adena…", signing: "Sign the text in Adena…", verifying: "Checking your signature…" };
-// An address's first six and last five characters: enough to know one's own.
-const short = (address: string) => `${address.slice(0, 6)}…${address.slice(-5)}`;
 
 export function LoginView({ session, step, problem, onLogIn, onLogOut, universe }: LoginViewProps) {
   return (
@@ -33,7 +32,7 @@ export function LoginView({ session, step, problem, onLogIn, onLogOut, universe 
           <Suspense
             fallback={
               <span className={styles["account"]} title={session.address}>
-                {short(session.address)}
+                {shortAddress(session.address)}
               </span>
             }
           >
