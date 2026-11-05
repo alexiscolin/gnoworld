@@ -94,6 +94,22 @@ describe("a checked action as a Form block", () => {
     expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["15", "NO"]);
   });
 
+  it.each(["constructor", "toString", "valueOf", "__proto__"])(
+    "leaves a parameter named %s empty when the action leaves it out, and the card draws",
+    async (name) => {
+      const under = vi.fn<ChainFetch>(() =>
+        listing([{ FuncName: "Vote", Params: [CUR, field(name, "string")], Results: null }]),
+      );
+      const box = mount(
+        <StoreProvider>
+          <ActionForm action={{ realm: DAO, function: "Vote", args: {} }} chain={CHAIN} options={{ fetch: under }} />
+        </StoreProvider>,
+      );
+      click(await calling(box, "Call Vote"));
+      expect(inputs(one(box, "article")).map((i) => i.value)).toEqual([""]);
+    },
+  );
+
   it("draws a team's pinned action under its label, and its card names the realm and function the data says", async () => {
     const box = await draw({ realm: DAO, function: "MustVoteOnProposalSimple", args: {} }, { label: "Vote" });
     click(await calling(box, "Vote"));

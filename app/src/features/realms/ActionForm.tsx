@@ -34,7 +34,8 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
   const write = writeOf(listing, name);
   if (write === undefined || !Object.keys(args).every((arg) => write.fields.some((field) => field.name === arg)))
     return undefined;
-  const texts = write.fields.map((field) => args[field.name] ?? "");
+  // Own keys only: a parameter the realm calls `constructor` must not find the object's own function.
+  const texts = write.fields.map((field) => (Object.hasOwn(args, field.name) ? (args[field.name] ?? "") : ""));
   return { write, texts, fields: write.fields.map((field, index) => fieldOf(field.name, texts[index] ?? "")) };
 }
 
