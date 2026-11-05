@@ -15,8 +15,9 @@ import { useCallable, writeOf, type Listing } from "./useCallable.ts";
 function textsOf(fields: readonly CallField[], form: readonly FormField[]): string[] | undefined {
   const names = new Set(fields.map(({ name }) => name));
   const seen = new Set<string>();
-  for (const { tag, name } of form) {
-    if (tag === "other" || name === "" || !names.has(name) || seen.has(name)) return undefined;
+  for (const { name } of form) {
+    // A line that is no field (`other`) has no name.
+    if (name === "" || !names.has(name) || seen.has(name)) return undefined;
     seen.add(name);
   }
   return fields.map(({ name }) => form.find((each) => each.name === name)?.value ?? "");

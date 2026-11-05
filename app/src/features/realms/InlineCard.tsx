@@ -35,7 +35,7 @@ export function openCard(
   callsActions.open({ id, chainId: place.chain.chainId, realm: place.realm, func: write.name, params: write.params });
   if (wasOpen) return;
   (card.texts ?? []).forEach((text, index) => {
-    if (text !== "") callsActions.edit(id, index, text);
+    callsActions.edit(id, index, text);
   });
 }
 
