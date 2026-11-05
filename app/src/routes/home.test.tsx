@@ -4,8 +4,11 @@ import events from "../../data/events.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
 import { fakeStream } from "../../tests/fakeStream.ts";
 import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
-import { BACK_HOME, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
-import Home, { clientLoader, ErrorBoundary, loader } from "./home.tsx";
+import { type MetaArgs } from "react-router";
+import { BACK_HOME, routeError, alertOf, expectClientAsBuild, render } from "../../tests/render.tsx";
+import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
+import { site } from "../places.ts";
+import Home, { clientLoader, ErrorBoundary, loader, meta } from "./home.tsx";
 
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
@@ -26,6 +29,18 @@ const failing = {
   },
   ErrorBoundary,
 };
+
+// The tags: the universe's own, a not-found's for an unknown universe, and a failure's for any other error.
+test("home's tags are the universe's, not-found's or failure's", async () => {
+  const universe = site.universe(new Request("https://gno.world/"), "cosmos");
+  const args = (loaderData: typeof universe | undefined, error?: unknown) =>
+    ({ loaderData, error }) as MetaArgs<typeof loader>;
+  expect(meta(args(universe))).toEqual(homeMeta(universe));
+  expect(
+    meta(args(undefined, await routeError({ path: "/net/:network", Component: Home, loader }, "/net/nowhere"))),
+  ).toEqual(missingUniverseMeta());
+  expect(meta(args(undefined, new Error("the chain did not answer")))).toEqual(failedPageMeta());
+});
 
 // Every route catches its own errors (docs/ARCHITECTURE.md; F329).
 test("home shows its own alert when it fails, with a way home", async () => {
@@ -176,6 +191,27 @@ describe("home and the chain's stream", () => {
     });
     expect(box.textContent).not.toContain("theirs");
     expect(box.textContent).toContain("Signal");
+  });
+
+  test("links a deploy under its universe's own path: none for the default one, /net/<id> for another", async () => {
+    const sources = fakeStream();
+    const onyx = drawRoute({ path: "/", Component: Home, loader }, "/");
+    await vi.waitFor(() => {
+      expect(sources.opened).toHaveLength(1);
+    });
+    sources.opened[0]?.emit("chain", deploy("onyx", "mine", 10));
+    await vi.waitFor(() => {
+      expect(onyx.box.querySelector("[data-ticker] a")?.getAttribute("href")).toBe(`/r/${ALICE}/mine`);
+    });
+    onyx.leave();
+    const gnoland = drawRoute({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
+    await vi.waitFor(() => {
+      expect(sources.opened).toHaveLength(2);
+    });
+    sources.opened[1]?.emit("chain", deploy("gnoland", "theirs", 11));
+    await vi.waitFor(() => {
+      expect(gnoland.box.querySelector("[data-ticker] a")?.getAttribute("href")).toBe(`/net/gnoland/r/${ALICE}/theirs`);
+    });
   });
 
   test("closes the stream when the page is left", async () => {

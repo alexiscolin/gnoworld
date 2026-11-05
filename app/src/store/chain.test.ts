@@ -123,6 +123,16 @@ describe("the chain's slice", () => {
     expect(store.getState().realmsDeployed["onyx"]).toEqual({ universe: "onyx", count: 17, height: 908297 });
     store.getState().chainActions.counted({ universe: "onyx", count: 18, height: 908300 });
     expect(store.getState().realmsDeployed["onyx"]?.count).toBe(18);
+    store.getState().chainActions.counted({ universe: "onyx", count: 19, height: 908300 });
+    expect(store.getState().realmsDeployed["onyx"]?.count).toBe(19);
+  });
+
+  it("leaves the ticker's deploys the very list it was when a batch holds no deploy", () => {
+    const store = createAppStore();
+    store.getState().chainActions.heard([deploy(5)]);
+    const before = store.getState().deploys;
+    store.getState().chainActions.heard([call(6)]);
+    expect(store.getState().deploys).toBe(before);
   });
 
   it("updates in one set for a batch: a subscriber is told once", () => {
