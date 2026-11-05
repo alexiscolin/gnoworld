@@ -113,6 +113,11 @@ describe("the constellations", () => {
     expect(got.find(({ id }) => id === "lone")).toEqual({ id: "lone", worlds: 1, stamped: 1 });
   });
 
+  it("counts a listed world in the namespace the list gives it, never again in the one its id begins with", () => {
+    const got = constellationsOf([{ id: "x/1", namespace: "other" }], new Set(["x/1"]));
+    expect(got).toEqual([{ id: "other", worlds: 1, stamped: 1 }]);
+  });
+
   it("gives every constellation of the list, the unstamped ones at 0 for the view to leave out", () => {
     const got = constellationsOf(worlds, new Set());
     expect(got.map(({ stamped }) => stamped)).toEqual([0, 0, 0]);

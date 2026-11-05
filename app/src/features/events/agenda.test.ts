@@ -65,6 +65,12 @@ describe("the agenda", () => {
     expect(got.days.map(({ events }) => events.map(({ id }) => id))).toEqual([["a", "b"], ["c"]]);
   });
 
+  it("drops an event the moment its live hour ends", () => {
+    const now = Date.parse("2026-11-05T12:00:00.000Z");
+    expect(agendaOf([event("ended", now - HOUR)], now).days).toEqual([]);
+    expect(agendaOf([event("last", now - HOUR + 1)], now).days).toHaveLength(1);
+  });
+
   it("orders two events at one time by their id", () => {
     const now = Date.parse("2026-11-05T12:00:00.000Z");
     const got = agendaOf([event("b", now + HOUR), event("a", now + HOUR)], now);
@@ -90,7 +96,8 @@ describe("the reminders' window", () => {
 
   it("tells a reminder ten minutes before its event, and not a minute sooner", () => {
     const soon = event("a", now + 10 * MINUTE);
-    expect(remindersAt([soon], { a: { fired: false } }, now).due).toEqual([soon]);
+    // Told now, so no timer is armed for it: a timer of 0 ms would tell it again.
+    expect(remindersAt([soon], { a: { fired: false } }, now)).toEqual({ due: [soon], over: [], next: undefined });
     const later = event("a", now + 10 * MINUTE + 1);
     const got = remindersAt([later], { a: { fired: false } }, now);
     expect(got.due).toEqual([]);

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { textHash } from "../space/cell.ts";
 import { daysBetween, utcDay } from "./day.ts";
 import { expeditionOf, reach, reachedOn, streakAfter, streakOn } from "./expedition.ts";
 
@@ -38,6 +39,12 @@ describe("the day's expedition", () => {
     expect(new Set(one).size).toBe(3);
     expect(ids(expeditionOf(day, pool.toReversed()))).toEqual(one);
     expect(ids(expeditionOf(day, [...pool.slice(6), ...pool.slice(0, 6)]))).toEqual(one);
+  });
+
+  it("is these three stops on these days, on every device and every version of the page that reads expedition v1", () => {
+    // A golden vector: a change of the salt or of the hash moves every device's day, which this catches.
+    expect(ids(expeditionOf("2026-11-05", pool))).toEqual(["stop-1", "stop-3", "stop-11"]);
+    expect(ids(expeditionOf("2026-11-06", pool))).toEqual(["stop-6", "stop-4", "stop-7"]);
   });
 
   it("changes with the day", () => {
@@ -83,12 +90,13 @@ describe("the day's expedition", () => {
     expect(ids(expeditionOf("2026-11-05", [{ id: "solo", live: true }]))).toEqual(["solo"]);
   });
 
-  it("orders stops of one hash by their id, so the order never depends on the file", () => {
-    // Two stops of one id hash alike: the tie is broken the same way whichever comes first.
-    const twins = [{ id: "same", live: false }, { id: "same", live: false }, { id: "other" }];
-    const a = expeditionOf("2026-11-05", twins);
-    const b = expeditionOf("2026-11-05", twins.toReversed());
-    expect(ids(a)).toEqual(ids(b));
+  it("orders two stops of one hash by their id, so the order never depends on the file", () => {
+    // Two ids whose hash on this day is the same, found by search.
+    const day = "2026-11-05";
+    expect(textHash(`gnoworld/expedition/v1 ${day} s7vl8`)).toBe(textHash(`gnoworld/expedition/v1 ${day} sopd6`));
+    const twins = [{ id: "sopd6" }, { id: "s7vl8" }];
+    expect(ids(expeditionOf(day, twins))).toEqual(["s7vl8", "sopd6"]);
+    expect(ids(expeditionOf(day, twins.toReversed()))).toEqual(["s7vl8", "sopd6"]);
   });
 });
 
