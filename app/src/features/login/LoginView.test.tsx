@@ -50,7 +50,9 @@ describe("LoginView", () => {
 
   it("says why a logout failed while the account is still in, in its status region (the red pass's medium)", () => {
     const html = view({ session: { kind: "in", address: ADDRESS }, problem: { reason: "network" } });
-    expect(html).toMatch(/role="status"[^>]*>[^<]+</);
+    expect(html).toMatch(
+      /role="status"[^>]*>The server could not be reached\. Check your connection, then try again\.</,
+    );
   });
 
   it("says why the last login stopped, in its status region", () => {

@@ -75,9 +75,10 @@ const mountMenu = async () => {
   await settle();
   return box;
 };
-// Each button's name: an icon's its label, a pill's its words.
 // Each wait a chunk asked lazily can take on a loaded machine: the menu's, Adena's.
 const SOON = { timeout: 10_000 };
+// The tests' own time, which holds several of those waits (Here.test.tsx's way).
+const SLOW = { timeout: 60_000 };
 const logOutItem = (box: HTMLElement) =>
   [...box.querySelectorAll<HTMLButtonElement>("[role='menuitem']")].find((item) => item.textContent === "Log out");
 // Opens the account's menu at its pill and picks Log out, as a reader does.
@@ -95,10 +96,11 @@ async function logOutThrough(box: HTMLElement) {
   });
   await settle();
 }
+// Each button's name: an icon's its label, a pill's its words.
 const buttonsOf = (box: HTMLElement) =>
   [...box.querySelectorAll("button")].map((each) => each.getAttribute("aria-label") ?? each.textContent.trim());
 
-describe("the header's account", () => {
+describe("the header's account", SLOW, () => {
   it("logged out: one Connect Adena beside the device's menu, the session read once, a press starting the login once", async () => {
     api.me.mockResolvedValue({ ok: true, value: { address: null } });
     adena.connect.mockClear();
@@ -113,7 +115,12 @@ describe("the header's account", () => {
     await vi.waitFor(() => {
       expect(adena.connect).toHaveBeenCalledTimes(1);
     }, SOON);
-    expect(box.textContent).not.toContain("Log out");
+    act(() => {
+      box.querySelector<HTMLButtonElement>("button[aria-label='Menu']")?.click();
+    });
+    await vi.waitFor(() => {
+      expect(items(box)).toEqual(["Passport", "Settings"]);
+    }, SOON);
   });
 
   it("logged in: the pill shows the short address before the menu's code comes, and Log out in its menu ends the session", async () => {
@@ -125,6 +132,9 @@ describe("the header's account", () => {
     }, SOON);
     const pill = box.querySelector("button");
     expect(pill?.textContent).toContain("Your account");
+    await vi.waitFor(() => {
+      expect(pill?.querySelector("[aria-hidden='true']")).not.toBeNull();
+    }, SOON);
     expect(buttonsOf(box)).not.toContain("Connect Adena");
     await logOutThrough(box);
     await vi.waitFor(() => {
@@ -142,7 +152,9 @@ describe("the header's account", () => {
     }, SOON);
     await logOutThrough(box);
     await vi.waitFor(() => {
-      expect(box.querySelector("[role='status']")?.textContent).not.toBe("");
+      expect(box.querySelector("[role='status']")?.textContent).toBe(
+        "The server could not be reached. Check your connection, then try again.",
+      );
     }, SOON);
     expect(box.querySelector("button")?.textContent).toContain("g1jg8m…vsqf5");
     expect(items(box)).toContain("Log out");
