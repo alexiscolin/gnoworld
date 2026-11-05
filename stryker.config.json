@@ -39,5 +39,5 @@
     "high": 95,
     "low": 85
   },
-  "ignorePatterns": ["docs", "!docs/OPERATIONS.md", "/gno", ".claude", "coverage"]
+  "ignorePatterns": ["docs", "/gno", ".claude", "coverage"]
 }
