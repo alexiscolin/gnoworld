@@ -6,8 +6,8 @@
 // the answer or the error held. A coin without a price is no token (an unlisted id is simply left out of the answer).
 import { Markets, MARKET_SYMBOLS, MarketBlock, StatusAnswer } from "@gnoworld/schemas";
 import type { Log } from "../log.ts";
-import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, type Send } from "../net.ts";
-import { repeat } from "../repeat.ts";
+import { Failure, fetchCapped, jsonOf, send as netSend, publicUrl, reachedNothing, type Send } from "../net.ts";
+import { repeat, waits } from "../repeat.ts";
 import { besideOf, replaceFile } from "../replaceFile.ts";
 import { makeHistory, type History } from "./history.ts";
 
@@ -35,8 +35,6 @@ const TIMEOUT_MS = 10_000;
 // A good answer is under 1 KB; 64 KB leaves room and stops a stream that never ends.
 export const MAX_BYTES = 64 * 1024;
 const EVERY_MS = 300_000;
-// A request that reached nothing: in the stack the server starts before the way out, and its first tick finds no proxy.
-const RETRY_MS = 15_000;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69,8 +67,6 @@ function checkedRpc(rpc: string): URL {
     throw new RangeError("prices: the rpc is no bare https address");
   return url;
 }
-
-const reachedNothing = (error: unknown): boolean => error instanceof Failure && error.kind === "request";
 
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
@@ -118,13 +114,15 @@ export function startPrices(options: Options): Prices {
     if (!history.add(markets.tokens, Date.parse(markets.updated))) log("prices_failed", { error: "history_write" });
   }
 
-  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
+  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one; as before
+  // F4872, one whose cause has no name is asked again soon too, for it is one call.
+  const wait = waits(everyMs, (kind) => kind === "request" || reachedNothing(kind));
   const timer = repeat({
     pass: read,
     failed: (error) => {
       log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
     },
-    waitMs: (error) => (reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs),
+    waitMs: (error) => wait(error instanceof Failure ? error.kind : undefined),
   });
   return { stop: timer.stop, history: history.current };
 }

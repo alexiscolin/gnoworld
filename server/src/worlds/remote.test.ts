@@ -148,4 +148,10 @@ describe("isDown", () => {
   ] as const)("says %s is about one read", (kind) => {
     expect(isDown(kind)).toBe(false);
   });
+  it.each(["unresolved", "refused", "proxy"] as const)(
+    "says %s, a way out not there yet or refusing the host, is the network not answering (F4872)",
+    (kind) => {
+      expect(isDown(kind)).toBe(true);
+    },
+  );
 });

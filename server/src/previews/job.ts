@@ -15,8 +15,8 @@ import { readFileSync, statSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { decide, type Thresholds } from "../moderation/decide.ts";
 import { moderationClient, type Answer } from "../moderation/provider.ts";
-import { publicUrl, send as netSend } from "../net.ts";
-import { repeat, type Repeating } from "../repeat.ts";
+import { publicUrl, reachedNothing, send as netSend } from "../net.ts";
+import { repeat, waitsAfterOutcome, type Outcome, type Repeating } from "../repeat.ts";
 import { replaceFile } from "../replaceFile.ts";
 import { abciQuery, Absent, isDown, kindOf, pacer, type Kind, type Send } from "../worlds/remote.ts";
 
@@ -36,8 +36,6 @@ export interface PreviewsOptions {
   wait?: (ms: number) => Promise<void>;
   isStopped?: () => boolean;
 }
-
-export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
 
 export const EVERY_MS = 6 * 60 * 60_000;
 export const PAUSE_MS = 250;
@@ -120,18 +118,28 @@ const settingsOf = (options: PreviewsOptions): Settings => ({
 interface Pass {
   readonly options: Settings;
   readonly pace: () => Promise<void>;
+  /** Whether a read of the pass reached anyone, and the kind of the last one that reached nothing. */
+  reached: boolean;
+  unreached?: Kind;
 }
 
-// A page's home as the chain renders it, or the kind of fault: a page that is gone (Absent) is no fault of the way, unlike a refusal.
-async function readPage({ options }: Pass, path: string): Promise<string | { kind: Kind; gone: boolean }> {
+// A page's home as the chain renders it, or the kind of fault: a page that is gone (Absent) is no fault of the way, unlike a refusal. The
+// pass is told whether the read reached anyone.
+async function readPage(pass: Pass, path: string): Promise<string | { kind: Kind; gone: boolean }> {
+  const { options } = pass;
   try {
-    return await abciQuery(
+    const page = await abciQuery(
       { send: options.send, rpc: options.universe.rpc },
       { path: "vm/qrender", data: `${path}:` },
       { ms: READ_MS, maxBytes: PAGE_READ_MAX_BYTES },
     );
+    pass.reached = true;
+    return page;
   } catch (error) {
-    return { kind: kindOf(error), gone: error instanceof Absent };
+    const kind = kindOf(error);
+    if (reachedNothing(kind)) pass.unreached = kind;
+    else pass.reached = true;
+    return { kind, gone: error instanceof Absent };
   }
 }
 
@@ -168,7 +176,7 @@ export async function runPreviews(options: PreviewsOptions): Promise<Outcome> {
   };
   try {
     const last = lastOf(options.file, options.universe.id);
-    const pass: Pass = { options: settled, pace: pacer(settled.wait, PAUSE_MS, settled.now) };
+    const pass: Pass = { options: settled, pace: pacer(settled.wait, PAUSE_MS, settled.now), reached: false };
     const kept: Capture[] = [];
     for (const path of pagesOf(options.pages)) {
       if (isStopped()) return fail("stopped");
@@ -176,6 +184,8 @@ export async function runPreviews(options: PreviewsOptions): Promise<Outcome> {
       if (capture !== undefined) kept.push(capture);
     }
     if (isStopped()) return fail("stopped");
+    // No read reached anyone (the way out not there yet): the last file stays, and the pass runs again soon (repeat.ts's waits, F4872).
+    if (!pass.reached && pass.unreached !== undefined) return fail(pass.unreached);
     const kind = written(settled, kept);
     if (kind !== undefined) return fail(kind);
     options.log("previews_written", { ms: settled.now() - start });
@@ -211,6 +221,6 @@ export function startPreviews(options: PreviewsOptions & { everyMs?: number }): 
     failed: () => {
       options.log("previews_failed", { error: "internal" });
     },
-    waitMs: () => everyMs,
+    waitMs: waitsAfterOutcome(everyMs),
   });
 }

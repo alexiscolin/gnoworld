@@ -9,7 +9,7 @@ import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import type { Log } from "../log.ts";
 import { send as netSend, publicUrl } from "../net.ts";
-import { repeat } from "../repeat.ts";
+import { repeat, waitsAfterOutcome, type Outcome } from "../repeat.ts";
 import { besideOf, replaceFiles } from "../replaceFile.ts";
 import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
@@ -45,8 +45,6 @@ export interface RunOptions {
   /** Told each pass that wrote its files: the file, and the histories this pass read (7t's trends). */
   trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
 }
-
-export type Outcome = { wrote: true } | { wrote: false; kind: Kind };
 
 export const EVERY_MS = 30 * 60_000;
 export const PAUSE_MS = 250;
@@ -205,7 +203,7 @@ export function startWorlds(
     failed: () => {
       options.log("worlds_failed", { error: "internal" });
     },
-    waitMs: () => everyMs,
+    waitMs: waitsAfterOutcome(everyMs),
   });
   return {
     stop() {

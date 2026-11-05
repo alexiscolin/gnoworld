@@ -2,7 +2,7 @@
 // (net.ts): an answer's text, UTF-8 checked, and an abci_query through the envelope QueryAnswer describes, base64 checked.
 import { abciQueryOf } from "@gnoworld/core";
 import { QueryAnswer } from "@gnoworld/schemas";
-import { Failure, fetchCapped, kindOf, type Kind, type Limits, type Send } from "../net.ts";
+import { Failure, fetchCapped, kindOf, reachedNothing, type Kind, type Limits, type Send } from "../net.ts";
 
 export { Failure, kindOf, type Kind, type Send };
 
@@ -13,9 +13,14 @@ export class Absent extends Failure {
   }
 }
 
-/** A fault that says the chain or the network is not answering, which ends a pass; any other is about one read. */
+/** A fault that says the chain, the network or the way out is not answering, which ends a pass; any other is about one read. */
 export const isDown = (kind: Kind): boolean =>
-  kind === "request" || kind === "timeout" || kind === "status" || kind === "rate_limited";
+  reachedNothing(kind) ||
+  kind === "request" ||
+  kind === "proxy" ||
+  kind === "timeout" ||
+  kind === "status" ||
+  kind === "rate_limited";
 
 /** One call: the body's bytes as UTF-8 text, or a Failure. */
 export async function fetchText(

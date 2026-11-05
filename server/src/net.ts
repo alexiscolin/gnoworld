@@ -12,6 +12,9 @@ export function send(url: string, init: RequestInit, ms: number): Promise<Respon
 /** Every way a read through it can end badly: what a log may say of a fault. */
 export type Kind =
   | "request"
+  | "unresolved"
+  | "refused"
+  | "proxy"
   | "timeout"
   | "status"
   | "rate_limited"
@@ -34,12 +37,40 @@ export class Failure extends Error {
   }
 }
 
-/** The kind of a fault: a Failure's own, a call that ran out of time, or a request that reached nothing. */
+// A call's fault by its causes' codes, as fetch gives them (undici in Node 24.22.0 and 26.12.0, measured on 2026-11-05; F4872): the way out's
+// refusal of a tunnel is undici's abort two causes down. A code alone is read, never a message, which names the host.
+function kindOfCode(code: unknown): Kind | undefined {
+  switch (code) {
+    case "ENOTFOUND":
+    case "EAI_AGAIN":
+      return "unresolved";
+    case "ECONNREFUSED":
+      return "refused";
+    case "UND_ERR_ABORTED":
+      return "proxy";
+    default:
+      return undefined;
+  }
+}
+
+/** The kind of a fault: a Failure's own, a call that ran out of time, a call named by the code of the error or of its first three causes,
+ * or a request whose cause has no name here. */
 export function kindOf(error: unknown): Kind {
   if (error instanceof Failure) return error.kind;
   const timedOut = error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
-  return timedOut ? "timeout" : "request";
+  if (timedOut) return "timeout";
+  let cause = error;
+  for (let read = 0; read < 4 && cause instanceof Error; read += 1) {
+    const kind = "code" in cause ? kindOfCode(cause.code) : undefined;
+    if (kind !== undefined) return kind;
+    cause = cause.cause;
+  }
+  return "request";
 }
+
+/** A call that reached no one: no address for its name, or nothing listening there. A cause with no name here (a reset, a bad
+ * certificate) may have reached the host. */
+export const reachedNothing = (kind: Kind): boolean => kind === "unresolved" || kind === "refused";
 
 /** What a call may take and give back: the time it has and the most bytes of the answer it reads. */
 export interface Limits {
