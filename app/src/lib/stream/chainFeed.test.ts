@@ -171,6 +171,14 @@ describe("the chain's events on the page's stream", () => {
     expect(batch?.at(-1)?.height).toBe(1099);
   });
 
+  it("hands nothing on once stopped: the window's timer is cancelled, not merely left to find nothing", () => {
+    const { feed, heard } = feedOf();
+    feed.chain(JSON.stringify(CALL));
+    feed.stop();
+    vi.advanceTimersByTime(BATCH_MS * 5);
+    expect(heard).not.toHaveBeenCalled();
+  });
+
   it("keeps hearing after a frame it dropped", () => {
     const { feed, heard } = feedOf();
     feed.chain(JSON.stringify({ ...CALL, func: "<b>" }));
