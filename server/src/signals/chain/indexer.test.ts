@@ -67,6 +67,34 @@ describe("the catch-up", () => {
     expect(read.map(({ events }) => events[0]?.height)).toEqual([101, 102]);
   });
 
+  it("gives each deployed realm's block time before its transaction, so a deploy recovered is counted like a live one", async () => {
+    const withHash = (height: number, name: string, hash: string) => ({
+      ...deployRow(height, name),
+      hash,
+      success: true,
+    });
+    const { readers, queries } = setup((query) =>
+      query.includes("getBlocks")
+        ? times([101, 103], () => "2026-11-06T00:00:00.000Z")
+        : rowsOf([withHash(101, "a", "d1"), row(102, "c"), withHash(103, "b", "d2")]),
+    );
+    const context = { universe: "onyx", watch: new Map([[ACCESS, { world: "access" }]]), log: () => undefined };
+    const read = (await readers.catchUp(101)).map((text) => readChainMessage(text, context));
+    expect(read.map(({ block, height }) => block?.height ?? height)).toEqual([101, 101, 102, 103, 103]);
+    expect(read.map(({ block }) => block !== undefined)).toEqual([true, false, false, true, false]);
+    expect(read[0]?.block?.time).toBe("2026-11-06T00:00:00.000Z");
+    expect(queries.filter((each) => each.includes("getBlocks"))).toHaveLength(1);
+  });
+
+  it("gives no block for a deploy whose block the indexer did not give, nor when no realm was deployed", async () => {
+    const lone = { ...deployRow(101, "a"), hash: "d1", success: true };
+    const missing = setup((query) => (query.includes("getBlocks") ? times([], () => "") : rowsOf([lone])));
+    expect(await missing.readers.catchUp(101)).toHaveLength(1);
+    const calls = setup(() => rowsOf([row(101, "b")]));
+    expect(await calls.readers.catchUp(101)).toHaveLength(1);
+    expect(calls.queries.filter((each) => each.includes("getBlocks"))).toHaveLength(0);
+  });
+
   it("drops a row that is no transaction, said, and keeps the others", async () => {
     const { readers, log } = setup(() => rowsOf([row(101, "b"), "x", { block_height: "7" }, row(102, "c")]));
     expect(await readers.catchUp(100)).toHaveLength(2);

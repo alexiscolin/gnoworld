@@ -101,6 +101,9 @@ export function indexerReaders({ url, watch, log, send = netSend }: IndexerOptio
       for (let page = 0; page < PAGES; page += 1) {
         const rows = rowsOf(await ask(catchUpQuery(watch.keys(), cursor, PAGE)), "getTransactions", PAGE);
         let last = cursor;
+        // A transaction carries no time and the live blocks of the gap were missed: a deployed realm's block is told first, so it is counted.
+        const { deploys } = deploysOf(rows, () => undefined);
+        const times = await blockTimes(ask, [...new Set(deploys.map(({ height }) => height))]);
         for (const row of rows) {
           const tx = z.object({ block_height: z.number() }).loose().safeParse(row);
           if (!tx.success) {
@@ -108,6 +111,17 @@ export function indexerReaders({ url, watch, log, send = netSend }: IndexerOptio
             continue;
           }
           last = Math.max(last, tx.data.block_height);
+          const time = times.get(tx.data.block_height);
+          if (time !== undefined) {
+            texts.push(
+              JSON.stringify({
+                type: "next",
+                id: "blocks",
+                payload: { data: { getBlocks: { height: tx.data.block_height, time } } },
+              }),
+            );
+            times.delete(tx.data.block_height);
+          }
           texts.push(JSON.stringify({ type: "next", id: "tx", payload: { data: { getTransactions: row } } }));
         }
         if (rows.length < PAGE) return texts;
