@@ -6,7 +6,7 @@ import dataEvents from "../../../data/events.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { Ticker } from "./Ticker.tsx";
-import { ledByTrends, tickerItems, type TickerItem } from "./ticker.ts";
+import { ledByTrends, tickerItems, withOnAir, type TickerItem } from "./ticker.ts";
 
 // Slice 5m (frame 6, the strip at the bottom): the data's news and events in a strip 34 px high that scrolls and can be paused.
 // With no news and no event it is not drawn at all, as before. Its look and size are measured in tests/e2e/homeLive.spec.ts.
@@ -126,6 +126,57 @@ const mountRouted = (items: TickerItem[]) => {
 };
 const visibleLinks = (box: HTMLElement) =>
   all(box, "a").filter((each) => each.closest("[aria-hidden='true']") === null);
+
+describe("withOnAir", () => {
+  const row = (id: string, until?: string) => ({ id, title: `Air ${id}`, link: `https://gno.land/${id}`, until });
+  const items = (...ids: string[]) =>
+    tickerItems(
+      [news("n1", "2026-10-30")],
+      ids.map((id) => event(id, "2026-11-02T10:00:00Z")),
+      NOW,
+    );
+
+  it("places the lines after the events and before the news, in the data's order", () => {
+    const placed = withOnAir(items("e1", "e2"), [row("a"), row("b")], NOW);
+    expect(placed.map(({ id, kind }) => `${kind}:${id}`)).toEqual([
+      "event:e1",
+      "event:e2",
+      "onair:a",
+      "onair:b",
+      "news:n1",
+    ]);
+  });
+
+  it("gives a line its kind, its title as text and its link", () => {
+    expect(withOnAir([], [row("a")], NOW)).toEqual<TickerItem[]>([
+      { id: "a", kind: "onair", text: "Air a", link: "https://gno.land/a" },
+    ]);
+  });
+
+  it("puts the lines first when no event is to come", () => {
+    expect(withOnAir(items(), [row("a")], NOW).map(({ id }) => id)).toEqual(["a", "n1"]);
+  });
+
+  it("keeps a line with no end and one that ends after now, and drops one that ends now or before", () => {
+    const rows = [
+      row("open"),
+      row("later", "2026-10-31T12:00:00.001Z"),
+      row("now", NOW.toISOString()),
+      row("past", "2026-01-01T00:00:00Z"),
+    ];
+    expect(withOnAir([], rows, NOW).map(({ id }) => id)).toEqual(["open", "later"]);
+  });
+
+  it("holds the six the ticker shows at most, the news giving way first", () => {
+    const placed = withOnAir(
+      items("e1"),
+      ["a", "b", "c", "d", "e", "f"].map((id) => row(id)),
+      NOW,
+    );
+    expect(placed).toHaveLength(6);
+    expect(placed.map(({ id }) => id)).toEqual(["e1", "a", "b", "c", "d", "e"]);
+  });
+});
 
 describe("the ticker", () => {
   it("is not drawn at all with no item", () => {
