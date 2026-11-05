@@ -31,7 +31,7 @@ export const createAppStore = () => {
     ...pinsSlice(...args),
     ...signalsSlice(...args),
   }));
-  // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines, pins or arrival banners,
+  // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines or pins,
   // whether or not the chat is open to begin the new one (the link then reads its account's device). The first session,
   // from none, has none to leave. This is the one place that ends a session's state (F2091).
   const who = ({ login }: AppState) => (login.session.kind === "in" ? login.session.address : login.session.kind);
@@ -41,7 +41,6 @@ export const createAppStore = () => {
     state.chatActions.follow([]);
     state.keepActions.begin(undefined);
     state.pinsActions.forget();
-    state.signalActions.forget();
     state.dmActions.begin();
     state.noticeActions.begin();
   });

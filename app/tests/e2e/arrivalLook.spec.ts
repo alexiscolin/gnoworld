@@ -9,7 +9,6 @@ const SIZES = [
   ["phone", 390, 844],
   ["computer", 1280, 900],
 ] as const;
-const CHARTER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
 async function arriveWith(page: Page, kinds: readonly ("chart" | "words")[]): Promise<void> {
   await adena(page, "signs", "arrival-look");
@@ -23,9 +22,6 @@ async function arriveWith(page: Page, kinds: readonly ("chart" | "words")[]): Pr
       contentType: "text/event-stream",
       body: `${frames.join("")}event: since\ndata: ${JSON.stringify({ time: at })}\n\n`,
     }),
-  );
-  await page.route("**/api/signals?world=bubble", (route) =>
-    route.fulfill({ json: { world: "bubble", charted: { account: CHARTER, at }, words: null } }),
   );
   await page.route("**/api/signals/chart", (route) => route.fulfill({ json: { world: "bubble", first: true } }));
   await page.goto("/w/bubble");
@@ -41,17 +37,18 @@ test.describe("the arrival banners, as they look", () => {
     test(`both banners and the plate's first, on a ${size}'s screen`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await arriveWith(page, ["chart", "words"]);
-      const chart = page.getByRole("article", { name: "First to chart · Bubble" });
-      const words = page.getByRole("article", { name: "First words in Bubble" });
-      await expect(chart).toBeVisible();
-      await expect(words).toBeVisible();
-      await expect(page.getByText("First charted by @g1jg8m…vsqf5")).toBeVisible();
+      const banner = page.locator("[data-look='arrival']");
+      await expect(banner).toContainText("First to chart · Bubble");
+      await expect(page.getByText(/^First charted by @g1/)).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
       ).toBe(0);
-      await expect(chart).toHaveScreenshot(`arrival-chart-${size}.png`);
-      await expect(words).toHaveScreenshot(`arrival-words-${size}.png`);
+      await expect(banner).toHaveScreenshot(`arrival-chart-${size}.png`);
+      // One at a time: First words waits until First to chart is closed.
+      await banner.getByRole("button", { name: "Close" }).click();
+      await expect(banner).toContainText("First words in Bubble");
+      await expect(banner).toHaveScreenshot(`arrival-words-${size}.png`);
     });
   }
 });

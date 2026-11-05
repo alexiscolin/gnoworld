@@ -11,7 +11,7 @@ const chartBanner = (page: Page) => page.getByText("First to chart · GovDAO");
 const sideways = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 // An event of the page's own to wait on before a count of 0 is read: toHaveCount(0) returns at once when nothing is there.
-const answered = (page: Page, method: "GET" | "POST", url: string) =>
+const answered = (page: Page, method: "POST", url: string) =>
   page.waitForResponse((r) => r.url().endsWith(url) && r.request().method() === method);
 
 // Logs in on a world as the wallet `as`, and gives the server's answer to the chart call the page made.
@@ -27,10 +27,12 @@ async function arriveAs(page: Page, as: string, path = "/w/govdao"): Promise<unk
 }
 
 test("a guest sees no banner and a plate that names nobody before anyone has charted", async ({ page }) => {
-  const read = answered(page, "GET", "/api/signals?world=govdao");
+  const stream = page.waitForResponse((r) => r.url().includes("/api/stream?"));
   await page.goto("/w/govdao");
   await hydrated(page);
-  expect(await (await read).json()).toEqual({ world: "govdao", charted: null, words: null });
+  await stream;
+  const firsts: unknown = await (await page.request.get("/api/signals?world=govdao")).json();
+  expect(firsts).toEqual({ world: "govdao", charted: null, words: null });
   await expect(chartBanner(page)).toHaveCount(0);
   await expect(page.getByText(/^First charted by/)).toHaveCount(0);
 });
@@ -56,18 +58,21 @@ test("a later account sees who charted it, and no banner", async ({ page }) => {
   await expect(chartBanner(page)).toHaveCount(0);
 });
 
-// D210 gives every world a first chart, so Earth and Bubble, which the other journeys open, are charted when the server starts
-// (api.mjs): no journey's plate gets a banner by the order the workers run in.
-test("the worlds the other journeys open are charted already: no banner, whoever logs in first", async ({ page }) => {
+// D218: the journeys' server charts GovDAO alone (FIRST_TO_CHART_WORLDS, api.mjs), so Bubble, which the other journeys open,
+// is never charted: no banner and no plate's line, whoever logs in first.
+test("the worlds the other journeys open are never charted: no banner and no first, whoever logs in", async ({
+  page,
+}) => {
   expect(await arriveAs(page, "third-charter", "/w/bubble")).toEqual({ world: "bubble", first: false });
   await expect(page.getByText(/^First to chart/)).toHaveCount(0);
+  const firsts: unknown = await (await page.request.get("/api/signals?world=bubble")).json();
+  expect(firsts).toEqual({ world: "bubble", charted: null, words: null });
+  await expect(page.getByText(/^First charted by/)).toHaveCount(0);
 });
 
 test("a guest's page, reloaded, shows the plate's first and still no banner", async ({ page }) => {
-  const read = answered(page, "GET", "/api/signals?world=govdao");
   await page.goto("/w/govdao");
   await hydrated(page);
-  await read;
   await expect(page.getByText(/^First charted by @g1/)).toBeVisible();
   await expect(chartBanner(page)).toHaveCount(0);
 });

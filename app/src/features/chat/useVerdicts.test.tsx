@@ -90,6 +90,6 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     });
     await draw([]);
     expect(followed).toEqual([["#bubble"]]);
-    expect(store.getState().signals.arrivals["bubble"]?.chart?.kind).toBe("chart");
+    expect(store.getState().signals.map(({ world, kind }) => `${world} ${kind}`)).toEqual(["bubble chart"]);
   });
 });

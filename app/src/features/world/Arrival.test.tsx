@@ -1,16 +1,17 @@
 // @vitest-environment jsdom
-import { Address, type Signal, type WorldFirsts } from "@gnoworld/schemas";
+import { Address, type Signal } from "@gnoworld/schemas";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import { Grab, state } from "../../../tests/grabStore.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
-import { Arrival } from "./Arrival.tsx";
+import { Arrival, FirstCharted } from "./Arrival.tsx";
+import { standInPopovers } from "../../../tests/popover.ts";
 
-// Slice 9h (frames 90 to 97): the two arrival banners, shown to the person who earned them and only from the server's signal,
-// never from the chart call's answer, a page load, a guest or another account. The signals reach the store on the chat's one
-// stream (D215), so <Arrival> opens none; a banner ends a day after its signal's time (D213), by the clock it is given.
+// Slice 9h (frames 90 to 97): the arrival banners, the design system's flash in its arrival look, one at a time, shown to the
+// account the server's signal names and only from it: never the chart call's answer, a page load, a guest or another account.
+// Their code loads only for a banner to show (budgets.spec.ts); a banner ends a day after its signal's time (D213).
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const AT = "2026-11-05T12:00:00.000Z";
@@ -20,14 +21,15 @@ const signal = (kind: Signal["kind"], account = ME): Signal => ({
   account: Address.parse(account),
   at: AT,
 });
-const NOBODY: Result<WorldFirsts> = { ok: true, value: { world: "fresh-mint", charted: null, words: null } };
 
 let root: Root | undefined;
 let host: HTMLElement | undefined;
+// The banners' chunk and the copy are promises: a few turns let each settle.
 const flush = async () => {
-  await act(async () => {
-    await Promise.resolve();
-  });
+  for (let turn = 0; turn < 5; turn += 1)
+    await act(async () => {
+      await Promise.resolve();
+    });
 };
 
 const DAY = 24 * 60 * 60_000;
@@ -46,10 +48,6 @@ function setup({
       calls.push(`chart ${world}`);
       return Promise.resolve(chart);
     }),
-    firsts: vi.fn((world: string) => {
-      calls.push(`firsts ${world}`);
-      return Promise.resolve(NOBODY);
-    }),
   };
   const page = (world: string) => (
     <StoreProvider>
@@ -57,32 +55,48 @@ function setup({
       <Arrival world={world} name={name} address={ADDRESS} api={api as never} now={() => clock.now} />
     </StoreProvider>
   );
-  const draw = (world = "fresh-mint") => {
+  const draw = async (world = "fresh-mint") => {
     act(() => {
       root?.render(page(world));
     });
+    await flush();
   };
   // A signal as the page's one stream hands it to the store.
-  const hear = (heard: Signal) => {
+  const hear = async (heard: Signal) => {
     act(() => {
       state().signalActions.signaled(heard);
     });
+    await flush();
   };
   return { api, calls, clock, draw, hear };
 }
-const signIn = (who: string) => {
+const signIn = async (who: string) => {
   act(() => {
     state().loginActions.signedIn(Address.parse(who));
   });
-};
-const text = () => host?.textContent ?? "";
-const arrive = async (page: { draw: () => void }) => {
-  page.draw();
-  signIn(ME);
   await flush();
 };
+const text = () => host?.textContent ?? "";
+const buttons = () => [...(host?.querySelectorAll("button") ?? [])].map((button) => button.textContent);
+const press = async (name: string) => {
+  const button = [...(host?.querySelectorAll("button") ?? [])].find(
+    (found) => found.textContent === name || found.getAttribute("aria-label") === name,
+  );
+  act(() => button?.click());
+  await flush();
+};
+const arrive = async (page: { draw: () => Promise<void> }) => {
+  await page.draw();
+  await signIn(ME);
+};
 
+// The first signals' chunk, loaded once ahead: the page waits for the network, a test only for React.
+beforeAll(async () => {
+  await import("./Banners.tsx");
+});
 beforeEach(() => {
+  Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
+  standInPopovers();
   vi.stubGlobal("matchMedia", (media: string) => ({ matches: false, media }));
   vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(() => Promise.resolve()) } });
   host = document.createElement("div");
@@ -100,22 +114,22 @@ afterEach(() => {
 describe("charting on arrival", () => {
   it("asks the server to chart the world once the person is logged in, and never as a guest", async () => {
     const guest = setup();
-    guest.draw();
-    await flush();
+    await guest.draw();
     expect(guest.api.chart).not.toHaveBeenCalled();
-    signIn(ME);
-    await flush();
-    expect(guest.calls.filter((call) => call.startsWith("chart"))).toEqual(["chart fresh-mint"]);
+    await signIn(ME);
+    expect(guest.calls).toEqual(["chart fresh-mint"]);
   });
 
-  it("reads who is first for anyone, and opens no stream of its own", async () => {
+  it("asks nothing else and opens no stream of its own: who is first comes on the chat's stream", async () => {
     const page = setup();
     const sources = vi.fn();
+    const fetches = vi.fn();
     vi.stubGlobal("EventSource", sources);
-    page.draw();
-    await flush();
-    expect(page.calls).toContain("firsts fresh-mint");
+    vi.stubGlobal("fetch", fetches);
+    await arrive(page);
+    expect(page.calls).toEqual(["chart fresh-mint"]);
     expect(sources).not.toHaveBeenCalled();
+    expect(fetches).not.toHaveBeenCalled();
   });
 
   // Every logged-in visit to a world calls it, and each call counts against the account's 20 an hour (D211): a refusal is
@@ -129,23 +143,20 @@ describe("charting on arrival", () => {
   ] as const)("leaves the page empty and asks once when the chart call fails with %s", async (_, refusal) => {
     const page = setup({ chart: refusal });
     await arrive(page);
-    await flush();
-    expect(page.calls.filter((call) => call.startsWith("chart"))).toEqual(["chart fresh-mint"]);
+    expect(page.calls).toEqual(["chart fresh-mint"]);
     expect(text()).toBe("");
     // A signal that names the earner still shows its banner: the signal is the only thing that does.
-    page.hear(signal("chart"));
+    await page.hear(signal("chart"));
     expect(text()).toContain("First to chart · Fresh Mint");
   });
 
   it("charts the next world once the page moves to it, and shows nothing of the one it left", async () => {
     const page = setup();
     await arrive(page);
-    page.hear(signal("chart"));
+    await page.hear(signal("chart"));
     expect(text()).toContain("First to chart · Fresh Mint");
-    page.draw("govdao");
-    await flush();
-    expect(page.calls.filter((call) => call.startsWith("chart"))).toEqual(["chart fresh-mint", "chart govdao"]);
-    expect(page.calls).toContain("firsts govdao");
+    await page.draw("govdao");
+    expect(page.calls).toEqual(["chart fresh-mint", "chart govdao"]);
     expect(text()).toBe("");
   });
 });
@@ -160,70 +171,80 @@ describe("the banners", () => {
 
   it("shows nothing for a guest, even for a signal that names an account", async () => {
     const page = setup();
-    page.draw();
-    await flush();
-    page.hear(signal("chart"));
+    await page.draw();
+    await page.hear(signal("chart"));
     expect(text()).toBe("");
   });
 
   it("shows nothing to an account that did not earn it", async () => {
     const page = setup();
-    page.draw();
-    signIn(OTHER);
-    await flush();
-    page.hear(signal("chart", ME));
+    await page.draw();
+    await signIn(OTHER);
+    await page.hear(signal("chart", ME));
     expect(text()).toBe("");
   });
 
   it("shows nothing for another world's signal, even to the one who earned it", async () => {
     const page = setup();
     await arrive(page);
-    page.hear({ ...signal("chart"), world: "govdao" });
-    page.hear({ ...signal("words"), world: "govdao" });
+    await page.hear({ ...signal("chart"), world: "govdao" });
+    await page.hear({ ...signal("words"), world: "govdao" });
     expect(text()).toBe("");
   });
 
-  it("shows First to chart to the earner, as the frames word it, with Share", async () => {
+  it("shows First to chart to the earner, as the frames word it, with Share and the flash's Close", async () => {
     const page = setup();
     await arrive(page);
-    page.hear(signal("chart"));
+    await page.hear(signal("chart"));
     expect(text()).toContain("First to chart · Fresh Mint");
     expect(text().toLowerCase()).toContain("your name stays on it");
     expect(text()).not.toContain("First words");
-    expect([...(host?.querySelectorAll("button") ?? [])].map((button) => button.textContent)).toEqual(["Share"]);
+    expect(buttons()).toEqual(["Share", ""]);
+    expect(host?.querySelector("[aria-label='Close']")).not.toBeNull();
+    expect(host?.querySelector("[data-look='arrival']")).not.toBeNull();
   });
 
-  it("shows First words to the earner with its day, and both banners when the person earned both", async () => {
+  it("shows First words to the earner with its day", async () => {
     const page = setup();
     await arrive(page);
-    page.hear(signal("words"));
+    await page.hear(signal("words"));
     expect(text()).toContain("First words in Fresh Mint");
     expect(text().toLowerCase()).toContain("your name shows on its label for a day");
-    page.hear(signal("chart"));
+  });
+
+  // DESIGN-SYSTEM.md, Flash: one at a time, the next waits.
+  it("shows one banner at a time: First words waits until First to chart is closed", async () => {
+    const page = setup();
+    await arrive(page);
+    await page.hear(signal("chart"));
+    await page.hear(signal("words"));
     expect(text()).toContain("First to chart · Fresh Mint");
+    expect(text()).not.toContain("First words");
+    await press("Close");
     expect(text()).toContain("First words in Fresh Mint");
+    expect(text()).not.toContain("First to chart");
+    await press("Close");
+    expect(text()).toBe("");
   });
 
   // D213: a banner is the arrival's, not the page's: it ends a day after the signal's time, whether the stream gave it
-  // live or replayed it (its ring keeps it until a restart), so a reload a week later shows none.
+  // live or replayed it, so a reload a week later shows none.
   it("shows a banner while its signal is under a day old, and none once it is a day old or more", async () => {
     const page = setup();
     await arrive(page);
-    page.hear(signal("chart"));
-    page.hear(signal("words"));
+    await page.hear(signal("words"));
     page.clock.now = Date.parse(AT) + DAY - 1;
-    page.draw();
-    expect(text()).toContain("First to chart · Fresh Mint");
+    await page.draw();
     expect(text()).toContain("First words in Fresh Mint");
     page.clock.now = Date.parse(AT) + DAY;
-    page.draw();
+    await page.draw();
     expect(text()).toBe("");
   });
 
   it("shows none for a signal replayed a week late, to the earner on a quiet world", async () => {
     const page = setup({ at: Date.parse(AT) + 7 * DAY });
     await arrive(page);
-    page.hear(signal("chart"));
+    await page.hear(signal("chart"));
     expect(text()).toBe("");
   });
 
@@ -232,22 +253,20 @@ describe("the banners", () => {
     vi.stubGlobal("navigator", { clipboard: { writeText } });
     const page = setup();
     await arrive(page);
-    page.hear(signal("chart"));
-    const share = host?.querySelector("button");
-    act(() => share?.click());
-    await flush();
+    await page.hear(signal("chart"));
+    await press("Share");
     expect(writeText).toHaveBeenCalledWith(ADDRESS);
-    expect(host?.querySelector("[role='status']")?.textContent).toContain("Copied");
+    expect(text()).toContain("Copied");
+    expect(text()).not.toContain("First to chart");
   });
 
   it("says the copy was refused in words, never that it was copied", async () => {
     vi.stubGlobal("navigator", { clipboard: { writeText: vi.fn(() => Promise.reject(new Error("denied"))) } });
     const page = setup();
     await arrive(page);
-    page.hear(signal("chart"));
-    act(() => host?.querySelector("button")?.click());
-    await flush();
-    expect(host?.querySelector("[role='status']")?.textContent).toBe("Could not copy the address");
+    await page.hear(signal("chart"));
+    await press("Share");
+    expect(text()).toContain("Could not copy the address");
     expect(text()).not.toContain("Copied");
   });
 
@@ -255,29 +274,74 @@ describe("the banners", () => {
     vi.stubGlobal("navigator", {});
     const page = setup();
     await arrive(page);
-    page.hear(signal("chart"));
+    await page.hear(signal("chart"));
     expect(text()).toContain("First to chart · Fresh Mint");
-    expect(host?.querySelectorAll("button")).toHaveLength(0);
+    expect(buttons()).not.toContain("Share");
   });
 
   it("draws a hostile world's name as text, never as markup", async () => {
     const page = setup({ name: '<img src=x onerror="alert(1)"><b>x</b>' });
     await arrive(page);
-    page.hear(signal("chart"));
+    await page.hear(signal("chart"));
     expect(host?.querySelector("img")).toBeNull();
     expect(host?.querySelector("b")).toBeNull();
     expect(text()).toContain('First to chart · <img src=x onerror="alert(1)"><b>x</b>');
   });
 
-  it("is one element for the page to mount: nothing at all when it shows nothing, one child when it shows both", async () => {
+  it("is one element for the page to mount, which draws nothing at all without a banner to show", async () => {
     const page = setup();
-    page.draw();
-    await flush();
+    await arrive(page);
     expect(host?.children).toHaveLength(0);
-    signIn(ME);
-    await flush();
-    page.hear(signal("chart"));
-    page.hear(signal("words"));
+    await page.hear(signal("chart"));
     expect(host?.children).toHaveLength(1);
+  });
+});
+
+// Frame 91's plate: "First charted by @name", for every reader, from the stream's signals alone; plain text, and nothing until
+// the server has said who.
+describe("First charted by", () => {
+  const charted = (world: string): Signal => ({ ...signal("chart"), world });
+  const plate = async () => {
+    act(() => {
+      root?.render(
+        <StoreProvider>
+          <Grab />
+          <FirstCharted world="fresh-mint" />
+        </StoreProvider>,
+      );
+    });
+    await flush();
+  };
+  const told = async (heard: Signal) => {
+    act(() => {
+      state().signalActions.signaled(heard);
+    });
+    await flush();
+  };
+
+  it("draws nothing until the server has said who charted the world, and never a guess", async () => {
+    await plate();
+    expect(text()).toBe("");
+  });
+
+  it("names the account that charted it, by its short address, as plain text", async () => {
+    await plate();
+    await told(charted("fresh-mint"));
+    expect(text()).toBe("First charted by @g1jg8m…vsqf5");
+    expect(host?.querySelector("a, button, img")).toBeNull();
+  });
+
+  it("names it from a signal of the stream too, and not for another world's", async () => {
+    await plate();
+    await told(charted("govdao"));
+    expect(text()).toBe("");
+    await told(charted("fresh-mint"));
+    expect(text()).toBe("First charted by @g1jg8m…vsqf5");
+  });
+
+  it("says nothing of a world whose first words alone are known", async () => {
+    await plate();
+    await told(signal("words"));
+    expect(text()).toBe("");
   });
 });

@@ -4,8 +4,6 @@ import { signalsApi } from "./signals.ts";
 
 // Slice 9h: the browser's client of the first signals (server/src/signals/routes.ts, mounted at /api/signals), through
 // the one JSON call of lib/api/http.ts. Each answer must name the world asked.
-const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-const AT = "2026-11-05T12:00:00.000Z";
 
 const server = (answer: { status: number; json?: unknown }) => {
   const sent: { url: string; init: RequestInit }[] = [];
@@ -53,30 +51,6 @@ describe("charting a world, from the browser", () => {
       reason: "malformed",
     });
     expect(await server({ status: 200, json: { world: "govdao", first: "yes" } }).api.chart("govdao")).toEqual({
-      ok: false,
-      reason: "malformed",
-    });
-  });
-});
-
-describe("who is first, from the browser", () => {
-  const FIRSTS = { world: "govdao", charted: { account: ALICE, at: AT }, words: null };
-
-  it("asks GET /api/signals for the world, with no body", async () => {
-    const { api, sent } = server({ status: 200, json: FIRSTS });
-    expect(await api.firsts("govdao")).toEqual({ ok: true, value: FIRSTS });
-    expect(sent[0]?.url).toBe("/api/signals?world=govdao");
-    expect(sent[0]?.init).toMatchObject({ method: "GET", credentials: "same-origin", redirect: "error" });
-    expect(sent[0]?.init.body).toBeUndefined();
-  });
-
-  it("takes an answer for another world, or with an account that is no address, as malformed", async () => {
-    expect(await server({ status: 200, json: { ...FIRSTS, world: "bubble" } }).api.firsts("govdao")).toEqual({
-      ok: false,
-      reason: "malformed",
-    });
-    const hostile = { ...FIRSTS, charted: { account: "<img src=x onerror=alert(1)>", at: AT } };
-    expect(await server({ status: 200, json: hostile }).api.firsts("govdao")).toEqual({
       ok: false,
       reason: "malformed",
     });

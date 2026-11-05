@@ -29,6 +29,28 @@
     padding-block-start: var(--flash-room);
   }
 
+  /* An arrival banner on a wide screen (DESIGN-SYSTEM.md, Top centre): under the header, centred between the plate's text column
+     and the dock, over the scene alone, so the page makes no room for it. Under that width it is a flash like any other. */
+  /* raw: the plate's layout breakpoint (Panel.module.css) */
+  @media (min-width: 1280px) {
+    .flash[data-look="arrival"] {
+      /* raw: 20 px under the outline's top at 98 px; the text column ends at 584 px and the dock is 320 px wide, 24 px in (frame 91) */
+      inset: 118px calc(320px + var(--space-m)) auto 584px;
+    }
+
+    :root:has(.flash[data-look="arrival"]:popover-open) {
+      --flash-room: 0px;
+      scroll-padding-block-start: 0;
+    }
+  }
+
+  /* raw: the dock's own width from 1400 px (Panel.module.css) */
+  @media (min-width: 1400px) {
+    .flash[data-look="arrival"] {
+      inset-inline-end: calc(var(--chat-dock) + var(--space-m));
+    }
+  }
+
   .title {
     font: var(--font-ui);
   }

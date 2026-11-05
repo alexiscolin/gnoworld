@@ -16,6 +16,8 @@ export interface FlashProps {
    * same words are the same flash, whatever object holds them: to say them again, pass null between. */
   message: FlashMessage | null;
   onClose: () => void;
+  /** An arrival banner (frames 90 to 97): on a wide screen, under the header in the scene's free area, over the scene alone. */
+  look?: "arrival" | undefined;
 }
 
 // docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it or the focus in it, each a
@@ -24,7 +26,7 @@ const LIFETIME = 5_000;
 
 // The flash itself, on the page while it has something to say: closed, it leaves with its holds, which
 // no pointerleave or blur would end.
-function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void }) {
+function Pill({ message, onClose, look }: FlashProps & { message: FlashMessage }) {
   const [pointed, setPointed] = useState(false);
   // Each move of the focus in or out: it makes the count read again where the focus is.
   const [moves, setMoves] = useState(0);
@@ -64,6 +66,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
       ref={pillRef}
       popover="manual"
       data-stays={action === undefined ? undefined : ""}
+      data-look={look}
       className={surface(styles["flash"])}
       onPointerEnter={() => {
         setPointed(true);
@@ -113,6 +116,6 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
 }
 
 /** A short note and at most one action, never the cream primary; shown at the top of the screen. */
-export function Flash({ message, onClose }: FlashProps) {
-  return <div role="status">{message === null ? null : <Pill message={message} onClose={onClose} />}</div>;
+export function Flash({ message, onClose, look }: FlashProps) {
+  return <div role="status">{message === null ? null : <Pill message={message} onClose={onClose} look={look} />}</div>;
 }
