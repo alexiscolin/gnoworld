@@ -71,7 +71,7 @@ function setup(
   const log = vi.fn();
   const sockets: FakeSocket[] = [];
   const queries: string[] = [];
-  const timers: { ms: number; run: () => void }[] = [];
+  const timers: { ms: number; run: () => void; cancelled: boolean }[] = [];
   const day = () => new Response(JSON.stringify({ data: { getTransactions: [] } }));
   let history: () => Response = indexer === "down" ? () => new Response("no", { status: 500 }) : day;
   const chain = startChain({
@@ -96,8 +96,11 @@ function setup(
     wait: () => new Promise<undefined>(() => undefined),
     random: () => 0.5,
     after: (ms, run) => {
-      timers.push({ ms, run });
-      return () => undefined;
+      const timer = { ms, run, cancelled: false };
+      timers.push(timer);
+      return () => {
+        timer.cancelled = true;
+      };
     },
   });
   const app = makeApp(
@@ -225,6 +228,48 @@ describe("the chain on the server", () => {
 });
 
 // F5773: a socket that fails before any frame at boot must not lose what came between the history read and its first frame.
+// F5788: the day's count asked again keeps one cancel, not one a minute.
+describe("the day's count asked again", () => {
+  const retries = <T extends { ms: number }>(timers: T[]) => timers.filter(({ ms }) => ms === RETRY_MS);
+
+  it("is cancelled by a stop, the one pending timer, and no other is kept to cancel", async () => {
+    const { chain, sockets, timers } = setup([universe("onyx", "https://indexer.example.test/q")], [], "down");
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    for (let n = 1; n <= 3; n += 1) {
+      timers.findLast(({ ms }) => ms === RETRY_MS)?.run();
+      await vi.waitFor(() => {
+        expect(retries(timers)).toHaveLength(n + 1);
+      });
+    }
+    chain.stop();
+    // Four timers were armed, three have run: only the pending one is left to cancel.
+    expect(retries(timers).map(({ cancelled }) => cancelled)).toEqual([false, false, false, true]);
+  });
+
+  it("ends when the count is known: no timer is armed once an answer came", async () => {
+    const { chain, sockets, timers, heal } = setup([universe("onyx", "https://indexer.example.test/q")], [], "down");
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    heal();
+    timers.find(({ ms }) => ms === RETRY_MS)?.run();
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(retries(timers)).toHaveLength(1);
+    chain.stop();
+  });
+
+  it("arms no timer when the first answer came", async () => {
+    const { chain, sockets, timers } = setup([universe("onyx", "https://indexer.example.test/q")]);
+    await vi.waitFor(() => {
+      expect(sockets).toHaveLength(1);
+    });
+    expect(retries(timers)).toHaveLength(0);
+    chain.stop();
+  });
+});
+
 describe("the catch-up after the day's history", () => {
   const deployAt = (height: number) => ({
     hash: `h${String(height)}`,

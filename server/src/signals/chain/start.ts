@@ -90,13 +90,14 @@ export function startChain(options: ChainOptions): { stop: () => void } {
       (count) => {
         if (stopped) return;
         // A history that could not load is asked again, so the Earth is not left without its count until a restart.
+        let retry: (() => void) | undefined;
         const again = (): void => {
           if (count.known()) return;
-          const cancel = after(RETRY_MS, () => {
+          retry = after(RETRY_MS, () => {
             count.load().then(again, again);
           });
-          stops.push(cancel);
         };
+        stops.push(() => retry?.());
         again();
         const follow = followChain({
           universe: universe.id,
