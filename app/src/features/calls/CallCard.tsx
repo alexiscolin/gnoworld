@@ -148,7 +148,8 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
       </Card.Actions>
     );
   }
-  if (state.kind === "failed" && state.hash === undefined) {
+  // A call that may have been sent has no way back to a signature: it could be signed twice (F5728).
+  if (state.kind === "failed" && state.hash === undefined && state.reason !== "maybe-sent") {
     return (
       <Card.Actions>
         <Button emphasis="solid" onClick={onRetry}>

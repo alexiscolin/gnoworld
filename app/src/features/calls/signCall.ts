@@ -48,10 +48,23 @@ async function follow(id: string, hash: string, deps: SignDeps): Promise<void> {
   failed(id, { reason: "unseen", hash });
 }
 
+// Adena's answer to the card's call: a hash is followed to its block, a failure without one is the card's state. A call that may
+// have been sent, with a hash, is followed as a sent one: the chain says what became of it (F5728).
+async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>, deps: SignDeps): Promise<void> {
+  const { landing, failed } = deps.store.getState().callsActions;
+  const hash = signed.ok || signed.reason === "maybe-sent" ? signed.hash : undefined;
+  if (hash !== undefined) {
+    landing(id, hash);
+    await follow(id, hash, deps);
+  } else if (!signed.ok) {
+    failed(id, signed.log === undefined ? { reason: signed.reason } : { reason: signed.reason, log: signed.log });
+  }
+}
+
 /** Signs the card's call as the logged-in account and follows it to its block; a card that is not in preview does nothing. */
 export async function signCall(id: string, deps: SignDeps): Promise<void> {
   const { store, adena, universe, call, watch } = deps;
-  const { signing, landing, failed } = store.getState().callsActions;
+  const { signing, failed } = store.getState().callsActions;
   const card = store.getState().calls[id];
   if (card?.state.kind !== "preview" || card.chainId !== universe.chainId) return;
   const { session } = store.getState().login;
@@ -69,11 +82,5 @@ export async function signCall(id: string, deps: SignDeps): Promise<void> {
     failed(id, { reason: "failed" });
     return;
   }
-  const signed = await call(adena, built.request, universe);
-  if (!signed.ok) {
-    failed(id, signed.log === undefined ? { reason: signed.reason } : { reason: signed.reason, log: signed.log });
-    return;
-  }
-  landing(id, signed.hash);
-  await follow(id, signed.hash, deps);
+  await settle(id, await call(adena, built.request, universe), deps);
 }

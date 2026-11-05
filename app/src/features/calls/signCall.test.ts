@@ -117,7 +117,7 @@ describe("signCall: the card's course", () => {
     expect(stateOf(store)).toEqual({ kind: "failed", reason: "chain", log: "panic: name taken", hash: SIGNED_HASH });
   });
 
-  it("is failed, not done, when Adena says signed with an error set (the call's log, no hash to follow)", async () => {
+  it("follows the hash by the chain when Adena says signed with an error set: it is the chain that says what became of the call (F5728)", async () => {
     const wallet = recordedAdena({
       account: CALLER,
       doContract: () =>
@@ -129,11 +129,25 @@ describe("signCall: the card's course", () => {
           data: { error: { message: "out of gas" }, data: null, Log: "out of gas", hash: SIGNED_HASH },
         }),
     });
+    const read = vi.fn(() => Promise.resolve(found({ ...LANDED, failed: true, data: "", log: "out of gas" })));
+    const { store, deps } = setup({ adena: wallet.adena, read });
+    await signCall("SetBio", deps);
+    expect(read).toHaveBeenCalledWith(SIGNED_HASH);
+    expect(stateOf(store)).toEqual({ kind: "failed", reason: "chain", log: "out of gas", hash: SIGNED_HASH });
+  });
+
+  it("is failed maybe-sent, with no way back and no read, when DoContract failed after the popup with no hash (F5728)", async () => {
+    const wallet = recordedAdena({
+      account: CALLER,
+      doContract: () => Promise.resolve({ status: "failure", type: "TRANSACTION_FAILED", message: "", data: {} }),
+    });
     const read = vi.fn(() => Promise.resolve(found(LANDED)));
     const { store, deps } = setup({ adena: wallet.adena, read });
     await signCall("SetBio", deps);
-    expect(stateOf(store)).toMatchObject({ kind: "failed", reason: "failed" });
+    expect(stateOf(store)).toEqual({ kind: "failed", reason: "maybe-sent" });
     expect(read).not.toHaveBeenCalled();
+    store.getState().callsActions.retry("SetBio");
+    expect(stateOf(store)?.kind).toBe("failed");
   });
 
   it("follows a call that is not in a block yet, waiting between reads, until it lands", async () => {

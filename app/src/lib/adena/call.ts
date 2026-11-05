@@ -19,7 +19,8 @@ import {
 } from "./answers.ts";
 import { serially } from "./queue.ts";
 
-export type CallResult = { ok: true; hash: string; log: string } | { ok: false; reason: CallFailure; log?: string };
+export type CallResult =
+  { ok: true; hash: string; log: string } | { ok: false; reason: CallFailure; log?: string; hash?: string };
 /** The chain a call is for, as app/data/universes.json names it: what AddNetwork needs. */
 export interface Universe {
   chainId: string;
@@ -123,6 +124,11 @@ export const transaction = (request: CallRequest, { chainId, rpc }: Universe) =>
   networkInfo: { chainId, rpcUrl: rpc },
 });
 
+// Once DoContract was asked, the popup may have signed and broadcast the call whatever came back: a failure that is not Adena's
+// refusal to start (a rejection, a lock, a pending request) says so (F5728), with the hash when Adena named one.
+const maybeSent = (failure: Failed): Failed =>
+  failure.reason === "failed" || failure.reason === "malformed" ? { ...failure, reason: "maybe-sent" } : failure;
+
 async function send(
   doContract: (...args: unknown[]) => unknown,
   request: CallRequest,
@@ -132,9 +138,9 @@ async function send(
   // and the realm's Log, with no height and no check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
   const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent);
-  if (!done.ok) return done;
+  if (!done.ok) return maybeSent(done);
   const { hash, Log, error } = done.value;
-  return error === null ? { ok: true, hash, log: capped(Log) } : refusal("failed", "", Log);
+  return error === null ? { ok: true, hash, log: capped(Log) } : { ...refusal("maybe-sent", "", Log), hash };
 }
 
 /** Asks Adena, once the requests before it are done, to sign and send this call, as the account on the universe's chain. */
@@ -147,9 +153,8 @@ export function callContract(adena: unknown, request: CallRequest, universe: Uni
     try {
       const result = await work(adena, parsed.data, universe);
       if (result.ok) return result;
-      return result.log === undefined
-        ? { ok: false, reason: result.reason }
-        : { ok: false, reason: result.reason, log: result.log };
+      const { reason, log, hash } = result;
+      return { ok: false, reason, ...(log === undefined ? {} : { log }), ...(hash === undefined ? {} : { hash }) };
     } catch {
       return { ok: false, reason: "failed" };
     }

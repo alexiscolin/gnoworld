@@ -192,3 +192,15 @@ describe("the store's calls slice", () => {
     expect(heard).toBe(0);
   });
 });
+
+describe("the calls slice: no way back from a call that may have been sent (F5728)", () => {
+  it("does not retry a failure of reason maybe-sent, with or without a hash: the same call could be signed twice", () => {
+    const store = opened();
+    const { signing, failed, retry } = store.getState().callsActions;
+    signing("SetBio");
+    failed("SetBio", { reason: "maybe-sent" });
+    retry("SetBio");
+    expect(state(store)).toBe("failed");
+    expect(card(store)?.state).toEqual({ kind: "failed", reason: "maybe-sent" });
+  });
+});

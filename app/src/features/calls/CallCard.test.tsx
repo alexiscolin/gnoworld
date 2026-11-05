@@ -199,6 +199,12 @@ describe("CallCard, the states after the click", () => {
     expect(buttons(box)).toEqual(["Try again", "Cancel"]);
   });
 
+  it("offers only 'Close' after a call that may have been sent, with no hash: never 'Try again' (F5728)", () => {
+    const box = withState({ kind: "failed", reason: "maybe-sent" });
+    expect(said(box)).toMatch(/recent transactions/i);
+    expect(buttons(box)).toEqual(["Close"]);
+  });
+
   it("says a failure after the hash with the hash and the chain's log, and only 'Close'", () => {
     const box = withState({ kind: "failed", reason: "chain", log: "panic: name taken", hash: HASH });
     expect(said(box)).toContain("panic: name taken");

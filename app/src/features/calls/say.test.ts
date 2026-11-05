@@ -17,6 +17,7 @@ const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain", RegExp> =
   unsupported: /gnoweb|does not support/i,
   "wrong-network": /network/i,
   malformed: /unexpected|report/i,
+  "maybe-sent": /may have been sent.*recent transactions/i,
   "logged-out": /connect adena/i,
   unseen: /block/i,
   chain: /chain|realm/i,

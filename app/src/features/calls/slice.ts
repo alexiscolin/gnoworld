@@ -56,7 +56,9 @@ export function ensureCalls(store: StoreApi<AppState>): void {
       },
       retry: (id) => {
         go(id, ["failed"], ({ state }) =>
-          state.kind === "failed" && state.hash === undefined ? { state: { kind: "preview" } } : undefined,
+          state.kind === "failed" && state.hash === undefined && state.reason !== "maybe-sent"
+            ? { state: { kind: "preview" } }
+            : undefined,
         );
       },
       close: (id) => {

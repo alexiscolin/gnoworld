@@ -13,6 +13,7 @@ export type CallFailure =
   | "no-account"
   | "declined"
   | "failed"
+  | "maybe-sent"
   | "unsupported"
   | "wrong-network"
   | "malformed";
@@ -40,6 +41,8 @@ export interface Failed {
   reason: CallFailure;
   type: string;
   log?: string;
+  /** The hash of a transaction Adena named in a failure: it was signed, so it may be on the chain. */
+  hash?: string;
 }
 export type Answered = { ok: true; data: unknown } | Failed;
 export const capped = (text: string) => (text.length <= MAX_LOG ? text : text.slice(0, MAX_LOG).toWellFormed());
@@ -78,6 +81,12 @@ function failure(type: string, code: number | undefined, message: string | undef
   return refusal(reason, type, reason === "failed" ? (message ?? "") : "");
 }
 
+// The hash a failure carries (adena-wallet bc5a7b5a, approve-transaction-main/index.tsx:604-627), only when it is one.
+function hashOf(data: unknown): string | undefined {
+  const parsed = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)) }).safeParse(data);
+  return parsed.success ? parsed.data.hash : undefined;
+}
+
 // One call to the extension, its answer read by its type: one of the method's successes, or a failure with its reason.
 export async function ask(run: () => unknown, method: Method): Promise<Answered> {
   const Answer = z.object({
@@ -102,7 +111,10 @@ export async function ask(run: () => unknown, method: Method): Promise<Answered>
   // A success type of any method, typed as a failure or by another method, has no business there: malformed, and it keeps
   // no type, so a caller that branches on one must not read it as a real failure (F5666).
   const anySuccess = Object.values(SUCCESSES).some((types) => (types as readonly string[]).includes(type));
-  return status === "success" || anySuccess ? refusal("malformed") : failure(type, code, message);
+  if (status === "success" || anySuccess) return refusal("malformed");
+  const failed = failure(type, code, message);
+  const hash = hashOf(data);
+  return hash === undefined ? failed : { ...failed, hash };
 }
 
 export type Read<T> = { ok: true; value: T } | Failed;

@@ -20,7 +20,7 @@ export interface Said {
 }
 
 // The reasons whose own words are followed by a log: the wallet's message, the realm's error log.
-const WITH_LOG: readonly CardFailure[] = ["failed", "chain"];
+const WITH_LOG: readonly CardFailure[] = ["failed", "maybe-sent", "chain"];
 
 /** The sentence of a failure: its next step, then the log of a reason that owns one. */
 export function sayFailure({ reason, log, hash }: Said): string {
@@ -35,6 +35,8 @@ export function sayFailure({ reason, log, hash }: Said): string {
     "no-account": "Adena has no account yet. Create or add an account in Adena, then try again.",
     declined: "The signature was declined in Adena, so nothing was sent. Try again when you want to sign.",
     failed: "Adena could not send this call. Try again in a moment.",
+    "maybe-sent":
+      "Adena did not say whether this call went through, so it may have been sent. Check Adena's recent transactions before you call again.",
     unsupported: "This version of Adena does not support this call. Open the realm on gnoweb to make it.",
     "wrong-network":
       "Adena is not on this universe's network and did not switch. Switch the network in Adena, then try again.",
