@@ -19,7 +19,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "jarvis back in the demo" "the demo profile holds no jarvis, nor its way out" compose 'services: { jarvis: { profiles: [demo] } }'
 	return 0
 fi
-if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait jarvis egress_jarvis; then
+# --no-deps: the demo's services, proven already, are neither rebuilt nor recreated under the checks (F5302).
+if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis; then
 	echo "test-jarvis.sh: jarvis did not start: $(docker compose -p "$project" $files --profile jarvis logs --no-log-prefix --tail 1 jarvis egress_jarvis 2>&1 | tr '\n' ' ')" >&2
 	exit 3
 fi

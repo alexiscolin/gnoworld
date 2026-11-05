@@ -825,14 +825,10 @@ PY
 	hardened "$ergo" ergo
 	hardened "$server" server
 	hardened "$egress" egress network
-	# jarvis and its way out sit in a profile of their own (10j-4): the demo holds neither, starts neither, and the
-	# server's name for jarvis answers nothing, so its door answers off, or not_ready when on (10l-1).
+	# jarvis and its way out sit in a profile of their own (10j-4): the demo holds neither, and the server's name for
+	# jarvis answers nothing, so its door answers off, or not_ready when on (10l-1).
 	expect "the demo profile holds no jarvis, nor its way out" \
 		"$(docker compose -p "$project" $files config --services | grep -cxE 'jarvis|egress_jarvis' || true)" 0
-	for name in jarvis egress_jarvis; do
-		expect "the demo starts no $name" \
-			"$(docker ps -aq --filter "label=com.docker.compose.project=$project" --filter "label=com.docker.compose.service=$name")" ""
-	done
 	expect "the server finds no jarvis in the demo" "$(docker exec "$server" /nodejs/bin/node -e \
 		"fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" refused
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "
@@ -1467,6 +1463,7 @@ else
 	guard=$(of guard)
 	web=$(of web)
 	ergo=$(of ergo) server=$(of server) egress=$(of egress)
+	jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis)
 	if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ]; then
 		echo "test.sh: the demo is not running (docker compose -f deploy/compose.yaml --profile demo up -d --build)" >&2
 		exit 3
@@ -1481,6 +1478,25 @@ else
 		cpus=$((cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
 	done
 	if [ "$memory" -le 2147483648 ] && [ "$cpus" -le 2000000000 ]; then pass "the demo stays under 2 GB and 2 cores"; else fail "the demo: $memory bytes, $cpus nano-cpus"; fi
+	# Jarvis switched on: both or neither, locked as the rest, within their own caps, 448 MiB and 0.4 core (D184).
+	if [ -n "$jarvis$egress_jarvis" ]; then
+		if [ -z "$jarvis" ] || [ -z "$egress_jarvis" ]; then
+			fail "jarvis and its way out run together or not at all"
+		else
+			hardened "$jarvis" jarvis
+			hardened "$egress_jarvis" egress_jarvis network
+			jarvis_memory=0 jarvis_cpus=0
+			for id in $jarvis $egress_jarvis; do
+				jarvis_memory=$((jarvis_memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
+				jarvis_cpus=$((jarvis_cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
+			done
+			if [ "$jarvis_memory" -le 469762048 ] && [ "$jarvis_cpus" -le 400000000 ]; then
+				pass "jarvis and its way out stay under 448 MiB and 0.4 core"
+			else
+				fail "jarvis and its way out: $jarvis_memory bytes, $jarvis_cpus nano-cpus"
+			fi
+		fi
+	fi
 
 	json=$(docker exec "$ts" tailscale --socket=/tmp/tailscaled.sock status --json)
 	read_json() { printf '%s' "$json" | python3 -c "import json, sys; d = json.load(sys.stdin); print($1)"; }

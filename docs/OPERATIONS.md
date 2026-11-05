@@ -43,7 +43,10 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (`JARVIS_NAMES_RPC`, D120).
 - `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
   serves its budgets and answers `off`, reads no key and starts no gnomcp. It and `egress_jarvis` sit in the profile
-  `jarvis`, out of the demo's (10j-4): started only with Jarvis switched on, `--profile demo --profile jarvis`. It listens on its fixed address of
+  `jarvis`, out of the demo's (10j-4): started only with Jarvis switched on, `--profile demo --profile jarvis`. Ops, who
+  run the file without the demo's profile, start it by its name, `docker compose up -d jarvis`, which switches its
+  profile on, with their own way out in `JARVIS_EGRESS_PROXY`; `--profile jarvis` alone is refused, as `egress_jarvis`
+  needs the guard. It listens on its fixed address of
   `jarvis` (`JARVIS_ADDRESS`, in `JARVIS_SUBNET`), a network it shares with the server alone; its `/ask` and
   `/budgets` ask no session, so that network is their wall (10i). It goes out through `egress_jarvis` alone, a
   smokescreen of its own on 4751 in `guard`'s network, which takes 4751 from `jarvis_out` alone and sends that network
@@ -126,7 +129,7 @@ cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0
 | Where | How | Back |
 |---|---|---|
 | On the host, in seconds | `docker compose -f deploy/compose.yaml --profile demo stop tailscale` | `... start tailscale` |
-| From anywhere, a phone included | The admin console, Machines, the demo, Remove: its node key is revoked at once | A new auth key, then `down -v` and `up` |
+| From anywhere, a phone included | The admin console, Machines, the demo, Remove: its node key is revoked at once | A new auth key, then the table's Remove it all and Start, above |
 
 ## On another host
 
@@ -148,7 +151,7 @@ Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
   without Compose's order: for a moment, Tailscale may run before the guard's rules are in, and
   if `web` is not up yet the guard stops, leaving Tailscale on a network with nothing in it.
   After such a restart, Compose's order again: `docker compose -f deploy/compose.yaml --profile demo
-  down`, then `up -d` (the node key stays in its volume) (F203).
+  --profile jarvis down`, then `up -d` with the profiles it ran with (the node key stays in its volume) (F203).
 - **DNS through the router.** On a host whose resolver is its router or a LAN server, the guard
   lets that server's port 53 out, for Tailscale's name lookups: an exception to "every private
   address refused" (F205).
