@@ -2,7 +2,49 @@
 // state moves only along the course, preview, signing, landing, done, so nothing is done before the chain has answered
 // (ADR-0002 section 4). It is added to the page's store by the first realm view that draws a card (features/calls/slice.ts), and
 // its code lives outside store/, whose files vite.config.ts puts in the first screen's chunk: only its types are here.
+import type { Param } from "@gnoworld/core";
 import type { CallFailure } from "./adena/answers.ts";
 
 /** Why a card failed: Adena's reasons, and the three of the card's own. */
 export type CardFailure = CallFailure | "logged-out" | "unseen" | "chain";
+
+export type CardState =
+  | { kind: "preview" }
+  | { kind: "signing" }
+  | { kind: "landing"; hash: string }
+  | { kind: "done"; hash: string; height: number; value: string }
+  | { kind: "failed"; reason: CardFailure; log?: string | undefined; hash?: string | undefined };
+
+export interface CallCard {
+  /** One card a row: the function's name. */
+  id: string;
+  realm: string;
+  func: string;
+  params: readonly Param[];
+  /** The text of each field, the realm parameter left out. */
+  texts: readonly string[];
+  state: CardState;
+}
+
+interface NewCard {
+  id: string;
+  realm: string;
+  func: string;
+  params: readonly Param[];
+}
+
+export interface CallsSlice {
+  calls: Readonly<Record<string, CallCard>>;
+  /** The page's Adena, set by a card's first gesture: the login follows its account (F5651). Absent until then. */
+  wallet: unknown;
+  callsActions: {
+    open: (card: NewCard) => void;
+    edit: (id: string, index: number, text: string) => void;
+    signing: (id: string) => void;
+    landing: (id: string, hash: string) => void;
+    done: (id: string, result: { height: number; value: string }) => void;
+    failed: (id: string, failure: { reason: CardFailure; log?: string | undefined; hash?: string | undefined }) => void;
+    retry: (id: string) => void;
+    close: (id: string) => void;
+  };
+}
