@@ -10,6 +10,7 @@ import {
 } from "@gnoworld/core";
 import { BufferAttribute, Group, LineSegments, Vector3 } from "three";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { SEARCH } from "../openEvent.ts";
 import { Orbits, type Words } from "./orbits.ts";
 
 // A system's Plan on the stage (7v; Alexis, 2026-11-03): the only view that draws its orbits, as ellipses, its star at the centre, each world
@@ -69,7 +70,7 @@ const made = () => {
   const orbits = new Orbits(parent, document, { projector, open });
   return { parent, orbits, open };
 };
-const names = () => [...document.querySelectorAll<HTMLAnchorElement>("[data-plan] a")];
+const names = () => [...document.querySelectorAll<HTMLElement>("[data-plan] a, [data-plan] button")];
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -419,5 +420,47 @@ describe("a system's Plan on the stage", () => {
     orbits.dispose();
     expect(parent.children).toEqual([]);
     expect(document.querySelector("[data-plan]")).toBeNull();
+  });
+});
+
+// F5462 (the chief, 2026-11-05, for Alexis's round): a Plan too full names the worlds there is room for; the others' names stay hidden, and a
+// "+N" in the names' style stands where the last of them on the outer ring would be named, opening the search drawer on the namespace.
+describe("a Plan too full to name every world", () => {
+  const crowded = () =>
+    plannedOf(
+      { system, worlds },
+      {
+        names: new Map(worlds.map(({ id }) => [id, id])),
+        links: new Map(),
+        named: new Set(["gnoswap/pool"]),
+        host: "gnoswap/gov",
+      },
+    );
+
+  it("hides the unnamed worlds' names and stands a +N counting them where the outer one's would be", () => {
+    const { orbits } = made();
+    orbits.show(crowded(), words);
+    orbits.tick({ x: 0, y: 0, z: 0 });
+    const shown = names().filter((name) => !name.hidden);
+    expect(shown.map((name) => name.textContent)).toEqual(["gnoswap/pool", "+2"]);
+    const more = shown[1];
+    expect(more?.getAttribute("aria-label")).toBe("2 more worlds of gnoswap");
+    expect(more?.style.transform).toBe(names()[2]?.style.transform);
+  });
+
+  it("opens the search drawer on the namespace at a click, and goes nowhere", () => {
+    const { orbits, open } = made();
+    const asked = vi.fn<(query: string) => void>();
+    const listen = (event: Event) => {
+      asked((event as CustomEvent<string>).detail);
+    };
+    window.addEventListener(SEARCH, listen);
+    orbits.show(crowded(), words);
+    orbits.tick({ x: 0, y: 0, z: 0 });
+    const more = names().find((name) => name.textContent === "+2");
+    expect(more?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }))).toBe(false);
+    expect(asked).toHaveBeenCalledWith("gnoswap");
+    expect(open).not.toHaveBeenCalled();
+    window.removeEventListener(SEARCH, listen);
   });
 });

@@ -1,6 +1,7 @@
 // The search drawer's search: one pass over the places the page already holds, so typing sends no request.
-import type { PlaceKind } from "@gnoworld/core";
+import { labelName, type PlaceKind } from "@gnoworld/core";
 import type { siteOf } from "../../places.ts";
+import { realmPage } from "../../scene/cosmos/planWords.ts";
 
 /** A group of the drawer: a kind of place, or the stations, worlds of a kind of their own round the Earth (8l). */
 export type SearchKind = PlaceKind | "station";
@@ -74,3 +75,20 @@ export function searchItemsOf(site: ReturnType<typeof siteOf>): SearchItem[] {
 
 // The chord, in a module of its own: the header's button reads it on the first screen, the search itself is the drawer's chunk.
 export { opensPalette } from "./chord.ts";
+
+/** A full Plan's namespace's worlds (F5470), from the worlds file the drawer reads already, each to its realm's page, while the words are the
+ * namespace's alone; none for other words, no namespace, no file yet or no such world. */
+export function namespaceGroup(
+  worlds: readonly { id: string; namespace: string; realms: readonly { path?: string | null }[] }[] | undefined,
+  namespace: string,
+  query: string,
+): { id: string; label: string; options: { id: string; label: string }[] }[] {
+  if (namespace === "" || query.trim() !== namespace) return [];
+  const options = (worlds ?? []).flatMap(({ id, namespace: its, realms }) => {
+    const page = its === namespace ? realmPage(realms[0]?.path ?? undefined) : undefined;
+    return page === undefined ? [] : [{ id: page, label: labelName(id) ?? id }];
+  });
+  return options.length === 0
+    ? []
+    : [{ id: "namespace", label: `Worlds of ${namespace} · ${String(options.length)}`, options }];
+}

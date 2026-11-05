@@ -4,18 +4,26 @@
 // chunk of its own, asked at the first opening: the first screen holds the header's button alone.
 import { daysSince, EARTH, hubWorldOf, isFresh, passportCount, stampedIn, worldLook } from "@gnoworld/core";
 import { Combobox, ComingSoon, Dialog, Kicker, Progress, type ComboboxGroup } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useDeviceView } from "../../deviceViews.ts";
-import { pagePresenceApi } from "../../lib/api/presence.ts";
 import { visitedIn } from "../../lib/visits.ts";
 import { site, type UniverseView } from "../../places.ts";
 import { useApp } from "../../storeContext.tsx";
+import type { Worlds } from "@gnoworld/schemas/indexer";
 import { useWorldsFile } from "../../worldsFile.ts";
 import { GoExplore } from "../home/index.ts";
 import { useWorldsCount } from "../universe/index.ts";
-import { searchItemsOf, searchPlaces, type SearchGroup, type SearchItem, type SearchKind } from "./search.ts";
+import {
+  namespaceGroup,
+  searchItemsOf,
+  searchPlaces,
+  type SearchGroup,
+  type SearchItem,
+  type SearchKind,
+} from "./search.ts";
 import styles from "./SearchDrawer.module.css";
+import { useHere } from "./useHere.ts";
 
 const KINDS: Record<SearchKind, string> = {
   ecosystem: "Ecosystems",
@@ -43,26 +51,6 @@ function Dot({ item }: { item: SearchItem }) {
       <circle cx={5} cy={5} r={5} fill={`rgb(${String(red)} ${String(green)} ${String(blue)})`} />
     </svg>
   );
-}
-
-// Who is here in each of the default universe's worlds, by its roles file's slug, read as the drawer opens; nothing when the server says
-// nothing.
-function useHere(open: boolean): ReadonlyMap<string, number> {
-  const [here, setHere] = useState<ReadonlyMap<string, number>>(() => new Map());
-  useEffect(() => {
-    if (!open) return undefined;
-    let shown = true;
-    pagePresenceApi()
-      .read()
-      .then((read) => {
-        if (shown && read.ok) setHere(new Map(read.value.worlds.map(({ world, here: people }) => [world, people])));
-      })
-      .catch(reportError);
-    return () => {
-      shown = false;
-    };
-  }, [open]);
-  return here;
 }
 
 const defaultUniverse = site.universes.find((each) => each.isDefault)?.id;
@@ -97,10 +85,19 @@ const optionsOf = (found: SearchGroup[], here: ReadonlyMap<string, number>): Com
   }));
 
 // "3 / 19" on its arc, the signals left, Go explore and the passport (frame 99).
-function Passport({ universe, open, onPassport }: { universe: UniverseView; open: boolean; onPassport: () => void }) {
+function Passport({
+  universe,
+  open,
+  worlds,
+  onPassport,
+}: {
+  universe: UniverseView;
+  open: boolean;
+  worlds: Worlds["worlds"] | undefined;
+  onPassport: () => void;
+}) {
   const stamped = useApp(({ device }) => stampedIn(device.stamps, universe.id).size);
   const count = passportCount(stamped, useWorldsCount(open) ?? undefined);
-  const worlds = useWorldsFile(open && universe.isDefault);
   const [now] = useState(Date.now);
   const visited = visitedIn(universe.id);
   const signals = worlds?.filter((world) => isFresh(daysSince(world.seen, now), visited(world.id))).length;
@@ -140,16 +137,27 @@ export default function SearchDrawer({
   universe,
   open,
   onClose,
+  start = "",
 }: {
   universe: UniverseView;
   open: boolean;
   onClose: () => void;
+  /** The words it opens on: a full Plan's namespace (F5462). */
+  start?: string;
 }) {
   const navigate = useNavigate();
   const [, openView] = useDeviceView();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(start);
+  // Each opening starts from its words: a closing cleared them, and the same ask again must find them.
+  const [shown, setShown] = useState(open);
+  if (open !== shown) {
+    setShown(open);
+    if (open) setQuery(start);
+  }
   const [items] = useState(() => searchItemsOf(site));
   const here = useHere(open);
+  // The worlds file the passport reads, read once for it and for a full Plan's namespace (F5470).
+  const worlds = useWorldsFile(open && universe.isDefault);
   const close = () => {
     setQuery("");
     onClose();
@@ -161,6 +169,7 @@ export default function SearchDrawer({
         <Passport
           universe={universe}
           open={open}
+          worlds={worlds}
           onPassport={() => {
             close();
             openView("passport");
@@ -174,7 +183,7 @@ export default function SearchDrawer({
               clearable
               value={query}
               onValueChange={setQuery}
-              groups={optionsOf(searchPlaces(items, query), here)}
+              groups={[...namespaceGroup(worlds, start, query), ...optionsOf(searchPlaces(items, query), here)]}
               onSelect={(path) => {
                 close();
                 Promise.resolve(navigate(path)).catch(reportError);

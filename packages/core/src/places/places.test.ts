@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { placeAt, placesOf, type PlaceSource } from "./places.ts";
+import { realmRoute, worldRoute } from "./route.ts";
 
 // Slice 5's 5c: the places of the data files and their canonical URLs (docs/plans/slice-5.md §1, decisions 2026-10-29:
 // Onyx the build's default, `/net/onyx/` canonical). A place has the path its page lives at (the default universe's
@@ -247,5 +248,14 @@ describe("the cost of the places, at n, 4n and 16n", () => {
     expect(afterOne[0]).toBeGreaterThan(0);
     expect(afterOne[1]).toBeLessThanOrEqual(4 * (afterOne[0] ?? 0));
     expect(afterOne[2]).toBeLessThanOrEqual(16 * (afterOne[0] ?? 0));
+  });
+});
+
+// 7v2 (F4474, F4475): one spelling of a world's page and of a realm's view, the default universe's and another's.
+describe("the routes", () => {
+  it("spells a world's page by its slug and a realm's view by its path under its universe", () => {
+    expect(worldRoute("adena")).toBe("/w/adena");
+    expect(realmRoute("gno.land/r/gov/dao")).toBe("/r/gov/dao");
+    expect(realmRoute("gno.land/r/gov/dao", "/net/gnoland")).toBe("/net/gnoland/r/gov/dao");
   });
 });

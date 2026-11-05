@@ -6,6 +6,7 @@ import { mountInStore } from "../../../tests/inStore.tsx";
 import { all, button, click, modals, nth, one, settled } from "../../../tests/mount.tsx";
 import { site } from "../../places.ts";
 import { visitKey } from "../../lib/visits.ts";
+import { SEARCH } from "../../scene/openEvent.ts";
 import { SearchPalette } from "./SearchPalette.tsx";
 
 // The search drawer (slice 8's 8i; frames 98 to 100): opened by its button and by the chord, closed four ways, its passport block, its groups
@@ -58,6 +59,14 @@ async function openIt(box: HTMLElement) {
   click(button(box, "Search"));
   await settled(() => isOpen(box));
 }
+// Closed, then opened again from its button: its field.
+async function reopened(box: HTMLElement) {
+  click(button(box, "Close"));
+  click(button(box, "Search"));
+  await settled(() => isOpen(box));
+  return field(box);
+}
+
 function type(input: HTMLElement, value: string) {
   act(() => {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(input, value);
@@ -181,10 +190,7 @@ describe("closing the drawer", () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
     type(field(box), "bub");
-    click(button(box, "Close"));
-    click(button(box, "Search"));
-    await settled(() => isOpen(box));
-    expect(field(box)).toHaveProperty("value", "");
+    expect(await reopened(box)).toHaveProperty("value", "");
   });
 });
 
@@ -370,5 +376,39 @@ describe("the passport block", () => {
     });
     await settled(() => at(box) === "/w/govdao");
     expect(isOpen(box)).toBe(false);
+  });
+});
+
+// The search drawer opened from outside the header (F5462, 8n): a full Plan's "+N" asks it, as an event, open on the namespace's words;
+// each ask starts from its own words, and its button and chord open on none (G3).
+describe("the search drawer asked from the page", () => {
+  const ask = (detail: unknown) => {
+    act(() => {
+      window.dispatchEvent(new CustomEvent(SEARCH, { detail }));
+    });
+  };
+
+  it("opens on the words it is asked, each time on its own", async () => {
+    const { box } = await mountInStore(<Page />);
+    ask("gnoswap");
+    await settled(() => isOpen(box));
+    expect(field(box)).toHaveProperty("value", "gnoswap");
+    ask("samcrew");
+    await settled(() => (field(box) as HTMLInputElement).value === "samcrew");
+    expect(field(box)).toHaveProperty("value", "samcrew");
+  });
+
+  it("takes no words that are not text", async () => {
+    const { box } = await mountInStore(<Page />);
+    ask({ evil: true });
+    await settled(() => isOpen(box));
+    expect(field(box)).toHaveProperty("value", "");
+  });
+
+  it("opens on no words from its button after a Plan asked it on its own", async () => {
+    const { box } = await mountInStore(<Page />);
+    ask("gnoswap");
+    await settled(() => (field(box) as HTMLInputElement).value === "gnoswap");
+    expect(await reopened(box)).toHaveProperty("value", "");
   });
 });

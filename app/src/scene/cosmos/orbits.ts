@@ -4,7 +4,7 @@
 // own pages, a tab of its own for a hand-made project's address. All a Plan needs is here, so the chunks every home loads pay none of it.
 import type { Planned, Point } from "@gnoworld/core";
 import { BufferGeometry, Float32BufferAttribute, LineBasicMaterial, LineSegments, Vector3, type Object3D } from "three";
-import { OPEN } from "../openEvent.ts";
+import { OPEN, SEARCH } from "../openEvent.ts";
 import type { Projector } from "./labels.ts";
 import labelStyles from "./labels.module.css";
 import styles from "./orbits.module.css";
@@ -34,6 +34,9 @@ const warmDot = (document: Document) => {
   return dot;
 };
 
+// Whether a world's name, or the "+N" in its place, stands on a Plan (F5462).
+const named = (plan: Planned, id: string) => plan.named.has(id) || plan.more?.id === id;
+
 export class Orbits {
   readonly #lines: LineSegments<BufferGeometry, LineBasicMaterial>;
   readonly #layer: HTMLElement;
@@ -43,7 +46,7 @@ export class Orbits {
   readonly #placed = new Placed();
   #plan: Named | undefined;
   #shown: { plan: Planned | undefined; words: Words | undefined } = { plan: undefined, words: undefined };
-  #names: HTMLAnchorElement[] = [];
+  #names: HTMLElement[] = [];
   #named: HTMLAnchorElement | undefined;
   // The layer shows while a Plan is shown, the frames run, and the scene's canvas does: the page stays over other routes (7v's review).
   #running = true;
@@ -101,7 +104,10 @@ export class Orbits {
     }
     this.#lines.visible = plan !== undefined;
     this.#named = undefined;
-    this.#names = plan === undefined ? [] : plan.worlds.map(({ id }) => this.#nameOf(plan, id));
+    this.#names =
+      plan === undefined
+        ? []
+        : plan.worlds.map(({ id }) => (id === plan.more?.id ? this.#more(plan) : this.#nameOf(plan, id)));
     this.#placed.set(this.#names);
     this.#layer.replaceChildren(...this.#names);
     this.#hide();
@@ -152,10 +158,26 @@ export class Orbits {
     return name;
   }
 
+  // A full Plan's "+N" (F5462), in the names' style where the last unnamed world on the outer ring would be named: the search drawer, open
+  // on the namespace, lists them all.
+  #more({ more, system }: Named): HTMLElement {
+    const button = this.#layer.ownerDocument.createElement("button");
+    button.type = "button";
+    button.className = `${labelStyles["placed"] ?? ""} ${styles["name"] ?? ""}`;
+    const count = more?.count ?? 0;
+    button.textContent = `+${String(count)}`;
+    button.setAttribute("aria-label", `${String(count)} more worlds of ${system.id}`);
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      window.dispatchEvent(new CustomEvent(SEARCH, { detail: system.id }));
+    });
+    return button;
+  }
+
   #rewrite(plan: Named): void {
     plan.worlds.forEach(({ id }, at) => {
       const name = this.#names[at];
-      if (name !== undefined) this.#word(plan, id, name);
+      if (name instanceof HTMLAnchorElement) this.#word(plan, id, name);
     });
   }
 
@@ -202,7 +224,7 @@ export class Orbits {
       const place = plan.places[at];
       if (name === undefined || world === undefined || place === undefined) continue;
       const spot = this.#projector.seen(this.#projector.fromEye(place, eye, this.#at), world.radius);
-      name.hidden = spot.depth <= 0;
+      name.hidden = spot.depth <= 0 || !named(plan, world.id);
       this.#placed.place(at, spot.x, spot.y + spot.radius + UNDER);
     }
   }

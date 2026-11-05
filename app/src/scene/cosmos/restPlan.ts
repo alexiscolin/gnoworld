@@ -18,14 +18,14 @@ export function planAt(systems: readonly StarSystem[], id: string | undefined): 
   const index = systems.findIndex((system) => system.id === id);
   const system = systems[index];
   if (system === undefined) return undefined;
-  const { eye, look, postcard, lens, up, lean } = planOf(system);
+  const { eye, look, postcard, lens, up, lean, named, host } = planOf(system);
   const names = new Map(postcard.worlds.map(({ id: world }) => [world, labelName(world) ?? world]));
   return {
     index,
     view: { eye, postcards: [index] },
     look,
     postcards: new Map([[index, postcard]]),
-    plan: plannedOf(postcard, { names, links: new Map() }),
+    plan: plannedOf(postcard, { names, links: new Map(), named, host }),
     lens,
     up,
     lean,

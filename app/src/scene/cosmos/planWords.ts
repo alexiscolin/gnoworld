@@ -18,8 +18,8 @@ export interface Words {
 export const external = (href: string) => /^https:\/\/[^\s/?#@\\]+(?:[/?#]\S*)?$/.test(href);
 export const linkable = (href: string | undefined): href is string =>
   href !== undefined && (external(href) || isOwnPage(href));
-// A world's page, its first realm's view, where the file's path is a realm's of gno.land; none for any other path.
-const realmPage = (path: string | undefined) =>
+/** A world's page, its first realm's view, where the file's path is a realm's of gno.land; none for any other path. */
+export const realmPage = (path: string | undefined) =>
   path !== undefined && RealmPath.safeParse(path).success ? realmRoute(path) : undefined;
 
 /** `plan` in the file's `words`: a world's page where the Plan knows none, who is here, the name the page gives. */

@@ -1370,6 +1370,17 @@ describe("the eye", () => {
     plan.remove();
   });
 
+  // F5403: the stations' names round the Earth (7x2) are links the scene places from the eye too: a mouse on one leans nothing, or the
+  // name slid 47 px from under it.
+  it("takes no lean from a mouse on a station's name round the Earth", () => {
+    const layer = document.createElement("nav");
+    layer.dataset["stations"] = "";
+    const name = layer.appendChild(document.createElement("a"));
+    document.body.append(layer);
+    expect(eyeAfter([{ events: [{ ...mouse(1024, 0), on: name }], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));
+    layer.remove();
+  });
+
   it("takes no lean under reduced motion", () => {
     query(MOTION).matches = true;
     expect(eyeAfter([{ events: [mouse(1024, 0)], ms: 3000 }])).toEqual(eyeAfter([{ ms: 3000 }]));

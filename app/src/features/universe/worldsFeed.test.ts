@@ -389,3 +389,67 @@ describe("the worlds' feed", () => {
     worlds.leave();
   });
 });
+
+// 8m: the box the scene keeps clear of the page's text is measured again as the hero and the list grow (the count, the fonts, the worlds),
+// not only on a window's resize; covered or gone, nothing watches it any more.
+describe("the text's box", () => {
+  const watched: { callback: (() => void) | undefined; elements: Element[]; cut: number } = {
+    callback: undefined,
+    elements: [],
+    cut: 0,
+  };
+  beforeEach(() => {
+    Object.assign(watched, { callback: undefined, elements: [], cut: 0 });
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        constructor(callback: () => void) {
+          watched.callback = callback;
+        }
+        observe(element: Element) {
+          watched.elements.push(element);
+        }
+        disconnect() {
+          watched.cut += 1;
+        }
+      },
+    );
+    const [hero, rail, other] = [
+      document.createElement("section"),
+      document.createElement("nav"),
+      document.createElement("nav"),
+    ];
+    hero.dataset["clear"] = "";
+    rail.dataset["rail"] = "";
+    document.body.append(hero, rail, other);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    document.body.replaceChildren();
+  });
+
+  it("measures the hero again as it or the rail grows, and lets them go once the cosmos is covered", async () => {
+    const keepClear = vi.fn();
+    const scene = { ...(sceneOf().scene as object), keepClear } as unknown as Scene;
+    const hero = document.querySelector("[data-clear]");
+    if (hero === null) throw new Error("no hero");
+    let bottom = 300;
+    vi.spyOn(hero, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect({ x: 10, y: 20, width: 500, height: bottom - 20 }),
+    );
+    const worlds = new WorldsFeed();
+    worlds.sync(scene, true);
+    await settled();
+    expect(watched.elements).toEqual([
+      document.querySelector("[data-clear]"),
+      document.querySelector("nav[data-rail]"),
+    ]);
+    expect(keepClear).toHaveBeenLastCalledWith({ left: 10, top: 20, right: 510, bottom: 300 });
+    bottom = 420;
+    watched.callback?.();
+    expect(keepClear).toHaveBeenLastCalledWith({ left: 10, top: 20, right: 510, bottom: 420 });
+    worlds.sync(scene, false);
+    expect(watched.cut).toBe(1);
+    worlds.leave();
+  });
+});

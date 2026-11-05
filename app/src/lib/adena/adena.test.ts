@@ -138,6 +138,8 @@ describe("connect", () => {
     ["its network has no account", { GetNetwork: () => no("NO_ACCOUNT") }, "no-account"],
     ["the site is not let in", { GetAccount: () => no("NOT_CONNECTED") }, "failed"],
     ["Adena fails on its side", { GetAccount: () => no("UNEXPECTED_ERROR") }, "failed"],
+    // An account mismatch is the signature's word (signLogin): as it connects, Adena failing is all it says.
+    ["the account mismatches as it connects", { GetAccount: () => no("ACCOUNT_MISMATCH") }, "failed"],
     ["a call rejects", { GetAccount: () => Promise.reject(new Error("extension gone")) }, "failed"],
     [
       "a call throws before any promise",

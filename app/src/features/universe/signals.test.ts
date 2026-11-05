@@ -78,3 +78,26 @@ describe("the labels' chips (8p, frames 4, 6 and 143)", () => {
     expect(localSignals(NOW, { people: [], rooms }).people).toBeUndefined();
   });
 });
+
+// A station's world stands round the Earth, never in the cloud (8l; Alexis, 2026-11-05): no label names it and its people count on none,
+// while every other world of the universe keeps both.
+describe("the stations round the Earth", () => {
+  it("names no station and counts no one on one, a planet and the Earth kept", () => {
+    const signals = signalsOf(
+      {
+        worlds: [
+          { world: "adena", here: 4, perHour: 1, rise: null },
+          { world: "supernova", here: 2, perHour: 0, rise: null },
+          { world: "govdao", here: 5, perHour: 2, rise: null },
+          { world: "earth", here: 3, perHour: 0, rise: null },
+        ],
+      },
+      0,
+    );
+    const names = [...signals.names.values()];
+    expect(names).not.toContain("Adena");
+    expect(names).not.toContain("Supernova");
+    expect(names).toContain("GovDAO");
+    expect([...signals.present.keys()]).toEqual(["gov/dao", "earth"]);
+  });
+});

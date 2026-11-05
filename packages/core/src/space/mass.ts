@@ -2,7 +2,7 @@
 // namespace a clump in volume with seeded dust for its matter. A clump's direction comes from its id and its distance from the volume of
 // the clumps more used than it, then neighbours that overlap are pushed apart; so a new world grows its clump, the clumps after it move
 // out a little, no direction changes, and the same data always gives the same mass. Sized so the whole fills the dive's first view.
-import { nextState, textHash, unitOf, type Point } from "./cell.ts";
+import { distanceOf, nextState, textHash, unitOf, type Point } from "./cell.ts";
 
 /** The mass's sizes, in the units its layout is drawn in before it is fitted to `reach`, the dive's first view filled (7d7's 760). */
 export const MASS = {
@@ -101,7 +101,8 @@ function clumpsOf(namespaces: readonly MassNamespace[]): Clump[] {
   });
 }
 
-// Two clumps that overlap pushed apart, the less used more; neighbours found through a grid, so a pass is about linear in the clumps.
+// Two clumps that overlap pushed apart, the less used alone, so a clump never moves for one ranked after it; neighbours found through a
+// grid, so a pass is about linear in the clumps.
 function apart(clumps: readonly Clump[]): void {
   const cell = 2 * MASS.gap * Math.max(1, ...clumps.map(({ radius }) => radius));
   for (let pass = 0; pass < MASS.passes; pass += 1) {
@@ -131,19 +132,11 @@ function nearOf(grid: ReadonlyMap<string, number[]>, at: Point, cell: number): n
 
 function push(a: Clump, b: Clump | undefined): void {
   if (b === undefined) return;
-  const [x, y, z] = [b.centre.x - a.centre.x, b.centre.y - a.centre.y, b.centre.z - a.centre.z];
-  const gap = Math.hypot(x, y, z);
+  const gap = distanceOf(a.centre, b.centre);
   const least = (a.radius + b.radius) * MASS.gap;
   if (gap >= least || gap === 0) return;
   const share = (least - gap) / gap;
-  for (const [axis, step] of [
-    ["x", x],
-    ["y", y],
-    ["z", z],
-  ] as const) {
-    a.centre[axis] -= 0.25 * share * step;
-    b.centre[axis] += 0.75 * share * step;
-  }
+  for (const axis of ["x", "y", "z"] as const) b.centre[axis] += share * (b.centre[axis] - a.centre[axis]);
 }
 
 interface Writer {

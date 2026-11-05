@@ -231,6 +231,13 @@ describe("page: links and images", () => {
     reads("![a](data:image/png;base64,AAAA)", paragraph(text("![a](data:image/png;base64,AAAA)")));
   });
 
+  // Past the inline depth an image's opener is text, as a link's is: no node deeper than the cap, and its address still no image.
+  test("keeps an image opened past the inline depth as text", () => {
+    const deep = "*a ".repeat(8) + "![x](https://x.test/a.png)";
+    const words = [...inlinesOf(blocksOf(deep))].flatMap((node) => (node.type === "text" ? [node.text] : []));
+    expect(words.join("")).toContain("![");
+  });
+
   test("makes no image node of any kind", () => {
     const nodes = [...inlinesOf(blocksOf("![a](https://x.test/a.png) ![b](https://x.test/b.svg)"))];
     expect(nodes.every((node) => node.type !== ("image" as string))).toBe(true);
@@ -402,6 +409,12 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
         ],
       },
     );
+  });
+
+  // A form's opening on the page's last line has no line after it to close it: no form, and no field taken from past the page.
+  test("makes no form of an opening on the page's last line", () => {
+    const blocks = blocksOf('Vote below.\n<gno-form exec="Vote">');
+    expect(blocks.some((block) => block.type === "form")).toBe(false);
   });
 
   test("gives a form with no exec an empty one, and an input with no type gnoweb's default, text", () => {

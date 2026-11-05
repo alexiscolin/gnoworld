@@ -79,7 +79,7 @@ const greyPalette = (): WebPalette => {
   const grey = () => new Color(0.5, 0.5, 0.5);
   const tone = grey();
   return {
-    ground: new Color(),
+    ground: new Color(0, 0, 0),
     kinds: Array.from({ length: 6 }, grey),
     touches: Array.from({ length: 6 }, grey),
     touch: 0,
