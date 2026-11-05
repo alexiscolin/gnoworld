@@ -128,6 +128,30 @@ describe("a reminder", () => {
 
 // The bell's count: one for each unread line of the three kinds the page holds without asking (messages, the coming and live events,
 // the news of 14 days), none for the worlds followed, which the panel alone asks the server for.
+describe("reminders due at once", () => {
+  it("are told in one pill: the soonest's title and place, and how many more, all marked fired", async () => {
+    data.events = [at("later", START - 5 * MINUTE), at("first", START - 20 * MINUTE, "bubble")];
+    asked({ first: { fired: false }, later: { fired: false } });
+    watching();
+    await after(0);
+    expect(raised).toHaveLength(1);
+    expect(raised[0]).toMatchObject({ title: "Event first", line: "Live now · Bubble · and 1 more" });
+    expect(raised[0]?.action?.label).toBe("Go there");
+    expect(kept()).toEqual({ first: { fired: true }, later: { fired: true } });
+  });
+
+  it("say a coming one's start, and no place for one online", async () => {
+    data.events = [at("b", START + 5 * MINUTE), at("a", START + 3 * MINUTE), at("c", START + 8 * MINUTE)];
+    asked({ a: { fired: false }, b: { fired: false }, c: { fired: false } });
+    watching();
+    await after(0);
+    expect(raised).toEqual([
+      expect.objectContaining({ title: "Event a", line: "Starts in a few minutes · and 2 more" }),
+    ]);
+    expect(raised[0]?.action).toBeUndefined();
+  });
+});
+
 describe("the bell's count", () => {
   const noted = {
     id: "m1",

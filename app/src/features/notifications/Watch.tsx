@@ -23,12 +23,17 @@ function useReminders() {
     const now = Date.now();
     const { due, over, next } = remindersAt(events, reminders, now);
     const universe = universeAt(location.pathname);
-    for (const event of due) {
+    // The pill holds one message: the soonest due, and how many more (Alexis, 2026-11-05, "Une pastille pour tous").
+    const [event, ...more] = due.toSorted(
+      (a, b) => Date.parse(a.start) - Date.parse(b.start) || a.id.localeCompare(b.id),
+    );
+    if (event !== undefined) {
       const place = event.world === undefined ? undefined : placeOf(universe, event.world);
       const live = Date.parse(event.start) <= now;
+      const where = place === undefined ? "" : ` · ${place.name}`;
       raisePill({
         title: event.title,
-        line: `${live ? "Live now" : "Starts in a few minutes"}${place === undefined ? "" : ` · ${place.name}`}`,
+        line: `${live ? "Live now" : "Starts in a few minutes"}${where}${more.length === 0 ? "" : ` · and ${String(more.length)} more`}`,
         ...(place === undefined
           ? {}
           : {
