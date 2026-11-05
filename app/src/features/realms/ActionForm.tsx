@@ -133,7 +133,7 @@ export function ActionForm({
           </Cluster>
         </Stack>
       </RealmForm>
-      {compact ? null : <InlineCard id={id} place={place} />}
+      {compact ? null : <InlineCard id={id} place={place} title={label} />}
     </>
   );
 }

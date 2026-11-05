@@ -75,7 +75,7 @@ export function onGnoland(urls: readonly string[], card: HTMLElement): void {
 }
 
 /** That `card` is prefilled with `values` and names the realm and the function it calls (`call`). */
-export function prefilled(card: HTMLElement, values: readonly string[], call: { realm: string; func: string }): void {
+function prefilled(card: HTMLElement, values: readonly string[], call: { realm: string; func: string }): void {
   expect(inputs(card).map((input) => input.value)).toEqual(values);
   expect(card.textContent).toContain(call.realm);
   expect(card.textContent).toContain(call.func);
@@ -91,4 +91,12 @@ export function warnsMembers(card: HTMLElement): void {
   expect(lines).toHaveLength(1);
   const sign = button(card, "Sign in Adena");
   expect(lines[0] !== undefined && sign !== undefined && follows(lines[0], sign)).toBe(true);
+}
+
+/** That `card` is GovDAO's pinned Vote's (D271, D272): titled Vote, prefilled with `values`, naming the realm and the function, and
+ * saying before Sign in Adena that only members can vote. */
+export function pinnedVote(card: HTMLElement, values: readonly string[]): void {
+  expect(card.querySelector("h1, h2, h3, h4")?.textContent).toBe("Vote");
+  prefilled(card, values, { realm: "gno.land/r/gov/dao", func: "MustVoteOnProposalSimple" });
+  warnsMembers(card);
 }

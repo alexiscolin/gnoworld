@@ -45,7 +45,7 @@ export function PinnedBar({ part, actions, universe, at }: PinnedBarProps) {
     const card = `${at} ${keyOf(index, call)}`;
     if (found === undefined) return null;
     return part === "cards" ? (
-      <InlineCard key={card} id={card} place={{ realm: found.realm, chain: found.chain }} />
+      <InlineCard key={card} id={card} place={{ realm: found.realm, chain: found.chain }} title={call.label} />
     ) : (
       <ActionForm
         key={card}

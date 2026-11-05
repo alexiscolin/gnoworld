@@ -112,7 +112,7 @@ function Docked({ children }: { children: ReactNode }) {
 export function Dock({ onWhoIsHere, pinned, children }: DockProps) {
   return (
     <div className={styles["dock"]}>
-      {pinned?.cards}
+      {pinned && <div className={styles["cards"]}>{pinned.cards}</div>}
       <QuickActions onWhoIsHere={onWhoIsHere} pills={pinned?.pills} />
       {children}
     </div>

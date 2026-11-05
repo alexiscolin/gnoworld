@@ -448,3 +448,17 @@ describe("CallCard, a GovDAO vote", () => {
     expect(view({ card: vote({ state: { kind: "signing" } }) }).textContent).not.toContain(MEMBERS_ONLY);
   });
 });
+
+// The video's card is named after the action ("Boop the pot", f0110), its function in its own row: a pinned action's card is titled
+// by its label (design review of 9e-1); a card with no name is titled by its function, as before.
+describe("CallCard, its title", () => {
+  it("is the name it is given, the function staying in its FUNCTION row", () => {
+    const box = view({ title: "Vote" });
+    expect(all(box, "h3").map((h) => said(h))).toEqual(["Vote"]);
+    expect(said(box)).toMatch(/FUNCTION\s*SetBio/);
+  });
+
+  it("is the function when no name is given", () => {
+    expect(all(view(), "h3").map((h) => said(h))).toEqual(["SetBio"]);
+  });
+});

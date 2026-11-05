@@ -23,6 +23,8 @@ export interface CallCardProps {
   onRetry: () => void;
   /** The title's level under the page's headings: 3 unless the page says. */
   level?: 2 | 3 | 4 | undefined;
+  /** The call's name, its title when it has one (a pinned action's label); else its function. */
+  title?: string | undefined;
 }
 
 const COUNT = new Intl.NumberFormat("en-US");
@@ -183,13 +185,13 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
   );
 }
 
-export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level }: CallCardProps) {
+export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level, title }: CallCardProps) {
   const preview = card.state.kind === "preview";
   return (
     <Card>
       <Card.Header
         kicker="SIGNATURE REQUEST · ADENA"
-        title={card.func}
+        title={title ?? card.func}
         size="large"
         {...(level === undefined ? {} : { level })}
       />

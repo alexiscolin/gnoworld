@@ -11,8 +11,7 @@ import {
   listing,
   onGnoland,
   openedUnsigned,
-  prefilled,
-  warnsMembers,
+  pinnedVote,
 } from "../../../tests/callFixtures.ts";
 import type { PinnedRow } from "../../pinned.ts";
 import { PinnedBar } from "../world/Pinned.tsx";
@@ -86,8 +85,7 @@ describe("the quick actions of a world with pinned actions", () => {
     const bar = one(box, '[role="toolbar"]');
     expect(bar.contains(card)).toBe(false);
     expect(card.compareDocumentPosition(bar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    prefilled(card, ["15", ""], { realm: DAO, func: "MustVoteOnProposalSimple" });
-    warnsMembers(card);
+    pinnedVote(card, ["15", ""]);
   });
 
   it("gives each of two pinned actions its own card: a click on one opens that one only", async () => {
