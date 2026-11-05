@@ -877,6 +877,24 @@ describe("callContract: a failure after DoContract was asked may have been sent 
     expect(await callContract(throws, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
   });
 
+  it("is maybe-sent for any throw once DoContract was asked, reading its answer included (F5747-B)", async () => {
+    const hostile = new Fake({
+      DoContract: () =>
+        Promise.resolve({
+          get status(): string {
+            throw new Error("getter");
+          },
+        }),
+    });
+    expect(await callContract(hostile, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+    const sync = new Fake({
+      DoContract: () => {
+        throw new Error("sync");
+      },
+    });
+    expect(await callContract(sync, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "maybe-sent" });
+  });
+
   it("is maybe-sent with the hash when Adena says signed with an error set: the chain says what became of it", async () => {
     const data = { ...SENT, error: { message: "out of gas" }, Log: "out of gas" };
     const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });

@@ -137,7 +137,10 @@ async function send(
   // As Adena answered on Onyx (app/recording/adena-recording.json, D209), not as the SDK's types say: a hex hash
   // and the realm's Log, with no height and no check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
-  const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent);
+  // Reading the answer can throw too (a hostile getter): once asked, any throw is maybe-sent, never a call to try again (F5747).
+  const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent).catch(() =>
+    refusal("maybe-sent"),
+  );
   if (!done.ok) return maybeSent(done);
   const { hash, Log, error } = done.value;
   return error === null ? { ok: true, hash, log: capped(Log) } : { ...refusal("maybe-sent", "", Log), hash };
