@@ -25,6 +25,10 @@ for (const width of [390, 1280] as const) {
     await bar(page).getByRole("button", { name: "Vote" }).click();
     const card = page.getByRole("article").filter({ hasText: "MustVoteOnProposalSimple" });
     await expect(card).toContainText("gno.land/r/gov/dao");
+    // D272: a GovDAO vote's card says, before Adena opens, that only its members can vote.
+    await expect(card).toContainText(
+      "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost.",
+    );
     for (const name of ["pid", "option"]) {
       const box = card.getByRole("textbox", { name, exact: true });
       await expect(box).toHaveValue("");
