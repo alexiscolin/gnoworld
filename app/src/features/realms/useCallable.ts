@@ -18,23 +18,58 @@ const report = (error: unknown): void => {
 };
 
 /** The listing a realm view already read, for the forms its page holds: they mount after the page is read, when the panels'
- * shared request has ended, and would ask again. */
-export const ListingContext = createContext<Listing | undefined>(undefined);
+ * shared request has ended, and would ask again. It names the chain and realm it was read for: a reader of another one ignores it. */
+export interface Shared {
+  key: string;
+  listing: Listing;
+}
+export const ListingContext = createContext<Shared | undefined>(undefined);
 
-/** The functions of `realm` on the chain at `rpc`; read again, from nothing, when any of the three changes. Inside a realm view
- * (`ListingContext`) the view's own listing, with no read of its own. */
+const LOADING: Listing = { state: "loading" };
+
+/** The functions of `realm` on the chain at `rpc`, read again from nothing when any of the three changes, and an answer that comes
+ * late for an earlier one dropped. Inside a realm view (`ListingContext`) the view's own listing when it is of this realm and
+ * chain, with no read of its own. */
 export function useCallable(rpc: string, realm: string, options: ReadOptions | undefined): Listing {
   const shared = use(ListingContext);
-  const [listing, setListing] = useState<Listing>({ state: "loading" });
+  const mine = shared?.key === keyOf(rpc, realm);
+  const own = useRead({ rpc, realm, options, skip: mine });
+  return mine ? shared.listing : own.listing;
+}
+
+const keyOf = (rpc: string, realm: string): string => `${rpc} ${realm}`;
+
+/** The read itself, for a realm view to share (`ListingContext`) and for a reader outside one; `skip` leaves it unread. */
+export function useRead({
+  rpc,
+  realm,
+  options,
+  skip = false,
+}: {
+  rpc: string;
+  realm: string;
+  options: ReadOptions | undefined;
+  skip?: boolean;
+}): Shared {
+  const key = keyOf(rpc, realm);
+  const [read, setRead] = useState<Shared | undefined>(undefined);
   useEffect(() => {
-    if (shared !== undefined) return;
+    if (skip) return;
+    let live = true;
     readCallable(rpc, realm, options)
-      .then((read) => {
-        setListing(read.ok ? { state: "listed", functions: read.value } : { state: "failed", next: read.failure.next });
+      .then((answer) => {
+        if (!live) return;
+        const listing: Listing = answer.ok
+          ? { state: "listed", functions: answer.value }
+          : { state: "failed", next: answer.failure.next };
+        setRead({ key, listing });
       })
       .catch(report);
-  }, [rpc, realm, options, shared]);
-  return shared ?? listing;
+    return () => {
+      live = false;
+    };
+  }, [key, rpc, realm, options, skip]);
+  return read?.key === key ? read : { key, listing: LOADING };
 }
 
 /** The function `name` as a call carries it (a write, of the types a call carries) with its fields, or none: no such function,

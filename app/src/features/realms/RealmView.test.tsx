@@ -1,12 +1,12 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
+import { CUR, inputs } from "../../../tests/callFixtures.ts";
 import type { ChainFetch } from "@gnoworld/chain/read";
-import { realmType } from "@gnoworld/core";
 import { StoreProvider } from "../../storeContext.tsx";
 import { RealmView } from "./RealmView.tsx";
 
@@ -21,8 +21,6 @@ const CHAIN = {
   gnoweb: "https://onyx.testnets.gno.land",
   indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
 };
-// The input fields under `box`, as the inputs they are.
-const inputs = (box: ParentNode): HTMLInputElement[] => [...box.querySelectorAll("input")];
 
 // 5k: the facts the indexer gives for the realm, in the shape the schema takes (synthetic: nothing is recorded, F2950).
 const FACTS = {
@@ -295,7 +293,6 @@ function Here() {
 
 // 9e: a page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
 describe("a realm's view, with a form on its page", () => {
-  const CUR = { Name: "cur", Type: realmType() };
   const WRITES = [{ FuncName: "SetBio", Params: [CUR, { Name: "bio", Type: "string" }], Results: null }];
   const form = (exec: string) =>
     `# Bio\n\n<gno-form exec="${exec}">\n<gno-input name="bio" type="text" value="hi" />\n</gno-form>`;
@@ -351,5 +348,88 @@ describe("a realm's view, with a form on its page", () => {
       expect(button(box, "Call SetBio")).toBeDefined();
     });
     expect(asked.mock.calls.filter(([url]) => url.includes("vm%2Fqfuncs"))).toHaveLength(1);
+  });
+});
+
+// 9e (reviewer-1-1, security-1-2): a view that moves to another realm shows nothing of the first realm's functions, whatever
+// the order the two reads answer in.
+describe("a realm's view that moves from one realm to another", () => {
+  const A = "gno.land/r/demo/realma";
+  const B = "gno.land/r/demo/realmb";
+  const hex = (text: string) =>
+    [...new TextEncoder().encode(text)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const only = (name: string) => JSON.stringify([{ FuncName: name, Params: [CUR], Results: null }]);
+  function moving() {
+    const held = new Map<string, (answer: string) => void>();
+    const asked = vi.fn<ChainFetch>((url) => {
+      if (url.includes("/status"))
+        return Promise.resolve(new Response(JSON.stringify(statusEnvelope(1, "2026-10-30T23:43:10Z"))));
+      if (!url.includes("vm%2Fqfuncs"))
+        return Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: "# Page" }))));
+      const realm = url.includes(hex(A)) ? A : B;
+      return new Promise((resolve) => {
+        held.set(realm, (answer) => {
+          resolve(new Response(JSON.stringify(queryEnvelope({ data: answer }))));
+        });
+      });
+    });
+    function Switch() {
+      const [realm, setRealm] = useState(A);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setRealm(B);
+            }}
+          >
+            Move
+          </button>
+          <RealmView realm={realm} chain={CHAIN} home="/" options={{ fetch: asked }} />
+        </>
+      );
+    }
+    const box = mount(
+      <StoreProvider>
+        <MemoryRouter>
+          <Switch />
+        </MemoryRouter>
+      </StoreProvider>,
+    );
+    const answer = async (realm: string, name: string) => {
+      await vi.waitFor(() => {
+        expect(held.has(realm)).toBe(true);
+      });
+      await act(async () => {
+        held.get(realm)?.(only(name));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      });
+    };
+    return { box, answer };
+  }
+
+  test("shows the first realm's functions no longer while the second's are read", async () => {
+    const { box, answer } = moving();
+    await answer(A, "OnlyInA");
+    await vi.waitFor(() => {
+      expect(button(box, "Call OnlyInA")).toBeDefined();
+    });
+    click(button(box, "Move"));
+    expect(box.textContent).not.toContain("Call OnlyInA");
+  });
+
+  test("keeps the second realm's functions when the first realm's read answers last", async () => {
+    const { box, answer } = moving();
+    await vi.waitFor(() => {
+      expect(all(box, "button").length).toBeGreaterThan(0);
+    });
+    click(button(box, "Move"));
+    await answer(B, "OnlyInB");
+    await vi.waitFor(() => {
+      expect(button(box, "Call OnlyInB")).toBeDefined();
+    });
+    await answer(A, "OnlyInA");
+    expect(box.textContent).not.toContain("Call OnlyInA");
+    expect(button(box, "Call OnlyInB")).toBeDefined();
   });
 });
