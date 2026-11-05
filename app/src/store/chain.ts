@@ -6,6 +6,8 @@ import type { StateCreator } from "zustand/vanilla";
 
 export type ChainCall = Extract<ChainEvent, { kind: "call" }>;
 export type ChainDeploy = Extract<ChainEvent, { kind: "deploy" }>;
+/** A call as the page heard it: with the time of its hearing, which places it among a room's messages (a chain event has no time). */
+type ChainHeard = ChainCall & { at: string };
 
 /** The most a world keeps, the most the ticker keeps, and the worlds kept: a session holds no more than it shows. */
 const LINES = 50;
@@ -13,7 +15,7 @@ const DEPLOYS = 20;
 const WORLDS = 200;
 
 export interface ChainSlice {
-  chainByWorld: Readonly<Record<string, readonly ChainCall[]>>;
+  chainByWorld: Readonly<Record<string, readonly ChainHeard[]>>;
   deploys: readonly ChainDeploy[];
   realmsDeployed: Readonly<Record<string, RealmsDeployed>>;
   chainActions: {
@@ -32,11 +34,12 @@ export const chainSlice: StateCreator<ChainSlice> = (set, get) => ({
     heard: (events) => {
       const { chainByWorld, deploys } = get();
       let byWorld = chainByWorld;
+      const at = new Date().toISOString();
       for (const call of events) {
         if (call.kind !== "call") continue;
         const held = byWorld[call.world];
         if (held !== undefined || Object.keys(byWorld).length < WORLDS)
-          byWorld = { ...byWorld, [call.world]: [...(held ?? []), call].slice(-LINES) };
+          byWorld = { ...byWorld, [call.world]: [...(held ?? []), { ...call, at }].slice(-LINES) };
       }
       const added = events.filter((event) => event.kind === "deploy");
       set({ chainByWorld: byWorld, deploys: added.length === 0 ? deploys : [...deploys, ...added].slice(-DEPLOYS) });

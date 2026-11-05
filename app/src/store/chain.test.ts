@@ -1,5 +1,5 @@
 import { Address, type ChainEvent } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createAppStore } from "./index.ts";
 
 // Slice 9g: the chain's slice, from the stream's events alone (ADR-0002 §4: nothing is optimistic). A room's line exists only
@@ -22,6 +22,10 @@ const deploy = (height: number): ChainEvent => ({
   height,
 });
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("the chain's slice", () => {
   it("starts with no line in any room, no deploy for the ticker and no count: nothing is shown before its chain event", () => {
     const state = createAppStore().getState();
@@ -35,6 +39,20 @@ describe("the chain's slice", () => {
     store.getState().chainActions.heard([call(900030), call(900031, "bubble"), call(900032)]);
     expect(store.getState().chainByWorld["govdao"]?.map(({ height }) => height)).toEqual([900030, 900032]);
     expect(store.getState().chainByWorld["bubble"]?.map(({ height }) => height)).toEqual([900031]);
+  });
+
+  it("stamps each call with the time the page heard it, which places it among the room's messages (the event has none)", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-11-06T09:00:00.000Z"));
+    const store = createAppStore();
+    store.getState().chainActions.heard([call(1)]);
+    vi.setSystemTime(new Date("2026-11-06T09:00:05.000Z"));
+    store.getState().chainActions.heard([call(2), call(3)]);
+    expect(store.getState().chainByWorld["govdao"]?.map(({ height, at }) => [height, at])).toEqual([
+      [1, "2026-11-06T09:00:00.000Z"],
+      [2, "2026-11-06T09:00:05.000Z"],
+      [3, "2026-11-06T09:00:05.000Z"],
+    ]);
   });
 
   it("keeps the last 50 lines of a world and the last 20 deploys, the oldest out", () => {
