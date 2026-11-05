@@ -318,7 +318,7 @@ describe("a realm's view, with a form on its page", () => {
   test("shows a Call on a page's form for a write function the chain lists, and opens its card prefilled in the view", async () => {
     const box = await view(fetcher(form("SetBio")));
     click(await callOf(box));
-    expect(inputs(one(box, "figure")).map((i) => i.value)).toEqual(["hi"]);
+    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["hi"]);
   });
 
   test("keeps the form read only for a function the chain does not list", async () => {
@@ -336,8 +336,11 @@ describe("a realm's view, with a form on its page", () => {
     const formCall = await callOf(box);
     click(all(box, '[aria-label="Write functions"] button').find((b) => b.textContent === "Call SetBio"));
     click(formCall);
-    expect(inputs(one(box, "figure")).map((i) => i.value)).toEqual(["hi"]);
+    const [formCard, rowCard] = all(box, "article");
     expect(all(box, "article")).toHaveLength(2);
+    expect(formCard?.previousElementSibling).toBe(one(box, "figure"));
+    expect(inputs(formCard ?? box).map((i) => i.value)).toEqual(["hi"]);
+    expect(inputs(rowCard ?? box).map((i) => i.value)).toEqual([""]);
   });
 
   test("reads the functions' list once for the page's form and the write rows together", async () => {

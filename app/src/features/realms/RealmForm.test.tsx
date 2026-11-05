@@ -66,7 +66,9 @@ describe("a page's gno-form as a Form block with a Call", () => {
     click(caller);
     const card = one(box, "article");
     expect(follows(caller, card)).toBe(true);
-    expect(one(box, "figure").contains(card)).toBe(true);
+    // After the form's frame, not inside it: a frame of its own and the column's width, its values in the card's own type.
+    expect(one(box, "figure").contains(card)).toBe(false);
+    expect(one(box, "figure").nextElementSibling).toBe(card);
     expect(inputs(card).map((i) => i.value)).toEqual(["bob", "3"]);
     expect(card.textContent).toContain(REALM);
     expect(all(box, "dialog, [role=dialog], [aria-modal]")).toHaveLength(0);
@@ -110,6 +112,14 @@ describe("a page's gno-form as a Form block with a Call", () => {
     expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["bob", ""]);
   });
 
+  it("sets its Call at the end of its line at its own width, worded Call for the function, as a write row's", async () => {
+    const box = await form(gnoForm("SetProfile", input("name"), input("times")));
+    const caller = await calling(box, "Call SetProfile");
+    expect(caller.firstChild?.textContent).toBe("Call");
+    expect(caller.querySelector(".visually-hidden")?.textContent).toBe(" SetProfile");
+    expect(caller.parentElement?.getAttribute("data-justify")).toBe("end");
+  });
+
   it("is no longer worded as one that sends nothing once it can call", async () => {
     const box = await form(gnoForm("SetProfile", input("name"), input("times")));
     await calling(box, "Call SetProfile");
@@ -121,13 +131,18 @@ describe("a page's gno-form as a Form block with a Call", () => {
       `${gnoForm("SetProfile", input("name", 'value="benign" '))}\n\n${gnoForm("SetProfile", input("name", 'value="hostile" '))}`,
     );
     const [first = box, second = box] = all(box, "figure");
+    // A form's card is the element after its figure, when that is one.
+    const cardOf = (figure: Element) => {
+      const next = figure.nextElementSibling;
+      return next?.matches("article") === true ? inputs(next).map((i) => i.value) : [];
+    };
     await calling(second, "Call SetProfile");
     click(button(second, "Call SetProfile"));
-    expect(all(first, "article")).toHaveLength(0);
-    expect(inputs(second).map((i) => i.value)).toEqual(["hostile", ""]);
+    expect(cardOf(first)).toEqual([]);
+    expect(cardOf(second)).toEqual(["hostile", ""]);
     click(button(first, "Call SetProfile"));
-    expect(inputs(first).map((i) => i.value)).toEqual(["benign", ""]);
-    expect(inputs(second).map((i) => i.value)).toEqual(["hostile", ""]);
+    expect(cardOf(first)).toEqual(["benign", ""]);
+    expect(cardOf(second)).toEqual(["hostile", ""]);
   });
 
   it("keeps the prefilled text's problem, with the Sign button disabled: a form's value the type refuses is not signed (F5801)", async () => {

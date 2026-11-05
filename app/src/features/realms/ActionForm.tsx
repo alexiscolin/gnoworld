@@ -4,7 +4,7 @@
 // In the chat (`viewHref`), a call of more than two fields is only a compact card with its way to the realm view (ADR-0002 section 4).
 import { useId } from "react";
 import { HIDDEN, type FormField } from "@gnoworld/core";
-import { Button, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Stack } from "@gnoworld/ui";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { callsIn } from "../calls/index.ts";
 import { RealmForm } from "./RealmForm.tsx";
@@ -68,32 +68,41 @@ export function ActionForm({
   const { write, texts, fields } = checked;
   const compact = viewHref !== undefined && fields.length > 2;
   return (
-    <RealmForm
-      exec={write.function.name}
-      path=""
-      fields={fields}
-      left={0}
-      note={compact ? "a call of more fields, made in the realm view" : "a call you sign in Adena"}
-    >
-      <Stack space="xs">
-        <Why text={action.why} />
-        {compact ? (
-          <Button emphasis="outline" size="s" href={viewHref}>
-            Open in the realm view
-          </Button>
-        ) : (
-          <Button
-            emphasis="outline"
-            size="s"
-            onClick={() => {
-              openCard(store, { id, place, write: write.function, texts });
-            }}
-          >
-            {label ?? `Call ${write.function.name}`}
-          </Button>
-        )}
-        {opened && !compact ? <InlineCard id={id} place={place} /> : null}
-      </Stack>
-    </RealmForm>
+    <>
+      <RealmForm
+        exec={write.function.name}
+        path=""
+        fields={fields}
+        left={0}
+        note={compact ? "a call of more fields, made in the realm view" : "a call you sign in Adena"}
+      >
+        <Stack space="xs">
+          <Why text={action.why} />
+          <Cluster justify="end">
+            {compact ? (
+              <Button emphasis="outline" size="s" href={viewHref}>
+                Open in the realm view
+              </Button>
+            ) : (
+              <Button
+                emphasis="outline"
+                size="s"
+                onClick={() => {
+                  openCard(store, { id, place, write: write.function, texts });
+                }}
+              >
+                {label ?? (
+                  <>
+                    Call
+                    <span className="visually-hidden"> {write.function.name}</span>
+                  </>
+                )}
+              </Button>
+            )}
+          </Cluster>
+        </Stack>
+      </RealmForm>
+      {opened && !compact ? <InlineCard id={id} place={place} /> : null}
+    </>
   );
 }

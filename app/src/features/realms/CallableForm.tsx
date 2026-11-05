@@ -1,10 +1,10 @@
 // A page's `<gno-form exec="Func">` that a call can carry (9e, ADR-0002 section 4): the form as RealmForm draws it, every field in
 // view, and a "Call" that opens the call card under it, prefilled from the form, every field editable (a hidden one shows as a field,
-// the form still says it is hidden). What the chain does not confirm leaves the read-only form: `vm/qfuncs` has no such write
+// the form still says it is hidden), the card after the form's frame and not inside it (a frame of its own, the column's width). What the chain does not confirm leaves the read-only form: `vm/qfuncs` has no such write
 // function, a type no call carries, a field no parameter is named for, two of one name, a line that is no field, fields left
 // out of the drawing, or a `path`, which names the realm gnoweb sends to and which this form does not follow.
 import type { CallField, FormField } from "@gnoworld/core";
-import { Button, Stack } from "@gnoworld/ui";
+import { Button, Cluster } from "@gnoworld/ui";
 import { useId } from "react";
 import { callsIn } from "../calls/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
@@ -47,19 +47,22 @@ export function CallableForm({
   if (write === undefined || texts === undefined)
     return <RealmForm exec={exec} path={path} fields={fields} left={left} />;
   return (
-    <RealmForm exec={exec} path={path} fields={fields} left={left} note="a call you sign in Adena">
-      <Stack space="xs">
-        <Button
-          emphasis="outline"
-          size="s"
-          onClick={() => {
-            openCard(store, { id, place: call, write: write.function, texts });
-          }}
-        >
-          {`Call ${write.function.name}`}
-        </Button>
-        {opened ? <InlineCard id={id} place={call} /> : null}
-      </Stack>
-    </RealmForm>
+    <>
+      <RealmForm exec={exec} path={path} fields={fields} left={left} note="a call you sign in Adena">
+        <Cluster justify="end">
+          <Button
+            emphasis="outline"
+            size="s"
+            onClick={() => {
+              openCard(store, { id, place: call, write: write.function, texts });
+            }}
+          >
+            Call
+            <span className="visually-hidden"> {write.function.name}</span>
+          </Button>
+        </Cluster>
+      </RealmForm>
+      {opened ? <InlineCard id={id} place={call} /> : null}
+    </>
   );
 }
