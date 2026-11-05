@@ -69,7 +69,7 @@ const block = (height: number, ago = 1000): ChainRead => ({
 describe("the relay", () => {
   it("tells each event on the stream with its height as it is", () => {
     const { relay, chain } = setup();
-    relay(events(call(900030), call(900031)));
+    relay(events(call(900030, "govdao", actorN(1)), call(900031, "govdao", actorN(2))));
     expect(chain.mock.calls.map(([event]) => event.height)).toEqual([900030, 900031]);
   });
 
