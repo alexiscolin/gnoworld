@@ -204,6 +204,17 @@ describe("a date", () => {
   ])("refuses an event's start %j", (start) => {
     expect(Events.safeParse([{ ...event, start }]).success).toBe(false);
   });
+
+  it.each([["AMA"], ["Demo day"], ["Workshopping"]])("takes an event's kind %j, a word or two (8p)", (kind) => {
+    expect(Events.safeParse([{ ...event, kind }]).success).toBe(true);
+  });
+
+  it.each([[""], ["AMA!"], ["A very long kind"], [" AMA"], ["<b>"], ["AMA\nnow"]])(
+    "refuses an event's kind %j",
+    (kind) => {
+      expect(Events.safeParse([{ ...event, kind }]).success).toBe(false);
+    },
+  );
 });
 
 describe("a link", () => {

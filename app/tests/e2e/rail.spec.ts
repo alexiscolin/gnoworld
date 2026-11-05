@@ -4,7 +4,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { running } from "./sceneStage.ts";
 
 // The rail (frame 4 and 16, 7i): the Earth, the trends, the rising worlds and the seeds as planets with their names down the right edge,
-// 25 at most and "See all"; one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
+// 25 at most, ending on the last (8p); one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
 // motion; each planet its own portrait. Frame 4's rail: x 1,585 to 1,703 at 1,728 px, y 98 to 1,024 at most, its planets 64 px, 98 apart.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
@@ -99,9 +99,9 @@ test("stands where frame 4's rail stands, as tall as its worlds, its planets the
   expect(Math.abs(x - FRAME.left)).toBeLessThanOrEqual(2);
   expect(Math.abs(x + width - FRAME.right)).toBeLessThanOrEqual(2);
   expect(Math.abs(y - FRAME.top)).toBeLessThanOrEqual(6);
-  // Eight worlds: the panel ends a step under See all, above frame 4's foot, and nothing fades at it.
-  const all = await rail(page).getByRole("link", { name: "See all" }).boundingBox();
-  const under = y + height - (all?.y ?? 0) - (all?.height ?? 0);
+  // Eight worlds: the panel ends a step under its last planet's name (8p: no link ends it), above frame 4's foot, and nothing fades at it.
+  const last = await railLinks(page).last().boundingBox();
+  const under = y + height - (last?.y ?? 0) - (last?.height ?? 0);
   expect(under).toBeGreaterThan(0);
   expect(under).toBeLessThanOrEqual(40);
   expect(y + height).toBeLessThan(FRAME.bottom - 40);
@@ -119,12 +119,12 @@ test("stands where frame 4's rail stands, as tall as its worlds, its planets the
   expect(Math.abs((second?.middle ?? 0) - (first?.middle ?? 0) - FRAME.pitch)).toBeLessThanOrEqual(4);
 });
 
-test("lists the Earth, then the trends, people before callers, the rising world and the seeds, and See all after them", async ({
+test("lists the Earth, then the trends, people before callers, the rising world and the seeds, and nothing after them", async ({
   page,
 }) => {
   await arrived(page);
   await expect.poll(() => names(page), SOON).toEqual(ORDER);
-  await expect(rail(page).getByRole("link", { name: "See all" })).toHaveText("See all");
+  await expect(rail(page).getByRole("link", { name: "See all" })).toHaveCount(0);
   expect(await railLinks(page).count()).toBeLessThanOrEqual(25);
 });
 
@@ -135,9 +135,7 @@ test("keeps the labels out of its band", async ({ page }) => {
   await clearOf(page, x);
 });
 
-test("is one stop in the tab order, the arrows moving among its worlds, then See all, which opens the list", async ({
-  page,
-}) => {
+test("is one stop in the tab order, the arrows moving among its worlds, then leaves it", async ({ page }) => {
   await arrived(page);
   const links = railLinks(page);
   await links.first().focus();
@@ -148,9 +146,7 @@ test("is one stop in the tab order, the arrows moving among its worlds, then See
   await page.keyboard.press("Home");
   await expect(links.first()).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(rail(page).getByRole("link", { name: "See all" })).toBeFocused();
-  await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/list\/?$/, SLOW);
+  await expect(rail(page).locator(":focus")).toHaveCount(0);
 });
 
 test("goes to a world's page", async ({ page }) => {
@@ -282,7 +278,7 @@ test("stands no rail on a phone, which keeps its plain list and asks none of the
   expect(asked.filter((url) => /\/assets\/(?:Rail|portraits)-[\w-]+\.js$/.test(url))).toEqual([]);
 });
 
-test("holds 25 worlds at most in its fixed panel, which scrolls, its last world and See all reached by the keyboard", async ({
+test("holds 25 worlds at most in its fixed panel, which scrolls to its last world, reached by the keyboard", async ({
   page,
 }) => {
   await served(page, { called: Object.fromEntries(RECORDED.worlds.slice(0, 40).map(({ id }, at) => [id, 50 - at])) });
@@ -302,8 +298,6 @@ test("holds 25 worlds at most in its fixed panel, which scrolls, its last world 
   await page.keyboard.press("End");
   await expect(railLinks(page).last()).toBeFocused();
   await expect(railLinks(page).last()).toBeInViewport();
-  await page.keyboard.press("Tab");
-  await expect(rail(page).getByRole("link", { name: "See all" })).toBeInViewport();
   const ticker = await boxOf(page, "[data-ticker]");
   expect(y + height).toBeLessThanOrEqual(ticker.y);
 });
@@ -329,7 +323,7 @@ test("passes axe where it stands", async ({ page }) => {
   expect(violations).toEqual([]);
 });
 
-test("draws its panel, names and See all as frame 4's rail", async ({ page }) => {
+test("draws its panel and names as frame 4's rail, ending on its last world", async ({ page }) => {
   await arrived(page);
   await expect.poll(() => names(page), SOON).toEqual(ORDER);
   // The panel's glass shows the cosmos behind it, which never stands still: hidden, as labels.spec.ts does.

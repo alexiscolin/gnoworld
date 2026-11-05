@@ -28,6 +28,10 @@ export interface Signals {
   readonly rise?: number;
   readonly use?: number;
   readonly uncharted?: boolean;
+  /** The world's next event within the day, as its chip says it ("AMA in 11 h", frames 4 and 6). */
+  readonly event?: string;
+  /** A person the reader follows who is in one of its rooms, as its chip says it ("noor is here", decision 714). */
+  readonly person?: string;
 }
 
 export interface LabelAsk {
@@ -44,6 +48,9 @@ export interface Label {
   readonly title: string;
   readonly count: string;
   readonly badge: string;
+  /** Its chips after the badge, none or empty for none: the coming event's and the followed person's. */
+  readonly event?: string;
+  readonly person?: string;
   readonly uncharted: boolean;
 }
 
@@ -93,9 +100,10 @@ function badgeOf({ rise, perHour = 0 }: Signals): string {
   return parts.filter((part) => part !== "").join(" · ");
 }
 
-/** Whether real data names a world: people here, a rise, a use, or a new world unvisited. A far world with none asks for no label. */
-export const known = ({ here = 0, rise, use = 0, uncharted = false }: Signals): boolean =>
-  here > 0 || rise !== undefined || use > 0 || uncharted;
+/** Whether real data names a world: people here, a rise, a use, a new world unvisited, an event coming or a person followed in it. A far
+ * world with none asks for no label. */
+export const known = ({ here = 0, rise, use = 0, uncharted = false, event, person }: Signals): boolean =>
+  here > 0 || rise !== undefined || use > 0 || uncharted || event !== undefined || person !== undefined;
 
 // Rise first, then people here, then use; a tie by id, so the order the asks come in moves nothing. Weighed once an ask.
 type Weighed = readonly [LabelAsk, readonly [number, number, number]];
@@ -128,7 +136,14 @@ function farOf(asks: readonly LabelAsk[], taken: ReadonlySet<string>): LabelAsk[
 function labelOf(ask: LabelAsk, title: string): Label {
   const signals = ask.signals ?? {};
   const uncharted = ask.kind !== "earth" && signals.uncharted === true;
-  return { id: ask.id, kind: ask.kind, title, count: countOf(signals), badge: badgeOf(signals), uncharted };
+  // An uncharted signal is unnamed till charted: nothing of its people or its events.
+  const chips = uncharted
+    ? {}
+    : {
+        ...(signals.event === undefined ? {} : { event: signals.event }),
+        ...(signals.person === undefined ? {} : { person: signals.person }),
+      };
+  return { id: ask.id, kind: ask.kind, title, count: countOf(signals), badge: badgeOf(signals), ...chips, uncharted };
 }
 
 /** The labels a view shows, in their order: the Earth, the bodies it draws in the order given, then its far worlds. */

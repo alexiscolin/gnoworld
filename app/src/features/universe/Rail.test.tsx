@@ -9,8 +9,8 @@ import { Rail, PORTRAIT_SIZE, type RailSource } from "./Rail.tsx";
 import { RAIL_MINUTE, type RailPlaces } from "./railWorlds.ts";
 import { Portraits } from "./worldsFeed.ts";
 
-// The rail (frame 4, 7i): the Earth and the worlds of the moment as links, one stop in the tab order, the arrows moving among them, "See
-// all" after them; each planet the planets' own portrait once drawn; magnified like a dock under the pointer, never under reduced motion
+// The rail (frame 4, 7i): the Earth and the worlds of the moment as links, one stop in the tab order, the arrows moving among them, ending
+// on the last (8p); each planet the planets' own portrait once drawn; magnified like a dock under the pointer, never under reduced motion
 // nor on a touch screen. Where it stands, the page's plain list of worlds steps aside.
 const NOW = Date.parse("2026-11-03T12:00:00.000Z");
 const world = (id: string, extra: Partial<CosmosWorld> = {}): CosmosWorld => ({
@@ -173,15 +173,11 @@ describe("the rail", () => {
     expect(worlds(box).every((link) => link.querySelector("img")?.getAttribute("alt") === "")).toBe(true);
   });
 
-  it("ends with See all, a link to the list of every place", () => {
-    const { box, open } = rail();
-    const all = one(box, "nav[aria-label='Worlds'] a[href='/list']");
-    expect(all.textContent).toBe("See all");
-    expect(all.getAttribute("href")).toBe("/list");
-    act(() => {
-      all.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
-    });
-    expect(open).toHaveBeenCalledWith("/list");
+  it("ends on its last world, with no link after it (frames 6 and 17, 8p)", () => {
+    const { box } = rail();
+    const links = [...box.querySelectorAll("nav[aria-label='Worlds'] a")];
+    expect(links).toEqual(worlds(box));
+    expect(box.querySelector("nav[aria-label='Worlds'] a[href='/list']")).toBeNull();
   });
 
   it("marks the seeds as signals and the other worlds as worlds", () => {
@@ -197,10 +193,9 @@ describe("the rail", () => {
 });
 
 describe("the rail's keyboard", () => {
-  it("is one stop in the tab order, the first world, then See all", () => {
+  it("is one stop in the tab order, the first world", () => {
     const { box } = rail();
     expect(worlds(box).map((link) => link.tabIndex)).toEqual([0, -1, -1, -1, -1]);
-    expect(one(box, "nav[aria-label='Worlds'] a[href='/list']").tabIndex).toBe(0);
   });
 
   it("moves among the worlds with the arrows, round the ends, and to the ends with Home and End", () => {

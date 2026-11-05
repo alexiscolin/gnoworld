@@ -4,7 +4,6 @@
 // chunk of its own, asked at the first opening: the first screen holds the header's button alone.
 import { daysSince, EARTH, hubWorldOf, isFresh, passportCount, stampedIn, worldLook } from "@gnoworld/core";
 import { Combobox, ComingSoon, Dialog, Kicker, Progress, type ComboboxGroup } from "@gnoworld/ui";
-import type { PlaceKind } from "@gnoworld/core";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { useDeviceView } from "../../deviceViews.ts";
@@ -15,14 +14,15 @@ import { useApp } from "../../storeContext.tsx";
 import { useWorldsFile } from "../../worldsFile.ts";
 import { GoExplore } from "../home/index.ts";
 import { useWorldsCount } from "../universe/index.ts";
-import { searchItemsOf, searchPlaces, type SearchGroup, type SearchItem } from "./search.ts";
+import { searchItemsOf, searchPlaces, type SearchGroup, type SearchItem, type SearchKind } from "./search.ts";
 import styles from "./SearchDrawer.module.css";
 
-const KINDS: Record<PlaceKind, string> = {
+const KINDS: Record<SearchKind, string> = {
   ecosystem: "Ecosystems",
   world: "Hubs and DAOs",
   earth: "Home",
   cosmos: "Universes",
+  station: "Stations",
 };
 
 const SATELLITES = "Sponsored satellites";
@@ -33,7 +33,7 @@ const RENT = "Satellites anyone can rent";
 function Dot({ item }: { item: SearchItem }) {
   if (item.kind === "earth" || item.kind === "cosmos") return <span className={styles["dot"]} data-dot={item.kind} />;
   const listed = [...site.worlds, ...site.ecosystems].find(({ path }) => path === item.path);
-  const seed = listed === undefined ? item.path : item.kind === "world" ? hubWorldOf(listed) : listed.slug;
+  const seed = listed === undefined ? item.path : item.kind === "ecosystem" ? listed.slug : hubWorldOf(listed);
   // Lifted till its brightest channel reaches 0.75, so a dark palette still reads as a colour on the drawer's night.
   const middle = worldLook(seed).ramp[1];
   const lift = Math.max(1, 0.75 / Math.max(...middle, 0.01));
@@ -67,12 +67,23 @@ function useHere(open: boolean): ReadonlyMap<string, number> {
 
 const defaultUniverse = site.universes.find((each) => each.isDefault)?.id;
 
-// The count at a row's end: the people in a world or on the Earth of the default universe, whose rooms the server counts.
-function hereOf(item: SearchItem, here: ReadonlyMap<string, number>): string | undefined {
+// The people in a world, a station or on the Earth of the default universe, whose rooms the server counts.
+function hereOf(item: SearchItem, here: ReadonlyMap<string, number>): number | undefined {
   if (item.universe !== defaultUniverse) return undefined;
-  const slug = item.kind === "earth" ? EARTH : item.kind === "world" ? item.path.split("/").at(-1) : undefined;
-  const people = slug === undefined ? undefined : here.get(slug);
-  return people === undefined ? undefined : String(people);
+  const slug =
+    item.kind === "earth"
+      ? EARTH
+      : item.kind === "world" || item.kind === "station"
+        ? item.path.split("/").at(-1)
+        : undefined;
+  return slug === undefined ? undefined : here.get(slug);
+}
+
+// A row's end, frame 98's: the world's kind when it is no plain hub, then its people ("DAO · 96").
+function trailOf(item: SearchItem, here: ReadonlyMap<string, number>): string | undefined {
+  const people = hereOf(item, here);
+  const parts = [item.tag, people === undefined ? undefined : String(people)].filter((part) => part !== undefined);
+  return parts.length === 0 ? undefined : parts.join(" · ");
 }
 
 const optionsOf = (found: SearchGroup[], here: ReadonlyMap<string, number>): ComboboxGroup[] =>
@@ -80,7 +91,7 @@ const optionsOf = (found: SearchGroup[], here: ReadonlyMap<string, number>): Com
     id: group.kind,
     label: KINDS[group.kind],
     options: group.items.map((item) => {
-      const trail = hereOf(item, here);
+      const trail = trailOf(item, here);
       return { id: item.path, label: item.name, lead: <Dot item={item} />, ...(trail === undefined ? {} : { trail }) };
     }),
   }));

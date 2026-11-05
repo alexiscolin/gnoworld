@@ -2,7 +2,9 @@
 import events from "../../data/events.json" with { type: "json" };
 import news from "../../data/news.json" with { type: "json" };
 import onAir from "../../data/onAir.json" with { type: "json" };
+import { lazy, Suspense, useEffect } from "react";
 import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
+import { setCosmosChat, useCosmosChat } from "../cosmosChat.ts";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import {
   Hero,
@@ -16,10 +18,11 @@ import {
   useTrends,
   Worlds,
 } from "../features/home/index.ts";
+import type { CalendarEvent } from "../lib/coming.ts";
 import { PlaceLinks } from "../features/list/index.ts";
 import { useNewcomer, useResting, useSpace, useWorldsCount } from "../features/universe/index.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
-import { pageOf, site } from "../places.ts";
+import { pageOf, placeOf, site } from "../places.ts";
 import { useAppStore } from "../storeContext.tsx";
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
@@ -48,6 +51,16 @@ function onAirOf(universe: ReturnType<typeof useLoaderData<typeof loader>>) {
   );
 }
 
+// The chat's dock over the cosmos (frame 143), a chunk asked when the header's Chat first opens it.
+const CosmosChat = lazy(() => import("../features/universe/CosmosChat.tsx"));
+
+// The calendar's events, each with its world's name in `universe` (frame 6's "Dev help · AMA …").
+const placed = (universe: ReturnType<typeof useLoaderData<typeof loader>>) =>
+  events.map((event: CalendarEvent) => ({
+    ...event,
+    place: event.world === undefined ? undefined : placeOf(universe, event.world)?.name,
+  }));
+
 export default function Home() {
   const universe = useLoaderData<typeof loader>();
   const now = useClock();
@@ -73,6 +86,14 @@ export default function Home() {
   // The first visit's one filled call is the Earth's "Start here", which only the default universe's cosmos labels (ADR-0003 §3).
   const newcomer = useNewcomer();
   // The chain's trends lead the ticker (7t), the default universe's alone: the server's worlds job reads no other.
+  const chatOpen = useCosmosChat();
+  // Leaving the cosmos shuts its dock: another page holds its own chat, or none.
+  useEffect(
+    () => () => {
+      setCosmosChat(false);
+    },
+    [],
+  );
   const trends = trendItems(
     useTrends(universe.isDefault),
     { earth: universe.earth.path, worlds: universe.worlds },
@@ -94,7 +115,14 @@ export default function Home() {
           <PlaceLinks places={universe.worlds} />
         </Worlds>
       ) : null}
-      <Ticker items={ledByTrends(trends, withOnAir(tickerItems(news, events, now), onAirOf(universe), now))} />
+      {chatOpen ? (
+        <Suspense fallback={null}>
+          <CosmosChat universe={universe} />
+        </Suspense>
+      ) : null}
+      <Ticker
+        items={ledByTrends(trends, withOnAir(tickerItems(news, placed(universe), now), onAirOf(universe), now))}
+      />
     </>
   );
 }

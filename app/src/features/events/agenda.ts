@@ -1,51 +1,35 @@
 // The calendar (ADR-0002 §1, Events and calendar; slice 8): the data's events as an agenda by day, in the reader's own time, the coming and
 // the live ones (an hour from their start), those whose date waits for confirmation last; and the reminders' window. Pure: the clock is
 // given.
-import { UNDATED_EVENT } from "@gnoworld/schemas";
+import { comingEvents, isDated, LIVE_FOR_MS, startOf, type CalendarEvent } from "../../lib/coming.ts";
 
-/** An event of the data file. */
-export interface CalendarEvent {
-  readonly id: string;
-  readonly title: string;
-  readonly start: string;
-  readonly link: string;
-  readonly world?: string | undefined;
-}
+export { isDated, type CalendarEvent } from "../../lib/coming.ts";
 
-/** How long an event is live after its start: the data gives no end. */
-const LIVE_FOR_MS = 60 * 60 * 1000;
 /** How long before its start a reminder fires. */
 const REMIND_BEFORE_MS = 10 * 60 * 1000;
 /** The farthest a reminder's timer is armed: past it, the page arms it again when it opens (a timer past 2^31 ms fires at once). */
 const REMIND_WINDOW_MS = 24 * 60 * 60 * 1000;
-
-const startOf = (event: CalendarEvent) => Date.parse(event.start);
-
-/** Whether the data dates `event`: one waiting for its date has the sentinel. */
-export const isDated = (event: CalendarEvent): boolean => startOf(event) < UNDATED_EVENT;
 
 /** Whether `event` is live at `now`: begun, and within its hour. */
 export const isLive = (event: CalendarEvent, now: number): boolean =>
   isDated(event) && startOf(event) <= now && now < startOf(event) + LIVE_FOR_MS;
 
 /** A day of the agenda: its first instant in the reader's time, and its events in their order. */
-export interface AgendaDay {
+export interface AgendaDay<Event extends CalendarEvent = CalendarEvent> {
   readonly day: number;
-  readonly events: readonly CalendarEvent[];
+  readonly events: readonly Event[];
 }
 
 /** The agenda at `now`: the dated events coming or live, by day in the reader's time, the soonest first; and the undated ones. In `world`
  * alone when one is named. */
-export function agendaOf(
-  events: readonly CalendarEvent[],
+export function agendaOf<Event extends CalendarEvent>(
+  events: readonly Event[],
   now: number,
   world?: string,
-): { days: AgendaDay[]; undated: CalendarEvent[] } {
+): { days: AgendaDay<Event>[]; undated: Event[] } {
   const here = events.filter((event) => world === undefined || event.world === world);
-  const dated = here
-    .filter((event) => isDated(event) && now < startOf(event) + LIVE_FOR_MS)
-    .toSorted((a, b) => startOf(a) - startOf(b) || a.id.localeCompare(b.id));
-  const days: AgendaDay[] = [];
+  const dated = comingEvents(here, now);
+  const days: AgendaDay<Event>[] = [];
   for (const event of dated) {
     const at = new Date(startOf(event));
     const day = new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();

@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { logOutHere } from "./account.ts";
 import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
@@ -30,7 +31,7 @@ const draftKeys = (page: Page) =>
 // The account menu is the page's header's, which the full chat covers: the chat is docked, then expanded again.
 async function logOut(page: Page) {
   await page.getByRole("button", { name: "Shrink the chat" }).click();
-  await page.getByRole("button", { name: "Log out" }).click();
+  await logOutHere(page);
   await page.getByRole("button", { name: "Expand the chat" }).click();
 }
 

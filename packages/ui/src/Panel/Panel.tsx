@@ -58,6 +58,7 @@ Panel.Header = Header;
 Panel.Body = Body;
 Panel.Footer = Footer;
 Panel.Layout = Layout;
+Panel.Dock = Dock;
 
 interface LayoutProps {
   /** The plate: a Panel of the plate look. */
@@ -74,7 +75,17 @@ function Layout({ plate, children }: LayoutProps) {
     <div>
       <div className={styles["frame"]} aria-hidden="true" />
       <div className={styles["place"]}>{plate}</div>
-      {children === undefined ? null : <div className={styles["dock"]}>{children}</div>}
+      {children === undefined ? null : <Dock>{children}</Dock>}
+    </div>
+  );
+}
+
+/** The dock at the right on a wide screen, under that width no place of its own: beside a plate, inside its outline (Layout), or
+ * `alone` over the scene with every corner round (the chat over the cosmos, frame 143). */
+function Dock({ alone = false, children }: { alone?: boolean; children: ReactNode }) {
+  return (
+    <div className={styles["dock"]} data-alone={alone ? "" : undefined}>
+      {children}
     </div>
   );
 }

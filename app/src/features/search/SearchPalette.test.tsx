@@ -194,7 +194,9 @@ describe("the places", () => {
     await openIt(box);
     const each = groups(box);
     expect(each.map((label) => label.split(" · ")[0])).toEqual(
-      ["Ecosystems", "Hubs and DAOs", "Home", "Universes"].filter((label) => each.some((got) => got.startsWith(label))),
+      ["Ecosystems", "Hubs and DAOs", "Home", "Universes", "Stations"].filter((label) =>
+        each.some((got) => got.startsWith(label)),
+      ),
     );
     const total = each.reduce((sum, label) => sum + Number(label.split(" · ")[1]), 0);
     expect(total).toBe(site.places.length);
@@ -237,7 +239,8 @@ describe("the places", () => {
       await Promise.resolve();
     });
     const bubble = all(box, "[role='option']").find((each) => each.textContent.includes("Bubble"));
-    expect(bubble?.textContent).toBe("Bubble");
+    // Its name and its kind's tag (8p, frame 98), and no count.
+    expect(bubble?.textContent).toBe("BubbledApp");
   });
 
   it("goes to a place chosen and closes", async () => {

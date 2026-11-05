@@ -10,6 +10,8 @@ import { worldsFile } from "./worldsFile.ts";
 // Who is here changes by the minute: asked again each minute while the cosmos shows (the server's answer keeps a minute too).
 const PRESENCE_MS = 60_000;
 const loadSignals = () => import("./signals.ts");
+// The home's meteors (frames 4, 6, 7) cross the sky only while the cosmos shows: a chunk asked as it first does.
+const loadMeteors = () => import("./meteors.ts");
 
 /** What the cosmos's page hands its rail (7i): its router, and the places its links go to. */
 export interface CosmosPage {
@@ -90,6 +92,26 @@ export class WorldsFeed {
   #signals: LabelSignals | undefined;
   #heard = false;
   #polling: AbortController | undefined;
+  #store: StoreApi<AppState> | undefined;
+  #meteors: AbortController | undefined;
+
+  #sky(): void {
+    const meteors = new AbortController();
+    this.#meteors = meteors;
+    // A chunk that cannot come leaves the sky without meteors, as a failed read leaves the labels without counts.
+    loadMeteors().then(
+      ({ startMeteors }) => {
+        if (!meteors.signal.aborted) startMeteors(meteors.signal);
+      },
+      () => undefined,
+    );
+  }
+
+  // ponytail: read at each minute's ask, so a followed person shows within a minute of the room's people coming; a store watch if it matters.
+  #held() {
+    const state = this.#store?.getState();
+    return state === undefined ? undefined : { people: state.device.follows.people, rooms: state.chat.rooms };
+  }
 
   /** Hears each change of what `data` gives; what it returns lets go. */
   readonly subscribe = this.#known.subscribe;
@@ -100,9 +122,15 @@ export class WorldsFeed {
   /** The planets' portraits the scene drew for the rail, kept as long as the page lives. */
   readonly portraits = new Portraits((ids, size, signal) => this.#scene?.portraits(ids, size, signal));
 
-  /** Says whether the page wants the worlds on `scene`. */
-  sync(scene: Scene, wanted: boolean): void {
+  /** Says whether the page wants the worlds on `scene`; `page`'s store is where the labels read the people the reader follows and the rooms
+   * its chat holds (8p's "noor is here"). */
+  sync(
+    scene: Scene,
+    wanted: boolean,
+    page?: { readonly open: unknown; readonly follows?: CosmosPage["follows"] },
+  ): void {
     this.#scene = scene;
+    this.#store = page?.follows?.store;
     if (wanted === this.#shown) return;
     this.#shown = wanted;
     // What was heard before the cosmos was covered is old once it shows again: the server's next answer is the first again. Covered, the
@@ -110,11 +138,22 @@ export class WorldsFeed {
     if (wanted) this.#heard = false;
     else this.portraits.stop();
     this.#hand(scene, wanted ? this.#worlds : undefined);
+    this.#stopShowing();
+    if (wanted) this.#startShowing(scene);
+  }
+
+  // What runs while the cosmos shows: its text kept clear, its meteors, who is here, and the file's one read.
+  #startShowing(scene: Scene): void {
+    this.#keepTextClear(scene);
+    this.#sky();
+    this.#poll(scene);
+    if (!this.#asked) this.#read(scene);
+  }
+
+  #stopShowing(): void {
     this.#clearing?.abort();
     this.#polling?.abort();
-    if (wanted) this.#keepTextClear(scene);
-    if (wanted) this.#poll(scene);
-    if (wanted && !this.#asked) this.#read(scene);
+    this.#meteors?.abort();
   }
 
   // The file's time goes with its worlds, once there is one: it ages their calls; the signals, once come, name them.
@@ -135,12 +174,13 @@ export class WorldsFeed {
     const ask = () => {
       loadSignals()
         .then(({ localSignals, readSignals }) => {
-          const kept = this.#signals ?? localSignals(Date.now());
+          const held = this.#held();
+          const kept = this.#signals ?? localSignals(Date.now(), held);
           if (this.#signals === undefined && !polling.signal.aborted) {
             this.#signals = kept;
             this.#hand(scene, this.#worlds);
           }
-          return readSignals(kept);
+          return readSignals(kept, held);
         })
         .then(
           (signals) => {
@@ -210,7 +250,6 @@ export class WorldsFeed {
   /** The page's scene has gone for good. */
   leave(): void {
     this.#leaving.abort();
-    this.#clearing?.abort();
-    this.#polling?.abort();
+    this.#stopShowing();
   }
 }

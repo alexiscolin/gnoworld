@@ -85,8 +85,35 @@
   }
 
   .count:empty,
-  .badge:empty {
+  .badge:empty,
+  .event:empty,
+  .person:empty {
     display: none;
+  }
+
+  /* Frames 4, 6 and 143's chips after the heat: the world's coming event in mint ("AMA in 11 h"), a followed person in the text's white
+     ("noor is here"), each in a pill of its own, in the figures' mono. */
+  .event,
+  .person {
+    /* layout: its fill reaches over the pill's padding, as the badge's */
+    margin-block: calc(-1 * var(--space-3xs));
+    /* layout: a step after the words before it, outside its own fill */
+    margin-inline-start: var(--space-xs);
+    padding: var(--space-3xs) var(--space-xs);
+    border-radius: var(--radius-pill);
+    opacity: var(--_fade);
+    /* raw: the figures' 15 px mono, as the count's */
+    font: 400 0.9375rem/1.4 var(--family-mono);
+  }
+
+  .event {
+    background: var(--color-mine-soft);
+    color: var(--color-mine);
+  }
+
+  .person {
+    background: var(--color-fill-hover);
+    color: var(--color-text);
   }
 
   /* f0004's heat, "▲ 21% · 130/h": the warm figures in a pill of their own, inside the label. */

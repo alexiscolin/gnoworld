@@ -140,7 +140,6 @@ const trimmed = (pathname: string) => (pathname.length > 1 ? pathname.replace(/\
 
 // A row of the data as the site lists it; its genre by the name genres.json gives it.
 function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
-  const { genre } = row;
   return {
     slug: row.slug,
     name: row.name,
@@ -150,7 +149,7 @@ function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: s
     ...at,
     ...(row.realms === undefined ? {} : { realms: row.realms }),
     ...(row.kind === undefined ? {} : { kind: row.kind }),
-    ...(genre === undefined ? {} : { genre }),
+    ...(row.genre === undefined ? {} : { genre: row.genre }),
   };
 }
 
@@ -246,3 +245,10 @@ export const realmView = (realm: string, universe: Pick<UniverseView, "id" | "is
 
 // A realm's path on a site or on gnoweb, `gno.land/r/gov/dao` -> `/r/gov/dao`: the data's realms, which dataFiles.ts checks.
 export const realmPath = (realm: string): string => realmRoute(realm);
+
+/** The world `slug` of universe `at` as a place: its name and page, the Earth's own; none for a slug the universe does not list. Where an
+ * event happens (the calendar, the bell, the ticker). */
+export function placeOf(at: UniverseView, slug: string): { name: string; href: string } | undefined {
+  const world = slug === "earth" ? { name: "Earth", ...at.earth } : at.worlds.find((each) => each.slug === slug);
+  return world === undefined ? undefined : { name: world.name, href: world.path };
+}

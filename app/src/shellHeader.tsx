@@ -5,6 +5,7 @@
 // drawn once the page wakes: a not-found path is served the page written at /, which must hydrate as the path's own (F4692).
 import { Button, Chip, Cluster, ComingSoon, Icon, Logo } from "@gnoworld/ui";
 import { Link, useLocation } from "react-router";
+import { setCosmosChat, useCosmosChat } from "./cosmosChat.ts";
 import { useWoken } from "./features/home/clock.ts";
 import { useDeviceView } from "./deviceViews.ts";
 import { AccountMenu } from "./features/account/index.ts";
@@ -18,13 +19,38 @@ import { site, type UniverseView, type View } from "./places.ts";
 import { BellSlot } from "./slots.tsx";
 import styles from "./shellHeader.module.css";
 
+// The chat's pill, cream while the chat is docked (frame 23): a link to the Earth's chat, but on the cosmos, where the chat docks over the
+// scene (frame 143) and the pill opens and shuts it.
+function ChatPill({ universe, current }: { universe: UniverseView; current: View | undefined }) {
+  const { pathname } = useLocation();
+  const woken = useWoken();
+  const open = useCosmosChat();
+  if (current === "cosmos" && woken)
+    return (
+      <Button
+        icon="chat"
+        emphasis={open ? "solid" : "outline"}
+        onClick={() => {
+          setCosmosChat(!open);
+        }}
+      >
+        Chat
+      </Button>
+    );
+  const docked = current === "earth" || /\/w\/[^/]+$/.test(pathname);
+  // Drawn anew once the page wakes, as the views are: a path served another page's markup keeps its light otherwise (F4880).
+  return (
+    <Button key={String(woken)} href={universe.earth.path} icon="chat" emphasis={docked ? "solid" : "outline"}>
+      Chat
+    </Button>
+  );
+}
+
 export function ShellHeader({ universe }: { universe: UniverseView }) {
   const { pathname } = useLocation();
   const current = site.viewAt(universe, pathname);
-  // The chat is docked on the Earth's page and a world's: the pill is then cream (frame 23).
   const [, openView] = useDeviceView();
   const listed = useWorldsDrawn();
-  const docked = current === "earth" || /\/w\/[^/]+$/.test(pathname);
   const woken = useWoken();
   // The list has no page of its own in a universe: it is the one page of the site. Each view says what it holds to a screen reader alone;
   // nothing is drawn under the tabs (ADR-0003, 2c).
@@ -77,10 +103,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             <ComingSoon name="Jarvis" icon="spark" words="Jarvis" />
           </span>
           <span className={styles["drops"]}>
-            {/* Drawn anew once the page wakes, as the views are: a path served another page's markup keeps its light otherwise (F4880). */}
-            <Button key={String(woken)} href={universe.earth.path} icon="chat" emphasis={docked ? "solid" : "outline"}>
-              Chat
-            </Button>
+            <ChatPill universe={universe} current={current} />
           </span>
           <span className={styles["drops"]}>
             <PassportCounter

@@ -38,7 +38,7 @@ export function Ticker({ items }: { items: TickerItem[] }) {
           {items.map((item) => (
             <li key={item.id} className={styles["item"]}>
               <b className={styles["kind"]} data-kind={item.kind}>
-                {KINDS[item.kind]}
+                {item.label ?? KINDS[item.kind]}
               </b>
               {/* Another site's address opens a new tab; the site's own page opens here, through the router. */}
               {item.link.startsWith("https://") ? (

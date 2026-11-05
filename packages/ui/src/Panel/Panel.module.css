@@ -71,6 +71,12 @@
       border-end-end-radius: var(--radius-l);
     }
 
+    /* Alone over the scene, no plate beside it (frame 143): round at every corner, on the night's own fill. */
+    .dock[data-alone] {
+      border-radius: var(--radius-l);
+      background: var(--color-surface);
+    }
+
     .place {
       position: fixed;
       /* raw: the header's clearance of 96 and the 2 px the frame keeps under it (frame 20) */

@@ -12,6 +12,7 @@ export const Outline: Story = {};
 export const Plain: Story = { args: { emphasis: "plain", icon: "bold", label: "Bold" } };
 export const Pressed: Story = { args: { icon: "star", label: "Save the room", pressed: true } };
 export const WithCount: Story = { args: { label: "Unread notifications", count: 8 } };
+export const NewCount: Story = { args: { label: "Notifications", count: 6, countTone: "new" } };
 export const CountPast99: Story = { args: { label: "Unread notifications", count: 120 } };
 
 // Its tooltip, shown as the keyboard brings the focus: in the top layer, pictured as the screen.

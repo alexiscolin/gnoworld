@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { phoneWith } from "./account.ts";
 import { logIn } from "./irc.ts";
 import type { HistoryLine } from "./scripted.ts";
 import { marks, room, ROOM, T } from "./scriptedRoom.ts";
@@ -35,7 +36,6 @@ const toEnd = (page: Page) =>
   page.getByRole("list", { name: "Messages" }).evaluate((box) => {
     box.scrollTop = box.scrollHeight;
   });
-const PHONE = { width: 390, height: 844 };
 const savedButton = (page: Page) => page.getByRole("button", { name: /^Saved/ });
 const savedDialog = (page: Page) => page.getByRole("dialog", { name: "Saved messages" });
 
@@ -189,17 +189,12 @@ test.describe("on a phone", () => {
 
   test("a tap on a line, then More, then Save message saves it", async ({ page, playwright, launchOptions }) => {
     const address = await logIn(page, word("saved"));
-    const { baseURL } = test.info().project.use;
-    if (baseURL === undefined) throw new Error("no baseURL");
-    const browser = await playwright.chromium.launch(launchOptions);
-    const storageState = await page.context().storageState();
-    const context = await browser.newContext({ baseURL, storageState, hasTouch: true, viewport: PHONE });
-    const phone = await context.newPage();
+    const { phone, close } = await phoneWith(page, { playwright, launchOptions });
     await room(phone, { me: address });
     await lines(phone).nth(1).tap();
     await moreOf(phone, 1).tap();
     await phone.getByRole("menuitem", { name: "Save message" }).tap();
     await expect(lines(phone).nth(1)).toContainText(/^\S+( you)? Saved /);
-    await browser.close();
+    await close();
   });
 });

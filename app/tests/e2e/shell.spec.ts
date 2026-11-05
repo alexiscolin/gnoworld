@@ -1,10 +1,11 @@
 import AxeBuilder from "@axe-core/playwright";
 import { controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
+import { accountPill } from "./account.ts";
 import { adena } from "./adena.ts";
 import { logIn } from "./irc.ts";
 import { UPDATING } from "./sites.ts";
 
-// The page's shell (slice 5's 5a: U5, F355): a 16 px gutter on every page, the home link, the account and Log out on
+// The page's shell (slice 5's 5a: U5, F355): a 16 px gutter on every page, the home link and the account (one pill, 8p) on
 // one header row, and an update notice that covers nothing the keyboard reaches.
 const GUTTER = 16;
 const WIDTHS = [390, 1280] as const;
@@ -63,7 +64,7 @@ for (const width of WIDTHS) {
     };
 
     for (const path of PAGES) {
-      test(`${path}: the home link, the account and Log out share one header row`, async ({ page }) => {
+      test(`${path}: the home link and the account share one header row`, async ({ page }) => {
         const address = await logInAt(page);
         await page.goto(path);
         await hydrated(page);
@@ -76,7 +77,6 @@ for (const width of WIDTHS) {
           page.getByRole("link", { name: "gnoworld" }),
           ...(width < 900 ? [] : [page.getByRole("button", { name: /^Search/ })]),
           account,
-          page.getByRole("button", { name: "Log out" }),
         ];
         const boxes = await Promise.all(
           row.map(async (item) => {
@@ -113,7 +113,7 @@ for (const width of WIDTHS) {
         await page.goto(path);
         await hydrated(page);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+        await expect(accountPill(page)).toBeVisible();
         expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       });
     }
@@ -132,8 +132,8 @@ for (const width of WIDTHS) {
           await adena(page);
           await page.reload();
           await hydrated(page);
-          await page.getByRole("button", { name: "Log in with Adena" }).click();
-          await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+          await page.getByRole("button", { name: "Connect Adena" }).click();
+          await expect(accountPill(page)).toBeVisible();
         }
         expect((await page.request.post(`${UPDATING}/__bump`)).status()).toBe(204);
         await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
