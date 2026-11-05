@@ -79,15 +79,15 @@ test.describe("pins", () => {
     const text = word("pin");
     const address = await said(page, text);
     await pin(page, text);
-    await expect(lineOf(page, text)).toContainText(/^\S+( you)? Pinned /);
+    await expect(lineOf(page, text)).toContainText(/^\S+( you)?( new here)? ?Pinned /);
     for (const as of [undefined, word("reader")]) {
       const other = await reader({ playwright, launchOptions }, as);
       await expect.poll(held(other.page, text)).toBe(1);
-      await expect(lineOf(other.page, text)).toContainText(/^\S+( you)? Pinned /);
+      await expect(lineOf(other.page, text)).toContainText(/^\S+( you)?( new here)? ?Pinned /);
       await other.close();
     }
     await unpin(page, address, text);
-    await expect(lineOf(page, text)).not.toContainText(/^\S+( you)? Pinned /);
+    await expect(lineOf(page, text)).not.toContainText(/^\S+( you)?( new here)? ?Pinned /);
   });
 
   test("offers Pin to the moderator alone: a guest and another account have no button and no Unpin", async ({

@@ -60,7 +60,7 @@ test.describe("a room's lines: Edit", () => {
     await expect(field(page)).toBeFocused();
     await saveAs(page, "my first words, fixed");
     await expect(lines(page).nth(0)).toContainText("my first words, fixed");
-    await expect(lines(page).nth(0)).toContainText(/^\S+( you)? Edited \d{2}:\d{2}/);
+    await expect(lines(page).nth(0)).toContainText(/^\S+( you)?( new here)? ?Edited \d{2}:\d{2}/);
     await expect(lines(page)).toHaveCount(2);
     await expect(editing(page)).toHaveCount(0);
     await expect(field(page)).toHaveValue("");
