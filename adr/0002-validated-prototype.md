@@ -1018,7 +1018,9 @@ not choose its hosts.
     `demo` profile only adds the Tailscale machine, the egress proxy and the caps;
     `.env.example` and a list of the secret files; `docs/OPERATIONS.md`. One command
     starts each: `docker compose --profile demo up -d` here, `docker compose up -d` with
-    their own settings and secrets there.
+    their own settings and secrets there. Jarvis sits in a profile of its own, `jarvis`,
+    out of both (10j-4): `--profile demo --profile jarvis` here and
+    `docker compose up -d jarvis` there, only once it is switched on.
   - **Safe to try:** the default universe is Onyx, so calls spend test tokens.
   - **Disposable:** no backups. Load tests never run on it. Removing it is
     `docker compose down -v` and deleting its tailnet machine.
@@ -1052,8 +1054,9 @@ not choose its hosts.
   last backup is older than 26 hours. A moderation on-call is named.
 - **Working locally, simply** (one compose file, three uses):
   - **develop:** `pnpm dev` serves the client with hot reload, and
-    `docker compose --profile dev up` starts Ergo, `server` and `jarvis` beside it, with the
-    same images as everywhere else;
+    `docker compose up` starts Ergo, `server` and `web` beside it (the services under no
+    profile), and `docker compose up jarvis` adds `jarvis`, with the same images as
+    everywhere else;
   - **demo:** `docker compose --profile demo up -d` adds the Tailscale container, the egress
     proxy and the caps above;
   - **ops:** the same file is the reference wiring they adapt.
