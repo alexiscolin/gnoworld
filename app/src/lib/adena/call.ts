@@ -12,6 +12,7 @@ import {
   read,
   refusal,
   SITE,
+  type Method,
   type Answered,
   type CallFailure,
   type Failed,
@@ -30,7 +31,7 @@ export interface Universe {
 const GAS_WANTED = 10_000_000;
 const GAS_FEE = 1_000_000;
 
-type Need = (name: string, ...args: unknown[]) => Promise<Answered>;
+type Need = (name: Method, ...args: unknown[]) => Promise<Answered>;
 interface Wallet {
   establish: (...args: unknown[]) => unknown;
   getAccount: (...args: unknown[]) => unknown;
@@ -38,10 +39,6 @@ interface Wallet {
   doContract: (...args: unknown[]) => unknown;
   need: Need;
 }
-const SUCCESS: Record<string, readonly string[]> = {
-  SwitchNetwork: ["SWITCH_NETWORK_SUCCESS"],
-  AddNetwork: ["ADD_NETWORK_SUCCESS"],
-};
 
 // The extension and the methods every call needs; the ones only some steps need are asked for by `need`.
 function open(adena: unknown): Wallet | Failed {
@@ -56,18 +53,18 @@ function open(adena: unknown): Wallet | Failed {
   // An extension without a method only some steps need is too old when that step comes.
   const need: Need = (name, ...args) => {
     const run = method(adena, name);
-    return run === undefined ? Promise.resolve(refusal("outdated")) : ask(() => run(...args), SUCCESS[name] ?? []);
+    return run === undefined ? Promise.resolve(refusal("outdated")) : ask(() => run(...args), name);
   };
   return { establish, getAccount, getNetwork, doContract, need };
 }
 
 // Adena's account must be the call's caller: the person chose that account in gnoworld.
 async function checkAccount(wallet: Wallet, caller: string): Promise<Failed | undefined> {
-  const account = () => read(() => wallet.getAccount(), ["GET_ACCOUNT"], Account);
+  const account = () => read(() => wallet.getAccount(), "GetAccount", Account);
   let who = await account();
   if (!who.ok && who.reason === "not-connected") {
     // A refused connection comes back with no error at all: the state is read again, never assumed.
-    const letIn = await ask(() => wallet.establish(SITE), ["CONNECTION_SUCCESS", "ALREADY_CONNECTED"]);
+    const letIn = await ask(() => wallet.establish(SITE), "AddEstablish");
     if (!letIn.ok) return letIn;
     who = await account();
   }
@@ -78,7 +75,7 @@ async function checkAccount(wallet: Wallet, caller: string): Promise<Failed | un
 
 // The network is read right before signing and must be the universe's, switched or added if not; still wrong, stop.
 async function checkNetwork(wallet: Wallet, universe: Universe): Promise<Failed | undefined> {
-  const network = () => read(() => wallet.getNetwork(), ["GET_NETWORK", "GET_NETWORK_SUCCESS"], Network);
+  const network = () => read(() => wallet.getNetwork(), "GetNetwork", Network);
   const on = await network();
   if (!on.ok) return on;
   if (on.value.chainId === universe.chainId) return undefined;
@@ -136,7 +133,7 @@ async function send(
   // As Adena answered on Onyx (app/recording/adena-recording.json, D209), not as the SDK's types say: a hex hash
   // and the realm's Log, with no height and no check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
-  const done = await read(() => doContract(transaction(request, universe)), ["TRANSACTION_SUCCESS"], Sent);
+  const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent);
   if (!done.ok) return done;
   const { hash, Log, error } = done.value;
   return error === null || error === undefined ? { ok: true, hash, log: capped(Log) } : refusal("failed", "", Log);

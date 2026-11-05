@@ -20,6 +20,21 @@ const MAX_LOG = 2048;
 /** The name Adena shows for gnoworld when it asks to let it in. */
 export const SITE = "gnoworld";
 
+/**
+ * Each Adena method's success types, once, for the login and for a call. Adena answers GET_NETWORK
+ * (app/recording/adena-recording.json, entry 1), so GET_NETWORK_SUCCESS is not taken (D210).
+ */
+export const SUCCESSES = {
+  AddEstablish: ["CONNECTION_SUCCESS", "ALREADY_CONNECTED"],
+  GetAccount: ["GET_ACCOUNT"],
+  GetNetwork: ["GET_NETWORK"],
+  SwitchNetwork: ["SWITCH_NETWORK_SUCCESS"],
+  AddNetwork: ["ADD_NETWORK_SUCCESS"],
+  SignArbitrary: ["SIGN_ARBITRARY"],
+  DoContract: ["TRANSACTION_SUCCESS"],
+} as const;
+export type Method = keyof typeof SUCCESSES;
+
 // A failure's type says what it is; a type nobody knows is read by its code (bin/index.js:785-985).
 const BY_TYPE = new Map<string, CallFailure>([
   ["NOT_CONNECTED", "not-connected"],
@@ -71,8 +86,8 @@ function failure(type: string, code: number | undefined, message: string | undef
   return refusal(reason, type, reason === "failed" ? (message ?? "") : "");
 }
 
-// One call to the extension, its answer read by its type: one of the call's successes, or a failure with its reason.
-export async function ask(run: () => unknown, successes: readonly string[]): Promise<Answered> {
+// One call to the extension, its answer read by its type: one of the method's successes, or a failure with its reason.
+export async function ask(run: () => unknown, method: Method): Promise<Answered> {
   let raw: unknown;
   try {
     raw = await run();
@@ -82,7 +97,7 @@ export async function ask(run: () => unknown, successes: readonly string[]): Pro
   const parsed = Answer.safeParse(raw);
   if (!parsed.success) return refusal("malformed");
   const { status, type, code, message, data } = parsed.data;
-  const named = successes.includes(type);
+  const named = (SUCCESSES[method] as readonly string[]).includes(type);
   // "Already connected" is a failure in the SDK's table, and the SDK reads it as connected.
   if (named && (status === "success" || type === "ALREADY_CONNECTED")) return { ok: true, data };
   return status === "success" || named ? refusal("malformed", type) : failure(type, code, message);
@@ -91,10 +106,10 @@ export async function ask(run: () => unknown, successes: readonly string[]): Pro
 export type Read<T> = { ok: true; value: T } | Failed;
 export async function read<T>(
   run: () => unknown,
-  successes: readonly string[],
+  method: Method,
   schema: { safeParse: (data: unknown) => { success: true; data: T } | { success: false } },
 ): Promise<Read<T>> {
-  const answered = await ask(run, successes);
+  const answered = await ask(run, method);
   if (!answered.ok) return answered;
   const parsed = schema.safeParse(answered.data);
   return parsed.success ? { ok: true, value: parsed.data } : refusal("malformed");

@@ -57,11 +57,11 @@ export function connect(adena: unknown): Promise<ConnectResult> {
       if (establish === undefined || account === undefined || network === undefined)
         return { ok: false, reason: "missing" };
       // Each call stops the rest at its first refusal.
-      const letIn = await ask(() => establish(SITE), ["CONNECTION_SUCCESS", "ALREADY_CONNECTED"]);
+      const letIn = await ask(() => establish(SITE), "AddEstablish");
       if (!letIn.ok) return { ok: false, reason: refusal(letIn.reason) };
-      const who = await ask(() => account(), ["GET_ACCOUNT"]);
+      const who = await ask(() => account(), "GetAccount");
       if (!who.ok) return { ok: false, reason: refusal(who.reason) };
-      const on = await ask(() => network(), ["GET_NETWORK", "GET_NETWORK_SUCCESS"]);
+      const on = await ask(() => network(), "GetNetwork");
       return on.ok ? connected(who.data, on.data) : { ok: false, reason: refusal(on.reason) };
     } catch {
       return { ok: false, reason: "failed" };
@@ -94,7 +94,7 @@ export function signLogin(adena: unknown, login: Login): Promise<SignResult> {
     try {
       const prepared = ready(adena, text);
       if (!prepared.ok) return prepared;
-      const signed = await ask(() => prepared.sign({ signer: address, data: text }), ["SIGN_ARBITRARY"]);
+      const signed = await ask(() => prepared.sign({ signer: address, data: text }), "SignArbitrary");
       if (!signed.ok)
         return { ok: false, reason: signed.reason === "wrong-account" ? "mismatch" : refusal(signed.reason) };
       const proof = Proof.safeParse(signed.data);
