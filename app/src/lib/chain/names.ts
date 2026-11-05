@@ -15,7 +15,7 @@ export interface Named {
   chainId: string;
   /** The account's name, or null when the chain has none for it. */
   name: string | null;
-  /** The block the read was made at. */
+  /** The chain's height just before the name was read: the name is as of this block or a later one (a vm query carries no height). */
   height: number;
 }
 
