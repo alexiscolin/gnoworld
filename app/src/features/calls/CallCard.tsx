@@ -153,7 +153,7 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
   const preview = card.state.kind === "preview";
   return (
     <Card>
-      <Card.Header kicker="SIGNATURE REQUEST · ADENA" title={card.func} />
+      <Card.Header kicker="SIGNATURE REQUEST · ADENA" title={card.func} size="large" />
       <Card.Body>
         <p>A call to {card.realm}. Adena asks you to sign it.</p>
         <div className={styles["block"]}>

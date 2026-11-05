@@ -56,6 +56,10 @@ describe("CallCard, the preview", () => {
     expect(all(box, "dialog, [role=dialog], [aria-modal]")).toHaveLength(0);
   });
 
+  it("sets the title large, as the frame's light title (F5730)", () => {
+    expect(all(view(), "h2, h3, h4")[0]?.dataset["size"]).toBe("large");
+  });
+
   it("has the kicker and a title naming the function", () => {
     const box = view();
     expect(said(box)).toContain("SIGNATURE REQUEST · ADENA");
