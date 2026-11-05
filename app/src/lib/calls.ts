@@ -5,8 +5,8 @@
 import type { Param } from "@gnoworld/core";
 import type { CallFailure } from "./adena/answers.ts";
 
-/** Why a card failed: Adena's reasons, and the three of the card's own. */
-export type CardFailure = CallFailure | "logged-out" | "unseen" | "chain";
+/** Why a card failed: Adena's reasons, and the four of the card's own. */
+export type CardFailure = CallFailure | "logged-out" | "unseen" | "chain" | "not-loaded";
 
 export type CardState =
   | { kind: "preview" }

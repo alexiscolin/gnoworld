@@ -41,6 +41,7 @@ export function sayFailure({ reason, log, hash }: Said): string {
     "wrong-network":
       "Adena is not on this universe's network and did not switch. Switch the network in Adena, then try again.",
     malformed: "Adena answered with something unexpected, so nothing was trusted. Try again, or report it.",
+    "not-loaded": "Part of gnoworld that signs did not load, so nothing was sent. Reload the page, then try again.",
     "logged-out": "You are not logged in. Connect Adena, then try again.",
     unseen: `${log === undefined || log === "" ? "The call was sent but has not shown in a block after about 2 minutes." : `The call was sent, but the node's answer could not be used. ${shown(log)}`} It is not known whether it succeeded or failed. Look up its hash before you try again: ${hash ?? ""}`,
     chain: "The chain ran the call and the realm refused it, so nothing changed.",

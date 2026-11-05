@@ -4,7 +4,7 @@ import { sayFailure, sayProblem, shown } from "./say.ts";
 
 // 9d, D206: every failure of a call is a state with the next step the person can take. The text is ours: Adena's message and
 // the realm's log are shown as what they are, after it, never in place of it.
-const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain", RegExp> = {
+const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain" | "not-loaded", RegExp> = {
   missing: /install adena/i,
   outdated: /update adena/i,
   "not-connected": /connect/i,
@@ -18,6 +18,7 @@ const REASONS: Record<CallFailure | "logged-out" | "unseen" | "chain", RegExp> =
   "wrong-network": /network/i,
   malformed: /unexpected|report/i,
   "maybe-sent": /may have been sent.*recent transactions/i,
+  "not-loaded": /reload/i,
   "logged-out": /connect adena/i,
   unseen: /block/i,
   chain: /chain|realm/i,

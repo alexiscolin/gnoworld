@@ -3,6 +3,7 @@
 // section 4, budgets.spec.ts).
 import type { Universe } from "../../lib/adena/call.ts";
 import type { createAppStore } from "../../store/index.ts";
+import { callsIn } from "./slice.ts";
 
 // A node seen on its chain is not asked its status again for a minute: a call followed to its block reads the hash many times.
 const seen = new Map<string, number>();
@@ -13,11 +14,20 @@ export async function signInPage(
   store: ReturnType<typeof createAppStore>,
   universe: Universe,
 ): Promise<void> {
-  const [{ signCall }, { callContract, pageAdena }, { readTransaction }] = await Promise.all([
+  // A chunk that did not load (a network gone, a page older than the server's files) is a state with its next step.
+  const loaded = await Promise.all([
     import("./signCall.ts"),
     import("../../lib/adena/adena.ts"),
     import("@gnoworld/chain/tx"),
-  ]);
+  ]).then(
+    (parts) => parts,
+    () => undefined,
+  );
+  if (loaded === undefined) {
+    callsIn(store.getState())?.callsActions.failed(id, { reason: "not-loaded" });
+    return;
+  }
+  const [{ signCall }, { callContract, pageAdena }, { readTransaction }] = loaded;
   await signCall(id, {
     store,
     adena: pageAdena(),
