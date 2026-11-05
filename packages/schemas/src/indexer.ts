@@ -27,6 +27,32 @@ export const RealmFactsAnswer = z.object({
 });
 export type RealmFactsAnswer = z.infer<typeof RealmFactsAnswer>;
 
+/** The most characters of the realm path and the function a fee read names, as a CallRequest takes them. */
+export const CALL_FEES_CAPS = { path: 256, func: 128 } as const;
+
+/** The indexer's `getTransactions` for a function's calls (SHARED/recordings/README.md, not recorded): a row short of a field is
+ * dropped by the reader, never a failure. */
+export const CallFeesAnswer = z.object({
+  data: z.object({
+    getTransactions: z.nullable(
+      z.array(
+        z.object({
+          success: z.optional(z.boolean()),
+          block_height: z.optional(z.number()),
+          gas_fee: z.optional(z.nullable(z.object({ amount: z.number(), denom: z.string() }))),
+          messages: z.array(
+            z.object({
+              value: z.optional(z.object({ pkg_path: z.optional(z.string()), func: z.optional(z.string()) })),
+            }),
+          ),
+        }),
+      ),
+    ),
+  }),
+  errors: z.optional(z.never()),
+});
+export type CallFeesAnswer = z.infer<typeof CallFeesAnswer>;
+
 /** The node's `tx` answer (ResultTx, rpc/core/types/responses.go:249): the hash in base64, the block's height and what the call
  * gave; a hash the node has not stored comes as an `error` whose `data` says so. */
 export const TxAnswer = z.object({
