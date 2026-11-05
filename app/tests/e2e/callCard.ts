@@ -121,7 +121,11 @@ export async function writeChain(
   let reads = 0;
   await indexer(page);
   await page.route(INDEXER, (route) => {
-    if (!decodeURIComponent(route.request().url()).includes("getTransactions")) return route.fallback();
+    const asked = decodeURIComponent(route.request().url());
+    // The fee read asks the tip first, then the calls above a window under it (F5724).
+    if (fees === "rows" && asked.includes("latestBlockHeight") && !asked.includes("getTransactions"))
+      return route.fulfill({ headers: CORS, body: JSON.stringify({ data: { latestBlockHeight: 110 } }) });
+    if (!asked.includes("getTransactions")) return route.fallback();
     if (fees === "down") return route.fulfill({ status: 503, headers: CORS, body: "down" });
     return route.fulfill({ headers: CORS, body: JSON.stringify({ data: { getTransactions: FEE_ROWS } }) });
   });
