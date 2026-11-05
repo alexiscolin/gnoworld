@@ -2,6 +2,7 @@
 import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } from "react-router";
 import { use } from "react";
 import { afterEach, describe, expect, test, vi } from "vitest";
+import { button, click } from "../../tests/mount.tsx";
 import { fakeStream } from "../../tests/fakeStream.ts";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
@@ -16,7 +17,7 @@ import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
 // The page's chat is the real one, but for the test that watches the stream's way to the room: there the chat is the room's wiring alone (its
 // stream followed through useVerdicts, its thread's cards drawn from the calls the page gave), the rooms' own service being no business of it.
-const probing = vi.hoisted(() => ({ on: false }));
+const probing = vi.hoisted(() => ({ on: false, place: undefined as { slug: string } | undefined }));
 vi.mock(import("../features/chat/index.ts"), async (original) => {
   const actual = await original();
   const Probe = () => {
@@ -32,7 +33,10 @@ vi.mock(import("../features/chat/index.ts"), async (original) => {
   };
   return {
     ...actual,
-    Chat: (props: Parameters<typeof actual.Chat>[0]) => (probing.on ? <Probe /> : <actual.Chat {...props} />),
+    Chat: (props: Parameters<typeof actual.Chat>[0]) => {
+      probing.place = props.place;
+      return probing.on ? <Probe /> : <actual.Chat {...props} />;
+    },
   };
 });
 
@@ -276,6 +280,7 @@ describe("a world's plate", () => {
 describe("a world's page and the chain's stream", () => {
   afterEach(() => {
     probing.on = false;
+    probing.place = undefined;
     vi.unstubAllGlobals();
   });
   const call = (id: string, world: string, universe = "onyx") => ({
@@ -303,6 +308,62 @@ describe("a world's page and the chain's stream", () => {
       expect(box.querySelectorAll("[data-chain]")).toHaveLength(1);
     });
     expect(box.querySelector("[data-chain]")?.textContent).toContain("g10gh7…y5tv called MustVoteOnProposal");
+  });
+
+  test("gives the chat its place: the world, its kicker, its way home and the worlds beside it", async () => {
+    probing.on = true;
+    fakeStream();
+    drawRoute(route(), "/w/govdao");
+    await vi.waitFor(() => {
+      expect(probing.place).toBeDefined();
+    });
+    expect(probing.place).toEqual({
+      slug: "govdao",
+      name: "GovDAO",
+      description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
+      kicker: "Onyx · GovDAO",
+      home: "/",
+      worlds: [
+        { slug: "bubble", name: "Bubble", href: "/w/bubble" },
+        { slug: "govdao", name: "GovDAO", href: "/w/govdao" },
+      ],
+    });
+  });
+
+  test("copies the world's address, the site's origin and its canonical path, when its Share is clicked", async () => {
+    probing.on = true;
+    fakeStream();
+    const copied: string[] = [];
+    vi.stubGlobal("navigator", {
+      clipboard: {
+        writeText: (text: string) => {
+          copied.push(text);
+          return Promise.resolve();
+        },
+      },
+    });
+    const { box } = drawRoute(route(), "/w/govdao");
+    await vi.waitFor(() => {
+      expect(button(box, "Share")).toBeDefined();
+    });
+    click(button(box, "Share"));
+    await vi.waitFor(() => {
+      expect(copied).toEqual(["https://gno.world/net/onyx/w/govdao"]);
+    });
+  });
+
+  test("reads the proposals under the plate for a world with a realm, which the realm's own read fails to give here, and for no other", async () => {
+    probing.on = true;
+    fakeStream();
+    vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+    const govdao = drawRoute(route(), "/w/govdao");
+    await vi.waitFor(() => {
+      expect(govdao.box.textContent).toContain("Read them on gnoweb");
+    });
+    govdao.leave();
+    const bubble = drawRoute(route(), "/w/bubble");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(bubble.box.textContent).not.toContain("Read them on gnoweb");
   });
 
   test("closes the stream when the page is left", async () => {
