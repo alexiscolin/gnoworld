@@ -417,6 +417,7 @@ func TestTakedownByOwnerOrOperatorOnly(cur realm, t *testing.T) {
 	_, _, _, ok := Rental("mars")
 	uassert.False(t, ok)
 
+	at(t0 + 3*oneDay) // the first rental's paid end
 	testing.SetRealm(testing.NewUserRealm(alice))
 	pay(3 * p0)
 	Rent(cross(cur), "mars", "hello", 3)
