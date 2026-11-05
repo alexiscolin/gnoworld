@@ -429,7 +429,12 @@ describe("a Plan too full to name every world", () => {
   const crowded = () =>
     plannedOf(
       { system, worlds },
-      { names: new Map(worlds.map(({ id }) => [id, id])), links: new Map(), named: new Set(["gnoswap/pool"]) },
+      {
+        names: new Map(worlds.map(({ id }) => [id, id])),
+        links: new Map(),
+        named: new Set(["gnoswap/pool"]),
+        host: "gnoswap/gov",
+      },
     );
 
   it("hides the unnamed worlds' names and stands a +N counting them where the outer one's would be", () => {

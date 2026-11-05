@@ -9,7 +9,7 @@ import { LEAN } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
 import { onPlane, orbitPlace } from "./disc.ts";
 import type { Planned } from "../lod/drawn.ts";
-import { boxOf, MARGIN, meet, namedIn } from "./planNames.ts";
+import { boxOf, MARGIN, meet, namesOf } from "./planNames.ts";
 import { along, cameraTowards, DEGREE, focalOf, looksFrom, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
 /** The most worlds a Plan draws, the largest first: past them its others are dust. */
@@ -149,9 +149,10 @@ function readable(
   });
 }
 
-/** A Plan: its view, and the worlds it names (F5462). */
+/** A Plan: its view, the worlds it names, and the one whose name's place its "+N" takes, if it names not all (F5462). */
 export interface Plan extends Arrival {
   readonly named: ReadonlySet<string>;
+  readonly host: string | undefined;
 }
 
 /** `system`'s Plan: the eye over its plane at a slant, far enough that its outer orbit spans most of the narrower screen, at the first turn
@@ -204,7 +205,7 @@ export function planOf(system: StarSystem): Plan {
     lens: PLAN_LENS,
     up,
     lean: PLAN_LEAN,
-    named: chosen < 0 ? namedIn(still, placed, { camera, lens: PLAN_LENS }) : new Set(placed.map(({ id }) => id)),
+    ...namesOf(still, placed, { camera, lens: PLAN_LENS, crowded: chosen < 0 }),
   };
 }
 
@@ -218,11 +219,14 @@ const ORIGIN = { x: 0, y: 0, z: 0 };
  * its worlds share a ring of points round the star, in its plane, from the star, with the ring each world stands on. */
 export function plannedOf(
   { system, worlds }: { system: StarSystem; worlds: readonly Orbiter[] },
-  { names, links, named }: Pick<Planned, "names" | "links"> & { named?: ReadonlySet<string> },
+  {
+    names,
+    links,
+    named,
+    host,
+  }: Pick<Planned, "names" | "links"> & { named?: ReadonlySet<string>; host?: string | undefined },
 ): Planned {
   const unnamed = named === undefined ? [] : worlds.filter(({ id }) => !named.has(id));
-  const outer = Math.max(...unnamed.map(({ orbit }) => orbit));
-  const last = unnamed.filter(({ orbit }) => orbit === outer).at(-1);
   const centred = { ...system, place: ORIGIN };
   const places = worlds.map((world) => {
     const out = { x: 0, y: 0, z: 0 };
@@ -247,6 +251,6 @@ export function plannedOf(
     rings,
     ringOf: worlds.map(({ orbit }) => orbits.indexOf(orbit)),
     named: named ?? new Set(worlds.map(({ id }) => id)),
-    more: last === undefined ? undefined : { id: last.id, count: unnamed.length },
+    more: host === undefined || unnamed.length === 0 ? undefined : { id: host, count: unnamed.length },
   };
 }

@@ -28,7 +28,7 @@ export interface Planned {
   readonly places: readonly Point[];
   readonly rings: readonly (readonly Point[])[];
   readonly ringOf: readonly number[];
-  /** The worlds it names; the others counted under a "+N" standing where the last of them on the outer ring would be named (F5462). */
+  /** The worlds it names; the others counted under a "+N" standing where one of them would be named, clear of every name (F5462). */
   readonly named: ReadonlySet<string>;
   readonly more: { readonly id: string; readonly count: number } | undefined;
 }

@@ -102,6 +102,34 @@ function standsReadable(system: StarSystem) {
   }
 }
 
+// Whether a room meets a world's box, its name's room under it where it is named.
+const meetsBox = (
+  room: { left: number; right: number; top: number; bottom: number },
+  { x, y, radius }: { x: number; y: number; radius: number },
+  named: boolean,
+) => {
+  const wide = named ? Math.max(radius, NAME.half) : radius;
+  const bottom = y + radius + (named ? NAME.high : 0);
+  return room.left < x + wide && x - wide < room.right && room.top < bottom && y - radius < room.bottom;
+};
+
+// A "+N"'s room under its host meets no name nor world on either screen, and stands whole.
+function plusClear(system: StarSystem, named: ReadonlySet<string>, host: string | undefined) {
+  for (const { look, worlds: seen } of seenOn(system)) {
+    const at = seen.find(({ id }) => id === host)?.seen;
+    if (at === undefined) throw new Error("no host");
+    const room = {
+      left: at.x - NAME.half,
+      right: at.x + NAME.half,
+      top: at.y + at.radius,
+      bottom: at.y + at.radius + NAME.high,
+    };
+    expect(look.whole({ ...room, depth: at.depth }, 16)).toBe(true);
+    for (const { id, seen: other } of seen.filter(({ id: one }) => one !== host))
+      expect(meetsBox(room, other, named.has(id)), `${host ?? ""} over ${id}`).toBe(false);
+  }
+}
+
 describe("a system's Plan", () => {
   it.each(Object.keys(SETS) as SetName[])(
     "centres each star of %s on both screens, its plane seen 30 degrees over",
@@ -472,12 +500,28 @@ describe("a Plan too full to name every world", () => {
     }
   });
 
-  it("counts the unnamed under a +N on the outer ring, at the last of them there", () => {
-    const { named, postcard } = planOf(crowded());
-    const { more, worlds } = plannedOf(postcard, { names: new Map(), links: new Map(), named });
-    const unnamed = worlds.filter(({ id }) => !named.has(id));
-    expect(more?.count).toBe(unnamed.length);
-    const outer = Math.max(...unnamed.map(({ orbit }) => orbit));
-    expect(more?.id).toBe(unnamed.filter(({ orbit }) => orbit === outer).at(-1)?.id);
+  // G2 (the chief, 2026-11-05): the "+N" stands by the names' own rule, where the first unnamed world's name would, and where it would meet
+  // a name or a world one more name goes into the count, till it stands clear: on 48 crowded systems, none meets.
+  it("stands its +N clear of every name and world, counting the unnamed, on 48 crowded systems", () => {
+    let crowded = 0;
+    for (let at = 0; at < 48; at += 1) {
+      const namespace = `crowd${String(at)}`;
+      const system = systemsOf(
+        Array.from({ length: 12 }, (_, w) => ({ id: `${namespace}/w${String(w)}`, namespace, use: (at * w) % 3 })),
+      ).find(({ id }) => id === namespace);
+      if (system === undefined) throw new Error("no system");
+      const { named, host, postcard } = planOf(system);
+      const { more, worlds } = plannedOf(postcard, { names: new Map(), links: new Map(), named, host });
+      const unnamed = worlds.filter(({ id }) => !named.has(id));
+      if (unnamed.length === 0) {
+        expect(more).toBeUndefined();
+        continue;
+      }
+      crowded += 1;
+      expect(more).toEqual({ id: host, count: unnamed.length });
+      expect(named.has(host ?? "")).toBe(false);
+      plusClear(system, named, host);
+    }
+    expect(crowded).toBeGreaterThan(0);
   });
 });
