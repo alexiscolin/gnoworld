@@ -10,6 +10,7 @@ import { bigLine } from "./RealmCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
 import { RealmFacts } from "./RealmFacts.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
+import { RealmWrites } from "./RealmWrites.tsx";
 import styles from "./RealmView.module.css";
 import { isHeight, useRealm, type Height, type Realm } from "./useRealm.ts";
 import { useRealmFacts } from "./useRealmFacts.ts";
@@ -121,6 +122,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
           <Body state={state} origin={origin} link={link} />
           {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
           <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
+          <RealmWrites realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
           <Facts indexer={chain.indexer} realm={realm} options={options} />
         </Stack>
       </Center>

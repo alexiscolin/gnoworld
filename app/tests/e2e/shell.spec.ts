@@ -132,7 +132,7 @@ for (const width of WIDTHS) {
           await adena(page);
           await page.reload();
           await hydrated(page);
-          await page.getByRole("button", { name: "Log in with Adena" }).click();
+          await page.getByRole("button", { name: "Connect Adena" }).click();
           await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
         }
         expect((await page.request.post(`${UPDATING}/__bump`)).status()).toBe(204);

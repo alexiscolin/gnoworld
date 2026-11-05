@@ -77,7 +77,7 @@ test.describe("at the video's size", () => {
       near(earth.y + earth.height / 2, 56, "the views' row's middle");
       near(logo.y + logo.height / 2, 56, "the logo's middle");
       // The header's right edge keeps the same 32 px, once the login has said whether a session is open.
-      await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
       const right = await page.evaluate(() => {
         const items = [...document.querySelectorAll("header a, header button")].map(
           (el) => el.getBoundingClientRect().right,

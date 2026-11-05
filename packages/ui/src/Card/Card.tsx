@@ -43,11 +43,13 @@ export interface CardHeaderProps {
   state?: string;
   /** Its title's level under the page's headings: 3 unless the page says (F305). */
   level?: 2 | 3 | 4;
+  /** Large is the light title of a card that is a screen's subject (F5730): the body's size otherwise. */
+  size?: "large";
 }
 
 const HEADINGS = { 2: "h2", 3: "h3", 4: "h4" } as const;
 
-function Header({ title, icon, kicker, state, level = 3 }: CardHeaderProps) {
+function Header({ title, icon, kicker, state, level = 3, size }: CardHeaderProps) {
   const Heading = HEADINGS[level];
   const titleId = use(TitleContext);
   return (
@@ -59,7 +61,7 @@ function Header({ title, icon, kicker, state, level = 3 }: CardHeaderProps) {
             {kicker === undefined ? null : <Kicker>{kicker}</Kicker>}
           </Cluster>
         )}
-        <Heading id={titleId} className={styles["title"]}>
+        <Heading id={titleId} className={styles["title"]} data-size={size}>
           {title}
         </Heading>
       </Stack>

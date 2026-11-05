@@ -1,4 +1,5 @@
-// What the browser reads from the public indexer for a realm's facts (slice 5 part 2, 5k). THE SHAPE IS OURS, NOT RECORDED: no
+// What the browser reads from the public indexer for a realm's facts (slice 5 part 2, 5k), and, for the realm view's call card (9d), a function's
+// fees and a node's `tx`: no first-screen module reads them, so they sit here and not in the root's chain.ts. THE SHAPE IS OURS, NOT RECORDED: no
 // indexer answer has been read through gnomcp yet (ledger F2950), so this is the shape the reader asks for and refuses anything
 // else by; the day a recording differs, this file and its test are what change. The indexer has no time field (F2950), so no fact
 // here may be a count by date (the calls in 24 h wait on an indexer with dates, F2974). Every text is capped, every count is a whole number: what an account
@@ -25,3 +26,55 @@ export const RealmFactsAnswer = z.object({
   errors: z.optional(z.never()),
 });
 export type RealmFactsAnswer = z.infer<typeof RealmFactsAnswer>;
+
+/** The most characters of the realm path and the function a fee read names, as a CallRequest takes them. */
+export const CALL_FEES_CAPS = { path: 256, func: 128 } as const;
+
+/** The indexer's `getTransactions` for a function's calls (SHARED/recordings/README.md, not recorded): a row short of a field is
+ * dropped by the reader, never a failure. */
+export const CallFeesAnswer = z.object({
+  data: z.object({
+    getTransactions: z.nullable(
+      z.array(
+        z.object({
+          success: z.optional(z.boolean()),
+          block_height: z.optional(z.number()),
+          gas_fee: z.optional(z.nullable(z.object({ amount: z.number(), denom: z.string() }))),
+          messages: z.array(
+            z.object({
+              value: z.optional(z.object({ pkg_path: z.optional(z.string()), func: z.optional(z.string()) })),
+            }),
+          ),
+        }),
+      ),
+    ),
+  }),
+  errors: z.optional(z.never()),
+});
+export type CallFeesAnswer = z.infer<typeof CallFeesAnswer>;
+
+/** The indexer's `latestBlockHeight`: the tip a fee read counts its window back from. */
+export const TipAnswer = z.object({
+  data: z.object({ latestBlockHeight: count }),
+  errors: z.optional(z.never()),
+});
+
+/** The node's `tx` answer (ResultTx, rpc/core/types/responses.go:249): the hash in base64, the block's height and what the call
+ * gave; a hash the node has not stored comes as an `error` whose `data` says so. */
+export const TxAnswer = z.object({
+  result: z.optional(
+    z.object({
+      hash: z.string(),
+      height: z.string().check(z.regex(/^[0-9]+$/)),
+      tx_result: z.object({
+        ResponseBase: z.object({
+          Error: z.optional(z.nullable(z.object({ "@type": z.string(), value: z.optional(z.string()) }))),
+          Data: z.optional(z.nullable(z.string())),
+          Log: z.optional(z.string()),
+        }),
+      }),
+    }),
+  ),
+  error: z.optional(z.object({ data: z.optional(z.string()) })),
+});
+export type TxAnswer = z.infer<typeof TxAnswer>;

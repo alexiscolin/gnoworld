@@ -4,6 +4,28 @@
     display: none;
   }
 
+  /* The video's control is 44 px tall on a computer too: the token's touch height. */
+  .computer {
+    /* raw: 44 px is --control-m under a coarse pointer (tokens.css); the logged-out control wears it on every screen (F5655) */
+    --control-m: 44px;
+  }
+
+  /* The account logged in: the frame's bordered pill, a control tall (frames f0031 to f0033). */
+  .account {
+    /* layout: the address centred in the pill */
+    display: inline-grid;
+    /* layout: centred in the pill */
+    place-items: center;
+    block-size: var(--control-m);
+    padding-inline: var(--space-s);
+    border-width: var(--line-width);
+    border-style: solid;
+    border-color: var(--color-line-strong);
+    /* a pill: half the height */
+    border-radius: calc(var(--control-m) / 2);
+    font: var(--font-body);
+  }
+
   .problem:empty {
     display: none;
   }

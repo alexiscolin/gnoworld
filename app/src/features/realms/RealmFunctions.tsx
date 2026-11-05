@@ -3,11 +3,12 @@
 // so, with the block height it was read at, and no wallet is ever asked. One request a view for the list, two a click (the
 // call, shown first, and the height, which follows it); nothing polls. The names are lib/chain's (one exported identifier or none); a long list is drawn a
 // hundred at a time and searched whole. Every state keeps the link to the realm on gnoweb, where the rest is done.
-import { Button, Cluster, Field, Row, Skeleton, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import edge from "./frame.module.css";
+import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
 import styles from "./RealmFunctions.module.css";
 import { useFunctions, type Functions, type Result } from "./useFunctions.ts";
 import { isHeight } from "./useRealm.ts";
@@ -77,23 +78,17 @@ function Items({ names, results, read }: { names: string[]; results: Functions["
       {found.length === 0 ? <p>No function matches your search.</p> : null}
       <ul className={styles["list"]}>
         {found.slice(0, shown).map((name) => (
-          <li key={name} className={styles["item"]}>
-            <Row
-              title={name}
-              trail={
-                <Button
-                  emphasis="quiet"
-                  {...(results[name]?.state === "busy" ? { busy: true } : {})}
-                  onClick={() => {
-                    read(name);
-                  }}
-                >
-                  Read<span className="visually-hidden"> {name}</span>
-                </Button>
-              }
-            />
+          <FunctionRow
+            key={name}
+            name={name}
+            verb="Read"
+            busy={results[name]?.state === "busy"}
+            onClick={() => {
+              read(name);
+            }}
+          >
             <Outcome name={name} result={results[name]} />
-          </li>
+          </FunctionRow>
         ))}
       </ul>
       {found.length > shown ? (
@@ -116,14 +111,7 @@ function Items({ names, results, read }: { names: string[]; results: Functions["
 
 function Body({ functions }: { functions: Functions }) {
   const { listing, results, read } = functions;
-  if (listing.state === "loading") {
-    return (
-      <div aria-busy="true" aria-label="Reading the functions">
-        <Skeleton lines={2} />
-      </div>
-    );
-  }
-  if (listing.state === "failed") return <p role="status">{listing.next}</p>;
+  if (listing.state !== "listed") return <Unlisted listing={listing} />;
   if (listing.names.length === 0) return <p>There is no function to read here.</p>;
   return <Items names={listing.names} results={results} read={read} />;
 }

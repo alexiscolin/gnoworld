@@ -24,7 +24,9 @@ export function LoginView({ session, step, problem, onLogIn, onLogOut }: LoginVi
     <Cluster>
       {session.kind === "in" ? (
         <>
-          <span title={session.address}>{short(session.address)}</span>
+          <span className={styles["account"]} title={session.address}>
+            {short(session.address)}
+          </span>
           <Button size="s" emphasis="quiet" onClick={onLogOut}>
             Log out
           </Button>
@@ -33,8 +35,8 @@ export function LoginView({ session, step, problem, onLogIn, onLogOut }: LoginVi
       {session.kind === "out" ? (
         <>
           <span className={styles["computer"]}>
-            <Button size="s" busy={step !== "idle"} onClick={onLogIn}>
-              {step === "idle" ? "Log in with Adena" : STEPS[step]}
+            <Button busy={step !== "idle"} onClick={onLogIn}>
+              {step === "idle" ? "Connect Adena" : STEPS[step]}
             </Button>
           </span>
           <span className={styles["phone"]}>To log in, use a computer; once logged in you can write from here.</span>

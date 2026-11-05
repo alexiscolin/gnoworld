@@ -537,7 +537,7 @@ describe("a wallet that throws or lacks a method ends in one result", () => {
 });
 
 // What commit e0cae601 changed without a test (F5666): a failure of a type nobody knows is read by its code, and a failure
-// typed as another call's success is a plain failed answer; only its own success type as a failure is malformed.
+// typed as another call's success is malformed again, as is its own success type as a failure (F5666, Alexis 2026-11-05).
 describe("a failure's type and code, for the login's calls", () => {
   const failure = (type: string, code: number) =>
     Promise.resolve({ code, status: "failure", type, message: "", data: {} });
@@ -559,9 +559,9 @@ describe("a failure's type and code, for the login's calls", () => {
       expect(result).toStrictEqual({ ok: false, reason });
     });
 
-    it("a failure typed as another call's success is failed, read by its code like an unknown type", async () => {
+    it("a failure typed as another call's success is malformed, whatever its code says", async () => {
       const result = await reads[call]({ [failing[call]]: () => failure("GET_NETWORK", 4001) });
-      expect(result).toStrictEqual({ ok: false, reason: "failed" });
+      expect(result).toStrictEqual({ ok: false, reason: "malformed" });
     });
   });
 });
