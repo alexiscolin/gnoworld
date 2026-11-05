@@ -25,3 +25,7 @@ export const RealmFactsAnswer = z.object({
   errors: z.optional(z.never()),
 });
 export type RealmFactsAnswer = z.infer<typeof RealmFactsAnswer>;
+
+// The chain's events the server tells (slice 9g) are read through this path too: a page loads them on its first event, in a chunk of its own,
+// which the package's barrel would pull into the first screen's.
+export { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
