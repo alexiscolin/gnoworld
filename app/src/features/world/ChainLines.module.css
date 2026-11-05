@@ -1,8 +1,14 @@
 @layer components {
   .lines {
-    /* layout: a list with no bullet and no indent of its own */
+    /* layout: the lines one under the other */
+    display: grid;
+    /* layout: a step between the lines */
+    gap: var(--space-2xs);
+    /* layout: a list's own margin and indent, which the browser gives it, taken off */
+    margin: 0;
     padding-inline-start: 0;
-    list-style: none;
+    /* layout: no marker: a line is a sentence, not an item of a list to count */
+    list-style-type: none;
     color: var(--color-text-muted);
   }
 }
