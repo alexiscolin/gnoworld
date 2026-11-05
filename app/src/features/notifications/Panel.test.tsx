@@ -3,6 +3,8 @@ import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, modals, noMedia, popovers, settled } from "../../../tests/mount.tsx";
 import { mountInStore } from "../../../tests/inStore.tsx";
+import { pageDevice } from "../../lib/keep/device.ts";
+import { isUnread } from "./feed.ts";
 import { Panel } from "./Panel.tsx";
 
 // The bell's panel (slice 8; frames 86, 87): the kinds with what is unread in each, the worlds to filter by, a followed world where people
@@ -99,6 +101,32 @@ describe("the bell's panel", () => {
     expect(warning?.hasAttribute("open")).toBe(true);
     expect(warning?.textContent).toContain("example.com");
     expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it("marks every line read on Mark all read: a followed world's row and the events to come included", async () => {
+    const page = await opened();
+    press(page, "Mark all read");
+    expect(unreadMarks(page)).toBe(0);
+    expect(tabs(page)).toEqual(["All", "Messages", "Worlds", "News"]);
+  });
+
+  it("keeps a line read one by one read once Mark all read is pressed", async () => {
+    localStorage.setItem("gnoworld:device:notificationsRead", JSON.stringify({ through: null, ids: ["here:bubble"] }));
+    const page = await opened();
+    expect(unreadMarks(page)).toBe(3);
+    press(page, "Mark all read");
+    // What the next page reads from the device.
+    const read = pageDevice().read("notificationsRead");
+    const followed = {
+      id: "here:bubble",
+      kind: "worlds",
+      icon: "people",
+      text: "",
+      where: "",
+      at: Number.NaN,
+      href: "/",
+    } as const;
+    expect(read !== undefined && isUnread(followed, read)).toBe(false);
   });
 
   it("closes on Esc and on a press outside it", async () => {
