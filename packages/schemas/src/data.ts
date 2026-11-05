@@ -78,10 +78,10 @@ export const RealmPath = z
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
 /** The most a call's arguments may hold, as a Jarvis proposal and a world's pinned action give them, in code points. */
-const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
+export const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
 
 /** A call's arguments by the parameter's name, as text: what a call carries. */
-const CallArgs = z.pipe(
+export const CallArgs = z.pipe(
   // Zod drops a key `__proto__` (an own key from JSON.parse) without a word: its argument would vanish unseen.
   z
     .unknown()

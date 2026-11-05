@@ -190,6 +190,13 @@ describe("ProposedAction", () => {
     expect(proposal({ args: { note: text(JARVIS_CAPS.arg + 1) } })).toBe(false);
   });
 
+  // JSON.parse makes "__proto__" an own key, which Zod drops from the parsed object without a word: the argument would vanish from the
+  // proposal the client prefills. A world's pinned action refuses it too (data.ts, D271): the same arguments' schema.
+  it("refuses an argument named __proto__ from Jarvis's JSON, which would vanish from the proposal", () => {
+    const parsed: unknown = JSON.parse(JSON.stringify(action()).replace('"id"', '"__proto__"'));
+    expect(ProposedAction.safeParse(parsed).success).toBe(false);
+  });
+
   it("bounds the realm, the function and the why, none of them empty", () => {
     expect(
       proposal({ realm: text(JARVIS_CAPS.realm), function: text(JARVIS_CAPS.name), why: text(JARVIS_CAPS.why) }),
