@@ -131,7 +131,8 @@ Anthropic key is Alexis's own for tests, then the company's.
 ## Jarvis's evals
 
 `evals/` is installed apart from the workspace (its own `pnpm-workspace.yaml`, with the workspace's supply-chain
-rules, and its own lockfile): `cd evals && pnpm install`, once, in your shell. They need Anthropic's key in a file
+rules, and its own lockfile): `cd evals && pnpm install --frozen-lockfile --ignore-scripts`, once, in your shell, so
+no package's script runs there (F5317). They need Anthropic's key in a file
 and gnomcp 0.11.0, and cost money for each case not kept in `evals/.cache`:
 `ANTHROPIC_API_KEY_FILE=deploy/secrets/anthropic_api_key sh evals/run.sh`. `run.sh` checks the evals' own types
 and Node tests first (`evals/test-*.ts`), then runs promptfoo's `eval` script, its results in `evals/results/`.
