@@ -180,6 +180,56 @@ describe("a failure's reason, by its type first and by its code for a type nobod
   });
 });
 
+// F5749: TRANSACTION_FAILED as adena-wallet bc5a7b5a answers it (approve-transaction-main/index.tsx:596-633): the generic
+// message, and in data the hash, `error` (response.toString()) and `log` (the chain's, a TM2Error only); a null response
+// is `error: null`. The reason of a failure with a hash is data.log, else data.error, never the generic message.
+describe("ask: why a transaction Adena named a hash for failed (F5749)", () => {
+  const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+  const failedWith = (data: unknown) => ({
+    status: "failure",
+    type: "TRANSACTION_FAILED",
+    message: "Transaction failed",
+    data,
+  });
+  const failure = (log?: string) => ({
+    ok: false,
+    reason: "failed",
+    type: "TRANSACTION_FAILED",
+    hash: HASH,
+    ...(log === undefined ? {} : { log }),
+  });
+
+  it("carries the chain's log, not the generic message", async () => {
+    const data = { hash: HASH, error: "TM2Error{...}", log: "insufficient fee" };
+    expect(await ask(() => failedWith(data), "DoContract")).toStrictEqual(failure("insufficient fee"));
+  });
+
+  it("falls back to the error text when there is no log, or the log is not a string", async () => {
+    const error = "Error: broadcast failed";
+    expect(await ask(() => failedWith({ hash: HASH, error }), "DoContract")).toStrictEqual(failure(error));
+    expect(await ask(() => failedWith({ hash: HASH, error, log: 7 }), "DoContract")).toStrictEqual(failure(error));
+  });
+
+  it("carries no reason for a null response, nor for an error that is not a string: never the message", async () => {
+    expect(await ask(() => failedWith({ hash: HASH, error: null }), "DoContract")).toStrictEqual(failure());
+    expect(await ask(() => failedWith({ hash: HASH, error: { a: 1 } }), "DoContract")).toStrictEqual(failure());
+  });
+
+  it("caps a long log as every log is", async () => {
+    const got = await ask(() => failedWith({ hash: HASH, log: "x".repeat(5000) }), "DoContract");
+    expect(got).toMatchObject({ log: "x".repeat(2048) });
+  });
+
+  it("leaves a failure with no hash as it was: the message is its log", async () => {
+    expect(await ask(() => failedWith({ error: "e", log: "l" }), "DoContract")).toStrictEqual({
+      ok: false,
+      reason: "failed",
+      type: "TRANSACTION_FAILED",
+      log: "Transaction failed",
+    });
+  });
+});
+
 describe("the account and the network as both callers read them", () => {
   it.each(["", " ", "\t"])("takes no chain id of %j, in an account or a network", (chainId) => {
     expect(Network.safeParse({ chainId }).success).toBe(false);

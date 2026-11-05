@@ -162,8 +162,8 @@ describe("signCall: the card's course", () => {
           Promise.resolve({
             status: "failure",
             type: "TRANSACTION_FAILED",
-            message: "insufficient funds",
-            data: { hash: SIGNED_HASH },
+            message: "Transaction failed",
+            data: { hash: SIGNED_HASH, error: "TM2Error{...}", log: "insufficient funds" },
           }),
       });
       return wallet.adena;

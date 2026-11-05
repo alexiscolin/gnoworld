@@ -81,10 +81,19 @@ function failure(type: string, code: number | undefined, message: string | undef
   return refusal(reason, type, reason === "failed" ? (message ?? "") : "");
 }
 
-// The hash a failure carries (adena-wallet bc5a7b5a, approve-transaction-main/index.tsx:604-627), only when it is one.
-function hashOf(data: unknown): string | undefined {
-  const parsed = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)) }).safeParse(data);
-  return parsed.success ? parsed.data.hash : undefined;
+// What a failure's data carries (adena-wallet bc5a7b5a, approve-transaction-main/index.tsx:596-633): the hash of a
+// transaction it signed, and why it failed: the chain's `log` (a TM2Error only), else `error` (null for a null response).
+function detailOf(data: unknown): { hash: string; why?: string } | undefined {
+  const Data = z.object({
+    hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)),
+    log: z.optional(z.unknown()),
+    error: z.optional(z.unknown()),
+  });
+  const parsed = Data.safeParse(data);
+  if (!parsed.success) return undefined;
+  const { hash, log, error } = parsed.data;
+  const why = [log, error].find((text) => typeof text === "string");
+  return typeof why === "string" ? { hash, why } : { hash };
 }
 
 // One call to the extension, its answer read by its type: one of the method's successes, or a failure with its reason.
@@ -113,8 +122,11 @@ export async function ask(run: () => unknown, method: Method): Promise<Answered>
   const anySuccess = Object.values(SUCCESSES).some((types) => (types as readonly string[]).includes(type));
   if (status === "success" || anySuccess) return refusal("malformed");
   const failed = failure(type, code, message);
-  const hash = hashOf(data);
-  return hash === undefined ? failed : { ...failed, hash };
+  const detail = detailOf(data);
+  if (detail === undefined) return failed;
+  // With a hash, the reason is the chain's, never Adena's generic message (F5749); only a plain failure has one.
+  const { hash, why } = detail;
+  return failed.reason === "failed" ? { ...refusal("failed", type, why), hash } : { ...failed, hash };
 }
 
 export type Read<T> = { ok: true; value: T } | Failed;
