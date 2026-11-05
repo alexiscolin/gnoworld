@@ -1955,6 +1955,17 @@ cover 1 || fail "patch_coverage asked coverage of the server's entry, which runs
 git -C "$c" rm -rq --cached server && rm "$c/server/src/main.ts"
 unmeasured server/src/app.ts
 rm -r "$c/server"
+# jarvis's entry runs in child processes as the server's (10i), and evals/ is installed and tested apart (10j); jarvis's
+# other files are measured.
+mkdir -p "$c/jarvis/src" "$c/evals"
+printf 'x\n' >"$c/jarvis/src/main.ts" && git -C "$c" add jarvis
+cover 1 || fail "patch_coverage asked coverage of jarvis's entry, which runs in child processes"
+git -C "$c" rm -rq --cached jarvis && rm "$c/jarvis/src/main.ts"
+printf 'x\n' >"$c/evals/provider.ts" && git -C "$c" add evals
+cover 1 || fail "patch_coverage asked coverage of evals/, which is installed and tested apart"
+git -C "$c" rm -rq --cached evals && rm -r "$c/evals"
+unmeasured jarvis/src/app.ts
+rm -r "$c/jarvis"
 # Storybook's config is a config and a test setup a test's, and its pages (the stories, the
 # overview) the journeys shoot, so none is measured; code named alike is.
 mkdir -p "$c/packages/ui/.storybook" "$c/packages/ui/src/Overview"
