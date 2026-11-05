@@ -61,6 +61,19 @@ const until = async (seen: () => boolean): Promise<void> => {
   while (!seen()) await new Promise((resolve) => setTimeout(resolve, 10));
 };
 
+// What a stream says up to its `since` word, which follows any replay; then it is left.
+const untilSince = async (body: ReadableStream<Uint8Array> | null): Promise<string> => {
+  const reader = body?.getReader();
+  let text = "";
+  while (!text.includes("event: since")) {
+    const chunk = await reader?.read();
+    if (chunk === undefined || chunk.done) break;
+    text += new TextDecoder().decode(chunk.value);
+  }
+  await reader?.cancel();
+  return text;
+};
+
 const exited = (server: Server): Promise<number | null> =>
   new Promise((resolve) =>
     server.child.once("exit", (code) => {
@@ -924,7 +937,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
   // and one stream tells both signals to a page that follows the world's room.
   it(
     "serves the first signals: a guest reads none and cannot chart, an account charts a world once, a line that passed is its first words, both told on the stream (9h)",
-    { timeout: 30_000 },
+    { timeout: 45_000 },
     async () => {
       const origin = "https://gnoworld.test";
       const ergo = await fakeErgo();
@@ -940,19 +953,16 @@ describe("the server's process", { timeout: 30_000 }, () => {
       writeFileSync(join(keys, "openai"), `sk-made-up-${"k".repeat(40)}\n`);
       const hook = join(keys, "openai.mjs");
       writeFileSync(hook, OPENAI_PASSES);
-      const port = await listening(
-        start(
-          {
-            ...settings(),
-            ORIGINS: origin,
-            ROLES_FILE: roles,
-            ERGO_PORT: String(ergo.port),
-            ERGO_OPER_PASSWORD_FILE: oper,
-            OPENAI_API_KEY_FILE: join(keys, "openai"),
-          },
-          [...FLAGS, "--import", hook],
-        ),
-      );
+      const env = {
+        ...settings(),
+        ORIGINS: origin,
+        ROLES_FILE: roles,
+        ERGO_PORT: String(ergo.port),
+        ERGO_OPER_PASSWORD_FILE: oper,
+        OPENAI_API_KEY_FILE: join(keys, "openai"),
+      };
+      const first = start(env, [...FLAGS, "--import", hook]);
+      let port = await listening(first);
       const peer = await ergo.peer(0);
       await welcome(peer);
       const at = (path: string): string => `http://127.0.0.1:${String(port)}${path}`;
@@ -1000,6 +1010,17 @@ describe("the server's process", { timeout: 30_000 }, () => {
       await expect.poll(async () => ((await firsts()) as { words: unknown }).words).not.toBeNull();
       expect(await firsts()).toMatchObject({ charted: { account: who.address }, words: { account: other } });
       expect(await told()).toEqual(["chart", "words"]);
+      // A restart: the page's plate learns who is first from the stream alone, so the new server tells the database's
+      // firsts to a reader who comes after, before its `since`.
+      await reader?.cancel();
+      const gone = exited(first);
+      first.child.kill("SIGTERM");
+      await gone;
+      port = await listening(start(env, [...FLAGS, "--import", hook]));
+      const replayed = await untilSince((await fetch(at("/api/stream?rooms=%23bubble"))).body);
+      const kinds = [...replayed.matchAll(/event: signal\ndata: .*"kind":"(\w+)"/g)].map(([, kind = ""]) => kind);
+      expect(kinds.toSorted()).toEqual(["chart", "words"]);
+      expect(replayed).toContain(who.address);
     },
   );
 

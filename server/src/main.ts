@@ -25,7 +25,7 @@ import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
 import { signalRoutes } from "./signals/routes.ts";
-import { makeSignals } from "./signals/signals.ts";
+import { firstSignals, makeSignals } from "./signals/signals.ts";
 import { makeStream } from "./stream/stream.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
@@ -56,6 +56,7 @@ const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
 // The first signals (9h): the chat records the first words and the routes the first charts, each told on the one stream.
 const stream = makeStream();
 const signals = makeSignals(db, { now: Date.now });
+for (const signal of firstSignals(signals, roles.worlds.keys())) stream.signal(signal);
 const chat = startChat(
   db,
   {

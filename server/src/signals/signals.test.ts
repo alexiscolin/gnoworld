@@ -10,7 +10,7 @@ import { makeProgress, PROGRESS_TABLES } from "../moderation/catchup.ts";
 import { VERDICT_TABLES, type Verdict } from "../moderation/check.ts";
 import { moderate } from "../moderation/way.ts";
 import { makeStream } from "../stream/stream.ts";
-import { firstWords, makeSignals, SIGNAL_TABLES, type Signals } from "./signals.ts";
+import { firstSignals, firstWords, makeSignals, SIGNAL_TABLES, type Signals } from "./signals.ts";
 
 // Slice 9h (D210 to D219): who charted a world first and who spoke first, recorded once a world by a unique key in
 // SQLite, a migration of its own. The store is the truth; the routes and the stream only tell it.
@@ -151,6 +151,21 @@ describe("first to chart", () => {
     const signals = makeSignals(after, { now: () => T0 + 60_000 });
     expect(signals.chart("govdao", BOB)).toBe(false);
     expect(signals.firsts("govdao").charted).toEqual({ account: ALICE, at: "2026-11-05T12:00:00.000Z" });
+  });
+
+  // The page's plate hears who is first on the stream alone: a new process tells the stream every first it holds.
+  it("gives a new process every first it holds as the signals its stream tells, and none for a world without one", () => {
+    const db = memory();
+    const signals = makeSignals(db, { now: () => T0 });
+    signals.chart("govdao", ALICE);
+    signals.words("govdao", BOB);
+    signals.chart("bubble", BOB);
+    const at = "2026-11-05T12:00:00.000Z";
+    expect(firstSignals(signals, ["govdao", "earth", "bubble"])).toEqual([
+      { kind: "chart", world: "govdao", account: ALICE, at },
+      { kind: "words", world: "govdao", account: BOB, at },
+      { kind: "chart", world: "bubble", account: BOB, at },
+    ]);
   });
 });
 

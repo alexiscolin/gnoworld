@@ -57,6 +57,17 @@ export function makeSignals(db: DatabaseSync, { now }: { now: () => number }): S
   };
 }
 
+/** Every first the store holds for these worlds, as the signals a new process's stream tells again: the plate hears who is
+ * first on the stream alone. */
+export const firstSignals = (signals: Signals, worlds: Iterable<string>): Signal[] =>
+  [...worlds].flatMap((world) => {
+    const { charted, words } = signals.firsts(world);
+    return [
+      ...(charted === null ? [] : [{ kind: "chart" as const, world, ...charted }]),
+      ...(words === null ? [] : [{ kind: "words" as const, world, ...words }]),
+    ];
+  });
+
 interface FirstWordsOptions {
   signals: Signals;
   publish: (signal: Signal) => void;
