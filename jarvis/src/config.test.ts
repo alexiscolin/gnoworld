@@ -1044,9 +1044,9 @@ describe("deploy/test.sh", () => {
   it("plants each of jarvis's faults in `--mutants` from test-jarvis.sh, each killed by its own check", () => {
     const faults: [string, string][] = [
       ["a host added to jarvis's way out", "jarvis's way out lets six hosts out"],
-      ["Anthropic's API dropped from jarvis's way out", "jarvis reaches Anthropic's API through its way out"],
+      ["Anthropic's API dropped from jarvis's way out", "reach Anthropic's API through its way out"],
       ["jarvis's way out open to the internal network", "the guard's rules refuse 4751 but from jarvis's network"],
-      ["the guard drops jarvis's replies", "jarvis reaches Anthropic's API through its way out"],
+      ["the guard drops jarvis's replies", "reach Anthropic's API through its way out"],
       ["jarvis on the internal network", "jarvis sits on its two networks only"],
       ["jarvis's root writable", "jarvis: read-only root"],
       ["jarvis's key given to the server", "the server holds no Anthropic key"],

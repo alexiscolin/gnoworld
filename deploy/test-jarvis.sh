@@ -7,9 +7,11 @@ if [ "${1:-}" = --mutants ]; then
 	# Its list widened or emptied, its proxy open to the internal network, its replies dropped, itself on a network others
 	# share, its root writable, its key given to the server, its stop cut short, itself back in the demo's profile.
 	mutant "a host added to jarvis's way out" "jarvis's way out lets six hosts out" jarvis_acl awk '{ print } /- api.anthropic.com/ { print "    - api.openai.com" }'
-	mutant "Anthropic's API dropped from jarvis's way out" "jarvis reaches Anthropic's API through its way out" jarvis_acl sed '/- api.anthropic.com/d'
+	# Their check's failure says "jarvis does not reach Anthropic's API through its way out": the words both its pass and its fail
+	# hold, so the mutant is credited to it (its first --mutants run, 2026-11-05, read "killed by other checks" for want of them).
+	mutant "Anthropic's API dropped from jarvis's way out" "reach Anthropic's API through its way out" jarvis_acl sed '/- api.anthropic.com/d'
 	mutant "jarvis's way out open to the internal network" "the guard's rules refuse 4751 but from jarvis's network" guard sed '/--dport 4751 -j REJECT/d'
-	mutant "the guard drops jarvis's replies" "jarvis reaches Anthropic's API through its way out" guard sed '/--sport 4751/d'
+	mutant "the guard drops jarvis's replies" "reach Anthropic's API through its way out" guard sed '/--sport 4751/d'
 	mutant "jarvis on the internal network" "jarvis sits on its two networks only" compose 'services: { jarvis: { networks: { inside: {} } } }'
 	mutant "jarvis's root writable" "jarvis: read-only root" compose 'services: { jarvis: { read_only: false } }'
 	mutant "jarvis's key given to the server" "the server holds no Anthropic key" compose 'services: { server: { secrets: [log_pepper, ergo_oper_password, openai_api_key, anthropic_api_key] } }'
