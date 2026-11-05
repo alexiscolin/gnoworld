@@ -29,6 +29,8 @@ export interface LoginSlice {
     stopped: (problem: LoginProblem) => void;
     signedIn: (address: Address) => void;
     signedOut: () => void;
+    /** Adena is on this account now: a session of another one ends, and the answer says whether it did (D200). */
+    accountChanged: (address: string) => boolean;
     chat: (state: ErgoState | "off") => void;
   };
 }
@@ -60,6 +62,12 @@ export const loginSlice: StateCreator<LoginSlice> = (set, get) => {
       },
       signedOut: () => {
         change({ session: { kind: "out" }, step: "idle", problem: undefined, chat: "off" });
+      },
+      accountChanged: (address) => {
+        const { session } = get().login;
+        if (session.kind !== "in" || session.address === address) return false;
+        get().loginActions.signedOut();
+        return true;
       },
       chat: (state) => {
         change({ chat: state });

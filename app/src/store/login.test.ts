@@ -73,4 +73,38 @@ describe("the store's login slice", () => {
     store.getState().loginActions.begin("wallet");
     expect(calls).toBe(1);
   });
+
+  describe("accountChanged (D200: only an account change ends the session)", () => {
+    const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+
+    it("ends the session of the account Adena left, and says it did", () => {
+      const store = createAppStore();
+      store.getState().loginActions.signedIn(ADDRESS);
+      store.getState().loginActions.chat("connected");
+      expect(store.getState().loginActions.accountChanged(OTHER)).toBe(true);
+      expect(store.getState().login).toMatchObject({ session: { kind: "out" }, chat: "off" });
+    });
+
+    it("keeps the session when Adena says the same account", () => {
+      const store = createAppStore();
+      store.getState().loginActions.signedIn(ADDRESS);
+      expect(store.getState().loginActions.accountChanged(ADDRESS)).toBe(false);
+      expect(store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+    });
+
+    it("keeps nobody logged out and leaves a login under way alone", () => {
+      const store = createAppStore();
+      store.getState().loginActions.begin("signing");
+      expect(store.getState().loginActions.accountChanged(OTHER)).toBe(false);
+      expect(store.getState().login).toMatchObject({ session: { kind: "unknown" }, step: "signing" });
+    });
+
+    it("ends it for an address that is no address too: what Adena says is not trusted", () => {
+      const store = createAppStore();
+      store.getState().loginActions.signedIn(ADDRESS);
+      store.getState().loginActions.chat("connected");
+      expect(store.getState().loginActions.accountChanged("not an address")).toBe(true);
+      expect(store.getState().login).toMatchObject({ session: { kind: "out" }, chat: "off" });
+    });
+  });
 });

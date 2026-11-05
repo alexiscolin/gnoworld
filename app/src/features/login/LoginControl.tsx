@@ -2,12 +2,16 @@
 import { useEffect, useState } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { knowSession, logIn, logOut, type SessionDeps } from "./logIn.ts";
+import { knowSession, logIn, logOut, watchAccount, type SessionDeps } from "./logIn.ts";
 import { LoginView } from "./LoginView.tsx";
 
 // Adena's calls come with the first click that logs in: a page that never logs in does not load them.
 async function logInWithAdena(deps: SessionDeps): Promise<void> {
-  const { connect, pageAdena, signLogin } = await import("../../lib/adena/adena.ts");
+  const [{ connect, pageAdena, signLogin }, { listen }] = await Promise.all([
+    import("../../lib/adena/adena.ts"),
+    import("../../lib/adena/events.ts"),
+  ]);
+  watchAccount(pageAdena(), { ...deps, listen });
   await logIn(pageAdena(), { ...deps, connect, sign: signLogin });
 }
 
