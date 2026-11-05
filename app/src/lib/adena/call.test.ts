@@ -3,6 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { connect, signLogin } from "./adena.ts";
 import { callContract } from "./call.ts";
+import recording from "../../../recording/adena-recording.json" with { type: "json" };
 
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -38,21 +39,16 @@ const CODES: Record<string, number> = {
 const no = (type: string, message = "") =>
   Promise.resolve({ code: CODES[type] ?? 4001, status: "failure", type, message, data: {} });
 
-// A BroadcastTxCommitResult as tm2-js-client 3.3.0 types it (provider/types/common.d.mts:146-150, 168-173) and the
-// Adena SDK 0.1.1 too (bin/index.d.ts:207-220): Error, Data, Events, Log and Info nest under ResponseBase, beside
-// GasWanted and GasUsed. `part` builds one such DeliverTx; `base` is its ResponseBase.
-const base = { Error: null, Data: null, Events: null, Log: "", Info: "" };
-const part = (response: Record<string, unknown> = {}) => ({
-  ResponseBase: { ...base, ...response },
-  GasWanted: "10000000",
-  GasUsed: "42000",
-});
+// DoContract's success as Adena answered Alexis on Onyx (app/recording/adena-recording.json, D209): a hex hash and
+// the realm's Log, no height, no check_tx or deliver_tx, whatever the SDK's types say. By place: 3 is the signed
+// call, 4 was signed by mistake under the label "call, rejected", 5 is the refusal.
 const SENT = {
-  check_tx: part(),
-  deliver_tx: part({ Log: "counter is 1" }),
-  hash: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=", // 32 bytes, as a transaction hash is
-  height: "1234",
+  error: null,
+  data: null,
+  Log: "counter is 1",
+  hash: "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058",
 };
+const recorded = (at: number) => recording[at]?.answer;
 
 type Method = ((...args: unknown[]) => unknown) | undefined;
 // An extension with state: the chain it is on, the networks it knows, the account. It records what it was asked.
@@ -114,7 +110,7 @@ class Fake {
     return this.run("SignArbitrary", args, () => no("SIGN_REJECTED"));
   }
   DoContract(...args: unknown[]) {
-    return this.run("DoContract", args, () => ok("TRANSACTION_SENT", SENT));
+    return this.run("DoContract", args, () => ok("TRANSACTION_SUCCESS", SENT));
   }
 }
 
@@ -142,14 +138,9 @@ const params = (request: CallRequest, universe = ONYX) => [
 const sent = (adena: Fake) => adena.asked.filter((a) => a.call === "DoContract");
 
 describe("callContract: the way through", () => {
-  it("checks the account and the network, then sends one DoContract, and answers with the hash, height and log", async () => {
+  it("checks the account and the network, then sends one DoContract, and answers with the hash and log", async () => {
     const adena = new Fake();
-    expect(await callContract(adena, REQUEST, ONYX)).toEqual({
-      ok: true,
-      hash: SENT.hash,
-      height: SENT.height,
-      log: "counter is 1",
-    });
+    expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: true, hash: SENT.hash, log: "counter is 1" });
     expect(adena.names).toEqual(["GetAccount", "GetNetwork", "DoContract"]);
   });
 
@@ -351,11 +342,8 @@ describe("callContract: every failure is a state with its next step", () => {
   });
 
   it("is a failure, with its log, when the chain ran the transaction and the realm failed it", async () => {
-    const data = {
-      ...SENT,
-      deliver_tx: part({ Error: { "@type": "/vm.m_call_error" }, Log: "panic: not allowed" }),
-    };
-    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SENT", data) });
+    const data = { ...SENT, error: { "@type": "/vm.m_call_error" }, Log: "panic: not allowed" };
+    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
     expect(await callContract(adena, REQUEST, ONYX)).toEqual({
       ok: false,
       reason: "failed",
@@ -363,13 +351,28 @@ describe("callContract: every failure is a state with its next step", () => {
     });
   });
 
-  it("is a failure, with its log, when the node refused the transaction at check", async () => {
-    const data = {
-      ...SENT,
-      check_tx: part({ Error: { "@type": "/std.InsufficientFundsError" }, Log: "insufficient" }),
-    };
-    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SENT", data) });
-    expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: false, reason: "failed", log: "insufficient" });
+  it("reads DoContract's two answers as Adena recorded them on Onyx: the signed call, and the refusal (D209)", async () => {
+    const signed = new Fake({ DoContract: () => Promise.resolve(recorded(3)) });
+    expect(await callContract(signed, REQUEST, ONYX)).toEqual({
+      ok: true,
+      hash: "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058",
+      log: "",
+    });
+    const refused = new Fake({ DoContract: () => Promise.resolve(recorded(5)) });
+    expect(await callContract(refused, REQUEST, ONYX)).toEqual({ ok: false, reason: "declined" });
+  });
+
+  it("reads GetAccount, GetNetwork and a switch to the chain it is on as Adena recorded them (D209)", async () => {
+    const caller = Address.parse("g15wmukt79xymnnu6c4de32trnufudqum60yrxu8");
+    let reads = 0;
+    const adena = new Fake({
+      GetAccount: () => Promise.resolve(recorded(0)),
+      // First on another chain, so the recorded "already there" answer to the switch is read; then Onyx as recorded.
+      GetNetwork: () => (++reads === 1 ? ok("GET_NETWORK", { chainId: "gnoland-1" }) : Promise.resolve(recorded(1))),
+      SwitchNetwork: () => Promise.resolve(recorded(2)),
+    });
+    expect(await callContract(adena, { ...REQUEST, caller }, ONYX)).toMatchObject({ ok: true });
+    expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork", "GetNetwork", "DoContract"]);
   });
 
   it("says missing for no extension, and outdated for one with no DoContract", async () => {
@@ -462,59 +465,49 @@ describe("callContract: every failure is a state with its next step", () => {
     const failed = (message: string) => new Fake({ DoContract: () => no("TRANSACTION_FAILED", message) });
     expect(await callContract(failed(at), REQUEST, ONYX)).toEqual({ ok: false, reason: "failed", log: at });
     expect(await callContract(failed(past), REQUEST, ONYX)).toEqual({ ok: false, reason: "failed", log: at });
-    const sentLog = (Log: string) =>
-      new Fake({ DoContract: () => ok("TRANSACTION_SENT", { ...SENT, deliver_tx: part({ Log }) }) });
+    const sentLog = (Log: string) => new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", { ...SENT, Log }) });
     expect(await callContract(sentLog(at), REQUEST, ONYX)).toMatchObject({ ok: true, log: at });
     expect(await callContract(sentLog(past), REQUEST, ONYX)).toMatchObject({ ok: true, log: at });
   });
 
   it("returns the log and not the chain's returned value: the card reads the result from the hash (D205)", async () => {
-    const data = { ...SENT, deliver_tx: part({ Data: "aGVsbG8=", Log: "counter is 1" }) };
-    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SENT", data) });
-    expect(await callContract(adena, REQUEST, ONYX)).toEqual({
-      ok: true,
-      hash: SENT.hash,
-      height: SENT.height,
-      log: "counter is 1",
-    });
+    const data = { ...SENT, data: "aGVsbG8=" };
+    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
+    expect(await callContract(adena, REQUEST, ONYX)).toEqual({ ok: true, hash: SENT.hash, log: "counter is 1" });
   });
 
-  it("takes TRANSACTION_SUCCESS as TRANSACTION_SENT: the SDK's table names a successful transaction so (D202)", async () => {
-    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", SENT) });
-    expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({ ok: true, hash: SENT.hash });
+  it("takes a hash in capitals, as hex may be written", async () => {
+    const data = { ...SENT, hash: SENT.hash.toUpperCase() };
+    const adena = new Fake({ DoContract: () => ok("TRANSACTION_SUCCESS", data) });
+    expect(await callContract(adena, REQUEST, ONYX)).toMatchObject({ ok: true, hash: data.hash });
   });
 });
 
 describe("callContract: Adena's answers that fail their schema become an error state", () => {
-  const sentWith = (change: Record<string, unknown>) => () => ok("TRANSACTION_SENT", { ...SENT, ...change });
+  const sentWith = (change: Record<string, unknown>) => () => ok("TRANSACTION_SUCCESS", { ...SENT, ...change });
   it.each([
     ["nothing", () => Promise.resolve(undefined)],
     ["a string", () => Promise.resolve("sent")],
     ["a success of another type", () => ok("SIGN_ARBITRARY", SENT)],
-    ["a failure that says it was sent", () => answer("failure", "TRANSACTION_SENT", SENT)],
-    ["no data", () => ok("TRANSACTION_SENT", undefined)],
-    ["data that is a string", () => ok("TRANSACTION_SENT", "hash")],
+    ["a failure that says it was sent", () => answer("failure", "TRANSACTION_SUCCESS", SENT)],
+    ["a success typed TRANSACTION_SENT, which Adena does not answer", () => ok("TRANSACTION_SENT", SENT)],
+    ["no data", () => ok("TRANSACTION_SUCCESS", undefined)],
+    ["data that is a string", () => ok("TRANSACTION_SUCCESS", "hash")],
     ["no hash", sentWith({ hash: undefined })],
     ["an empty hash", sentWith({ hash: "" })],
     ["a hash with a path in it", sentWith({ hash: "a/../b?x=1" })],
     ["a hash that is markup", sentWith({ hash: "<script>" })],
-    ["a hash of the wrong length", sentWith({ hash: "Zm9vYmFyaGFzaA==" })],
-    ["a hash of a million characters", sentWith({ hash: "A".repeat(1_000_000) })],
-    ["a hash with a character outside base64", sentWith({ hash: `${"A".repeat(43)}!` })],
+    ["a hash of the wrong length", sentWith({ hash: SENT.hash.slice(1) })],
+    ["a hash one digit too long", sentWith({ hash: `${SENT.hash}0` })],
+    ["a hash of a million characters", sentWith({ hash: "a".repeat(1_000_000) })],
+    ["a hash with a character outside hex", sentWith({ hash: `${SENT.hash.slice(1)}g` })],
+    [
+      "a hash in base64, as the SDK's types have it",
+      sentWith({ hash: "BwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwc=" }),
+    ],
     ["a hash that is no string", sentWith({ hash: 12 })],
-    ["no height", sentWith({ height: undefined })],
-    ["a height that is no whole number", sentWith({ height: "12.5" })],
-    ["a negative height", sentWith({ height: "-1" })],
-    ["an empty height", sentWith({ height: "" })],
-    ["a height of zero", sentWith({ height: "0" })],
-    ["a height with a space", sentWith({ height: " 12" })],
-    ["a height in exponent form", sentWith({ height: "1e3" })],
-    ["a height with a leading zero", sentWith({ height: "012" })],
-    ["a height that is a number", sentWith({ height: 12 })],
-    ["no deliver_tx", sentWith({ deliver_tx: undefined })],
-    ["a deliver_tx with no log", sentWith({ deliver_tx: part({ Log: undefined }) })],
-    ["no check_tx", sentWith({ check_tx: undefined })],
-    ["a deliver_tx with its fields flat, not under ResponseBase", sentWith({ deliver_tx: { ...base, Log: "x" } })],
+    ["no Log", sentWith({ Log: undefined })],
+    ["a Log that is no string", sentWith({ Log: 1 })],
   ])("%s", async (_, doContract) => {
     expect(await callContract(new Fake({ DoContract: doContract }), REQUEST, ONYX)).toEqual({
       ok: false,
@@ -531,7 +524,7 @@ describe("callContract: a second request waits for the first", () => {
       DoContract: async () => {
         started.resolve(undefined);
         await gate.promise;
-        return ok("TRANSACTION_SENT", SENT);
+        return ok("TRANSACTION_SUCCESS", SENT);
       },
     });
     const first = callContract(adena, REQUEST, ONYX);
@@ -549,7 +542,7 @@ describe("callContract: a second request waits for the first", () => {
     const adena = new Fake({
       DoContract: () => {
         calls += 1;
-        return calls === 1 ? Promise.reject(new Error("popup closed")) : ok("TRANSACTION_SENT", SENT);
+        return calls === 1 ? Promise.reject(new Error("popup closed")) : ok("TRANSACTION_SUCCESS", SENT);
       },
     });
     const first = callContract(adena, REQUEST, ONYX);
@@ -711,7 +704,7 @@ describe("callContract: one request at a time, whoever asks Adena", () => {
       DoContract: async () => {
         started.resolve(undefined);
         await gate.promise;
-        return ok("TRANSACTION_SENT", SENT);
+        return ok("TRANSACTION_SUCCESS", SENT);
       },
     });
     const call = callContract(adena, REQUEST, ONYX);

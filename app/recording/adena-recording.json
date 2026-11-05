@@ -1,0 +1,100 @@
+[
+  {
+    "label": "account",
+    "call": "GetAccount",
+    "args": [],
+    "answer": {
+      "status": "success",
+      "data": {
+        "address": "g15wmukt79xymnnu6c4de32trnufudqum60yrxu8",
+        "coins": "292372443ugnot",
+        "chainId": "onyx-1",
+        "status": "ACTIVE",
+        "publicKey": {
+          "@type": "/tm.PubKeySecp256k1",
+          "value": "A6QxDeE9T4utsKFysdC0JZTyVwnc4UgqQ7vhHJf5pp+p"
+        },
+        "accountNumber": "218",
+        "sequence": "25"
+      },
+      "code": 0,
+      "message": "Get Account Information.",
+      "type": "GET_ACCOUNT"
+    }
+  },
+  {
+    "label": "network",
+    "call": "GetNetwork",
+    "args": [],
+    "answer": {
+      "status": "success",
+      "data": {
+        "chainId": "onyx-1",
+        "networkName": "Onyx",
+        "addressPrefix": "g",
+        "rpcUrl": "https://rpc.onyx.testnets.gno.land:443",
+        "indexerUrl": "https://onyx.indexer.onbloc.xyz"
+      },
+      "code": 0,
+      "message": "Get Network Information.",
+      "type": "GET_NETWORK"
+    }
+  },
+  {
+    "label": "switch",
+    "call": "SwitchNetwork",
+    "args": ["onyx-1"],
+    "answer": {
+      "status": "failure",
+      "data": {
+        "chainId": "onyx-1"
+      },
+      "code": 4001,
+      "message": "Unable to change to the current network.",
+      "type": "REDUNDANT_CHANGE_REQUEST"
+    }
+  },
+  {
+    "label": "call, signed",
+    "call": "DoContract",
+    "answer": {
+      "status": "success",
+      "data": {
+        "error": null,
+        "data": null,
+        "Log": "",
+        "hash": "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058"
+      },
+      "code": 0,
+      "message": "Transaction has been successfully executed.",
+      "type": "TRANSACTION_SUCCESS"
+    }
+  },
+  {
+    "label": "call, rejected",
+    "call": "DoContract",
+    "answer": {
+      "status": "success",
+      "data": {
+        "error": null,
+        "data": null,
+        "Log": "",
+        "hash": "e50c00566a136e8e7ab4a36067cee05a17df22e61b11b0a6dd84cd15076ea1bb"
+      },
+      "code": 0,
+      "message": "Transaction has been successfully executed.",
+      "type": "TRANSACTION_SUCCESS"
+    }
+  },
+  {
+    "label": "call, rejected",
+    "call": "DoContract",
+    "answer": {
+      "status": "failure",
+      "data": {},
+      "code": 4000,
+      "message": "The transaction has been rejected by the user.",
+      "type": "TRANSACTION_REJECTED"
+    }
+  }
+]

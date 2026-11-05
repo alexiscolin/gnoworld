@@ -7,8 +7,7 @@ import { detect, method } from "./detect.ts";
 import { ask, capped, read, refusal, type Answered, type CallFailure, type Failed } from "./answers.ts";
 import { serially } from "./queue.ts";
 
-export type CallResult =
-  { ok: true; hash: string; height: string; log: string } | { ok: false; reason: CallFailure; log?: string };
+export type CallResult = { ok: true; hash: string; log: string } | { ok: false; reason: CallFailure; log?: string };
 /** The chain a call is for, as app/data/universes.json names it: what AddNetwork needs. */
 export interface Universe {
   chainId: string;
@@ -22,12 +21,6 @@ const GAS_FEE = 1_000_000;
 const SITE = "gnoworld";
 const Account = z.object({ address: Address, chainId: z.string().check(z.minLength(1)) });
 const Network = z.object({ chainId: z.string().check(z.minLength(1)) });
-// A transaction's hash is 32 bytes in base64; a block's height a whole number from 1.
-const Hash = z.string().check(z.regex(/^[A-Za-z0-9+/]{43}=$/));
-const Height = z.string().check(z.regex(/^[1-9][0-9]{0,15}$/));
-// Error and Log sit under ResponseBase (tm2-js-client 3.3.0 common.d.mts:146-150; the Adena SDK 0.1.1 bin/index.d.ts:207-220).
-const Part = z.object({ ResponseBase: z.object({ Error: z.unknown(), Log: z.string() }) });
-const Sent = z.object({ check_tx: Part, deliver_tx: Part, hash: Hash, height: Height });
 
 type Need = (name: string, ...args: unknown[]) => Promise<Answered>;
 interface Wallet {
@@ -131,19 +124,13 @@ async function send(
   request: CallRequest,
   universe: Universe,
 ): Promise<CallResult | Failed> {
-  const done = await read(
-    () => doContract(transaction(request, universe)),
-    ["TRANSACTION_SENT", "TRANSACTION_SUCCESS"],
-    Sent,
-  );
+  // As Adena answered on Onyx (app/recording/adena-recording.json, D209), not as the SDK's types say: a hex hash
+  // and the realm's Log, with no height and no check_tx or deliver_tx.
+  const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
+  const done = await read(() => doContract(transaction(request, universe)), ["TRANSACTION_SUCCESS"], Sent);
   if (!done.ok) return done;
-  const { check_tx, deliver_tx, hash, height } = done.value;
-  // The node refused it at check, or the realm failed it: no hash is a success then.
-  const failed = [check_tx, deliver_tx].find(
-    ({ ResponseBase }) => ResponseBase.Error !== null && ResponseBase.Error !== undefined,
-  );
-  if (failed !== undefined) return refusal("failed", "", failed.ResponseBase.Log);
-  return { ok: true, hash, height, log: capped(deliver_tx.ResponseBase.Log) };
+  const { hash, Log, error } = done.value;
+  return error === null || error === undefined ? { ok: true, hash, log: capped(Log) } : refusal("failed", "", Log);
 }
 
 /** Asks Adena, once the requests before it are done, to sign and send this call, as the account on the universe's chain. */
