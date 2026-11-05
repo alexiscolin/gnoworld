@@ -1,4 +1,4 @@
-import { adena } from "./adena.ts";
+import { adena, changeAccount } from "./adena.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // The login, end to end (slice 4's 4a): the page, a stand-in for Adena (adena.ts), the static host and the real
@@ -50,6 +50,20 @@ test.describe("the login with Adena", () => {
     expect(await page.evaluate(async () => (await fetch("/api/login/me")).json() as Promise<unknown>)).toEqual({
       address: null,
     });
+  });
+
+  test("ends the session when Adena's account changes: the page logs out and the server is told (D200)", async ({
+    page,
+  }) => {
+    await adena(page);
+    await page.goto("/");
+    await hydrated(page);
+    await logInButton(page).click();
+    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    const logout = page.waitForRequest((request) => request.url().endsWith("/api/login/logout"));
+    await changeAccount(page, "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+    await logout;
+    await expect(logInButton(page)).toBeVisible();
   });
 
   for (const [mode, words] of [
