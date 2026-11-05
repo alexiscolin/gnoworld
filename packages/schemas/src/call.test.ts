@@ -11,6 +11,9 @@ const REQUEST = {
   args: ["1", "two"],
 };
 
+// What the property tests strip from generated text: the characters the request refuses.
+const CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}]/gu;
+
 describe("CallRequest", () => {
   it("takes one call: a chain, a caller, a realm, an exported function and string arguments", () => {
     expect(CallRequest.parse(REQUEST)).toEqual(REQUEST);
@@ -44,7 +47,7 @@ describe("CallRequest", () => {
   });
 
   it("keeps every argument as it was written, empty, spaced or unicode", () => {
-    const args = ["", " 12 ", "1e3", "café \u{1f600}", "line\nbreak"];
+    const args = ["", " 12 ", "1e3", "café \u{1f600}", "line\nbreak", "tab\tbed"];
     expect(CallRequest.parse({ ...REQUEST, args }).args).toEqual(args);
   });
 
@@ -81,6 +84,12 @@ describe("CallRequest", () => {
     ["an argument that is no string", { args: ["1", 2] }],
     ["arguments that are no list", { args: "1" }],
     ["an argument that is not well-formed text", { args: ["\ud800"] }],
+    ["an argument with a bidi override", { args: ["a\u202eb"] }],
+    ["an argument with a zero-width space", { args: ["a\u200bb"] }],
+    ["an argument with an escape character", { args: ["a\u001bb"] }],
+    ["an argument with a carriage return", { args: ["a\rb"] }],
+    ["an argument with a NUL", { args: ["\u0000"] }],
+    ["an argument with a DEL", { args: ["a\u007fb"] }],
   ])("refuses %s", (_, change) => {
     expect(CallRequest.safeParse({ ...REQUEST, ...change }).success).toBe(false);
   });
@@ -93,9 +102,23 @@ describe("CallRequest", () => {
   it("parses what it was given, whatever the call's shape: a valid request parses back to itself", () => {
     fc.assert(
       fc.property(fc.array(fc.string({ unit: "grapheme" }), { maxLength: 8 }), (args) => {
-        const request = { ...REQUEST, args };
+        const request = { ...REQUEST, args: args.map((arg) => arg.replace(CONTROL, "")) };
         expect(CallRequest.parse(request)).toEqual(request);
       }),
+    );
+  });
+
+  it("refuses an argument with any control or format character but a newline or a tab, wherever it sits", () => {
+    fc.assert(
+      fc.property(
+        fc.string({ unit: "grapheme", maxLength: 6 }),
+        fc.constantFrom("\u0000", "\u001b", "\u007f", "\u0085", "\u200b", "\u200f", "\u202e", "\u2066", "\ufeff"),
+        fc.string({ unit: "grapheme", maxLength: 6 }),
+        (before, hidden, after) => {
+          const args = [`${before.replace(CONTROL, "")}${hidden}${after.replace(CONTROL, "")}`];
+          expect(CallRequest.safeParse({ ...REQUEST, args }).success).toBe(false);
+        },
+      ),
     );
   });
 });

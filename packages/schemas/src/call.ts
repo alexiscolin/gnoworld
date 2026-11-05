@@ -12,11 +12,19 @@ const Chain = z.string().check(z.regex(/^[a-z0-9][a-z0-9_-]{0,49}$/));
 const Realm = z.string().check(z.maxLength(CALL_CAPS.realm), z.regex(/^gno\.land\/r\/[a-z0-9_]+(\/[a-z0-9_]+)*$/));
 // An exported function: it starts with a capital, as gno exports it.
 const Func = z.string().check(z.maxLength(CALL_CAPS.func), z.regex(/^[A-Z][A-Za-z0-9_]*$/));
+// Control and format characters (bidi overrides, zero-width, escapes) but newline and tab: the card would draw text
+// unlike the signed bytes (D231).
+const HIDDEN = /(?![\n\t])[\p{Cc}\p{Cf}]/u;
 // The host's TextEncoder, which this package's lib (no DOM, no Node types) does not declare.
 declare const TextEncoder: new () => { encode(text: string): { length: number } };
 const Argument = z
   .string()
-  .check(z.refine((text) => text.isWellFormed() && new TextEncoder().encode(text).length <= CALL_CAPS.argBytes));
+  .check(
+    z.refine(
+      (text) =>
+        text.isWellFormed() && !HIDDEN.test(text) && new TextEncoder().encode(text).length <= CALL_CAPS.argBytes,
+    ),
+  );
 
 export const CallRequest = z.strictObject({
   chainId: Chain,
