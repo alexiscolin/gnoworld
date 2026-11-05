@@ -13,7 +13,8 @@ import { BUILD } from "./sites.ts";
 const FIRST_SCREEN_JS = 187_569;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-const PLAIN_FIRST_SCREEN_JS = 185_999;
+// 186,018 B with the chat's worlds' pictures: a new chunk in the first screen's preload list (slice-8, chat planets).
+const PLAIN_FIRST_SCREEN_JS = 186_018;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -145,9 +146,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with what
-// it asks once open: 8d's chat within Alexis's 23 KiB ("Oui, jusqu'à 23 Ko"), RoomsDrawer's 768 B, which slice-8's measure left out
-// (docs/decisions.md, 2026-11-05), and 8p's 18 B for the dock over the cosmos's close (the 256 B margin given ahead).
-const LATE_CHAT_JS = 24_107;
+// it asks once open: 8d's chat within Alexis's 23 KiB, RoomsDrawer's 768 B (docs/decisions.md, 2026-11-05), 8p's 18 B for the dock's close,
+// and 5,300 B of the look's code for the worlds' pictures (slice-8, chat planets: 29,407 B).
+const LATE_CHAT_JS = 29_407;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;

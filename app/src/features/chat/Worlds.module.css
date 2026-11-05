@@ -1,4 +1,4 @@
-/* The column of worlds: planets one under another at the video's 44 px, a ring around the one in view (frame 66). */
+/* The column of worlds: planets, each with its name under it, one under another at the video's 44 px, a ring around the one in view (frame 66). */
 @layer components {
   .list {
     /* raw: the first planet stands 23 px under the region's top in the frame (76 - 53), 24 here */
@@ -7,11 +7,20 @@
 
   .world {
     display: block;
-    border-radius: var(--radius-pill);
+    text-align: center;
+    text-decoration: none;
+  }
+
+  /* A line of air over the name, two lines at most: a longer name is cut there, its link's label keeps it whole. */
+  .name {
+    display: block;
+    padding-block-start: var(--space-3xs);
+    max-block-size: calc(2lh + var(--space-3xs));
+    overflow: hidden;
   }
 
   /* raw: the video's planet, 44 px: ui's thumb sizes are 32, 48 and 64, so the column sets its own (a new size is ui's to add) */
-  .world > span {
+  .world > span:first-child {
     /* raw: the video's planet is 44 px wide */
     inline-size: 44px;
     /* raw: the video's planet is 44 px high */
@@ -20,7 +29,7 @@
 
   /* The ring off the planet, outside the flow so the planets keep their step of 52: 54 px round a 44 px one, a line wide.
      A focused link keeps the focus ring, which is the same outline. */
-  .world[aria-current="page"]:not(:focus-visible) {
+  .world[aria-current="page"]:not(:focus-visible) > span:first-child {
     outline: var(--line-width) solid var(--color-text);
     /* raw: the video's ring stands 4 px off the planet's edge (54 round 44, its line included) */
     outline-offset: 4px;

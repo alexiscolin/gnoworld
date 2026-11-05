@@ -13,7 +13,7 @@ export const chatPlace = (
   ...place,
   kicker,
   home: universe.home.path,
-  worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
+  worlds: universe.worlds.map(({ path: href, ...world }) => ({ ...world, href })),
   universe,
 });
 

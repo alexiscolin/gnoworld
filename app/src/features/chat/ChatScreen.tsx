@@ -37,7 +37,7 @@ export interface ChatPlace {
   /** What closing does instead, where the chat stands over the page it closes back to (the dock over the cosmos, frame 143). */
   close?: (() => void) | undefined;
   /** The universe's worlds, in order. */
-  worlds: readonly { slug: string; name: string; href: string }[];
+  worlds: readonly { slug: string; name: string; href: string; realms?: readonly string[] | undefined }[];
   /** Under the dock's width the chat stays a block of the page, and never takes it: the Earth's globe is what its page shows. */
   inPage?: boolean | undefined;
   /** The Earth's general chat, whose pills are its own (QuickActions.tsx). */

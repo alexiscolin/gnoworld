@@ -50,6 +50,23 @@ test.describe("the chat as the video shows it", () => {
     await expect(page.getByRole("button", { name: "Close the chat" })).toBeVisible();
   });
 
+  test("names each world in the column of worlds and draws each with its own planet", async ({ page }) => {
+    await logIn(page, "screen-worlds");
+    await open(page, { width: 1280, as: ACCOUNT });
+    const links = worlds(page).getByRole("link");
+    const count = await links.count();
+    expect(count).toBeGreaterThan(1);
+    const names = await links.evaluateAll((all) => all.map((link) => link.textContent));
+    expect(names.every((name) => name.length > 0)).toBe(true);
+    await expect(links.filter({ hasText: "Bubble" })).toHaveCount(1);
+    // The pictures' code is a chunk asked once the column is drawn: till it comes every row holds ui's one fallback disc.
+    const pictures = () =>
+      worlds(page)
+        .locator("img")
+        .evaluateAll((all) => all.map((img) => img.getAttribute("src")));
+    await expect.poll(async () => new Set(await pictures()).size, "each world draws its own picture").toBe(count);
+  });
+
   test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {
     await logIn(page, "screen-close");
     await open(page, { width: 1280, as: ACCOUNT });
