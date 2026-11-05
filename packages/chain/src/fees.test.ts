@@ -23,8 +23,27 @@ const row = (
   gas_fee: { amount, denom },
   messages: [{ value: { pkg_path, func } }],
 });
+const TIP = 5_000_000;
 const answer = (rows: unknown) =>
-  vi.fn<ChainFetch>(() => Promise.resolve(new Response(JSON.stringify({ data: { getTransactions: rows } }))));
+  vi.fn<ChainFetch>(() =>
+    Promise.resolve(new Response(JSON.stringify({ data: { latestBlockHeight: TIP, getTransactions: rows } }))),
+  );
+// An indexer that holds `rows` and answers a transaction query with those above its `from` variable, the tip to any other.
+const holding = (rows: ReturnType<typeof row>[]) =>
+  vi.fn<ChainFetch>((url) => {
+    const asked = new URL(url).searchParams;
+    const { from } = JSON.parse(asked.get("variables") ?? "{}") as { from?: number };
+    const data = asked.get("query")?.includes("getTransactions")
+      ? { getTransactions: rows.filter((r) => r.block_height > (from ?? 0)) }
+      : { latestBlockHeight: TIP };
+    return Promise.resolve(new Response(JSON.stringify({ data })));
+  });
+const sent = (fetch: ReturnType<typeof holding>) =>
+  fetch.mock.calls.flatMap(([url]) =>
+    new URL(url).searchParams.get("query")?.includes("getTransactions")
+      ? [(JSON.parse(new URL(url).searchParams.get("variables") ?? "{}") as { from?: number }).from]
+      : [],
+  );
 const fees = async (rows: unknown) => {
   const read = await readCallFees(INDEXER, { realm: REALM, func: "Register" }, { fetch: answer(rows) });
   return read.ok ? read.value : read;
@@ -35,8 +54,7 @@ describe("readCallFees", () => {
     const fetch = answer([row(48000, 100), row(1000000, 102), row(52000, 101)]);
     const read = await readCallFees(INDEXER, { realm: REALM, func: "Register" }, { fetch });
     expect(read).toMatchObject({ ok: true, value: { fees: [1000000, 52000, 48000], height: 102 } });
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const [url] = fetch.mock.calls[0] ?? [""];
+    const [url] = fetch.mock.calls.at(-1) ?? [""];
     expect(decodeURIComponent(url)).toContain(REALM);
     expect(decodeURIComponent(url)).toContain("Register");
     expect(decodeURIComponent(url)).toContain("success");
@@ -93,6 +111,27 @@ describe("readCallFees", () => {
     const lost = { ...row(40), block_height: undefined };
     expect(await fees([lost])).toEqual({ fees: [], height: 0 });
     expect(await fees([])).toEqual({ fees: [], height: 0 });
+  });
+
+  it("asks only for the blocks of a window under the tip, never every call the function ever had (F5724)", async () => {
+    const recent = Array.from({ length: 25 }, (_, i) => row(1000 + i, TIP - 100 + i));
+    const old = [row(9, 10), row(8, 11)];
+    const fetch = holding([...old, ...recent]);
+    const read = await readCallFees(INDEXER, { realm: REALM, func: "Register" }, { fetch });
+    expect(read).toMatchObject({ ok: true, value: { height: TIP - 76 } });
+    expect(read.ok && read.value.fees).toHaveLength(20);
+    expect(sent(fetch)).toEqual([TIP - 1_000]);
+  });
+
+  it("widens the window while fewer than 20 calls come back, and gives up past a million blocks (F5724)", async () => {
+    const few = [row(7, TIP - 50_000), row(8, TIP - 400_000)];
+    const fetch = holding(few);
+    const read = await readCallFees(INDEXER, { realm: REALM, func: "Register" }, { fetch });
+    expect(read).toMatchObject({ ok: true, value: { fees: [7, 8], height: TIP - 50_000 } });
+    expect(sent(fetch)).toEqual([TIP - 1_000, TIP - 10_000, TIP - 100_000, TIP - 1_000_000]);
+    const none = holding([]);
+    await readCallFees(INDEXER, { realm: REALM, func: "Register" }, { fetch: none });
+    expect(sent(none)).toHaveLength(4);
   });
 
   it("is a failure with a next step for an answer of the wrong shape, an address that is not https and a name past the cap", async () => {

@@ -53,6 +53,12 @@ export const CallFeesAnswer = z.object({
 });
 export type CallFeesAnswer = z.infer<typeof CallFeesAnswer>;
 
+/** The indexer's `latestBlockHeight`: the tip a fee read counts its window back from. */
+export const TipAnswer = z.object({
+  data: z.object({ latestBlockHeight: count }),
+  errors: z.optional(z.never()),
+});
+
 /** The node's `tx` answer (ResultTx, rpc/core/types/responses.go:249): the hash in base64, the block's height and what the call
  * gave; a hash the node has not stored comes as an `error` whose `data` says so. */
 export const TxAnswer = z.object({

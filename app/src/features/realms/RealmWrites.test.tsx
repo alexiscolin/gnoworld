@@ -166,7 +166,7 @@ describe("a realm's write functions, with the call card inline", () => {
     }));
     const fetch = vi.fn<ChainFetch>((url) =>
       url.includes("indexer")
-        ? Promise.resolve(new Response(JSON.stringify({ data: { getTransactions: rows } })))
+        ? Promise.resolve(new Response(JSON.stringify({ data: { latestBlockHeight: 200, getTransactions: rows } })))
         : Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: JSON.stringify(FUNCTIONS) })))),
     );
     const box = await panel(fetch);
