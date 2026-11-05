@@ -318,18 +318,17 @@ describe("AccountName: a registration that does not go through", () => {
     expect(signed(wallet)).toBe(1);
   });
 
-  it("says a declined signature and offers Register again, which signs a second time", async () => {
+  it("says a declined signature may have gone and offers no second Register (9d-2)", async () => {
     const wallet = recordedAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
     const { box } = await opened({ wallet });
     register(box);
     await vi.waitFor(() => {
-      expect(said(dialog(box))).toMatch(/declined in Adena/);
+      expect(said(dialog(box))).toMatch(/the signature was declined/);
     });
+    expect(said(dialog(box))).toMatch(/check Adena's recent transactions/);
     expect(said(dialog(box))).not.toMatch(/is registered/);
-    register(box);
-    await vi.waitFor(() => {
-      expect(signed(wallet)).toBe(2);
-    });
+    expect(button(box, "Register · 0 GNOT")).toBeUndefined();
+    expect(signed(wallet)).toBe(1);
   });
 
   it("offers no second Register for a hash that never showed in a block: it may still land", async () => {
@@ -481,8 +480,13 @@ describe("AccountName: reads again, and what goes wrong", () => {
   });
 
   it("reads both chains again after each registration that ran, the second time as the first", async () => {
-    const wallet = recordedAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
-    const { box, asked } = control(ONYX_UNIVERSE, NONE, { wallet });
+    // A call the realm refused changed nothing and may be signed again; a decline may not (9d-2).
+    const refused = () => ({
+      ok: true as const,
+      value: { ...LANDED, failed: true, log: "susers: canonical collision" },
+      source,
+    });
+    const { box, asked } = control(ONYX_UNIVERSE, NONE, { landing: refused });
     await settled();
     await pick(box);
     expect(asked).toHaveLength(2);

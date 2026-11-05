@@ -3,7 +3,7 @@
 // (the account and the chain) is kept with it: a card of another account or chain is never read as this person's.
 import { realmType } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
-import { callsIn, ensureCalls, signWith, type SignDeps } from "../calls/index.ts";
+import { callsIn, ensureCalls, retryable, signWith, type SignDeps } from "../calls/index.ts";
 import type { CallCard } from "../../lib/calls.ts";
 import { NAMEREG, NYM_PREFIX, nymProblem } from "./nym.ts";
 
@@ -26,11 +26,9 @@ export function registrationOf(state: AppState, account: string, chainId: string
     : undefined;
 }
 
-// A failed card that may have been sent has no way back to a second signature; one the chain ran and refused changed nothing.
+// A failed card that may have been sent has no way back to a second signature (9d-2); one the chain ran and refused changed nothing.
 function mayBeSent(state: CallCard["state"]): boolean {
-  return (
-    state.kind === "failed" && state.reason !== "chain" && (state.hash !== undefined || state.reason === "maybe-sent")
-  );
+  return state.kind === "failed" && state.reason !== "chain" && !retryable(state);
 }
 
 // What a card already in the store means for a new registration, in the person's words when it forbids one. `mine`: it was opened for

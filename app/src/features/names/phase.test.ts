@@ -39,6 +39,11 @@ describe("phaseOf", () => {
     ["a call the chain ran and refused", { kind: "failed", reason: "chain", hash: "ab" }, true],
     ["a decline, nothing sent", { kind: "failed", reason: "declined" }, true],
     ["a call that may have been sent, no hash", { kind: "failed", reason: "maybe-sent" }, false],
+    [
+      "a decline once signing was asked: it may have gone (9d-2)",
+      { kind: "failed", reason: "declined-maybe-sent" },
+      false,
+    ],
     ["a failure that names a hash", { kind: "failed", reason: "unseen", hash: "ab" }, false],
   ] as const)("says whether Register is offered again for %s", (_title, state, again) => {
     expect(phaseOf(card(state))).toEqual({ kind: "failed", text: sayFailure(state), again });

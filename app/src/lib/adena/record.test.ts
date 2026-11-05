@@ -84,7 +84,7 @@ describe("record", () => {
     await record(adena, "call", { call: "DoContract", request: REQUEST, universe: ONYX });
     expect(asked).toEqual([
       { call: "SwitchNetwork", args: ["onyx-1"] },
-      { call: "DoContract", args: [TRANSACTION] },
+      { call: "DoContract", args: [TRANSACTION, { isVisibleResult: false }] },
     ]);
   });
 
@@ -133,14 +133,14 @@ describe("recordCall", () => {
     ]);
     expect(asked).toEqual([
       { call: "GetAccount", args: [] },
-      { call: "DoContract", args: [TRANSACTION] },
+      { call: "DoContract", args: [TRANSACTION, { isVisibleResult: false }] },
     ]);
   });
 
   it("calls as the account it knows, reading nothing first, one argument a line", async () => {
     const { adena, asked } = wallet({ DoContract: { status: "success" } });
     await recordCall(adena, "call", { ...FORM, account: CALLER, args: "1\ntwo" });
-    expect(asked).toEqual([{ call: "DoContract", args: [transactionOf(["1", "two"])] }]);
+    expect(asked).toEqual([{ call: "DoContract", args: [transactionOf(["1", "two"]), { isVisibleResult: false }] }]);
   });
 
   it("records no call, and asks for none, while Adena gives no account: it has not let the page in", async () => {

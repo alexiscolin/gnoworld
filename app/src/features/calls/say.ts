@@ -47,6 +47,8 @@ export function sayFailure({ reason, log, hash, adena }: Said): string {
     failed: "Adena could not send this call. Try again in a moment.",
     "maybe-sent":
       "Adena did not say whether this call went through, so it may have been sent. Check Adena's recent transactions before you call again.",
+    "declined-maybe-sent":
+      "Adena says the signature was declined. If you closed Adena's window after confirming, the call may have been sent: check Adena's recent transactions before you call again.",
     unsupported: "This version of Adena does not support this call. Open the realm on gnoweb to make it.",
     "wrong-network":
       "Adena is not on this universe's network and did not switch. Switch the network in Adena, then try again.",

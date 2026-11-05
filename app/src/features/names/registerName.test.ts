@@ -145,15 +145,16 @@ describe("registerName: a store that already holds a registration", () => {
     adena.asked.filter((entry) => entry.call === "DoContract");
   const failing = (type: string) => () => Promise.resolve({ status: "failure", type, message: "", data: {} });
 
-  it("signs a second time after a decline: the card goes back to its preview, and ends done", async () => {
+  it("offers no second Register after a decline once signing was asked: it may have gone (9d-2)", async () => {
     const adena = recordedAdena({ account: ACCOUNT, doContract: failing("TRANSACTION_REJECTED") });
     const { store, deps } = setup({}, adena);
     expect(await registerName("alexis042", deps)).toEqual({ ok: true });
-    expect(stateOf(store)).toMatchObject({ kind: "failed", reason: "declined" });
+    expect(stateOf(store)).toMatchObject({ kind: "failed", reason: "declined-maybe-sent" });
     const second = recordedAdena({ account: ACCOUNT });
-    expect(await registerName("alexis043", { ...deps, adena: second.adena })).toEqual({ ok: true });
-    expect(stateOf(store)).toMatchObject({ kind: "done", height: 55414 });
-    expect(JSON.stringify(signedBy(second))).toContain("nym-alexis043");
+    const again = await registerName("alexis043", { ...deps, adena: second.adena });
+    expect(again).toEqual({ ok: false, problem: expect.stringMatching(/may already have been sent/) as string });
+    expect(signedBy(second)).toEqual([]);
+    expect(stateOf(store)).toMatchObject({ kind: "failed", reason: "declined-maybe-sent" });
   });
 
   it("asks for the other universe's chain after a decline on this one, never a silent end on the first's card", async () => {

@@ -218,4 +218,13 @@ describe("the calls slice: no way back from a call that may have been sent (F572
     expect(state(store)).toBe("failed");
     expect(card(store)?.state).toEqual({ kind: "failed", reason: "maybe-sent" });
   });
+
+  it("does not retry a refusal Adena gave once asked to sign: the window closed after Confirm reads so (F5747)", () => {
+    const store = opened();
+    const { signing, failed, retry } = store.getState().callsActions;
+    signing("SetBio");
+    failed("SetBio", { reason: "declined-maybe-sent" });
+    retry("SetBio");
+    expect(card(store)?.state).toEqual({ kind: "failed", reason: "declined-maybe-sent" });
+  });
 });

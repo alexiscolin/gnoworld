@@ -9,6 +9,13 @@ import { without } from "../../store/record.ts";
 /** A store that has the calls' slice. */
 export type CallsStore = StoreApi<AppState & CallsSlice>;
 
+/** A failure the card may sign again: none that may have been sent, or that has a hash (F5728, F5747). */
+export const retryable = (state: CardState): boolean =>
+  state.kind === "failed" &&
+  state.hash === undefined &&
+  state.reason !== "maybe-sent" &&
+  state.reason !== "declined-maybe-sent";
+
 /** The state with the calls' slice, or nothing before a card was drawn: the one way to read it (F5726). */
 export function callsIn(state: AppState): (AppState & CallsSlice) | undefined {
   return Object.hasOwn(state, "callsActions") ? (state as AppState & CallsSlice) : undefined;
@@ -61,11 +68,7 @@ function addCalls({ setState: set, getState: get }: CallsStore): void {
         go(id, ["preview", "signing", "landing"], () => ({ state: { kind: "failed", ...failure } }));
       },
       retry: (id) => {
-        go(id, ["failed"], ({ state }) =>
-          state.kind === "failed" && state.hash === undefined && state.reason !== "maybe-sent"
-            ? { state: { kind: "preview" } }
-            : undefined,
-        );
+        go(id, ["failed"], ({ state }) => (retryable(state) ? { state: { kind: "preview" } } : undefined));
       },
       close: (id) => {
         const kind = get().calls[id]?.state.kind;

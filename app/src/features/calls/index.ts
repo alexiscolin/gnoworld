@@ -4,4 +4,4 @@ export { feeText } from "./fee.ts";
 export { pageParts, signInPage, signWith, type Parts } from "./signPage.ts";
 export { NOT_CHECKED, networkOf, publicForever, sayFailure } from "./say.ts";
 export type { SignDeps } from "./signCall.ts";
-export { callsIn, ensureCalls } from "./slice.ts";
+export { callsIn, ensureCalls, retryable } from "./slice.ts";
