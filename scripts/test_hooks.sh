@@ -112,7 +112,7 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scri
            "Edit(/.claude/settings.json)", "Edit(/.claude/settings.local.json)", "Edit(/.claude/agents/**)", "Edit(/.claude/commands/**)",
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
-           "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)",
+           "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)", "Edit(/jarvis/package.json)", "Edit(/evals/package.json)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
            "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(~/Server/gnoworld-wt/*/.git)",
            "Edit(~/Server/gnoworld/.git/hooks/**)", "Edit(~/Server/gnoworld/.git/config)", "Edit(~/Server/gnoworld/scripts/**)", "Edit(~/Server/gnoworld/.githooks/**)"}
@@ -139,7 +139,8 @@ grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may
 python3 -I - "$here/.." <<'PY' || fail "pnpm install runs a package.json script (F087, F129)"
 import glob, json, os, sys
 root = sys.argv[1]
-for p in [os.path.join(root, "package.json"), os.path.join(root, "app/package.json"), *glob.glob(os.path.join(root, "packages/*/package.json"))]:
+# Every project pnpm installs, the next one too: the root, each folder's and each package's, evals/ apart (F5316).
+for p in [os.path.join(root, "package.json"), *glob.glob(os.path.join(root, "*/package.json")), *glob.glob(os.path.join(root, "packages/*/package.json"))]:
     scripts = json.load(open(p)).get("scripts", {})
     run = {"preinstall", "install", "postinstall", "preprepare", "prepare", "postprepare"} & set(scripts)
     assert not run, (p, run)

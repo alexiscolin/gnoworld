@@ -19,6 +19,8 @@
       "Bash(rm -rf *)",
       "Edit(/scripts/guard.py)",
       "Edit(/server/package.json)",
+      "Edit(/jarvis/package.json)",
+      "Edit(/evals/package.json)",
       "Edit(/packages/schemas/package.json)",
       "Edit(/scripts/stop_gate.sh)",
       "Edit(/scripts/code_changed.sh)",
