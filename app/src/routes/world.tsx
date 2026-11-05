@@ -49,6 +49,7 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   const realm = world.realms?.[0];
+  const address = ORIGIN + world.canonical;
   const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
   const realmPath =
     realm === undefined
@@ -64,7 +65,7 @@ export default function World() {
           <Panel.Body>
             <Stack>
               {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
-              <Arrival world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
+              <Arrival world={world.slug} name={world.name} address={address} />
               {/* The kind of place ("UNIVERSE > DAO") is not in the data yet: the universe alone says where this is. */}
               <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
@@ -76,10 +77,7 @@ export default function World() {
               <Here />
               {/* No source yet for the history: the block says so. */}
               <Activity />
-              <Actions
-                address={ORIGIN + world.canonical}
-                {...(realmPath === undefined ? {} : { proposals: realmPath })}
-              />
+              <Actions address={address} {...(realmPath === undefined ? {} : { proposals: realmPath })} />
               {realmPath === undefined ? null : (
                 <Suspense fallback={null}>
                   <Proposals path={realmPath} />
