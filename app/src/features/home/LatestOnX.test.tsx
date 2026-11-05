@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { mount } from "../../../tests/mount.tsx";
+import { mount, noMedia } from "../../../tests/mount.tsx";
 import { LatestOnX } from "./LatestOnX.tsx";
 import { stampOf } from "./stamp.ts";
 
@@ -27,7 +27,7 @@ const post = (id: string, at: string, extra: { sample?: boolean } = {}) => ({
 
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ["Date"] });
-  vi.stubGlobal("matchMedia", (media: string) => ({ matches: false, media }));
+  noMedia();
 });
 afterEach(() => {
   vi.useRealTimers();

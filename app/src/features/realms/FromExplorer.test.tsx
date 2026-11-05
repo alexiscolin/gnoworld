@@ -4,7 +4,7 @@ import type { Worlds } from "@gnoworld/schemas/indexer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ChainRead } from "../../lib/chain/read.ts";
 import { explorerLink } from "../../lib/chain/explorer.ts";
-import { all, mount, settled } from "../../../tests/mount.tsx";
+import { all, mount, noMedia, settled } from "../../../tests/mount.tsx";
 import FromExplorer from "./FromExplorer.tsx";
 
 // A world's realm card (8g, frame 93): the facts the indexer read and the file holds, each left out when no source gave it, never a zero;
@@ -39,7 +39,7 @@ const said = (value: ChainRead<unknown>) => {
 };
 
 beforeEach(() => {
-  vi.stubGlobal("matchMedia", (media: string) => ({ matches: false, media }));
+  noMedia();
 });
 afterEach(() => {
   vi.unstubAllGlobals();

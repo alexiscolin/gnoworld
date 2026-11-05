@@ -2,7 +2,7 @@
 import type { ShownLine } from "@gnoworld/core";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, mount, one } from "../../../tests/mount.tsx";
+import { all, mount, noMedia, one } from "../../../tests/mount.tsx";
 import { Head, openAuthorCard } from "./LineHead.tsx";
 
 // View profile (8j): the More menu's item opens the card of the line's author, whose name is the pointer's way and no Tab stop; the focus
@@ -18,7 +18,7 @@ const GUEST: ShownLine = {
 const ACCOUNT: ShownLine = { ...GUEST, id: "m1", from: ALICE, account: ALICE };
 
 beforeEach(() => {
-  vi.stubGlobal("matchMedia", (media: string) => ({ matches: false, media }));
+  noMedia();
 });
 afterEach(() => {
   vi.unstubAllGlobals();

@@ -125,7 +125,7 @@ describe("a field read from the device", () => {
     expect(pageDevice().read("stamps")).toEqual({ [at(256)]: "2026-11-01" });
   });
 
-  it("reads a __proto__ key with a stamp as an own entry, and keeps a hostile value aside without polluting any prototype", () => {
+  it("reads a __proto__ key with a stamp as an own entry, and drops a hostile value without polluting any prototype", () => {
     held.words.set("gnoworld:device:stamps", '{"__proto__":{"polluted":1}}');
     const device = pageDevice();
     const read = device.read("stamps") ?? {};
