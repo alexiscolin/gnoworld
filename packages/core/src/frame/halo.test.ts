@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { systemsOf } from "../cosmos/system.ts";
+import { systemsOf, type StarSystem } from "../cosmos/system.ts";
 import { glowsAt, HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./halo.ts";
 
 // A star's halo by its distance from the eye (7d6, 7d3), and a sun's size on the screen: whole near, a point far, and no two suns at
@@ -67,5 +67,44 @@ describe("a sun's size", () => {
         },
       ),
     );
+  });
+});
+
+// 8r: halo.ts's numbers, pinned where StrykerJS found them loose (8n's run, 2026-11-05). A star of size 4 reaches 7.5 * 2 + 2 = 17 on
+// the map; a point is 10 pixels of radius; the main light's halo is 320 pixels at its widest.
+describe("a sun's reach in numbers (8r)", () => {
+  const sized = (star: number): StarSystem => ({
+    id: "test",
+    place: { x: 0, y: 0, z: 0 },
+    star,
+    warmth: 0.5,
+    spin: 0,
+    tilt: 0,
+    node: 0,
+    belt: false,
+    worlds: [],
+  });
+
+  it("a point's reach grows with its distance and shrinks with the lens: 10 pixels at 20 units through 2 is 100", () => {
+    expect(pointReach(20, 2)).toBe(100);
+    expect(pointReach(40, 2)).toBe(200);
+  });
+
+  it("the main light, its halo whole and room on the screen, reaches its own 7.5 times the root of its size plus 2", () => {
+    expect(sunReach(sized(4), { distance: 1, focal: 1, halo: 1 })).toBe(17);
+    expect(sunReach(sized(16), { distance: 1, focal: 1, halo: 1 })).toBe(32);
+  });
+
+  it("the main light never draws past its widest halo, 320 pixels: through a lens of 320 at 1 unit it reaches 1, not its own 17", () => {
+    expect(sunReach(sized(4), { distance: 1, focal: 320, halo: 1 })).toBe(1);
+  });
+
+  it("any other sun stands under `most` times its distance, and near it when its own reach is far past it", () => {
+    const reach = sunReach(sized(4), { distance: 4, focal: 1, halo: 1, most: 0.5 });
+    expect(reach).toBeLessThan(2);
+    expect(reach).toBeCloseTo(2, 3);
+    const far = sunReach(sized(4), { distance: 400, focal: 1, halo: 1, most: 0.5 });
+    expect(far).toBeLessThan(17);
+    expect(far).toBeCloseTo(17, 3);
   });
 });
