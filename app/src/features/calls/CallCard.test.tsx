@@ -169,6 +169,11 @@ describe("CallCard, the states after the click", () => {
     );
   });
 
+  it("says what Adena reported while a call it named a hash for is followed (F5749)", () => {
+    const box = withState({ kind: "landing", hash: HASH, adena: "insufficient funds" });
+    expect(said(box)).toContain("Adena reported: insufficient funds");
+  });
+
   it("says it is landing in a block, with the hash, once it is sent: nothing yet says done", () => {
     const box = withState({ kind: "landing", hash: HASH });
     expect(said(box)).toMatch(/landing in a block/i);

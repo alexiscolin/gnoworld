@@ -47,8 +47,8 @@ function addCalls({ setState: set, getState: get }: CallsStore): void {
       signing: (id) => {
         to(id, "preview", { kind: "signing" });
       },
-      landing: (id, hash) => {
-        to(id, "signing", { kind: "landing", hash });
+      landing: (id, hash, adena) => {
+        to(id, "signing", adena === undefined ? { kind: "landing", hash } : { kind: "landing", hash, adena });
       },
       done: (id, { height, value }) => {
         go(id, ["landing"], ({ state }) =>

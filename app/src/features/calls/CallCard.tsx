@@ -62,6 +62,7 @@ function Status({ card }: { card: Card_ }) {
         <Mark kind="ring" />
         <span>
           Landing in a block… <Tx hash={state.hash} />
+          {state.adena === undefined || state.adena === "" ? null : ` Adena reported: ${shown(state.adena)}`}
         </span>
       </p>
     );

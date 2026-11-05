@@ -57,6 +57,14 @@ describe("sayFailure: each failure's next step", () => {
     expect(said).toContain(hash);
   });
 
+  it("says what Adena reported for a call it named a hash for and failed, before the hash (F5749)", () => {
+    const hash = "ab".repeat(32);
+    const said = sayFailure({ reason: "unseen", hash, adena: "insufficient funds" });
+    expect(said).toContain("Adena reported: insufficient funds");
+    expect(said.indexOf("insufficient funds")).toBeLessThan(said.indexOf(hash));
+    expect(sayFailure({ reason: "unseen", hash, adena: `bad${String.fromCodePoint(0x202e)}` })).toContain("<U+202E>");
+  });
+
   it("names the hash of a call that was sent and never seen in a block, so it can be looked up", () => {
     const hash = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
     expect(sayFailure({ reason: "unseen", hash })).toContain(hash);

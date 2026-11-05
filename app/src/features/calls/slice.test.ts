@@ -87,6 +87,16 @@ describe("the store's calls slice", () => {
     expect(card(store)?.state).toEqual({ kind: "done", hash: HASH, height: 55414, value: "(42 int)" });
   });
 
+  it("keeps Adena's log from landing to a failure, for the card to say (F5749)", () => {
+    const store = opened();
+    const { signing, landing, failed } = store.getState().callsActions;
+    signing("SetBio");
+    landing("SetBio", HASH, "insufficient funds");
+    expect(card(store)?.state).toEqual({ kind: "landing", hash: HASH, adena: "insufficient funds" });
+    failed("SetBio", { reason: "unseen", hash: HASH, adena: "insufficient funds" });
+    expect(card(store)?.state).toEqual({ kind: "failed", reason: "unseen", hash: HASH, adena: "insufficient funds" });
+  });
+
   it("is never done before the chain's answer: done from preview or signing is ignored, and so is landing from preview", () => {
     const store = opened();
     const { signing, landing, done } = store.getState().callsActions;

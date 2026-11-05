@@ -17,13 +17,14 @@ export interface Said {
   reason: CardFailure;
   log?: string | undefined;
   hash?: string | undefined;
+  adena?: string | undefined;
 }
 
 // The reasons whose own words are followed by a log: the wallet's message, the realm's error log.
 const WITH_LOG: readonly CardFailure[] = ["failed", "maybe-sent", "chain"];
 
 /** The sentence of a failure: its next step, then the log of a reason that owns one. */
-export function sayFailure({ reason, log, hash }: Said): string {
+export function sayFailure({ reason, log, hash, adena }: Said): string {
   const WORDS: Record<CardFailure, string> = {
     missing: "Adena is not installed in this browser. Install Adena, then try again.",
     outdated: "Your Adena is too old for this call. Update Adena, then try again.",
@@ -43,7 +44,7 @@ export function sayFailure({ reason, log, hash }: Said): string {
     malformed: "Adena answered with something unexpected, so nothing was trusted. Try again, or report it.",
     "not-loaded": "Part of gnoworld that signs did not load, so nothing was sent. Reload the page, then try again.",
     "logged-out": "You are not logged in. Connect Adena, then try again.",
-    unseen: `${log === undefined || log === "" ? "The call was sent but has not shown in a block after about 2 minutes." : `The call was sent, but the node's answer could not be used. ${shown(log)}`} It is not known whether it succeeded or failed. Look up its hash before you try again: ${hash ?? ""}`,
+    unseen: `${log === undefined || log === "" ? "The call was sent but has not shown in a block after about 2 minutes." : `The call was sent, but the node's answer could not be used. ${shown(log)}`} ${adena === undefined || adena === "" ? "" : `Adena reported: ${shown(adena)} `}It is not known whether it succeeded or failed. Look up its hash before you try again: ${hash ?? ""}`,
     chain: "The chain ran the call and the realm refused it, so nothing changed.",
   };
   const words = WORDS[reason];

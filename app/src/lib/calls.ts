@@ -11,9 +11,16 @@ export type CardFailure = CallFailure | "logged-out" | "unseen" | "chain" | "not
 export type CardState =
   | { kind: "preview" }
   | { kind: "signing" }
-  | { kind: "landing"; hash: string }
+  | { kind: "landing"; hash: string; adena?: string | undefined }
   | { kind: "done"; hash: string; height: number; value: string }
-  | { kind: "failed"; reason: CardFailure; log?: string | undefined; hash?: string | undefined };
+  | {
+      kind: "failed";
+      reason: CardFailure;
+      log?: string | undefined;
+      hash?: string | undefined;
+      /** What Adena reported for a call it named a hash for and said failed. */
+      adena?: string | undefined;
+    };
 
 export interface CallCard {
   /** One card a row of a chain: the chain and the function's name. */
@@ -42,9 +49,12 @@ export interface CallsSlice {
     open: (card: NewCard) => void;
     edit: (id: string, index: number, text: string) => void;
     signing: (id: string) => void;
-    landing: (id: string, hash: string) => void;
+    landing: (id: string, hash: string, adena?: string) => void;
     done: (id: string, result: { height: number; value: string }) => void;
-    failed: (id: string, failure: { reason: CardFailure; log?: string | undefined; hash?: string | undefined }) => void;
+    failed: (
+      id: string,
+      failure: { reason: CardFailure; log?: string | undefined; hash?: string | undefined; adena?: string | undefined },
+    ) => void;
     retry: (id: string) => void;
     close: (id: string) => void;
   };

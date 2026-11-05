@@ -37,8 +37,14 @@ const BOUND_MS = 120_000;
 // What a moment can change; any other answer of the node is final for this hash.
 const AGAIN: readonly FailureKind[] = ["not-landed", "down", "timeout", "chain-refused"];
 
+interface Sent {
+  hash: string;
+  /** Adena's log of a call it named a hash for and said failed. */
+  adena?: string | undefined;
+}
+
 // Reads the hash until it is in a block, or the bound; the card's state is the chain's answer.
-async function follow(id: string, hash: string, deps: SignDeps): Promise<void> {
+async function follow(id: string, { hash, adena }: Sent, deps: SignDeps): Promise<void> {
   const { done, failed } = actionsOf(deps);
   const { read, wait, now = Date.now } = deps;
   const started = now();
@@ -52,13 +58,13 @@ async function follow(id: string, hash: string, deps: SignDeps): Promise<void> {
     }
     // A final answer is said with its own sentence; only a wait that ran out says the wait (F5725).
     if (!AGAIN.includes(landed.failure.kind)) {
-      failed(id, { reason: "unseen", hash, log: landed.failure.next });
+      failed(id, { reason: "unseen", hash, log: landed.failure.next, adena });
       return;
     }
     if (now() - started >= BOUND_MS || tries === READS) break;
     await wait(EVERY_MS);
   }
-  failed(id, { reason: "unseen", hash });
+  failed(id, { reason: "unseen", hash, adena });
 }
 
 // Adena's answer to the card's call: a hash is followed to its block, a failure without one is the card's state. A call that may
@@ -67,8 +73,10 @@ async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>,
   const { landing, failed } = actionsOf(deps);
   const hash = signed.ok || signed.reason === "maybe-sent" ? signed.hash : undefined;
   if (hash !== undefined) {
-    landing(id, hash);
-    await follow(id, hash, deps);
+    // Adena's log of a call it named a hash for and said failed (the node refused the broadcast, F5749): the card says it.
+    const adena = signed.ok || signed.log === undefined ? undefined : signed.log;
+    landing(id, hash, adena);
+    await follow(id, { hash, adena }, deps);
   } else if (!signed.ok) {
     failed(id, signed.log === undefined ? { reason: signed.reason } : { reason: signed.reason, log: signed.log });
   }

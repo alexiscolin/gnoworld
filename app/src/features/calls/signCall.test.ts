@@ -154,6 +154,46 @@ describe("signCall: the card's course", () => {
     expect(stateOf(store)?.kind).toBe("failed");
   });
 
+  describe("a call Adena says failed after it named the hash (F5749)", () => {
+    const refused = () => {
+      const wallet = recordedAdena({
+        account: CALLER,
+        doContract: () =>
+          Promise.resolve({
+            status: "failure",
+            type: "TRANSACTION_FAILED",
+            message: "insufficient funds",
+            data: { hash: SIGNED_HASH },
+          }),
+      });
+      return wallet.adena;
+    };
+
+    it("is landing with Adena's log while the chain is asked", async () => {
+      const pending = Promise.withResolvers<ChainRead<typeof LANDED>>();
+      const read = vi.fn(() => pending.promise);
+      const { store, deps } = setup({ adena: refused(), read });
+      const running = signCall("SetBio", deps);
+      await vi.waitFor(() => {
+        expect(read).toHaveBeenCalled();
+      });
+      expect(stateOf(store)).toEqual({ kind: "landing", hash: SIGNED_HASH, adena: "insufficient funds" });
+      pending.resolve(found(LANDED));
+      await running;
+    });
+
+    it("ends unseen with Adena's log kept, so the card can say what Adena said", async () => {
+      const { store, deps } = setup({ adena: refused(), read: vi.fn(() => Promise.resolve(missing)) });
+      await signCall("SetBio", deps);
+      expect(stateOf(store)).toEqual({
+        kind: "failed",
+        reason: "unseen",
+        hash: SIGNED_HASH,
+        adena: "insufficient funds",
+      });
+    });
+  });
+
   it("follows a call that is not in a block yet, waiting between reads, until it lands", async () => {
     const read = vi
       .fn<SignDeps["read"]>()
