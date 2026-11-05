@@ -17,6 +17,7 @@ export {
   Stations,
   Universes,
 } from "./data.ts";
+export { CallRequest } from "./call.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export {
   AnswerButton,
