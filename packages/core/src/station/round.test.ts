@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
 import { composed } from "../frame/composition.ts";
 import { offMoon, type MoonRing } from "../frame/earthMoon.ts";
-import { looksFrom, type Look, type Seen } from "../frame/restLook.ts";
+import { Look, looksFrom, type Seen } from "../frame/restLook.ts";
 import { onOrbit, stationsRound, type Placed } from "./round.ts";
 import { earthCamera, sceneryOf } from "./scenery.ts";
 
@@ -70,6 +70,20 @@ describe("stationsRound", () => {
     expect(new Set(belt.map(({ place }) => `${String(place.x)} ${String(place.z)}`)).size).toBe(belt.length);
     expect(Math.max(...belt.map(({ orbit }) => orbit.node))).toBeGreaterThan(1.5 * Math.PI);
     for (const count of quarters(belt.map(phaseOf))) expect(count).toBeGreaterThan(belt.length / 8);
+  });
+
+  // Sizes found by a search so that a lone station's nearest clear place stands exactly on a bound: a bound is kept, never passed. Exact
+  // to the last bit of V8's own Math functions, so a change of engine may move them: search again (8r's report says how).
+  it("stands a body exactly at the Earth's least gap, and on a phone exactly at the screen's right edge", () => {
+    const [atEarth] = stationsRound([{ seed: "edge 3", size: 0.05540347923023921 }], ring).close;
+    const [look] = looksFrom(earthCamera());
+    if (atEarth === undefined || look === undefined) throw new Error("no body placed");
+    const seen = look.ball(atEarth.place, atEarth.radius);
+    const { earth } = look;
+    expect(Math.hypot(seen.x - earth.x, seen.y - earth.y) - seen.radius - earth.radius).toBe(0.4 * earth.radius + 24);
+    const [atEdge] = stationsRound([{ seed: "edge 3", size: 0.6178026516015254 }], ring).close;
+    if (atEdge === undefined) throw new Error("no body placed");
+    expect(new Look(earthCamera(), { width: 390, height: 844 }).ball(atEdge.place, atEdge.radius).right).toBe(390);
   });
 
   // 7x: every rule a body stands by, on each of the video's screens, with what was placed before it: the files where each decides.
