@@ -1,5 +1,6 @@
 import { Address, type ChainEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { chainKey } from "./chain.ts";
 import { createAppStore } from "./index.ts";
 
 // Slice 9g: the chain's slice, from the stream's events alone (ADR-0002 §4: nothing is optimistic). A room's line exists only
@@ -37,8 +38,10 @@ describe("the chain's slice", () => {
   it("keeps a world's calls under that world, oldest first, each with its height", () => {
     const store = createAppStore();
     store.getState().chainActions.heard([call(900030), call(900031, "bubble"), call(900032)]);
-    expect(store.getState().chainByWorld["govdao"]?.map(({ height }) => height)).toEqual([900030, 900032]);
-    expect(store.getState().chainByWorld["bubble"]?.map(({ height }) => height)).toEqual([900031]);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.map(({ height }) => height)).toEqual([
+      900030, 900032,
+    ]);
+    expect(store.getState().chainByWorld[chainKey("onyx", "bubble")]?.map(({ height }) => height)).toEqual([900031]);
   });
 
   it("stamps each call with the time the page heard it, which places it among the room's messages (the event has none)", () => {
@@ -48,7 +51,7 @@ describe("the chain's slice", () => {
     store.getState().chainActions.heard([call(1)]);
     vi.setSystemTime(new Date("2026-11-06T09:00:05.000Z"));
     store.getState().chainActions.heard([call(2), call(3)]);
-    expect(store.getState().chainByWorld["govdao"]?.map(({ height, at }) => [height, at])).toEqual([
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.map(({ height, at }) => [height, at])).toEqual([
       [1, "2026-11-06T09:00:00.000Z"],
       [2, "2026-11-06T09:00:05.000Z"],
       [3, "2026-11-06T09:00:05.000Z"],
@@ -59,8 +62,8 @@ describe("the chain's slice", () => {
     const store = createAppStore();
     store.getState().chainActions.heard(Array.from({ length: 70 }, (_, n) => call(n)));
     store.getState().chainActions.heard(Array.from({ length: 30 }, (_, n) => deploy(1000 + n)));
-    expect(store.getState().chainByWorld["govdao"]).toHaveLength(50);
-    expect(store.getState().chainByWorld["govdao"]?.[0]?.height).toBe(20);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]).toHaveLength(50);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.[0]?.height).toBe(20);
     expect(store.getState().deploys).toHaveLength(20);
     expect(store.getState().deploys[0]?.height).toBe(1010);
   });
@@ -87,8 +90,8 @@ describe("the chain's slice", () => {
     store.getState().chainActions.heard(Array.from({ length: 200 }, (_, n) => call(n, `w${String(n)}`)));
     store.getState().chainActions.heard([call(900, "w0"), call(901, "w200")]);
     expect(Object.keys(store.getState().chainByWorld)).toHaveLength(200);
-    expect(store.getState().chainByWorld["w0"]?.map(({ height }) => height)).toEqual([0, 900]);
-    expect(store.getState().chainByWorld["w200"]).toBeUndefined();
+    expect(store.getState().chainByWorld[chainKey("onyx", "w0")]?.map(({ height }) => height)).toEqual([0, 900]);
+    expect(store.getState().chainByWorld[chainKey("onyx", "w200")]).toBeUndefined();
   });
 
   it("keeps a universe's count with its height, and a count at an older height does not replace a newer one", () => {

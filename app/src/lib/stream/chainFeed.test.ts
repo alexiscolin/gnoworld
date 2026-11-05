@@ -1,5 +1,6 @@
 import { Address, type ChainEvent, type RealmsDeployed } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
 import { BATCH_MS, chainFeed } from "./chainFeed.ts";
 import { followVerdicts, type VerdictSource } from "./verdicts.ts";
@@ -62,7 +63,7 @@ describe("the chain's feed", () => {
     expect(store.getState().chainByWorld).toEqual({});
     vi.advanceTimersByTime(BATCH_MS);
     expect(told()).toBe(1);
-    expect(store.getState().chainByWorld["govdao"]).toHaveLength(17);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]).toHaveLength(17);
   });
 
   it("puts a deploy in the ticker's, and a call in its world's, whatever order they came", () => {
@@ -71,7 +72,7 @@ describe("the chain's feed", () => {
     say("chain", call(6));
     vi.advanceTimersByTime(BATCH_MS);
     expect(store.getState().deploys.map(({ height }) => height)).toEqual([5]);
-    expect(store.getState().chainByWorld["govdao"]?.map(({ height }) => height)).toEqual([6]);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.map(({ height }) => height)).toEqual([6]);
   });
 
   it("puts the count in the store at once, from the frame, and a frame that fails its schema nowhere", () => {
@@ -94,15 +95,15 @@ describe("the chain's feed", () => {
     say("chain", call(3));
     feed.stop();
     vi.advanceTimersByTime(BATCH_MS * 5);
-    expect(store.getState().chainByWorld["govdao"]).toHaveLength(2);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]).toHaveLength(2);
   });
 
   it("holds 1,000 events at most in a window", () => {
     const { store, say } = page();
     for (let n = 0; n < 1100; n += 1) say("chain", call(n));
     vi.advanceTimersByTime(BATCH_MS);
-    expect(store.getState().chainByWorld["govdao"]).toHaveLength(50);
-    expect(store.getState().chainByWorld["govdao"]?.[0]?.height).toBe(1050);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]).toHaveLength(50);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.[0]?.height).toBe(1050);
   });
 });
 

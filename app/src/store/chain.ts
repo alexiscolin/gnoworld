@@ -14,6 +14,9 @@ const LINES = 50;
 const DEPLOYS = 20;
 const WORLDS = 200;
 
+/** The key a world's lines are kept under. */
+export const chainKey = (_universe: string, world: string): string => world;
+
 export interface ChainSlice {
   chainByWorld: Readonly<Record<string, readonly ChainHeard[]>>;
   deploys: readonly ChainDeploy[];
@@ -37,9 +40,10 @@ export const chainSlice: StateCreator<ChainSlice> = (set, get) => ({
       const at = new Date().toISOString();
       for (const call of events) {
         if (call.kind !== "call") continue;
-        const held = byWorld[call.world];
+        const key = chainKey(call.universe, call.world);
+        const held = byWorld[key];
         if (held !== undefined || Object.keys(byWorld).length < WORLDS)
-          byWorld = { ...byWorld, [call.world]: [...(held ?? []), { ...call, at }].slice(-LINES) };
+          byWorld = { ...byWorld, [key]: [...(held ?? []), { ...call, at }].slice(-LINES) };
       }
       const added = events.filter((event) => event.kind === "deploy");
       set({ chainByWorld: byWorld, deploys: added.length === 0 ? deploys : [...deploys, ...added].slice(-DEPLOYS) });

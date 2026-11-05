@@ -8,7 +8,7 @@ import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, ChainCallsContext, ChainPlaceContext, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
-import type { ChainHeard } from "../store/chain.ts";
+import { chainKey, type ChainHeard } from "../store/chain.ts";
 import { useApp } from "../storeContext.tsx";
 import styles from "./world.module.css";
 
@@ -49,7 +49,7 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   const realm = world.realms?.[0];
-  const calls = useApp((app) => app.chainByWorld[world.slug]);
+  const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
   const realmPath =
     realm === undefined
       ? undefined
