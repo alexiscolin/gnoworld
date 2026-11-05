@@ -155,7 +155,9 @@ test.describe("reduced motion", () => {
 });
 
 test.describe("Go explore", () => {
-  test("goes to today's next stop when no world holds a crowd, and says so in the top pill", async ({ page }) => {
+  test("goes to today's next stop when no world holds a crowd, says so, and keeps the progress through a reload", async ({
+    page,
+  }) => {
     await page.setViewportSize(COMPUTER);
     await page.route("**/api/presence", (route) => route.fulfill({ json: { worlds: [] } }));
     await page.goto("/");
@@ -163,5 +165,26 @@ test.describe("Go explore", () => {
     await page.getByRole("link", { name: "Go explore" }).click();
     await expect(page.getByText(/^0 of 3 · next stop: /)).toBeVisible();
     await expect(page).not.toHaveURL(/\/$/);
+    // The stop's arrival counts it, in the same pill.
+    await expect(page.getByText("Today's expedition · 1 of 3")).toBeVisible();
+    await page.goto("/");
+    await page.reload();
+    await hydrated(page);
+    await page.getByRole("link", { name: "Go explore" }).click();
+    await expect(page.getByText(/^1 of 3 · next stop: /)).toBeVisible();
+  });
+});
+
+test.describe("Follow", () => {
+  test("is kept on the device and through a reload", async ({ page }) => {
+    await page.setViewportSize(COMPUTER);
+    await page.goto("/w/bubble");
+    await hydrated(page);
+    await page.getByRole("button", { name: "Follow", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
+    expect(await held(page, "follows")).toEqual({ worlds: ["onyx:bubble"], people: [] });
+    await page.reload();
+    await hydrated(page);
+    await expect(page.getByRole("button", { name: "Following" })).toBeVisible();
   });
 });
