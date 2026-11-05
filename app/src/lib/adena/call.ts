@@ -134,7 +134,7 @@ async function send(
   const done = await read(() => doContract(transaction(request, universe)), "DoContract", Sent);
   if (!done.ok) return done;
   const { hash, Log, error } = done.value;
-  return error === null || error === undefined ? { ok: true, hash, log: capped(Log) } : refusal("failed", "", Log);
+  return error === null ? { ok: true, hash, log: capped(Log) } : refusal("failed", "", Log);
 }
 
 /** Asks Adena, once the requests before it are done, to sign and send this call, as the account on the universe's chain. */
