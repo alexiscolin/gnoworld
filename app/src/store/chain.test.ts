@@ -82,6 +82,15 @@ describe("the chain's slice", () => {
     expect(Object.keys(store.getState().chainByWorld)).toHaveLength(200);
   });
 
+  it("keeps taking the lines of a world it holds once 200 worlds are held, and keeps no new one", () => {
+    const store = createAppStore();
+    store.getState().chainActions.heard(Array.from({ length: 200 }, (_, n) => call(n, `w${String(n)}`)));
+    store.getState().chainActions.heard([call(900, "w0"), call(901, "w200")]);
+    expect(Object.keys(store.getState().chainByWorld)).toHaveLength(200);
+    expect(store.getState().chainByWorld["w0"]?.map(({ height }) => height)).toEqual([0, 900]);
+    expect(store.getState().chainByWorld["w200"]).toBeUndefined();
+  });
+
   it("keeps a universe's count with its height, and a count at an older height does not replace a newer one", () => {
     const store = createAppStore();
     store.getState().chainActions.counted({ universe: "onyx", count: 17, height: 908297 });

@@ -158,6 +158,16 @@ describe("the chain's events on the page's stream", () => {
     expect(log).toHaveBeenCalledWith("realms_unknown");
   });
 
+  it("holds 1,000 events at most while a window waits: the oldest are the ones dropped", () => {
+    const { feed, heard } = feedOf();
+    for (let n = 0; n < 1100; n += 1) feed.chain(JSON.stringify(call(n)));
+    vi.advanceTimersByTime(BATCH_MS);
+    const [batch] = heard.mock.calls[0] ?? [];
+    expect(batch).toHaveLength(1000);
+    expect(batch?.[0]?.height).toBe(100);
+    expect(batch?.at(-1)?.height).toBe(1099);
+  });
+
   it("keeps hearing after a frame it dropped", () => {
     const { feed, heard } = feedOf();
     feed.chain(JSON.stringify({ ...CALL, func: "<b>" }));
