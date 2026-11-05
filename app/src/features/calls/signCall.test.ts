@@ -176,6 +176,13 @@ describe("signCall: the card's course", () => {
     expect(total).toBeLessThanOrEqual(180_000);
   });
 
+  it("carries no cause for a call that waited out the bound: the wait itself is the cause (F5725)", async () => {
+    const read = vi.fn(() => Promise.resolve(missing));
+    const { store, deps } = setup({ read });
+    await signCall("SetBio", deps);
+    expect(stateOf(store)).not.toHaveProperty("log");
+  });
+
   it("treats a node that is down or slow as not landed yet, within the same bound, and ends unseen", async () => {
     const down: ChainRead<typeof LANDED> = { ok: false, failure: { kind: "down", next: "Try again." }, source };
     const read = vi.fn(() => Promise.resolve(down));
@@ -193,7 +200,7 @@ describe("signCall: the card's course", () => {
     const read = vi.fn(() => Promise.resolve(other));
     const { store, deps } = setup({ read });
     await signCall("SetBio", deps);
-    expect(stateOf(store)).toEqual({ kind: "failed", reason: "unseen", hash: SIGNED_HASH });
+    expect(stateOf(store)).toEqual({ kind: "failed", reason: "unseen", hash: SIGNED_HASH, log: "Wrong node." });
     expect(read).toHaveBeenCalledTimes(1);
   });
 
@@ -203,7 +210,7 @@ describe("signCall: the card's course", () => {
       const read = vi.fn(() => Promise.resolve({ ok: false, failure: { kind, next: "No." }, source } as const));
       const { store, deps, waits } = setup({ read });
       await signCall("SetBio", deps);
-      expect(stateOf(store)).toEqual({ kind: "failed", reason: "unseen", hash: SIGNED_HASH });
+      expect(stateOf(store)).toEqual({ kind: "failed", reason: "unseen", hash: SIGNED_HASH, log: "No." });
       expect(read).toHaveBeenCalledTimes(1);
       expect(waits).toEqual([]);
     },

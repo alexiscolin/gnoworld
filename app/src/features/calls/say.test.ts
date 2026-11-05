@@ -47,6 +47,15 @@ describe("sayFailure: each failure's next step", () => {
     expect(said).toMatch(/about 2 minutes/i);
   });
 
+  it("words a node's final answer by its own sentence, and claims no wait that did not happen (F5725)", () => {
+    const hash = "ab".repeat(32);
+    const said = sayFailure({ reason: "unseen", hash, log: "This is not the universe's node." });
+    expect(said).toContain("This is not the universe's node.");
+    expect(said).not.toMatch(/minutes/i);
+    expect(said).toMatch(/not known whether it succeeded or failed/i);
+    expect(said).toContain(hash);
+  });
+
   it("names the hash of a call that was sent and never seen in a block, so it can be looked up", () => {
     const hash = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
     expect(sayFailure({ reason: "unseen", hash })).toContain(hash);

@@ -42,7 +42,12 @@ async function follow(id: string, hash: string, deps: SignDeps): Promise<void> {
       else done(id, { height, value: data });
       return;
     }
-    if (!AGAIN.includes(landed.failure.kind) || now() - started >= BOUND_MS || tries === READS) break;
+    // A final answer is said with its own sentence; only a wait that ran out says the wait (F5725).
+    if (!AGAIN.includes(landed.failure.kind)) {
+      failed(id, { reason: "unseen", hash, log: landed.failure.next });
+      return;
+    }
+    if (now() - started >= BOUND_MS || tries === READS) break;
     await wait(EVERY_MS);
   }
   failed(id, { reason: "unseen", hash });
