@@ -1276,9 +1276,10 @@ setTimeout(() => {
 	# 256 already survived), so these hold 1,280, past 1,024. Sixteen each, Ergo's max-concurrent-connections for
 	# one address (ircd.yaml.tmpl): past it Ergo closes the rest, which freed web's room and let 1,024 survive
 	# (F2137). The other goes once each of the 640 has settled, its first answer, an error or a close, 6 s at most:
-	# opened at once, they meet nginx's listen backlog, 511 on Linux, and a loaded host answered two after a fixed
-	# 3 s (F5486). Counted are the 101s before it, then the other's code within 4 s; any other answer is printed by
-	# its status, an error by its code, a socket still waiting by their number.
+	# opened at once, they meet nginx's listen backlog, 511 on Linux, and a loaded host counted 638 at a fixed 3 s
+	# (F5486). Counted are the 101s still held when it goes (Ergo's registration waits 60 s), then its code within
+	# 4 s; any other answer is printed by its status, an error by its code, a 101 closed before it as such (Ergo's
+	# way past 16 an address, F2137), the sockets still waiting by their number.
 	crowded=$(docker run --rm --network "$inside" --entrypoint /nodejs/bin/node "$server_image" -e '
 const net = require("node:net");
 const { randomBytes } = require("node:crypto");
@@ -1291,11 +1292,12 @@ const others = new Map();
 let settled = 0;
 let upgraded = 0;
 let asked = false;
+const tally = (what) => others.set(what, (others.get(what) ?? 0) + 1);
 const settle = (what) => {
   if (asked) return;
   settled += 1;
   if (what === "101") upgraded += 1;
-  else others.set(what, (others.get(what) ?? 0) + 1);
+  else tally(what);
   if (settled === crowd) ask();
 };
 for (let visitor = 0; visitor < crowd / 16; visitor += 1) {
@@ -1308,12 +1310,20 @@ for (let visitor = 0; visitor < crowd / 16; visitor += 1) {
       }
     };
     const socket = net.connect(8080, "web", () => socket.write(`${proxy(`203.0.113.${String(130 + visitor)}`)}${upgrade}`));
+    let held = false;
     socket.once("data", (chunk) => {
       const line = chunk.toString().split("\r\n")[0];
-      once(line.startsWith("HTTP/1.1 101") ? "101" : `answered ${line.split(" ")[1] ?? line}`);
+      held = line.startsWith("HTTP/1.1 101");
+      once(held ? "101" : `answered ${line.split(" ")[1] ?? line}`);
     });
     socket.on("error", (error) => once(error.code ?? error.message));
-    socket.on("close", () => once("closed before an answer"));
+    socket.on("close", () => {
+      if (held && !asked) {
+        upgraded -= 1;
+        tally("closed after a 101");
+      }
+      once("closed before an answer");
+    });
   }
 }
 function ask() {

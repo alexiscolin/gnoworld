@@ -8156,8 +8156,9 @@ awk -v q="'" '/^\tcrowded=\$\(docker run / { on = 1; next }
 	fail "deploy/test.sh's crowd is no longer the script after crowded=\$(docker run, with two connections to web's 8080: update test_hooks.sh's deploy_checks"
 # web's place: each WebSocket, in the order they come, answers as the plan says (late: a 101 at 3.5 s, past the old fixed 3 s; slow: a
 # 101 at 5 s, under the 6 s cap; closing: a 101 then a close, as Ergo past 16 a visitor; 503; reset; closed with no answer; silent: never;
-# verylate: a 101 at 7 s, after the 641st request went), the others a 101 at once; any other request a 200, `other` ms later. Each
-# margin is a second or more, against a loaded host (F2503's class). It ends itself after a minute, should the suite be stopped mid-case.
+# verylate: a 101 at 7 s, after the 641st request went), the others a 101 at once; the first other request a 200, `other` ms later,
+# any after it a 500 at once (a second 641st). Each margin is a second or more, against a loaded host (F2503's class). It ends itself
+# after a minute, should the suite be stopped mid-case.
 cat >"$dc/web.js" <<'JS'
 const net = require("node:net");
 const fs = require("node:fs");
@@ -8166,6 +8167,7 @@ const plan = Object.fromEntries(planText.split(",").map((part) => part.split("="
 const kinds = ["late", "slow", "closing", "503", "reset", "closed", "silent", "verylate"].flatMap((kind) => Array(Number(plan[kind] ?? 0)).fill(kind));
 const upgraded = "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n\r\n";
 let crowd = 0;
+let plain = 0;
 const server = net.createServer((socket) => {
   let text = "";
   socket.on("error", () => {});
@@ -8174,7 +8176,9 @@ const server = net.createServer((socket) => {
     text += chunk;
     if (!text.includes("\r\n\r\n")) return;
     if (!text.includes("GET /ws ")) {
-      setTimeout(() => socket.end("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), Number(plan.other ?? 0));
+      plain += 1;
+      if (plain > 1) socket.end("HTTP/1.1 500 Internal Server Error\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+      else setTimeout(() => socket.end("HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"), Number(plan.other ?? 0));
       return;
     }
     const kind = kinds[crowd] ?? "101";
@@ -8205,12 +8209,15 @@ start_web() { # $1 the plan; its pid in $web, its port in $port
 	port=$(cat "$dc/port")
 }
 stop_web() { kill "$web" 2>/dev/null || :; wait "$web" 2>/dev/null || :; }
-crowd() { out=$(node -e "$(sed "s/net\.connect(8080, \"web\"/net.connect($port, \"127.0.0.1\"/" "$dc/crowd.js")" user http://gnoworld.test 2>&1) || :; }
-start_web late=1,slow=1,closing=3
+crowd() { # $1 an edit of the script (sed), if any
+	out=$(node -e "$(sed -e "s/net\.connect(8080, \"web\"/net.connect($port, \"127.0.0.1\"/" ${1:+-e "$1"} "$dc/crowd.js")" user http://gnoworld.test 2>&1) || :
+}
+# Three 101s closed at once count as no WebSocket held (F2137's way); a second 641st would get web's 500 before the first's 200.
+start_web late=1,slow=1,closing=3,other=2000
 crowd
 stop_web
-[ "$out" = "640 200" ] ||
-	fail "deploy/test.sh's crowd asked its 641st before the 640 WebSockets had settled (101s at 3.5 and 5 s, three closed after theirs; F5486): [$out]"
+[ "$out" = "637 200 (3 closed after a 101)" ] ||
+	fail "deploy/test.sh's crowd asked its 641st before the 640 WebSockets had settled (101s at 3.5 and 5 s; F5486), twice, or counted a 101 closed before it as held (F2137): [$out]"
 start_web 503=2,reset=2,closed=1,silent=1,verylate=1,other=8000
 crowd
 stop_web
@@ -8219,10 +8226,16 @@ stop_web
 tallied=$(printf '%s' "${out#* (}" | tr -d ')' | tr ',' '\n' | sed 's/^ *//' | LC_ALL=C sort | paste -sd, -)
 [ "$tallied" = "1 closed before an answer,2 ECONNRESET,2 answered 503,2 unanswered after 6 s" ] ||
 	fail "deploy/test.sh's crowd did not print each other answer by its status, each error by its code and the sockets still waiting (F5486): [$out]"
+# web's port closed: every socket settles at once with its error's code (macOS gives a few EINVAL among them under load, F5501), so the
+# 641st goes then, not at the cap, set here to 30 s for a verdict no loaded host can blur.
+grep -q 'setTimeout(ask, 6000);' "$dc/crowd.js" || fail "deploy/test.sh's crowd has no 6 s cap for deploy_checks to raise: update test_hooks.sh's deploy_checks"
 start_web ""
 stop_web
-crowd
-[ "$out" = "0 none (640 ECONNREFUSED)" ] || fail "deploy/test.sh's crowd did not print the code of an error it met, web's port closed: [$out]"
+began=$(date +%s)
+crowd 's/setTimeout(ask, 6000);/setTimeout(ask, 30000);/'
+took=$(($(date +%s) - began))
+case $out in "0 none ("*ECONNREFUSED*")") ;; *) fail "deploy/test.sh's crowd did not print the code of an error it met, web's port closed: [$out]" ;; esac
+[ "$took" -lt 15 ] || fail "deploy/test.sh's crowd waited out its cap ($took s) though its 640 had all settled at once: the 641st goes once they have (F5486)"
 sed -n '/^pass() {/,/^is_public() {/p' "$ds" | sed '$d' >"$dc/fns"
 sed -n '/^\tcloses() {/,/^\t}$/p' "$ds" >>"$dc/fns"
 sed -n '/^\tcloses /p' "$ds" >"$dc/calls"
