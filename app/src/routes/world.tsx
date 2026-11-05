@@ -4,6 +4,7 @@ import { lazy, Suspense } from "react";
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
+import { realmViewOf } from "../pinned.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, type ChatPlace, type Pinned as ChatPinned } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
@@ -53,10 +54,7 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   const realm = world.realms?.[0];
-  const realmPath =
-    realm === undefined
-      ? undefined
-      : `${universe.isDefault ? "" : `/net/${universe.id}`}/r/${realm.slice("gno.land/r/".length)}`;
+  const realmPath = realm === undefined ? undefined : realmViewOf(universe, realm);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
