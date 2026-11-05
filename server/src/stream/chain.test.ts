@@ -23,6 +23,7 @@ vi.mock("../rooms/rooms.ts", async (original) => {
 });
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const CALL: ChainEvent = {
+  id: "h900030:0",
   kind: "call",
   universe: "onyx",
   world: "govdao",
@@ -32,6 +33,7 @@ const CALL: ChainEvent = {
   height: 900030,
 };
 const DEPLOY: ChainEvent = {
+  id: "h887427:0",
   kind: "deploy",
   universe: "onyx",
   realm: `gno.land/r/${ALICE}/counter`,

@@ -7,6 +7,7 @@ import * as indexer from "./indexer.ts";
 // transaction's args or memo ever travels: what a stranger wrote reaches a room as bounded names or not at all.
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const CALL = {
+  id: "jTQy7ZDx+Eee5VDR/EObtTz5tvLV432m4Q6/gjhecw8=:0",
   kind: "call",
   universe: "onyx",
   world: "govdao",
@@ -16,6 +17,7 @@ const CALL = {
   height: 900030,
 };
 const DEPLOY = {
+  id: "Zm9v+YmFy/0123456789abcdefghijklmnopqrstuvwxyzABCDE=:3",
   kind: "deploy",
   universe: "onyx",
   realm: "gno.land/r/g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y/smoke/s5f26c0fe/counter",
@@ -47,6 +49,11 @@ describe("a chain event", () => {
     ["a height that is not whole", { ...CALL, height: 1.5 }],
     ["a height as text", { ...CALL, height: "900030" }],
     ["no height", { ...CALL, height: undefined }],
+    ["no id", { ...CALL, id: undefined }],
+    ["an id as a number", { ...CALL, id: 7 }],
+    ["an id of 10 KB", { ...CALL, id: "A".repeat(10_000) }],
+    ["an id of 141 characters", { ...CALL, id: "A".repeat(141) }],
+    ["an empty id", { ...DEPLOY, id: "" }],
     ["a field more (the args, the memo)", { ...CALL, args: ["x"] }],
   ])("refuses %s", (_, event) => {
     expect(ChainEvent.safeParse(event).success).toBe(false);

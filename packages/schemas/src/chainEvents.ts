@@ -7,15 +7,18 @@ import { Slug } from "./slug.ts";
 import { z } from "./zod.ts";
 
 /** The longest function name and realm path, in characters. A realm's path is not `RealmPath` (data.ts, 128): a path an account deploys under its own address and nested names can be longer, and a deploy shows whatever the chain accepted. */
-const CHAIN_CAPS = { func: 64, realm: 256 } as const;
+const CHAIN_CAPS = { func: 64, realm: 256, id: 140 } as const;
 
 const height = () => z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.nonnegative());
+/** Where an event stands: its transaction's hash and its message's place in it (`hash:index`), the key a page draws it under. */
+const id = () => z.string().check(z.minLength(1), z.maxLength(CHAIN_CAPS.id));
 const realm = () =>
   z.string().check(z.maxLength(CHAIN_CAPS.realm), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
 /** A call to a world's realm, or a realm deployed (which names no world and no function): an event of the chain at a block. */
 export const ChainEvent = z.union([
   z.strictObject({
+    id: id(),
     kind: z.literal("call"),
     universe: Slug,
     world: Slug,
@@ -24,7 +27,14 @@ export const ChainEvent = z.union([
     func: z.string().check(z.maxLength(CHAIN_CAPS.func), z.regex(/^[A-Za-z_][A-Za-z0-9_]*$/)),
     height: height(),
   }),
-  z.strictObject({ kind: z.literal("deploy"), universe: Slug, realm: realm(), actor: Address, height: height() }),
+  z.strictObject({
+    id: id(),
+    kind: z.literal("deploy"),
+    universe: Slug,
+    realm: realm(),
+    actor: Address,
+    height: height(),
+  }),
 ]);
 export type ChainEvent = z.infer<typeof ChainEvent>;
 

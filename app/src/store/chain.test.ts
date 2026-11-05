@@ -7,6 +7,7 @@ import { createAppStore } from "./index.ts";
 // once its chain event has come; each is kept with its height; what a room keeps is bounded.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const call = (height: number, world = "govdao"): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "call",
   universe: "onyx",
   world,
@@ -16,6 +17,7 @@ const call = (height: number, world = "govdao"): ChainEvent => ({
   height,
 });
 const deploy = (height: number): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "deploy",
   universe: "onyx",
   realm: `gno.land/r/${ALICE}/r${String(height)}`,
@@ -83,6 +85,17 @@ describe("the chain's slice", () => {
     const store = createAppStore();
     store.getState().chainActions.heard(Array.from({ length: 201 }, (_, n) => call(n, `w${String(n)}`)));
     expect(Object.keys(store.getState().chainByWorld)).toHaveLength(200);
+  });
+
+  it("holds a call once: an event heard again (a replay) is not a second line, by its id", () => {
+    const store = createAppStore();
+    store.getState().chainActions.heard([call(1), call(2)]);
+    store.getState().chainActions.heard([call(2), { ...call(2), id: "other:0" }]);
+    expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.map(({ id }) => id)).toEqual([
+      "h1:0",
+      "h2:0",
+      "other:0",
+    ]);
   });
 
   it("keeps a world's lines apart by universe: a busy chain's world never pushes another's out, and each takes its own 50", () => {

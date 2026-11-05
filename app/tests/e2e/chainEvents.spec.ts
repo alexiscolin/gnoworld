@@ -8,6 +8,7 @@ const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const SINCE = `event: since\ndata: ${JSON.stringify({ time: "2026-11-05T12:00:00.000Z" })}\n\n`;
 const frame = (name: string, data: unknown) => `event: ${name}\ndata: ${JSON.stringify(data)}\n\n`;
 const CALL = {
+  id: "h900030:0",
   kind: "call",
   universe: "onyx",
   world: "govdao",
@@ -16,7 +17,14 @@ const CALL = {
   actor: ALICE,
   height: 900030,
 };
-const DEPLOY = { kind: "deploy", universe: "onyx", realm: `gno.land/r/${ALICE}/counter`, actor: ALICE, height: 887427 };
+const DEPLOY = {
+  id: "h887427:0",
+  kind: "deploy",
+  universe: "onyx",
+  realm: `gno.land/r/${ALICE}/counter`,
+  actor: ALICE,
+  height: 887427,
+};
 
 const SIZES = [
   ["phone", 390, 844],

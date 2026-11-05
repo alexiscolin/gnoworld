@@ -10,6 +10,7 @@ const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 // A flood is of many accounts: each has its own address.
 const actorN = (n: number): Address => Address.parse(toAddress(new Uint8Array(20).fill(n % 256)));
 const call = (height: number, world = "govdao", actor: Address = ALICE): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "call",
   universe: "onyx",
   world,
@@ -19,6 +20,7 @@ const call = (height: number, world = "govdao", actor: Address = ALICE): ChainEv
   height,
 });
 const deploy = (height: number, name = `r${String(height)}`, actor: Address = ALICE): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "deploy",
   universe: "onyx",
   realm: `gno.land/r/${ALICE}/${name}`,

@@ -30,6 +30,7 @@ describe("a recorded call", () => {
     const read = readChainMessage(registration(0), context);
     expect(read.events).toEqual([
       {
+        id: "jTQy7ZDx+Eee5VDR/EObtTz5tvLV432m4Q6/gjhecw8=:0",
         kind: "call",
         universe: "onyx",
         world: "bubble",
@@ -42,6 +43,18 @@ describe("a recorded call", () => {
     expect(ChainEvent.safeParse(read.events[0]).success).toBe(true);
     expect(read.hash).toBe("jTQy7ZDx+Eee5VDR/EObtTz5tvLV432m4Q6/gjhecw8=");
     expect(log).not.toHaveBeenCalled();
+  });
+
+  it("gives each event its transaction's hash and its message's place in it, so two like calls of one block are two", () => {
+    const { context } = setup();
+    const frame = changed(registration(0), (tx) => {
+      const [first] = tx["messages"] as unknown[];
+      tx["messages"] = [first, first];
+    });
+    expect(readChainMessage(frame, context).events.map(({ id }) => id)).toEqual([
+      "jTQy7ZDx+Eee5VDR/EObtTz5tvLV432m4Q6/gjhecw8=:0",
+      "jTQy7ZDx+Eee5VDR/EObtTz5tvLV432m4Q6/gjhecw8=:1",
+    ]);
   });
 
   it("carries neither the args nor the memo of the transaction", () => {
@@ -126,7 +139,7 @@ describe("a recorded call", () => {
       const first = (tx["messages"] as unknown[])[0];
       tx["messages"] = [first, { typeUrl: "x", route: "vm", value: { __typename: "UnexpectedMessage" } }, first];
     });
-    expect(readChainMessage(frame, context).events).toHaveLength(2);
+    expect(readChainMessage(frame, context).events.map(({ id }) => id.slice(-2))).toEqual([":0", ":2"]);
   });
 });
 
@@ -135,6 +148,7 @@ describe("a recorded deploy", () => {
     const { context } = setup();
     expect(readChainMessage(deploy, context).events).toEqual([
       {
+        id: "gmVEDlIQzgG65Fk21gcZeKAmGPc0p4rqdxd/fW02IWM=:0",
         kind: "deploy",
         universe: "onyx",
         realm: "gno.land/r/g1zdyqzhwsg2ayg9rjh8txhgm42ntu0aajda6x7y/smoke/s5f26c0fe/counter",

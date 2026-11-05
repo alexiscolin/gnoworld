@@ -16,13 +16,13 @@ export function callsIn(
   return calls.filter(({ universe }) => universe === place.universe).slice(-SHOWN);
 }
 
-/** A line, or a call with the key its item is drawn under (the time it was heard, its block and its place among the calls). */
+/** A line, or a call with the key its item is drawn under (the event's own id). */
 export type Entry<L> = { line: L } | { call: ChainHeard; key: string };
 
 function entryOf(calls: readonly ChainHeard[], at: number): Entry<never> {
   const call = calls[at];
   if (call === undefined) throw new Error("no such call");
-  return { call, key: `${call.at}-${String(call.height)}-${String(at)}` };
+  return { call, key: call.id };
 }
 
 /** Lines and calls in one order, oldest first: a call stands before the first line that is newer than the time it was heard. */

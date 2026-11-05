@@ -9,6 +9,7 @@ import { followVerdicts, type VerdictSource } from "./verdicts.ts";
 // `heard` with a batch; this is the path a page takes: frames through the stream client's schemas, then one update a burst.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const call = (height: number, world = "govdao"): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "call",
   universe: "onyx",
   world,
@@ -18,6 +19,7 @@ const call = (height: number, world = "govdao"): ChainEvent => ({
   height,
 });
 const deploy = (height: number): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "deploy",
   universe: "onyx",
   realm: `gno.land/r/${ALICE}/r${String(height)}`,

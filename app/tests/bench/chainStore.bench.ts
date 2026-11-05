@@ -9,6 +9,7 @@ import { createAppStore } from "../../src/store/index.ts";
 
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const event = (height: number): ChainEvent => ({
+  id: `h${String(height)}:0`,
   kind: "call",
   universe: "onyx",
   world: `w${String(height % 100)}`,

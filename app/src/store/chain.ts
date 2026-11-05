@@ -42,6 +42,7 @@ export const chainSlice: StateCreator<ChainSlice> = (set, get) => ({
         if (call.kind !== "call") continue;
         const key = chainKey(call.universe, call.world);
         const held = byWorld[key];
+        if (held?.some(({ id }) => id === call.id) === true) continue;
         if (held !== undefined || Object.keys(byWorld).length < WORLDS)
           byWorld = { ...byWorld, [key]: [...(held ?? []), { ...call, at }].slice(-LINES) };
       }

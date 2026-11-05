@@ -85,11 +85,11 @@ function eventOf(
 function eventsOf(tx: z.infer<Schemas["tx"]>, context: ChainContext, parts: Schemas): ChainEvent[] {
   if (!tx.success) return [];
   const events: ChainEvent[] = [];
-  for (const each of tx.messages) {
+  for (const [at, each] of tx.messages.entries()) {
     const message = parts.message.safeParse(each);
     const event = message.success ? eventOf(message.data.value, context, parts) : null;
     if (event === undefined) continue;
-    const checked = ChainEvent.safeParse({ ...event, height: tx.block_height });
+    const checked = ChainEvent.safeParse({ id: `${tx.hash}:${String(at)}`, ...event, height: tx.block_height });
     if (checked.success) events.push(checked.data);
     else context.log("chain_message_bad");
   }

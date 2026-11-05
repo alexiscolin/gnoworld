@@ -303,6 +303,7 @@ describe("the lines view, compiled: threads' chips", () => {
 // heard; the keys of the list move among the messages and skip the cards.
 describe("the lines view with the chain's calls", () => {
   const call = (height: number, atMs: number): ChainHeard => ({
+    id: `h${String(height)}:0`,
     kind: "call",
     universe: "onyx",
     world: "govdao",

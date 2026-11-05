@@ -152,7 +152,7 @@ describe("the chain on the server", () => {
     sockets[0]?.emit("message", blocks[0]);
     const text = await room.until('"height":55414');
     expect(text).toMatch(
-      /event: chain\ndata: \{"kind":"call","universe":"onyx","world":"govdao","realm":"gno.land\/r\/sys\/namereg\/v0","actor":"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq","func":"Register","height":55414\}/,
+      /event: chain\ndata: \{"id":"jTQy7ZDx\+Eee5VDR\/EObtTz5tvLV432m4Q6\/gjhecw8=:0","kind":"call","universe":"onyx","world":"govdao","realm":"gno.land\/r\/sys\/namereg\/v0","actor":"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq","func":"Register","height":55414\}/,
     );
     expect(await earth.until("event: realms")).toContain('"count":0');
     chain.stop();

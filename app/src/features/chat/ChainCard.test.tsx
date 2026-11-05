@@ -10,6 +10,7 @@ import { ChainCard } from "./ChainCard.tsx";
 // event and from nothing a page did first (ADR-0002 §4).
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const line = (height: number, func = "MustVoteOnProposal", universe = "onyx"): ChainCall => ({
+  id: `h${String(height)}:0`,
   kind: "call",
   universe,
   world: "govdao",

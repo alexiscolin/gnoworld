@@ -8,6 +8,7 @@ import { callsIn, interleave } from "./chainEntries.ts";
 // time each was heard; another room, or another universe's call, draws none.
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const call = (height: number, at: string, universe = "onyx"): ChainHeard => ({
+  id: `h${String(height)}:0`,
   kind: "call",
   universe,
   world: "govdao",
@@ -43,6 +44,18 @@ describe("the calls a room draws", () => {
     expect(shown).toHaveLength(20);
     expect(shown[0]?.height).toBe(30);
     expect(shown[19]?.height).toBe(49);
+  });
+});
+
+describe("a call's key", () => {
+  it("is the event's own id: one actor calling the same function twice in a block is two keys", () => {
+    const at = "2026-11-06T09:00:00.000Z";
+    const twice = [
+      { ...call(7, at), id: "tx:0" },
+      { ...call(7, at), id: "tx:1" },
+    ];
+    const keys = interleave([], twice).map((entry) => ("call" in entry ? entry.key : ""));
+    expect(keys).toEqual(["tx:0", "tx:1"]);
   });
 });
 

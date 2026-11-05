@@ -13,6 +13,7 @@ import { withChain } from "./tickerChain.ts";
 const NOW = new Date("2026-11-05T12:00:00.000Z");
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const deploy = (height: number, name = "counter", universe = "onyx"): ChainDeploy => ({
+  id: `h${String(height)}:0`,
   kind: "deploy",
   universe,
   realm: `gno.land/r/${ALICE}/${name}`,

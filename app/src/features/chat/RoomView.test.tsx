@@ -83,6 +83,7 @@ describe("RoomView", () => {
   // Slice 9g: a room the chain told a call of holds a card of its thread even with no message: the list is not the empty one.
   it("draws a card of the chain in a world's main room that holds no message, and nothing in another room", () => {
     const call = {
+      id: "h900030:0",
       kind: "call" as const,
       universe: "onyx",
       world: "govdao",
