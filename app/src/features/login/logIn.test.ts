@@ -2,7 +2,8 @@ import { Address, type Proof } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
 import { listen } from "../../lib/adena/events.ts";
-import { endForAccount, knowSession, logIn, logOut, readSession, watchAccount, type LoginDeps } from "./logIn.ts";
+import { knowSession, logIn, logOut, readSession, type LoginDeps } from "./logIn.ts";
+import { endForAccount, watchAccount } from "./watch.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const CHALLENGE = {
@@ -267,6 +268,22 @@ describe("endForAccount", () => {
     await endForAccount(parts, ADDRESS);
     expect(asked.includes("logout")).toBe(false);
     expect(store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("ends it for an address that is no address too: what Adena says is not trusted", async () => {
+    const { parts, asked, store } = deps();
+    await logIn("x", parts);
+    await endForAccount(parts, "not an address");
+    expect(asked.filter((line) => line === "logout")).toHaveLength(1);
+    expect(store.getState().login.session).toEqual({ kind: "out" });
+  });
+
+  it("leaves a login under way alone", async () => {
+    const { parts, asked, store } = deps();
+    store.getState().loginActions.begin("signing");
+    await endForAccount(parts, OTHER);
+    expect(asked).toEqual([]);
+    expect(store.getState().login).toMatchObject({ session: { kind: "unknown" }, step: "signing" });
   });
 
   it("asks the server nothing when nobody is logged in", async () => {

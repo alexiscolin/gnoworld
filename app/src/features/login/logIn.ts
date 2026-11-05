@@ -2,7 +2,6 @@
 // signed unchanged, the proof posted; each step in the store, each stop with its reason. Its parts come in,
 // so the tests give their own: lib's in the page.
 import type { connect, signLogin } from "../../lib/adena/adena.ts";
-import type { listen } from "../../lib/adena/events.ts";
 import type { loginApi } from "../../lib/api/login.ts";
 import type { createAppStore } from "../../store/index.ts";
 
@@ -72,23 +71,4 @@ export async function logOut({ api, store }: SessionDeps): Promise<void> {
   const done = await api.logout();
   if (done.ok) signedOut();
   else stopped(done);
-}
-
-/** Adena is on `address` now: a session of another account ends on the server as a click's logout does (D200). */
-export async function endForAccount(deps: SessionDeps, address: string): Promise<void> {
-  const { accountChanged, stopped } = deps.store.getState().loginActions;
-  if (!accountChanged(address)) return;
-  const done = await deps.api.logout();
-  if (!done.ok) stopped(done);
-}
-
-/** Follows the page's Adena once, for the account's changes; a network change ends nothing, the chain is read again before each action. */
-export function watchAccount(
-  adena: unknown,
-  { listen: follow, ...deps }: SessionDeps & { listen: typeof listen },
-): void {
-  follow(adena, {
-    account: (address) => endForAccount(deps, address),
-    network: () => undefined,
-  });
 }
