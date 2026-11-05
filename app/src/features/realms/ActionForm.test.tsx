@@ -161,6 +161,16 @@ describe("a checked action as a Form block", () => {
     expect(all(box, "p").some((p) => p.textContent.includes("ON YES"))).toBe(false);
   });
 
+  it("draws no paragraph for an empty why, and shows each field as a text field with nothing more said of it", async () => {
+    const box = await draw({ ...VOTE, why: "" });
+    await calling(box, "Call MustVoteOnProposalSimple");
+    expect(all(box, "p").filter((p) => p.getAttribute("dir") === "ltr")).toHaveLength(0);
+    const text = one(box, "figure").textContent;
+    expect(text).toContain("pid input");
+    expect(text).toContain("value: 15");
+    for (const unsaid of ["type:", "placeholder:", "description:", "flags:"]) expect(text).not.toContain(unsaid);
+  });
+
   it("draws a pinned label as plain text too", async () => {
     const box = await draw({ ...VOTE, args: {} }, { label: "<b>Vote</b>" });
     expect((await calling(box, "<b>Vote</b>")).querySelector("b")).toBeNull();
@@ -235,6 +245,22 @@ describe("a checked action in the chat", () => {
     ).toBe("/r/gov/dao");
     expect(all(box, "button, input, article")).toHaveLength(0);
     expect(box.textContent).toContain("Needs three.");
+    expect(one(box, "figure").textContent).toContain("made in the realm view");
+  });
+
+  it("opens the card of a call of more than two fields when it is drawn with no way to a realm view", async () => {
+    const box = mount(
+      <StoreProvider>
+        <ActionForm
+          action={{ realm: DAO, function: "Grant", args: {} }}
+          chain={CHAIN}
+          options={{ fetch: vi.fn<ChainFetch>(() => listing(WIDE)) }}
+        />
+      </StoreProvider>,
+    );
+    click(await calling(box, "Call Grant"));
+    expect(inputs(one(box, "article"))).toHaveLength(3);
+    expect(one(box, "figure").textContent).toContain("a call you sign in Adena");
   });
 
   it("keeps a call of one or two fields as the form with its Call", async () => {
