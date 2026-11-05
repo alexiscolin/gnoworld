@@ -5078,6 +5078,21 @@ for cmd in 'unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE' 'env -u GIT_DIR -u GIT_C
 	'grep -rn GIT_COMMON_DIR= scripts' 'echo GIT_DIR=x'; do
 	sh_ "$cmd" 0
 done
+# git's global config, which a command may place (F5541, H3): HOME or XDG_CONFIG_HOME given a value on a line that runs git makes git read a
+# config of the command's own, whose hooks folder skips every hook (`HOME=/tmp/h git commit` ran none, here and on main). Given before the
+# program, through env, exported, declared, bare, inside sh -c or a subshell, or before a program a variable names: each is refused, whatever
+# git command it reaches. Reading them, a line with no git, and the other variables the tools take (XDG_CACHE_HOME) pass.
+for cmd in 'HOME=/tmp/h git commit -m x' 'XDG_CONFIG_HOME=/tmp/h git commit -m x' 'env HOME=/tmp/h git commit -m x' 'env -i HOME=/tmp/h git commit -m x' \
+	'export HOME=/tmp/h; git commit -m x' 'HOME=/tmp/h; git commit -m x' 'export XDG_CONFIG_HOME=/tmp/h && git commit -m x' 'declare -x HOME=/tmp/h; git commit -m x' \
+	'HOME=/tmp/h git status' 'HOME=/tmp/h git push origin x' "HOME=/tmp/h sh -c 'git commit -m x'" 'HOME=/tmp/h; (git commit -m x)' 'HOME=/tmp/h /usr/bin/git commit -m x' \
+	'HOME+=/x git commit -m x' 'f() { local HOME=/tmp/h; git commit -m x; }; f' 'timeout 60 env XDG_CONFIG_HOME=/tmp/h git commit -m x' 'g=git; HOME=/tmp/h $g commit -m x' \
+	"env -S 'HOME=/tmp/h git commit -m x'" 'HOME="/tmp/h" git commit -m x' 'git commit -m x; HOME=/tmp/h true'; do
+	sh_ "$cmd" 2
+done
+for cmd in 'echo $HOME' 'cd "$HOME" && git status' 'HOME=/tmp/h npm run build' 'export HOME=/tmp/h' 'XDG_CACHE_HOME=/tmp/c git status' 'HOME_DIR=/tmp/h git status' \
+	'git commit -m "HOME=/tmp/h"' 'git log --format=%h -- HOME=x' 'grep -n HOME= scripts/check.sh' 'unset HOME' 'env -u HOME git status'; do
+	sh_ "$cmd" 0
+done
 # A global option whose argument came as the next word was taken for the subcommand (F4920): `commit -n` and a forced push passed,
 # and a push got no ask. git 2.53 takes --namespace, --config-env, --attr-source and --shallow-file so, as -c and -C.
 sh_ 'git --namespace x commit -n -m y' 2

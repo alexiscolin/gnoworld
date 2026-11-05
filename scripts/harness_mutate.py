@@ -36,6 +36,7 @@ from suite_parts import code, parts, select
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
 GAPS = {  # label -> why no test can notice it yet
+    "guard takes a program a variable names for git when HOME is given (F5541) #1": "equivalent for what a line can write: a variable given on the line shows its value as a word named git, and the guard reads every word as a program; one from the environment is unseen",
     "workshop.sh takes a Node that is the user's own file #1": "no second user to own a file in a test: the check needs a file of another owner",
     "workshop.sh waits for the last run's script to end before it serves #1": "a timing: the old script's cleanup races the new run's by under a second, and no stub makes it slower",
     "check.sh: a git that cannot list the change fails the gate #1": "equivalent: under sh, set -e already holds inside the command substitution, so the && only says it",
@@ -781,6 +782,11 @@ def mutants():
     yield from each(g, ', "local"}', "}", "hooks", "guard refuses git's folders given by local")
     yield from each(g, "if any(git_place(w) for w in given) or ", "if ", "hooks", "guard refuses git's folders given before a program or by env")
     yield from each(g, " or (words and words[0] in SETTERS and any(git_place(w) for w in words[1:])):", ":", "hooks", "guard refuses git's folders exported or declared")
+    yield from each(g, 'CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}', 'CONFIG_HOMES = {"XDG_CONFIG_HOME"}', "hooks", "guard refuses HOME given on a line that runs git (F5541)")
+    yield from each(g, 'CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}', 'CONFIG_HOMES = {"HOME"}', "hooks", "guard refuses XDG_CONFIG_HOME given on a line that runs git (F5541)")
+    yield from each(g, 'given + (words[1:] if words and words[0] in SETTERS else [])\n                     if ASSIGNMENT', 'given\n                     if ASSIGNMENT', "hooks", "guard refuses HOME exported or declared on a line that runs git (F5541)")
+    yield from each(g, 'unseen and at == 0\n', 'False\n', "hooks", "guard takes a program a variable names for git when HOME is given (F5541)")
+    yield from each(g, "    if HOMED and git_named:", "    if False:", "hooks", "guard refuses HOME or XDG_CONFIG_HOME given on a line that runs git (F5541)")
     yield from each(g, "            given.append(words[0])\n            words = words[1:]\n", "            words = words[1:]\n", "hooks", "guard keeps the values given before a program")
     yield from each(g, "                if ASSIGNMENT.fullmatch(words[0]):\n                    given.append(words[0])\n", "", "hooks", "guard keeps the values given through env")
     yield from each(g, "    return words, given\n    return words, given", "    return words, given + words\n    return words, given", "hooks", "guard lets a mention of git's folders after the program pass")
