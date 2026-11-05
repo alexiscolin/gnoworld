@@ -1,7 +1,6 @@
 // What the server asks a universe's public indexer for the chain's rooms (slice 9g), the indexer's GraphQL being this package's
 // alone (D113). Checked against the live schema of the Onyx indexer on 2026-11-06 (introspection): `FilterInt` has eq, gt, lt;
-// `TransactionOrder` has heightAndIndex; the subscription's and the query's `where` are one filter, and the subscription's
-// `where` is required, so a block's is empty. What a transaction asks for holds no args, no memo and no events.
+// `TransactionOrder` has heightAndIndex. What a transaction asks for holds no args, no memo and no events.
 const TX_FIELDS =
   "hash block_height success messages { value { __typename ... on MsgCall { caller pkg_path func } ... on MsgAddPackage { creator package { path } } } }";
 
@@ -13,12 +12,6 @@ function whereOf(realms: Iterable<string>, bound = ""): string {
   const deploys = `{ messages: { typeUrl: { eq: "add_package" } } }`;
   return `{ success: { eq: true }, ${bound}_or: [${[deploys, ...calls].join(", ")}] }`;
 }
-
-/** The two subscriptions of a universe: its transactions, and its blocks (a block carries its time, a transaction none). */
-export const subscriptionsOf = (realms: Iterable<string>): { id: string; query: string }[] => [
-  { id: "tx", query: `subscription { getTransactions(where: ${whereOf(realms)}) { ${TX_FIELDS} } }` },
-  { id: "blocks", query: "subscription { getBlocks(where: {}) { height time } }" },
-];
 
 /** A page of these realms' transactions from a block on (that block included), oldest first. */
 export const catchUpQuery = (realms: Iterable<string>, from: number, limit: number): string =>
