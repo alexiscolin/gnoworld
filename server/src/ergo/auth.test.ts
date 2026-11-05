@@ -15,6 +15,20 @@ import { LOGIN_TABLES } from "../login/login.ts";
 import { makeTickets, TICKET_TABLES } from "../login/ticket.ts";
 import { authServer, listenAt } from "./auth.ts";
 
+// A stale socket the sandbox cannot make (it binds none): lstatSync is the real one but where a test says a socket stands.
+const files = vi.hoisted(() => ({ lstat: { stale: false }, unlinked: [] as string[] }));
+vi.mock("node:fs", async (actual) => {
+  const fs = await actual<typeof import("node:fs")>();
+  return {
+    ...fs,
+    lstatSync: (...args: Parameters<typeof fs.lstatSync>) =>
+      files.lstat.stale ? { isSocket: () => true } : fs.lstatSync(...args),
+    unlinkSync: (path: string) => {
+      files.unlinked.push(path);
+    },
+  };
+});
+
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const MINUTE = 60_000;
 const PEPPER = "a-pepper-of-forty-characters-0123456789";
@@ -106,6 +120,30 @@ describe("Ergo's auth script, answered by the server", () => {
     const answers = await Promise.all([ask(sent), ask(sent)]);
     expect(answers.toSorted()).toEqual([NO, YES(ME)].toSorted());
     expect(await ask(sent)).toBe(NO);
+  });
+
+  // auth.ts:87: what comes after the answer is never read, a ticket in it never spent.
+  it("reads nothing a client writes after its answer", async () => {
+    const { tickets, port, events } = await setup();
+    const [first, second] = [tickets.mint(ME), tickets.mint(ME)];
+    const socket = connect(port, "127.0.0.1");
+    socket.on("error", () => undefined);
+    let answer = "";
+    socket.setEncoding("utf8");
+    const answered = new Promise<void>((done) =>
+      socket.on("data", (chunk: string) => {
+        answer += chunk;
+        if (answer.endsWith("\n")) done();
+      }),
+    );
+    socket.write(line({ accountName: ME, passphrase: first }));
+    await answered;
+    socket.end(line({ accountName: ME, passphrase: second }));
+    await once(socket, "close");
+    expect(answer).toBe(YES(ME));
+    expect(tickets.redeem(second, ME)).toBe(ME);
+    // Read again, its first line would be a spent ticket's refusal.
+    expect(events().map(({ event }) => event)).toEqual(["irc_login"]);
   });
 
   it("answers the first line alone: a second line in the same write spends nothing", async () => {
@@ -355,6 +393,21 @@ describe("Ergo's auth script, answered by the server", () => {
 });
 
 describe("listenAt", () => {
+  // auth.ts:110: a socket a crash left where Ergo dials is removed before the server listens there; a file never is (below).
+  it("removes a stale socket at its path before it listens", async () => {
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES]);
+    const server = authServer(db, { log: logger(PEPPER, () => true) });
+    files.lstat.stale = true;
+    const path = join(tmpdir(), "gnoworld-auth-stale.sock");
+    await listenAt(server, path).then(
+      () => server.close(),
+      () => undefined,
+    );
+    files.lstat.stale = false;
+    db.close();
+    expect(files.unlinked).toEqual([path]);
+  });
+
   // The sandbox binds no Unix socket, so only the refusals are tried here; the bind is 3e's operator test.
   it("refuses a path it cannot listen on, naming the setting, and leaves a file there as it was", async () => {
     const dir = mkdtempSync(join(tmpdir(), "gnoworld-auth-"));
