@@ -1,5 +1,6 @@
 // Adena's answers read as outside data (slice 9's plan, 9b): by their type, as the SDK tables them (bin/index.js:785-985),
 // each ending a call as a success or a failure with its reason. Nothing here asks Adena anything but the call it is given.
+import { ChallengeRequest } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 
 export type CallFailure =
@@ -16,6 +17,8 @@ export type CallFailure =
   | "wrong-network"
   | "malformed";
 const MAX_LOG = 2048;
+/** The name Adena shows for gnoworld when it asks to let it in. */
+export const SITE = "gnoworld";
 
 // A failure's type says what it is; a type nobody knows is read by its code (bin/index.js:785-985).
 const BY_TYPE = new Map<string, CallFailure>([
@@ -25,6 +28,7 @@ const BY_TYPE = new Map<string, CallFailure>([
   ["ACCOUNT_MISMATCH", "wrong-account"],
   ["NO_ACCOUNT", "no-account"],
   ["TRANSACTION_REJECTED", "declined"],
+  ["SIGN_REJECTED", "declined"],
   ["SWITCH_NETWORK_REJECTED", "declined"],
   ["ADD_NETWORK_REJECTED", "declined"],
   ["CONNECTION_REJECTED", "declined"],
@@ -95,3 +99,8 @@ export async function read<T>(
   const parsed = schema.safeParse(answered.data);
   return parsed.success ? { ok: true, value: parsed.data } : refusal("malformed");
 }
+
+// The chain as the server's challenge takes it, not blank; the address stays the caller's to read, for it says why not.
+const Chain = ChallengeRequest.shape.chainId.check(z.refine((chain) => chain.trim() !== ""));
+export const Account = z.object({ address: z.string(), chainId: Chain });
+export const Network = z.object({ chainId: Chain });

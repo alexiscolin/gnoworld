@@ -4,7 +4,18 @@
 import { Address, CallRequest } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 import { detect, method } from "./detect.ts";
-import { ask, capped, read, refusal, type Answered, type CallFailure, type Failed } from "./answers.ts";
+import {
+  Account,
+  ask,
+  capped,
+  Network,
+  read,
+  refusal,
+  SITE,
+  type Answered,
+  type CallFailure,
+  type Failed,
+} from "./answers.ts";
 import { serially } from "./queue.ts";
 
 export type CallResult = { ok: true; hash: string; log: string } | { ok: false; reason: CallFailure; log?: string };
@@ -18,9 +29,6 @@ export interface Universe {
 // The SDK's default gas and fee (bin/index.js:2452; gno-js-client's default fee, in ugnot): the card shows the fee as an estimate.
 const GAS_WANTED = 10_000_000;
 const GAS_FEE = 1_000_000;
-const SITE = "gnoworld";
-const Account = z.object({ address: Address, chainId: z.string().check(z.minLength(1)) });
-const Network = z.object({ chainId: z.string().check(z.minLength(1)) });
 
 type Need = (name: string, ...args: unknown[]) => Promise<Answered>;
 interface Wallet {
@@ -64,6 +72,7 @@ async function checkAccount(wallet: Wallet, caller: string): Promise<Failed | un
     who = await account();
   }
   if (!who.ok) return who;
+  if (!Address.safeParse(who.value.address).success) return refusal("malformed");
   return who.value.address === caller ? undefined : refusal("wrong-account");
 }
 
