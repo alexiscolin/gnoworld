@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
 import { evalCall, isRealmPath, userCall } from "./evalCall.ts";
 
-// 5g-reads, tier 1: the one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent (ANY_EXPRESSION_RUNS,
-// recorded on onyx-1), so the only defence is that this builder gives one `<realm>.<Name>()` or nothing.
+// 5g-reads, tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
+// (ANY_EXPRESSION_RUNS, recorded on onyx-1), so the only defence is that it gives one `<realm>.<Name>()`, one of r/sys/users's
+// two calls on a proved address (D283), or nothing.
 
 // A port of gno's parseQueryEvalData (gno.land/pkg/sdk/vm/handler.go:289 at v1.5.0): the first dot AFTER the first slash cuts the
 // realm from the expression. A realm path with a dot past its first slash would change what is asked.

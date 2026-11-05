@@ -1,6 +1,6 @@
-// Tier 1 (docs/REVIEW.md). The only place a `vm/qeval` expression is built. The chain runs ANY expression it is sent, so the
-// defence is here: one `<realm>.<Name>()`, one of r/sys/users's two calls on a proved address (D283), or nothing. Each pattern is
-// built inside its function (typescript.md, F412).
+// Tier 1 (docs/REVIEW.md). The app's only place a `vm/qeval` expression is built (the server's door has its own, D92). The chain
+// runs ANY expression it is sent, so the defence is here: one `<realm>.<Name>()`, one of r/sys/users's two calls on a proved
+// address (D283), or nothing. Each pattern is built inside its function (typescript.md, F412).
 import { Address } from "@gnoworld/schemas";
 
 /** gno's grammar for a realm's path (mempackage.go:49-54,67-70,81-90 at v1.5.0), `_test` paths left out. */
