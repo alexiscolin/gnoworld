@@ -79,7 +79,7 @@ export function startChain(options: ChainOptions): { stop: () => void } {
       url: universe.indexer,
       watch,
       log: said,
-      ...(send === undefined ? {} : { send }),
+      send,
     });
     const history = async (since: string): Promise<Deploy[]> => {
       const deploys = await readers.history(since);
@@ -108,7 +108,7 @@ export function startChain(options: ChainOptions): { stop: () => void } {
           wait,
           random,
           deliver: makeRelay({ stream, count, universe: universe.id, now }),
-          ...(reached === undefined ? {} : { from: reached }),
+          from: reached,
           log: said,
           after,
         });

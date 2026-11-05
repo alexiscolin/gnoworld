@@ -36,7 +36,7 @@ export interface FollowOptions {
   random: () => number;
   deliver: (read: ChainRead) => void;
   /** The height already read before the first socket (the day's history reached it): the first connection catches up from it. */
-  from?: number;
+  from?: number | undefined;
   log: (what: FollowLog) => void;
   /** Runs `run` in `ms` unless the returned function is called first. */
   after?: (ms: number, run: () => void) => () => void;
