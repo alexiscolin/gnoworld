@@ -1,13 +1,26 @@
 import { Address } from "@gnoworld/schemas";
 import { ChainEvent, RealmsDeployed } from "@gnoworld/schemas/indexer";
 import { logger } from "@gnoworld/service/log";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
 import { makeStream, type Stream } from "./stream.ts";
 
 // Slice 9g: the chain's events reach a page on the server's existing stream, as their own events `chain` and `realms`, to the
 // readers who follow the room and may read it, live only (the indexer gives them again; nothing is stored here) but for the
 // Earth's last count, which a page that opens later still needs.
+
+// worldOf, counted: an event must not split a client's rooms again (F5774).
+const worlds = vi.hoisted(() => ({ asked: 0 }));
+vi.mock("../rooms/rooms.ts", async (original) => {
+  const rooms = await original<typeof import("../rooms/rooms.ts")>();
+  return {
+    ...rooms,
+    worldOf: (room: string) => {
+      worlds.asked += 1;
+      return rooms.worldOf(room);
+    },
+  };
+});
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const CALL: ChainEvent = {
   kind: "call",
@@ -101,6 +114,18 @@ describe("the stream's chain event", () => {
     expect(sent(await earth.until("event: chain"), "chain", ChainEvent)).toEqual([DEPLOY]);
     expect(await world.until("event: verdict")).not.toContain("event: chain");
     await Promise.all([earth.cancel(), world.cancel()]);
+  });
+
+  it("finds a client's worlds once, when its stream opens, never again for an event", async () => {
+    const { stream, open } = setup();
+    const rooms = Array.from({ length: 25 }, (_, n) => `#w${String(n)}`);
+    const client = await open(rooms.join(","));
+    await client.settled();
+    worlds.asked = 0;
+    for (let n = 0; n < 40; n += 1) stream.chain(CALL);
+    stream.signal({ kind: "chart", world: "govdao", account: ALICE, at: "2026-11-05T12:00:00.000Z" });
+    expect(worlds.asked).toBe(0);
+    await client.cancel();
   });
 
   it("tells nothing to a reader who may not read the room", async () => {

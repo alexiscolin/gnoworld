@@ -8,6 +8,7 @@ import { Hono, type Context } from "hono";
 import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
 import { z } from "zod";
+import { worldOf } from "../rooms/rooms.ts";
 import { visitor } from "../visitor.ts";
 import { chainSide, EARTH } from "./chain.ts";
 import { follows, signalRing } from "./signals.ts";
@@ -62,6 +63,8 @@ interface Options {
 
 interface Client {
   rooms: ReadonlySet<string>;
+  /** The worlds of its rooms, found once when its stream opens: an event is matched by a lookup, not by splitting every room. */
+  worlds: ReadonlySet<string>;
   stream: SSEStreamingApi;
   unread: number;
 }
@@ -162,7 +165,7 @@ export function makeStream(options: Options = {}): Stream {
   const tell = (world: string, framed: (id: number) => string): void => {
     sequence += 1;
     const text = framed(sequence);
-    for (const client of clients) if (follows(client.rooms, world)) write(client, text);
+    for (const client of clients) if (client.worlds.has(world)) write(client, text);
   };
 
   const side = chainSide(tell, (rooms) => follows(rooms, EARTH));
@@ -203,7 +206,7 @@ export function makeStream(options: Options = {}): Stream {
           const ended = new Promise<void>((resolve) => {
             stream.onAbort(resolve);
           });
-          const client: Client = { rooms: seen, stream, unread: 0 };
+          const client: Client = { rooms: seen, worlds: new Set([...seen].map(worldOf)), stream, unread: 0 };
           clients.add(client);
           // The newest it missed, or the rooms' last events for a new client, as many as it may leave unread:
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).
