@@ -24,10 +24,10 @@ export interface VerdictOptions {
   open: (url: string) => VerdictSource;
   log: (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => void;
   /** A first signal of a world the rooms belong to (slice 9h). */
-  signal?: (signal: Signal) => void;
+  signal?: ((signal: Signal) => void) | undefined;
   /** The data of a `chain` and of a `realms` event (slice 9g), unread: their schemas are the feed's (chainFeed.ts), which a page loads on the first. */
-  chain?: (data: unknown) => void;
-  realms?: (data: unknown) => void;
+  chain?: ((data: unknown) => void) | undefined;
+  realms?: ((data: unknown) => void) | undefined;
   /** The stream's word of when it began following, in ms. */
   since?: (time: number) => void;
   /** The stream ended for good: the browser will not reconnect it. */
@@ -90,20 +90,17 @@ export function followVerdicts(
 /** The page's own stream, on its EventSource; an unknown event reported once, as the page reports an error. */
 export const pageVerdicts = (
   rooms: readonly string[],
-  on: {
+  on: Pick<VerdictOptions, "signal" | "chain" | "realms"> & {
     verdict: (event: StreamEvent) => void;
-    signal?: ((signal: Signal) => void) | undefined;
-    chain?: ((data: unknown) => void) | undefined;
-    realms?: ((data: unknown) => void) | undefined;
     since: (time: number) => void;
     dead: () => void;
   },
 ) =>
   followVerdicts(rooms, on.verdict, {
     open: (url) => new EventSource(url),
-    ...(on.signal === undefined ? {} : { signal: on.signal }),
-    ...(on.chain === undefined ? {} : { chain: on.chain }),
-    ...(on.realms === undefined ? {} : { realms: on.realms }),
+    signal: on.signal,
+    chain: on.chain,
+    realms: on.realms,
     log: (what) => {
       reportError(new Error(`verdicts: ${what}`));
     },
