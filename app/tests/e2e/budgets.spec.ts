@@ -62,7 +62,8 @@ test(
 );
 
 // A page of its own, planted where the site is served: what its entry imports, statically, as it runs and after a fetch, is its first
-// screen; what a timer, a frame or an idle callback asks is not, whatever the load, though the page asks it once its clock runs again.
+// screen; what a timer, a frame or an idle callback asks is not. Then frames and short timers run, while an idle callback or a timer of
+// a second or more waits until the test lets it go, whatever the load (F5410).
 test(
   "the first screen counts what a page imports as it runs, never what its timers ask",
   { tag: "@gate" },
@@ -75,6 +76,7 @@ test(
         'void import("./early.js");',
         'void fetch("/__first/data.json").then(() => import("./fetched.js"));',
         'setTimeout(() => import("./timer.js"), 0);',
+        'setTimeout(() => import("./second.js"), 1000);',
         'requestAnimationFrame(() => import("./frame.js"));',
         'requestIdleCallback(() => import("./idle.js"));',
         'const every = setInterval(() => { clearInterval(every); void import("./interval.js"); }, 0);',
@@ -93,6 +95,7 @@ test(
       "idle.js": "export const at = 6;",
       "interval.js": "export const at = 7;",
       "cleared.js": "export const at = 8;",
+      "second.js": "export const at = 9;",
     };
     const name = (url: string) => new URL(url).pathname.split("/").pop() ?? "";
     await page.route("**/__first/*", (route) => {
@@ -107,15 +110,20 @@ test(
     const seen = watch(page);
     const early = (await firstScreenOf(page, "/__first/index.html", seen)).map(name).sort();
     expect(early).toEqual(["early.js", "entry.js", "fetched.js", "part.js", "static.js"]);
-    const later = ["frame.js", "idle.js", "interval.js", "timer.js"];
-    await expect
-      .poll(() =>
-        [...seen.scripts]
-          .map(name)
-          .filter((file) => later.includes(file))
-          .sort(),
-      )
-      .toEqual(later);
+    const asked = (files: readonly string[]) =>
+      [...seen.scripts]
+        .map(name)
+        .filter((file) => files.includes(file))
+        .sort();
+    const short = ["frame.js", "interval.js", "timer.js"];
+    const putOff = ["idle.js", "second.js"];
+    await expect.poll(() => asked(short)).toEqual(short);
+    await page.waitForTimeout(1500);
+    await settled(page, seen);
+    expect(asked(putOff), "what the page puts off waits for the test").toEqual([]);
+    await letTimersGo(page);
+    const later = [...short, ...putOff].sort();
+    await expect.poll(() => asked(later)).toEqual(later);
     // A held call cleared before it ran never runs once the rest goes (R5).
     expect([...seen.scripts].map(name)).not.toContain("cleared.js");
     // The guard of every page's run names them: asked, and under no cap.
@@ -216,31 +224,27 @@ const THREE_MARK = "isWebGLRenderer";
 const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
 const GENERATED_MARK = "minorShare";
 
-// The scripts the page's others import, as each file's own static imports say, from the roots that are no other's import, the chunk that
-// comes late apart.
-const without = (page: Page, urls: readonly string[], skip: readonly string[]) =>
-  page.evaluate(
-    async ([list, skipped, pattern]) => {
-      const edges = new Map<string, string[]>();
-      for (const url of list) {
-        const text = await (await fetch(url, { cache: "no-store" })).text();
-        edges.set(
-          url,
-          [...text.matchAll(new RegExp(pattern, "g"))].map((found) => new URL(found[1] ?? "", url).href),
-        );
-      }
-      const imported = new Set([...edges.values()].flat());
-      const kept = new Set<string>();
-      const walk = (url: string) => {
-        if (kept.has(url) || !edges.has(url) || skipped.includes(url)) return;
-        kept.add(url);
-        for (const next of edges.get(url) ?? []) walk(next);
-      };
-      for (const url of list) if (!skipped.includes(url) && !imported.has(url)) walk(url);
-      return [...kept];
-    },
-    [[...urls], skip, STATIC_IMPORT.source] as const,
+// A script the page's HTML names: its entry, a route's module, a preload.
+const NAMED_SCRIPT = /["'](\/[\w./-]+\.js)["']/;
+
+// The scripts the page's HTML names (at its address) and, at any depth, what they import statically or by a dynamic import the page asked (`asked`), read
+// from the built files; never a chunk of `late`, nor what only one opens, though it came before the page settled (F5410: the chat's
+// RoomsDrawer, at a load of 100, counted in the first screen as a root of its own).
+async function reached(page: Page, asked: readonly string[], late: readonly string[]) {
+  const html = await (await page.request.get(page.url())).text();
+  const kept = new Set<string>();
+  const next = [...html.matchAll(new RegExp(NAMED_SCRIPT.source, "g"))].map(
+    ([, name = ""]) => new URL(name, page.url()).href,
   );
+  for (let url = next.pop(); url !== undefined; url = next.pop()) {
+    if (kept.has(url) || late.includes(url) || !asked.includes(url)) continue;
+    kept.add(url);
+    const text = readFileSync(join(ASSETS, fileOfUrl(url)), "utf8");
+    for (const pattern of [STATIC_IMPORT, DYNAMIC_IMPORT])
+      for (const [, name = ""] of text.matchAll(new RegExp(pattern.source, "g"))) next.push(new URL(name, url).href);
+  }
+  return [...kept];
+}
 
 // What a page asks, as the test sees it: each script, every answer but a stream's, the scripts in flight and every request in flight but
 // a stream's or a socket's, and how many it asked.
@@ -296,20 +300,29 @@ function holdTimers() {
     ["requestAnimationFrame", "cancelAnimationFrame"],
     ["requestIdleCallback", "cancelIdleCallback"],
   ] as const;
-  const waiting: (() => void)[] = [];
+  interface Held {
+    set: string;
+    args: unknown[];
+    go: () => void;
+  }
+  let waiting: Held[] = [];
   const held = new Map<number, number | undefined>(); // a held call's id, and the real one once let go
-  let holding = true;
+  let holds: (set: string, args: unknown[]) => boolean = () => true;
   let last = 0;
   for (const [set, clear] of pairs) {
     const setReal = (window[set] as unknown as (...args: unknown[]) => number).bind(window);
     const clearReal = window[clear].bind(window);
     Reflect.set(window, set, (...args: unknown[]) => {
-      if (!holding) return setReal(...args);
+      if (!holds(set, args)) return setReal(...args);
       last -= 1;
       const id = last;
       held.set(id, undefined);
-      waiting.push(() => {
-        if (held.has(id)) held.set(id, setReal(...args));
+      waiting.push({
+        set,
+        args,
+        go: () => {
+          if (held.has(id)) held.set(id, setReal(...args));
+        },
       });
       return id;
     });
@@ -323,9 +336,19 @@ function holdTimers() {
       if (real !== undefined) clearReal(real);
     });
   }
+  const release = (stillHeld: typeof holds) => {
+    holds = stillHeld;
+    const going = waiting.filter(({ set, args }) => !stillHeld(set, args));
+    waiting = waiting.filter(({ set, args }) => stillHeld(set, args));
+    for (const { go } of going) go();
+  };
+  // What a page puts off on purpose waits on: an idle callback, or a timer of a second or more (later.ts, the bell's watch). A frame and
+  // a shorter timer run, as React's own that shows a boundary's content once its code came.
+  Reflect.set(window, "__letShortGo", () => {
+    release((set, args) => set === "requestIdleCallback" || (set.startsWith("set") && Number(args[1] ?? 0) >= 1000));
+  });
   Reflect.set(window, "__letTimersGo", () => {
-    holding = false;
-    for (const go of waiting.splice(0)) go();
+    release(() => false);
   });
 }
 
@@ -341,7 +364,8 @@ async function settled(page: Page, seen: Seen): Promise<void> {
 }
 
 // The first screen: what a page asks before any of its timers, frames or idle callbacks runs (the chief, 2026-11-04: a timer's chunk was
-// counted at a load of 50 to 80, not quiet), once settled. What it imports as it runs or mounts counts.
+// counted at a load of 50 to 80, not quiet), once settled. What it imports as it runs or mounts counts. Then what the page puts off on
+// purpose stays held until the caller lets it go.
 async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
   await page.addInitScript(holdTimers);
   await page.goto(path);
@@ -349,10 +373,15 @@ async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<stri
   await settled(page, seen);
   const asked = [...seen.scripts];
   await page.evaluate(() => {
-    (Reflect.get(window, "__letTimersGo") as () => void)();
+    (Reflect.get(window, "__letShortGo") as () => void)();
   });
   return asked;
 }
+
+const letTimersGo = (page: Page) =>
+  page.evaluate(() => {
+    (Reflect.get(window, "__letTimersGo") as () => void)();
+  });
 
 // The built files the pages are served from (serve.mjs), which chunks.ts weighs with no page (item 7: a page drawing the scene on a
 // software GPU timed these journeys out at a load of 60).
@@ -496,7 +525,7 @@ for (const path of PAGES) {
     // A plate's late chunk landing meanwhile is named late, never weighed as the first screen's.
     const plateLate = [...scripts].filter((url) => PLATE_LATE.test(url));
     const late = [asked[0], ...capture, chatLate, ...plateLate].filter((url) => url !== undefined);
-    const firstScreen = await without(page, early, late);
+    const firstScreen = await reached(page, early, late);
     const lateChunk = late.find((url) => CHAT.test(url));
     const chatOpened = lateChunk === undefined ? [] : openedOf(lateChunk, firstScreen, scripts);
     if (lateChunk !== undefined)
@@ -512,11 +541,13 @@ for (const path of PAGES) {
       );
     const plates = await plateWithin(page, plateLate, firstScreen);
     const captured = await captureWithin(page, capture, [...firstScreen, ...chatOpened, ...proposals]);
-    // Every script the page asked is under one of its caps: a chunk between two cuts fails here (the chief, 2026-11-04).
+    // Every script the page asked is under one of its caps: a chunk between two cuts fails here (the chief, 2026-11-04). What the page
+    // puts off is still held, so what it asks (the bell's watch, the arrival pill) is never the chat's, whatever the load (F5410).
     expect(
       uncounted(scripts, firstScreen, chatOpened, proposals, plates, captured),
       "every chunk the page asks is under a cap",
     ).toEqual([]);
+    await letTimersGo(page);
     expect(firstScreen.length, "the page loads no script: the measure is empty").toBeGreaterThan(0);
     expect(
       firstScreen.filter((url) => LINES.test(url)),
@@ -578,7 +609,7 @@ test("a page's capture under a line, on a world with no realm, stays within its 
   ).toBe(true);
   // What the page's other roots reach (its first screen, the chat, the lines), each with every chunk it imports: a chunk only the capture's
   // parts import is the capture's, one the lines import too (the chat's drawing) is not.
-  const roots = await without(page, [...scripts], parts);
+  const roots = await reached(page, [...scripts], parts);
   const there = [...new Set(roots.flatMap(closureOf))];
   const own = parts.map((url) => ownOf(url, there));
   expect(
