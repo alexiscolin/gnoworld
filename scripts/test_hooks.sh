@@ -7562,6 +7562,35 @@ const base = (files) => (l) =>
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
+  // A fixer's "could not reproduce" is its word alone (F5542, H5): it stands only when a finding-verifier refutes the finding with evidence of
+  // its own; one it does not refute is still open; a rejected high finding on a tier-1 file still gets its second security round; the
+  // result lists every rejection that stood, with both evidences.
+  let v;
+  const rejects = (verdicts, extra = {}) => {
+    let rounds = 0;
+    return run((l, p, o) =>
+      l === "security" ? { findings: rounds++ === 0 ? [finding("high", "scripts/a.sh"), finding("medium", "scripts/b.sh")] : [] }
+      : (l || "").startsWith("fix round") ? { fixed: [{ id: "security-1-2", commit: "f1" }], rejected: [{ id: "security-1-1", evidence: "cannot reproduce" }], notes: "", branch: "b" }
+      : (l || "").startsWith("verify rejected") ? verdicts
+      : base(["scripts/a.sh"])(l, p), extra);
+  };
+  v = await rejects({ verdicts: [{ id: "security-1-1", refuted: true, evidence: "scripts/a.sh:3 checks it" }] });
+  ok(v.r.status === "ready for the chief", `a rejection the verifier refuted did not stand: ${v.r.status}`);
+  const verifier = v.calls.find((c) => c.agentType === "finding-verifier");
+  ok(verifier && verifier.prompt.includes("write nothing") && verifier.prompt.includes("security-1-1") && !verifier.prompt.includes("security-1-2"), `the finding-verifier was not asked about the rejected finding alone, writing nothing: ${verifier && verifier.prompt}`);
+  ok(v.labels.filter((l) => l === "security").length === 2, `a rejected high finding on a tier-1 file got no second security round: ${v.labels}`);
+  ok(v.r.rejected && v.r.rejected.length === 1 && v.r.rejected[0].id === "security-1-1" && v.r.rejected[0].verifier === "scripts/a.sh:3 checks it" && v.r.rejected[0].fixer === "cannot reproduce", `the result did not list the rejection with both evidences: ${JSON.stringify(v.r.rejected)}`);
+  for (const verdicts of [{ verdicts: [{ id: "security-1-1", refuted: false, evidence: "it reproduces" }] }, { verdicts: [] }, null, { verdicts: [{ id: "security-1-2", refuted: true, evidence: "x" }] }]) {
+    v = await rejects(verdicts);
+    ok(v.r.status.startsWith("blocked") && v.r.status.includes("security-1-1"), `a rejection the verifier did not refute (${JSON.stringify(verdicts)}) stood: ${v.r.status}`);
+  }
+  // The verifier refutes what the fixer rejected, never a finding the fixer left alone.
+  v = await run((l, p, o) =>
+    l === "security" ? { findings: [finding("high", "scripts/a.sh"), finding("high", "scripts/b.sh")] }
+    : (l || "").startsWith("fix round") ? { fixed: [], rejected: [{ id: "security-1-1", evidence: "cannot reproduce" }], notes: "", branch: "b" }
+    : (l || "").startsWith("verify rejected") ? { verdicts: [{ id: "security-1-1", refuted: true, evidence: "e" }, { id: "security-1-2", refuted: true, evidence: "e" }] }
+    : base(["scripts/a.sh"])(l, p));
+  ok(v.r.status.startsWith("blocked") && v.r.status.includes("security-1-2") && !v.r.status.includes("security-1-1"), `a finding the fixer never rejected was ruled out by the verifier: ${v.r.status}`);
   // Read-only agents are told to write nothing; writers get the shared files.
   for (const c of t.calls) {
     const readOnly = ["red pass", "reviewer", "security", "gno-auditor", "design-reviewer"].includes(c.label);
@@ -7591,7 +7620,7 @@ const base = (files) => (l) =>
   // Two files of each folder, so a prefix cut to one file fails (server/src/login/ is also ticket.ts and routes.ts).
   for (const file of ["app/src/csp.ts", "app/src/cspOrigins.ts", "app/src/cspForms.ts", "app/src/lib/chain/evalCall.ts", "deploy/test.sh", "deploy/compose.yaml", "deploy/web/nginx.conf", "packages/core/src/markdown/inline.ts", "packages/core/src/markdown/scan.ts",
     "app/src/lib/adena/adena.ts", "app/src/lib/adena/digest.ts", "server/src/login/login.ts", "server/src/login/ticket.ts", "server/src/roles/roles.ts", "server/roles.json",
-    "app/src/sw/worker.ts", "app/src/sw/register.ts", "server/src/ergo/auth.ts", "app/src/features/login/logIn.ts", "app/src/features/login/LoginView.tsx",
+    "packages/service/src/net.ts", "packages/service/src/settings.ts", "app/src/sw/worker.ts", "app/src/sw/register.ts", "server/src/ergo/auth.ts", "app/src/features/login/logIn.ts", "app/src/features/login/LoginView.tsx",
     "app/src/lib/api/login.ts", "app/src/lib/ergo/ergo.ts", "app/src/lib/ergo/handshake.ts"]) {
     const labels = await lensOf(file);
     ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
