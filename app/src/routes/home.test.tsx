@@ -24,6 +24,23 @@ vi.mock("../../data/events.json", async (original) => {
   return { default: [...rows, DATED] };
 });
 
+// What is on air (8i), as the data may hold it: a world by its hub, a hub the page does not list, another universe's line.
+const { LIVE } = vi.hoisted(() => ({
+  LIVE: [
+    { id: "air-world", universe: "onyx", title: "Live in Bubble", hub: "bubble" },
+    {
+      id: "air-site",
+      universe: "onyx",
+      title: "Live elsewhere",
+      link: "https://example.org/live",
+      until: "2999-01-01T00:00:00Z",
+    },
+    { id: "air-nowhere", universe: "onyx", title: "Live in a lost world", hub: "nowhere" },
+    { id: "air-other", universe: "gnoland", title: "Live in another universe", link: "https://example.org/other" },
+  ],
+}));
+vi.mock("../../data/onAir.json", () => ({ default: LIVE }));
+
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267, 8i: the kicker says gno.land · live now as frame 6, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
@@ -242,6 +259,29 @@ describe("home's live line", () => {
   test("still claims nobody online, with the live line in", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     expect(html).not.toMatch(/online|here now|talking/i);
+  });
+});
+
+describe("home's on-air lines", () => {
+  const home = () => render({ path: "/", Component: Home, loader }, "/");
+
+  test("leads a hub's line to its world's page through the router, and a link's line to its own site", async () => {
+    const html = await home();
+    expect(html).toMatch(/href="\/w\/bubble"[^>]*>Live in Bubble</);
+    expect(html).toMatch(/href="https:\/\/example\.org\/live"[^>]*>Live elsewhere</);
+  });
+
+  test("leaves out a hub the page does not list and another universe's line", async () => {
+    const html = await home();
+    for (const title of ["Live in a lost world", "Live in another universe"]) {
+      expect(html, title).not.toContain(title);
+    }
+  });
+
+  test("shows another universe's line under that universe, and not this one's", async () => {
+    const html = await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
+    expect(html).toContain("Live in another universe");
+    expect(html).not.toContain("Live elsewhere");
   });
 });
 

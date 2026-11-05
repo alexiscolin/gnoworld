@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { headingOf, render } from "../../../tests/render.tsx";
 import { siteOf } from "../../places.ts";
 import { PLANTED } from "../../placesFixture.ts";
-import { Hero } from "./Hero.tsx";
+import { Hero, type People } from "./Hero.tsx";
 
 // The hero's big number counts the worlds it is given: the page says how many (the cosmos's, or a universe's list). The real data
 // holds one world in Onyx and none in gno.land, so the site is planted, with two worlds in its default universe.
@@ -147,6 +147,55 @@ describe("the hero's actions for a newcomer", () => {
 });
 
 // F3267: the hero as the frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
+// 8i (frame 6): who is online, from the server; "coming" while it is asked, none where no server counts people.
+describe("the hero's people", () => {
+  const withPeople = (people: People | undefined, worlds: number | undefined) =>
+    render({ path: "/", Component: () => <Hero universe={universeOf("main")} worlds={worlds} people={people} /> }, "/");
+  const lineText = (html: string) => /data-hero="line"[^>]*>(.*?)<\/div>/s.exec(html)?.[1]?.replace(/<[^>]*>/g, "");
+
+  test("makes the number the people online, marked as such, and the line their countries and the worlds", async () => {
+    const html = await withPeople({ online: 671, countries: 31 }, 18);
+    expect(numberOf(html)).toBe("671");
+    expect(html).toMatch(/data-hero="number" data-online=""/);
+    expect(headingOf(html)).toBe("People in 31 countries, across 18 worlds.");
+  });
+
+  test("says country and world in the singular for one", async () => {
+    expect(headingOf(await withPeople({ online: 3, countries: 1 }, 1))).toBe("People in 1 country, across 1 world.");
+  });
+
+  test("leaves the countries out while nobody online shows one", async () => {
+    const html = await withPeople({ online: 12, countries: 0 }, 18);
+    expect(headingOf(html)).toBe("People, across 18 worlds.");
+    expect(html).not.toContain('data-hero="countries"');
+  });
+
+  test("says a count of zero people as it is", async () => {
+    const html = await withPeople({ online: 0, countries: 0 }, 18);
+    expect(numberOf(html)).toBe("0");
+  });
+
+  test("keeps the figure's room while the people are asked, with no number and no online mark", async () => {
+    const html = await withPeople("coming", undefined);
+    expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
+    expect(html).not.toContain("data-online");
+    expect(lineText(html)).toBe("Worlds in Mainland. Each one is a place to talk.");
+  });
+
+  test("counts the worlds where no server counts people, as before, without the online mark", async () => {
+    const html = await withPeople(undefined, 2);
+    expect(numberOf(html)).toBe("2");
+    expect(html).not.toContain("data-online");
+    expect(headingOf(html)).toBe("2 worlds in Mainland");
+  });
+
+  test("names the worlds still coming after the people", async () => {
+    expect(headingOf(await withPeople({ online: 5, countries: 2 }, undefined))).toMatch(
+      /^People in 2 countries, across Worlds\.?$/,
+    );
+  });
+});
+
 describe("the hero's parts", () => {
   test("opens with the kicker and its warm dot, the universe's name in the one label style", async () => {
     const html = await heroOf("main");

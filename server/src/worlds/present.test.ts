@@ -1,10 +1,10 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { Presence, PRESENCE_ANSWER_MAX } from "@gnoworld/schemas/indexer";
+import { Presence, PRESENCE_ANSWER_MAX, PresencePeople } from "@gnoworld/schemas/indexer";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makePresence } from "./presence.ts";
-import { PRESENT_MS, startPresent } from "./present.ts";
+import { countriesTo, PRESENT_MS, startPresent } from "./present.ts";
 
 // Who is here (slice 7, 7h, the sampler 7c left to the labels): the people the reconciler reads in each room a guest may see, a world's
 // counted once across its rooms, the bot left out; recorded into 7c's history, so a world rises against its own 14 days; and served as
@@ -379,5 +379,95 @@ describe("the history it keeps", () => {
       present.stop();
     }).not.toThrow();
     expect(readFileSync(join(file, "..", ".."), "utf8")).toBe("a file where a folder should be");
+  });
+});
+
+// The home's hero (8i): the people online, each once, and the countries those of them name: two counts, never who.
+describe("the people online", () => {
+  const peopleOf = async (present: ReturnType<typeof setup>["present"]) => {
+    const response = await present.routes.request("/people");
+    return {
+      status: response.status,
+      cache: response.headers.get("cache-control"),
+      body: await response.text(),
+    };
+  };
+  const counts = async (present: ReturnType<typeof setup>["present"]) =>
+    PresencePeople.parse(JSON.parse((await peopleOf(present)).body));
+
+  it("counts each nick once across the rooms a guest sees, whatever its case, the bot left out", async () => {
+    const { present } = setup();
+    present.seen("#earth", ["gnoworld", "Ada", "bo"]);
+    present.seen("#earth/kyoto", ["ADA", "cy"]);
+    present.seen("#bubble", ["ada", "di"]);
+    expect(await counts(present)).toEqual({ online: 4, countries: 0 });
+  });
+
+  it("leaves out the rooms a guest cannot see, and the rooms unread for three minutes", async () => {
+    const { present } = setup();
+    present.seen("#earth/desk", ["secret"]);
+    present.seen("#bubble", ["ada"]);
+    vi.advanceTimersByTime(2 * MINUTE);
+    present.seen("#earth", ["bo"]);
+    vi.advanceTimersByTime(MINUTE + 1000);
+    expect(await counts(present)).toEqual({ online: 1, countries: 0 });
+  });
+
+  it("answers counts alone, public and kept a minute, as the world answer does", async () => {
+    const { present } = setup();
+    present.seen("#earth", ["ada-lovelace"]);
+    present.declared("ada-lovelace", "FR", false);
+    const { status, cache, body } = await peopleOf(present);
+    expect([status, cache]).toEqual([200, "public, max-age=60"]);
+    expect(body).not.toContain("ada");
+    expect(body).not.toContain("FR");
+  });
+
+  it("answers zero people and zero countries when no room was read", async () => {
+    expect(await counts(setup().present)).toEqual({ online: 0, countries: 0 });
+  });
+
+  it("counts the countries of the people online alone, each country once", async () => {
+    const { present } = setup();
+    present.seen("#earth", ["ada", "bo", "cy"]);
+    present.declared("Ada", "FR", false);
+    present.declared("bo", "FR", false);
+    present.declared("gone", "DE", false);
+    expect(await counts(present)).toEqual({ online: 3, countries: 1 });
+  });
+
+  it("keeps an account's last country, and an older line only for an account not heard yet", async () => {
+    const { present } = setup();
+    present.seen("#earth", ["ada", "bo", "cy"]);
+    present.declared("ada", "FR", false);
+    present.declared("ada", "DE", false);
+    present.declared("bo", "DE", false);
+    present.declared("ada", "US", true);
+    present.declared("cy", "JP", true);
+    expect(await counts(present)).toEqual({ online: 3, countries: 2 });
+  });
+
+  it("evicts the account that spoke longest ago once 100,000 are kept", async () => {
+    const { present } = setup();
+    present.seen("#earth", ["first", "a1"]);
+    present.declared("first", "FR", false);
+    for (let at = 1; at < 100_000; at += 1) present.declared(`a${String(at)}`, "US", false);
+    expect((await counts(present)).countries).toBe(2);
+    present.declared("one-more", "US", false);
+    present.seen("#earth", ["first", "a1"]);
+    vi.advanceTimersByTime(MINUTE);
+    expect((await counts(present)).countries).toBe(1);
+  });
+
+  it("declares nothing from a line of a room a guest cannot see, or one with no country", () => {
+    const { present } = setup();
+    const declared = vi.spyOn(present, "declared");
+    const to = countriesTo(present, (room) => room !== "#earth/desk");
+    const said = { msgid: "m", text: "hi", account: "ada" };
+    to({ ...said, room: "#earth/desk", country: "FR" }, false);
+    to({ ...said, room: "#earth" }, false);
+    expect(declared).not.toHaveBeenCalled();
+    to({ ...said, room: "#earth", country: "FR" }, true);
+    expect(declared).toHaveBeenCalledWith("ada", "FR", true);
   });
 });

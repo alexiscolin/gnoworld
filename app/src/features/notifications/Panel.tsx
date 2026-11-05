@@ -66,17 +66,16 @@ function useHere(): ReadonlyMap<string, number> {
   return here;
 }
 
-// What marks lines read on this device: some by their ids, or every one up to now, the rooms' notices seen with them.
-function useMarkRead(now: number) {
+// What marks lines read on this device: some by their ids, or all of them, every line up to now and by their ids the lines shown that
+// `through` misses (an event to come is later than now, a followed world's row has no time), the rooms' notices seen with them.
+function useMarkRead(now: number, shown: readonly Item[]) {
   const store = useAppStore();
   return (ids: readonly string[] | "all") => {
-    store
-      .getState()
-      .deviceActions.change("notificationsRead", (held) =>
-        ids === "all"
-          ? { through: new Date(now).toISOString(), ids: [] }
-          : { ...held, ids: [...new Set([...ids, ...held.ids])].slice(0, FOLLOWS_KEPT) },
-      );
+    const marked = ids === "all" ? shown.filter(({ at }) => !(at <= now)).map(({ id }) => id) : ids;
+    store.getState().deviceActions.change("notificationsRead", (held) => ({
+      through: ids === "all" ? new Date(now).toISOString() : held.through,
+      ids: [...new Set([...marked, ...held.ids])].slice(0, FOLLOWS_KEPT),
+    }));
     if (ids === "all") store.getState().noticeActions.clear();
   };
 }
@@ -90,7 +89,7 @@ export function Panel({ onClose }: { onClose: () => void }) {
   const [kind, setKind] = useState<"all" | NoticeKind>("all");
   const [world, setWorld] = useState<string>();
   const leaving = useLeaving();
-  const markRead = useMarkRead(now);
+  const markRead = useMarkRead(now, items);
   const unread = (of: "all" | NoticeKind) =>
     items.filter((item) => (of === "all" || item.kind === of) && isUnread(item, read)).length;
   const shown = items.filter(

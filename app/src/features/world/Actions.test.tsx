@@ -3,6 +3,8 @@ import { createRoot } from "react-dom/client";
 import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { ircOf } from "../../../tests/irc.ts";
+import { mountInStore } from "../../../tests/inStore.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import { Actions } from "./Actions.tsx";
 
@@ -134,5 +136,39 @@ describe("a world's actions, with proposals", () => {
     "",
   ])("draws %j as no link at all", (proposals) => {
     expect(draw(proposals).textContent).not.toMatch(/read the proposals/i);
+  });
+});
+
+// Frame 93: once the main room's history came with nobody's words in it, the main action asks to be the first.
+describe("a world's main action, in a room nobody spoke in", () => {
+  const FIRST = "Be the first to say hi";
+  const ROOM = "#bubble";
+  const LINE = `@msgid=m1;time=2026-11-05T10:00:00.000Z;account=alice :alice!u@h`;
+  const mainWords = async (history: readonly string[] | undefined) => {
+    const { box, store } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} room={ROOM} />);
+    act(() => {
+      store.getState().chatActions.follow([ROOM]);
+      if (history !== undefined) store.getState().chatActions.page(ROOM, history.map(ircOf));
+    });
+    return box.querySelector("a[href='#chat']")?.textContent;
+  };
+
+  it("keeps its words while the history has not come, an empty room included", async () => {
+    expect(await mainWords(undefined)).toBe("Say hi in the chat");
+  });
+
+  it("asks to be the first once the history came with no line, or notices alone", async () => {
+    expect(await mainWords([])).toBe(FIRST);
+    expect(await mainWords([`${LINE} NOTICE ${ROOM} :a topic`])).toBe(FIRST);
+  });
+
+  it("goes back to its words as soon as a message or a /me is in the history", async () => {
+    expect(await mainWords([`${LINE} PRIVMSG ${ROOM} :hello`])).toBe("Say hi in the chat");
+    expect(await mainWords([`${LINE} PRIVMSG ${ROOM} :\u0001ACTION waves\u0001`])).toBe("Say hi in the chat");
+  });
+
+  it("never asks to be the first with no room to read", async () => {
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} />);
+    expect(box.querySelector("a[href='#chat']")?.textContent).toBe("Say hi in the chat");
   });
 });
