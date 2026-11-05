@@ -30,20 +30,27 @@ export function readEval(
   return readEvaluated(rpc, call, { ...options, chainId: null });
 }
 
+type Listing = (Awaited<ReturnType<typeof readFunctionList>> & { ok: true })["value"][number];
+
+// A realm's exported functions, in the chain's order.
+async function readExported(rpc: string, realm: string, options: ReadOptions): Promise<ChainRead<Listing[]>> {
+  if (!isRealmPath(realm)) return badName(rpc, options);
+  const read = await readFunctionList(rpc, realm, { ...options, chainId: null });
+  if (!read.ok) return read;
+  return { ok: true, value: read.value.filter(({ FuncName }) => isExportedName(FuncName)), source: read.source };
+}
+
 /** The exported functions of a realm, in the chain's order: readable when it takes nothing (a `cur` is a parameter) and gives something. */
 export async function readFunctions(
   rpc: string,
   realm: string,
   options: ReadOptions = {},
 ): Promise<ChainRead<{ name: string; readable: boolean }[]>> {
-  if (!isRealmPath(realm)) return badName(rpc, options);
-  const read = await readFunctionList(rpc, realm, { ...options, chainId: null });
+  const read = await readExported(rpc, realm, options);
   if (!read.ok) return read;
-  const value = read.value
-    .filter(({ FuncName }) => isExportedName(FuncName))
-    .map(({ FuncName, Params, Results }) => ({
-      name: FuncName,
-      readable: (Params ?? []).length === 0 && (Results ?? []).length > 0,
-    }));
+  const value = read.value.map(({ FuncName, Params, Results }) => ({
+    name: FuncName,
+    readable: (Params ?? []).length === 0 && (Results ?? []).length > 0,
+  }));
   return { ok: true, value, source: read.source };
 }
