@@ -1,5 +1,5 @@
 // The rail (frames 4 and 16; ADR-0002 §1's rail and §10; 7i): the Earth and the worlds of the moment down the right edge, each its planet and
-// its name, 25 at most, then See all; one stop in the tab order, the arrows among the worlds; each planet its own portrait once the scene
+// its name, 25 at most, the column scrolling to its end with no link after them (frames 6, 17); one stop in the tab order, the arrows among the worlds; each planet its own portrait once the scene
 // drew it, ui's drawn disc till then. Where it stands, the page's plain list of worlds steps aside: the rail stands for it.
 import { RAIL } from "@gnoworld/core";
 import { PlanetThumb } from "@gnoworld/ui";
@@ -14,7 +14,6 @@ import styles from "./Rail.module.css";
 
 /** A portrait's side, in the page's pixels: a 64 px planet as the dock magnifies it. */
 export const PORTRAIT_SIZE = 100;
-const EVERY_PLACE = "/list";
 // The rail's footprint, which the labels keep clear (core's RAIL): its width comes from it.
 const FOOTPRINT = { "--_footprint": `${String(RAIL.footprint)}px` } as CSSProperties;
 
@@ -181,15 +180,6 @@ export function Rail({
             </li>
           ))}
         </ul>
-        <a
-          href={EVERY_PLACE}
-          className={["label", styles["all"]].join(" ")}
-          onClick={(event) => {
-            followed(event, EVERY_PLACE, open);
-          }}
-        >
-          See all
-        </a>
       </div>
     </nav>
   );

@@ -85,7 +85,8 @@ afterEach(() => {
 const layer = () => document.body.querySelector("[aria-hidden='true']");
 const slots = () => [...(layer()?.children ?? [])] as HTMLElement[];
 const shown = () => slots().filter((slot) => slot.style.opacity !== "" && slot.style.opacity !== "0");
-const words = (slot: HTMLElement | undefined) => [...(slot?.children ?? [])].map(({ textContent }) => textContent);
+const words = (slot: HTMLElement | undefined) =>
+  [...(slot?.children ?? [])].map(({ textContent }) => textContent).filter((said) => said !== "");
 
 describe("the pool", () => {
   it(`keeps ${String(LABEL_SLOTS)} labels on the page, hidden from readers, made once`, () => {

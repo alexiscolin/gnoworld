@@ -3,7 +3,16 @@ import { Menu, type MenuItem } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { useDeviceView } from "../../deviceViews.ts";
 
-export function Opened({ address, face }: { address: string | undefined; face: ReactNode }) {
+/** The menu for `address`, or the device's for a guest; `lead` is drawn on an account's trigger, its face and address (AccountMenu.tsx). */
+export function Opened({
+  address,
+  lead,
+  onLogOut,
+}: {
+  address: string | undefined;
+  lead: ReactNode;
+  onLogOut: () => void;
+}) {
   const [, open] = useDeviceView();
   const items: MenuItem[] = [
     {
@@ -31,10 +40,12 @@ export function Opened({ address, face }: { address: string | undefined; face: R
         open("settings");
       },
     },
+    // The way out, the account's last act (frame 17: one pill in the header).
+    ...(address === undefined ? [] : [{ label: "Log out", onSelect: onLogOut }]),
   ];
   return address === undefined ? (
     <Menu trigger="Menu" label="Your device" icon="menu" items={items} openAtOnce />
   ) : (
-    <Menu trigger="Your account" label="Your account" lead={face} wordsHidden items={items} openAtOnce />
+    <Menu trigger="Your account" label="Your account" lead={lead} wordsHidden items={items} openAtOnce />
   );
 }

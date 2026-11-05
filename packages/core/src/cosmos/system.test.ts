@@ -18,6 +18,7 @@ import {
 import { CENTRE, DISC_TILT, focusDistance, focusOf, orbitPlace, toMap, toScene } from "../frame/disc.ts";
 import { REST_DISTANCE } from "../frame/rest.ts";
 import { worldsDrawn } from "./count.ts";
+import { starWarmth } from "./warmth.ts";
 import { screenRadius } from "../lod/ladder.ts";
 
 // A namespace's worlds around its star (ADR-0002 §3 and §10): the same file gives the same systems on every device, each stays in the room
@@ -422,5 +423,26 @@ describe("the disc on the stage", () => {
     const nearestRoom = 2 * CELL - 0.45 * CELL - ROOM;
     expect(fromCentre - EARTH_RADIUS * 1.3).toBeGreaterThan(starSize(1024) / 2);
     expect(fromCentre + EARTH_RADIUS * 1.3).toBeLessThanOrEqual(nearestRoom);
+  });
+});
+
+// 7b9: one star's warmth, read by its system's light and by its worlds' plants (recipe.ts) from warmth.ts alone: the two never part.
+describe("a star's warmth", () => {
+  it("is the one its worlds' plants read, for gno.land's star and any namespace's", () => {
+    fc.assert(
+      fc.property(
+        fc.uniqueArray(fc.stringMatching(/^[a-z][a-z0-9]{0,7}$/), { minLength: 1, maxLength: 8 }),
+        (names) => {
+          const systems = systemsOf([...names.flatMap((name) => held(name, 2)), ...held(GNO_LAND, 1)]);
+          for (const system of systems) expect(system.warmth, system.id).toBe(starWarmth(system.id));
+          expect(named(systems, GNO_LAND).warmth).toBe(starWarmth(GNO_LAND));
+          for (const system of systems) {
+            expect(system.warmth).toBeGreaterThanOrEqual(0);
+            expect(system.warmth).toBeLessThan(1);
+          }
+        },
+      ),
+      { numRuns: 50 },
+    );
   });
 });

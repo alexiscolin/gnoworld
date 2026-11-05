@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { FIXTURE } from "../../placesFixture.ts";
 import { siteOf } from "../../places.ts";
-import { opensPalette, searchItemsOf, searchPlaces, type SearchItem } from "./search.ts";
+import { namespaceGroup, opensPalette, searchItemsOf, searchPlaces, type SearchItem } from "./search.ts";
 
 // Slice 5's 5n: the palette's search, over the places the page holds already (no request, docs/plans/slice-5.md §1).
 const ITEMS: SearchItem[] = [
@@ -211,5 +211,37 @@ describe("opensPalette", () => {
     expect(press("k", { ctrlKey: true, shiftKey: true })).toBe(false);
     expect(press("k", { metaKey: true, altKey: true })).toBe(false);
     expect(press("j", { ctrlKey: true })).toBe(false);
+  });
+});
+
+// F5470 (the review's G1; the chief, 2026-11-05): a full Plan's "+N" opens the drawer on its namespace, which lists that namespace's
+// worlds from the worlds file the drawer reads already, each to its realm's page, while the words are the namespace's; none else.
+describe("the worlds of a namespace", () => {
+  const realm = (path: string) => ({ path });
+  const file = [
+    { id: "gnoswap/router", namespace: "gnoswap", realms: [realm("gno.land/r/gnoswap/v1/router")] },
+    { id: "gnoswap/odd", namespace: "gnoswap", realms: [realm("not a realm")] },
+    { id: "gnoswap/pool", namespace: "gnoswap", realms: [realm("gno.land/r/gnoswap/v1/pool")] },
+    { id: "demo/boards", namespace: "demo", realms: [realm("gno.land/r/demo/boards")] },
+  ];
+
+  it("lists the namespace's worlds with a realm page, by name, while the words are the namespace", () => {
+    expect(namespaceGroup(file, "gnoswap", "gnoswap")).toEqual([
+      {
+        id: "namespace",
+        label: "Worlds of gnoswap · 2",
+        options: [
+          { id: "/r/gnoswap/v1/router", label: "router" },
+          { id: "/r/gnoswap/v1/pool", label: "pool" },
+        ],
+      },
+    ]);
+  });
+
+  it("lists nothing once the words change, with no namespace, before the file came, or for a namespace with no world", () => {
+    expect(namespaceGroup(file, "gnoswap", "gnoswap pool")).toEqual([]);
+    expect(namespaceGroup(file, "", "")).toEqual([]);
+    expect(namespaceGroup(undefined, "gnoswap", "gnoswap")).toEqual([]);
+    expect(namespaceGroup(file, "ahh", "ahh")).toEqual([]);
   });
 });

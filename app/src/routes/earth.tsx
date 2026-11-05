@@ -3,7 +3,7 @@
 import { EARTH as EARTH_ID, stampKey } from "@gnoworld/core";
 import { Breadcrumb, ComingSoon, Panel, Stack } from "@gnoworld/ui";
 import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
-import { Chat, LOADING } from "../features/chat/index.ts";
+import { Chat, chatPlace, EARTH_CHAT as EARTH, EARTH_KICKER, LOADING } from "../features/chat/index.ts";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Actions } from "../features/world/Actions.tsx";
 import { Activity } from "../features/world/Activity.tsx";
@@ -15,7 +15,6 @@ import { DOCS, explorerLink } from "../lib/chain/explorer.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
-import { chatPlace } from "../chatPlace.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import { useAppStore } from "../storeContext.tsx";
 import { useLateRead } from "../lateRead.ts";
@@ -35,16 +34,6 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   if (loaderData) return earthMeta(loaderData);
   return isMissing(error) ? missingUniverseMeta() : failedPageMeta();
 }
-
-// The general chat, one for every universe: the Earth stays one place (ADR-0002 §10).
-const EARTH = {
-  slug: "earth",
-  name: "Earth",
-  description: "Where people speak from. Countries are opt-in.",
-  inPage: true,
-  // Its pills are the Earth's (frame 56).
-  earth: true,
-};
 
 // Who is talking and from how many countries, which are the relay's, whose rooms are the default universe's (8i); the realms deployed in
 // 24 h beside, slice 9's (the indexer's events), greyed.
@@ -145,7 +134,7 @@ export default function Earth() {
         }
       >
         <div id="chat" className={styles["chat"]}>
-          {chatDue ? <Chat world={EARTH.slug} place={chatPlace(EARTH, universe, "Earth · General chat")} /> : LOADING}
+          {chatDue ? <Chat world={EARTH.slug} place={chatPlace(EARTH, universe, EARTH_KICKER)} /> : LOADING}
         </div>
       </Panel.Layout>
       <Arrival universe={universe.id} world={EARTH_ID} name="Earth" path={universe.earth.path} />

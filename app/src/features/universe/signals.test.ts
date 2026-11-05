@@ -1,8 +1,25 @@
 // @vitest-environment jsdom
 import { hubWorldOf } from "@gnoworld/core";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import hubs from "../../../data/hubs.json" with { type: "json" };
 import { localSignals, signalsOf } from "./signals.ts";
+
+// The shipped events are two samples waiting for their date: these, a test's own, show a world's chip (8p; Alexis: never in the data).
+vi.mock("../../lateData.ts", () => ({
+  events: [
+    {
+      id: "ama",
+      title: "AMA · interrealm",
+      start: "2026-11-05T23:00:00Z",
+      link: "https://gno.land/",
+      world: "earth",
+      kind: "AMA",
+    },
+    { id: "far", title: "Far", start: "2026-11-09T12:00:00Z", link: "https://gno.land/", world: "earth" },
+  ],
+}));
+const NOW = Date.parse("2026-11-05T12:00:00Z");
+const NOOR = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
 // What the labels read of this reader (ADR-0003 §4): whether they are new, as the device keeps it, read again at each reading, so the Earth's
 // label takes back its badge on the first return after a place was entered.
@@ -43,5 +60,44 @@ describe("the labels' stations", () => {
   it("names every hub of the universe but its stations", () => {
     const stations = hubs.filter((hub) => hub.kind === "station").length;
     expect(signalsOf({ worlds: [] }, 0).names.size).toBe(hubs.length - stations);
+  });
+});
+
+describe("the labels' chips (8p, frames 4, 6 and 143)", () => {
+  it("names a world's next event within the day by its kind and how soon: AMA in 11 h", () => {
+    expect(localSignals(NOW).events?.get("earth")).toBe("AMA in 11 h");
+  });
+
+  it("names none for an event past the day", () => {
+    expect(localSignals(Date.parse("2026-11-06T00:00:00Z")).events?.get("earth")).toBeUndefined();
+  });
+
+  it("names a followed person in a room the page's chat holds, on that room's world, and nobody not followed", () => {
+    const rooms = { "#earth/help": { members: ["g1other", NOOR] } };
+    expect(localSignals(NOW, { people: [NOOR], rooms }).people?.get("earth")).toBe("g1jg8m…vsqf5 is here");
+    expect(localSignals(NOW, { people: [], rooms }).people).toBeUndefined();
+  });
+});
+
+// A station's world stands round the Earth, never in the cloud (8l; Alexis, 2026-11-05): no label names it and its people count on none,
+// while every other world of the universe keeps both.
+describe("the stations round the Earth", () => {
+  it("names no station and counts no one on one, a planet and the Earth kept", () => {
+    const signals = signalsOf(
+      {
+        worlds: [
+          { world: "adena", here: 4, perHour: 1, rise: null },
+          { world: "supernova", here: 2, perHour: 0, rise: null },
+          { world: "govdao", here: 5, perHour: 2, rise: null },
+          { world: "earth", here: 3, perHour: 0, rise: null },
+        ],
+      },
+      0,
+    );
+    const names = [...signals.names.values()];
+    expect(names).not.toContain("Adena");
+    expect(names).not.toContain("Supernova");
+    expect(names).toContain("GovDAO");
+    expect([...signals.present.keys()]).toEqual(["gov/dao", "earth"]);
   });
 });

@@ -4,11 +4,11 @@
 // reader follows who is in a room says so on its moon ("noor is here", Alexis, slice 8): matched on the account, which Ergo makes the
 // nick (force-nick-equals-account), from the room's people the page already holds; nothing is asked of anyone for it.
 import { moonSize, nextMoons, type Moons, type RoomCount } from "@gnoworld/core";
-import { shortAddress } from "@gnoworld/schemas";
 import { Chip } from "@gnoworld/ui";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import type { MoonMark, WorldPage } from "../../scene/world/part.ts";
 import { roomIds, roomLabel, roomParams, shownRoom } from "../chat/index.ts";
+import { friendAmong, isHere } from "../follow/index.ts";
 import styles from "./WorldMoons.module.css";
 
 // A room taking a moon's place waits minutes, so the set is asked again now and then though nothing was said.
@@ -101,7 +101,7 @@ function FriendHere({ address }: { address: string | undefined }) {
   return (
     <>
       {" "}
-      <Chip tone="warm">{`${shortAddress(address)} is here`}</Chip>
+      <Chip tone="warm">{isHere(address)}</Chip>
     </>
   );
 }
@@ -117,7 +117,7 @@ export function WorldMoons({ page, sky }: { page: WorldPage; sky: Sky }) {
   const peopleOf = (room: string) => chat.rooms[room]?.members.length ?? 0;
   const followed = useSyncExternalStore(page.store.subscribe, () => page.store.getState().device.follows.people);
   // The first followed person in the room, by the order followed: the last followed first.
-  const friendIn = (room: string) => followed.find((person) => chat.rooms[room]?.members.includes(person) === true);
+  const friendIn = (room: string) => friendAmong(followed, chat.rooms[room]?.members ?? []);
   useEffect(() => {
     const busiest = Math.max(0, ...rooms.map((room) => chat.rooms[room]?.members.length ?? 0));
     sky.moons(

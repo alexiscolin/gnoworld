@@ -34,6 +34,8 @@ export interface ChatPlace {
   kicker: string;
   /** Where closing the chat goes: the universe's home. */
   home: string;
+  /** What closing does instead, where the chat stands over the page it closes back to (the dock over the cosmos, frame 143). */
+  close?: (() => void) | undefined;
   /** The universe's worlds, in order. */
   worlds: readonly { slug: string; name: string; href: string }[];
   /** Under the dock's width the chat stays a block of the page, and never takes it: the Earth's globe is what its page shows. */
@@ -192,7 +194,8 @@ export function ChatScreen(props: ChatScreenProps) {
                   : undefined
               }
               onClose={() => {
-                Promise.resolve(navigate(place.home)).catch(reportError);
+                if (place.close === undefined) Promise.resolve(navigate(place.home)).catch(reportError);
+                else place.close();
               }}
             />
           }

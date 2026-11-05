@@ -241,3 +241,10 @@ export const cacheContents = (page: Page) =>
       for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
     return { names, paths: paths.sort() };
   });
+
+/** Every script `page` asks from now on, by its address, as it asks it: a list that grows. */
+export function scriptsAsked(page: Page): string[] {
+  const scripts: string[] = [];
+  page.on("request", (request) => (request.resourceType() === "script" ? scripts.push(request.url()) : undefined));
+  return scripts;
+}

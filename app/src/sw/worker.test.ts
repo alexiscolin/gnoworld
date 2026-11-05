@@ -218,6 +218,19 @@ test("a listed file held with other bytes is dropped at once, and fetched again 
   expect(store(name).get(ENTRY)).toBe("build /assets/entry.client-Bx3f9a1Q.js");
 });
 
+// worker.ts's kept(): a file its cache holds that this version does not list is no file of its own: never counted as held, nor deleted
+// there (8n, tier-1 coverage).
+test("a file the cache holds and the list does not is neither counted held nor deleted", async () => {
+  const stores: Stores = new Map();
+  const first = await installed(scope({ stores }));
+  const stray = "https://example.test/assets/stray-AAAAAAAA.js";
+  first.store(first.name).set(stray, "a file of no list");
+  first.store(first.name).delete(ENTRY);
+  const { store, added, name } = await installed(scope({ stores }));
+  expect(added).toEqual([PRECACHE[2]]);
+  expect(store(name).get(stray)).toBe("a file of no list");
+});
+
 test("a file gone between the cache's list and its read is fetched again", async () => {
   const stores: Stores = new Map();
   await installed(scope({ stores }));

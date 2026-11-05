@@ -9,11 +9,11 @@ import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
 // worker's precache; steps in docs/decisions.md. A plate's page, within the +4 KiB over 183,128 B Alexis gave the plates' pages: the
-// stations' worlds (8l) and the hero's box measured again (8m), both "oui" on 2026-11-05, summed on their merge; +4 B for 8h's bug 4.
-const FIRST_SCREEN_JS = 186_408;
+// Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
+const FIRST_SCREEN_JS = 187_523;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
-// met slice-8, the stations' worlds (8l), the hero's box measured again (8m), summed on their merge (docs/decisions.md); +4 B for 8h's bug 4.
-const PLAIN_FIRST_SCREEN_JS = 184_260;
+// Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
+const PLAIN_FIRST_SCREEN_JS = 185_952;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -145,9 +145,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with what
-// it asks once open: 8d's chat complete within Alexis's 23 KiB ("Oui, jusqu'à 23 Ko"), 23,295 B, and RoomsDrawer's 768 B, which slice-8's
-// measure left out (docs/decisions.md, 2026-11-05).
-const LATE_CHAT_JS = 24_063;
+// it asks once open: 8d's chat within Alexis's 23 KiB ("Oui, jusqu'à 23 Ko"), RoomsDrawer's 768 B, which slice-8's measure left out
+// (docs/decisions.md, 2026-11-05), and 8p's 18 B for the dock over the cosmos's close (the 256 B margin given ahead).
+const LATE_CHAT_JS = 24_081;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;

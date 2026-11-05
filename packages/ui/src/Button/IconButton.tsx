@@ -13,6 +13,8 @@ export interface IconButtonProps {
   emphasis?: "outline" | "plain";
   pressed?: boolean;
   count?: number;
+  /** The count's tone: the design system's mint, or its coral for what is new to the reader, the bell's alone (frames 6, 86, 87). */
+  countTone?: "mine" | "new";
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -31,6 +33,7 @@ export function IconButton({
   emphasis = "outline",
   pressed,
   count,
+  countTone = "mine",
   onClick,
 }: IconButtonProps) {
   const counted = shown(count);
@@ -45,7 +48,11 @@ export function IconButton({
       >
         <Icon name={icon} size={iconSize(size)} />
         {counted === null ? null : (
-          <span className={`${String(styles["badge"])} ${String(styles["count"])}`} aria-hidden="true">
+          <span
+            className={`${String(styles["badge"])} ${String(styles["count"])}`}
+            data-tone={countTone === "new" ? "new" : undefined}
+            aria-hidden="true"
+          >
             {counted.badge}
           </span>
         )}

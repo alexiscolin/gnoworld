@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { logOutHere } from "./account.ts";
 import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn, talk, ticketOf, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
@@ -82,8 +83,8 @@ test.describe("a world's rooms", () => {
     const address = await logIn(page, word("as"));
     const history = word("history");
     await say(page, { address, room: "#bubble/games" }, [history]);
-    await page.getByRole("button", { name: "Log out" }).click();
-    await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+    await logOutHere(page);
+    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
     const nicks = guestNicks(page);
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
@@ -189,9 +190,9 @@ test.describe("a world's rooms", () => {
     const nicks = guestNicks(page);
     // The account menu is the page's header's, which the full chat covers: the chat is docked, then expanded again.
     await page.getByRole("button", { name: "Shrink the chat" }).click();
-    await page.getByRole("button", { name: "Log out" }).click();
+    await logOutHere(page);
     await page.getByRole("button", { name: "Expand the chat" }).click();
-    await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
     await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
     await expect(heading(page, "#games")).toBeVisible();
     await expect.poll(() => nicks.length).toBeGreaterThan(0);

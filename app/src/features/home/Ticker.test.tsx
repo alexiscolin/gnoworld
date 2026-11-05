@@ -32,9 +32,12 @@ const event = (id: string, start: string, title = `Event ${id}`) => ({
 });
 
 describe("tickerItems", () => {
-  it("drops an event that starts exactly now, and keeps one a millisecond ahead", () => {
+  it("keeps an event that starts now, live, and one a millisecond ahead, as the video's ticker does (Alexis, 2026-11-05)", () => {
     const items = tickerItems([], [event("now", NOW.toISOString()), event("soon", "2026-10-31T12:00:00.001Z")], NOW);
-    expect(items.map((item) => item.id)).toEqual(["soon"]);
+    expect(items.map((item) => [item.id, item.text])).toEqual([
+      ["now", "Event now live now"],
+      ["soon", "Event soon in 1 min"],
+    ]);
   });
 
   it("is empty with no news and no event", () => {
@@ -44,7 +47,7 @@ describe("tickerItems", () => {
   it("gives each news and each event its kind, its title as text, its link and its id", () => {
     const items = tickerItems([news("n1", "2026-10-30")], [event("e1", "2026-11-02T10:00:00Z")], NOW);
     expect(items).toEqual<TickerItem[]>([
-      { id: "e1", kind: "event", text: "Event e1", link: "https://gno.land/e1" },
+      { id: "e1", kind: "event", text: "Event e1 in 46 h", link: "https://gno.land/e1" },
       { id: "n1", kind: "news", text: "News n1", link: "https://gno.land/n1" },
     ]);
   });
@@ -58,9 +61,28 @@ describe("tickerItems", () => {
     expect(items.map((item) => item.id)).toEqual(["soon", "later", "new", "mid", "old"]);
   });
 
-  it("drops an event that has already begun: a strip of what is happening elsewhere would be news of the past", () => {
-    const items = tickerItems([], [event("gone", "2026-10-31T11:59:00Z"), event("next", "2026-10-31T12:01:00Z")], NOW);
-    expect(items.map((item) => item.id)).toEqual(["next"]);
+  it("keeps an event within the hour it began, and drops one past it", () => {
+    const items = tickerItems(
+      [],
+      [
+        event("over", "2026-10-31T10:59:00Z"),
+        event("live", "2026-10-31T11:01:00Z"),
+        event("next", "2026-10-31T12:01:00Z"),
+      ],
+      NOW,
+    );
+    expect(items.map((item) => item.id)).toEqual(["live", "next"]);
+  });
+
+  it("names an event's world before its title, and how soon, as frame 6's \"Dev help · AMA … in 11 h\"", () => {
+    const ama = {
+      ...event("ama", "2026-10-31T22:30:00Z", "AMA · interrealm"),
+      world: "devhelp",
+      kind: "AMA",
+      place: "Dev help",
+    };
+    const items = tickerItems([], [ama], NOW);
+    expect(items[0]).toMatchObject({ text: "Dev help · AMA · interrealm in 11 h", label: "AMA" });
   });
 
   it("keeps six items at most, the nearest first", () => {

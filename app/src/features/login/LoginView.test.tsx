@@ -12,14 +12,7 @@ const said = (html: string) =>
     .trim();
 const view = (over: Partial<LoginViewProps> = {}) =>
   renderToStaticMarkup(
-    <LoginView
-      session={{ kind: "out" }}
-      step="idle"
-      problem={undefined}
-      onLogIn={() => undefined}
-      onLogOut={() => undefined}
-      {...over}
-    />,
+    <LoginView session={{ kind: "out" }} step="idle" problem={undefined} onLogIn={() => undefined} {...over} />,
   );
 const buttons = (html: string) => [...html.matchAll(/<button[^>]*>(.*?)<\/button>/g)].map((m) => said(m[1] ?? ""));
 
@@ -31,9 +24,9 @@ describe("LoginView", () => {
     expect(said(html)).toBe("");
   });
 
-  it("offers a login with Adena to nobody logged in, and tells a phone to log in on a computer, then that it can write from there", () => {
+  it("offers one pill, Connect Adena, to nobody logged in, and tells a phone to log in on a computer, then that it can write from there", () => {
     const html = view();
-    expect(buttons(html)).toEqual(["Log in with Adena"]);
+    expect(buttons(html)).toEqual(["Connect Adena"]);
     expect(said(html)).toContain("To log in, use a computer; once logged in you can write from here.");
     expect(said(html)).not.toContain("To speak");
   });
@@ -48,12 +41,26 @@ describe("LoginView", () => {
     expect(html).toMatch(/<button[^>]*aria-busy="true"/);
   });
 
-  it("shows the account logged in, shortened, and a way out", () => {
+  it.each(["in", "unknown"] as const)(
+    "is its status region alone, no box round it, while the session is %s: an empty box would hold a gap in the header's row (8p's review)",
+    (kind) => {
+      const html = view({ session: kind === "in" ? { kind, address: ADDRESS } : { kind } });
+      expect(html).toMatch(/^<p role="status"[^>]*><\/p>$/);
+    },
+  );
+
+  it("draws nothing but its status region once logged in: the account's pill and its menu hold the address and the way out (frame 17)", () => {
     const html = view({ session: { kind: "in", address: ADDRESS } });
-    expect(said(html)).toContain("g1jg8m…vsqf5");
-    expect(html).toContain(`title="${ADDRESS}"`);
-    expect(buttons(html)).toEqual(["Log out"]);
-    expect(said(html)).not.toContain("To speak");
+    expect(buttons(html)).toEqual([]);
+    expect(said(html)).toBe("");
+    expect(html.match(/role="status"/g)).toHaveLength(1);
+  });
+
+  it("says why a logout failed while the account is still in, in its status region (the red pass's medium)", () => {
+    const html = view({ session: { kind: "in", address: ADDRESS }, problem: { reason: "network" } });
+    expect(html).toMatch(
+      /role="status"[^>]*>The server could not be reached\. Check your connection, then try again\.</,
+    );
   });
 
   it("says why the last login stopped, in its status region", () => {

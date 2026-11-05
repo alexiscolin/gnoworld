@@ -36,6 +36,7 @@ export function Bell() {
         icon="bell"
         label="Notifications"
         count={count}
+        countTone="new"
         pressed={open}
         onClick={() => {
           setOpen(!open);

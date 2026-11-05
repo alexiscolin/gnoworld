@@ -13,6 +13,7 @@ export async function drawing() {
 }
 export type Drawing = Awaited<ReturnType<typeof drawing>>;
 export type { ChatPlace } from "./ChatScreen.tsx";
+export { chatPlace, EARTH_CHAT, EARTH_KICKER } from "./place.ts";
 
 // The settings' country and the account menu's saved messages (slice 8), each in a chunk asked when its dialog opens: a static export put
 // them in every world page's first screen.
