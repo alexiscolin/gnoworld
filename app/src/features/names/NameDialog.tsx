@@ -3,8 +3,9 @@
 // It holds no state of the chain: its `phase` is the card's course, and a name shows as registered only in the phase `done`.
 import { Avatar, Button, Cluster, Dialog, Field, Kicker, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
+import { NOT_CHECKED, networkOf, publicForever } from "../calls/index.ts";
 import styles from "./NameDialog.module.css";
-import { NYM_PREFIX, nymProblem, NYM_RULE } from "./nym.ts";
+import { NAMEREG, NYM_PREFIX, nymProblem, NYM_RULE } from "./nym.ts";
 import type { Phase } from "./phase.ts";
 
 export interface NameDialogProps {
@@ -12,6 +13,8 @@ export interface NameDialogProps {
   account: string;
   /** The universe's chain: where the name is registered; `real` when its GNOT is real money. */
   network: { name: string; chainId: string; real: boolean };
+  /** The fee line, already worded as an estimate (the call card's feeText). */
+  fee: string;
   phase: Phase;
   onRegister: (typed: string) => void;
   onClose: () => void;
@@ -19,11 +22,11 @@ export interface NameDialogProps {
 
 const COUNT = new Intl.NumberFormat("en-US");
 
-// What the network costs, in words: the registry's price is 0, Adena's network fee is not.
-const feeWords = ({ name, real }: NameDialogProps["network"]) =>
+// What the network costs, in words: the registry's price is 0, the network fee is not.
+const feeWords = ({ name, real }: NameDialogProps["network"], fee: string) =>
   real
-    ? "The registry's price is 0 GNOT. Adena asks for the network fee in real GNOT when you sign."
-    : `${name} is a test network: the network fee Adena asks for is paid in test GNOT, which has no value.`;
+    ? `The registry's price is 0 GNOT. The network fee is paid in real GNOT. Fee: ${fee}.`
+    : `${name} is a test network: its GNOT has no value. The registry's price is 0 GNOT. Fee: ${fee}.`;
 
 function State({ phase }: { phase: Phase }) {
   return (
@@ -34,54 +37,56 @@ function State({ phase }: { phase: Phase }) {
   );
 }
 
-export function NameDialog({ open, account, network, phase, onRegister, onClose }: NameDialogProps) {
+export function NameDialog({ open, account, network, fee, phase, onRegister, onClose }: NameDialogProps) {
   // What is typed stays through a wait and a failure that leaves the form: the person corrects it, never retypes it.
   const [typed, setTyped] = useState("");
-  const [asked, setAsked] = useState(false);
   const problem = nymProblem(typed);
   const submit = (event: SyntheticEvent) => {
     event.preventDefault();
-    setAsked(true);
     if (problem === undefined) onRegister(typed);
   };
   const form = phase.kind === "typing" || (phase.kind === "failed" && phase.again);
   return (
-    <Dialog
-      title="Pick a name and a face"
-      open={open}
-      onClose={onClose}
-      description="Your name is kept by r/sys/namereg on this universe's chain."
-    >
+    <Dialog title="Pick a name and a face" open={open} onClose={onClose}>
       <Stack space="s">
         <Cluster>
           <Avatar address={account} name="You" size="l" />
           <Kicker>YOUR GNO.LAND NAME</Kicker>
         </Cluster>
-        {form ? (
-          <form onSubmit={submit}>
-            <Stack space="s">
+        <p className={styles["note"]}>
+          Your name is kept by <code>r/sys/namereg</code> on {networkOf(network)}.
+        </p>
+        <form onSubmit={submit}>
+          <Stack space="s">
+            {form ? (
               <Field
                 label="Name"
                 prefix={NYM_PREFIX}
+                placeholder="alexis042"
                 value={typed}
                 onChange={setTyped}
                 help={NYM_RULE}
-                {...(asked && problem !== undefined ? { error: problem } : {})}
+                {...(typed !== "" && problem !== undefined ? { error: problem } : {})}
               />
-              <p className={styles["note"]}>{feeWords(network)}</p>
-              <span className={styles["computer"]}>
-                <Button emphasis="solid" type="submit">
-                  Register · 0 GNOT
-                </Button>
-              </span>
-              <p className={[styles["phone"], styles["note"]].join(" ")}>To sign, use a computer.</p>
-            </Stack>
-          </form>
-        ) : null}
-        <State phase={phase} />
-        <Cluster>
-          <Button onClick={onClose}>Later</Button>
-        </Cluster>
+            ) : null}
+            <Cluster>
+              {form ? (
+                <span className={styles["computer"]}>
+                  <Button emphasis="solid" type="submit" disabled={problem !== undefined}>
+                    Register · 0 GNOT
+                  </Button>
+                </span>
+              ) : null}
+              <Button onClick={onClose}>{phase.kind === "done" ? "Done" : "Later"}</Button>
+            </Cluster>
+            <State phase={phase} />
+            <p className={styles["note"]}>{feeWords(network, fee)}</p>
+            <p className={[styles["phone"], styles["note"]].join(" ")}>To sign, use a computer.</p>
+            <p className={styles["note"]}>
+              {publicForever(NAMEREG)} {NOT_CHECKED}
+            </p>
+          </Stack>
+        </form>
       </Stack>
     </Dialog>
   );

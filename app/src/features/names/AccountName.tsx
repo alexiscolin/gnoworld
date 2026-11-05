@@ -1,97 +1,90 @@
-// The account control's name (9f): mainnet's name, else Onyx's, else the short address, each read live with its block; "Pick a name"
-// for an account logged in with no name on THIS universe's chain, once that read has answered; the dialog that registers one.
-// A name is shown only when a read of a chain gives it, never because Adena or the card said so. This file is loaded on its own,
-// after the first screen (budgets.spec.ts): the login's view reaches it only through a dynamic import.
-import { Button } from "@gnoworld/ui";
+// The account control's name (9f): mainnet's name, else Onyx's, else the short address, each read live with its block. With no
+// name on THIS universe's chain, once that read has answered, the pill is the way to pick one. A name is shown only when a read of a
+// chain gives it. The dialog and what signs load on the first press (RegisterFlow.tsx); this file's chunk loads after the first screen.
+import type { readCallFees } from "@gnoworld/chain/fees";
+import { Avatar } from "@gnoworld/ui";
 import { useState } from "react";
-import { MAINNET_CHAIN, readName, shownName } from "../../lib/chain/names.ts";
-import { useApp, useAppStore } from "../../storeContext.tsx";
-import { pageParts, type Parts } from "../calls/index.ts";
-import { NameDialog } from "./NameDialog.tsx";
-import { phaseOf, type Phase } from "./phase.ts";
+import { MAINNET_CHAIN, readName, shownName, type Chain } from "../../lib/chain/names.ts";
+import type { Parts } from "../calls/index.ts";
+import styles from "./AccountName.module.css";
+import type { RegisterFlow } from "./RegisterFlow.tsx";
 import { useReads } from "./useReads.ts";
-import { registerName, registrationOf } from "./registerName.ts";
 
-interface Chain {
-  chainId: string;
-  rpc: string;
-}
 export interface AccountNameProps {
   account: string;
-  universe: Chain & { name: string; real: boolean };
+  universe: Chain & { name: string; real: boolean; indexer: string };
   chains: { mainnet: Chain; onyx: Chain };
-  /** The page's reader and signing parts; a test gives its own. */
+  /** A reader, the signing parts and a fee reader of a test's own. */
   read?: typeof readName;
   deps?: Parts | undefined;
+  fees?: typeof readCallFees | undefined;
   /** The class of the pill the name is drawn in: the login's. */
   pill?: string | undefined;
 }
 
+// Outside the component: the compiler does not take an import() inside one.
+const load = () => import("./RegisterFlow.tsx");
 const COUNT = new Intl.NumberFormat("en-US");
 const report = (error: unknown): void => {
   reportError(error);
 };
 
-// What the dialog says: the card's course, or a refusal before any card was opened (the signing parts did not load).
-function phaseShown(card: Parameters<typeof phaseOf>[0], refused: string | undefined): Phase {
-  const typing = card === undefined || card.state.kind === "preview";
-  return refused !== undefined && typing ? { kind: "failed", text: refused, again: true } : phaseOf(card);
-}
-
-export function AccountName({ account, universe, chains, read = readName, deps, pill }: AccountNameProps) {
-  const store = useAppStore();
+export function AccountName({ account, universe, chains, read = readName, deps, fees, pill = "" }: AccountNameProps) {
   // A new read after each registration: the chain, not the card, says whether the name is there.
   const [again, setAgain] = useState(0);
   const [open, setOpen] = useState(false);
-  const [refused, setRefused] = useState<string | undefined>(undefined);
-  const card = useApp((state) => registrationOf(state, account, universe.chainId));
+  const [flow, setFlow] = useState<{ Flow: typeof RegisterFlow } | undefined>(undefined);
   const mine = useReads({ account, chains, read }, again);
   const shown = shownName(account, mine);
   const here = mine[universe.chainId === MAINNET_CHAIN ? "mainnet" : "onyx"];
   const where = shown.from === MAINNET_CHAIN ? "gno.land" : "Onyx";
-  const register = async (typed: string) => {
-    setRefused(undefined);
-    const parts = deps ?? (await pageParts(store, universe));
-    if (parts === undefined) {
-      setRefused("Part of gnoworld that signs did not load, so nothing was sent. Reload the page, then try again.");
-      return;
-    }
-    const result = await registerName(typed, { store, universe, ...parts });
-    if (!result.ok) setRefused(result.problem);
-    setAgain((count) => count + 1);
+  const title = shown.height === undefined ? account : `${where} · block ${COUNT.format(shown.height)}`;
+  const face = (
+    <span className={styles["row"]}>
+      <Avatar address={account} name={shown.text} size="m" decorative />
+      {shown.text}
+    </span>
+  );
+  const ask = () => {
+    setOpen(true);
+    if (flow === undefined)
+      load().then((loaded) => {
+        setFlow({ Flow: loaded.RegisterFlow });
+      }, report);
   };
   return (
     <>
-      <span
-        className={pill}
-        data-account=""
-        title={shown.height === undefined ? account : `${where} · block ${COUNT.format(shown.height)}`}
-      >
-        {shown.text}
-      </span>
       {here?.name === null ? (
-        <Button
-          size="s"
-          emphasis="quiet"
-          onClick={() => {
-            setOpen(true);
-          }}
+        <button
+          type="button"
+          className={`${pill} ${styles["opener"] ?? ""}`}
+          data-account=""
+          aria-label={`Pick a name for ${shown.text}`}
+          title={title}
+          onClick={ask}
         >
-          Pick a name
-        </Button>
-      ) : null}
-      <NameDialog
-        open={open}
-        account={account}
-        network={universe}
-        phase={phaseShown(card, refused)}
-        onRegister={(typed) => {
-          register(typed).catch(report);
-        }}
-        onClose={() => {
-          setOpen(false);
-        }}
-      />
+          {face}
+        </button>
+      ) : (
+        <span className={pill} data-account="" title={title}>
+          {face}
+        </span>
+      )}
+      {flow === undefined ? null : (
+        <flow.Flow
+          account={account}
+          universe={universe}
+          open={open}
+          deps={deps}
+          fees={fees}
+          onSettled={() => {
+            setAgain((count) => count + 1);
+          }}
+          onClose={() => {
+            setOpen(false);
+          }}
+        />
+      )}
     </>
   );
 }

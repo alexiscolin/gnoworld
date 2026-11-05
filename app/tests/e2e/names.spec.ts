@@ -57,14 +57,16 @@ test.describe("the name dialog", () => {
     await logIn(page, [1280, 900]);
     await pick(page).click();
     const field = page.getByRole("textbox", { name: "Name" });
+    const register = dialog(page).getByRole("button", { name: "Register · 0 GNOT" });
+    await expect(register).toBeDisabled();
     for (const [typed, words] of [
       ["alex", /5 to 13 letters, then 3 digits/],
       ["gnomes042", /reserved prefix/],
     ] as const) {
       await field.fill(typed);
-      await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
       await expect(dialog(page)).toContainText(words);
       await expect(field).toHaveAttribute("aria-invalid", "true");
+      await expect(register).toBeDisabled();
       expect(await violations(page)).toEqual([]);
     }
     expect(await done(page)).toBe(0);
@@ -85,26 +87,29 @@ test.describe("the name dialog", () => {
     expect(sent).toContain("gno.land/r/sys/namereg/v0");
     expect(sent).not.toContain("gnoland-1");
     expect(await violations(page)).toEqual([]);
-    await dialog(page).getByRole("button", { name: "Later" }).click();
+    await dialog(page).getByRole("button", { name: "Done" }).click();
     await expect(page.getByRole("banner").locator("[data-account]")).toContainText(NAME);
     await expect(pick(page)).toHaveCount(0);
   });
 
-  test("registers from the keyboard alone: Enter in the field asks, Tab reaches Register then Later", async ({
+  test("registers from the keyboard alone: a name that fails is told and not asked, Tab skips the disabled Register, Enter in the field asks", async ({
     page,
   }) => {
     await logIn(page, [1280, 900]);
     await pick(page).click();
+    await expect(page.getByRole("textbox", { name: "Name" })).toBeFocused();
     await page.keyboard.type("gnomes042");
     await page.keyboard.press("Enter");
     await expect(dialog(page)).toContainText(/reserved prefix/);
     expect(await done(page)).toBe(0);
     await page.keyboard.press("Tab");
-    await expect(dialog(page).getByRole("button", { name: "Register · 0 GNOT" })).toBeFocused();
-    await page.keyboard.press("Tab");
     await expect(dialog(page).getByRole("button", { name: "Later" })).toBeFocused();
+    await page.keyboard.press("Shift+Tab");
     const field = page.getByRole("textbox", { name: "Name" });
     await field.fill("alexis042");
+    await page.keyboard.press("Tab");
+    await expect(dialog(page).getByRole("button", { name: "Register · 0 GNOT" })).toBeFocused();
+    await field.focus();
     await field.press("Enter");
     await expect(dialog(page)).toContainText(/is registered/i);
   });

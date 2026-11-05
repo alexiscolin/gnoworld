@@ -9,18 +9,27 @@ test.describe("the name dialog, as it looks", () => {
   const dialog = (page: Page) => page.getByRole("dialog", { name: "Pick a name and a face" });
   const mask = (page: Page) => [dialog(page).getByRole("img")];
 
-  test("on a computer: empty, a problem, the wait and the name registered", async ({ page }) => {
+  test("on a computer: empty, a problem and the name registered", async ({ page }) => {
     await logIn(page, [1280, 900]);
     await page.getByRole("button", { name: "Pick a name" }).click();
     await expect(dialog(page)).toHaveScreenshot("name-dialog-computer-empty.png", { mask: mask(page) });
     const field = page.getByRole("textbox", { name: "Name" });
     await field.fill("gnomes042");
-    await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
+    await expect(dialog(page)).toContainText(/reserved prefix/);
     await expect(dialog(page)).toHaveScreenshot("name-dialog-computer-problem.png", { mask: mask(page) });
     await field.fill("alexis042");
     await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
     await expect(dialog(page)).toContainText(/is registered/i);
     await expect(dialog(page)).toHaveScreenshot("name-dialog-computer-done.png", { mask: mask(page) });
+  });
+
+  test("on a computer: the wait for Adena's signature", async ({ page }) => {
+    await logIn(page, [1280, 900], { wallet: { hold: true } });
+    await page.getByRole("button", { name: "Pick a name" }).click();
+    await page.getByRole("textbox", { name: "Name" }).fill("alexis042");
+    await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
+    await expect(dialog(page)).toContainText("Waiting for your signature in Adena…");
+    await expect(dialog(page)).toHaveScreenshot("name-dialog-computer-wait.png", { mask: mask(page) });
   });
 
   test("on a phone, which only reads", async ({ page, playwright, launchOptions }) => {

@@ -40,6 +40,12 @@ async function nameOf(rpc: string, account: string, options: ReadOptions): Promi
     : failedRead("wrong-shape", read.source);
 }
 
+/** A chain and the node it is read on. */
+export interface Chain {
+  chainId: string;
+  rpc: string;
+}
+
 /** The name of `account` on the chain `chainId` at `rpc`, or why it could not be read: a failure is never a no-name. */
 export async function readName(
   rpc: string,

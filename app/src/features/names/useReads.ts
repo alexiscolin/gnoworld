@@ -1,11 +1,7 @@
 // What the chains give of an account's name, read again when the account or the universe's chains change or `again` does.
 import { useEffect, useState } from "react";
-import type { readName, Named } from "../../lib/chain/names.ts";
+import type { Chain, readName, Named } from "../../lib/chain/names.ts";
 
-interface Chain {
-  chainId: string;
-  rpc: string;
-}
 /** What was read for one account: a chain with no answer, or a failed one, is not here. */
 export interface Reads {
   mainnet?: Named | undefined;

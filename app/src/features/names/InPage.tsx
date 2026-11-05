@@ -18,7 +18,8 @@ interface InPageProps {
 }
 
 export default function InPage({ account, universe, pill }: InPageProps) {
-  const here = universes.find((each) => each.id === universe) ?? chainOf(ONYX_CHAIN);
+  const here = universes.find((each) => each.id === universe) ?? universes.find((each) => each.default === true);
+  if (here === undefined) throw new RangeError("universes.json holds no default universe");
   return (
     <AccountName
       account={account}

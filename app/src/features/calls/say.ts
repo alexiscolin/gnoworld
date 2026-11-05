@@ -13,6 +13,15 @@ export function shown(text: string): string {
   );
 }
 
+/** The help under a free-text argument: where it goes, and for how long. */
+export const publicForever = (realm: string): string => `This text goes to ${realm} on gno.land, publicly and forever.`;
+
+/** The warning every call carries (ADR-0002 section 1). */
+export const NOT_CHECKED = "gnoworld does not check what this realm does. Read it on gnoweb first.";
+
+/** A chain as the card names it. */
+export const networkOf = ({ name, chainId }: { name: string; chainId: string }): string => `${name} (${chainId})`;
+
 export interface Said {
   reason: CardFailure;
   log?: string | undefined;

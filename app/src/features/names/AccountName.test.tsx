@@ -1,12 +1,14 @@
 // @vitest-environment jsdom
 import type { ChainRead } from "@gnoworld/chain/read";
 import { Address } from "@gnoworld/schemas";
+import { Avatar } from "@gnoworld/ui";
 import type { Landed } from "@gnoworld/chain/tx";
 import { act, useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { button, click, mount, one } from "../../../tests/mount.tsx";
+import { all, button, click, faceOf, mount, one } from "../../../tests/mount.tsx";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
+import type { CallFees } from "@gnoworld/chain/fees";
 import type { readName, Named } from "../../lib/chain/names.ts";
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { AccountName } from "./AccountName.tsx";
@@ -19,8 +21,14 @@ const CHAINS = {
   mainnet: { chainId: "gnoland-1", rpc: "https://rpc.gno.land:443" },
   onyx: { chainId: "onyx-1", rpc: "https://rpc.onyx.testnets.gno.land:443" },
 };
-const ONYX_UNIVERSE = { id: "onyx", name: "Onyx", real: false, ...CHAINS.onyx };
-const MAIN_UNIVERSE = { id: "gnoland", name: "gno.land", real: true, ...CHAINS.mainnet };
+const ONYX_UNIVERSE = { id: "onyx", name: "Onyx", real: false, indexer: "https://indexer.onyx", ...CHAINS.onyx };
+const MAIN_UNIVERSE = {
+  id: "gnoland",
+  name: "gno.land",
+  real: true,
+  indexer: "https://indexer.main",
+  ...CHAINS.mainnet,
+};
 const source = { url: "https://rpc", at: "2026-11-06T05:00:00.000Z" };
 
 const named = (chainId: string, name: string | null, height = 55_420): ChainRead<Named> => ({
@@ -34,6 +42,7 @@ const down = (): ChainRead<Named> => ({
   source,
 });
 type Answers = Partial<Record<"gnoland-1" | "onyx-1", () => ChainRead<Named>>>;
+const NONE: Answers = { "gnoland-1": () => named("gnoland-1", null), "onyx-1": () => named("onyx-1", null) };
 // A reader that answers by the chain it is asked on, and keeps what it was asked.
 function reader(answers: Answers) {
   const asked: { rpc: string; chainId: string; account: string }[] = [];
@@ -53,6 +62,9 @@ interface Options {
   landing?: () => ChainRead<Landed>;
   account?: Address;
 }
+// The indexer's answer for the function's last calls: two Register calls, as the recording holds them (48,000 and 1,000,000 ugnot).
+const FEES: CallFees = { fees: [48_000, 1_000_000], height: 56_773 };
+const feeRead = () => Promise.resolve({ ok: true as const, value: FEES, source });
 const LANDED = { height: 55_414, failed: false, data: "", log: "ok" };
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 
@@ -77,6 +89,7 @@ function control(universe: typeof ONYX_UNIVERSE, answers: Answers, options: Opti
         {...shown}
         chains={CHAINS}
         read={read}
+        fees={feeRead}
         deps={{
           adena: wallet.adena,
           call: callContract,
@@ -115,14 +128,26 @@ function register(box: HTMLElement, typed = "alexis042") {
   click(button(box, "Register · 0 GNOT"));
 }
 const settled = () => act(() => Promise.resolve());
+// The pill is the way in; the dialog and what signs load on that first ask, so it is there a moment later.
+async function pick(box: HTMLElement) {
+  click(button(box, PICK));
+  await vi.waitFor(() => {
+    expect(one(box, "dialog").hasAttribute("open")).toBe(true);
+  });
+}
 const said = (box: Element) => box.textContent.replaceAll(/\s+/g, " ").trim();
 const SHORT = "g1jg8m…vsqf5";
+// The pill's name for assistive technology holds the words it shows.
+const PICK = `Pick a name for ${SHORT}`;
+// The pill whatever it shows: a mainnet name on a universe with none is still a way to pick one.
+const offered = (box: HTMLElement) =>
+  all(box, "button").find((each) => each.getAttribute("aria-label")?.startsWith("Pick a name for "));
 
 describe("AccountName: the name shown", () => {
   it("shows the short address until a read answers, and reads each chain once, on its own node, for the logged-in account", async () => {
     const { box, asked } = control(ONYX_UNIVERSE, { "gnoland-1": () => named("gnoland-1", null) });
     expect(said(box)).toContain(SHORT);
-    expect(button(box, "Pick a name")).toBeUndefined();
+    expect(button(box, PICK)).toBeUndefined();
     await settled();
     expect(asked.map(({ rpc, chainId }) => `${chainId} ${rpc}`).toSorted()).toEqual([
       `gnoland-1 ${CHAINS.mainnet.rpc}`,
@@ -165,26 +190,43 @@ describe("AccountName: who is offered a name", () => {
       "onyx-1": () => named("onyx-1", null),
     });
     await settled();
-    expect(one(box, "dialog").hasAttribute("open")).toBe(false);
-    click(button(box, "Pick a name"));
+    expect(all(box, "dialog")).toHaveLength(0);
+    await pick(box);
     expect(one(box, "dialog").hasAttribute("open")).toBe(true);
     expect(said(one(box, "dialog"))).toContain("Pick a name and a face");
+  });
+
+  it("makes the account's pill itself the way in, with the person's face before the short address, and no other control", async () => {
+    const { box } = control(ONYX_UNIVERSE, NONE);
+    await settled();
+    const pill = button(box, PICK);
+    expect(pill?.hasAttribute("data-account")).toBe(true);
+    expect(said(pill ?? box)).toContain(SHORT);
+    expect(faceOf(pill ?? box)).toBe(faceOf(mount(<Avatar address={ACCOUNT} name="you" />)));
+    expect(all(box, "button")).toHaveLength(1);
+  });
+
+  it("draws the face before a name too, in a pill that is no button when the name is there", async () => {
+    const { box } = control(ONYX_UNIVERSE, { "gnoland-1": () => named("gnoland-1", "nym-mainname042") });
+    await settled();
+    expect(all(box, "button")).toHaveLength(0);
+    expect(faceOf(one(box, "[data-account]"))).not.toBe("");
   });
 
   it("offers it to a mainnet-named account on Onyx's universe, which has no name on Onyx, and not on the universe that has one", async () => {
     const answers = { "gnoland-1": () => named("gnoland-1", "nym-mainname042"), "onyx-1": () => named("onyx-1", null) };
     const onOnyx = control(ONYX_UNIVERSE, answers);
     await settled();
-    expect(button(onOnyx.box, "Pick a name")).toBeDefined();
+    expect(offered(onOnyx.box)).toBeDefined();
     const onMain = control(MAIN_UNIVERSE, answers);
     await settled();
-    expect(button(onMain.box, "Pick a name")).toBeUndefined();
+    expect(offered(onMain.box)).toBeUndefined();
   });
 
   it("offers nothing while the universe's chain has not answered, or failed to: an unknown name is not a free one", async () => {
     const { box } = control(ONYX_UNIVERSE, { "gnoland-1": () => named("gnoland-1", null), "onyx-1": down });
     await settled();
-    expect(button(box, "Pick a name")).toBeUndefined();
+    expect(button(box, PICK)).toBeUndefined();
   });
 
   it("leaves the short address, closes, and registers nothing on Later", async () => {
@@ -193,7 +235,7 @@ describe("AccountName: who is offered a name", () => {
       "onyx-1": () => named("onyx-1", null),
     });
     await settled();
-    click(button(box, "Pick a name"));
+    await pick(box);
     click(button(box, "Later"));
     expect(one(box, "dialog").hasAttribute("open")).toBe(false);
     expect(said(box)).toContain(SHORT);
@@ -202,14 +244,14 @@ describe("AccountName: who is offered a name", () => {
 });
 
 describe("AccountName: registering", () => {
-  it("shows the new name in the control only when a read of the chain gives it, not when the card is done", async () => {
+  it("shows the new name in the control only when a read of the chain gives it, not when the card is done, and closes on Done", async () => {
     let registered = false;
     const { box, wallet } = control(ONYX_UNIVERSE, {
       "gnoland-1": () => named("gnoland-1", null),
       "onyx-1": () => named("onyx-1", registered ? "nym-alexis042" : null, registered ? 55_414 : 55_410),
     });
     await settled();
-    click(button(box, "Pick a name"));
+    await pick(box);
     typeName(box);
     registered = true;
     click(button(box, "Register · 0 GNOT"));
@@ -220,6 +262,17 @@ describe("AccountName: registering", () => {
     await vi.waitFor(() => {
       expect(said(one(box, "[data-account]"))).toContain("nym-alexis042");
     });
+    click(button(box, "Done"));
+    expect(one(box, "dialog").hasAttribute("open")).toBe(false);
+  });
+
+  it("says the fee as the median of the function's last calls, read from the universe's indexer when the dialog loads", async () => {
+    const { box } = control(ONYX_UNIVERSE, NONE);
+    await settled();
+    await pick(box);
+    await vi.waitFor(() => {
+      expect(said(one(box, "dialog"))).toContain("Fee: ≈ 0.524 GNOT, an estimate from calls up to block 56,773.");
+    });
   });
 
   it("keeps the short address when the chain, read again, still gives no name", async () => {
@@ -228,7 +281,7 @@ describe("AccountName: registering", () => {
       "onyx-1": () => named("onyx-1", null),
     });
     await settled();
-    click(button(box, "Pick a name"));
+    await pick(box);
     typeName(box);
     click(button(box, "Register · 0 GNOT"));
     await vi.waitFor(() => {
@@ -238,7 +291,6 @@ describe("AccountName: registering", () => {
   });
 });
 
-const NONE: Answers = { "gnoland-1": () => named("gnoland-1", null), "onyx-1": () => named("onyx-1", null) };
 const signed = (wallet: ReturnType<typeof recordedAdena>) =>
   wallet.asked.filter((entry) => entry.call === "DoContract").length;
 const failing = (type: string) => () => Promise.resolve({ status: "failure", type, message: "", data: {} });
@@ -247,7 +299,7 @@ describe("AccountName: a registration that does not go through", () => {
   async function opened(options: Options) {
     const view = control(ONYX_UNIVERSE, NONE, options);
     await settled();
-    click(button(view.box, "Pick a name"));
+    await pick(view.box);
     return view;
   }
   const dialog = (box: HTMLElement) => one(box, "dialog");
@@ -329,7 +381,7 @@ describe("AccountName: a registration that does not go through", () => {
   it("says the fee is real GNOT, and the registry's price 0, on gno.land's universe", async () => {
     const view = control(MAIN_UNIVERSE, NONE, { wallet: recordedAdena({ account: ACCOUNT, chain: "gnoland-1" }) });
     await settled();
-    click(button(view.box, "Pick a name"));
+    await pick(view.box);
     expect(said(dialog(view.box))).toMatch(/real GNOT/);
     expect(said(dialog(view.box))).toMatch(/0 GNOT/);
     expect(said(dialog(view.box))).not.toMatch(/free/i);
@@ -359,15 +411,15 @@ describe("AccountName: whose name, whose card", () => {
       "onyx-1": () => named("onyx-1", null),
     });
     await settled();
-    expect(button(box, "Pick a name")).toBeDefined();
+    expect(offered(box)).toBeDefined();
     switchTo({ universe: MAIN_UNIVERSE });
-    expect(button(box, "Pick a name")).toBeUndefined();
+    expect(offered(box)).toBeUndefined();
   });
 
   it("starts the next account on an empty form: a registration done for the first is not the second's", async () => {
     const { box, switchTo } = control(ONYX_UNIVERSE, NONE);
     await settled();
-    click(button(box, "Pick a name"));
+    await pick(box);
     register(box);
     await vi.waitFor(() => {
       expect(said(one(box, "dialog"))).toMatch(/is registered/);

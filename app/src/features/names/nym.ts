@@ -3,6 +3,9 @@
 // The reserved role names and the canonical collisions are the chain's answer, shown as its error, never guessed here.
 // Each pattern is built inside its function (typescript.md).
 
+/** The registry a name is kept by. */
+export const NAMEREG = "gno.land/r/sys/namereg/v0";
+
 /** What every name starts with: the field shows it, and the message signed is it and what was typed. */
 export const NYM_PREFIX = "nym-";
 

@@ -4,6 +4,7 @@ import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, faceOf, mount, one } from "../../../tests/mount.tsx";
 import { NameDialog, type NameDialogProps } from "./NameDialog.tsx";
+import { NYM_PREFIX } from "./nym.ts";
 
 // 9f, frames 9 to 15 ("Pick a name and a face"), the person's nebula as the face (ADR-0002 section 1, decision 7 of
 // docs/design/coherence.md). The dialog holds no state of the chain: its `phase` is the card's course, and a name shows as
@@ -11,6 +12,7 @@ import { NameDialog, type NameDialogProps } from "./NameDialog.tsx";
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ONYX = { name: "Onyx", chainId: "onyx-1", real: false };
 const MAINNET = { name: "gno.land", chainId: "gnoland-1", real: true };
+const FEE = "≈ 0.048 GNOT, an estimate from calls up to block 55,414";
 
 const said = (box: Element) => box.textContent.replaceAll(/\s+/g, " ").trim();
 function view(over: Partial<NameDialogProps> = {}) {
@@ -21,6 +23,7 @@ function view(over: Partial<NameDialogProps> = {}) {
       open
       account={ACCOUNT}
       network={ONYX}
+      fee={FEE}
       phase={{ kind: "typing" }}
       onRegister={onRegister}
       onClose={onClose}
@@ -47,8 +50,8 @@ describe("NameDialog: the frames' parts", () => {
     expect(said(dialog)).toMatch(/Pick a name and a face/);
     expect(said(dialog)).toMatch(/your gno\.land name/i);
     expect(said(dialog)).toContain("r/sys/namereg");
-    expect(said(dialog)).toContain("nym-");
-    expect(said(dialog)).toContain("5 to 13 letters, then 3 digits");
+    expect(said(dialog)).toContain(NYM_PREFIX);
+    expect(said(dialog)).toContain("5 to 13 letters, then 3 digits. Example: nym-alexis042.");
     expect(all(box, "button").map(said)).toEqual(expect.arrayContaining(["Register · 0 GNOT", "Later"]));
   });
 
@@ -61,14 +64,45 @@ describe("NameDialog: the frames' parts", () => {
     expect(all(box, "button").map(said).join(" ")).not.toMatch(/upload|planet|choose|face/i);
   });
 
-  it("says on gno.land's universe that the registry's price is 0 and the network fee is real GNOT, and on Onyx that it is a test network's", () => {
+  it("says on both universes which chain the name goes to, in the card's words: public and forever, and not checked", () => {
+    for (const [network, chain] of [
+      [ONYX, "Onyx (onyx-1)"],
+      [MAINNET, "gno.land (gnoland-1)"],
+    ] as const) {
+      const text = said(one(view({ network }).box, "dialog"));
+      expect(text).toContain(chain);
+      expect(text).toContain("This text goes to gno.land/r/sys/namereg/v0 on gno.land, publicly and forever.");
+      expect(text).toContain("gnoworld does not check what this realm does. Read it on gnoweb first.");
+    }
+  });
+
+  it("sets the realm's path as code, the frames' way", () => {
+    expect(one(view().box, "dialog code").textContent).toBe("r/sys/namereg");
+  });
+
+  it("asks the name with the frames' placeholder, a name the chain would take", () => {
+    expect(one(view().box, "input").getAttribute("placeholder")).toBe("alexis042");
+  });
+
+  it("says the fee as the call card's estimate; on gno.land's universe it is real GNOT and the registry's price 0, never free", () => {
     const main = said(one(view({ network: MAINNET }).box, "dialog"));
-    expect(main).toMatch(/real GNOT/);
+    expect(main).toContain(`Fee: ${FEE}.`);
+    expect(main).toMatch(/paid in real GNOT/);
     expect(main).toMatch(/registry's price is 0 GNOT/);
     expect(main).not.toMatch(/free/i);
     const onyx = said(one(view({ network: ONYX }).box, "dialog"));
+    expect(onyx).toContain(`Fee: ${FEE}.`);
     expect(onyx).not.toMatch(/real GNOT/);
-    expect(onyx).toContain("Onyx");
+    expect(onyx).toContain("test network");
+  });
+
+  it("puts Register and Later on one row, Register first, with the fine print under them", () => {
+    const { box } = view();
+    const row = button(box, "Later")?.parentElement;
+    expect(button(box, "Register · 0 GNOT")?.closest("span")?.parentElement).toBe(row);
+    expect(row?.firstElementChild?.querySelector("button")).toBe(button(box, "Register · 0 GNOT"));
+    const fee = all(box, "p").find((each) => said(each).includes("Fee:"));
+    expect(row?.compareDocumentPosition(fee ?? box)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
   it("tells a phone it reads only: to sign, use a computer", () => {
@@ -88,13 +122,21 @@ describe("NameDialog: the name is checked before Adena opens", () => {
     ["alex042", /5 to 13 letters, then 3 digits/],
     ["Alexis042", /5 to 13 letters, then 3 digits/],
     ["gnomes042", /reserved prefix/],
-  ])("refuses %s with its problem under the field, and asks for no signature", (typed, problem) => {
+  ])("refuses %s with its problem under the field, Register disabled, and asks for no signature", (typed, problem) => {
     const { box, onRegister } = view();
     const input = type(box, typed);
     click(button(box, "Register · 0 GNOT"));
+    expect(button(box, "Register · 0 GNOT")?.hasAttribute("disabled")).toBe(true);
     expect(onRegister).not.toHaveBeenCalled();
     expect(input.getAttribute("aria-invalid")).toBe("true");
     expect(said(one(box, "dialog"))).toMatch(problem);
+  });
+
+  it("draws Register disabled while nothing is typed, as the frames do, and enabled for a name that holds", () => {
+    const { box } = view();
+    expect(button(box, "Register · 0 GNOT")?.hasAttribute("disabled")).toBe(true);
+    type(box, "alexis042");
+    expect(button(box, "Register · 0 GNOT")?.hasAttribute("disabled")).toBe(false);
   });
 
   it("asks to register the typed name, and only it, when it is valid", () => {
@@ -115,8 +157,11 @@ describe("NameDialog: nothing is registered until the chain says so", () => {
     expect(button(box, "Register · 0 GNOT")?.hasAttribute("disabled") ?? true).toBe(true);
   });
 
-  it("says the name registered, with its block, once the chain gave its answer", () => {
-    const { box } = view({ phase: { kind: "done", name: "nym-alexis042", height: 55414 } });
+  it("says the name registered, with its block, once the chain gave its answer, and the dialog's way out is then Done", () => {
+    const { box, onClose } = view({ phase: { kind: "done", name: "nym-alexis042", height: 55414 } });
+    expect(button(box, "Later")).toBeUndefined();
+    click(button(box, "Done"));
+    expect(onClose).toHaveBeenCalledTimes(1);
     expect(said(one(box, "dialog"))).toContain("nym-alexis042");
     expect(said(one(box, "dialog"))).toMatch(/registered/i);
     expect(said(one(box, "dialog"))).toContain("55,414");

@@ -64,6 +64,10 @@ async function chains(page: Page, { mainnet = null, onyx = null }: World = {}) {
       const body = answers[url.pathname]?.() ?? evaluated(url, name);
       return route.fulfill({ headers: CORS, body: JSON.stringify(body) });
     });
+  // The fee read of the dialog finds no call to go by: Adena sets the fee, and the line says so.
+  await page.route("https://indexer.onyx.testnets.gno.land/**", (route) =>
+    route.fulfill({ headers: CORS, body: JSON.stringify({ data: { latestBlockHeight: 0, getTransactions: [] } }) }),
+  );
   await serve("gnoland-1", 1_325_774, () => mainnet);
   await serve("onyx-1", 55_420, () => (registered ? NAME : onyx));
 }

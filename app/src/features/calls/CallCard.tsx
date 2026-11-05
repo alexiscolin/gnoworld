@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import styles from "./CallCard.module.css";
 import { problemsOf } from "./problems.ts";
-import { sayFailure, sayProblem, shown } from "./say.ts";
+import { NOT_CHECKED, networkOf, publicForever, sayFailure, sayProblem, shown } from "./say.ts";
 
 export interface CallCardProps {
   card: Card_;
@@ -130,7 +130,7 @@ function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
             onChange={(next) => {
               onEdit(index, next);
             }}
-            {...(field.freeText ? { help: `This text goes to ${card.realm} on gno.land, publicly and forever.` } : {})}
+            {...(field.freeText ? { help: publicForever(card.realm) } : {})}
             {...(problem !== undefined && text !== "" ? { error: sayProblem(problem) } : {})}
           />
         );
@@ -200,12 +200,10 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
           <Row label="ARGUMENTS">
             <Arguments card={card} onEdit={onEdit} />
           </Row>
-          <Row label="NETWORK">{`${network.name} (${network.chainId})`}</Row>
+          <Row label="NETWORK">{networkOf(network)}</Row>
           <Row label="FEE">{fee}</Row>
         </dl>
-        {preview ? (
-          <p className={styles["note"]}>gnoworld does not check what this realm does. Read it on gnoweb first.</p>
-        ) : null}
+        {preview ? <p className={styles["note"]}>{NOT_CHECKED}</p> : null}
         <Status card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>
