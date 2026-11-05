@@ -1,7 +1,7 @@
-// What the subscription's reads become on the stream (slice 9g): each event told as it is, with its block's height, coalesced to 4
+// What the poll's reads become on the stream (slice 9g): each event told as it is, with its block's height, coalesced to 4
 // a second a room (a flood of one world cannot starve another's, nor the ticker's deploys); and the Earth's 24 h count, from block
 // times only: a transaction carries none, so a deploy waits for its block's frame, then is counted whether or not the ticker
-// was told of it (the count is the chain's truth).
+// was told of it (the count is the chain's truth). A round's tip tells the count too, so it ages out between deploys.
 import type { ChainEvent, RealmsDeployed } from "@gnoworld/schemas";
 import { makeCoalescer } from "./coalesce.ts";
 import type { Deploy } from "./count.ts";
@@ -51,7 +51,7 @@ export function makeRelay({ stream, count, universe, now }: RelayOptions): (read
     for (const { id } of waiting.filter((each) => each.height === height)) count.deployed({ height, time, id });
     waiting.splice(0, waiting.length, ...waiting.filter((each) => each.height !== height));
   };
-  return ({ events, block }) => {
+  return ({ events, block, tip }) => {
     let counted: number | undefined;
     for (const event of events) {
       if (event.kind === "call") {
@@ -62,7 +62,7 @@ export function makeRelay({ stream, count, universe, now }: RelayOptions): (read
       counted = countDeploy(event) ?? counted;
     }
     if (block !== undefined) arrived(block);
-    const at = block?.height ?? counted;
+    const at = [block?.height, counted, tip].find((height) => height !== undefined);
     if (at !== undefined) tell(at);
   };
 }

@@ -24,6 +24,8 @@ export interface ChainRead {
   hash?: string;
   height?: number;
   block?: { height: number; time: string };
+  /** The chain's newest height, read by a poll round. */
+  tip?: number;
   /** The indexer refused the subscription. */
   refused?: true;
 }

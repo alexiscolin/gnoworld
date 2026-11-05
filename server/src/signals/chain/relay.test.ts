@@ -238,3 +238,40 @@ describe("the relay with the 24 h count", () => {
     expect(realms).toHaveBeenCalledTimes(1);
   });
 });
+
+// A poll round reads a tip and no block frame: the count is told at that height, as it was at a block's.
+describe("the relay at a poll's tip", () => {
+  const tipped = (tip: number): ChainRead => ({ events: [], tip });
+
+  it("tells the count loaded at the tip's height, once, however many rounds read the same tip", () => {
+    const { relay, realms, loaded } = setup();
+    loaded(4);
+    relay(tipped(7000));
+    relay(tipped(7000));
+    relay(tipped(7001));
+    expect(realms.mock.calls).toEqual([[{ universe: "onyx", count: 4, height: 7000 }]]);
+  });
+
+  it("tells a count that changed at the tip that saw it change, and none while the history could not load", () => {
+    const { relay, realms, loaded } = setup();
+    loaded(0, false);
+    relay(tipped(7000));
+    expect(realms).not.toHaveBeenCalled();
+    loaded(2);
+    relay(tipped(7001));
+    loaded(1);
+    relay(tipped(7002));
+    expect(realms.mock.calls.map(([count]) => [count.count, count.height])).toEqual([
+      [2, 7001],
+      [1, 7002],
+    ]);
+  });
+
+  it("counts a deploy of the round at the tip's height once its block's frame came", () => {
+    const { relay, realms } = setup();
+    relay(events(deploy(7001)));
+    relay(block(7001));
+    relay(tipped(7002));
+    expect(realms.mock.calls).toEqual([[{ universe: "onyx", count: 1, height: 7001 }]]);
+  });
+});
