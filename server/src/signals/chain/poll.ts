@@ -65,9 +65,9 @@ export function pollChain(options: PollOptions): { stop: () => void } {
   const { emit, highest } = delivery(deliver, options.from);
   // The height the tip was last caught up to, and the one the next catch-up starts from (this block read again, once by its hash).
   let asked = options.from;
-  let stopped = false;
   let attempt = 0;
-  let cancel: (() => void) | undefined;
+  // Always set: the first round starts before pollChain returns.
+  let cancel: () => void;
 
   // One round: its reads and deliveries, none once `alive` says the round was given up or the poll stopped.
   async function read(alive: () => boolean): Promise<void> {
@@ -89,7 +89,6 @@ export function pollChain(options: PollOptions): { stop: () => void } {
       if (!live) return;
       live = false;
       cancelLimit();
-      if (stopped) return;
       if (worked) attempt = 0;
       else log("chain_poll_failed");
       const base = Math.min(BACKOFF_MAX_MS, BACKOFF_MS * 2 ** attempt);
@@ -115,8 +114,7 @@ export function pollChain(options: PollOptions): { stop: () => void } {
   round();
   return {
     stop() {
-      stopped = true;
-      cancel?.();
+      cancel();
     },
   };
 }
