@@ -140,6 +140,16 @@ describe("reminders due at once", () => {
     expect(kept()).toEqual({ first: { fired: true }, later: { fired: true } });
   });
 
+  it("name, of two starting at once, the first by id, whatever the file's order", async () => {
+    data.events = [at("b", START + 5 * MINUTE), at("a", START + 5 * MINUTE)];
+    asked({ a: { fired: false }, b: { fired: false } });
+    watching();
+    await after(0);
+    expect(raised).toEqual([
+      expect.objectContaining({ title: "Event a", line: "Starts in a few minutes · and 1 more" }),
+    ]);
+  });
+
   it("say a coming one's start, and no place for one online", async () => {
     data.events = [at("b", START + 5 * MINUTE), at("a", START + 3 * MINUTE), at("c", START + 8 * MINUTE)];
     asked({ a: { fired: false }, b: { fired: false }, c: { fired: false } });
