@@ -28,6 +28,11 @@ const deployRow = (height: number, name: string) => ({
     { value: { __typename: "MsgAddPackage", creator: ALICE, package: { path: `gno.land/r/${ALICE}/${name}` } } },
   ],
 });
+const withHash = (height: number, name: string, hash = `h${String(height)}`) => ({
+  ...deployRow(height, name),
+  hash,
+  success: true,
+});
 const times = (heights: number[], at: (height: number) => string) =>
   answer({ getBlocks: heights.map((height) => ({ height, time: at(height) })) });
 
@@ -57,6 +62,10 @@ describe("the catch-up", () => {
     expect(queries[0]).toContain(ACCESS);
     expect(queries[0]).not.toContain("memo");
     expect(send.mock.calls[0]?.[2]).toBe(TIMEOUT_MS);
+    expect(send.mock.calls[0]?.[1]).toMatchObject({
+      method: "POST",
+      headers: { "content-type": "application/json", accept: "application/json" },
+    });
     const read = texts.map((text) =>
       readChainMessage(text, {
         universe: "onyx",
@@ -68,11 +77,6 @@ describe("the catch-up", () => {
   });
 
   it("gives each deployed realm's block time before its transaction, so a deploy recovered is counted like a live one", async () => {
-    const withHash = (height: number, name: string, hash: string) => ({
-      ...deployRow(height, name),
-      hash,
-      success: true,
-    });
     const { readers, queries } = setup((query) =>
       query.includes("getBlocks")
         ? times([101, 103], () => "2026-11-06T00:00:00.000Z")
@@ -86,8 +90,34 @@ describe("the catch-up", () => {
     expect(queries.filter((each) => each.includes("getBlocks"))).toHaveLength(1);
   });
 
+  it("asks the blocks 100 heights at a time", async () => {
+    const heights = Array.from({ length: 101 }, (_, n) => n + 1);
+    const { readers, queries } = setup((query) =>
+      query.includes("getBlocks")
+        ? times(
+            [...query.matchAll(/eq: (\d+)/g)].map(([, h = ""]) => Number(h)),
+            () => "2026-11-06T00:00:00.000Z",
+          )
+        : rowsOf(heights.map((height) => withHash(height, `n${String(height)}`))),
+    );
+    expect(await readers.catchUp(1)).toHaveLength(202);
+    expect(queries.filter((each) => each.includes("getBlocks")).map((each) => each.match(/eq:/g)?.length)).toEqual([
+      100, 1,
+    ]);
+  });
+
+  it("gives a block's time once, before the first of the deploys it holds", async () => {
+    const { readers } = setup((query) =>
+      query.includes("getBlocks")
+        ? times([101], () => "2026-11-06T00:00:00.000Z")
+        : rowsOf([withHash(101, "a"), withHash(101, "b")]),
+    );
+    const kinds = (await readers.catchUp(101)).map((text) => (text.includes("getBlocks") ? "block" : "tx"));
+    expect(kinds).toEqual(["block", "tx", "tx"]);
+  });
+
   it("gives no block for a deploy whose block the indexer did not give, nor when no realm was deployed", async () => {
-    const lone = { ...deployRow(101, "a"), hash: "d1", success: true };
+    const lone = withHash(101, "a");
     const missing = setup((query) => (query.includes("getBlocks") ? times([], () => "") : rowsOf([lone])));
     expect(await missing.readers.catchUp(101)).toHaveLength(1);
     const calls = setup(() => rowsOf([row(101, "b")]));
@@ -105,6 +135,10 @@ describe("the catch-up", () => {
     ["a status that is no success", () => answer({}, 502)],
     ["an answer that is no JSON", () => new Response("<html>")],
     ["an answer with errors", () => new Response(JSON.stringify({ data: null, errors: [{ message: "x" }] }))],
+    [
+      "an answer with rows and errors together",
+      () => new Response(JSON.stringify({ data: { getTransactions: [] }, errors: [{ message: "x" }] })),
+    ],
     ["an answer of no rows", () => answer({ other: 1 })],
     ["an answer past its size", () => new Response(`{"data":"${"x".repeat(MAX_BYTES)}"}`)],
     [
@@ -176,6 +210,13 @@ describe("the 24 h history", () => {
     expect(queries.filter((each) => each.includes("getTransactions"))).toHaveLength(1);
   });
 
+  it("counts a deploy whose block is exactly at the bound", async () => {
+    const { readers } = setup((query) =>
+      query.includes("getBlocks") ? times([20], () => SINCE) : rowsOf([deployRow(20, "a")]),
+    );
+    expect(await readers.history(SINCE)).toHaveLength(1);
+  });
+
   it("asks the next page below the lowest block seen", async () => {
     const heights = [[50, 40], [30]];
     const { readers, queries } = setup((query) => {
@@ -195,6 +236,44 @@ describe("the 24 h history", () => {
     });
     expect((await readers.history(SINCE)).length).toBeGreaterThan(2);
     expect(queries.find((each) => each.includes("lt: 41"))).toBeDefined();
+  });
+
+  it("counts realms only: a pure package, a call and a message with no path are no deploy", async () => {
+    const message = (value: Record<string, unknown>) => ({ block_height: 20, messages: [{ value }] });
+    const { readers } = setup((query) =>
+      query.includes("getBlocks")
+        ? times([20], fresh)
+        : rowsOf([
+            message({ __typename: "MsgAddPackage", package: { path: `gno.land/p/${ALICE}/lib` } }),
+            message({ __typename: "MsgCall", pkg_path: `gno.land/r/${ALICE}/called` }),
+            message({ __typename: "MsgAddPackage" }),
+            message({ __typename: "MsgCall", package: { path: `gno.land/r/${ALICE}/notadeploy` } }),
+            message({ __typename: "MsgAddPackage", package: { path: `gno.land/r/${ALICE}/real` } }),
+          ]),
+    );
+    expect((await readers.history(SINCE)).map(({ id }) => id)).toEqual([`gno.land/r/${ALICE}/real`]);
+  });
+
+  it("does not count a deploy whose block the indexer did not give", async () => {
+    const { readers } = setup((query) =>
+      query.includes("getBlocks") ? times([20], fresh) : rowsOf([deployRow(20, "a"), deployRow(10, "b")]),
+    );
+    expect((await readers.history(SINCE)).map(({ id }) => id)).toEqual([`gno.land/r/${ALICE}/a`]);
+  });
+
+  it("refuses blocks past the heights it asked, and a page that moved no further", async () => {
+    await expect(
+      setup((query) =>
+        query.includes("getBlocks") ? times([20, 21], fresh) : rowsOf([deployRow(20, "a")]),
+      ).readers.history(SINCE),
+    ).rejects.toThrow();
+    const stuck = setup((query) =>
+      query.includes("getBlocks")
+        ? times([], fresh)
+        : rowsOf(Array.from({ length: HISTORY_PAGE }, (_, n) => deployRow(50, `s${String(n)}`))),
+    );
+    await expect(stuck.readers.history(SINCE)).rejects.toThrow("past its cap");
+    expect(stuck.queries.filter((each) => each.includes("getTransactions"))).toHaveLength(2);
   });
 
   it("drops a row that fails its schema, said", async () => {
