@@ -32,8 +32,15 @@ export type SignResult =
 const MSG_TYPE = "sign/MsgSignData";
 
 // The reasons of the one reader of Adena's answers (answers.ts), as the login tells them: what it cannot act on is failed.
-const REASONS = new Set<CallFailure>(["missing", "declined", "locked", "no-account", "malformed"]);
-const refusal = (reason: CallFailure): Refusal => (REASONS.has(reason) ? (reason as Refusal) : "failed");
+// Typed by Refusal, so a reason ConnectResult does not have cannot be added.
+const REASONS: Partial<Record<CallFailure, Refusal>> = {
+  missing: "missing",
+  declined: "declined",
+  locked: "locked",
+  "no-account": "no-account",
+  malformed: "malformed",
+};
+const refusal = (reason: CallFailure): Refusal => REASONS[reason] ?? "failed";
 
 // The account and the chain, from Adena's two answers: one chain for both, and a gno address, or why not.
 function connected(account: unknown, network: unknown): ConnectResult {
