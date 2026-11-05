@@ -1,6 +1,6 @@
-// One function of a realm as a row: its name and one quiet button, "Read" or "Call", named for the function, and what the row
+// One function of a realm as a row: its name and one small outlined button, "Read" or "Call", named for the function, and what the row
 // opens under it (a result, a call card). The list of read functions and the list of write functions share it.
-import { Button, Row, Skeleton } from "@gnoworld/ui";
+import { Button, Skeleton } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import styles from "./RealmFunctions.module.css";
 
@@ -17,15 +17,13 @@ export interface FunctionRowProps {
 export function FunctionRow({ name, verb, busy = false, onClick, children }: FunctionRowProps) {
   return (
     <li className={styles["item"]}>
-      <Row
-        title={name}
-        trail={
-          <Button emphasis="quiet" {...(busy ? { busy: true } : {})} onClick={onClick}>
-            {verb}
-            <span className="visually-hidden"> {name}</span>
-          </Button>
-        }
-      />
+      <div className={styles["line"]}>
+        <span className={styles["name"]}>{name}</span>
+        <Button emphasis="outline" size="s" {...(busy ? { busy: true } : {})} onClick={onClick}>
+          {verb}
+          <span className="visually-hidden"> {name}</span>
+        </Button>
+      </div>
       {children}
     </li>
   );

@@ -209,4 +209,17 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(all(gno, "article input")).toHaveLength(2);
     expect(all(onyx, "article input")).toHaveLength(1);
   });
+
+  // The rows are the frame's (F5741 to F5744): an outlined small pill, the name in mono and muted on the pill's line. The stylesheet
+  // is read as empty here, so the rules (the hairlines, the step) are the Mac Studio's pictures.
+  it("draws each row's Call as a small outlined pill, and its name as its own mono, muted part on the pill's line (F5741, F5742, F5743)", async () => {
+    const box = await panel();
+    const call = button(box, "Call SetBio");
+    expect(call?.dataset["emphasis"]).toBe("outline");
+    expect(call?.dataset["size"]).toBe("s");
+    const name = all(box, "li span").find((s) => s.textContent === "SetBio");
+    expect(name?.className).toContain("name");
+    expect(name?.parentElement?.className).toContain("line");
+    expect(name?.parentElement?.contains(call ?? null)).toBe(true);
+  });
 });
