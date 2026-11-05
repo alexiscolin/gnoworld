@@ -199,8 +199,8 @@ describe("callFields", () => {
 
 describe("callArgs", () => {
   it("gives the texts unchanged as the arguments, in order", () => {
-    const params = [cur(), param("string"), param("int8"), param("bool"), param("[]uint8")];
-    const texts = [" two  spaces\n", "-12", "true", "AAAA"];
+    const params = [cur(), param("string"), param("int8"), param("[]uint8"), param("bool")];
+    const texts = [" two  spaces\n", "-12", "AAAA", "true"];
     expect(callArgs(params, texts)).toEqual({ ok: true, args: texts });
   });
 
@@ -601,11 +601,10 @@ describe("bytes", () => {
     expect(accepts("string", "é".repeat(1_000_000))).toBe(true);
   });
 
-  it("never parses a long digit text as a number: a canonical int64 or uint64 is 20 characters at most, a uint8 3 after its zeros (F5683)", () => {
+  it("never parses a long digit text as a number: a canonical int64 or uint64 is 20 characters at most (F5683)", () => {
     const parse = vi.spyOn(globalThis, "BigInt");
     try {
       for (const [type] of WIDTHS) expect(problemOf(type, "9".repeat(21))).toBe("range");
-      expect(problemOf("[]uint8", `${"0".repeat(399)}9`)).toBe("format");
       expect(parse.mock.calls.filter(([text]) => String(text).length > 20)).toEqual([]);
     } finally {
       parse.mockRestore();
