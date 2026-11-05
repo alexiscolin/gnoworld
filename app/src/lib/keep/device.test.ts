@@ -282,11 +282,10 @@ describe("the passport's file", () => {
     expect(readPassportFile(passportFile({ stamps: {}, charted: { [at(257)]: "2026-11-01" } }))).toBeUndefined();
   });
 
-  it("pollutes no prototype and reads plain objects from a hostile __proto__ value", () => {
-    const file = '{"gnoworld":"passport","version":1,"stamps":{"__proto__":{"polluted":1}},"charted":{}}';
-    const read = readPassportFile(file);
-    expect(Object.getPrototypeOf(read?.stamps)).toBe(Object.prototype);
+  it("pollutes no prototype when a file's stamps hold a hostile __proto__ value", () => {
+    readPassportFile('{"gnoworld":"passport","version":1,"stamps":{"__proto__":{"polluted":1}},"charted":{}}');
     expect(({} as Record<string, unknown>)["polluted"]).toBeUndefined();
+    expect(Object.getPrototypeOf(Object.prototype)).toBeNull();
   });
 
   it("reads a __proto__ key with a day as an own entry of a plain object", () => {
