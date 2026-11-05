@@ -17,6 +17,21 @@ import {
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 
 export type Failure = "down" | "slow" | "failed" | "shape" | "gone" | "refused";
+
+// What a status jarvis answers with means, any other its failure: what its schemas refuse is the asker's request (400),
+// a jarvis starting or draining is not ready (503, D93), one past its own time slow (504) (F5314).
+function failureOfStatus(status: number): Failure {
+  switch (status) {
+    case 400:
+      return "refused";
+    case 503:
+      return "down";
+    case 504:
+      return "slow";
+    default:
+      return "failed";
+  }
+}
 type Called<T> = { ok: true; value: T } | { ok: false; error: Failure };
 interface Schema<T> {
   safeParse: (value: unknown) => { success: true; data: T } | { success: false };
@@ -72,8 +87,7 @@ export function jarvisClient({
       const response = await send(`${url}${path}`, { ...init, signal: signal ?? null }, ms);
       const json = await readJson(response, MAX_BYTES);
       if (response.ok) return parsed(schema, json);
-      // jarvis refuses what its schemas refuse (400): the asker's request, never jarvis's failure.
-      return { ok: false, error: response.status === 400 ? "refused" : "failed" };
+      return { ok: false, error: failureOfStatus(response.status) };
     } catch (error) {
       return { ok: false, error: failureOf(error, signal) };
     }

@@ -109,6 +109,13 @@ describe("asking jarvis", () => {
     expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "failed" });
   });
 
+  it("answers a jarvis that answers 503 not ready as down, and 504 as slow, never as its failure (F5314)", async () => {
+    const jarvis = await fakeJarvis([json({ error: "not_ready" }, 503), json({ error: "not_ready" }, 504)]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
+    expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "down" });
+    expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "slow" });
+  });
+
   it("answers down when nothing listens", async () => {
     const jarvis = await fakeJarvis([]);
     const server = servers.pop();
