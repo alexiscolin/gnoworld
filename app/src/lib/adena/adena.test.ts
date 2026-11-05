@@ -471,6 +471,71 @@ describe("signLogin and the extension's version (sign-in needs 1.22.2)", () => {
   });
 });
 
+// Each hostile wallet ends in one named result, for the login's two calls alike (F5665).
+describe("a wallet that throws or lacks a method ends in one result", () => {
+  const whole: Record<string, (...args: unknown[]) => unknown> = {
+    AddEstablish: () => ok("CONNECTION_SUCCESS", {}),
+    GetAccount: () => ok("GET_ACCOUNT", ACCOUNT),
+    GetNetwork: () => ok("GET_NETWORK", NETWORK),
+    SignArbitrary: (params: unknown) => {
+      const { data, signer } = params as { data: string; signer: string };
+      return ok("SIGN_ARBITRARY", proofOf(data, signer));
+    },
+  };
+  const throwing = (name: string) =>
+    Object.defineProperty({ ...whole }, name, {
+      get(): never {
+        throw new Error("trap");
+      },
+    });
+  const revoked = () => {
+    const proxy = Proxy.revocable({}, {});
+    proxy.revoke();
+    return proxy.proxy;
+  };
+  const trap = (): never => {
+    throw new Error("trap");
+  };
+  const trapped = () => new Proxy({}, { has: trap, ownKeys: trap, get: trap });
+
+  it.each([
+    ["a SignArbitrary getter that throws", () => throwing("SignArbitrary"), "failed"],
+    ["an AddEstablish getter that throws", () => throwing("AddEstablish"), "failed"],
+    ["a revoked proxy", revoked, "failed"],
+    ["a proxy whose every trap throws", trapped, "failed"],
+  ])("signLogin with %s is %s", async (_, make, reason) => {
+    expect(await signLogin(make(), login(TEXT))).toStrictEqual({ ok: false, reason });
+  });
+
+  it.each([
+    ["an AddEstablish getter that throws", () => throwing("AddEstablish")],
+    ["a GetAccount getter that throws", () => throwing("GetAccount")],
+    ["a GetNetwork getter that throws", () => throwing("GetNetwork")],
+  ])("connect with %s is failed", async (_, make) => {
+    expect(await connect(make())).toStrictEqual({ ok: false, reason: "failed" });
+  });
+
+  it.each(["AddEstablish", "GetAccount", "GetNetwork"])(
+    "connect with no %s is missing, and Adena is asked nothing",
+    async (name) => {
+      const asked: string[] = [];
+      const adena = Object.fromEntries(
+        Object.entries(whole)
+          .filter(([method]) => method !== name)
+          .map(([method, answering]) => [
+            method,
+            (...args: unknown[]) => {
+              asked.push(method);
+              return answering(...args);
+            },
+          ]),
+      );
+      expect(await connect(adena)).toStrictEqual({ ok: false, reason: "missing" });
+      expect(asked).toEqual([]);
+    },
+  );
+});
+
 describe("pageAdena", () => {
   it("reads the page's window.adena, as it is, whatever it holds", () => {
     const marker = { AddEstablish: () => undefined };
