@@ -1,5 +1,5 @@
 import { UNDATED_EVENT } from "@gnoworld/schemas";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { agendaOf, isDated, isLive, remindersAt, type CalendarEvent } from "./agenda.ts";
 
 // The calendar and the reminders' window (slice 8; the plan's threat model, "The clock" and "Reminder timers"): the agenda by the
@@ -16,15 +16,6 @@ const event = (id: string, start: string | number, world?: string): CalendarEven
   ...(world === undefined ? {} : { world }),
 });
 const UNDATED = new Date(UNDATED_EVENT).toISOString();
-
-let zone: string | undefined;
-beforeEach(() => {
-  zone = process.env["TZ"];
-});
-afterEach(() => {
-  if (zone === undefined) delete process.env["TZ"];
-  else process.env["TZ"] = zone;
-});
 
 describe("an event's time", () => {
   const now = Date.parse("2026-11-05T12:00:00.000Z");
@@ -44,42 +35,32 @@ describe("an event's time", () => {
 });
 
 describe("the agenda", () => {
+  // Built in the reader's own zone, whatever it is where the tests run: the agenda's days are the reader's.
+  const local = (day: number, [hour, minute = 0, second = 0]: readonly number[]) =>
+    new Date(2026, 10, day, hour, minute, second).getTime();
+
   it("groups the coming and live events by the reader's local day, the soonest first, and puts the undated apart", () => {
-    process.env["TZ"] = "UTC";
-    const now = Date.parse("2026-11-05T12:00:00.000Z");
+    const now = local(5, [12]);
     const got = agendaOf(
       [
-        event("late", "2026-11-06T00:00:00.000Z"),
-        event("past", "2026-11-05T10:00:00.000Z"),
-        event("live", "2026-11-05T11:30:00.000Z"),
-        event("eve", "2026-11-05T23:59:59.000Z"),
+        event("late", local(6, [0])),
+        event("past", local(5, [10])),
+        event("live", local(5, [11, 30])),
+        event("eve", local(5, [23, 59, 59])),
         event("soon", UNDATED),
       ],
       now,
     );
     expect(got.days.map(({ events }) => events.map(({ id }) => id))).toEqual([["live", "eve"], ["late"]]);
-    expect(got.days[0]?.day).toBe(Date.parse("2026-11-05T00:00:00.000Z"));
+    expect(got.days.map(({ day }) => day)).toEqual([local(5, [0]), local(6, [0])]);
     expect(got.undated.map(({ id }) => id)).toEqual(["soon"]);
   });
 
-  it("puts 23:59:59 and 00:00:00 on two days in the reader's own zone", () => {
-    process.env["TZ"] = "America/New_York";
-    const now = Date.parse("2026-11-05T12:00:00.000Z");
-    const got = agendaOf([event("a", "2026-11-06T04:59:59.000Z"), event("b", "2026-11-06T05:00:00.000Z")], now);
-    expect(got.days.map(({ events }) => events.map(({ id }) => id))).toEqual([["a"], ["b"]]);
-  });
-
-  it("keeps a day whole across a DST change in the reader's zone", () => {
-    process.env["TZ"] = "Europe/Paris";
-    // 2026-10-25: clocks go back at 03:00, a day of 25 hours.
-    const now = Date.parse("2026-10-24T12:00:00.000Z");
+  it("keeps a local day whole however long it is: 2026-10-25 has 25 hours where clocks go back", () => {
+    const at = (day: number, hour: number, minute: number) => new Date(2026, 9, day, hour, minute).getTime();
     const got = agendaOf(
-      [
-        event("a", "2026-10-24T22:30:00.000Z"),
-        event("b", "2026-10-25T22:30:00.000Z"),
-        event("c", "2026-10-25T23:30:00.000Z"),
-      ],
-      now,
+      [event("a", at(25, 0, 30)), event("b", at(25, 23, 30)), event("c", at(26, 0, 30))],
+      at(24, 12, 0),
     );
     expect(got.days.map(({ events }) => events.map(({ id }) => id))).toEqual([["a", "b"], ["c"]]);
   });
