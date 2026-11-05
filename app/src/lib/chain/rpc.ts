@@ -1,12 +1,11 @@
 // The app's three reads of a realm (slice 5 part 2, 5g-reads) around the chain package's (D112, D114): a realm's page
 // (vm/qrender), its functions (vm/qfuncs) and one call (vm/qeval), each asked only for a name evalCall.ts's checks pass, the
-// tier-1 builder of the one expression sent, bar readUser's two fixed expressions below (D283). One request a call. What the
-// realm wrote is returned as text and never interpreted.
+// tier-1 builder of every expression sent (readUser's two included, D283). One request a call. What the realm wrote is returned
+// as text and never interpreted.
 // The app names no universe's chain to its reads yet (D118): each states null.
 import { readEvaluated, readFunctionList, readRender } from "@gnoworld/chain/node";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
-import { Address } from "@gnoworld/schemas";
-import { evalCall, isExportedName, isRealmPath } from "./evalCall.ts";
+import { evalCall, isExportedName, isRealmPath, userCall } from "./evalCall.ts";
 
 const badName = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
   Promise.resolve(failedRead("bad-name", sourceOf(rpc, options)));
@@ -32,22 +31,16 @@ export function readEval(
   return readEvaluated(rpc, call, { ...options, chainId: null });
 }
 
-/** The typed text of one of the two calls on r/sys/users's record of `account`, a fixed expression over an address the schema proved
- * (D92; evalCall.ts builds only `<realm>.<Name>()` and stays as it is). `IsDeleted` answers for a missing record, which `Name` would
- * panic on. Nothing is asked for what is no address. */
+/** The typed text of one of the two calls on r/sys/users's record of `account` (D92, D283: evalCall.ts builds the expression).
+ * `IsDeleted` answers for a missing record, which `Name` would panic on. Nothing is asked for what is no address. */
 export function readUser(
   rpc: string,
   { account, call }: { account: string; call: "IsDeleted" | "Name" },
   options: ReadOptions = {},
 ): Promise<ChainRead<string>> {
-  const proved = Address.safeParse(account);
-  if (!proved.success) return badName(rpc, options);
-  // One of two whole strings, whatever `call` holds at run time: a type is no check on data.
-  const tail = call === "Name" ? "Name()" : "IsDeleted()";
-  return readEvaluated(rpc, `gno.land/r/sys/users.ResolveAddress("${proved.data}").${tail}`, {
-    ...options,
-    chainId: null,
-  });
+  const expression = userCall(account, call);
+  if (expression === null) return badName(rpc, options);
+  return readEvaluated(rpc, expression, { ...options, chainId: null });
 }
 
 type Listing = (Awaited<ReturnType<typeof readFunctionList>> & { ok: true })["value"][number];

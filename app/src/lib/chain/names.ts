@@ -1,6 +1,6 @@
 // The name of an account on one chain (9f), read live from r/sys/users with the block it was read at, and the name the page shows:
 // mainnet's, else Onyx's, else the short address. The expressions are fixed ones over an address the schema proved (as
-// server/src/door/names.ts does, D92): evalCall.ts builds only `<realm>.<Name>()` and stays as it is. `ResolveAddress` gives nil for a
+// server/src/door/names.ts does, D92), built by evalCall.ts's `userCall` (D283). `ResolveAddress` gives nil for a
 // missing or deleted record, which `.Name()` would panic on, so `IsDeleted` is asked first (a nil receiver answers true).
 import { readHeight } from "@gnoworld/chain/node";
 import { Address } from "@gnoworld/schemas";
