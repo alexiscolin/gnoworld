@@ -50,6 +50,19 @@ describe("the ticker with the chain's deploys", () => {
     expect(onyx.map(({ link }) => link)).toEqual([`/r/${ALICE}/theirs`]);
   });
 
+  it("names a deploy by its realm's path with the creator's address cut to its ends, as the room's cards do", () => {
+    const [item] = withChain([], { deploys: [deploy(10)], universe: "onyx", prefix: "" });
+    expect(item?.text).toBe("r/g10gh7…y5tv/counter deployed · block 10");
+  });
+
+  it("caps the path at 80 characters, after the address is cut, and strips what is no text", () => {
+    const long = withChain([], { deploys: [deploy(10, "n".repeat(100))], universe: "onyx", prefix: "" });
+    expect(long[0]?.text).toBe(`r/g10gh7…y5tv/${"n".repeat(66)} deployed · block 10`);
+    const bidi = String.fromCodePoint(0x202e);
+    const hostile = withChain([], { deploys: [deploy(10, `a${bidi}b`)], universe: "onyx", prefix: "" });
+    expect(hostile[0]?.text).toBe("r/g10gh7…y5tv/ab deployed · block 10");
+  });
+
   it("is still six at most, the chain's first, and changes nothing without any deploy", () => {
     const rows = Array.from({ length: 9 }, (_, i) => news(`n${String(i)}`, `2026-10-${String(10 + i)}`));
     const full = withChain(tickerItems(rows, [], NOW), {

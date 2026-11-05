@@ -1,4 +1,5 @@
 // The chain's deploys in the home's strip (slice 9g): the newest of this page's universe first, still six at most, each a link to the realm's own page.
+import { short, stripped } from "../../lib/chainText.ts";
 import type { ChainDeploy } from "../../store/chain.ts";
 import { MOST, type TickerItem } from "./ticker.ts";
 
@@ -9,8 +10,12 @@ export interface Deploys {
   prefix: string;
 }
 
-// A realm's path for the line: what the chain wrote, capped.
-const named = (realm: string): string => realm.slice("gno.land/".length, "gno.land/".length + 80);
+// A realm's path for the line: what the chain wrote, as text, its creator's address cut to its ends as the room's cards cut it, capped.
+const named = (realm: string): string =>
+  stripped(realm)
+    .slice("gno.land/".length)
+    .replace(/g1[0-9a-z]{38}/g, short)
+    .slice(0, 80);
 
 /** The strip with the chain's newest deploys first, from this universe's chain alone (another's is no line of this page's strip), still six at most. */
 export function withChain(items: readonly TickerItem[], { deploys, universe, prefix }: Deploys): TickerItem[] {
