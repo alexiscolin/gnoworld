@@ -6,14 +6,14 @@ export function lazyChain(load: () => Promise<ChainFeed>): ChainFeed {
   let feed: Promise<ChainFeed> | undefined;
   let stopped = false;
   const then = (use: (feed: ChainFeed) => void): void => {
-    const loading = (feed ??= load());
-    loading.then(
+    feed ??= load();
+    feed.then(
       (loaded) => {
         if (!stopped) use(loaded);
       },
       () => {
         // A load that failed is dropped: the next event asks again.
-        if (feed === loading) feed = undefined;
+        feed = undefined;
       },
     );
   };
@@ -29,11 +29,9 @@ export function lazyChain(load: () => Promise<ChainFeed>): ChainFeed {
       stopped = true;
       feed?.then((loaded) => {
         loaded.stop();
-      }, noop);
+      }, ignore);
     },
   };
 }
 
-function noop(): void {
-  return undefined;
-}
+const ignore = () => undefined;
