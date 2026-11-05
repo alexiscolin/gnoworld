@@ -53,10 +53,10 @@ function setup(visible: (room: string) => boolean = () => true) {
     () => true,
   );
   app.route("/api/stream", stream.routes({ proxy: undefined, visible }));
-  const open = async (rooms: string) => {
+  const open = async (rooms: string, lastId?: number) => {
     const response = await app.request(
       `/api/stream?rooms=${encodeURIComponent(rooms)}`,
-      {},
+      lastId === undefined ? {} : { headers: { "last-event-id": String(lastId) } },
       { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
     );
     const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
@@ -172,6 +172,25 @@ describe("the stream's realms event", () => {
       { universe: "gnoland", count: 3, height: 1325774 },
     ]);
     await late.cancel();
+  });
+
+  // F5781: a reader that comes back with its newest id is replayed the counts after it, not the ones it has.
+  it("replays to a returning reader only the counts newer than its Last-Event-ID", async () => {
+    const { stream, open } = setup();
+    stream.realms(COUNT);
+    stream.realms({ universe: "gnoland", count: 3, height: 1325774 });
+    const first = await open("#earth");
+    const text = await first.settled();
+    const ids = [...text.matchAll(/id: (\d+)\nevent: realms/g)].map(([, id = ""]) => Number(id));
+    expect(ids).toHaveLength(2);
+    const [older = 0, newer = 0] = ids;
+    const returning = await open("#earth", older);
+    expect(sent(await returning.settled(), "realms", RealmsDeployed)).toEqual([
+      { universe: "gnoland", count: 3, height: 1325774 },
+    ]);
+    const current = await open("#earth", newer);
+    expect(sent(await current.settled(), "realms", RealmsDeployed)).toEqual([]);
+    await Promise.all([first.cancel(), returning.cancel(), current.cancel()]);
   });
 
   it("tells the readers of the Earth's room only, live", async () => {

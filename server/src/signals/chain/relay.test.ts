@@ -120,6 +120,30 @@ describe("the relay", () => {
     expect(deployed).not.toHaveBeenCalled();
     relay({ events: [], block: { height: 11_099, time } });
     expect(deployed).toHaveBeenCalledTimes(1);
+    // The edge: the 1,000 newest are kept (10,100 on), the one before is not.
+    relay({ events: [], block: { height: 10_100, time } });
+    expect(deployed).toHaveBeenCalledTimes(2);
+    relay({ events: [], block: { height: 10_099, time } });
+    expect(deployed).toHaveBeenCalledTimes(2);
+  });
+
+  // F5781: the blocks' times the relay remembers for the deploys that come after are bounded too.
+  it("remembers the times of the last 100 blocks only: a deploy of an older block waits, one of the oldest kept is counted", () => {
+    const { relay, deployed } = setup();
+    for (let height = 1; height <= 101; height += 1) relay(block(height));
+    relay(events(deploy(1)));
+    expect(deployed).not.toHaveBeenCalled();
+    relay(events(deploy(2)));
+    expect(deployed).toHaveBeenCalledTimes(1);
+    expect(deployed).toHaveBeenCalledWith(expect.objectContaining({ height: 2 }));
+  });
+
+  it("counts a deploy that waited once, however many times its block's frame comes", () => {
+    const { relay, deployed } = setup();
+    relay(events(deploy(9)));
+    relay(block(9));
+    relay(block(9));
+    expect(deployed).toHaveBeenCalledTimes(1);
   });
 
   // Red pass: a bot deploying 100 realms a second is 4 events a second to every ticker, and every deploy is still counted.
