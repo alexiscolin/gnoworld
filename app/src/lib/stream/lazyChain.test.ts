@@ -67,6 +67,30 @@ describe("the lazy feed", () => {
     });
   });
 
+  it("asks for the chunk again on the next event after a load that failed, and gives that event to it", async () => {
+    const told: string[] = [];
+    const feed: ChainFeed = {
+      chain: (data) => {
+        told.push(String(data));
+      },
+      realms: () => undefined,
+      stop: () => undefined,
+    };
+    const load = vi.fn<() => Promise<ChainFeed>>().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(feed);
+    const lazy = lazyChain(load);
+    lazy.chain("a");
+    await vi.waitFor(() => {
+      expect(load).toHaveBeenCalledTimes(1);
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    lazy.chain("b");
+    await vi.waitFor(() => {
+      expect(told).toEqual(["b"]);
+    });
+    expect(load).toHaveBeenCalledTimes(2);
+  });
+
   it("is silent when the chunk cannot load: a feed that is not there is no line", async () => {
     const lazy = lazyChain(() => Promise.reject(new Error("offline")));
     expect(() => {

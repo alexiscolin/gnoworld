@@ -6,10 +6,16 @@ export function lazyChain(load: () => Promise<ChainFeed>): ChainFeed {
   let feed: Promise<ChainFeed> | undefined;
   let stopped = false;
   const then = (use: (feed: ChainFeed) => void): void => {
-    feed ??= load();
-    feed.then((loaded) => {
-      if (!stopped) use(loaded);
-    }, noop);
+    const loading = (feed ??= load());
+    loading.then(
+      (loaded) => {
+        if (!stopped) use(loaded);
+      },
+      () => {
+        // A load that failed is dropped: the next event asks again.
+        if (feed === loading) feed = undefined;
+      },
+    );
   };
   const forward = (name: "chain" | "realms") => (data: unknown) => {
     then((loaded) => {
