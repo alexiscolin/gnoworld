@@ -4,7 +4,7 @@ import { loadRealmCount } from "./count.ts";
 import { makeRelay } from "./relay.ts";
 import type { ChainRead } from "./message.ts";
 
-// Slice 9g: what the subscription's reads become on the stream: coalesced to 4 a second a room, each event with its block
+// Slice 9g: what the poll's reads become on the stream: coalesced to 4 a second a room, each event with its block
 // height; the Earth's count from block times only (a transaction carries none, so a deploy waits for its block).
 const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 // A flood is of many accounts: each has its own address.

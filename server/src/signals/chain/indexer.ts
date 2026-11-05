@@ -100,7 +100,7 @@ export function indexerReaders({ url, watch, log, send = netSend }: IndexerOptio
       if (!height.success) throw new Error("the indexer gave no height");
       return height.data.latestBlockHeight;
     },
-    /** The transactions from this height on (this block included: the follower reads one once by its hash), as the subscription's own texts. */
+    /** The transactions from this height on (this block included: the poll reads one once by its hash), as the texts of a `next` frame. */
     async catchUp(from: number): Promise<string[]> {
       const texts: string[] = [];
       let cursor = from;

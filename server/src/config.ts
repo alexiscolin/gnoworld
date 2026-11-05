@@ -43,7 +43,7 @@ export interface Config {
   markets: string | undefined;
   // The universes' data file: its default universe's RPC is where the prices timer reads the block height; none, no height.
   universes: string | undefined;
-  // The hubs' data file (slice 9g): with the universes' it starts the chain's subscriptions, one a universe; none, no chain.
+  // The hubs' data file (slice 9g): with the universes' it starts the chain's polls, one a universe; none, no chain.
   hubs: string | undefined;
   moderation: {
     openaiKey: Secret | undefined;

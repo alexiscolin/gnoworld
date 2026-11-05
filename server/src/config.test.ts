@@ -169,7 +169,7 @@ describe("loadConfig", () => {
     }
   });
 
-  it("reads the hubs' data file the chain's subscriptions need: absolute, none by default, and never without the universes'", () => {
+  it("reads the hubs' data file the chain's polls need: absolute, none by default, and never without the universes'", () => {
     const universes = { ...ENV, UNIVERSES_FILE: "/app/app/data/universes.json" };
     expect(loadConfig(universes).hubs).toBeUndefined();
     expect(loadConfig({ ...universes, HUBS_FILE: "/app/app/data/hubs.json" }).hubs).toBe("/app/app/data/hubs.json");

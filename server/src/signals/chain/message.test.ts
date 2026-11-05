@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { blocks, call, deploy, NAMEREG, registration } from "../../testing/chainRecorded.ts";
 import { readChainMessage, type ChainContext } from "./message.ts";
 
-// Slice 9g: one frame of the indexer's subscription becomes the room's events, from the recorded frames (Onyx, 2026-11-05). The
+// Slice 9g: one `next` frame of the indexer becomes the room's events, from the recorded frames (Onyx, 2026-11-05). The
 // filter the server asks the indexer for lets other messages through (183 returned, 77 of them `UnexpectedMessage`), so each
 // message's realm and function are checked again here, and a call that failed is no vote.
 const ACCESS = "gno.land/r/g14wv9hyngyrzpxn3ztvnx2jygs50m0240qncm8j/access";

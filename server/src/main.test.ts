@@ -544,7 +544,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     return { universes, hubs };
   };
 
-  // Slice 9g: the chain's rooms. The data's two files start one subscription to each universe's indexer, which the egress way
+  // Slice 9g: the chain's rooms. The data's two files start one poll of each universe's indexer, which the egress way
   // sees as a tunnel; SIGTERM stops it with the rest.
   it("follows each universe's indexer when UNIVERSES_FILE and HUBS_FILE name the data, and stops on SIGTERM", async () => {
     const way = await tunnels();

@@ -58,7 +58,7 @@ const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
 const stream = makeStream();
 const signals = makeSignals(db, { now: Date.now });
 for (const signal of firstSignals(signals, roles.worlds.keys())) stream.signal(signal);
-// The chain in the rooms (9g): one subscription to each universe's indexer, relayed on the stream; none without both data files.
+// The chain in the rooms (9g): one poll of each universe's indexer once a block, relayed on the stream; none without both data files.
 const chain =
   config.universes === undefined || config.hubs === undefined
     ? undefined

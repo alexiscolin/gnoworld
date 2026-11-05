@@ -36,7 +36,7 @@ describe("the 24 h count", () => {
     expect(count.count()).toBe(1);
   });
 
-  it("counts a deploy once, whether the catch-up and the live subscription both give it", async () => {
+  it("counts a deploy once, however many times the catch-up reads it", async () => {
     const count = await loadRealmCount({ history: () => Promise.resolve([deploy(5, HOUR)]), now: () => NOW });
     count.deployed(deploy(5, HOUR));
     count.deployed(deploy(5, HOUR));
