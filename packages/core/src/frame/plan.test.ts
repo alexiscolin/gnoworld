@@ -1,3 +1,4 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import recorded from "../../../../app/lab/worlds.json" with { type: "json" };
 import {
@@ -71,6 +72,35 @@ const ringsOf = (worlds: readonly Orbiter[]) =>
     orbit,
     radius: Math.max(...worlds.filter((world) => world.orbit === orbit).map(({ radius }) => radius)),
   }));
+
+// Each world whole with its name's room under it, off the star's heart, none meeting another or a name, on both screens.
+function standsReadable(system: StarSystem) {
+  const { named } = planOf(system);
+  for (const { look, star, worlds } of seenOn(system)) {
+    const boxes = worlds.map(({ id, seen }) => ({
+      id,
+      left: seen.x - (named.has(id) ? Math.max(seen.radius, NAME.half) : seen.radius),
+      right: seen.x + (named.has(id) ? Math.max(seen.radius, NAME.half) : seen.radius),
+      top: seen.y - seen.radius,
+      bottom: seen.y + seen.radius + (named.has(id) ? NAME.high : 0),
+    }));
+    for (const { seen } of worlds)
+      expect(Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius).toBeGreaterThanOrEqual(STAR_HEART);
+    for (const box of boxes) {
+      expect(box.left).toBeGreaterThanOrEqual(0);
+      expect(box.right).toBeLessThanOrEqual(look.width);
+      expect(box.top).toBeGreaterThanOrEqual(0.09 * look.height);
+      expect(box.bottom).toBeLessThanOrEqual(look.height);
+    }
+    boxes.forEach((box, at) => {
+      for (const other of boxes.slice(at + 1))
+        expect(
+          box.left < other.right && other.left < box.right && box.top < other.bottom && other.top < box.bottom,
+          `${box.id} and ${other.id} on ${String(look.width)} px`,
+        ).toBe(false);
+    });
+  }
+}
 
 describe("a system's Plan", () => {
   it.each(Object.keys(SETS) as SetName[])(
@@ -208,29 +238,7 @@ describe("a system's Plan", () => {
   it.each(Object.keys(SETS) as SetName[])(
     "stands each world of %s whole with its name's room under it, off the star's heart, none meeting another or a name",
     (name) => {
-      for (const system of bodied(name))
-        for (const { look, star, worlds } of seenOn(system)) {
-          const boxes = worlds.map(({ seen }) => ({
-            left: seen.x - Math.max(seen.radius, NAME.half),
-            right: seen.x + Math.max(seen.radius, NAME.half),
-            top: seen.y - seen.radius,
-            bottom: seen.y + seen.radius + NAME.high,
-          }));
-          for (const { seen } of worlds)
-            expect(Math.hypot(seen.x - star.x, seen.y - star.y) - seen.radius).toBeGreaterThanOrEqual(STAR_HEART);
-          for (const box of boxes) {
-            expect(box.left).toBeGreaterThanOrEqual(0);
-            expect(box.right).toBeLessThanOrEqual(look.width);
-            expect(box.top).toBeGreaterThanOrEqual(0.09 * look.height);
-            expect(box.bottom).toBeLessThanOrEqual(look.height);
-          }
-          boxes.forEach((box, at) => {
-            for (const other of boxes.slice(at + 1))
-              expect(
-                box.left < other.right && other.left < box.right && box.top < other.bottom && other.top < box.bottom,
-              ).toBe(false);
-          });
-        }
+      for (const system of bodied(name)) standsReadable(system);
     },
   );
 
@@ -396,5 +404,80 @@ describe("a Plan as drawn", () => {
 
   it("draws nothing for a Plan of no world", () => {
     expect(plannedOf({ system, worlds: [] }, words)).toMatchObject({ places: [], rings: [] });
+  });
+});
+
+// 7v2: the Plan's rules on systems no one chose, as the mock-up's on the three sets above: five rings at most in their real order, worlds
+// sharing them, never evenly spaced, a disc's width apart, sizes in their uses' order within worldSize's 3.5 times, none on the star's heart.
+describe("a Plan of a system no one chose", () => {
+  it("keeps the Plan's rules on random namespaces and uses", () => {
+    fc.assert(
+      fc.property(
+        fc.stringMatching(/^[a-z][a-z0-9]{1,9}$/),
+        fc.array(fc.nat(400), { minLength: 2, maxLength: 24 }),
+        (namespace, uses) => {
+          const system = systemsOf(uses.map((use, at) => ({ id: `${namespace}/w${String(at)}`, namespace, use }))).find(
+            ({ id }) => id === namespace,
+          );
+          if (system === undefined || system.worlds.filter(({ radius }) => radius >= GRAIN).length < 2) return;
+          const plan = planOf(system);
+          const { worlds } = plan.postcard;
+          const rings = ringsOf(worlds);
+          expect(worlds.length).toBeLessThanOrEqual(12);
+          expect(rings.length).toBeLessThanOrEqual(5);
+          expect(rings.map(({ orbit }) => orbit)).toEqual([...rings.map(({ orbit }) => orbit)].sort((a, b) => a - b));
+          for (const [at, ring] of rings.slice(1).entries()) {
+            const inner = rings[at];
+            expect(ring.orbit - (inner?.orbit ?? 0)).toBeGreaterThanOrEqual(
+              2 * Math.max(ring.radius, inner?.radius ?? 0) - 1e-9,
+            );
+          }
+          const radii = worlds.map(({ radius }) => radius);
+          expect(Math.max(...radii) / Math.min(...radii)).toBeLessThanOrEqual(3.5 + 1e-9);
+          const own = new Map(system.worlds.map((world) => [world.id, world.own ?? world.radius]));
+          const byOwn = [...worlds].sort((a, b) => (own.get(a.id) ?? 0) - (own.get(b.id) ?? 0));
+          expect(byOwn.map(({ radius }) => radius)).toEqual([...radii].sort((a, b) => a - b));
+          standsReadable(system);
+        },
+      ),
+      { numRuns: 25 },
+    );
+  });
+});
+
+// F5462 (Alexis, 2026-11-05, the mock-up): a Plan too full names as many worlds as there is room for, the largest first, and counts the rest
+// under a "+N" standing where the last name that does not fit would, on the outer ring.
+describe("a Plan too full to name every world", () => {
+  const crowded = () => {
+    const system = systemsOf(
+      Array.from({ length: 12 }, (_, at) => ({ id: `ahh/w${String(at)}`, namespace: "ahh", use: 0 })),
+    ).find(({ id }) => id === "ahh");
+    if (system === undefined) throw new Error("no system");
+    return system;
+  };
+
+  it("names the worlds there is room for, none meeting another or a world", () => {
+    const system = crowded();
+    const { named, postcard } = planOf(system);
+    expect(named.size).toBeGreaterThan(0);
+    expect(named.size).toBeLessThan(postcard.worlds.length);
+    standsReadable(system);
+  });
+
+  it("names every world of a Plan with room for all", () => {
+    for (const system of bodied("60 mixed systems")) {
+      const { named, postcard } = planOf(system);
+      expect([...named].sort()).toEqual(postcard.worlds.map(({ id }) => id).sort());
+      expect(plannedOf(postcard, { names: new Map(), links: new Map(), named }).more).toBeUndefined();
+    }
+  });
+
+  it("counts the unnamed under a +N on the outer ring, at the last of them there", () => {
+    const { named, postcard } = planOf(crowded());
+    const { more, worlds } = plannedOf(postcard, { names: new Map(), links: new Map(), named });
+    const unnamed = worlds.filter(({ id }) => !named.has(id));
+    expect(more?.count).toBe(unnamed.length);
+    const outer = Math.max(...unnamed.map(({ orbit }) => orbit));
+    expect(more?.id).toBe(unnamed.filter(({ orbit }) => orbit === outer).at(-1)?.id);
   });
 });

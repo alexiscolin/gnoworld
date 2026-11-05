@@ -1,9 +1,11 @@
-// ⌘K and the header's search button, which open the search drawer (frames 98 to 100) over the places the page holds. The drawer is a chunk
-// of its own, asked at the first opening and kept after, so it closes as a dialog does; a new page closes it (a place chosen, Go explore).
+// ⌘K and the header's search button, which open the search drawer (frames 98 to 100) over the places the page holds; a full Plan's "+N" opens
+// it on its namespace, by an event (F5462). The drawer is a chunk of its own, asked at the first opening and kept after, so it closes as a
+// dialog does; a new page closes it (a place chosen, Go explore).
 import { IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import type { UniverseView } from "../../places.ts";
+import { SEARCH } from "../../scene/openEvent.ts";
 import { opensPalette } from "./chord.ts";
 
 const SearchDrawer = lazy(() => import("./SearchDrawer.tsx"));
@@ -11,6 +13,8 @@ const SearchDrawer = lazy(() => import("./SearchDrawer.tsx"));
 export function SearchPalette({ universe }: { universe: UniverseView }) {
   const [open, setOpen] = useState(false);
   const [asked, setAsked] = useState(false);
+  // The words it opens on: a new ask starts the drawer anew on them.
+  const [start, setStart] = useState("");
   const { pathname } = useLocation();
   const [at, setAt] = useState(pathname);
   if (at !== pathname) {
@@ -36,6 +40,15 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
       },
       { signal: controller.signal },
     );
+    window.addEventListener(
+      SEARCH,
+      (event) => {
+        const { detail } = event as CustomEvent<unknown>;
+        setStart(typeof detail === "string" ? detail : "");
+        show();
+      },
+      { signal: controller.signal },
+    );
     return () => {
       controller.abort();
     };
@@ -46,6 +59,8 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
       {asked ? (
         <Suspense fallback={null}>
           <SearchDrawer
+            key={start}
+            start={start}
             universe={universe}
             open={open}
             onClose={() => {

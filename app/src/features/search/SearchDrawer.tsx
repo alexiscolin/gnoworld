@@ -129,14 +129,17 @@ export default function SearchDrawer({
   universe,
   open,
   onClose,
+  start = "",
 }: {
   universe: UniverseView;
   open: boolean;
   onClose: () => void;
+  /** The words it opens on: a full Plan's namespace (F5462). */
+  start?: string;
 }) {
   const navigate = useNavigate();
   const [, openView] = useDeviceView();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(start);
   const [items] = useState(() => searchItemsOf(site));
   const here = useHere(open);
   const close = () => {

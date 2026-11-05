@@ -9,6 +9,7 @@ import { LEAN } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
 import { onPlane, orbitPlace } from "./disc.ts";
 import type { Planned } from "../lod/drawn.ts";
+import { boxOf, MARGIN, meet, namedIn } from "./planNames.ts";
 import { along, cameraTowards, DEGREE, focalOf, looksFrom, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
 /** The most worlds a Plan draws, the largest first: past them its others are dust. */
@@ -42,10 +43,6 @@ const TURN = 2 * Math.PI;
 const LEAST = 0.02;
 const SHRINK = 0.9;
 const NEAR_BEST = 0.8;
-// A name's room under its world, in pixels: its height, and half its width at the least.
-const NAME_HIGH = 30;
-const NAME_HALF = 60;
-const MARGIN = 16;
 
 // A world's own size, its use's, before its system's room caps it (7v's design review, F4470: gnoswap's 16 stood at their crowd's cap).
 const sizeOf = ({ radius, own }: Orbiter) => own ?? radius;
@@ -143,15 +140,7 @@ function readable(
   return looksFrom(camera, PLAN_LENS).every((look) => {
     const star = look.seen(system.place);
     const spots = worlds.map((world) => look.seen(placeOf(system, world, 0), world.radius));
-    const boxes = spots.map(({ x, y, radius, depth }) => ({
-      left: x - Math.max(radius, NAME_HALF),
-      right: x + Math.max(radius, NAME_HALF),
-      top: y - radius,
-      bottom: y + radius + NAME_HIGH,
-      depth,
-    }));
-    const meet = (a: (typeof boxes)[number], b: (typeof boxes)[number]) =>
-      a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+    const boxes = spots.map((spot) => ({ ...boxOf(spot), depth: spot.depth }));
     return (
       spots.every(({ x, y, radius }) => Math.hypot(x - star.x, y - star.y) - radius >= heart) &&
       boxes.every((box) => look.whole(box, MARGIN)) &&
@@ -160,10 +149,15 @@ function readable(
   });
 }
 
+/** A Plan: its view, and the worlds it names (F5462). */
+export interface Plan extends Arrival {
+  readonly named: ReadonlySet<string>;
+}
+
 /** `system`'s Plan: the eye over its plane at a slant, far enough that its outer orbit spans most of the narrower screen, at the first turn
  * from its address's whose largest size that stands every world readable is within a fifth of the best turn's; its first turn at the least
  * size if none does. Its postcard holds the Plan's worlds, still, and leaves out every other. */
-export function planOf(system: StarSystem): Arrival {
+export function planOf(system: StarSystem): Plan {
   const still = { ...system, spin: 0 };
   const worlds = planWorlds(system);
   const [screen] = REST_SCREENS;
@@ -210,6 +204,7 @@ export function planOf(system: StarSystem): Arrival {
     lens: PLAN_LENS,
     up,
     lean: PLAN_LEAN,
+    named: chosen < 0 ? namedIn(still, placed, { camera, lens: PLAN_LENS }) : new Set(placed.map(({ id }) => id)),
   };
 }
 
@@ -223,8 +218,11 @@ const ORIGIN = { x: 0, y: 0, z: 0 };
  * its worlds share a ring of points round the star, in its plane, from the star, with the ring each world stands on. */
 export function plannedOf(
   { system, worlds }: { system: StarSystem; worlds: readonly Orbiter[] },
-  { names, links }: Pick<Planned, "names" | "links">,
+  { names, links, named }: Pick<Planned, "names" | "links"> & { named?: ReadonlySet<string> },
 ): Planned {
+  const unnamed = named === undefined ? [] : worlds.filter(({ id }) => !named.has(id));
+  const outer = Math.max(...unnamed.map(({ orbit }) => orbit));
+  const last = unnamed.filter(({ orbit }) => orbit === outer).at(-1);
   const centred = { ...system, place: ORIGIN };
   const places = worlds.map((world) => {
     const out = { x: 0, y: 0, z: 0 };
@@ -240,5 +238,15 @@ export function plannedOf(
       return out;
     }),
   );
-  return { system, worlds, names, links, places, rings, ringOf: worlds.map(({ orbit }) => orbits.indexOf(orbit)) };
+  return {
+    system,
+    worlds,
+    names,
+    links,
+    places,
+    rings,
+    ringOf: worlds.map(({ orbit }) => orbits.indexOf(orbit)),
+    named: named ?? new Set(worlds.map(({ id }) => id)),
+    more: last === undefined ? undefined : { id: last.id, count: unnamed.length },
+  };
 }
