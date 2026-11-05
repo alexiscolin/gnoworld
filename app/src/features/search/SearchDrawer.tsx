@@ -12,10 +12,11 @@ import { pagePresenceApi } from "../../lib/api/presence.ts";
 import { visitedIn } from "../../lib/visits.ts";
 import { site, type UniverseView } from "../../places.ts";
 import { useApp } from "../../storeContext.tsx";
+import type { Worlds } from "@gnoworld/schemas/indexer";
 import { useWorldsFile } from "../../worldsFile.ts";
 import { GoExplore } from "../home/index.ts";
 import { useWorldsCount } from "../universe/index.ts";
-import { searchItemsOf, searchPlaces, type SearchGroup, type SearchItem } from "./search.ts";
+import { namespaceGroup, searchItemsOf, searchPlaces, type SearchGroup, type SearchItem } from "./search.ts";
 import styles from "./SearchDrawer.module.css";
 
 const KINDS: Record<PlaceKind, string> = {
@@ -86,10 +87,19 @@ const optionsOf = (found: SearchGroup[], here: ReadonlyMap<string, number>): Com
   }));
 
 // "3 / 19" on its arc, the signals left, Go explore and the passport (frame 99).
-function Passport({ universe, open, onPassport }: { universe: UniverseView; open: boolean; onPassport: () => void }) {
+function Passport({
+  universe,
+  open,
+  worlds,
+  onPassport,
+}: {
+  universe: UniverseView;
+  open: boolean;
+  worlds: Worlds["worlds"] | undefined;
+  onPassport: () => void;
+}) {
   const stamped = useApp(({ device }) => stampedIn(device.stamps, universe.id).size);
   const count = passportCount(stamped, useWorldsCount(open) ?? undefined);
-  const worlds = useWorldsFile(open && universe.isDefault);
   const [now] = useState(Date.now);
   const visited = visitedIn(universe.id);
   const signals = worlds?.filter((world) => isFresh(daysSince(world.seen, now), visited(world.id))).length;
@@ -148,6 +158,8 @@ export default function SearchDrawer({
   }
   const [items] = useState(() => searchItemsOf(site));
   const here = useHere(open);
+  // The worlds file the passport reads, read once for it and for a full Plan's namespace (F5470).
+  const worlds = useWorldsFile(open && universe.isDefault);
   const close = () => {
     setQuery("");
     onClose();
@@ -159,6 +171,7 @@ export default function SearchDrawer({
         <Passport
           universe={universe}
           open={open}
+          worlds={worlds}
           onPassport={() => {
             close();
             openView("passport");
@@ -172,7 +185,7 @@ export default function SearchDrawer({
               clearable
               value={query}
               onValueChange={setQuery}
-              groups={optionsOf(searchPlaces(items, query), here)}
+              groups={[...namespaceGroup(worlds, start, query), ...optionsOf(searchPlaces(items, query), here)]}
               onSelect={(path) => {
                 close();
                 Promise.resolve(navigate(path)).catch(reportError);
