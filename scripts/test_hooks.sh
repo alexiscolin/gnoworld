@@ -1439,6 +1439,25 @@ printf '%s' "$out" | grep -qF "TIER1 lacks scripts/" || fail "check_docs did not
 { printf 'const TIER1 = [\n  /*\n  "src/k/",\n  */\n'; tail -n +2 "$t/branch.js"; } >"$v/.claude/workflows/branch.js" && printf '| 1 | The k (`src/k/`) |\n' >>"$v/docs/REVIEW.md"
 out=$(tiers) && fail "check_docs took an entry in a comment of TIER1 for an entry"
 cp "$t/branch.js" "$v/.claude/workflows/branch.js" && cp "$t/tiers.md" "$v/docs/REVIEW.md"
+# The coverage globs held at 100% are docs/REVIEW.md's tier-1 TypeScript paths, never a hand copy (F5543): a tier-1 path under app/, server/
+# or packages/ no glob holds, and a glob that matches no file (a rename leaves it measuring nothing), each fail and are named.
+c="$t/cov-root" && mkdir -p "$c/docs" "$c/.claude/workflows" "$c/server/src/q" && : >"$c/CLAUDE.md" && good_rules "$c"
+printf 'export const q = 1;\n' >"$c/server/src/q/q.ts" && printf 'export const r = 1;\n' >"$c/server/src/r.ts"
+{ sed '$d' "$t/branch.js" | sed '$d'; printf '  "server/src/q/",\n  "server/src/r.ts",\n  ...(A.tier1 ?? []),\n];\n'; } >"$c/.claude/workflows/branch.js"
+{ cat "$t/tiers.md"; printf '| 1 | The q (`server/src/q/`) and the r (`server/src/r.ts`) |\n'; } >"$c/docs/REVIEW.md"
+globs() { printf 'thresholds: {\n  lines: 85,\n  "{%s}/**":\n    { lines: 100, functions: 100, branches: 97.2 },\n  "{%s}":\n    { lines: 100, branches: 97.3 },\n}\n' "$1" "$2" >"$c/vitest.config.ts"; }
+cov() { python3 -I "$docs" "$c" 2>&1; }
+globs server/src/q server/src/r.ts
+out=$(cov) || fail "check_docs refused coverage globs that hold every tier-1 TypeScript path and match a file each: $out"
+globs server/src/q server/src/s.ts
+out=$(cov) && fail "check_docs accepted a tier-1 file (server/src/r.ts) no 100% glob holds (F5543)"
+printf '%s' "$out" | grep -qF "server/src/r.ts" || fail "check_docs did not name the tier-1 path no glob holds: $out"
+printf '%s' "$out" | grep -qF "server/src/s.ts" || fail "check_docs did not name the glob that matches no file: $out"
+globs server/src/gone server/src/r.ts
+out=$(cov) && fail "check_docs accepted a 100% glob that matches no file and a tier-1 folder no glob holds (F5543)"
+printf '%s' "$out" | grep -qF "server/src/q/" || fail "check_docs did not name the tier-1 folder no glob holds: $out"
+printf 'thresholds: {\n  lines: 85,\n  "{server/src/q}/**": { lines: 99.9 },\n  "{server/src/r.ts}": { lines: 100 },\n}\n' >"$c/vitest.config.ts"
+out=$(cov) && fail "check_docs took a glob under 100% for one that holds a tier-1 folder (F5543)"
 # The rules the review depends on, which no other check reads: each of the four agents' briefs says the git-index rule,
 # in its full sentence, and the review card keeps its item 8 (G12); a missing file, folder or sentence fails (CR2).
 r="$t/rules-root" && mkdir -p "$r" && : >"$r/CLAUDE.md" && good_rules "$r"

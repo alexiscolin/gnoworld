@@ -152,6 +152,8 @@ const TIER1 = [
   "server/src/guard.ts",
   "server/src/limit.ts",
   "server/src/config.ts",
+  "packages/service/src/net.ts",
+  "packages/service/src/settings.ts",
   "app/src/features/chat/embeds.ts",
   "app/src/features/chat/Embed.tsx",
   "app/src/features/realms/useExternalLinks.tsx",

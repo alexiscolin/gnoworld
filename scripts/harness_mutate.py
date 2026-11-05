@@ -1063,7 +1063,11 @@ def mutants():
     yield from each("scripts/check_docs.py", "if status not in STATUSES:", "if False:", "hooks", "ledger: a known status")
     # docs/REVIEW.md's tier 1 against the workflow's TIER1, on every commit (F4928).
     cd = "scripts/check_docs.py"
-    yield from each(cd, "or lost or rules or drift:", "or lost or rules:", "hooks", "check_docs fails a tier 1 the workflow does not hold")
+    yield from each(cd, "or lost or rules or drift or globs:", "or lost or rules or globs:", "hooks", "check_docs fails a tier 1 the workflow does not hold")
+    yield from each(cd, "or lost or rules or drift or globs:", "or lost or rules or drift:", "hooks", "check_docs fails a coverage glob that differs from tier 1 (F5543)")
+    yield from each(cd, "if not any(p == h or p.startswith(h + \"/\") or p == h + \"/\" for h in held)]", "if False]", "hooks", "check_docs fails a tier-1 path no 100% glob holds (F5543)")
+    yield from each(cd, "for h in held if not (root / h).is_file() and not any((root / h).rglob(\"*.ts*\"))]", "for h in [] if not (root / h).is_file()]", "hooks", "check_docs fails a 100% glob that matches no file (F5543)")
+    yield from each(cd, 're.search(r"\\blines:\\s*100\\b(?!\\.)", block)', "re.search(r\"\\blines:\", block)", "hooks", "check_docs reads only globs held at 100% (F5543)")
     yield from each(cd, "for p in sorted(tier1 - named) if named]", "for p in [] if named]", "hooks", "check_docs fails a TIER1 entry no tier-1 row names")
     yield from each(cd, "for p in sorted(named - tier1) if tier1]", "for p in [] if tier1]", "hooks", "check_docs fails a tier-1 row TIER1 lacks")
     yield from each(cd, "if len(tier1) < 10 else []", "if False else []", "hooks", "check_docs fails a tier-1 table with no TIER1 to compare with")
@@ -1073,8 +1077,8 @@ def mutants():
     yield from each(cd, 'speeds.rows(str(root))["1"]', '[p for line in review.read_text().splitlines() if line.startswith("| 1 |") for p in re.findall(r"`([^`]*)`", line)]', "hooks", "check_docs reads the table as speeds.py does (lot 2, S2-10)")
     yield from each(cd, 're.sub(r"/\\*.*?\\*/|//[^\\n]*", "", block, flags=re.S)', "block", "hooks", "check_docs leaves TIER1's comments out (lot 2, S2-12)")
     yield from each("scripts/check_docs.py", "problems or orphans or", "problems or", "hooks", "check_docs wants each test beside its file")
-    yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift:", "unnamed or rules or drift:", "hooks", "check_docs wants the runbook's known limits")
-    yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift:", "unnamed or lost or drift:", "hooks", "check_docs fails a lost review rule (G12)")
+    yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or rules or drift or globs:", "hooks", "check_docs wants the runbook's known limits")
+    yield from each("scripts/check_docs.py", "unnamed or lost or rules or drift or globs:", "unnamed or lost or drift or globs:", "hooks", "check_docs fails a lost review rule (G12)")
     yield from each("scripts/check_docs.py", 'limit not in " ".join(said.split())', "limit not in said", "hooks", "check_docs reads a limit wrapped anyhow")
     yield from each("scripts/check_docs.py", "*lost, sep=", "*LIMITS, sep=", "hooks", "check_docs names the limits lost alone")
     yield from each("scripts/check_docs.py", " for sha in shas if sha not in real]", " for sha in shas if False]", "hooks", "ledger: every commit cited is one")

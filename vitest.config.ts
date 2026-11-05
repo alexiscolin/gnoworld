@@ -129,6 +129,12 @@ export default defineConfig({
           { lines: 100, functions: 100, statements: 100, branches: 97.2 },
         "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}":
           { lines: 100, functions: 100, statements: 100, branches: 97.3 },
+        "{packages/service/src/net.ts,packages/service/src/settings.ts}": {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 97.2,
+        },
       },
     },
   },

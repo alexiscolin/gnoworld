@@ -272,12 +272,24 @@ drift += [f"branch.js's TIER1 holds {p}, which no tier-1 row of docs/REVIEW.md n
 drift += [f"docs/REVIEW.md names {p} as tier 1 in backticks, which branch.js's TIER1 lacks" for p in sorted(named - tier1) if tier1]
 if drift:
     print("check_docs: docs/REVIEW.md's tier 1 and the workflow's TIER1 differ: change both in one commit:", *drift, sep="\n  ", file=sys.stderr)
+# The coverage globs held at 100% (vitest.config.ts) are docs/REVIEW.md's tier-1 TypeScript paths (F5543): each such path under app/,
+# server/ or packages/ is in one, and each glob matches a file, as istanbul gives a glob with no file no percentage and so no failure.
+held = []
+for key, block in re.findall(r'"([^"]+)":\s*\{([^}]*)\}', (root / "vitest.config.ts").read_text() if (root / "vitest.config.ts").is_file() else ""):
+    if re.search(r"\blines:\s*100\b(?!\.)", block):
+        braced = re.fullmatch(r"\{(.+)\}(/\*\*)?", key)
+        held += braced.group(1).split(",") if braced else [key.removesuffix("/**")]
+ts = [p for p in sorted(named) if p.startswith(("app/", "server/", "packages/")) and p.endswith(("/", ".ts", ".tsx"))] if held else []
+globs = [f"docs/REVIEW.md names {p} as tier 1, which no glob of vitest.config.ts held at 100% covers" for p in ts if not any(p == h or p.startswith(h + "/") or p == h + "/" for h in held)]
+globs += [f"vitest.config.ts holds {h} at 100%, which matches no file" for h in held if not (root / h).is_file() and not any((root / h).rglob("*.ts*"))]
+if globs:
+    print("check_docs: docs/REVIEW.md's tier-1 TypeScript paths and vitest.config.ts's 100% globs differ: change both in one commit:", *globs, sep="\n  ", file=sys.stderr)
 hidden_chars = hidden(root)
 if hidden_chars:
     print("check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
           " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
           " bytes, IMAGES):", *hidden_chars, sep="\n  ", file=sys.stderr)
-if hidden_chars or missing or problems or orphans or unnamed or lost or rules or drift:
+if hidden_chars or missing or problems or orphans or unnamed or lost or rules or drift or globs:
     sys.exit(1)
 if stray:
     sys.exit(1)
