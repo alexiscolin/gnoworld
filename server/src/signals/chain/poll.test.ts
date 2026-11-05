@@ -139,6 +139,58 @@ describe("the poll", () => {
     expect(delivered[3]).toEqual({ events: [], tip: 7002 });
   });
 
+  it("moves its cursor by the transactions it read, not by the tip: the next catch-up starts at the last one", async () => {
+    let round = 0;
+    const catchUp = vi.fn<PollOptions["catchUp"]>(() => Promise.resolve(round === 2 ? [tx(7003, "a")] : []));
+    const { next, tips } = setup({ tip: () => Promise.resolve([7000, 7005, 7009][round++] ?? 7009), catchUp });
+    await next();
+    await vi.waitFor(() => {
+      expect(tips()).toHaveLength(2);
+    });
+    await next();
+    await vi.waitFor(() => {
+      expect(catchUp).toHaveBeenCalledTimes(2);
+    });
+    expect(catchUp.mock.calls.map(([from]) => from)).toEqual([7000, 7003]);
+  });
+
+  it("leaves its cursor where it is for a text that tells no height", async () => {
+    let round = 0;
+    const catchUp = vi.fn<PollOptions["catchUp"]>(() =>
+      Promise.resolve(round === 2 ? ["not json", "not json either"] : []),
+    );
+    const { next, delivered, tips } = setup({
+      tip: () => Promise.resolve([7000, 7005, 7009][round++] ?? 7009),
+      catchUp,
+    });
+    await next();
+    await vi.waitFor(() => {
+      expect(tips()).toHaveLength(2);
+    });
+    // Both said texts were delivered as reads of no event, and the next catch-up still starts at the tip the last one reached.
+    expect(delivered.filter((read) => read.tip === undefined)).toHaveLength(2);
+    await next();
+    await vi.waitFor(() => {
+      expect(catchUp).toHaveBeenCalledTimes(2);
+    });
+    expect(catchUp.mock.calls.map(([from]) => from)).toEqual([7000, 7005]);
+  });
+
+  it("delivers every block's frame: a block has no hash to read it once by", async () => {
+    let round = 0;
+    const { next, delivered, tips } = setup({
+      tip: () => Promise.resolve([7000, 7005][round++] ?? 7005),
+      catchUp: () => Promise.resolve([blocks[0] ?? "", blocks[1] ?? ""]),
+    });
+    await next();
+    await vi.waitFor(() => {
+      expect(tips()).toHaveLength(2);
+    });
+    expect(delivered.flatMap((read) => (read.block === undefined ? [] : [read.block.height]))).toEqual([
+      908297, 908298,
+    ]);
+  });
+
   it("takes a block's height as read too: the next catch-up starts from it", async () => {
     let round = 0;
     const catchUp = vi.fn<PollOptions["catchUp"]>(() =>
