@@ -1,10 +1,11 @@
-import { StreamEvent } from "@gnoworld/schemas";
+import { Address, StreamEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
 import { logger } from "@gnoworld/service/log";
 import { makeStream, type Stream } from "./stream.ts";
 
 const PEER = "203.0.113.7";
+const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const PROXY = "10.0.0.2";
 const streams: Stream[] = [];
 afterEach(() => {
@@ -250,6 +251,17 @@ describe("the verdicts' stream", () => {
     }
   });
 
+  it("drops a client at the pending its writes may leave unread, not one past: 3 in a burst stay, a fourth drops it", async () => {
+    const { stream, rooms } = setup({ pending: 3 });
+    const kept = await rooms("#a", { peer: "198.51.100.1" });
+    const dropped = await rooms("#bubble", { peer: "198.51.100.2" });
+    await Promise.all([kept.more(), dropped.more()]);
+    for (let n = 1; n <= 3; n += 1) stream.publish(event(n, "#a"));
+    for (let n = 1; n <= 4; n += 1) stream.publish(event(n));
+    await expect.poll(() => stream.size().clients).toBe(1);
+    expect(msgids(await kept.read(3))).toEqual(["m1", "m2", "m3"]);
+  });
+
   it("ends every stream when it closes, for the server's drain", async () => {
     const { stream, rooms } = setup();
     const client = await rooms("#bubble");
@@ -292,6 +304,28 @@ describe("the verdicts' stream, its green pass (3j)", () => {
     expect(replayed.map(({ id }) => Number(id))).toEqual(
       replayed.map(({ id }) => Number(id)).toSorted((x, y) => x - y),
     );
+  });
+
+  it("replays a room's verdicts and its world's signals together in the order they were told", async () => {
+    const { stream, rooms } = setup();
+    stream.publish(event(1));
+    stream.signal({ kind: "chart", world: "bubble", account: ALICE, at: "2026-11-05T12:00:00.000Z" });
+    stream.publish(event(2));
+    const late = await rooms("#bubble");
+    await late.read(2);
+    const told = [...late.raw().matchAll(/id: (\d+)\nevent: (verdict|signal)/g)].map(([, id = "", kind = ""]) => [
+      Number(id),
+      kind,
+    ]);
+    expect(told.map(([, kind]) => kind)).toEqual(["verdict", "signal", "verdict"]);
+    expect(told.map(([id]) => id)).toEqual(told.map(([id]) => id).toSorted((x, y) => Number(x) - Number(y)));
+  });
+
+  it("counts the visitors of the chat's streams and the Earth's together", async () => {
+    const { stream, rooms } = setup();
+    await rooms("#bubble", { peer: "198.51.100.1" });
+    await rooms("#earth", { peer: "198.51.100.2" });
+    expect(stream.size().visitors).toBe(2);
   });
 
   it("keeps a visitor's other streams counted when one of them ends", async () => {
