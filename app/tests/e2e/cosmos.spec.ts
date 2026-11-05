@@ -300,6 +300,9 @@ test("counts in the hero the worlds the cosmos draws", async ({ page }) => {
 // are the field of stars and the nebulae's dust: the approved arrival drew 47,438 on this file, this view 47,437 (7d6, SwiftShader).
 const DRAWS_AT_REST = 90;
 const POINTS_AT_REST = 48_000;
+// The dive's points count 7u's mass (0a7b4534) on top of the field: its particles on the recorded file, and a margin (Alexis, 2026-11-06).
+const MASS_PARTICLES = 11_485;
+const MASS_MARGIN = 100;
 for (const tier of ["high", "low"] as const)
   test(`holds the draw bound and a frame's cost at rest on the ${tier} tier`, async ({ page }) => {
     if (tier === "low")
@@ -406,12 +409,16 @@ for (const tier of ["high", "low"] as const)
     expect(seen.some(({ share, along }) => share === 1 && along < 0.25)).toBe(true);
     // The whole cosmos's two draws, the bodies passing behind the hero's text on the way down (7d9), 7p's two depth bodies among them, and
     // the rocks' one draw. Measured on the recorded file (2026-11-03): 24 draws at most after 7d9, 28 after 7p, 21 or 22 landed; 47,508
-    // points at most, 47,465 landed.
+    // points at most, 47,465 landed; with the mass (2026-11-06) 58,421 at most, 46,940 landed.
     const landedFrame = seen.at(-1);
     expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual((landedFrame?.calls ?? 0) + 7);
     expect(Math.max(...seen.map(({ calls }) => calls))).toBeLessThanOrEqual(DRAWS_AT_REST);
-    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual((landedFrame?.points ?? 0) + 533);
-    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(POINTS_AT_REST);
+    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(
+      (landedFrame?.points ?? 0) + MASS_PARTICLES + MASS_MARGIN,
+    );
+    expect(Math.max(...seen.map(({ points }) => points))).toBeLessThanOrEqual(
+      POINTS_AT_REST + MASS_PARTICLES + MASS_MARGIN,
+    );
     expect(Math.max(...seen.map(({ textures }) => textures))).toBeLessThanOrEqual(tier === "low" ? 40 : 60);
   });
 
