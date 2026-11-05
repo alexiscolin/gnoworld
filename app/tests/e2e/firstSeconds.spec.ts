@@ -15,6 +15,10 @@ const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url),
 const SLOW = { timeout: 90_000 };
 const EARTH_HERE = { world: "earth", here: 184, perHour: 130, rise: 0.21 };
 
+// The crumb's way home from a world's page: 8a's header holds a "Universe" link too.
+const homeByCrumb = (page: Page) =>
+  page.getByRole("navigation", { name: "You are here" }).getByRole("link", { name: "Universe", exact: true }).click();
+
 test.describe.configure({ timeout: 180_000 });
 
 const served = (page: Page, worlds: unknown[] = [EARTH_HERE]) =>
@@ -275,7 +279,7 @@ test.describe("a newcomer", () => {
   test("sees no opening on the home after a shared link to a world", async ({ page }) => {
     await served(page);
     await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
-    await page.getByRole("link", { name: "Universe", exact: true }).click();
+    await homeByCrumb(page);
     await expect(page).toHaveURL(/\/(\?test-gpu)?$/, SLOW);
     await running(page);
     await expect(opening(page)).toHaveCount(0);
@@ -426,7 +430,7 @@ test.describe("a newcomer's Earth label", () => {
   test("sees no Start here after a shared link to a world: a place was entered", async ({ page }) => {
     await served(page);
     await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
-    await page.getByRole("link", { name: "Universe", exact: true }).click();
+    await homeByCrumb(page);
     await expect(earthLabel(page)).toContainText("Earth", SLOW);
     await expect(earthLabel(page)).not.toContainText("Start here");
   });
