@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./mass.ts";
+import type { Point } from "./cell.ts";
 
 const world = (
   id: string,
@@ -236,5 +237,148 @@ describe("massOf", () => {
     const dust = mass.keys.filter((key) => key.startsWith("one#"));
     expect(dust).toHaveLength(3 * MASS.dust);
     expect(dust.every((key) => kindOf(mass, key) === MASS_KIND.dust)).toBe(true);
+  });
+});
+
+// 8r: where StrykerJS found massOf loose (8n's run, 2026-11-05). The survivors no input tells apart are in the ledger, F5518.
+describe("massOf's particles: their spread, sizes, tones and pushes", () => {
+  // A particle's place, size and tone, by its key, read through byKey.
+  const particlesOf = (mass: Mass) => {
+    const all = byKey(mass);
+    return (key: string) => {
+      const [x, y, z, size, , tone] = (all.get(key) ?? []).map(Number);
+      return { x: x ?? NaN, y: y ?? NaN, z: z ?? NaN, size: size ?? NaN, tone: tone ?? NaN };
+    };
+  };
+  type Particle = ReturnType<ReturnType<typeof particlesOf>>;
+  // Offsets of `keys` from `from`, each axis over `reach`: a normal law's draws, mean 0 and spread 1.
+  const offsets = (
+    particle: (key: string) => Particle,
+    keys: readonly string[],
+    { from, reach }: { from: (key: string) => Point; reach: number },
+  ) => (["x", "y", "z"] as const).flatMap((axis) => keys.map((key) => (particle(key)[axis] - from(key)[axis]) / reach));
+  const expectNormal = (draws: readonly number[]) => {
+    const mean = draws.reduce((sum, one) => sum + one, 0) / draws.length;
+    const deviation = Math.sqrt(draws.reduce((sum, one) => sum + (one - mean) ** 2, 0) / draws.length);
+    expect(Math.abs(mean)).toBeLessThan(0.1);
+    expect(deviation).toBeGreaterThan(0.9);
+    expect(deviation).toBeLessThan(1.1);
+    // A normal law holds 68% of its draws within one deviation of its mean.
+    const within = draws.filter((one) => Math.abs(one - mean) < deviation).length / draws.length;
+    expect(within).toBeGreaterThan(0.63);
+    expect(within).toBeLessThan(0.73);
+  };
+  const big = () =>
+    space(
+      "big",
+      [world("big/w0", 5, { realms: Array.from({ length: 300 }, (_, at) => `gno.land/r/big/r${String(at)}`) })],
+      Array.from({ length: 300 }, (_, at) => `gno.land/p/big/p${String(at)}`),
+    );
+  // The fit's scale: a clump's reach after it over its reach before, the root of its 601 real particles' volume.
+  const bigMass = () => {
+    const mass = massOf([big(), space("other", [world("other/w0", 1)])]);
+    const clump = mass.clumps.find(({ id }) => id === "big");
+    if (clump === undefined) throw new Error("no clump big");
+    return { mass, clump, scale: clump.radius / (MASS.size * Math.cbrt(601)), spread: clump.radius * MASS.spread };
+  };
+  const keysFrom = (mass: Mass, start: string) => mass.keys.filter((key) => key.startsWith(start));
+
+  it("spreads a clump's dust, its packages and a world's realms round their middles by normal laws of their own widths", () => {
+    const { mass, clump, spread } = bigMass();
+    const particle = particlesOf(mass);
+    expectNormal(offsets(particle, keysFrom(mass, "big#"), { from: () => clump.centre, reach: spread * 1.25 }));
+    expectNormal(
+      offsets(particle, keysFrom(mass, "gno.land/p/big/"), { from: () => clump.centre, reach: spread * 1.1 }),
+    );
+    expectNormal(
+      offsets(particle, keysFrom(mass, "gno.land/r/big/"), {
+        from: () => particle("big/w0"),
+        reach: spread * MASS.realmNear,
+      }),
+    );
+  });
+
+  it("varies realms and packages from 0.7 to 1.3 times their size and grains from 0.4 to 2 times theirs, after the fit", () => {
+    const { mass, scale } = bigMass();
+    const particle = particlesOf(mass);
+    for (const [start, size] of [
+      ["gno.land/r/big/", MASS.realm],
+      ["gno.land/p/big/", MASS.package],
+    ] as const) {
+      const shares = keysFrom(mass, start).map((key) => particle(key).size / (size * scale));
+      expect(Math.min(...shares)).toBeGreaterThanOrEqual(0.7 - 1e-4);
+      expect(Math.max(...shares)).toBeLessThanOrEqual(1.3 + 1e-4);
+      expect(Math.max(...shares) - Math.min(...shares)).toBeGreaterThan(0.5);
+    }
+    const grains = keysFrom(mass, "big#").map((key) => particle(key).size / (MASS.grain * scale));
+    expect(Math.min(...grains)).toBeGreaterThanOrEqual(0.4 - 1e-4);
+    expect(Math.min(...grains)).toBeLessThan(0.5);
+    expect(Math.max(...grains)).toBeLessThanOrEqual(2 + 1e-4);
+    expect(Math.max(...grains)).toBeGreaterThan(1.8);
+    expect(particle("earth").size / (MASS.earth * scale)).toBeCloseTo(1, 4);
+  });
+
+  it("gives each particle its own tone and each clump its own dust", () => {
+    const { mass, clump } = bigMass();
+    const particle = particlesOf(mass);
+    expect(new Set(mass.keys.map((key) => particle(key).tone)).size).toBeGreaterThan(mass.keys.length / 2);
+    const other = mass.clumps.find(({ id }) => id === "other");
+    const [mine, theirs] = [particle("big#0"), particle("other#0")];
+    expect(other).toBeDefined();
+    const along = (one: Point, { centre, radius }: Clump) => (one.x - centre.x) / radius;
+    expect(along(mine, clump)).not.toBeCloseTo(other === undefined ? NaN : along(theirs, other), 3);
+  });
+
+  it("ranks two namespaces of one score by their ids", () => {
+    const mass = massOf([space("b", [world("b/w", 3)]), space("a", [world("a/w", 3)])]);
+    expect(mass.clumps.map(({ id }) => id)).toEqual(["a", "b"]);
+  });
+
+  it("pushes the less used of two overlapping clumps out just far enough to touch, along the line between them", () => {
+    // Found by a search over n0 to n399 beside six worlds of use 9: these two namespaces' clumps overlap before the push.
+    const worlds = (id: string, use: number) =>
+      Array.from({ length: 6 }, (_, at) => world(`${id}/w${String(at)}`, use));
+    const [first, second] = massOf([space("first", worlds("first", 9)), space("n18", worlds("n18", 1))]).clumps;
+    if (first === undefined || second === undefined) throw new Error("two clumps");
+    const apart = Math.hypot(
+      second.centre.x - first.centre.x,
+      second.centre.y - first.centre.y,
+      second.centre.z - first.centre.z,
+    );
+    expect(apart / (first.radius + second.radius)).toBeCloseTo(MASS.gap, 9);
+  });
+
+  // Goldens, worked out once by this code (8r): the places a normal law's sign or angle gives, and a seventh pass, change no rule above.
+  // A retune of MASS or of the walks moves them: work them out again, and say why in the commit.
+  it("lays a small cosmos's particles where they always have stood", () => {
+    const mass = massOf([
+      space("gnoland", [world("gnoland/home", 4, { realms: ["gno.land/r/gnoland/home"] })], ["gno.land/p/gnoland/ui"]),
+    ]);
+    const particle = particlesOf(mass);
+    const golden = [
+      ["gnoland/home", 70.949, -190.048, 181.006],
+      ["gno.land/r/gnoland/home", 61.879, -186.493, 173.9],
+      ["gno.land/p/gnoland/ui", 108.219, -170.808, 184.452],
+      ["gnoland#0", 66.99, -147.517, 171.089],
+    ] as const;
+    for (const [key, x, y, z] of golden) {
+      const got = particle(key);
+      expect(got.x, key).toBeCloseTo(x, 2);
+      expect(got.y, key).toBeCloseTo(y, 2);
+      expect(got.z, key).toBeCloseTo(z, 2);
+    }
+  });
+
+  it("pushes a crowd apart in six passes, a clump left where the sixth leaves it", () => {
+    const crowd = Array.from({ length: 23 }, (_, at) =>
+      space(
+        `c${String(at)}`,
+        [0, 1, 2, 3].map((w) => world(`c${String(at)}/w${String(w)}`, 1)),
+      ),
+    );
+    const moved = massOf(crowd).clumps.find(({ id }) => id === "c9");
+    expect(moved?.centre.x).toBeCloseTo(-83.466, 2);
+    expect(moved?.centre.y).toBeCloseTo(-182.285, 2);
+    expect(moved?.centre.z).toBeCloseTo(-6.952, 2);
   });
 });

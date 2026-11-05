@@ -1,9 +1,11 @@
 import fc from "fast-check";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
 import { offMoon, type MoonRing } from "../frame/earthMoon.ts";
 import { Look, looksFrom } from "../frame/restLook.ts";
-import { reachOf } from "./parts.ts";
+import { armsOf, dishOf, lamp, wheelOf, wingsOf } from "./around.ts";
+import { greatWheelOf, shellOf } from "./great.ts";
+import { reachOf, type Part } from "./parts.ts";
 import { stationsRound } from "./round.ts";
 import { earthCamera, earthEye, earthTopEye, offEarthViews, sceneryOf } from "./scenery.ts";
 import { stationOf } from "./station.ts";
@@ -190,5 +192,154 @@ describe("the way between the Earth's views", () => {
     const far = planets.map(({ place }) => Math.hypot(place.x - eye.x, place.y - eye.y, place.z - eye.z));
     expect(far).toEqual([...far].sort((a, b) => a - b));
     for (const { place, radius } of planets) expect(offEarthViews(place)).toBeGreaterThan(radius);
+  });
+});
+
+// 8r: what stationOf joins, counted through its calls (8n's StrykerJS run, 2026-11-05): the real parts, each call recorded. Shares are read on
+// 600 names: each bound stands three standard deviations or more off its draw's odds, and a tenth off them fails.
+vi.mock(import("./around.ts"), async (original) => {
+  const real = await original();
+  return {
+    ...real,
+    armsOf: vi.fn(real.armsOf),
+    dishOf: vi.fn(real.dishOf),
+    lamp: vi.fn(real.lamp),
+    wheelOf: vi.fn(real.wheelOf),
+    wingsOf: vi.fn(real.wingsOf),
+  };
+});
+vi.mock(import("./great.ts"), async (original) => {
+  const real = await original();
+  return { ...real, greatWheelOf: vi.fn(real.greatWheelOf), shellOf: vi.fn(real.shellOf) };
+});
+describe("what stationOf joins, by count and share", () => {
+  // A station of `seed` and `size`, with what it was joined from.
+  function built(seed: string, size: number) {
+    vi.clearAllMocks();
+    const station = stationOf(seed, size);
+    // The station's own lights stand on its spine, 0.03 across; the great wheel's stand round its rim.
+    const lights = vi.mocked(lamp).mock.calls.filter(([at, radius]) => radius === 0.03 && at.x === 0 && at.z === 0);
+    const greatParts = [...vi.mocked(greatWheelOf).mock.results, ...vi.mocked(shellOf).mock.results].flatMap(
+      (result) => (result.type === "return" ? result.value : []),
+    );
+    return {
+      station,
+      wheels: vi.mocked(wheelOf).mock.calls.length,
+      armed: vi.mocked(armsOf).mock.calls.length > 0,
+      wings: vi.mocked(wingsOf).mock.calls.length,
+      dishes: vi.mocked(dishOf).mock.calls.length,
+      top: lights.some(([at]) => at.y > 0),
+      bottom: lights.some(([at]) => at.y < 0),
+      greatWheel: vi.mocked(greatWheelOf).mock.calls.map(([, reach]) => reach)[0],
+      shell: vi.mocked(shellOf).mock.calls.map(([, reach]) => reach)[0],
+      hub: station.parts.slice(0, station.parts.length - greatParts.length),
+    };
+  }
+  const NAMES = 600;
+  const built600 = new Map<number, ReturnType<typeof built>[]>();
+  const many = (size: number) => {
+    const kept = built600.get(size) ?? Array.from({ length: NAMES }, (_, n) => built(`project ${String(n)}`, size));
+    built600.set(size, kept);
+    return kept;
+  };
+  const share = <T>(list: readonly T[], test: (one: T) => boolean) => list.filter(test).length / list.length;
+  const most = <T>(list: readonly T[], of: (one: T) => number) => Math.max(...list.map(of));
+
+  describe("a station's wheels (stationOf)", () => {
+    it("a small one has one wheel at most, three times in ten", () => {
+      const small = many(0.1);
+      expect(most(small, ({ wheels }) => wheels)).toBe(1);
+      expect(share(small, ({ wheels }) => wheels === 1)).toBeGreaterThan(0.22);
+      expect(share(small, ({ wheels }) => wheels === 1)).toBeLessThan(0.38);
+    });
+
+    it("from a quarter its wheels are counted: one half the time at a quarter, never two", () => {
+      const quarter = many(0.25);
+      expect(most(quarter, ({ wheels }) => wheels)).toBe(1);
+      expect(share(quarter, ({ wheels }) => wheels === 1)).toBeGreaterThan(0.42);
+      expect(share(quarter, ({ wheels }) => wheels === 1)).toBeLessThan(0.58);
+      expect(most(many(0.5), ({ wheels }) => wheels)).toBe(1);
+    });
+
+    it("past two thirds a station has up to two wheels", () => {
+      expect(most(many(0.9), ({ wheels }) => wheels)).toBe(2);
+    });
+  });
+
+  describe("a station's arms, wings and dishes (stationOf)", () => {
+    it("arms one station in two, more as it grows: five in eight at a half", () => {
+      const half = many(0.5);
+      expect(share(half, ({ armed }) => armed)).toBeGreaterThan(0.55);
+      expect(share(half, ({ armed }) => armed)).toBeLessThan(0.7);
+    });
+
+    it("gives a station with no wheel and no arm a pair of wings at the least, and some with a wheel and arms none", () => {
+      const all = [0.1, 0.5, 0.9].flatMap(many);
+      for (const one of all.filter(({ wheels, armed }) => wheels === 0 && !armed)) expect(one.wings).toBeGreaterThan(0);
+      expect(all.some(({ wheels, armed, wings }) => wheels === 1 && armed && wings === 0)).toBe(true);
+    });
+
+    it("gives up to one pair of wings and one dish when small, up to two pairs at a half and two dishes past it, three pairs at the most", () => {
+      const small = many(0.1);
+      expect(most(small, ({ wings }) => wings)).toBe(1);
+      expect(small.some(({ wings }) => wings === 0)).toBe(true);
+      expect(most(small, ({ dishes }) => dishes)).toBe(1);
+      expect(small.some(({ dishes }) => dishes === 0)).toBe(true);
+      expect(most(many(0.5), ({ wings }) => wings)).toBe(2);
+      expect(most(many(0.9), ({ dishes }) => dishes)).toBe(2);
+      expect(most(many(1), ({ wings }) => wings)).toBe(3);
+    });
+
+    it("lights its spine's top seven times in ten and its foot one in two", () => {
+      const all = many(0.4);
+      expect(share(all, ({ top }) => top)).toBeGreaterThan(0.62);
+      expect(share(all, ({ top }) => top)).toBeLessThan(0.78);
+      expect(share(all, ({ bottom }) => bottom)).toBeGreaterThan(0.42);
+      expect(share(all, ({ bottom }) => bottom)).toBeLessThan(0.58);
+    });
+  });
+
+  describe("an artificial world's great parts (stationOf)", () => {
+    it("builds a great wheel, a shell or both from 0.7, never under", () => {
+      for (const one of many(0.69)) expect(one.greatWheel ?? one.shell).toBeUndefined();
+      const least = many(0.7);
+      for (const one of least) expect(one.greatWheel ?? one.shell).toBeDefined();
+      expect(least.some(({ greatWheel, shell }) => greatWheel !== undefined && shell === undefined)).toBe(true);
+      expect(least.some(({ greatWheel, shell }) => greatWheel === undefined && shell !== undefined)).toBe(true);
+    });
+
+    it("at 0.7 a wheel nearly one time in two, a shell with it one in four; at 1 a wheel three in four, a shell with it one in two", () => {
+      const wheeled = (list: ReturnType<typeof many>) => list.filter(({ greatWheel }) => greatWheel !== undefined);
+      const least = many(0.7);
+      expect(share(least, ({ greatWheel }) => greatWheel !== undefined)).toBeGreaterThan(0.38);
+      expect(share(least, ({ greatWheel }) => greatWheel !== undefined)).toBeLessThan(0.52);
+      expect(share(wheeled(least), ({ shell }) => shell !== undefined)).toBeGreaterThan(0.15);
+      expect(share(wheeled(least), ({ shell }) => shell !== undefined)).toBeLessThan(0.35);
+      const whole = many(1);
+      expect(share(whole, ({ greatWheel }) => greatWheel !== undefined)).toBeGreaterThan(0.67);
+      expect(share(whole, ({ greatWheel }) => greatWheel !== undefined)).toBeLessThan(0.83);
+      expect(share(wheeled(whole), ({ shell }) => shell !== undefined)).toBeGreaterThan(0.45);
+      expect(share(wheeled(whole), ({ shell }) => shell !== undefined)).toBeLessThan(0.65);
+    });
+
+    it("stands its hub within half its reach, and a shell inside the great wheel it comes with", () => {
+      for (const { hub, greatWheel, shell } of [0.7, 1].flatMap(many)) {
+        expect(Math.max(...hub.map((part: Part) => reachOf(part)))).toBeLessThanOrEqual(0.5);
+        if (greatWheel !== undefined && shell !== undefined) expect(shell).toBeLessThan(greatWheel);
+      }
+    });
+  });
+
+  describe("a station's turn (stationOf)", () => {
+    it("spins either way, and points its spine and turns at rest all the way round", () => {
+      const all = many(0.5).map(({ station }) => station);
+      expect(all.some(({ spin }) => spin < 0)).toBe(true);
+      expect(all.some(({ spin }) => spin > 0)).toBe(true);
+      for (const axis of ["x", "z"] as const) {
+        expect(all.some(({ spine }) => spine[axis] < -0.3)).toBe(true);
+        expect(all.some(({ spine }) => spine[axis] > 0.3)).toBe(true);
+      }
+      expect(Math.max(...all.map(({ turn }) => turn))).toBeGreaterThan(1.5 * Math.PI);
+    });
   });
 });
