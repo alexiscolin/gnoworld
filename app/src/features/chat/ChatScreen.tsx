@@ -8,7 +8,7 @@ import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
 import { PlaceInfo } from "./PlaceInfo.tsx";
-import { QuickActions, type Pinned, type QuickActionsProps } from "./QuickActions.tsx";
+import { QuickActions, type DockProps, type Pinned } from "./QuickActions.tsx";
 import { useCompact } from "./useCompact.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
@@ -35,7 +35,7 @@ export interface ChatPlace {
   home: string;
   /** The universe's worlds, in order. */
   worlds: readonly { slug: string; name: string; href: string }[];
-  /** The calls the world's team pins, in the quick actions (D271). */
+  /** The calls the world's team pins (D271): their pills in the quick actions, and the cards they open over them. */
   pinned?: Pinned;
 }
 
@@ -109,10 +109,11 @@ function Docked({ children }: { children: ReactNode }) {
 }
 
 /** What goes under a room's lines: the quick actions over what writes (the composer, or a visitor's word). */
-export function Dock({ children, ...actions }: QuickActionsProps & { children: ReactNode }) {
+export function Dock({ onWhoIsHere, pinned, children }: DockProps) {
   return (
     <div className={styles["dock"]}>
-      <QuickActions {...actions} />
+      {pinned?.cards}
+      <QuickActions onWhoIsHere={onWhoIsHere} pills={pinned?.pills} />
       {children}
     </div>
   );

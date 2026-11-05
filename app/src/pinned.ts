@@ -1,5 +1,6 @@
 // A world's pinned actions (D271), as the data file holds them and as the site gives them: each with the view of its own realm in the
 // world's universe, whose path names the chain the action is read and signed on.
+import { realmViewOf } from "./places.ts";
 
 /** A call a world's team pins: its label, the call, and its realm's view. */
 export interface PinnedCall {
@@ -15,10 +16,6 @@ export interface PinnedRow {
   function: string;
   args: Readonly<Record<string, string>>;
 }
-
-/** The site's view of a realm in a universe: /r/<path> in the default one, /net/<id>/r/<path> in another. */
-export const realmViewOf = (universe: { id: string; isDefault: boolean }, realm: string): string =>
-  `${universe.isDefault ? "" : `/net/${universe.id}`}/r/${realm.slice("gno.land/r/".length)}`;
 
 /** A world's pinned rows, each with its view in the world's universe. */
 export const pinnedOf = (rows: readonly PinnedRow[], universe: { id: string; isDefault: boolean }): PinnedCall[] =>

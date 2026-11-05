@@ -71,6 +71,10 @@ export function pageOf(request: Request): Request {
   return new Request(url);
 }
 
+/** The site's view of a realm in a universe: /r/<path> in the default one, /net/<id>/r/<path> in another. */
+export const realmViewOf = (universe: { id: string; isDefault: boolean }, realm: string): string =>
+  `${universe.isDefault ? "" : `/net/${universe.id}`}/r/${realm.slice("gno.land/r/".length)}`;
+
 /** The site's places as the data files hold them. Built when first asked, never at a module's load (F2206: a build at
  * load is a static mutant, which StrykerJS leaves unjudged). */
 export function siteOf(source: Source) {

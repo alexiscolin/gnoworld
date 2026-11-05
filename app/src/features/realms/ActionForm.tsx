@@ -46,26 +46,15 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
 const Why = ({ text }: { text: string | undefined }) =>
   text === undefined || text === "" || HIDDEN.test(text) ? null : <p dir="ltr">{text}</p>;
 
-// The bar's pill: a link to the realm view for a call of more than two fields (`href`), else a button that opens its card.
-function BarPill({
-  className,
-  href,
-  onClick,
-  children,
-}: {
-  className: string;
-  href: string | undefined;
-  onClick: () => void;
-  children: ReactNode;
-}) {
+// The bar's pill, its look the bar's: a link to the realm view for a call of more than two fields (`href`), else a button that
+// opens its card.
+function BarPill({ href, onClick, children }: { href: string | undefined; onClick: () => void; children: ReactNode }) {
   return href === undefined ? (
-    <button type="button" className={className} onClick={onClick}>
+    <button type="button" onClick={onClick}>
       {children}
     </button>
   ) : (
-    <Link className={className} to={href}>
-      {children}
-    </Link>
+    <Link to={href}>{children}</Link>
   );
 }
 
@@ -83,8 +72,8 @@ export function ActionForm({
   chain: CallPlace["chain"];
   options?: CallPlace["options"];
   viewHref?: string;
-  /** In the quick actions bar: the card the bar draws, which the pill opens, and the bar's look for a pill. */
-  bar?: { card: string; className: string };
+  /** In the quick actions bar: the card the bar draws, which the pill opens. */
+  bar?: { card: string };
 }) {
   const store = useAppStore();
   const place: CallPlace = { realm: action.realm, chain, options };
@@ -106,7 +95,6 @@ export function ActionForm({
   if (bar !== undefined)
     return (
       <BarPill
-        className={bar.className}
         href={compact ? viewHref : undefined}
         onClick={() => {
           open(bar.card);

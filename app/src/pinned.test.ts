@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { pinnedOf, realmViewOf } from "./pinned.ts";
+import { pinnedOf } from "./pinned.ts";
+import { realmViewOf } from "./places.ts";
 
 // 9e-1 (D271): a world's pinned actions, each with the realm view of its own realm in the world's universe, where the chat's link and
 // the chain the action is read and signed on come from: never the world's first realm's.

@@ -10,4 +10,3 @@ export async function drawing() {
 }
 export type Drawing = Awaited<ReturnType<typeof drawing>>;
 export type { ChatPlace } from "./ChatScreen.tsx";
-export type { Pinned, PinnedBarProps } from "./QuickActions.tsx";

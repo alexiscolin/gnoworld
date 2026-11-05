@@ -15,7 +15,8 @@ import {
   warnsMembers,
 } from "../../../tests/callFixtures.ts";
 import type { PinnedRow } from "../../pinned.ts";
-import { Cards, Pills } from "../world/Pinned.tsx";
+import { PinnedBar } from "../world/Pinned.tsx";
+import { Dock } from "./ChatScreen.tsx";
 import { QuickActions } from "./QuickActions.tsx";
 
 // 5q: the row of quick actions over the composer (frame 23.58.01, bottom). Only what works today: Who's here.
@@ -52,12 +53,20 @@ describe("the quick actions of a world with pinned actions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
+  // The dock as a world's route hands it its pinned actions: the pills in the row, the cards over it.
+  const docked = (actions: PinnedRow[], universe = ONYX) => (
+    <Dock
+      onWhoIsHere={() => undefined}
+      pinned={{
+        pills: <PinnedBar part="pills" actions={actions} universe={universe} at="govdao" />,
+        cards: <PinnedBar part="cards" actions={actions} universe={universe} at="govdao" />,
+      }}
+    >
+      {null}
+    </Dock>
+  );
   const draw = (actions: PinnedRow[], universe = ONYX) =>
-    mount(
-      <StoreProvider>
-        <QuickActions onWhoIsHere={() => undefined} pinned={{ actions, universe, Pills, Cards }} />
-      </StoreProvider>,
-    );
+    mount(<StoreProvider>{docked(actions, universe)}</StoreProvider>);
 
   it("puts each confirmed action in the toolbar after Who's here, a pill as Who's here is", async () => {
     vi.stubGlobal("fetch", answer(VOTING));
@@ -65,7 +74,8 @@ describe("the quick actions of a world with pinned actions", () => {
     await calling(box, "Vote");
     const bar = one(box, '[role="toolbar"]');
     expect(all(bar, "button").map((b) => b.textContent)).toEqual(["Who's here", "Vote"]);
-    expect(button(bar, "Vote")?.className).toBe(button(bar, "Who's here")?.className);
+    // The row gives each of its own children the pill's look: the pinned pill is one, as Who's here is.
+    expect([...bar.children]).toEqual([button(bar, "Who's here"), button(bar, "Vote")]);
   });
 
   it("opens the card over the bar, out of the toolbar, prefilled and naming the realm and the function", async () => {
@@ -134,7 +144,7 @@ describe("the quick actions of a world with pinned actions", () => {
           >
             Move
           </button>
-          <QuickActions onWhoIsHere={() => undefined} pinned={{ actions: pinned, universe: ONYX, Pills, Cards }} />
+          {docked(pinned)}
         </>
       );
     }

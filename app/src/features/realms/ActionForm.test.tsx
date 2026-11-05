@@ -335,7 +335,7 @@ describe("a pinned action in the quick actions bar", () => {
               chain={CHAIN}
               options={{ fetch: under }}
               {...(viewHref === undefined ? {} : { viewHref })}
-              bar={{ card: "pinned 0", className: "pill" }}
+              bar={{ card: "pinned 0" }}
             />
           </div>
         </StoreProvider>
@@ -343,11 +343,10 @@ describe("a pinned action in the quick actions bar", () => {
     );
   }
 
-  it("is one pill under its label, with the bar's class, and no form, why or card of its own", async () => {
+  it("is one button under its label, and no form, why or card of its own", async () => {
     const box = inBar(VOTE);
     const pill = await calling(box, "Vote");
     const bar = one(box, '[data-test="bar"]');
-    expect(pill.className).toBe("pill");
     expect(pill.getAttribute("type")).toBe("button");
     expect([...bar.children]).toEqual([pill]);
     expect(all(box, "figure, form, article, input")).toHaveLength(0);
@@ -373,9 +372,7 @@ describe("a pinned action in the quick actions bar", () => {
       ]);
     const box = inBar({ realm: DAO, function: "Grant", args: {} }, vi.fn<ChainFetch>(wide), "/r/gov/dao");
     await vi.waitFor(() => {
-      expect(all(box, "a").map((a) => [a.textContent, a.getAttribute("href"), a.className])).toEqual([
-        ["Vote", "/r/gov/dao", "pill"],
-      ]);
+      expect(all(box, "a").map((a) => [a.textContent, a.getAttribute("href")])).toEqual([["Vote", "/r/gov/dao"]]);
     });
     expect(all(box, "button, article")).toHaveLength(0);
   });
