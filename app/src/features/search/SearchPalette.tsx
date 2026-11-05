@@ -13,7 +13,7 @@ const SearchDrawer = lazy(() => import("./SearchDrawer.tsx"));
 export function SearchPalette({ universe }: { universe: UniverseView }) {
   const [open, setOpen] = useState(false);
   const [asked, setAsked] = useState(false);
-  // The words it opens on: a new ask starts the drawer anew on them.
+  // The words it opens on, none but a full Plan's ask: other words start the drawer anew on them.
   const [start, setStart] = useState("");
   const { pathname } = useLocation();
   const [at, setAt] = useState(pathname);
@@ -22,6 +22,7 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
     setOpen(false);
   }
   const show = () => {
+    setStart("");
     setAsked(true);
     setOpen(true);
   };
@@ -33,10 +34,7 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
         if (!opensPalette(event)) return;
         // The browser's own use of the chord (Firefox's address bar) is left; a dialog already open keeps the screen.
         event.preventDefault();
-        if (document.querySelector("dialog[open]") === null) {
-          setAsked(true);
-          setOpen(true);
-        }
+        if (document.querySelector("dialog[open]") === null) show();
       },
       { signal: controller.signal },
     );
@@ -44,8 +42,8 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
       SEARCH,
       (event) => {
         const { detail } = event as CustomEvent<unknown>;
-        setStart(typeof detail === "string" ? detail : "");
         show();
+        setStart(typeof detail === "string" ? detail : "");
       },
       { signal: controller.signal },
     );

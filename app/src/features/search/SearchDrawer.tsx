@@ -140,6 +140,12 @@ export default function SearchDrawer({
   const navigate = useNavigate();
   const [, openView] = useDeviceView();
   const [query, setQuery] = useState(start);
+  // Each opening starts from its words: a closing cleared them, and the same ask again must find them.
+  const [shown, setShown] = useState(open);
+  if (open !== shown) {
+    setShown(open);
+    if (open) setQuery(start);
+  }
   const [items] = useState(() => searchItemsOf(site));
   const here = useHere(open);
   const close = () => {

@@ -48,4 +48,17 @@ describe("the search drawer asked from the page", () => {
     await settled(() => drawer() !== null);
     expect(drawer()?.dataset["start"]).toBe("");
   });
+
+  // G3: the button and the chord open on no words, after a Plan's ask too.
+  it("opens on no words from its button after a Plan asked it on its own", async () => {
+    const router = createMemoryRouter([{ path: "/", element: <SearchPalette universe={universe} /> }]);
+    const box = mount(<RouterProvider router={router} />);
+    ask("gnoswap");
+    await settled(() => drawer()?.dataset["start"] === "gnoswap");
+    act(() => {
+      box.querySelector<HTMLButtonElement>("button[aria-label='Search']")?.click();
+    });
+    await settled(() => drawer()?.dataset["start"] === "");
+    expect(drawer()?.dataset["start"]).toBe("");
+  });
 });
