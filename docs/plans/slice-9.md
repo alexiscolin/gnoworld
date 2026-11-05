@@ -55,6 +55,6 @@ None. The browser talks to `window.adena` directly through `lib/adena` (ADR-0002
 1. The call card sits in the thread or on the plate, with the video's look; never a dialog.
 2. Two universes, one for Onyx (later the other devnets), one for mainnet, the main one: a name registers on the universe's chain; the name shown is mainnet's, else Onyx's, else the short address.
 3. Claude writes `core/args`; Alexis reads it.
-4. The server subscribes to the indexers and relays; the CSP is unchanged.
+4. The server subscribes to the indexers and relays; the CSP is unchanged. (Amended by D266 (answer 9g-4): the server polls each indexer over HTTP once a block; it does not subscribe.)
 5. The recordings are made from this MacBook once Alexis opens gnomcp's network here (his sandbox setting).
 6. Alexis records Adena's real answers once, on Onyx, at 9b's end.
