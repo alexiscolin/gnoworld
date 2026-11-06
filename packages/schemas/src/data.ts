@@ -80,9 +80,14 @@ export const RealmPath = z
 /** The most a call's arguments may hold, as a Jarvis proposal and a world's pinned action give them, in code points. */
 export const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
 
-/** A call's arguments by the parameter's name, as text: what a call carries. */
-export const CallArgs = z.pipe(
-  // Zod drops a key `__proto__` (an own key from JSON.parse) without a word: its argument would vanish unseen.
+/** A call's arguments by the parameter's name, as text: what a call carries, and what a model is shown of them. */
+export const CallArgs = z
+  .record(text(CALL_CAPS.name), z.string().check(z.maxLength(CALL_CAPS.arg)))
+  .check(z.refine((args) => Object.keys(args).length <= CALL_CAPS.args, "too many arguments"));
+
+// A team's arguments from a data file: Zod drops a key `__proto__` (an own key from JSON.parse) without a word, so its argument
+// would vanish unseen; refused first. Not Jarvis's: a pipe shows a model no shape (jarvis/src/allowlist.ts's input schema).
+const DataArgs = z.pipe(
   z
     .unknown()
     .check(
@@ -91,9 +96,7 @@ export const CallArgs = z.pipe(
         "no argument is named __proto__",
       ),
     ),
-  z
-    .record(text(CALL_CAPS.name), z.string().check(z.maxLength(CALL_CAPS.arg)))
-    .check(z.refine((args) => Object.keys(args).length <= CALL_CAPS.args, "too many arguments")),
+  CallArgs,
 );
 
 // A label drawn on a button that leads to a signature: words a reader sees as they are (no control, format or separator character,
@@ -109,7 +112,7 @@ const PinnedAction = z.strictObject({
   label: Label,
   realm: RealmPath,
   function: text(CALL_CAPS.name),
-  args: CallArgs,
+  args: DataArgs,
 });
 
 const World = z
