@@ -288,7 +288,8 @@ walk every story in Chromium, in the full gate.
   by Playwright and compared with the approved images (the browser and its platform: slice 2's
   plan). A new baseline is its own commit, which Alexis reviews; changing or deleting an
   approved one fails the push unless the commit says why (`Updated-baseline:`,
-  `scripts/check_regressions.py`).
+  `scripts/check_regressions.py`). Since the speed plan (2026-11-06) the default runs compare none: the pictures spec stays in the repository and
+  runs in `check.sh --everything`; the approved video is the reference, compared by eye, and the design is decided live.
 - **Invariants,** measured in the browser on every story and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
   - every target is at least 24 px, the default control 44 px by touch;

@@ -1,30 +1,17 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "plugins": ["@stryker-mutator/vitest-runner", "@stryker-mutator/typescript-checker"],
+  "plugins": [
+    "@stryker-mutator/vitest-runner"
+  ],
   "testRunner": "vitest",
-  "checkers": ["typescript"],
   "mutate": [
-    "packages/*/src/**/*.{ts,tsx}",
-    "!packages/*/src/**/*.test.{ts,tsx}",
-    "!packages/*/src/**/*.stories.tsx",
-    "!packages/*/src/index.ts",
-    "!packages/ui/src/Overview/**",
-    "!packages/*/src/testSetup.ts",
-    "!packages/chain/src/testing/**",
-    "app/src/**/*.{ts,tsx}",
-    "!app/src/**/*.test.{ts,tsx}",
-    "!app/src/routes.ts",
-    "!app/src/root.tsx",
-    "!app/src/entry.server.tsx",
-    "server/src/**/*.ts",
-    "!server/src/**/*.test.ts",
-    "!server/src/main.ts",
-    "!server/src/testing/**",
-    "jarvis/src/**/*.ts",
-    "!jarvis/src/**/*.test.ts",
+    "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,packages/core/src/chain,packages/core/src/markdown,app/src/sw,server/src/ergo,jarvis/src}/**/*.{ts,tsx}",
+    "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}",
+    "{packages/service/src/net.ts,packages/service/src/settings.ts}",
+    "!**/*.test.{ts,tsx}",
+    "!**/testing/**",
     "!jarvis/src/main.ts",
-    "!jarvis/src/**/*.bench.ts",
-    "!jarvis/src/testing/**"
+    "!jarvis/src/**/*.bench.ts"
   ],
   "incremental": true,
   "dryRunTimeoutMinutes": 20,
@@ -48,5 +35,12 @@
     "CLAUDE.md",
     "CLAUDE.local.md",
     "AGENTS.md"
-  ]
+  ],
+  "mutator": {
+    "excludedMutations": [
+      "StringLiteral",
+      "ObjectLiteral",
+      "ArrayDeclaration"
+    ]
+  }
 }

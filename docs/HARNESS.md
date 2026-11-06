@@ -12,6 +12,31 @@ Three ideas run through it:
   and switching the check off must make a test fail.
 - **What costs no tokens runs first.** Scripts and linters before any model.
 
+## The speed plan (Alexis, 2026-11-06): nothing deleted, less called by default
+
+Goal: from the end of a slice's code to `main`, 15-20 minutes, everything included. No test, snapshot, picture or check was deleted: the
+default runs do not call the ones the plan drops, and one command calls everything. Where this section disagrees with the rest of this file,
+it holds.
+
+- **Default** (`check.sh`, `--full`, `--merge`, the commit gate): tier 1 of `docs/REVIEW.md` (wallet signing, realms, login and roles,
+  moderation, Jarvis's tools and egress in `jarvis/src/`, the deploy) keeps full rigor; a commit with no tier-1 path runs the types, the lint,
+  prettier, the build when the app changed and `check_docs` (`scripts/speeds.py --tier1`; a doubt is tier 1); `--full`/`--merge` add the
+  journeys of `check.sh` (tier 1's and the critical flows: the file list in `lane_ts`, flights' two smoke tests by title), the coverage of tier-1
+  files and core (`vitest.config.ts`, the `packages/core/**` floor kept), the secrets' scan, the audit, and, only when a harness file changed,
+  the probe, the bench, `test_hooks.sh`, the harness mutants, and the stories (also for `packages/ui`) without their pictures. `--merge` adds
+  StrykerJS on the changed tier-1 lines (`stryker.config.json`, now tier 1 only, no TypeScript checker) and records the full gate too.
+  No declaration line is asked (`check_regressions.py`, `prove_fix.py`, `batch_size.py`, the `fix` check of commit-msg and pre-commit,
+  the Stop hook's gate): they stay as files and are called only under `GNOWORLD_STRICT=1` or `--everything`.
+- **On demand**: the Vitest tests the inventory (`.claude/tmp/slice-8/reports/inventory-tests.md`) marks display-only are in the `display` and
+  `display_ui` projects of `vitest.config.ts` (`vitest run --project display --project display_ui`); the journeys not in the default list, the
+  pictures and compositions specs of the stories, and all snapshot folders stay in the repository.
+- **Everything**: `pnpm run test:all` = `sh scripts/check.sh --everything`: the old full gate, every lane: StrykerJS whole
+  (`stryker.all.config.json`, `pnpm run mutate:all`), the probe, test_hooks, harness_mutate, the stories and their pictures, every journey, every
+  Vitest project with the old coverage floors (`COVERAGE_ALL`), check_regressions, prove_fix, batch_size, the patch's coverage.
+  `GNOWORLD_STRICT=1` gives every mode its old behaviour; `scripts/test_hooks.sh` exports it, so its fixtures test the old paths as before.
+- **Ship**: `sh scripts/ship.sh` (sandbox) runs the check that fits the change, records the pass, writes the log row and the
+  `Harness-changed:` lines, commits docs only, and prints Alexis's merge and push commands.
+
 ## The picture
 
 ![How the AI works: Alexis's approvals, the chief session and the branch sessions, each branch's Workflow loop, the agents, the gates, the merge and the dream](harness.png)
@@ -78,7 +103,7 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    branch, never on a fixer's tests; the commit that brings the tests and their code carries
    `Red-pass: <findings fixed>`.
 3. **Code.** Before each Bash command, web fetch or edit, `scripts/guard.py` runs.
-4. **End of each turn.** When code changed, the Stop hook (`scripts/stop_gate.sh`) stops the turn
+4. **End of each turn.** By default the Stop hook only reaps stray processes (below); with `GNOWORLD_STRICT=1`, when code changed, it (`scripts/stop_gate.sh`) stops the turn
    once unless the fast gate, which Claude runs in the sandbox, passed on exactly this tree. The
    hook itself runs nothing from the repository. First, it stops what runs of this project left
    behind, which the sandbox cannot see: a node process naming a folder `gnoworld/` whose parent
@@ -119,8 +144,13 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
    command that removes it. `test_hooks.sh`'s section `deploy_lock` runs it against stubbed Docker.
-9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, which shows
-   each harness file the branch changes, with its diff, before git writes it. Pushing `main` wants
+9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, onto the branch
+   checked out (`main`, or a part's), which shows each harness file the merge changes (git
+   merge-tree's tree, with HEAD's attributes), with its diff, before git writes it, and refuses
+   a harness file in conflict and a non-empty `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`; a merge
+   stopped on a conflict outside the harness (the ledgers, every time) it commits itself, with its
+   own message, once resolved, on Enter; then it undoes any commit that is not the merge shown
+   (its parents, its harness), with `git reset --hard` (it began on a clean tree). Pushing `main` wants
    the hooks installed from it, the full gate recorded green on that code, the committed review
    pass for exactly that tree, and each harness file changed since the remote's `main` declared on
    a line `Harness-changed: <path> - why`. Claude can do neither: the sandbox refuses the merge's
@@ -584,7 +614,12 @@ costs context in every session.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
   harness is refused at its commit, its files written already: undo it at once
   (`git merge --abort`). A cherry-pick, a rebase or a checkout of Claude's branch runs no such
-  check (F153); a merge with a conflict that changes the harness needs the branch rebased first.
+  check (F153). pre-commit compares only the merge's harness files with git merge-tree's merge of
+  the commit merge.sh marked: one changed during the resolution, or in conflict, is refused; the
+  other files are resolved by hand and gated (9n), and so is a merge read through a non-empty
+  `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`, which a sandboxed command can write. A mark anyone
+  types by hand for a clean merge merge.sh never showed still passes (a backlog row on
+  slice-9n, answer 9n-4): merge.sh never asks Alexis to type one.
 - **A merge refuses a path with a non-ASCII character** (F164).
 - **The install is not atomic** (F159), and a fresh clone has no hooks until its owner installs
   them from `main`.

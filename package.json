@@ -20,7 +20,9 @@
     "mutate": "stryker run",
     "unused": "knip --no-progress",
     "copies": "jscpd .",
-    "comments": "node scripts/check_comments.mjs"
+    "comments": "node scripts/check_comments.mjs",
+    "mutate:all": "stryker run stryker.all.config.json",
+    "test:all": "sh scripts/check.sh --everything"
   },
   "devDependencies": {
     "@eslint-react/eslint-plugin": "5.28.0",

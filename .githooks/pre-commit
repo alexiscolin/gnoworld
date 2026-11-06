@@ -35,9 +35,29 @@ if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 			exit 1
 		fi
 		changed=$(harness --cached --name-only HEAD)
-		if [ -n "$changed" ] && [ "$(git merge-tree --write-tree HEAD "${GNOWORLD_MERGE:-}" 2>/dev/null)" != "$(git write-tree)" ]; then
-			echo "pre-commit: this merge changes the harness, which merge.sh did not show you first, and has written it: undo it now (git merge --abort, or git reset --hard after a squash), then sh .git/hooks/merge.sh <branch>" >&2
-			exit 1
+		if [ -n "$changed" ]; then
+			# Each harness file is committed as the merge of the commit merge.sh showed holds it (records.sh's merge_of), none
+			# in conflict; the other files, every merge's ledgers first, are resolved by hand, and the gate below checks their
+			# code (9n). Nor is a merge read through .git/info, which any session can write (9n's /pre-merge).
+			merged=$(merge_of "${GNOWORLD_MERGE:-}")
+			tree=$(printf '%s\n' "$merged" | sed -n 1p)
+			clash=$(printf '%s\n' "$merged" | sed 1d)
+			rewiring=$(rewired)
+			why=
+			if [ -n "$rewiring" ]; then
+				why="$rewiring, which any session can write, changes how git merged it"
+			elif [ -z "$tree" ]; then
+				why="names no commit merge.sh showed (GNOWORLD_MERGE)"
+			elif [ -n "$clash" ]; then
+				why="a harness file was in conflict, so it is not as merge.sh showed it: $clash"
+			else
+				drift=$(harness --cached --name-only "$tree")
+				[ -z "$drift" ] || why="its harness differs from the merge merge.sh showed: $drift"
+			fi
+			if [ -n "$why" ]; then
+				echo "pre-commit: this merge changes the harness, but $why; undo it now (git merge --abort, or git reset --hard after a squash), then sh .git/hooks/merge.sh <branch>" >&2
+				exit 1
+			fi
 		fi
 	fi
 	sh "$(dirname "$0")/scan_secrets.sh" --staged
@@ -91,12 +111,13 @@ changed=$(git -c core.quotePath=false diff --cached --no-renames --name-only HEA
 # MERGE_HEAD only after that hook), or a merge in progress. Always set, so a caller's own value counts for nothing.
 merge=0
 { [ "${1:-}" = --merge ] || git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; } && merge=1
+# Only with GNOWORLD_STRICT=1 (the speed plan, 2026-11-06: by default no declaration check runs; scripts/test_hooks.sh runs it on).
 # A commit that touches a test, a bench or an approved picture runs the staged check_regressions.py here, in the repository (the
 # copy has no git), with the base check.sh takes: where the branch left main, so a `Removed-test:` line of an earlier commit of the
 # branch counts, else HEAD (a renamed test passed the fast gate in 5b and failed only the merge check). Not in a merge, whose full
 # gate follows, nor with no commit yet. The list of tests is check.sh's, the same.
 tests=$(printf '%s\n' "$changed" | grep -E '\.(test|bench)\.tsx?$|\.spec\.ts$|_test\.(gno|go)$|-snapshots/.*\.png$|__screenshots__/.*\.png$' || :)
-if [ "$merge" = 0 ] && [ -n "$tests" ] && base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null); then
+if [ "${GNOWORLD_STRICT:-}" = 1 ] && [ "$merge" = 0 ] && [ -n "$tests" ] && base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null); then
 	nodebin= # Vitest's list in check_regressions reads the Node .node-version pins (a bare shell may hold another)
 	[ ! -f .node-version ] || nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat .node-version)/bin:"
 	env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE PATH="$nodebin$PATH" python3 -I "$s/check_regressions.py" --quick "$base"

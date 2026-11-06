@@ -136,7 +136,7 @@ def journeys_mutants():
         ("\t\treturn 0\n\tfi\n\t# Three free ports", "\tfi\n\t# Three free ports", "stops after the build at a commit"),
         ("\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true ;;", "\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true app=true ;;", "builds the app for a change of its tests alone"),
         ("\t\tapp/tests/*) ts=true ;;", "\t\tapp/tests/*) ts=true app=true ;;", "builds the app for a change of a journey"),
-        ("--reporter=dot,json >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
+        ("--reporter=dot,json $journeys >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', '{ $full || [ -n "$tested" ]; } || format_cache=', "keeps Prettier's cache in a staged copy and none in a repository"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', "format_cache=", "keeps Prettier's cache in a staged copy"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', '[ -z "$tested" ] || format_cache=', "gives --full and --merge Prettier's writable cache"),
@@ -1215,7 +1215,7 @@ def mutants():
     yield from each(ih, '[ "$(git rev-parse --path-format=absolute --git-path hooks)" = "$hooks" ] ||', "true ||", "hooks", "install_hooks fails while git takes hooks from elsewhere")
     ms = ".githooks/merge.sh"
     yield from each(ms, 'cd "$(git rev-parse --show-toplevel)"', ":", "hooks", "merge.sh reads the harness from the root, from any folder")
-    yield from each(ms, '[ "$(git symbolic-ref -q --short HEAD)" = main ] ||', "true ||", "hooks", "merge.sh merges onto main only")
+    yield from each(ms, '|| { echo "merge.sh: check out the branch', '|| : || { echo "merge.sh: check out the branch', "hooks", "merge.sh merges onto a branch, never onto no branch (9n-3)")
     yield from each(ms, '[ -z "$(git status --porcelain)" ] ||', "true ||", "hooks", "merge.sh merges onto a clean tree only")
     yield from each(ms, "if [ -n \"$changed\" ]; then", "if false; then", "hooks", "merge.sh shows the harness a branch changes")
     yield from each(ms, 'shown=$(harness --text ', "shown=$(harness ", "hooks", "merge.sh shows a file as text, whatever git takes it for (F132)")
@@ -1228,10 +1228,23 @@ def mutants():
     yield from each(".githooks/pre-commit", "merge=0\n{", "merge=1\n{", "hooks", "pre-commit gives a work commit its time budget")
     yield from each(".githooks/pre-commit", '{ [ "${1:-}" = --merge ] || git', "{ false || git", "hooks", "pre-commit tells the staged gate of pre-merge-commit's merge")
     yield from each(".githooks/pre-commit", "|| git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; } && merge=1", "|| false; } && merge=1", "hooks", "pre-commit tells the staged gate of a merge in progress")
-    yield from each(".githooks/pre-commit", '[ -n "$changed" ] && ', "", "hooks", "pre-commit wants merge.sh only for a merge that changes the harness")
-    yield from each(".githooks/pre-commit", '[ "$(git merge-tree --write-tree HEAD "${GNOWORLD_MERGE:-}" 2>/dev/null)" != "$(git write-tree)" ]',
-                    '[ -z "${GNOWORLD_MERGE:-}" ]', "hooks", "pre-commit wants merge.sh's mark for this merge, not any (F129)")
-    yield from each(".githooks/pre-commit", 'sh .git/hooks/merge.sh <branch>" >&2\n\t\t\texit 1', 'sh .git/hooks/merge.sh <branch>" >&2', "hooks", "pre-commit refuses a merge merge.sh did not show")
+    pc, rs = ".githooks/pre-commit", ".githooks/records.sh"
+    yield from each(pc, '\t\tif [ -n "$changed" ]; then\n\t\t\t# Each harness file', '\t\tif true; then\n\t\t\t# Each harness file', "hooks", "pre-commit wants merge.sh only for a merge that changes the harness")
+    yield from each(pc, 'if [ -n "$rewiring" ]; then', "if false; then", "hooks", "pre-commit refuses a merge of the harness read through .git/info (9n's /pre-merge)")
+    yield from each(pc, 'elif [ -z "$tree" ]; then', "elif false; then", "hooks", "pre-commit wants merge.sh's mark to name a commit (F129)")
+    yield from each(pc, 'elif [ -n "$clash" ]; then', "elif false; then", "hooks", "pre-commit refuses a harness file in conflict, whatever the resolution keeps (9n)")
+    yield from each(pc, '[ -z "$drift" ] ||', "true ||", "hooks", "pre-commit wants every harness file as merge.sh's merge holds it (9n)")
+    yield from each(pc, 'drift=$(harness --cached ', 'drift=$(harness ', "hooks", "pre-commit compares the harness in the index, what is committed (9n)")
+    yield from each(pc, 'if [ -n "$why" ]; then', "if false; then", "hooks", "pre-commit refuses a merge merge.sh did not show (F129)")
+    yield from each(pc, 'sh .git/hooks/merge.sh <branch>" >&2\n\t\t\t\texit 1', 'sh .git/hooks/merge.sh <branch>" >&2', "hooks", "pre-commit stops a merge merge.sh did not show")
+    yield from each(rs, "git --attr-source=HEAD ", "git ", "hooks", "a merge is read with HEAD's attributes, not a .gitattributes the merge wrote (9n's /pre-merge)")
+    yield from each(rs, "merge-tree --write-tree --name-only ", "merge-tree --write-tree ", "hooks", "merge-tree's conflicts are read by their names (9n)")
+    yield from each(rs, 'grep -xF -e "$ours"', 'grep -xF "$ours"', "hooks", "a harness path that starts with - is a name, not an option (9n's review)")
+    yield from each(rs, ' || [ $? = 1 ]\n)', '\n)', "hooks", "a merge with no harness file in conflict is no failure (9n)")
+    yield from each(rs, 'git rev-parse -q --verify "$tree^{tree}" >/dev/null || exit 0', ":", "hooks", "a mark that names no commit merges nothing (F129)")
+    rewiring = ("info/attributes", "info/grafts", "shallow")
+    for f in rewiring:
+        yield from each(rs, f"for f in {' '.join(rewiring)}; do", f"for f in {' '.join(g for g in rewiring if g != f)}; do", "hooks", f"the hooks refuse a merge read through .git/{f} (9n's /pre-merge)")
     yield from each(".githooks/pre-commit", '	sh "$(dirname "$0")/code_changed.sh" --staged', "	sh scripts/code_changed.sh --staged", "hooks", "pre-commit runs its own code_changed.sh, not the working tree's (F129)")
     yield from each(".githooks/pre-commit", '	sh "$(dirname "$0")/scan_secrets.sh" --staged', "	sh scripts/scan_secrets.sh --staged", "hooks", "pre-commit runs its own scan, not the working tree's (F129)")
     yield from each(".githooks/pre-merge-commit", " --merge", "", "hooks", "pre-merge-commit tells pre-commit it is a merge (F129)")
@@ -1244,7 +1257,22 @@ def mutants():
     yield from each(ih, "grep -vxF", "grep -vF", "hooks", "install_hooks takes a hook's whole name, not a part of it")
     yield from each(ih, "git config pull.ff only", ":", "hooks", "install_hooks keeps a pull a fast-forward")
     yield from each(ih, '$check || mkdir -p "$hooks"', ":", "hooks", "install_hooks makes a missing hooks folder")
-    yield from each(ms, ' "$tip"\n', ' "$branch"\n', "hooks", "merge.sh merges the commit it showed, not where the branch is now")
+    yield from each(ms, ' "$tip"; then\n\tkept', ' "$branch"; then\n\tkept', "hooks", "merge.sh merges the commit it showed, not where the branch is now")
+    yield from each(ms, '[ -z "$rewiring" ] ||', "true ||", "hooks", "merge.sh refuses to merge through .git/info (9n's /pre-merge)")
+    yield from each(ms, 'if [ -n "$clash" ]; then', "if false; then", "hooks", "merge.sh refuses a harness file that would be in conflict (9n's review)")
+    yield from each(ms, 'changed=$(harness --name-only HEAD "$shown_tree")', 'changed=$(harness --name-only HEAD..."$tip")', "hooks", "merge.sh lists what the merge does to the harness, not what the branch changed (9n's /pre-merge)")
+    yield from each(ms, '--color=never HEAD "$shown_tree")', '--color=never HEAD..."$tip")', "hooks", "merge.sh shows what the merge does to the harness, not what the branch changed (9n's /pre-merge)")
+    yield from each(ms, 'git commit -m "$message"', 'git commit --no-edit', "hooks", "merge.sh commits with its own message, not .git/MERGE_MSG (9n's /pre-merge)")
+    yield from each(ms, '[ "$(git rev-parse -q --verify HEAD^1)" = "$start" ] &&', "true &&", "hooks", "merge.sh undoes a merge onto a branch moved while it was made (9n's /pre-merge)")
+    yield from each(ms, '[ "$(git rev-parse -q --verify HEAD^2)" = "$tip" ] &&', "true &&", "hooks", "merge.sh undoes a merge of another commit than the one shown (9n's /pre-merge)")
+    yield from each(ms, '! git rev-parse -q --verify HEAD^3 >/dev/null &&', "true &&", "hooks", "merge.sh undoes a merge with a third parent (9n's /pre-merge)")
+    yield from each(ms, '[ -z "$(harness --name-only "$shown_tree" HEAD)" ] &&', "true &&", "hooks", "merge.sh undoes a merge whose harness changed after the hooks (9n's /pre-merge)")
+    yield from each(ms, 'git reset -q --hard "$start" ||', ': ||', "hooks", "merge.sh puts the branch back when it undoes a merge (9n's /pre-merge)")
+    yield from each(ms, 'git reset -q --hard "$start" ||', 'git reset -q --keep "$start" ||', "hooks", "merge.sh undoes even a commit whose index alone was swapped (9n's /pre-merge, round 2)")
+    yield from each(ms, 'is back at $start" >&2\n\texit 1', 'is back at $start" >&2\n\texit 0', "hooks", "merge.sh fails when it undoes a merge (9n's /pre-merge)")
+    yield from each(ms, '[ -n "$(git diff --name-only --diff-filter=U)" ] || exit 1', "true || exit 1", "hooks", "merge.sh waits only on a merge in conflict (9n)")
+    yield from each(ms, "while read -r _; do", "while false; do", "hooks", "merge.sh commits a merge in conflict itself, once resolved (9n's review)")
+    yield from each(ms, 'git merge --abort" >&2\nexit 1', 'git merge --abort" >&2\nexit 0', "hooks", "merge.sh fails when nothing was committed (9n)")
     ck = "scripts/check.sh"
     hooks = ("commit-msg", "pre-commit", "pre-merge-commit", "pre-push")
     for hook in hooks:
@@ -1459,7 +1487,7 @@ def mutants():
     yield from each("scripts/guard.py", "isinstance(cwd, str) and ", "", "hooks", "guard reads an event with no folder (F5058)")
     yield from each("scripts/guard.py", 'return bool(words) and os.path.basename(words[0]) == "worktree.sh"', "return False", "hooks", "guard sees a run of worktree.sh (F5058)")
     yield from each("scripts/guard.py", 'words = [w for w in words[1:] if not w.startswith("-")]', "words = words[1:]", "hooks", "guard sees worktree.sh past a shell's options (F5058)")
-    yield from each("scripts/check.sh", "unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
+    yield from each("scripts/check.sh", "unset COVERAGE_ALL GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/code_changed.sh", 'git ls-files -s -- "$@"; git diff --binary -- "$@";', "git rev-parse HEAD; git diff HEAD --binary;", "hooks", "code_changed state leaves prose out")
@@ -1774,7 +1802,7 @@ def mutants():
         ("\t\tpython3 -I scripts/probe.py\n", "\t\tpython3 -I scripts/probe.py || :\n", "--full fails when the probe does (G2)"),
         ("\t\tpython3 -I scripts/bench.py\n", "\t\tpython3 -I scripts/bench.py || :\n", "--full fails when a bench passes its budget (G2)"),
         ('\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge and --full fail when the batch is too large (G2)"),
-        ("ts=true app=true tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
+        ("ts=true app=true; ! $strict || tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
         ("\t$tokens || return 0\n\t! $light", "\t! $light", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
         ("finish ts types tests gno docs pictures ||", "finish ts types tests gno docs ||", "a failed tokens comparison fails the gate (F1190)"),
@@ -1792,7 +1820,7 @@ def mutants():
         ('run coverage "--maxWorkers=$half ', 'run coverage "', "--full caps Vitest's coverage at half the machine (F777)"),
         ("--concurrency $cores --incrementalFile", "--concurrency $half --incrementalFile", "StrykerJS runs alone on every core (Alexis, 2026-11-04)"),
         ("\tstart probe\n\tphase probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
-        ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
+        ("\t! $merge || ! $strict || full=false", "\t:", "--merge records no full gate"),
         ("\tif $merging; then\n", "\tif false; then\n", "a merge commit has no time budget (Alexis, 2026-10-28)"),
         ("\tif git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then merging=true; fi\n", '\tif [ -e "$(git rev-parse --git-path MERGE_HEAD)" ]; then merging=true; fi\n', "a MERGE_HEAD git cannot read is no merge, the budget holds"),
         ("\tif git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then merging=true; fi\n", "\t:\n", "a merge in progress, in a repository, has no time budget"),

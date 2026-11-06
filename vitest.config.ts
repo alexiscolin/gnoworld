@@ -15,6 +15,35 @@ if (process.version !== PINNED)
 const STRYKER_TMP = "**/.stryker-tmp/**";
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
+// The tests the inventory (.claude/tmp/slice-8/reports/inventory-tests.md) marks display-only: props, classes, variants, markup, the look
+// of a world, small view components. They stay in the repository, and run in the `display` and `display_ui` projects, on demand
+// (`vitest run --project display --project display_ui`) and in `check.sh --everything`, not in the default `test` and `coverage` runs.
+const DISPLAY_UI = [
+  "packages/ui/src/{Avatar,Breadcrumb,Button,Card,ChatLayout,Chip,EmptyState,Kicker,Logo,NavItem,Overview,Panel,PlanetThumb,Row,Skeleton,Sparkline,Stat,TokensPage,compositions,icons}/**/*.test.{ts,tsx}",
+  "packages/ui/src/tokens.test.ts",
+];
+const DISPLAY = [
+  "app/src/routes/*.test.tsx",
+  "app/src/{shell,slots,root,routerLink}.test.tsx",
+  "app/src/scene/earth/{look,maps}.test.ts",
+  "app/src/scene/planet/{light,maps,signShaders}.test.ts",
+  "app/src/scene/world/shaders.test.ts",
+  "app/src/scene/cosmos/maps.test.ts",
+  "app/src/features/world/*.test.tsx",
+  "app/src/features/chat/{ChatHeader,LineHead,MessageBox,NoticeModes,OnlyKnown,PersonCard,PlaceInfo,QuickActions,Reactions,RoomChips,RoomMenu,RoomSections,Saved,SavedView}.test.tsx",
+  "app/src/features/realms/{ReadSource,RealmCard,RealmFacts}.test.tsx",
+  "app/src/features/universe/{Credits,FlightPanel}.test.tsx",
+  "app/src/features/home/{Height,GoExplore,LatestOnX}.test.tsx",
+  "app/src/features/list/PlacesList.test.tsx",
+  "app/src/features/update/UpdatePrompt.test.tsx",
+  "app/src/features/follow/FollowButton.test.tsx",
+  "app/src/features/events/Calendar.test.tsx",
+  "app/src/features/account/AccountMenu.test.tsx",
+  "app/src/features/share/ShareSheet.test.tsx",
+  "app/src/features/settings/DeviceSection.test.tsx",
+  "app/src/features/previews/{Preview,PreviewCard}.test.tsx",
+];
+
 // core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode otherwise
 // than Node's (F816, F817). The project exists only when CORE_CHROMIUM is set, so the coverage,
 // StrykerJS, `vitest list` and a file run alone never open a browser.
@@ -77,8 +106,14 @@ export default defineConfig({
             "app/src/features/chat/composing.test.tsx",
             "app/src/features/chat/lineFlash.test.tsx",
             ...SLOW,
+            ...DISPLAY,
           ],
         },
+      },
+      {
+        // The display-only tests of the app, on demand (see DISPLAY).
+        extends: true,
+        test: { name: "display", include: DISPLAY, exclude: [...configDefaults.exclude, "packages/ui/**"] },
       },
       {
         // The real Ergo's tests and the check's soak: the full gate runs them, the fast gate leaves them.
@@ -91,9 +126,21 @@ export default defineConfig({
         test: {
           name: "ui",
           include: ["packages/ui/src/**/*.test.{ts,tsx}"],
+          exclude: [...configDefaults.exclude, ...DISPLAY_UI],
           environment: "jsdom",
           setupFiles: ["packages/ui/src/testSetup.ts"],
           // Vitest reads a stylesheet as empty unless named here: the token page reads the token file.
+          css: { include: [/tokens\.css/] },
+        },
+      },
+      {
+        // The design system's display-only tests, on demand (see DISPLAY_UI): the same environment as `ui`.
+        extends: true,
+        test: {
+          name: "display_ui",
+          include: DISPLAY_UI,
+          environment: "jsdom",
+          setupFiles: ["packages/ui/src/testSetup.ts"],
           css: { include: [/tokens\.css/] },
         },
       },
@@ -104,7 +151,16 @@ export default defineConfig({
       // Every source file counts, tested or not, so an untested file shows as 0%.
       // The app too, but for the document shell and the server entry, which only the build
       // renders, and Storybook's pages, whose handlers do nothing: the Playwright journeys walk them.
-      include: ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "server/src/**/*.ts", "jarvis/src/**/*.ts"],
+      // By default (the speed plan, Alexis 2026-11-06): tier 1 of docs/REVIEW.md, core and jarvis, whose floors below hold. `check.sh --everything`
+      // sets COVERAGE_ALL: every file, as before, with the display-only tests run too.
+      include: process.env["COVERAGE_ALL"]
+        ? ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "server/src/**/*.ts", "jarvis/src/**/*.ts"]
+        : [
+            "packages/core/src/**/*.{ts,tsx}",
+            "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,app/src/sw,server/src/ergo,jarvis/src}/**/*.{ts,tsx}",
+            "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}",
+            "{packages/service/src/net.ts,packages/service/src/settings.ts}",
+          ],
       exclude: [
         "app/src/root.tsx",
         "app/src/entry.server.tsx",
