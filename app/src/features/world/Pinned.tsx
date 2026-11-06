@@ -30,7 +30,7 @@ export function PinnedForms({ pinned, options }: PinnedFormsProps) {
         action={call.action}
         label={call.label}
         chain={found.chain}
-        {...(options === undefined ? {} : { options })}
+        options={options}
       />
     );
   });

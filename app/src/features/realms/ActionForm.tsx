@@ -20,15 +20,9 @@ export interface ProposedCall {
   why?: string | undefined;
 }
 
-const fieldOf = (name: string, value: string): FormField => ({
-  tag: "input",
-  name,
-  inputType: "",
-  value,
-  placeholder: "",
-  description: "",
-  flags: "",
-});
+function fieldOf(name: string, value: string): FormField {
+  return { tag: "input", name, inputType: "", value, placeholder: "", description: "", flags: "" };
+}
 
 // The function the action calls, and its texts and fields, when the chain confirms it: a write a call carries, every argument named for a parameter.
 function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
@@ -43,8 +37,9 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
 
 // Jarvis's words, set left to right, as text and nothing else: a reason holding a control or format character (a bidi override
 // draws reversed inside an isolate too) is not drawn at all; the card below says the true realm, function and arguments.
-const Why = ({ text }: { text: string | undefined }) =>
-  text === undefined || text === "" || HIDDEN.test(text) ? null : <p dir="ltr">{text}</p>;
+function Why({ text }: { text: string | undefined }) {
+  return text === undefined || text === "" || HIDDEN.test(text) ? null : <p dir="ltr">{text}</p>;
+}
 
 // The bar's pill, its look the bar's: a link to the realm view for a call of more than two fields (`href`), else a button that
 // opens its card.
