@@ -42,8 +42,8 @@
   .open {
     /* layout: the words one under the other, each as wide as itself */
     display: grid;
-    /* layout: the step between those words */
-    row-gap: var(--space-2xs);
+    /* layout: the step between those words, in its one column */
+    gap: var(--space-2xs);
     /* layout: each word at the start */
     justify-items: start;
     /* layout: the words packed in the middle of the card's height, a step apart, as frame 26 sets them */

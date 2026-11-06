@@ -1,4 +1,4 @@
-/* The dialog: a surface (Popover/surface.module.css) in the top layer, 460 px or 760, never wider than
+/* The dialog: a surface (Popover/surface.module.css) in the top layer, 490 px or 760, never wider than
    the screen, over the scrim. */
 @layer components {
   .dialog {

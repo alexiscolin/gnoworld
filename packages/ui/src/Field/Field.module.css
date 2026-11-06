@@ -1,18 +1,15 @@
-/* The field: a box on the resting fill, one line at the default control's height, or a box of lines of two rows or more; invalid, coral. */
+/* The field: a box on the resting fill, one line at the default control's height and its two edges, or a box of lines of two rows or more;
+   invalid, coral. */
 @layer components {
   /* The box and, with a prefix, its frame wear one look: the edge, the corners and the fill. */
+  /* The strong line at rest and under the pointer, frame 10's edge (F5968). */
   .box,
   .frame {
-    --_line: var(--color-line);
+    --_line: var(--color-line-strong);
 
     border: var(--line-width) solid var(--_line);
     border-radius: var(--radius-m);
     background: var(--color-fill);
-  }
-
-  .box:hover,
-  .frame:hover {
-    --_line: var(--color-line-strong);
   }
 
   .box[aria-invalid="true"],
@@ -25,14 +22,15 @@
 
     /* A drag of the box's handle never makes it wider than its place: its neighbour stays in view. */
     max-inline-size: 100%;
-    min-block-size: var(--control-m);
+    /* Frame 10's field is 46 px: the default control inside its two edges (F5967). */
+    min-block-size: calc(var(--control-m) + 2 * var(--line-width));
     padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
     font: var(--font-field);
   }
 
   .box::placeholder {
-    color: var(--color-text-muted);
+    color: var(--color-text-faint);
   }
 
   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls (F1722, F1729); a
@@ -70,8 +68,8 @@
     flex: 1;
     min-inline-size: 0;
 
-    /* The frame's edge is outside this height: the control stays as tall as the others. */
-    min-block-size: calc(var(--control-m) - 2 * var(--line-width));
+    /* The frame's edges are outside this height, as a bare box's are. */
+    min-block-size: var(--control-m);
     padding-inline-start: var(--space-2xs);
     border: 0;
     background: transparent;

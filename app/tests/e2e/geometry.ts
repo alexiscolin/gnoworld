@@ -38,6 +38,17 @@ export const brightShare = (page: Page, picture: Buffer, least: number): Promise
 /** The mean light of each box of `picture`. */
 export const brightness = async (page: Page, picture: Buffer, boxes: [number, number, number, number][]) =>
   (await colours(page, picture, boxes)).map(([red, green, blue]) => 0.2126 * red + 0.7152 * green + 0.0722 * blue);
+/** The colour a token computes to on this page, read through a probe element. */
+export const tokenColour = (page: Page, token: string) =>
+  page.evaluate((name) => {
+    const probe = document.createElement("i");
+    probe.style.color = `var(${name})`;
+    document.body.append(probe);
+    const colour = getComputedStyle(probe).color;
+    probe.remove();
+    return colour;
+  }, token);
+
 /** A computed style of the first element a selector finds. */
 export const style = (page: Page, selector: string, property: string) =>
   page

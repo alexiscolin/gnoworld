@@ -219,10 +219,10 @@ test.describe("Dialog", () => {
     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("H2");
   });
 
-  test("is 460 px wide, or 760 when wide, never wider than the screen", async ({ page }) => {
+  test("is 490 px wide (the frames), or 760 when wide, never wider than the screen", async ({ page }) => {
     for (const [id, width] of [
-      ["dialog--standard", 460],
-      ["dialog--without-close", 460],
+      ["dialog--standard", 490],
+      ["dialog--without-close", 490],
       ["dialog--wide", 760],
     ] as const) {
       await page.setViewportSize({ width: 1280, height: 800 });

@@ -129,7 +129,7 @@
   }
 
   /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
-  /* The search is a control's own size, 40 px (44 by touch), centred in the pill's 34 px between its padding: the pill keeps its height. */
+  /* The search is a control's own size, 44 px, centred in the pill's 34 px between its padding: the pill keeps its height. */
   .views button {
     /* layout: the control's overflow is shared by both sides, so it stays on the pill's middle line */
     /* raw: the 34 px between the pill's padding */

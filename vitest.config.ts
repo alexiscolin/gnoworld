@@ -148,11 +148,9 @@ export default defineConfig({
       ...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),
     ],
     coverage: {
-      // Every source file counts, tested or not, so an untested file shows as 0%.
-      // The app too, but for the document shell and the server entry, which only the build
-      // renders, and Storybook's pages, whose handlers do nothing: the Playwright journeys walk them.
-      // By default (the speed plan, Alexis 2026-11-06): tier 1 of docs/REVIEW.md, core and jarvis, whose floors below hold. `check.sh --everything`
-      // sets COVERAGE_ALL: every file, as before, with the display-only tests run too.
+      // By default (the speed plan, Alexis 2026-11-06): tier 1 of docs/REVIEW.md, core and jarvis, whose floors below hold.
+      // `check.sh --everything` sets COVERAGE_ALL: every source file, tested or not (an untested one shows 0%), but the document
+      // shell, the server entry and Storybook's pages, which the journeys walk; the display-only tests run too.
       include: process.env["COVERAGE_ALL"]
         ? ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "server/src/**/*.ts", "jarvis/src/**/*.ts"]
         : [

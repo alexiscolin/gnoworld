@@ -49,7 +49,7 @@ export function NameDialog({ open, account, network, fee, phase, onRegister, onC
   return (
     <Dialog title="Pick a name and a face" kicker="YOUR GNO.LAND NAME" hideClose open={open} onClose={onClose}>
       <Stack space="s">
-        <p className={styles["note"]}>
+        <p className={styles["note"]} data-size="reading">
           Your name is kept by <code>r/sys/namereg</code> on {networkOf(network)}.
         </p>
         <Avatar address={account} name="You" size="l" />

@@ -439,11 +439,6 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
     expect(line).toBeDefined();
     expect(line?.className).toContain("lede");
   });
-
-  it("wraps its buttons in the tall control of the frame, 44 px (F5735)", () => {
-    const footer = all(view(), "footer")[0];
-    expect(footer?.parentElement?.className).toContain("tall");
-  });
 });
 
 // Alexis (D272): a GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and

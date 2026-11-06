@@ -132,6 +132,13 @@ describe("NameDialog: the design system's own parts", () => {
     expect(dialog.getAttribute("aria-describedby")).toContain(kicker?.id ?? "no id");
   });
 
+  // F5970: the line under the title is the frames' reading size, the other notes stay small.
+  it("sets the line naming the registry in the reading size, and no other note", () => {
+    const sized = all(view().box, "dialog p[data-size]");
+    expect(sized).toHaveLength(1);
+    expect(sized[0]?.querySelector("code")).not.toBeNull();
+  });
+
   // F5964: frames 9 to 15 put the line naming the registry first, then the face, then the field.
   it("says the line naming r/sys/namereg before the face, and the face before the field", () => {
     const { box } = view();

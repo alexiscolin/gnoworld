@@ -8,9 +8,8 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
-// worker's precache; steps in docs/decisions.md. A plate's page, within the +4 KiB over 183,128 B Alexis gave the plates' pages: the
-// Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-// 192,299 B once slice 9 met slice 8 (the Earth's page, the highest; the worlds' pages 188,707), measured on that merge.
+// worker's precache; each raise in docs/decisions.md. 192,299 B once slice 9 met slice 8 (the Earth's page, the highest; the worlds'
+// pages 188,707), measured on that merge.
 const FIRST_SCREEN_JS = 192_299;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
@@ -146,10 +145,9 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // for Alexis: 7f2's report for the Earth, 7e's for a world.
 const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with what
-// it asks once open: 8d's chat within Alexis's 23 KiB, RoomsDrawer's 768 B (docs/decisions.md, 2026-11-05), 8p's 18 B for the dock's close,
-// and 1,060 B for the column's pictures, their manifest, the rail's order and its Credits button (slice-8: 25,167 B).
-// 25,880 B once slice 9 met slice 8 (the chain cards, the pinned pills and their wrapping row).
+// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with
+// what it asks once open; slice-8's 25,167 B (its steps in docs/decisions.md), 25,880 B once slice 9 met slice 8 (the chain cards, the
+// pinned pills and their wrapping row).
 const LATE_CHAT_JS = 25_880;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
@@ -615,8 +613,7 @@ for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [
 
 // A page's capture under a chat line (8f), on a world with no realm, whose page loaded none of the realm view's code: what the capture
 // brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap (8f's review, 1).
-// 7,445 B: the capture's code, the realm page's reader and drawing, and the warning before a link leaves; capped at its size and 256 B.
-// 8,122 B once slice 9 met slice 8 (slice 9's code in the capture).
+// 7,445 B before slice 9 (the capture's code, the realm page's reader and drawing, the warning before a link leaves); 8,122 B with it.
 const LINE_PREVIEW_JS = 8122;
 test("a page's capture under a line, on a world with no realm, stays within its cap", async ({ page }) => {
   const scripts = new Set<string>();

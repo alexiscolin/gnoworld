@@ -72,9 +72,10 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* Open, the field's edge stays on the strong line, as when hovered: the state is drawn, not only announced. */
+  /* Open, the field takes the hover fill: its edge is the strong line at rest already (F5968), and the state is drawn, not only
+     announced. */
   .field[aria-expanded="true"]:not(:focus) {
-    --_line: var(--color-line-strong);
+    background: var(--color-fill-hover);
   }
 
   .list [aria-selected="true"] {

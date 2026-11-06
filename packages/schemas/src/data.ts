@@ -4,7 +4,7 @@
 import { Key, SLUG_CAP } from "./slug.ts";
 import { z } from "./zod.ts";
 
-export { Key, Slug } from "./slug.ts";
+export { Key } from "./slug.ts";
 
 /** The most a data file may hold: rows in a list, and each kind of string, in characters. */
 export const DATA_CAPS = {

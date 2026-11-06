@@ -4,22 +4,7 @@ import { act, useEffect } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
-import { LoginControl, useLogin } from "./LoginControl.tsx";
-
-// The header's account holds the hook and the way out (8p): this stands in for it, the way out shown once the session is in.
-function Account() {
-  const { login, logIn, logOut } = useLogin();
-  return (
-    <>
-      <LoginControl login={login} logIn={logIn} />
-      {login.session.kind === "in" ? (
-        <button type="button" onClick={logOut}>
-          Log out
-        </button>
-      ) : null}
-    </>
-  );
-}
+import { Account } from "./testing/Account.tsx";
 
 // F5669: only the journeys mounted LoginControl, which StrykerJS does not run. The page's real login, its fetch and its
 // window.adena faked: the session read, a login, an account change, a network change, the page's leaving.

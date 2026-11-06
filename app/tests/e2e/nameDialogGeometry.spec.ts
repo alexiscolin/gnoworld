@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./fixtures.ts";
-import { box, near, style } from "./geometry.ts";
+import { box, near, style, tokenColour } from "./geometry.ts";
 import { logIn } from "./namesChain.ts";
 
 // 9k (answer 9f-1): the name dialog at the video's size (1728 by 1080) against frames 9 to 15, read off the frames' pixels: the
@@ -46,6 +46,13 @@ test.describe("the name dialog against the frames", () => {
     expect(face.y + face.height, "the face is above the field").toBeLessThanOrEqual(field.y);
   });
 
+  // F5970: the registry line is 13 px with a 1.5 leading (frame 10), the notes below it 12 px.
+  test("sets the registry line in 13 px over 19.5 px", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    expect(await style(page, "dialog[open] p:has(code)", "font-size")).toBe("13px");
+    expect(await style(page, "dialog[open] p:has(code)", "line-height")).toBe("19.5px");
+  });
+
   // F5981: the frames draw the registry's path in the text colour with no fill, not as a chip.
   test("draws the registry's path in the text colour, on no fill", async ({ page }) => {
     await opened(page, [1728, 1080]);
@@ -67,10 +74,45 @@ test.describe("the name dialog against the frames", () => {
     expect(prefix.x + prefix.width).toBeLessThanOrEqual(field.x + field.width);
   });
 
-  // F5972: a prefixed field is a control, 40 px like the others, its frame's edge inside that height.
-  test("draws the field's box 40 px tall, as the other fields are", async ({ page }) => {
+  // F5967 (answer 9k-3): frame 10's field is 46 px from edge to edge (rows 566 to 611), a 44 px control and its two edges.
+  test("draws the field's box 46 px tall, the control's 44 and its edges", async ({ page }) => {
     await opened(page, [1728, 1080]);
-    expect((await box(page, "dialog[open] [data-part='box']")).height).toBe(40);
+    expect((await box(page, "dialog[open] [data-part='box']")).height).toBe(46);
+  });
+
+  // F5967: frame 14's Register fill and frame 10's Later border run from row 654 to 697, 44 px.
+  test("draws Register and Later 44 px tall", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    for (const name of ["Register · 0 GNOT", "Later"])
+      expect((await dialog(page).getByRole("button", { name }).boundingBox())?.height, name).toBe(44);
+  });
+
+  // F5969: frame 10's title has capitals 19 px tall, Geist 300 at 26 px.
+  test("sets the title in 26 px", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    expect(await style(page, "dialog[open] h2", "font-size")).toBe("26px");
+  });
+
+  // F5968: frame 10's resting edge is (70, 73, 82) over the dialog's (11, 15, 24), about a fifth of the text: the strong line.
+  test("draws the resting field's edge in the strong line", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    await page.mouse.move(0, 0);
+    expect(await style(page, "dialog[open] [data-part='box']", "border-top-color")).toBe(
+      await tokenColour(page, "--color-line-strong"),
+    );
+  });
+
+  // F5980: frame 10's placeholder is dimmer than the prefix beside it (luma 128 against 174).
+  test("draws the placeholder in the faint grey, the prefix in the muted one", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    const placeholder = await page
+      .locator("dialog[open] [data-part='box'] input")
+      .evaluate((input) => getComputedStyle(input, "::placeholder").color);
+    expect(placeholder).toBe(await tokenColour(page, "--color-text-faint"));
+    expect(placeholder, "not the prefix's grey").not.toBe(await tokenColour(page, "--color-text-muted"));
+    expect(await style(page, "dialog[open] [data-part='box'] >> text=nym-", "color")).toBe(
+      await tokenColour(page, "--color-text-muted"),
+    );
   });
 
   // F5963: the focus ring is the frame's, so it encloses the prefix; the bare input inside draws none.
@@ -90,15 +132,7 @@ test.describe("the name dialog against the frames", () => {
 
   test("sets the field's label in the muted colour", async ({ page }) => {
     await opened(page, [1728, 1080]);
-    const muted = await page.evaluate(() => {
-      const probe = document.createElement("i");
-      probe.style.color = "var(--color-text-muted)";
-      document.body.append(probe);
-      const colour = getComputedStyle(probe).color;
-      probe.remove();
-      return colour;
-    });
-    expect(await style(page, LABEL, "color")).toBe(muted);
+    expect(await style(page, LABEL, "color")).toBe(await tokenColour(page, "--color-text-muted"));
   });
 
   test("passes axe", async ({ page }) => {

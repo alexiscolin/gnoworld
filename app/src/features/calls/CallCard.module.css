@@ -60,15 +60,7 @@
 
   .lede {
     color: var(--color-text-muted);
-  }
-
-  /* The video's controls are 44 px tall on a computer too (F5655): the footer wears the token's touch height. */
-  .tall {
-    /* raw: 44 px is --control-m under a coarse pointer (tokens.css); the card's buttons wear it on every screen (F5735) */
-    --control-m: 44px;
-
-    /* layout: the wrapper takes no box, so the footer stays the card's own row */
-    display: contents;
+    font: var(--font-reading);
   }
 
   .value {
