@@ -1,4 +1,11 @@
 @layer components {
+  /* The realm's part of the plate, a step of 32 px under the actions' row as f0030 leaves (design review of 9e-1): the plate's own
+     step and one more. */
+  .realm {
+    /* layout: one more step than the plate's after the actions' row, which no composition gives a single child */
+    margin-block-start: var(--space-s);
+  }
+
   .ring {
     /* raw: the frames' orbit, a small ring beside the pill */
     inline-size: 32px;

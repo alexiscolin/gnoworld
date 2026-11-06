@@ -226,3 +226,10 @@ export async function phoneOf(
   });
   return { phone: await context.newPage(), browser };
 }
+
+/** What every call journey asks of the page it ends on: no dialog, no accessibility violation, no sideways scroll. */
+export async function sound(page: Page): Promise<void> {
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  expect(await violations(page)).toEqual([]);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+}

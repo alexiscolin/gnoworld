@@ -5,21 +5,12 @@ import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { mount } from "../../../tests/mount.tsx";
 import type { ChainFetch, ChainRead } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
+import { HOME, PATH } from "../../../tests/govdaoFixtures.ts";
 import Proposals from "./Proposals.tsx";
 
 // A world's proposals on its plate (5k): drawn from the realm's home page as RECORDED on onyx-1 (tests/chain/recorded), which
 // states no threshold, so the page draws no "of 66.66%" and no ring; a read that fails says its state and links to gnoweb. The ring
 // itself is drawn from a proposal that gave its tally, invented here: no recorded page has one.
-const HOME = Object.values(
-  import.meta.glob<string>("../../../tests/chain/recorded/onyx-1-gov-dao-home.md", {
-    query: "?raw",
-    import: "default",
-    eager: true,
-  }),
-)
-  .join("")
-  .replace(/^<!--.*-->\n/, "");
-const PATH = "/r/gov/dao";
 const flush = () =>
   act(async () => {
     await new Promise((done) => setTimeout(done, 0));

@@ -5,6 +5,7 @@ import fc from "fast-check";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, follows, markup, mount } from "../../../tests/mount.tsx";
+import { MEMBERS_ONLY, warnsMembers } from "../../../tests/callFixtures.ts";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
 import type { CallCard as Card } from "../../lib/calls.ts";
@@ -416,5 +417,48 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
   it("wraps its buttons in the tall control of the frame, 44 px (F5735)", () => {
     const footer = all(view(), "footer")[0];
     expect(footer?.parentElement?.className).toContain("tall");
+  });
+});
+
+// Alexis (D272): a GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and
+// the fee is lost: one line, in the card every vote opens (the realm view, a pinned action, a page's form). r/gov/dao's votes are
+// MustVoteOnProposalSimple and the two of a struct no call carries (read on onyx with gnomcp).
+describe("CallCard, a GovDAO vote", () => {
+  const vote = (over: Partial<Card> = {}): Card => ({
+    ...preview,
+    realm: "gno.land/r/gov/dao",
+    func: "MustVoteOnProposalSimple",
+    ...over,
+  });
+
+  it("says before Adena opens that only GovDAO's members can vote, once, before Sign in Adena", () => {
+    warnsMembers(view({ card: vote() }));
+  });
+
+  it.each([
+    ["a call to another realm", { realm: REALM, func: "SetBio" }],
+    ["a GovDAO call that is no vote", { func: "ExecuteProposal" }],
+    ["a vote of another realm", { realm: "gno.land/r/demo/poll", func: "Vote" }],
+    ["a realm whose path only starts as GovDAO's", { realm: "gno.land/r/gov/daox" }],
+  ])("says nothing of members on %s", (_name, over) => {
+    expect(view({ card: vote(over) }).textContent).not.toContain(MEMBERS_ONLY);
+  });
+
+  it("says it no more once the vote is signed: the card then says what the chain did", () => {
+    expect(view({ card: vote({ state: { kind: "signing" } }) }).textContent).not.toContain(MEMBERS_ONLY);
+  });
+});
+
+// The video's card is named after the action ("Boop the pot", f0110), its function in its own row: a pinned action's card is titled
+// by its label (design review of 9e-1); a card with no name is titled by its function, as before.
+describe("CallCard, its title", () => {
+  it("is the name it is given, the function staying in its FUNCTION row", () => {
+    const box = view({ title: "Vote" });
+    expect(all(box, "h3").map((h) => said(h))).toEqual(["Vote"]);
+    expect(said(box)).toMatch(/FUNCTION\s*SetBio/);
+  });
+
+  it("is the function when no name is given", () => {
+    expect(all(view(), "h3").map((h) => said(h))).toEqual(["SetBio"]);
   });
 });

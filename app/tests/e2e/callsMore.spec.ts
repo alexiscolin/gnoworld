@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { adena } from "./adena.ts";
-import { calls, callWallet, connect, done, openRealm, writeChain } from "./callCard.ts";
+import { calls, callWallet, connect, done, openRealm, sound, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
 // 9e's journeys at 390 and 1280 px: a write of three fields opens its card under its row and signs its three texts; a page's
@@ -15,11 +14,6 @@ async function opened(page: Page, [width, height]: readonly [number, number]) {
   await callWallet(page);
   await writeChain(page);
   await openRealm(page, () => connect(page));
-}
-async function sound(page: Page) {
-  await expect(page.getByRole("dialog")).toHaveCount(0);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 }
 
 for (const [name, size] of [

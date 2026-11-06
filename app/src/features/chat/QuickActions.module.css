@@ -1,5 +1,6 @@
 /* The quick actions: pills that share the row's width, each an edge round the resting fill, its words centred (the
-   prototype's #quick, index.html:323-325: 32 px high, 12 px, a step between them). */
+   prototype's #quick, index.html:323-325: 32 px high, 12 px, a step between them). A world's pinned actions (D271) come from
+   another feature's code as the row's own children, a button or a link: the row gives every child the pill's look. */
 @layer components {
   .bar {
     /* layout: the pills side by side, sharing the row; no composition lets each child grow by its own width */
@@ -9,7 +10,7 @@
     padding-block: var(--space-s);
   }
 
-  .action {
+  .bar > * {
     /* layout: each pill grows from its words' width to share what the row has left */
     flex: 1 0 auto;
     block-size: var(--control-s);
@@ -21,7 +22,16 @@
     cursor: pointer;
   }
 
-  .action:hover {
+  /* A pinned action of more fields is a link to the realm view: its words centred and coloured as a button's. */
+  .bar > a {
+    /* layout: the words in the middle of the pill, as a button sets them */
+    align-content: center;
+    text-align: center;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .bar > *:hover {
     border-color: var(--color-line-strong);
     background: var(--color-fill-hover);
   }

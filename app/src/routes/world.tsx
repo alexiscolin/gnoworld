@@ -1,19 +1,28 @@
 // A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, type ComponentType } from "react";
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
-import { pageOf, site, type World as WorldPlace } from "../places.ts";
+import { pageOf, realmViewOf, site, type World as WorldPlace } from "../places.ts";
 import { Chat, ChainCallsContext, ChainPlaceContext, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
+import type { PinnedBarProps } from "../features/world/Pinned.tsx";
+import type { ProposalsProps } from "../features/world/Proposals.tsx";
 import { chainKey, type ChainHeard } from "../store/chain.ts";
 import { useApp } from "../storeContext.tsx";
 import styles from "./world.module.css";
 
-// A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
-const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
+// A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it. The
+// chat's bar takes a world's pinned actions (D271) from that module too (the chat reaches no realm code of its own); code that
+// cannot be fetched leaves its place alone (F1763).
+const realmPart = () => import("../features/world/Proposals.tsx");
+const none = () => ({ default: () => null });
+const Proposals = lazy<ComponentType<ProposalsProps>>(() => realmPart().catch(none));
+const PinnedBar = lazy<ComponentType<PinnedBarProps>>(() =>
+  realmPart().then((chunk) => ({ default: chunk.PinnedBar }), none),
+);
 
 // No call of the chain told yet: a room draws no card.
 const NO_CALLS: readonly ChainHeard[] = [];
@@ -33,6 +42,20 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return loaderData || isMissing(error) ? worldMeta(loaderData) : failedWorldMeta();
 }
 
+// A world's pinned actions in its chat's bar: its pills and the cards they open, each drawn as the chunk comes.
+const pinnedBar = (
+  actions: NonNullable<WorldPlace["actions"]>,
+  universe: { id: string; isDefault: boolean },
+  at: string,
+) => {
+  const part = (which: "pills" | "cards") => (
+    <Suspense fallback={null}>
+      <PinnedBar part={which} actions={actions} universe={universe} at={at} />
+    </Suspense>
+  );
+  return { pills: part("pills"), cards: part("cards") };
+};
+
 // What the chat's header, its column of worlds and its info panel say of the place.
 function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): ChatPlace {
   return {
@@ -42,6 +65,7 @@ function placeOf(world: WorldPlace, universe: ReturnType<typeof site.home>): Cha
     kicker: `${universe.name} · ${world.name}`,
     home: universe.home.path,
     worlds: universe.worlds.map(({ slug, name, path }) => ({ slug, name, href: path })),
+    ...(world.actions === undefined ? {} : { pinned: pinnedBar(world.actions, universe, world.slug) }),
   };
 }
 
@@ -51,10 +75,7 @@ export default function World() {
   const realm = world.realms?.[0];
   const address = ORIGIN + world.canonical;
   const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
-  const realmPath =
-    realm === undefined
-      ? undefined
-      : `${universe.isDefault ? "" : `/net/${universe.id}`}/r/${realm.slice("gno.land/r/".length)}`;
+  const realmPath = realm === undefined ? undefined : realmViewOf(universe, realm);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -80,7 +101,10 @@ export default function World() {
               <Actions address={address} {...(realmPath === undefined ? {} : { proposals: realmPath })} />
               {realmPath === undefined ? null : (
                 <Suspense fallback={null}>
-                  <Proposals path={realmPath} />
+                  <Proposals
+                    path={realmPath}
+                    {...(world.actions === undefined ? {} : { pinned: { actions: world.actions, universe } })}
+                  />
                 </Suspense>
               )}
             </Stack>

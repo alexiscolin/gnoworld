@@ -2,7 +2,9 @@
 // `vm/qfuncs` before anything shows, the function, its types and the names of its arguments, so a planted message forges no button.
 // A confirmed one shows its why and a "Call" that opens the call card prefilled, every field editable; anything else shows nothing.
 // In the chat (`viewHref`), a call of more than two fields is only a compact card with its way to the realm view (ADR-0002 section 4).
-import { useId } from "react";
+// In the chat's quick actions bar (`bar`, D271) it is one pill that opens the bar's own card, or a link to the realm view.
+import { useId, type ReactNode } from "react";
+import { Link } from "react-router";
 import { HIDDEN, type FormField } from "@gnoworld/core";
 import { Button, Cluster, Stack } from "@gnoworld/ui";
 import { useAppStore } from "../../storeContext.tsx";
@@ -18,15 +20,9 @@ export interface ProposedCall {
   why?: string | undefined;
 }
 
-const fieldOf = (name: string, value: string): FormField => ({
-  tag: "input",
-  name,
-  inputType: "",
-  value,
-  placeholder: "",
-  description: "",
-  flags: "",
-});
+function fieldOf(name: string, value: string): FormField {
+  return { tag: "input", name, inputType: "", value, placeholder: "", description: "", flags: "" };
+}
 
 // The function the action calls, and its texts and fields, when the chain confirms it: a write a call carries, every argument named for a parameter.
 function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
@@ -41,8 +37,21 @@ function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
 
 // Jarvis's words, set left to right, as text and nothing else: a reason holding a control or format character (a bidi override
 // draws reversed inside an isolate too) is not drawn at all; the card below says the true realm, function and arguments.
-const Why = ({ text }: { text: string | undefined }) =>
-  text === undefined || text === "" || HIDDEN.test(text) ? null : <p dir="ltr">{text}</p>;
+function Why({ text }: { text: string | undefined }) {
+  return text === undefined || text === "" || HIDDEN.test(text) ? null : <p dir="ltr">{text}</p>;
+}
+
+// The bar's pill, its look the bar's: a link to the realm view for a call of more than two fields (`href`), else a button that
+// opens its card.
+function BarPill({ href, onClick, children }: { href: string | undefined; onClick: () => void; children: ReactNode }) {
+  return href === undefined ? (
+    <button type="button" onClick={onClick}>
+      {children}
+    </button>
+  ) : (
+    <Link to={href}>{children}</Link>
+  );
+}
 
 /** The action for the chain `place` names (its realm is the action's own). */
 export function ActionForm({
@@ -51,12 +60,15 @@ export function ActionForm({
   chain,
   options,
   viewHref,
+  bar,
 }: {
   action: ProposedCall;
   label?: string;
   chain: CallPlace["chain"];
   options?: CallPlace["options"];
   viewHref?: string;
+  /** In the quick actions bar: the card the bar draws, which the pill opens. */
+  bar?: { card: string };
 }) {
   const store = useAppStore();
   const place: CallPlace = { realm: action.realm, chain, options };
@@ -66,6 +78,26 @@ export function ActionForm({
   if (checked === undefined) return null;
   const { write, texts, fields } = checked;
   const compact = viewHref !== undefined && fields.length > 2;
+  const open = (card: string) => {
+    openCard(store, { id: card, place, write: write.function, texts });
+  };
+  const name = label ?? (
+    <>
+      Call
+      <span className="visually-hidden"> {write.function.name}</span>
+    </>
+  );
+  if (bar !== undefined)
+    return (
+      <BarPill
+        href={compact ? viewHref : undefined}
+        onClick={() => {
+          open(bar.card);
+        }}
+      >
+        {name}
+      </BarPill>
+    );
   return (
     <>
       <RealmForm
@@ -87,21 +119,16 @@ export function ActionForm({
                 emphasis="outline"
                 size="s"
                 onClick={() => {
-                  openCard(store, { id, place, write: write.function, texts });
+                  open(id);
                 }}
               >
-                {label ?? (
-                  <>
-                    Call
-                    <span className="visually-hidden"> {write.function.name}</span>
-                  </>
-                )}
+                {name}
               </Button>
             )}
           </Cluster>
         </Stack>
       </RealmForm>
-      {compact ? null : <InlineCard id={id} place={place} />}
+      {compact ? null : <InlineCard id={id} place={place} title={label} />}
     </>
   );
 }
