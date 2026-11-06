@@ -4,7 +4,17 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
-import { after, calling, CHAIN, CUR, field, inputs, listing, typed } from "../../../tests/callFixtures.ts";
+import {
+  after,
+  calling,
+  CHAIN,
+  CUR,
+  field,
+  inputs,
+  listing,
+  typed,
+  warnsMembers,
+} from "../../../tests/callFixtures.ts";
 import { drawing } from "../chat/index.ts";
 import { CallableForm } from "./CallableForm.tsx";
 import { DRAW_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
@@ -250,4 +260,33 @@ describe("a form's card among a page's headings", () => {
       expect(one(one(box, "article"), "h2, h3, h4").tagName).toBe(level);
     },
   );
+});
+
+// Alexis (D272): a page's form that votes on GovDAO opens the vote's card, which says before Adena opens that only its members can vote.
+describe("a GovDAO page's vote form", () => {
+  it("opens the vote's card saying that only GovDAO's members can vote, before Sign in Adena", async () => {
+    const vote = [
+      {
+        FuncName: "MustVoteOnProposalSimple",
+        Params: [CUR, field("pid", "int64"), field("option", "string")],
+        Results: null,
+      },
+    ];
+    const box = mount(
+      <StoreProvider>
+        <RealmBlocks
+          via={via}
+          origin={CHAIN.gnoweb}
+          blocks={blocksOf(gnoForm("MustVoteOnProposalSimple", input("pid"), input("option")))}
+          call={{
+            realm: "gno.land/r/gov/dao",
+            chain: CHAIN,
+            options: { fetch: vi.fn<ChainFetch>(() => listing(vote)) },
+          }}
+        />
+      </StoreProvider>,
+    );
+    click(await calling(box, "Call MustVoteOnProposalSimple"));
+    warnsMembers(one(box, "article"));
+  });
 });

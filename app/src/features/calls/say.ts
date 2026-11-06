@@ -19,6 +19,18 @@ export const publicForever = (realm: string): string => `This text goes to ${rea
 /** The warning every call carries (ADR-0002 section 1). */
 export const NOT_CHECKED = "gnoworld does not check what this realm does. Read it on gnoweb first.";
 
+// Whether a call is a vote on GovDAO: a function of r/gov/dao itself that votes (MustVoteOnProposalSimple, read on onyx).
+function isGovVote({ realm, func }: { realm: string; func: string }): boolean {
+  return realm === "gno.land/r/gov/dao" && func.includes("Vote");
+}
+
+/** The warnings a card says before Adena opens: every call's, then a GovDAO vote's (Alexis, D272: r/gov/dao refuses a vote from
+ * anyone but its members). The words are written here, in the function, where a mutation of them is tested (F412). */
+export function warningsOf(call: { realm: string; func: string }): readonly string[] {
+  if (!isGovVote(call)) return [NOT_CHECKED];
+  return [NOT_CHECKED, "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost."];
+}
+
 /** A chain as the card names it. */
 export const networkOf = ({ name, chainId }: { name: string; chainId: string }): string => `${name} (${chainId})`;
 

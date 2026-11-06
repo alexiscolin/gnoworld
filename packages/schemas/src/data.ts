@@ -77,14 +77,90 @@ export const RealmPath = z
   .string()
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
-const World = z.strictObject({
-  slug: Slug,
-  name: text(DATA_CAPS.name),
-  description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
-  universe: Slug,
-  /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
-  realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
+/** The most a call's arguments may hold, as a Jarvis proposal and a world's pinned action give them, in code points. */
+export const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
+
+/** A call's arguments by the parameter's name, as text: what a call carries, and what a model is shown of them. */
+export const CallArgs = z
+  .record(text(CALL_CAPS.name), z.string().check(z.maxLength(CALL_CAPS.arg)))
+  .check(z.refine((args) => Object.keys(args).length <= CALL_CAPS.args, "too many arguments"));
+
+// A team's arguments from a data file: Zod drops a key `__proto__` (an own key from JSON.parse) without a word, so its argument
+// would vanish unseen; refused first. Not Jarvis's: a pipe shows a model no shape (jarvis/src/allowlist.ts's input schema).
+const DataArgs = z.pipe(
+  z
+    .unknown()
+    .check(
+      z.refine(
+        (args) => typeof args !== "object" || args === null || !Object.hasOwn(args, "__proto__"),
+        "no argument is named __proto__",
+      ),
+    ),
+  CallArgs,
+);
+
+// A label as a reader sees it: compatibility forms folded, what draws nothing gone (any default-ignorable code point: joiners,
+// variation selectors, Hangul's fillers), any apostrophe one, spaces and the Braille blank one space, no case.
+const labelKey = (label: string): string =>
+  label
+    .normalize("NFKC")
+    .replace(/\p{Default_Ignorable_Code_Point}/gu, "")
+    .replace(/[\u2018\u2019\u02bc\u0060\u00b4]/gu, "'")
+    .replace(/[\s\u2800]+/gu, " ")
+    .trim()
+    .toLowerCase();
+
+// A label drawn on a button that leads to a signature: words a reader sees as they are (no control, format or separator character,
+// not blank), never read as the bar's own Who's here.
+const Label = text(CALL_CAPS.label).check(
+  z.refine((label) => !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(label), "a label holds no control or format character"),
+  z.refine((label) => labelKey(label) !== "", "a label draws more than blank"),
+  z.refine((label) => labelKey(label) !== "who's here", "a label is not the bar's Who's here"),
+);
+
+/** A call the team pins in a world (D271): the realm one of the world's own, checked against vm/qfuncs before it shows. */
+const PinnedAction = z.strictObject({
+  label: Label,
+  realm: RealmPath,
+  function: text(CALL_CAPS.name),
+  args: DataArgs,
 });
+
+const World = z
+  .strictObject({
+    slug: Slug,
+    name: text(DATA_CAPS.name),
+    description: z.string().check(z.minLength(50), z.maxLength(DATA_CAPS.seoDescription)),
+    universe: Slug,
+    /** The realms the world is about, the first the one its page reads proposals from (docs/decisions.md, 2026-10-30). */
+    realms: z.optional(z.array(RealmPath).check(z.minLength(1), z.maxLength(5))),
+    /** Up to 3 calls the team pins, shown in the world's chat bar and on its page (D271). */
+    actions: z.optional(z.array(PinnedAction).check(z.minLength(1), z.maxLength(3))),
+  })
+  .check(
+    z.check((ctx) => {
+      const realms = new Set(ctx.value.realms);
+      const labels = new Set<string>();
+      ctx.value.actions?.forEach((action, index) => {
+        if (!realms.has(action.realm))
+          ctx.issues.push({
+            code: "custom",
+            input: action.realm,
+            path: ["actions", index, "realm"],
+            message: "an action's realm is one of the world's realms",
+          });
+        const key = labelKey(action.label);
+        if (labels.has(key))
+          ctx.issues.push({
+            code: "custom",
+            input: action.label,
+            path: ["actions", index, "label"],
+            message: `a label reads as another: ${JSON.stringify(action.label)}`,
+          });
+        labels.add(key);
+      });
+    }),
+  );
 
 export const Hubs = inUniverse(World);
 export const Stations = inUniverse(World);

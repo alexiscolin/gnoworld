@@ -5,7 +5,7 @@
 // the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
 // since 10k, a line's translation and a realm's digest.
 import { Address } from "./address.ts";
-import { RealmPath, Slug } from "./data.ts";
+import { CALL_CAPS, CallArgs, RealmPath, Slug } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
 import { PinId } from "./pins.ts";
 import { RoomId } from "./rooms.ts";
@@ -17,15 +17,15 @@ export const JARVIS_CAPS = {
   facts: 12,
   points: 100,
   links: 10,
-  args: 16,
-  label: 80,
+  args: CALL_CAPS.args,
+  label: CALL_CAPS.label,
   value: 200,
   href: 2048,
   announcement: 280,
   text: 1000,
-  arg: 1000,
+  arg: CALL_CAPS.arg,
   why: 200,
-  name: 128,
+  name: CALL_CAPS.name,
   realm: 128,
   place: 200,
 } as const;
@@ -37,9 +37,7 @@ const list = <T extends z.ZodMiniType>(item: T, max: number) => z.array(item).ch
 export const ProposedAction = z.strictObject({
   realm: text(JARVIS_CAPS.realm),
   function: text(JARVIS_CAPS.name),
-  args: z
-    .record(text(JARVIS_CAPS.name), z.string().check(z.maxLength(JARVIS_CAPS.arg)))
-    .check(z.refine((args) => Object.keys(args).length <= JARVIS_CAPS.args, "too many arguments")),
+  args: CallArgs,
   why: text(JARVIS_CAPS.why),
 });
 export type ProposedAction = z.infer<typeof ProposedAction>;

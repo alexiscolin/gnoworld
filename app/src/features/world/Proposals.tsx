@@ -3,16 +3,40 @@
 // that gives no threshold gives no ring and no "of 66.66%". A read that fails says its state and links to the realm on gnoweb.
 // This file is a chunk of its own, asked only by a world with a realm (world.tsx): no other page pays for it.
 import { Cluster, Stack } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { realmAt } from "../../realmAt.ts";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { readProposals } from "../../lib/chain/proposal.ts";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { ProposalCard, ReadFailed } from "../realms/index.ts";
+import { pinnedOf } from "../../pinned.ts";
+import type { PinnedBarProps, PinnedFormsProps } from "./Pinned.tsx";
 import styles from "./Proposals.module.css";
 import { ringOf } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";
+
+// A world's pinned actions (D271), asked only by a world that pins one; code that cannot be fetched leaves the proposals alone (F1763).
+// The chat's bar takes them from this module too, which the world's page imports once for both (the first screen holds a list of
+// what each import preloads).
+const pinnedChunk = () => import("./Pinned.tsx");
+const none = () => ({ default: () => null });
+const PinnedForms = lazy<ComponentType<PinnedFormsProps>>(() =>
+  pinnedChunk().then((chunk) => ({ default: chunk.PinnedForms }), none),
+);
+const PinnedBarPart = lazy<ComponentType<PinnedBarProps>>(() =>
+  pinnedChunk().then((chunk) => ({ default: chunk.PinnedBar }), none),
+);
+
+/** The chat's bar's part of a world's pinned actions, as its code comes (a lazy component resolves to a function, never to another
+ * lazy one: React's error 306). */
+export function PinnedBar(props: PinnedBarProps) {
+  return (
+    <Suspense fallback={null}>
+      <PinnedBarPart {...props} />
+    </Suspense>
+  );
+}
 
 /** The most proposals drawn: the newest, as the realm's page lists them. */
 const SHOWN = 3;
@@ -23,6 +47,8 @@ export interface ProposalsProps {
   /** The realm's view on this site, `/r/gov/dao` or `/net/<universe>/r/gov/dao`: which realm and which chain it is read from. */
   path: string;
   options?: ReadOptions;
+  /** The world's pinned actions (D271), drawn first, under Read the proposals. */
+  pinned?: Pick<PinnedBarProps, "actions" | "universe">;
 }
 
 // The ring of a proposal that gave its tally: the lit share of the orbit and the mark of the threshold, a circle of 1 unit's
@@ -120,25 +146,34 @@ function useProposals(path: string, options: ReadOptions) {
   return { read, realm, origin };
 }
 
-export default function Proposals({ path, options = NO_OPTIONS }: ProposalsProps) {
+export default function Proposals({ path, options = NO_OPTIONS, pinned }: ProposalsProps) {
   const { read, realm, origin } = useProposals(path, options);
   const home = origin === undefined || realm === undefined ? undefined : gnowebLink(origin, realm);
   return (
-    <section aria-labelledby="proposals-title">
-      <Stack space="xs">
-        <h2 id="proposals-title" className="label">
-          Proposals
-        </h2>
-        {read === undefined || realm === undefined ? (
-          <p className="label" role="status">
-            Reading the proposals
-          </p>
-        ) : read.ok ? (
-          <Read read={read} realm={realm} origin={origin} />
-        ) : (
-          <Failed read={read} home={home} />
+    <div className={styles["realm"]}>
+      <Stack>
+        {pinned === undefined ? null : (
+          <Suspense fallback={null}>
+            <PinnedForms pinned={pinnedOf(pinned.actions, pinned.universe)} options={options} />
+          </Suspense>
         )}
+        <section aria-labelledby="proposals-title">
+          <Stack space="xs">
+            <h2 id="proposals-title" className="label">
+              Proposals
+            </h2>
+            {read === undefined || realm === undefined ? (
+              <p className="label" role="status">
+                Reading the proposals
+              </p>
+            ) : read.ok ? (
+              <Read read={read} realm={realm} origin={origin} />
+            ) : (
+              <Failed read={read} home={home} />
+            )}
+          </Stack>
+        </section>
       </Stack>
-    </section>
+    </div>
   );
 }

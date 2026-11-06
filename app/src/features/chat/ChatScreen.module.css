@@ -44,4 +44,11 @@
     padding-inline: var(--chat-inset);
     border-block-start: var(--line-width) solid var(--color-line);
   }
+
+  /* The card a pinned action opens over the row (D271): it scrolls in its own box, so the row and what writes stay on screen. */
+  .cards {
+    /* raw: half the window at most, the conversation keeping the rest */
+    max-block-size: 50dvb;
+    overflow: auto;
+  }
 }

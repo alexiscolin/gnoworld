@@ -10,7 +10,7 @@ import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
 import { CallStatus } from "./CallStatus.tsx";
 import { problemsOf } from "./problems.ts";
-import { NOT_CHECKED, networkOf, publicForever, sayProblem, shown } from "./say.ts";
+import { networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
 export interface CallCardProps {
@@ -25,6 +25,8 @@ export interface CallCardProps {
   onRetry: () => void;
   /** The title's level under the page's headings: 3 unless the page says. */
   level?: 2 | 3 | 4 | undefined;
+  /** The call's name, its title when it has one (a pinned action's label); else its function. */
+  title?: string | undefined;
 }
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -128,13 +130,13 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
   );
 }
 
-export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level }: CallCardProps) {
+export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level, title }: CallCardProps) {
   const preview = card.state.kind === "preview";
   return (
     <Card>
       <Card.Header
         kicker="SIGNATURE REQUEST · ADENA"
-        title={card.func}
+        title={title ?? card.func}
         size="large"
         {...(level === undefined ? {} : { level })}
       />
@@ -149,7 +151,13 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
           <Row label="NETWORK">{networkOf(network)}</Row>
           <Row label="FEE">{fee}</Row>
         </dl>
-        {preview ? <p className={styles["note"]}>{NOT_CHECKED}</p> : null}
+        {preview
+          ? warningsOf(card).map((warning) => (
+              <p key={warning} className={styles["note"]}>
+                {warning}
+              </p>
+            ))
+          : null}
         <CallStatus card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>

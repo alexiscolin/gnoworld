@@ -219,7 +219,11 @@ export function Loaded(props: LoadedProps) {
             ...composing.view,
             ...threads.view,
           }}
-          composer={<Dock onWhoIsHere={ask}>{writer}</Dock>}
+          composer={
+            <Dock onWhoIsHere={ask} pinned={place.pinned}>
+              {writer}
+            </Dock>
+          }
         />
       )}
     </ChatScreen>

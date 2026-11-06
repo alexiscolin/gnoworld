@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { z } from "./zod.ts";
 import {
   AnswerButton,
   Digest,
@@ -188,6 +189,16 @@ describe("ProposedAction", () => {
     expect(proposal({ args: { "": "1" } })).toBe(false);
     expect(proposal({ args: { note: text(JARVIS_CAPS.arg) } })).toBe(true);
     expect(proposal({ args: { note: text(JARVIS_CAPS.arg + 1) } })).toBe(false);
+  });
+
+  // The model is told a proposal's shape from its input schema (jarvis/src/allowlist.ts, `io: "input"`): the arguments stay an object
+  // of strings, keys and values bounded, whatever guard refuses `__proto__` (the combined review of 9e-1).
+  it("offers the model its arguments as an object of bounded strings", () => {
+    const offered = z.toJSONSchema(ProposedAction, { io: "input" });
+    const args = JSON.stringify(offered.properties?.["args"]);
+    expect(args).toContain('"additionalProperties":{"type":"string","maxLength":1000}');
+    expect(args).toContain('"propertyNames":{"type":"string","minLength":1,"maxLength":128}');
+    expect(args).toContain('"type":"object"');
   });
 
   it("bounds the realm, the function and the why, none of them empty", () => {

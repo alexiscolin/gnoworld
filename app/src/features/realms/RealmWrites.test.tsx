@@ -8,7 +8,7 @@ import { StoreProvider } from "../../storeContext.tsx";
 import { Grab, state } from "../../../tests/grabStore.tsx";
 import { Address } from "@gnoworld/schemas";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
-import { typed } from "../../../tests/callFixtures.ts";
+import { typed, warnsMembers } from "../../../tests/callFixtures.ts";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { RealmWrites } from "./RealmWrites.tsx";
 
@@ -331,6 +331,7 @@ describe("a vote on GovDAO", () => {
     expect(all(card, "input")).toHaveLength(2);
     expect(card.textContent).toContain(DAO);
     expect(card.textContent).toContain("MustVoteOnProposalSimple");
+    warnsMembers(card);
   });
 
   it("shows the vote as voted only once the chain has answered, never when Adena has signed", async () => {

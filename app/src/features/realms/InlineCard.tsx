@@ -39,13 +39,20 @@ export function openCard(
   });
 }
 
-/** The card `id`, once opened: nothing before. */
-export function InlineCard({ id, place, level }: { id: string; place: CallPlace; level?: 2 | 3 | 4 | undefined }) {
-  const card = useApp((state) => callsIn(state)?.calls[id]);
-  return card === undefined ? null : <OpenCard card={card} place={place} level={level} />;
+interface Shown {
+  /** The title's level under the page's headings. */
+  level?: 2 | 3 | 4 | undefined;
+  /** The call's name, the card's title (a pinned action's label); else its function. */
+  title?: string | undefined;
 }
 
-function OpenCard({ card, place, level }: { card: CallCardState; place: CallPlace; level: 2 | 3 | 4 | undefined }) {
+/** The card `id`, once opened: nothing before. */
+export function InlineCard({ id, place, ...shown }: { id: string; place: CallPlace } & Shown) {
+  const card = useApp((state) => callsIn(state)?.calls[id]);
+  return card === undefined ? null : <OpenCard card={card} place={place} {...shown} />;
+}
+
+function OpenCard({ card, place, level, title }: { card: CallCardState; place: CallPlace } & Shown) {
   const store = useAppStore();
   const [fees, setFees] = useState<CallFees | undefined>(undefined);
   const { id, realm, func } = card;
@@ -63,6 +70,7 @@ function OpenCard({ card, place, level }: { card: CallCardState; place: CallPlac
     <CallCard
       card={card}
       level={level}
+      title={title}
       network={{ name, chainId }}
       fee={feeText(fees)}
       onEdit={(index, text) => {

@@ -317,7 +317,9 @@ describe("a world's page and the chain's stream", () => {
     await vi.waitFor(() => {
       expect(probing.place).toBeDefined();
     });
-    expect(probing.place).toEqual({
+    // GovDAO pins Vote (D271): the chat's bar has its pills and cards too, apart from what the place says.
+    expect(probing.place).toHaveProperty("pinned");
+    expect({ ...probing.place, pinned: undefined }).toEqual({
       slug: "govdao",
       name: "GovDAO",
       description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",

@@ -5,7 +5,7 @@ import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { expect, vi } from "vitest";
-import { button } from "./mount.tsx";
+import { button, click, follows, one } from "./mount.tsx";
 
 export const CHAIN = {
   name: "Onyx",
@@ -49,4 +49,54 @@ export function typed(box: HTMLInputElement | undefined, text: string): void {
     Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set?.call(box, text);
     box?.dispatchEvent(new Event("input", { bubbles: true }));
   });
+}
+
+/** Clicks `name` under `box` with no wallet asked: the card it opens leaves its Sign in Adena to the person. The card, opened. */
+export async function openedUnsigned(box: HTMLElement, name: string): Promise<HTMLElement> {
+  const touched = vi.fn(() => undefined);
+  Object.defineProperty(globalThis, "adena", { get: touched, configurable: true });
+  try {
+    click(await calling(box, name));
+    expect(touched).not.toHaveBeenCalled();
+    const card = one(box, "article");
+    expect(card.textContent).toContain("Sign in Adena");
+    return card;
+  } finally {
+    Reflect.deleteProperty(globalThis, "adena");
+  }
+}
+
+/** That a card was read from gno.land's own chain, never onyx's, and names gnoland-1: `urls` are the reads made. */
+export function onGnoland(urls: readonly string[], card: HTMLElement): void {
+  const hosts = urls.map((url) => new URL(url).host);
+  expect(hosts).toContain("rpc.gno.land");
+  expect(hosts).not.toContain("rpc.onyx.testnets.gno.land");
+  expect(card.textContent).toContain("(gnoland-1)");
+}
+
+/** That `card` is prefilled with `values` and names the realm and the function it calls (`call`). */
+function prefilled(card: HTMLElement, values: readonly string[], call: { realm: string; func: string }): void {
+  expect(inputs(card).map((input) => input.value)).toEqual(values);
+  expect(card.textContent).toContain(call.realm);
+  expect(card.textContent).toContain(call.func);
+}
+
+/** What a GovDAO vote's card says before Adena opens (Alexis, D272): r/gov/dao refuses a vote from anyone but its members. */
+export const MEMBERS_ONLY =
+  "Only GovDAO's members can vote: the chain refuses anyone else's vote, and its fee is lost.";
+
+/** That `card` says MEMBERS_ONLY once, as its own line, before its Sign in Adena. */
+export function warnsMembers(card: HTMLElement): void {
+  const lines = [...card.querySelectorAll("p")].filter((line) => line.textContent === MEMBERS_ONLY);
+  expect(lines).toHaveLength(1);
+  const sign = button(card, "Sign in Adena");
+  expect(lines[0] !== undefined && sign !== undefined && follows(lines[0], sign)).toBe(true);
+}
+
+/** That `card` is GovDAO's pinned Vote's (D271, D272): titled Vote, prefilled with `values`, naming the realm and the function, and
+ * saying before Sign in Adena that only members can vote. */
+export function pinnedVote(card: HTMLElement, values: readonly string[]): void {
+  expect(card.querySelector("h1, h2, h3, h4")?.textContent).toBe("Vote");
+  prefilled(card, values, { realm: "gno.land/r/gov/dao", func: "MustVoteOnProposalSimple" });
+  warnsMembers(card);
 }
