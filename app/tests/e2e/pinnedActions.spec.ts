@@ -20,6 +20,13 @@ for (const width of [390, 1280] as const) {
     const read = await plate(page).getByRole("link", { name: "Read the proposals" }).boundingBox();
     const under = await form.boundingBox();
     expect(read !== null && under !== null && under.y >= read.y + read.height).toBe(true);
+    // A step of 32 px (--space-l) after the actions' row, as f0030 leaves about 28 under Read the proposals (design review, 9e-1).
+    const share = await plate(page)
+      .getByRole("button", { name: "Share" })
+      .or(plate(page).getByRole("link", { name: "Say hi in the chat" }))
+      .last()
+      .boundingBox();
+    expect(share !== null && under !== null && Math.abs(under.y - (share.y + share.height) - 32) <= 1).toBe(true);
     await expect(bar(page).getByRole("button")).toHaveText(["Who's here", "Vote"]);
 
     await bar(page).getByRole("button", { name: "Vote" }).click();
