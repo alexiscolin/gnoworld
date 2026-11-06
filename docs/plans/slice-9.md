@@ -45,8 +45,8 @@ Shared with 7 and 8, kept small and apart: `store/index.ts` (7 adds a camera sta
 | 9g | Chain events: the server reads each universe's indexer by HTTP once a block (answer 9g-4), relayed on its stream; activity lines in rooms, the ticker's chain events, new realms as signals, the Earth's realms of 24 h | Recorded events; flood and hostile text; height on every line | answer 5's recording |
 | 9e | The realm view's write functions, calls with more than two fields, `<gno-form>` as a Form block then a card, votes, quick and pinned actions that call (20 to 35) | A planted proposal shows nothing; a non-primitive type says "open in gnoweb" | 9d |
 | 9f | Registering a name on the universe's chain: the dialog, `r/sys/namereg/v0.Register`, the astronaut as the face (9 to 15); the name shown, mainnet else Onyx | The `nym-` format before Adena opens; the name shown only once the chain has it; the chain is the universe's | 9d, answer 5's recording |
-| 9i | Quest steps that call | A step done only from its chain event | 9d, slice 8's merge |
-Order, two at once: 9b with 9h; 9c with 9g (once recorded); 9d alone; 9e with 9f; 9i last. Cut first if time runs out: 9i, then 9g's Earth count. Estimate (not a promise): 8 branches at 1.6 to 4 h, about 7 to 16 h of wall time two at once, before fixes and reviews.
+| 9i | Cut from slice 9 (Alexis, 2026-11-06): quest steps that call go to the backlog, after slice 8's quests are in main | — | — |
+Order, two at once: 9b with 9h; 9c with 9g (once recorded); 9d alone; 9e with 9f; 9i cut (Alexis, 2026-11-06: slice 9 no longer waits on slice 8). Cut first if time runs out: 9g's Earth count. Estimate (not a promise): 8 branches at 1.6 to 4 h, about 7 to 16 h of wall time two at once, before fixes and reviews.
 
 ## 8. Dependencies to ask for
 None. The browser talks to `window.adena` directly through `lib/adena` (ADR-0002 §4), as the login does; `@adena-wallet/sdk` stays the server's.

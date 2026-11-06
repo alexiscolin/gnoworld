@@ -173,6 +173,7 @@ takes its lines. A slice's plan names the video's frames each of its screens is 
 | The scene's meteors, signs and the header's live counters | 7, once the 3:36 cut shows what they are |
 | The dock beside the 3D | 7 |
 | The "first words" arrival banner | 9 |
+| Quest steps that call: a step done only from its chain event, through 9d's call card, on slice 8's `quests.json` and its schema (an optional `call` on a step) | A slice of its own after slice 8's quests are in main; cut from slice 9 by Alexis on 2026-11-06 (it was 9i) |
 | The AI Ring and Harbor station bodies | Once their content exists (slice 5, question 6) |
 | The composer's emoji picker | Waits for Alexis: it needs `emojibase-data` |
 | One staging of `deploy/web/nginx.conf` for a test: `app/tests/nginx.ts` repeats `scripts/check_nginx.py`'s (5m's review, row 14) | The next slice that touches either |
