@@ -93,10 +93,16 @@ for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [
     const chat = world ? page.waitForResponse((response) => CHAT.test(response.url())) : undefined;
     // A world page opens its verdicts stream: measured once it has, every run, not as the timing falls.
     const stream = world ? page.waitForResponse((response) => response.url().includes("/api/stream")) : undefined;
+    // A world that pins asks for the pinned actions' code once the proposals' code has drawn the plate, after the chat's scripts
+    // may all have come: measured once it has, not as the timing falls (3 runs in 6 counted none before it, on slice-9a).
+    const pinnedCode = path.includes("govdao")
+      ? page.waitForResponse((response) => PINNED.test(response.url()))
+      : undefined;
     await page.goto(path);
     await hydrated(page);
     await stream;
     await chat;
+    await pinnedCode;
     if (charted) await expect(page.getByText(/^First charted by @g1jg8m/)).toBeVisible();
     await expect.poll(() => pending.size, "the scripts the chat's code asks for come").toBe(0);
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
