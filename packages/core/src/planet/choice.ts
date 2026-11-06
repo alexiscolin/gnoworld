@@ -81,10 +81,9 @@ export function anchorOf(seed: Uint8Array, nature: Nature | null = null): Anchor
   return leaning[among % leaning.length] ?? walked(WEIGHTS, draw);
 }
 
-/** The class of a world by its id: two are fixed by hand to the looks the video draws (Alexis, 2026-11-06: Bubble a banded gas giant, GovDAO
- * sandy as Venus, frames 4 and 16), the others read their seed. */
+/** The class of a world by its id: GovDAO is drawn by hand, sandy as Venus (Alexis, 2026-11-06, frames 4 and 16); every other world, Bubble
+ * included, reads its seed. */
 export function worldAnchor(id: string, seed: Uint8Array, nature: Nature | null = null): Anchor {
-  if (id === "bubble") return "gas giant";
   if (id === "gov/dao") return "cloud deck";
   return anchorOf(seed, nature);
 }

@@ -17,8 +17,8 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
  * absent: the chunk alone. Each cap's history is here or beside its chunk's pattern in budgets.spec.ts, before 7y's steady names. */
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // 159,847 B in this measure with the Earth's stations' three classes (Alexis, 2026-11-04, "Oui, 160 256"); 160,325 B once 7v2, 7b9,
-  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening); 160,357 B with 8l's restIn; 160,394 B with Bubble's and GovDAO's classes fixed by hand (slice-8, core's worldAnchor).
-  { chunk: "scene", after: ["mountUniverse"], cap: 160_394 },
+  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening); 160,357 B with 8l's restIn; 160,382 B with GovDAO's class fixed by hand (slice-8, core's worldAnchor).
+  { chunk: "scene", after: ["mountUniverse"], cap: 160_382 },
   // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
   // 7x2's loader and text box, 7v2's ratio, bands and a Plan half lit, 7b9's star's warmth (the night's +1 KiB, the chief), measured.
   { chunk: "cosmos", after: ["scene"], cap: 17_345 },
