@@ -37,6 +37,22 @@ test.describe("the name dialog against the frames", () => {
     await expect(dialog(page).getByText("YOUR GNO.LAND NAME")).toBeVisible();
   });
 
+  test("says the registry line above the face, the face above the field", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    const line = await box(page, "dialog[open] p:has(code)");
+    const face = await box(page, "dialog[open] svg");
+    const field = await box(page, "dialog[open] [data-part='box']");
+    expect(line.y + line.height, "the line is above the face").toBeLessThanOrEqual(face.y);
+    expect(face.y + face.height, "the face is above the field").toBeLessThanOrEqual(field.y);
+  });
+
+  // F5981: the frames draw the registry's path in the text colour with no fill, not as a chip.
+  test("draws the registry's path in the text colour, on no fill", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    expect(await style(page, "dialog[open] code", "background-color")).toBe("rgba(0, 0, 0, 0)");
+    expect(await style(page, "dialog[open] code", "color")).toBe(await style(page, "dialog[open] h2", "color"));
+  });
+
   test("draws no Close button", async ({ page }) => {
     await opened(page, [1728, 1080]);
     await expect(dialog(page).getByRole("button", { name: "Close" })).toHaveCount(0);

@@ -132,6 +132,15 @@ describe("NameDialog: the design system's own parts", () => {
     expect(dialog.getAttribute("aria-describedby")).toContain(kicker?.id ?? "no id");
   });
 
+  // F5964: frames 9 to 15 put the line naming the registry first, then the face, then the field.
+  it("says the line naming r/sys/namereg before the face, and the face before the field", () => {
+    const { box } = view();
+    const line = one(box, "dialog code").closest("p");
+    const face = all(box, "dialog svg")[0];
+    expect(line !== null && face !== undefined && follows(line, face)).toBe(true);
+    expect(face !== undefined && follows(face, one(box, "dialog input"))).toBe(true);
+  });
+
   it.each<[string, NameDialogProps["phase"]]>([
     ["typing", { kind: "typing" }],
     ["working", { kind: "working", text: "Waiting for Adena" }],
