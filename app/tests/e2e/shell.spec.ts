@@ -11,7 +11,8 @@ const GUTTER = 16;
 const WIDTHS = [390, 1280] as const;
 const PAGES = ["/", "/w/bubble", "/nowhere"];
 
-// Every visible word (a text node's lines, one box each) and every visible control, as a box's top, left and right edge.
+// Every visible word (a text node's lines, one box each) and every visible control, as a box's top, left and right edge. The full-bleed chat
+// screen is not counted: the top gutter is the site header's, and the chat's own geometry is chatGeometry's and the phone picture's.
 const edgesOf = (page: Page) =>
   page.evaluate(() => {
     const found: { what: string; top: number; left: number; right: number }[] = [];
@@ -22,7 +23,7 @@ const edgesOf = (page: Page) =>
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const text = (node.textContent ?? "").trim();
       const parent = node.parentElement;
-      if (text === "" || parent?.closest("script, style, [hidden], [data-ticker]") !== null) continue;
+      if (text === "" || parent?.closest("script, style, [hidden], [data-ticker], [data-full]") !== null) continue;
       if (getComputedStyle(parent).visibility === "hidden") continue;
       const range = document.createRange();
       range.selectNodeContents(node);
@@ -30,13 +31,21 @@ const edgesOf = (page: Page) =>
     }
     // The ticker is a strip across the foot of the screen, edge to edge by design: homeLive.spec measures it.
     for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
-      if (control.closest("[data-ticker]") === null)
+      if (control.closest("[data-ticker], [data-full]") === null)
         take(
           `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
           control.getBoundingClientRect(),
         );
     return found;
   });
+
+// On a phone a world's chat takes the whole page once its code is in: the measure waits for that, so it is always of the same page.
+async function chatOpened(page: Page, path: string, width: number): Promise<void> {
+  if (path !== "/w/bubble" || width >= 1280) return;
+  const screen = page.locator("[data-full][data-compact]");
+  await expect(screen).toBeVisible();
+  expect(await screen.boundingBox()).toMatchObject({ x: 0, width, y: 0, height: 844 });
+}
 
 for (const width of WIDTHS) {
   test.describe(`at ${String(width)} px`, () => {
@@ -48,6 +57,7 @@ for (const width of WIDTHS) {
       }) => {
         await page.goto(path);
         await hydrated(page);
+        await chatOpened(page, path, width);
         const touching = (await edgesOf(page)).filter(
           ({ top, left, right }) => top < GUTTER - 0.5 || left < GUTTER - 0.5 || right > width - GUTTER + 0.5,
         );
@@ -68,6 +78,7 @@ for (const width of WIDTHS) {
         const address = await logInAt(page);
         await page.goto(path);
         await hydrated(page);
+        await chatOpened(page, path, width);
         const account = page.getByTitle(address);
         // The shortening the chat's names get: the first six characters, an ellipsis, the last five.
         await expect(account).toHaveText(`${address.slice(0, 6)}…${address.slice(-5)}`);
@@ -125,7 +136,8 @@ for (const width of WIDTHS) {
       [" logged in", "/w/bubble"],
     ] as const) {
       test(`the update notice overlaps no control the keyboard reaches, on ${path}${name}`, async ({ page }) => {
-        await page.goto(`${UPDATING}${path}`);
+        // Logged in, the way in is the home's: on a phone a world's chat takes the page, over the header's button, once its code is in.
+        await page.goto(`${UPDATING}${name === "" ? path : "/"}`);
         await controlled(page);
         await hydrated(page);
         if (name !== "") {
@@ -134,7 +146,13 @@ for (const width of WIDTHS) {
           await hydrated(page);
           await page.getByRole("button", { name: "Connect Adena" }).click();
           await expect(accountPill(page)).toBeVisible();
+          if (path !== "/") {
+            await page.goto(`${UPDATING}${path}`);
+            await hydrated(page);
+            await expect(accountPill(page)).toBeVisible();
+          }
         }
+        await chatOpened(page, path, width);
         expect((await page.request.post(`${UPDATING}/__bump`)).status()).toBe(204);
         await page.evaluate(() => document.dispatchEvent(new Event("visibilitychange")));
         const notice = page.locator("[popover]:popover-open");
