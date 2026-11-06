@@ -590,7 +590,10 @@ test.describe("a planet's thumb", () => {
       await open(page, "planetthumb--magnified");
       const thumb = page.locator("[data-magnify]");
       const resting = (await box(thumb)).width;
-      await thumb.hover();
+      // The dock's list writes --_mag on the planet under the pointer (71b0e235); the thumb has no hover scale of its own.
+      await thumb.evaluate((t) => {
+        t.style.setProperty("--_mag", "1.55");
+      });
       if (reduced) {
         expect(await thumb.evaluate((t) => getComputedStyle(t).transitionDuration)).toBe("0s");
         expect((await box(thumb)).width).toBe(resting);
