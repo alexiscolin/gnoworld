@@ -1,8 +1,6 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
-  "plugins": [
-    "@stryker-mutator/vitest-runner"
-  ],
+  "plugins": ["@stryker-mutator/vitest-runner"],
   "testRunner": "vitest",
   "mutate": [
     "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,packages/core/src/chain,packages/core/src/markdown,app/src/sw,server/src/ergo,jarvis/src}/**/*.{ts,tsx}",
@@ -37,10 +35,6 @@
     "AGENTS.md"
   ],
   "mutator": {
-    "excludedMutations": [
-      "StringLiteral",
-      "ObjectLiteral",
-      "ArrayDeclaration"
-    ]
+    "excludedMutations": ["StringLiteral", "ObjectLiteral", "ArrayDeclaration"]
   }
 }
