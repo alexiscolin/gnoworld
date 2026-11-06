@@ -591,6 +591,40 @@ describe("a world's pinned actions", () => {
       expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success, label).toBe(false);
   });
 
+  // The reviews of 9e-1: a label is compared as a reader sees it (case, spaces, apostrophes, compatibility forms), so no pill reads as
+  // Who's here or as another pill; one that draws nothing is refused. Code points, not escapes typed here.
+  it.each([
+    ["a curly apostrophe", `Who${String.fromCodePoint(0x2019)}s here`],
+    ["a modifier apostrophe", `Who${String.fromCodePoint(0x2bc)}s here`],
+    ["a no-break space", `Who's${String.fromCodePoint(0xa0)}here`],
+    ["two spaces", "Who's  here"],
+    ["a fullwidth form", `Who's ${String.fromCodePoint(0xff48)}ere`],
+  ])("refuses a label that reads as Who's here with %s", (_name, label) => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success).toBe(false);
+  });
+
+  it.each([
+    ["case", "vote"],
+    ["a trailing space", "Vote "],
+    ["a no-break space inside", `Vote${String.fromCodePoint(0xa0)}now`, `Vote now`],
+  ])("refuses two labels that read the same but for %s", (_name, second, first = "Vote") => {
+    expect(
+      Hubs.safeParse(
+        withActions([
+          { ...vote(), label: first },
+          { ...vote(), label: second },
+        ]),
+      ).success,
+    ).toBe(false);
+  });
+
+  it.each([[0x3164], [0x2800], [0x115f], [0xffa0]])(
+    "refuses a label that draws nothing, code point %i alone",
+    (point) => {
+      expect(Hubs.safeParse(withActions([{ ...vote(), label: String.fromCodePoint(point) }])).success).toBe(false);
+    },
+  );
+
   // JSON.parse makes "__proto__" an own key, which a parsed object would drop: the argument would vanish unseen.
   it("refuses an argument named __proto__ from a file, which would vanish from the action", () => {
     const rows: unknown = JSON.parse(JSON.stringify(withActions([vote()])).replace('"pid"', '"__proto__"'));

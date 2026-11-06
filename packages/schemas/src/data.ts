@@ -99,12 +99,22 @@ const DataArgs = z.pipe(
   CallArgs,
 );
 
+// A label as a reader sees it: compatibility forms folded, any apostrophe one, spaces one, no case; and, as no pill must draw blank,
+// without the fillers that draw nothing (Hangul's, the Braille blank).
+const labelKey = (label: string): string =>
+  label
+    .normalize("NFKC")
+    .replace(/[\u2018\u2019\u02bc\u0060\u00b4]/gu, "'")
+    .replace(/[\s\u115f\u1160\u3164\uffa0\u2800]+/gu, " ")
+    .trim()
+    .toLowerCase();
+
 // A label drawn on a button that leads to a signature: words a reader sees as they are (no control, format or separator character,
-// not spaces alone), never the bar's own Who's here.
+// not blank), never read as the bar's own Who's here.
 const Label = text(CALL_CAPS.label).check(
   z.refine((label) => !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(label), "a label holds no control or format character"),
-  z.refine((label) => label.trim() !== "", "a label is more than spaces"),
-  z.refine((label) => label.trim().toLowerCase() !== "who's here", "a label is not the bar's Who's here"),
+  z.refine((label) => labelKey(label) !== "", "a label draws more than blank"),
+  z.refine((label) => labelKey(label) !== "who's here", "a label is not the bar's Who's here"),
 );
 
 /** A call the team pins in a world (D271): the realm one of the world's own, checked against vm/qfuncs before it shows. */
@@ -138,14 +148,15 @@ const World = z
             path: ["actions", index, "realm"],
             message: "an action's realm is one of the world's realms",
           });
-        if (labels.has(action.label))
+        const key = labelKey(action.label);
+        if (labels.has(key))
           ctx.issues.push({
             code: "custom",
             input: action.label,
             path: ["actions", index, "label"],
-            message: `duplicate label ${JSON.stringify(action.label)}`,
+            message: `a label reads as another: ${JSON.stringify(action.label)}`,
           });
-        labels.add(action.label);
+        labels.add(key);
       });
     }),
   );
