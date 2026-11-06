@@ -135,7 +135,13 @@ test("the focus ring is the 2 px mint outline, 2 px off, on every control reache
         const focused = document.activeElement;
         const all = [...document.querySelectorAll("#storybook-root *")];
         const where = focused === null ? -1 : all.indexOf(focused);
-        const style = getComputedStyle(focused ?? document.body);
+        // A prefixed field's ring is its frame's, around the prefix too (F5963): the bare input inside draws none (F6040).
+        const own = getComputedStyle(focused ?? document.body);
+        const frame = focused?.parentElement;
+        const style =
+          own.outlineStyle === "none" && frame?.matches(":has(> :focus-visible)") === true
+            ? getComputedStyle(frame)
+            : own;
         return [String(where), style.outlineStyle, style.outlineWidth, style.outlineColor, style.outlineOffset];
       });
       reached.add(name);
