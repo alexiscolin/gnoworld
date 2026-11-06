@@ -7,6 +7,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./chainEvents": "./src/chainEvents.ts",
     "./functions": "./src/functions.ts",
     "./indexer": "./src/indexer.ts",
     "./proposal": "./src/proposal.ts"

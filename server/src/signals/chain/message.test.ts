@@ -1,4 +1,4 @@
-import { ChainEvent } from "@gnoworld/schemas/indexer";
+import { ChainEvent } from "@gnoworld/schemas/chainEvents";
 import { describe, expect, it, vi } from "vitest";
 import { call, deploy, NAMEREG, registration, rowOf } from "../../testing/chainRecorded.ts";
 import { readChainRow, type ChainContext } from "./message.ts";
