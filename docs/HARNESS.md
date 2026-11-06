@@ -112,8 +112,13 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
    command that removes it. `test_hooks.sh`'s section `deploy_lock` runs it against stubbed Docker.
-9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, which shows
-   each harness file the branch changes, with its diff, before git writes it. Pushing `main` wants
+9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, onto the branch
+   checked out (`main`, or a part's), which shows each harness file the merge changes (git
+   merge-tree's tree, with HEAD's attributes), with its diff, before git writes it, and refuses
+   a harness file in conflict and a non-empty `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`; a merge
+   stopped on a conflict outside the harness (the ledgers, every time) it commits itself, with its
+   own message, once resolved, on Enter; then it undoes any commit that is not the merge shown
+   (its parents, its harness), with `git reset --hard` (it began on a clean tree). Pushing `main` wants
    the hooks installed from it, the full gate recorded green on that code, the committed review
    pass for exactly that tree, and each harness file changed since the remote's `main` declared on
    a line `Harness-changed: <path> - why`. Claude can do neither: the sandbox refuses the merge's
@@ -571,7 +576,12 @@ costs context in every session.
 - **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
   harness is refused at its commit, its files written already: undo it at once
   (`git merge --abort`). A cherry-pick, a rebase or a checkout of Claude's branch runs no such
-  check (F153); a merge with a conflict that changes the harness needs the branch rebased first.
+  check (F153). pre-commit compares only the merge's harness files with git merge-tree's merge of
+  the commit merge.sh marked: one changed during the resolution, or in conflict, is refused; the
+  other files are resolved by hand and gated (9n), and so is a merge read through a non-empty
+  `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`, which a sandboxed command can write. A mark anyone
+  types by hand for a clean merge merge.sh never showed still passes (a backlog row on
+  slice-9n, answer 9n-4): merge.sh never asks Alexis to type one.
 - **A merge refuses a path with a non-ASCII character** (F164).
 - **The install is not atomic** (F159), and a fresh clone has no hooks until its owner installs
   them from `main`.

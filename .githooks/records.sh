@@ -49,3 +49,20 @@ foreign() (
 	paths=$(git -c core.quotePath=false diff --name-only "$@") || exit 0
 	printf '%s\n' "$paths" | LC_ALL=C grep -q '[^ -~]'
 )
+# The merge of HEAD and the commit $1 as git merges it: its tree on the first line, then the harness files git merge-tree
+# names in conflict (git-merge-tree(1), git 2.50, OUTPUT). It reads HEAD's attributes, not a .gitattributes git merge has
+# written since (9n's /pre-merge), and merges over every merge base, as git merge does. Nothing when $1 names no commit:
+# git 2.50 then writes nothing and exits 1, as for a conflict, though its manual says otherwise. A grep that fails fails it.
+merge_of() (
+	set -e
+	merged=$(git --attr-source=HEAD -c core.quotePath=false merge-tree --write-tree --name-only --no-messages HEAD "$1" 2>/dev/null) || :
+	tree=$(printf '%s\n' "$merged" | sed -n 1p)
+	git rev-parse -q --verify "$tree^{tree}" >/dev/null || exit 0
+	ours=$(harness --name-only "$(git hash-object -t tree /dev/null)" "$tree")
+	printf '%s\n' "$tree"
+	# -e: a harness path may start with - (*.config.ts)
+	printf '%s\n' "$merged" | sed 1d | grep -xF -e "$ours" || [ $? = 1 ]
+)
+# The files of .git that change how git merges whatever the trees hold, and that Claude's sandbox can write: info/attributes
+# (merge drivers, union), info/grafts and shallow (other parents, other merge bases) (9n's /pre-merge). Each one that holds anything.
+rewired() ( for f in info/attributes info/grafts shallow; do [ ! -s "$(git rev-parse --git-path "$f")" ] || echo ".git/$f"; done )
