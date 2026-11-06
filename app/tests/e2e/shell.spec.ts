@@ -180,8 +180,11 @@ for (const width of WIDTHS) {
       await page.getByTitle(address).evaluate((element) => {
         element.textContent = "g1xxxx…xxxxx";
       });
+      // The face is drawn from the wallet's address, which differs at each server's start: its box stays, its nebula is masked.
+      const face = page.getByRole("button", { name: /Your account/ }).locator("svg");
+      await expect(face).toBeVisible();
       await fixTimes(page);
-      await expect(page).toHaveScreenshot(`shell-in-${String(width)}.png`);
+      await expect(page).toHaveScreenshot(`shell-in-${String(width)}.png`, { mask: [face] });
     });
   });
 }

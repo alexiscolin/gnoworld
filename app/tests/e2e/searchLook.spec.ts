@@ -5,7 +5,7 @@ const WIDTHS = [390, 1280] as const;
 
 for (const width of WIDTHS) {
   test.describe(`at ${String(width)} px`, () => {
-    test.use({ viewport: { width, height: 844 } });
+    test.use({ viewport: { width, height: 844 }, figures: true });
     for (const [name, query] of [
       ["results", ""],
       ["no-place", "zzz"],

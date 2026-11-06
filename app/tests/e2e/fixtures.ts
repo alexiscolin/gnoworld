@@ -4,6 +4,7 @@ import { expect, test as base, type Page, type Response as Answer, type Worker }
 import { VIOLATION } from "../../src/sw/report.ts";
 import { site } from "../../src/places.ts";
 import { serveJobs } from "./deployed.ts";
+import { pinFigures } from "./figures.ts";
 
 export { COUNTED } from "./deployed.ts";
 
@@ -73,11 +74,13 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
   planted: boolean;
   violations: string[];
   homeReads: undefined;
+  pinned: undefined;
   refusing: boolean;
   refusals: string[];
   newcomer: boolean;
   returning: undefined;
   counted: boolean;
+  figures: boolean;
 }>({
   planted: [false, { option: true }],
   refusing: [false, { option: true }],
@@ -144,6 +147,16 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
           route.fulfill({ status: 404, headers: cors, body: JSON.stringify({ error: "not_ready" }) }),
         );
       if (counted) await serveJobs(context, cors);
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+  // A look journey's live figures, fixed: who is here (/api/presence) and a world's hours, as no other journey of the run leaves them
+  // (they share one stack). A page's own route goes first. The hours end on 11:00 UTC, so the plate's peak reads the same each run.
+  figures: [false, { option: true }],
+  pinned: [
+    async ({ context, figures }, use) => {
+      if (figures) await pinFigures(context);
       await use(undefined);
     },
     { auto: true },
