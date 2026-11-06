@@ -1,0 +1,57 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "plugins": [
+    "@stryker-mutator/vitest-runner",
+    "@stryker-mutator/typescript-checker"
+  ],
+  "testRunner": "vitest",
+  "checkers": [
+    "typescript"
+  ],
+  "mutate": [
+    "packages/*/src/**/*.{ts,tsx}",
+    "!packages/*/src/**/*.test.{ts,tsx}",
+    "!packages/*/src/**/*.stories.tsx",
+    "!packages/*/src/index.ts",
+    "!packages/ui/src/Overview/**",
+    "!packages/*/src/testSetup.ts",
+    "!packages/chain/src/testing/**",
+    "app/src/**/*.{ts,tsx}",
+    "!app/src/**/*.test.{ts,tsx}",
+    "!app/src/routes.ts",
+    "!app/src/root.tsx",
+    "!app/src/entry.server.tsx",
+    "server/src/**/*.ts",
+    "!server/src/**/*.test.ts",
+    "!server/src/main.ts",
+    "!server/src/testing/**",
+    "jarvis/src/**/*.ts",
+    "!jarvis/src/**/*.test.ts",
+    "!jarvis/src/main.ts",
+    "!jarvis/src/**/*.bench.ts",
+    "!jarvis/src/testing/**"
+  ],
+  "incremental": true,
+  "dryRunTimeoutMinutes": 20,
+  "ignoreStatic": true,
+  "htmlReporter": {
+    "fileName": "reports/mutation/index.html"
+  },
+  "clearTextReporter": {
+    "allowColor": false
+  },
+  "thresholds": {
+    "high": 95,
+    "low": 85
+  },
+  "ignorePatterns": [
+    "docs/**",
+    "!docs/OPERATIONS.md",
+    "/gno",
+    ".claude",
+    "coverage",
+    "CLAUDE.md",
+    "CLAUDE.local.md",
+    "AGENTS.md"
+  ]
+}

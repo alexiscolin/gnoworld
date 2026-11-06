@@ -136,7 +136,7 @@ def journeys_mutants():
         ("\t\treturn 0\n\tfi\n\t# Three free ports", "\tfi\n\t# Three free ports", "stops after the build at a commit"),
         ("\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true ;;", "\t\tapp/src/*.test.ts | app/src/*.test.tsx) ts=true app=true ;;", "builds the app for a change of its tests alone"),
         ("\t\tapp/tests/*) ts=true ;;", "\t\tapp/tests/*) ts=true app=true ;;", "builds the app for a change of a journey"),
-        ("--reporter=dot,json >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
+        ("--reporter=dot,json $journeys >", "--reporter=dot,json app/tests/e2e/home.spec.ts >", "gives the merge check's journeys a filter"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', '{ $full || [ -n "$tested" ]; } || format_cache=', "keeps Prettier's cache in a staged copy and none in a repository"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', "format_cache=", "keeps Prettier's cache in a staged copy"),
         ('{ $full || [ -z "$tested" ]; } || format_cache=', '[ -z "$tested" ] || format_cache=', "gives --full and --merge Prettier's writable cache"),
@@ -1461,7 +1461,7 @@ def mutants():
     yield from each("scripts/guard.py", "isinstance(cwd, str) and ", "", "hooks", "guard reads an event with no folder (F5058)")
     yield from each("scripts/guard.py", 'return bool(words) and os.path.basename(words[0]) == "worktree.sh"', "return False", "hooks", "guard sees a run of worktree.sh (F5058)")
     yield from each("scripts/guard.py", 'words = [w for w in words[1:] if not w.startswith("-")]', "words = words[1:]", "hooks", "guard sees worktree.sh past a shell's options (F5058)")
-    yield from each("scripts/check.sh", "unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
+    yield from each("scripts/check.sh", "unset COVERAGE_ALL GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO", "true", "hooks", "check.sh clears the test switches")
     yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
     yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
     yield from each("scripts/code_changed.sh", 'git ls-files -s -- "$@"; git diff --binary -- "$@";', "git rev-parse HEAD; git diff HEAD --binary;", "hooks", "code_changed state leaves prose out")
@@ -1776,7 +1776,7 @@ def mutants():
         ("\t\tpython3 -I scripts/probe.py\n", "\t\tpython3 -I scripts/probe.py || :\n", "--full fails when the probe does (G2)"),
         ("\t\tpython3 -I scripts/bench.py\n", "\t\tpython3 -I scripts/bench.py || :\n", "--full fails when a bench passes its budget (G2)"),
         ('\t\tpython3 -I scripts/batch_size.py "$base"\n', '\t\tpython3 -I scripts/batch_size.py "$base" || :\n', "--merge and --full fail when the batch is too large (G2)"),
-        ("ts=true app=true tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
+        ("ts=true app=true; ! $strict || tokens=true ;;", "ts=true app=true ;;", "a change of tokens.css compares the tokens story's pictures (F1190)"),
         ("\t$tokens || return 0\n\t! $light", "\t! $light", "the tokens pictures only for a change of tokens.css (F1190)"),
         ("start docs\nstart pictures\n", "start docs\n", "the tokens pictures lane starts (F1190)"),
         ("finish ts types tests gno docs pictures ||", "finish ts types tests gno docs ||", "a failed tokens comparison fails the gate (F1190)"),
@@ -1794,7 +1794,7 @@ def mutants():
         ('run coverage "--maxWorkers=$half ', 'run coverage "', "--full caps Vitest's coverage at half the machine (F777)"),
         ("--concurrency $cores --incrementalFile", "--concurrency $half --incrementalFile", "StrykerJS runs alone on every core (Alexis, 2026-11-04)"),
         ("\tstart probe\n\tphase probe\n", "\tstart probe\n", "probe.py runs alone, before the full lanes"),
-        ("\t! $merge || full=false", "\t:", "--merge records no full gate"),
+        ("\t! $merge || ! $strict || full=false", "\t:", "--merge records no full gate"),
         ("\tif $merging; then\n", "\tif false; then\n", "a merge commit has no time budget (Alexis, 2026-10-28)"),
         ("\tif git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then merging=true; fi\n", '\tif [ -e "$(git rev-parse --git-path MERGE_HEAD)" ]; then merging=true; fi\n', "a MERGE_HEAD git cannot read is no merge, the budget holds"),
         ("\tif git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; then merging=true; fi\n", "\t:\n", "a merge in progress, in a repository, has no time budget"),

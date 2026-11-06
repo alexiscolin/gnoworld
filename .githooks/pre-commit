@@ -99,12 +99,13 @@ changed=$(git -c core.quotePath=false diff --cached --no-renames --name-only HEA
 # MERGE_HEAD only after that hook), or a merge in progress. Always set, so a caller's own value counts for nothing.
 merge=0
 { [ "${1:-}" = --merge ] || git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; } && merge=1
+# Only with GNOWORLD_STRICT=1 (the speed plan, 2026-11-06: by default no declaration check runs; scripts/test_hooks.sh runs it on).
 # A commit that touches a test, a bench or an approved picture runs the staged check_regressions.py here, in the repository (the
 # copy has no git), with the base check.sh takes: where the branch left main, so a `Removed-test:` line of an earlier commit of the
 # branch counts, else HEAD (a renamed test passed the fast gate in 5b and failed only the merge check). Not in a merge, whose full
 # gate follows, nor with no commit yet. The list of tests is check.sh's, the same.
 tests=$(printf '%s\n' "$changed" | grep -E '\.(test|bench)\.tsx?$|\.spec\.ts$|_test\.(gno|go)$|-snapshots/.*\.png$|__screenshots__/.*\.png$' || :)
-if [ "$merge" = 0 ] && [ -n "$tests" ] && base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null); then
+if [ "${GNOWORLD_STRICT:-}" = 1 ] && [ "$merge" = 0 ] && [ -n "$tests" ] && base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null); then
 	nodebin= # Vitest's list in check_regressions reads the Node .node-version pins (a bare shell may hold another)
 	[ ! -f .node-version ] || nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat .node-version)/bin:"
 	env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE PATH="$nodebin$PATH" python3 -I "$s/check_regressions.py" --quick "$base"

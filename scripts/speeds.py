@@ -1,4 +1,4 @@
-"""speeds.py <root>: the merge check's two speeds (slice 7, question 21); speeds.py --light <root>, the radical mode's light gate.
+"""speeds.py --tier1 <root>: `tier1` or `other` for a change (check.sh's slim gate and its coverage); speeds.py <root>: the merge check's two speeds (slice 7, question 21); speeds.py --light <root>, the radical mode's light gate.
 
 Reads the paths of a change on stdin, one a line (check.sh's own `$changes`), and prints `interface` or `full`; it always exits 0.
 `interface` is for a change of the interface alone: one review and no StrykerJS. Everything else runs the full control, and so does
@@ -78,6 +78,13 @@ def speed(root, paths):
     return INTERFACE if within(root, paths, [folded(p) for p in table["1"]], folders(table)) else FULL
 
 
+def tier1(root, paths):
+    """`tier1` when a path is a tier-1 path, or one this script cannot place, or the table or the change is empty; `other` when none is
+    (the slim fast gate and the full gate's coverage, check.sh, speed plan 2026-11-06). Every doubt is `tier1`."""
+    security = [folded(p) for p in rows(root)["1"]]
+    return "other" if security and paths and not any(secure(root, path, security) for path in paths) else "tier1"
+
+
 def light(root, main_table, paths):
     """`light` when every path is under a tier-3 folder of both tables, the tree's and main's, and none is a tier-1 path of either (the
     radical mode's light gate, check.sh; the interface alone, F4909's (a)): a tier-1 row the change drops stays main's, and a tier-3
@@ -93,11 +100,13 @@ def main(argv):
     try:
         text = sys.stdin.buffer.read().decode("utf-8")
         paths = [p for p in text.split("\n") if p]
+        if argv[1:2] == ["--tier1"]:
+            return tier1(argv[2], paths) if len(argv) == 3 else "tier1"
         if argv[1:2] == ["--light"]:
             return light(argv[2], argv[3], paths) if len(argv) == 4 else FULL
         return speed(argv[1], paths) if len(argv) == 2 else FULL
     except (OSError, ValueError):  # a table or a name it cannot read, bytes that are not text
-        return FULL
+        return "tier1" if argv[1:2] == ["--tier1"] else FULL
 
 
 if __name__ == "__main__":

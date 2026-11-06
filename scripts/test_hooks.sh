@@ -10,6 +10,9 @@ unset GIT_NO_REPLACE_OBJECTS
 # The hooks run the gate as they do in Claude Code's sandbox, the CI included; the sections
 # `outside` and `installed` run them as in Alexis's shell (F076, F129).
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
+# The declaration checks (check_regressions, the fix-needs-a-test check, the Stop hook's gate, check.sh's old modes) are opt-in since the speed plan
+# (Alexis, 2026-11-06): this suite tests them, so it runs them on, as `check.sh --everything` does.
+export GNOWORLD_STRICT=1
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 # No git config from around this file reaches its throwaway repositories (F5012, F5022, section `unsigned`): Alexis's global
 # one signs every commit with a key the sandbox cannot read; a system file, what `git -c` hands a hook, or a template folder
