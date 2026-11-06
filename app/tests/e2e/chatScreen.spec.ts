@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
+import { calmed } from "./figures.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { open, PIN } from "./chatScreenOpen.ts";
@@ -197,6 +198,7 @@ test.describe("the chat as the video shows it", () => {
     page,
   }) => {
     await open(page, { width: 390, as: GUEST });
+    await calmed(page);
     await expect(worlds(page)).toBeHidden();
     await expect(info(page)).toBeHidden();
     await expect(roomsButton(page)).toBeVisible();
