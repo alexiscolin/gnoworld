@@ -309,7 +309,7 @@ component with its CSS Module, documented by its props.
 
 **How they compose:**
 - **Named parts.** Card.Header, Card.Body and Card.Actions; Row's lead, title, subtitle,
-  activity and trail; Field's label, help, error and prefix.
+  activity and trail; Field's label, box (the frame round a prefix and its input), help, error and prefix.
 - **Closed variants.** `size`, `emphasis` (solid, outline, quiet), `tone` (neutral, danger; and
   for static marks mine, warm, signal) and `density` are TypeScript unions, and each value only
   sets private properties. A primary button is `emphasis="solid" tone="neutral"` (cream); a
@@ -337,7 +337,7 @@ component with its CSS Module, documented by its props.
 | `Combobox` | mentions, commands, search | A list moved with the arrow keys in a `Popover`, ARIA `combobox`: `@`, `/` and ⌘K |
 | `Tooltip` | | On every icon-only control |
 | `Toolbar` | | ARIA `toolbar` with roving focus: a message's actions, formatting, the composer's tools |
-| `Dialog` | standard, wide (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
+| `Dialog` | standard, wide (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. An optional `kicker` line above the title (the one label style, read with the description) and `hideClose` where the page draws another way out (Esc still closes). Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
 | `Panel` | docked, floating; the plate (world-tinted, dot grid, fading edge, a vertical caption) | Header (one height), body, footer; the plate and the chat dock are panels |
 | `Card` | header, body, actions; tones; dashed; density | Layout only. Its kinds (message, call, digest, proposal, event, announcement, media, poll, quiz, seal) are assemblies in their features (ADR-0002 §4) |
 | `SignPanel` | preview, waiting, signed, in a block, done; refused, failed, too late, wrong network, wallet missing or locked | The one signing block, whoever signs (Adena, a session, a signature that is not a transaction). It shows the account, the realm, the function, the arguments, the network with its label, the fee as an estimate and who pays, the steps in words, the ADR-0001 §11 warnings and a link to gnoweb. Only it renders the confirm control |
