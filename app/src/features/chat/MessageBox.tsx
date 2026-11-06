@@ -2,6 +2,7 @@
 // field's words and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
 import { Cluster, Icon, IconButton, type IconName } from "@gnoworld/ui";
 import { Fragment, type ReactNode } from "react";
+import shared from "../../edge.module.css";
 import type { Format } from "./format.ts";
 import styles from "./MessageBox.module.css";
 
@@ -73,7 +74,7 @@ export function MessageBox({
   children: ReactNode;
 }) {
   return (
-    <div role="group" aria-label="Message box" className={styles["box"]}>
+    <div role="group" aria-label="Message box" className={[shared["edge"], styles["box"]].join(" ")}>
       <FormatBar onFormat={onFormat} />
       <div className={styles["field"]}>{children}</div>
       <div className={styles["marks"]}>

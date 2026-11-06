@@ -418,6 +418,11 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
     expect(block.className).toContain("block");
   });
 
+  // F5953: the block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
+  it("wears the shared edge on its block", () => {
+    expect((all(view(), "dl")[0] ?? document.body).className).toContain("edge");
+  });
+
   it("sets the line under the title in its own class, muted by the stylesheet (F5731)", () => {
     const line = all(view(), "p").find((p) => said(p).startsWith("A call to"));
     expect(line).toBeDefined();

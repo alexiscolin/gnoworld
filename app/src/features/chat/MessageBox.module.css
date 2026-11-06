@@ -7,7 +7,6 @@
     display: grid;
     /* layout: the marks, the words that take what is left, Send */
     grid-template-columns: auto minmax(0, 1fr) auto;
-    border: var(--line-width) solid var(--color-line);
     border-radius: var(--radius-box);
     background: var(--color-fill);
   }

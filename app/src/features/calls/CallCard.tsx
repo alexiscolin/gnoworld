@@ -6,6 +6,7 @@ import { callFields } from "@gnoworld/core";
 import { Button, Card, Field, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
+import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
 import { problemsOf } from "./problems.ts";
 import { NOT_CHECKED, networkOf, publicForever, sayFailure, sayProblem, shown } from "./say.ts";
@@ -98,7 +99,8 @@ function Status({ card }: { card: Card_ }) {
   return <p role="status" className={styles["status"]} />;
 }
 
-// What is called with: the fields to fill in preview, the texts as they were once the card has left it.
+// What is called with: the fields to fill in preview (a name in its own case, as the frames draw it; the field's label is for
+// assistive technology), the texts as they were once the card has left it.
 function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
   const fields = callFields(card.params);
   const list = fields.ok ? fields.fields : [];
@@ -126,7 +128,6 @@ function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
         const name = field.name === "" ? `Argument ${String(index + 1)}` : field.name;
         return (
           <Stack key={index} space="2xs">
-            {/* The frames draw a name in its own case, mono: the field's caps label stays for assistive technology. */}
             <span aria-hidden="true" className={styles["name"]}>
               {name}
             </span>
@@ -202,7 +203,7 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
       />
       <Card.Body>
         <p className={styles["lede"]}>A call to {card.realm}. Adena asks you to sign it.</p>
-        <dl className={styles["block"]}>
+        <dl className={[shared["edge"], styles["block"]].join(" ")}>
           <Row label="REALM">{card.realm}</Row>
           <Row label="FUNCTION">{card.func}</Row>
           <Row label="ARGUMENTS">

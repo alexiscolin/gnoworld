@@ -5,8 +5,10 @@
     display: grid;
     /* layout: the labels take what they need, the values what is left */
     grid-template-columns: max-content 1fr;
-    /* layout: the step between two rows, and between a label and its value */
-    gap: var(--space-2xs) var(--space-m);
+    /* layout: the step between two rows */
+    row-gap: var(--space-2xs);
+    /* layout: the step between a label and its value, 16 px as the frame draws it */
+    column-gap: var(--space-s);
     /* layout: a label sits on its value's baseline, as the frame draws it */
     align-items: baseline;
     /* layout: a list's own margin, which the browser gives it, taken off */
