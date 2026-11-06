@@ -16,10 +16,5 @@
     .computer {
       display: none;
     }
-
-    /* By touch the pill may be the "Pick a name" button: a target keeps the default control's 44 (coherence decision 4). */
-    .account {
-      --_h: var(--control-m);
-    }
   }
 }
