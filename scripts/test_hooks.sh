@@ -2336,7 +2336,45 @@ for h in $hook_names; do
 	git -C "$i" rm -q ".githooks/$h"
 	git -C "$i" commit -qm "no $h"
 done
-git -C "$i" checkout -q main
+# Merges that stop on a conflict (9n), each branch merged onto the first of its pair with merge.sh's mark:
+# - ledger-main, ledger: a ledger both change, every merge's case; ledger also changes the harness file merge.sh shows,
+#   with a line that looks like a conflict's marker;
+# - clash-main, clash: a harness file both change; gone: that file deleted, against ledger's change and clash-main's;
+# - twin-main-<n>, twin-branch-<n>: a harness file both add, named with a capital, matched by a glob, or starting with -;
+git -C "$i" checkout -q -b ledger-main main
+mkdir -p "$i/docs"
+echo main >"$i/docs/decisions.md"
+{ sed -n 1p "$i/.githooks/pre-push" && echo '# main, at the top' && sed 1d "$i/.githooks/pre-push"; } >"$t/pre-push"
+cat "$t/pre-push" >"$i/.githooks/pre-push"
+git -C "$i" add docs/decisions.md .githooks/pre-push
+git -C "$i" commit -qm ledger-main
+git -C "$i" checkout -q -b ledger main
+mkdir -p "$i/docs"
+echo branch >"$i/docs/decisions.md"
+printf '# shown\n<<<<<<< not a conflict\n' >>"$i/.githooks/pre-push"
+git -C "$i" add docs/decisions.md .githooks/pre-push
+git -C "$i" commit -qm ledger
+git -C "$i" checkout -q -b clash-main main
+echo '# main' >>"$i/.githooks/pre-push"
+git -C "$i" commit -qam clash-main
+git -C "$i" checkout -q -b clash main
+echo '# branch' >>"$i/.githooks/pre-push"
+git -C "$i" commit -qam clash
+git -C "$i" checkout -q -b gone main
+git -C "$i" rm -q .githooks/pre-push
+git -C "$i" commit -qm gone
+n=0
+for p in Scripts/new.sh lint/a.config.ts packages/x/package.json -a.config.ts; do
+	n=$((n + 1))
+	for side in main branch; do
+		git -C "$i" checkout -q -b "twin-$side-$n" main
+		b=$(echo "$side" | git -C "$i" hash-object -w --stdin)
+		git -C "$i" update-index --add --cacheinfo "100644,$b,$p"
+		git -C "$i" commit -qm "twin $side $n"
+		git -C "$i" checkout -q -f main
+	done
+done
+mkdir -p "$i/docs" # the checkouts above removed it with the ledger
 # As in Alexis's shell, with no mark of merge.sh and, as everywhere in this file, no git config of
 # his own (no hooks path): from the root, or from a folder below it.
 alexis() { env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_MERGE_AUTOEDIT=no "$@"; }
@@ -2436,7 +2474,8 @@ ran "install_hooks.sh"
 # merge.sh merges no code its gate did not pass, then shows each harness file a branch changes,
 # with its diff as text and its control bytes visible, and merges once the name is typed, from
 # any folder of the repository.
-echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged code no gate passed"
+echo planted | in_i sh .git/hooks/merge.sh planted >"$t/out" 2>&1 && fail "merge.sh merged code no gate passed"
+grep -q '^merge\.sh: .*press Enter' "$t/out" && fail "merge.sh said to conclude a merge a hook refused, with no conflict (9n)"
 git -C "$i" merge --abort
 mark_i planted fast
 # A replace ref would show an innocent script where the branch holds a planted one.
@@ -2518,12 +2557,18 @@ printf 'fix: x\n\naws = %s\n' "$key" >"$t/installed-msg"
 in_i sh .git/hooks/commit-msg "$t/installed-msg" >"$t/out" 2>&1 && fail "commit-msg let a key through, with the working tree's rule file (F129)"
 grep -q 'the message holds' "$t/out" || fail "commit-msg refused the key for another reason than the scan's"
 ran "pre-commit or commit-msg"
-# merge.sh merges onto main only, with nothing uncommitted, staged or untracked, and starts
-# nothing otherwise; with no harness change it asks for nothing.
+# merge.sh merges onto the branch checked out, a part's as main (9n-3), never onto no branch, with nothing uncommitted,
+# staged or untracked, and starts nothing otherwise; with no harness change it asks for nothing.
 git -C "$i" reset -q --hard "$base"
 git -C "$i" checkout -q feature
-echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged onto a branch other than main"
-untouched_main "$(git -C "$i" rev-parse feature)" || fail "merge.sh began a merge onto a branch other than main"
+mark_i "$(git -C "$i" merge-tree --write-tree feature planted)" fast
+echo planted | in_i sh .git/hooks/merge.sh planted >"$t/out" 2>&1 || { cat "$t/out" >&2; fail "merge.sh refused to merge onto a part's branch (9n-3)"; }
+[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse planted)" ] && [ "$(git -C "$i" symbolic-ref --short HEAD)" = feature ] ||
+	fail "merge.sh did not merge onto the part's branch it was on (9n-3)"
+git -C "$i" reset -q --hard HEAD^1
+git -C "$i" checkout -q --detach main
+echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged onto no branch"
+untouched_main "$base" || fail "merge.sh began a merge onto no branch"
 git -C "$i" checkout -q main
 for dirt in 'echo dirty >>a.ts' 'echo staged >>a.ts && git add a.ts' 'echo new >new.ts'; do
 	(cd "$i" && sh -c "$dirt")
@@ -2533,7 +2578,8 @@ for dirt in 'echo dirty >>a.ts' 'echo staged >>a.ts && git add a.ts' 'echo new >
 	rm -f "$i/new.ts"
 done
 mark_i feature fast
-in_i sh .git/hooks/merge.sh feature </dev/null >/dev/null 2>&1 || fail "merge.sh wanted a name for a merge with no harness change"
+in_i sh .git/hooks/merge.sh feature </dev/null >"$t/out" 2>&1 || fail "merge.sh wanted a name for a merge with no harness change"
+grep -q '^merge\.sh: .*press Enter' "$t/out" && fail "merge.sh said to conclude a merge it made (9n)"
 [ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse feature)" ] || fail "merge.sh did not merge a branch with no harness change"
 git -C "$i" reset -q --hard "$base"
 # A merge that did not come through merge.sh has written the harness unseen: its commit is
@@ -2568,6 +2614,164 @@ git -C "$i" reset -q --hard "$base"
 rm -f "$i/.git/SQUASH_MSG"
 ran "a refused merge"
 in_i git merge -q --no-ff feature >/dev/null 2>&1 || fail "a merge with no harness change wanted merge.sh"
+# Every merge's ledgers conflict (9n): merge.sh's merge stops on them and prints the line that concludes it with its mark;
+# once the ledger is resolved by hand, the merge is committed if every harness file is as git merge-tree merges the commit
+# shown, none in conflict. Each refusal says why and how to undo the merge.
+conflicted() { # <main's side> <branch> [squash]: main reset to the first, the second merged with its mark, stopped on its conflict, the ledger resolved
+	git -C "$i" reset -q --hard "$1"
+	rm -f "$i/.git/SQUASH_MSG"
+	tip=$(git -C "$i" rev-parse "$2")
+	if [ -n "${3:-}" ]; then
+		in_i env GNOWORLD_MERGE="$tip" git -c merge.ff=true merge -q --squash "$tip" >/dev/null 2>&1 && fail "the squash of $2 did not stop on its conflict"
+	else
+		in_i env GNOWORLD_MERGE="$tip" git merge -q --no-ff "$tip" >/dev/null 2>&1 && fail "the merge of $2 did not stop on its conflict"
+	fi
+	[ ! -e "$i/docs/decisions.md" ] || { echo both >"$i/docs/decisions.md" && git -C "$i" add docs/decisions.md; }
+}
+concluded() { # [mark]: the merge committed with the mark, merge.sh's by default, the gate's record made for its tree first
+	mark_i "$(git -C "$i" write-tree)" fast
+	in_i env GNOWORLD_MERGE="${1-$tip}" git commit -q --no-edit >"$t/out" 2>&1
+}
+refused() { # <why> <what the refusal names> [mark]
+	concluded "${3-$tip}" && fail "$1"
+	grep -qF -- "$2" "$t/out" && grep -qF 'git merge --abort' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused for another reason than it should: $1"; }
+}
+# merge.sh stops on the ledger's conflict and waits; once it is resolved and Enter is pressed, it commits the merge itself, so
+# no mark is ever typed (9n's review): Enter before the resolution commits nothing and asks again; no more keys, nothing.
+git -C "$i" reset -q --hard ledger-main
+tip=$(git -C "$i" rev-parse ledger)
+mkfifo "$t/keys"
+(cd "$i" && alexis sh .git/hooks/merge.sh ledger <"$t/keys" >"$t/out" 2>&1; echo $? >"$t/status") &
+exec 3>"$t/keys"
+trap '' PIPE # a merge.sh that stopped reading fails the test below, not the suite by a signal
+key() { printf '%s\n' "$1" >&3 || { cat "$t/out" >&2; fail "merge.sh stopped reading its keys before the merge was committed (9n)"; }; }
+said() { # <what merge.sh says>: waits until it says it, 30 s at most
+	w=0
+	until grep -q "$1" "$t/out" 2>/dev/null; do
+		w=$((w + 1))
+		[ "$w" -lt 300 ] || { cat "$t/out" >&2; fail "merge.sh never said: $1"; }
+		sleep 0.1
+	done
+}
+key ledger
+said '^merge\.sh: .*press Enter'
+grep -q 'GNOWORLD_MERGE=' "$t/out" && fail "merge.sh told Alexis to type a mark, which anyone can write for any merge (9n's review)"
+key ''
+said '^merge\.sh: not committed'
+echo both >"$i/docs/decisions.md"
+git -C "$i" add docs/decisions.md
+mark_i "$(git -C "$i" write-tree)" fast
+key ''
+exec 3>&-
+trap - PIPE
+wait
+[ "$(cat "$t/status")" = 0 ] || { cat "$t/out" >&2; fail "merge.sh did not commit a merge whose ledger was resolved by hand (9n)"; }
+[ "$(git -C "$i" rev-parse HEAD^2)" = "$tip" ] || fail "merge.sh's merge is not the merge of the commit shown (9n)"
+git -C "$i" show HEAD:.githooks/pre-push | grep -qx '# main, at the top' || fail "the merge lost main's side of a harness file both changed (9n's review)"
+git -C "$i" show HEAD:.githooks/pre-push | grep -qx '# shown' && [ "$(git -C "$i" show HEAD:docs/decisions.md)" = both ] ||
+	fail "the merge concluded did not hold the harness shown and the ledger as resolved (9n)"
+git -C "$i" reset -q --hard ledger-main
+echo ledger | in_i sh .git/hooks/merge.sh ledger >"$t/out" 2>&1 && fail "merge.sh committed a merge in conflict with no key pressed"
+grep -q '^merge\.sh: nothing committed' "$t/out" && [ -e "$i/.git/MERGE_HEAD" ] || { cat "$t/out" >&2; fail "merge.sh did not leave the merge in conflict to undo (9n)"; }
+git -C "$i" merge --abort
+# A harness file in conflict has no resolution that merge.sh showed: it undoes the merge and says so (9n's review).
+git -C "$i" reset -q --hard clash-main
+mark_i "$(git -C "$i" write-tree)" fast
+echo clash | in_i sh .git/hooks/merge.sh clash >"$t/out" 2>&1 && fail "merge.sh merged a harness file in conflict (9n's review)"
+grep -q 'are in conflict' "$t/out" && grep -qx '.githooks/pre-push' "$t/out" || { cat "$t/out" >&2; fail "merge.sh refused a harness conflict without naming it (9n's review)"; }
+untouched_main "$(git -C "$i" rev-parse clash-main)" || fail "merge.sh left a merge whose harness is in conflict (9n's review)"
+conflicted ledger-main ledger
+concluded "$tip" || { cat "$t/out" >&2; fail "a merge with its mark, its ledger resolved, was refused (9n)"; }
+conflicted ledger-main ledger
+mark_i "$(git -C "$i" write-tree)" fast
+in_i env GNOWORLD_MERGE="$tip" git commit -qa --no-edit >"$t/out" 2>&1 || { cat "$t/out" >&2; fail "a merge resolved and committed with -a was refused (9n)"; }
+conflicted ledger-main ledger squash
+mark_i "$(git -C "$i" write-tree)" fast
+in_i env GNOWORLD_MERGE="$tip" git commit -qm "chore: squash ledger" >"$t/out" 2>&1 || { cat "$t/out" >&2; fail "a squash with merge.sh's mark, its ledger resolved, was refused (9n)"; }
+# The mark: missing, or naming no commit, or another commit than the one merged.
+orphan=$(git -C "$i" commit-tree -m orphan "$(git -C "$i" mktree </dev/null)")
+for mark in '' nonsense "$orphan" "$(git -C "$i" rev-parse 'ledger^{tree}')"; do
+	conflicted ledger-main ledger
+	refused "a merge in conflict took the mark '$mark' (F129)" "names no commit merge.sh showed" "$mark"
+	grep -qF 'sh .git/hooks/merge.sh <branch>' "$t/out" || fail "pre-commit refused the mark '$mark' without saying how to redo the merge (F129)"
+done
+conflicted ledger-main ledger
+refused "a merge in conflict concluded with no mark took harness changes (F129)" "names no commit merge.sh showed" ''
+conflicted ledger-main ledger
+refused "a merge in conflict took the mark of the commit before it (F129)" ".githooks/pre-push" "$base"
+# Every harness file, as committed: changed, added, deleted or made executable during the resolution, the index's copy
+# whatever the disk holds, and what commit -a stages.
+conflicted ledger-main ledger
+echo '# changed after the merge' >>"$i/.githooks/pre-push"
+git -C "$i" add .githooks/pre-push
+refused "a merge took a harness file changed after merge.sh showed it (9n)" ".githooks/pre-push"
+conflicted ledger-main ledger
+echo '# stray' >>"$i/.githooks/commit-msg"
+git -C "$i" add .githooks/commit-msg
+refused "a merge took a harness file it does not change, changed during the resolution (9n)" ".githooks/commit-msg"
+conflicted ledger-main ledger
+echo 'echo evil' >"$i/scripts/evil.sh"
+git -C "$i" add scripts/evil.sh
+refused "a merge took a harness file added during the resolution (9n)" "scripts/evil.sh"
+conflicted ledger-main ledger
+git -C "$i" rm -q .githooks/commit-msg
+refused "a merge took a harness file deleted during the resolution (9n)" ".githooks/commit-msg"
+conflicted ledger-main ledger
+chmod +x "$i/scripts/gitleaks.toml"
+git -C "$i" add scripts/gitleaks.toml
+refused "a merge took a harness file made executable during the resolution (9n)" "scripts/gitleaks.toml"
+conflicted ledger-main ledger
+echo '# in the index alone' >>"$i/.githooks/commit-msg"
+git -C "$i" add .githooks/commit-msg
+git -C "$i" show HEAD:.githooks/commit-msg >"$i/.githooks/commit-msg"
+refused "a merge took a harness file changed in the index alone, the disk as merged (9n)" ".githooks/commit-msg"
+conflicted ledger-main ledger
+echo '# not staged' >>"$i/.githooks/commit-msg"
+git -C "$i" add .githooks/commit-msg
+mark_i "$(git -C "$i" write-tree)" fast
+git -C "$i" reset -q -- .githooks/commit-msg
+in_i env GNOWORLD_MERGE="$tip" git commit -qa --no-edit >"$t/out" 2>&1 && fail "a merge committed with -a took a harness file changed on the disk (9n)"
+grep -qF .githooks/commit-msg "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused a commit -a's harness file for another reason (9n)"; }
+# A harness file in conflict, whatever the resolution keeps: a content conflict's markers, the side git left of a file
+# one side deleted, the deletion, a file both sides added, named with a capital or matched by a glob; a squash too.
+conflicted clash-main clash
+grep -q '^>>>>>>>' "$i/.githooks/pre-push" || fail "the clash's merge left no conflict in the harness file"
+git -C "$i" add .githooks/pre-push
+refused "a merge took a harness file in conflict, its markers kept (9n)" "in conflict"
+conflicted gone ledger
+git -C "$i" add .githooks/pre-push
+refused "a merge took a harness file main deleted and the branch changed, kept as git left it (9n)" "in conflict"
+conflicted clash-main gone
+git -C "$i" rm -q .githooks/pre-push
+refused "a merge took a harness file the branch deleted and main changed, deleted at the resolution (9n)" "in conflict"
+for n in 1 2 3 4; do
+	conflicted "twin-main-$n" "twin-branch-$n"
+	p=$(git -C "$i" diff --name-only --diff-filter=U)
+	[ -n "$p" ] || fail "twin $n left no conflict"
+	git -C "$i" add -- "$p"
+	refused "a merge took $p, added on both sides, in conflict, its markers kept (9n)" "in conflict"
+done
+conflicted clash-main clash squash
+git -C "$i" add .githooks/pre-push
+mark_i "$(git -C "$i" write-tree)" fast
+in_i env GNOWORLD_MERGE="$tip" git commit -qm "chore: squash clash" >"$t/out" 2>&1 && fail "a squash took a harness file in conflict (9n)"
+grep -qF 'in conflict' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused the squash's conflict for another reason (9n)"; }
+# The other files are resolved by hand, and their code still needs the gate's record: written during the resolution,
+# with no record, or after the record was made.
+conflicted ledger-main ledger
+echo 'export const evil = 1;' >"$i/evil.ts"
+git -C "$i" add evil.ts
+in_i env GNOWORLD_MERGE="$tip" git commit -q --no-edit >"$t/out" 2>&1 && fail "a merge took code written during the resolution, which no gate passed (9n)"
+grep -q 'no gate passed' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused unchecked code in a merge for another reason (9n)"; }
+conflicted ledger-main ledger
+mark_i "$(git -C "$i" write-tree)" fast
+echo 'export const evil = 1;' >"$i/evil.ts"
+git -C "$i" add evil.ts
+in_i env GNOWORLD_MERGE="$tip" git commit -q --no-edit >"$t/out" 2>&1 && fail "a merge took code written after the gate passed (9n)"
+grep -q 'no gate passed' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused late code in a merge for another reason (9n)"; }
+git -C "$i" reset -q --hard "$base"
+mkdir -p "$i/docs"
+ran "a merge in conflict"
 # pre-push wants .git/hooks to hold the hooks of the main it pushes, checked by the install
 # script beside it: what runs is what was reviewed.
 git -C "$i" reset -q --hard "$base"
