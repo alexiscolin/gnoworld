@@ -6,9 +6,10 @@
 // an address, which a guest's cannot be (Ergo gives a guest 32 characters, server/src/testing/ergo.test.ts:314).
 import type { Line, Reacting, Reaction, Typing } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
-import { lazy, Suspense, type ReactNode } from "react";
+import { lazy, Suspense, use, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
+import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
 import { chunked } from "./Failing.tsx";
@@ -34,9 +35,12 @@ const LINES = [styles["lines"], styles["fill"]].join(" ");
 // acts on the page as it stands, nothing queued for the lines.
 const waiting = (busy: boolean) => <ol aria-label="Messages" aria-busy={busy || undefined} className={LINES} />;
 
-// The room's lines: the list's place while it holds none or their code comes, then the lines view.
+// The room's lines: the list's place while it holds none (nor a call of the chain) or their code comes, then the lines view.
 function RoomLines(props: LinesProps) {
-  return props.lines.length === 0 ? (
+  // A room the chain told a call of holds one item at least, as a card of its thread among no message.
+  const place = use(ChainPlaceContext);
+  const told = place !== undefined && props.room === `#${place.slug}` && use(ChainCallsContext).length > 0;
+  return props.lines.length === 0 && !told ? (
     waiting(false)
   ) : (
     <Suspense fallback={waiting(true)}>

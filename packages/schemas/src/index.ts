@@ -19,6 +19,8 @@ export {
 } from "./data.ts";
 export { CallRequest } from "./call.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
+// The chain events' schemas are values at "@gnoworld/schemas/indexer" (a page loads them on its first event, in a chunk of its own); here, the types.
+export type { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
 export {
   AnswerButton,
   Digest,

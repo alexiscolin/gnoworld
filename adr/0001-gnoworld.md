@@ -603,7 +603,7 @@ follows gnoradio and gnogolf. Every package below was checked on npm on 2026-10-
 | Validation | Zod 4 (`zod/mini`), at trust boundaries only | Relay, indexer and realm data is checked before use |
 | Animation | GSAP 3.15 core, loaded with the 3D | Sequences: a planet's birth, a light trail |
 | Wallet | Adena through `@adena-wallet/sdk` 0.1 | Young (0.1.0): its session support is open question 2 |
-| Live events | `graphql-ws` 6.4 against `indexer.gno.land` | Subscriptions without a GraphQL framework |
+| Live events | `graphql-ws` 6.4 against `indexer.gno.land` | Subscriptions without a GraphQL framework (amended by D266 (answer 9g-4): the server polls the indexer over HTTP once a block, no WebSocket) |
 | Chat transport | Phase 0: IRC over WebSocket to Ergo (§1), through a small IRCv3 module in `app/src/core/irc`, written test first. Phase 2: MLS over the relay | Parsing IRCv3 lines and tags takes a few dozen lines; no IRC library to depend on |
 | Crypto | WebCrypto (Ed25519, SHA-256, X25519); from phase 2, ts-mls 1.6 in a Web Worker, behind a thin interface | Crypto never blocks the interface. npm's `openmls-wasm` is a 0.1.0 from 2025-10, not a product; the mainnet library is chosen before phase 3 (open question 7) |
 | PWA | `vite-plugin-pwa` 2.0 | iOS delivers push only to an installed app, and an installed app keeps its storage |

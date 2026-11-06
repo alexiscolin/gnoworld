@@ -14,10 +14,14 @@ import {
 } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import { Flash, type FlashMessage } from "@gnoworld/ui";
+import { use } from "react";
+import { ChainCard } from "./ChainCard.tsx";
+import { callsIn, interleave } from "./chainEntries.ts";
+import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { lineKeeping } from "./LineKeeping.tsx";
 import type { RoomKeeping } from "./RoomKeeping.ts";
 import { LineActions } from "./LineActions.tsx";
-import { useCopy, useRemoval } from "./lineFlash.ts";
+import { forLine, useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
 import { mentionable } from "./names.ts";
@@ -176,7 +180,6 @@ function List(props: ListProps) {
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room });
   // A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's (F1921).
   const verdictOf = (id: string) => verdicts?.[newest.get(id) ?? id];
-  // A reaction that could not go out says so at once; one Ergo refuses, when it answers (cannotReact).
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
     if (!went) setSaid({ title: "Could not react." });
@@ -201,13 +204,7 @@ function List(props: ListProps) {
         onReply(line.id);
       }}
       onThread={onThread}
-      onEdit={
-        onEdit === undefined
-          ? undefined
-          : () => {
-              onEdit(line.id);
-            }
-      }
+      onEdit={forLine(onEdit, line.id)}
     />
   );
   return (
@@ -224,25 +221,31 @@ function List(props: ListProps) {
         aria-relevant="additions"
         className={LINES}
       >
-        {lines.map((line) => (
-          <LineView
-            key={line.id}
-            line={line}
-            me={me}
-            members={known}
-            stop={line.id === stop}
-            actions={(room !== undefined || partner !== undefined) && mounted(line.id) ? actionsOf(line) : null}
-            fresh={line.id === fresh}
-            verdict={verdictOf(line.id)}
-            players={room !== undefined && !saving}
-            {...keptOf(keeping, line.id)}
-            chips={chips.get(line.id)}
-            react={me === undefined || !shown.has(line.id) ? undefined : react}
-            answers={answeredBy(line, byId, lineOf)}
-            replies={repliesOf.get(line.id)?.length}
-            onThread={onThread}
-          />
-        ))}
+        {interleave(lines, callsIn(use(ChainCallsContext), use(ChainPlaceContext), room)).map((entry) =>
+          "call" in entry ? (
+            <ChainCard key={entry.key} call={entry.call} />
+          ) : (
+            <LineView
+              key={entry.line.id}
+              line={entry.line}
+              me={me}
+              members={known}
+              stop={entry.line.id === stop}
+              actions={
+                (room !== undefined || partner !== undefined) && mounted(entry.line.id) ? actionsOf(entry.line) : null
+              }
+              fresh={entry.line.id === fresh}
+              verdict={verdictOf(entry.line.id)}
+              players={room !== undefined && !saving}
+              {...keptOf(keeping, entry.line.id)}
+              chips={chips.get(entry.line.id)}
+              react={me === undefined || !shown.has(entry.line.id) ? undefined : react}
+              answers={answeredBy(entry.line, byId, lineOf)}
+              replies={repliesOf.get(entry.line.id)?.length}
+              onThread={onThread}
+            />
+          ),
+        )}
       </ol>
     </>
   );

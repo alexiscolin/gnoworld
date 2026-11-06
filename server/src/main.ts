@@ -24,6 +24,7 @@ import { startPrices } from "./prices/prices.ts";
 import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
+import { readChainData, startChain } from "./signals/chain/start.ts";
 import { signalRoutes } from "./signals/routes.ts";
 import { firstSignals, makeSignals } from "./signals/signals.ts";
 import { makeStream } from "./stream/stream.ts";
@@ -57,6 +58,11 @@ const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
 const stream = makeStream();
 const signals = makeSignals(db, { now: Date.now });
 for (const signal of firstSignals(signals, roles.worlds.keys())) stream.signal(signal);
+// The chain in the rooms (9g): one poll of each universe's indexer once a block, relayed on the stream; none without both data files.
+const chain =
+  config.universes === undefined || config.hubs === undefined
+    ? undefined
+    : startChain({ ...readChainData(config.universes, config.hubs), stream, log, now: Date.now });
 const chat = startChat(
   db,
   {
@@ -166,6 +172,7 @@ const drain = (): void => {
   log("stopping");
   retention.stop();
   prices?.stop();
+  chain?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).
