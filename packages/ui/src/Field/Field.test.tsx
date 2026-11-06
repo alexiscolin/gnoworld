@@ -193,8 +193,15 @@ describe("Field", () => {
     input.blur();
     const frame = input.closest("[data-part='box']");
     expect(frame).not.toBeNull();
+    expect(frame?.className).toContain("frame");
+    expect(screen.getByText("nym-").className).toContain("prefix");
     if (frame !== null) await userEvent.click(frame);
     expect(document.activeElement).toBe(input);
+  });
+
+  it("draws no frame round a box that has no prefix", () => {
+    render(<Field label="Name" value="" onChange={vi.fn()} />);
+    expect(document.querySelector("[data-part='box']")).toBeNull();
   });
 
   it("reads its prefix, help, error and the page's words in that order, and is invalid inside the box", () => {

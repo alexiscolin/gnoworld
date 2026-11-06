@@ -233,6 +233,9 @@ describe("Dialog", () => {
     );
     const wrapper = document.getElementById((dialog().getAttribute("aria-describedby") ?? "").split(" ")[0] ?? "");
     expect(wrapper?.querySelector("p.label")?.textContent).toBe("YOUR NAME");
+    expect(wrapper?.className).toContain("kicker");
+    expect(dialog().className).toContain("dialog");
+    expect(screen.getByText("Kept by namereg").className).toContain("description");
     const head = wrapper?.parentElement;
     expect(head?.contains(screen.getByRole("heading", { name: "Pick a name" }))).toBe(true);
     expect(head?.contains(screen.getByText("Kept by namereg"))).toBe(false);

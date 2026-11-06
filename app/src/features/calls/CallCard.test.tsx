@@ -106,6 +106,15 @@ describe("CallCard, the preview", () => {
     expect(labels.some((label) => label.classList.contains("label"))).toBe(false);
   });
 
+  it("names a field that has no name by its place, Argument 1", () => {
+    const nameless = {
+      ...preview,
+      params: [PARAMS[0] ?? { Name: "", Type: "" }, { Name: "", Type: "string" }],
+      texts: ["x"],
+    };
+    expect(all(view({ card: nameless }), "label").map((label) => label.textContent)).toEqual(["Argument 1"]);
+  });
+
   it("warns under a text field only, with the realm named: 'This text goes to {realm} on gno.land, publicly and forever'", () => {
     const box = view();
     const warning = `This text goes to ${REALM} on gno.land, publicly and forever`;
@@ -420,7 +429,8 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
 
   // F5953: the block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
   it("wears the shared edge on its block", () => {
-    expect((all(view(), "dl")[0] ?? document.body).className).toContain("edge");
+    const classes = (all(view(), "dl")[0] ?? document.body).className.split(" ");
+    expect(classes).toEqual([expect.stringContaining("edge"), expect.stringContaining("block")]);
   });
 
   it("sets the line under the title in its own class, muted by the stylesheet (F5731)", () => {
