@@ -42,9 +42,9 @@ const NETS: readonly string[] = ["volcanic", "dark carbon", "lava world"];
 const VIEWS = ["?view=gallery", "?view=close&world=1", "?view=eclipse&world=1", "?view=earth"];
 
 const stages = (page: Page) => askLab<string[]>(page, "stages");
-// The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at EARTH_INSTANT, at this base (41776567),
-// before 7b5 split the surface program in two. A hand-made world never moves.
-const EARTH_PIXELS = "a1fc799da0825909";
+// The render Alexis approved of the Earth and its Moon: the lab's Earth view on SwiftShader at EARTH_INSTANT, as slice 7 left it
+// (approved again 2026-11-06, after its small fixes moved it). A hand-made world never moves.
+const EARTH_PIXELS = "6fbb60066112a662";
 
 const { width, height } = COMPUTER;
 const CORNER = 80;
