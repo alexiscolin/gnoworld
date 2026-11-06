@@ -74,3 +74,4 @@
 2026-11-01 3f5ea2e368fc853d77e76c18378dbb76618ff7c3 chief: reviewer on slice-6, security-reviewer on slice-5-reco twice; check.sh --full on c63884c5, 3198 s; deploy/test.sh and 17 mutants by Alexis
 2026-11-06 956b57aaad09eab103116caf2ba01aa6cf59e7f6 reviewer, security-reviewer, gno-auditor, finding-verifier
 2026-11-06 8bf5cbfe64610a16ae314f3c8efa601b7c94c2cd reviewer, security-reviewer (two rounds), finding-verifier; merged by force by Alexis's decision, StrykerJS not run
+2026-11-06 a250c2fbd4e17b34f33be6e1273ed96e35320a1e reviewer, security-reviewer, finding-verifier (on the MacBook, three rounds); test_hooks green on the merged tree
