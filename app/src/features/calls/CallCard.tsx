@@ -6,9 +6,11 @@ import { callFields } from "@gnoworld/core";
 import { Button, Card, Field, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
+import shared from "../../edge.module.css";
 import styles from "./CallCard.module.css";
+import { CallStatus } from "./CallStatus.tsx";
 import { problemsOf } from "./problems.ts";
-import { networkOf, publicForever, sayFailure, sayProblem, shown, warningsOf } from "./say.ts";
+import { networkOf, publicForever, sayProblem, shown, warningsOf } from "./say.ts";
 import { retryable } from "./slice.ts";
 
 export interface CallCardProps {
@@ -27,8 +29,6 @@ export interface CallCardProps {
   title?: string | undefined;
 }
 
-const COUNT = new Intl.NumberFormat("en-US");
-
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
@@ -38,69 +38,8 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
-// The mark before a wait's words, a ring turning, and before the result's, a dot: drawn by the stylesheet.
-const Mark = ({ kind }: { kind: "ring" | "dot" }) => (
-  <span className={styles["mark"]} data-mark={kind} aria-hidden="true" />
-);
-
-// A transaction's hash, short as the frame draws it (its first and last four), whole in its title.
-const Tx = ({ hash }: { hash: string }) => (
-  <span title={hash}>
-    tx {hash.slice(0, 4)}…{hash.slice(-4)}
-  </span>
-);
-
-// The result of the call as the card says it: the state's words in the one status region, and what the chain gave.
-function Status({ card }: { card: Card_ }) {
-  const { state } = card;
-  if (state.kind === "signing") {
-    return (
-      <p role="status" className={styles["line"]}>
-        <Mark kind="ring" />
-        <span>Waiting for your signature in Adena…</span>
-      </p>
-    );
-  }
-  if (state.kind === "landing") {
-    return (
-      <p role="status" className={styles["line"]}>
-        <Mark kind="ring" />
-        <span>
-          Landing in a block… <Tx hash={state.hash} />
-          {state.adena === undefined || state.adena === "" ? null : ` Adena reported: ${shown(state.adena)}`}
-        </span>
-      </p>
-    );
-  }
-  if (state.kind === "done") {
-    return (
-      <Stack space="2xs">
-        <p role="status" className={styles["line"]}>
-          <Mark kind="dot" />
-          <span>
-            Signed · <Tx hash={state.hash} />, in block {COUNT.format(state.height)}.
-          </span>
-        </p>
-        {state.value === "" ? null : <p className={styles["value"]}>Returned {shown(state.value)}</p>}
-      </Stack>
-    );
-  }
-  if (state.kind === "failed") {
-    return (
-      <Stack space="2xs">
-        <p role="status">{sayFailure(state)}</p>
-        {state.hash === undefined || state.reason === "unseen" ? null : (
-          <p>
-            <Tx hash={state.hash} />
-          </p>
-        )}
-      </Stack>
-    );
-  }
-  return <p role="status" className={styles["status"]} />;
-}
-
-// What is called with: the fields to fill in preview, the texts as they were once the card has left it.
+// What is called with: the fields to fill in preview (a name in its own case, as the frames draw it; the field's label is for
+// assistive technology), the texts as they were once the card has left it.
 function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
   const fields = callFields(card.params);
   const list = fields.ok ? fields.fields : [];
@@ -125,17 +64,23 @@ function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
       {rows.map(({ field, index }) => {
         const text = card.texts[index] ?? "";
         const problem = problems[index];
+        const name = field.name === "" ? `Argument ${String(index + 1)}` : field.name;
         return (
-          <Field
-            key={index}
-            label={field.name === "" ? `Argument ${String(index + 1)}` : field.name}
-            value={text}
-            onChange={(next) => {
-              onEdit(index, next);
-            }}
-            {...(field.freeText ? { help: publicForever(card.realm) } : {})}
-            {...(problem !== undefined && text !== "" ? { error: sayProblem(problem) } : {})}
-          />
+          <Stack key={index} space="2xs">
+            <span aria-hidden="true" className={styles["name"]}>
+              {name}
+            </span>
+            <Field
+              hideLabel
+              label={name}
+              value={text}
+              onChange={(next) => {
+                onEdit(index, next);
+              }}
+              {...(field.freeText ? { help: publicForever(card.realm) } : {})}
+              {...(problem !== undefined && text !== "" ? { error: sayProblem(problem) } : {})}
+            />
+          </Stack>
         );
       })}
     </Stack>
@@ -197,7 +142,7 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
       />
       <Card.Body>
         <p className={styles["lede"]}>A call to {card.realm}. Adena asks you to sign it.</p>
-        <dl className={styles["block"]}>
+        <dl className={[shared["edge"], styles["block"]].join(" ")}>
           <Row label="REALM">{card.realm}</Row>
           <Row label="FUNCTION">{card.func}</Row>
           <Row label="ARGUMENTS">
@@ -213,7 +158,7 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
               </p>
             ))
           : null}
-        <Status card={card} />
+        <CallStatus card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>
       <div className={styles["tall"]}>

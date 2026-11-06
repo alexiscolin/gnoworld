@@ -75,6 +75,20 @@ test.describe("a write function's call card", () => {
     ).toBe("baseline");
   });
 
+  // F5952, F5953 (frame f0110): the block is one box with a 1 px edge, 16 px between a label and its value.
+  test("draws its block with a 1 px edge and 16 px between a label and its value", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setup(page);
+    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    const look = await card(page)
+      .locator("dl")
+      .evaluate((el) => {
+        const { borderTopWidth, borderTopStyle, columnGap } = getComputedStyle(el);
+        return { edge: borderTopWidth, drawn: borderTopStyle, gap: columnGap };
+      });
+    expect(look).toEqual({ edge: "1px", drawn: "solid", gap: "16px" });
+  });
+
   test("draws the note small and muted, as the frame does (F5740)", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
