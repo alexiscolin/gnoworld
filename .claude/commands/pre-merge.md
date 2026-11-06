@@ -10,7 +10,11 @@ A branch's Workflow `branch` (`.claude/workflows/branch.js`) runs steps 1, 3, 4 
 lines that loosen the net and its tokens; the branch session then runs steps 2 and 6 to 9. The chief session runs them all
 on the slice's last merge.
 
-1. **No tokens first.** Run `scripts/check.sh --merge` (the full gate's lanes, with the harness
+0. **The speed plan (2026-11-06).** One review per slice, at its last merge, not per branch; the `security-reviewer` and `gno-auditor` only on a
+   tier-1 or harness change (docs/REVIEW.md); no `finding-verifier`; StrykerJS by hand (`pnpm run mutate`; `--merge` runs it on the changed tier-1
+   lines alone). `sh scripts/ship.sh` runs steps 1, 8 and 9 in one command and prints Alexis's merge and push commands: use it at the slice's end.
+   `pnpm run test:all` (`check.sh --everything`) is the old full gate, every lane, on demand.
+1. **No tokens first.** Run `scripts/check.sh --merge` (the slim full gate, with StrykerJS on the changed tier-1 lines and the harness
    mutants of the guard files the branch changed). If it fails, run the failing lane alone, fix,
    and run it again; stop and report if it still fails. Read `.claude/tmp/unsteady.log` (test files
    the fast gate ran twice: failed once, then passed; docs/HARNESS.md): a file that passed on its

@@ -9,7 +9,7 @@ Review by risk, not line by line everywhere.
 | 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization (`server/src/ergo/`) | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
 | 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builders (`app/src/lib/chain/evalCall.ts`, for a realm's call, and core's chain folder, `packages/core/src/chain/`, where the name read's builder and the CSP's host rule live, F3535) | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
-| 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop, Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
+| 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop and its egress (`jarvis/src/`, whose allowlist.ts and gnomcp.ts decide them), Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
 | 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`), the server's guard of every route that changes something, its rate limits and its settings (`server/src/guard.ts`, `server/src/limit.ts`, `server/src/config.ts`, and the service's two guards, `packages/service/src/net.ts` for publicUrl and `packages/service/src/settings.ts` for absolute, T2), the chat's players (the embed host list, `app/src/features/chat/embeds.ts`, and its frame's sandbox, `app/src/features/chat/Embed.tsx`), the warning before a realm page's link leaves (`app/src/features/realms/useExternalLinks.tsx`, and `app/src/leaving.tsx`, where 8c moved it for the calendar and the bell too), the link that stops another host's address before the router (`app/src/pagePath.ts`) | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
@@ -64,7 +64,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    surviving mutant is a missing test, found without a model.
 2. **The red pass, once per branch.** Before any code, the `test-auditor` reviews the branch's
    failing tests against the plan: complete, relevant, riskiest paths first, the threat model's
-   abuse cases present. Their commit says what it fixed (`Red-pass:`). A fixer's tests get none.
+   abuse cases present. Tier-1 and harness code alone (the speed plan, 2026-11-06). A fixer's tests get none.
 3. **One combined review.** The `reviewer` agent reads the branch once: the tests' green pass on the
    mutation survivors (tautologies, mocks of the thing under test, empty assertions, timing
    guesses, a test weakened since its red pass), correctness, security, cost in big O against the
@@ -74,7 +74,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
    runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
    `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
-   missing fail the step). At most two review lots a part (7d6 had eight). Each finding names its
+   missing fail the step). One review per slice, at its last merge (the speed plan, 2026-11-06). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
    (DORA's small batches; Alexis, 2026-10-22).
@@ -84,7 +84,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    is `rejected`, a true one whose behaviour is wanted `intended`, a true one of no matter `moot`,
    each with its reason. A speed claim names the call it timed, its input, Node's version and what
    the call answered. A fix of the product proves itself: its tests, run on the commit before it,
-   must fail (`scripts/prove_fix.py`, in the full gate).
+   must fail (`scripts/prove_fix.py`, run by `check.sh --everything`, not by default).
 5. **High and medium fixed, low listed.** High and medium findings are fixed, test first. Low ones
    and anything beyond the plan go to one list for Alexis with a recommendation (fix now, a backlog
    row, or moot). A second round runs only for a high finding fixed in a tier-1 file, only its

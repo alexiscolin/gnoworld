@@ -65,6 +65,8 @@ sys.exit(0 if check(int(sys.argv[1]), None, 0) == 0 else 1)' "$pid" 2>/dev/null 
 	return 1
 }
 reap || : # set -e is off inside it, called so: one kill that finds its pid gone stops nothing
+# No gate at a turn's end by default (the speed plan, Alexis 2026-11-06): the block below runs only with GNOWORLD_STRICT=1 (scripts/test_hooks.sh runs it so).
+[ "${GNOWORLD_STRICT:-}" = 1 ] || exit 0
 case $input in *'"stop_hook_active":true'* | *'"stop_hook_active": true'*) exit 0 ;; esac
 sh scripts/code_changed.sh || exit 0
 state=$(sh scripts/code_changed.sh --state)

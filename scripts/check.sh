@@ -11,6 +11,17 @@
 #   merge changed alone, since its last recorded pass (Alexis, 2026-10-25, 2026-10-27), and without the stories, the
 #   coverage lane and prove_fix when no product code changed since main (2026-10-29); it records the fast gate only.
 #
+# The speed plan (Alexis, 2026-11-06), nothing deleted: by default the gate is slim, and `--everything` is the old full gate as it was.
+# - A fast run of a change with no tier-1 path (scripts/speeds.py --tier1) is the types, the lint, prettier, the build when the app changed
+#   and check_docs: no Vitest, no jscpd/knip/css/comments, no gno. A tier-1 path keeps the whole commit gate. No declaration check runs.
+# - `--full` and `--merge` run tier 1's and the smoke journeys, the coverage of tier-1 files and core, the secrets, the audit; the probe, the
+#   bench, test_hooks, the harness's mutants and the stories only when the harness (or packages/ui) changed; `--merge` adds StrykerJS on the
+#   changed tier-1 lines and records the full gate too. The Vitest tests of the display project, the journeys and stories pictures it leaves out
+#   are kept, and run by `--everything`.
+# - `--everything`: every lane of the old full gate: StrykerJS whole (stryker.all.config.json), the probe, test_hooks, harness_mutate, the stories
+#   and their pictures, every journey, every Vitest project (display included) with the old coverage floors, check_regressions, prove_fix,
+#   batch_size, the patch's coverage. GNOWORLD_STRICT=1 gives every mode its old behaviour (scripts/test_hooks.sh runs its fixtures so).
+#
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
 # shell's own differs.
@@ -43,7 +54,7 @@ gate_build="$(pwd)/app/build-gate/${logs##*/}"
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
 # Nor a caller's: a common folder of its own would hold the radical mode on and hooks of its choice (lot 1's security review, S5).
 unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES
-unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
+unset COVERAGE_ALL GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO PICTURES_OF STORIES_PORT STORIES_OUT # the scripts' test switches, which would fake a pass
 unset NGINX_SHA256 NGINX_START_TIMEOUT BENCH_WAIT_CEILING BENCH_WAIT_STEP # a run must not trust any nginx binary, nor measure a busy machine, on a caller's say-so
 # The e2e web server dies of EMFILE under a soft limit of open files that is too low, and F2543 failed at 1048576 too: the soft limit is set
 # to 10240 for every step, up or down, and a limit that cannot be set is said, never hidden.
@@ -54,6 +65,11 @@ fi
 full=false merge=false tests_all=false
 [ "${1:-}" = "--full" ] && full=true
 [ "${1:-}" = "--merge" ] && full=true merge=true
+everything=false strict=false # see the header: GNOWORLD_STRICT only ever makes a run stricter
+[ "${1:-}" = "--everything" ] && full=true everything=true
+[ "${GNOWORLD_STRICT:-}" != 1 ] || strict=true
+! $everything || strict=true
+! $everything || export COVERAGE_ALL=1 # vitest.config.ts: the old coverage include and floors
 # --tests-all: the fast gate with every test, a part's last step before its report (Alexis, 2026-11-04): a commit runs the related ones.
 [ "${1:-}" = "--tests-all" ] && tests_all=true
 # `--full|--merge --base <ref>`: what this run's branch is measured against, in every lane that reads a base (the batch, the fixes, the
@@ -202,7 +218,7 @@ if [ -n "$changed" ]; then
 		# in 5b and failed only the merge check); one that changes the lockfile runs the audit (lighthouse's advisories showed only
 		# at the merge check, 5e). .githooks/pre-commit holds the same list of tests, for the staged copy's own gate.
 		case $path in
-		*.test.ts | *.test.tsx | *.bench.ts | *.bench.tsx | *.spec.ts | *_test.gno | *_test.go | *-snapshots/*.png | *__screenshots__/*.png) regressions=true ;;
+		*.test.ts | *.test.tsx | *.bench.ts | *.bench.tsx | *.spec.ts | *_test.gno | *_test.go | *-snapshots/*.png | *__screenshots__/*.png) ! $strict || regressions=true ;;
 		pnpm-lock.yaml) audit=true ;;
 		esac
 		case $path in
@@ -210,7 +226,7 @@ if [ -n "$changed" ]; then
 		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
 		app/tests/*) ts=true ;; # the journeys, their helpers and recordings: the merge check and --full walk them
 		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
-		packages/ui/src/tokens.css) ts=true app=true tokens=true ;; # the tokens story lists every token (F1190)
+		packages/ui/src/tokens.css) ts=true app=true; ! $strict || tokens=true ;; # the tokens story lists every token (F1190)
 		app/src/* | app/data/* | app/lab/* | app/public/* | packages/core/src/* | packages/chain/src/* | packages/schemas/src/* | packages/ui/src/*) ts=true app=true ;;
 		gno/*) gno=true ;;
 		*)
@@ -240,6 +256,34 @@ if $merging; then audit=false; fi
 if $regressions; then
 	regr_base=$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse -q --verify HEAD 2>/dev/null) || regr_base=
 	[ -n "$regr_base" ] || regressions=false
+fi
+# The slim fast gate (speed plan, 2026-11-06): a commit whose paths hold no tier-1 path of docs/REVIEW.md (scripts/speeds.py --tier1; a
+# list it cannot read, an empty one, a doubt, is tier 1) runs the types, the lint, prettier, the build when the app changed, and
+# check_docs; no Vitest, no jscpd/knip/css/comments, no gno. Tier-1 paths keep the whole commit gate; --everything and the strict mode, all.
+slim=false
+if ! $strict && ! $full && ! $tests_all && [ -n "$changed" ] && [ "$(printf '%s\n' "$changed" | python3 -I scripts/speeds.py --tier1 "$PWD" 2>/dev/null)" = other ]; then
+	slim=true
+	echo "check.sh: no tier-1 path in this change: the types, the lint, prettier and the build; no Vitest"
+fi
+# The slim --full and --merge: what the branch changed since its base decides the lanes below (the harness's probe and mutants, the stories,
+# the coverage of tier-1 files, check_nginx, the migrations). The strict mode and --everything compute their own, below.
+harness_changed=false ui_changed=false tier1_changed=true product=true nginx=false migrations=false base= changes=
+if $full && ! $strict; then
+	base=$(git merge-base HEAD "$base_ref") || { echo "check.sh --full: needs $base_ref to compare with (git fetch, or a ref that exists)" >&2; exit 1; }
+	changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
+	printf '%s\n' "$changes" >"$logs/changed" && changed_list="$logs/changed"
+	harness --quiet "$base" && [ -z "$(git ls-files --others --exclude-standard -- scripts .githooks .github .claude)" ] || harness_changed=true
+	hooks=$harness_changed # test_hooks.sh runs with the harness alone
+	printf '%s\n' "$changes" | grep -q '^packages/ui/' && ui_changed=true
+	[ "$(printf '%s\n' "$changes" | python3 -I scripts/speeds.py --tier1 "$PWD" 2>/dev/null)" = other ] && tier1_changed=false
+	! $merge || product=false
+	while IFS= read -r path; do
+		case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) product=true ;; '' | docs/* | adr/* | *.md | scripts/* | .githooks/* | .claude/* | .github/* | lint/* | eslint.config.ts | knip.json | .jscpd.json | .prettierrc.json | .prettierignore) ;; *) product=true ;; esac
+		case $path in deploy/web/* | app/src/csp*.ts | app/react-router.config.ts | scripts/check_nginx.py | scripts/nginx.sha256) nginx=true ;; esac
+		case $path in server/src/* | scripts/check_migrations.py) migrations=true ;; esac
+	done <<EOF
+$changes
+EOF
 fi
 budget=120 # s, for everything (Alexis, 2026-10-28: 75 refused a harness commit on a half-busy machine; 60 before 2026-10-27); for a run scoped to a change, 30
 # A run that builds the app has the build to wait for, and the lint and types of a whole project: the budget of a run of everything. A commit's gate walks no journey (Alexis, 2026-10-31): the merge check and --full do.
@@ -404,12 +448,16 @@ lane_ts() {
 		format_cache=
 		{ $full || [ -z "$tested" ]; } || format_cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
 		run format:check "$format_cache"
-		step unused
-		run unused
+		if ! $slim; then
+			step unused
+			run unused
+		fi
 	fi
-	step copies
-	copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
-	if ! $light; then
+	if ! $slim; then
+		step copies
+		copies=$(run copies 2>&1) || { printf '%s\n' "$copies"; exit 1; }
+	fi
+	if ! $light && ! $slim; then
 		step css
 		python3 -I scripts/check_css.py
 		step comments
@@ -447,8 +495,21 @@ lane_ts() {
 	E2E_PORT=$(free_ports 3)
 	export E2E_PORT
 	export PLAYWRIGHT_JSON_OUTPUT_NAME="$logs/playwright.json"
-	node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot,json >"$logs/playwright.out" 2>&1 || # node: see check_regressions.py
-		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot
+	playwright="node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts" # node: see check_regressions.py
+	journeys= # --everything and the strict mode: every journey of app/tests/e2e
+	if ! $strict; then
+		# The journeys main needs (speed plan, 2026-11-06; .claude/tmp/slice-8/reports/inventory-journeys.md): the specs it keeps whole or trims,
+		# the cheap ones: tier 1 (login, CSP, service worker, embeds, rooms, pins, composer, DMs, realm reads) and the critical flows. The rest
+		# (the display, pixel and picture specs and their snapshot folders) stay in the repository and run in `--everything`. Flights is
+		# trimmed to its two smoke tests (fly to a star, fly to a world), picked by title with --grep (no spec edited, no tag), in a second invocation.
+		journeys="app/tests/e2e/accountLater.spec.ts app/tests/e2e/budgets.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/chunks.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/edits.spec.ts app/tests/e2e/history.spec.ts app/tests/e2e/linesLater.spec.ts app/tests/e2e/login.spec.ts app/tests/e2e/places.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/country.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/dmBar.spec.ts app/tests/e2e/embeds.spec.ts app/tests/e2e/govdao.spec.ts app/tests/e2e/heroNumber.spec.ts app/tests/e2e/homeLive.spec.ts app/tests/e2e/messageMenu.spec.ts app/tests/e2e/multiline.spec.ts app/tests/e2e/pages.spec.ts app/tests/e2e/pins.spec.ts app/tests/e2e/placesPhone.spec.ts app/tests/e2e/previews.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmFunctions.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/roomEdit.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/search.spec.ts app/tests/e2e/stationPage.spec.ts app/tests/e2e/threads.spec.ts app/tests/e2e/worldPage.spec.ts"
+	fi
+	# shellcheck disable=SC2086 # the list is words
+	$playwright --reporter=dot,json $journeys >"$logs/playwright.out" 2>&1 ||
+		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME $playwright --reporter=dot
+	if ! $strict; then
+		env -u PLAYWRIGHT_JSON_OUTPUT_NAME $playwright --reporter=dot app/tests/e2e/flights.spec.ts --grep 'jumps to the star aimed at|flies from the cosmos to a world'
+	fi
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }
 
@@ -482,9 +543,10 @@ lane_types() {
 lane_tests() {
 	$ts || return 0
 	! $light || return 0 # no Vitest in the light gate
+	! $slim || return 0 # nor in the slim fast gate: --tests-all and the full gate run it
 	step ergo
 	sh scripts/ergo.sh >/dev/null # the Ergo the server's tests start, built once from deploy/ergo/VERSION
-	if ! $full; then # --full runs the tests once, with coverage
+	if ! $full || { ! $strict && ! $tier1_changed; }; then # --full runs the tests once, with the coverage lane's (slim: when a tier-1 path changed)
 		step vitest
 		tests=$(node -p "require('./package.json').scripts.test")
 		if $related; then
@@ -515,6 +577,7 @@ lane_tests() {
 
 lane_gno() {
 	$gno || return 0
+	! $slim || return 0 # a tool of the Go reference client: no realm in a slim change
 	! $light || return 0 # neither the realms nor Go's tools are the interface: a light change holds none of this lane's files
 	step gno
 	(cd gno && "$GNO" lint ./... && "$GNO" test ./...)
@@ -599,7 +662,7 @@ if ! $full && [ "$took" -gt "$budget" ]; then
 	fi
 fi
 
-if $full; then
+if $full && $strict; then
 	base=$(git merge-base HEAD "$base_ref") || { echo "check.sh --full: needs $base_ref to compare with (git fetch, or a ref that exists)" >&2; exit 1; }
 	changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
 	printf '%s\n' "$changes" >"$logs/changed" && changed_list="$logs/changed"
@@ -623,7 +686,7 @@ EOF
 	# took 173 s warm, up to 3,766 s); probe.py too, when nothing at all changed, as it reads the product's files (tokens.css, F4813).
 	# The record must name a commit by its whole id; anything else runs both.
 	harness_judged=false probe_judged=false
-	if ! $merge && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+	if ! $merge && ! $everything && [ -z "$(git ls-files --others --exclude-standard)" ]; then
 		judged=$(cat .claude/tmp/green-harness 2>/dev/null || :)
 		case $judged in *[!0-9a-f]*) judged= ;; esac # a name, an option, a second line, a carriage return: no id
 		if [ "${#judged}" = 40 ] && git rev-parse -q --verify "$judged^{commit}" >/dev/null && harness --quiet "$judged"; then
@@ -677,8 +740,10 @@ EOF
 		# A test that fails once under the coverage's load runs again, as in the fast gate (F3384: one failure cost an hour of a gate that was
 		# not retried). The second run is the WHOLE coverage, not the failed file alone: the thresholds (85%, core 100%) are measured on
 		# every file, and one file alone cannot meet them; unsteady.py's file arguments are left unread. R1's refusals hold as in the fast gate.
-		run coverage "--maxWorkers=$half --reporter=default --reporter=json --outputFile.json=$logs/coverage.json" >"$logs/coverage.out" 2>&1 ||
-			retry vitest "$logs/coverage.json" "$logs/coverage.out" sh -c "$(node -p "require('./package.json').scripts.coverage") --maxWorkers=$half" sh
+		display=
+		! $everything || display="--project display --project display_ui" # the on-demand tests, with the old floors (vitest.config.ts)
+		run coverage "--maxWorkers=$half --reporter=default --reporter=json --outputFile.json=$logs/coverage.json $display" >"$logs/coverage.out" 2>&1 ||
+			retry vitest "$logs/coverage.json" "$logs/coverage.out" sh -c "$(node -p "require('./package.json').scripts.coverage") --maxWorkers=$half $display" sh
 	}
 	lane_mutation() {
 		step patch_coverage # 85% of the lines this branch changed
@@ -699,6 +764,7 @@ EOF
 		mkdir -p "${cache%/*}"
 		! parses "$cache" || cp "$cache" "$own"
 		config=
+		! $everything || config=stryker.all.config.json # the whole of the TypeScript, as before the speed plan
 		if $merge; then
 			lines=0
 			python3 -I scripts/stryker_lines.py "$base" "$logs/stryker.json" || lines=$?
@@ -781,15 +847,144 @@ EOF
 	}
 fi
 
+if $full && ! $strict; then
+	# $base, $changes, $harness_changed, $ui_changed, $tier1_changed, $product, $nginx and $migrations: computed above, before the lanes.
+	$product || echo "check.sh --merge: no product code since $base: the stories and the coverage lane do not run"
+	$tier1_changed || echo "check.sh --full: no tier-1 path since $base: no coverage (tier-1 files only), no StrykerJS; Vitest runs whole in the tests lane"
+	$harness_changed || echo "check.sh --full: no harness file since $base: probe.py, bench.py, test_hooks.sh and harness_mutate.py do not run"
+	# probe.py plants its faults in the source tree, so it runs alone: a lane beside it (the coverage's Vitest,
+	# StrykerJS, the stories' build) would read its files as they come and go.
+	lane_probe() {
+		if $harness_changed; then
+			step probe # the harness keeps its promises
+			python3 -I scripts/probe.py
+			# The budgets of docs/plans/, after probe.py and alone: beside other work a bench measures the load. At a slice's end alone (--full).
+			if ! $merge; then
+				step bench
+				python3 -I scripts/bench.py
+			fi
+		fi
+		if $nginx; then
+			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
+			python3 -I scripts/check_nginx.py
+		fi
+	}
+	lane_stories() {
+		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
+		CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
+		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
+		port=$(free_ports 1) # its own: two worktrees' gates both took 6007 and one failed (2026-10-29)
+		STORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot app/tests/stories/stories.spec.ts app/tests/stories/behaviours.spec.ts # not pictures.spec.ts nor compositions.spec.ts: --everything
+	}
+	# The coverage lane's tools take half the machine, the harness lane beside it the rest: at the machine's
+	# width, their load outlasted Ergo's 9 s auth script (F777).
+	cores=$(node -p "require('os').availableParallelism()")
+	half=$((cores / 2))
+	[ "$half" -ge 1 ] || half=1
+	parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
+	lane_coverage() {
+		step coverage # tier-1 files at 100% (vitest.config.ts: its `include` is tier 1)
+		# A test that fails once under the coverage's load runs again, as in the fast gate (F3384: one failure cost an hour of a gate that was
+		# not retried). The second run is the WHOLE coverage, not the failed file alone: the thresholds are measured on
+		# every file, and one file alone cannot meet them; unsteady.py's file arguments are left unread. R1's refusals hold as in the fast gate.
+		run coverage "--maxWorkers=$half --reporter=default --reporter=json --outputFile.json=$logs/coverage.json" >"$logs/coverage.out" 2>&1 ||
+			retry vitest "$logs/coverage.json" "$logs/coverage.out" sh -c "$(node -p "require('./package.json').scripts.coverage") --maxWorkers=$half" sh
+	}
+	# StrykerJS at --merge only, alone once every other lane has ended, on every core (Alexis, 2026-11-04: "16 cœurs"), and on the code the
+	# branch changed since its base alone ("Lignes de la tranche": scripts/stryker_lines.py) in the files stryker.config.json's `mutate`
+	# selects, which is tier 1: a survivor in code it did not touch goes unseen. No such line: it does not run. A stryker_lines.py that
+	# fails mutates the whole of tier 1. --full does not run it: `pnpm run mutate`, by hand.
+	lane_stryker() {
+		step stryker # mutations, incremental, from the one cache every tree shares: a tree's own copy went stale (Alexis, 2026-10-29)
+		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
+		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
+		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
+		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
+		# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
+		# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
+		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
+		mkdir -p "${cache%/*}"
+		! parses "$cache" || cp "$cache" "$own"
+		config=
+		lines=0
+		python3 -I scripts/stryker_lines.py "$base" "$logs/stryker.json" || lines=$?
+		case $lines in
+		0) config=$logs/stryker.json ;;
+		3) echo "check.sh --merge: no tier-1 line StrykerJS mutates changed since $base: it does not run" && return 0 ;;
+		*) echo "check.sh --merge: stryker_lines.py failed: StrykerJS mutates the whole of tier 1" ;;
+		esac
+		stryker=0
+		run mutate "${config:+$config }--concurrency $cores --incrementalFile $own" || stryker=$?
+		! parses "$own" || { cp "$own" "$cache.$$" && mv -f "$cache.$$" "$cache"; }
+		[ "$stryker" = 0 ]
+	}
+	lane_history() {
+		if $migrations; then
+			step migrations # a migration main has keeps its text and its place (F466)
+			python3 -I scripts/check_migrations.py "$base"
+		fi
+		step secrets # no secret anywhere in the history, no known vulnerability in a dependency
+		sh scripts/scan_secrets.sh
+		step audit
+		python3 -I scripts/audit.py
+	}
+	lane_harness() {
+		$harness_changed || return 0 # records.sh's list: no harness file changed since the base
+		step harness_mutate # each guard switched off must fail a test (several minutes)
+		if $merge; then
+			python3 -I scripts/harness_mutate.py --changed "$base"
+			return 0
+		fi
+		python3 -I scripts/harness_mutate.py
+	}
+	# A phase is the lanes that run side by side. --full stops at the first phase with a failure, which fixes nothing of what comes after; a
+	# merge check's phases all run (the dream of 2026-11-01, 5: a failed lane or a bench refused for the load stopped the 20 minutes that find
+	# the survivors), and the end of it fails, saying every failure.
+	phase() {
+		finish "$@" || {
+			$merge || {
+				echo "check.sh: the lanes after $* did not run: $* failed first" >&2
+				exit 1
+			}
+			carried=1
+		}
+	}
+	start probe
+	phase probe
+	# The coverage after the probe, which plants its faults in the tree, and never beside it (F3384). It runs alone: beside it, the
+	# stories' journeys timed out (F815). Tier-1 files only (vitest.config.ts), so a change with none has none.
+	if $product && $tier1_changed; then
+		start coverage
+		phase coverage
+	fi
+	# The stories' journeys run beside the history lane alone: under the coverage, StrykerJS and the harness's worktrees, a Dialog's
+	# teardown in the browser outlasted its test (F815).
+	stories=false
+	{ $ui_changed || $harness_changed; } && $product && stories=true
+	! $stories || start stories
+	start history
+	phase $($stories && echo stories) history
+	start harness
+	phase harness
+	if $merge && $product && $tier1_changed; then # StrykerJS on the changed tier-1 lines alone
+		start stryker
+		phase stryker
+	fi
+	[ -z "$carried" ] || {
+		echo "check.sh --merge: every failure above, in the order they came:$all_failed" >&2
+		exit 1
+	}
+fi
+
 if [ -n "$tested" ]; then
 	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares
 	# The harness a green --full judged, by its commit, for the next --full to skip the probe and the mutants on (above): only a tree
 	# whose harness is committed, with nothing untracked, and that did not change while the gate ran, is named by one; and only from
 	# origin/main, as a run from another base judges no mutant of a harness that base already has (F4814).
-	if $full && ! $merge && [ "$base_ref" = origin/main ] && [ "$(worktree_print)" = "$tested" ] && harness --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
+	if $strict && $full && ! $merge && [ "$base_ref" = origin/main ] && [ "$(worktree_print)" = "$tested" ] && harness --quiet HEAD && [ -z "$(git ls-files --others --exclude-standard)" ]; then
 		git rev-parse HEAD >.claude/tmp/green-harness
 	fi
-	! $merge || full=false # --merge records the fast gate only: main wants --full's record
+	! $merge || ! $strict || full=false # the strict --merge records the fast gate only: main wants --full's record; the slim one is --full plus StrykerJS, and records both
 	gate_passed "$tested" "$full" # for the hooks outside the sandbox, which run no gate (F076)
 fi
 echo "all checks passed in $(($(date +%s) - started)) s (budget $budget s)"

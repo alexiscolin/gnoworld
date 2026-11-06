@@ -154,7 +154,7 @@ backend a run killed hard left included, and that run's names stay on the tailne
 `tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
 **The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
-a turn of Claude's in it ends without the gate, so each retouch shows live in a couple of minutes; the gate, the tests and the
+a turn of Claude's in it ends without the gate (as every turn does by default since the speed plan), so each retouch shows live in a couple of minutes; the gate, the tests and the
 review come once the batch is accepted, and pre-commit still gates every commit. The hook knows the workshop by its own shell,
 running this checkout's `scripts/workshop.sh` from it, in its terminal's foreground group and outside every sandbox: a session's
 sandboxed command cannot start one that counts. The code the workshop runs is outside Claude's sandbox, under a profile of its

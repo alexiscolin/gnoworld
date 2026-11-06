@@ -6,7 +6,7 @@ export const meta = {
     'A branch session runs it once its worktree and brief exist (docs/HARNESS.md, "Who does what"); the chief reads what it returns.',
   phases: [
     { title: "Tests", detail: "the failing tests, seen failing" },
-    { title: "Red pass", detail: "the test-auditor, once per branch" },
+    { title: "Red pass", detail: "the test-auditor, once per branch, for tier-1 and harness tests alone" },
     { title: "Build", detail: "the red pass's findings, then the code, a commit per behaviour" },
     { title: "Merge check", detail: "check.sh --merge, the failing lane alone until it passes" },
     {
@@ -174,6 +174,7 @@ const TIER1 = [
   "app/src/features/realms/useExternalLinks.tsx",
   "app/src/leaving.tsx",
   "app/src/pagePath.ts",
+  "jarvis/src/",
   ...(A.tier1 || []),
 ];
 const BASE = A.base || "main";
@@ -258,21 +259,21 @@ const tests = await agent(
 if (!tests || !tests.seenFailing) return result("blocked at the tests", { tests });
 
 phase("Red pass");
-const red = await agent(
-  `Red pass. ${where("red-pass", false)}. The failing tests, uncommitted: ${tests.files.join(", ")}.`,
-  {
-    agentType: "test-auditor",
-    label: "red pass",
-    schema: FINDINGS,
-  },
-);
+// The red pass is for tier-1 and harness code alone (the speed plan, 2026-11-06): tests of other code go to the build as they are.
+const red = tests.files.some(tier1)
+  ? await agent(`Red pass. ${where("red-pass", false)}. The failing tests, uncommitted: ${tests.files.join(", ")}.`, {
+      agentType: "test-auditor",
+      label: "red pass",
+      schema: FINDINGS,
+    })
+  : { findings: [] };
 if (!red) return result("blocked at the red pass: the test-auditor gave no report");
 
 phase("Build");
 const built = await write(
   `${where("build", true)}. Save the red pass's findings to ${A.shared}/reports/${A.branch}-red-pass.md, then fix them in the tests: ` +
     `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests (the fast gate runs at each ` +
-    "commit: a refused commit is fixed, never bypassed); the commit that brings the tests says `Red-pass: <the findings fixed>`.",
+    "commit: a refused commit is fixed, never bypassed). No declaration line is needed in a message by default.",
   { label: "build", schema: DONE },
 );
 if (!built) return result("blocked at the build");
