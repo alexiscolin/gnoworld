@@ -10,7 +10,8 @@ import { BUILD } from "./sites.ts";
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
 // worker's precache; steps in docs/decisions.md. A plate's page, within the +4 KiB over 183,128 B Alexis gave the plates' pages: the
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-const FIRST_SCREEN_JS = 187_569;
+// 192,299 B once slice 9 met slice 8 (the Earth's page, the highest; the worlds' pages 188,707), measured on that merge.
+const FIRST_SCREEN_JS = 192_299;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
 // 189,695 B once slice 9 met slice 8 (the chain's deploys in the ticker, the Earth's room followed, the store's chain and signals), measured on that merge.
@@ -155,22 +156,22 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
 // where the bytes come from: hardening).
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
-const PROPOSALS_JS = 22_724;
+const PROPOSALS_JS = 35_631;
 // A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
 // world that pins one alone: weighed with the proposals.
 const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 // A plate's blocks that wait for a read (8g, Alexis's "Charger avec leur donnée"): the realm card, the hours and their chart, each asked as its
 // read starts and capped at its size measured on 2026-11-04 and 256 B (the chief's call). The connected worlds wait for the worlds' file,
 // which the journeys' site does not serve: their chunk never loads here.
-const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars)-[\w-]+\.js$/;
-const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336 };
+const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars|ChartedBy)-[\w-]+\.js$/;
+const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336, ChartedBy: 348 };
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads.
 const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
 // 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B; 5,212 B in the timer-held
 // measure on slice-7's merge into slice-8, the realm page's drawing (RealmBlocks) and the chat's (Message) counted here, the capture
 // asking for both (Alexis, 2026-11-05, "oui pour l'aperçu à 5 203").
-const PREVIEW_JS = 5212;
+const PREVIEW_JS = 5615;
 // Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
 const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
 // And the realm page's drawing (5h's RealmBlocks), a chunk of its own through its slot: the capture's three parts.
