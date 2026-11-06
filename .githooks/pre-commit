@@ -21,26 +21,23 @@ if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 		fi
 		changed=$(harness --cached --name-only HEAD)
 		if [ -n "$changed" ]; then
-			# git merge-tree writes again the merge of the commit merge.sh showed: its first line is the tree, any conflict's
-			# markers in it, then the names of the files in conflict (git-merge-tree(1), git 2.50, OUTPUT). Each harness file
-			# is committed as that tree holds it, none in conflict; the other files, every merge's ledgers first, are resolved
-			# by hand, and the gate below checks their code (9n). With no mark, or one that names no commit, git 2.50 writes
-			# nothing and exits 1, as for a conflict (its manual says otherwise): what it wrote is then no tree.
-			merged=$(git -c core.quotePath=false merge-tree --write-tree --name-only --no-messages HEAD "${GNOWORLD_MERGE:-}" 2>/dev/null) || :
+			# Each harness file is committed as the merge of the commit merge.sh showed holds it (records.sh's merge_of), none
+			# in conflict; the other files, every merge's ledgers first, are resolved by hand, and the gate below checks their
+			# code (9n). Nor is a merge read through .git/info, which any session can write (9n's /pre-merge).
+			merged=$(merge_of "${GNOWORLD_MERGE:-}")
 			tree=$(printf '%s\n' "$merged" | sed -n 1p)
+			clash=$(printf '%s\n' "$merged" | sed 1d)
+			rewiring=$(rewired)
 			why=
-			if ! git rev-parse -q --verify "$tree^{tree}" >/dev/null; then
+			if [ -n "$rewiring" ]; then
+				why="$rewiring, which any session can write, changes how git merged it"
+			elif [ -z "$tree" ]; then
 				why="names no commit merge.sh showed (GNOWORLD_MERGE)"
+			elif [ -n "$clash" ]; then
+				why="a harness file was in conflict, so it is not as merge.sh showed it: $clash"
 			else
-				ours=$(harness --name-only "$(git hash-object -t tree /dev/null)" "$tree")
-				# -e: a harness path may start with - (*.config.ts); a grep that fails refuses the commit
-				clash=$(printf '%s\n' "$merged" | sed 1d | grep -xF -e "$ours") || [ $? = 1 ]
 				drift=$(harness --cached --name-only "$tree")
-				if [ -n "$clash" ]; then
-					why="a harness file was in conflict, so it is not as merge.sh showed it: $clash"
-				elif [ -n "$drift" ]; then
-					why="its harness differs from the merge merge.sh showed: $drift"
-				fi
+				[ -z "$drift" ] || why="its harness differs from the merge merge.sh showed: $drift"
 			fi
 			if [ -n "$why" ]; then
 				echo "pre-commit: this merge changes the harness, but $why; undo it now (git merge --abort, or git reset --hard after a squash), then sh .git/hooks/merge.sh <branch>" >&2
