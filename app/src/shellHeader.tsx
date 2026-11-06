@@ -3,7 +3,6 @@
 // stands here only when it works: Jarvis, chat, the passport and the bell join as their slices land.
 import { Chip, Icon, Logo } from "@gnoworld/ui";
 import { Link, useLocation } from "react-router";
-import shared from "./edge.module.css";
 import { LoginControl } from "./features/login/index.ts";
 import { SearchPalette } from "./features/search/index.ts";
 import { site, type UniverseView, type View } from "./places.ts";
@@ -22,7 +21,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
       <Link to="/" className={styles["logo"]} aria-label="gnoworld">
         <Logo wordmark />
       </Link>
-      <nav aria-label="Views" className={[shared["edge"], styles["views"]].join(" ")}>
+      <nav aria-label="Views" className={styles["views"]}>
         {views.map((view) => (
           <Link
             key={view.view}
