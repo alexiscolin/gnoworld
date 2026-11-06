@@ -1,0 +1,835 @@
+diff --git a/app/src/features/calls/CallCard.module.css b/app/src/features/calls/CallCard.module.css
+index 574d8283..0469a369 100644
+--- a/app/src/features/calls/CallCard.module.css
++++ b/app/src/features/calls/CallCard.module.css
+@@ -60,15 +60,7 @@
+
+   .lede {
+     color: var(--color-text-muted);
+-  }
+-
+-  /* The video's controls are 44 px tall on a computer too (F5655): the footer wears the token's touch height. */
+-  .tall {
+-    /* raw: 44 px is --control-m under a coarse pointer (tokens.css); the card's buttons wear it on every screen (F5735) */
+-    --control-m: 44px;
+-
+-    /* layout: the wrapper takes no box, so the footer stays the card's own row */
+-    display: contents;
++    font: var(--font-reading);
+   }
+
+   .value {
+diff --git a/app/src/features/calls/CallCard.test.tsx b/app/src/features/calls/CallCard.test.tsx
+index 69211c35..e45189bc 100644
+--- a/app/src/features/calls/CallCard.test.tsx
++++ b/app/src/features/calls/CallCard.test.tsx
+@@ -439,11 +439,6 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
+     expect(line).toBeDefined();
+     expect(line?.className).toContain("lede");
+   });
+-
+-  it("wraps its buttons in the tall control of the frame, 44 px (F5735)", () => {
+-    const footer = all(view(), "footer")[0];
+-    expect(footer?.parentElement?.className).toContain("tall");
+-  });
+ });
+
+ // Alexis (D272): a GovDAO vote's card says, before Adena opens, that only the DAO's members can vote, otherwise the chain refuses and
+diff --git a/app/src/features/calls/CallCard.tsx b/app/src/features/calls/CallCard.tsx
+index 7a5c4732..0191c9c9 100644
+--- a/app/src/features/calls/CallCard.tsx
++++ b/app/src/features/calls/CallCard.tsx
+@@ -161,9 +161,7 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
+         <CallStatus card={card} />
+         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
+       </Card.Body>
+-      <div className={styles["tall"]}>
+-        <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
+-      </div>
++      <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
+     </Card>
+   );
+ }
+diff --git a/app/src/features/login/LoginView.module.css b/app/src/features/login/LoginView.module.css
+index 3c7822f5..226af343 100644
+--- a/app/src/features/login/LoginView.module.css
++++ b/app/src/features/login/LoginView.module.css
+@@ -4,25 +4,22 @@
+     display: none;
+   }
+
+-  /* The video's control is 44 px tall on a computer too: the token's touch height. */
+-  .computer {
+-    /* raw: 44 px is --control-m under a coarse pointer (tokens.css); the logged-out control wears it on every screen (F5655) */
+-    --control-m: 44px;
+-  }
+-
+-  /* The account logged in: the frame's bordered pill, a control tall (frames f0031 to f0033). */
++  /* The account logged in: the frames' bordered pill, 40 px with a mouse beside 44 px controls (frames f0031 to f0033). */
+   .account {
++    /* raw: the frames' pill is 40 px, rows 36 to 75 of f0031 */
++    --_h: 40px;
++
+     /* layout: the address centred in the pill */
+     display: inline-grid;
+     /* layout: centred in the pill */
+     place-items: center;
+-    block-size: var(--control-m);
++    block-size: var(--_h);
+     padding-inline: var(--space-s);
+     border-width: var(--line-width);
+     border-style: solid;
+     border-color: var(--color-line-strong);
+     /* a pill: half the height */
+-    border-radius: calc(var(--control-m) / 2);
++    border-radius: calc(var(--_h) / 2);
+     font: var(--font-body);
+   }
+
+@@ -38,5 +35,10 @@
+     .computer {
+       display: none;
+     }
++
++    /* By touch the pill may be the "Pick a name" button: a target keeps the default control's 44 (coherence decision 4). */
++    .account {
++      --_h: var(--control-m);
++    }
+   }
+ }
+diff --git a/app/src/features/names/NameDialog.module.css b/app/src/features/names/NameDialog.module.css
+index 6a36123b..ad7d015c 100644
+--- a/app/src/features/names/NameDialog.module.css
++++ b/app/src/features/names/NameDialog.module.css
+@@ -5,6 +5,11 @@
+     color: var(--color-text-muted);
+   }
+
++  /* The line under the title is the frames' 13 px reading size. */
++  .note[data-size="reading"] {
++    font: var(--font-reading);
++  }
++
+   /* The frames draw the registry's path in the text colour, not as a chip on a fill. */
+   .note code {
+     padding-inline: 0;
+diff --git a/app/src/features/names/NameDialog.test.tsx b/app/src/features/names/NameDialog.test.tsx
+index cbe096cb..95ddf881 100644
+--- a/app/src/features/names/NameDialog.test.tsx
++++ b/app/src/features/names/NameDialog.test.tsx
+@@ -132,6 +132,13 @@ describe("NameDialog: the design system's own parts", () => {
+     expect(dialog.getAttribute("aria-describedby")).toContain(kicker?.id ?? "no id");
+   });
+
++  // F5970: the line under the title is the frames' reading size, the other notes stay small.
++  it("sets the line naming the registry in the reading size, and no other note", () => {
++    const sized = all(view().box, "dialog p[data-size]");
++    expect(sized).toHaveLength(1);
++    expect(sized[0]?.querySelector("code")).not.toBeNull();
++  });
++
+   // F5964: frames 9 to 15 put the line naming the registry first, then the face, then the field.
+   it("says the line naming r/sys/namereg before the face, and the face before the field", () => {
+     const { box } = view();
+diff --git a/app/src/features/names/NameDialog.tsx b/app/src/features/names/NameDialog.tsx
+index cbf3451f..4ce81b98 100644
+--- a/app/src/features/names/NameDialog.tsx
++++ b/app/src/features/names/NameDialog.tsx
+@@ -49,7 +49,7 @@ export function NameDialog({ open, account, network, fee, phase, onRegister, onC
+   return (
+     <Dialog title="Pick a name and a face" kicker="YOUR GNO.LAND NAME" hideClose open={open} onClose={onClose}>
+       <Stack space="s">
+-        <p className={styles["note"]}>
++        <p className={styles["note"]} data-size="reading">
+           Your name is kept by <code>r/sys/namereg</code> on {networkOf(network)}.
+         </p>
+         <Avatar address={account} name="You" size="l" />
+diff --git a/app/src/shellHeader.module.css b/app/src/shellHeader.module.css
+index 27a47272..050dea4c 100644
+--- a/app/src/shellHeader.module.css
++++ b/app/src/shellHeader.module.css
+@@ -111,7 +111,7 @@
+   }
+
+   /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
+-  /* The search is a control's own size, 40 px (44 by touch), centred in the pill's 34 px between its padding: the pill keeps its height. */
++  /* The search is a control's own size, 44 px, centred in the pill's 34 px between its padding: the pill keeps its height. */
+   .views button {
+     /* layout: the control's overflow is shared by both sides, so it stays on the pill's middle line */
+     /* raw: the 34 px between the pill's padding */
+diff --git a/app/tests/e2e/callCard.spec.ts b/app/tests/e2e/callCard.spec.ts
+index 1931b9f0..3e69f57c 100644
+--- a/app/tests/e2e/callCard.spec.ts
++++ b/app/tests/e2e/callCard.spec.ts
+@@ -89,6 +89,25 @@ test.describe("a write function's call card", () => {
+     expect(look).toEqual({ edge: "1px", drawn: "solid", gap: "16px" });
+   });
+
++  // F5954 (frame f0110): the sentence under the title is 13 px with a 1.5 leading.
++  test("draws its first sentence in the 13 px reading size", async ({ page }) => {
++    await page.setViewportSize({ width: 1280, height: 900 });
++    await setup(page);
++    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
++    const lede = card(page).getByText("A call to").first();
++    expect(await lede.evaluate((el) => getComputedStyle(el).fontSize)).toBe("13px");
++    expect(await lede.evaluate((el) => getComputedStyle(el).lineHeight)).toBe("19.5px");
++  });
++
++  // F5735, F5967: frame f0110's Cancel border runs from row 630 to 673, the default control's 44 px.
++  test("draws Sign in Adena and Cancel 44 px tall, as the frame does", async ({ page }) => {
++    await page.setViewportSize({ width: 1280, height: 900 });
++    await setup(page);
++    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
++    for (const name of ["Sign in Adena", "Cancel"])
++      expect((await card(page).getByRole("button", { name }).boundingBox())?.height, name).toBe(44);
++  });
++
+   test("draws the note small and muted, as the frame does (F5740)", async ({ page }) => {
+     await page.setViewportSize({ width: 1280, height: 900 });
+     await setup(page);
+diff --git a/app/tests/e2e/geometry.ts b/app/tests/e2e/geometry.ts
+index 7e6d5785..4326055d 100644
+--- a/app/tests/e2e/geometry.ts
++++ b/app/tests/e2e/geometry.ts
+@@ -19,6 +19,17 @@ export const near = (actual: number, wanted: number, what: string) => {
+   );
+ };
+
++/** The colour a token computes to on this page, read through a probe element. */
++export const tokenColour = (page: Page, token: string) =>
++  page.evaluate((name) => {
++    const probe = document.createElement("i");
++    probe.style.color = `var(${name})`;
++    document.body.append(probe);
++    const colour = getComputedStyle(probe).color;
++    probe.remove();
++    return colour;
++  }, token);
++
+ /** A computed style of the first element a selector finds. */
+ export const style = (page: Page, selector: string, property: string) =>
+   page
+diff --git a/app/tests/e2e/login.spec.ts b/app/tests/e2e/login.spec.ts
+index d9449316..eb427f96 100644
+--- a/app/tests/e2e/login.spec.ts
++++ b/app/tests/e2e/login.spec.ts
+@@ -34,7 +34,7 @@ test.describe("the login with Adena", () => {
+     expect(asked.map((params) => params.data)).toEqual([text]);
+     const { address } = (await (await page.request.get("/__wallet")).json()) as { address: string };
+     await expect(page.getByTitle(address)).toBeVisible();
+-    // F5745 (a display choice taken by default, to confirm): the account is the frame's bordered pill, 40 px tall.
++    // F5745: the account is the frame's bordered pill, 40 px tall (f0031 rows 36 to 75), not a control: the default's 44 is not its.
+     expect((await page.getByTitle(address).boundingBox())?.height).toBe(40);
+     expect(await page.getByTitle(address).evaluate((el) => getComputedStyle(el).borderTopWidth)).toBe("1px");
+     await page.reload();
+diff --git a/app/tests/e2e/nameDialogGeometry.spec.ts b/app/tests/e2e/nameDialogGeometry.spec.ts
+index fbd4664a..34b50219 100644
+--- a/app/tests/e2e/nameDialogGeometry.spec.ts
++++ b/app/tests/e2e/nameDialogGeometry.spec.ts
+@@ -1,6 +1,6 @@
+ import AxeBuilder from "@axe-core/playwright";
+ import { expect, test, type Page } from "./fixtures.ts";
+-import { box, near, style } from "./geometry.ts";
++import { box, near, style, tokenColour } from "./geometry.ts";
+ import { logIn } from "./namesChain.ts";
+
+ // 9k (answer 9f-1): the name dialog at the video's size (1728 by 1080) against frames 9 to 15, read off the frames' pixels: the
+@@ -46,6 +46,13 @@ test.describe("the name dialog against the frames", () => {
+     expect(face.y + face.height, "the face is above the field").toBeLessThanOrEqual(field.y);
+   });
+
++  // F5970: the registry line is 13 px with a 1.5 leading (frame 10), the notes below it 12 px.
++  test("sets the registry line in 13 px over 19.5 px", async ({ page }) => {
++    await opened(page, [1728, 1080]);
++    expect(await style(page, "dialog[open] p:has(code)", "font-size")).toBe("13px");
++    expect(await style(page, "dialog[open] p:has(code)", "line-height")).toBe("19.5px");
++  });
++
+   // F5981: the frames draw the registry's path in the text colour with no fill, not as a chip.
+   test("draws the registry's path in the text colour, on no fill", async ({ page }) => {
+     await opened(page, [1728, 1080]);
+@@ -67,10 +74,45 @@ test.describe("the name dialog against the frames", () => {
+     expect(prefix.x + prefix.width).toBeLessThanOrEqual(field.x + field.width);
+   });
+
+-  // F5972: a prefixed field is a control, 40 px like the others, its frame's edge inside that height.
+-  test("draws the field's box 40 px tall, as the other fields are", async ({ page }) => {
++  // F5967 (answer 9k-3): frame 10's field is 46 px from edge to edge (rows 566 to 611), a 44 px control and its two edges.
++  test("draws the field's box 46 px tall, the control's 44 and its edges", async ({ page }) => {
++    await opened(page, [1728, 1080]);
++    expect((await box(page, "dialog[open] [data-part='box']")).height).toBe(46);
++  });
++
++  // F5967: frame 14's Register fill and frame 10's Later border run from row 654 to 697, 44 px.
++  test("draws Register and Later 44 px tall", async ({ page }) => {
++    await opened(page, [1728, 1080]);
++    for (const name of ["Register · 0 GNOT", "Later"])
++      expect((await dialog(page).getByRole("button", { name }).boundingBox())?.height, name).toBe(44);
++  });
++
++  // F5969: frame 10's title has capitals 19 px tall, Geist 300 at 26 px.
++  test("sets the title in 26 px", async ({ page }) => {
++    await opened(page, [1728, 1080]);
++    expect(await style(page, "dialog[open] h2", "font-size")).toBe("26px");
++  });
++
++  // F5968: frame 10's resting edge is (70, 73, 82) over the dialog's (11, 15, 24), about a fifth of the text: the strong line.
++  test("draws the resting field's edge in the strong line", async ({ page }) => {
++    await opened(page, [1728, 1080]);
++    await page.mouse.move(0, 0);
++    expect(await style(page, "dialog[open] [data-part='box']", "border-top-color")).toBe(
++      await tokenColour(page, "--color-line-strong"),
++    );
++  });
++
++  // F5980: frame 10's placeholder is dimmer than the prefix beside it (luma 128 against 174).
++  test("draws the placeholder in the faint grey, the prefix in the muted one", async ({ page }) => {
+     await opened(page, [1728, 1080]);
+-    expect((await box(page, "dialog[open] [data-part='box']")).height).toBe(40);
++    const placeholder = await page
++      .locator("dialog[open] [data-part='box'] input")
++      .evaluate((input) => getComputedStyle(input, "::placeholder").color);
++    expect(placeholder).toBe(await tokenColour(page, "--color-text-faint"));
++    expect(placeholder, "not the prefix's grey").not.toBe(await tokenColour(page, "--color-text-muted"));
++    expect(await style(page, "dialog[open] [data-part='box'] >> text=nym-", "color")).toBe(
++      await tokenColour(page, "--color-text-muted"),
++    );
+   });
+
+   // F5963: the focus ring is the frame's, so it encloses the prefix; the bare input inside draws none.
+@@ -90,15 +132,7 @@ test.describe("the name dialog against the frames", () => {
+
+   test("sets the field's label in the muted colour", async ({ page }) => {
+     await opened(page, [1728, 1080]);
+-    const muted = await page.evaluate(() => {
+-      const probe = document.createElement("i");
+-      probe.style.color = "var(--color-text-muted)";
+-      document.body.append(probe);
+-      const colour = getComputedStyle(probe).color;
+-      probe.remove();
+-      return colour;
+-    });
+-    expect(await style(page, LABEL, "color")).toBe(muted);
++    expect(await style(page, LABEL, "color")).toBe(await tokenColour(page, "--color-text-muted"));
+   });
+
+   test("passes axe", async ({ page }) => {
+diff --git a/app/tests/e2e/names.spec.ts b/app/tests/e2e/names.spec.ts
+index 2f3e7cbd..3f5ff8ea 100644
+--- a/app/tests/e2e/names.spec.ts
++++ b/app/tests/e2e/names.spec.ts
+@@ -153,6 +153,8 @@ test.describe("the name dialog", () => {
+     launchOptions,
+   }) => {
+     const { phone, browser } = await phoneOf(page, { playwright, launchOptions });
++    // The pill is a button here: a touch target keeps the default control's 44 px (coherence decision 4), the frames' 40 is a mouse's.
++    expect((await pick(phone).boundingBox())?.height).toBeGreaterThanOrEqual(44);
+     await pick(phone).tap();
+     await expect(dialog(phone)).toBeVisible();
+     expect(await violations(phone)).toEqual([]);
+diff --git a/app/tests/e2e/pageGeometry.spec.ts b/app/tests/e2e/pageGeometry.spec.ts
+index 29da8894..6adf237f 100644
+--- a/app/tests/e2e/pageGeometry.spec.ts
++++ b/app/tests/e2e/pageGeometry.spec.ts
+@@ -98,8 +98,9 @@ test.describe("at the video's size", () => {
+     const search = await box(page, "header nav[aria-label='Views'] button[aria-label='Search']");
+     expect(search.x).toBeGreaterThan(list.x + list.width);
+     expect(search.x + search.width).toBeLessThanOrEqual(pill.x + pill.width);
+-    // A control's own size, 40 px, centred in the 34 px between the pill's padding (touch asks 44: search.spec.ts).
++    // A control's own size, 44 px (F5967), centred in the 34 px between the pill's padding, its overflow shared by both sides.
+     expect(search.width).toBeGreaterThanOrEqual(34);
++    near(search.height, 44, "the search's height");
+     near(search.y + search.height / 2, 56, "the search's middle");
+   });
+
+diff --git a/app/tests/e2e/shell.spec.ts b/app/tests/e2e/shell.spec.ts
+index 12d089c9..ba2f9013 100644
+--- a/app/tests/e2e/shell.spec.ts
++++ b/app/tests/e2e/shell.spec.ts
+@@ -87,10 +87,10 @@ for (const width of WIDTHS) {
+             });
+           }),
+         );
+-        // The search control is the default control, 40 px with a mouse (44 by touch: search.spec.ts).
++        // The search control is the default control, 44 px (F5967).
+         const search = await page.getByRole("button", { name: /^Search/ }).boundingBox();
+-        expect(search?.width).toBeGreaterThanOrEqual(40);
+-        expect(search?.height).toBeGreaterThanOrEqual(40);
++        expect(search?.width).toBeGreaterThanOrEqual(44);
++        expect(search?.height).toBeGreaterThanOrEqual(44);
+         const middles = boxes.map(({ top, bottom }) => (top + bottom) / 2);
+         expect(boxes.filter(({ top, bottom }) => middles.some((m) => m < top || m > bottom))).toEqual([]);
+         // The header keeps to the gutter too, logged in.
+diff --git a/app/tests/stories/behaviours.spec.ts b/app/tests/stories/behaviours.spec.ts
+index 871dc3a9..c7c1730d 100644
+--- a/app/tests/stories/behaviours.spec.ts
++++ b/app/tests/stories/behaviours.spec.ts
+@@ -219,10 +219,10 @@ test.describe("Dialog", () => {
+     expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("H2");
+   });
+
+-  test("is 460 px wide, or 760 when wide, never wider than the screen", async ({ page }) => {
++  test("is 490 px wide (the frames), or 760 when wide, never wider than the screen", async ({ page }) => {
+     for (const [id, width] of [
+-      ["dialog--standard", 460],
+-      ["dialog--without-close", 460],
++      ["dialog--standard", 490],
++      ["dialog--without-close", 490],
+       ["dialog--wide", 760],
+     ] as const) {
+       await page.setViewportSize({ width: 1280, height: 800 });
+diff --git a/app/tests/stories/stories.spec.ts b/app/tests/stories/stories.spec.ts
+index fab23cb7..f3b796cb 100644
+--- a/app/tests/stories/stories.spec.ts
++++ b/app/tests/stories/stories.spec.ts
+@@ -292,8 +292,9 @@ for (const touch of [false, true]) {
+       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(touch);
+     });
+
+-    test("controls are as tall as their size's control, the default 44 px by touch", async ({ page }) => {
+-      const m = touch ? 44 : 40;
++    // F5967 (answer 9k-3): the video's default control is 44 px with a pointer too.
++    test("controls are as tall as their size's control, the default 44 px", async ({ page }) => {
++      const m = 44;
+       expect((await sizes(page, "button--sizes")).heights).toEqual({ s: 32, m, l: 56 });
+       expect(await sizes(page, "button-iconbutton--sizes"), "icon buttons").toEqual({
+         heights: { s: 32, m, l: 56 },
+@@ -301,9 +302,9 @@ for (const touch of [false, true]) {
+       });
+     });
+
+-    // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a
+-    // field's box and a popover's trigger at the default one, 44 by touch.
+-    test("chips, tabs and fields are as tall as their size's control", async ({ page }) => {
++    // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a popover's trigger at
++    // the default one, and a field's box at the default one with its two edges, 46 px (frame 10, F5967).
++    test("chips, tabs and triggers are as tall as their size's control, a field 2 px taller", async ({ page }) => {
+       const heights = async (id: string, selector: string) => {
+         await open(page, id);
+         return [
+@@ -317,8 +318,8 @@ for (const touch of [false, true]) {
+       expect(await heights("chip--marks", "[data-tone]"), "marks").toEqual([24]);
+       expect(await heights("chip--control", "button"), "a chip that acts").toEqual([32]);
+       expect(await heights("tabs--segmented", "[role='tab']"), "tabs").toEqual([32]);
+-      expect(await heights("field--text", "input"), "a field").toEqual([touch ? 44 : 40]);
+-      expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([touch ? 44 : 40]);
++      expect(await heights("field--text", "input"), "a field").toEqual([46]);
++      expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([44]);
+     });
+
+     // iOS Safari zooms into a field whose text is under 16 px when it takes the focus (F371).
+@@ -334,6 +335,34 @@ for (const touch of [false, true]) {
+   });
+ }
+
++// F5968 (answer 9k-3): a field rests on the strong line, frame 10's edge, and keeps it under the pointer; an invalid one is coral.
++test("a field's edge is the strong line at rest and under the pointer, the danger line when invalid", async ({
++  page,
++}) => {
++  const token = (name: string) =>
++    page.evaluate((n) => {
++      const probe = document.createElement("i");
++      probe.style.color = `var(${n})`;
++      document.body.append(probe);
++      const colour = getComputedStyle(probe).color;
++      probe.remove();
++      return colour;
++    }, name);
++  const edge = () =>
++    page
++      .locator("#storybook-root :is([data-part='box'], input)")
++      .first()
++      .evaluate((e) => getComputedStyle(e).borderTopColor);
++  await open(page, "field--text");
++  await page.mouse.move(0, 0);
++  expect(await edge(), "at rest").toBe(await token("--color-line-strong"));
++  await page.locator("#storybook-root input").first().hover();
++  expect(await edge(), "under the pointer").toBe(await token("--color-line-strong"));
++  await open(page, "field--with-error");
++  await page.mouse.move(0, 0);
++  expect(await edge(), "invalid").toBe(await token("--color-danger-line"));
++});
++
+ test("a busy button's spinner turns, and stops under reduced motion", async ({ page }) => {
+   const spin = async () => {
+     await open(page, "button--busy");
+@@ -519,7 +548,8 @@ test("the base styles text with the tokens, and the label keeps its case where c
+       .first()
+       .evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), property);
+   expect(await style("h1", "font-size")).toBe("36px");
+-  expect(await style("h2", "font-size")).toBe("28px");
++  // F5969 (answer 9k-3): the panel and dialog title is frame 10's 26 px.
++  expect(await style("h2", "font-size")).toBe("26px");
+   expect(await style("h3", "font-size")).toBe("20px");
+   expect(await style("small", "font-size")).toBe("12px");
+   expect(await style("code", "font-family")).toContain("Geist Mono Variable");
+diff --git a/docs/DESIGN-SYSTEM.md b/docs/DESIGN-SYSTEM.md
+index 7f766cd4..8fe3643e 100644
+--- a/docs/DESIGN-SYSTEM.md
++++ b/docs/DESIGN-SYSTEM.md
+@@ -80,8 +80,9 @@ Semantic roles, all computed from them:
+ | Role | Made of | Use |
+ |---|---|---|
+ | `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
++| `--color-text-faint` | muted at 80% | A field's placeholder alone, dimmer than the prefix as frame 10's (F5980): 5.1:1 on a field over night, 5.4:1 over space, 4.6:1 inside a card (WCAG AA; D311) |
+ | `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show (F369) |
+-| `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover |
++| `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover; a field's resting edge is the strong one (frame 10, F5968) |
+ | `--color-panel`, `--color-glass` | night at 86% and 60% | Docked panels; what floats over the scene |
+ | `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
+ | `--color-scrim` | space at 70% | Behind a dialog |
+@@ -142,12 +143,13 @@ the brightest planet behind the header's pills.
+ | `--font-meta` | 12 px, leading 1.4 | Geist 400 | Timestamps, secondary lines, fine print |
+ | `--font-data` | 12 px | Geist Mono 400 | Addresses, hashes, code, the ticker, chart axes |
+ | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
++| `--font-reading` | 13 px, leading 1.5 | Geist 400 | The sentence under a card's or a dialog's title (frames 10 and 110): a line read, not a control |
+ | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
+ | `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus (F371) |
+ | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
+ | `--font-action` | 16 px | Geist 500 | The 56 px main action |
+ | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
+-| `--font-title-m` | 28 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts |
++| `--font-title-m` | 26 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts (frame 10's dialog title, F5969) |
+ | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
+ | `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat` (Alexis, 2026-10-31): the board "Instrument" of the counter-proposal; its caption is the label |
+ | `--font-display` | `clamp(4.5rem, 8vw, 7rem)`, -0.04em, leading 0.9 | Geist 600 | A world's name on its plate |
+@@ -171,18 +173,18 @@ the brightest planet behind the header's pills.
+ | Token | Values |
+ |---|---|
+ | `--space-3xs` … `--space-2xl` | 4, 8, 12, 16, 24, 32, 48, 64 px, a 4 px grid; section space is fluid with `clamp()` |
+-| `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 40 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. Under `pointer: coarse`, `--control-m` is 44 |
++| `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 44 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. The default is 44 with a pointer too, as the video's (F5967); a field's box is the default and its two edges, 46 |
+ | `--radius-s` / `--radius-m` / `--radius-l` / `--radius-pill` | 8 / 12 / 24 / 999 px: small controls, rows, menus / cards, fields, popovers, bubbles / panels, dialogs / buttons, chips, tabs |
+ | `--icon-m` / `--icon-l` | 16 / 20 px, the only icon sizes |
+ | `--size-counter` / `--size-progress` | 18 px (an unread count) / 4 px (every progress bar) |
+ | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
+ | `--thumb-s` / `-m` / `-l` | 32 / 48 / 64 px: a row's lead / a card / the rail; 16 and 24 join with their first readers |
+-| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 460 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
++| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 490 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
+
+ - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
+   the control instead of spilling out.
+ - A target is at least 24 px (WCAG 2.2, 2.5.8; a link inside a sentence aside), and the default
+-  control is 44 px by touch; a toolbar's small controls stay at 32.
++  control is 44 px; a toolbar's small controls stay at 32.
+ - Interface text and controls do not scale with the window; section space and titles do.
+ - **Density:** `comfortable` (default) or `compact`, set once with `data-density` on a container;
+   it remaps the control and row aliases, so no component holds a density rule of its own.
+@@ -291,7 +293,7 @@ walk every story in Chromium, in the full gate.
+   `scripts/check_regressions.py`).
+ - **Invariants,** measured in the browser on every story and the journeys:
+   - nothing overlaps: the point at the centre of each control hits that control;
+-  - every target is at least 24 px, the default control 44 px by touch;
++  - every target is at least 24 px, the default control 44 px;
+   - `:focus-visible` draws its ring;
+   - no horizontal scroll from 320 px wide; text still fits at 200% zoom;
+   - forced colours keep every control visible; reduced motion stops transitions;
+@@ -329,7 +331,7 @@ component with its CSS Module, documented by its props.
+ | Component | Variants and states | Notes |
+ |---|---|---|
+ | `Button` | emphasis solid, outline, quiet; tone neutral, danger; sizes s, m, l; with an icon; disabled; busy | The solid neutral (cream) is the primary: one per region. A danger button names its act |
+-| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
++| `IconButton` | sizes s, m, l (the header, m: 44); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
+ | `Chip` | interactive (default, selected, with a count); static, at `--control-xs`, with a tone (a card's state, a badge) | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3); "Testnet" and "Sponsored" are uses of the static chip |
+ | `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Cosmos, List), notifications, the library filter, a world's rooms in the dock |
+ | `ChoiceGroup` | segmented, list | ARIA `radiogroup`, one look: each option a boxed row; the chosen one cream with the check. The days to rent, a poll's and a quiz's answers |
+@@ -395,7 +397,7 @@ assembly in its own slice, with its story.
+
+ | Region | Place | Size |
+ |---|---|---|
+-| Header | Top, 34 px from the edge, the same on every view | Controls at `--control-m` (44 by touch). Logo left; the views (Earth, Cosmos, List), the network (the universe switcher, "Testnet" on a testnet) and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings). When narrow, labels drop before icons; the network and the account never drop. Its pills have a backdrop that keeps them readable over any planet |
++| Header | Top, 34 px from the edge, the same on every view | Controls at `--control-m` (44); the logged-in account's pill is the frames' 40 (f0031). Logo left; the views (Earth, Cosmos, List), the network (the universe switcher, "Testnet" on a testnet) and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings). When narrow, labels drop before icons; the network and the account never drop. Its pills have a backdrop that keeps them readable over any planet |
+ | Top centre | Under the header, centred in the scene's free area (between the plate and the dock) | One slot: the flight panel, the expedition pill, the flash |
+ | Hero | Bottom left of the cosmos | The number, one line that says what gnoworld is, two big actions, the markets row; the scene keeps it clear (a safe area) |
+ | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines; as tall as its worlds; labels keep out of it |
+diff --git a/docs/decisions.md b/docs/decisions.md
+index 61f37abb..fb0e2376 100644
+--- a/docs/decisions.md
++++ b/docs/decisions.md
+@@ -905,3 +905,8 @@ once (CLAUDE.md). Newest last.
+ | 2026-11-06 | Slice 9, 9e-3: on a world with proposals the action row is "Read the proposals" and "Share" on one line, as frame 30 without Follow (nothing stands behind Follow yet); "Say hi in the chat" stays on worlds without proposals (amends slice 5k's row); by Alexis | The row wrapped at 539 px in a 484 px column (F5950) | `app/src/features/world/Actions.tsx` |
+ | 2026-11-06 | Slice 9, 9k-3: four design tokens follow the video, in a small part of its own after 9k: controls and buttons 44 px and the field 46 (F5967), a resting field's border `--color-line-strong` (F5968), the dialog title about 26 px (F5969), the placeholder a grey below `--color-text-muted` with its contrast kept (F5980); every dependent picture redone at once on the Mac Studio; the focus ring around the whole box stays, a deliberate gap from frame 13 (keyboard access); by Alexis | The video is the end state; a token changes every screen, so its pictures go together. These change the tokens page, which this MacBook cannot approve (decision `4238523f`): the part prepares them as a patch for the Mac Studio at /pre-merge, as 9k-1's width | `packages/ui/src/tokens.css` |
+ | 2026-11-06 | Slice 9, 9l-1: no simulation before signing for now; a backlog row keeps the idea and 9l's facts (gno v1.5.1: `.app/simulate` takes the unsigned amino tx with one empty signature and answers the realm's own refusal, charging and writing nothing; Adena at bc5a7b5a already simulates every call and disables "Approve" when it fails); amends the row "next, a session checks ... simulated before signing" by closing it; by Alexis | Adena already keeps a refused call from being signed; a hand-written transaction encoder in tier-1 code is not worth its risk now | `docs/plans/backlog.md` |
++| 2026-11-06 | D310: answer 9k-3's four values, measured on the frames (1728 by 1080, one pixel a CSS pixel): `--control-m` is 44 px with a pointer too, the coarse pointer's own 44 gone (f0014 Register's fill and f0010 Later's border rows 654 to 697), so LoginView's and CallCard's local 44 go; a field's box is that control and its two edges, 46 px (f0010 rows 566 and 611); its resting edge is `--color-line-strong` and stays so under the pointer (f0010 edge (70, 73, 82) over the dialog's (11, 15, 24), a fifth of the text); `--font-title-m` is 26 px (f0010's capitals 19 px tall, rows 390 to 408, where 28 px draws 20); the focus ring stays around the whole box; by Alexis (answer 9k-3) | The video is the end state | `packages/ui/src/tokens.css`, `packages/ui/src/Field/Field.module.css` |
++| 2026-11-06 | D311: the placeholder is `--color-text-faint`, muted at 80 %, not the frame's grey: f0010's (125, 128, 135) is 4.44:1 on its fill, under WCAG AA, and 75 % falls to 4.24:1 on a field inside a card over night (the call card); 80 % holds 5.09 on a field over night, 5.36 over space, 4.61 and 4.93 inside a card; by Claude, by default, to confirm by Alexis | Answer 9k-3 keeps the contrast; a placeholder is text (WCAG 1.4.3) | `packages/ui/src/tokens.css` |
++| 2026-11-06 | D312: the logged-in account's pill stays 40 px with a mouse (f0031 to f0033, rows 36 to 75) while the default control becomes 44; by touch it keeps the control's 44, being the "Pick a name" button when the account has no name (coherence decision 4: 44 by touch); by Claude, by default, to confirm by Alexis | The frames draw it 40 beside 44 px Jarvis and Chat pills (f0031 rows 34 to 77) | `app/src/features/login/LoginView.module.css` |
++| 2026-11-06 | D313: `--font-title-m` at 26 px moves every user of the token (each h2, a card's title, the place panel's figures, a realm page's title, the list's names), measured only on the dialog's title (f0010); coherence decision 6 keeps panel and dialog titles one size; by Claude, by default, to confirm by Alexis at the Mac Studio's pictures | One title size, as decided on 2026-10-19 | `packages/ui/src/tokens.css`, `docs/design/coherence.md` |
++| 2026-11-06 | D314: an open combobox (the search palette's field, open whenever it lists options) takes the hover fill, `--color-fill-hover`, where it took the strong line: that line is every field's resting edge now (D310), so open would look like shut; no frame shows the palette; by Claude, by default, to confirm by Alexis at the Mac Studio's searchLook and combobox pictures | A state is drawn, not only announced (stories.spec.ts, "looks unlike its resting self") | `packages/ui/src/Combobox/Combobox.module.css` |
+diff --git a/docs/design/coherence.md b/docs/design/coherence.md
+index 8a905af2..b3c9eb27 100644
+--- a/docs/design/coherence.md
++++ b/docs/design/coherence.md
+@@ -109,7 +109,7 @@ second between two frames, the 3D art (slice 7), a voice-and-tone guide.
+
+ 1. One secondary grey. 2. One label style (mono 11 caps 0.14em), the header's links included.
+ 3. Selected is the cream fill; current row a quiet fill. 4. Targets 24 px with a pointer, 44 by
+-touch. 5. Spacing on the 4 px grid, no 2 px token. 6. Panel and dialog titles 28/300.
++touch. 5. Spacing on the 4 px grid, no 2 px token. 6. Panel and dialog titles 28/300 (26/300 since answer 9k-3, the video's).
+ 7. The astronaut from the name replaces planets and uploads (ADR-0002 §6). 8. Transactions are
+ call cards in the thread (ADR-0002 §4). 9. No blue in the system. 10. Seven new components, the
+ rule of two uses. 11. Search becomes a ⌘K palette. 12. The dead UI is not rebuilt. 13. Three tiers
+diff --git a/docs/review/findings.md b/docs/review/findings.md
+index f7042c36..a21d8d2c 100644
+--- a/docs/review/findings.md
++++ b/docs/review/findings.md
+@@ -2742,3 +2742,4 @@ checks each row.
+ | F5979 | 2026-11-06 | review round 1 (slice 9k), reviewer/design-reviewer, verified | `DESIGN-SYSTEM.md:339, :311-312, NameDialog.module.css:1` | low: the Dialog row lacks kicker and hidden Close; Field's parts lack `box`; the comment says the face beside its words | fixed | `c26cf575`: DESIGN-SYSTEM.md's Dialog row and Field parts; NameDialog.module.css's header is 3c00b358 |
+ | F5980 | 2026-11-06 | review round 1 (slice 9k), reviewer/design-reviewer, verified | `Field.module.css` | low: prefix and placeholder are the same grey (157,168,188); f0010's placeholder is dimmer (luma 128 against 174) | asked | Question 9k-3. |
+ | F5981 | 2026-11-06 | review round 1 (slice 9k), reviewer/design-reviewer, verified | `NameDialog.tsx` | low: `code` in the muted note is drawn as a chip with a 5% fill; f0010 shows text colour, no fill | fixed | `3c00b358`: the path in the note is text colour, no fill (nameDialogGeometry.spec.ts) |
++| F6040 | 2026-11-06 | Claude while working (slice 9m) | `app/tests/stories/stories.spec.ts` | medium: "the focus ring is the 2 px mint outline, 2 px off, on every control reached by the keyboard" fails on slice-9a at 9cedf1a4 itself: a prefixed field's input draws no outline, its frame draws the ring (F5963), and the test reads the focused input (dialog--with-field control 15, dialog--without-close control 9, field--with-prefix control 4, field--with-error control 4, overview--all control 567) | reproduced | `node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts stories.spec -g "focus ring is the 2 px"` on a clean 9cedf1a4 tree: 1 failed, the five controls above; same with 9m's patch. The fast gate walks no stories spec, so no gate saw it. Fix: the test reads the ring on the focused control's frame when it has one |
+diff --git a/packages/ui/src/Combobox/Combobox.module.css b/packages/ui/src/Combobox/Combobox.module.css
+index e76baa15..df42b509 100644
+--- a/packages/ui/src/Combobox/Combobox.module.css
++++ b/packages/ui/src/Combobox/Combobox.module.css
+@@ -15,9 +15,10 @@
+     font: var(--font-label);
+   }
+
+-  /* Open, the field's edge stays on the strong line, as when hovered: the state is drawn, not only announced. */
++  /* Open, the field takes the hover fill: its edge is the strong line at rest already (F5968), and the state is drawn, not only
++     announced. */
+   .field[aria-expanded="true"] {
+-    --_line: var(--color-line-strong);
++    background: var(--color-fill-hover);
+   }
+
+   .list [aria-selected="true"] {
+diff --git a/packages/ui/src/Dialog/Dialog.module.css b/packages/ui/src/Dialog/Dialog.module.css
+index 1e9ff524..f711e232 100644
+--- a/packages/ui/src/Dialog/Dialog.module.css
++++ b/packages/ui/src/Dialog/Dialog.module.css
+@@ -1,4 +1,4 @@
+-/* The dialog: a surface (Popover/surface.module.css) in the top layer, 460 px or 760, never wider than
++/* The dialog: a surface (Popover/surface.module.css) in the top layer, 490 px or 760, never wider than
+    the screen, over the scrim. */
+ @layer components {
+   .dialog {
+diff --git a/packages/ui/src/Dialog/Dialog.tsx b/packages/ui/src/Dialog/Dialog.tsx
+index a76beaa5..fb4bfdf7 100644
+--- a/packages/ui/src/Dialog/Dialog.tsx
++++ b/packages/ui/src/Dialog/Dialog.tsx
+@@ -11,7 +11,7 @@ export interface DialogProps {
+   open: boolean;
+   /** Asked to close, by Esc or Close: the page sets open to false. */
+   onClose: () => void;
+-  /** 760 px, for the palette, the lightbox and the passport; 460 otherwise. */
++  /** 760 px, for the palette, the lightbox and the passport; 490 otherwise. */
+   wide?: boolean;
+   /** The line above the title, in the one label style, read with the description. */
+   kicker?: string;
+diff --git a/packages/ui/src/Field/Field.module.css b/packages/ui/src/Field/Field.module.css
+index 8f36e88a..059d438a 100644
+--- a/packages/ui/src/Field/Field.module.css
++++ b/packages/ui/src/Field/Field.module.css
+@@ -1,20 +1,17 @@
+-/* The field: a box on the resting fill, one line at the default control's height, or a box of lines of two rows or more; invalid, coral. */
++/* The field: a box on the resting fill, one line at the default control's height and its two edges, or a box of lines of two rows or more;
++   invalid, coral. */
+ @layer components {
+   /* The box and, with a prefix, its frame wear one look: the edge, the corners and the fill. */
++  /* The strong line at rest and under the pointer, frame 10's edge (F5968). */
+   .box,
+   .frame {
+-    --_line: var(--color-line);
++    --_line: var(--color-line-strong);
+
+     border: var(--line-width) solid var(--_line);
+     border-radius: var(--radius-m);
+     background: var(--color-fill);
+   }
+
+-  .box:hover,
+-  .frame:hover {
+-    --_line: var(--color-line-strong);
+-  }
+-
+   .box[aria-invalid="true"],
+   .frame:has([aria-invalid="true"]) {
+     --_line: var(--color-danger-line);
+@@ -25,14 +22,15 @@
+
+     /* A drag of the box's handle never makes it wider than its place: its neighbour stays in view. */
+     max-inline-size: 100%;
+-    min-block-size: var(--control-m);
++    /* Frame 10's field is 46 px: the default control inside its two edges (F5967). */
++    min-block-size: calc(var(--control-m) + 2 * var(--line-width));
+     padding-block: var(--space-2xs);
+     padding-inline: var(--space-s);
+     font: var(--font-field);
+   }
+
+   .box::placeholder {
+-    color: var(--color-text-muted);
++    color: var(--color-text-faint);
+   }
+
+   /* A box of lines grows with its draft, wrapped lines too, from two lines to ten, then scrolls (F1722, F1729); a
+@@ -70,8 +68,8 @@
+     flex: 1;
+     min-inline-size: 0;
+
+-    /* The frame's edge is outside this height: the control stays as tall as the others. */
+-    min-block-size: calc(var(--control-m) - 2 * var(--line-width));
++    /* The frame's edges are outside this height, as a bare box's are. */
++    min-block-size: var(--control-m);
+     padding-inline-start: var(--space-2xs);
+     border: 0;
+     background: transparent;
+diff --git a/packages/ui/src/compositions/Compositions.stories.tsx b/packages/ui/src/compositions/Compositions.stories.tsx
+index 06b61da0..47b9eeee 100644
+--- a/packages/ui/src/compositions/Compositions.stories.tsx
++++ b/packages/ui/src/compositions/Compositions.stories.tsx
+@@ -65,7 +65,7 @@ export const Switcher: Story = {
+ export const Center: Story = {
+   render: () => (
+     <layout.Center max="dialog" space="m">
+-      <p>A dialog holds its text at 460 px, and the measure at 65 characters.</p>
++      <p>A dialog holds its text at 490 px, and the measure at 65 characters.</p>
+     </layout.Center>
+   ),
+ };
+diff --git a/packages/ui/src/tokens.css b/packages/ui/src/tokens.css
+index a9c9bf50..f74de811 100644
+--- a/packages/ui/src/tokens.css
++++ b/packages/ui/src/tokens.css
+@@ -18,6 +18,8 @@
+     --color-space: var(--p-space);
+     --color-text: var(--p-text);
+     --color-text-muted: var(--p-muted);
++    /* A placeholder, dimmer than muted as frame 10's (F5980), at 4.5:1 or more on a field over night, space or a card. */
++    --color-text-faint: color-mix(in oklab, var(--p-muted) 80%, transparent);
+     --color-primary: var(--p-cream);
+     --color-ink: var(--p-space);
+     --color-mine: var(--p-mint);
+@@ -51,6 +53,7 @@
+     --font-meta: 400 0.75rem/1.4 var(--family-sans);
+     --font-data: 400 0.75rem/1.4 var(--family-mono);
+     --font-ui: 500 0.8125rem/1 var(--family-sans);
++    --font-reading: 400 0.8125rem/1.5 var(--family-sans);
+     --font-chat: 400 0.84375rem/1.45 var(--family-sans);
+     --font-hint: 400 0.65625rem/1.4 var(--family-sans);
+     --font-body: 400 0.875rem/1.5 var(--family-sans);
+@@ -58,7 +61,7 @@
+     --font-action: 500 1rem/1 var(--family-sans);
+     --font-title-s: 400 1.25rem/1.4 var(--family-sans);
+     --font-title-room: 300 1.375rem/1 var(--family-sans);
+-    --font-title-m: 300 1.75rem/1 var(--family-sans);
++    --font-title-m: 300 1.625rem/1 var(--family-sans);
+     --font-title-l: 300 2.25rem/1 var(--family-sans);
+     --font-figure: 500 2.75rem/1 var(--family-mono);
+     --tracking-caps: 0.14em;
+@@ -75,7 +78,7 @@
+
+     --control-xs: 24px;
+     --control-s: 32px;
+-    --control-m: 40px;
++    --control-m: 44px;
+     --control-l: 56px;
+     --icon-m: 16px;
+     --icon-l: 20px;
+@@ -86,7 +89,7 @@
+     --column-l: 384px;
+     --measure: 65ch;
+     --switch-at: 38rem;
+-    --dialog-w: 460px;
++    --dialog-w: 490px;
+     --dialog-wide: 760px;
+     --popover-w: 300px;
+     /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
+@@ -132,7 +135,6 @@
+
+   @media (pointer: coarse) {
+     :root {
+-      --control-m: 44px;
+       /* Under 16 px, iOS Safari zooms into a field that takes the focus (F371). */
+       --font-field: 400 1rem/1.5 var(--family-sans);
+     }
+diff --git a/packages/ui/src/tokens.test.ts b/packages/ui/src/tokens.test.ts
+index 764c0bee..6dd544be 100644
+--- a/packages/ui/src/tokens.test.ts
++++ b/packages/ui/src/tokens.test.ts
+@@ -28,11 +28,11 @@ function contrast(a: string, b: string) {
+   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
+ }
+
+-// A translucent token laid over a ground, mixed in sRGB as docs/DESIGN-SYSTEM.md measures it: the
+-// token's primitive at its share, the ground under the rest.
++// A translucent token laid over a ground (a base colour's name or a #rrggbb), mixed in sRGB as docs/DESIGN-SYSTEM.md
++// measures it: the token's primitive at its share, the ground under the rest.
+ function over(name: string, ground: string) {
+   const [, primitive = "", share = "0"] = /var\(--p-(\w+)\) (\d+)%, transparent/.exec(value(name) ?? "") ?? [];
+-  const [top, under] = [BASE[primitive] ?? "", BASE[ground] ?? ""];
++  const [top, under] = [BASE[primitive] ?? "", BASE[ground] ?? ground];
+   const mixed = [1, 3, 5].map((at) => {
+     const channel = (hex: string) => Number.parseInt(hex.slice(at, at + 2), 16);
+     const blend = (Number(share) / 100) * channel(top) + (1 - Number(share) / 100) * channel(under);
+@@ -180,7 +180,7 @@ describe("the tokens", () => {
+     ["--radius-s", "8px"],
+     ["--radius-m", "12px"],
+     ["--radius-l", "24px"],
+-    ["--dialog-w", "460px"],
++    ["--dialog-w", "490px"],
+     ["--dialog-wide", "760px"],
+     ["--popover-w", "300px"],
+     ["--thumb-s", "32px"],
+@@ -198,7 +198,7 @@ describe("the tokens", () => {
+     ["--icon-m", "16px"],
+     ["--icon-l", "20px"],
+     ["--control-s", "32px"],
+-    ["--control-m", "40px"],
++    ["--control-m", "44px"],
+     ["--control-l", "56px"],
+     ["--radius-pill", "999px"],
+     ["--space-3xs", "4px"],
+@@ -207,8 +207,11 @@ describe("the tokens", () => {
+     expect(value(name)).toBe(px);
+   });
+
+-  it("set the medium control to 44 px under a coarse pointer, for touch", () => {
+-    expect(css).toMatch(/@media \(pointer: coarse\)\s*\{\s*:root\s*\{\s*--control-m:\s*44px;/);
++  // F5967 (answer 9k-3): the video's controls are 44 px on a computer too, so a coarse pointer has no height of its own.
++  it("set the medium control to 44 px on every pointer, a coarse one setting none of its own", () => {
++    const coarse = /@media \(pointer: coarse\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
++    expect(value("--control-m")).toBe("44px");
++    expect(parseTokens(`:root {${coarse}}`).map(({ name }) => name)).not.toContain("--control-m");
+   });
+
+   it("still the fast and the base motion under reduced motion, and keep the wait", () => {
+@@ -229,6 +232,37 @@ describe("the New mark's colours", () => {
+   });
+ });
+
++// F5954 (frames 10 and 110): the sentence under a title is 13 px with a reading leading, which --font-ui (leading 1, weight 500) is not.
++describe("the reading font", () => {
++  it("is Geist 400 at 13 px with a leading of 1.5, in a token of its own", () => {
++    expect(value("--font-reading")).toBe("400 0.8125rem/1.5 var(--family-sans)");
++  });
++});
++
++// F5969 (answer 9k-3): frame 10's dialog title has capitals 19 px tall (rows 390 to 408), where Geist 300 at 28 px draws 20.
++describe("the panel and dialog title", () => {
++  it("is Geist 300 at 26 px", () => {
++    expect(value("--font-title-m")).toBe("300 1.625rem/1 var(--family-sans)");
++  });
++});
++
++// F5980 (answer 9k-3): frame 10's placeholder is dimmer than the field's prefix (luma 128 against 174); a placeholder is
++// text, so it keeps WCAG AA's 4.5:1 on the field's fill wherever a field sits: the dialog's night, the page's space, and a
++// card's fill under the field's own (the call card), which the frame's 4.44:1 grey would not.
++describe("the placeholder's grey", () => {
++  it("holds 4.5:1 on a field over night, over space and on a card over either, and is clearly dimmer than muted", () => {
++    for (const ground of ["night", "space"]) {
++      for (const fill of [over("--color-fill", ground), over("--color-fill", over("--color-fill", ground))]) {
++        const faint = contrast(over("--color-text-faint", fill), fill);
++        expect(faint, `on ${fill} over ${ground}`).toBeGreaterThanOrEqual(4.5);
++        expect(faint, `a fifth dimmer than muted on ${fill}`).toBeLessThanOrEqual(
++          0.8 * contrast(BASE["muted"] ?? "", fill),
++        );
++      }
++    }
++  });
++});
++
+ // docs/DESIGN-SYSTEM.md, "Type" (Alexis, 2026-10-31): the instrument figures, the board "Instrument" of the counter-proposal: Geist
+ // Mono 500, 44 px (the video's figure on a plate); the Stat takes it (worldPage.spec.ts reads what it draws).
+ describe("the instrument figure", () => {

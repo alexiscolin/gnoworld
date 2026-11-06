@@ -1,0 +1,16 @@
+test(app): declare the tests slice 9's token patch renames
+
+The token patch (SHARED/slice9-tokens.patch) renames or drops these
+tests with the values they name; the commit gate reads such lines only
+from an earlier commit.
+
+Removed-test: packages/ui/src/tokens.test.ts > the tokens > set --control-m to 40px - the default control is 44 px with a pointer too (answer 9k-3, F5967); the row now reads 44px
+Removed-test: packages/ui/src/tokens.test.ts > the tokens > set --dialog-w to 460px - the dialog is 490 px, frames 9 to 15 (answer 9k-1, F5862); the row now reads 490px
+Removed-test: app/tests/stories/behaviours.spec.ts > Dialog > is 460 px wide, or 760 when wide, never wider than the screen - renamed to 490 px with the width (F5862)
+Removed-test: app/tests/stories/stories.spec.ts > with a pointer > chips, tabs and fields are as tall as their size's control - a field is now the control and its two edges, 46 px (F5967): renamed to say so
+Removed-test: app/tests/stories/stories.spec.ts > by touch > chips, tabs and fields are as tall as their size's control - a field is now the control and its two edges, 46 px (F5967): renamed to say so
+Removed-test: packages/ui/src/tokens.test.ts > the tokens > set the medium control to 44 px under a coarse pointer, for touch - the default is 44 px on every pointer (F5967): renamed to say a coarse pointer sets none of its own
+Removed-test: app/tests/stories/stories.spec.ts > with a pointer > controls are as tall as their size's control, the default 44 px by touch - the default is 44 px with a pointer too (F5967): renamed without "by touch"
+Removed-test: app/tests/stories/stories.spec.ts > by touch > controls are as tall as their size's control, the default 44 px by touch - the default is 44 px with a pointer too (F5967): renamed without "by touch"
+Removed-test: app/tests/e2e/nameDialogGeometry.spec.ts > the name dialog against the frames > draws the field's box 40 px tall, as the other fields are - frame 10's field is 46 px (F5967): renamed to 46
+Removed-test: app/src/features/calls/CallCard.test.tsx > CallCard, the look of the frame (F5731 to F5735) > wraps its buttons in the tall control of the frame, 44 px (F5735) - the wrapper is gone, the default control being 44 px; callCard.spec.ts measures the buttons' 44 px instead
