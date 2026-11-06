@@ -40,4 +40,17 @@
     /* raw: the video's ring stands 3 px off the planet's edge (54 round 44, its two lines included) */
     outline-offset: 3px;
   }
+
+  /* The textures' credit at the column's foot, in the label style, muted; its padding makes a target of 24 px at least. */
+  .credits {
+    display: block;
+    inline-size: 100%;
+    padding-block: var(--space-2xs);
+    text-align: center;
+    color: var(--color-text-muted);
+  }
+
+  .credits:hover {
+    color: var(--color-text);
+  }
 }

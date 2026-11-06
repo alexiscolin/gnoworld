@@ -2,9 +2,17 @@
 // view ringed, no text under it; its name shows on hover (the tooltip) and names the link. A world with no picture keeps ui's disc.
 import { hubWorldOf } from "@gnoworld/core";
 import { Cluster, PlanetThumb, Tooltip } from "@gnoworld/ui";
+import { useState } from "react";
+import { chunked } from "./Failing.tsx";
 import { pictureOf } from "../../lib/worldPictures.ts";
 import { RouterLink } from "../../routerLink.tsx";
 import styles from "./Worlds.module.css";
+
+// The credits' dialog is the universe's own, its code asked at the first press: the column carries only the button.
+const CreditsDialog = chunked(async () => ({ default: (await import("../credits/index.ts")).CreditsDialog }), {
+  waiting: null,
+  failed: <p role="status">The credits could not load.</p>,
+});
 
 export interface WorldsProps {
   worlds: readonly { slug: string; name: string; href: string; realms?: readonly string[] | undefined }[];
@@ -36,6 +44,8 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
 }
 
 export function Worlds({ worlds, current, followed = NONE }: WorldsProps) {
+  const [asked, setAsked] = useState(false);
+  const [open, setOpen] = useState(false);
   return (
     <nav aria-label="Worlds" className={styles["list"]}>
       {/* One planet to a line: the column is no wider than one, so a Cluster wraps each onto its own. */}
@@ -55,6 +65,24 @@ export function Worlds({ worlds, current, followed = NONE }: WorldsProps) {
           </li>
         ))}
       </Cluster>
+      <button
+        type="button"
+        className={["label", styles["credits"]].join(" ")}
+        onClick={() => {
+          setAsked(true);
+          setOpen(true);
+        }}
+      >
+        Credits
+      </button>
+      {asked ? (
+        <CreditsDialog
+          open={open}
+          onClose={() => {
+            setOpen(false);
+          }}
+        />
+      ) : null}
     </nav>
   );
 }

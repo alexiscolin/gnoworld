@@ -3,7 +3,7 @@ import { hubWorldOf } from "@gnoworld/core";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 import { act } from "react";
-import { all, mount as draw, one, settled } from "../../../tests/mount.tsx";
+import { all, button, click, modals, mount as draw, one, settled } from "../../../tests/mount.tsx";
 import { pictureOf } from "../../lib/worldPictures.ts";
 import { inRailOrder, Worlds } from "./Worlds.tsx";
 
@@ -104,5 +104,20 @@ describe("inRailOrder", () => {
   it("draws the column in that order", () => {
     const box = mount(<Worlds worlds={[BUBBLE, EARTH, ZENAO]} current="earth" followed={["zenao"]} />);
     expect(all(box, "a").map((link) => link.getAttribute("aria-label"))).toEqual(["Earth", "Zenao", "Bubble"]);
+  });
+});
+
+// Alexis 2026-11-06: the pictures carry the textures' credit, so the full chat offers the credits too: the universe's own dialog.
+describe("Worlds, the credits", () => {
+  it("offers a Credits button at the column's foot that opens the attributions, Solar System Scope's among them", async () => {
+    modals();
+    const box = mount(<Worlds worlds={[EARTH]} current="earth" />);
+    const credits = button(box, "Credits");
+    expect(credits).toBeDefined();
+    expect(all(box, "nav > *").at(-1)).toBe(credits);
+    expect(all(box, "dialog")).toHaveLength(0);
+    click(credits);
+    await settled(() => all(box, "dialog[open]").length === 1);
+    expect(one(box, "dialog").textContent).toContain("Solar System Scope");
   });
 });

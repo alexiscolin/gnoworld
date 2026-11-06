@@ -146,8 +146,8 @@ const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with what
 // it asks once open: 8d's chat within Alexis's 23 KiB, RoomsDrawer's 768 B (docs/decisions.md, 2026-11-05), 8p's 18 B for the dock's close,
-// and 916 B for the column's pictures, their manifest and the rail's order (slice-8, chat planets: 25,023 B).
-const LATE_CHAT_JS = 25_023;
+// and 1,060 B for the column's pictures, their manifest, the rail's order and its Credits button (slice-8: 25,167 B).
+const LATE_CHAT_JS = 25_167;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
