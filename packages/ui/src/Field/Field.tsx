@@ -1,5 +1,6 @@
 import { useId, useRef, type KeyboardEvent } from "react";
 import { Stack } from "../compositions/index.ts";
+import { ids } from "../ids.ts";
 import styles from "./Field.module.css";
 
 export interface FieldProps {
@@ -91,7 +92,7 @@ function describing(
   parts: Partial<Record<"prefix" | "help" | "error" | "describedBy", string | undefined>>,
 ) {
   const own = (["prefix", "help", "error"] as const).filter((name) => parts[name] !== undefined);
-  return [...own.map((name) => `${id}-${name}`), parts.describedBy ?? ""].filter(Boolean).join(" ");
+  return ids(...own.map((name) => `${id}-${name}`), parts.describedBy);
 }
 
 /** A labelled box, described by its help and its error, which also marks it invalid. */

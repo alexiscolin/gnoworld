@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } from "react";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Sidebar, Stack } from "../compositions/index.ts";
+import { ids } from "../ids.ts";
 import { surface } from "../Popover/floating.ts";
 import styles from "./Dialog.module.css";
 
@@ -72,9 +73,7 @@ export function Dialog({
   const descriptionId = useId();
   const kickerId = useId();
   const kickerShown = kicker !== undefined && kicker !== "";
-  const describedBy = [kickerShown ? kickerId : "", description === undefined ? "" : descriptionId]
-    .filter(Boolean)
-    .join(" ");
+  const describedBy = ids(kickerShown ? kickerId : undefined, description === undefined ? undefined : descriptionId);
   // Each close the browser made itself: the page is told, and while it keeps the dialog open the
   // dialog shows again (F330).
   const [closes, setCloses] = useState(0);
