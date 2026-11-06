@@ -18,3 +18,10 @@ export const near = (actual: number, wanted: number, what: string) => {
     NEAR,
   );
 };
+
+/** A computed style of the first element a selector finds. */
+export const style = (page: Page, selector: string, property: string) =>
+  page
+    .locator(selector)
+    .first()
+    .evaluate((el, name) => getComputedStyle(el).getPropertyValue(name), property);

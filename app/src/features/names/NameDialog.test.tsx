@@ -2,7 +2,7 @@
 import { Avatar } from "@gnoworld/ui";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { all, button, click, faceOf, mount, one } from "../../../tests/mount.tsx";
+import { all, button, click, faceOf, follows, mount, one } from "../../../tests/mount.tsx";
 import { NameDialog, type NameDialogProps } from "./NameDialog.tsx";
 import { NYM_PREFIX } from "./nym.ts";
 
@@ -114,6 +114,50 @@ describe("NameDialog: the frames' parts", () => {
     click(button(box, "Later"));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(onRegister).not.toHaveBeenCalled();
+  });
+});
+
+// 9k (answer 9f-1): the design system's five changes, as frames 9 to 15 draw the dialog.
+describe("NameDialog: the design system's own parts", () => {
+  it("draws the kicker once, above the title through Dialog's kicker slot, not beside the face, and describes the dialog with it", () => {
+    const { box } = view();
+    const dialog = one(box, "dialog");
+    const kickers = all(dialog, "p").filter((each) => said(each) === "YOUR GNO.LAND NAME");
+    const [kicker] = kickers;
+    const title = one(dialog, "h2");
+    expect(kickers).toHaveLength(1);
+    expect(kicker?.classList.contains("label")).toBe(true);
+    expect(kicker !== undefined && follows(kicker, title)).toBe(true);
+    expect(kicker !== undefined && all(box, "svg").every((face) => !face.parentElement?.contains(kicker))).toBe(true);
+    expect(dialog.getAttribute("aria-describedby")).toContain(kicker?.id ?? "no id");
+  });
+
+  it.each<[string, NameDialogProps["phase"]]>([
+    ["typing", { kind: "typing" }],
+    ["working", { kind: "working", text: "Waiting for Adena" }],
+    ["failed, the form stays", { kind: "failed", text: "Refused", again: true }],
+    ["failed, no second try", { kind: "failed", text: "Refused", again: false }],
+    ["done", { kind: "done", name: "nym-alex042", height: 55414 }],
+  ])("draws no Close button while %s: Later or Done is the way out", (_, phase) => {
+    const { box } = view({ phase });
+    expect(button(box, "Close")).toBeUndefined();
+    expect(button(box, phase.kind === "done" ? "Done" : "Later")).toBeDefined();
+  });
+
+  it("asks to close on Escape", () => {
+    const { box, onClose } = view();
+    one(box, "dialog").dispatchEvent(new Event("cancel", { cancelable: true }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("draws nym- inside the field's box, read with the field", () => {
+    const { box } = view();
+    const input = one(box, "input");
+    const inner = input.closest("[data-part='box']");
+    expect(inner?.textContent).toContain(NYM_PREFIX);
+    expect(input.getAttribute("aria-describedby")).toContain(
+      all(box, "span").find((each) => said(each) === NYM_PREFIX)?.id ?? "no id",
+    );
   });
 });
 
