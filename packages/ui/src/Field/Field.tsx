@@ -85,27 +85,13 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, 
   );
 }
 
-const ids = (id: string) => ({ prefix: `${id}-prefix`, help: `${id}-help`, error: `${id}-error` });
-
 // What reads with the box, in order: its prefix, its help, its error, then the page's words.
 function describing(
   id: string,
-  {
-    prefix,
-    help,
-    error,
-    describedBy,
-  }: Partial<Record<"prefix" | "help" | "error" | "describedBy", string | undefined>>,
+  parts: Partial<Record<"prefix" | "help" | "error" | "describedBy", string | undefined>>,
 ) {
-  const named = ids(id);
-  return [
-    prefix === undefined ? "" : named.prefix,
-    help === undefined ? "" : named.help,
-    error === undefined ? "" : named.error,
-    describedBy ?? "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const own = (["prefix", "help", "error"] as const).filter((name) => parts[name] !== undefined);
+  return [...own.map((name) => `${id}-${name}`), parts.describedBy ?? ""].filter(Boolean).join(" ");
 }
 
 /** A labelled box, described by its help and its error, which also marks it invalid. */
@@ -147,21 +133,21 @@ export function Field({
         box
       ) : (
         <div data-part="box" className={styles["frame"]}>
-          <span id={ids(id).prefix} className={styles["prefix"]}>
+          <span id={`${id}-prefix`} className={styles["prefix"]}>
             {prefix}
           </span>
           {box}
         </div>
       )}
       {help === undefined ? null : (
-        <p id={ids(id).help} className={styles["help"]}>
+        <p id={`${id}-help`} className={styles["help"]}>
           {help}
         </p>
       )}
       {/* Shown, and described to the box; said by the region below with its field's name, waiting on the
           page empty so the error is announced when it comes (F335, F356). */}
       {error === undefined ? null : (
-        <p id={ids(id).error} className={styles["error"]} aria-hidden="true">
+        <p id={`${id}-error`} className={styles["error"]} aria-hidden="true">
           {error}
         </p>
       )}
