@@ -6,6 +6,13 @@ import { useState } from "react";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { roomHref } from "./names.ts";
 
+// A line's action as a call with no argument, when the view gives one: made as the line's bar is, which only the line pointed at has.
+export const forLine = (act: ((id: string) => void) | undefined, id: string) =>
+  act === undefined
+    ? undefined
+    : () => {
+        act(id);
+      };
 // What a copy says, in the room's flash: done, or not and why, a page with no clipboard (a plain http origin) included.
 export function useCopy() {
   const [said, setSaid] = useState<FlashMessage | null>(null);

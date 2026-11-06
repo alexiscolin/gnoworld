@@ -4,6 +4,7 @@
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
+import { lazyChain } from "../../lib/stream/lazyChain.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";
@@ -11,6 +12,7 @@ import { verdictAsker } from "./askVerdicts.ts";
 type Linked = (text: string) => boolean;
 // Outside the hook, which the React Compiler cannot lower an import() in.
 const loadLinked = () => import("./linked.ts");
+const loadFeed = () => import("../../lib/stream/chainFeed.ts");
 type Store = ReturnType<typeof createAppStore>;
 
 /** The room shown, its lines once loaded, and who reads it: an account's address, or none for a guest. */
@@ -31,16 +33,23 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
   useEffect(() => {
     if (saving) return;
     const api = pageVerdictsApi();
+    // The world's calls on chain and the Earth's count come on the same stream, into the store in batches (9g).
+    const feed = lazyChain(async () => (await loadFeed()).chainFeed(store.getState().chainActions));
     const asker = verdictAsker({
       verdicts: api.verdicts,
       ...store.getState().verdictActions,
       signal: store.getState().signalActions.signaled,
       held: (room) => store.getState().verdicts[room],
-      follow: (room, on) => pageVerdicts([room], on),
+      follow: (room, on) => pageVerdicts([room], { ...on, chain: feed.chain, realms: feed.realms }),
       linked: (text) => linkedRef.current?.(text) ?? false,
     });
     askerRef.current = asker;
-    return asker.stop;
+    return () => {
+      asker.stop();
+      feed.stop();
+      // A stopped asker given a room follows it again: none is left for the lines' effect to find.
+      askerRef.current = undefined;
+    };
   }, [store, saving]);
   useEffect(() => {
     // Lines given the asker before it can read them would be counted looked at and never asked of: it follows the room alone.

@@ -196,6 +196,10 @@ export function relay(port, incoming, outgoing) {
     if (!outgoing.headersSent) outgoing.writeHead(502);
     outgoing.end();
   });
+  // A page gone ends its request upstream, as nginx does: a stream left open holds one of the server's slots for good.
+  outgoing.on("close", () => {
+    upstream.destroy();
+  });
   incoming.pipe(upstream);
 }
 

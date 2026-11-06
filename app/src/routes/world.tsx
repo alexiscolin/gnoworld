@@ -5,13 +5,18 @@ import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type World as WorldPlace } from "../places.ts";
-import { Chat, type ChatPlace } from "../features/chat/index.ts";
+import { Chat, ChainCallsContext, ChainPlaceContext, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
+import { chainKey, type ChainHeard } from "../store/chain.ts";
+import { useApp } from "../storeContext.tsx";
 import styles from "./world.module.css";
 
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
 const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
+
+// No call of the chain told yet: a room draws no card.
+const NO_CALLS: readonly ChainHeard[] = [];
 
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
@@ -44,6 +49,8 @@ export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
   const realm = world.realms?.[0];
+  const address = ORIGIN + world.canonical;
+  const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
   const realmPath =
     realm === undefined
       ? undefined
@@ -58,7 +65,7 @@ export default function World() {
           <Panel.Body>
             <Stack>
               {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
-              <Arrival world={world.slug} name={world.name} address={ORIGIN + world.canonical} />
+              <Arrival world={world.slug} name={world.name} address={address} />
               {/* The kind of place ("UNIVERSE > DAO") is not in the data yet: the universe alone says where this is. */}
               <Kicker>{universe.name}</Kicker>
               <h1>{world.name}</h1>
@@ -70,10 +77,7 @@ export default function World() {
               <Here />
               {/* No source yet for the history: the block says so. */}
               <Activity />
-              <Actions
-                address={ORIGIN + world.canonical}
-                {...(realmPath === undefined ? {} : { proposals: realmPath })}
-              />
+              <Actions address={address} {...(realmPath === undefined ? {} : { proposals: realmPath })} />
               {realmPath === undefined ? null : (
                 <Suspense fallback={null}>
                   <Proposals path={realmPath} />
@@ -84,9 +88,14 @@ export default function World() {
         </Panel>
       }
     >
-      <div id="chat" className={styles["chat"]}>
-        <Chat world={world.slug} place={placeOf(world, universe)} />
-      </div>
+      {/* What the chain told of this world's realms, from its events alone, drawn among its main room's messages. */}
+      <ChainPlaceContext value={world}>
+        <ChainCallsContext value={calls ?? NO_CALLS}>
+          <div id="chat" className={styles["chat"]}>
+            <Chat world={world.slug} place={placeOf(world, universe)} />
+          </div>
+        </ChainCallsContext>
+      </ChainPlaceContext>
     </Panel.Layout>
   );
 }

@@ -3,9 +3,12 @@ import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
 import { type MetaArgs, useLoaderData } from "react-router";
 import { isMissing, PlaceError } from "../features/errors/index.ts";
 import { Connected } from "../features/world/Connected.tsx";
+import { RealmsToday } from "../features/world/RealmsToday.tsx";
+import { useEarthChain } from "../features/world/useEarthChain.ts";
 import { PlaceLinks } from "../features/list/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site } from "../places.ts";
+import { useApp } from "../storeContext.tsx";
 
 export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "earth");
@@ -21,6 +24,8 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 
 export default function Earth() {
   const universe = useLoaderData<typeof loader>();
+  const count = useApp((app) => app.realmsDeployed[universe.id]);
+  useEarthChain();
   return (
     <Panel.Layout
       plate={
@@ -33,6 +38,7 @@ export default function Earth() {
               />
               <h1>Earth</h1>
               <p>{universe.name}</p>
+              <RealmsToday count={count} />
               {universe.worlds.length === 0 ? (
                 <>
                   <h2>Worlds</h2>

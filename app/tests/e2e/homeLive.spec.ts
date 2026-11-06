@@ -139,6 +139,26 @@ test.describe("the home at the video's size", () => {
     expect(await style(page, "[data-ticker] a", "font-family")).toMatch(/mono/i);
   });
 
+  // The video's strip (frames 4 and 144): the kinds in capitals and mint, the titles in near-white text.
+  test("draws each kind in capitals and mint and each title in the text colour (F5797)", async ({ page }) => {
+    await openHome(page);
+    await expect(page.locator("[data-ticker]")).toBeVisible();
+    const token = (name: string) =>
+      page.evaluate((variable) => {
+        const probe = document.body.appendChild(document.createElement("i"));
+        probe.style.color = `var(${variable})`;
+        const color = getComputedStyle(probe).color;
+        probe.remove();
+        return color;
+      }, name);
+    for (const kind of ["news", "event"]) {
+      const selector = `[data-ticker] b[data-kind="${kind}"]`;
+      expect(await style(page, selector, "text-transform")).toBe("uppercase");
+      expect(await style(page, selector, "color")).toBe(await token("--color-mine"));
+    }
+    expect(await style(page, "[data-ticker] a", "color")).toBe(await token("--color-text"));
+  });
+
   test("scrolls every title past the pause: at the end of a pass the whole line has left, the last link included", async ({
     page,
   }) => {

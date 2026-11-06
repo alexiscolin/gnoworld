@@ -3,12 +3,15 @@
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
 
+// The list's lines: its items but the chain's cards (a room's thread holds them among its lines), which no key stops on.
+const linesOf = (list: HTMLElement): Element[] => [...list.children].filter((item) => !item.hasAttribute("data-chain"));
+
 // The place of the line a list's event happened in, a link in its words included; -1 outside a line.
 function itemAt(list: HTMLElement, target: EventTarget | null): number {
   // Up to the list's own item: a line that is a Markdown list holds items of its own (F814's class).
   let item = target instanceof Element ? target : null;
   while (item !== null && item.parentElement !== list) item = item.parentElement;
-  return item === null ? -1 : Array.prototype.indexOf.call(list.children, item);
+  return item === null ? -1 : linesOf(list).indexOf(item);
 }
 
 // The line a list's event happened in; none outside a line.
@@ -41,7 +44,7 @@ export function stopOf(lines: readonly Line[], chosen: string | undefined, fresh
 
 function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
   const list = event.currentTarget;
-  const items = list.children;
+  const items = linesOf(list);
   // From a line or a link in its words (U1); a key on its bar, its menu or its dialog is theirs.
   const to = nextLine(event, items.length, () =>
     event.target instanceof Element && event.target.closest("[role='toolbar']") !== null
@@ -125,7 +128,7 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     const neighbour = lines[next];
     if (neighbour === undefined) return;
     setChosen(neighbour.id);
-    const item = listRef.current?.children[next];
+    const item = listRef.current === null ? undefined : linesOf(listRef.current)[next];
     if (item instanceof HTMLElement) item.focus();
   };
   // One bar at a time: the pointed line's while the pointer is on the lines, else the focused line's; a bar holding
