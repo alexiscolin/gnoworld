@@ -99,13 +99,14 @@ const DataArgs = z.pipe(
   CallArgs,
 );
 
-// A label as a reader sees it: compatibility forms folded, any apostrophe one, spaces one, no case; and, as no pill must draw blank,
-// without the fillers that draw nothing (Hangul's, the Braille blank).
+// A label as a reader sees it: compatibility forms folded, what draws nothing gone (any default-ignorable code point: joiners,
+// variation selectors, Hangul's fillers), any apostrophe one, spaces and the Braille blank one space, no case.
 const labelKey = (label: string): string =>
   label
     .normalize("NFKC")
+    .replace(/\p{Default_Ignorable_Code_Point}/gu, "")
     .replace(/[\u2018\u2019\u02bc\u0060\u00b4]/gu, "'")
-    .replace(/[\s\u115f\u1160\u3164\uffa0\u2800]+/gu, " ")
+    .replace(/[\s\u2800]+/gu, " ")
     .trim()
     .toLowerCase();
 

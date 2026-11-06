@@ -618,6 +618,22 @@ describe("a world's pinned actions", () => {
     ).toBe(false);
   });
 
+  // The verifier of 9e-1: marks that draw nothing (a combining grapheme joiner, a variation selector, Khmer's inherent vowels) are
+  // no Cf, so the control check missed them; any default-ignorable code point is read as nothing.
+  it.each([
+    ["blank", [0x34f]],
+    ["blank", [0xfe0f]],
+    ["blank", [0x17b4]],
+    ["Who's here", [0x57, 0x68, 0x6f, 0x27, 0x73, 0x34f, 0x20, 0x68, 0x65, 0x72, 0x65]],
+  ])("refuses a label of invisible marks that reads %s", (_reads, points) => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), label: String.fromCodePoint(...points) }])).success).toBe(false);
+  });
+
+  it("refuses a second label that is the first with an invisible mark inside", () => {
+    const marked = String.fromCodePoint(0x56, 0x6f, 0x34f, 0x74, 0x65);
+    expect(Hubs.safeParse(withActions([vote(), { ...vote(), label: marked }])).success).toBe(false);
+  });
+
   it.each([[0x3164], [0x2800], [0x115f], [0xffa0]])(
     "refuses a label that draws nothing, code point %i alone",
     (point) => {
