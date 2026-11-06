@@ -5,7 +5,7 @@ import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import styles from "./ComingSoon.module.css";
 
 export interface ComingSoonProps {
-  /** What it will be: assistive technology reads "<name>, coming soon". */
+  /** What it will be: assistive technology reads "<name>, coming soon". A face of your own says the same words, as the name must hold what is seen. */
   name: string;
   /** Its face as a control, as the video draws it: an icon, words, or both. */
   icon?: IconName;

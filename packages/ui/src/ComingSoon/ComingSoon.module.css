@@ -16,6 +16,8 @@
 
   /* A face that is no control: no pill, the words as they are. */
   .plain {
+    /* raw: the least a target can be (WCAG 2.5.8), as the extra-small control */
+    min-block-size: var(--control-xs);
     padding: 0;
     border: 0;
     background: none;

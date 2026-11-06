@@ -7,4 +7,4 @@ type Story = StoryObj<typeof meta>;
 
 export const Words: Story = { args: { icon: "spark", words: "Jarvis" } };
 export const IconOnly: Story = { args: { name: "Notifications", icon: "bell" } };
-export const Plain: Story = { args: { name: "Call the realm", children: "Needs a wallet, soon" } };
+export const Plain: Story = { args: { name: "Needs a wallet, soon", children: "Needs a wallet, soon" } };

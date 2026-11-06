@@ -137,7 +137,9 @@ export function Panel({ onClose }: { onClose: () => void }) {
           </ol>
         )}
         {/* The chain's own lines (a new realm's signal, a proposal opened or closing) come with the indexer's events, slice 9. */}
-        <ComingSoon name="New realms and proposals in the bell">New realms and proposals, from the chain</ComingSoon>
+        <ComingSoon name="New realms and proposals, from the chain">
+          New realms and proposals, from the chain
+        </ComingSoon>
         <p className={styles["note"]}>What you have read is kept on this device alone.</p>
       </Surface>
       {leaving.dialog}

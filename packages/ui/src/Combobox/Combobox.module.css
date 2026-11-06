@@ -26,12 +26,9 @@
     padding-inline-end: var(--control-m);
   }
 
-  /* In use, the field's edge is mint and two lines wide, one ring, as frame 99 draws it. */
+  /* In use, the field's edge is mint; the design system's ring stands round it. */
   .field:focus {
     --_line: var(--color-mine);
-
-    outline: none;
-    box-shadow: 0 0 0 var(--line-width) var(--color-mine);
   }
 
   .clear {
