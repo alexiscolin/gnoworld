@@ -173,6 +173,14 @@ describe("a world's actions, with proposals", () => {
     expect(text.join(" ")).not.toMatch(/follow/i);
   });
 
+  // Alexis, D273 (answer 9e-3): frame 30's row on one line, Follow aside while nothing stands behind it; the chat sits beside the plate.
+  it("draws Read the proposals then Share, and no Say hi in the chat, the proposals the solid action", () => {
+    const row = draw(PROPOSALS);
+    expect(labels(row)).toEqual(["Read the proposals", "Share"]);
+    expect(row.querySelector("a[href='#chat']")).toBeNull();
+    expect(row.querySelector("a")?.getAttribute("data-emphasis")).toBe("solid");
+  });
+
   it("draws no 'Read the proposals' when the world has none, and 'Say hi' stays the solid action", () => {
     expect(draw().textContent).not.toMatch(/read the proposals/i);
     expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");

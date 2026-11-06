@@ -1,4 +1,4 @@
-// A world's actions (frames 26 and 92): the main one, then Share. Follow is never drawn: it needs an account's store, which
+// A world's actions (frames 26, 30 and 92): the main one, then Share. Follow is never drawn: it needs an account's store, which
 // does not exist. Share is drawn only where the browser can copy the page's address, so none on the server; the build's page
 // has none, and hydration adds it. No dead button.
 import { Button, Cluster } from "@gnoworld/ui";
@@ -38,10 +38,13 @@ export function Actions({ address, proposals }: { address: string; proposals?: s
           Read the proposals
         </Button>
       ) : null}
-      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead. */}
-      <Button href="#chat" emphasis={reading ? "outline" : "solid"} size="l" icon="arrow">
-        Say hi in the chat
-      </Button>
+      {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead; then the row is
+          frame 30's, on one line, the chat beside the plate (Alexis, D273). */}
+      {reading ? null : (
+        <Button href="#chat" emphasis="solid" size="l" icon="arrow">
+          Say hi in the chat
+        </Button>
+      )}
       <Share address={address} />
     </Cluster>
   );

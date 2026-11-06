@@ -83,3 +83,14 @@ test("GovDAO keeps its plate and its chat's bar when the pinned actions' code ca
   await expect(bar(page).getByRole("button")).toHaveText(["Who's here"]);
   await expect(page.getByRole("button", { name: "Vote" })).toHaveCount(0);
 });
+
+// Alexis, D273 (answer 9e-3, F5950): GovDAO's action row holds Read the proposals and Share on one line in its column, as frame 30.
+test("GovDAO's action row is Read the proposals then Share, on one line, at the video's size", async ({ page }) => {
+  await opened(page, 1728);
+  const row = plate(page).getByRole("link", { name: "Read the proposals" });
+  const share = plate(page).getByRole("button", { name: "Share" });
+  await expect(share).toBeVisible();
+  await expect(plate(page).getByRole("link", { name: "Say hi in the chat" })).toHaveCount(0);
+  const [a, b] = [await row.boundingBox(), await share.boundingBox()];
+  expect(a !== null && b !== null && Math.abs(a.y - b.y) <= 1 && b.x > a.x).toBe(true);
+});
