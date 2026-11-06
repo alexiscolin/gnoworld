@@ -14,18 +14,14 @@ import { chainKey, type ChainHeard } from "../store/chain.ts";
 import { useApp } from "../storeContext.tsx";
 import styles from "./world.module.css";
 
-// A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
-// Code that cannot be fetched leaves the plate alone (F1763), as the pinned actions' does.
-const Proposals = lazy<ComponentType<ProposalsProps>>(() =>
-  import("../features/world/Proposals.tsx").catch(() => ({ default: () => null })),
-);
-// A world's pinned actions (D271) are drawn on the plate by the proposals' chunk and in the chat's bar from a chunk this route hands the
-// chat (the chat reaches no realm code of its own); one that cannot be fetched leaves the bar alone (F1763).
+// A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it. The
+// chat's bar takes a world's pinned actions (D271) from that module too (the chat reaches no realm code of its own); code that
+// cannot be fetched leaves its place alone (F1763).
+const realmPart = () => import("../features/world/Proposals.tsx");
+const none = () => ({ default: () => null });
+const Proposals = lazy<ComponentType<ProposalsProps>>(() => realmPart().catch(none));
 const PinnedBar = lazy<ComponentType<PinnedBarProps>>(() =>
-  import("../features/world/Pinned.tsx").then(
-    (chunk) => ({ default: chunk.PinnedBar }),
-    () => ({ default: () => null }),
-  ),
+  realmPart().then((chunk) => ({ default: chunk.PinnedBar }), none),
 );
 
 // No call of the chain told yet: a room draws no card.

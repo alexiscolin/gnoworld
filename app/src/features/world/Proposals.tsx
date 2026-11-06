@@ -17,12 +17,26 @@ import { ringOf } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";
 
 // A world's pinned actions (D271), asked only by a world that pins one; code that cannot be fetched leaves the proposals alone (F1763).
+// The chat's bar takes them from this module too, which the world's page imports once for both (the first screen holds a list of
+// what each import preloads).
+const pinnedChunk = () => import("./Pinned.tsx");
+const none = () => ({ default: () => null });
 const PinnedForms = lazy<ComponentType<PinnedFormsProps>>(() =>
-  import("./Pinned.tsx").then(
-    (chunk) => ({ default: chunk.PinnedForms }),
-    () => ({ default: () => null }),
-  ),
+  pinnedChunk().then((chunk) => ({ default: chunk.PinnedForms }), none),
 );
+const PinnedBarPart = lazy<ComponentType<PinnedBarProps>>(() =>
+  pinnedChunk().then((chunk) => ({ default: chunk.PinnedBar }), none),
+);
+
+/** The chat's bar's part of a world's pinned actions, as its code comes (a lazy component resolves to a function, never to another
+ * lazy one: React's error 306). */
+export function PinnedBar(props: PinnedBarProps) {
+  return (
+    <Suspense fallback={null}>
+      <PinnedBarPart {...props} />
+    </Suspense>
+  );
+}
 
 /** The most proposals drawn: the newest, as the realm's page lists them. */
 const SHOWN = 3;
