@@ -337,17 +337,10 @@
   "sandbox": {
     "enabled": true,
     "allowUnsandboxedCommands": false,
-    "excludedCommands": [
-      "sh scripts/worktree.sh *"
-    ],
+    "excludedCommands": ["sh scripts/worktree.sh *"],
     "network": {
       "allowLocalBinding": true,
-      "allowedDomains": [
-        "registry.npmjs.org",
-        "proxy.golang.org",
-        "sum.golang.org",
-        "github.com"
-      ]
+      "allowedDomains": ["registry.npmjs.org", "proxy.golang.org", "sum.golang.org", "github.com"]
     },
     "filesystem": {
       "allowWrite": [
@@ -385,6 +378,16 @@
         ".jscpd.json",
         "tsconfig.base.json",
         "tsconfig.json",
+        "app/tsconfig.json",
+        "server/tsconfig.json",
+        "jarvis/tsconfig.json",
+        "packages/*/tsconfig.json",
+        "*.config.ts",
+        "app/*.config.ts",
+        "lint/*.config.ts",
+        ".nvmrc",
+        "app/tests/stories/pictures.spec.ts",
+        "deploy/test.sh",
         ".prettierrc.json",
         ".prettierignore",
         ".git/hooks",
@@ -461,12 +464,7 @@
         "~/Server/gnoworld-wt/*/.githooks/pre-push",
         "~/Server/gnoworld-wt/*/.githooks/records.sh"
       ],
-      "denyRead": [
-        "~/.ssh",
-        "~/.config/gh",
-        "~/.npmrc",
-        "~/.aws"
-      ]
+      "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]
     }
   }
 }

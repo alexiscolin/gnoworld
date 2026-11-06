@@ -590,3 +590,162 @@ describe("EarthOrbit", () => {
     expect(EarthOrbit.safeParse(rows(DATA_CAPS.rows + 1)).success).toBe(false);
   });
 });
+
+// 9e-1 (Alexis, 2026-11-06): a world's pinned actions, at most 3, each a call on one of the world's own realms, its texts capped as a
+// proposal's; the client checks each against vm/qfuncs before it shows. A label is drawn on a button: no control or format character.
+describe("a world's pinned actions", () => {
+  const DAO = "gno.land/r/gov/dao";
+  const vote = () => ({ label: "Vote", realm: DAO, function: "MustVoteOnProposalSimple", args: { pid: "15" } });
+  const withActions = (actions: unknown, realms: unknown = [DAO]) => [{ ...hub, realms, actions }];
+
+  it("takes one to three actions on the world's realms, and none at all", () => {
+    const schema = Hubs;
+    expect(schema.safeParse([hub]).success).toBe(true);
+    expect(schema.safeParse(withActions([vote()])).success).toBe(true);
+    const labelled = (n: number) => Array.from({ length: n }, (_, i) => ({ ...vote(), label: `Vote ${String(i)}` }));
+    expect(schema.safeParse(withActions(labelled(3))).success).toBe(true);
+    expect(schema.safeParse(withActions(labelled(4))).success).toBe(false);
+    expect(schema.safeParse(withActions([])).success).toBe(false);
+  });
+
+  it("refuses an action on a realm the world is not about, and an action on a world with no realm", () => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), realm: "gno.land/r/demo/boards" }])).success).toBe(false);
+    expect(Hubs.safeParse([{ ...hub, actions: [vote()] }]).success).toBe(false);
+    expect(
+      Hubs.safeParse(withActions([{ ...vote(), realm: "gno.land/r/demo/boards" }], [DAO, "gno.land/r/demo/boards"]))
+        .success,
+    ).toBe(true);
+  });
+
+  it("says which row, action and field refuse a realm outside the world's", () => {
+    const parsed = Hubs.safeParse([
+      hub,
+      { ...hub, slug: "dao", realms: [DAO], actions: [vote(), { ...vote(), label: "Other", realm: "gno.land/r/x" }] },
+    ]);
+    expect(parsed.success).toBe(false);
+    expect(parsed.error?.issues.map(({ path, message }) => [path, message])).toEqual([
+      [[1, "actions", 1, "realm"], "an action's realm is one of the world's realms"],
+    ]);
+  });
+
+  it("says which row, action and field read as another's label, and which label", () => {
+    const parsed = Hubs.safeParse([
+      hub,
+      { ...hub, slug: "dao", realms: [DAO], actions: [vote(), { ...vote(), label: "vote" }] },
+    ]);
+    expect(parsed.error?.issues.map(({ path, message }) => [path, message])).toEqual([
+      [[1, "actions", 1, "label"], 'a label reads as another: "vote"'],
+    ]);
+  });
+
+  it("refuses a realm that is no realm's path, a field it does not know, and a missing one", () => {
+    expect(
+      Hubs.safeParse(withActions([{ ...vote(), realm: "gno.land/p/demo/avl" }], ["gno.land/p/demo/avl"])).success,
+    ).toBe(false);
+    expect(Hubs.safeParse(withActions([{ ...vote(), why: "Closes tonight." }])).success).toBe(false);
+    for (const key of ["label", "realm", "function", "args"] as const) {
+      const action: Record<string, unknown> = vote();
+      Reflect.deleteProperty(action, key);
+      expect(Hubs.safeParse(withActions([action])).success, key).toBe(false);
+    }
+  });
+
+  it("caps a label at 80 characters, a function's name at 128, an argument at 1000 and the arguments at 16, as a proposal's", () => {
+    const ok = (action: Record<string, unknown>) => Hubs.safeParse(withActions([{ ...vote(), ...action }])).success;
+    expect([ok({ label: "v".repeat(80) }), ok({ label: "v".repeat(81) }), ok({ label: "" })]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect([ok({ function: "F".repeat(128) }), ok({ function: "F".repeat(129) }), ok({ function: "" })]).toEqual([
+      true,
+      false,
+      false,
+    ]);
+    expect([
+      ok({ args: { pid: "1".repeat(1000) } }),
+      ok({ args: { pid: "1".repeat(1001) } }),
+      ok({ args: { pid: "" } }),
+    ]).toEqual([true, false, true]);
+    const many = (n: number) => Object.fromEntries(Array.from({ length: n }, (_, i) => [`a${String(i)}`, "x"]));
+    expect([ok({ args: many(16) }), ok({ args: many(17) }), ok({ args: {} })]).toEqual([true, false, true]);
+    expect([
+      ok({ args: { ["n".repeat(128)]: "x" } }),
+      ok({ args: { ["n".repeat(129)]: "x" } }),
+      ok({ args: { "": "x" } }),
+    ]).toEqual([true, false, false]);
+  });
+
+  // Code points, not escapes typed here: a right-to-left override, a zero-width space and a line feed.
+  it.each([[0x202e], [0x200b], [0x0a], [0x2066], [0x2069], [0xfeff], [0x2028], [0x00], [0x09], [0xad]])(
+    "refuses a label holding the control, format or separator character %i",
+    (point) => {
+      const label = `Vote${String.fromCodePoint(point)}`;
+      expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success).toBe(false);
+    },
+  );
+
+  it("refuses a label of spaces alone, two actions of one label, and a label that reads as Who's here", () => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), label: "   " }])).success).toBe(false);
+    expect(Hubs.safeParse(withActions([vote(), { ...vote(), args: { pid: "16" } }])).success).toBe(false);
+    expect(Hubs.safeParse(withActions([vote(), { ...vote(), label: "Vote on 16" }])).success).toBe(true);
+    for (const label of ["Who's here", "who's here", " Who's here "])
+      expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success, label).toBe(false);
+  });
+
+  // The reviews of 9e-1: a label is compared as a reader sees it (case, spaces, apostrophes, compatibility forms), so no pill reads as
+  // Who's here or as another pill; one that draws nothing is refused. Code points, not escapes typed here.
+  it.each([
+    ["a curly apostrophe", `Who${String.fromCodePoint(0x2019)}s here`],
+    ["a modifier apostrophe", `Who${String.fromCodePoint(0x2bc)}s here`],
+    ["a no-break space", `Who's${String.fromCodePoint(0xa0)}here`],
+    ["two spaces", "Who's  here"],
+    ["a fullwidth form", `Who's ${String.fromCodePoint(0xff48)}ere`],
+  ])("refuses a label that reads as Who's here with %s", (_name, label) => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), label }])).success).toBe(false);
+  });
+
+  it.each([
+    ["case", "vote"],
+    ["a trailing space", "Vote "],
+    ["a no-break space inside", `Vote${String.fromCodePoint(0xa0)}now`, `Vote now`],
+  ])("refuses two labels that read the same but for %s", (_name, second, first = "Vote") => {
+    expect(
+      Hubs.safeParse(
+        withActions([
+          { ...vote(), label: first },
+          { ...vote(), label: second },
+        ]),
+      ).success,
+    ).toBe(false);
+  });
+
+  // The verifier of 9e-1: marks that draw nothing (a combining grapheme joiner, a variation selector, Khmer's inherent vowels) are
+  // no Cf, so the control check missed them; any default-ignorable code point is read as nothing.
+  it.each([
+    ["blank", [0x34f]],
+    ["blank", [0xfe0f]],
+    ["blank", [0x17b4]],
+    ["Who's here", [0x57, 0x68, 0x6f, 0x27, 0x73, 0x34f, 0x20, 0x68, 0x65, 0x72, 0x65]],
+  ])("refuses a label of invisible marks that reads %s", (_reads, points) => {
+    expect(Hubs.safeParse(withActions([{ ...vote(), label: String.fromCodePoint(...points) }])).success).toBe(false);
+  });
+
+  it("refuses a second label that is the first with an invisible mark inside", () => {
+    const marked = String.fromCodePoint(0x56, 0x6f, 0x34f, 0x74, 0x65);
+    expect(Hubs.safeParse(withActions([vote(), { ...vote(), label: marked }])).success).toBe(false);
+  });
+
+  it.each([[0x3164], [0x2800], [0x115f], [0xffa0]])(
+    "refuses a label that draws nothing, code point %i alone",
+    (point) => {
+      expect(Hubs.safeParse(withActions([{ ...vote(), label: String.fromCodePoint(point) }])).success).toBe(false);
+    },
+  );
+
+  // JSON.parse makes "__proto__" an own key, which a parsed object would drop: the argument would vanish unseen.
+  it("refuses an argument named __proto__ from a file, which would vanish from the action", () => {
+    const rows: unknown = JSON.parse(JSON.stringify(withActions([vote()])).replace('"pid"', '"__proto__"'));
+    expect(Hubs.safeParse(rows).success).toBe(false);
+  });
+});

@@ -1,6 +1,7 @@
-import type { StreamEvent } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
-import { followVerdicts, type VerdictSource } from "./verdicts.ts";
+import { Address, type Signal, type StreamEvent } from "@gnoworld/schemas";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { fakeStream } from "../../../tests/fakeStream.ts";
+import { followVerdicts, pageVerdicts, type VerdictSource } from "./verdicts.ts";
 
 // A stand-in for the page's EventSource: the URL it opened, its listeners, whether it was closed.
 function fakeSource() {
@@ -113,9 +114,141 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     expect(source.closed()).toBe(1);
   });
 
+  it("ends quietly when the browser gives up and the page asked to hear no end", () => {
+    const source = fakeSource();
+    followVerdicts(["#bubble"], () => undefined, { open: source.open, log: () => undefined });
+    expect(() => {
+      source.error(2);
+    }).not.toThrow();
+  });
+
   it("opens no stream for no room", () => {
     const source = fakeSource();
     followVerdicts([], () => undefined, { open: source.open, log: () => undefined })();
     expect(source.opened).toEqual([]);
+  });
+});
+
+// Slice 9h: the stream's `signal` event, read through the Signal schema as the verdicts are; an event of another shape is
+// dropped, said once, and the verdicts go on.
+const ALICE = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+const CHART: Signal = { kind: "chart", world: "fresh-mint", account: ALICE, at: "2026-11-05T12:00:00.000Z" };
+const signalSource = () => {
+  const source = fakeSource();
+  return {
+    ...source,
+    say: (data: unknown, type = "signal") => {
+      source.say(data, type);
+    },
+  };
+};
+
+describe("followVerdicts: the first signals", () => {
+  it("hands on a signal that fits its schema", () => {
+    const source = signalSource();
+    const heard: Signal[] = [];
+    followVerdicts(["#fresh-mint"], () => undefined, {
+      open: source.open,
+      log: () => undefined,
+      signal: (event) => heard.push(event),
+    });
+    source.say(JSON.stringify(CHART));
+    expect(heard).toEqual([CHART]);
+  });
+
+  it("drops a signal of another shape or with a hostile account, saying so once, and hears the next", () => {
+    const source = signalSource();
+    const heard: Signal[] = [];
+    const logged: string[] = [];
+    followVerdicts(["#fresh-mint"], () => undefined, {
+      open: source.open,
+      log: (what) => logged.push(what),
+      signal: (event) => heard.push(event),
+    });
+    source.say(JSON.stringify({ ...CHART, account: "<script>alert(1)</script>" }));
+    source.say("not json");
+    source.say(JSON.stringify({ ...CHART, kind: "stamped" }));
+    source.say(JSON.stringify(CHART));
+    expect(heard).toEqual([CHART]);
+    expect(logged).toEqual(["signal_unknown"]);
+  });
+
+  it("leaves the verdicts as they were: one handler for each kind of event", () => {
+    const source = signalSource();
+    const verdicts: unknown[] = [];
+    const heard: Signal[] = [];
+    followVerdicts(["#fresh-mint"], (event) => verdicts.push(event), {
+      open: source.open,
+      log: () => undefined,
+      signal: (event) => heard.push(event),
+    });
+    source.say(JSON.stringify({ msgid: "m1", room: "#fresh-mint", state: "checked" }), "verdict");
+    expect(verdicts).toHaveLength(1);
+    expect(heard).toEqual([]);
+  });
+});
+
+// The page's chat follows the one stream of the page (D215): the signals reach the store through it, so the page's own
+// follower hands them on as it hands the verdicts.
+describe("pageVerdicts: the page's own stream", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("hands a signal on to the page, beside the verdicts", () => {
+    const opened: string[] = [];
+    const listeners = new Map<string, (event: { data: unknown }) => void>();
+    class Source {
+      readyState = 1;
+      constructor(url: string) {
+        opened.push(url);
+      }
+      addEventListener(type: string, listener: (event: { data: unknown }) => void) {
+        listeners.set(type, listener);
+      }
+      close() {
+        return undefined;
+      }
+    }
+    vi.stubGlobal("EventSource", Source);
+    const heard: Signal[] = [];
+    pageVerdicts(["#fresh-mint"], {
+      verdict: () => undefined,
+      since: () => undefined,
+      dead: () => undefined,
+      signal: (event) => heard.push(event),
+    });
+    listeners.get("signal")?.({ data: JSON.stringify(CHART) });
+    expect(opened).toEqual(["/api/stream?rooms=%23fresh-mint"]);
+    expect(heard).toEqual([CHART]);
+  });
+
+  it("listens to the events it has a handler for and to no other, handing the chain's on unread", () => {
+    const sources = fakeStream();
+    pageVerdicts(["#a"], { verdict: () => undefined, since: () => undefined, dead: () => undefined });
+    expect(sources.opened[0]?.heard()).toEqual(["error", "since", "verdict"]);
+    const told: unknown[] = [];
+    pageVerdicts(["#b"], {
+      verdict: () => undefined,
+      since: () => undefined,
+      dead: () => undefined,
+      chain: (data) => told.push(data),
+      realms: (data) => told.push(data),
+    });
+    sources.opened[1]?.emit("chain", { kind: "x" });
+    sources.opened[1]?.emit("realms", { count: 1 });
+    expect(sources.opened[1]?.heard()).toEqual(["chain", "error", "realms", "since", "verdict"]);
+    expect(told).toEqual(['{"kind":"x"}', '{"count":1}']);
+  });
+
+  it("reports a frame it does not know once, as an error of the page", () => {
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const sources = fakeStream();
+    pageVerdicts(["#a"], { verdict: () => undefined, since: () => undefined, dead: () => undefined });
+    sources.opened[0]?.emit("verdict", { state: "gone" });
+    sources.opened[0]?.emit("verdict", { state: "gone" });
+    expect(report).toHaveBeenCalledTimes(1);
+    expect(String(report.mock.calls[0]?.[0])).toBe("Error: verdicts: verdict_unknown");
   });
 });

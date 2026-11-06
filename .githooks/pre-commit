@@ -8,6 +8,18 @@ set -eu
 # staged copy a planted object under a staged file's name, and the gate passed code the commit does not hold (7w2, F4923).
 unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 . "$(dirname "$0")/records.sh"
+# A harness file is committed in Alexis's Terminal alone, never from Claude Code's sandbox (D241): the sandbox stops a shell's
+# writes, not the file tools', and an agent's Edit of stryker.config.json passed its commit (f792bf47). A sandboxed command can
+# unset SANDBOX_RUNTIME, never the sandbox's ban on writing the installed hooks: a hook that cannot open itself for writing runs
+# in the sandbox too.
+if [ -n "${SANDBOX_RUNTIME:-}" ] || ! { : >>"$0"; } 2>/dev/null; then
+	held=$(harness --cached --name-only) || { echo "pre-commit: git could not list the staged harness files; nothing is committed unchecked" >&2; exit 1; }
+	# A letter the disk folds names a harness file no list can match (ſ is s on APFS): a path with one is refused too (F164).
+	if [ -n "$held" ] || foreign --cached; then
+		echo "pre-commit: a harness file is committed in Alexis's Terminal alone, never from Claude Code's sandbox (D241): ${held:-a path with a non-ASCII character, which this disk may read as the name of a harness file (F164)}" >&2
+		exit 1
+	fi
+fi
 if [ -z "${SANDBOX_RUNTIME:-}" ]; then
 	# Outside Claude Code's sandbox, in Alexis's shell, no gate runs, so no code Claude can edit
 	# runs with his access (F076): only the scripts installed beside the hooks, where no branch

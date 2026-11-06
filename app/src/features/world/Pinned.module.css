@@ -1,0 +1,15 @@
+@layer components {
+  /* The plate's pinned forms, a step of 32 px under the actions' row as f0030 leaves: the plate's own step and one more. Empty when the
+     chain confirms none, so it leaves no gap. */
+  .forms {
+    /* layout: one more step than the plate's after the actions' row */
+    margin-block-start: var(--space-s);
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-s);
+  }
+
+  .forms:empty {
+    display: none;
+  }
+}

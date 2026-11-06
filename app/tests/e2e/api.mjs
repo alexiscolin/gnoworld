@@ -77,6 +77,9 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts } = {}) {
       ERGO_PORT: String(ergo.port),
       ERGO_OPER_PASSWORD_FILE: join(dir, "oper"),
       ROLES_FILE: join(dir, "roles.json"),
+      // D218: only GovDAO can be first charted, which arrival.spec.ts owns: the worlds the other journeys open, Bubble and
+      // Earth, are never charted, so their plates and pictures stay as they were and no journey earns a banner by its order.
+      FIRST_TO_CHART_WORLDS: "govdao",
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
@@ -194,6 +197,10 @@ export function relay(port, incoming, outgoing) {
   upstream.on("error", () => {
     if (!outgoing.headersSent) outgoing.writeHead(502);
     outgoing.end();
+  });
+  // A page gone ends its request upstream, as nginx does: a stream left open holds one of the server's slots for good.
+  outgoing.on("close", () => {
+    upstream.destroy();
   });
   incoming.pipe(upstream);
 }

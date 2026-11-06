@@ -1,12 +1,26 @@
 /* The field: a box on the resting fill, one line at the default control's height, or a box of lines of two rows or more; invalid, coral. */
 @layer components {
-  .label {
-    font: var(--font-ui);
+  /* The box and, with a prefix, its frame wear one look: the edge, the corners and the fill. */
+  .box,
+  .frame {
+    --_line: var(--color-line);
+
+    border: var(--line-width) solid var(--_line);
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+  }
+
+  .box:hover,
+  .frame:hover {
+    --_line: var(--color-line-strong);
+  }
+
+  .box[aria-invalid="true"],
+  .frame:has([aria-invalid="true"]) {
+    --_line: var(--color-danger-line);
   }
 
   .box {
-    --_line: var(--color-line);
-
     inline-size: 100%;
 
     /* A drag of the box's handle never makes it wider than its place: its neighbour stays in view. */
@@ -14,9 +28,6 @@
     min-block-size: var(--control-m);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
-    border: var(--line-width) solid var(--_line);
-    border-radius: var(--radius-m);
-    background: var(--color-fill);
     font: var(--font-field);
   }
 
@@ -40,17 +51,37 @@
     resize: none;
   }
 
-  .box:hover {
-    --_line: var(--color-line-strong);
+  /* With a prefix the frame is the one box; the input inside is bare, and the ring is the frame's, around the prefix too. */
+  .frame {
+    /* layout: the prefix and the input share the one frame */
+    display: flex;
+    /* layout: the prefix sits level with the input's text */
+    align-items: center;
+    padding-inline-start: var(--space-s);
   }
 
-  .box[aria-invalid="true"] {
-    --_line: var(--color-danger-line);
+  .frame:has(:focus-visible) {
+    outline: var(--focus-width) solid var(--color-mine);
+    outline-offset: var(--focus-offset);
+  }
+
+  .frame .box {
+    /* layout: the input takes what the prefix leaves */
+    flex: 1;
+    min-inline-size: 0;
+
+    /* The frame's edge is outside this height: the control stays as tall as the others. */
+    min-block-size: calc(var(--control-m) - 2 * var(--line-width));
+    padding-inline-start: var(--space-2xs);
+    border: 0;
+    background: transparent;
+  }
+
+  .frame .box:focus-visible {
+    outline: none;
   }
 
   .prefix {
-    /* layout: the prefix sits level with the box's text */
-    align-self: center;
     color: var(--color-text-muted);
     font: var(--font-field);
   }

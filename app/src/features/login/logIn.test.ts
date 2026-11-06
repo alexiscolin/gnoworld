@@ -1,7 +1,9 @@
 import { Address, type Proof } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import { createAppStore } from "../../store/index.ts";
+import { listen } from "../../lib/adena/events.ts";
 import { knowSession, logIn, logOut, readSession, type LoginDeps } from "./logIn.ts";
+import { endForAccount, watchAccount } from "./watch.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const CHALLENGE = {
@@ -234,5 +236,121 @@ describe("logOut", () => {
       session: { kind: "in", address: ADDRESS },
       problem: { reason: "network" },
     });
+  });
+});
+
+// D200: only an account change ends the session, with the server's logout as a click's; a network change ends nothing.
+describe("endForAccount", () => {
+  const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+
+  it("logs out on the server, once, when Adena is on another account, and the chat link goes off", async () => {
+    const { parts, asked, store } = deps();
+    await logIn("x", parts);
+    store.getState().loginActions.chat("connected");
+    await endForAccount(parts, OTHER);
+    expect(asked.filter((line) => line === "logout")).toHaveLength(1);
+    expect(store.getState().login).toEqual({ session: { kind: "out" }, step: "idle", problem: undefined, chat: "off" });
+  });
+
+  it("says why when the server cannot be told: the person is out here, and sees that the cookie still lives", async () => {
+    const base = deps();
+    const { parts, store } = deps({
+      api: { ...base.parts.api, logout: () => Promise.resolve({ ok: false, reason: "network" }) },
+    });
+    await logIn("x", parts);
+    await endForAccount(parts, OTHER);
+    expect(store.getState().login).toMatchObject({ session: { kind: "out" }, problem: { reason: "network" } });
+  });
+
+  it("does nothing for the same account", async () => {
+    const { parts, asked, store } = deps();
+    await logIn("x", parts);
+    await endForAccount(parts, ADDRESS);
+    expect(asked.includes("logout")).toBe(false);
+    expect(store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("ends it for an address that is no address too: what Adena says is not trusted", async () => {
+    const { parts, asked, store } = deps();
+    await logIn("x", parts);
+    await endForAccount(parts, "not an address");
+    expect(asked.filter((line) => line === "logout")).toHaveLength(1);
+    expect(store.getState().login.session).toEqual({ kind: "out" });
+  });
+
+  it("leaves a login under way alone", async () => {
+    const { parts, asked, store } = deps();
+    store.getState().loginActions.begin("signing");
+    await endForAccount(parts, OTHER);
+    expect(asked).toEqual([]);
+    expect(store.getState().login).toMatchObject({ session: { kind: "unknown" }, step: "signing" });
+  });
+
+  it("asks the server nothing when nobody is logged in", async () => {
+    const { parts, asked } = deps();
+    await endForAccount(parts, OTHER);
+    expect(asked).toEqual([]);
+  });
+});
+
+describe("watchAccount", () => {
+  // Adena's `On`: the first listener of an event hears it.
+  class Wallet {
+    registered: { event: string; func: (value: string) => void }[] = [];
+    On(event: string, func: (value: string) => void) {
+      this.registered.push({ event, func });
+    }
+    emit(event: string, value: string) {
+      this.registered.find((r) => r.event === event)?.func(value);
+    }
+  }
+  // The logout the wiring asked of the server, as a promise: the test waits on it, never on a clock.
+  const watched = () => {
+    const made = deps();
+    const asked = Promise.withResolvers<undefined>();
+    const api = {
+      ...made.parts.api,
+      logout: () => {
+        made.asked.push("logout");
+        asked.resolve(undefined);
+        return Promise.resolve({ ok: true as const, value: undefined });
+      },
+    };
+    const parts = { ...made.parts, api };
+    const wallet = new Wallet();
+    watchAccount(wallet, { ...parts, listen });
+    return { ...made, parts, wallet, logoutAsked: asked.promise };
+  };
+
+  it("logs the person out when Adena says another account", async () => {
+    const { parts, wallet, logoutAsked, store } = watched();
+    await logIn("x", parts);
+    wallet.emit("changedAccount", "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+    await logoutAsked;
+    expect(store.getState().login).toEqual({ session: { kind: "out" }, step: "idle", problem: undefined, chat: "off" });
+  });
+
+  it("does nothing when Adena says the same account", async () => {
+    const { parts, wallet, asked, store } = watched();
+    await logIn("x", parts);
+    wallet.emit("changedAccount", ADDRESS);
+    expect(asked.includes("logout")).toBe(false);
+    expect(store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("ends nothing on a network change: the person is still logged in, the server is not asked", async () => {
+    const { parts, wallet, asked, store } = watched();
+    await logIn("x", parts);
+    store.getState().loginActions.chat("connected");
+    wallet.emit("changedNetwork", "gnoland-1");
+    expect(asked.includes("logout")).toBe(false);
+    expect(store.getState().login).toMatchObject({ session: { kind: "in", address: ADDRESS }, chat: "connected" });
+  });
+
+  it("listens once however many times the page asks", () => {
+    const made = deps();
+    const wallet = new Wallet();
+    for (let i = 0; i < 3; i++) watchAccount(wallet, { ...made.parts, listen });
+    expect(wallet.registered).toHaveLength(2);
   });
 });

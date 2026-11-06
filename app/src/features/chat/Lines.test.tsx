@@ -5,6 +5,8 @@ import { excerpt, foldEdits, reactionsOn, threadsOf, type Line, type Reaction } 
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ChainHeard } from "../../store/chain.ts";
+import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import { Lines, type LinesProps } from "./Lines.tsx";
 import { Reactions } from "./Reactions.tsx";
 import type * as reactionsModule from "./Reactions.tsx";
@@ -294,5 +296,62 @@ describe("the lines view, compiled: threads' chips", () => {
     vi.clearAllMocks();
     draw({ ...asked, members: [ALICE, BOB, "guest-ab12cd"] });
     expect(vi.mocked(ThreadChip)).not.toHaveBeenCalled();
+  });
+});
+
+// Slice 9g (frames 20 to 35): the calls the chain told stand among the world's main room's messages, as cards, by the time each was
+// heard; the keys of the list move among the messages and skip the cards.
+describe("the lines view with the chain's calls", () => {
+  const call = (height: number, atMs: number): ChainHeard => ({
+    id: `h${String(height)}:0`,
+    kind: "call",
+    universe: "onyx",
+    world: "govdao",
+    realm: "gno.land/r/gov/dao",
+    func: "MustVoteOnProposal",
+    actor: "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv" as ChainHeard["actor"],
+    height,
+    at: new Date(T0 + atMs).toISOString(),
+  });
+  const room = {
+    room: "#govdao",
+    reactions: [],
+    lines: [line(1, { id: "a", text: "first" }), line(3, { id: "b", text: "second" })],
+  };
+  const drawWith = (calls: readonly ChainHeard[], over: Partial<LinesProps> = {}) => {
+    act(() => {
+      root.render(
+        <ChainPlaceContext value={{ slug: "govdao", universe: "onyx" }}>
+          <ChainCallsContext value={calls}>
+            <Lines {...PROPS} {...room} {...over} />
+          </ChainCallsContext>
+        </ChainPlaceContext>,
+      );
+    });
+  };
+
+  it("draws a card between the messages around the time it was heard, and none in another room", () => {
+    drawWith([call(900030, 2 * 60_000)]);
+    const items = [...host.querySelectorAll("ol > li")];
+    expect(items.map((item) => item.hasAttribute("data-chain"))).toEqual([false, true, false]);
+    expect(items[0]?.textContent).toContain("first");
+    expect(items[1]?.textContent).toContain("called MustVoteOnProposal");
+    expect(items[1]?.textContent).toContain("block 900030");
+    expect(items[2]?.textContent).toContain("second");
+    drawWith([call(900030, 2 * 60_000)], { room: "#govdao/crew" });
+    expect(host.querySelectorAll("[data-chain]")).toHaveLength(0);
+  });
+
+  it("moves the arrow keys among the messages and over the cards, and gives a card no bar", () => {
+    // jsdom lays nothing out: a focused line's bar scrolls into view nowhere.
+    Object.assign(HTMLElement.prototype, { scrollIntoView: () => undefined });
+    drawWith([call(900030, 2 * 60_000)]);
+    const [first, , second] = [...host.querySelectorAll<HTMLElement>("ol > li")];
+    act(() => {
+      first?.focus();
+      first?.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+    });
+    expect(document.activeElement).toBe(second);
+    expect(host.querySelectorAll("[data-chain] [role='toolbar']")).toHaveLength(0);
   });
 });

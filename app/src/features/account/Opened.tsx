@@ -8,10 +8,13 @@ export function Opened({
   address,
   lead,
   onLogOut,
+  onPickName,
 }: {
   address: string | undefined;
   lead: ReactNode;
   onLogOut: () => void;
+  /** Opens the dialog that registers a name (9f); none, no such item. */
+  onPickName?: () => void;
 }) {
   const [, open] = useDeviceView();
   const items: MenuItem[] = [
@@ -40,6 +43,7 @@ export function Opened({
         open("settings");
       },
     },
+    ...(address === undefined || onPickName === undefined ? [] : [{ label: "Pick a name", onSelect: onPickName }]),
     // The way out, the account's last act (frame 17: one pill in the header).
     ...(address === undefined ? [] : [{ label: "Log out", onSelect: onLogOut }]),
   ];

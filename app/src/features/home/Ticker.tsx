@@ -15,6 +15,7 @@ const KINDS: Record<TickerItem["kind"], string> = {
   news: "News",
   event: "Event",
   onair: "On air",
+  chain: "Signal",
 };
 
 export function Ticker({ items }: { items: TickerItem[] }) {

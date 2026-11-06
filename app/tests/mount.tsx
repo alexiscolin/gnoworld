@@ -13,6 +13,17 @@ beforeAll(() => {
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
   // jsdom has no popover API, which an icon button's tooltip asks for as it mounts: the page's own journeys see it.
   Object.assign(HTMLElement.prototype, { togglePopover: () => true });
+  // ... and no showModal: a dialog it opens is open, and closed by close(), as ui's tests do (packages/ui/src/testSetup.ts).
+  Object.assign(HTMLDialogElement.prototype, {
+    showModal(this: HTMLDialogElement) {
+      this.open = true;
+    },
+    close(this: HTMLDialogElement) {
+      if (!this.open) return;
+      this.open = false;
+      this.dispatchEvent(new Event("close"));
+    },
+  });
   return () => {
     Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", before);
   };

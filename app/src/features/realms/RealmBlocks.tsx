@@ -1,14 +1,20 @@
 // A realm page's tree as elements (5h): core's allowlisted blocks, each an element of the list, every text React's text,
 // so nothing from a realm reaches HTML. Marks, paragraphs, code and lists are drawn by the chat's own drawing (one
-// place), a heading at its level, a form read only (RealmForm). A link on gnoweb's own origin opens there in a new tab, no
+// place), a heading at its level, a form read only (RealmForm) or, in a realm's own view, with its Call (CallableForm). A link on gnoweb's own origin opens there in a new tab, no
 // opener and no referrer; any other is a button that asks first, naming the host it goes to (ExternalLink).
 import type { Inline, PageBlock } from "@gnoworld/core";
-import { createElement, type ReactNode } from "react";
+import { createElement, lazy, Suspense, type ReactNode } from "react";
 import type { Drawing } from "../chat/index.ts";
 import { useExternalLinks } from "./useExternalLinks.tsx";
 import styles from "./RealmBlocks.module.css";
+import type { CallPlace } from "./InlineCard.tsx";
 import { RealmForm } from "./RealmForm.tsx";
 
+// A form with its Call is the realm view's own, never a capture's or a chat's: the call card's code comes only as one is drawn.
+const CallableForm = lazy(async () => ({ default: (await import("./CallableForm.tsx")).CallableForm }));
+
+// A form's card, one level under the heading before it, and no deeper than a card's title goes.
+const CARD_LEVEL = { 1: 2, 2: 3, 3: 4, 4: 4, 5: 4, 6: 4 } as const;
 const HEADINGS = { 1: "h1", 2: "h2", 3: "h3", 4: "h4", 5: "h5", 6: "h6" } as const;
 
 /** The most blocks, list items and form fields a page draws, and the most inline nodes in them: 256 KB of `*a* ` is
@@ -53,6 +59,9 @@ interface Drawn {
   readonly budget: Budget;
   readonly via: Drawing;
   readonly reader: Drawing["reader"];
+  readonly call: CallPlace | undefined;
+  /** The level of the last heading drawn, which a form's card sits under. */
+  readonly under: { level: 1 | 2 | 3 | 4 | 5 | 6 };
 }
 
 const inlinesOf = (block: PageBlock): readonly Inline[] =>
@@ -69,21 +78,25 @@ function drawAll(blocks: readonly PageBlock[], on: Drawn): ReactNode[] {
 }
 
 // A block as an element; none for a list or a quote left empty, which would be a hole in the page.
-function draw(block: PageBlock, { budget, via, reader }: Drawn): ReactNode {
+function draw(block: PageBlock, on: Drawn): ReactNode {
+  const { budget, via, reader, call, under } = on;
   switch (block.type) {
     case "heading":
+      under.level = block.level;
       return createElement(HEADINGS[block.level], null, ...via.inlines(block.children, reader));
     case "form": {
       const fields = budget.fit(block.fields, () => 0);
-      return createElement(RealmForm, {
-        exec: block.exec,
-        path: block.path,
-        fields,
-        left: block.fields.length - fields.length,
-      });
+      const form = { exec: block.exec, path: block.path, fields, left: block.fields.length - fields.length };
+      return call === undefined
+        ? createElement(RealmForm, form)
+        : createElement(
+            Suspense,
+            { fallback: null },
+            createElement(CallableForm, { ...form, call, level: CARD_LEVEL[under.level] }),
+          );
     }
     case "quote": {
-      const inside = drawAll(block.children, { budget, via, reader });
+      const inside = drawAll(block.children, on);
       return inside.length === 0 ? undefined : createElement("blockquote", null, ...inside);
     }
     case "list": {
@@ -103,16 +116,19 @@ export function RealmBlocks({
   origin,
   more,
   via,
+  call,
 }: {
   blocks: readonly PageBlock[];
   origin?: string;
   more?: string;
   via: Drawing;
+  /** The realm the page is of: with it, a form a call can carry gets its Call (9e). */
+  call?: CallPlace;
 }) {
   const warning = useExternalLinks(origin);
   const budget = new Budget();
   const reader = { ...via.reader, link: warning.link };
-  const drawn = drawAll(blocks, { budget, via, reader });
+  const drawn = drawAll(blocks, { budget, via, reader, call, under: { level: 1 } });
   const notice = budget.cut
     ? createElement(
         "p",

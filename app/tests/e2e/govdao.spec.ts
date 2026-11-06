@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
+import { CORS, HOME, RPC } from "./govdaoChain.ts";
 import { box, near } from "./geometry.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { opened, stats } from "./sceneStage.ts";
@@ -8,13 +9,6 @@ import { opened, stats } from "./sceneStage.ts";
 // GovDAO, a world with a realm (docs/decisions.md, 2026-10-31): its page reads the realm's proposals from the chain, in the format
 // RECORDED on onyx-1 (tests/chain/recorded: its first line is the recording's own comment). The page states no threshold, so the
 // page draws none: no "of 66.66%", no ring. The geometry is frame 26's (the same GovDAO plate), to 2 px (geometry.ts).
-const RPC = "https://rpc.onyx.testnets.gno.land/**";
-const HOME = readFileSync(new URL("../chain/recorded/onyx-1-gov-dao-home.md", import.meta.url), "utf8")
-  .split("\n")
-  .slice(1)
-  .join("\n");
-const CORS = { "access-control-allow-origin": "*", "content-type": "application/json" };
-
 async function chain(page: Page, { down = false }: { down?: boolean } = {}): Promise<void> {
   await page.route(RPC, (route) => {
     if (down) return route.fulfill({ status: 503, headers: CORS, body: "down" });

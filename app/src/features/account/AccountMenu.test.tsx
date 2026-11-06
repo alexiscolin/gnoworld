@@ -69,7 +69,7 @@ const mountMenu = async () => {
   const { AccountMenu } = await import("./AccountMenu.tsx");
   const box = mount(
     <StoreProvider>
-      <AccountMenu />
+      <AccountMenu universe="onyx" />
     </StoreProvider>,
   );
   await settle();

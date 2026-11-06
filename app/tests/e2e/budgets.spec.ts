@@ -10,10 +10,12 @@ import { BUILD } from "./sites.ts";
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
 // worker's precache; steps in docs/decisions.md. A plate's page, within the +4 KiB over 183,128 B Alexis gave the plates' pages: the
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-const FIRST_SCREEN_JS = 187_569;
+// 192,299 B once slice 9 met slice 8 (the Earth's page, the highest; the worlds' pages 188,707), measured on that merge.
+const FIRST_SCREEN_JS = 192_299;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-const PLAIN_FIRST_SCREEN_JS = 185_999;
+// 189,695 B once slice 9 met slice 8 (the chain's deploys in the ticker, the Earth's room followed, the store's chain and signals), measured on that merge.
+const PLAIN_FIRST_SCREEN_JS = 189_695;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -147,25 +149,29 @@ const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with what
 // it asks once open: 8d's chat within Alexis's 23 KiB, RoomsDrawer's 768 B (docs/decisions.md, 2026-11-05), 8p's 18 B for the dock's close,
 // and 1,060 B for the column's pictures, their manifest, the rail's order and its Credits button (slice-8: 25,167 B).
-const LATE_CHAT_JS = 25_167;
+// 25,880 B once slice 9 met slice 8 (the chain cards, the pinned pills and their wrapping row).
+const LATE_CHAT_JS = 25_880;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
 // where the bytes come from: hardening).
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
-const PROPOSALS_JS = 22_724;
+const PROPOSALS_JS = 35_631;
+// A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
+// world that pins one alone: weighed with the proposals.
+const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 // A plate's blocks that wait for a read (8g, Alexis's "Charger avec leur donnée"): the realm card, the hours and their chart, each asked as its
 // read starts and capped at its size measured on 2026-11-04 and 256 B (the chief's call). The connected worlds wait for the worlds' file,
 // which the journeys' site does not serve: their chunk never loads here.
-const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars)-[\w-]+\.js$/;
-const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336 };
+const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars|ChartedBy)-[\w-]+\.js$/;
+const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336, ChartedBy: 348 };
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads.
 const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
 // 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B; 5,212 B in the timer-held
 // measure on slice-7's merge into slice-8, the realm page's drawing (RealmBlocks) and the chat's (Message) counted here, the capture
 // asking for both (Alexis, 2026-11-05, "oui pour l'aperçu à 5 203").
-const PREVIEW_JS = 5212;
+const PREVIEW_JS = 5615;
 // Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
 const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
 // And the realm page's drawing (5h's RealmBlocks), a chunk of its own through its slot: the capture's three parts.
@@ -503,8 +509,41 @@ async function captureWithin(page: Page, capture: readonly string[], there: read
   return own;
 }
 
-for (const path of PAGES) {
-  test(`${path} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
+// A world someone charted (slice 9h, D210): its plate names who, from the stream, so a guest's first screen also asks for the
+// plate's line; the stream is handed the signal here, as no journey charts Bubble (D218).
+const CHARTED = "/w/bubble";
+const signalFrame = () =>
+  `event: signal\ndata: ${JSON.stringify({
+    kind: "chart",
+    world: "bubble",
+    account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
+    at: new Date().toISOString(),
+  })}\n\nevent: since\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`;
+
+// The stream handed the signal of a charted world; the plate's line, once it shows.
+const chartedStream = async (page: Page, charted: boolean) => {
+  if (charted)
+    await page.route("**/api/stream?*", (route) =>
+      route.fulfill({ contentType: "text/event-stream", body: signalFrame() }),
+    );
+};
+const chartedShown = async (page: Page, charted: boolean) => {
+  if (charted) await expect(page.getByText(/^First charted by @g1jg8m/)).toBeVisible();
+};
+// A world that pins asks for the pinned actions' code once the proposals' code has drawn the plate, after the chat's scripts may all have
+// come: measured once it has, not as the timing falls. Only GovDAO pins an action.
+const pinnedCodeOf = (page: Page, path: string) =>
+  path.includes("govdao") ? page.waitForResponse((response) => PINNED.test(response.url())) : undefined;
+const expectPinned = (scripts: ReadonlySet<string>, path: string) => {
+  const pinned = [...scripts].filter((url) => PINNED.test(url));
+  expect(pinned.length, "a world asks for the pinned actions' code when it pins one").toBe(
+    path.includes("govdao") ? 1 : 0,
+  );
+};
+
+for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [CHARTED, true] as const]) {
+  test(`${path}${charted ? ", charted," : ""} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
+    await chartedStream(page, charted);
     const seen = watch(page);
     const { scripts, all, pending } = seen;
     const world = isWorld(path);
@@ -513,13 +552,17 @@ for (const path of PAGES) {
     const chat = world ? page.waitForResponse((response) => CHAT.test(response.url())) : undefined;
     // A world page opens its verdicts stream: measured once it has, every run, not as the timing falls.
     const stream = world ? page.waitForResponse((response) => response.url().includes("/api/stream")) : undefined;
+    const pinnedCode = pinnedCodeOf(page, path);
     const early = await firstScreenOf(page, path, seen);
     await stream;
     await chat;
+    await pinnedCode;
+    await chartedShown(page, charted);
     await expect.poll(() => pending.size, "the scripts the chat's code asks for come").toBe(0);
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
+    expectPinned(scripts, path);
     const chatLate = await lateChat(page, path, seen);
     const capture = await lateCapture(path, scripts);
     // A plate's late chunk landing meanwhile is named late, never weighed as the first screen's.
@@ -573,7 +616,8 @@ for (const path of PAGES) {
 // A page's capture under a chat line (8f), on a world with no realm, whose page loaded none of the realm view's code: what the capture
 // brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap (8f's review, 1).
 // 7,445 B: the capture's code, the realm page's reader and drawing, and the warning before a link leaves; capped at its size and 256 B.
-const LINE_PREVIEW_JS = 7701;
+// 8,122 B once slice 9 met slice 8 (slice 9's code in the capture).
+const LINE_PREVIEW_JS = 8122;
 test("a page's capture under a line, on a world with no realm, stays within its cap", async ({ page }) => {
   const scripts = new Set<string>();
   page.on("response", (response) => {

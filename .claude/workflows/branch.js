@@ -155,6 +155,7 @@ const TIER1 = [
   "app/src/lib/chain/evalCall.ts",
   "deploy/",
   "packages/core/src/markdown/",
+  "packages/core/src/args/",
   "app/src/lib/adena/",
   "server/src/login/",
   "app/src/features/login/",

@@ -38,3 +38,9 @@ export const brightShare = (page: Page, picture: Buffer, least: number): Promise
 /** The mean light of each box of `picture`. */
 export const brightness = async (page: Page, picture: Buffer, boxes: [number, number, number, number][]) =>
   (await colours(page, picture, boxes)).map(([red, green, blue]) => 0.2126 * red + 0.7152 * green + 0.0722 * blue);
+/** A computed style of the first element a selector finds. */
+export const style = (page: Page, selector: string, property: string) =>
+  page
+    .locator(selector)
+    .first()
+    .evaluate((el, name) => getComputedStyle(el).getPropertyValue(name), property);

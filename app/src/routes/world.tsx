@@ -5,23 +5,26 @@ import { useLoaderData, useNavigate, useRouteError, useSearchParams, type MetaAr
 import { hubWorldOf, stampKey } from "@gnoworld/core";
 import { Breadcrumb, Panel, Stack } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
-import { failedWorldMeta, worldMeta } from "../meta.ts";
+import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, realmView, site } from "../places.ts";
-import { Chat, chatPlace, LOADING } from "../features/chat/index.ts";
+import { Chat, chatPlace, ChainCallsContext, ChainPlaceContext, LOADING } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { OutLinks } from "../features/realms/OutLinks.tsx";
 import { platePreview } from "../features/previews/plate.ts";
 import { useEntered, useSpace } from "../features/universe/index.ts";
-import { Actions, Activity, Here, type Ring } from "../features/world/index.ts";
+import { Actions, Activity, Arrival as Banners, FirstCharted, Here, type Ring } from "../features/world/index.ts";
+import { pinnedBar, Proposed } from "../features/world/PlateRealm.tsx";
 import { useHours, type Hours } from "../features/world/useHours.ts";
-import { useAppStore } from "../storeContext.tsx";
+import { chainKey, type ChainHeard } from "../store/chain.ts";
+import { useApp, useAppStore } from "../storeContext.tsx";
 import { useWorldsFile } from "../worldsFile.ts";
 import place from "./globe.module.css";
 import styles from "./world.module.css";
 
-// A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
-const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
+// No call of the chain told yet: a room draws no card.
+const NO_CALLS: readonly ChainHeard[] = [];
+
 // What the worlds' file says of this world, its links and its realm, comes in a chunk once the file has: the first screen holds neither.
 const Linked = lazy(() => import("../features/world/Linked.tsx"));
 const FromExplorer = lazy(() => import("../features/realms/FromExplorer.tsx"));
@@ -132,6 +135,8 @@ export default function World() {
   const preview = platePreview(world.realms, universe);
   // A station round the Earth (8l) keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
   const own = stationOf(world.slug)?.url;
+  const address = ORIGIN + world.canonical;
+  const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -145,8 +150,13 @@ export default function World() {
             <Panel.Body>
               <Stack>
                 <Breadcrumb label="You are here" items={crumbOf(world, universe.home.path)} />
+                {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
+                <Banners world={world.slug} name={world.name} address={address} />
                 <h1>{world.name}</h1>
-                <p>{world.description}</p>
+                <p>
+                  {world.description}
+                  <FirstCharted world={world.slug} />
+                </p>
                 <OutLinks links={[{ label: "Website", href: own }]} />
                 {/* Who is here comes from the chat once it has connected; the rate and the day's history from the server's hours. */}
                 <Here perHour={paceOf(hours)} />
@@ -160,11 +170,7 @@ export default function World() {
                     {...(realmPath === undefined ? {} : { proposals: realmPath })}
                   />
                 </div>
-                {realmPath === undefined ? null : (
-                  <Suspense fallback={null}>
-                    <Proposals path={realmPath} onRing={setRing} />
-                  </Suspense>
-                )}
+                <Proposed world={world} realmPath={realmPath} universe={universe} onRing={setRing} />
                 <FromTheFile world={world} realmPath={realmPath} prefix={prefix} />
                 {/* Last on the plate, as frame 26 draws it: the world's page, captured. */}
                 {preview === undefined ? null : (
@@ -177,9 +183,21 @@ export default function World() {
           </Panel>
         }
       >
-        <div id="chat" className={styles["chat"]}>
-          {chatDue ? <Chat world={world.slug} place={chatPlace(world, universe)} /> : LOADING}
-        </div>
+        {/* What the chain told of this world's realms, from its events alone, drawn among its main room's messages. */}
+        <ChainPlaceContext value={world}>
+          <ChainCallsContext value={calls ?? NO_CALLS}>
+            <div id="chat" className={styles["chat"]}>
+              {chatDue ? (
+                <Chat
+                  world={world.slug}
+                  place={chatPlace({ ...world, pinned: pinnedBar(world, universe) }, universe)}
+                />
+              ) : (
+                LOADING
+              )}
+            </div>
+          </ChainCallsContext>
+        </ChainPlaceContext>
       </Panel.Layout>
       <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>

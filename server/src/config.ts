@@ -1,6 +1,7 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
 import { jsonOf } from "@gnoworld/core";
+import { Key } from "@gnoworld/schemas";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -31,6 +32,8 @@ export interface Config {
   chains: string[];
   origins: string[];
   newAccountsPerHour: number;
+  // The worlds that can be first charted (D218): every world when none is named.
+  firstToChart: ReadonlySet<string> | undefined;
   authSocket: string | undefined;
   // Ergo's internal listener and its operator's password; no IRC link without the password's file.
   ergo: { host: string; port: number; password: string } | undefined;
@@ -44,6 +47,8 @@ export interface Config {
   previews: string | undefined;
   // The universes' data file: its default universe's RPC is where the prices timer reads the block height; none, no height.
   universes: string | undefined;
+  // The hubs' data file (slice 9g): with the universes' it starts the chain's polls, one a universe; none, no chain.
+  hubs: string | undefined;
   moderation: {
     openaiKey: Secret | undefined;
     thresholds: Thresholds;
@@ -85,6 +90,12 @@ const settingsSchema = () =>
         .transform(Number)
         .pipe(z.number().max(1000))
         .default(5),
+      // The worlds that can be first charted (D218): unset, every world (D210); else slugs, at least one.
+      FIRST_TO_CHART_WORLDS: z
+        .string()
+        .transform((text) => text.split(","))
+        .pipe(z.array(z.string().refine((slug) => Key.safeParse(slug).success)))
+        .optional(),
       // The socket Ergo's auth script dials (3d): an absolute path, within what a socket's address holds.
       AUTH_SOCKET: z
         .string()
@@ -110,6 +121,7 @@ const settingsSchema = () =>
       // The preview job's file (8f), written like MARKETS_FILE: the default universe's hubs' pages, each checked before it is written.
       PREVIEWS_FILE: absolute.optional(),
       UNIVERSES_FILE: absolute.optional(),
+      HUBS_FILE: absolute.optional(),
       OPENAI_API_KEY_FILE: z.string().min(1).optional(),
       // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
       MODERATION_THRESHOLDS: z
@@ -153,6 +165,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     chains: CHAINS,
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
+    firstToChart: settings.FIRST_TO_CHART_WORLDS === undefined ? undefined : new Set(settings.FIRST_TO_CHART_WORLDS),
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
     ergoData: ergoDataOf(env, ERGO_DATA, ERGO_DATA_MB),
@@ -160,6 +173,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     worlds: settings.WORLDS_FILE,
     previews: settings.PREVIEWS_FILE,
     universes: settings.UNIVERSES_FILE,
+    hubs: hubsOf(env, settings.HUBS_FILE),
     moderation: {
       openaiKey:
         OPENAI_API_KEY_FILE === undefined
@@ -172,6 +186,13 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     jarvis: doorOf(env, settings),
     admin: adminOf(env, settings),
   };
+}
+
+// The hubs' file, or none. Without the universes' file it names no indexer: the server stops rather than run without the
+// chain it was asked for.
+function hubsOf(env: Record<string, string | undefined>, file: string | undefined): string | undefined {
+  if (file !== undefined && env["UNIVERSES_FILE"] === undefined) throw new Error("setting UNIVERSES_FILE: required");
+  return file;
 }
 
 // The link to Ergo, or none without the password's file. Ergo's listener named with no password is a link

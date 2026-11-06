@@ -25,7 +25,8 @@ import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
 import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
 import { getConnInfo } from "@hono/node-server/conninfo";
-import { makeStream } from "./stream/stream.ts";
+import { passedLines, type Signals } from "./signals/signals.ts";
+import { makeStream, type Stream } from "./stream/stream.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitor } from "./visitor.ts";
 import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
@@ -80,6 +81,11 @@ interface Options {
   reconcileMs?: number;
   // The account of a session's token (login.ts's session), for the rooms a reader may see.
   session?: (token: string | undefined) => string | undefined;
+  // The page's stream, made by the caller when the first signals' routes tell on it too (slice 9h); its own otherwise.
+  stream?: Stream;
+  // The first signals' store (slice 9h): with it, the first line of a public room that passed moderation is recorded and
+  // told on the stream; without it, none is.
+  signals?: Signals | undefined;
   // How long after a refused hide (the line not yet in Ergo's history) it is asked again (F2462).
   redactRetryMs?: number;
   // The file who-is-here keeps its history in (7h); none keeps none.
@@ -162,12 +168,13 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   ensureRooms(db, [...worlds.keys()], now());
   ensureNamed(db, typedRooms(worlds), now());
   const check = checkerFor(db, settings, options);
-  const stream = makeStream();
+  const stream = options.stream ?? makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
   const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
   const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room) });
-  const run = moderate({ db, check, send, stream, progress, strike, passed: recent.passed });
+  const passed = passedLines({ roles: settings, recent, stream, signals: options.signals });
+  const run = moderate({ db, check, send, stream, progress, strike, passed });
   const queue = makeQueue<Said>({ run, log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);

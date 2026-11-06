@@ -78,6 +78,13 @@ export function mayRead(roles: Typed, room: string, who: string | undefined): bo
 export const publicRoom = (roles: Typed, room: string): boolean =>
   !["members", "members-write"].includes(typeOf(roles, room).type);
 
+/** A room whose lines may be a world's first words (slice 9h, D214): open to everyone to read and write, and listed. A
+ * first words' author is served to anyone and drawn on a banner, so no members, announcement, accounts or hidden room. */
+export const openRoom = (roles: Typed, room: string): boolean => {
+  const { type, hidden } = typeOf(roles, room);
+  return type === "open" && !hidden;
+};
+
 /** One of the room's world's moderators or the team: they see a hidden or archived room in the lists. */
 export const staffOf = (roles: Typed, room: string, who: string | undefined): boolean =>
   who !== undefined && staff(roles, worldOf(room)).includes(who);

@@ -8,6 +8,7 @@ import genres from "../data/genres.json" with { type: "json" };
 import hubs from "../data/hubs.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
+import type { PinnedRow } from "./pinned.ts";
 
 /** A world or an ecosystem: what the site shows of it, with its one address. */
 export interface Listed {
@@ -26,6 +27,8 @@ export interface Listed {
   /** What a world is and its genre's name, as its plate's crumb says them (8g): "dao", "Games". */
   kind?: string;
   genre?: string;
+  /** The calls its team pins (D271), as the data file holds them. */
+  actions?: readonly PinnedRow[];
 }
 export type World = Listed;
 export type Ecosystem = Listed;
@@ -45,15 +48,10 @@ export interface UniverseView {
   ecosystems: Listed[];
 }
 
-interface Row {
-  slug: string;
-  name: string;
-  description: string;
-  universe: string;
-  realms?: readonly string[] | undefined;
-  kind?: string | undefined;
-  genre?: string | undefined;
-}
+/** A world as the data file holds it: its optional fields may be said absent. */
+type Row = Pick<Listed, "slug" | "name" | "description" | "universe"> & {
+  [K in "realms" | "kind" | "genre" | "actions"]?: Listed[K] | undefined;
+};
 interface Source {
   universes: {
     id: string;
@@ -150,6 +148,7 @@ function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: s
     ...(row.realms === undefined ? {} : { realms: row.realms }),
     ...(row.kind === undefined ? {} : { kind: row.kind }),
     ...(row.genre === undefined ? {} : { genre: row.genre }),
+    ...(row.actions === undefined ? {} : { actions: row.actions }),
   };
 }
 

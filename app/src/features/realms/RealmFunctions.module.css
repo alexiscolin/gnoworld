@@ -5,15 +5,30 @@
     display: flex;
     /* layout: one under the other */
     flex-direction: column;
-    /* layout: the step between those lines */
-    gap: var(--space-xs);
     /* layout: a list's own space, which the browser gives it, taken off as the reset takes a paragraph's */
     margin-block: 0;
     padding: 0;
     list-style: none;
   }
 
+  .line {
+    /* layout: the name and the button on one line, the name taking what is left */
+    display: flex;
+    /* layout: the name and the button share one centre line */
+    align-items: center;
+    /* layout: the button at the end */
+    justify-content: space-between;
+  }
+
+  .name {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+
+  /* The frame's rows are told apart by a hairline above each, the first too, not by space (F5744, F5839). */
   .item {
+    border-block-start: var(--line-width) solid var(--color-line);
+    padding-block: var(--space-2xs);
     /* layout: a function's button and its result, one under the other, from the start */
     display: grid;
     /* layout: the step between them */

@@ -87,7 +87,7 @@ function GuestRoom({
           {...shown.view}
           {...view}
           composer={
-            <Dock onWhoIsHere={onWhoIsHere} place={place} dm={false} writes={false}>
+            <Dock onWhoIsHere={onWhoIsHere} place={place} dm={false} writes={false} pinned={place.pinned}>
               <p>{LOG_IN_TO_WRITE}</p>
             </Dock>
           }

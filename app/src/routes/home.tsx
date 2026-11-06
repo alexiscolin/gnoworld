@@ -12,6 +12,7 @@ import {
   Ticker,
   tickerItems,
   trendItems,
+  withChain,
   withOnAir,
   useClock,
   usePeople,
@@ -21,9 +22,10 @@ import {
 import type { CalendarEvent } from "../lib/coming.ts";
 import { PlaceLinks } from "../features/list/index.ts";
 import { useNewcomer, useResting, useSpace, useWorldsCount } from "../features/universe/index.ts";
+import { useEarthChain } from "../features/world/useEarthChain.ts";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, placeOf, site } from "../places.ts";
-import { useAppStore } from "../storeContext.tsx";
+import { useApp, useAppStore } from "../storeContext.tsx";
 
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
 // case is checked (F376).
@@ -99,6 +101,9 @@ export default function Home() {
     { earth: universe.earth.path, worlds: universe.worlds },
     now,
   );
+  // The chain's newest deploys of this universe lead the news and events (slice 9g).
+  const deploys = useApp((app) => app.deploys);
+  useEarthChain();
   return (
     <>
       {resting === undefined ? (
@@ -121,7 +126,18 @@ export default function Home() {
         </Suspense>
       ) : null}
       <Ticker
-        items={ledByTrends(trends, withOnAir(tickerItems(news, placed(universe), now), onAirOf(universe), now))}
+        items={ledByTrends(
+          trends,
+          withOnAir(
+            withChain(tickerItems(news, placed(universe), now), {
+              deploys,
+              universe: universe.id,
+              prefix: universe.isDefault ? "" : `/net/${universe.id}`,
+            }),
+            onAirOf(universe),
+            now,
+          ),
+        )}
       />
     </>
   );

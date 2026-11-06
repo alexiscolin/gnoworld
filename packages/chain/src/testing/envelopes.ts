@@ -60,6 +60,7 @@ export function statusEnvelope(height: number, time: string, network?: string) {
 
 // NOT recorded, written from v1.5.0: a bad parameter or a failed query answers HTTP 200 with `error` and no result (handlers.go:393,413;
 // lib/types/types.go:143,158).
-export function rpcErrorEnvelope(message: string) {
-  return { jsonrpc: "2.0", id: "", error: { code: -32603, message, data: message } };
+// `message` is "Internal error" and `data` the Go error's text (types.go:248); a caller that gives one text gets it in both.
+export function rpcErrorEnvelope(message: string, data: string = message) {
+  return { jsonrpc: "2.0", id: "", error: { code: -32603, message, data } };
 }

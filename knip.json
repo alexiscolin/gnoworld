@@ -5,7 +5,7 @@
   "workspaces": {
     ".": { "entry": ["!evals/**"], "project": ["**/*.{js,mjs,cjs,ts,tsx}", "!evals/**"] },
     "app": {
-      "entry": ["src/**/*.test.{ts,tsx}", "lab/main.ts", "tests/e2e/workshopBackend.mjs"],
+      "entry": ["src/**/*.test.{ts,tsx}", "lab/main.ts", "tests/e2e/workshopBackend.mjs", "recording/serve.mjs"],
       "react-router": { "config": ["react-router.config.ts"] },
       "playwright": {
         "config": ["playwright.config.ts", "playwright.stories.config.ts", "playwright.pictures.config.ts"]
