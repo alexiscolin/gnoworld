@@ -15,8 +15,9 @@
     --_w: var(--dialog-wide);
   }
 
+  /* The frames' kicker sits 33 px under the dialog's edge, 8 more than the padding gives. */
   .kicker {
-    overflow-wrap: anywhere;
+    padding-block-start: var(--space-2xs);
   }
 
   .description {

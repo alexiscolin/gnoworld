@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type ReactNode, type RefObject } fr
 import { IconButton } from "../Button/IconButton.tsx";
 import { Sidebar, Stack } from "../compositions/index.ts";
 import { ids } from "../ids.ts";
+import { Kicker } from "../Kicker/Kicker.tsx";
 import { surface } from "../Popover/floating.ts";
 import styles from "./Dialog.module.css";
 
@@ -123,12 +124,14 @@ export function Dialog({
       }}
     >
       <Stack space="m">
-        {kickerShown ? (
-          <p id={kickerId} className={["label", styles["kicker"]].join(" ")}>
-            {kicker}
-          </p>
-        ) : null}
-        <TitleRow headingRef={headingRef} id={titleId} title={title} hideClose={hideClose} onClose={onClose} />
+        <Stack space="xs">
+          {kickerShown ? (
+            <div id={kickerId} className={styles["kicker"]}>
+              <Kicker>{kicker}</Kicker>
+            </div>
+          ) : null}
+          <TitleRow headingRef={headingRef} id={titleId} title={title} hideClose={hideClose} onClose={onClose} />
+        </Stack>
         {description === undefined ? null : (
           <p id={descriptionId} className={styles["description"]}>
             {description}

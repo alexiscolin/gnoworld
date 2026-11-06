@@ -30,6 +30,10 @@ test.describe("the name dialog against the frames", () => {
     const title = await box(page, "dialog[open] h2");
     expect(kicker.y + kicker.height, "the kicker sits above the title").toBeLessThanOrEqual(title.y);
     near(kicker.x - frame.x, 25, "the kicker's inset");
+    // F5965: the frames' kicker caps sit 33 px under the border and 19 px above the title's caps; a box here is the line: 11 px
+    // for the label (caps 1 px in), a title's caps 4 px below its line's top.
+    near(kicker.y - frame.y, 33, "the kicker's top under the dialog's edge");
+    near(title.y - (kicker.y + kicker.height), 13, "the gap from the kicker to the title");
     await expect(dialog(page).getByText("YOUR GNO.LAND NAME")).toBeVisible();
   });
 

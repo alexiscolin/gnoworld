@@ -223,6 +223,22 @@ describe("Dialog", () => {
     expect(dialog().getAttribute("aria-labelledby")).toBe(title.id);
   });
 
+  // F5973, F5965: the kicker is the Kicker component in a wrapper that carries the description's id, and it stays with the
+  // title in a stack of its own, tighter than the one that holds the description and the body.
+  it("draws its kicker with the Kicker component, grouped with the title apart from the description and the body", () => {
+    render(
+      <Dialog title="Pick a name" kicker="YOUR NAME" description="Kept by namereg" open onClose={vi.fn()}>
+        <p>Body</p>
+      </Dialog>,
+    );
+    const wrapper = document.getElementById((dialog().getAttribute("aria-describedby") ?? "").split(" ")[0] ?? "");
+    expect(wrapper?.querySelector("p.label")?.textContent).toBe("YOUR NAME");
+    const head = wrapper?.parentElement;
+    expect(head?.contains(screen.getByRole("heading", { name: "Pick a name" }))).toBe(true);
+    expect(head?.contains(screen.getByText("Kept by namereg"))).toBe(false);
+    expect(head?.contains(screen.getByText("Body"))).toBe(false);
+  });
+
   it("is described by its kicker alone when it has no description, and draws no kicker unless given one", () => {
     const { rerender } = render(
       <Dialog title="Pick a name" kicker="YOUR NAME" open onClose={vi.fn()}>
