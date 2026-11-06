@@ -16,7 +16,12 @@ function placed(call: PinnedCall) {
 const keyOf = (index: number, call: PinnedCall) => `${String(index)} ${call.view} ${JSON.stringify(call.action)}`;
 
 /** The plate's: each a block of the plate's own stack, so one the chain does not confirm draws nothing, not even a gap. */
-export function PinnedForms({ pinned, options }: { pinned: readonly PinnedCall[]; options?: ReadOptions | undefined }) {
+export interface PinnedFormsProps {
+  pinned: readonly PinnedCall[];
+  options?: ReadOptions | undefined;
+}
+
+export function PinnedForms({ pinned, options }: PinnedFormsProps) {
   return pinned.map((call, index) => {
     const found = placed(call);
     return found === undefined ? null : (

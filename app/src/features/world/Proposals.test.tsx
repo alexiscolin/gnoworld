@@ -2,26 +2,15 @@
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
-import { follows, mount } from "../../../tests/mount.tsx";
-import { calling, CUR, field, listing } from "../../../tests/callFixtures.ts";
-import { StoreProvider } from "../../storeContext.tsx";
+import { mount } from "../../../tests/mount.tsx";
 import type { ChainFetch, ChainRead } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
+import { HOME, PATH } from "../../../tests/govdaoFixtures.ts";
 import Proposals from "./Proposals.tsx";
 
 // A world's proposals on its plate (5k): drawn from the realm's home page as RECORDED on onyx-1 (tests/chain/recorded), which
 // states no threshold, so the page draws no "of 66.66%" and no ring; a read that fails says its state and links to gnoweb. The ring
 // itself is drawn from a proposal that gave its tally, invented here: no recorded page has one.
-const HOME = Object.values(
-  import.meta.glob<string>("../../../tests/chain/recorded/onyx-1-gov-dao-home.md", {
-    query: "?raw",
-    import: "default",
-    eager: true,
-  }),
-)
-  .join("")
-  .replace(/^<!--.*-->\n/, "");
-const PATH = "/r/gov/dao";
 const flush = () =>
   act(async () => {
     await new Promise((done) => setTimeout(done, 0));
@@ -96,41 +85,5 @@ describe("a world's proposals", () => {
     expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 15 · YES 33% of 66.66%");
     expect(el.querySelectorAll("svg circle")).toHaveLength(3);
     vi.doUnmock("../../lib/chain/proposal.ts");
-  });
-});
-
-// 9e-1 (D271): a world's pinned actions stand first, under Read the proposals, each a Form block once vm/qfuncs confirms it; the
-// proposals follow. NOT recorded: qfuncs' shape.
-describe("a world's proposals, with its pinned actions", () => {
-  it("draws each confirmed pinned action as a form before the proposals, on the chain of its realm's view", async () => {
-    const functions = [
-      {
-        FuncName: "MustVoteOnProposalSimple",
-        Params: [CUR, field("pid", "int64"), field("option", "string")],
-        Results: null,
-      },
-    ];
-    const read = vi.fn<ChainFetch>((url) =>
-      decodeURIComponent(url).includes("qfuncs")
-        ? listing(functions)
-        : Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: HOME })))),
-    );
-    const el = mount(
-      <StoreProvider>
-        <Proposals
-          path={PATH}
-          options={{ fetch: read }}
-          pinned={{
-            actions: [{ label: "Vote", realm: "gno.land/r/gov/dao", function: "MustVoteOnProposalSimple", args: {} }],
-            universe: { id: "onyx", isDefault: true },
-          }}
-        />
-      </StoreProvider>,
-    );
-    const vote = await calling(el, "Vote");
-    const heading = el.querySelector("#proposals-title");
-    expect(heading).not.toBeNull();
-    expect(heading !== null && follows(vote, heading)).toBe(true);
-    expect(read.mock.calls.map(([url]) => new URL(url).host)).toContain("rpc.onyx.testnets.gno.land");
   });
 });

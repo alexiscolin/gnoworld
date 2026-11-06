@@ -3,7 +3,7 @@
 // that gives no threshold gives no ring and no "of 66.66%". A read that fails says its state and links to the realm on gnoweb.
 // This file is a chunk of its own, asked only by a world with a realm (world.tsx): no other page pays for it.
 import { Cluster, Stack } from "@gnoworld/ui";
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState, type ComponentType } from "react";
 import { realmAt } from "../../realmAt.ts";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { readProposals } from "../../lib/chain/proposal.ts";
@@ -11,10 +11,18 @@ import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { ProposalCard, ReadFailed } from "../realms/index.ts";
 import { pinnedOf } from "../../pinned.ts";
-import { PinnedForms, type PinnedBarProps } from "./Pinned.tsx";
+import type { PinnedBarProps, PinnedFormsProps } from "./Pinned.tsx";
 import styles from "./Proposals.module.css";
 import { ringOf } from "./statusRing.ts";
 import { StatusPill } from "./StatusPill.tsx";
+
+// A world's pinned actions (D271), asked only by a world that pins one; code that cannot be fetched leaves the proposals alone (F1763).
+const PinnedForms = lazy<ComponentType<PinnedFormsProps>>(() =>
+  import("./Pinned.tsx").then(
+    (chunk) => ({ default: chunk.PinnedForms }),
+    () => ({ default: () => null }),
+  ),
+);
 
 /** The most proposals drawn: the newest, as the realm's page lists them. */
 const SHOWN = 3;
@@ -130,7 +138,9 @@ export default function Proposals({ path, options = NO_OPTIONS, pinned }: Propos
   return (
     <>
       {pinned === undefined ? null : (
-        <PinnedForms pinned={pinnedOf(pinned.actions, pinned.universe)} options={options} />
+        <Suspense fallback={null}>
+          <PinnedForms pinned={pinnedOf(pinned.actions, pinned.universe)} options={options} />
+        </Suspense>
       )}
       <section aria-labelledby="proposals-title">
         <Stack space="xs">

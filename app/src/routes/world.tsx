@@ -9,10 +9,14 @@ import { Chat, type ChatPlace } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Actions, Activity, Arrival, FirstCharted, Here } from "../features/world/index.ts";
 import type { PinnedBarProps } from "../features/world/Pinned.tsx";
+import type { ProposalsProps } from "../features/world/Proposals.tsx";
 import styles from "./world.module.css";
 
 // A world with a realm reads its proposals in a chunk of its own, after the page has hydrated: no other world pays for it.
-const Proposals = lazy(() => import("../features/world/Proposals.tsx"));
+// Code that cannot be fetched leaves the plate alone (F1763), as the pinned actions' does.
+const Proposals = lazy<ComponentType<ProposalsProps>>(() =>
+  import("../features/world/Proposals.tsx").catch(() => ({ default: () => null })),
+);
 // A world's pinned actions (D271) are drawn on the plate by the proposals' chunk and in the chat's bar from a chunk this route hands the
 // chat (the chat reaches no realm code of its own); one that cannot be fetched leaves the bar alone (F1763).
 const PinnedBar = lazy<ComponentType<PinnedBarProps>>(() =>

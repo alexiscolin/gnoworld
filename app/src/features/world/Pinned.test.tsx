@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import type { ChainFetch } from "@gnoworld/chain/read";
-import { describe, expect, it, vi } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { all, click, mount, one } from "../../../tests/mount.tsx";
+import { all, click, follows, mount, one } from "../../../tests/mount.tsx";
 import { calling, CUR, field, listing, onGnoland, openedUnsigned, pinnedVote } from "../../../tests/callFixtures.ts";
 import { PinnedForms } from "./Pinned.tsx";
+import Proposals from "./Proposals.tsx";
+import { HOME, PATH, PINNED_VOTE } from "../../../tests/govdaoFixtures.ts";
+import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 
 // 9e-1 (Alexis, 2026-11-06): a world's pinned actions on its page, under Read the proposals, each a Form block under its label once
 // vm/qfuncs confirms it, read from the chain of the realm view the world names; anything else draws nothing. NOT recorded: qfuncs' shape.
@@ -100,5 +103,39 @@ describe("a world's pinned actions on its page", () => {
 
   it("draws nothing for no action", () => {
     expect(draw([]).childElementCount).toBe(0);
+  });
+});
+
+// 9e-1 (D271): a world's pinned actions stand first, under Read the proposals, each a Form block once vm/qfuncs confirms it; the
+// proposals follow. NOT recorded: qfuncs' shape.
+describe("a world's proposals, with its pinned actions", () => {
+  // The pinned actions' chunk's first import compiles it, longer than a wait for a drawing: asked once before.
+  beforeAll(async () => {
+    await import("./Pinned.tsx");
+  });
+
+  it("draws each confirmed pinned action as a form before the proposals, on the chain of its realm's view", async () => {
+    const functions = [
+      {
+        FuncName: "MustVoteOnProposalSimple",
+        Params: [CUR, field("pid", "int64"), field("option", "string")],
+        Results: null,
+      },
+    ];
+    const read = vi.fn<ChainFetch>((url) =>
+      decodeURIComponent(url).includes("qfuncs")
+        ? listing(functions)
+        : Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: HOME })))),
+    );
+    const el = mount(
+      <StoreProvider>
+        <Proposals path={PATH} options={{ fetch: read }} pinned={PINNED_VOTE} />
+      </StoreProvider>,
+    );
+    const vote = await calling(el, "Vote");
+    const heading = el.querySelector("#proposals-title");
+    expect(heading).not.toBeNull();
+    expect(heading !== null && follows(vote, heading)).toBe(true);
+    expect(read.mock.calls.map(([url]) => new URL(url).host)).toContain("rpc.onyx.testnets.gno.land");
   });
 });
