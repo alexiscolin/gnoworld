@@ -75,9 +75,12 @@ test("GovDAO keeps its plate and its chat's bar when the pinned actions' code ca
   const failed = page.waitForEvent("requestfailed", (request) => request.url().includes("/assets/Pinned"));
   await opened(page, 1280);
   await failed;
-  // What only the proposals' code draws, after the failed chunk: the pre-rendered page alone would pass the rest (F5933's journey
-  // passed while the page fell a moment later, the combined review of 9e-1).
-  await expect(plate(page).getByRole("heading", { name: "Proposals" })).toBeVisible();
+  // What only the proposals' code draws, after the failed chunk: a proposal read from the chain. The pre-rendered page holds the rest,
+  // its "Proposals" heading too, so a journey waiting on those passed while the page fell (F5941, refuted by the verifier).
+  await expect(
+    plate(page).getByRole("heading", { name: "Set validator gno-core-validator-1 to voting power 60" }).first(),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "This world could not load" })).toHaveCount(0);
   await expect(plate(page).getByRole("heading", { level: 1 })).toHaveText("GovDAO");
   await expect(plate(page).getByRole("link", { name: "Read the proposals" })).toBeVisible();
   await expect(bar(page).getByRole("button")).toHaveText(["Who's here"]);
