@@ -8,6 +8,7 @@ import {
   planetLook,
   planetSeed,
   worldLook,
+  worldPath,
   type Anchor,
   type Nature,
   type RealmFunctions,
@@ -495,5 +496,37 @@ describe("worldLook", () => {
         expect(worldLook(id)).toEqual(worldLook(id));
       }),
     );
+  });
+});
+
+// Alexis 2026-11-06: the video draws Bubble a banded gas giant, tan and white as Jupiter, and GovDAO sandy as Venus (frames 4 and 16).
+// The generator gave Bubble a temperate, Earth-like globe; these two worlds' classes are fixed by hand, the others stay generated.
+describe("the worlds whose class is fixed by hand", () => {
+  it("makes Bubble a gas giant read from the Jupiter map", () => {
+    const look = worldLook("bubble");
+    expect([look.anchor, look.map]).toEqual(["gas giant", "jupiter"]);
+  });
+
+  it("makes GovDAO a cloud deck, the Venus kind, read from the haze map", () => {
+    const look = worldLook("gov/dao");
+    expect([look.anchor, look.map]).toEqual(["cloud deck", "haze"]);
+  });
+
+  it("gives each world's recipe the same class as its look", () => {
+    expect(worldRecipe("bubble")).toEqual(planetRecipe(worldPath("bubble"), "gas giant"));
+    expect(worldRecipe("gov/dao")).toEqual(planetRecipe(worldPath("gov/dao"), "cloud deck"));
+  });
+
+  it("holds whatever a realm's nature would lean it to", () => {
+    for (const nature of NATURES) {
+      expect(worldLook("bubble", nature).anchor).toBe("gas giant");
+      expect(worldLook("gov/dao", nature).anchor).toBe("cloud deck");
+    }
+  });
+
+  it("leaves every other world to its seed, the stations among them", () => {
+    for (const id of ["adena", "zenao", "gnoscan", "demo/defi", "bubble/other"]) {
+      expect(worldLook(id).anchor).toBe(anchorOf(planetSeed(worldPath(id))));
+    }
   });
 });

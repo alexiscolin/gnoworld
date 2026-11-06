@@ -1,4 +1,4 @@
-import { statusOrbit, worldLook } from "@gnoworld/core";
+import { readsMinorMap, statusOrbit, worldLook } from "@gnoworld/core";
 import {
   BufferGeometry,
   Color,
@@ -146,7 +146,8 @@ describe("the world in its circle", () => {
     const { said, colours } = await opened();
     expect(said).toEqual(["loading", "drawn"]);
     const { look, recipe } = worldOf(ID);
-    for (const name of [look.map, recipe.minorMap])
+    // The minor's map is loaded where the world's program reads it (F4586): GovDAO, a cloud deck by hand, does not.
+    for (const name of [look.map, ...(readsMinorMap(recipe) ? [recipe.minorMap] : [])])
       expect(
         maps.load.mock.calls.some(
           ([url, how]) =>

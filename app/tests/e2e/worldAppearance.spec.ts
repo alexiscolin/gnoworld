@@ -84,7 +84,7 @@ async function arrived(page: Page, go: () => Promise<unknown>) {
 }
 
 // A world's page opened with the clock held, once its world is drawn.
-async function opened(page: Page, path = "/w/bubble?test-gpu") {
+async function opened(page: Page, path = "/w/govdao?test-gpu") {
   await page.clock.install();
   return arrived(page, () => page.goto(path));
 }

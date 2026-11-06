@@ -81,6 +81,14 @@ export function anchorOf(seed: Uint8Array, nature: Nature | null = null): Anchor
   return leaning[among % leaning.length] ?? walked(WEIGHTS, draw);
 }
 
+/** The class of a world by its id: two are fixed by hand to the looks the video draws (Alexis, 2026-11-06: Bubble a banded gas giant, GovDAO
+ * sandy as Venus, frames 4 and 16), the others read their seed. */
+export function worldAnchor(id: string, seed: Uint8Array, nature: Nature | null = null): Anchor {
+  if (id === "bubble") return "gas giant";
+  if (id === "gov/dao") return "cloud deck";
+  return anchorOf(seed, nature);
+}
+
 /** The class mixed under `dominant`: another that `fits`, by its weight among those, on one word so a small weight keeps its share. */
 export function minorOf(more: Uint8Array, dominant: Anchor, fits: (anchor: Anchor) => boolean): Anchor {
   const others = WEIGHTS.filter(([anchor]) => anchor !== dominant && fits(anchor));

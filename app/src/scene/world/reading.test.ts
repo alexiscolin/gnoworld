@@ -1,4 +1,4 @@
-import { anchorOf, asciiBytes, planetSeed, presenceOf, worldLook, worldSigns } from "@gnoworld/core";
+import { asciiBytes, planetSeed, presenceOf, worldLook, worldSigns } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
@@ -318,7 +318,7 @@ describe("readingOf", () => {
     const reading = readingOf(quietFile(), quiet({ id: "bubble", people: 12 }));
     const seed = planetSeed(asciiBytes("gno.land/r/bubble"));
     expect(reading.signs).toEqual(
-      worldSigns(seed, anchorOf(seed, null), { vitality: reading.vitality, present: reading.heat, fresh: false }),
+      worldSigns(seed, worldLook("bubble").anchor, { vitality: reading.vitality, present: reading.heat, fresh: false }),
     );
     expect(reading.vitality).toBeGreaterThan(0);
   });

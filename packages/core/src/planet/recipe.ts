@@ -4,7 +4,7 @@
 import { REALM_PREFIX } from "../chain/realm.ts";
 import { starWarmth } from "../cosmos/warmth.ts";
 import type { Anchor, MapName, Ramp, Rgb } from "./anchors.ts";
-import { anchorOf, minorOf, moreSeed, type Nature } from "./choice.ts";
+import { minorOf, moreSeed, worldAnchor, type Nature } from "./choice.ts";
 import { ramp } from "./colours.ts";
 import { ofContinents } from "./continents.ts";
 import { asciiBytes, planetSeed, worldPath } from "./look.ts";
@@ -166,5 +166,5 @@ export function planetRecipe(path: Uint8Array, anchor: Anchor): Recipe {
 export function worldRecipe(id: string, nature: Nature | null = null): Recipe {
   const path = worldPath(id);
   const seed = planetSeed(path);
-  return seededRecipe(seed, anchorOf(seed, nature), starOf(path));
+  return seededRecipe(seed, worldAnchor(id, seed, nature), starOf(path));
 }
