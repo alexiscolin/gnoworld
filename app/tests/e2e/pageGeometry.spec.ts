@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { calmed, pinFigures } from "./figures.ts";
 import { box, brightness, near } from "./geometry.ts";
 
 // Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
@@ -276,9 +277,12 @@ test.describe("at the video's size", () => {
     await plateAt(page, "/earth");
   });
 
-  test("the wide plate looks as approved, the header masked", async ({ page }) => {
+  test("the wide plate looks as approved, the header masked", async ({ page, context }) => {
+    // Its figures are the fixture's and the arrival's pill closed: the stack's live counts and today's stop never reach the picture.
+    await pinFigures(context);
     await page.goto("/earth");
     await hydrated(page);
+    await calmed(page);
     // The dock's room holds the Earth's chat, whose people and lines are the server's: chatDock.spec.ts holds its look.
     await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
     await expect(page).toHaveScreenshot("plate-wide-1728.png", { mask: [page.getByRole("banner")] });
