@@ -6,7 +6,6 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { Account } from "./testing/Account.tsx";
 
-
 // F5669: only the journeys mounted LoginControl, which StrykerJS does not run. The page's real login, its fetch and its
 // window.adena faked: the session read, a login, an account change, a network change, the page's leaving.
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");

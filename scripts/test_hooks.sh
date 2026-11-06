@@ -270,7 +270,10 @@ harnessed = sorted({f for f in on_disk if any(f.lower() == s or f.lower().starts
                    | {".claude/" + p for p in ("CLAUDE.md", "settings.json", "settings.local.json", "agents/a.md", "commands/a.md", "skills/a/SKILL.md", "rules/a.md", "hooks/a.sh", "workflows/a.js")})
 open_ = [f for f in harnessed if not any(b.match(f) for b in bans)]
 assert not open_, f"the sandbox lets a shell write these harness files: {open_}"
-copies = [f for f in harnessed if any(b.match(".stryker-tmp/sandbox-x/" + f) for b in bans)]
+# StrykerJS copies no file its ignorePatterns leave out (gitignore-like: a bare name at any depth, a leading / from the root).
+skipped = [s for s in json.load(open(os.path.join(root, "stryker.config.json")))["ignorePatterns"] if not s.startswith("!")]
+ignored = lambda f: any(fnmatch.fnmatchcase(f, s[1:]) if s.startswith("/") else fnmatch.fnmatchcase(f, s) if "/" in s else s in f.split("/") for s in skipped)
+copies = [f for f in harnessed if not ignored(f) and any(b.match(".stryker-tmp/sandbox-x/" + f) for b in bans)]
 assert not copies, f"a write ban reaches StrykerJS's copies of {copies}, which a merge check writes (F111)"
 PY
 # The full gate judges every harness mutant: an argument (--changed) would judge a part of them.

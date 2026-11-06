@@ -29,7 +29,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-
 const depsOf = (call: unknown[] | undefined) => call?.[0] as SessionDeps;
 
 describe("the login control", () => {
