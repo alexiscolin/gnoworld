@@ -62,6 +62,8 @@ test.describe("the chat as the video shows it", () => {
     );
     expect(rows.every(({ name, text }) => name.length > 0 && text === "")).toBe(true);
     await expect(links.first()).toHaveAccessibleName("Earth");
+    // The Earth is listed once, first.
+    await expect(worlds(page).getByRole("link", { name: "Earth" })).toHaveCount(1);
     await expect(links.filter({ has: page.locator("img") })).toHaveCount(count);
     const pictures = () =>
       worlds(page)
