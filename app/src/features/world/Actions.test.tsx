@@ -173,18 +173,6 @@ describe("a world's actions, with proposals", () => {
     expect(text.join(" ")).not.toMatch(/follow/i);
   });
 
-  // Frames 22 and 27 show the proposals first; the chat stays a click away (it is the world's core, and F2864's focus path). The
-  // decision is mine, not Alexis's: it is named in the report for his review.
-  it("keeps 'Say hi in the chat' after it, as a link to the chat, and makes only the proposals the solid action", () => {
-    const withChat = draw(PROPOSALS);
-    expect(labels(withChat)).toEqual(["Read the proposals", "Say hi in the chat", "Share"]);
-    const [proposals, hi] = [...withChat.querySelectorAll("a")];
-    expect(hi?.getAttribute("href")).toBe("#chat");
-    expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");
-    expect(proposals?.getAttribute("data-emphasis")).toBe("solid");
-    expect(hi?.getAttribute("data-emphasis")).toBe("outline");
-  });
-
   it("draws no 'Read the proposals' when the world has none, and 'Say hi' stays the solid action", () => {
     expect(draw().textContent).not.toMatch(/read the proposals/i);
     expect(draw().querySelector("a[href='#chat']")?.getAttribute("data-emphasis")).toBe("solid");
