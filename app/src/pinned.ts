@@ -18,9 +18,10 @@ export interface PinnedRow {
 }
 
 /** A world's pinned rows, each with its view in the world's universe. */
-export const pinnedOf = (rows: readonly PinnedRow[], universe: { id: string; isDefault: boolean }): PinnedCall[] =>
-  rows.map(({ label, realm, function: name, args }) => ({
+export function pinnedOf(rows: readonly PinnedRow[], universe: { id: string; isDefault: boolean }): PinnedCall[] {
+  return rows.map(({ label, realm, function: name, args }) => ({
     label,
     action: { realm, function: name, args },
     view: realmViewOf(universe, realm),
   }));
+}
