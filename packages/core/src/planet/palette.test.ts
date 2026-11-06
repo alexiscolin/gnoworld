@@ -159,23 +159,32 @@ describe("a world's palette", () => {
     }
   });
 
+  // The sources are the ramps the world grows: its row's, or a temperate world's other plants by its realm namespace's star.
+  const sourcesOf = (path: Uint8Array, anchor: Anchor) => {
+    const namespace = /^gno\.land\/r\/([^/]+)/.exec(String.fromCharCode(...path))?.[1];
+    return plantsOf(sha256(planetSeed(path)), anchor, namespace === undefined ? undefined : starWarmth(namespace));
+  };
+  const bounded = (path: Uint8Array, anchor: Anchor) => {
+    const { palette } = planetRecipe(path, anchor);
+    const [one, other] = sourcesOf(path, anchor);
+    for (const index of [0, 1, 2] as const) {
+      const most = Math.max(chroma(cieLab(one[index])), chroma(cieLab(other[index])));
+      expect(chroma(palette.lab[index])).toBeLessThanOrEqual(most + 1e-6);
+      expect(palette.lab[index][0]).toBeGreaterThanOrEqual(0);
+      expect(palette.lab[index][0]).toBeLessThanOrEqual(100);
+      for (const channel of palette.linear[index]) {
+        expect(channel).toBeGreaterThanOrEqual(0);
+        expect(channel).toBeLessThanOrEqual(1);
+      }
+    }
+  };
+
+  it("holds a temperate world's chroma to its own purple plants', not the Earth's row's (gno.land/r/__/kx6__all_6r)", () => {
+    bounded(asciiBytes("gno.land/r/__/kx6__all_6r"), "temperate");
+  });
+
   it("never grows a colour's chroma past its sources': plausible, never neon, in a system or out of one", () => {
-    fc.assert(
-      fc.property(anyPath, fc.constantFrom(...ANCHORS), (path, anchor) => {
-        const { palette } = planetRecipe(path, anchor);
-        const [one, other] = ROWS[anchor].palettes;
-        for (const index of [0, 1, 2] as const) {
-          const most = Math.max(chroma(cieLab(one[index])), chroma(cieLab(other[index])));
-          expect(chroma(palette.lab[index])).toBeLessThanOrEqual(most + 1e-6);
-          expect(palette.lab[index][0]).toBeGreaterThanOrEqual(0);
-          expect(palette.lab[index][0]).toBeLessThanOrEqual(100);
-          for (const channel of palette.linear[index]) {
-            expect(channel).toBeGreaterThanOrEqual(0);
-            expect(channel).toBeLessThanOrEqual(1);
-          }
-        }
-      }),
-    );
+    fc.assert(fc.property(anyPath, fc.constantFrom(...ANCHORS), bounded));
   });
 
   it("spreads lightness and chroma over their whole grade", () => {
