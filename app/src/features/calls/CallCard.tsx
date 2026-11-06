@@ -123,17 +123,24 @@ function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
       {rows.map(({ field, index }) => {
         const text = card.texts[index] ?? "";
         const problem = problems[index];
+        const name = field.name === "" ? `Argument ${String(index + 1)}` : field.name;
         return (
-          <Field
-            key={index}
-            label={field.name === "" ? `Argument ${String(index + 1)}` : field.name}
-            value={text}
-            onChange={(next) => {
-              onEdit(index, next);
-            }}
-            {...(field.freeText ? { help: publicForever(card.realm) } : {})}
-            {...(problem !== undefined && text !== "" ? { error: sayProblem(problem) } : {})}
-          />
+          <Stack key={index} space="2xs">
+            {/* The frames draw a name in its own case, mono: the field's caps label stays for assistive technology. */}
+            <span aria-hidden="true" className={styles["name"]}>
+              {name}
+            </span>
+            <Field
+              hideLabel
+              label={name}
+              value={text}
+              onChange={(next) => {
+                onEdit(index, next);
+              }}
+              {...(field.freeText ? { help: publicForever(card.realm) } : {})}
+              {...(problem !== undefined && text !== "" ? { error: sayProblem(problem) } : {})}
+            />
+          </Stack>
         );
       })}
     </Stack>

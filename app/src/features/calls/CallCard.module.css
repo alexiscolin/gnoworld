@@ -79,6 +79,11 @@
     white-space: pre-wrap;
   }
 
+  /* An argument's name as the frames draw it: its own case, in the data's mono. */
+  .name {
+    font: var(--font-data);
+  }
+
   .status:empty {
     display: none;
   }

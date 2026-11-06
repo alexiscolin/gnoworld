@@ -95,6 +95,17 @@ describe("CallCard, the preview", () => {
     expect(inputs.map((input) => input.labels?.[0]?.textContent)).toEqual(["bio", "times"]);
   });
 
+  // F5966: the frames draw an argument's name in its own case, mono; the caps label would turn a Go name (bio) into BIO.
+  it("draws each argument's name in its own case, aside the caps label, which its field keeps for assistive technology", () => {
+    const box = view();
+    const names = all(box, "[class*='name']");
+    expect(names.map((name) => name.textContent)).toEqual(["bio", "times"]);
+    expect(names.every((name) => name.getAttribute("aria-hidden") === "true")).toBe(true);
+    const labels = all(box, "label");
+    expect(labels.map((label) => label.textContent)).toEqual(["bio", "times"]);
+    expect(labels.some((label) => label.classList.contains("label"))).toBe(false);
+  });
+
   it("warns under a text field only, with the realm named: 'This text goes to {realm} on gno.land, publicly and forever'", () => {
     const box = view();
     const warning = `This text goes to ${REALM} on gno.land, publicly and forever`;
