@@ -94,7 +94,7 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
   const navigate = useNavigate();
   const { key } = useLocation();
   return (
-    <section aria-labelledby="realm-title">
+    <section aria-labelledby="realm-title" className={styles["view"]}>
       <Center gutter="all">
         <Stack space="m">
           <Cluster space="s">

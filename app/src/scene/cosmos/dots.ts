@@ -1,0 +1,115 @@
+// Worlds from afar: one draw of points around their stars. A point's size and light come from the ladder, written at each look, so no world
+// keeps a size as the eye leaves. Its orbit runs in the vertex shader, and it is a soft glint added to the light around it, so a crowd reads
+// as warm dust round its star, never as black dots.
+import type { Point } from "@gnoworld/core";
+import { AdditiveBlending, ShaderMaterial, type Object3D } from "three";
+import type { Disposer } from "../disposer.ts";
+import { pointCloud, type Cloud } from "./cloud.ts";
+
+interface DotLook {
+  /** Its orbit's radius, its phase, its star's spin. */
+  readonly orbit: readonly [number, number, number];
+  /** Its system's plane: the line of nodes, then the tilt, in radians. */
+  readonly plane: readonly [number, number];
+  readonly tint: readonly [number, number, number];
+  /** Its radius in pixels, and its light. */
+  readonly size: readonly [number, number];
+}
+
+/** Which way a world stands from its star, its orbit's radius, phase and its star's spin given, in its system's plane (line of nodes, then
+ * tilt, as core's `onPlane`): the one place a world's point and its lines take it, at any distance (GLSL). */
+export const ORBITING = /* glsl */ `
+vec3 orbiting(vec3 orbit, vec2 plane, float seconds) {
+  float angle = orbit.y + orbit.z * seconds;
+  vec2 node = vec2(cos(plane.x), sin(plane.x));
+  vec2 tilt = vec2(cos(plane.y), sin(plane.y));
+  return cos(angle) * vec3(node.x, 0.0, node.y) + sin(angle) * vec3(-node.y * tilt.x, -tilt.y, node.x * tilt.x);
+}`;
+
+// A far body's light, FAR_ANGLE from the eye, on the side its star stands (planet/light.ts).
+const VERTEX = /* glsl */ `
+const vec2 SIDE = vec2(0.906, 0.423);
+attribute vec3 aOrbit;
+attribute vec2 aPlane;
+attribute vec3 aTint;
+attribute vec2 aSize;
+uniform float uSeconds;
+uniform float uRatio;
+varying vec3 vTint;
+varying float vLight;
+varying vec3 vStar;
+${ORBITING}
+void main() {
+  vec3 out_ = orbiting(aOrbit, aPlane, uSeconds);
+  vTint = aTint;
+  vLight = aSize.y;
+  vec2 side = normalize((mat3(modelViewMatrix) * -out_).xy + vec2(1.0e-4, 0.0));
+  vStar = vec3(side * SIDE.x, SIDE.y);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position + out_ * aOrbit.x, 1.0);
+  gl_PointSize = 2.0 * aSize.x * uRatio;
+}`;
+
+const FRAGMENT = /* glsl */ `
+uniform float uFade;
+varying vec3 vTint;
+varying float vLight;
+varying vec3 vStar;
+void main() {
+  vec2 at = gl_PointCoord * 2.0 - 1.0;
+  at.y = -at.y;
+  float reach = dot(at, at);
+  if (reach >= 1.0) discard;
+  vec3 normal = vec3(at, sqrt(1.0 - reach));
+  float lit = smoothstep(-0.16, 0.95, dot(normal, vStar));
+  gl_FragColor = vec4(vTint * (0.2 + 0.9 * lit) * vLight * uFade * (1.0 - smoothstep(0.45, 1.0, reach)), 1.0);
+  #include <tonemapping_fragment>
+  #include <colorspace_fragment>
+}`;
+
+export class Dots {
+  readonly #cloud: Cloud<"position" | "aOrbit" | "aPlane" | "aTint" | "aSize">;
+  readonly #seconds = { value: 0 };
+  readonly #ratio = { value: 1 };
+  /** How much of them shows: the whole cosmos takes the rest. */
+  readonly fade = { value: 1 };
+
+  constructor(parent: Object3D, owner: Disposer, most: number) {
+    const material = new ShaderMaterial({
+      blending: AdditiveBlending,
+      depthWrite: false,
+      transparent: true,
+      uniforms: { uSeconds: this.#seconds, uRatio: this.#ratio, uFade: this.fade },
+      vertexShader: VERTEX,
+      fragmentShader: FRAGMENT,
+    });
+    this.#cloud = pointCloud(parent, owner, {
+      most,
+      items: { position: 3, aOrbit: 3, aPlane: 2, aTint: 3, aSize: 2 },
+      material,
+    });
+  }
+
+  resize(ratio: number): void {
+    this.#ratio.value = ratio;
+  }
+
+  /** The clock their orbits run on. */
+  advance(seconds: number): void {
+    this.#seconds.value = seconds;
+  }
+
+  /** Sets point `index`: around the star at `at`. */
+  set(index: number, { x, y, z }: Point, { orbit, plane, tint, size }: DotLook): void {
+    const { position, aOrbit, aPlane, aTint, aSize } = this.#cloud.attributes;
+    position.setXYZ(index, x, y, z);
+    aOrbit.setXYZ(index, ...orbit);
+    aPlane.setXY(index, ...plane);
+    aTint.setXYZ(index, ...tint);
+    aSize.setXY(index, ...size);
+  }
+
+  /** Shows the first `count`. */
+  commit(count: number): void {
+    this.#cloud.commit(count);
+  }
+}

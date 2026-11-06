@@ -1,9 +1,11 @@
 import { adena } from "./adena.ts";
+import { logIn } from "./irc.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { accountPill, logOutHere, phoneWith } from "./account.ts";
 
 // The login, end to end (slice 4's 4a): the page, a stand-in for Adena (adena.ts), the static host and the real
 // server behind its /api.
-const logInButton = (page: Page) => page.getByRole("button", { name: "Log in with Adena" });
+const logInButton = (page: Page) => page.getByRole("button", { name: "Connect Adena" });
 
 test.describe("the login with Adena", () => {
   test("signs the server's text unchanged, and the server takes the proof: logged in, across a reload", async ({
@@ -15,7 +17,7 @@ test.describe("the login with Adena", () => {
     const challenge = page.waitForResponse((response) => response.url().endsWith("/api/login/challenge"));
     await logInButton(page).click();
     const { text } = (await (await challenge).json()) as { text: string };
-    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    await expect(accountPill(page)).toBeVisible();
     const asked = await page.evaluate(() => (window as unknown as { __asked: { data: string }[] }).__asked);
     expect(asked.map((params) => params.data)).toEqual([text]);
     const { address } = (await (await page.request.get("/__wallet")).json()) as { address: string };
@@ -42,7 +44,7 @@ test.describe("the login with Adena", () => {
     await page.goto("/");
     await hydrated(page);
     await logInButton(page).click();
-    await page.getByRole("button", { name: "Log out" }).click();
+    await logOutHere(page);
     await expect(logInButton(page)).toBeVisible();
     await page.reload();
     await hydrated(page);
@@ -86,6 +88,25 @@ test.describe("on a phone", () => {
   });
 });
 
+// 8p's red pass (medium): the way out moved into the account's menu, which a phone given a computer's session must still reach.
+test("logs out of a phone through the account's menu, the session handed from a computer", async ({
+  page,
+  playwright,
+  launchOptions,
+}) => {
+  await logIn(page);
+  const { phone, close } = await phoneWith(page, { playwright, launchOptions });
+  await phone.goto("/");
+  await hydrated(phone);
+  await accountPill(phone).tap();
+  await phone.getByRole("menuitem", { name: "Log out" }).tap();
+  await expect(accountPill(phone)).toHaveCount(0);
+  expect(await phone.evaluate(async () => (await fetch("/api/login/me")).json() as Promise<unknown>)).toEqual({
+    address: null,
+  });
+  await close();
+});
+
 test.describe("Adena's code", () => {
   // Adena's calls (connect, sign) are the login's click's: a page that never logs in does not load them, and the click
   // asks for them (docs/decisions.md, 2026-10-28).
@@ -103,7 +124,7 @@ test.describe("Adena's code", () => {
     const before = (await Promise.all(bodies)).join("\n");
     expect(before.includes(ADENA_CALLS), "the page's scripts hold Adena's calls").toBe(false);
     await logInButton(page).click();
-    await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+    await expect(accountPill(page)).toBeVisible();
     const after = (await Promise.all(bodies)).join("\n");
     expect(after.includes(ADENA_CALLS), "the click loaded Adena's calls").toBe(true);
   });

@@ -14,24 +14,17 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
-from repo_files import git
+from repo_files import changed_lines
 
 base = sys.argv[1]
 floor = float(sys.argv[2]) if len(sys.argv) > 2 else 85.0
-diff = git("diff", "-U0", base, "--", "*.ts", "*.tsx")
+changed = {os.path.realpath(path): lines for path, lines in changed_lines(base, "--", "*.ts", "*.tsx").items()}
 
-changed, current = {}, None
-for line in diff.splitlines():
-    if line.startswith("+++ "):
-        current = None if line == "+++ /dev/null" else os.path.realpath(line[6:])
-    elif line.startswith("@@") and current:
-        m = re.match(r"@@ -\S+ \+(\d+)(?:,(\d+))? @@", line)
-        if m:
-            start, count = int(m.group(1)), int(m.group(2) or 1)
-            changed.setdefault(current, set()).update(range(start, start + count))
-
-with open("coverage/coverage-final.json") as f:
-    report = {os.path.realpath(k): v for k, v in json.load(f).items()}
+try:
+    with open("coverage/coverage-final.json") as f:
+        report = {os.path.realpath(k): v for k, v in json.load(f).items()}
+except OSError as e:  # a coverage run that failed leaves none: Vitest deletes coverage/ and writes no report on failure
+    sys.exit(f"patch_coverage: no coverage report (coverage/coverage-final.json): {e.strerror}; the coverage run failed or did not run")
 
 total = run = 0
 # Tests and configs are never measured (Storybook's config and the tests' setup are of those); nor

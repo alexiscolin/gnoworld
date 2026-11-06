@@ -38,8 +38,44 @@ async function answers(page: Page, options: Options = {}) {
   });
   return asked;
 }
-/** The home with its read answered, hydrated. */
+// 7t: the chain's trends, as the server answers them from its worlds job and who is here; days gone by, so their words stand still.
+const TRENDS = {
+  items: [
+    {
+      kind: "trending",
+      by: "transactions",
+      world: "gnoswap/pool",
+      realm: "gno.land/r/gnoswap/pool",
+      title: "pool",
+      count: 45,
+      rise: 1.2,
+      since: "2026-10-30T09:00:00.000Z",
+      at: "2026-10-30T09:31:00.000Z",
+    },
+    { kind: "rising", world: "bubble", rise: 0.45, at: "2026-10-30T09:39:00.000Z" },
+    {
+      kind: "new",
+      world: "alexis/blog",
+      realm: "gno.land/r/alexis/blog",
+      title: "blog",
+      at: "2026-10-30T22:10:00.000Z",
+    },
+  ],
+};
+/** The server's trends, answered as `answer` says: a body, or a status alone. */
+const trendsServed = (page: Page, answer: { body: unknown } | { status: number } = { body: TRENDS }) =>
+  page.route("**/api/trends", (route) =>
+    "body" in answer
+      ? route.fulfill({ contentType: "application/json", body: JSON.stringify(answer.body) })
+      : route.fulfill({ status: answer.status }),
+  );
+/** Waits for the server's trends to lead the ticker, before what is on air (8i, onAir.json) and the news: the strip then holds the line it
+ * keeps, six items. */
+const trendsShown = (page: Page) =>
+  expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["Trending", "Rising", "New", "On air", "News", "News"]);
+/** The home with its reads answered, hydrated: the prices' file, and the server's trends. */
 async function openHome(page: Page, options: Options = { markets: MARKETS }, path = "/") {
+  await trendsServed(page);
   const asked = await answers(page, options);
   await page.goto(path);
   await hydrated(page);
@@ -83,7 +119,8 @@ test.describe("the home at the video's size", () => {
     expect(lefts).toEqual([...lefts].sort((a, b) => a - b));
     near(lefts[0] ?? 0, 48, "the first token's left");
     await expect(row).toContainText("CoinGecko");
-    await expect(row).toContainText(/\$1\.23\b/);
+    // 8i: frame 6's "0.398 USD", the price and its unit raised.
+    await expect(row).toContainText(/T1\.23 USD/);
     await expect(row).not.toContainText(/online/i);
   });
 
@@ -144,6 +181,7 @@ test.describe("the home at the video's size", () => {
   }) => {
     await openHome(page);
     await expect(page.locator("[data-ticker]")).toBeVisible();
+    await trendsShown(page);
     const links = page.locator("[data-ticker] a");
     expect(await links.count()).toBeGreaterThan(3);
     // A pass takes 60 s: the animation is put 10 ms from its end, and held there.
@@ -160,6 +198,71 @@ test.describe("the home at the video's size", () => {
     );
     const first = await box(page, "[data-ticker] a >> nth=0");
     expect(first.x + first.width).toBeLessThanOrEqual(clip.x + clip.width + 1);
+  });
+
+  test("leads the ticker with the chain's trends from the server, each in its word, linked to its world's page here (7t)", async ({
+    page,
+  }) => {
+    await openHome(page);
+    await trendsShown(page);
+    expect(await style(page, "[data-ticker] [data-kind]", "text-transform")).toBe("uppercase");
+    const links = page.locator("[data-ticker] a");
+    await expect(links.nth(0)).toHaveText("pool · 45 calls in 31 min");
+    await expect(links.nth(1)).toHaveText("Bubble · +45% this hour");
+    await expect(links.nth(2)).toHaveText("blog · first seen 30 Oct 22:10 UTC");
+    const trends = await links.evaluateAll((all) =>
+      all
+        .slice(0, 3)
+        .map((link) => [link.getAttribute("href"), link.getAttribute("target"), link.getAttribute("title") !== null]),
+    );
+    expect(trends).toEqual([
+      ["/r/gnoswap/pool", null, true],
+      ["/w/bubble", null, true],
+      ["/r/alexis/blog", null, true],
+    ]);
+    await expect(page.locator("[data-ticker]")).not.toContainText(/date to be confirmed/i);
+  });
+
+  for (const [name, answer] of [
+    ["no trend", { body: { items: [] } }],
+    ["a failing server", { status: 502 }],
+    ["an answer its schema refuses", { body: { items: [{ kind: "trending", by: "transactions", count: -1 }] } }],
+  ] as const) {
+    test(`holds the dated news alone with ${name}, and never an event that waits for its date (7t)`, async ({
+      page,
+    }) => {
+      await trendsServed(page, answer);
+      await answers(page, { markets: MARKETS });
+      const read = page.waitForResponse("**/api/trends");
+      await page.goto("/");
+      await hydrated(page);
+      await read;
+      // The answer is in: a trend drawn from it would show within this second.
+      await page.waitForTimeout(1000);
+      await expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["On air", "News", "News", "News"]);
+      await expect(page.locator("[data-ticker]")).not.toContainText(/date to be confirmed/i);
+    });
+  }
+
+  test("asks the server's trends on the default universe's home alone, once a visit: the job reads no other (7t)", async ({
+    page,
+  }) => {
+    let asked = 0;
+    await page.route("**/api/trends", (route) => {
+      asked += 1;
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify(TRENDS) });
+    });
+    await answers(page, { markets: MARKETS });
+    await page.goto("/net/gnoland");
+    await hydrated(page);
+    await expect(page.locator("[data-ticker] [data-kind]")).toHaveText(["News", "News", "News"]);
+    await page.waitForTimeout(1000);
+    expect(asked).toBe(0);
+    await page.goto("/");
+    await hydrated(page);
+    await trendsShown(page);
+    await page.waitForTimeout(1000);
+    expect(asked).toBe(1);
   });
 
   test("stands still under the pointer and under keyboard focus, so a link does not move while it is aimed at", async ({
@@ -202,13 +305,18 @@ test.describe("the home at the video's size", () => {
   });
 
   test("keeps the strip out of the way of the hero: the actions stay above it and take the click", async ({ page }) => {
+    // Nobody anywhere: Go explore goes to today's next stop (slice 8, a hub's or a realm's page, by the UTC day), so its click lands on one
+    // page (F4516).
+    await page.route("**/api/presence", (route) =>
+      route.fulfill({ body: JSON.stringify({ worlds: [] }), contentType: "application/json" }),
+    );
     await openHome(page);
     await expect(page.locator("[data-ticker]")).toBeVisible();
     const strip = await box(page, "[data-ticker]");
     const live = await box(page, "[data-hero='markets']");
     expect(live.y + live.height).toBeLessThanOrEqual(strip.y);
     await page.getByRole("link", { name: /go explore/i }).click();
-    await expect(page).toHaveURL(/\/earth$/);
+    await expect(page).toHaveURL(/\/(?:w|r)\/[^/]/);
   });
 
   test("has no accessibility violation, the live line and the ticker included", async ({ page }) => {
@@ -380,6 +488,7 @@ test.describe("the home's live line at every stage and in every universe", () =>
     await page.emulateMedia({ reducedMotion: "reduce" });
     await openHome(page);
     await expect(page.locator("[data-ticker]")).toBeVisible();
+    await trendsShown(page);
     await expect(page.locator("[data-ticker]")).toHaveScreenshot("home-ticker.png");
   });
 });

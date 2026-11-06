@@ -37,6 +37,14 @@ describe("Proposal", () => {
     expect(valid({ threshold: share })).toBe(false);
   });
 
+  it.each([-0.1, 100.1, Number.NaN, "0"])(
+    "refuses the no share %j, which an open proposal's page gives (F4308)",
+    (share) => {
+      expect(valid({ no: share })).toBe(false);
+      expect(valid({ no: 0 })).toBe(true);
+    },
+  );
+
   it("accepts the ends of a share, 0 and 100", () => {
     expect(valid({ yes: 0, threshold: 100 })).toBe(true);
   });

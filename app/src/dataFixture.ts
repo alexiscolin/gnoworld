@@ -29,7 +29,6 @@ const GOOD: Files = {
   ],
   "hubs.json": [{ slug: "bubble", name: "Bubble", description: "B".repeat(60), universe: "onyx" }],
   "ecosystems.json": [],
-  "stations.json": [],
   "genres.json": [],
   "events.json": [],
   "expedition.json": [],
@@ -42,7 +41,11 @@ const GOOD: Files = {
     readLast: 500,
     maxAgeSeconds: 300,
   },
+  "earthOrbit.json": [{ name: "gnosh.ai", url: "https://gnosh.ai" }],
+  "earthRooms.json": [{ room: "#earth/lisbon", lat: 38.7, lon: -9.1 }],
   "news.json": [{ id: "n1", title: "News", date: "2026-10-29", link: "https://gno.land/" }],
+  "xPosts.json": [],
+  "onAir.json": [],
 };
 
 /** A copy of the good files with one changed, written to a new directory; returns the directory. */

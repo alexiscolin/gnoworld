@@ -14,7 +14,10 @@ import { originsOf } from "../../src/cspOrigins.ts";
 import { dropSockets, relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
 import { headerRules } from "./cspFiles.mjs";
 
-const root = fileURLToPath(new URL("../../build/client/", import.meta.url));
+// GNOWORLD_BUILD names another build folder (the commit's gate reads the first screen's budget from its own, react-router.config.ts).
+const built = process.env.GNOWORLD_BUILD;
+const root =
+  built === undefined ? fileURLToPath(new URL("../../build/client/", import.meta.url)) : join(built, "client", "/");
 // The policy of each page the build wrote (src/csp.ts), by its address, as a host that reads _headers sends it. Every other
 // answer (a file, a 400, a 401, a 500) gets the one with no hash, as nginx's map sends its default.
 const RULES = headerRules(readFileSync(join(root, "_headers"), "utf8"));
@@ -32,6 +35,7 @@ const TYPES = {
   ".xml": "application/xml",
   ".txt": "text/plain; charset=utf-8",
   ".png": "image/png",
+  ".webp": "image/webp",
   ".svg": "image/svg+xml",
   ".css": "text/css; charset=utf-8",
   ".woff2": "font/woff2",

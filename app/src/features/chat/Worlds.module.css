@@ -1,28 +1,56 @@
-/* The column of worlds: planets one under another at the video's 44 px, a ring around the one in view (frame 66). */
+/* The column of worlds: planets one under another at the video's 44 px, no text, a ring around the one in view (frame 80). */
 @layer components {
   .list {
     /* raw: the first planet stands 23 px under the region's top in the frame (76 - 53), 24 here */
     padding-block: var(--space-m) var(--space-s);
+    /* the frame's planets stand 23 px from the column's edge and 15 from its rule: the column's centre 4 px to the right */
+    padding-inline-start: var(--space-2xs);
   }
 
   .world {
     display: block;
-    border-radius: var(--radius-pill);
+    text-align: center;
+    text-decoration: none;
   }
 
   /* raw: the video's planet, 44 px: ui's thumb sizes are 32, 48 and 64, so the column sets its own (a new size is ui's to add) */
-  .world > span {
+  .world > span:first-child {
     /* raw: the video's planet is 44 px wide */
     inline-size: 44px;
     /* raw: the video's planet is 44 px high */
     block-size: 44px;
   }
 
-  /* The ring off the planet, outside the flow so the planets keep their step of 52: 54 px round a 44 px one, a line wide.
+  .planet {
+    display: block;
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+  }
+
+  .picture {
+    inline-size: 100%;
+    block-size: 100%;
+    vertical-align: top;
+  }
+
+  /* The ring off the planet, outside the flow so the planets keep their step of 52: 54 px round a 44 px one, two lines wide, 3 px off.
      A focused link keeps the focus ring, which is the same outline. */
-  .world[aria-current="page"]:not(:focus-visible) {
-    outline: var(--line-width) solid var(--color-text);
-    /* raw: the video's ring stands 4 px off the planet's edge (54 round 44, its line included) */
-    outline-offset: 4px;
+  .world[aria-current="page"]:not(:focus-visible) > span:first-child {
+    outline: calc(2 * var(--line-width)) solid var(--color-text);
+    /* raw: the video's ring stands 3 px off the planet's edge (54 round 44, its two lines included) */
+    outline-offset: 3px;
+  }
+
+  /* The textures' credit at the column's foot, in the label style, muted; its padding makes a target of 24 px at least. */
+  .credits {
+    display: block;
+    inline-size: 100%;
+    padding-block: var(--space-2xs);
+    text-align: center;
+    color: var(--color-text-muted);
+  }
+
+  .credits:hover {
+    color: var(--color-text);
   }
 }

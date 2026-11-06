@@ -2,3 +2,4 @@
 export { Actions } from "./Actions.tsx";
 export { Activity } from "./Activity.tsx";
 export { Here } from "./Here.tsx";
+export type { Ring } from "./statusRing.ts";

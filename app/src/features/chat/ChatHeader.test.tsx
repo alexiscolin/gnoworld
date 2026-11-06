@@ -39,7 +39,8 @@ describe("the chat's header", () => {
 
   it("puts the control to the rooms before the kicker, where a phone's header has it", () => {
     const box = mount(<ChatHeader kicker="k" title="t" onClose={none} rooms={<button type="button">Rooms</button>} />);
-    expect(box.firstElementChild?.firstElementChild?.textContent).toBe("Rooms");
+    // The control and the place share the header's first box, its first row on a narrow chat (7e changed this test: one level deeper).
+    expect(box.firstElementChild?.firstElementChild?.firstElementChild?.textContent).toBe("Rooms");
   });
 
   it("makes the name the menu's trigger, a chevron after it, the name still the level-2 heading", () => {

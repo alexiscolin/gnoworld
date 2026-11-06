@@ -309,7 +309,8 @@ describe("RoomView", () => {
   // The red pass (M12): a line that is a Markdown list holds list items of its own; the tab stop is the line's alone.
   it("gives a line that is a list one tab stop, its own items none", () => {
     const html = part(view({ state: { ...ROOM, lines: [line({ text: "- one\n- two" })] } }), "Messages");
-    expect(html.match(/tabindex=/g)).toHaveLength(1);
+    // The author's name, which opens their card (8d), is out of the Tab order: tabindex="-1", no stop.
+    expect(html.match(/tabindex="(?!-1")/g)).toHaveLength(1);
   });
 
   // 4c's message menu: Ergo's refusal of a delete, said in the room's flash.
@@ -570,9 +571,11 @@ describe("RoomView: what is new", () => {
   it("marks the first line past the reading place New, before its time, and that line alone", () => {
     const html = part(view({ state: { ...OPENED, lines: LINES, read: T(0) } }), "Messages");
     expect(items(html)).toEqual([
-      expect.stringMatching(/^g10gh7…3y5tv \d{2}:\d{2} /),
+      // An account's first words in a room whose history came: "new here" (8d).
+      expect.stringMatching(/^g10gh7…3y5tv (new here )?\d{2}:\d{2} /),
       expect.stringMatching(/^New( from here)? g10gh7…3y5tv \d{2}:\d{2} /),
-      expect.stringMatching(/^g10gh7…3y5tv \d{2}:\d{2} /),
+      // An account's first words in a room whose history came: "new here" (8d).
+      expect.stringMatching(/^g10gh7…3y5tv (new here )?\d{2}:\d{2} /),
     ]);
     expect(html.match(/data-new=""/g)).toHaveLength(1);
   });
@@ -639,7 +642,8 @@ describe("RoomView: reactions", () => {
 
   it("shows a line's reactions to a guest as words it cannot press", () => {
     const html = view({ state: { ...ROOM, lines: TWO, reactions: REACTIONS } });
-    expect(part(html, "Messages")).not.toContain("<button");
+    // The authors' names open their cards (8d): no other button.
+    expect(part(html, "Messages").match(/<button(?![^>]*aria-haspopup="dialog")/g)).toBeNull();
     expect(linesOf(html)[0]).toMatch(/first👍 2😂 1$/);
   });
 
@@ -675,7 +679,8 @@ describe("RoomView: reactions", () => {
     const lines = ["a", "b", "c"].map((id) => line({ id, text: id }));
     const reactions = lines.flatMap(({ id }) => MANY.map((each) => ({ ...each, id: `${each.id}${id}`, to: id })));
     const html = part(view({ me: BOB, onReact: () => true, state: { ...ROOM, lines, reactions } }), "Messages");
-    expect(html.match(/<button/g)).toHaveLength(60);
+    // The authors' names, which open their cards (8d), are no chips.
+    expect(html.match(/<button(?![^>]*aria-haspopup="dialog")/g)).toHaveLength(60);
   });
 
   // R8: a reaction names a msgid; another room's line of that msgid is not its line.

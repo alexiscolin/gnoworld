@@ -19,6 +19,8 @@ export interface Line {
   readonly reply?: string;
   /** The msgid of the line it corrects (4d's edits shown, +gnoworld/edit), a msgid a tag carries; none for the rest. */
   readonly edits?: string;
+  /** The country its speaker declares (+gnoworld/country, two capitals), never guessed; none for a speaker who declares none. */
+  readonly country?: string;
 }
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl), its names being ASCII alone
@@ -80,6 +82,9 @@ export function isTagMsgid(value: string): boolean {
 export const REPLY = ["+reply", "+draft/reply"];
 // The line a message corrects: our own tag, no IRCv3 one existing (docs/decisions.md, 2026-10-21).
 const EDIT = ["+gnoworld/edit"];
+// The speaker's country, a client's tag (ADR-0001 §7): any client may write anything there, so it is two capitals or none.
+const COUNTRY = ["+gnoworld/country"];
+export const isCountryCode = (value: string): boolean => /^[A-Z]{2}$/.test(value);
 
 /** The first of these tags whose value `fits`, or none. */
 export function first(
@@ -103,20 +108,28 @@ function textTo({ command, params }: IrcMessage, room: string): string | undefin
   return sent && sameName(target, room) && text !== "" ? text : undefined;
 }
 
+// What a line's client tags mark, none for a tag absent or malformed.
+function marked(tags: IrcMessage["tags"]): Pick<Line, "reply" | "edits" | "country"> {
+  const [reply, edits, country] = [
+    first(tags, REPLY, isTagMsgid),
+    first(tags, EDIT, isTagMsgid),
+    first(tags, COUNTRY, isCountryCode),
+  ];
+  return {
+    ...(reply === undefined ? {} : { reply }),
+    ...(edits === undefined ? {} : { edits }),
+    ...(country === undefined ? {} : { country }),
+  };
+}
+
 /** The room's line a message carries, or none: a PRIVMSG or NOTICE to this room with an id, a time and a
  * text; a private message, another room's line or a malformed one is none. */
 export function lineOf(message: IrcMessage, room: string): Line | undefined {
   const [text, marks, from] = [textTo(message, room), stamp(message.tags), nickOf(message.source ?? "")];
   const body = text === undefined ? undefined : said(message.command, text);
   if (marks === undefined || body === undefined || from === "") return undefined;
-  const { tags } = message;
-  const [account = "", reply, edits] = [
-    tags.get("account"),
-    first(tags, REPLY, isTagMsgid),
-    first(tags, EDIT, isTagMsgid),
-  ];
-  const marked = { ...(reply === undefined ? {} : { reply }), ...(edits === undefined ? {} : { edits }) };
-  return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked };
+  const account = message.tags.get("account") ?? "";
+  return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked(message.tags) };
 }
 
 // By time alone: JS sorts stably, so lines of one millisecond keep the order they came in (F773).

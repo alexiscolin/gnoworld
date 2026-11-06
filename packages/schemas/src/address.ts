@@ -42,6 +42,9 @@ export const Address = z
   .brand<"Address">();
 export type Address = z.infer<typeof Address>;
 
+/** An address's first six and last five characters, as the login shows one's own. */
+export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
+
 // The address a key's 20-byte hash spells: the inverse of the check above, so the tests' wallet
 // names its account as the chain would. A string: only the schema makes an Address.
 export function toAddress(hash: Uint8Array): string {

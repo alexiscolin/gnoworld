@@ -1,5 +1,6 @@
 // What the chat's journeys share (slice 4): a word of a test's own, the room's lines and people, and an account of
 // the test's own in #games.
+import type { Locator } from "@playwright/test";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 
@@ -9,6 +10,8 @@ const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
 /** A room's lines: the Messages list's own items, never those of a line that is a list (F814). */
 export const lines = (page: Page) => messages(page).locator(":scope > li");
 export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText: text });
+/** A line's buttons but its author's name, which opens the person's card (5a1e8335): the chips, the bar, the players. */
+export const buttonsOf = (line: Locator) => line.locator("button:not([data-author] > button)");
 export const whoIsHere = (page: Page) => page.getByRole("region", { name: "Who's here" });
 /** The polite status that tells a screen reader a notice came: apart from the rooms' list, which a phone hides. */
 export const noticeStatus = (page: Page) => page.locator('p[role="status"].visually-hidden');

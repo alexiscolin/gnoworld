@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
-import { all, click, faceOf, follows, mount, nth, one } from "../../../tests/mount.tsx";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { mountInStore } from "../../../tests/inStore.tsx";
+import { all, click, faceOf, follows, mount, nth, one, settled } from "../../../tests/mount.tsx";
+import { shortAddress } from "./names.ts";
 import { People } from "./People.tsx";
 
 // 5q: "Here now" as the video's info panel draws it (frame 23.58.01): each person's nebula, their name, a rule under each row. The list and the way to write to a person stay (4e): the
@@ -47,5 +49,42 @@ describe("who is here, as the info panel shows it", () => {
     click(writes);
     expect(onMessage).toHaveBeenCalledWith(ALICE);
     expect(all(nth(all(box, "li"), 1), "button")).toHaveLength(0);
+  });
+});
+
+describe("who is here, with Follow", () => {
+  const followed = async (over: Partial<Parameters<typeof People>[0]>) => {
+    const { box } = await mountInStore(
+      <People members={["guest-ab12cd", ALICE, BOB]} connected me={BOB} onMessage={undefined} canFollow {...over} />,
+    );
+    return box;
+  };
+  const rowOf = (box: HTMLElement, who: string) => all(box, "li").find((row) => row.textContent.includes(who)) ?? box;
+  const hasFollow = (row: HTMLElement) => all(row, "button").some((each) => each.textContent === "Follow");
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  it("offers it for another account alone: no guest's nick, not oneself", async () => {
+    const box = await followed({});
+    await settled(() => hasFollow(rowOf(box, shortAddress(ALICE))));
+    expect(hasFollow(rowOf(box, "guest-ab12cd"))).toBe(false);
+    expect(hasFollow(rowOf(box, shortAddress(BOB)))).toBe(false);
+    expect(all(box, "button").filter((each) => each.textContent === "Follow")).toHaveLength(1);
+  });
+
+  it("offers it to nobody unless the list says it can", async () => {
+    const box = await followed({ canFollow: false });
+    expect(all(box, "button")).toHaveLength(0);
+  });
+
+  it("follows the account by its address", async () => {
+    const box = await followed({});
+    await settled(() => hasFollow(rowOf(box, shortAddress(ALICE))));
+    click(all(rowOf(box, shortAddress(ALICE)), "button").find((each) => each.textContent === "Follow"));
+    expect(JSON.parse(localStorage.getItem("gnoworld:device:follows") ?? "null")).toEqual({
+      worlds: [],
+      people: [ALICE],
+    });
   });
 });

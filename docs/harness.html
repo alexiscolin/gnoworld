@@ -1,253 +1,242 @@
 <!doctype html>
-<!-- The source of docs/harness.png; docs/HARNESS.md says how to render it again. -->
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>gnoworld: how the AI works</title>
-    <style>
-      :root {
-        --ink: #1d2433;
-        --muted: #5b6475;
-        --line: #d9dde5;
-        --page: #f6f7f9;
-        --card: #ffffff;
-        --code: #eef1f6;
-        --human: #c2334d;
-        --chief: #2f5bd3;
-        --branch: #0f8a7e;
-        --agent: #8a4fb0;
-        --gate: #2e8540;
-        --memory: #b7791f;
-      }
-      * {
-        box-sizing: border-box;
-        margin: 0;
-      }
-      body {
-        width: 1600px;
-        padding: 40px 44px 44px;
-        background: var(--page);
-        color: var(--ink);
-        font: 15px/1.45 -apple-system, "Helvetica Neue", Arial, sans-serif;
-      }
-      h1 {
-        font-size: 36px;
-        letter-spacing: -0.5px;
-      }
-      .lead {
-        color: var(--muted);
-        font-size: 17px;
-        margin-top: 6px;
-        max-width: 1200px;
-      }
-      code {
-        font: 12.5px/1.3 "SF Mono", Menlo, monospace;
-        background: var(--code);
-        border-radius: 4px;
-        padding: 0 4px;
-      }
-      .lane {
-        margin-top: 26px;
-        display: grid;
-        grid-template-columns: 190px 1fr;
-        gap: 18px;
-        align-items: stretch;
-      }
-      .who {
-        border-radius: 10px;
-        color: #fff;
-        background: var(--accent);
-        padding: 16px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-      }
-      .who b {
-        font-size: 20px;
-      }
-      .who span {
-        font-size: 13px;
-        opacity: 0.9;
-        margin-top: 4px;
-      }
-      .steps {
-        display: flex;
-        align-items: stretch;
-        gap: 0;
-      }
-      .step {
-        flex: 1;
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-top: 4px solid var(--accent);
-        border-radius: 8px;
-        padding: 10px 12px;
-        font-size: 13.5px;
-      }
-      .step h3 {
-        font-size: 15px;
-        margin-bottom: 4px;
-      }
-      .arrow {
-        align-self: center;
-        width: 30px;
-        text-align: center;
-        color: var(--muted);
-        font-size: 22px;
-      }
-      .loop {
-        border: 2px dashed var(--branch);
-        border-radius: 14px;
-        padding: 14px 14px 10px;
-        position: relative;
-      }
-      .loop .tag {
-        position: absolute;
-        top: -12px;
-        left: 18px;
-        background: var(--page);
-        padding: 0 8px;
-        color: var(--branch);
-        font-weight: 700;
-        font-size: 13px;
-        letter-spacing: 1px;
-        text-transform: uppercase;
-      }
-      .back {
-        text-align: right;
-        color: var(--branch);
-        font-size: 13px;
-        margin-top: 8px;
-      }
-      .row2 {
-        margin-top: 30px;
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 18px;
-      }
-      .box {
-        background: var(--card);
-        border: 1px solid var(--line);
-        border-left: 6px solid var(--accent);
-        border-radius: 8px;
-        padding: 14px 16px;
-      }
-      .box h2 {
-        font-size: 17px;
-        margin-bottom: 6px;
-        color: var(--accent);
-      }
-      ul {
-        padding-left: 18px;
-        font-size: 13.5px;
-      }
-      li + li {
-        margin-top: 3px;
-      }
-      .legend {
-        margin-top: 26px;
-        color: var(--muted);
-        font-size: 13px;
-      }
-    </style>
-  </head>
-  <body>
-    <h1>How the AI builds gnoworld</h1>
-    <p class="lead">
-      One slice at a time. Alexis decides; a chief session plans and integrates; each branch runs in a session and a
-      worktree of its own, as a loop the gate checks at every commit. Nothing reaches <code>main</code> without the
-      full gate, a recorded review and Alexis's merge.
-    </p>
-
-    <div class="lane" style="--accent: var(--human)">
-      <div class="who"><b>Alexis</b><span>decides, reviews, merges</span></div>
-      <div class="steps">
-        <div class="step"><h3>Approves the plan</h3>the slice's "done when", its threat model, its branches</div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Opens the sessions</h3>pastes each branch's brief, two branches at once at most</div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Reviews blind first</h3>in revdiff, before reading the agents' findings; picks from the low list</div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Runs what the sandbox refuses</h3><code>deploy/test.sh</code> (Docker) once per branch</div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Merges and pushes</h3><code>merge.sh</code> shows every harness file; then <code>git push</code></div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Accepts each rule</h3>the dream proposes, Alexis says yes or no, one by one</div>
-      </div>
-    </div>
-
-    <div class="lane" style="--accent: var(--chief)">
-      <div class="who"><b>Chief session</b><span>one per slice</span></div>
-      <div class="steps">
-        <div class="step"><h3>Plans</h3><code>/slice-plan</code> in <code>docs/plans/</code></div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Cuts and briefs</h3>branches that wait on none run side by side; a worktree each, by <code>worktree.sh</code></div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Integrates</h3>merges each finished branch into the slice</div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Full gate</h3><code>check.sh --full</code> on the tip <code>main</code> will take, then the last <code>/pre-merge</code></div>
-        <div class="arrow">→</div>
-        <div class="step"><h3>Dream</h3>one read-only agent over the reports, learnings, review log and ledger</div>
-      </div>
-    </div>
-
-    <div class="lane" style="--accent: var(--branch)">
-      <div class="who"><b>Branch session</b><span>one per branch, its own worktree</span></div>
-      <div class="loop">
-        <span class="tag">Workflow loop</span>
-        <div class="steps">
-          <div class="step" style="--accent: var(--branch)"><h3>Failing tests</h3>written first, seen failing</div>
-          <div class="arrow">→</div>
-          <div class="step" style="--accent: var(--agent)"><h3>Red pass</h3><code>test-auditor</code>: complete, relevant, riskiest first</div>
-          <div class="arrow">→</div>
-          <div class="step" style="--accent: var(--branch)"><h3>Code</h3>each commit through the fast gate</div>
-          <div class="arrow">→</div>
-          <div class="step" style="--accent: var(--gate)"><h3>Merge check</h3><code>check.sh --merge</code>: the lanes the change needs, the changed guards' mutants</div>
-          <div class="arrow">→</div>
-          <div class="step" style="--accent: var(--agent)"><h3>One review</h3><code>reviewer</code>; + <code>security-reviewer</code> for tier 1, <code>gno-auditor</code> for a realm</div>
-          <div class="arrow">→</div>
-          <div class="step" style="--accent: var(--agent)"><h3>Verify, fix</h3><code>finding-verifier</code> on tier 1; high and medium fixed test first, low listed</div>
-        </div>
-        <div class="back">↺ back to the merge check after the fixes · a second review only for a high tier-1 fix · three rounds at most</div>
-      </div>
-    </div>
-
-    <div class="row2">
-      <div class="box" style="--accent: var(--gate)">
-        <h2>The gate, at every step</h2>
-        <ul>
-          <li><b>Every edit and command:</b> <code>guard.py</code> and the sandbox (no hook skipped, no secret read, no harness edit in <code>main</code>)</li>
-          <li><b>Every turn:</b> the Stop hook wants the fast gate green on exactly this tree</li>
-          <li><b>Every commit:</b> the fast gate (five lanes, 30 s scoped, 120 s for everything), the secret scan</li>
-          <li><b>Every merge:</b> the full gate's lanes: coverage, mutations, regressions, the harness proving itself</li>
-          <li><b>Every push of main:</b> the full gate's record and the review pass, for exactly that tree</li>
-        </ul>
-      </div>
-      <div class="box" style="--accent: var(--agent)">
-        <h2>Agents</h2>
-        <ul>
-          <li>Fresh, briefed from files, never forks; four at most at once</li>
-          <li>Read-only: they report one row per finding, with its evidence</li>
-          <li>A finding is a claim until a command or a failing test shows it</li>
-          <li>Every finding goes to the ledger: fixed, rejected, intended, moot or asked</li>
-          <li>Tokens and hours per branch measured, against slice 4's</li>
-        </ul>
-      </div>
-      <div class="box" style="--accent: var(--memory)">
-        <h2>Memory lives in files</h2>
-        <ul>
-          <li><code>docs/plans/</code>: what to build, and when it is done</li>
-          <li><code>docs/decisions.md</code>: every decision of Alexis's, with its reason</li>
-          <li><code>docs/review/findings.md</code>: every finding, with its evidence</li>
-          <li>A state file per branch, one shared learnings file</li>
-          <li><code>CLAUDE.md</code> and <code>.claude/</code>: the rules, which the dream proposes to change</li>
-        </ul>
-      </div>
-    </div>
-
-    <p class="legend">
-      Red: Alexis · Blue: the chief session · Teal: a branch session · Purple: agents · Green: the gate · Gold: memory.
-      Details: docs/HARNESS.md, docs/REVIEW.md, CLAUDE.md.
-    </p>
-  </body>
-</html>
+<html lang="en"><head><meta charset="utf-8"><title>How the AI builds gnoworld</title><style>
+body { margin: 0; padding: 34px 20px 24px; background: #f6f7f9; color: #1f2937; font-family: Inter, -apple-system, "Helvetica Neue", Arial, sans-serif; }
+main { max-width: 1560px; margin: 0 auto; }
+h1 { font-size: 36px; margin: 0 0 8px; letter-spacing: -0.02em; }
+p { font-size: 16px; color: #5b6472; margin: 0 0 22px; }
+svg { display: block; width: 100%; height: auto; }
+.s { font-size: 12.5px; fill: #5b6472; }
+.t { font-size: 14.5px; font-weight: 650; fill: #1f2937; }
+.h { font-size: 18px; font-weight: 700; }
+.b { font-size: 13px; font-weight: 700; }
+</style></head><body><main>
+<h1>How the AI builds gnoworld</h1>
+<p>Four loops, one inside the other, each with its own rhythm. Nothing reaches <code>main</code> without having gone through them all.</p>
+<figure style="margin:0"><svg viewBox="0 0 1560 1190" role="img" aria-label="Four nested loops: every commit through the fast gate, every branch through review and fixes, every slice through the chief's integration, and between slices through the dream back into the rules."><defs><marker id="line" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#6b7280"/></marker><marker id="green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2e8b57"/></marker><marker id="teal" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#0f8a7c"/></marker><marker id="blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#2f5bd3"/></marker><marker id="gold" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="4.5" markerHeight="4.5" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#b7791f"/></marker></defs>
+<rect x="10" y="10" width="1540" height="108" rx="14" fill="#c2334d" fill-opacity="0.07" stroke="#c2334d" stroke-opacity="0.55" stroke-width="1.5"/>
+<text x="24" y="58" class="h" text-anchor="start" fill="#c2334d">Alexis</text>
+<text x="24" y="78" class="s" text-anchor="start" fill="#c2334d">decides</text>
+<rect x="140" y="28" width="270" height="76" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M141 33 a8 8 0 0 1 8 -5 h252 a8 8 0 0 1 8 5" fill="none" stroke="#c2334d" stroke-width="4"/>
+<text x="153" y="54" class="t" text-anchor="start">Approves the plan</text>
+<text x="153" y="73" class="s" text-anchor="start">short questions, one by one</text>
+<rect x="422" y="28" width="270" height="76" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M423 33 a8 8 0 0 1 8 -5 h252 a8 8 0 0 1 8 5" fill="none" stroke="#c2334d" stroke-width="4"/>
+<text x="435" y="54" class="t" text-anchor="start">Accepts each rule</text>
+<text x="435" y="73" class="s" text-anchor="start">the dream proposes, he chooses</text>
+<rect x="704" y="28" width="270" height="76" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M705 33 a8 8 0 0 1 8 -5 h252 a8 8 0 0 1 8 5" fill="none" stroke="#c2334d" stroke-width="4"/>
+<text x="717" y="54" class="t" text-anchor="start">Judges the look</text>
+<text x="717" y="73" class="s" text-anchor="start">realism test, gallery, by eye</text>
+<rect x="986" y="28" width="270" height="76" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M987 33 a8 8 0 0 1 8 -5 h252 a8 8 0 0 1 8 5" fill="none" stroke="#c2334d" stroke-width="4"/>
+<text x="999" y="54" class="t" text-anchor="start">Runs what the sandbox refuses</text>
+<text x="999" y="73" class="s" text-anchor="start">deploy/test.sh, closed files</text>
+<rect x="1268" y="28" width="270" height="76" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M1269 33 a8 8 0 0 1 8 -5 h252 a8 8 0 0 1 8 5" fill="none" stroke="#c2334d" stroke-width="4"/>
+<text x="1281" y="54" class="t" text-anchor="start">Reviews, merges, pushes</text>
+<text x="1281" y="73" class="s" text-anchor="start">blind first, merge.sh, git push</text>
+<rect x="10" y="160" width="290" height="700" rx="14" fill="#2f5bd3" fill-opacity="0.07" stroke="#2f5bd3" stroke-opacity="0.55" stroke-width="1.5"/>
+<text x="30" y="188" class="h" text-anchor="start" fill="#2f5bd3">Chief session</text>
+<text x="30" y="206" class="s" text-anchor="start" fill="#2f5bd3">one per slice</text>
+<rect x="30" y="215" width="250" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M31 220 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#2f5bd3" stroke-width="4"/>
+<text x="43" y="241" class="t" text-anchor="start">Plan, cut, brief</text>
+<text x="43" y="260" class="s" text-anchor="start">/slice-plan, worktree.sh, a brief</text>
+<rect x="30" y="320" width="250" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M31 325 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#2f5bd3" stroke-width="4"/>
+<text x="43" y="346" class="t" text-anchor="start">Open the sessions</text>
+<text x="43" y="365" class="s" text-anchor="start">herdr panes, two at most</text>
+<rect x="30" y="470" width="250" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M31 475 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#2f5bd3" stroke-width="4"/>
+<text x="43" y="496" class="t" text-anchor="start">Integrate</text>
+<text x="43" y="515" class="s" text-anchor="start">merge into slice-n, hourly check</text>
+<rect x="30" y="620" width="250" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M31 625 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#2f5bd3" stroke-width="4"/>
+<text x="43" y="646" class="t" text-anchor="start">Full gate, last review</text>
+<text x="43" y="665" class="s" text-anchor="start">--full, /pre-merge, every screen</text>
+<rect x="30" y="770" width="250" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M31 775 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#b7791f" stroke-width="4"/>
+<text x="43" y="796" class="t" text-anchor="start">Dream</text>
+<text x="43" y="815" class="s" text-anchor="start">dreamer: what to add, what to remove</text>
+<rect x="340" y="160" width="882" height="700" rx="14" fill="#0f8a7c" fill-opacity="0.07" stroke="#0f8a7c" stroke-opacity="0.55" stroke-width="1.5" stroke-dasharray="7 6"/>
+<text x="360" y="188" class="h" text-anchor="start" fill="#0f8a7c">Branch session</text>
+<text x="500" y="188" class="s" text-anchor="start" fill="#0f8a7c">one per branch, in its own worktree: the Workflow branch</text>
+<rect x="365" y="225" width="170" height="80" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M366 230 a8 8 0 0 1 8 -5 h152 a8 8 0 0 1 8 5" fill="none" stroke="#0f8a7c" stroke-width="4"/>
+<text x="378" y="251" class="t" text-anchor="start">Failing tests</text>
+<text x="378" y="270" class="s" text-anchor="start">written first,</text>
+<text x="378" y="287" class="s" text-anchor="start">seen failing</text>
+<rect x="575" y="225" width="170" height="80" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M576 230 a8 8 0 0 1 8 -5 h152 a8 8 0 0 1 8 5" fill="none" stroke="#8a4fb3" stroke-width="4"/>
+<text x="588" y="251" class="t" text-anchor="start">Red pass</text>
+<text x="588" y="270" class="s" text-anchor="start">test-auditor: complete,</text>
+<text x="588" y="287" class="s" text-anchor="start">relevant, risk first</text>
+<rect x="785" y="225" width="170" height="80" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M786 230 a8 8 0 0 1 8 -5 h152 a8 8 0 0 1 8 5" fill="none" stroke="#0f8a7c" stroke-width="4"/>
+<text x="798" y="251" class="t" text-anchor="start">Code</text>
+<text x="798" y="270" class="s" text-anchor="start">one behaviour a commit</text>
+<rect x="995" y="225" width="170" height="80" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M996 230 a8 8 0 0 1 8 -5 h152 a8 8 0 0 1 8 5" fill="none" stroke="#2e8b57" stroke-width="4"/>
+<text x="1008" y="251" class="t" text-anchor="start">Commit</text>
+<text x="1008" y="270" class="s" text-anchor="start">fast gate, secret scan;</text>
+<text x="1008" y="287" class="s" text-anchor="start">its related tests</text>
+<rect x="985" y="450" width="190" height="120" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M986 455 a8 8 0 0 1 8 -5 h172 a8 8 0 0 1 8 5" fill="none" stroke="#2e8b57" stroke-width="4"/>
+<text x="998" y="476" class="t" text-anchor="start">Merge check</text>
+<text x="998" y="495" class="s" text-anchor="start">check.sh --merge: coverage,</text>
+<text x="998" y="512" class="s" text-anchor="start">mutants, harness; interface</text>
+<text x="998" y="529" class="s" text-anchor="start">alone skips StrykerJS</text>
+<rect x="735" y="450" width="220" height="120" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M736 455 a8 8 0 0 1 8 -5 h202 a8 8 0 0 1 8 5" fill="none" stroke="#8a4fb3" stroke-width="4"/>
+<text x="748" y="476" class="t" text-anchor="start">One review</text>
+<text x="748" y="495" class="s" text-anchor="start">reviewer</text>
+<text x="748" y="512" class="s" text-anchor="start">+ security-reviewer: tier 1</text>
+<text x="748" y="529" class="s" text-anchor="start">+ gno-auditor: a realm</text>
+<text x="748" y="546" class="s" text-anchor="start">+ design-reviewer: space, once</text>
+<rect x="575" y="450" width="120" height="120" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M576 455 a8 8 0 0 1 8 -5 h102 a8 8 0 0 1 8 5" fill="none" stroke="#0f8a7c" stroke-width="4"/>
+<text x="588" y="476" class="t" text-anchor="start">Reproduce</text>
+<text x="588" y="495" class="s" text-anchor="start">a command or</text>
+<text x="588" y="512" class="s" text-anchor="start">a failing test</text>
+<rect x="365" y="450" width="170" height="120" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M366 455 a8 8 0 0 1 8 -5 h152 a8 8 0 0 1 8 5" fill="none" stroke="#0f8a7c" stroke-width="4"/>
+<text x="378" y="476" class="t" text-anchor="start">Fix</text>
+<text x="378" y="495" class="s" text-anchor="start">high and medium,</text>
+<text x="378" y="512" class="s" text-anchor="start">test first;</text>
+<text x="378" y="529" class="s" text-anchor="start">low ones listed</text>
+<rect x="750" y="680" width="190" height="80" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M751 685 a8 8 0 0 1 8 -5 h172 a8 8 0 0 1 8 5" fill="none" stroke="#0f8a7c" stroke-width="4"/>
+<text x="763" y="706" class="t" text-anchor="start">Report</text>
+<text x="763" y="725" class="s" text-anchor="start">commits, low findings,</text>
+<text x="763" y="742" class="s" text-anchor="start">tokens, state file</text>
+<rect x="365" y="790" width="820" height="50" rx="8" fill="#2e8b57" fill-opacity="0.1"/>
+<text x="379" y="811" class="s" text-anchor="start" fill="#2e8b57">Around every step, in every session: guard.py and the sandbox before each command and edit;</text>
+<text x="379" y="829" class="s" text-anchor="start" fill="#2e8b57">the Stop hook wants the gate green on exactly this tree at the end of each turn.</text>
+<rect x="1250" y="160" width="300" height="700" rx="14" fill="#2e8b57" fill-opacity="0.07" stroke="#2e8b57" stroke-opacity="0.55" stroke-width="1.5"/>
+<text x="1270" y="188" class="h" text-anchor="start" fill="#2e8b57">Where the code goes</text>
+<rect x="1270" y="225" width="230" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M1271 230 a8 8 0 0 1 8 -5 h212 a8 8 0 0 1 8 5" fill="none" stroke="#0f8a7c" stroke-width="4"/>
+<text x="1283" y="251" class="t" text-anchor="start">Worktree branch</text>
+<text x="1283" y="270" class="s" text-anchor="start">slice-7a, slice-7c</text>
+<rect x="1270" y="350" width="230" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M1271 355 a8 8 0 0 1 8 -5 h212 a8 8 0 0 1 8 5" fill="none" stroke="#2f5bd3" stroke-width="4"/>
+<text x="1283" y="376" class="t" text-anchor="start">slice-n</text>
+<text x="1283" y="395" class="s" text-anchor="start">the integration branch</text>
+<rect x="1270" y="560" width="230" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M1271 565 a8 8 0 0 1 8 -5 h212 a8 8 0 0 1 8 5" fill="none" stroke="#c2334d" stroke-width="4"/>
+<text x="1283" y="586" class="t" text-anchor="start">main</text>
+<text x="1283" y="605" class="s" text-anchor="start">only by Alexis's merge</text>
+<rect x="1270" y="720" width="230" height="74" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M1271 725 a8 8 0 0 1 8 -5 h212 a8 8 0 0 1 8 5" fill="none" stroke="#2e8b57" stroke-width="4"/>
+<text x="1283" y="746" class="t" text-anchor="start">origin, then the CI</text>
+<text x="1283" y="765" class="s" text-anchor="start">the full gate again, on GitHub</text>
+<rect x="10" y="905" width="1540" height="125" rx="14" fill="#b7791f" fill-opacity="0.07" stroke="#b7791f" stroke-opacity="0.55" stroke-width="1.5"/>
+<text x="500" y="930" class="h" text-anchor="start" fill="#b7791f">Files</text>
+<text x="550" y="930" class="s" text-anchor="start" fill="#b7791f">how sessions and agents talk: each agent starts fresh, briefed from these, never from a conversation</text>
+<rect x="30" y="945" width="190" height="70" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M31 950 a8 8 0 0 1 8 -5 h172 a8 8 0 0 1 8 5" fill="none" stroke="#b7791f" stroke-width="4"/>
+<text x="43" y="971" class="t" text-anchor="start">The rules</text>
+<text x="43" y="990" class="s" text-anchor="start">read at every session's start</text>
+<rect x="235" y="945" width="250" height="70" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M236 950 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#b7791f" stroke-width="4"/>
+<text x="248" y="971" class="t" text-anchor="start">What happened</text>
+<text x="248" y="990" class="s" text-anchor="start">reports, state files, learnings</text>
+<rect x="500" y="945" width="230" height="70" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M501 950 a8 8 0 0 1 8 -5 h212 a8 8 0 0 1 8 5" fill="none" stroke="#b7791f" stroke-width="4"/>
+<text x="513" y="971" class="t" text-anchor="start">The ledger</text>
+<text x="513" y="990" class="s" text-anchor="start">findings.md: every finding</text>
+<rect x="745" y="945" width="250" height="70" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M746 950 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#b7791f" stroke-width="4"/>
+<text x="758" y="971" class="t" text-anchor="start">The plan</text>
+<text x="758" y="990" class="s" text-anchor="start">plans, ADRs, decisions, briefs</text>
+<rect x="1010" y="945" width="250" height="70" rx="9" fill="#fff" stroke="#d6dbe3"/>
+<path d="M1011 950 a8 8 0 0 1 8 -5 h232 a8 8 0 0 1 8 5" fill="none" stroke="#b7791f" stroke-width="4"/>
+<text x="1023" y="971" class="t" text-anchor="start">The measures</text>
+<text x="1023" y="990" class="s" text-anchor="start">review-log, tokens, hours</text>
+<path d="M155 104 V212" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" marker-start="url(#line)" stroke-linejoin="round"/>
+<text x="163" y="192" class="s" text-anchor="start">plan, questions</text>
+<path d="M155 289 V317" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M280 357 H320 V265 H362" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="341" y="255" class="s" text-anchor="middle">brief</text>
+<path d="M155 544 V617" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="163" y="586" class="s" text-anchor="start">all branches in</text>
+<path d="M155 694 V767" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="163" y="736" class="s" text-anchor="start">after the merge</text>
+<path d="M535 265 H572" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M745 265 H782" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M955 265 H992" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M1120 305 V447" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1128" y="382" class="s" text-anchor="start">code done</text>
+<path d="M985 510 H958" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M735 510 H698" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M575 510 H538" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<path d="M845 570 V677" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="853" y="628" class="s" text-anchor="start">no high or medium left</text>
+<path d="M750 720 H320 V507 H283" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="540" y="712" class="s" text-anchor="middle">report, commits, low findings</text>
+<path d="M1165 262 H1267" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1168" y="254" class="s" text-anchor="start">commits</text>
+<path d="M839 104 V157" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" marker-start="url(#line)" stroke-linejoin="round"/>
+<text x="847" y="136" class="s" text-anchor="start">pictures up, his notes down</text>
+<path d="M1230 104 V387 H1267" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1238" y="143" class="s" text-anchor="start">on slice-n</text>
+<path d="M1385 299 V347" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1393" y="319" class="s" text-anchor="start">the chief merges,</text>
+<text x="1393" y="336" class="s" text-anchor="start">after the merge check</text>
+<path d="M1385 424 V557" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1393" y="470" class="s" text-anchor="start">full gate green,</text>
+<text x="1393" y="487" class="s" text-anchor="start">review pass recorded,</text>
+<text x="1393" y="504" class="s" text-anchor="start">harness files shown</text>
+<path d="M1385 634 V717" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1393" y="670" class="s" text-anchor="start">pre-push: its record,</text>
+<text x="1393" y="687" class="s" text-anchor="start">its review pass</text>
+<path d="M1525 104 V597 H1503" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1518" y="546" class="s" text-anchor="end">merges</text>
+<path d="M280 657 H306 V880 H1230 V597 H1267" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="1010" y="875" class="s" text-anchor="middle">asks for his review and his merge</text>
+<path d="M775 860 V902" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" marker-start="url(#line)" stroke-linejoin="round"/>
+<text x="785" y="898" class="s" text-anchor="start">reads its brief and the rules; writes state, reports, findings</text>
+<path d="M260 945 V847" fill="none" stroke="#6b7280" stroke-width="1.7" marker-end="url(#line)" stroke-linejoin="round"/>
+<text x="252" y="884" class="s" text-anchor="end">reads</text>
+<path d="M1080 225 V204 H870 V222" fill="none" stroke="#2e8b57" stroke-width="2.8" marker-end="url(#green)" stroke-linejoin="round"/>
+<circle cx="975" cy="204" r="13" fill="#2e8b57"/>
+<text x="975" y="209" class="b" text-anchor="middle" fill="#fff">1</text>
+<text x="995" y="199" class="s" text-anchor="start" fill="#2e8b57">refused: fix, never --no-verify</text>
+<path d="M450 450 V400 H1040 V447" fill="none" stroke="#0f8a7c" stroke-width="2.8" marker-end="url(#teal)" stroke-linejoin="round"/>
+<circle cx="450" cy="400" r="13" fill="#0f8a7c"/>
+<text x="450" y="405" class="b" text-anchor="middle" fill="#fff">2</text>
+<text x="470" y="392" class="s" text-anchor="start" fill="#0f8a7c">back to the merge check, three rounds at most</text>
+<path d="M155 470 V397" fill="none" stroke="#2f5bd3" stroke-width="2.8" marker-end="url(#blue)" stroke-linejoin="round"/>
+<circle cx="155" cy="432" r="13" fill="#2f5bd3"/>
+<text x="155" y="437" class="b" text-anchor="middle" fill="#fff">3</text>
+<text x="175" y="437" class="s" text-anchor="start" fill="#2f5bd3">next branch</text>
+<path d="M30 807 H18 V140 H556 V107" fill="none" stroke="#b7791f" stroke-width="2.8" marker-end="url(#gold)" marker-start="url(#gold)" stroke-linejoin="round"/>
+<circle cx="18" cy="500" r="13" fill="#b7791f"/>
+<text x="18" y="505" class="b" text-anchor="middle" fill="#fff">4</text>
+<text x="175" y="134" class="s" text-anchor="start" fill="#b7791f">proposals up, with their evidence; accepted ones down</text>
+<path d="M100 844 V942" fill="none" stroke="#b7791f" stroke-width="2.8" marker-end="url(#gold)" stroke-linejoin="round"/>
+<text x="108" y="884" class="s" text-anchor="start">accepted: a rule,</text>
+<text x="108" y="900" class="s" text-anchor="start">a memory, a check</text>
+<circle cx="24" cy="1072" r="13" fill="#2e8b57"/>
+<text x="24" y="1077" class="b" text-anchor="middle" fill="#fff">1</text>
+<text x="48" y="1077" class="t" text-anchor="start">Every commit, minutes</text>
+<text x="232" y="1077" class="s" text-anchor="start">the fast gate refuses, the code changes, the commit goes again.</text>
+<circle cx="24" cy="1099" r="13" fill="#0f8a7c"/>
+<text x="24" y="1104" class="b" text-anchor="middle" fill="#fff">2</text>
+<text x="48" y="1104" class="t" text-anchor="start">Every branch, hours</text>
+<text x="232" y="1104" class="s" text-anchor="start">review finds, a fix lands test first, the merge check runs again, until no high or medium is left.</text>
+<circle cx="24" cy="1126" r="13" fill="#2f5bd3"/>
+<text x="24" y="1131" class="b" text-anchor="middle" fill="#fff">3</text>
+<text x="48" y="1131" class="t" text-anchor="start">Every slice, days</text>
+<text x="232" y="1131" class="s" text-anchor="start">a report comes in, the chief merges it and opens the next branch, two at once at most.</text>
+<circle cx="24" cy="1153" r="13" fill="#b7791f"/>
+<text x="24" y="1158" class="b" text-anchor="middle" fill="#fff">4</text>
+<text x="48" y="1158" class="t" text-anchor="start">Between slices</text>
+<text x="232" y="1158" class="s" text-anchor="start">what went wrong becomes a rule, a memory or a check, once Alexis accepts it: the harness learns.</text>
+<text x="1290" y="1077" class="s" text-anchor="start" fill="#8a4fb3">Purple: an agent, read-only</text>
+<text x="1290" y="1104" class="s" text-anchor="start" fill="#2e8b57">Green: a gate</text>
+<text x="1290" y="1131" class="s" text-anchor="start" fill="#b7791f">Gold: files and memory</text>
+<text x="1290" y="1158" class="s" text-anchor="start" fill="#1f2937">Thick line: a loop</text>
+</svg><figcaption style="position:absolute;left:-9999px">Four nested loops: every commit through the fast gate, every branch through review and fixes, every slice through the chief's integration, and between slices through the dream back into the rules.</figcaption></figure>
+</main></body></html>

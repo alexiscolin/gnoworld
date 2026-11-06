@@ -3,7 +3,7 @@
 import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
-import { afterEach, beforeAll } from "vitest";
+import { afterEach, beforeAll, vi } from "vitest";
 
 const roots: { root: Root; host: HTMLElement }[] = [];
 // React flushes an update inside act only in an environment that says so; restored as the file ends.
@@ -90,4 +90,42 @@ export function markup(element: ReactElement): HTMLElement {
   const host = document.createElement("div");
   host.innerHTML = renderToStaticMarkup(element);
   return host;
+}
+
+/** Until `holds`, the effects, promises and lazy chunks it waits on flushed inside act, or a failure after 10 s. */
+export async function settled(holds: () => boolean): Promise<void> {
+  const end = Date.now() + 10_000;
+  while (!holds()) {
+    if (Date.now() > end) throw new Error("waited 10 s");
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    });
+  }
+}
+
+/** jsdom has no top layer and no showModal: a modal it opens is open, closed by close() with its event. The focus, Esc and the scrim
+ * are the journeys'. */
+export function modals(): void {
+  const proto = HTMLDialogElement.prototype;
+  proto.showModal = function open(this: HTMLDialogElement) {
+    this.open = true;
+  };
+  proto.close = function shut(this: HTMLDialogElement) {
+    this.open = false;
+    this.dispatchEvent(new Event("close"));
+  };
+}
+
+/** jsdom has no popover API: a panel shown or hidden by its methods stays in the page as it is drawn. Its top layer, light dismiss and
+ * placement are the journeys'. */
+export function popovers(): void {
+  Object.assign(HTMLElement.prototype, { showPopover: () => undefined, hidePopover: () => undefined });
+}
+
+/** jsdom has no matchMedia: every query answers no, until the test unstubs its globals. */
+export function noMedia(): void {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined })),
+  );
 }

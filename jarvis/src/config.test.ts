@@ -900,7 +900,11 @@ describe("jarvis's way out", () => {
   it("shares no host with the server's list but a node both read", () => {
     const server = new Set(allowedBy(read("deploy/egress/acl.yaml")));
     const shared = allowedBy(read("deploy/egress/jarvis-acl.yaml")).filter((host) => server.has(host));
-    const nodes = universes().map((universe) => new URL(universe.rpc).hostname);
+    // A chain's node and its indexer: both read each (the server's worlds job reads the indexers, 7c).
+    const nodes = universes().flatMap((universe) => [
+      new URL(universe.rpc).hostname,
+      new URL(universe.indexer).hostname,
+    ]);
     expect(shared.filter((host) => !nodes.includes(host))).toEqual([]);
     expect(server.has("api.anthropic.com")).toBe(false);
     expect(server.has("gnoscope.com")).toBe(false);

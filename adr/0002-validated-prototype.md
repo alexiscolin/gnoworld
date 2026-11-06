@@ -145,7 +145,7 @@ Phases are ADR-0001's:
 |---|---|---|
 | Rooms, shared rooms, and a room switcher that scales to hundreds: groups set by the world's moderators, pinned, joined, "active now", then the rest; search, unread counts, the keyboard, a windowed list | 0 | Ergo channels; groups in the hubs data file, then `r/gnoworld/hubs` |
 | Replies, reactions, mentions, threads built from reply chains | 0 | `+draft/reply`, `+draft/react` (message-tags) |
-| Rich composer with a format bar: bold, italic, strikethrough, code, quote and lists show as such; Markdown on the wire. No underline: Markdown has none | 0 | `draft/multiline` |
+| Rich composer with a format bar: bold, italic, underline, strikethrough, code, quote and lists show as such; Markdown on the wire. Underline, which Markdown lacks, as the video (Alexis, 2026-11-04, `docs/decisions.md`): `++word++` on the wire (markdown-it-ins's; part 8k's choice, since `__` is bold in CommonMark and gnoweb), the chat's alone, a realm's page reading none as gnoweb does | 0 | `draft/multiline` |
 | Slash commands with autocomplete; `#room` and `@name` completion; Alt+Up and Alt+Down between rooms | 0 | — |
 | Message menu: copy, room link, save, report, delete your own | 0. Delete needs `allow-individual-delete` on (it is off by default); report goes to moderation (§6) | `draft/message-redaction` |
 | Moderation: a bot checks each public message; a hidden message says why and can be contested | 0 | The moderation bot (§6) |
@@ -205,7 +205,7 @@ Phases are ADR-0001's:
 
 | Concept | Phase | Where |
 |---|---|---|
-| Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. Progress shows per constellation, never against the universe's total (§3). A person may publish their stamp count on their profile (phase 1); otherwise nobody else sees it. These are not ADR-0001's paid stamps, which travel with a tip |
+| Passport: a stamp per world visited, constellations per ecosystem | 0 | Device. Progress shows per constellation, never against the universe's total (§3), except the header's counter, out of the worlds the reader's own view lists (§3). A person may publish their stamp count on their profile (phase 1); otherwise nobody else sees it. These are not ADR-0001's paid stamps, which travel with a tip |
 | "You charted it": the uncharted worlds you were the first on your device to visit. On a first visit a scan sweeps the planet, then "Stamped" and, for the first in the universe, "First to chart · your name stays on it · Share" | 0 | Device. Only a first visit to an uncharted world reaches the server, for the shared "first to chart" (Realms, above); nothing else of the passport leaves the device |
 | Daily expedition: the same three stops for everyone, the first where something is live; a streak; a shareable route | 0 | Device; the stops from a data file the team curates |
 | Quests across worlds, each ending on a realm action. Rewards stay on the device: no NFT badges (ADR-0001 §11) | 0 | Device; the quests data file |
@@ -477,8 +477,10 @@ between worlds. None may saturate the map:
 
 **The infinite, felt.**
 - Haze closes the view before any edge.
-- No counter announces the total, as in "42 of 551". Progress shows per constellation
-  ("DeFi 3/5"), per session or as a rank.
+- No counter announces the universe's total, as in "42 of 551". Progress shows per
+  constellation ("DeFi 3/5"), per session or as a rank. The one exception is the header's
+  passport counter, as the video draws it ("3/19"): stamps out of the worlds the reader's
+  own view lists, never out of every realm (Alexis, 2026-11-04, slice 8's answer 1).
 - The rim thins instead of stopping.
 
 ### 4. Realm calls: read for free, sign inline
@@ -1207,7 +1209,7 @@ questions before any code, and its review card checks the answers:
 a machine and never drain a battery, even open for hours beside the chat. The rules come
 from gno-golf's engine, measured there.
 - **The GPU:** the low-power adapter where there are two, so the fans stay off; no stencil.
-- **The pixel ratio** is capped at 1.25 on desktop and 1 on touch screens; Low takes 1 and
+- **The pixel ratio** is capped at 2 on desktop (§10) and 1 on touch screens; Low takes 1 and
   0.8. The cap is applied again when the window moves to another screen.
 - **The frame rate follows what happens, never above 60:**
   - 60 fps while flying or interacting;
@@ -1423,6 +1425,13 @@ This section overrides the text above where they differ. The reasons and the num
 - **Dependencies are not positions.** A world stays with its namespace's star; its dependencies show as lines on hover.
 - **Mechanics of discovery are in; money and competition are out.** This refines ADR-0001's "not a game".
 - **Textures:** WebP from real maps, Solar System Scope's under CC BY 4.0, not KTX2, so no page's CSP widens.
+- **The pixel ratio** is capped at 2 on a computer, not 1.25, and the worlds' maps are 4096 wide as the Earth's: a Retina screen drawn at 1.25 and 2048 maps magnified were blurred. It rests on one measure, 8.3 ms a frame on an M4 Pro, with the Auto probe as the net; a base laptop is not measured.
+- **The renderer** is `WebGLRenderer` for the demo, not ADR-0001's `WebGPURenderer`: the gate's software renderer then tests what people see, it weighs 88 KB less, and post-processing is ready. Moving later means rewriting the shaders in TSL.
+- **A universe's shape.** Systems sit in a thick disc, with clusters above and below it, their height from a smooth field of position. Systems take cells in rings by their rank in the set, so nothing piles up; an arrival moves others slowly, by §3's seasonal drift (Alexis, 2026-11-02, F3520). Universes stay never shown together; far galaxies and doors between chains wait.
+- **The mood of space.** Colours, nebulae and density are a smooth field computed from a position: no list, no count, no border, nothing stored, and it means nothing on chain. The same place gives the same picture, and a star takes the mood of where it sits.
+- **A system is a postcard.** Its star, nebula, rings and debris come from its address, with a good arrival angle. Debris is only a far belt, for dust is a sign; rings are wide, for the status is a thin tilted line with its moon; real shadows fall on the one world seen close alone.
+- **Coherence.** Fixed everywhere: deep black, one light a system, one image grade, the video's palette, the same labels. The video's frames are the reference for the look: a side light, a large dark night side, a bright rim and a soft halo; never flat frontal light, never pushed saturation (Alexis, 2026-11-02, on a real GPU). Free: star, nebula, planets, angle.
+- **Space views** like a telescope's nebula show from a cluster's distance down to a system's; near a world, space is near-black. 3 or 4 warped real images for the big views, a computed field for the deep background, a smooth parallax on several levels; an image's licence is read first, and its credit shows.
 
 ## Consequences
 

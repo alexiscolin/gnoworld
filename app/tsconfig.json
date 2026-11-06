@@ -7,5 +7,5 @@
     "resolveJsonModule": true,
     "types": []
   },
-  "include": ["src", "tests"]
+  "include": ["src", "tests", "lab"]
 }

@@ -194,6 +194,21 @@ describe("page: the blocks a realm's Markdown reads into", () => {
   });
 });
 
+// 8k: the chat's underline is the chat's alone. gnoweb reads no `++` (goldmark with GFM's extensions), so a page shows it
+// as written, and a bare address keeps GFM's bounds: a `+` neither starts one nor is left out of its end.
+describe("page: no underline, as gnoweb", () => {
+  test("keeps `++` as text, in a heading and a list too", () => {
+    reads("++x++ and ++y z++", paragraph(text("++x++ and ++y z++")));
+    reads("## ++x++", heading(2, text("++x++")));
+    reads("- ++x++", { type: "list", ordered: false, items: [[text("++x++")]] });
+  });
+
+  test("links a bare address with its `+` at the end, and none after a `+`", () => {
+    reads("see https://a.test/c++", paragraph(text("see "), link("https://a.test/c++")));
+    reads("a+https://a.test/x", paragraph(text("a+https://a.test/x")));
+  });
+});
+
 describe("page: links and images", () => {
   test.each([
     "[click](javascript:alert(1))",
@@ -214,6 +229,13 @@ describe("page: links and images", () => {
   test("shows an image that is not an https one as text", () => {
     reads("![a](javascript:alert(1))", paragraph(text("![a](javascript:alert(1))")));
     reads("![a](data:image/png;base64,AAAA)", paragraph(text("![a](data:image/png;base64,AAAA)")));
+  });
+
+  // Past the inline depth an image's opener is text, as a link's is: no node deeper than the cap, and its address still no image.
+  test("keeps an image opened past the inline depth as text", () => {
+    const deep = "*a ".repeat(8) + "![x](https://x.test/a.png)";
+    const words = [...inlinesOf(blocksOf(deep))].flatMap((node) => (node.type === "text" ? [node.text] : []));
+    expect(words.join("")).toContain("![");
   });
 
   test("makes no image node of any kind", () => {
@@ -387,6 +409,12 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
         ],
       },
     );
+  });
+
+  // A form's opening on the page's last line has no line after it to close it: no form, and no field taken from past the page.
+  test("makes no form of an opening on the page's last line", () => {
+    const blocks = blocksOf('Vote below.\n<gno-form exec="Vote">');
+    expect(blocks.some((block) => block.type === "form")).toBe(false);
   });
 
   test("gives a form with no exec an empty one, and an input with no type gnoweb's default, text", () => {
@@ -822,6 +850,7 @@ describe("page: the allowlist, for any input", () => {
     "**",
     "_",
     "~~",
+    "++",
     "`",
     "[",
     "](",

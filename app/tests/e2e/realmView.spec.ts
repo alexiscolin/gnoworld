@@ -208,6 +208,25 @@ test.describe("a realm's view", () => {
         await expect(page.getByRole("main")).toContainText("Read at block");
         await expect(page).toHaveScreenshot(`realm-view-${name}.png`, { mask: [page.getByRole("banner")] });
       });
+
+      // Frame 26 lights no view on a world's page, nor does a realm's: a realm is served the page written at /, Cosmos lit,
+      // and hydration patches no attribute (react-dom 19.3.1), so the light must follow the path once the page wakes (F4880).
+      test(`lights no view on a realm's page or a world's, and Cosmos on the cosmos, on a ${name}'s screen`, async ({
+        page,
+      }) => {
+        await page.setViewportSize({ width, height });
+        await chain(page, { "gno.land/r/gnoland/coins": COINS });
+        const views = page.getByRole("navigation", { name: "Views" });
+        for (const path of ["/r/gnoland/coins", "/w/bubble"]) {
+          await page.goto(path);
+          await hydrated(page);
+          await expect(views.getByRole("link", { name: "Universe" })).toBeVisible();
+          await expect(views.locator("[aria-current]")).toHaveCount(0);
+        }
+        await page.goto("/");
+        await hydrated(page);
+        await expect(views.locator("[aria-current='page']")).toHaveText("Universe");
+      });
     }
   });
 });

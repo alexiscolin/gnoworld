@@ -12,6 +12,19 @@
     gap: 22px;
     /* The hero's own box takes no click from the page behind it; its words and actions do. */
     pointer-events: none;
+    /* raw: the hero comes back in the opening's own 600 ms as its words leave (Opening.module.css) */
+    transition: opacity 600ms var(--ease-standard);
+  }
+
+  /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1), taking no pointer; it stays the
+     page's reading, and shows again as the keyboard reaches it: a link the keyboard is on, never the heading View in space hands the focus
+     to, by a tap or a key (F4644, F4651). */
+  .hero[data-yield="opening"]:not(:has(:focus-visible:not([tabindex="-1"]))) {
+    opacity: 0;
+  }
+
+  .hero[data-yield="opening"]:not(:has(:focus-visible:not([tabindex="-1"]))) > * {
+    pointer-events: none;
   }
 
   .hero > * {
@@ -34,6 +47,23 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* People online: "ONLINE" up the number's right side from its top, in mint, read top to bottom (frame 6: 14 px from the last digit). */
+  .number[data-online]::after {
+    /* raw: frame 6's word, which assistive technology reads after the count */
+    content: "ONLINE";
+    display: inline-block;
+    /* raw: 14 px from the last digit, frame 6 */
+    /* layout: the word beside the number */
+    margin-inline-start: 14px;
+    vertical-align: top;
+    writing-mode: vertical-rl;
+    color: var(--color-mine);
+    /* raw: 9 px mono, frame 6's "ONLINE" */
+    font: 400 9px/1 var(--family-mono);
+    /* raw: frame 6's wide tracking */
+    letter-spacing: 0.3em;
+  }
+
   .row {
     /* layout: the line and the actions on one row, wrapping when the screen is narrow */
     display: flex;
@@ -45,13 +75,20 @@
   }
 
   .line {
-    /* layout: the page's heading, in the line's own size: no margin, no heading size */
-    margin-block: 0;
     /* raw: the line's own grey and 17 px (the prototype's #hero .heroCap) */
     color: #c8d0de;
     /* raw: the prototype's and the frames' own value */
     font: 400 17px/1.5 var(--family-sans);
     letter-spacing: normal;
+  }
+
+  /* The page's heading is the line's count, inline in it, in the line's own size: no margin, no heading size (ADR-0003, 2a). */
+  .heading {
+    display: inline;
+    /* layout: a heading with no margin of its own, inline in the line */
+    margin-block: 0;
+    font: inherit;
+    letter-spacing: inherit;
   }
 
   .actions {
@@ -79,10 +116,10 @@
     /* raw: 24 px at each side, 20 on a phone (the prototype's lines 543 and 772) */
     padding-inline: 24px;
     /* the action's edge is a ring inside its box, so a solid one needs none */
-    box-shadow: inset 0 0 0 var(--line-width) var(--color-line-strong);
+    box-shadow: inset 0 0 0 var(--line-width) var(--_ring, var(--color-line-strong));
     border-radius: var(--radius-pill);
     /* raw: the night at 50% over the scene, as the prototype's 0.5 */
-    background: color-mix(in oklab, var(--color-surface) 50%, transparent);
+    background: var(--_fill, color-mix(in oklab, var(--color-surface) 50%, transparent));
     /* raw: 15 px, 500 (the prototype's #hero .cta .link) */
     font: 500 15px/1 var(--family-sans);
     text-decoration: none;
@@ -90,16 +127,19 @@
   }
 
   .action[data-emphasis="solid"] {
-    box-shadow: none;
-    background: var(--color-primary);
+    --_ring: transparent;
+    --_fill: var(--color-primary);
+
     color: var(--color-ink);
   }
 
   .worlds {
     /* layout: the list stands off the hero above it when the page holds them in a column */
     margin-block-start: var(--space-s);
-    /* The ticker is fixed over the foot of the page: the last link scrolls above it. */
-    padding-block-end: var(--space-xl);
+    /* raw: the list gives way and comes back with the hero, in the opening's 600 ms */
+    transition: opacity 600ms var(--ease-standard);
+    /* The ticker is fixed over the foot of the page, and "View in space" over a phone's: the last link scrolls above them. */
+    padding-block-end: calc(var(--space-xl) + var(--control-m) + var(--space-s));
   }
 
   /* The cosmos' worlds as plain links: no bullet, no link colour, the design system's type. */
@@ -116,13 +156,64 @@
     text-decoration: none;
   }
 
+  /* ADR-0003, 2d: the list's kicker, over its first link. */
+  .worlds > p {
+    /* layout: the kicker's own line, its first link's line box under it (mock-ups 2 to 4: 13 px between) */
+    margin-block: 0;
+    color: var(--color-text-muted);
+  }
+
   .worlds a:hover {
     color: var(--color-text);
+  }
+
+  /* f0008 lights the line's count, its figure and its word, over the rest of the line: #f4f5f9 against #c8d0de, a heavier weight. */
+  .count {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  .figure {
+    /* Digits of one width each, so a count fills the room its figure kept. */
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* While the number comes, three hidden digits and the space after them keep its room (7n): a count of 100 to 999 fills it, whatever face
+     draws the line. `3ch` and figure spaces are a proportional zero's width in Geist, 3.2 px wider than three of its tabular digits. */
+  .figure:empty::before {
+    visibility: hidden;
+    content: "000 ";
+  }
+
+  /* The word after the room, "Worlds" in the page (F4641), drawn as the count's "worlds", so the line holds its width when the number comes. */
+  .coming {
+    text-transform: lowercase;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero,
+    .worlds {
+      transition: none;
+    }
+  }
+
+  /* Where the list stands in the page under the hero, a phone or a short screen, the opening's words come over it: it gives way with the
+     hero (F4648). Fixed at the top from 900 by 800 px, it stands clear of them, as mock-up 1 draws it. */
+  @media (max-width: 899px), (max-height: 799px) {
+    .worlds[data-yield="opening"]:not(:has(:focus-visible)) {
+      opacity: 0;
+      pointer-events: none;
+    }
   }
 
   @media (max-width: 899px) {
     .row {
       /* layout: the actions go under the line when the phone is too narrow for both */
+      flex-wrap: wrap;
+    }
+
+    .actions {
+      /* layout: the second call goes under the first before it passes the page's edge, as at 320 px (F4642) */
       flex-wrap: wrap;
     }
 
@@ -135,6 +226,26 @@
 
     .line {
       white-space: normal;
+    }
+  }
+
+  /* On a first visit beside the cosmos the Earth's "Start here" is the one filled call: Go explore an outline, Join the chat for the return
+     (ADR-0003 §3). Where no cosmos stands, a phone that did not ask for space or a scene that does not run, the filled call stays. */
+  .actions[data-first][data-cosmos="standing"] .action {
+    --_ring: initial;
+    --_fill: initial;
+
+    color: inherit;
+  }
+
+  .actions[data-first][data-cosmos="standing"] [data-call="chat"] {
+    display: none;
+  }
+
+  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. */
+  @media (min-width: 900px) {
+    .worlds[data-rail="standing"] {
+      display: none;
     }
   }
 
@@ -151,8 +262,8 @@
       margin-block-start: 0;
       padding-block-end: 0;
       position: fixed;
-      /* raw: under the header's 96 px, and 16 more */
-      inset-block-start: 112px;
+      /* raw: the kicker at mock-ups 2 to 4's 98 px, under the header's 96, its first link where it was */
+      inset-block-start: 101px;
       inset-inline-start: var(--space-xl);
       /* raw: the room above the hero (the header, the hero at its tallest and the margins), whatever the list's length */
       max-block-size: calc(100dvb - 520px);

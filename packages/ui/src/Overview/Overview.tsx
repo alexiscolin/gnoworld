@@ -5,8 +5,8 @@ import { EmptyState } from "../EmptyState/EmptyState.tsx";
 import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { Skeleton } from "../Skeleton/Skeleton.tsx";
+import { Activity } from "./Activity.tsx";
 import {
-  Activity,
   Avatars,
   Cards,
   Chips,
@@ -23,6 +23,7 @@ import { NavItems } from "./NavItems.tsx";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import { Frames, Kickers, Layout } from "./Frames.tsx";
 import { Region } from "./Region.tsx";
+import { Soon } from "./Soon.tsx";
 
 function Buttons() {
   return (
@@ -174,6 +175,7 @@ export function Overview() {
       </Region>
       <Region name="Stats">
         <Stats />
+        <Soon />
       </Region>
       <Region name="Activity">
         <Activity />

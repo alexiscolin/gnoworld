@@ -5,7 +5,7 @@
 // the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
 // since 10k, a line's translation and a realm's digest.
 import { Address } from "./address.ts";
-import { RealmPath, Slug } from "./data.ts";
+import { Key, RealmPath } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
 import { PinId } from "./pins.ts";
 import { RoomId } from "./rooms.ts";
@@ -203,7 +203,7 @@ export const JarvisTranslation = z.discriminatedUnion("status", [
 export type JarvisTranslation = z.infer<typeof JarvisTranslation>;
 
 /** A realm's digest asked for, by the universe whose chain holds it and its path, the same from a page and the door. */
-export const JarvisDigestRequest = z.strictObject({ universe: Slug, realm: RealmPath });
+export const JarvisDigestRequest = z.strictObject({ universe: Key, realm: RealmPath });
 export type JarvisDigestRequest = z.infer<typeof JarvisDigestRequest>;
 
 // A digest's fields on both wires: the digest, its one proposal or none, and the height its reads were made at.

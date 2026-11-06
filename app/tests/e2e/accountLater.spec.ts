@@ -19,6 +19,9 @@ const ACCOUNT_ONLY = [
   "@+typing=",
   "MARKREAD ",
   "+gnoworld/edit=",
+  // The country an account declares (7j): the choice and the tag it sends.
+  "Choose a country",
+  "+gnoworld/country=",
   // What reads a line's Markdown for a mention of the room: a notice's, or a line shown, never an empty room's first screen.
   "@room(?!",
 ];

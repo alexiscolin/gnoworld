@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
+import { act } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
+import { createMemoryRouter, RouterProvider } from "react-router";
+import dataEvents from "../../../data/events.json" with { type: "json" };
 import { describe, expect, it } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { Ticker } from "./Ticker.tsx";
-import { tickerItems, type TickerItem } from "./ticker.ts";
+import { ledByTrends, tickerItems, withOnAir, type TickerItem } from "./ticker.ts";
 
 // Slice 5m (frame 6, the strip at the bottom): the data's news and events in a strip 34 px high that scrolls and can be paused.
 // With no news and no event it is not drawn at all, as before. Its look and size are measured in tests/e2e/homeLive.spec.ts.
 const NOW = new Date("2026-10-31T12:00:00.000Z");
+const trend = (kind: "trending" | "rising" | "new"): TickerItem => ({
+  id: `trend-${kind}`,
+  kind,
+  text: `A ${kind} world`,
+  link: `/r/${kind}`,
+  source: `The ${kind} world's source`,
+});
 const news = (id: string, date: string, title = `News ${id}`) => ({
   id,
   title,
@@ -22,9 +32,12 @@ const event = (id: string, start: string, title = `Event ${id}`) => ({
 });
 
 describe("tickerItems", () => {
-  it("drops an event that starts exactly now, and keeps one a millisecond ahead", () => {
+  it("keeps an event that starts now, live, and one a millisecond ahead, as the video's ticker does (Alexis, 2026-11-05)", () => {
     const items = tickerItems([], [event("now", NOW.toISOString()), event("soon", "2026-10-31T12:00:00.001Z")], NOW);
-    expect(items.map((item) => item.id)).toEqual(["soon"]);
+    expect(items.map((item) => [item.id, item.text])).toEqual([
+      ["now", "Event now live now"],
+      ["soon", "Event soon in 1 min"],
+    ]);
   });
 
   it("is empty with no news and no event", () => {
@@ -34,7 +47,7 @@ describe("tickerItems", () => {
   it("gives each news and each event its kind, its title as text, its link and its id", () => {
     const items = tickerItems([news("n1", "2026-10-30")], [event("e1", "2026-11-02T10:00:00Z")], NOW);
     expect(items).toEqual<TickerItem[]>([
-      { id: "e1", kind: "event", text: "Event e1", link: "https://gno.land/e1" },
+      { id: "e1", kind: "event", text: "Event e1 in 46 h", link: "https://gno.land/e1" },
       { id: "n1", kind: "news", text: "News n1", link: "https://gno.land/n1" },
     ]);
   });
@@ -48,9 +61,28 @@ describe("tickerItems", () => {
     expect(items.map((item) => item.id)).toEqual(["soon", "later", "new", "mid", "old"]);
   });
 
-  it("drops an event that has already begun: a strip of what is happening elsewhere would be news of the past", () => {
-    const items = tickerItems([], [event("gone", "2026-10-31T11:59:00Z"), event("next", "2026-10-31T12:01:00Z")], NOW);
-    expect(items.map((item) => item.id)).toEqual(["next"]);
+  it("keeps an event within the hour it began, and drops one past it", () => {
+    const items = tickerItems(
+      [],
+      [
+        event("over", "2026-10-31T10:59:00Z"),
+        event("live", "2026-10-31T11:01:00Z"),
+        event("next", "2026-10-31T12:01:00Z"),
+      ],
+      NOW,
+    );
+    expect(items.map((item) => item.id)).toEqual(["live", "next"]);
+  });
+
+  it("names an event's world before its title, and how soon, as frame 6's \"Dev help · AMA … in 11 h\"", () => {
+    const ama = {
+      ...event("ama", "2026-10-31T22:30:00Z", "AMA · interrealm"),
+      world: "devhelp",
+      kind: "AMA",
+      place: "Dev help",
+    };
+    const items = tickerItems([], [ama], NOW);
+    expect(items[0]).toMatchObject({ text: "Dev help · AMA · interrealm in 11 h", label: "AMA" });
   });
 
   it("keeps six items at most, the nearest first", () => {
@@ -58,6 +90,38 @@ describe("tickerItems", () => {
     const items = tickerItems(rows, [], NOW);
     expect(items).toHaveLength(6);
     expect(items[0]?.id).toBe("n8");
+  });
+
+  // 7t: the chain's trends come first, as the server ranks them, before what the team's data dates; an event that waits for its date
+  // starts at the data's far-off sentinel (dataFiles.test.ts), and is no longer shown.
+  it("puts the chain's trends first, in their order, then the events to come, then the news, six at most", () => {
+    const trends = [trend("trending"), trend("rising"), trend("new")];
+    const items = ledByTrends(
+      trends,
+      tickerItems(
+        [news("n1", "2026-10-30"), news("n2", "2026-10-29"), news("n3", "2026-10-28")],
+        [event("e1", "2026-11-02T10:00:00Z")],
+        NOW,
+      ),
+    );
+    expect(items.map((item) => item.id)).toEqual(["trend-trending", "trend-rising", "trend-new", "e1", "n1", "n2"]);
+  });
+
+  it("shows no event that waits for its date, and keeps one dated far ahead but before the sentinel", () => {
+    const items = tickerItems(
+      [],
+      [
+        event("tbc", "2099-12-31T00:00:00Z"),
+        event("tbc2", "2099-01-01T00:00:00Z"),
+        event("far", "2098-12-31T23:59:59Z"),
+      ],
+      NOW,
+    );
+    expect(items.map((item) => item.id)).toEqual(["far"]);
+  });
+
+  it("shows none of the data's events while each waits for its date", () => {
+    expect(tickerItems([], dataEvents, NOW)).toEqual([]);
   });
 
   it("does not change what it is given", () => {
@@ -71,8 +135,70 @@ const ITEMS: TickerItem[] = [
   { id: "sample-1", kind: "news", text: "A first headline", link: "https://gno.land/one" },
   { id: "sample-2", kind: "event", text: "A call, date to be confirmed", link: "https://gno.land/two" },
 ];
+// The ticker in a router, as the home draws it: a trend's link goes through it.
+const mountRouted = (items: TickerItem[]) => {
+  const router = createMemoryRouter(
+    [
+      { path: "/", element: <Ticker items={items} /> },
+      { path: "*", element: <p>elsewhere</p> },
+    ],
+    { initialEntries: ["/"] },
+  );
+  return mount(<RouterProvider router={router} />);
+};
 const visibleLinks = (box: HTMLElement) =>
   all(box, "a").filter((each) => each.closest("[aria-hidden='true']") === null);
+
+describe("withOnAir", () => {
+  const row = (id: string, until?: string) => ({ id, title: `Air ${id}`, link: `https://gno.land/${id}`, until });
+  const items = (...ids: string[]) =>
+    tickerItems(
+      [news("n1", "2026-10-30")],
+      ids.map((id) => event(id, "2026-11-02T10:00:00Z")),
+      NOW,
+    );
+
+  it("places the lines after the events and before the news, in the data's order", () => {
+    const placed = withOnAir(items("e1", "e2"), [row("a"), row("b")], NOW);
+    expect(placed.map(({ id, kind }) => `${kind}:${id}`)).toEqual([
+      "event:e1",
+      "event:e2",
+      "onair:a",
+      "onair:b",
+      "news:n1",
+    ]);
+  });
+
+  it("gives a line its kind, its title as text and its link", () => {
+    expect(withOnAir([], [row("a")], NOW)).toEqual<TickerItem[]>([
+      { id: "a", kind: "onair", text: "Air a", link: "https://gno.land/a" },
+    ]);
+  });
+
+  it("puts the lines first when no event is to come", () => {
+    expect(withOnAir(items(), [row("a")], NOW).map(({ id }) => id)).toEqual(["a", "n1"]);
+  });
+
+  it("keeps a line with no end and one that ends after now, and drops one that ends now or before", () => {
+    const rows = [
+      row("open"),
+      row("later", "2026-10-31T12:00:00.001Z"),
+      row("now", NOW.toISOString()),
+      row("past", "2026-01-01T00:00:00Z"),
+    ];
+    expect(withOnAir([], rows, NOW).map(({ id }) => id)).toEqual(["open", "later"]);
+  });
+
+  it("holds the six the ticker shows at most, the news giving way first", () => {
+    const placed = withOnAir(
+      items("e1"),
+      ["a", "b", "c", "d", "e", "f"].map((id) => row(id)),
+      NOW,
+    );
+    expect(placed).toHaveLength(6);
+    expect(placed.map(({ id }) => id)).toEqual(["e1", "a", "b", "c", "d", "e"]);
+  });
+});
 
 describe("the ticker", () => {
   it("is not drawn at all with no item", () => {
@@ -83,6 +209,8 @@ describe("the ticker", () => {
     const box = mount(<Ticker items={ITEMS} />);
     expect(all(box, "[data-ticker]")).toHaveLength(1);
     expect(one(box, "[data-ticker]").getAttribute("aria-label")).toMatch(/news and events/i);
+    // 7t: the region leads with the chain's trends, and says so (F4562).
+    expect(one(box, "[data-ticker]").getAttribute("aria-label")).toBe("Trends, news and events");
     expect(visibleLinks(box).map((each) => [each.textContent, each.getAttribute("href")])).toEqual([
       ["A first headline", "https://gno.land/one"],
       ["A call, date to be confirmed", "https://gno.land/two"],
@@ -127,6 +255,29 @@ describe("the ticker", () => {
     click(play);
     expect(strip.getAttribute("data-paused")).toBe("false");
     expect(button(box, "Pause the ticker")).toBeDefined();
+  });
+
+  it("names each kind in a word, the chain's trends among them", () => {
+    const kinds = all(mountRouted([trend("trending"), trend("rising"), trend("new"), ...ITEMS]), "[data-kind]");
+    expect(kinds.map((each) => [each.getAttribute("data-kind"), each.textContent])).toEqual([
+      ["trending", "Trending"],
+      ["rising", "Rising"],
+      ["new", "New"],
+      ["news", "News"],
+      ["event", "Event"],
+    ]);
+  });
+
+  it("opens a trend's world on this site, in the page and through the router, and says its source on the link", () => {
+    const box = mountRouted([trend("trending"), ...ITEMS]);
+    const link = all(box, "a").find((each) => each.textContent === "A trending world");
+    expect(link?.getAttribute("href")).toBe("/r/trending");
+    expect(link?.getAttribute("target")).toBeNull();
+    expect(link?.getAttribute("title")).toBe("The trending world's source");
+    act(() => {
+      link?.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 }));
+    });
+    expect(box.textContent).toContain("elsewhere");
   });
 
   it("makes the pause its first control, before any link, so a keyboard reaches it first", () => {

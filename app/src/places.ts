@@ -1,12 +1,11 @@
 // The places the app knows, from the data files (slice 5's 5c and 5d; the bundle holds a copy of app/data's lists, which
 // the build's config checked first: GNOWORLD_DATA names another directory, vite.config.ts). A page is found by its
 // request's path, exactly as written: the path's case is part of the address (F376), a trailing slash is not.
-import { placeAt, type Place, type PlaceKind } from "@gnoworld/core";
+import { placeAt, realmRoute, type Place, type PlaceKind } from "@gnoworld/core";
 import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
 import genres from "../data/genres.json" with { type: "json" };
 import hubs from "../data/hubs.json" with { type: "json" };
-import stations from "../data/stations.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
 import { placesFrom } from "./dataPlaces.ts";
 
@@ -24,6 +23,9 @@ export interface Listed {
   canonical: string;
   /** The realms a world is about, on its universe's chain: the first is the one its page reads proposals from. */
   realms?: readonly string[];
+  /** What a world is and its genre's name, as its plate's crumb says them (8g): "dao", "Games". */
+  kind?: string;
+  genre?: string;
 }
 export type World = Listed;
 export type Ecosystem = Listed;
@@ -35,6 +37,8 @@ export interface UniverseView {
   isDefault: boolean;
   /** A testnet's pages are not indexed (ADR-0002 §2). */
   testnet: boolean;
+  /** Its chain's gnoweb, the chat's link out (8d); none in data that names none. */
+  gnoweb?: string | undefined;
   home: { path: string; canonical: string };
   earth: { path: string; canonical: string };
   worlds: Listed[];
@@ -47,12 +51,19 @@ interface Row {
   description: string;
   universe: string;
   realms?: readonly string[] | undefined;
+  kind?: string | undefined;
+  genre?: string | undefined;
 }
 interface Source {
-  universes: { id: string; name: string; default?: boolean | undefined; testnet?: boolean | undefined }[];
+  universes: {
+    id: string;
+    name: string;
+    gnoweb?: string | undefined;
+    default?: boolean | undefined;
+    testnet?: boolean | undefined;
+  }[];
   hubs: Row[];
   ecosystems: Row[];
-  stations: Row[];
   genres: { slug: string; name: string }[];
 }
 
@@ -127,6 +138,7 @@ function viewAt(universe: UniverseView, pathname: string): View | undefined {
 // A path as the data spells it: a trailing slash is no part of the address.
 const trimmed = (pathname: string) => (pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname);
 
+// A row of the data as the site lists it; its genre by the name genres.json gives it.
 function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
   return {
     slug: row.slug,
@@ -136,6 +148,8 @@ function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: s
     testnet,
     ...at,
     ...(row.realms === undefined ? {} : { realms: row.realms }),
+    ...(row.kind === undefined ? {} : { kind: row.kind }),
+    ...(row.genre === undefined ? {} : { genre: row.genre }),
   };
 }
 
@@ -144,14 +158,17 @@ function build(source: Source) {
   const testnets = new Set(
     source.universes.filter((universe) => universe.testnet === true).map((universe) => universe.id),
   );
+  const genres = new Map(source.genres.map(({ slug, name }) => [slug, name]));
   const listed = (kind: PlaceKind, from: Row[]): Listed[] => {
     const rows = new Map(from.map((row) => [`${row.universe}/${row.slug}`, row]));
     return places.flatMap(({ kind: is, universe, slug, path, canonical }) => {
       const row = is === kind && slug !== undefined ? rows.get(`${universe}/${slug}`) : undefined;
-      return row === undefined ? [] : [listedFrom(row, testnets.has(universe), { path, canonical })];
+      return row === undefined
+        ? []
+        : [listedFrom({ ...row, genre: genres.get(row.genre ?? "") }, testnets.has(universe), { path, canonical })];
     });
   };
-  const worlds = listed("world", [...source.hubs, ...source.stations]);
+  const worlds = listed("world", source.hubs);
   const ecosystemList = listed("ecosystem", source.ecosystems);
   const views = source.universes.map((universe): UniverseView => {
     const at = (kind: PlaceKind): Place => {
@@ -164,6 +181,7 @@ function build(source: Source) {
       name: universe.name,
       isDefault: universe.default === true,
       testnet: testnets.has(universe.id),
+      gnoweb: universe.gnoweb,
       home: { path: at("cosmos").path, canonical: at("cosmos").canonical },
       earth: { path: at("earth").path, canonical: at("earth").canonical },
       worlds: worlds.filter((world) => world.universe === universe.id),
@@ -219,4 +237,18 @@ function build(source: Source) {
   };
 }
 
-export const site = siteOf({ universes, hubs, ecosystems, stations, genres });
+export const site = siteOf({ universes, hubs, ecosystems, genres });
+
+/** A world's realm's view on the site: /r/<path> in the default universe, /net/<id>/r/<path> in another. */
+export const realmView = (realm: string, universe: Pick<UniverseView, "id" | "isDefault">): string =>
+  realmRoute(realm, universe.isDefault ? "" : `/net/${universe.id}`);
+
+// A realm's path on a site or on gnoweb, `gno.land/r/gov/dao` -> `/r/gov/dao`: the data's realms, which dataFiles.ts checks.
+export const realmPath = (realm: string): string => realmRoute(realm);
+
+/** The world `slug` of universe `at` as a place: its name and page, the Earth's own; none for a slug the universe does not list. Where an
+ * event happens (the calendar, the bell, the ticker). */
+export function placeOf(at: UniverseView, slug: string): { name: string; href: string } | undefined {
+  const world = slug === "earth" ? { name: "Earth", ...at.earth } : at.worlds.find((each) => each.slug === slug);
+  return world === undefined ? undefined : { name: world.name, href: world.path };
+}

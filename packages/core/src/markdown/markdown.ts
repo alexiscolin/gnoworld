@@ -7,9 +7,10 @@ import { Blocks, CHAT } from "./blocks.ts";
 import type { Block } from "./types.ts";
 
 export { MAX_QUOTE_DEPTH } from "./blocks.ts";
-export { inWord, MAX_INLINE_DEPTH } from "./inline.ts";
+export { MAX_INLINE_DEPTH } from "./inline.ts";
 export { mentions, mentionsRoom } from "./mentions.ts";
 export { inlines } from "./nodes.ts";
+export { inWord } from "./scan.ts";
 export type { Block, Inline } from "./types.ts";
 
 /** A message, as its tree's blocks. */

@@ -138,6 +138,44 @@ describe("loadConfig", () => {
     }
   });
 
+  it("reads the file the worlds job writes: absolute, none by default (7c)", () => {
+    const universes = "/app/app/data/universes.json";
+    expect(loadConfig(ENV).worlds).toBeUndefined();
+    expect(loadConfig({ ...ENV, WORLDS_FILE: "/markets/worlds.json", UNIVERSES_FILE: universes }).worlds).toBe(
+      "/markets/worlds.json",
+    );
+    for (const value of [
+      "",
+      "worlds.json",
+      "./worlds.json",
+      "/",
+      "/srv/../worlds.json",
+      "/srv//worlds.json",
+      "/srv/",
+    ]) {
+      expect(failure({ ...ENV, UNIVERSES_FILE: universes, WORLDS_FILE: value })).toMatch(/setting WORLDS_FILE: /);
+    }
+  });
+
+  it("reads the file the preview job writes: absolute, none by default (8f)", () => {
+    const universes = "/app/app/data/universes.json";
+    expect(loadConfig(ENV).previews).toBeUndefined();
+    expect(loadConfig({ ...ENV, PREVIEWS_FILE: "/markets/previews.json", UNIVERSES_FILE: universes }).previews).toBe(
+      "/markets/previews.json",
+    );
+    for (const value of [
+      "",
+      "previews.json",
+      "./previews.json",
+      "/",
+      "/srv/../previews.json",
+      "/srv//previews.json",
+      "/srv/",
+    ]) {
+      expect(failure({ ...ENV, UNIVERSES_FILE: universes, PREVIEWS_FILE: value })).toMatch(/setting PREVIEWS_FILE: /);
+    }
+  });
+
   // The home's block height (2026-10-31): the universes' data names the RPC the prices timer reads it from.
   it("reads the universes' data file the height's RPC comes from: absolute, none by default", () => {
     expect(loadConfig(ENV).universes).toBeUndefined();

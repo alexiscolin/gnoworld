@@ -9,8 +9,10 @@ import type { Precached } from "./worker.ts";
 
 const HASHED = /^assets\/(?:[\w.-]+-[\w-]{8}\.(?:js|css)|geist(?:-mono)?-latin-wght-normal-[\w-]{8}\.woff2)$/;
 
-/** Whether a file of the build (a path from its folder, no leading slash) is a hashed script, style or font. */
-export const isHashed = (name: string) => HASHED.test(name);
+/** Whether a file of the build (a path from its folder, no leading slash) is a hashed script, style or font the worker holds. The
+ * scene's chunk is none: the worker runs on a phone too, where nothing of the 3D loads before "View in space" (ADR-0002 §8, row 10), so
+ * no version lists it, the browser fetches it when asked, and offline the page has its list. */
+export const isHashed = (name: string) => HASHED.test(name) && !/^assets\/scene-[\w-]{8}\.js$/.test(name);
 
 // The address a shell file answers at: a page is its folder's index.html, the fallback and the data are
 // where they sit. A file under assets/ is no page or data.

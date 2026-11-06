@@ -1,0 +1,39 @@
+/* The sparkline: a 1 px line in its tone over its area, the tone at 28% at the line's height fading to none at the foot (frame 6's markets
+   row: 58 by 22 px beside each price). */
+@layer components {
+  .spark {
+    --_tone: var(--color-text-muted);
+
+    display: block;
+    /* raw: 58 by 22 px, frame 6's sparklines */
+    inline-size: 58px;
+    /* raw: the same */
+    block-size: 22px;
+  }
+
+  .spark[data-tone="up"] {
+    --_tone: var(--color-mine);
+  }
+
+  .spark[data-tone="down"] {
+    --_tone: var(--color-danger);
+  }
+
+  /* Its fill and its round joins are the drawing's own attributes (Sparkline.tsx). */
+  .line {
+    stroke: var(--_tone);
+    stroke-width: var(--line-width);
+    vector-effect: non-scaling-stroke;
+  }
+
+  .top {
+    stop-color: var(--_tone);
+    /* raw: the area's shade at the line's height, frame 6 */
+    stop-opacity: 0.28;
+  }
+
+  .foot {
+    stop-color: var(--_tone);
+    stop-opacity: 0;
+  }
+}

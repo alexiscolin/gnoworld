@@ -1,0 +1,18 @@
+/* The list: at the small control's height, beside the chips it is chosen among, on the resting fill. */
+@layer components {
+  .select {
+    /* raw: the list never makes its place wider, whatever its longest row; not a bare 100%, which a Field's rule has too */
+    max-inline-size: min(100%, 100vi);
+    min-block-size: var(--control-s);
+    padding-inline: var(--space-2xs);
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-s);
+    background: var(--color-fill);
+    font: var(--font-field);
+    cursor: pointer;
+  }
+
+  .select:hover {
+    background: var(--color-fill-hover);
+  }
+}

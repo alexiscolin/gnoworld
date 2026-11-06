@@ -36,14 +36,17 @@
     background: var(--color-fill-hover);
   }
 
-  /* An irreversible act, coral, its alert icon before its words. */
-  .item[data-tone="danger"] {
+  /* An act with an icon before its words; an irreversible one coral, its alert icon first. */
+  .item:has(svg) {
     /* layout: the icon and the words on one line, as in a button */
     display: flex;
     /* layout: the icon's distance from its words */
     gap: var(--space-2xs);
     /* layout: the icon centred on the words' line */
     align-items: center;
+  }
+
+  .item[data-tone="danger"] {
     color: var(--color-danger);
   }
 

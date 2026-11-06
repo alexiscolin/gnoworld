@@ -1,0 +1,108 @@
+/* The home's opening (ADR-0003 §1, mock-up 1): the kicker in amber, the promise in large type and its line, over the dive's middle, the
+   Earth under them; a discreet link to gno.land's own site. The words take no pointer but their link, and fade as the camera lands. */
+@layer components {
+  .opening {
+    position: fixed;
+    inset-inline: 0;
+    /* raw: mock-up 1's: the column's middle a little under the window's, over the Earth, the hero given way */
+    inset-block-start: 54%;
+    translate: 0 -50%;
+    /* raw: over the labels' layer (0) and the canvas (-1), as the rail is: a label that stands before the words leave is under their veil */
+    z-index: 1;
+    /* layout: the column as wide as its longest line and centred, so its veil is the words' own */
+    inline-size: fit-content;
+    /* layout: the column centred between the window's sides */
+    margin-inline: auto;
+    /* layout: the words in one centred column over the canvas */
+    display: grid;
+    /* layout: each line centred in the column */
+    justify-items: center;
+    /* layout: the arrangement mock-up 1 draws */
+    gap: var(--space-m);
+    padding-inline: var(--space-l);
+    text-align: center;
+    pointer-events: none;
+    /* raw: the words fade in 600 ms as the camera lands (the review's demo, 0.8 s), then leave the page's reading */
+    transition:
+      opacity 600ms var(--ease-standard),
+      visibility 0s linear 600ms;
+  }
+
+  /* F4643: a soft dark veil behind the words, the dive showing through it: each word keeps 4.5:1 over the brightest the dive shows, a sun's
+     white, and the dive itself is never dimmed. Its edge stands 96 px past the words, more than twice its blur, so it is whole behind them. */
+  .opening::before {
+    position: absolute;
+    /* raw: 96 px past the words, the column's own 32 px of side included */
+    inset: -96px -64px;
+    /* raw: a long soft ellipse, no card's corner */
+    border-radius: 50%;
+    /* raw: the night at 72%, under which the line's grey keeps 5.4:1 over white */
+    background: color-mix(in oklab, var(--color-ink) 72%, transparent);
+    /* raw: the veil's soft edge */
+    filter: blur(40px);
+    content: "";
+  }
+
+  /* The words over their veil, which comes first. */
+  .opening > * {
+    position: relative;
+  }
+
+  .opening[data-left] {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  .opening > p {
+    /* layout: the column spaces its lines */
+    margin-block: 0;
+  }
+
+  /* The kicker's word in amber, mock-up 1's: the label utility colours its line in a later layer. */
+  .warm {
+    color: var(--color-warm);
+  }
+
+  .title {
+    color: var(--color-text);
+    /* raw: mock-up 1's promise, 54 px at 1,728 px wide, 600 */
+    font: 600 clamp(2rem, 3.2vi, 3.5rem) / 1.08 var(--family-sans);
+    /* raw: the promise's tight tracking (mock-up 1, about -0.04em) */
+    letter-spacing: -0.04em;
+    /* raw: a shade under the words, so they read over a sun */
+    text-shadow: 0 2px 24px color-mix(in oklab, var(--color-ink) 70%, transparent);
+  }
+
+  .line {
+    /* raw: mock-up 1's line on one row at 1,728 px, on two at most on a laptop's screen */
+    max-inline-size: 64rem;
+    /* raw: mock-up 1's line, 20 px at 1,728 px wide */
+    font: 400 clamp(1rem, 1.16vi, 1.25rem) / 1.5 var(--family-sans);
+    /* raw: the same shade as the promise's */
+    text-shadow: 0 2px 18px color-mix(in oklab, var(--color-ink) 70%, transparent);
+  }
+
+  /* The line and its link in the hero line's own grey; the muted grey kept no 4.5:1 over the veil (F4643). */
+  .line,
+  .about {
+    /* raw: the hero line's grey (Hero.module.css) */
+    color: #c8d0de;
+  }
+
+  .about {
+    pointer-events: auto;
+    font: var(--font-meta);
+    /* raw: the underline a little under the words */
+    text-underline-offset: 0.2em;
+  }
+
+  .about:hover {
+    color: var(--color-text);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .opening {
+      transition: none;
+    }
+  }
+}

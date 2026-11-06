@@ -1,6 +1,7 @@
 // The GovDAO proposals a realm's home page lists, in the format RECORDED on gnoland-1 and onyx-1 (F2951, app/tests/chain/recorded/):
-// `### [Prop #N - Title](/r/gov/dao:N)` and `Status: WORD`, no tally and no threshold. A proposer's title is text, bounded. Every
-// pattern is linear, the page is read to a bound, nothing throws, the Zod schema has the last word.
+// `### [Prop #N - Title](/r/gov/dao:N)` and `Status: WORD`, no tally and no threshold; the newest open one's own page gives its yes
+// and no (F4308), never a threshold. A proposer's words are text, bounded. Every pattern is linear, a page is read to a bound,
+// nothing throws, the Zod schema has the last word.
 import { cutGraphemes } from "@gnoworld/core";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
@@ -17,6 +18,13 @@ const LISTED_MAX = 50;
 const LISTED = /^###[ \t]+\[Prop[ \t]+#(\d{1,9})[ \t]+-[ \t]+(.*)\]\(\/r\/gov\/dao:(\d{1,9})\)$/;
 // A home entry's line of state, `Status: ACTIVE`.
 const STATUS = /^Status:[ \t]+(.+)$/;
+// The realm's word for a proposal open for votes, on its home page.
+const OPEN_STATE = "ACTIVE";
+// A proposal's own page: its one block of stats, open or not, its yes and its no as `- YES PERCENT: 33.33333333333333%`.
+const STATS = /^###[ \t]+Stats$/;
+const OPEN = /^-[ \t]+\*\*Proposal is open for votes\*\*$/;
+const YES = /^-[ \t]+YES PERCENT:[ \t]+(\d{1,3}(?:\.\d{1,20})?)%$/;
+const NO = /^-[ \t]+NO PERCENT:[ \t]+(\d{1,3}(?:\.\d{1,20})?)%$/;
 // Markdown's backslash before a punctuation mark (`gno\-core`), which the realm adds to a title.
 const ESCAPED = /\\([!-/:-@[-`{-~])/g;
 
@@ -50,7 +58,7 @@ function blockAfter(lines: readonly string[], from: number): string[] {
 }
 
 // A proposal that fits the schema, or none.
-function fitted(base: { id: number; title: string; state: string }): Proposal | undefined {
+function fitted(base: { id: number; title: string; state: string; yes?: number; no?: number }): Proposal | undefined {
   const parsed = Proposal.safeParse(base);
   return parsed.success ? parsed.data : undefined;
 }
@@ -69,12 +77,40 @@ export function proposalsOf(text: string): Proposal[] {
   return listed;
 }
 
-/** The proposals a realm's home page lists, newest first as written: one request, or a typed failure. */
+// A yes and a no a page states, read from decimals: their sum may pass 100 by a rounding, never by more.
+const WHOLE = 100 + 1e-9;
+
+/** What a proposal's own page states of its votes: whether it is open, its yes and its no, 0 to 100, from its one block of stats; none
+ * when a proposer's words hold a second block or a second line, a share is none, the two pass the whole, or the page is longer than what
+ * is read: a proposer's long description would push the realm's own block past the bound and leave a forged one alone (security review). */
+export function votesOf(text: string): { open: boolean; yes: number; no: number } | undefined {
+  if (text.length > PAGE_READ) return undefined;
+  const lines = linesOf(text);
+  const heads = lines.flatMap((line, at) => (STATS.test(line) ? [at] : []));
+  const [head] = heads;
+  if (heads.length !== 1 || head === undefined) return undefined;
+  const block = blockAfter(lines, head);
+  const yes = Number(only(block, YES)?.[1] ?? Number.NaN);
+  const no = Number(only(block, NO)?.[1] ?? Number.NaN);
+  if (fitted({ id: 0, title: "votes", state: "", yes, no }) === undefined || yes + no > WHOLE) return undefined;
+  return { open: only(block, OPEN) !== undefined, yes, no };
+}
+
+/** The proposals a realm's home page lists, newest first as written, the newest open one with its yes and no from its own page: two
+ * requests at most, or a typed failure of the first. A page of votes that does not come leaves the list as it is. */
 export async function readProposals(
   rpc: string,
   realm: string,
   options: ReadOptions = {},
 ): Promise<ChainRead<Proposal[]>> {
   const page = await readPage(rpc, { realm }, options);
-  return page.ok ? { ok: true, value: proposalsOf(page.value), source: page.source } : page;
+  if (!page.ok) return page;
+  const listed = proposalsOf(page.value);
+  const open = listed.find(({ state }) => state === OPEN_STATE);
+  if (open === undefined) return { ok: true, value: listed, source: page.source };
+  const own = await readPage(rpc, { realm, path: String(open.id) }, options);
+  const votes = own.ok ? votesOf(own.value) : undefined;
+  const voted = votes?.open === true ? fitted({ ...open, yes: votes.yes, no: votes.no }) : undefined;
+  const value = voted === undefined ? listed : listed.map((each) => (each === open ? voted : each));
+  return { ok: true, value, source: page.source };
 }

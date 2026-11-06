@@ -1,10 +1,16 @@
 // Who is here, in the info panel (4b; 5q's nebula): counted once connected, the bot left out, the first
 // MEMBERS_SHOWN named.
 import { Avatar, Cluster } from "@gnoworld/ui";
+import { lazy, Suspense } from "react";
 import { BOT, isAccount } from "./names.ts";
+import type { Line } from "@gnoworld/core";
+import { Country, countriesHere } from "./Country.tsx";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./People.module.css";
+
+// Follow comes in a chunk of its own, after the list: out of the late chat's budget.
+const FollowButton = lazy(async () => ({ default: (await import("../follow/index.ts")).FollowButton }));
 
 /** The people a room lists by name; the others are counted. */
 export const MEMBERS_SHOWN = 100;
@@ -16,6 +22,10 @@ export interface PeopleProps {
   /** The reader's address, and how it opens a direct message with another account: each offered beside it. */
   me: string | undefined;
   onMessage: ((partner: string) => void) | undefined;
+  /** Each account but the reader's may be followed, on this device (slice 8): where it is here, the labels say so. */
+  canFollow?: boolean;
+  /** The room's lines: the country each declared there, its code and name at the row's end. */
+  lines?: readonly Line[] | undefined;
 }
 
 // A person: their nebula and their name, what `said` adds before it for a screen reader alone.
@@ -29,8 +39,9 @@ function Who({ nick, account, said }: { nick: string; account: boolean; said?: s
   );
 }
 
-export function People({ members, connected, me, onMessage }: PeopleProps) {
+export function People({ members, connected, me, onMessage, canFollow = false, lines }: PeopleProps) {
   const people = members.filter((nick) => nick !== BOT);
+  const countries = countriesHere(lines ?? [], people);
   return (
     <section aria-label="Who's here">
       <h3 className="visually-hidden">{connected ? `${String(people.length)} here` : "Who's here"}</h3>
@@ -56,6 +67,14 @@ export function People({ members, connected, me, onMessage }: PeopleProps) {
                 ) : (
                   <Who nick={nick} account={account} />
                 )}
+                <Cluster space="2xs">
+                  <Country code={countries.get(nick)} />
+                  {canFollow && account && nick !== me ? (
+                    <Suspense fallback={null}>
+                      <FollowButton kind="people" id={nick} size="m" />
+                    </Suspense>
+                  ) : null}
+                </Cluster>
               </Cluster>
             </li>
           );

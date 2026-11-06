@@ -1,5 +1,9 @@
 // The capped, timed GET of every chain read (the browser's since 5g, 5m's markets too; the server's and Jarvis's since 10h):
 // the bytes of an answer under a time limit and a size cap, or a kind of failure. Nothing here reads a schema: `read.ts` does.
+// This site's own files are read here too (7n2): a module of their own, shared by the first screen and the scene's chunk, would be a
+// chunk that every lazy chunk names.
+import { cappedBytes } from "@gnoworld/core";
+import type * as z from "zod/mini";
 
 /** The time an answer has, its body read included. */
 const CHAIN_TIMEOUT_MS = 8_000;
@@ -30,29 +34,6 @@ async function drop(stream: { cancel(): Promise<void> } | null | undefined): Pro
   }
 }
 
-// The chunks of a body, or why not; the reader is cancelled the moment the total passes the cap.
-async function chunksOf(
-  reader: ReadableStreamDefaultReader<Uint8Array>,
-  maxBytes: number,
-): Promise<Uint8Array[] | "too-big" | "down"> {
-  const chunks: Uint8Array[] = [];
-  let total = 0;
-  try {
-    for (;;) {
-      const { done, value } = await reader.read();
-      if (done) return chunks;
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await drop(reader);
-        return "too-big";
-      }
-      chunks.push(value);
-    }
-  } catch {
-    return "down";
-  }
-}
-
 // The body's bytes, or why not.
 async function bodyOf(response: Response, maxBytes: number): Promise<Uint8Array | "too-big" | "down"> {
   const declared = Number(response.headers.get("content-length"));
@@ -61,15 +42,12 @@ async function bodyOf(response: Response, maxBytes: number): Promise<Uint8Array 
     return "too-big";
   }
   const reader = response.body?.getReader();
-  const chunks = reader === undefined ? [] : await chunksOf(reader, maxBytes);
-  if (typeof chunks === "string") return chunks;
-  const whole = new Uint8Array(chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0));
-  let at = 0;
-  for (const chunk of chunks) {
-    whole.set(chunk, at);
-    at += chunk.byteLength;
+  if (reader === undefined) return new Uint8Array();
+  try {
+    return (await cappedBytes(reader, maxBytes)) ?? "too-big";
+  } catch {
+    return "down";
   }
-  return whole;
 }
 
 /** What ends a piece of work early: its time limit, and its caller's signal. */
@@ -161,4 +139,30 @@ export function fetchBytes(url: string, options: Transport): Promise<Fetched> {
   return withinTime(options, { timeout: { kind: "timeout" }, left: { kind: "down" } }, (signal) =>
     attempt({ url, fetcher, signal, credentials, cache, maxBytes }),
   );
+}
+
+export interface SiteFileRead {
+  fetch?: ChainFetch;
+  signal?: AbortSignal;
+}
+
+/** A file the server's jobs write from a chain, at this site's `url` (slice 7): its own credentials and cache, under `maxBytes`, as `schema`
+ * reads it, or nothing if it did not come whole. Never a throw, for a page has nothing to do with one. */
+export async function readSiteFile<T>(
+  url: string,
+  schema: z.ZodMiniType<T>,
+  { maxBytes, fetch, signal }: SiteFileRead & { maxBytes: number },
+): Promise<T | undefined> {
+  const answer = await fetchBytes(url, {
+    ...(fetch === undefined ? {} : { fetch }),
+    ...(signal === undefined ? {} : { signal }),
+    maxBytes,
+    credentials: "same-origin",
+  });
+  if ("kind" in answer) return undefined;
+  try {
+    return schema.safeParse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(answer.bytes))).data;
+  } catch {
+    return undefined;
+  }
 }

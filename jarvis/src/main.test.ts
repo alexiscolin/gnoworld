@@ -789,7 +789,7 @@ describe("the files jarvis's image takes", () => {
         "^jarvis/src/.+\\.ts$",
         "^jarvis/skills/[a-z-]+/.+$",
         "^packages/(core|schemas|service|chain)/src/.+\\.ts$",
-        "^app/data/[a-z]+\\.json$",
+        "^app/data/[a-zA-Z]+\\.json$",
         "^deploy/jarvis/gnomcp\\.toml$",
       ].join("|"),
     );

@@ -3,7 +3,7 @@
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { tallyOf } from "../../lib/chain/tally.ts";
 
-export function StatusPill({ proposal }: { proposal: Pick<Proposal, "id" | "yes" | "threshold"> }) {
+export function StatusPill({ proposal }: { proposal: Pick<Proposal, "id" | "yes" | "no" | "threshold"> }) {
   const tally = tallyOf(proposal);
   return (
     <span role="status" className="label">

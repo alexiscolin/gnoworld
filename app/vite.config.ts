@@ -1,10 +1,11 @@
 import { reactRouter } from "@react-router/dev/vite";
 import babel from "@rolldown/plugin-babel";
 import { reactCompilerPreset } from "@vitejs/plugin-react";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, realpathSync } from "node:fs";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { build, defineConfig, type Plugin } from "vite";
+import { build, defineConfig, parseSync, type Plugin } from "vite";
+import { glslSpaces } from "./src/glsl.ts";
 import { precached } from "./src/sw/precache.ts";
 
 // The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script, with the
@@ -65,16 +66,57 @@ const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 // 173,363 B, not 178,495 B (F3157). The chat's and the lines' code stay behind their own chunks: budgets.spec.ts holds that.
 // The order of the CSS layers does not hang on these groups: root.tsx links the layers' sheet first (F3260).
 const CHUNKS = [
-  { name: "store", test: /\/app\/src\/store\// },
-  // The activity chart is no part of it: a world's page loads the bars apart, once it has a history (F304, slice 5j).
-  // The stat is none of it either: the figure of who is here comes once the chat has someone to count (F2868).
-  // Nor are Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState, Combobox, Field (7.7 KB, F2976).
+  // saveData goes with the store: the chat and the universe share it, and a file of its own costs a world's first screen 131 B. So does its
+  // React binding, now the Earth's page and the chat both read it.
+  { name: "store", test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts)/ },
+  // Not the activity chart (F304), the stat (F2868), Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState,
+  // Combobox, Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i): the chunks
+  // that need them load them after the first screen.
   {
     name: "ui",
-    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row)\/)/,
+    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row|Tabs|Progress|Sparkline)\/)/,
   },
-  { name: "vendor", test: /node_modules/, minShareCount: 2 },
+  // three never: two lazy parts of the scene (the cosmos, a world's page) share some of it, and a share of two would put it on the first screen.
+  { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },
 ];
+
+// The workshop's dev servers, the app's and the lab's (scripts/workshop.sh gives each its port): this machine alone, the exact names
+// WORKSHOP_HOSTS lists (its tailnet's), and by path the app, the packages and their store, which a worktree links into the main
+// checkout's (the fonts' files); never the repository's root, whose deploy/ holds secrets.
+export const workshopHosts = () => process.env["WORKSHOP_HOSTS"]?.split(",").filter(Boolean) ?? [];
+export const workshopServer = () => ({
+  host: "127.0.0.1",
+  strictPort: true,
+  allowedHosts: workshopHosts(),
+  // A build of a copy of app/ alone (dataFiles.test.ts) has no packages beside it: a folder that is not there is allowed to no one.
+  fs: {
+    allow: ["./", "../packages", "../node_modules/.pnpm"]
+      .map((path) => new URL(path, import.meta.url))
+      .filter((url) => existsSync(url))
+      .map((url) => realpathSync(url)),
+  },
+});
+
+// The workshop's backend behind the app's dev server (scripts/workshop.sh starts it): its server's /api and Ergo's /ws on this machine, as
+// nginx's are, the visitor's address set here and never the browser's. Vite's proxy is a dev server's, which no build reads; both ports,
+// written plainly, or none.
+export const workshopBackend = () => {
+  const [api, ws] = [process.env["WORKSHOP_API_PORT"], process.env["WORKSHOP_WS_PORT"]].map((text) =>
+    text !== undefined && /^\d{1,5}$/.test(text) && Number(text) >= 1 && Number(text) <= 65535 ? text : undefined,
+  );
+  if (api === undefined || ws === undefined) return undefined;
+  return {
+    "^/api/": { target: `http://127.0.0.1:${api}`, headers: { "x-real-ip": "127.0.0.1" } },
+    "^/ws$": {
+      target: `ws://127.0.0.1:${ws}`,
+      ws: true,
+      headers: { "x-forwarded-for": "127.0.0.1", "x-real-ip": "127.0.0.1" },
+    },
+  };
+};
+
+/** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
+export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 
 // The React Compiler memoizes every component (ADR-0002 §8); one it cannot compile fails the build.
 export default defineConfig({
@@ -82,7 +124,9 @@ export default defineConfig({
     dataFiles,
     reactRouter(),
     babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
+    glslSpaces(parsed),
     serviceWorker,
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
+  server: { ...workshopServer(), proxy: workshopBackend() },
 });

@@ -42,9 +42,9 @@ and the deployment live in one repository, with one lockfile and one gate:
 ```
 app/                         the web client
   react-router.config.ts     ssr: false; prerender lists every place from data/
-  data/                      universes, hubs, ecosystems, stations, events, expedition stops, quests,
+  data/                      universes, hubs, ecosystems, the Earth's stations, events, expedition stops, quests,
                              news, bubble rules (Zod-checked at build, ADR-0002 §7)
-  public/                    fonts, KTX2 textures, preview captures, generated OG images
+  public/                    fonts, WebP textures, preview captures, generated OG images
   src/
     root.tsx                 document shell, providers, top error boundary
     routes/                  one module per URL: meta, build-time loader, the screen
@@ -99,7 +99,7 @@ features/chat/
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` and `ui`
 since slice 1, `app`'s folders since 2g (F378: `sw`, `features`, `routes`), `lib` and `store` since
 slice 4 (4a), `jarvis`, `service` and `chain` since 10h (`lint/server.config.ts`, `lint/chain.config.ts`,
-each wall proven by `scripts/probe.py`'s `walls` block); `scene` gets its own with the slice that makes the folder.
+each wall proven by `scripts/probe.py`'s `walls` block), `scene` since slice 7 (7a).
 
 | Folder | May import | Never imports |
 |---|---|---|
@@ -173,7 +173,7 @@ TypeScript compiler; a reviewer reads the map to see the whole repo without read
 - Imports by package name across workspaces (`@gnoworld/core`, `@gnoworld/schemas`) and by
   `#` subpath imports inside one (`#lib/adena`), with `import type` for types. Never tsconfig
   `paths`: Node ignores them.
-- Functions are verbs (`pickBubbles`, `placeSystem`), types are nouns, booleans read as
+- Functions are verbs (`pickBubbles`, `placeSystems`), types are nouns, booleans read as
   questions (`isLive`, `hasDigest`). No abbreviations a newcomer would have to guess.
 - Exported functions in `core` and `lib` carry a one-line TSDoc: what it returns and when it
   fails. Comments say why, never what.
@@ -251,21 +251,35 @@ Rules:
 
 ## The scene
 
-- One `WebGPURenderer` with its WebGL2 fallback. One render loop.
+- One `WebGLRenderer` (ADR-0002 §10). One render loop.
 - It renders on demand, by what happens (ADR-0002 §9, rendering):
   - 60 fps while travelling or interacting, 30 when only scenery moves, 10 after a minute
     with no input, never above 60;
   - nothing when the tab is hidden, an opaque view covers the scene, or the window is
     blurred and still;
   - no idle orbit under reduced motion or "Reduce animations".
-- The low-power GPU. The pixel ratio is capped at 1.25 on desktop and 1 on touch; the Low
+- The low-power GPU. The pixel ratio is capped at 2 on desktop (a Retina screen is drawn sharp; the Auto probe is the net) and 1 on touch; the Low
   tier takes 1 and 0.8. Auto drops to Low from a 2 s frame probe.
-- Bodies are instanced, static meshes merged per material. Textures are KTX2. Shaders are
+- Bodies are instanced, static meshes merged per material. Textures are WebP. Shaders are
   compiled before a flight arrives. Generation runs in workers.
 - Each part (a world, a station, the belt, the labels) registers what it creates with one
   disposer. Leaving disposes everything it registered: geometry, material, texture, render
   target, listener.
+- The camera stays at the origin and the world comes to it (slice 7 §5): the eye is a position in doubles, and the GPU gets only what
+  remains of it, so a far coordinate is as steady as home.
+- The scenery (`scene/space.ts`, `core/space`) is computed from a position and tied to no data (ADR-0002 §10): the mood is a smooth field,
+  a cell's stars come from its hash, and both sit in tori of cells that follow the eye, so a step writes only what entered. The sky is
+  marched at half the buffer's size a side, shows through the image's one grade (`scene/renderer.ts`), and is added to the stage's black.
+- What runs on a frame makes nothing: `ON_A_FRAME` in `lint/shared.config.ts` holds it by name, in the scene and in core's `frame` and
+  `space`; a function a frame reaches joins that list as it is written.
 - Text is HTML anchored to the scene (ADR-0001 §7), never 3D geometry.
+- A page that shows space calls `useSpace` (`features/universe`). That door is all it holds of the scene: the universe comes after the
+  text, in a React root of its own that outlives the route, so leaving covers the scene and the way back finds it. three is in the
+  `scene` chunk, which the worker does not precache: a phone fetches it on "View in space". A test build (`VITE_GNOWORLD_TEST_GPU`, the
+  journeys') lets `?test-gpu` pass the software GPU the gate has; a production build holds no trace of it.
+- A page asks for the Earth with `useSpace("earth")` and keeps an empty `[data-globe]` box, laid out by its own stylesheet: the host
+  measures it and the scene stands the globe in that circle, so a breakpoint moves the planet with what is around it. The box's
+  `data-earth` says how far it came: `loading` keeps the box's room, `drawn` opens the plate's mask round it, for the opaque canvas lies under the plate.
 - `?debug` shows fps, draw calls and `renderer.info.memory`.
 
 ## Memory: the checklist
@@ -290,8 +304,8 @@ Each slice that adds a resource proves it is released:
 
 - [ ] **CSP:** no inline script, no `eval`, `connect-src` limited to the hosts above,
       `frame-src` limited to the accepted embed services, and JSON-LD allowed by hash.
-- [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, strike, code, block,
-      lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
+- [ ] **Markdown** becomes DOM nodes from an allowlist (bold, italic, strike, underline, code,
+      block, lists, quote, links, mentions). Nothing from data reaches `innerHTML`.
 - [ ] **Links and media:**
   - https only;
   - embeds only from the accepted services (ADR-0002 §6), shown once the moderation check

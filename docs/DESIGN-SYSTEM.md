@@ -343,6 +343,7 @@ component with its CSS Module, documented by its props.
 | `SignPanel` | preview, waiting, signed, in a block, done; refused, failed, too late, wrong network, wallet missing or locked | The one signing block, whoever signs (Adena, a session, a signature that is not a transaction). It shows the account, the realm, the function, the arguments, the network with its label, the fee as an estimate and who pays, the steps in words, the ADR-0001 §11 warnings and a link to gnoweb. Only it renders the confirm control |
 | `Row` | plain, divided, boxed; current; with a thumbnail, an icon or an avatar | Lists, connected worlds, notifications, search results, agenda entries. The activity slot carries in words what the 3D shows |
 | `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. At rest it is one line (add, emoji, mention, send); the formatting tools show when it has focus. A name is typed at body size, never in data mono |
+| `Select` | the small control's height; a name for assistive technology | The browser's own list, for a choice among many fixed rows (a country): a phone's picker does better than a list of ours |
 | `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's nebula is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; three clouds of colour on night and the address's constellation over them (five stars, one per fifth of the disc so the shape stays open, joined in one of three orders, one bright), the same at every size, readable at 20 px. Never an NFT: the face is computed from the address, which only its key controls (ADR-0001 §11). Where the clouds and stars sit always comes from the address; the palette is chosen in phase 1. A face tells people apart at a glance, never who they are: anyone can try addresses until a face looks like yours, so the name, and the short address where a person matters, identify; my own messages are marked by my name in mint and the word "you", never by the face. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
 | `Stat` | number, unit, caption; the heat badge; delta | Geist Mono 500, tabular, the "instrument" figures (Alexis, 2026-10-31), that count up on arrival. Under reduced motion, effects become `Stat` counts |
@@ -377,11 +378,11 @@ assembly in its own slice, with its story.
 
 ### Icons
 
-- One set of 55: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
+- One set of 56: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
   passport, seal, expand, shrink, image, bookmark, smile, code, code-block, list-bulleted,
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
   spark, news, satellite, planet, cluster, bold, italic, underline, strikethrough, slash, caret,
-  share, menu, people, star, chart, info, warning, alert, lock, shield, key. A new icon joins the
+  share, menu, people, star, chart, info, warning, alert, lock, shield, key, sliders (the settings, slice 8). A new icon joins the
   list in the slice that needs it. Those that point along the text turn right to left: arrow,
   arrow-up-right, reply, list-bulleted, list-numbered and quote; the chevron and the caret point
   across it and stay.
@@ -409,7 +410,9 @@ Search is a ⌘K palette (a wide `Dialog` with a `Combobox`), not a drawer.
 Breakpoints:
 - 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
   are a list with planet thumbnails; "View in space" loads the 3D on request, and then the
-  plate goes below the planet.
+  plate goes below the planet. The Earth alone keeps its chat a block of the page under the
+  globe, up to the dock's 1280 px: a full chat would cover the globe, "View in space" and the
+  Credits.
 - 1200 px: the dock opens by itself on a world.
 - 1400 px: the dock's width.
 
@@ -428,7 +431,9 @@ Components use container queries, so they fit wherever they are placed.
   cascade layers declared once: `@layer reset, tokens, base, compositions, components,
   utilities;`.
   - **Base** styles the elements globally first (type, links, focus, `hr`, rich text: code,
-    quote, mention), so components write little. `::selection` waits for Baseline.
+    quote, mention, underline), so components write little. An underline's line is the muted
+    grey, a step under the words; a link's is the words' own colour, at the font's place.
+    `::selection` waits for Baseline.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking
     a space step (Center's is its gutter). All layout is one of them, never new CSS.

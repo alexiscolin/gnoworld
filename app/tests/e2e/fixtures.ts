@@ -3,6 +3,10 @@
 import { expect, test as base, type Page, type Response as Answer, type Worker } from "@playwright/test";
 import { VIOLATION } from "../../src/sw/report.ts";
 import { site } from "../../src/places.ts";
+import { serveJobs } from "./deployed.ts";
+import { pinFigures } from "./figures.ts";
+
+export { COUNTED } from "./deployed.ts";
 
 export { expect, type Answer, type Page };
 
@@ -64,19 +68,65 @@ async function flushWorker(page: Page, worker: Worker): Promise<void> {
   }).toPass();
 }
 
-// Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f).
-// The directives a page's documents reported, written to its console, which outlives a navigation.
+// Every journey runs under the site's CSP: a violation no test planted fails it (slice 3's plan, 3f). The directives a page's documents
+// reported, written to its console, which outlives a navigation.
 export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<{
   planted: boolean;
   violations: string[];
   homeReads: undefined;
+  pinned: undefined;
+  refusing: boolean;
+  refusals: string[];
+  newcomer: boolean;
+  returning: undefined;
+  counted: boolean;
+  figures: boolean;
 }>({
   planted: [false, { option: true }],
+  refusing: [false, { option: true }],
+  // A shader the scene refused fails every journey that plants none (`refusing`): the scene reports each as a page error (scene.ts's
+  // onShaderError), three logs any other. No journey heard the scene's own report before 7v, when the build broke them all.
+  refusals: [
+    async ({ context, refusing }, use) => {
+      const seen: string[] = [];
+      context.on("weberror", (error) => {
+        const { message } = error.error();
+        if (message.includes("a shader was refused")) seen.push(message);
+      });
+      context.on("console", (message) => {
+        if (message.text().includes("THREE.WebGLProgram")) seen.push(message.text());
+      });
+      await use(seen);
+      if (!refusing) expect(seen, "a shader the scene refused, which no journey planted").toEqual([]);
+    },
+    { auto: true },
+  ],
+  // ADR-0003: a device new to gnoworld sees the home's opening, "Start here" and the first visit's buttons. A journey's browser is a new
+  // device, so each one is a reader who came back, as the video's frames are, unless it asks to be a newcomer.
+  newcomer: [false, { option: true }],
+  returning: [
+    async ({ context, newcomer }, use) => {
+      if (!newcomer)
+        await context.addInitScript(() => {
+          // A document with no origin of its own (about:blank) keeps no storage, and refuses it.
+          try {
+            for (const key of ["gnoworld:entered", "gnoworld:opened"]) localStorage.setItem(key, "1");
+          } catch {
+            return;
+          }
+        });
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+  // The host serves no worlds' count, as a deployment before the job's first pass (heroNumber.spec.ts serves its own); a journey that watches
+  // every request the page makes asks for it as a deployment serves it once the job ran.
+  counted: [false, { option: true }],
   // The home's one read, answered as a settled site would: a file with no price and a block three minutes old (the server's timer
   // writes both), so no page fails a request it did not mean to and the age words stay still. The home asks no chain: a journey
   // that reads one routes its own. A journey that asks otherwise routes its own file.
   homeReads: [
-    async ({ context }, use) => {
+    async ({ context, counted }, use) => {
       const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
       const ago = () => new Date(Date.now() - 3 * 60_000).toISOString();
       await context.route("**/markets.json", (route) =>
@@ -90,6 +140,23 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
           }),
         }),
       );
+      // No count of people online and no prices' history (8i), as a server whose relay and timer have said nothing yet: the hero counts the
+      // worlds and the live line draws no sparkline. A journey that watches them routes its own on its page, which goes first.
+      for (const pattern of ["**/api/presence/people", "**/api/markets/history"])
+        await context.route(pattern, (route) =>
+          route.fulfill({ status: 404, headers: cors, body: JSON.stringify({ error: "not_ready" }) }),
+        );
+      if (counted) await serveJobs(context, cors);
+      await use(undefined);
+    },
+    { auto: true },
+  ],
+  // A look journey's live figures, fixed: who is here (/api/presence) and a world's hours, as no other journey of the run leaves them
+  // (they share one stack). A page's own route goes first. The hours end on 11:00 UTC, so the plate's peak reads the same each run.
+  figures: [false, { option: true }],
+  pinned: [
+    async ({ context, figures }, use) => {
+      if (figures) await pinFigures(context);
       await use(undefined);
     },
     { auto: true },
@@ -168,3 +235,10 @@ export const cacheContents = (page: Page) =>
       for (const request of await (await caches.open(name)).keys()) paths.push(new URL(request.url).pathname);
     return { names, paths: paths.sort() };
   });
+
+/** Every script `page` asks from now on, by its address, as it asks it: a list that grows. */
+export function scriptsAsked(page: Page): string[] {
+  const scripts: string[] = [];
+  page.on("request", (request) => (request.resourceType() === "script" ? scripts.push(request.url()) : undefined));
+  return scripts;
+}

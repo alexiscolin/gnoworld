@@ -76,7 +76,8 @@ test.describe("the chat at the video's size", () => {
     expect(pin.y + pin.height).toBeLessThanOrEqual(row1.y);
     const quick = await at('[role="toolbar"][aria-label="Quick actions"]');
     const message = await at('[role="group"][aria-label="Message box"]');
-    const button = await at('[role="toolbar"][aria-label="Quick actions"] button');
+    // The row holds a place's pills (8d): the first stands for them all.
+    const button = await at('[role="toolbar"][aria-label="Quick actions"] button >> nth=0');
     near(button.height, 32);
     near(message.x, talk.x + 32);
     near(message.width, talk.width - 64);
@@ -134,7 +135,7 @@ test.describe("the chat at the video's size", () => {
   test("sets the panel and the composer as frame 66 does", async ({ page }) => {
     await logIn(page, "geometry-panel");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
-    // The panel: 20 px in from its edge, its title 32 px, the people a step of 41 (frame: Earth at x 1449, rows 410, 451).
+    // The panel: 20 px in from its edge, its title 32 px (frame: Earth at x 1449); the people a step of 41 in the frame (rows 410, 451).
     const info = await page.locator('[data-region="info"]').boundingBox();
     if (info === null) throw new Error("no panel");
     const title = await page.locator('[data-region="info"] h2').boundingBox();
@@ -146,7 +147,8 @@ test.describe("the chat at the video's size", () => {
     ).toBe("32px");
     const [row1, row2] = await Promise.all([people.nth(0).boundingBox(), people.nth(1).boundingBox()]);
     if (row1 === null || row2 === null) throw new Error("no people");
-    near(row2.y - row1.y, 41);
+    // 57, not the frame's 41: each row holds 8c's Follow button, 40 px high (red on slice-8 at d63a03b7 already).
+    near(row2.y - row1.y, 57);
     // Send is round, 32 px; the format bar's icons 13 px in the muted grey; the field has no handle or ring of its own.
     const send = await page.getByRole("button", { name: "Send" }).evaluate((element) => {
       const css = getComputedStyle(element);
@@ -191,12 +193,16 @@ test.describe("the chat at the video's size", () => {
       };
     });
     expect(look).toEqual({ edge: "1px", seen: true, size: "12px", offCentre: 0 });
-    const [row, bar] = await Promise.all([
+    // A place's pills share the row (8d): the first at its start, the last at its end.
+    const last = page.locator('[role="toolbar"][aria-label="Quick actions"] button').last();
+    const [row, bar, end] = await Promise.all([
       page.locator('[role="toolbar"][aria-label="Quick actions"]').boundingBox(),
       pill.boundingBox(),
+      last.boundingBox(),
     ]);
-    if (row === null || bar === null) throw new Error("not drawn");
-    near(bar.width, row.width);
+    if (row === null || bar === null || end === null) throw new Error("not drawn");
+    near(bar.x, row.x);
+    near(end.x + end.width, row.x + row.width);
     // The format bar's buttons are the smallest control, 24 px square (the video's 24 high).
     const tool = await page.getByRole("group", { name: "Format" }).getByRole("button").first().boundingBox();
     if (tool === null) throw new Error("not drawn");
@@ -208,20 +214,28 @@ test.describe("the chat at the video's size", () => {
   test("draws the worlds' planets at 44 px, the format bar's two rules, the thread at 13.5 px", async ({ page }) => {
     await logIn(page, "geometry-last");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
-    // The planet: 44 px, the first 23 px under the region's top (frame 66: 76 - 53). Onyx holds one world, so no step is measured.
-    const first = await page.locator('[data-region="worlds"] a > span').first().boundingBox();
-    if (first === null) throw new Error("no planet");
+    // The planet: 44 px, the first 23 px under the region's top (frame 66: 76 - 53), one planet to a 52 px step, no text under it.
+    const [first, second] = await Promise.all(
+      [0, 1].map((at) => page.locator('[data-region="worlds"] a > span').nth(at).boundingBox()),
+    );
+    if (first === null || first === undefined || second === null || second === undefined) throw new Error("no planet");
     near(first.width, 44);
     near(first.height, 44);
+    near(second.y - first.y, 52, 1);
     const worlds = await page.locator('[data-region="worlds"]').boundingBox();
     if (worlds === null) throw new Error("no worlds");
     near(first.y - worlds.y, 23, 2);
-    // The ring of the world in view stands 4 px off its planet, a line wide (frame 66: 54 px round a 44 px planet).
-    const ring = await page.locator('[data-region="worlds"] a[aria-current="page"]').evaluate((link) => {
-      const css = getComputedStyle(link);
+    // And 23 px from the column's left edge (frame 80: x 23 to 66).
+    near(first.x - worlds.x, 23, 2);
+    const link = await page.locator('[data-region="worlds"] a').first().boundingBox();
+    if (link === null) throw new Error("no link");
+    near(link.height, 44);
+    // The ring of the world in view: 2 px wide, 3 px off its planet (frame 80: 54 px round a 44 px planet).
+    const ring = await page.locator('[data-region="worlds"] a[aria-current="page"] > span').evaluate((planet) => {
+      const css = getComputedStyle(planet);
       return { width: css.outlineWidth, offset: css.outlineOffset, style: css.outlineStyle };
     });
-    expect(ring).toEqual({ width: "1px", offset: "4px", style: "solid" });
+    expect(ring).toEqual({ width: "2px", offset: "3px", style: "solid" });
     // The format bar: three groups, two rules of 1 px by 12 px between them (prototype #fmtBar .sep).
     const rules = page.getByRole("group", { name: "Format" }).getByRole("separator");
     await expect(rules).toHaveCount(2);

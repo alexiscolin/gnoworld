@@ -3,7 +3,7 @@ import styles from "./Kicker.module.css";
 
 export interface KickerProps {
   children: ReactNode;
-  dot?: "warm" | "mine" | "signal";
+  dot?: "warm" | "mine" | "signal" | "world";
   vertical?: boolean;
 }
 
@@ -11,7 +11,7 @@ export interface KickerProps {
 export function Kicker({ children, dot, vertical }: KickerProps) {
   return (
     <p className={["label", styles["kicker"]].join(" ")} data-orientation={vertical === true ? "vertical" : undefined}>
-      {dot === undefined ? null : <span className={styles["dot"]} data-tone={dot} aria-hidden="true" />}
+      {dot === undefined ? null : <span className="dot" data-tone={dot} aria-hidden="true" />}
       {children}
     </p>
   );

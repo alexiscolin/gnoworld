@@ -31,6 +31,146 @@
         "mentionsPerMessage": 5,
         "linksForNewAccount": 2
       }
+    },
+    {
+      "slug": "adena",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnoscan",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnoswap",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gno-playground",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gno-faucet-hub",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnodev",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "tx-indexer",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnopls",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnomcp",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gno-native-kit",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "zenao",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnosh-ai",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "gnobro",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
+    },
+    {
+      "slug": "supernova",
+      "moderators": [],
+      "rules": {
+        "bannedWords": [],
+        "linksPerMessage": 3,
+        "mentionsPerMessage": 5,
+        "linksForNewAccount": 2
+      }
     }
   ]
 }

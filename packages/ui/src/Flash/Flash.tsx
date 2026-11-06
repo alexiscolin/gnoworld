@@ -16,6 +16,8 @@ export interface FlashProps {
    * same words are the same flash, whatever object holds them: to say them again, pass null between. */
   message: FlashMessage | null;
   onClose: () => void;
+  /** An arrival's banner (frames 23, 93): under the header, over the scene, never pushing the page; timed even with its action. */
+  banner?: boolean;
 }
 
 // docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it or the focus in it, each a
@@ -24,7 +26,7 @@ const LIFETIME = 5_000;
 
 // The flash itself, on the page while it has something to say: closed, it leaves with its holds, which
 // no pointerleave or blur would end.
-function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void }) {
+function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: () => void; banner: boolean }) {
   const [pointed, setPointed] = useState(false);
   // Each move of the focus in or out: it makes the count read again where the focus is.
   const [moves, setMoves] = useState(0);
@@ -42,7 +44,7 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
   const moved = () => {
     setMoves((count) => count + 1);
   };
-  const timed = action === undefined && !pointed;
+  const timed = (action === undefined || banner) && !pointed;
   // Its words, not its object, keep their count. The focus holds it where the page has it now: a removed
   // element fires no blur in jsdom (Chromium 156 fires one), so no flag kept by events can say (F316).
   useEffect(() => {
@@ -55,15 +57,17 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
     };
   }, [timed, title, line, moves]);
   // In the top layer, over a modal dialog's scrim when raised from it (F331), shown as it comes; its
-  // region stays in the page, where it is announced.
+  // region stays in the page, where it is announced. A banner, raised by the page and never from a
+  // dialog, stays in the page: an open dialog's layer covers it (8j).
   useLayoutEffect(() => {
-    pillRef.current?.showPopover();
-  }, []);
+    if (!banner) pillRef.current?.showPopover();
+  }, [banner]);
   return (
     <div
       ref={pillRef}
-      popover="manual"
-      data-stays={action === undefined ? undefined : ""}
+      popover={banner ? undefined : "manual"}
+      data-stays={action === undefined || banner ? undefined : ""}
+      data-banner={banner ? "" : undefined}
       className={surface(styles["flash"])}
       onPointerEnter={() => {
         setPointed(true);
@@ -83,7 +87,8 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
       <Cluster space="m">
         <Stack space="3xs">
           <p className={styles["title"]}>{title}</p>
-          {line === undefined ? null : <p className={styles["line"]}>{line}</p>}
+          {/* A banner's line is in the one label style, as frames 18, 23 and 93 draw it ("TODAY'S EXPEDITION · 1 OF 3"). */}
+          {line === undefined ? null : <p className={banner ? "label" : styles["line"]}>{line}</p>}
         </Stack>
         <Cluster space="2xs">
           {action === undefined ? null : (
@@ -113,6 +118,8 @@ function Pill({ message, onClose }: { message: FlashMessage; onClose: () => void
 }
 
 /** A short note and at most one action, never the cream primary; shown at the top of the screen. */
-export function Flash({ message, onClose }: FlashProps) {
-  return <div role="status">{message === null ? null : <Pill message={message} onClose={onClose} />}</div>;
+export function Flash({ message, onClose, banner = false }: FlashProps) {
+  return (
+    <div role="status">{message === null ? null : <Pill message={message} onClose={onClose} banner={banner} />}</div>
+  );
 }

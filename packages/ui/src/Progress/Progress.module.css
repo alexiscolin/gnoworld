@@ -1,0 +1,70 @@
+/* The gauge: a thin track that fills in cream, or a dot a step, cream when done; its figure in the label's mono beside it. */
+@layer components {
+  .track {
+    /* layout: the gauge takes the room its figure leaves */
+    flex: 1;
+    /* layout: a gauge drawn as a line, never as a word's inline box */
+    display: block;
+    /* raw: a 4 px line, the prototype's .bar */
+    block-size: 4px;
+    min-inline-size: var(--space-l);
+    border-radius: var(--radius-pill);
+    background: var(--color-line);
+  }
+
+  .fill {
+    fill: var(--color-primary);
+  }
+
+  .steps {
+    /* layout: the dots in a row */
+    display: flex;
+    /* layout: a small step between them */
+    gap: var(--space-3xs);
+  }
+
+  .step {
+    /* raw: an 8 px dot, the prototype's .dots i */
+    inline-size: 8px;
+    /* raw: the same */
+    block-size: 8px;
+    border: var(--line-width) solid var(--color-line-strong);
+    border-radius: var(--radius-pill);
+  }
+
+  .step[data-done] {
+    border-color: var(--color-primary);
+    background: var(--color-primary);
+  }
+
+  /* The arc: a thin ring's three quarters on the line's grey, the done part in cream, round at its ends (frame 99: about 88 px across). */
+  .arc {
+    display: block;
+    /* raw: 88 px across, frame 99 */
+    inline-size: 88px;
+    /* raw: the same */
+    block-size: 88px;
+  }
+
+  .arcTrack,
+  .arcFill {
+    fill: none;
+    /* raw: a 4 px stroke in the 100 px drawing, about 3.5 px drawn */
+    stroke-width: 4;
+    stroke-linecap: round;
+  }
+
+  .arcTrack {
+    stroke: var(--color-line-strong);
+  }
+
+  .arcFill {
+    stroke: var(--color-primary);
+  }
+
+  .shown {
+    color: var(--color-text-muted);
+    font: var(--font-label);
+    font-variant-numeric: tabular-nums;
+  }
+}

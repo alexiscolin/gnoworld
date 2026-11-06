@@ -5,5 +5,7 @@
 export function savesData(): boolean {
   if (typeof navigator === "undefined") return false;
   const connection: unknown = Reflect.get(navigator, "connection");
-  return typeof connection === "object" && connection !== null && Reflect.get(connection, "saveData") === true;
+  if (typeof connection !== "object" || connection === null) return false;
+  const link: unknown = Reflect.get(connection, "effectiveType");
+  return Reflect.get(connection, "saveData") === true || link === "2g" || link === "slow-2g";
 }

@@ -15,6 +15,7 @@ import sys
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))  # -I leaves this folder off the path
+import speeds
 from hidden import hidden_in, hidden_in_data
 from repo_files import git, listed, listing
 
@@ -41,7 +42,7 @@ LIMITS = [
 # Every review agent never writes a worktree's git index (2026-10-26: one staged old files into wt-4dm's and failed the
 # next commit's gate); CLAUDE.md's review card ends with the change's risk and undo.
 AGENT_RULE = "Never run a git command that writes the index or the work tree"
-AGENTS = ("design-reviewer", "finding-verifier", "reviewer", "security-reviewer", "test-auditor")  # each must exist (CR2)
+AGENTS = ("design-reviewer", "reviewer", "security-reviewer", "test-auditor")  # each must exist (CR2); the finding-verifier left (2026-11-04)
 CARD_ITEM = re.compile(r"^8\. Risk and undo:", re.M)
 
 
@@ -61,10 +62,31 @@ def lost_rules(root):
     return out
 
 
+# The instructions Claude Code reads beside the root's (its memory and skills pages): a subfolder's CLAUDE.md and CLAUDE.local.md, an
+# AGENTS.md where no CLAUDE.md stands, and a subfolder's .claude/rules and .claude/skills, each loaded once a file there is read (S2-3).
+INSTRUCTIONS = {"claude.md", "claude.local.md", "agents.md"}
+ROOT_OWN = {("claude.md",), (".claude", "claude.md")}
+
+
+def stray_instructions(root):
+    """Each path git would hold that Claude Code may read as instructions, past the root's closed CLAUDE.md: one of those names
+    anywhere but the root's CLAUDE.md and .claude/CLAUDE.md (a CLAUDE.local.md is a person's own, never committed; an AGENTS.md
+    stands in for a CLAUDE.md), and any .claude below the root. Names are read as macOS's disk reads them, case folded, and a
+    link by its name, whether it leads anywhere or not."""
+    out = []
+    for p in listing(root):
+        parts = tuple(part.lower() for part in p.relative_to(root).parts)
+        if ".claude" in parts[1:]:
+            out.append(f"{p.relative_to(root)}: a .claude folder below the root")
+        elif parts[-1] in INSTRUCTIONS and parts not in ROOT_OWN:
+            out.append(f"{p.relative_to(root)}: an instruction file Claude Code reads beside the root's")
+    return sorted(out)
+
+
 # An image is no text: a file whose suffix names one and that starts with its format's own bytes is not read (a text so
 # named is). Any other file is UTF-8 text read for what hidden.py names (F5053), or is refused: a binary of another format
 # (a font, a video) wants its suffix and first bytes here first (F5082).
-IMAGES = {".png": b"\x89PNG\r\n\x1a\n", ".jpg": b"\xff\xd8\xff"}
+IMAGES = {".png": b"\x89PNG\r\n\x1a\n", ".jpg": b"\xff\xd8\xff", ".webp": b"RIFF"}  # a WebP is RIFF, then its size, then WEBP
 
 
 def messages(root):
@@ -154,7 +176,11 @@ def ledger_problems(root):
     rows = []
     for line in ledger.read_text().splitlines():
         cells = [c.strip() for c in re.split(r"(?<!\\)\|", line.strip().strip("|"))]
-        if len(cells) == 7 and re.fullmatch(r"F\d{3,}", cells[0]):
+        if line.lstrip().startswith("|") and re.fullmatch(r"F\d{3,}", cells[0]):
+            # A row of other than seven cells was skipped by every check below (1,992 rows read, 95 with more and 14 with fewer were not).
+            if len(cells) != 7:
+                out.append(f"{cells[0]}: {len(cells)} cells, not 7 (a pipe inside a cell is written \\|)")
+                continue
             rows.append((cells[0], cells[5], cells[6], re.findall(r"`([0-9a-f]{7,40})`", cells[6])))
     real = commits(root, [sha for *_, shas in rows for sha in shas])
     for fid, status, evidence, shas in rows:
@@ -192,6 +218,10 @@ if rules:
     print("check_docs: a rule the review depends on is gone:", *rules, sep="\n  ", file=sys.stderr)
 if problems:
     print("check_docs: the findings ledger (docs/review/findings.md):", *problems, sep="\n  ", file=sys.stderr)
+# No instruction file below the root reaches a commit (7w3, S2-3): every commit runs this, prose alone included.
+stray = stray_instructions(root)
+if stray:
+    print("check_docs: instructions every session reading their folder would follow, past the root's CLAUDE.md:", *stray, sep="\n  ", file=sys.stderr)
 # A test sits beside the file it tests, under its name (docs/ARCHITECTURE.md, "Naming").
 tests = [p for p in listed(root, {".ts", ".tsx"}) if re.search(r"\.test\.tsx?$", p.name) and "src" in p.relative_to(root).parts]
 orphans = [t.relative_to(root) for t in tests if not any(t.with_name(t.name.replace(".test.", ".", 1)).with_suffix(s).exists() for s in (".ts", ".tsx"))]
@@ -223,10 +253,43 @@ if unnamed:
 lost = [limit for limit in LIMITS if runbook.is_file() and limit not in " ".join(said.split())]
 if lost:
     print("check_docs: docs/OPERATIONS.md no longer says these known limits (slice 3's plan, section 8):", *lost, sep="\n  ", file=sys.stderr)
+# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways (F2530): pre-commit runs this on every commit,
+# prose alone included, so a row the table gains or loses without the workflow stops at its own commit, which took a change of the
+# table for prose and ran no gate (7y's c160019e, F4928). The table is read as speeds.py reads it, one reader for both. The harness's
+# folders and gno/ are tier 1 by the harness's own rule: TIER1 must hold them; the realms' two folders are the table's `gno/r/` and
+# `gno/p/`. A comment in the list is no entry. A root with no tier-1 row (a test's) has none to compare.
+review = root / "docs/REVIEW.md"
+named = set(speeds.rows(str(root))["1"]) - {"gno/r/", "gno/p/"} if review.is_file() else set()
+workflow = root / ".claude/workflows/branch.js"
+src = workflow.read_text() if workflow.is_file() else ""
+block = src[src.find("const TIER1 = ["):src.find("...(A.tier1")] if "const TIER1 = [" in src else ""
+entries = set(re.findall(r'^\s+"([^"]+)",$', re.sub(r"/\*.*?\*/|//[^\n]*", "", block, flags=re.S), re.M))
+OWN = {"scripts/", ".githooks/", ".github/", ".claude/", "gno/"}
+tier1 = entries - OWN
+drift = [] if not named else [".claude/workflows/branch.js holds no TIER1 list to compare with"] if len(tier1) < 10 else []
+drift += [f"branch.js's TIER1 lacks {p}, tier 1 by the harness's own rule" for p in sorted(OWN - entries) if named and tier1]
+drift += [f"branch.js's TIER1 holds {p}, which no tier-1 row of docs/REVIEW.md names in backticks" for p in sorted(tier1 - named) if named]
+drift += [f"docs/REVIEW.md names {p} as tier 1 in backticks, which branch.js's TIER1 lacks" for p in sorted(named - tier1) if tier1]
+if drift:
+    print("check_docs: docs/REVIEW.md's tier 1 and the workflow's TIER1 differ: change both in one commit:", *drift, sep="\n  ", file=sys.stderr)
+# The coverage globs held at 100% (vitest.config.ts) are docs/REVIEW.md's tier-1 TypeScript paths (F5543): each such path under app/,
+# server/ or packages/ is in one, and each glob matches a file, as istanbul gives a glob with no file no percentage and so no failure.
+held = []
+for key, block in re.findall(r'"([^"]+)":\s*\{([^}]*)\}', (root / "vitest.config.ts").read_text() if (root / "vitest.config.ts").is_file() else ""):
+    if re.search(r"\blines:\s*100\b(?!\.)", block):
+        braced = re.fullmatch(r"\{(.+)\}(/\*\*)?", key)
+        held += braced.group(1).split(",") if braced else [key.removesuffix("/**")]
+ts = [p for p in sorted(named) if p.startswith(("app/", "server/", "packages/")) and p.endswith(("/", ".ts", ".tsx"))] if held else []
+globs = [f"docs/REVIEW.md names {p} as tier 1, which no glob of vitest.config.ts held at 100% covers" for p in ts if not any(p == h or p.startswith(h + "/") or p == h + "/" for h in held)]
+globs += [f"vitest.config.ts holds {h} at 100%, which matches no file" for h in held if not (root / h).is_file() and not any((root / h).rglob("*.ts*"))]
+if globs:
+    print("check_docs: docs/REVIEW.md's tier-1 TypeScript paths and vitest.config.ts's 100% globs differ: change both in one commit:", *globs, sep="\n  ", file=sys.stderr)
 hidden_chars = hidden(root)
 if hidden_chars:
     print("check_docs: these files hold a hidden character, which shows nothing or changes how the text around it reads"
           " (F5053); write each as an escape, never raw, and every text in UTF-8 (an image is known by its suffix and first"
           " bytes, IMAGES):", *hidden_chars, sep="\n  ", file=sys.stderr)
-if hidden_chars or missing or problems or orphans or unnamed or lost or rules:
+if hidden_chars or missing or problems or orphans or unnamed or lost or rules or drift or globs:
+    sys.exit(1)
+if stray:
     sys.exit(1)

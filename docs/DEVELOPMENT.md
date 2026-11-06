@@ -43,7 +43,9 @@ installed (the main checkout, or the worktree a part is cut from) by one script,
 folder (Alexis, 2026-11-04; its file tools still can, F5095), which it may also be given in full.
 Whatever the spelling (a `..`, a link, another path) it refuses any other folder, as it may run
 outside the sandbox and must touch no other (F5058), and a base whose harness,
-`CLAUDE.md` or package files are not its tree's (F5098). It makes the branch, links the main tree's
+`CLAUDE.md` or package files are not its tree's (F5098). No part's session writes a sibling there, moves
+one or plants one (7w3, F4893); the chief's session writes the folder by `--add-dir` (docs/HARNESS.md, "Who does
+what"). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
 relative links and a `.bin` of its own, through no link it did not make; the gate's StrykerJS reads
 one incremental file every tree shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made
@@ -107,6 +109,10 @@ each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-
 ## The gate and the harness
 
 `./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.
+A commit's gate runs the unit tests related to its change (HARNESS.md, "The related tests"); before a part's report,
+`./scripts/check.sh --tests-all` runs every test of the commit's projects (node, ui, compiled); the slow ones (the real Ergo,
+the soak) and core's in Chromium run at the merge check and in `--full`. Design still being tried lives in the workshop
+(this file's "The workshop") and lands later, in one tested batch (REVIEW.md, "Keep it cheap").
 `--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
@@ -127,6 +133,82 @@ To regenerate the seal vectors after a change to `gno/tools/sealvec`, in `gno/`:
 **Secrets** live in `deploy/secrets/`, one file each, gitignored and unreadable by Claude
 Code; the code reads them through `*_FILE` variables. Nobody pastes a key into a chat. The
 Anthropic key is Alexis's own for tests, then the company's.
+
+## The workshop
+
+Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the app's screens and the lab's pages on Vite's dev
+servers, with hot reload, and the lab's tuning panel on the real renderer, opened from the MacBook or a phone over Tailscale. No
+gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
+pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
+fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
+
+**Start it** with `pnpm workshop`, in your own terminal, from a worktree or the main checkout (the sandbox reaches neither
+Tailscale's socket nor a server it could stop). `scripts/workshop.sh` serves the checkout it sits in, two dev servers of its app,
+each started by its function `start` and put on the tailnet by `share`: the app's (`react-router dev`) on 127.0.0.1:5198 and the
+lab's (`vite --config lab.config.ts`) on 5199, with `WORKSHOP_HOSTS` set to this machine's tailnet name and address; then, when
+the `tailnet-preview` skill's script is installed, each on the tailnet under its own name, `workshop-app` and `workshop-lab`;
+without it, the local addresses. It stops only processes it started itself (their pids and ports in `.claude/tmp/workshop.pid`):
+a port held by anything else is said, never taken. Ctrl+C stops all three, the servers and the backend (below), and takes them
+off the tailnet, and so does any of them that stops; a second `pnpm workshop` in the same checkout replaces the first, the
+backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
+`tailnet-preview.sh down workshop-app` and `down workshop-lab`.
+
+**The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
+a turn of Claude's in it ends without the gate, so each retouch shows live in a couple of minutes; the gate, the tests and the
+review come once the batch is accepted, and pre-commit still gates every commit. The hook knows the workshop by its own shell,
+running this checkout's `scripts/workshop.sh` from it, in its terminal's foreground group and outside every sandbox: a session's
+sandboxed command cannot start one that counts. The code the workshop runs is outside Claude's sandbox, under a profile of its
+own (`scripts/workshop.sb`): it writes its own folders and caches alone, reads of the home folder the code alone it runs, reaches
+no keychain, no other app and no Unix socket but the system's. It cannot hold where that code listens, and its outbound network
+stays open (HARNESS.md's known limits, F204, F4977): the servers listen on 127.0.0.1 because their configs say so, and macOS's
+firewall is the wall against the LAN. Stop the workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that
+checkout's turns gate-free.
+
+Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
+the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,
+which both configs use). The `tailnet-preview` skill's script prints two links for each name, and the workshop says which is
+which. On the MacBook or the phone, open the https ones:
+- **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route,
+  the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
+- **`workshop-lab`, the lab:** `https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for
+  the site's own scene (`&arrive=<system>` for a system's view).
+
+**The backend**, started once the app's server is on the tailnet (Alexis, 2026-11-04: "avec le chat dedans et toute l'UI"):
+the journeys' real server and a local Ergo (`app/tests/e2e/workshopBackend.mjs`, through `api.mjs`'s `startBackend`, Ergo built
+by `scripts/ergo.sh` first), on 127.0.0.1:5195 for the server, 5196 and 5197 for Ergo and its WebSocket
+(`WORKSHOP_API_PORT`, `WORKSHOP_IRC_PORT`, `WORKSHOP_WS_PORT`), allowing the app's local address and its tailnet links as
+origins. The app's dev server proxies `^/api/` and `^/ws$` there (`app/vite.config.ts`'s `workshopBackend`), the visitor's
+address set by the proxy, never the browser's; Vite's proxy is a dev server's, so no build holds it, and the lab's server has
+none. The chat, who is here and the rooms run on it; its roles are the journeys' (the shipped file and their test rooms). The
+worlds job and the prices' timer do not run, and nothing serves what they write: the worlds read from the chain
+(`worlds.json`) and the hero's prices and block (`markets.json`) stay empty. A login with Adena is untried here.
+
+The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
+cannot reach the clipboard there; select the list instead.
+
+**The panel:** T shows and hides it, on either page of the lab, and so does its Tuning button in the corner, for a phone.
+- **Scene.** The scene's values the page's code has read: Exposure (the image grade, `app/src/scene/renderer.ts`), Lean at home
+  (`LEAN`) and, at a system's view, its share of that lean (`ARRIVAL_LEAN = LEAN / 2.2`), both in
+  `packages/core/src/space/drift.ts`. A Plan keeps its own share.
+- **Colours.** The palette's primitives (`--p-*`, read from the design system's sheet).
+- **Sizes.** The labels' font sizes (`--font-ui`, `--font-data`) and paddings (`--space-2xs`, `--space-xs`).
+
+Colours and sizes are set on `:root`'s own style; no product code is touched. Every change draws at once. Keys, drags and wheels
+inside the panel stay there. Copy lists the values changed, one line each, with where each lives in code; Reset puts back the
+code's values. A code edit reloads the page and loses the panel's values, so copy first.
+
+**Making a value tunable:**
+- **A size token of `tokens.css`** needs only its name in `app/lab/panel.ts`'s lists; every primitive colour is offered already.
+- **A scene value** gets a name in `TUNABLES` and a row in `app/lab/controls.ts`. It also gets one read where the value is used,
+  written on the lab's switch: `import.meta.env.GNOWORLD_TUNING === "1" ? tuned(name, VALUE) : VALUE`, or `applyTuned` for a value
+  set once on an object, as the renderer's exposure.
+
+Only `lab.config.ts` defines the switch. The site's build folds each read back to `VALUE` and drops the registry
+(`app/src/scene/tuning.ts`). Write the read so that it folds to the code that was there: in an expression, not a new variable the
+minifier keeps. Then build the site before and after and compare every file (`tuning.spec.ts` holds the names out of the site's
+build, and the budgets hold the bytes).
+
+**Landing a batch:** paste Copy's list to Claude. The values land in code as one part, test first.
 
 ## Jarvis's evals
 

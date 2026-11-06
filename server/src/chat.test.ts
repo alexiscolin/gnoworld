@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { Address, PinList, RoomList } from "@gnoworld/schemas";
+import { Presence } from "@gnoworld/schemas/indexer";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { makeApp } from "./app.ts";
@@ -53,12 +54,14 @@ const setup = (
     tickMs,
     session,
     redactRetryMs,
+    presence,
   }: {
     now?: () => number;
     provider?: (text: string) => Promise<Answer | "unchecked">;
     tickMs?: number;
     session?: (token: string | undefined) => string | undefined;
     redactRetryMs?: number;
+    presence?: string;
   } = {},
 ) => {
   const db = openDatabase(":memory:", [
@@ -78,6 +81,7 @@ const setup = (
     ...(tickMs === undefined ? {} : { tickMs }),
     ...(session === undefined ? {} : { session }),
     ...(redactRetryMs === undefined ? {} : { redactRetryMs }),
+    ...(presence === undefined ? {} : { presence }),
   };
   const chat = startChat(db, settings, options);
   started.push({ db, chat });
@@ -1368,6 +1372,69 @@ describe("the chat, as the server starts it", () => {
         "SAMODE #bubble +M",
         "SAMODE #bubble +M",
       ]);
+    });
+
+    it("counts who is here in the rooms a guest may see, a members room's people never, and answers it (7h)", async () => {
+      const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
+      const { peer, chat, app } = await linked(
+        { worlds: roled(), moderation: OFF },
+        { presence: file, now: () => Date.now() },
+      );
+      if (chat.presence === undefined) throw new Error("no presence route");
+      app.route("/api/presence", chat.presence);
+      await answer(peer, "#bubble", "~@gnoworld ada bo");
+      await answer(peer, "#bubble/crew", `~@gnoworld ${MEMBER} cy`);
+      await answer(peer, "#bubble/desk", `~@gnoworld ${WRITER}`);
+      await expect
+        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
+        .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
+    });
+
+    it("hands the server's other readers what /api/presence serves, for the ticker's trends (7t)", async () => {
+      const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
+      const { peer, chat, app } = await linked(
+        { worlds: roled(), moderation: OFF },
+        { presence: file, now: () => Date.now() },
+      );
+      if (chat.presence === undefined) throw new Error("no presence route");
+      app.route("/api/presence", chat.presence);
+      await answer(peer, "#bubble", "~@gnoworld ada bo");
+      await expect
+        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
+        .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
+      expect(chat.presenceNow?.()).toEqual(Presence.parse(await (await app.request("/api/presence")).json()));
+    });
+
+    it("leaves a hidden open room and an archived room out of who is here, as a guest sees neither (7h)", async () => {
+      const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
+      const hidden = roled();
+      hidden.get("bubble")?.rooms.set("#bubble/attic", { type: "open", hidden: true });
+      const { peer, chat, app } = await linked(
+        { worlds: hidden, moderation: OFF },
+        { presence: file, now: () => Date.now() },
+      );
+      if (chat.presence === undefined) throw new Error("no presence route");
+      app.route("/api/presence", chat.presence);
+      chat.rooms.create("bubble", "old");
+      chat.rooms.archive("bubble", "old");
+      await answer(peer, "#bubble", "~@gnoworld ada bo");
+      await answer(peer, "#bubble/attic", "~@gnoworld cy dee");
+      await answer(peer, "#bubble/crew", "~@gnoworld");
+      await answer(peer, "#bubble/desk", "~@gnoworld");
+      await answer(peer, "#bubble/old", "~@gnoworld eve fay gus");
+      await expect
+        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
+        .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
+    });
+
+    it("serves no presence without its file", () => {
+      const { chat } = setup({ worlds: roled(), moderation: OFF, ergo: undefined });
+      expect(chat.presence).toBeUndefined();
+    });
+
+    it("hands no presence to another reader without its file (7t)", () => {
+      const { chat } = setup({ worlds: roled(), moderation: OFF, ergo: undefined });
+      expect(chat.presenceNow).toBeUndefined();
     });
 
     it("voices a writer who joins a members-write room, at once", async () => {

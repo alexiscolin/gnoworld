@@ -16,6 +16,8 @@ export const Proposal = z.object({
   state: z.string().check(z.maxLength(PROPOSAL_CAPS.state)),
   /** The share of yes votes, 0 to 100, when the page said it. */
   yes: z.optional(share),
+  /** The share of no votes, 0 to 100, when an open proposal's page said it. */
+  no: z.optional(share),
   /** The share of yes the proposal needs, 0 to 100, when the page said it. */
   threshold: z.optional(share),
 });

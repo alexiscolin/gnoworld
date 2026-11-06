@@ -17,3 +17,12 @@ function snapshot(): Date {
 export function useClock(): Date {
   return useSyncExternalStore(NEVER, snapshot, () => EPOCH);
 }
+
+/** False while the page is written and hydrated, true after: what only a woken page draws stays out of the markup it hydrates (F4692). */
+export function useWoken(): boolean {
+  return useSyncExternalStore(
+    NEVER,
+    () => true,
+    () => false,
+  );
+}

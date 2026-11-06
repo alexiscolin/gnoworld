@@ -106,8 +106,8 @@ tailnet; keep it so.
 |---|---|
 | Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
 | The same with Jarvis switched on (`JARVIS=on`) | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis up -d --build` |
-| Test the stack: web, the guard, Ergo, the server and the way out, then jarvis under its profile (no secret needed) | `sh deploy/test.sh` |
-| Test that each check catches its fault | `sh deploy/test.sh --mutants` |
+| Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh`, from the commit you reviewed (below) |
+| Test that each check catches its fault | `sh deploy/test.sh --mutants`, from the commit you reviewed (below) |
 | Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
 | Its logs, jarvis's with them if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis logs -f` |
 | Stop, jarvis with it if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down` |
@@ -120,11 +120,43 @@ that changes `deploy/`. App code alone needs neither: the gate's journeys test i
 The tests run on the host (macOS or Linux), outside Claude Code's sandbox, which refuses Docker's
 socket. Their output names the host's addresses and ports: never commit it, nor paste it in public.
 
+### Run test.sh from the commit you reviewed
+
+`deploy/test.sh` runs with Docker's socket, which is root on the host, and every session can write a
+worktree's `deploy/` (F204) and the shared `.git`'s objects: git does not check an object against its
+name as it reads it, so even `git archive <sha>` writes a planted object's text (F152's class,
+F4921). So run it neither from a worktree nor from a bare archive, but from a copy of the commit you
+reviewed whose commit and files hash to that commit's name. Paste this in your own Terminal, `sha`
+set to that commit (read it once, right after you reviewed it: a session can move a branch), and
+add `--mutants` to the last line when the branch changes `deploy/`:
+
+```sh
+( repo=~/Server/gnoworld sha=$(/usr/bin/git -C ~/Server/gnoworld rev-parse --verify '<the commit you reviewed>^{commit}')
+export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 PYTHONNOUSERSITE=1 # no git config of the home folder, no python3 user site
+/bin/mkdir -p ~/.local/state && d=$(/usr/bin/mktemp -d ~/.local/state/gnoworld-test.XXXXXX) &&
+	/usr/bin/git -C "$repo" archive "$sha" | /usr/bin/tar -x -C "$d" &&
+	[ "$(/usr/bin/git -C "$repo" cat-file commit "$sha" | /usr/bin/git hash-object -t commit --stdin)" = "$sha" ] &&
+	(cd "$d" && /usr/bin/git init -q && /usr/bin/git add -A -f && [ "$(/usr/bin/git write-tree)" = "$(/usr/bin/git -C "$repo" rev-parse "$sha^{tree}")" ]) &&
+	echo "test.sh runs from $sha, checked, in $d" && (cd "$d" && /bin/sh deploy/test.sh)
+status=$?; [ -z "${d:-}" ] || /bin/rm -rf "$d"; exit "$status" )
+```
+
+It runs in a subshell of its own, so nothing it sets stays in the Terminal; it calls the system's
+programs by path, and the copy holds a repository of its own, for test.sh's checks of what git
+ignores, and is removed at the end. A run that prints no "test.sh runs from" line means the copy is
+not that commit: run nothing more, and tell the chief. It takes about 15 s before test.sh. The copy
+lives under `~/.local`, which Alexis's user settings of 2026-11-04 (7w2's `apply-7w2-user.sh`) close
+to every session's file tools, as they close the programs test.sh calls (docker and its config,
+python3's user site, sh's startup files); the sandbox closes it to commands. Without those settings,
+anything on `PATH` outside `/usr/bin` and `/bin` is the sessions' to rewrite.
+
 ## When something goes wrong: cut the public URL
 
 A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2
 cores and 1,504 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
-cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.4 core and 448 MB more when on. To cut the public URL at once:
+cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.4 core and 448 MB more when on. The
+limit lets one address 640 requests at once and 20 a second after that (F3665); `auth_basic` runs after it, so a
+burst with a wrong password costs about 640 password checks, at the name in the file, before the 429s begin. To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|
@@ -362,12 +394,58 @@ Slice 3, the server's retention (3n):
   lets that host out by its full name) for GNOT, ATONE and BTC and writes `markets.json` by renaming a temporary file.
   Any failure keeps the last file and logs `{"event":"prices_failed","error":"<kind>"}`, the kind one of `rate_limited`
   (a 429: the free tier's limit is per IP and shared, so a run of them means another user of the address),
-  `status`, `timeout`, `request`, `too_large`, `not_json`, `shape`, `no_price` or `write` (the volume): never the answer.
+  `status`, `timeout`, `unresolved` (no address for a name: the way out's, before it starts), `refused` (nothing listening there yet),
+  `proxy` (the way out refused the host, or could not reach it), `request` (a fault whose cause has no name), `too_large`, `not_json`,
+  `shape`, `no_price` or `write` (the volume): never the answer, nor an error's message. One that reached nothing (`unresolved`,
+  `refused`) or whose cause has no name (`request`) is asked again 15 s later, then twice as long for each such failure in a row, up to
+  the five minutes: the stack starts the server before its way out (F4872).
   A file that stops changing means the failures repeat in the log; `updated` in the file is the time of the last good read.
   With `UNIVERSES_FILE` (`/app/app/data/universes.json`, copied into the image) the same read also asks the default universe's RPC
   for `/status` and writes the latest block's `height`, `time` and `host` as `block`, which the home draws: no visitor's browser asks a
   chain. A failed height leaves `block` out and logs `{"event":"height_failed","error":"<kind>"}`, never what the answer held; a data
   file that is bad stops the server at boot, naming the file. Changing the default universe's RPC means changing `acl.yaml` with it.
+- **The worlds** (`WORLDS_FILE`, `/markets/worlds.json`, served at `/worlds.json`, 7c): with `UNIVERSES_FILE`, every half hour from
+  the end of the last pass the server reads the default universe's realm list (`vm/qpaths`), each new package once (`vm/qdoc`,
+  `vm/qfile`), each new deployer's name, and every call of the chain from the universe's indexer, by pages of 2,000 transactions in
+  height order (7k3), one call at a time, each started at least a quarter-second after the last began, and writes the worlds by
+  renaming a temporary file, at most 4 MiB; each pass that wrote logs `{"event":"worlds_written","ms":<its length>}`. Beside it the same pass writes their count
+  (`/markets/worlds-count.json`, served at `/worlds-count.json`, 7n2): the file's universe and time and the worlds the cosmos draws
+  with the Earth, which the home's hero reads, so a phone asks nothing of the cosmos before View in space. Both temporaries are written
+  before either is renamed: a failed write keeps both last files and logs `write`. A failed list keeps the last file and logs
+  `{"event":"worlds_failed","error":"<kind>"}`, and a pass whose list reached nothing (`unresolved`, `refused`) runs again 15 s later,
+  then twice as long for each such pass in a row, up to the half hour (F4872: Compose starts the server before its way out); a list the
+  chain cuts at its limit is read by prefix, up to 2,000 requests. A world
+  keeps its first 512 realms, and a file past the byte cap loses the lists of its heaviest worlds, then whole worlds: each logs
+  `worlds_shed` with `error` one of `realms`, `lists` or `worlds`. A fault of any indexer request (the network, an answer of the
+  wrong shape, a page past 4 MiB even at one transaction, more than 500 requests) logs `worlds_indexer_failed` once and every realm
+  keeps its earlier counts (null on a first pass): none is counted from half the chain; a read past 32 MiB of answers gives up as
+  `too_many`. A call that names no realm is left out and one whose caller is no address is counted with none; either logs
+  `worlds_history_skipped` once. The kinds
+  are `unresolved`, `refused`, `proxy` and `request` (as the prices'), `timeout`, `status`, `rate_limited`, `too_large`, `too_many`,
+  `not_json`, `shape`, `chain_refused`, `empty`, `write` and `stopped`, never what an answer held. The indexers' hosts are on the way out by name (`acl.yaml`); the first live proof
+  of the realm list's and `vm/qdoc`'s answers in the stack is `deploy/test.sh`, which Alexis runs: it waits for the running job's own
+  first pass, asks for a realm with a deployer, functions and counts, and prints the job's log lines. The indexer's queries are those
+  onyx-1's answered on 2026-11-04 (`server/src/worlds/onyxIndexer.json`); 7c's per-realm filter was refused there (422), so no count
+  was read before 7k3. A first pass of onyx-1's 767 realms, measured outside Docker on 2026-11-04: 1,628 calls in 13.2 minutes and no
+  count before 7k3; 1,634 calls (7 of them the indexer's) in 7.0 minutes after, every realm counted.
+- **The previews** (`PREVIEWS_FILE`, `/markets/previews.json`, served at `/previews.json`, 8f): with `UNIVERSES_FILE` and
+  `OPENAI_API_KEY_FILE` (the server refuses to start with the file named and either missing), at start and then every six hours from
+  the end of the last pass, the server reads the home page (`vm/qrender` of `<path>:`) of every realm the default universe's hubs list in
+  `app/data/hubs.json`, 32 at most, through the default universe's RPC (already on the way out: no host is added for it), one call at a
+  time a quarter-second apart, each within 10 s and 64 KiB. It keeps a page's first 4,096 bytes, cut at a line's end, has OpenAI's
+  moderation read exactly that text with `MODERATION_THRESHOLDS`, and writes the captures that passed by renaming a temporary file, 1 MiB
+  at most; each pass that wrote logs `{"event":"previews_written","ms":<its length>}`. A page the check hides, that the chain says is
+  gone, that is too large, empty or no text has no capture; a page whose read failed on the way, whose read the chain refused, or that the
+  check could not read keeps its last checked capture, with its own time; each logs `{"event":"previews_skipped","error":"<kind>"}`, the
+  kind one of `hidden`, `unchecked`, `empty`, `unresolved`, `refused`, `proxy`, `request` (as the prices'), `timeout`, `status`,
+  `rate_limited`, `too_large`, `shape` or `chain_refused`. A
+  pass none of whose reads reached anyone (`unresolved`, `refused`: the way out not there yet) writes nothing, keeps the last file, logs
+  `previews_failed` with that kind and runs again 15 s later, then twice as long for each such pass in a row, up to the six hours
+  (F4872); one read that reached the chain, or whose cause has no name (`request`), makes it a pass as any other. A pass that cannot write logs `previews_failed` (`write`, `stopped`, `shape`, `too_large`, `internal`) and keeps the
+  last file. No
+  capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
+  a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
+  capture down at once, remove its realm from `hubs.json` and redeploy: the next pass drops it, and so does a restart.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
@@ -385,7 +463,11 @@ Slice 3, the server's retention (3n):
   call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
-  and `room_opened` (the rooms, below). `scripts/check_docs.py` keeps this list whole.
+  and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history, or its
+  messages' (7t3), beside the database: rising and Trending by the rooms stay dark until the folder takes it);
+  `trends_write` (the worlds job could not write the chain's habits, trends-transactions.json and
+  trends-addresses.json, beside the database: Trending by the chain loses what the pass learned until the folder
+  takes it). `scripts/check_docs.py` keeps this list whole.
 - **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
   is kept and how long, and the erasure path (slice 12) are blockers.
 
@@ -410,11 +492,12 @@ Slice 3, the stack (3e):
   reaching OpenAI, `docker compose ... restart web egress` (F622, beside F203).
 - **The tailnet's policy stays closed.** In userspace mode, Tailscale hands a device's connection to
   the demo machine's own address on to `127.0.0.1`, so a device the policy let in would reach both ways
-  out, the server's on 4750 (its four hosts, `acl.yaml`) and jarvis's on 4751 (its six, `jarvis-acl.yaml`).
+  out, the server's on 4750 (its six hosts, `acl.yaml`) and jarvis's on 4751 (its six, `jarvis-acl.yaml`).
   `"acls": []` keeps every device out (F619; 10j's review, S8).
 - **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
-  `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` before `up -d --build`.
+  `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` from the commit you reviewed (in "Run, test, stop") before
+  `up -d --build`.
 - **`web`'s fixed address** is in `INSIDE_SUBNET`: a host with another network in that range refuses
   to start the stack (Compose names the overlap); set both in `deploy/.env`.
 

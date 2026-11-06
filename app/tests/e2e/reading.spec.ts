@@ -157,7 +157,8 @@ test.describe("the reading place", () => {
     const { sent, ergo } = await room(page, { me: address, read: T(2) });
     ergo().send(live("elsewhere", T(3), { room: "#bubble" }));
     ergo().send(live("here", T(4)));
-    await expect(lineOf(page, "here")).toBeVisible();
+    // Its words exactly: an account's first line says "new here" in its head (8d).
+    await expect(lines(page).filter({ has: page.locator("[data-line-text]", { hasText: /^here$/ }) })).toBeVisible();
     await expect.poll(() => marks(sent)).toEqual([`MARKREAD ${ROOM} timestamp=${T(4)}`]);
   });
 

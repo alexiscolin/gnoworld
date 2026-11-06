@@ -1,0 +1,62 @@
+/* The bell's panel (frames 86, 87): a floating panel (ui's Panel) in the top layer, over the dock's column, from under the header to the
+   page's foot. */
+@layer components {
+  .place {
+    /* raw: under the header's controls, where the dock's panel starts (frame 86: 88 px) */
+    inset: calc(var(--space-2xl) + var(--space-l)) var(--space-s) var(--space-s) auto;
+    /* layout: the browser centres a popover; this one runs from the column's top to the page's foot (frame 86) */
+    margin: 0;
+    block-size: auto;
+    /* raw: the dock's width in frame 86 (360 px), less on a narrow screen */
+    inline-size: min(360px, calc(100% - 2 * var(--space-s)));
+    overflow: auto;
+    /* The browser's popover frame and fill go: the panel inside is the surface. */
+    border-style: none;
+    background-color: transparent;
+    /* layout: the panel inside fills the box */
+    padding: 0;
+  }
+
+  /* Its panel fills it, the lines scrolling inside. */
+  .place > * {
+    /* layout: the panel takes the box's whole height */
+    block-size: 100%;
+  }
+
+  /* "MARK ALL READ" in the label style, a button with no frame (frame 86). */
+  .markAll {
+    color: var(--color-text);
+    cursor: pointer;
+  }
+
+  .title {
+    font: var(--font-title-s);
+  }
+
+  .list {
+    /* layout: a list with no marks */
+    padding: 0;
+    list-style: none;
+  }
+
+  /* A line's mark: its icon in a ring (frame 86), mint while unread. */
+  .mark {
+    /* layout: the ring hugs its icon, an even step all round */
+    display: inline-block;
+    padding: var(--space-2xs);
+    line-height: 0;
+    color: var(--color-text-muted);
+    outline: var(--line-width) solid var(--color-line);
+    outline-offset: calc(var(--line-width) * -1);
+    border-radius: var(--radius-pill);
+  }
+
+  .mark[data-unread] {
+    color: var(--color-mine);
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

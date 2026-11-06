@@ -1,5 +1,6 @@
 import { lineOf, word } from "./chat.ts";
 import type { WebSocketRoute } from "@playwright/test";
+import { RECORDED_FILE } from "./deployed.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, live, OTHER, room, ROOM, T, tags, typingOf, typist } from "./scriptedRoom.ts";
@@ -42,6 +43,10 @@ test.describe("who is typing", () => {
   test("keeps a renewed typist 6 s from its last active, and the second of two alone once the first's are past", async ({
     page,
   }) => {
+    // The world page reads the worlds' file, which the static host here lacks: a 404 would be an error of the page's console.
+    await page.route("**/worlds.json", (route) =>
+      route.fulfill({ body: RECORDED_FILE, contentType: "application/json" }),
+    );
     const errors: string[] = [];
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("console", (message) => {
@@ -150,7 +155,7 @@ test.describe("telling the room the account is typing", () => {
       "People in this room see when you type. Shift+Enter adds a line.",
     );
     await field(page).fill("/");
-    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me.");
+    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me; also /poll.");
   });
 
   // The red pass (R3): a draft the device kept is no typing; opening a room, or coming back to it, tells nothing.

@@ -124,6 +124,12 @@ services:
       NODE_USE_ENV_PROXY: "1"
       # The prices timer's file (5l): CoinGecko's prices every 5 minutes, in a volume of their own.
       MARKETS_FILE: /markets/markets.json
+      # The worlds job's file (7c): the default universe's realms grouped into worlds, in the same volume, served at /worlds.json; its
+      # count beside it (7n2), worlds-count.json, served at /worlds-count.json.
+      WORLDS_FILE: /markets/worlds.json
+      # The preview job's file (8f): the hubs' realms' home pages, each read by the moderation check before it is written, in the same volume,
+      # served at /previews.json; through the same RPC as the worlds job, so the way out lets no host out for it.
+      PREVIEWS_FILE: /markets/previews.json
       # The same read takes the default universe's block height from its RPC (the host the way out lets out besides CoinGecko's and OpenAI's).
       UNIVERSES_FILE: /app/app/data/universes.json
       # The door to jarvis (10g), on the network only the two share; off unless JARVIS=on, the setting jarvis reads.

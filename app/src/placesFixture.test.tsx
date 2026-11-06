@@ -1,6 +1,6 @@
 import type { ClientLoaderFunctionArgs } from "react-router";
 import { describe, expect, test, vi } from "vitest";
-import { render, routeError } from "../tests/render.tsx";
+import { headingOf, render, routeError } from "../tests/render.tsx";
 import Earth, {
   clientLoader as earthLoader,
   ErrorBoundary as EarthError,
@@ -99,24 +99,17 @@ describe("an ecosystem's page", () => {
 });
 
 describe("the Earth of a universe that holds worlds", () => {
-  test("links a world of another universe at that universe's path", async () => {
+  // 8g (frames 37 to 42): the Earth's plate is its general chat's; the List keeps every world and ecosystem.
+  test("lists neither its worlds nor its ecosystems", async () => {
     const html = await page("earth", "/net/gnoland/earth");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
-    expect(html).toContain("Other");
-    expect(html).not.toContain("Bubble");
-    expect(html).not.toMatch(/no world yet/i);
+    expect(html).not.toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
+    expect(html).not.toMatch(/<a [^>]*href="\/e\/tokens"/);
   });
 
-  test("lists the ecosystems of its universe, and no other", async () => {
-    const html = await page("earth", "/earth");
-    expect(html).toMatch(/<a [^>]*href="\/e\/tokens"[^>]*>Tokens<\/a>/);
-    expect(html).not.toContain("Tokens of gno.land");
-  });
-
-  test("has a trail to its universe's home, ending on the Earth", async () => {
+  test("has frame 40's crumb: its universe's cosmos, then the home, the general chat", async () => {
     const html = await page("earth", "/net/gnoland/earth");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>gno\.land<\/a>/);
-    expect(html).toMatch(/aria-current="page"[^>]*>Earth</);
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
+    expect(html).toMatch(/aria-current="page"[^>]*>Home · the general chat</);
   });
 
   test("carries the loader's own address in its tags", () => {
@@ -139,7 +132,7 @@ describe("a universe's index", () => {
     const html = await page("home", "/net/gnoland/");
     // F3267: the hero's kicker names the universe, and the heading is its line, what the page holds.
     expect(html).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land<\/p>/);
-    expect(html).toMatch(/<h1\b[^>]*>1 world in gno\.land<\/h1>/);
+    expect(headingOf(html)).toBe("1 world in gno.land");
     expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/w\/other"/);
     expect(html).toContain("Other");
     // Slice 5r: the way to the Earth is the hero's big action, "Go explore" (frame 6), and the header's Earth view.
@@ -152,8 +145,10 @@ describe("a universe's index", () => {
   test("is the home itself for the default universe, at / and at /net/onyx/", async () => {
     for (const path of ["/", "/net/onyx/"]) {
       const html = await page("home", path);
-      expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.world<\/p>/);
-      expect(html, path).toMatch(/<h1\b[^>]*>2 worlds in Onyx<\/h1>/);
+      expect(html, path).toMatch(/<p [^>]*>(?:<span [^>]*><\/span>)?gno\.land · live now<\/p>/);
+      // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+      // the line's figure's room for it.
+      expect(headingOf(html), path).toBe("Worlds in Onyx");
     }
   });
 
@@ -173,10 +168,10 @@ describe("a universe's index", () => {
 });
 
 describe("a world of another universe", () => {
-  test("is at its universe's path, its kicker naming that universe", async () => {
+  test("is at its universe's path, its crumb leading to that universe", async () => {
     const html = await page("world", "/net/gnoland/w/other");
     expect(html).toContain("<h1>Other</h1>");
-    expect(html).toMatch(/<p class="label[^"]*">gno\.land<\/p><h1>Other<\/h1>/);
+    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
   });
 
   test.each(["/net/gnoland/w/bubble", "/w/other", "/net/nowhere/w/other", "/net/onyx/w/other"])(

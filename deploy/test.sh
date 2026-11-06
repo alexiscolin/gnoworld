@@ -4,7 +4,8 @@
 # refuses, so the operator runs it:
 #   sh deploy/test.sh            builds the static server, starts it with the guard in a throwaway
 #                                project and a password of its own, checks both, then removes it;
-#   sh deploy/test.sh --mutants  the same against faults planted one at a time: each must fail;
+#   sh deploy/test.sh --mutants  the same against faults planted one at a time: each must fail, and its run ends at the check that
+#                                must catch it (STOP_AT), not after every check of the stack;
 #   sh deploy/test.sh --demo     checks the running demo: Tailscale, its tailnet, the public URL;
 #                                it asks for the demo's password, which no command line shows.
 # Its output names the host's own addresses and ports: never commit it, nor paste it in public.
@@ -92,6 +93,9 @@ pass() { printf 'ok    %s\n' "$1"; }
 fail() {
 	printf 'FAIL  %s\n' "$1"
 	failed=$((failed + 1))
+	# A mutant's run is told the check that must catch it (STOP_AT, see mutant() below) and ends at that check's failure, the other checks'
+	# failures shown before it: what comes after it, hours of the full stack, cannot change the verdict. A plain run has none, and goes through every check.
+	[ -z "${STOP_AT:-}" ] || case $1 in *"$STOP_AT"*) exit 1 ;; esac
 }
 expect() { if [ "$2" = "$3" ]; then pass "$1"; else fail "$1: wanted [$3], got [$2]"; fi; }
 at_least() { if [ "$2" -ge "$3" ]; then pass "$1 ($2)"; else fail "$1: $2, under $3"; fi; }
@@ -273,7 +277,7 @@ guard_dns() { docker exec "$guard" iptables-nft -S OUTPUT | sed -n 's#^-A OUTPUT
 
 if [ "${1:-}" = --mutants ]; then
 	# The stack as it is passes first: a check that always failed would kill every mutant naming it.
-	TEST_PROJECT=gnoworld-demo-mutant-$$ sh "$0" >"$tmp/run.log" 2>&1 ||
+	STOP_AT= TEST_PROJECT=gnoworld-demo-mutant-$$ sh "$0" >"$tmp/run.log" 2>&1 ||
 		missing "the stack fails with no fault planted (first: $(grep '^FAIL' "$tmp/run.log" | head -1 | cut -c7-120)): fix it before the mutants"
 	# The faults each check must catch (CLAUDE.md: a guard lands with the fault that proves it).
 	# Each fault names the check that must catch it: killed by another one, it proves nothing.
@@ -284,7 +288,7 @@ if [ "${1:-}" = --mutants ]; then
 		[ -z "${ONLY_MUTANTS:-}" ] || printf '%s\n' "$label" | grep -qE -- "$ONLY_MUTANTS" || return 0
 		"$@" >"$tmp/override.yaml"
 		code=0
-		TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
+		STOP_AT=$wanted TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
 		if [ "$code" = 1 ] && grep '^FAIL' "$tmp/run.log" | grep -qF "$wanted"; then
 			pass "killed: $label, by \"$wanted\""
 		elif [ "$code" = 0 ]; then
@@ -354,7 +358,8 @@ if [ "${1:-}" = --mutants ]; then
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
-	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=320#burst=60#'
+	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=640#burst=60#'
+	mutant "the burst back at 320" "a burst of 640 requests is served whole" nginx sed 's#burst=640#burst=320#'
 	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
 	mutant "no password at all" "no password, no /" nginx sed 's#auth_basic "gno.world demo";#auth_basic off;#'
@@ -440,6 +445,29 @@ if [ "${1:-}" = --mutants ]; then
 		compose 'services: { web: { volumes: !override [] } }'
 	mutant "markets.json open without the password" "web serves markets.json only with the password" \
 		nginx awk '{ print } /location = \/markets\.json \{/ { print "            auth_basic off;" }'
+	mutant "worlds.json is not served" "web serves worlds.json from the volume the server writes" \
+		nginx sed '/location = \/worlds\.json {/,/}/d'
+	mutant "worlds.json open without the password" "web serves worlds.json only with the password" \
+		nginx awk '{ print } /location = \/worlds\.json \{/ { print "            auth_basic off;" }'
+	mutant "worlds-count.json is not served" "web serves worlds-count.json from the volume the server writes" \
+		nginx sed '/location = \/worlds-count\.json {/,/}/d'
+	mutant "worlds-count.json open without the password" "web serves worlds-count.json only with the password" \
+		nginx awk '{ print } /location = \/worlds-count\.json \{/ { print "            auth_basic off;" }'
+	mutant "worlds-count.json kept a year" "web serves worlds-count.json with a short cache" \
+		nginx sed '/worlds-count/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
+	mutant "web follows a link at worlds-count.json" "web does not follow a link planted at worlds-count.json" \
+		nginx awk '/location = \/worlds-count\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
+	# The preview captures (8f) ride the same volume and location.
+	mutant "previews.json is not served" "web serves previews.json from the volume the server writes" \
+		nginx sed '/location = \/previews\.json {/,/}/d'
+	mutant "previews.json open without the password" "web serves previews.json only with the password" \
+		nginx awk '{ print } /location = \/previews\.json \{/ { print "            auth_basic off;" }'
+	mutant "previews.json kept a year" "web serves previews.json with a short cache" \
+		nginx sed '/previews/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
+	mutant "web follows a link at previews.json" "web does not follow a link planted at previews.json" \
+		nginx awk '/location = \/previews\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
+	mutant "the captures written where web serves none" "the running preview job reads the hubs' pages through the way out and writes only the captures the check passed" \
+		compose 'services: { server: { environment: { PREVIEWS_FILE: /markets/elsewhere.json } } }'
 	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
 		nginx sed '/disable_symlinks on/d'
 	mutant "web mounts markets writable" "web cannot write in the folder of markets.json" \
@@ -451,17 +479,26 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "headers waited for a minute" "web closes a connection that never ends its headers" nginx sed '/client_header_timeout/d'
 	mutant "a body waited for a minute" "web closes a connection that never sends its body" nginx sed '/client_body_timeout/d'
 	mutant "an idle connection kept 75 s" "web closes a connection that stays idle between requests" nginx sed '/keepalive_timeout/d'
-	mutant "a host added to the way out" "the way out lets four hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
+	mutant "a host added to the way out" "the way out lets six hosts out" acl awk '{ print } /- api.openai.com/ { print "    - example.com" }'
 	# The prices timer's host (5l): its line gone, widened to the whole domain, or the server's own way out off for it.
 	mutant "CoinGecko's API dropped from the way out" "the server does not reach CoinGecko" acl sed '/- api.coingecko.com/d'
-	mutant "CoinGecko's whole domain let out" "the way out lets four hosts out" \
+	mutant "CoinGecko's whole domain let out" "the way out lets six hosts out" \
 		acl awk '{ print } /- api.coingecko.com/ { print "    - \"*.coingecko.com\"" }'
 	# The default universe's RPC (decision of 2026-10-31): its line gone, another universe's RPC let out beside it, its whole domain
 	# let out. A server with no data file fails closed at boot (main.test.ts), which the stack's start shows, no mutant needed.
 	mutant "the default RPC's host dropped from the way out" "the server does not reach the default universe's RPC" acl sed '/- rpc\.onyx\./d'
-	mutant "another chain's node let out" "the way out lets four hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.sapphire.testnets.gno.land" }'
-	mutant "the default RPC's whole domain let out" "the way out lets four hosts out" \
+	mutant "another chain's node let out" "the way out lets six hosts out" acl awk '{ print } /- rpc\.onyx\./ { print "    - rpc.sapphire.testnets.gno.land" }'
+	mutant "the default RPC's whole domain let out" "the way out lets six hosts out" \
 		acl awk '{ print } /- rpc\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
+	# The worlds job's indexers (slice 7, 7c): each universe's host gone, or its whole domain let out beside it.
+	mutant "Onyx's indexer dropped from the way out" "the server does not reach the universe's indexer indexer.onyx.testnets.gno.land" \
+		acl sed '/- indexer\.onyx\./d'
+	mutant "gno.land's indexer dropped from the way out" "the server does not reach the universe's indexer indexer.gno.land" \
+		acl sed '/- indexer\.gno\.land/d'
+	mutant "Onyx's indexer's whole domain let out" "the way out lets six hosts out" \
+		acl awk '{ print } /- indexer\.onyx\./ { print "    - \"*.testnets.gno.land\"" }'
+	mutant "gno.land's indexer's whole domain let out" "the way out lets six hosts out" \
+		acl awk '{ print } /- indexer\.gno\.land/ { print "    - \"*.gno.land\"" }'
 	# The door's mainnet names (D120): its node's line gone.
 	mutant "the names' node dropped from the way out" "the server does not reach the names' node" acl sed '/- rpc\.gno\.land/d'
 	# jarvis's faults (10j, 10j-4), planted from the file that holds its checks.
@@ -791,12 +828,13 @@ PY
 	expect "a font's type" "$(header content-type "$font" 203.0.113.1 -u "$auth")" font/woff2
 	expect "a font is kept a year" "$(header cache-control "$font" 203.0.113.1 -u "$auth")" "public, max-age=31536000, immutable"
 
-	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-800]')" 200
-	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-800]')" 200
-	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-800]')" 200
+	# 1,600 requests, twice those that met the burst of 320: a slow host's refill then eats no more of the floor of 200 than it did (F3665).
+	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-1600]')" 200
+	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-1600]')" 200
+	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-1600]')" 200
 	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy.
 	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}|%header{content-security-policy}\n' --haproxy-protocol \
-		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-800]" || true)
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-1600]" || true)
 	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
 	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$bare"
@@ -810,9 +848,12 @@ PY
 		--haproxy-clientip 198.51.100.9 -u "$auth" --parallel --parallel-max 50 $fetches || true)
 	expect "a visitor's first load, twice its files at once, gets no 429" "$(printf '%s\n' "$load" | grep -c '^429$' || true)" 0
 	expect "and every request of it is served" "$(printf '%s\n' "$load" | grep -c '^200$' || true)" "$(printf '%s\n' $urls $urls | grep -c .)"
+	# The room itself (F3665): a build's first load sits under 320, so only this tells a burst of 640 from the one before it. A real file: a
+	# made-up path is the app's 404, which would count nothing.
+	at_least "a burst of 640 requests is served whole" "$(codes 200 198.51.100.13 -u "$auth" 'http://web:8080/sw.js?[1-640]')" 640
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
 	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
-		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-800]"
+		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-1600]"
 		curl -s -o /dev/null -w "%{http_code}" --haproxy-protocol --haproxy-clientip 198.51.100.12 -u "$1" http://web:8080/' sh "$auth")" 200
 	expect "no log holds the password, its hash or the header that carries it" \
 		"$(docker logs "$web" 2>&1 | grep -cF -e "$password" -e "$hash" -e "$(printf 'team:%s' "$password" | base64)" || true)" 0
@@ -1390,19 +1431,20 @@ print(u.urlparse(next(row["rpc"] for row in rows if row.get("default"))).hostnam
 	gnoweb_host=$(python3 -I -c 'import json, sys, urllib.parse as u
 rows = json.load(open(sys.argv[1]))
 print(u.urlparse(next(row["gnoweb"] for row in rows if row.get("default"))).hostname)' "$repo/app/data/universes.json")
-	other_indexer=$(python3 -I -c 'import json, sys, urllib.parse as u
-rows = json.load(open(sys.argv[1]))
-print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default"))).hostname)' "$repo/app/data/universes.json")
+	# The worlds job's indexers (slice 7, 7c): every universe's, each by its full name.
+	indexer_hosts=$(python3 -I -c 'import json, sys, urllib.parse as u
+for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostname)' "$repo/app/data/universes.json")
 	# The door's mainnet names (D120): JARVIS_NAMES_RPC's default, server/src/door/settings.ts (universes.test.ts holds it).
 	names_host=rpc.gno.land
-	expect "the way out lets four hosts out: CoinGecko's API, OpenAI's, the default universe's RPC and the names' node" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
-		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" "$names_host" | sort | tr '\n' ' ')"
+	expect "the way out lets six hosts out: CoinGecko's API, OpenAI's, the default universe's RPC, the names' node and the universes' indexers" "$(sed -n 's/^ *- *//p' "$tmp/acl.yaml" | tr -d '"' | sort | tr '\n' ' ')" \
+		"$(printf '%s\n' api.coingecko.com api.openai.com "$rpc_host" "$names_host" $indexer_hosts | sort | tr '\n' ' ')"
 	# Refused by the proxy itself, 407 (smokescreen.go, rejectResponse), not a connection that failed (502, 504).
 	refuses() {
 		result=$(via "$@")
 		case $result in *407*) pass "the way out refuses $1" ;; *) fail "the way out does not refuse $1: [$result]" ;; esac
 	}
-	for target in "https://$other_indexer/" https://api.anthropic.com/ https://gnoscope.com/ "https://$rpc_host.evil.test/" "https://$gnoweb_host/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
+	for indexer_host in $indexer_hosts; do refuses "https://$indexer_host.evil.test/"; done
+	for target in https://api.anthropic.com/ https://gnoscope.com/ "https://$rpc_host.evil.test/" "https://$gnoweb_host/" https://example.com/ https://platform.openai.com/ https://api.openai.com.evil.test/ https://api.coingecko.com.evil.test/ https://pro-api.coingecko.com/ https://1.1.1.1/ \
 		https://10.0.0.1/ "https://$hostip:$canary/" http://169.254.169.254/; do
 		refuses "$target"
 	done
@@ -1418,6 +1460,11 @@ print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default")))
 	case $(fetched 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd') in 200 | 429) pass "the server reaches CoinGecko through the way out" ;; *) fail "the server does not reach CoinGecko through the way out" ;; esac
 	# The home's block height (decision of 2026-10-31): the default universe's RPC, asked as the timer asks it; any answer is a way through.
 	case $(fetched "https://$rpc_host/status") in [1-5][0-9][0-9]) pass "the server reaches the default universe's RPC through the way out" ;; *) fail "the server does not reach the default universe's RPC through the way out" ;; esac
+	# The worlds job's indexers (slice 7, 7c): each universe's host, a GET of `/` (the job POSTs to `/graphql/query`: its answer is read
+	# below, from a real pass); any answer is a way through.
+	for indexer_host in $indexer_hosts; do
+		case $(fetched "https://$indexer_host/") in [1-5][0-9][0-9]) pass "the server reaches the universe's indexer $indexer_host through the way out" ;; *) fail "the server does not reach the universe's indexer $indexer_host through the way out" ;; esac
+	done
 	case $(fetched "https://$names_host/status") in [1-5][0-9][0-9]) pass "the server reaches the names' node through the way out" ;; *) fail "the server does not reach the names' node through the way out" ;; esac
 	# The server read the data it names (UNIVERSES_FILE) at boot, or it would not be up: its default RPC is the list's third host.
 	expect "the server's data holds the default universe's RPC" "$(docker exec "$server" /nodejs/bin/node -e "const rows = JSON.parse(require('fs').readFileSync(process.env.UNIVERSES_FILE, 'utf8')); console.log(new URL(rows.find((row) => row.default).rpc).hostname)" 2>&1 || true)" "$rpc_host"
@@ -1435,6 +1482,41 @@ print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default")))
 	else
 		expect "the running timer writes the block height itself, from the default universe's RPC" "$timer_block" block
 	fi
+	# The worlds job's first real pass (7c), not a planted file: the running job reads the list, each package, each realm's calls from the
+	# indexer and the names, one call at a time. This proves vm/qdoc, vm/qfile and the indexer's GraphQL filter against the real chain
+	# (F3516): the file must hold a realm with a deployer, functions and some call counted (F3545). A first pass takes minutes: it waits up to twenty.
+	worlds_real=none
+	for _ in $(seq 1 120); do
+		worlds_real=$(docker exec "$server" /nodejs/bin/node -e "try { const w = JSON.parse(require('fs').readFileSync('/markets/worlds.json', 'utf8')); console.log(w.worlds.some((x) => x.realms.some((r) => r.deployer !== null && r.functions.length > 0 && r.calls > 0)) ? 'read' : 'empty') } catch { console.log('none') }" 2>/dev/null || true)
+		[ "$worlds_real" = read ] && break
+		sleep 10
+	done
+	expect "the running worlds job reads a realm's deployer, functions and calls from the chain and its indexer" "$worlds_real" read
+	# Its count (7n2), which the home's hero reads, written by the same pass beside it at the name nginx serves: a WORLDS_FILE named
+	# otherwise would leave the hero without its number for good.
+	worlds_counted=$(docker exec "$server" /nodejs/bin/node -e "try { const f = require('fs'); const w = JSON.parse(f.readFileSync('/markets/worlds.json', 'utf8')); const c = JSON.parse(f.readFileSync('/markets/worlds-count.json', 'utf8')); console.log(c.updated === w.updated && c.count === w.worlds.length + 1 ? 'counted' : 'other') } catch { console.log('none') }" 2>/dev/null || true)
+	expect "the running worlds job writes the worlds' count beside their file, from the same pass" "$worlds_counted" counted
+	# The preview job's first real pass (8f), not a planted file: at boot it reads the hubs' realms' home pages (GovDAO's) through the way out,
+	# then asks OpenAI to check each. This stack's key is test.sh's own (openssl rand), which OpenAI always refuses: every capture is then
+	# unchecked, so the file must hold none and the log say the page was read, then not checked. The "captured" branch runs only under an
+	# operator's real key: no run of test.sh proves a passed check writes a capture (server/src/previews/job.test.ts does). A read that
+	# failed (the chain, the way out) fails here.
+	previews_real=missing
+	for _ in $(seq 1 30); do
+		previews_real=$(docker exec "$server" /nodejs/bin/node -e "try { const p = JSON.parse(require('fs').readFileSync('/markets/previews.json', 'utf8')); console.log(p.previews.length === 0 ? 'none' : p.previews.every((c) => c.path === 'gno.land/r/gov/dao' && c.text.trim() !== '') ? 'captured' : 'other') } catch { console.log('missing') }" 2>/dev/null || true)
+		[ "$previews_real" = missing ] || break
+		sleep 2
+	done
+	previews_said=$(docker logs "$server" 2>&1 | grep -oE '"event":"previews_(skipped|written|failed)"(,"error":"[a-z_]+")?' | tr '\n' ' ' || true)
+	case "$previews_real $previews_said" in
+		"captured "*'"event":"previews_written"'*) previews_ok=yes ;;
+		"none "*'"event":"previews_skipped","error":"unchecked"'*'"event":"previews_written"'*) previews_ok=yes ;;
+		*) previews_ok="no: the file $previews_real, the log $previews_said" ;;
+	esac
+	expect "the running preview job reads the hubs' pages through the way out and writes only the captures the check passed" "$previews_ok" yes
+	# What the job logged, its faults' kinds and each pass's length in ms (a line holds nothing a chain wrote): the stack's logs go with it at
+	# the end, and a first pass's length in Docker is what 7k3 could not measure from its sandbox.
+	printf 'the worlds job logged: %s\n' "$(docker logs "$server" 2>&1 | grep -oE '"event":"worlds_[a-z_]+"(,"error":"[a-z_]+"|,"ms":[0-9]+)?' | tr '\n' ' ' || true)"
 	# markets.json's folder is the volume the server may write in, as 65532, on a read-only root (5l).
 	expect "the server may write in the folder of markets.json" "$(docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/probe', 'x'); f.unlinkSync('/markets/probe'); console.log('written')" 2>&1 || true)" written
 	expect "and nothing else" "$(fetched https://example.com/)" refused
@@ -1447,6 +1529,27 @@ print(u.urlparse(next(row["indexer"] for row in rows if not row.get("default")))
 	expect "web serves markets.json never sniffed" "$(header x-content-type-options /markets.json 203.0.113.1 -u "$auth")" nosniff
 	expect "web serves markets.json as JSON" "$(header content-type /markets.json 203.0.113.1 -u "$auth")" application/json
 	expect "web serves markets.json only with the password" "$(status /markets.json 203.0.113.3)" 401
+	# worlds.json (7c) rides the same volume and location: a file the server wrote, read-only there, with a short cache.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/worlds.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), worlds: [] }))" >/dev/null 2>&1 || true
+	expect "web serves worlds.json from the volume the server writes" "$(status /worlds.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves worlds.json with a short cache" "$(header cache-control /worlds.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves worlds.json only with the password" "$(status /worlds.json 203.0.113.3)" 401
+	# Its count beside it (7n2), which the home's hero reads: the same volume, location and cache.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/worlds-count.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), count: 1 }))" >/dev/null 2>&1 || true
+	expect "web serves worlds-count.json from the volume the server writes" "$(status /worlds-count.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves worlds-count.json with a short cache" "$(header cache-control /worlds-count.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves worlds-count.json only with the password" "$(status /worlds-count.json 203.0.113.3)" 401
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/worlds-count.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/worlds-count.json')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted at worlds-count.json" "$(status /worlds-count.json 203.0.113.4 -u "$auth")" 404
+	# The preview captures (8f): the same volume, location and cache, planted over the job's own file once its real pass was read.
+	docker exec "$server" /nodejs/bin/node -e "require('fs').writeFileSync('/markets/previews.json', JSON.stringify({ version: 1, universe: 'onyx', updated: new Date().toISOString(), previews: [] }))" >/dev/null 2>&1 || true
+	expect "web serves previews.json from the volume the server writes" "$(status /previews.json 203.0.113.1 -u "$auth")" 200
+	expect "web serves previews.json with a short cache" "$(header cache-control /previews.json 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves previews.json as JSON, never sniffed" "$(header content-type /previews.json 203.0.113.1 -u "$auth") $(header x-content-type-options /previews.json 203.0.113.1 -u "$auth")" "application/json nosniff"
+	expect "web serves previews.json only with the password" "$(status /previews.json 203.0.113.3)" 401
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/previews.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/previews.json')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted at previews.json" "$(status /previews.json 203.0.113.4 -u "$auth")" 404
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); for (const p of ['/markets/worlds.json', '/markets/worlds-count.json', '/markets/previews.json']) { try { f.unlinkSync(p) } catch {} }" >/dev/null 2>&1 || true
 	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted in the markets volume" "$(status /markets.json 203.0.113.4 -u "$auth")" 404

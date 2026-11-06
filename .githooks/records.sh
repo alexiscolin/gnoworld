@@ -4,9 +4,10 @@
 # a subshell, so it leaves no variable behind in the shell that sources this file.
 # Git shows each object itself, whatever a replace ref would show instead (F132).
 export GIT_NO_REPLACE_OBJECTS=1
-# A tree's code: every file but prose (docs/, adr/, *.md), as scripts/code_changed.sh leaves it
-# out; names unquoted, so an accented one is matched as code_changed.sh matches it.
-code_print() ( printf '%s' "$(git -c core.quotePath=false ls-tree -r "$1" | grep -v -e '	docs/' -e '	adr/' -e '\.md$')" | git hash-object --stdin )
+# A tree's code: every file but prose (docs/, adr/, *.md but under the sources, where a recorded page is a fixture, F4827), as
+# scripts/code_changed.sh leaves it out; names unquoted, so an accented one is matched as code_changed.sh matches it.
+code_print() ( printf '%s' "$(git -c core.quotePath=false ls-tree -r "$1" | grep -v -e '	docs/' -e '	adr/' -e '\.md$'
+	git -c core.quotePath=false ls-tree -r "$1" | grep -E '	(app/(src|tests)|server/src|packages/[^/]+/src)/.*[.]md$' || :)" | git hash-object --stdin )
 # The working tree's code print, untracked files included, read through a throwaway index.
 worktree_print() (
 	set -e

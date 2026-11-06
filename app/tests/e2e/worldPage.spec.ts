@@ -10,21 +10,28 @@ import { box, near } from "./geometry.ts";
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
+// Bubble has no history here: the plate's hours (8g) come from the server's rooms, where the other journeys of the run have said lines, so
+// each test below answers them as a server with none does, and reads no rate it did not plant.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/presence/hours*", (route) =>
+    route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ error: "not_ready" }) }),
+  );
+});
+
 test.describe("a world's page at the video's size", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
-  test("the kicker stands at the text column's left, 137 px down, over the title (frame 26)", async ({ page }) => {
+  // 8g: the kicker is frame 104's crumb, "UNIVERSE › GAMES › DAPP", the universe a link to its cosmos.
+  test("the crumb stands at the text column's left, 137 px down, over the title (frames 26, 104)", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
-    // The plate's vertical atlas caption is a label too: the kicker is the one that is not vertical.
-    const label = "[data-look='plate'] p.label:not([data-orientation])";
+    const label = "[data-look='plate'] nav[aria-label='You are here']";
     const kicker = await box(page, label);
     const title = await box(page, "[data-look='plate'] h1");
     near(kicker.x, 100, "the kicker's left");
     near(kicker.y + kicker.height / 2, 137, "the kicker's middle");
     expect(kicker.y + kicker.height).toBeLessThanOrEqual(title.y + 0.5);
-    await expect(page.locator(label).first()).toHaveText("Onyx");
-    await expect(page.getByRole("navigation", { name: "You are here" })).toHaveCount(0);
+    await expect(page.locator(`${label} li`)).toHaveText(["Universe", "Games", "dApp"]);
   });
 
   // F2871: the kicker's row (24 px, flex) is the paragraph right before the title, not any first paragraph of a block of the plate: the
@@ -48,50 +55,62 @@ test.describe("a world's page at the video's size", () => {
 
   // F2869: each block at its place. Frame 26's description line stands at y 316 (its centre); Bubble's has two lines, the first at
   // the frame's place. The frame's facts, chart (479) and actions (574) have the data Bubble lacks (no source for who is here, no
-  // history), so below the description the page is pinned at what it lays: the words of no history, then the actions under them.
+  // history), so below the description the page is pinned at what it lays: the flat chart of no history, then the actions under it.
   test("the title, the line, the activity's words and the actions stand at their y (frames 26, 90)", async ({
     page,
   }) => {
+    // The demo's rooms hold people: nobody is counted here, as the test's premise says.
+    await page.routeWebSocket(/\/ws$/, () => undefined);
     await page.goto("/w/bubble");
     await hydrated(page);
     const title = await box(page, "[data-look='plate'] h1");
     const line = await box(page, "[data-look='plate'] h1 + p");
-    const activity = await box(page, "[data-look='plate'] h1 + p + p");
+    // The activity's words by what they say: from 1,280 px nobody counted holds no place over them (Alexis, 2026-11-03, "retire le vide").
+    const activity = await box(page, "[data-look='plate'] .label:has-text('Activity · last 24 h')");
     const main = await box(page, "[data-look='plate'] a[href='#chat']");
     near(title.y, 172, "the title's top");
     near(line.y + 12.4, 316, "the line's first line's middle");
     near(line.x, 100, "the line's left");
-    near(activity.y, 371, "the activity words' top");
-    near(main.y, 398, "the actions' top");
-    expect(main.y, "the actions come after the activity's words").toBeGreaterThan(activity.y + activity.height);
+    near(activity.y, 371, "the activity title's top");
+    // Frame 26: the actions' top 30 px under the chart's last words' ink (544 to 574); a label's box ends 2 px under its ink.
+    // 8g: the activity holds the chart's room while it has no history, so the actions stand under that room as frame 26's under its chart.
+    const room = await box(page, "[data-look='plate'] div:has(> div > .label:has-text('Activity · last 24 h'))");
+    near(room.y, activity.y, "the room's top, the title's");
+    near(main.y - (room.y + room.height), 574 - 544 - 2, "the actions under the activity's room");
+    expect(main.y, "the actions come after the activity's title").toBeGreaterThan(activity.y + activity.height);
   });
 
-  test("the actions are 56 px tall from the column's left, Share 10 px after the main one, and no Follow (frames 26, 92)", async ({
+  test("the actions are 56 px tall from the column's left, Follow 10 px after the main one, Share 10 px after Follow (frames 26, 92)", async ({
     page,
   }) => {
+    await page.routeWebSocket(/\/ws$/, () => undefined);
     await page.goto("/w/bubble");
     await hydrated(page);
     const plate = page.locator("[data-look='plate']");
     const main = plate.getByRole("link", { name: "Say hi in the chat" });
     const share = plate.getByRole("button", { name: "Share" });
     await expect(share).toBeVisible();
-    await expect(plate.getByRole("button", { name: "Follow" })).toHaveCount(0);
-    const first = (await main.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
-    const second = (await share.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+    const follow = plate.getByRole("button", { name: "Follow" });
+    await expect(follow).toBeVisible();
+    const none = { x: 0, y: 0, width: 0, height: 0 };
+    const first = (await main.boundingBox()) ?? none;
+    const second = (await follow.boundingBox()) ?? none;
+    const third = (await share.boundingBox()) ?? none;
     near(first.x, 100, "the main action's left");
     near(first.height, 56, "the main action's height");
-    near(second.height, 56, "Share's height");
-    near(second.x - (first.x + first.width), 10, "the gap between the two actions");
-    near(second.y, first.y, "Share's top");
+    near(second.height, 56, "Follow's height");
+    near(third.height, 56, "Share's height");
+    near(second.x - (first.x + first.width), 10, "the gap between the main action and Follow");
+    near(third.x - (second.x + second.width), 10, "the gap between Follow and Share");
+    near(second.y, first.y, "Follow's top");
+    near(third.y, first.y, "Share's top");
   });
 
-  test("the activity block says in words that no history is known, and draws no chart or rate for Bubble", async ({
-    page,
-  }) => {
+  test("the activity block draws its chart flat and names it as no activity yet for Bubble", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect(page.getByText(/no activity (recorded|known) yet/i)).toBeVisible();
-    await expect(page.locator("[data-look='plate'] [data-hour]")).toHaveCount(0);
+    await expect(page.getByRole("group", { name: /no activity recorded yet/i })).toBeVisible();
+    await expect(page.locator("[data-look='plate'] [data-hour]")).toHaveCount(24);
     await expect(page.getByText("messages now")).toHaveCount(0);
     await expect(page.getByText(/connected worlds/i)).toHaveCount(0);
   });
@@ -122,6 +141,45 @@ test.describe("who is here right now", () => {
     await expect(plate.getByText("right now", { exact: true })).toBeVisible();
     return plate;
   };
+
+  // Frame 26 draws "38 here" under its one line, its digits from 372 to 405 px, the line's middle at 316: the page's figure, 44 px at line
+  // height 1, stands its box 8 px over its digits, so 364 - (316 + half a line) under the line's last line, whatever its count of lines
+  // (7w's design review: Bubble's two lines had put it there by chance). The fact comes there, the words under it, from 1,280 px.
+  for (const width of [1280, 1728] as const)
+    test(`stands where frame 26 draws it once someone is counted, the activity's words under it, at ${String(width)} px`, async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await connected(page);
+      const line = page.locator("[data-look='plate'] h1 + p");
+      const half = Number.parseFloat(await line.evaluate((node) => getComputedStyle(node).lineHeight)) / 2;
+      const words = await box(page, "[data-look='plate'] h1 + p");
+      const figure = await box(page, "[data-look='plate'] [data-value]");
+      const activity = await box(page, "[data-look='plate'] .label:has-text('Activity · last 24 h')");
+      near(figure.y - (words.y + words.height), 364 - (316 + half), "the figure under the line");
+      expect(activity.y, "the activity's words under the fact").toBeGreaterThan(figure.y + figure.height);
+    });
+
+  // Frame 26 draws a hairline over each fact (1 px at 355, from the column's left: 100 to 325 and 358 to 583), its digits 17 px under it:
+  // the figure's box 9 px under the hairline.
+  for (const width of [1280, 1728] as const)
+    test(`draws a hairline over each fact, as frame 26, at ${String(width)} px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 1080 });
+      await connected(page);
+      const fact = page.locator("[data-look='plate'] h1 + p + div > * > *").first();
+      const drawn = await fact.evaluate((node) => {
+        const style = getComputedStyle(node);
+        return [style.borderTopWidth, style.borderTopStyle];
+      });
+      expect(drawn, "a hairline over the fact").toEqual(["1px", "solid"]);
+      const rule = (await fact.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+      const words = await box(page, "[data-look='plate'] h1 + p");
+      const figure = await box(page, "[data-look='plate'] [data-value]");
+      near(rule.x, words.x, "the hairline from the column's left");
+      near(figure.y - rule.y, 364 - 355, "the figure under the hairline");
+      // One fact a column, as frame 26's two: a hairline 226 px wide of the column's 484, 33 px from the next; a lone fact keeps its own.
+      near(rule.width, (words.width - 32) / 2, "the hairline's width, a column's");
+    });
 
   test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
     page,
@@ -154,27 +212,55 @@ test.describe("who is here right now", () => {
   });
 });
 
+// Who is here, while nobody is counted (Alexis, 2026-11-03, "retire le vide"): where the plate is a block in the page, under 1,280 px, its
+// place is held, so nothing under it moves as the count comes (7e); from 1,280 px, where the plate stands beside its dock, it holds none.
+// The chat's socket answers nothing, so nobody is ever counted.
+test.describe("who is here while nobody is counted", () => {
+  const FACT = 59;
+  for (const [width, held] of [
+    [390, FACT],
+    [1279, FACT],
+    [1280, 0],
+    [1728, 0],
+  ] as const)
+    test(`at ${String(width)} px holds ${held === 0 ? "no place" : "the fact's place"}`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await page.routeWebSocket(/\/ws$/, () => undefined);
+      await page.goto("/w/bubble");
+      await hydrated(page);
+      const here = page.locator("[data-look='plate'] h1 + p + div");
+      await expect(here).toBeAttached();
+      expect(await here.evaluate((node) => node.getBoundingClientRect().height)).toBeCloseTo(held, 0);
+    });
+});
+
 test.describe("Share", () => {
   test.use({ permissions: ["clipboard-read", "clipboard-write"] });
 
+  // 8c: Share opens a sheet (the link, a picture, Copy link); the copy and its answer are the sheet's.
   test("copies the world's canonical address and says it did", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
     await page.getByRole("button", { name: "Share" }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Copy link" }).click();
     await expect(page.getByText(/copied/i)).toBeVisible();
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("https://gno.world/net/onyx/w/bubble");
   });
 });
 
 test.describe("Share where the browser cannot copy", () => {
-  test("is not drawn: no dead button", async ({ page }) => {
+  test("shows the link to select, and says it could not copy: no dead button", async ({ page }) => {
     await page.addInitScript(() => {
       Object.defineProperty(navigator, "clipboard", { value: undefined });
     });
     await page.goto("/w/bubble");
     await hydrated(page);
     await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Share" })).toHaveCount(0);
+    await page.getByRole("button", { name: "Share" }).click();
+    const sheet = page.getByRole("dialog");
+    await expect(sheet.getByText("https://gno.world/net/onyx/w/bubble")).toBeVisible();
+    await sheet.getByRole("button", { name: "Copy link" }).click();
+    await expect(sheet.getByText("Could not copy: select the link above")).toBeVisible();
   });
 });
 
@@ -254,7 +340,7 @@ for (const width of [390, 1280] as const) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect(page.getByText(/no activity (recorded|known) yet/i)).toBeVisible();
+    await expect(page.getByRole("group", { name: /no activity recorded yet/i })).toBeVisible();
     const { violations } = await new AxeBuilder({ page }).analyze();
     expect(violations).toHaveLength(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

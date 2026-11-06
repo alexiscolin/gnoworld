@@ -5,6 +5,7 @@ import { z } from "zod";
 import { adena } from "./adena.ts";
 import type { PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { accountPill } from "./account.ts";
 
 // Each step is a line sent once a received line matches its pattern ("" waits for none).
 export type Step = readonly [after: string, line: string];
@@ -58,8 +59,8 @@ export async function logIn(page: Page, as = ""): Promise<string> {
   await adena(page, "signs", as);
   await page.goto("/");
   await hydrated(page);
-  await page.getByRole("button", { name: "Log in with Adena" }).click();
-  await expect(page.getByRole("button", { name: "Log out" })).toBeVisible();
+  await page.getByRole("button", { name: "Connect Adena" }).click();
+  await expect(accountPill(page)).toBeVisible();
   const named = `/__wallet?as=${encodeURIComponent(as)}`;
   const wallet = z.object({ address: Address }).parse(await (await page.request.get(named)).json());
   return wallet.address;
@@ -85,7 +86,7 @@ export async function loggedIn(page: Page, as = ""): Promise<{ address: string; 
   return { address, ticket: await ticketOf(page) };
 }
 
-type Launcher = Pick<PlaywrightWorkerArgs, "playwright"> & Pick<PlaywrightWorkerOptions, "launchOptions">;
+export type Launcher = Pick<PlaywrightWorkerArgs, "playwright"> & Pick<PlaywrightWorkerOptions, "launchOptions">;
 
 /** Another account, in a browser of its own (the sandbox's Chromium runs one process, one context): its address, and its
  * page to talk from. */

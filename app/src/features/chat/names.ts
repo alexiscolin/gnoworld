@@ -1,6 +1,6 @@
 // How the chat names a room and an address, and which room a world's page shows.
-import { firstGraphemes, type Line } from "@gnoworld/core";
-import { Address, type RoomList } from "@gnoworld/schemas";
+import { firstGraphemes, worldRoute, type Line } from "@gnoworld/core";
+import { Address, shortAddress, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
 import { withFull } from "./full.ts";
 
@@ -14,14 +14,22 @@ export function quoted(words: string): string {
   return first.length > 80 ? `${first.slice(0, 80).join("")}…` : words;
 }
 
-/** An address's first six and last five characters, as the login shows one's own. */
-export const shortAddress = (address: string): string => `${address.slice(0, 6)}…${address.slice(-5)}`;
+export { shortAddress } from "@gnoworld/schemas";
 
-/** A room by its own name: #games for #bubble/games, the world's main room by the world. */
+// The Earth is a page of its own, under no /w/, and its main room is the general chat (frames 37 to 55).
+const EARTH = "earth";
+
+/** A room by its own name: #games for #bubble/games, the world's main room by the world, the Earth's the general chat. */
 export const roomLabel = (room: string): string => {
   const { world, name } = partsOf(room);
-  return `#${name ?? world}`;
+  return `#${name ?? (world === EARTH ? "general" : world)}`;
 };
+
+/** A sender as a list names it: an account by its short address, a guest by its nick. */
+export const whoIs = (by: string): string => (isAccount(by) ? shortAddress(by) : by);
+
+/** The world a room is in, by its slug: #bubble/games's is bubble. */
+export const roomWorld = (room: string): string => partsOf(room).world;
 
 /** A room's address on the site: its world's page, and ?room=<name> for one that is not the main room. */
 export function roomHref(room: string, full = false): string {
@@ -32,7 +40,8 @@ export function roomHref(room: string, full = false): string {
 // A world's page at `params`, the full chat asked for or not.
 function hrefOf(world: string, params: URLSearchParams, full: boolean): string {
   const search = withFull(params, full).toString();
-  return search === "" ? `/w/${world}` : `/w/${world}?${search}`;
+  const page = world === EARTH ? "/earth" : worldRoute(world);
+  return search === "" ? page : `${page}?${search}`;
 }
 
 /** A direct message's address on the site: its world's page, and ?dm=<the partner's address> (4e). */

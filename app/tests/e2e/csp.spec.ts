@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { controlled, expect, hydrated, PAGES, test, type Page } from "./fixtures.ts";
 import { headerRules, nginxTable } from "./cspFiles.mjs";
-import { GUARDED, SITE } from "./sites.ts";
+import { BUILD, GUARDED, SITE } from "./sites.ts";
 
 // The policy's shape: the unit test pins its words, this the page's every answer (slice 3's plan, 3f).
 const SHAPE = new RegExp(
@@ -13,7 +13,6 @@ const SHAPE = new RegExp(
 );
 const HASH = /'sha256-[^']+'/g;
 const PASSWORD = `Basic ${btoa("team:a test password")}`;
-const BUILD = new URL("../../build/", import.meta.url);
 
 test.describe("the content security policy", () => {
   // 5f: one policy a page, not one for all of them: a page's holds its own scripts' hashes, so a host that cuts a line at

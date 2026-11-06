@@ -3,6 +3,13 @@
    and the account on a row, the network under them, and the views in a bar at the foot of the screen, which the page leaves
    room for. The one breakpoint of both is here. */
 @layer components {
+  /* The views' bar's height, one source for the bar and the room the page leaves under it on a phone; the two are no parent and child. */
+  .views,
+  .page {
+    /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
+    --_bar: 44px;
+  }
+
   .header {
     /* layout: the header's cells on a grid, the account's group out of it on a phone */
     display: grid;
@@ -26,6 +33,19 @@
   .end {
     /* layout: on a phone the network and the account are the header's own cells */
     display: contents;
+  }
+
+  /* What drops when the header runs short, the network and the account kept: Jarvis, the chat and the counter (the menu keeps the
+     passport), on a phone too. */
+  .drops {
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    .drops {
+      /* layout: the control itself is the row's item */
+      display: contents;
+    }
   }
 
   .network {
@@ -65,15 +85,7 @@
     inset-block-end: var(--space-s);
     /* raw: above the page's content until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
     z-index: 1;
-    box-sizing: border-box;
-    /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
-    block-size: 44px;
-    /* raw: four pixels between the pill's edge and its links */
-    padding: 4px;
-    border: var(--line-width) solid var(--color-line);
-    border-radius: var(--radius-pill);
-    /* raw: 45% of the night, the prototype's rgba(8, 11, 18, 0.45); no blur behind it until the scene has a sky (slice 7) */
-    background: color-mix(in oklab, var(--color-surface) 45%, transparent);
+    block-size: var(--_bar);
   }
 
   .view {
@@ -83,7 +95,6 @@
     place-items: center;
     /* raw: a link is 34 px tall inside the 44 px pill */
     block-size: 34px;
-    padding-inline: var(--space-s);
     border-radius: var(--radius-pill);
     color: var(--color-text-muted);
     /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
@@ -92,6 +103,13 @@
     letter-spacing: 0.1em;
     text-decoration: none;
     text-transform: uppercase;
+  }
+
+  /* A step at each side of a view's name: the prototype's 16 px on a screen 390 px wide or more, a pixel less each 10 px narrower, 12 at the
+     least, so a bar 320 px wide holds its three names on one line (F4691). */
+  .views .view {
+    /* raw: 16 px at 390 px wide, 12 at 350 and under */
+    padding-inline: clamp(var(--space-xs), calc(var(--space-s) - (390px - 100vi) / 10), var(--space-s));
   }
 
   .view[aria-current="page"] {
@@ -119,14 +137,17 @@
   }
 
   .page {
-    /* raw: the bar's 44 px, its 16 px gap under it and 16 px over it */
-    padding-block-end: calc(44px + 2 * var(--space-s));
+    /* The bar, its gap under it and one more over it. */
+    padding-block-end: calc(var(--_bar) + 2 * var(--space-s));
   }
 
   @media (min-width: 900px) {
     .header {
-      /* layout: logo, views, the end: the views in the exact middle */
-      grid-template-columns: 1fr auto 1fr;
+      /* layout: logo, views, the end: the views in the exact middle while the end fits its half; past it, the end keeps its controls whole
+         and the views give way to the left */
+      grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+      /* a control's words stay on one line: the row never grows a second */
+      white-space: nowrap;
       /* raw: 34 px from the top, 32 each side, and 18 under the 44 px row: 96 high in all (DESIGN-SYSTEM.md, Layout) */
       padding: 34px var(--space-l) 18px;
       /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it. */

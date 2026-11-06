@@ -80,11 +80,11 @@ test.describe("a direct message's bar", () => {
     await write(page, "from me");
     await lines(page).nth(0).hover();
     await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
-    await expect(menu(page)).toHaveText(["Copy text"]);
+    await expect(menu(page)).toHaveText(["Copy text", "View profile"]);
     await page.keyboard.press("Escape");
     await lines(page).nth(1).hover();
     await barOf(page, 1).getByRole("button", { name: "More actions" }).click();
-    await expect(menu(page)).toHaveText(["Copy text", "Edit", "Delete"]);
+    await expect(menu(page)).toHaveText(["Copy text", "View profile", "Edit", "Delete"]);
   });
 
   test("reacts with a quick reaction, shows the partner's, and takes a reaction back", async ({ page }) => {

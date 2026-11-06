@@ -13,3 +13,8 @@ export const SITE = at(0);
 export const UPDATING = at(1);
 /** The updating host behind the demo's shared password. */
 export const GUARDED = at(2);
+/** The build the journeys serve (serve.mjs): app/build, or GNOWORLD_BUILD, an absolute folder (react-router.config.ts). */
+export const BUILD =
+  process.env["GNOWORLD_BUILD"] === undefined
+    ? new URL("../../build/", import.meta.url)
+    : new URL(`file://${process.env["GNOWORLD_BUILD"]}/`);

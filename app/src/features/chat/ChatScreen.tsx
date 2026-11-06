@@ -2,13 +2,16 @@
 // (frames 20 to 35) or, expanded, full bleed over it (frames 56 to 77): the header over the column of worlds, the rooms, the
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
 import { ChatLayout, Dialog } from "@gnoworld/ui";
+import type { Line } from "@gnoworld/core";
 import { useRef, useState, type ReactElement, type ReactNode, type RefObject } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
-import { PlaceInfo } from "./PlaceInfo.tsx";
-import { QuickActions } from "./QuickActions.tsx";
+import { Info } from "./Info.tsx";
+import type { UniverseView } from "../../places.ts";
+import { worldsFollowedIn } from "../follow/index.ts";
+import { useApp } from "../../storeContext.tsx";
 import { useCompact } from "./useCompact.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
@@ -33,8 +36,18 @@ export interface ChatPlace {
   kicker: string;
   /** Where closing the chat goes: the universe's home. */
   home: string;
+  /** What closing does instead, where the chat stands over the page it closes back to (the dock over the cosmos, frame 143). */
+  close?: (() => void) | undefined;
   /** The universe's worlds, in order. */
-  worlds: readonly { slug: string; name: string; href: string }[];
+  worlds: readonly { slug: string; name: string; href: string; realms?: readonly string[] | undefined }[];
+  /** Under the dock's width the chat stays a block of the page, and never takes it: the Earth's globe is what its page shows. */
+  inPage?: boolean | undefined;
+  /** The Earth's general chat, whose pills are its own (QuickActions.tsx). */
+  earth?: boolean | undefined;
+  /** The world's realms on the chain (`gno.land/r/gov/dao`), and its universe: Realm opens the first's view, the panel links it on
+   * gnoweb. */
+  realms?: readonly string[] | undefined;
+  universe: Pick<UniverseView, "id" | "isDefault" | "gnoweb">;
 }
 
 /** What Who's here does: where the chat has an info panel it takes the reader to the people in it, closing the thread that
@@ -106,16 +119,6 @@ function Docked({ children }: { children: ReactNode }) {
   return useFull() ? null : children;
 }
 
-/** What goes under a room's lines: the quick actions over what writes (the composer, or a visitor's word). */
-export function Dock({ onWhoIsHere, children }: { onWhoIsHere: () => void; children: ReactNode }) {
-  return (
-    <div className={styles["dock"]}>
-      <QuickActions onWhoIsHere={onWhoIsHere} />
-      {children}
-    </div>
-  );
-}
-
 export interface ChatScreenProps {
   place: ChatPlace;
   /** The room's name, or a direct message's partner: the place's own name when none is in view. */
@@ -133,6 +136,8 @@ export interface ChatScreenProps {
   unread: number;
   /** How many are talking here now, in the panel; none draws no figure. */
   talking?: number | undefined;
+  /** The room's lines and who is here: the countries they declared, counted in the panel. */
+  here?: { lines: readonly Line[]; members: readonly string[] } | undefined;
   /** Who is here, drawn under Here now. */
   people: ReactNode;
   /** What the room's thread adds: its panel, which takes the info panel's place while one is open. */
@@ -150,27 +155,20 @@ const DOCKABLE = "(min-width: 1280px)";
 const threadAside = (threads: ChatScreenProps["threads"]) =>
   "threaded" in threads.view && threads.view.threaded ? <>{threads.aside}</> : undefined;
 
-export function ChatScreen({
-  place,
-  title,
-  kicker,
-  chips,
-  menu,
-  mark,
-  rail,
-  unread,
-  talking,
-  people,
-  threads,
-  status,
-  children,
-}: ChatScreenProps) {
+// Under the dock's width the chat takes the page, unless the place keeps it a block of its own.
+const takesPage = (dockable: boolean, { inPage }: ChatPlace) => !dockable && inPage !== true;
+
+export function ChatScreen(props: ChatScreenProps) {
+  const { place, title, kicker, chips, menu, mark, rail, unread, talking, here: room, people, threads } = props;
+  const { status, children } = props;
   const dockable = useMedia(DOCKABLE);
   const [params, setParams] = useSearchParams();
-  const full = !dockable || asksFull(params);
+  const full = takesPage(dockable, place) || asksFull(params);
   const screenRef = useRef<HTMLDivElement>(null);
   const compact = useCompact(screenRef, NARROW);
   const navigate = useNavigate();
+  const follows = useApp((state) => state.device.follows);
+  const followed = worldsFollowedIn(follows, place.universe.id);
   const here = usePeople({ screenRef, people, compact, talking, closeThread: threads.close });
   const thread = threadAside(threads);
   return (
@@ -200,23 +198,17 @@ export function ChatScreen({
                   : undefined
               }
               onClose={() => {
-                Promise.resolve(navigate(place.home)).catch(reportError);
+                if (place.close === undefined) Promise.resolve(navigate(place.home)).catch(reportError);
+                else place.close();
               }}
             />
           }
-          worlds={<Worlds worlds={place.worlds} current={place.slug} />}
+          worlds={<Worlds worlds={place.worlds} current={place.slug} followed={followed} />}
           rooms={compact ? undefined : <div className={styles["rail"]}>{rail}</div>}
           info={
             thread ??
             (compact ? undefined : (
-              <PlaceInfo
-                kicker={place.kicker}
-                name={place.name}
-                description={place.description}
-                talking={talking}
-                here={people}
-                panelRef={here.panel}
-              />
+              <Info place={place} talking={talking} room={room} people={people} panelRef={here.panel} />
             ))
           }
           infoFirst={thread !== undefined}

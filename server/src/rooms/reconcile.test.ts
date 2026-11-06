@@ -381,4 +381,19 @@ describe("the reconciler's pass", () => {
     await reconciler.pass();
     expect(sent).toEqual(["SAMODE #b +M", "SAMODE #b +M"]);
   });
+
+  it("hands each room's people, as Ergo read them, to whoever counts who is here (7h), a room Ergo left unanswered none", async () => {
+    const seen: [string, string[]][] = [];
+    const reconciler = makeReconciler({
+      rooms: () => ["#earth", "#quiet"],
+      desired: () => OPEN,
+      state: (room) =>
+        Promise.resolve(room === "#quiet" ? undefined : state({ present: [BOT, { nick: "ada", powers: "+" }] })),
+      send: () => true,
+      log: quiet,
+      seen: (room, present) => seen.push([room, [...present]]),
+    });
+    await reconciler.pass();
+    expect(seen).toEqual([["#earth", ["gnoworld", "ada"]]]);
+  });
 });

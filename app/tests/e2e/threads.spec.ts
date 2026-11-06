@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
-import { lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
+import { buttonsOf, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened, scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
@@ -314,7 +314,7 @@ test.describe("threads", () => {
     }
     await expect(panel(page).getByRole("toolbar")).toHaveCount(0);
     await expect(chipOf(panel(page))).toHaveCount(0);
-    await expect(inThread(page).getByRole("button")).toHaveCount(0);
+    await expect(buttonsOf(inThread(page))).toHaveCount(0);
   });
 
   // G2: the panel's rows are no stop of the room's list, so a link in one is a Tab stop of its own, after Close.

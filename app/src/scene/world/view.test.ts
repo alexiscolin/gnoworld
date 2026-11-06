@@ -1,0 +1,901 @@
+import { readsMinorMap, statusOrbit, worldLook } from "@gnoworld/core";
+import {
+  BufferGeometry,
+  Color,
+  PerspectiveCamera,
+  Scene as Stage,
+  ShaderMaterial,
+  SRGBColorSpace,
+  Texture,
+  Vector3,
+  Vector4,
+  type Mesh,
+  type Object3D,
+} from "three";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Circle } from "../earth/device.ts";
+import { createWorld, worldOf } from "../planet/generated.ts";
+import type { WorldReading } from "./reading.ts";
+import { CLOSE_WIDTH } from "./standing.ts";
+import { WorldView, type MoonMark, type WorldPlace } from "./view.ts";
+
+const maps = vi.hoisted(() => ({ load: vi.fn(), made: [] as unknown[] }));
+vi.mock("../planet/maps.ts", async (original) => ({
+  ...(await original<typeof import("../planet/maps.ts")>()),
+  loadMap: maps.load,
+}));
+
+// A world's page in space (frames 20 to 35, 90 to 107, 115 to 125): its planet stands in the circle the page keeps, as the Earth's does, with
+// its signs drawn by one overlay, the tilted status ring for what its realm reports, its rooms as moons clear of the plate, and real shadows:
+// the moons' and the ring's moon's fall on the world. The one world seen close is the only one that casts them.
+const WIDTH = 1728;
+const HEIGHT = 1080;
+// The plate's box reaches under the world's left side, as the page's does: a moon passing there goes.
+const PLATE = { left: 24, top: 98, right: 900, bottom: 1056, fill: [24, 31, 50] as const };
+const PLACE: Circle = { x: 960, y: 561, radius: 300, plate: PLATE };
+const ID = "gov/dao";
+// What the page asks for world `id`: its circle, and what keeps this reader's visit.
+const askFor = (id = ID, remember: () => void = () => undefined): WorldPlace => ({ circle: PLACE, id, remember });
+
+// `arrival` is what a flight writes as it brings the world (7g): none, as on a page loaded by itself, is a world at rest.
+interface Arrival {
+  approach: number;
+  aside: number;
+}
+
+function device({ halved = false, arrival }: { halved?: boolean; arrival?: Arrival } = {}) {
+  const stage = new Stage();
+  const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
+  const moved = vi.fn();
+  const renderer = {
+    capabilities: { getMaxAnisotropy: () => 16 },
+    initTexture: vi.fn(),
+    compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
+  };
+  const view = new WorldView({
+    renderer,
+    stage,
+    camera,
+    halved: () => halved,
+    base: "/",
+    moved,
+    stood: vi.fn(),
+    ...(arrival === undefined ? {} : { arrival }),
+  });
+  return { stage, camera, moved, renderer, view };
+}
+
+const settled = async () => {
+  for (let task = 0; task < 12; task += 1) await new Promise((done) => setTimeout(done));
+};
+
+const reading = (more: Partial<WorldReading> = {}): WorldReading => ({
+  look: worldLook(ID),
+  signs: {
+    stage: "rest",
+    size: 1,
+    signal: 0,
+    lights: { extent: 0, level: 0.35, kind: "towns", grain: 1, fine: 1, offset: [0, 0, 0], turn: 0 },
+  },
+  vitality: 0,
+  heat: 0,
+  aurora: 0,
+  storms: [0, 0, 0],
+  wake: false,
+  // A seed wakes only on this reader's first visit (isFresh): a reading that wakes one is a first visit, unless a test says otherwise.
+  first: more.wake === true,
+  ...more,
+});
+
+async function opened({ halved = false, id = ID, arrival }: { halved?: boolean; id?: string; arrival?: Arrival } = {}) {
+  const made = device({ halved, ...(arrival === undefined ? {} : { arrival }) });
+  const said: string[] = [];
+  const colours: string[] = [];
+  const remember = vi.fn();
+  made.view.resize(WIDTH, HEIGHT, 1);
+  made.view.show(askFor(id, remember), (state, colour) => {
+    said.push(state);
+    if (colour !== undefined) colours.push(colour);
+  });
+  made.view.read(reading({ look: worldLook(id) }));
+  await settled();
+  made.view.tick(0);
+  return { ...made, said, colours, remember };
+}
+
+const mark = (room: string, size = 0.5) => {
+  const spots: { x: number; y: number; shown: boolean }[] = [];
+  const moon: MoonMark = {
+    room,
+    size,
+    place: (x, y, shown) => {
+      spots.push({ x, y, shown });
+    },
+  };
+  return { moon, spots };
+};
+
+const materials = (stage: Stage) => {
+  const found: ShaderMaterial[] = [];
+  stage.traverse((part) => {
+    const material = (part as Partial<Mesh>).material;
+    if (material instanceof ShaderMaterial) found.push(material);
+  });
+  return found;
+};
+const overlayOf = (stage: Stage) => materials(stage).find((material) => "occluders" in material.uniforms);
+const value = (material: ShaderMaterial | undefined, name: string) => material?.uniforms[name]?.value as unknown;
+
+beforeEach(() => {
+  maps.made.length = 0;
+  vi.stubGlobal("matchMedia", () => ({ matches: false }));
+  maps.load.mockImplementation(() => {
+    const texture = new Texture({ width: 4, height: 2, close: vi.fn() });
+    maps.made.push(texture);
+    return Promise.resolve(texture);
+  });
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
+  maps.load.mockReset();
+});
+
+describe("the world in its circle", () => {
+  it("loads the world's maps at the close view's width, and says it is drawn with its colour", async () => {
+    const { said, colours } = await opened();
+    expect(said).toEqual(["loading", "drawn"]);
+    const { look, recipe } = worldOf(ID);
+    // The minor's map is loaded where the world's program reads it (F4586): GovDAO, a cloud deck by hand, does not.
+    for (const name of [look.map, ...(readsMinorMap(recipe) ? [recipe.minorMap] : [])])
+      expect(
+        maps.load.mock.calls.some(
+          ([url, how]) =>
+            (url as string).endsWith(`/${name}.webp`) && (how as { width?: number }).width === CLOSE_WIDTH,
+        ),
+        name,
+      ).toBe(true);
+    const [low, mid] = worldLook(ID).ramp;
+    expect(low).toBeDefined();
+    // The palette's hue, lit and coloured enough to tint a plate (the design review's second finding changed this test).
+    const hsl = (hex: string) => new Color(hex).getHSL({ h: 0, s: 0, l: 0 }, SRGBColorSpace);
+    const ramp = new Color().setRGB(...mid, SRGBColorSpace).getHSL({ h: 0, s: 0, l: 0 }, SRGBColorSpace);
+    const [colour = ""] = colours;
+    expect(colours).toHaveLength(1);
+    expect(hsl(colour).h).toBeCloseTo(ramp.h, 1);
+    expect(hsl(colour).l).toBeGreaterThanOrEqual(0.59);
+    expect(hsl(colour).s).toBeGreaterThanOrEqual(0.34);
+  });
+
+  it("halves the maps where memory is short, and casts no shadow there", async () => {
+    const { view } = await opened({ halved: true });
+    expect(maps.load.mock.calls.map(([, how]) => (how as { width?: number }).width)).toContain(CLOSE_WIDTH / 2);
+    view.ring(statusOrbit({ lit: 0.4, mark: 0.5 }));
+    view.moons([mark("#a", 1).moon]);
+    await settled();
+    view.tick(1);
+    expect(view.stats().shadows).toBe(0);
+  });
+
+  it("stands the world's centre on the circle the page keeps, within it", async () => {
+    const { view } = await opened();
+    const { centre } = view.stats();
+    expect(centre.x).toBeCloseTo(PLACE.x, 0);
+    expect(centre.y).toBeCloseTo(PLACE.y, 0);
+    // With no count in its universe, the middle of frame 22's GovDAO and frame 104's Bubble, which fills the circle (F4307 changed this test:
+    // it asked 0.7 to 1 of the circle).
+    expect(centre.radius / PLACE.radius).toBeCloseTo((1 + 172 / 336) / 2, 1);
+  });
+
+  it("fills the circle for its universe's busiest and stands the quietest at frame 22's share (F4307)", async () => {
+    const { view } = await opened();
+    view.read(reading({ used: 1 }));
+    view.tick(1);
+    expect(view.stats().centre.radius / PLACE.radius).toBeCloseTo(1, 1);
+    view.read(reading({ used: 0 }));
+    view.tick(2);
+    expect(view.stats().centre.radius / PLACE.radius).toBeCloseTo(172 / 336, 1);
+  });
+
+  it("keeps the world on its circle as the eye turns about, its light turning with it", async () => {
+    const { view, camera } = await opened();
+    const before = view.stats();
+    camera.rotation.set(0.12, -0.26, 0);
+    camera.updateMatrixWorld();
+    view.tick(5);
+    const { centre, sun } = view.stats();
+    expect(centre.x).toBeCloseTo(PLACE.x, 0);
+    expect(centre.y).toBeCloseTo(PLACE.y, 0);
+    const seen = new Vector3(sun.x, sun.y, sun.z).applyQuaternion(camera.quaternion.clone().invert());
+    expect(seen.distanceTo(new Vector3(before.sun.x, before.sun.y, before.sun.z))).toBeLessThan(1e-6);
+  });
+
+  it("draws the look the cosmos draws for the same id: its palette on its surface", async () => {
+    for (const id of [ID, "gnoland/blog"]) {
+      const { stage } = await opened({ id });
+      const [, mid] = worldOf(id).recipe.palette.linear;
+      const surface = materials(stage).find((material) => "minorMid" in material.uniforms);
+      expect((value(surface, "mid") as Color).getHexString()).toBe(new Color().setRGB(...mid).getHexString());
+    }
+  });
+
+  it("says it failed, and tints nothing, when a map does not come", async () => {
+    maps.load.mockImplementation(() => Promise.reject(new Error("404")));
+    const { said, colours } = await opened();
+    expect(said).toEqual(["loading", "failed"]);
+    expect(colours).toEqual([]);
+  });
+
+  it("says it failed when only the moons' small maps do not come (A2a-1)", async () => {
+    maps.load.mockImplementation((_url: string, how: { width?: number }) =>
+      how.width === 512
+        ? Promise.reject(new Error("404"))
+        : Promise.resolve(new Texture({ width: 4, height: 2, close: vi.fn() })),
+    );
+    const { said } = await opened();
+    expect(said).toEqual(["loading", "failed"]);
+  });
+
+  it("asks for a world that failed no more maps when the page places it again (A2a-2)", async () => {
+    maps.load.mockImplementation(() => Promise.reject(new Error("404")));
+    const { view } = await opened();
+    const asked = maps.load.mock.calls.length;
+    for (let again = 0; again < 5; again += 1) view.show(askFor(), () => undefined);
+    await settled();
+    expect(maps.load.mock.calls.length).toBe(asked);
+  });
+
+  it("compiles a seed's glow with the world: nothing is made on the wake's first frame (A2a-3)", async () => {
+    const { view, stage } = await opened();
+    const before = materials(stage).length;
+    view.read(
+      reading({
+        wake: true,
+        signs: { ...reading().signs, stage: "seed", size: 0.3, signal: 0.8 },
+        woken: reading().signs,
+      }),
+    );
+    view.tick(1);
+    expect(materials(stage).length).toBe(before);
+  });
+
+  it("never stands a world the page left while it compiled, and takes its lens shift back (A2a-4)", async () => {
+    const made = device();
+    let compiled: () => void = () => undefined;
+    made.renderer.compileAsync.mockImplementationOnce(
+      (scene: Object3D) =>
+        new Promise<Object3D>((done) => {
+          compiled = () => {
+            done(scene);
+          };
+        }),
+    );
+    made.view.resize(WIDTH, HEIGHT, 1);
+    made.view.show(askFor(), () => undefined);
+    await settled();
+    made.view.show(askFor("gnoland/blog"), () => undefined);
+    await settled();
+    compiled();
+    await settled();
+    expect(made.view.stats().anchor).toBe(worldLook("gnoland/blog").anchor);
+    expect(made.stage.children.filter((child) => child.children.length > 0)).toHaveLength(1);
+    made.view.show(undefined, () => undefined);
+    expect(made.camera.view?.enabled === true).toBe(false);
+  });
+
+  it("keeps the wake that ran when a lost context comes back: the world does not wake twice (A2a-6)", async () => {
+    const { view } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    for (let second = 0; second < 6; second += 0.5) view.tick(second);
+    const woken = view.stats().size;
+    view.restored();
+    await settled();
+    view.tick(7);
+    expect(view.stats().wake).toBe(0);
+    expect(view.stats().size).toBeCloseTo(woken, 6);
+  });
+
+  it("stands another world in place of the first when the page names another, and never the first late", async () => {
+    let arrive: (texture: Texture) => void = () => undefined;
+    maps.load.mockImplementationOnce(
+      () =>
+        new Promise<Texture>((done) => {
+          arrive = done;
+        }),
+    );
+    const { view } = device();
+    view.resize(WIDTH, HEIGHT, 1);
+    view.show(askFor(), () => undefined);
+    view.show(askFor("gnoland/blog"), () => undefined);
+    view.read(reading({ look: worldLook("gnoland/blog") }));
+    await settled();
+    arrive(new Texture({ width: 4, height: 2, close: vi.fn() }));
+    await settled();
+    view.tick(1);
+    expect(view.stats().anchor).toBe(worldLook("gnoland/blog").anchor);
+  });
+
+  it("takes the world away with the page, and frees every material, shape and map it made", async () => {
+    const { view, stage, said } = await opened();
+    view.moons([mark("#a", 1).moon]);
+    await settled();
+    view.ring(statusOrbit({ lit: 0.5, mark: 0.6 }));
+    view.tick(1);
+    const drawn = materials(stage).length;
+    const shapes = new Set<BufferGeometry>();
+    stage.traverse((part) => {
+      const geometry = (part as Partial<Mesh>).geometry;
+      if (geometry instanceof BufferGeometry) shapes.add(geometry);
+    });
+    const freedMaterials = vi.spyOn(ShaderMaterial.prototype, "dispose");
+    const freedShapes = vi.spyOn(BufferGeometry.prototype, "dispose");
+    const freedMaps = vi.spyOn(Texture.prototype, "dispose");
+    view.show(undefined, (state) => said.push(state));
+    await settled();
+    expect(said.at(-1)).toBe("gone");
+    expect(materials(stage)).toEqual([]);
+    expect(freedMaterials.mock.calls.length).toBeGreaterThanOrEqual(drawn);
+    expect(freedShapes.mock.calls.length).toBeGreaterThanOrEqual(shapes.size);
+    expect(freedMaps.mock.calls.length).toBeGreaterThanOrEqual(maps.made.length);
+  });
+});
+
+describe("each sign on its data", () => {
+  it("shows no status ring when the realm reports no tally", async () => {
+    const { view } = await opened();
+    view.ring(undefined);
+    view.tick(1);
+    expect(view.stats().ring).toBeUndefined();
+  });
+
+  it("draws an open proposal's no from the ring's right end and no threshold's mark where the realm states none (F4308)", async () => {
+    const { view, stage } = await opened();
+    view.ring(statusOrbit({ lit: 0.4, against: 0.3 }));
+    view.tick(1);
+    const tube = materials(stage).find((material) => "litTo" in material.uniforms);
+    expect(value(tube, "against")).toBeCloseTo(Math.PI * 0.3, 12);
+    expect(value(tube, "mark") as number).toBeLessThan(0);
+    expect(view.stats().ring?.mark).toBeUndefined();
+    expect(view.stats().ring?.against).toBeCloseTo(Math.PI * 0.3, 12);
+  });
+
+  it("stands the ring's moon on the front half, at the share its realm reports", async () => {
+    const { view, stage } = await opened();
+    const orbit = statusOrbit({ lit: 0.33, mark: 0.6666 });
+    view.ring(orbit);
+    view.tick(1);
+    const ring = view.stats().ring;
+    expect(ring?.moon).toBeCloseTo(orbit.moon, 12);
+    expect(ring?.front).toBe(true);
+    const tube = materials(stage).find((material) => "litTo" in material.uniforms);
+    expect(value(tube, "litTo")).toBeCloseTo(orbit.moon, 12);
+    expect(value(tube, "mark")).toBeCloseTo(orbit.mark ?? Number.NaN, 12);
+    expect(tube?.fragmentShader).toMatch(/litTo/);
+    expect(tube?.fragmentShader).toMatch(/mark/);
+  });
+
+  it("draws no aurora, storm nor heat for a world that has none, and each for its own data", async () => {
+    const { view, stage } = await opened();
+    const overlay = overlayOf(stage);
+    expect(value(overlay, "aurora")).toBe(0);
+    expect(value(overlay, "storms")).toEqual(new Vector3(0, 0, 0));
+    expect(value(overlay, "heat")).toBe(0);
+    view.read(reading({ aurora: 0.6, storms: [0.8, 0.3, 0], heat: 0.4 }));
+    view.tick(2);
+    expect(value(overlay, "aurora")).toBe(0.6);
+    expect(value(overlay, "storms")).toEqual(new Vector3(0.8, 0.3, 0));
+    expect(value(overlay, "heat")).toBe(0.4);
+    for (const name of ["aurora", "storms", "heat", "occluders"])
+      expect(overlay?.fragmentShader.split(name).length ?? 0, name).toBeGreaterThan(2);
+  });
+
+  it("orbits one moon a room it is given, each placed on the page", async () => {
+    const { view } = await opened();
+    view.moons([]);
+    view.tick(1);
+    expect(view.stats().moons).toEqual([]);
+    const marks = [mark("#govdao", 1), mark("#builders", 0.4)];
+    view.moons(marks.map(({ moon }) => moon));
+    await settled();
+    view.tick(2);
+    expect(view.stats().moons.map(({ room }) => room)).toEqual(["#govdao", "#builders"]);
+    expect(marks.every(({ spots }) => spots.length > 0)).toBe(true);
+  });
+
+  it("shows a moon beside the world and hides it where its orbit reaches the plate", async () => {
+    const { view } = await opened();
+    const marks = Array.from({ length: 4 }, (_, at) => mark(`#r${String(at)}`, 1));
+    view.moons(marks.map(({ moon }) => moon));
+    await settled();
+    let shown = 0;
+    let hidden = 0;
+    for (let second = 0; second < 600; second += 2) {
+      view.tick(second);
+      for (const { x, shown: visible } of view.stats().moons) {
+        if (visible) expect(x).toBeGreaterThan(PLATE.right + 8);
+        if (visible) shown += 1;
+        else if (x <= PLATE.right + 8) hidden += 1;
+      }
+    }
+    expect(shown).toBeGreaterThan(0);
+    expect(hidden).toBeGreaterThan(0);
+  });
+
+  it("holds the moons still under reduced motion", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view } = await opened();
+    view.moons([mark("#a", 1).moon]);
+    await settled();
+    view.tick(1);
+    const first = view.stats().moons[0];
+    view.tick(40);
+    expect(view.stats().moons[0]).toEqual(first);
+  });
+
+  it("wakes a seed on this reader's first visit: it grows to a world's size in one step, carried by the wake", async () => {
+    const { view } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(0);
+    const before = view.stats();
+    expect(before.wake).toBeGreaterThan(0);
+    for (let second = 0; second < 6; second += 0.5) view.tick(second);
+    const after = view.stats();
+    expect(after.size).toBeGreaterThan(before.size * 2.5);
+    expect(after.wake).toBe(0);
+  });
+
+  it("wakes it at once with no wave under reduced motion", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(0);
+    expect(view.stats().wake).toBe(0);
+    expect(view.stats().size).toBeCloseTo((await opened()).view.stats().size, 6);
+  });
+});
+
+// The first visit's appearance (Alexis, 2026-11-03; frames 20, 21 and 102 to 105, one a second): once the world rests, a band of light
+// runs down it from its north pole and draws a grid behind it; the grid then fades. Frame 102 has landed and shows none, 103 the band just
+// under the equator, 104 the whole grid, 105 nothing. A seed's wake is the same appearance, from the same frame.
+const appearance = (view: WorldView) => view.stats().appearance;
+
+describe("its appearance on this reader's first visit", () => {
+  it("runs a band of light down from its north pole, the grid drawn behind it, then fades the grid (frames 102 to 105)", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(10);
+    expect(appearance(view).band, "frame 102: above the north pole, nothing on the world yet").toBeGreaterThanOrEqual(
+      1,
+    );
+    expect(appearance(view).grid).toBe(1);
+    view.tick(10.8);
+    expect(Math.abs(appearance(view).band), "frame 103: about the equator").toBeLessThan(0.3);
+    view.tick(11.8);
+    expect(appearance(view).band, "frame 104: gone under the south pole").toBeLessThanOrEqual(-1.3);
+    expect(appearance(view).grid, "frame 104: the grid whole and strong").toBeGreaterThan(0.7);
+    view.tick(12.1);
+    expect(appearance(view).grid, "fading").toBeGreaterThan(0);
+    expect(appearance(view).grid).toBeLessThan(0.7);
+    view.tick(12.8);
+    expect(appearance(view).grid, "frame 105: gone").toBe(0);
+    expect(Math.abs(appearance(view).band), "and its band off the world").toBeGreaterThanOrEqual(1.3);
+  });
+
+  it("tells the world's overlay where the band stands and how much grid shows: drawn in its draw, nothing made", async () => {
+    const { view, stage } = await opened();
+    const before = materials(stage).length;
+    view.read(reading({ first: true }));
+    view.tick(3);
+    view.tick(3.9);
+    const overlay = overlayOf(stage);
+    expect(value(overlay, "band")).toBeCloseTo(appearance(view).band, 6);
+    expect(value(overlay, "grid")).toBeCloseTo(appearance(view).grid, 6);
+    expect(appearance(view).grid).toBeGreaterThan(0);
+    expect(materials(stage).length).toBe(before);
+    view.tick(9);
+    expect(value(overlay, "grid")).toBe(0);
+    expect(Math.abs(value(overlay, "band") as number)).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it("plays none on a return: no grid, and no band on the world", async () => {
+    const { view, stage } = await opened();
+    view.read(reading({ first: false }));
+    for (let second = 0; second < 4; second += 0.25) {
+      view.tick(second);
+      expect(appearance(view).grid).toBe(0);
+      expect(Math.abs(appearance(view).band)).toBeGreaterThanOrEqual(1.3);
+    }
+    expect(value(overlayOf(stage), "grid")).toBe(0);
+    expect(Math.abs(value(overlayOf(stage), "band") as number)).toBeGreaterThanOrEqual(1.3);
+  });
+
+  it("plays once a visit: the readings that follow each second, and the page asking again, neither restart nor replay it", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(10);
+    view.tick(10.8);
+    view.read(reading({ first: true, heat: 0.2 }));
+    view.show(askFor(), () => undefined);
+    view.tick(10.9);
+    expect(Math.abs(appearance(view).band), "carried on, not back at the pole").toBeLessThan(0.3);
+    view.tick(13);
+    view.read(reading({ first: true, heat: 0.4 }));
+    view.tick(13.5);
+    view.tick(14);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  it("holds the grid while a flight brings the world, even at the last of its approach", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    view.tick(1);
+    Object.assign(arrival, { approach: 1.05, aside: 0.001 });
+    view.tick(2);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  it("starts the band on the frame the world rests (frames 101 and 102)", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    view.tick(1);
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(3);
+    expect(appearance(view).grid).toBe(1);
+    expect(appearance(view).band).toBeGreaterThanOrEqual(1);
+    view.tick(3.8);
+    expect(Math.abs(appearance(view).band)).toBeLessThan(0.3);
+  });
+
+  it("holds a seed's wake while a flight brings it, and wakes it once it rests", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view } = await opened({ arrival });
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(1);
+    view.tick(2);
+    expect(view.stats().wake).toBe(0);
+    const held = view.stats().size;
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(3);
+    view.tick(3.8);
+    expect(view.stats().wake).toBeGreaterThan(0);
+    expect(view.stats().size).toBeGreaterThan(held);
+  });
+
+  it("is one appearance with a seed's wake: the seed grows, its wave runs and its grid draws from the same frame", async () => {
+    const { view } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(5);
+    expect(view.stats().wake).toBe(1);
+    expect(appearance(view).band).toBeGreaterThanOrEqual(1);
+    view.tick(5.8);
+    expect(view.stats().wake).toBeLessThan(1);
+    expect(Math.abs(appearance(view).band)).toBeLessThan(0.3);
+  });
+
+  it("stands a still grid under reduced motion, shown then faded, with no band and no turn", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view, stage } = await opened();
+    view.read(reading({ first: true }));
+    for (const second of [0, 0.8, 1.5]) {
+      view.tick(second);
+      expect(appearance(view).band, "no band on the world").toBeLessThanOrEqual(-1.3);
+      expect(appearance(view).grid).toBe(1);
+    }
+    expect(value(overlayOf(stage), "time"), "the grid does not turn").toBe(0);
+    view.tick(2);
+    expect(appearance(view).grid).toBeGreaterThan(0);
+    expect(appearance(view).grid).toBeLessThan(1);
+    view.tick(2.8);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  // Under reduced motion the scene draws only the frames it owes (frameRate): a grid shown and never owed its fade would stay for good.
+  it("owes a frame while it plays, under reduced motion too, and none once it is over", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view, moved } = await opened();
+    view.read(reading({ first: true }));
+    moved.mockClear();
+    view.tick(0);
+    view.tick(2);
+    expect(moved).toHaveBeenCalledTimes(2);
+    view.tick(2.6);
+    moved.mockClear();
+    view.tick(2.7);
+    expect(moved).not.toHaveBeenCalled();
+  });
+
+  // ADR-0002 §9: scenery that moves runs at the loop's own 30 fps; owing frames would hold it at 60 (7w's review, F4531).
+  it("owes no frame with motion on: the loop draws the scenery's frames already", async () => {
+    const { view, moved } = await opened();
+    view.read(reading({ first: true }));
+    moved.mockClear();
+    for (const second of [0, 0.5, 1, 2]) view.tick(second);
+    expect(moved).not.toHaveBeenCalled();
+  });
+
+  // fwidth counts the buffer's pixels: at a ratio of 2 a line of 1.5 of them is 0.75 of the page's (7w's review, F4532).
+  it("tells the overlay the buffer's pixels to one of the page's, so its lines keep frame 104's width at any ratio", async () => {
+    const { view, stage } = await opened();
+    expect(value(overlayOf(stage), "ratio")).toBe(1);
+    view.resize(WIDTH, HEIGHT, 2);
+    expect(value(overlayOf(stage), "ratio")).toBe(2);
+  });
+
+  it("keeps the appearance that ran when a lost context comes back: it carries on, never starts again", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    view.tick(0.4);
+    view.restored();
+    await settled();
+    view.tick(0.8);
+    expect(Math.abs(appearance(view).band), "carried on, not back at the pole").toBeLessThan(0.3);
+    view.tick(3);
+    view.restored();
+    await settled();
+    view.tick(3.5);
+    expect(appearance(view).grid).toBe(0);
+  });
+
+  it("starts again for another world the page names: each world's first visit is its own", async () => {
+    const { view } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    view.tick(3);
+    view.show(askFor("gnoland/blog"), () => undefined);
+    view.read(reading({ first: true, look: worldLook("gnoland/blog") }));
+    await settled();
+    view.tick(4);
+    expect(appearance(view).grid).toBe(1);
+    expect(appearance(view).band).toBeGreaterThanOrEqual(1);
+  });
+});
+
+// Alexis, 2026-11-04 (F4533): the visit is kept as the grid starts, no longer as the page's feed first reads the world, so a reader who backs
+// out of the flight, a world whose maps never come and a tab closed while they load all see the appearance next time.
+describe("this reader's visit, kept as its appearance starts", () => {
+  it("is kept once, on the frame the grid starts as the world rests, and never again that visit", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view, remember } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    view.tick(1);
+    view.show(askFor(ID, remember), () => undefined);
+    view.tick(1.5);
+    expect(remember).not.toHaveBeenCalled();
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(2);
+    expect(appearance(view).grid).toBe(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+    for (const second of [2.5, 3, 5]) view.tick(second);
+    view.read(reading({ first: true, heat: 0.2 }));
+    view.show(askFor(ID, remember), () => undefined);
+    view.tick(6);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it("is kept as a seed wakes, on the frame its growth starts", async () => {
+    const { view, remember } = await opened();
+    const seed = { ...reading().signs, stage: "seed" as const, size: 0.3, signal: 0.8 };
+    view.read(reading({ wake: true, signs: seed, woken: reading().signs }));
+    view.tick(5);
+    expect(view.stats().wake).toBe(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it("is kept as the still grid shows under reduced motion", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("reduce") }));
+    const { view, remember } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    expect(appearance(view).grid).toBe(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not kept on a return", async () => {
+    const { view, remember } = await opened();
+    view.read(reading({ first: false }));
+    for (const second of [0, 1, 2, 3]) view.tick(second);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it("is not kept for a flight backed out of: brought to the last of its approach, then the page left before it landed", async () => {
+    const arrival = { approach: 4, aside: 0.2 };
+    const { view, remember } = await opened({ arrival });
+    view.read(reading({ first: true }));
+    for (const [second, approach] of [
+      [1, 4],
+      [2, 1.5],
+      [3, 1.001],
+    ] as const) {
+      Object.assign(arrival, { approach });
+      view.tick(second);
+    }
+    view.show(undefined, () => undefined);
+    Object.assign(arrival, { approach: 1, aside: 0 });
+    view.tick(4);
+    expect(remember).not.toHaveBeenCalled();
+  });
+
+  it("is not kept for a world whose maps never come, nor for one whose maps fail", async () => {
+    maps.load.mockImplementation(() => new Promise<Texture>(() => undefined));
+    const hung = await opened();
+    hung.view.read(reading({ first: true }));
+    for (const second of [1, 2, 3]) hung.view.tick(second);
+    expect(hung.said).toEqual(["loading"]);
+    expect(hung.remember).not.toHaveBeenCalled();
+    maps.load.mockImplementation(() => Promise.reject(new Error("404")));
+    const lost = await opened();
+    lost.view.read(reading({ first: true }));
+    for (const second of [1, 2, 3]) lost.view.tick(second);
+    expect(lost.said).toEqual(["loading", "failed"]);
+    expect(lost.remember).not.toHaveBeenCalled();
+  });
+
+  it("is kept once across a lost context, and for each world the page names, its own", async () => {
+    const { view, remember } = await opened();
+    view.read(reading({ first: true }));
+    view.tick(0);
+    view.restored();
+    await settled();
+    view.tick(0.8);
+    expect(remember).toHaveBeenCalledTimes(1);
+    const blog = vi.fn();
+    view.show(askFor("gnoland/blog", blog), () => undefined);
+    view.read(reading({ first: true, look: worldLook("gnoland/blog") }));
+    await settled();
+    view.tick(4);
+    expect(blog).toHaveBeenCalledTimes(1);
+    expect(remember).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("its light (design review, 4 and 6)", () => {
+  it("gives the world a soft halo on its lit limb and its star's haze on the sun's side, behind it", async () => {
+    const { view, stage } = await opened();
+    view.tick(1);
+    const halo = materials(stage).find(
+      (material) => "litSide" in material.uniforms && "rimColour" in material.uniforms,
+    );
+    const haze = materials(stage).find(
+      (material) => "litSide" in material.uniforms && !("rimColour" in material.uniforms),
+    );
+    expect(halo).toBeDefined();
+    expect(haze).toBeDefined();
+    const side = value(haze, "litSide") as { x: number; y: number };
+    expect(Math.sign(side.x)).toBe(Math.sign(view.stats().sun.x));
+    let behind = Number.NaN;
+    stage.traverse((part) => {
+      if ((part as Partial<Mesh>).material === haze) behind = part.position.z;
+    });
+    expect(behind).toBeLessThan(0);
+  });
+});
+
+describe("real shadows on the one world seen close", () => {
+  it("casts each moon's and the ring moon's shadow on the world, from where they stand, and none with no moon", async () => {
+    const { view, stage } = await opened();
+    view.moons([]);
+    view.tick(1);
+    expect(view.stats().shadows).toBe(0);
+    expect(value(overlayOf(stage), "occluderCount")).toBe(0);
+    view.moons([mark("#a", 1).moon, mark("#b", 0.5).moon]);
+    view.ring(statusOrbit({ lit: 0.4, mark: 0.5 }));
+    await settled();
+    view.tick(2);
+    expect(view.stats().shadows).toBe(3);
+    const overlay = overlayOf(stage);
+    expect(value(overlay, "occluderCount")).toBe(3);
+    const occluders = value(overlay, "occluders") as Vector4[];
+    for (const { centre, radius } of view.stats().casters) {
+      const found = occluders.some(
+        (each) =>
+          each
+            .clone()
+            .sub(new Vector4(centre.x, centre.y, centre.z, radius))
+            .length() < 1e-6 && radius > 0,
+      );
+      expect(found).toBe(true);
+    }
+  });
+
+  it("lights the shadows from the world's one sun", async () => {
+    const { view, stage } = await opened();
+    view.moons([mark("#a", 1).moon]);
+    await settled();
+    view.tick(3);
+    const surface = materials(stage).find((material) => "minorMid" in material.uniforms);
+    expect((value(overlayOf(stage), "sun") as Vector3).toArray()).toEqual((value(surface, "sun") as Vector3).toArray());
+  });
+
+  it("is the close view's alone: a world drawn among the others carries no shadow", () => {
+    const planet = createWorld(
+      worldOf(ID),
+      { map: () => new Texture(), clouds: new Texture(), ring: new Texture() },
+      new BufferGeometry(),
+    );
+    const found: ShaderMaterial[] = [];
+    planet.group.traverse((part) => {
+      const material = (part as Partial<Mesh>).material;
+      if (material instanceof ShaderMaterial) found.push(material);
+    });
+    expect(found.some((material) => "occluders" in material.uniforms)).toBe(false);
+  });
+});
+
+describe("brought by a flight (7g)", () => {
+  it("stands farther along its own ray while a flight brings it, and in its circle once the flight has landed", async () => {
+    const stage = new Stage();
+    const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
+    const renderer = {
+      capabilities: { getMaxAnisotropy: () => 16 },
+      initTexture: vi.fn(),
+      compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
+    };
+    const arrival = { approach: 30 };
+    const view = new WorldView({
+      renderer,
+      stage,
+      camera,
+      halved: () => false,
+      base: "/",
+      moved: vi.fn(),
+      stood: vi.fn(),
+      arrival,
+    });
+    view.resize(WIDTH, HEIGHT, 1);
+    view.show(askFor(), () => undefined);
+    view.read(reading());
+    await settled();
+    view.tick(0);
+    const world = stage.children.find((child) => child.children.length > 0);
+    if (world === undefined) throw new Error("no world");
+    const far = world.position.clone();
+    arrival.approach = 1;
+    view.tick(0);
+    const near = world.position.clone();
+    expect(far.length()).toBeCloseTo(30 * near.length(), 6);
+    expect(far.length()).toBeLessThan(camera.far);
+    expect(far.clone().normalize().dot(near.clone().normalize())).toBeCloseTo(1, 9);
+  });
+
+  it("stands to the side of its place by a share of its distance while a flight brings it in from there", async () => {
+    const stage = new Stage();
+    const camera = new PerspectiveCamera(50, WIDTH / HEIGHT, 0.1, 2000);
+    const renderer = {
+      capabilities: { getMaxAnisotropy: () => 16 },
+      initTexture: vi.fn(),
+      compileAsync: vi.fn((scene: Object3D) => Promise.resolve(scene)),
+    };
+    const arrival = { approach: 1, aside: 0 };
+    const view = new WorldView({
+      renderer,
+      stage,
+      camera,
+      halved: () => false,
+      base: "/",
+      moved: vi.fn(),
+      stood: vi.fn(),
+      arrival,
+    });
+    view.resize(WIDTH, HEIGHT, 1);
+    view.show(askFor(), () => undefined);
+    view.read(reading());
+    await settled();
+    view.tick(0);
+    const world = stage.children.find((child) => child.children.length > 0);
+    if (world === undefined) throw new Error("no world");
+    const place = world.position.clone();
+    arrival.aside = -1.5;
+    view.tick(0);
+    expect(world.position.x).toBeCloseTo(place.x - 1.5 * place.length(), 6);
+    expect(world.position.y).toBeCloseTo(place.y, 6);
+    expect(world.position.z).toBeCloseTo(place.z, 6);
+  });
+});

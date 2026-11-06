@@ -32,7 +32,29 @@ BLOCK = "".join(f"  total += values[{i}] * {i + 1};\n" for i in range(14))
 # The network and the device's storage, which the app reaches only from lib and the worker (F378).
 # No state at a module's top in a workspace's source (F412): every test shares it, and StrykerJS ignores what builds it.
 MODULE = "no-restricted-syntax: A Map, WeakMap or Set at a module's top"
+# What runs on a frame makes nothing (ADR-0002 §9, backlog row 7): the collector's pause is a dropped frame.
+FRAME = "no-restricted-syntax: Nothing is made on a frame"
 REACHES = ["fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore"]
+
+# What the scene's loop reaches in core, planted in the two folders that hold it: every name of the rule, then each form.
+FRAME_NAMES = ["tick", "wake", "reschedule", "cancel", "readRate", "draw", "sample", "advance", "follow", "march", "visit", "cellIn", "write", "light", "unit", "moodAt", "lattice", "field", "side", "ringAt", "tintOf", "densityAt", "driftAt", "turnAt", "wrapTo", "nearestCell", "cellHash", "salted", "mix", "settle", "nextState", "unitOf", "clamp01", "lerp", "smoothstep", "smootherstep", "frameRate", "isDue", "carryOver", "frameWait", "judgeFrames"]
+FRAME_CORE = [
+    *[(f"name_{name}.ts", f"export function {name}(): number[] {{\n  return [1];\n}}\n", FRAME) for name in FRAME_NAMES],
+    ("frame_arrow.ts", "export const wrapTo = (): number[] => {\n  return [1];\n};\n", FRAME),
+    ("frame_closure.ts", "export function driftAt(): () => number {\n  return () => 1;\n}\n", FRAME),
+    ("frame_arrow_closure.ts", "export const wrapTo = (): (() => number) => () => 1;\n", FRAME),
+    ("frame_method.ts", "export class Torus {\n  follow(): number[] {\n    return [1];\n  }\n}\n", FRAME),
+    ("frame_property.ts", "export const cells = {\n  follow(): number[] {\n    return [1];\n  },\n};\n", FRAME),
+    # By whole names; an index walks an array, where for...of is refused; a test stays under the tests' list.
+    ("frame_longer.ts", "export function drawing(): number[] {\n  return [1];\n}\n", None),
+    ("frame_index.ts", "export function moodAt(list: number[]): number {\n  let sum = 0;\n  for (let at = 0; at < list.length; at += 1) sum += list[at] ?? 0;\n  return sum;\n}\n", None),
+    ("frame_off.test.ts", 'import { expect, test } from "vitest";\n\ntest.skip("x", () => {\n  expect(1).toBe(1);\n});\n', "no-restricted-syntax: A test is never switched off"),
+    ("frame_plain.ts", "export function moodAt(out: Float32Array): void {\n  out[0] = Math.sqrt(2);\n}\n", None),
+    ("frame_setup.ts", "export function newMood(): number[] {\n  return [0, 0];\n}\n", None),
+    # The block replaces core's list: what that list holds still holds here.
+    ("frame_module.ts", "export const SEEN = new Set<string>();\n", MODULE),
+    ("frame_clock.ts", "export function now(): Date {\n  return new Date();\n}\n", "no-restricted-syntax: core takes the time"),
+]
 
 # File name, content, and what ESLint must report: a rule, or "rule: the start of its message" when
 # one rule holds several guards (no-restricted-syntax's selectors); None: no report at all.
@@ -224,6 +246,12 @@ try:
     if part("lint"):
         # ESLint: one run over every planted file, then each file must carry its rule.
         lint_cases(LINT, HERE, "core")
+        shutil.rmtree(HERE)
+        for folder in ("space", "frame"):
+            lint_cases(FRAME_CORE, f"packages/core/src/{folder}/__probe__", f"core {folder}")
+            shutil.rmtree(f"packages/core/src/{folder}/__probe__")
+        # Elsewhere in core a `field` or a `sample` is nobody's frame.
+        lint_cases([("frame_elsewhere.ts", "export function field(): number[] {\n  return [1];\n}\n", None)], HERE, "core elsewhere")
         shutil.rmtree(HERE)
 
     if part("vitest"):
@@ -587,6 +615,7 @@ try:
         src = "app/src"
         uses = 'import {{ {name} }} from "{path}";\n\nexport const used: unknown = {name};\n'.format
         reach = "export function load(): unknown {{\n  return {};\n}}\n".format
+        onframe = "export class Loop {{\n  seen = 0;\n\n  draw(list: number[]): unknown {{\n    {}\n    return this.seen;\n  }}\n}}\n".format
         net = "The network and storage are lib's"
         app = [
             ("sw/__probe__/sw_clean.ts", uses(name="TAKE_OVER", path="../worker.ts"), None),
@@ -660,6 +689,69 @@ try:
             ("routes/__probe__/route_log.ts", 'export function load(): void {\n  console.log("loaded");\n}\n', "no-console"),
             ("routes/__probe__/route_scene.ts", uses(name="globe", path="../../scene/__probe__/globe.ts"), "import-x/no-restricted-paths"),
             ("scene/__probe__/globe.ts", "export const globe = 1;\n", None),
+            # The scene: core, the store and three; never React, the design system, a feature or a route (docs/ARCHITECTURE.md).
+            ("scene/__probe__/scene_three.ts", uses(name="Color", path="three"), None),
+            ("scene/__probe__/scene_core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("scene/__probe__/scene_store.ts", uses(name="globe", path="../../store/__probe__/store_clean.ts"), None),
+            ("scene/__probe__/scene_react.ts", uses(name="useState", path="react"), "no-restricted-imports"),
+            ("scene/__probe__/scene_react_dom.ts", uses(name="flushSync", path="react-dom"), "no-restricted-imports"),
+            ("scene/__probe__/scene_router.ts", uses(name="Link", path="react-router"), "no-restricted-imports"),
+            ("scene/__probe__/scene_zustand_react.ts", uses(name="useStore", path="zustand/react"), "no-restricted-imports"),
+            ("scene/__probe__/scene_zustand.ts", uses(name="create", path="zustand"), "no-restricted-imports"),
+            ("scene/__probe__/scene_lib.ts", uses(name="savesData", path="../../lib/saveData.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/scene_fetch.ts", reach('fetch("/x")'), f"no-restricted-globals: Unexpected use of 'fetch'. {net}"),
+            ("scene/__probe__/scene_storage.ts", reach("localStorage"), f"no-restricted-globals: Unexpected use of 'localStorage'. {net}"),
+            ("scene/__probe__/scene_ui.ts", uses(name="Button", path="@gnoworld/ui"), "no-restricted-imports"),
+            ("scene/__probe__/scene_reaches_ui.ts", uses(name="Button", path="../../../../packages/ui/src/index.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/scene_feature.ts", uses(name="UpdatePrompt", path="../../features/update/index.ts"), "import-x/no-restricted-paths"),
+            ("scene/__probe__/scene_route.ts", uses(name="globe", path="../../routes/__probe__/route_clean.ts"), "import-x/no-restricted-paths"),
+            # What runs on a frame makes nothing: a method, a private one, a field's arrow; each way of making, each alone.
+            *[(f"scene/__probe__/frame_{name}.ts", onframe(body), FRAME) for name, body in (
+                ("new", "return new Date();"),
+                ("array", "return [list];"),
+                ("object", "return { list };"),
+                ("template", "return `${list.length.toString()}`;"),
+                ("spread", "return Math.max(...list);"),
+                ("closure", "return () => list;"),
+                ("function", "return function kept() {\n      return list;\n    };"),
+                ("class", "return class {};"),
+                ("map", "return list.map(String);"),
+                ("filter", "return list.filter(Boolean);"),
+                ("slice", "return list.slice(1);"),
+                ("concat", "return list.concat(list);"),
+                ("flatMap", "return list.flatMap(String);"),
+                ("reduce", "return list.reduce(Math.max);"),
+                ("forEach", "list.forEach(String);"),
+                ("sort", "return list.sort();"),
+                ("toSorted", "return list.toSorted();"),
+                ("join", "return list.join();"),
+                ("split", "return String(list).split(String());"),
+                ("bind", "return String.bind(list);"),
+                ("clone", "return (list as unknown as { clone(): unknown }).clone();"),
+                ("from", "return Array.from(list);"),
+                ("assign", "return Object.assign(list);"),
+                ("keys", "return Object.keys(list);"),
+                ("values", "return Object.values(list);"),
+                ("entries", "return Object.entries(list);"),
+                ("stringify", "return JSON.stringify(list);"),
+                ("for_of", "for (const each of list) this.seen = each;"),
+                ("destructured", "const [first] = list;\n    return first;"),
+            )],
+            ("scene/__probe__/frame_rest.ts", "export class Loop {\n  draw(...list: number[]): number {\n    return list.length;\n  }\n}\n", FRAME),
+            ("scene/__probe__/frame_private.ts", "export class Loop {\n  #kept = 0;\n\n  #tick(): number[] {\n    this.#kept += 1;\n    return [this.#kept];\n  }\n\n  run(): number[] {\n    return this.#tick();\n  }\n}\n", FRAME),
+            ("scene/__probe__/frame_field.ts", "export class Loop {\n  readonly #draw = (): number[] => {\n    return [1];\n  };\n\n  run(): number[] {\n    return this.#draw();\n  }\n}\n", FRAME),
+            ("scene/__probe__/frame_field_closure.ts", "export class Loop {\n  readonly #draw = () => () => 1;\n\n  run(): () => number {\n    return this.#draw();\n  }\n}\n", FRAME),
+            ("scene/__probe__/frame_plain.ts", onframe("this.seen = list.length * 2;"), None),
+            ("scene/__probe__/frame_index.ts", onframe("for (let at = 0; at < list.length; at += 1) this.seen += list[at] ?? 0;"), None),
+            ("scene/__probe__/frame_longer.ts", "export class Loop {\n  drawing(): number[] {\n    return [1];\n  }\n}\n", None),
+            ("scene/__probe__/frame_setup.ts", "export class Loop {\n  readonly kept = [1];\n\n  build(): number[] {\n    return [...this.kept];\n  }\n}\n", None),
+            ("scene/__probe__/frame_tested.test.ts", 'import { expect, test } from "vitest";\n\nconst draw = () => [1];\n\ntest("x", () => {\n  expect(draw()).toEqual([1]);\n});\n', None),
+            # A page's own `draw` is no frame of the scene.
+            ("features/__probe__/frame_elsewhere.ts", onframe("this.seen = [list].length;"), None),
+            # The block replaces the root's list: what that holds still holds in the scene.
+            ("scene/__probe__/scene_log_catch.ts", dict((n, c) for n, c, _ in LINT)["log_catch.ts"], "no-restricted-syntax: A catch that only logs"),
+            ("scene/__probe__/scene_class_at_end.ts", dict((n, c) for n, c, _ in LINT)["class_at_end.ts"], "no-restricted-syntax: A character class right before"),
+            *[(f"scene/__probe__/frame_is_{name}.ts", f"export class Part {{\n  {name}(): number[] {{\n    return [1];\n  }}\n}}\n", FRAME) for name in FRAME_NAMES],
         ]
         lint_cases(app, src, "app folders")
         os.remove(f"{src}/probe_root_fetch.ts")
@@ -1183,6 +1275,8 @@ finally:
     shutil.rmtree(AVATAR, ignore_errors=True)
     shutil.rmtree(FIELD, ignore_errors=True)
     shutil.rmtree(APP, ignore_errors=True)
+    shutil.rmtree("packages/core/src/space/__probe__", ignore_errors=True)
+    shutil.rmtree("packages/core/src/frame/__probe__", ignore_errors=True)
     shutil.rmtree("jarvis/src/__probe__", ignore_errors=True)
     shutil.rmtree("packages/service/src/__probe__", ignore_errors=True)
     shutil.rmtree("packages/chain/src/__probe__", ignore_errors=True)

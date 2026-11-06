@@ -2,8 +2,9 @@
 // is; a link made of it; a quote's or a list's start on the line, taken off, or one list's turned to the other's. A
 // mark goes round whole words, the selection's spaces outside: Markdown reads a mark at a word's bounds alone.
 import { inWord } from "@gnoworld/core";
+import { isEscaped, readsOneMore, underlined } from "./underline.ts";
 
-export type Format = "bold" | "italic" | "strike" | "code" | "link" | "quote" | "bulleted" | "numbered";
+export type Format = "bold" | "italic" | "underline" | "strike" | "code" | "link" | "quote" | "bulleted" | "numbered";
 
 /** A draft, and its selection from `start` to `end` (the caret, when they are one). */
 export interface Edit {
@@ -12,7 +13,7 @@ export interface Edit {
   end: number;
 }
 
-const MARKS = { bold: "**", italic: "*", strike: "~~", code: "`" } as const;
+const MARKS = { bold: "**", italic: "*", underline: "++", strike: "~~", code: "`" } as const;
 const STARTS = { quote: "> ", bulleted: "- ", numbered: "1. " } as const;
 // The starts the bar puts on a line, which it takes off or turns: a number other than 1 is the writer's own text.
 const LIST = /^(?:[-*+]|1\.) /;
@@ -30,7 +31,8 @@ export function inserted({ text, start, end }: Edit, mark: string): Edit {
 export function formatted(edit: Edit, format: Format): Edit {
   if (format === "link") return linked(edit);
   if (format === "quote" || format === "bulleted" || format === "numbered") return started(edit, format);
-  return marked(words(edit), MARKS[format]);
+  const chosen = words(edit);
+  return format === "underline" ? underlineOf(chosen) : marked(chosen, MARKS[format]);
 }
 
 // The selection less its spaces; a selection of spaces alone, a caret at its end.
@@ -56,18 +58,21 @@ function words(edit: Edit): Edit {
   return { text: edit.text, start: from, end: to };
 }
 
+// Whether the character at `at` is `mark`'s own: one a backslash escapes is the writer's text (F5387a).
+const own = (text: string, at: number, mark: string) => text[at] === mark[0] && !isEscaped(text, at);
+
 // The selection begins and ends with `mark`, and no more of its character inside: `*` is not in `**a**`.
 function inside({ text, start: from, end: to }: Edit, mark: string): boolean {
   const size = mark.length;
   const ends = text.slice(from, from + size) === mark && text.slice(to - size, to) === mark;
-  return to - from >= 2 * size && ends && text[from + size] !== mark[0] && text[to - size - 1] !== mark[0];
+  return to - from >= 2 * size && ends && !own(text, from + size, mark) && !own(text, to - size - 1, mark);
 }
 
 // `mark` sits just before the selection and just after it, and no more of its character beyond.
 function around({ text, start: from, end: to }: Edit, mark: string): boolean {
   const size = mark.length;
   const ends = from >= size && text.slice(from - size, from) === mark && text.slice(to, to + size) === mark;
-  return ends && text[from - size - 1] !== mark[0] && text[to + size] !== mark[0];
+  return ends && !own(text, from - size - 1, mark) && !own(text, to + size, mark);
 }
 
 function marked(words: Edit, mark: string): Edit {
@@ -92,6 +97,15 @@ function marked(words: Edit, mark: string): Edit {
     start: from + size,
     end: to + size,
   };
+}
+
+// The underline taken off where the reader reads one there, or round a caret (the bar's empty pair); else written as the
+// reader reads one (underline.ts).
+function underlineOf(chosen: Edit): Edit {
+  const mark = MARKS.underline;
+  const off = inside(chosen, mark) || around(chosen, mark) ? marked(chosen, mark) : undefined;
+  if (off !== undefined && (chosen.start === chosen.end || readsOneMore(off.text, chosen.text))) return off;
+  return underlined(chosen);
 }
 
 // The selection, less its spaces, as a link's label, the address after it selected to be typed; at a caret, the label

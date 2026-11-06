@@ -2,7 +2,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { box, near } from "./geometry.ts";
+import { calmed, pinFigures } from "./figures.ts";
+import { box, brightness, near } from "./geometry.ts";
 
 // Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
 // frames 1, 6, 20, 26, 37, 90 and 102 (docs/design/video-screens.md; frames in ~/.cache/gnoworld-tools/video-frames/). A box is
@@ -12,37 +13,6 @@ const style = (page: Page, selector: string, property: string) =>
     .locator(selector)
     .first()
     .evaluate((el, name) => getComputedStyle(el).getPropertyValue(name), property);
-
-// The mean brightness of boxes of a picture, read by a page of its own (the site's policy refuses a picture's pixels to a page
-// that holds none of its own): each box is [x0, y0, x1, y1].
-async function brightness(page: Page, picture: Buffer, boxes: [number, number, number, number][]): Promise<number[]> {
-  const reader = await page.context().newPage();
-  try {
-    await reader.goto("about:blank");
-    return await reader.evaluate(
-      async ([base64, cells]) => {
-        const bitmap = await createImageBitmap(await (await fetch(`data:image/png;base64,${base64}`)).blob());
-        const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-        const context = canvas.getContext("2d");
-        if (context === null) throw new Error("no canvas");
-        context.drawImage(bitmap, 0, 0);
-        const { data, width } = context.getImageData(0, 0, bitmap.width, bitmap.height);
-        return cells.map(([x0, y0, x1, y1]) => {
-          let sum = 0;
-          for (let y = y0; y < y1; y++)
-            for (let x = x0; x < x1; x++) {
-              const at = (y * width + x) * 4;
-              sum += 0.2126 * (data[at] ?? 0) + 0.7152 * (data[at + 1] ?? 0) + 0.0722 * (data[at + 2] ?? 0);
-            }
-          return sum / ((x1 - x0) * (y1 - y0));
-        });
-      },
-      [picture.toString("base64"), boxes] as const,
-    );
-  } finally {
-    await reader.close();
-  }
-}
 
 // A plate as frames 20, 37 and 90 draw it: 24 px from the left, 98 from the top, 808 wide with its fade, and the box it stands in.
 const plateAt = async (page: Page, path: string) => {
@@ -77,7 +47,7 @@ test.describe("at the video's size", () => {
       near(earth.y + earth.height / 2, 56, "the views' row's middle");
       near(logo.y + logo.height / 2, 56, "the logo's middle");
       // The header's right edge keeps the same 32 px, once the login has said whether a session is open.
-      await expect(page.getByRole("button", { name: "Log in with Adena" })).toBeVisible();
+      await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
       const right = await page.evaluate(() => {
         const items = [...document.querySelectorAll("header a, header button")].map(
           (el) => el.getBoundingClientRect().right,
@@ -170,7 +140,7 @@ test.describe("at the video's size", () => {
       canvas.width = canvas.height = 1;
       const context = canvas.getContext("2d");
       if (context === null) throw new Error("no canvas context");
-      context.fillStyle = getComputedStyle(el).backgroundColor;
+      context.fillStyle = getComputedStyle(el, "::before").backgroundColor;
       context.fillRect(0, 0, 1, 1);
       return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
     });
@@ -280,12 +250,13 @@ test.describe("at the video's size", () => {
     const rows = await brightness(
       page,
       picture,
-      Array.from({ length: 14 }, (_, dy): [number, number, number, number] => [300, 600 + dy, 340, 601 + dy]),
+      // 8g: the Earth's plate holds its latest post on X at y 600, so the rows are read lower, in a plain stretch under its links.
+      Array.from({ length: 14 }, (_, dy): [number, number, number, number] => [300, 900 + dy, 340, 901 + dy]),
     );
     const peak = (values: number[]) => values.indexOf(Math.max(...values));
-    // The tiles start at 42 px and 600 px: the dot of x 45 is the 4th column, the dot of y 105 + 14 * 36 = 609 the 10th row.
+    // The tiles start at 42 px and 900 px: the dot of x 45 is the 4th column, the dot of y 105 + 14 * 57 = 903 the 4th row.
     near(42 + peak(columns), 45, "the dots' column");
-    near(600 + peak(rows), 609, "the dots' row");
+    near(900 + peak(rows), 903, "the dots' row");
   });
 
   test("the plate's caption stands vertical at the plate's foot, from y 813 to 1001, in the atlas's tracking (frame 20)", async ({
@@ -306,9 +277,14 @@ test.describe("at the video's size", () => {
     await plateAt(page, "/earth");
   });
 
-  test("the wide plate looks as approved, the header masked", async ({ page }) => {
+  test("the wide plate looks as approved, the header masked", async ({ page, context }) => {
+    // Its figures are the fixture's and the arrival's pill closed: the stack's live counts and today's stop never reach the picture.
+    await pinFigures(context);
     await page.goto("/earth");
     await hydrated(page);
+    await calmed(page);
+    // The dock's room holds the Earth's chat, whose people and lines are the server's: chatDock.spec.ts holds its look.
+    await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
     await expect(page).toHaveScreenshot("plate-wide-1728.png", { mask: [page.getByRole("banner")] });
   });
 
@@ -327,10 +303,12 @@ test.describe("at the video's size", () => {
     near(first.height, 52, "an action's height");
     near(second.x - (first.x + first.width), 10, "the gap between the actions");
     expect(await style(page, "[data-hero='actions'] a", "font-size")).toBe("15px");
-    // The line is the row's first cell, 28 px before the actions, on their middle line (frame 6).
-    const line = await box(page, "h1");
+    // The line is the row's first cell, 28 px before the actions, on their middle line (frame 6): the page's heading and what a world is
+    // after it (ADR-0003, 2a), in the line's own size.
+    const line = await box(page, "[data-hero='line']");
     near(first.x - (line.x + line.width), 28, "the gap between the line and the actions");
     near(line.y + line.height / 2, first.y + first.height / 2, "the line's middle against the actions'");
+    expect(await style(page, "[data-hero='line']", "font-size")).toBe("17px");
     expect(await style(page, "h1", "font-size")).toBe("17px");
     // 22 px between the kicker, the number and the row (the prototype's #hero gap).
     const label = await box(page, "main p.label");
@@ -445,7 +423,7 @@ for (const width of [390, 1280, 1728] as const) {
       const views = page.getByRole("navigation", { name: "Views" });
       for (const [name, path] of [
         ["Earth", "/earth"],
-        ["Cosmos", "/"],
+        ["Universe", "/"],
         ["List", "/list"],
       ] as const) {
         const link = views.getByRole("link", { name });
@@ -467,6 +445,31 @@ for (const width of [390, 1280, 1728] as const) {
     }
   });
 }
+
+// F4642: at 320 px "Join the chat" ran past the window's right edge (7v's pictures): the hero's calls wrap to a second row before they leave
+// the page's 16 px gutter, and at 390 px they share a row, as the approved hero-390 draws them.
+for (const width of [320, 390] as const)
+  test(`the hero's calls stand inside the page's 16 px gutter at ${String(width)} px, wrapping before they overflow`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 844 });
+    await page.goto("/");
+    await hydrated(page);
+    // The line's face changes its width, and so whether it wraps: the calls are measured in the page's own fonts.
+    await page.evaluate(async () => {
+      await document.fonts.ready;
+    });
+    await expect(page.locator("[data-hero='actions'] a")).toHaveCount(2);
+    const first = await box(page, "[data-hero='actions'] a >> nth=0");
+    const second = await box(page, "[data-hero='actions'] a >> nth=1");
+    for (const [at, call] of [first, second].entries()) {
+      expect(call.x, `call ${String(at)}'s left`).toBeGreaterThanOrEqual(16 - 0.5);
+      expect(call.x + call.width, `call ${String(at)}'s right`).toBeLessThanOrEqual(width - 16 + 0.5);
+    }
+    if (width === 320) expect(second.y).toBeGreaterThanOrEqual(first.y + first.height);
+    else near(second.y, first.y, "the calls' row");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  });
 
 // F3274: the bar of the three views stands over the foot of a phone's page; the page leaves it the room, so at the page's end
 // nothing of it lies under the bar (the prototype reserves it: lines 770 to 774).

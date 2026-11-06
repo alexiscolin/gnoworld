@@ -15,6 +15,25 @@
     z-index: 3;
   }
 
+  /* Full bleed on a wide screen, the arrival's pill stands in its header's empty centre (frame 73), the 52 px band holding its
+     one row: the lines keep their place under the header (frame 66). */
+  :root:has(.screen[data-full]) {
+    --banner-top: calc(
+      var(--flash-room) + (var(--chat-head) - var(--control-s) - var(--space-2xs) * 2 - var(--line-width) * 2) / 2
+    );
+  }
+
+  /* A narrow chat's header has two rows and no free centre (ChatHeader.module.css: two controls' height, its step and its
+     line): the pill stands a step under it, and the conversation keeps its room free above the lines (tokens.css). */
+  :root:has(.screen[data-full][data-compact]) {
+    --banner-under: calc(var(--flash-room) + var(--control-s) * 2 + var(--space-m) + var(--line-width));
+    --banner-top: calc(var(--banner-under) + var(--space-s));
+  }
+
+  .screen[data-full][data-compact] [data-region="conversation"] {
+    padding-block-start: var(--banner-room);
+  }
+
   /* The dock: what the slot (320 under 1400 px, the video's 360) holds beside the scene, at the video's 24 px inset. */
   .screen:not([data-full]) {
     --chat-inset: var(--space-m);
@@ -35,13 +54,5 @@
   .rail {
     padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;
-  }
-
-  /* The quick actions and the composer under the lines, set off by a rule across the conversation. */
-  .dock {
-    /* the video's 21 px under the box, from the tokens: 16 and 4 */
-    padding-block-end: calc(var(--space-s) + var(--space-3xs));
-    padding-inline: var(--chat-inset);
-    border-block-start: var(--line-width) solid var(--color-line);
   }
 }

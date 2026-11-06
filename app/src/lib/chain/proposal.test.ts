@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch, ReadOptions } from "@gnoworld/chain/read";
 import { PROPOSAL_CAPS, Proposal } from "@gnoworld/schemas/proposal";
-import { proposalsOf, readProposals } from "./proposal.ts";
+import { proposalsOf, readProposals, votesOf } from "./proposal.ts";
 
 // 5k2, a GovDAO home page to its proposals, against pages RECORDED through gnomcp (F2951): app/tests/chain/recorded/, each file's first
 // line naming its chain, height and date. What the real pages state is read; what they do not state (a threshold) stays absent.
@@ -21,6 +21,56 @@ const recorded = (name: string): string => fileOf(name).replace(/^<!--.*-->\n/, 
 const ACTIVE_14 = recorded("gnoland-1-gov-dao-14-active.md");
 const HOME_GNOLAND = recorded("gnoland-1-gov-dao-home.md");
 const HOME_ONYX = recorded("onyx-1-gov-dao-home.md");
+const ACCEPTED_37 = recorded("onyx-1-gov-dao-37-accepted.md");
+// What a request asked the realm: `<realm>:<path>`, from the query's hex.
+const askedOf = (url: string): string =>
+  new TextDecoder().decode(
+    Uint8Array.from(/data=0x([0-9a-f]+)/.exec(url)?.[1]?.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)),
+  );
+
+// What an open proposal's page states (F4308, Alexis: the ring shows what the chain gives): its yes and its no in its one Stats block,
+// and that it is open for votes; never a threshold, which no recorded page states.
+describe("an open proposal's yes and no, from its page", () => {
+  it("reads gnoland-1's open #14: open, its yes and its no", () => {
+    expect(votesOf(ACTIVE_14)).toEqual({ open: true, yes: 33.33333333333333, no: 0 });
+  });
+
+  it("reads onyx-1's accepted #37 as closed", () => {
+    expect(votesOf(ACCEPTED_37)).toEqual({ open: false, yes: 100, no: 0 });
+  });
+
+  it("gives none where a proposer's words could forge them: a second Stats block, or a second YES line", () => {
+    const forged = ACTIVE_14.replace(
+      "## Validator Updates",
+      "### Stats\n- **Proposal is open for votes**\n- YES PERCENT: 99%\n- NO PERCENT: 0%\n\n---\n\n## Validator Updates",
+    );
+    expect(votesOf(forged)).toBeUndefined();
+    expect(votesOf(ACTIVE_14.replace("- NO PERCENT: 0%", "- NO PERCENT: 0%\n- YES PERCENT: 99%"))).toBeUndefined();
+  });
+
+  it("gives none for a page longer than it reads: 70 KB of a proposer's words push the realm's own Stats past the bound (security review, high)", () => {
+    const padded = ACTIVE_14.replace(
+      "## Validator Updates",
+      `### Stats\n- **Proposal is open for votes**\n- YES PERCENT: 99%\n- NO PERCENT: 0%\n\n${"padding ".repeat(9000)}\n\n## Validator Updates`,
+    );
+    expect(padded.length).toBeGreaterThan(64 * 1024);
+    expect(padded.indexOf("YES PERCENT: 33.33333333333333%")).toBeGreaterThan(64 * 1024);
+    expect(votesOf(padded)).toBeUndefined();
+  });
+
+  it("gives none for a yes and a no that come to more than the whole (security review, low)", () => {
+    expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: 100%"))).toBeUndefined();
+    expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: 66.66666666666667%"))).toMatchObject({
+      no: 66.66666666666667,
+    });
+  });
+
+  it("gives none for a share past 100 or not a number, and none for a home page", () => {
+    expect(votesOf(ACTIVE_14.replace("YES PERCENT: 33.33333333333333%", "YES PERCENT: 133%"))).toBeUndefined();
+    expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: none%"))).toBeUndefined();
+    expect(votesOf(HOME_GNOLAND)).toBeUndefined();
+  });
+});
 
 describe("the recorded pages (gnoland-1 at 1208146, onyx-1 at 796366, 2026-10-31)", () => {
   it("the home page of gnoland-1 lists five proposals, newest first, each with its own state word and no tally", () => {
@@ -129,6 +179,7 @@ describe("linear in the page (a proposer's page must not freeze the tab)", () =>
       ...Array.from({ length: 3 }, () => {
         const start = performance.now();
         proposalsOf(page);
+        votesOf(page);
         return performance.now() - start;
       }),
     );
@@ -157,6 +208,32 @@ describe("readProposals", () => {
     expect(new TextDecoder().decode(Uint8Array.from(hex.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)))).toBe(
       `${REALM}:`,
     );
+  });
+
+  it("reads the newest open proposal's page for its yes and no, and no other's (F4308)", async () => {
+    const fetcher = vi.fn<ChainFetch>((url) =>
+      Promise.resolve(
+        new Response(JSON.stringify(queryEnvelope({ data: askedOf(url).endsWith(":14") ? ACTIVE_14 : HOME_GNOLAND }))),
+      ),
+    );
+    const result = await readProposals(RPC, REALM, options(fetcher));
+    const listed = result.ok ? result.value : [];
+    expect(listed.find(({ id }) => id === 14)).toMatchObject({ yes: 33.33333333333333, no: 0 });
+    expect(listed.filter(({ yes }) => yes !== undefined).map(({ id }) => id)).toEqual([14]);
+    expect(fetcher.mock.calls.map(([url]) => askedOf(url))).toEqual([`${REALM}:`, `${REALM}:14`]);
+  });
+
+  it("keeps the proposals, with no votes, when the open one's page cannot be read", async () => {
+    const fetcher = vi.fn<ChainFetch>((url) =>
+      Promise.resolve(
+        askedOf(url).endsWith(":14")
+          ? new Response("down", { status: 503 })
+          : new Response(JSON.stringify(queryEnvelope({ data: HOME_GNOLAND }))),
+      ),
+    );
+    const result = await readProposals(RPC, REALM, options(fetcher));
+    expect(result.ok && result.value.length).toBe(5);
+    expect(result.ok && result.value.every(({ yes, no }) => yes === undefined && no === undefined)).toBe(true);
   });
 
   it("gives no proposal, not a failure, for a home page that lists none", async () => {

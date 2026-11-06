@@ -2,13 +2,22 @@ import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { bytes } from "../irc/irc.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
-import { MAX_INLINE_DEPTH, MAX_QUOTE_DEPTH, markdown, mentions, type Block, type Inline } from "./markdown.ts";
+import {
+  MAX_INLINE_DEPTH,
+  MAX_QUOTE_DEPTH,
+  markdown,
+  mentions,
+  mentionsRoom,
+  type Block,
+  type Inline,
+} from "./markdown.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
 const text = (value: string): Inline => ({ type: "text", text: value });
 const em = (...children: Inline[]): Inline => ({ type: "em", children });
 const strong = (...children: Inline[]): Inline => ({ type: "strong", children });
+const underline = (...children: Inline[]): Inline => ({ type: "underline", children });
 const link = (href: string, label = href): Inline => ({ type: "link", href, children: [text(label)] });
 const paragraph = (...children: Inline[]): Block => ({ type: "paragraph", children });
 const br: Inline = { type: "break" };
@@ -143,6 +152,205 @@ describe("markdown: marks within a line", () => {
     expect(depthOf(markdown("***a** b* ".repeat(4) + "*a ".repeat(9) + "x"))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
     expect(words(markdown(nested))).toStrictEqual(words([paragraph(text(nested.replace(/\*/g, "")))]));
     expect(depthOf(markdown("***a ".repeat(5) + "x" + " a***".repeat(5)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
+  });
+});
+
+// 8k: the composer's U (frame 73) writes `++`, the chat's one mark Markdown lacks (markdown-it-ins's, HackMD's); `__`
+// stays bold, as CommonMark, gnoweb and every line written before read it. Another IRC client shows `++word++`.
+describe("markdown: underline, `++` at word bounds", () => {
+  const strike = (...children: Inline[]): Inline => ({ type: "strike", children });
+
+  test("reads ++underlined++ as underline, its words alone", () => {
+    reads("++under++", paragraph(underline(text("under"))));
+    reads("++two words++", paragraph(underline(text("two words"))));
+  });
+
+  test.each<[string, Inline[]]>([
+    ["x ++u++ y", [text("x "), underline(text("u")), text(" y")]],
+    ["(++u++)", [text("("), underline(text("u")), text(")")]],
+    ["++u++.", [underline(text("u")), text(".")]],
+    ["++a++ ++b++", [underline(text("a")), text(" "), underline(text("b"))]],
+    ["++😀++", [underline(text("😀"))]],
+    ["🔥++hot++🔥", [text("🔥"), underline(text("hot")), text("🔥")]],
+    ["++café++", [underline(text("café"))]],
+    ["🐀++b++", [text("🐀"), underline(text("b"))]],
+    ["**a**++b++", [strong(text("a")), underline(text("b"))]],
+  ])("reads an underline beside words, punctuation and emoji (%j)", (source, children) => {
+    reads(source, paragraph(...children));
+  });
+
+  test("nests underline in the other marks and the other marks in it", () => {
+    reads("**a ++b++**", paragraph(strong(text("a "), underline(text("b")))));
+    reads("++a **b**++", paragraph(underline(text("a "), strong(text("b")))));
+    reads("++a *b ~~c~~*++", paragraph(underline(text("a "), em(text("b "), strike(text("c"))))));
+    reads("***++x++***", paragraph(em(strong(underline(text("x"))))));
+    reads("~~++x++~~", paragraph(strike(underline(text("x")))));
+    reads("++~~x~~++", paragraph(underline(strike(text("x")))));
+  });
+
+  test("reads crossed marks as the first pair that closes, the rest as text", () => {
+    reads("++a **b++ c**", paragraph(underline(text("a **b")), text(" c**")));
+    reads("**a ++b** c++", paragraph(strong(text("a ++b")), text(" c++")));
+  });
+
+  test.each([
+    "++open",
+    "open++",
+    "a ++ b",
+    "a ++ b ++ c",
+    "++",
+    "+",
+    "++++",
+    "++ a++",
+    "++a ++",
+    "1+1=2",
+    "C++ and C++",
+    "x ++ ++ y",
+  ])("keeps an unclosed, empty or spaced `+` as its own text (%j)", plain);
+
+  test.each(["+a+", "+++a+++", "++++a++++", "+++++a+++++", "++a+", "+a++", "++a+++", "+++a++"])(
+    "reads no underline of another length (%j)",
+    plain,
+  );
+
+  test.each(["snake++case++name", "a++b++c", "**a**b++c++", "x++y++", "𝐀++b++", "a 𠀀++b++"])(
+    "reads no underline opening inside a word (%j)",
+    plain,
+  );
+
+  // F5383: a run that closes before a letter closes nothing, as one that opens after a letter opens nothing.
+  test.each(["++a++b", "++a++é", "++a++𝐀", "++a++9"])("reads no underline closing inside a word (%j)", plain);
+
+  test("ends an underline at its line's end: one closed on the next line is none", () => {
+    reads("a ++b\nc++ d", paragraph(text("a ++b"), br, text("c++ d")));
+  });
+
+  test("takes a backslash's `+` as text", () => {
+    reads("\\+\\+x\\+\\+", paragraph(text("++x++")));
+    reads("\\++x++", paragraph(text("++x++")));
+    reads("\\\\++x++", paragraph(text("\\"), underline(text("x"))));
+  });
+
+  test("reads code inside an underline, and no underline inside code", () => {
+    reads("++`code`++", paragraph(underline({ type: "code", text: "code" })));
+    reads("++a `++` b++", paragraph(underline(text("a "), { type: "code", text: "++" }, text(" b"))));
+    reads("`++x++`", paragraph({ type: "code", text: "++x++" }));
+    reads("```\n++x++\n```", { type: "codeBlock", text: "++x++" });
+  });
+
+  test("reads a link inside an underline, and an underline in a link's label", () => {
+    reads("++[docs](https://gno.land/docs)++", paragraph(underline(link("https://gno.land/docs", "docs"))));
+    reads(
+      "[++a++ b](https://a.example)",
+      paragraph({ type: "link", href: "https://a.example", children: [underline(text("a")), text(" b")] }),
+    );
+  });
+
+  // Inside an underline, its run at an address's end is the underline's, as `~~` is a strike's (GFM's trailing
+  // punctuation); outside one, a `+` is the address's own, as GFM and every line written before read it.
+  test("keeps a `+` ending a bare address in it, and none before one, outside an underline", () => {
+    reads("see https://a.example/C++", paragraph(text("see "), link("https://a.example/C++")));
+    reads("https://a.example/x+.", paragraph(link("https://a.example/x+"), text(".")));
+    plain("a+https://a.example/x");
+    plain("https://a.example++");
+    reads("**see https://a.example/C++**", paragraph(strong(text("see "), link("https://a.example/C++"))));
+  });
+
+  // F5382: the rule holds while an underline is open, never after one closed or one the depth cap refused.
+  test("keeps a `+` ending a bare address in it once an underline closed, or when none could open", () => {
+    reads(
+      "++a++ see https://a.example/C++",
+      paragraph(underline(text("a")), text(" see "), link("https://a.example/C++")),
+    );
+    const capped = "*a ".repeat(MAX_INLINE_DEPTH) + "++x https://a.example/C++";
+    expect(hrefs(markdown(capped))).toStrictEqual(["https://a.example/C++"]);
+  });
+
+  test("reads a bare address inside an underline, its run left out of the address", () => {
+    reads("++https://a.example++", paragraph(underline(link("https://a.example"))));
+    reads("++https://a.example/x++", paragraph(underline(link("https://a.example/x"))));
+    reads(
+      "see ++https://a.example/x?q=1++ now",
+      paragraph(text("see "), underline(link("https://a.example/x?q=1")), text(" now")),
+    );
+    reads("++https://a.example/x++.", paragraph(underline(link("https://a.example/x")), text(".")));
+    reads("(++https://a.example/x++)", paragraph(text("("), underline(link("https://a.example/x")), text(")")));
+  });
+
+  // F5384: an address in an open underline ends before its `+`, so the next run closes the underline; an odd run is
+  // text. A link written `[label](…)` keeps its address whole, a `+` at its end too.
+  test("ends an address in an open underline before its `+`: the run after it closes the underline", () => {
+    reads("++see https://a.example/C++", paragraph(underline(text("see "), link("https://a.example/C"))));
+    reads("++a https://a.example/C++ b++", paragraph(underline(text("a "), link("https://a.example/C")), text(" b++")));
+    reads("++https://a.example/x+++", paragraph(text("++"), link("https://a.example/x"), text("+++")));
+    reads("++[c++](https://a.example/C++)++", paragraph(underline(link("https://a.example/C++", "c++"))));
+  });
+
+  // F5382: only the underline's own opening run may come before an address; a `+` of the writer's inside it may not.
+  test("starts a bare address after the underline's opening run alone, never after another `+`", () => {
+    reads("++a+https://a.example/x++", paragraph(underline(text("a+https://a.example/x"))));
+    reads("++a +https://a.example/x++", paragraph(underline(text("a +https://a.example/x"))));
+    reads("++**https://a.example/x**++", paragraph(underline(strong(link("https://a.example/x")))));
+  });
+
+  // F5381: what a label holds is its words, an underline's address too: one link, to the label's own address.
+  test("links no bare address inside a label, an underline round it or not", () => {
+    reads(
+      "[++https://a.example/x++](https://b.example)",
+      paragraph({ type: "link", href: "https://b.example", children: [underline(text("https://a.example/x"))] }),
+    );
+    reads(
+      "[a ++https://a.example/x++](https://b.example)",
+      paragraph({
+        type: "link",
+        href: "https://b.example",
+        children: [text("a "), underline(text("https://a.example/x"))],
+      }),
+    );
+  });
+
+  test("closes no underline past a label's start, and makes no link of a label that shows nothing", () => {
+    reads("++[a++](https://a.example)", paragraph(text("++"), link("https://a.example", "a++")));
+    reads(
+      "[++\u200b++](https://a.example)",
+      paragraph(text("["), underline(text("\u200b")), text("]("), link("https://a.example"), text(")")),
+    );
+  });
+
+  // The server counts a mention after anything but a letter, a digit or `_`: `+` is none, so an underlined one counts.
+  test("reads a mention inside an underline, which the server counts, and @room too", () => {
+    reads(`++@${ALICE}++`, paragraph(underline(mention(ALICE))));
+    expect(mentions(markdown(`++@${ALICE}++ and ++@${BOB}++`))).toEqual([ALICE, BOB]);
+    expect(mentionsRoom(markdown("++@room++"))).toBe(true);
+    reads(
+      `[++@${ALICE}++](https://a.example)`,
+      paragraph({ type: "link", href: "https://a.example", children: [underline(text(`@${ALICE}`))] }),
+    );
+  });
+
+  test("reads an underline in a quote and a list's item", () => {
+    reads("> ++q++", { type: "quote", children: [paragraph(underline(text("q")))] });
+    reads("- ++i++\n- j", { type: "list", ordered: false, items: [[underline(text("i"))], [text("j")]] });
+  });
+
+  test(`counts an underline in the ${String(MAX_INLINE_DEPTH)} marks a line nests: deeper ones stay text`, () => {
+    const nested = "++a ".repeat(9) + "x" + " a++".repeat(9);
+    expect(depthOf(markdown(nested))).toBe(MAX_INLINE_DEPTH);
+    // Eight runs open and eight close: the ninth pair's four `+` stay text.
+    expect(flat(markdown(nested)).join("").split("+").length - 1).toBe(4);
+    const mixed = "**a ++b *c ~~d ".repeat(2) + "x" + " d~~ c* b++ a**".repeat(2);
+    expect(depthOf(markdown(mixed))).toBe(MAX_INLINE_DEPTH);
+    expect(depthOf(markdown("++a ***b ".repeat(4) + "x" + " b*** a++".repeat(4)))).toBeLessThanOrEqual(
+      MAX_INLINE_DEPTH,
+    );
+  });
+
+  test("gives back the depth of each underline closed: many in a row nest nothing", () => {
+    const each = (word: string) => [underline(text(word)), text(" ")];
+    reads(
+      "++a++ ++b++ ++c++ ++d++ ++e++ ++f++ ++g++ ++h++ ++i++",
+      paragraph(...["a", "b", "c", "d", "e", "f", "g", "h"].flatMap(each), underline(text("i"))),
+    );
   });
 });
 
@@ -647,6 +855,7 @@ describe("mentions: the accounts a message names", () => {
       "*",
       "_",
       "~~",
+      "++",
       "`",
       "\n",
       "\n\n",
@@ -784,6 +993,7 @@ const KEYS: Readonly<Record<string, string>> = {
   strong: "children,type",
   em: "children,type",
   strike: "children,type",
+  underline: "children,type",
   code: "text,type",
   link: "children,href,type",
   mention: "address,type",
@@ -886,6 +1096,10 @@ describe("markdown: whatever comes", () => {
     "_",
     "__",
     "~~",
+    "++",
+    "+",
+    "++[x](https://a.example/y)++",
+    "https://a.example/z++",
     "`",
     "```",
     "[",
@@ -967,6 +1181,7 @@ describe("markdown: whatever comes", () => {
       "**",
       "_",
       "~~",
+      "++",
       "`",
       "[",
       "]",
@@ -1091,5 +1306,28 @@ describe("markdown: whatever comes", () => {
       return Date.now() - start;
     };
     expect(instrumented || Math.min(window(), window(), window()) < 250).toBe(true);
+  });
+
+  // 8k: underline's `+` runs, open, closed or neither, and its addresses, cost what `~~`'s cost (F5385).
+  test.each(["++a ", "+", "++", "+++ ", "a++ ", "++[", `++@${ALICE} `, "++https://a.example/x++ ", "++a https://x/+ "])(
+    "reads a line of %j in linear time, a backslash and a ) closing it",
+    (piece) => {
+      expect(linear(repeated(piece, "\\)"))).toBe(true);
+      expect(allowed(markdown(repeated(piece, "\\)")(16_000)))).toBe(true);
+    },
+  );
+
+  test("reads an address ending in a long `+` run, in an open underline, in linear time", () => {
+    expect(linear((size) => "++a https://a.example/" + "+".repeat(size))).toBe(true);
+    expect(linear((size) => "++a https://a.example/x" + "+b".repeat(size / 2))).toBe(true);
+  });
+
+  test("reads a deep pile of closed underlines and marks in linear time, its depth capped", () => {
+    const pile = (size: number) => {
+      const count = Math.ceil(size / 22);
+      return "++a **b ~~c ".repeat(count) + "x" + " c~~ b** a++".repeat(count);
+    };
+    expect(linear(pile)).toBe(true);
+    expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
   });
 });

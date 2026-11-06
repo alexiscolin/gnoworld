@@ -1,8 +1,7 @@
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
-import { another, logIn } from "./irc.ts";
 import { opened, type HistoryLine, type Scripted } from "./scripted.ts";
-import { asAccount, barOf, field, GUEST, HISTORY, ROOM, T, tagged } from "./talk.ts";
+import { asAccount, barOf, field, GUEST, HISTORY, ROOM, T, tagged, twoInGames } from "./talk.ts";
 
 // slice-4-room-edit (docs/decisions.md, 2026-10-28, F1560): a room's own lines get Edit as a direct message's do (dmBar.spec.ts):
 // its words in the composer, sent tagged +gnoworld/edit with the line's msgid, shown in the line's place marked edited.
@@ -61,7 +60,7 @@ test.describe("a room's lines: Edit", () => {
     await expect(field(page)).toBeFocused();
     await saveAs(page, "my first words, fixed");
     await expect(lines(page).nth(0)).toContainText("my first words, fixed");
-    await expect(lines(page).nth(0)).toContainText(/^\S+( you)? Edited \d{2}:\d{2}/);
+    await expect(lines(page).nth(0)).toContainText(/^\S+( you)?( new here)? ?Edited \d{2}:\d{2}/);
     await expect(lines(page)).toHaveCount(2);
     await expect(editing(page)).toHaveCount(0);
     await expect(field(page)).toHaveValue("");
@@ -88,7 +87,7 @@ test.describe("a room's lines: Edit", () => {
       await expect(menu(page)).toHaveText(names);
       await page.keyboard.press("Escape");
     };
-    const copies = ["Copy text", "Copy room link", "Open thread"];
+    const copies = ["Copy text", "Copy room link", "Open thread", "View profile"];
     await itemsAre(0, [...copies, "Save message", "Edit", "Delete"]);
     await itemsAre(1, [...copies, "Save message", "Mark unread"]);
     await itemsAre(2, [...copies, "Delete"]);
@@ -101,7 +100,7 @@ test.describe("a room's lines: Edit", () => {
     await lines(page).nth(0).hover();
     await expect(page.getByRole("button", { name: "More actions" })).toBeVisible();
     await page.getByRole("button", { name: "More actions" }).click();
-    await expect(menu(page)).toHaveText(["Copy text", "Copy room link", "Open thread"]);
+    await expect(menu(page)).toHaveText(["Copy text", "Copy room link", "Open thread", "View profile"]);
   });
 
   // The room's draft is the device's: what is typed in the edit box never reaches it, and comes back as the edit goes.
@@ -299,11 +298,12 @@ test.describe("a room's lines: Edit", () => {
       "Copy text",
       "Copy room link",
       "Open thread",
+      "View profile",
       "Save message",
       "Edit",
       "Delete",
     ]);
-    for (let presses = 0; presses < 4; presses += 1) await page.keyboard.press("ArrowDown");
+    for (let presses = 0; presses < 5; presses += 1) await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Edit" })).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(editing(page)).toBeVisible();
@@ -340,16 +340,7 @@ test.describe("a room's lines: Edit, between two accounts", () => {
     playwright,
     launchOptions,
   }) => {
-    const bob = await another({ playwright, launchOptions }, word("bob"));
-    const me = await logIn(page, word("as"));
-    // Each page in the room, then each seeing the other there.
-    await bob.page.goto("/w/bubble?room=games&chat=full");
-    await page.goto("/w/bubble?room=games&chat=full");
-    for (const [each, who] of [
-      [bob.page, me],
-      [page, bob.address],
-    ] as const)
-      await expect(each.getByRole("region", { name: "Who's here" }).getByTitle(who)).toBeVisible();
+    const bob = await twoInGames(page, { playwright, launchOptions });
     const text = word("hello");
     await field(page).fill(text);
     await field(page).press("Enter");
@@ -370,6 +361,7 @@ test.describe("a room's lines: Edit, between two accounts", () => {
       "Copy text",
       "Copy room link",
       "Open thread",
+      "View profile",
       "Save message",
       "Mark unread",
     ]);

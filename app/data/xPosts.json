@@ -1,0 +1,10 @@
+[
+  {
+    "id": "sample-x-latest",
+    "handle": "@_gnoland",
+    "text": "An example: the team copies gno.land's latest post on X here, by hand.",
+    "at": "2026-11-03T10:00:00Z",
+    "link": "https://x.com/_gnoland",
+    "sample": true
+  }
+]

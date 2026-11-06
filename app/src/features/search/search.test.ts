@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { FIXTURE } from "../../placesFixture.ts";
 import { siteOf } from "../../places.ts";
-import { opensPalette, searchItemsOf, searchPlaces, type SearchItem } from "./search.ts";
+import { namespaceGroup, opensPalette, searchItemsOf, searchPlaces, type SearchItem } from "./search.ts";
 
 // Slice 5's 5n: the palette's search, over the places the page holds already (no request, docs/plans/slice-5.md §1).
 const ITEMS: SearchItem[] = [
@@ -20,13 +20,13 @@ describe("searchPlaces", () => {
     expect(names(searchPlaces(ITEMS, "ARC"))).toEqual(["Arcade"]);
   });
 
-  it("groups by kind, each group with its count, in the order cosmos, earth, world, ecosystem", () => {
+  it("groups by kind, each group with its count, in frame 98's order: ecosystem, world, earth, cosmos", () => {
     const found = searchPlaces(ITEMS, "");
     expect(found.map((g) => [g.kind, g.count])).toEqual([
-      ["cosmos", 1],
-      ["earth", 1],
-      ["world", 2],
       ["ecosystem", 1],
+      ["world", 2],
+      ["earth", 1],
+      ["cosmos", 1],
     ]);
   });
 
@@ -99,30 +99,34 @@ describe("searchPlaces", () => {
   });
 
   // Its limit is its own: the ratio below holds under load, and five seconds stopped StrykerJS's whole dry run on its slower copy (F2592).
-  it("scales with the list, not with its square: 16 times the places cost far less than 64 times the time", () => {
-    const universe = (count: number): SearchItem[] =>
-      Array.from({ length: count }, (_, n) => ({
-        name: `World number ${String(n)}`,
-        kind: (["world", "ecosystem"] as const)[n % 2] ?? "world",
-        universe: "onyx",
-        path: `/w/world-${String(n)}`,
-      }));
-    // The least of several runs, after a warm-up: a busy machine only makes a run slower.
-    const least = (items: SearchItem[], query: string) => {
-      searchPlaces(items, query);
-      let best = Infinity;
-      for (let run = 0; run < 7; run++) {
-        const start = performance.now();
+  it(
+    "scales with the list, not with its square: 16 times the places cost far less than 64 times the time",
+    { tags: ["timing"], timeout: 30_000 },
+    () => {
+      const universe = (count: number): SearchItem[] =>
+        Array.from({ length: count }, (_, n) => ({
+          name: `World number ${String(n)}`,
+          kind: (["world", "ecosystem"] as const)[n % 2] ?? "world",
+          universe: "onyx",
+          path: `/w/world-${String(n)}`,
+        }));
+      // The least of several runs, after a warm-up: a busy machine only makes a run slower.
+      const least = (items: SearchItem[], query: string) => {
         searchPlaces(items, query);
-        best = Math.min(best, performance.now() - start);
-      }
-      return best;
-    };
-    const small = universe(5000);
-    const large = universe(80_000);
-    for (const query of ["", "number 1", "zzz"])
-      expect(least(large, query) / Math.max(least(small, query), 0.01)).toBeLessThan(64);
-  }, 30_000);
+        let best = Infinity;
+        for (let run = 0; run < 7; run++) {
+          const start = performance.now();
+          searchPlaces(items, query);
+          best = Math.min(best, performance.now() - start);
+        }
+        return best;
+      };
+      const small = universe(5000);
+      const large = universe(80_000);
+      for (const query of ["", "number 1", "zzz"])
+        expect(least(large, query) / Math.max(least(small, query), 0.01)).toBeLessThan(64);
+    },
+  );
 
   it("counts every item of the list in the empty query's groups", () => {
     fc.assert(
@@ -178,7 +182,7 @@ describe("searchItemsOf, one name in two universes", () => {
     description: "Tokens, a place of the fixture, described at more than fifty characters, as the schema asks.",
     universe,
   });
-  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")], stations: [] }));
+  const items = searchItemsOf(siteOf({ ...FIXTURE, ecosystems: [twin("onyx"), twin("gnoland")] }));
 
   it("gives two places of one name, in two universes, two names that tell them apart", () => {
     const found = items.filter((i) => i.kind === "ecosystem");
@@ -207,5 +211,37 @@ describe("opensPalette", () => {
     expect(press("k", { ctrlKey: true, shiftKey: true })).toBe(false);
     expect(press("k", { metaKey: true, altKey: true })).toBe(false);
     expect(press("j", { ctrlKey: true })).toBe(false);
+  });
+});
+
+// F5470 (the review's G1; the chief, 2026-11-05): a full Plan's "+N" opens the drawer on its namespace, which lists that namespace's
+// worlds from the worlds file the drawer reads already, each to its realm's page, while the words are the namespace's; none else.
+describe("the worlds of a namespace", () => {
+  const realm = (path: string) => ({ path });
+  const file = [
+    { id: "gnoswap/router", namespace: "gnoswap", realms: [realm("gno.land/r/gnoswap/v1/router")] },
+    { id: "gnoswap/odd", namespace: "gnoswap", realms: [realm("not a realm")] },
+    { id: "gnoswap/pool", namespace: "gnoswap", realms: [realm("gno.land/r/gnoswap/v1/pool")] },
+    { id: "demo/boards", namespace: "demo", realms: [realm("gno.land/r/demo/boards")] },
+  ];
+
+  it("lists the namespace's worlds with a realm page, by name, while the words are the namespace", () => {
+    expect(namespaceGroup(file, "gnoswap", "gnoswap")).toEqual([
+      {
+        id: "namespace",
+        label: "Worlds of gnoswap · 2",
+        options: [
+          { id: "/r/gnoswap/v1/router", label: "router" },
+          { id: "/r/gnoswap/v1/pool", label: "pool" },
+        ],
+      },
+    ]);
+  });
+
+  it("lists nothing once the words change, with no namespace, before the file came, or for a namespace with no world", () => {
+    expect(namespaceGroup(file, "gnoswap", "gnoswap pool")).toEqual([]);
+    expect(namespaceGroup(file, "", "")).toEqual([]);
+    expect(namespaceGroup(undefined, "gnoswap", "gnoswap")).toEqual([]);
+    expect(namespaceGroup(file, "ahh", "ahh")).toEqual([]);
   });
 });

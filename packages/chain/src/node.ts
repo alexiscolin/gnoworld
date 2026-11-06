@@ -3,6 +3,7 @@
 // request a read, after its node's status when a chain is named, the two under one time limit. What the realm wrote is returned as text and never interpreted; its error text, Log and Info reach no failure
 // and no value. The expression of a vm/qeval is its caller's to build, with its tier-1 checks (app/src/lib/chain/evalCall.ts).
 import { jsonOf } from "@gnoworld/core";
+import { abciQueryOf } from "./abci.ts";
 import { QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
 import { FunctionList } from "@gnoworld/schemas/functions";
 import {
@@ -29,9 +30,6 @@ export interface NodeOptions extends ReadOptions {
 
 /** How long a node seen on its chain is taken to stay on it. */
 const SEEN_MS = 60_000;
-
-const hexOf = (text: string): string =>
-  Array.from(new TextEncoder().encode(text), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 // The text of a base64 body, or null when it is no base64 or no UTF-8.
 function textOf(base64: string): string | null {
@@ -71,7 +69,7 @@ interface Ask<T> {
 
 // An abci_query: the data in hex, the answer's text through `decode`.
 async function query<T>(rpc: string, { path, data, decode }: Ask<T>, options: ReadOptions): Promise<ChainRead<T>> {
-  const url = `${withoutSlash(rpc)}/abci_query?path=%22${path.replace("/", "%2F")}%22&data=0x${hexOf(data)}`;
+  const url = `${withoutSlash(rpc)}${abciQueryOf(path, new TextEncoder().encode(data))}`;
   const answer = await readChain(url, QueryAnswer, options);
   if (!answer.ok) return failedRead(answer.failure.kind, answer.source, answer.failure.status);
   const body = bodyText(answer.value);

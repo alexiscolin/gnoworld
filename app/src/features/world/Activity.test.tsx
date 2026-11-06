@@ -1,28 +1,29 @@
 // @vitest-environment jsdom
 import { createRoot } from "react-dom/client";
 import { act } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Activity } from "./Activity.tsx";
 
-// Slice 5j (frame 26): "ACTIVITY · LAST 24 H", the bars with the chart's row of peak and now, "24 H AGO". With no history the block says
-// so in words and draws no chart.
+// Slice 5j (frames 26 and 40), 8g: "ACTIVITY · LAST 24 H" and the rate now over the bars, "24 H AGO", the peak with its hour and "NOW" under
+// them, from the server's hours (useHours.ts). With no history the chart is drawn flat, named as no activity yet.
+const FROM = Date.UTC(2026, 10, 3, 16);
 const day = Array.from({ length: 24 }, (_, hour) => (hour === 18 ? 43 : hour));
+const hoursOf = (counts: (number | null)[], now: number | null = null) => ({ from: FROM, hours: counts, now });
 let host: HTMLElement | undefined;
 afterEach(() => {
   host?.remove();
   host = undefined;
 });
 // The bars load apart (Activity.tsx): a history is drawn once they have.
-async function draw(hours: number[] | undefined) {
+async function draw(counts: (number | null)[] | undefined, now: number | null = null, always = false) {
   host = document.createElement("div");
   document.body.append(host);
   const root = createRoot(host);
   await act(async () => {
-    root.render(<Activity hours={hours} />);
+    root.render(<Activity hours={counts === undefined ? undefined : hoursOf(counts, now)} />);
     await Promise.resolve();
   });
-  if (hours !== undefined && hours.length > 0)
+  if (always || (counts !== undefined && counts.length > 0))
     await vi.waitFor(() => {
       expect(host?.querySelector("svg")).not.toBeNull();
     });
@@ -36,48 +37,44 @@ describe("a world's activity", () => {
     expect(el.querySelectorAll("svg [data-hour]")).toHaveLength(24);
   });
 
-  it("writes the title, then the bars with their one row of peak and now, and 24 h ago, with the peak and now written once (F2867)", async () => {
-    const el = await draw(day);
+  it("writes the title and the rate now, the bars, then 24 h ago, the peak with its hour and now, each once (F2867)", async () => {
+    const el = await draw(day, 30);
     const text = el.textContent;
     const at = (part: RegExp) => text.search(part);
-    expect(at(/activity\s*·\s*last 24 h/i)).toBeLessThan(at(/peak 43/i));
-    expect(at(/peak 43/i)).toBeLessThan(at(/now 23/i));
-    expect(at(/now 23/i)).toBeLessThan(at(/24 h ago/i));
+    expect(at(/activity\s*·\s*last 24 h/i)).toBeLessThan(at(/30 msgs\/h now/i));
+    expect(at(/30 msgs\/h now/i)).toBeLessThan(at(/24 h ago/i));
+    expect(at(/24 h ago/i)).toBeLessThan(at(/peak 43\/h/i));
     expect(text.match(/peak/gi)).toHaveLength(1);
-    expect(text.match(/now/gi)).toHaveLength(1);
-    expect([...el.querySelectorAll("p.label")].at(-1)?.textContent).toBe("24 h ago");
+    const peak = el.querySelector("time");
+    expect(peak?.getAttribute("dateTime")).toBe(new Date(FROM + 18 * 3_600_000).toISOString());
   });
 
-  it("says the hours it holds, never 24 for a shorter history", async () => {
-    const el = await draw([1, 2, 3, 4, 5]);
-    expect(el.textContent).toMatch(/5 h ago/);
-    expect(el.textContent).not.toMatch(/24 h ago/);
-  });
-
-  it("titles the chart and its label with the hours it holds, as it says them under the bars (F2872)", async () => {
-    const el = await draw([1, 2, 3, 4, 5]);
-    expect(el.textContent).toMatch(/activity\s*·\s*last 5 h/i);
-    expect(el.textContent).not.toMatch(/last 24 h/i);
-    expect(
-      el.querySelector("svg")?.getAttribute("aria-label") ??
-        el.querySelector("[aria-label]")?.getAttribute("aria-label"),
-    ).toMatch(/last 5 hours/i);
+  it("says the last hour's count as the rate now when the server gave no pace", async () => {
+    expect((await draw(day)).textContent).toMatch(/23 msgs\/h now/i);
   });
 
   it("writes a peak of 0 for a history of none, and no NaN or negative for a value that is no count", async () => {
     expect((await draw(Array.from({ length: 24 }, () => 0))).textContent).toMatch(/peak 0/i);
     host?.remove();
-    const text = (await draw([Number.NaN, -1, 3])).textContent;
+    const text = (await draw([Number.NaN, -1, 3, null])).textContent;
     expect(text).toMatch(/peak 3/i);
-    expect(text).toMatch(/now 3/i);
-    expect(text).not.toMatch(/NaN|-1|undefined/);
+    expect(text).not.toMatch(/NaN|-1|undefined|null/);
   });
 
-  it("says in words that no activity is known, and draws no chart, with no history", () => {
-    for (const hours of [undefined, []]) {
-      const html = renderToStaticMarkup(<Activity hours={hours} />);
-      expect(html).toMatch(/no activity (recorded|known) yet/i);
-      expect(html).not.toMatch(/<svg|data-hour|<table/);
+  it("draws the chart flat, with its words, a rate of 0 and no peak hour, with no history", async () => {
+    for (const counts of [undefined, []]) {
+      const el = await draw(counts, null, true);
+      expect(el.textContent).toMatch(/activity\s*·\s*last 24 h/i);
+      expect(el.textContent).toMatch(/0 msgs\/h now/i);
+      expect(el.textContent).toMatch(/24 h ago/i);
+      expect(el.textContent).toMatch(/now$/i);
+      expect(el.textContent).toMatch(/peak 0\/h/i);
+      expect(el.querySelector("time")).toBeNull();
+      const bars = [...el.querySelectorAll("svg [data-hour]")];
+      expect(bars).toHaveLength(24);
+      expect(bars.every((bar) => bar.getAttribute("height") === "0")).toBe(true);
+      expect(el.querySelector('[role="group"]')?.getAttribute("aria-label")).toMatch(/no activity recorded yet/i);
+      host?.remove();
     }
   });
 });

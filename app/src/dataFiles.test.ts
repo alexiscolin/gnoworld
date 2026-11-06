@@ -12,11 +12,28 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { EarthOrbit, EarthRooms } from "@gnoworld/schemas";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import orbiting from "../data/earthOrbit.json" with { type: "json" };
+import places from "../data/earthRooms.json" with { type: "json" };
 import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
 import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
 import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
+import { headingOf } from "../tests/render.tsx";
+
+/** The fault a planted change to the files makes `loadData` throw, or an empty string when the files load. */
+const loads = (change: (f: Record<string, unknown>) => void) => {
+  const dir = plant(change);
+  try {
+    loadData(dir);
+    return "";
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  } finally {
+    rmSync(dir, { recursive: true });
+  }
+};
 
 // 5g: the origins of the default data's two RPCs (app/data/universes.json), the only hosts connect-src names besides 'self'.
 const RPC_ORIGINS = ["https://rpc.gno.land", "https://rpc.onyx.testnets.gno.land"];
@@ -87,7 +104,7 @@ async function expectPolicies(client: string, conf: string, cap: number): Promis
 
 // Slice 5's 5c: the data files read and checked at build time (docs/plans/slice-5.md §3, "Data files").
 describe("loadData", () => {
-  it("reads the ten files into their schemas' shapes", () => {
+  it("reads the fourteen files into their schemas' shapes", () => {
     const dir = plant();
     try {
       const data = loadData(dir);
@@ -96,15 +113,18 @@ describe("loadData", () => {
       expect(data.ecosystems).toEqual([]);
       expect(Object.keys(data).sort()).toEqual([
         "bubbles",
+        "earthOrbit",
+        "earthRooms",
         "ecosystems",
         "events",
         "expedition",
         "genres",
         "hubs",
         "news",
+        "onAir",
         "quests",
-        "stations",
         "universes",
+        "xPosts",
       ]);
     } finally {
       rmSync(dir, { recursive: true });
@@ -195,19 +215,25 @@ describe("loadData", () => {
   });
 
   // What worlds.ts held, moved and nothing more (the brief: "nothing invented"): one world, and the two networks it needs.
-  it("reads the files the repository ships: Bubble and GovDAO in Onyx, the build's default, and nothing else", () => {
+  it("reads the files the repository ships: Bubble, GovDAO and the stations round the Earth (8l) in Onyx, the build's default", () => {
     const data = loadData(new URL("../data", import.meta.url).pathname);
     expect(data.universes.map((u) => [u.id, u.default === true])).toEqual([
       ["onyx", true],
       ["gnoland", false],
     ]);
-    expect(data.hubs).toEqual([
+    // Each station round the Earth is a world of its own kind, at its slug (8l).
+    expect(data.hubs.slice(2).map(({ slug, kind }) => [slug, kind])).toEqual(
+      data.earthOrbit.map(({ slug }) => [slug, "station"]),
+    );
+    expect(data.hubs.slice(0, 2)).toEqual([
       {
         slug: "bubble",
         name: "Bubble",
         description:
           "Bubble, a world of gno.land: the BUBBLE token, its governance, and the games played with it on chain.",
         universe: "onyx",
+        genre: "games",
+        kind: "dapp",
       },
       {
         slug: "govdao",
@@ -215,11 +241,13 @@ describe("loadData", () => {
         description: "GovDAO, the governance of gno.land: its proposals and the votes that accept or refuse them.",
         universe: "onyx",
         realms: ["gno.land/r/gov/dao"],
+        kind: "dao",
       },
     ]);
+    // The crumbs' one genre (8g, frame 104: "GAMES › DAPP").
+    expect(data.genres).toEqual([{ slug: "games", name: "Games" }]);
     // events and news hold the ticker's placeholders, listed below.
-    for (const empty of ["ecosystems", "stations", "genres", "expedition", "quests"] as const)
-      expect(data[empty]).toEqual([]);
+    for (const empty of ["ecosystems"] as const) expect(data[empty]).toEqual([]);
   });
 
   it("refuses a list of universes that is empty: no default, so no build", () => {
@@ -230,6 +258,160 @@ describe("loadData", () => {
     } finally {
       rmSync(dir, { recursive: true });
     }
+  });
+});
+
+// 7v: what turns round the Earth, the projects the team adds by hand (Alexis, 2026-11-03), checked when the app builds.
+describe("earthOrbit.json", () => {
+  it("stops the build on a project's address that is not https, and names the file", () => {
+    const dir = plant((f) => {
+      Reflect.set(f, "earthOrbit.json", [{ name: "gnosh.ai", url: "http://gnosh.ai" }]);
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^earthOrbit\.json: \[0\]\.url/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  // A project's slug names the world whose page it links to: one no hub of the file holds would link to no page.
+  it("stops the build on a project whose slug names no hub", () => {
+    const dir = plant((f) => {
+      Reflect.set(f, "earthOrbit.json", [{ name: "gnosh.ai", url: "https://gnosh.ai", slug: "mars" }]);
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^earthOrbit\.json: \[0\]\.slug: no hub of hubs\.json is named "mars"/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("ships gnosh.ai, Alexis's own link, among the projects", () => {
+    expect(orbiting).toContainEqual(expect.objectContaining({ name: "gnosh.ai", url: "https://gnosh.ai" }));
+    expect(() => EarthOrbit.parse(orbiting)).not.toThrow();
+  });
+});
+
+// Slice 8: the expedition's stops, the quests' steps, what is on air and the events name worlds the site holds, each fault stopping the
+// build with its file, its row and what it names; two stops of one world would make one visit reach both.
+describe("the discovery's files", () => {
+  const stop = (over: Record<string, unknown>) => ({
+    id: "s",
+    universe: "onyx",
+    why: "Why go.",
+    hub: "bubble",
+    ...over,
+  });
+  const steps = (first: Record<string, unknown>) => [
+    { id: "a", kind: "visit", title: "Go", ...first },
+    { id: "z", kind: "call", title: "Do", realm: "gno.land/r/demo/x", function: "Do" },
+  ];
+  const quest = (first: Record<string, unknown>, universe = "onyx") => ({
+    id: "q",
+    universe,
+    title: "Q",
+    description: "D.",
+    reward: "R",
+    steps: steps(first),
+  });
+
+  it("takes stops and steps that name the site's hubs and realms", () => {
+    expect(
+      loads((f) => {
+        f["expedition.json"] = [stop({}), stop({ id: "r", hub: undefined, realm: "gno.land/r/demo/x", name: "X" })];
+        f["quests.json"] = [quest({ hub: "bubble" })];
+      }),
+    ).toBe("");
+  });
+
+  it("stops the build on a stop of a universe the site does not hold", () => {
+    expect(loads((f) => void (f["expedition.json"] = [stop({ universe: "mars" })]))).toMatch(
+      /^expedition\.json: \[0\]\.universe: no universe of universes\.json is named "mars"/,
+    );
+  });
+
+  it("stops the build on a stop of a hub its universe does not hold, another universe's included", () => {
+    expect(loads((f) => void (f["expedition.json"] = [stop({ hub: "mars" })]))).toMatch(
+      /^expedition\.json: \[0\]\.hub: no hub of "onyx" is named "mars"/,
+    );
+    expect(loads((f) => void (f["expedition.json"] = [stop({ universe: "gnoland" })]))).toMatch(
+      /^expedition\.json: \[0\]\.hub: no hub of "gnoland" is named "bubble"/,
+    );
+  });
+
+  it("stops the build on two stops of one realm's world", () => {
+    expect(
+      loads(
+        (f) =>
+          void (f["expedition.json"] = [
+            stop({ id: "a", hub: undefined, realm: "gno.land/r/demo/x", name: "X" }),
+            stop({ id: "b", hub: undefined, realm: "gno.land/r/demo/x", name: "Y" }),
+          ]),
+      ),
+    ).toMatch(/^expedition\.json: \[1\]: a second stop of the world "/);
+  });
+
+  it("stops the build on a quest of a universe the site does not hold, or a step of a hub it does not", () => {
+    expect(loads((f) => void (f["quests.json"] = [quest({ hub: "bubble" }, "mars")]))).toMatch(
+      /quests\.json: \[0\]\.universe: no universe/,
+    );
+    expect(loads((f) => void (f["quests.json"] = [quest({ hub: "mars" })]))).toMatch(
+      /^quests\.json: \[0\]\.steps\[0\]\.hub: no hub of "onyx" is named "mars"/,
+    );
+  });
+
+  it("stops the build on an event in a world no hub holds, and takes the Earth's and none", () => {
+    const event = (world?: string) => ({
+      id: "e",
+      title: "E",
+      start: "2026-11-05T18:00:00.000Z",
+      link: "https://gno.land/",
+      ...(world === undefined ? {} : { world }),
+    });
+    expect(loads((f) => void (f["events.json"] = [event("mars")]))).toMatch(
+      /^events\.json: \[0\]\.world: no hub of hubs\.json is named "mars"/,
+    );
+    expect(
+      loads(
+        (f) => void (f["events.json"] = [event("earth"), { ...event("bubble"), id: "f" }, { ...event(), id: "g" }]),
+      ),
+    ).toBe("");
+  });
+
+  it("stops the build on an on-air line of a hub its universe does not hold", () => {
+    const row = (hub: string) => [{ id: "a", universe: "onyx", title: "Live", hub }];
+    expect(loads((f) => void (f["onAir.json"] = row("mars")))).toMatch(
+      /^onAir\.json: \[0\]\.hub: no hub of "onyx" is named "mars"/,
+    );
+    expect(loads((f) => void (f["onAir.json"] = row("bubble")))).toBe("");
+  });
+
+  it("names every fault at once", () => {
+    const said = loads((f) => {
+      f["expedition.json"] = [stop({ hub: "mars" })];
+      f["quests.json"] = [quest({ hub: "venus" })];
+    });
+    expect(said).toMatch(/"mars"/);
+    expect(said).toMatch(/"venus"/);
+  });
+});
+
+// 7f2: the places of the Earth's side rooms, one row a room, checked when the app builds.
+describe("earthRooms.json", () => {
+  it("stops the build on a place off the globe, and names the file", () => {
+    const dir = plant((f) => {
+      Reflect.set(f, "earthRooms.json", [{ room: "#earth/lisbon", lat: 91, lon: 0 }]);
+    });
+    try {
+      expect(() => loadData(dir)).toThrow(/^earthRooms\.json: \[0\]\.lat/);
+    } finally {
+      rmSync(dir, { recursive: true });
+    }
+  });
+
+  it("ships the side rooms that have a place, which the app reads as it is", () => {
+    expect(places.length).toBeGreaterThan(0);
+    expect(() => EarthRooms.parse(places)).not.toThrow();
   });
 });
 
@@ -327,7 +509,35 @@ const BIN = new URL("../node_modules/@react-router/dev/bin.cjs", import.meta.url
 // StrykerJS runs the tests in a sandbox whose sources it has instrumented (hooks inside its mutant switches): the
 // compiler refuses them, and a build in a child process reaches no mutant. The build takes the real sources.
 const APP = new URL("..", import.meta.url).pathname.replace(/\/\.stryker-tmp\/sandbox-[^/]+\//, "/");
-const KEPT = ["src", "data", "public", "react-router.config.ts", "vite.config.ts", "package.json", "tsconfig.json"];
+const KEPT = [
+  "src",
+  "data",
+  "public",
+  "lab",
+  "lab.config.ts",
+  "react-router.config.ts",
+  "vite.config.ts",
+  "package.json",
+  "tsconfig.json",
+];
+
+// The image takes app/build/client whole, so what builds there ships: the realism page goes beside the site for the journeys alone.
+describe("the realism page", () => {
+  it("is built by nothing the image runs", () => {
+    const docker = readFileSync(join(APP, "..", "deploy", "web", "Dockerfile"), "utf8");
+    const builds = docker.split("\n").filter((line) => /^RUN .*\bbuild\b/.test(line));
+    expect(builds).toEqual(["RUN cd app && node_modules/.bin/react-router build"]);
+    expect(docker).not.toContain("lab.config");
+  });
+
+  it("is imported by nothing in the site", () => {
+    const source = join(APP, "src");
+    const importing = readdirSync(source, { recursive: true })
+      .filter((name) => /\.tsx?$/.test(name) && !name.includes(".test."))
+      .filter((name) => /from "(?:\.\.\/)+lab\//.test(readFileSync(join(source, name), "utf8")));
+    expect(importing).toEqual([]);
+  });
+});
 
 describe("react-router build", () => {
   let root = "";
@@ -344,11 +554,11 @@ describe("react-router build", () => {
     rmSync(root, { recursive: true });
   });
 
-  function build(data: string) {
+  function build(data: string, more: Record<string, string> = {}) {
     rmSync(join(copy, "build"), { recursive: true, force: true });
     return spawnSync(process.execPath, [BIN, "build"], {
       cwd: copy,
-      env: { ...process.env, GNOWORLD_DATA: data },
+      env: { ...process.env, GNOWORLD_DATA: data, ...more },
       encoding: "utf8",
     });
   }
@@ -365,6 +575,40 @@ describe("react-router build", () => {
       rmSync(dir, { recursive: true });
     }
   });
+
+  // ADR-0002 §9: the gate's browsers have a software GPU, so a test build lets `?test-gpu` pass it. In a production build neither the
+  // switch nor the journeys' door to the scene exists: the words are gone from every file the browser gets.
+  it(
+    "leaves nothing of the scene's test switch in a production build, and a test build holds it",
+    { timeout: 240_000 },
+    () => {
+      const dir = plant(() => undefined);
+      const client = join(copy, "build", "client");
+      const holding = () =>
+        readdirSync(client, { recursive: true })
+          .filter((name) => /\.(?:js|html|data)$/.test(name))
+          .filter((name) => /test-gpu|__gnoworld(?:Scene|Labels)/.test(readFileSync(join(client, name), "utf8")));
+      try {
+        const production = build(dir);
+        expect(production.status, `${production.stdout}${production.stderr}`).toBe(0);
+        const names = readdirSync(client, { recursive: true });
+        expect(
+          names.some((name) => /^assets\/scene-[\w-]{8}\.js$/.test(name)),
+          "the scene's chunk under its own name",
+        ).toBe(true);
+        expect(holding()).toEqual([]);
+        expect(
+          names.filter((name) => name.startsWith("lab")),
+          "the realism page is no part of a production build",
+        ).toEqual([]);
+        const test = build(dir, { VITE_GNOWORLD_TEST_GPU: "1" });
+        expect(test.status, `${test.stdout}${test.stderr}`).toBe(0);
+        expect(holding().length, "the words this looks for are the switch's").toBeGreaterThan(0);
+      } finally {
+        rmSync(dir, { recursive: true });
+      }
+    },
+  );
 
   // The positive control: the data drives the pages. A build that ignored GNOWORLD_DATA, or kept a list in the config,
   // would write bubble alone; a config that failed on every build would write nothing. 5d: each place has its page, at its
@@ -387,10 +631,12 @@ describe("react-router build", () => {
         const client = join(copy, "build", "client");
         const page = (...path: string[]) => readFileSync(join(client, ...path, "index.html"), "utf8");
         const pages: [string[], string, string][] = [
-          [[], "\\d+ worlds? in Onyx", "/net/onyx/"],
+          // The default universe's count is the cosmos's, which the browser reads from the worlds' file (7n): none in the build, which keeps
+          // the line's figure's room for it.
+          [[], "Worlds in Onyx", "/net/onyx/"],
           [["w", "bubble"], "Bubble", "/net/onyx/w/bubble"],
           [["w", "mars"], "Mars", "/net/onyx/w/mars"],
-          [["net", "onyx"], "\\d+ worlds? in Onyx", "/net/onyx/"],
+          [["net", "onyx"], "Worlds in Onyx", "/net/onyx/"],
           [["net", "onyx", "w", "mars"], "Mars", "/net/onyx/w/mars"],
           [["net", "gnoland"], "\\d+ worlds? in gno\\.land", "/net/gnoland/"],
           [["net", "gnoland", "w", "other"], "Other", "/net/gnoland/w/other"],
@@ -404,8 +650,8 @@ describe("react-router build", () => {
         for (const [path, heading, canonical] of pages) {
           const html = page(...path);
           const where = path.join("/") || "/";
-          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern.
-          expect(html.replaceAll("<!-- -->", ""), where).toMatch(new RegExp(`<h1\\b[^>]*>${heading}</h1>`));
+          // The cosmos' heading is the hero's line (F3267), so a heading is a pattern, of its words whatever marks their parts.
+          expect(headingOf(html), where).toMatch(new RegExp(`^${heading}$`));
           expect(html, where).toContain(`<link rel="canonical" href="https://gno.world${canonical}"/>`);
         }
         // The home lists the worlds of its universe alone, and the data's order is not a page.
@@ -717,8 +963,8 @@ describe("react-router build", () => {
   });
 });
 
-// The ticker's placeholders (Alexis, 2026-10-31): named here, so none reaches a public deploy unnoticed; removing them is
-// deleting these ids from the two files and the lines below. No sample world, number or activity.
+// The ticker's placeholders (Alexis, 2026-10-31), and the on-air line's and the post on X's (8i): named here, so none reaches a public deploy
+// unnoticed; removing them is deleting these ids from their files and the lines below. No sample world, number or activity.
 const DIR = new URL("../data/", import.meta.url);
 const read = (file: string): unknown => JSON.parse(readFileSync(new URL(file, DIR), "utf8"));
 
@@ -736,6 +982,9 @@ const events = read("events.json") as Row[];
 /** The placeholders of the ticker, by id: three news and two events. Change this list only with the files. */
 const SAMPLE_NEWS = ["sample-news-bubble-onyx", "sample-news-demo", "sample-news-testnet"];
 const SAMPLE_EVENTS = ["sample-event-community-call", "sample-event-demo-session"];
+/** The on-air line's placeholder and the post on X's (8i), one each, in files of their own. */
+const SAMPLE_OTHERS = ["sample-on-air", "sample-x-latest"];
+const OTHERS = ["onAir.json", "xPosts.json"];
 
 describe("the ticker's placeholders", () => {
   beforeEach(() => {
@@ -747,14 +996,14 @@ describe("the ticker's placeholders", () => {
     expect(events.map((row) => row.id)).toEqual(SAMPLE_EVENTS);
   });
 
-  it("are counted across every data file's text, not only the two lists: five ids, no sixth hidden in another file", () => {
+  it("are counted across every data file's text, not only the two lists: seven ids with the on-air line and the post on X, no eighth", () => {
     const files = readdirSync(DIR.pathname, { recursive: true }).filter(
       (file) => !file.includes("/") && file.endsWith(".json"),
     );
     const found = files.flatMap((file) =>
       [...readFileSync(new URL(file, DIR), "utf8").matchAll(/"id":\s*"(sample-[^"]*)"/g)].map((match) => match[1]),
     );
-    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS].toSorted());
+    expect(found.toSorted()).toEqual([...SAMPLE_NEWS, ...SAMPLE_EVENTS, ...SAMPLE_OTHERS].toSorted());
   });
 
   it("do not name a session of the product that no document has announced", () => {
@@ -767,7 +1016,12 @@ describe("the ticker's placeholders", () => {
 
   it("are the only sample- rows of the data: no sample world, ecosystem, station or number", () => {
     const files = readdirSync(DIR.pathname, { recursive: true }).filter(
-      (file) => !file.includes("/") && file.endsWith(".json") && file !== "news.json" && file !== "events.json",
+      (file) =>
+        !file.includes("/") &&
+        file.endsWith(".json") &&
+        file !== "news.json" &&
+        file !== "events.json" &&
+        !OTHERS.includes(file),
     );
     expect(files.length).toBeGreaterThan(0);
     for (const file of files) expect(readFileSync(new URL(file, DIR), "utf8"), file).not.toMatch(/sample/i);
@@ -809,15 +1063,15 @@ describe("the ticker's placeholders", () => {
     expect(text).toMatch(/testnet/i);
   });
 
-  it("show a community call whose date is to be confirmed, in its own words", () => {
+  it("hold a community call whose date is to be confirmed, in its own words, which the ticker does not show", () => {
     const call = events.find((row) => row.id === "sample-event-community-call");
     expect(call?.title).toMatch(/community call/i);
     expect(call?.title).toMatch(/date to be confirmed/i);
   });
 
   it("hold no date that was made up: an event waiting for its date starts at the one far-off sentinel, which the ticker never shows", () => {
-    // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the event in the strip and
-    // the gate off the calendar. A real start replaces it with the content; this test then lists the event's id out.
+    // The schema asks for a start; until the real one is known, a sentinel past every clock keeps the gate off the calendar, and the
+    // ticker shows no event that starts there (7t). A real start replaces it with the content; this test then lists the event's id out.
     for (const row of events) {
       expect(row.title, row.id).toMatch(/date to be confirmed/i);
       expect(row.start ?? "", row.id).toMatch(/^2099-12-\d\dT00:00:00Z$/);
@@ -828,5 +1082,40 @@ describe("the ticker's placeholders", () => {
     const today = new Date().toISOString().slice(0, 10);
     for (const row of news) expect(row.date ?? "", row.id).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     for (const row of news) expect((row.date ?? "") <= today, `${row.id}: ${row.date ?? ""}`).toBe(true);
+  });
+});
+
+// 8g (frames 22 and 104): a world's kind and genre are its plate's crumb; a genre names one of genres.json.
+describe("hubs.json's kind and genre", () => {
+  const hub = (extra: Record<string, unknown>) => [
+    { slug: "bubble", name: "Bubble", description: "B".repeat(60), universe: "onyx", ...extra },
+  ];
+
+  it("stops the build on a genre no genre of genres.json names, with its one-line fault", () => {
+    expect(loads((f) => void (f["hubs.json"] = hub({ genre: "games" })))).toBe(
+      'hubs.json: [0].genre: no genre of genres.json is named "games"',
+    );
+  });
+
+  it("takes a genre genres.json names, and a world with none", () => {
+    const named = (f: Record<string, unknown>) => {
+      f["genres.json"] = [{ slug: "games", name: "Games" }];
+      f["hubs.json"] = hub({ genre: "games", kind: "dapp" });
+    };
+    expect(loads(named)).toBe("");
+    expect(loads((f) => void (f["hubs.json"] = hub({})))).toBe("");
+  });
+
+  it("names the row of each world whose genre is unknown", () => {
+    const two = [...hub({}), { ...hub({ genre: "mars" })[0], slug: "other" }];
+    expect(loads((f) => void (f["hubs.json"] = two))).toMatch(/^hubs\.json: \[1\]\.genre: /);
+  });
+
+  it.each(["hub", "dao", "dapp", "station"])("takes the kind %s", (kind) => {
+    expect(loads((f) => void (f["hubs.json"] = hub({ kind })))).toBe("");
+  });
+
+  it("stops the build on a kind the crumb does not know, naming the file and the field", () => {
+    expect(loads((f) => void (f["hubs.json"] = hub({ kind: "planet" })))).toMatch(/^hubs\.json: \[0\]\.kind/);
   });
 });

@@ -1,6 +1,7 @@
 import { parseLine, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
+import { DEVICE_EMPTY, type Device, type DeviceField, type DeviceFields } from "../lib/keep/fields.ts";
 import { keep } from "../lib/keep/keep.ts";
 import { createAppStore } from "./index.ts";
 
@@ -576,5 +577,127 @@ describe("a live line heard by the keep slice", () => {
     expect(t.now().saved.find(({ id }) => id === "m2")?.text).toBe("corrected");
     t.heard(heard(`@msgid=r1;time=${T(4)};account=${BOB} :${BOB}!u@h REDACT #bubble m1`));
     expect(t.now().saved.map(({ id }) => id)).toEqual(["m2"]);
+  });
+});
+
+// The device slice of the store (slice 8; lib/keep's rule): every field read at the page's start and again when another tab changes it;
+// a change made from what the device holds now, so another tab's change is kept; never written over a device that could not be read.
+function fake() {
+  const fields: Partial<DeviceFields> = {};
+  const state = { blind: new Set<DeviceField>(), refuses: false, writes: 0 };
+  const device: Device = {
+    keys: Object.fromEntries(Object.keys(DEVICE_EMPTY).map((field) => [field, field])) as Device["keys"],
+    read: (field) => (state.blind.has(field) ? undefined : (fields[field] ?? DEVICE_EMPTY[field])),
+    write: (field, value) => {
+      state.writes += 1;
+      if (state.refuses) return false;
+      Object.assign(fields, { [field]: value });
+      return true;
+    },
+  };
+  return { device, fields, state };
+}
+
+describe("the device in the store", () => {
+  it("holds the defaults, unreadable, before the page reads the device", () => {
+    const store = createAppStore();
+    expect(store.getState().device).toEqual({ ...DEVICE_EMPTY, readable: false, notKept: false });
+  });
+
+  it("writes nothing before the device is read, and says the change was not kept", () => {
+    const store = createAppStore();
+    expect(store.getState().deviceActions.change("stamps", () => ({ "g:a": "2026-11-05" }))).toBe(false);
+    expect(store.getState().device.stamps).toEqual({ "g:a": "2026-11-05" });
+    expect(store.getState().device.notKept).toBe(true);
+  });
+
+  it("reads every field at the start", () => {
+    const { device, fields } = fake();
+    fields.stamps = { "g:a": "2026-11-01" };
+    fields.settings = { quality: "low", calm: true, phone3d: false };
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    const { device: kept } = store.getState();
+    expect(kept.stamps).toEqual({ "g:a": "2026-11-01" });
+    expect(kept.settings).toEqual({ quality: "low", calm: true, phone3d: false });
+    expect(kept.readable).toBe(true);
+    expect(kept.notKept).toBe(false);
+  });
+
+  it("keeps another tab's change: a change starts from what the device holds now", () => {
+    const { device, fields } = fake();
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    fields.stamps = { "g:other-tab": "2026-11-04" };
+    expect(store.getState().deviceActions.change("stamps", (held) => ({ ...held, "g:here": "2026-11-05" }))).toBe(true);
+    expect(fields.stamps).toEqual({ "g:other-tab": "2026-11-04", "g:here": "2026-11-05" });
+    expect(store.getState().device.stamps).toEqual(fields.stamps);
+  });
+
+  it("takes another tab's change on a load, which the page does on the storage event", () => {
+    const { device, fields } = fake();
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    fields.follows = { worlds: ["g:a"], people: [] };
+    store.getState().deviceActions.load(device);
+    expect(store.getState().device.follows).toEqual({ worlds: ["g:a"], people: [] });
+  });
+
+  it("never writes a device it could not read whole, keeps the change in memory, and says so", () => {
+    const { device, fields, state } = fake();
+    fields.stamps = { "g:kept": "2026-11-01" };
+    state.blind.add("charted");
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    expect(store.getState().device.readable).toBe(false);
+    expect(store.getState().device.notKept).toBe(true);
+    expect(store.getState().deviceActions.change("stamps", (held) => ({ ...held, "g:new": "2026-11-05" }))).toBe(false);
+    expect(state.writes).toBe(0);
+    expect(fields.stamps).toEqual({ "g:kept": "2026-11-01" });
+    expect(store.getState().device.stamps).toEqual({ "g:kept": "2026-11-01", "g:new": "2026-11-05" });
+  });
+
+  it("never writes a field the device cannot read at the change, though it read whole at the start", () => {
+    const { device, fields, state } = fake();
+    fields.stamps = { "g:kept": "2026-11-01" };
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    state.blind.add("stamps");
+    expect(store.getState().deviceActions.change("stamps", () => ({}))).toBe(false);
+    expect(state.writes).toBe(0);
+    expect(fields.stamps).toEqual({ "g:kept": "2026-11-01" });
+    expect(store.getState().device.notKept).toBe(true);
+  });
+
+  it("says a write the device refused was not kept, and keeps the change in memory", () => {
+    const { device, state } = fake();
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    state.refuses = true;
+    expect(store.getState().deviceActions.change("settings", (held) => ({ ...held, calm: true }))).toBe(false);
+    expect(store.getState().device.settings.calm).toBe(true);
+    expect(store.getState().device.notKept).toBe(true);
+  });
+
+  it("writes nothing and changes no state for a change that leaves the field as it is", () => {
+    const { device, state } = fake();
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    const before = store.getState().device;
+    expect(store.getState().deviceActions.change("settings", (held) => ({ ...held }))).toBe(true);
+    expect(state.writes).toBe(0);
+    expect(store.getState().device).toBe(before);
+  });
+
+  it("changes one field alone", () => {
+    const { device, fields } = fake();
+    fields.stamps = { "g:a": "2026-11-01" };
+    fields.follows = { worlds: ["g:a"], people: [] };
+    const store = createAppStore();
+    store.getState().deviceActions.load(device);
+    store.getState().deviceActions.change("stamps", () => ({}));
+    expect(fields.follows).toEqual({ worlds: ["g:a"], people: [] });
+    expect(store.getState().device.follows).toEqual({ worlds: ["g:a"], people: [] });
+    expect(store.getState().device.stamps).toEqual({});
   });
 });

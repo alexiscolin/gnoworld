@@ -190,4 +190,12 @@ export const GLYPHS = {
       <path d="M7.5 8.5L13 3M11 5l1.5 1.5" />
     </>
   ),
+  sliders: (
+    <>
+      <path d="M3 4.5h10M3 8h10M3 11.5h10" />
+      <circle cx="10" cy="4.5" r="1.5" />
+      <circle cx="6" cy="8" r="1.5" />
+      <circle cx="11" cy="11.5" r="1.5" />
+    </>
+  ),
 } satisfies Record<string, ReactElement>;

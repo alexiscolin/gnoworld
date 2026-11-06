@@ -1,0 +1,56 @@
+/* The two views of space in the header's pill, after its views: a pair of the pill's own icon controls, 2 px apart as its links are. */
+@layer components {
+  /* Shown while a scene runs, as its canvas says (Universe.tsx's data-scene): on a phone a pill of their own at the scene's top right
+     corner, under the header, for the bar has no room for them beside its names at 320 px (F4691); on a computer in the header's pill. */
+  .space {
+    /* layout: none until a scene runs */
+    display: none;
+    position: fixed;
+    /* raw: under the phone's header, 96 px high (16 px, a 40 px row, 4 px, a 20 px line, 16 px), a step below it */
+    inset-block-start: calc(96px + var(--space-2xs));
+    inset-inline-end: var(--space-s);
+  }
+
+  :root:has(canvas[data-scene="on"]) .space {
+    /* layout: the icons on a row */
+    display: flex;
+  }
+
+  .space > :not(.switch) {
+    /* layout: apart from the bar, the pill divides nothing */
+    display: none;
+  }
+
+  @media (min-width: 900px) {
+    :root:has(canvas[data-scene="on"]) .space {
+      /* layout: in the header's pill, the icons and its divider among its views */
+      display: contents;
+    }
+
+    .space > :not(.switch) {
+      /* layout: the pill's divider before its search */
+      display: block;
+    }
+  }
+
+  .switch {
+    /* layout: the two icons on the pill's row */
+    display: inline-flex;
+    /* layout: they share its middle */
+    align-items: center;
+    /* raw: the prototype's links' 2 px (shellHeader.module.css) */
+    /* layout: the icons 2 px apart, as the pill's links */
+    gap: 2px;
+  }
+
+  /* Each icon a round of the pill's views' height, the selected one filled as the selected view (the design review, F4472): over the plain
+     icon control's square corners and height, which the pressed state alone names here. */
+  .switch button[aria-pressed] {
+    /* raw: a view link's 34 px inside the 44 px pill (shellHeader.module.css) */
+    --_h: 34px;
+
+    /* layout: no room to share with the pill's 40 px controls: the icons are its links' height */
+    margin-block: 0;
+    border-radius: var(--radius-pill);
+  }
+}

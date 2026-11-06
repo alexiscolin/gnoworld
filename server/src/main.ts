@@ -19,11 +19,17 @@ import { makeLogin, makeSigned } from "./login/login.ts";
 import { migrations } from "./migrations.ts";
 import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
+import { historyRoutes } from "./prices/history.ts";
 import { isTeam, loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
-import { defaultUniverse } from "./prices/universes.ts";
+import { checkFor, startPreviews } from "./previews/job.ts";
+import { defaultUniverse, hubRealms, hubWorlds } from "./prices/universes.ts";
+import { habitsBeside } from "./worlds/habitsFiles.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsRoutes } from "./rooms/routes.ts";
+import { startWorlds } from "./worlds/job.ts";
+import { trendsRoutes } from "./worlds/trends.ts";
+import { dirname, join } from "node:path";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -45,6 +51,35 @@ const prices =
         log,
         ...(config.universes === undefined ? {} : { universe: defaultUniverse(config.universes) }),
       });
+// The worlds job (7c, every half hour, WORLDS_FILE) and the previews job (8f, every six hours, PREVIEWS_FILE, each page read by the
+// moderation check) read the default universe alone: with no chain, or for previews no check, the server stops rather than run.
+if ((config.worlds !== undefined || config.previews !== undefined) && config.universes === undefined)
+  throw new Error("setting UNIVERSES_FILE: required");
+if (config.previews !== undefined && config.moderation.openaiKey === undefined)
+  throw new Error("setting OPENAI_API_KEY_FILE: required");
+// The trends read a hub's rooms and its realms as one world (7t3): the hubs beside the universes, read before the job, so a bad file stops
+// the server at boot; each world's chain windows kept beside the database, counts alone, none for a database in memory.
+const hubs = config.worlds === undefined || config.universes === undefined ? undefined : hubWorlds(config.universes);
+const worlds =
+  config.worlds === undefined || config.universes === undefined
+    ? undefined
+    : startWorlds({
+        file: config.worlds,
+        log,
+        universe: defaultUniverse(config.universes),
+        ...habitsBeside(config.database),
+      });
+const { openaiKey, thresholds } = config.moderation;
+const previews =
+  config.previews === undefined || config.universes === undefined || openaiKey === undefined
+    ? undefined
+    : startPreviews({
+        file: config.previews,
+        log,
+        universe: defaultUniverse(config.universes),
+        pages: hubRealms(config.universes),
+        check: checkFor({ openaiKey, thresholds }, { log }),
+      });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -60,9 +95,29 @@ const chat = startChat(
     trustedProxy: config.trustedProxy,
     spared: spared(roles),
   },
-  { log, pepper: config.pepper, session },
+  // Who is here keeps its history beside the database (7h); a database held in memory keeps none.
+  {
+    log,
+    pepper: config.pepper,
+    session,
+    ...(config.database === ":memory:" ? {} : { presence: join(dirname(config.database), "presence.json") }),
+  },
 );
 app.route("/api/activity", chat.activity);
+if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
+// The markets row's sparklines (8i): the prices timer's day, a 404 while it has none or without the timer.
+app.route("/api/markets/history", historyRoutes(prices?.history ?? (() => undefined)));
+// The home's ticker's trends (7t): the worlds job's last passes and who is here, a few items; none without either, never a 404.
+app.route(
+  "/api/trends",
+  trendsRoutes({
+    chain: worlds?.trends ?? (() => ({ worlds: [], newest: [] })),
+    presence: chat.presenceNow,
+    chat: chat.presenceChat,
+    hubs,
+    now: Date.now,
+  }),
+);
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
@@ -146,6 +201,8 @@ const drain = (): void => {
   log("stopping");
   retention.stop();
   prices?.stop();
+  worlds?.stop();
+  previews?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).

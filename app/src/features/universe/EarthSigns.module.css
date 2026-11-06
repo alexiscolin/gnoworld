@@ -1,0 +1,292 @@
+/* The signs over the globe, as the frames draw them (43 to 55): a dark bubble, a country's ring and pill, the far side's counts. Under the plate and
+   the dock, over the canvas; only a pin takes a pointer. */
+@layer components {
+  .signs {
+    /* raw: where the page keeps the globe, which the script writes here as soon as it reads it */
+    --_foot: 100vb;
+    /* raw: the same, from the window's left edge */
+    --_left: 0px;
+    /* raw: the same: what the ring leaves the counts, clear of the dock */
+    --_room: 520px;
+
+    position: fixed;
+    inset: 0;
+    /* raw: over the page's own flow, under the header and the dock (shellHeader.module.css, Panel.module.css) */
+    z-index: 0;
+    overflow: clip;
+    pointer-events: none;
+  }
+
+  .who,
+  .rings,
+  .dot,
+  .pill,
+  .pin,
+  .pin::before,
+  .count,
+  .ping::after {
+    border-radius: var(--radius-pill);
+  }
+
+  .who,
+  .pill {
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  .pin,
+  .count {
+    font: var(--font-meta);
+    color: var(--color-text);
+  }
+
+  .pill,
+  .pin,
+  .count {
+    white-space: nowrap;
+  }
+
+  .anchor {
+    position: absolute;
+    /* raw: the script moves it from the page's corner to its point of the ground */
+    inset: 0 auto auto 0;
+  }
+
+  .anchor[data-mark="bubble"] {
+    /* raw: the bubble's place from its point, and how far it moved clear of another: the script writes them */
+    --_x: 6px;
+    /* raw: the same, 62 px over the point */
+    --_y: -62px;
+    /* raw: the same */
+    --_lift: 0px;
+
+    visibility: hidden;
+  }
+
+  .bubble {
+    /* layout: the face beside the words, in one row that never wraps */
+    display: grid;
+    /* layout: the frames' face, the rest to the words */
+    grid-template-columns: var(--control-xs) minmax(0, 1fr);
+    /* layout: a step between the two */
+    column-gap: var(--space-xs);
+    /* layout: the face at the words' middle */
+    align-items: center;
+    /* raw: frame 47's bubble, 258 px wide */
+    inline-size: 258px;
+    /* raw: frame 47's corners */
+    border-radius: 16px;
+    border: var(--line-width) solid var(--color-line-strong);
+    padding: var(--space-xs);
+    /* raw: near-black over the night side: the frames' glass, with no blur, which is not yet baseline */
+    background: color-mix(in oklab, var(--color-space) 94%, transparent);
+    /* raw: a quarter of a second, a little past its size and back */
+    animation: pop 240ms cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+    translate: var(--_x) var(--_y);
+    /* raw: a fifth of a second, so a bubble that gives way is seen to move */
+    transition: translate 200ms ease-out;
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      /* raw: from a little under its size, rising from its place */
+      transform: scale(0.82) translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+
+  .who {
+    /* layout: the initial at the disc's middle */
+    display: grid;
+    /* layout: the same */
+    place-items: center;
+    block-size: var(--control-xs);
+    font: var(--font-meta);
+  }
+
+  .words {
+    /* layout: a line under the head */
+    margin-block: var(--space-3xs) 0;
+    color: var(--color-text);
+    /* raw: frame 47's words, 13 px */
+    font: 400 0.8125rem/1.35 var(--family-sans);
+    overflow-wrap: anywhere;
+  }
+
+  .head {
+    /* raw: frame 55's head, mono 10 px */
+    font: 400 0.625rem/1.3 var(--family-mono);
+    /* raw: the same, 7.2 px a letter */
+    letter-spacing: 0.12em;
+  }
+
+  .head:not(:empty) {
+    color: var(--color-text-muted);
+    text-transform: uppercase;
+  }
+
+  /* A person spoke here: one ring leaves the place as the bubble comes. */
+  .ping {
+    position: absolute;
+    /* raw: on the point itself */
+    inset: 0 auto auto 0;
+  }
+
+  /* A bubble that moved clear of another stays tied to its place by a line. */
+  .ping::before {
+    content: "";
+    position: absolute;
+    /* raw: from the point upwards */
+    inset-block-end: 0;
+    inline-size: var(--line-width);
+    block-size: var(--_lift);
+    background: var(--color-line-strong);
+    /* raw: the bubble's own ease */
+    transition: block-size 200ms ease-out;
+  }
+
+  .ping::after {
+    content: "";
+    position: absolute;
+    /* raw: frame 47's ring, 20 px out */
+    inset: -20px;
+    border: var(--line-width) solid var(--color-mine);
+    /* raw: one ring, as a person speaks */
+    animation: ring 1.2s ease-out both;
+  }
+
+  .rings,
+  .dot {
+    position: absolute;
+    color: var(--color-mine);
+  }
+
+  [data-trend="down"] > .rings,
+  [data-trend="down"] > .dot {
+    color: var(--color-danger);
+  }
+
+  .rings {
+    /* raw: frame 52's ring, 20 px out */
+    inset: -20px;
+    border: var(--line-width) solid currentcolor;
+    /* raw: the frames' faint fill */
+    background: color-mix(in oklab, currentcolor 4%, transparent);
+    /* raw: a slow beat, the frames' */
+    animation: ring 2.4s ease-out infinite;
+  }
+
+  .dot {
+    /* raw: frame 52's dot, 5 px out */
+    inset: -5px;
+    background: currentcolor;
+    /* raw: its glow, which stays small: no blinding light */
+    box-shadow: 0 0 14px currentcolor;
+  }
+
+  @keyframes ring {
+    from {
+      /* raw: from a little under its own strength */
+      opacity: 0.9;
+      /* raw: from half its size */
+      transform: scale(0.5);
+    }
+
+    to {
+      opacity: 0;
+      /* raw: to frame 55's 62 px, as it fades */
+      transform: scale(1.6);
+    }
+  }
+
+  .pill {
+    position: absolute;
+    /* raw: frame 52's place, 38 px over the point */
+    inset-block-start: -38px;
+    /* raw: and 20 px right of it */
+    inset-inline-start: 20px;
+    padding-inline: var(--space-2xs);
+    /* raw: frame 52's 11 px mono, in a pill 20 px high */
+    font: 500 0.6875rem/20px var(--family-mono);
+  }
+
+  .pin {
+    position: absolute;
+    /* raw: at its point's height, its dot on the point: half the chip up, and the dot's place left */
+    transform: translate(-12px, -50%);
+    /* layout: the dot before the name, on one line */
+    display: inline-grid;
+    /* layout: the same */
+    grid-template-columns: auto auto;
+    /* layout: the same */
+    column-gap: var(--space-3xs);
+    /* layout: the same */
+    place-items: center;
+    block-size: var(--control-xs);
+    border: var(--line-width) solid var(--color-line-strong);
+    padding-inline: var(--space-2xs);
+    /* raw: the bubbles' dark */
+    background: color-mix(in oklab, var(--color-space) 94%, transparent);
+    pointer-events: auto;
+  }
+
+  .pin:any-link {
+    text-decoration: none;
+  }
+
+  .pin::before {
+    content: "";
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    background: var(--color-primary);
+    /* raw: a small glow */
+    box-shadow: 0 0 8px var(--color-primary);
+  }
+
+  .pin:hover {
+    border-color: var(--color-primary);
+  }
+
+  .counts {
+    position: absolute;
+    /* raw: 50 px under the ring, as the frames have them */
+    inset-block-start: calc(var(--_foot) + 50px);
+    inset-inline-start: var(--_left);
+    max-inline-size: var(--_room);
+  }
+
+  .count {
+    border: var(--line-width) solid var(--color-line);
+    /* raw: the frames' 10 px beside the words */
+    padding: var(--space-3xs) 10px;
+    /* raw: a little lighter than a bubble, for it holds no words to read at length */
+    background: color-mix(in oklab, var(--color-space) 65%, transparent);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .bubble,
+    .rings {
+      animation: none;
+    }
+
+    .bubble,
+    .ping::before {
+      transition: none;
+    }
+
+    .ping::after {
+      animation: none;
+      visibility: hidden;
+    }
+
+    .rings {
+      /* raw: the ring at rest, where it does not beat */
+      opacity: 0.8;
+    }
+  }
+}

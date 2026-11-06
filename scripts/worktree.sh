@@ -35,6 +35,8 @@ case $name in *[!abcdefghijklmnopqrstuvwxyz0123456789-]*) parent= ;; esac
 [ "$parent" = "$root" ] || { echo "worktree.sh: $dir is not $root/<name>, <name> in a-z, 0-9 and -, once resolved" >&2; exit 1; }
 dir=$root/$name
 [ ! -L "$dir" ] || { echo "worktree.sh: $dir is a link; name the folder itself" >&2; exit 1; }
+# A caller's git folders are never this run's: a work tree, an index or an object folder of another place (7w3, T9).
+unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY
 src=$(pwd -P)
 # Every git below, and every git it starts in another tree, reads this tree's common folder and so its config, never one a
 # commondir names: Claude Code denies writing a commondir only for the trees that stood when the session started, and outside

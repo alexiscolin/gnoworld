@@ -4,13 +4,23 @@
 // package, on a node checked to be its chain (D120), so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is capped, parsed, checked field by field, only the file's fields written; a failure keeps the last file and is
 // logged by its kind, never by what it held. A coin without a price is no token (an unlisted id is left out of the answer).
-import { jsonOf } from "@gnoworld/core";
-import { renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { readHeight } from "@gnoworld/chain/node";
 import type { Failure as ReadFailure, FailureKind } from "@gnoworld/chain/read";
 import { Markets, MARKET_SYMBOLS, MarketBlock } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
-import { readCapped, send as netSend, type Send } from "@gnoworld/service/net";
+import {
+  Failure,
+  fetchCapped,
+  jsonOrFail,
+  publicUrl,
+  reachedNothing,
+  send as netSend,
+  type Kind,
+  type Send,
+} from "@gnoworld/service/net";
+import { repeat, waits } from "../repeat.ts";
+import { besideOf, replaceFile } from "../replaceFile.ts";
+import { makeHistory, type History } from "./history.ts";
 
 interface Options {
   file: string;
@@ -26,6 +36,8 @@ interface Options {
 
 export interface Prices {
   stop: () => void;
+  /** The day's prices so far (8i), from the file beside markets.json. */
+  history: History["current"];
 }
 
 // CoinGecko asks by id, never by symbol (btc is shared by a dozen tokens).
@@ -35,27 +47,6 @@ const TIMEOUT_MS = 10_000;
 // A good answer is under 1 KB; 64 KB leaves room and stops a stream that never ends.
 export const MAX_BYTES = 64 * 1024;
 const EVERY_MS = 300_000;
-// A request that reached nothing: in the stack the server starts before the way out, and its first tick finds no proxy.
-const RETRY_MS = 15_000;
-
-type Kind =
-  | "rate_limited"
-  | "status"
-  | "too_large"
-  | "not_json"
-  | "shape"
-  | "no_price"
-  | "timeout"
-  | "request"
-  | "write"
-  | "other_chain";
-class Failure extends Error {
-  readonly kind: Kind;
-  constructor(kind: Kind) {
-    super(kind);
-    this.kind = kind;
-  }
-}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
@@ -83,14 +74,11 @@ function tokensOf(answer: unknown): Markets["tokens"] {
 
 // The RPC the height is read from, or a refusal at start: https alone, no user, no path, query or fragment.
 function checkedRpc(rpc: string): URL {
-  const url = URL.parse(rpc);
-  const bare = url?.pathname === "/" && url.search === "" && url.hash === "";
-  if (url?.protocol !== "https:" || url.username !== "" || url.password !== "" || !bare)
+  const url = publicUrl(rpc);
+  if (url?.pathname !== "/" || url.search !== "" || url.hash !== "")
     throw new RangeError("prices: the rpc is no bare https address");
   return url;
 }
-
-const reachedNothing = (error: unknown): boolean => error instanceof Failure && error.kind === "request";
 
 // A failed height read, the chain package's kind in this timer's words: a request that reached nothing, a status, a 429.
 function failureOf({ kind, status }: ReadFailure): Failure {
@@ -104,8 +92,6 @@ function failureOf({ kind, status }: ReadFailure): Failure {
   };
   return new Failure(words[kind] ?? "shape");
 }
-const named = (error: unknown): boolean =>
-  error instanceof Error && (error.name === "TimeoutError" || error.name === "AbortError");
 
 // The default universe's latest block through the chain package, its node checked to be that universe's chain, the way
 // out its transport; then the file's own bounds.
@@ -126,36 +112,23 @@ export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
   const { universe } = options;
   const node = universe === undefined ? undefined : { url: checkedRpc(universe.rpc), chainId: universe.chainId };
-  const temp = `${file}.tmp`;
-  let stopped = false;
-  let timer: NodeJS.Timeout | undefined;
+  // Each token's day of prices beside the file (8i), for the markets row's sparklines.
+  const history = makeHistory(besideOf(file, "history"), now);
 
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
   async function get(url: string): Promise<unknown> {
-    let text: string;
-    try {
-      const response = await send(url, { method: "GET", headers: { accept: "application/json" } }, TIMEOUT_MS);
-      if (response.status === 429) throw new Failure("rate_limited");
-      if (!response.ok) throw new Failure("status");
-      const capped = await readCapped(response, MAX_BYTES);
-      if (capped === undefined) throw new Failure("too_large");
-      text = capped;
-    } catch (error) {
-      if (error instanceof Failure) throw error;
-      throw new Failure(named(error) ? "timeout" : "request");
-    }
-    const value = jsonOf(text);
-    if (value === undefined) throw new Failure("not_json");
-    return value;
+    const init = { method: "GET", headers: { accept: "application/json" } };
+    const bytes = await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes: MAX_BYTES });
+    return jsonOrFail(Buffer.from(bytes).toString("utf8"));
   }
 
-  async function read(): Promise<void> {
+  async function read(isStopped: () => boolean): Promise<void> {
     // Both asked at once, each its own failure: the prices' ends the read (the last file stays), the height's only leaves it out.
     const [priced, blocked] = await Promise.allSettled([
       get(URL_ASKED),
       node === undefined ? Promise.resolve(undefined) : readBlock(node, send),
     ]);
-    if (stopped) return;
+    if (isStopped()) return;
     if (priced.status === "rejected") throw priced.reason;
     const tokens = tokensOf(priced.value);
     let block: MarketBlock | undefined;
@@ -167,36 +140,20 @@ export function startPrices(options: Options): Prices {
       tokens,
       ...(block === undefined ? {} : { block }),
     });
-    try {
-      // Written beside the file and renamed over it: a reader sees the old file or the new one, never half of one.
-      writeFileSync(temp, `${JSON.stringify(markets)}\n`, { mode: 0o644 });
-      renameSync(temp, file);
-    } catch {
-      try {
-        unlinkSync(temp);
-      } catch {
-        // Nothing was written, or it is gone already.
-      }
-      throw new Failure("write");
-    }
+    if (!replaceFile(file, `${JSON.stringify(markets)}\n`)) throw new Failure("write");
+    // The history's file failing keeps markets.json new: the sparklines wait, the prices do not.
+    if (!history.add(markets.tokens, Date.parse(markets.updated))) log("prices_failed", { error: "history_write" });
   }
 
-  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one.
-  const next = (error?: unknown): void => {
-    if (!stopped) timer = setTimeout(tick, reachedNothing(error) ? Math.min(RETRY_MS, everyMs) : everyMs);
-  };
-  function tick(): void {
-    read().then(next, (error: unknown) => {
-      if (!stopped) log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
-      next(error);
-    });
-  }
-
-  tick();
-  return {
-    stop: () => {
-      stopped = true;
-      if (timer !== undefined) clearTimeout(timer);
+  // After the read ends: one request in flight. A failure waits as long as a success, but one that reached nothing asked no one; as before
+  // F4872, one whose cause has no name is asked again soon too, for it is one call.
+  const wait = waits(everyMs, (kind) => kind === "request" || reachedNothing(kind));
+  const timer = repeat({
+    pass: read,
+    failed: (error) => {
+      log("prices_failed", { error: error instanceof Failure ? error.kind : "shape" });
     },
-  };
+    waitMs: (error) => wait(error instanceof Failure ? error.kind : undefined),
+  });
+  return { stop: timer.stop, history: history.current };
 }

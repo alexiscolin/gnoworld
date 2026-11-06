@@ -24,4 +24,55 @@
     /* layout: the controls at the far end of the header's row */
     margin-inline-start: auto;
   }
+
+  /* The rooms' control and the place: on a wide chat, items of the header's one row (frame 60). */
+  .place {
+    /* layout: its children are the header's own items */
+    display: contents;
+  }
+
+  /* raw: the design system's one breakpoint for the chat, read from the chat's own width: a narrow chat's header (a dock's, a phone's) has
+     two rows whatever comes late, its title's font or its rooms' control (7e, 2026-11-02): the place, then the name on one line and the
+     controls, so nothing under it moves */
+  @container (inline-size <= 900px) {
+    .place {
+      /* layout: the first row, whole */
+      display: flex;
+      /* layout: the whole row */
+      flex-basis: 100%;
+      /* the rooms' control's height, before its chunk comes: the row does not grow when it does */
+      min-block-size: var(--control-s);
+      /* layout: the control and the place on one line */
+      align-items: center;
+      /* layout: the header's own step between them */
+      gap: inherit;
+    }
+
+    .title {
+      /* layout: the name takes what the controls leave of the second row, and gives way */
+      flex: 1 1 0;
+      white-space: nowrap;
+    }
+
+    /* A direct message's name, long, takes the second row whole; its mark, said at once, and the controls make the third. */
+    .title:has(~ .mark) {
+      /* layout: a row of its own */
+      flex-basis: 100%;
+    }
+
+    /* A plain name gives way at the row's end; a name that opens the menu holds a control, whose focus ring nothing may clip. */
+    .title:not(:has(.trigger)) {
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .trigger {
+      max-inline-size: 100%;
+      overflow: hidden;
+      /* raw: room for the ink a glyph draws past its 22 px line (a #'s bars, a g's tail), which the clip cut (F4883) */
+      padding: 2px;
+      /* layout: the padding taken back, so the name stands where it did */
+      margin: -2px;
+    }
+  }
 }

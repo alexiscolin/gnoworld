@@ -4,6 +4,7 @@ import { parseLine, type IrcMessage } from "../irc/irc.ts";
 import {
   addLines,
   concerns,
+  isCountryCode,
   isTagMsgid,
   lineOf,
   membersAfter,
@@ -71,6 +72,33 @@ describe("concerns: the room a message is about", () => {
   test("folds A to Z alone, as Ergo's casemapping does", () => {
     expect(concerns(read(":a!u@h PRIVMSG #BUBBLÉ :x"))).toBe("#bubblÉ");
   });
+});
+
+// 7f2: the speaker's declared country, a client's tag of our own beside +gnoworld/edit. 7j sends it, with the opt-in; a line only reads it,
+// and a page's other client may write anything there.
+describe("lineOf: the country a line declares", () => {
+  const withCountry = (value: string) =>
+    read(`@msgid=a1;time=${T0};account=${ALICE};+gnoworld/country=${value} :${ALICE}!u@h PRIVMSG #bubble :hi`);
+
+  test("reads two capitals", () => {
+    expect(lineOf(withCountry("FR"), "#bubble")).toMatchObject({ country: "FR" });
+  });
+
+  test("carries none when the line declares none", () => {
+    expect(lineOf(said("a1", T0, "hi"), "#bubble")).not.toHaveProperty("country");
+  });
+
+  test("reads only our own client tag: a server tag of that name is another's", () => {
+    const line = read(`@msgid=a1;time=${T0};account=${ALICE};country=FR :${ALICE}!u@h PRIVMSG #bubble :hi`);
+    expect(lineOf(line, "#bubble")).not.toHaveProperty("country");
+  });
+
+  test.each(["fr", "F", "FRA", "F1", "<b>", "FR\\s", "\\:", "", "ЕР"])(
+    "keeps none for the hostile value %j",
+    (value) => {
+      expect(lineOf(withCountry(value), "#bubble")).not.toHaveProperty("country");
+    },
+  );
 });
 
 describe("lineOf: a room's line from Ergo's message", () => {
@@ -667,5 +695,31 @@ describe("isTagMsgid: a msgid a tag carries back", () => {
     "a\u007fb",
   ])("refuses %j", (id) => {
     expect(isTagMsgid(id)).toBe(false);
+  });
+});
+
+// 7j: what may ride in the tag, going out as coming in. A value is written into a line, so a character more could open a tag of its own.
+describe("isCountryCode", () => {
+  test("takes two capitals", () => {
+    expect(isCountryCode("JP")).toBe(true);
+  });
+
+  test.each([
+    "jp",
+    "J",
+    "JPN",
+    "J1",
+    "JP ",
+    " JP",
+    "JP\n",
+    "JP;a=b",
+    "JP x",
+    "",
+    "ЕР",
+    "US-CA",
+    "GB-ENG",
+    "35.6,139.7",
+  ])("refuses %j", (value) => {
+    expect(isCountryCode(value)).toBe(false);
   });
 });

@@ -21,7 +21,7 @@ import { useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
 import { mentionable } from "./names.ts";
-import { chipsOf } from "./Reactions.tsx";
+import { chipsOn, firstWordsOf, votesOf } from "./lineMarks.ts";
 import { useListRead } from "./reading.ts";
 import styles from "./RoomView.module.css";
 
@@ -117,6 +117,10 @@ type ListProps = Omit<LinesProps, "lines"> & {
   byId: ReadonlyMap<string, Line>;
   /** Each line's reactions as chipsOf writes them, by msgid. */
   chips: ReadonlyMap<string, string>;
+  /** Each poll line's votes as votesString writes them, by msgid. */
+  votes: ReadonlyMap<string, string>;
+  /** The lines that are an account's first words in the room. */
+  firsts: ReadonlySet<string>;
   /** Each root's replies, by msgid (4d's threads): a chip counts them. */
   repliesOf: ReadonlyMap<string, readonly Line[]>;
   /** The newest edit shown in each corrected line's place, by the line's msgid: the verdict a player waits on is its. */
@@ -149,9 +153,12 @@ export function Lines(props: LinesProps) {
   const onThread = threaded ? props.onThread : undefined;
   const byId = new Map(lines.map((line) => [line.id, line]));
   // Each line's chips as a string a line compares by value (F1222).
-  const chips = new Map([...shown].map(([id, each]) => [id, chipsOf(each)]));
+  const votes = votesOf({ lines, reactions: props.reactions ?? [], me: props.me, lineOf });
+  const chips = chipsOn(shown, votes);
   return (
     <List
+      votes={votes}
+      firsts={firstWordsOf(lines, { room: props.room, paged: props.paged === true })}
       {...props}
       known={mentionable(props.members, lines)}
       byId={byId}
@@ -169,7 +176,7 @@ export function Lines(props: LinesProps) {
 function List(props: ListProps) {
   const { room, partner, known, me, refused, connected, cannotReact, lines, shown, lineOf, newest } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { verdicts, saving = false, keeping, byId, chips, repliesOf, onThread, onEdit } = props;
+  const { verdicts, saving = false, keeping, byId, chips, votes, firsts, repliesOf, onThread, onEdit } = props;
   const { fresh, listRef, onScroll } = useListRead(props);
   const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
@@ -237,7 +244,9 @@ function List(props: ListProps) {
             players={room !== undefined && !saving}
             {...keptOf(keeping, line.id)}
             chips={chips.get(line.id)}
-            react={me === undefined || !shown.has(line.id) ? undefined : react}
+            votes={votes.get(line.id)}
+            newHere={firsts.has(line.id)}
+            react={me === undefined || (!shown.has(line.id) && !votes.has(line.id)) ? undefined : react}
             answers={answeredBy(line, byId, lineOf)}
             replies={repliesOf.get(line.id)?.length}
             onThread={onThread}

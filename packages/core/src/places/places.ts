@@ -1,6 +1,8 @@
 // The places of the data files and their addresses (slice 5's 5c; docs/decisions.md, 2026-10-29): in every universe the
-// cosmos and the Earth, then its worlds (hubs and stations) and its ecosystems. A place has the path its page lives at,
+// cosmos and the Earth, then its worlds (the hubs) and its ecosystems. A place has the path its page lives at,
 // the default universe's unprefixed, and one canonical address, always under /net/<universe>.
+import { worldRoute } from "./route.ts";
+
 export type PlaceKind = "cosmos" | "earth" | "world" | "ecosystem";
 
 export interface Place {
@@ -23,7 +25,6 @@ export interface PlaceSource {
   universes: { id: string }[];
   hubs: Row[];
   ecosystems: Row[];
-  stations: Row[];
 }
 
 /** Every place, universe by universe; throws on a universe, a world or an ecosystem the files name twice or name wrong. */
@@ -60,12 +61,11 @@ export function placesOf(source: PlaceSource): Place[] {
       const key = `${universe}/${slug}`;
       if (taken.has(key)) throw new RangeError(`places: two ${kind}s named "${slug}" in "${universe}"`);
       taken.add(key);
-      add({ kind, universe, slug, route: `${kind === "world" ? "/w/" : "/e/"}${slug}` });
+      add({ kind, universe, slug, route: kind === "world" ? worldRoute(slug) : `/e/${slug}` });
     }
   };
   const worlds = new Set<string>();
   named(source.hubs, "world", worlds);
-  named(source.stations, "world", worlds);
   named(source.ecosystems, "ecosystem", new Set());
   return places;
 }

@@ -1,6 +1,5 @@
 // The overview's parts for the interface's components, each region's content (Overview.tsx).
 import { useState } from "react";
-import { ActivityChart } from "../ActivityChart/ActivityChart.tsx";
 import { Avatar } from "../Avatar/Avatar.tsx";
 import { Breadcrumb } from "../Breadcrumb/Breadcrumb.tsx";
 import { Button } from "../Button/Button.tsx";
@@ -17,7 +16,7 @@ import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
 import { Comboboxes } from "./Comboboxes.tsx";
-import { ADDRESS, DAY, disc, short } from "./samples.ts";
+import { ADDRESS, disc, short } from "./samples.ts";
 
 export function Chips() {
   const [lens, setLens] = useState("games");
@@ -160,10 +159,6 @@ export function Stats() {
       <Stat value={21480} unit="calls" caption="Today" delta={-120} />
     </Cluster>
   );
-}
-
-export function Activity() {
-  return <ActivityChart label="Calls per hour, today" values={DAY} />;
 }
 
 export function Planets() {

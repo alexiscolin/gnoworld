@@ -1,4 +1,4 @@
-// The places' data files a test writes in a folder of its own: two universes, two hubs, an ecosystem and a station by
+// The places' data files a test writes in a folder of its own: two universes, two hubs, an ecosystem by
 // default, each file as JSON unless a test gives its text; the folders are removed with `remove`.
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -26,7 +26,6 @@ export interface Files {
   universes?: unknown;
   hubs?: unknown;
   ecosystems?: unknown;
-  stations?: unknown;
 }
 
 /** A maker of data folders, and the removal of every folder it made. */
@@ -37,9 +36,8 @@ export function placesData() {
     folders.push(folder);
     const json: Required<Files> = {
       universes: [universe("onyx", { default: true }), universe("gnoland")],
-      hubs: [world("bubble", "Bubble"), world("govdao", "GovDAO")],
+      hubs: [world("bubble", "Bubble"), world("govdao", "GovDAO"), world("tower", "Tower", "gnoland")],
       ecosystems: [{ slug: "games", name: "Games", description: "Games played on chain.", universe: "onyx" }],
-      stations: [world("tower", "Tower", "gnoland")],
       ...files,
     };
     for (const [name, value] of Object.entries(json))

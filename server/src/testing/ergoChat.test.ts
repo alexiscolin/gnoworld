@@ -24,11 +24,9 @@ describe("the bot acts (3j)", { timeout: 40_000 }, () => {
     const flagged = await say(alice, "#bubble", "I will hurt you");
     // The bot's verdict, which the full gate's load slows past the 2 s a line's echo takes.
     await bob.expect(new RegExp(` REDACT #bubble ${flagged} violence`), 10_000);
-    await alice.expect(
-      new RegExp(
-        `NOTICE ${author} :Your message in #bubble was hidden: violence\\. The rules: https://gno\\.world/rules`,
-      ),
-    );
+    // The notice can reach the author before their own echo, and `say` has then read past it, so all they received is searched (F4055).
+    const notice = `NOTICE ${author} :Your message in #bubble was hidden: violence. The rules: https://gno.world/rules`;
+    await expect.poll(() => alice.lines().filter((line) => line.includes(notice)), { timeout: 10_000 }).toHaveLength(1);
     await expect.poll(() => verdicts().length).toBe(2);
     await sync(bob);
     expect(bob.lines().filter((line) => line.includes(` REDACT #bubble ${clean}`))).toEqual([]);

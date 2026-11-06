@@ -218,6 +218,19 @@ test("a listed file held with other bytes is dropped at once, and fetched again 
   expect(store(name).get(ENTRY)).toBe("build /assets/entry.client-Bx3f9a1Q.js");
 });
 
+// worker.ts's kept(): a file its cache holds that this version does not list is no file of its own: never counted as held, nor deleted
+// there (8n, tier-1 coverage).
+test("a file the cache holds and the list does not is neither counted held nor deleted", async () => {
+  const stores: Stores = new Map();
+  const first = await installed(scope({ stores }));
+  const stray = "https://example.test/assets/stray-AAAAAAAA.js";
+  first.store(first.name).set(stray, "a file of no list");
+  first.store(first.name).delete(ENTRY);
+  const { store, added, name } = await installed(scope({ stores }));
+  expect(added).toEqual([PRECACHE[2]]);
+  expect(store(name).get(stray)).toBe("a file of no list");
+});
+
 test("a file gone between the cache's list and its read is fetched again", async () => {
   const stores: Stores = new Map();
   await installed(scope({ stores }));
@@ -428,6 +441,18 @@ test("a cache that is not the worker's never answers: its copy of a hashed file 
   const { event, answer } = request(url);
   site.fire("fetch", event);
   expect(await (await answer())?.text()).toBe(`network ${url}`);
+});
+
+// No version lists the scene's chunk, so a copy in one of the worker's caches can only have been planted there. This narrows one way
+// of carrying a planted file into the next version; the page open during an update is another, which it does not close (F181's row).
+test("the scene's chunk is left to the browser: a copy in the worker's own caches is never served", async () => {
+  const stores: Stores = new Map();
+  const site = await running(stores, PRECACHE, "");
+  const url = `${SITE}/assets/scene-AAAAAAAA.js`;
+  for (const store of stores.values()) store.set(url, "planted");
+  const { event, answers } = request(url);
+  site.fire("fetch", event);
+  expect(answers()).toBe(0);
 });
 
 // Only a hashed name is the content's: the worker answers no other file of the build's own folder.

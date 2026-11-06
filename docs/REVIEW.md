@@ -7,13 +7,22 @@ Review by risk, not line by line everywhere.
 | Tier | What | Written by | How it is reviewed |
 |---|---|---|---|
 | 1 | Realms (`gno/r/`, `gno/p/`), the sponsor, relay authorization (`server/src/ergo/`) | Claude | Claude and a fresh-context `gno-auditor` read every line. Alexis reviews the function cards and the attack scenarios. External audit before mainnet |
-| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builder (`app/src/lib/chain/evalCall.ts`, the one place an expression sent to a chain is built) | Alexis for the core, Claude elsewhere | Alexis reads every line |
+| 1 | Client crypto (keys, signed statements, Merkle, the MLS boundary), the CSP (`app/src/csp.ts`, and `app/src/cspOrigins.ts` and `app/src/cspForms.ts`, where its connect-src origins and inline-script forms are decided), the chain reads' qeval builders (`app/src/lib/chain/evalCall.ts`, for a realm's call, and core's chain folder, `packages/core/src/chain/`, where the name read's builder and the CSP's host rule live, F3535) | Alexis for the core, Claude elsewhere | Alexis reads every line |
 | 2 | Other TypeScript (state, queries, views) | Alexis for the core, Claude elsewhere | Alexis reads the tests first, then every line |
 | 1 | The server's login (`server/src/login/`) and the client's (`app/src/features/login/`, `app/src/lib/api/login.ts`, `app/src/lib/ergo/`), the admin API's rights (`server/src/roles/`, `server/roles.json`), the approval signing, the admin console, Jarvis's tool-allowlist loop, Adena (`app/src/lib/adena/`) | Claude | Alexis reads every line |
-| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`) | Claude | Alexis reads every line |
+| 1 | What decides who may do what at the edge: the deploy folder (`deploy/`), the markdown scanner (`packages/core/src/markdown/`), the service worker (`app/src/sw/`), the server's guard of every route that changes something, its rate limits and its settings (`server/src/guard.ts`, `server/src/limit.ts`, `server/src/config.ts`, and the service's two guards, `packages/service/src/net.ts` for publicUrl and `packages/service/src/settings.ts` for absolute, T2), the chat's players (the embed host list, `app/src/features/chat/embeds.ts`, and its frame's sandbox, `app/src/features/chat/Embed.tsx`), the warning before a realm page's link leaves (`app/src/features/realms/useExternalLinks.tsx`, and `app/src/leaving.tsx`, where 8c moved it for the calendar and the bell too), the link that stops another host's address before the router (`app/src/pagePath.ts`) | Claude | Alexis reads every line |
 | 2 | The rest of the server (TypeScript on Node) | Claude | Alexis reads the tests first, then every line |
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
-| 3 | Interface, 3D, motion | Either | Run it; read the budgets the gate prints |
+| 3 | Interface, 3D, motion: `app/src/features/errors/`, `app/src/features/home/`, `app/src/features/list/`, `app/src/features/search/`, `app/src/features/update/`, `app/src/features/world/`, and the design system's folders `packages/ui/src/ActivityChart/`, `packages/ui/src/Avatar/`, `packages/ui/src/Breadcrumb/`, `packages/ui/src/Button/`, `packages/ui/src/Card/`, `packages/ui/src/ChatLayout/`, `packages/ui/src/Chip/`, `packages/ui/src/Combobox/`, `packages/ui/src/compositions/`, `packages/ui/src/Dialog/`, `packages/ui/src/EmptyState/`, `packages/ui/src/Field/`, `packages/ui/src/Flash/`, `packages/ui/src/icons/`, `packages/ui/src/Kicker/`, `packages/ui/src/Logo/`, `packages/ui/src/NavItem/`, `packages/ui/src/Overview/`, `packages/ui/src/Panel/`, `packages/ui/src/PlanetThumb/`, `packages/ui/src/Popover/`, `packages/ui/src/Row/`, `packages/ui/src/Skeleton/`, `packages/ui/src/Stat/`, `packages/ui/src/Tabs/`, `packages/ui/src/TokensPage/`, `packages/ui/src/Tooltip/`, each named one by one | Either | Run it; read the budgets the gate prints |
+
+The backticked paths of this table are read by machines: the tier-1 ones by `.claude/workflows/branch.js` (its security lens) and by
+`scripts/speeds.py`, the tier-3 ones by `scripts/speeds.py` alone. A merge check whose every path is under a tier-3 folder, and none a tier-1
+path, runs no StrykerJS; any other path, or a table it cannot read, runs the whole control. Tier 3 fails closed, folder by folder: a feature
+or design-system folder is interface only once this row names it, so a folder added tomorrow, and the files in `packages/ui/src/`'s own root,
+take the whole control. The `chat` and `realms` features are not listed: the guards they hold or use are tier-1 rows (the embed host list and
+its frame's sandbox, the warning before a realm page's link leaves, the link that stops `//host`), and the rest of them is read as
+tier 2 (state, queries, views) with the rest of the TypeScript this row does not list. A state or query file in a listed folder is tier 3 for the
+mutation check and is still read by its tests first. A folder is written with its slash. Add a security path here and both follow.
 
 ## Order
 
@@ -59,16 +68,19 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
 3. **One combined review.** The `reviewer` agent reads the branch once: the tests' green pass on the
    mutation survivors (tautologies, mocks of the thing under test, empty assertions, timing
    guesses, a test weakened since its red pass), correctness, security, cost in big O against the
-   size each input reaches, and simplification. A tier-1 file or the harness adds the
-   `security-reviewer` (Opus, the threat model), a realm the `gno-auditor`, a changed screen (`app/src/`,
-   `packages/ui/src/`) the `design-reviewer`, which compares it with the video's frames in the branch loop
-   (`docs/design/video-screens.md`; frames missing fail the step). Each finding names its
+   size each input reaches, and simplification. Where StrykerJS runs on the files it reads its
+   survivors and writes no mutant by hand. A tier-1 file or the harness adds the `security-reviewer`
+   (Opus, the threat model), a realm the `gno-auditor`. A changed screen is the `reviewer`'s too, read
+   with the video's frames (`docs/design/video-screens.md`) in the same pass; the `design-reviewer`
+   runs apart only when the change alters how space looks (the scene, the planets, the cosmos) or the
+   `reviewer` asks for it, once, and again only on the screens of a high finding a fix changed (frames
+   missing fail the step). At most two review lots a part (7d6 had eight). Each finding names its
    class, and its fix covers every instance; one only about style is dropped. A merge carries
    about 400 lines of product code at most when it touches a tier-1 file, and about 600 otherwise
    (DORA's small batches; Alexis, 2026-10-22).
-4. **Verified, then reproduced, before it is fixed.** On tier-1 files the `finding-verifier`
-   (Opus) first tries to refute each finding, then to reproduce it, and its severity stands. Then:
-   a command, or a test seen failing. One nobody could reproduce stays `claimed`; a false positive
+4. **Reproduced before it is fixed:** a command, or a test seen failing, by the session (no agent
+   verifies the reviewers' findings: the `finding-verifier` gave 5 ledger rows in November, none high,
+   Alexis 2026-11-04). One nobody could reproduce stays `claimed`; a false positive
    is `rejected`, a true one whose behaviour is wanted `intended`, a true one of no matter `moot`,
    each with its reason. A speed claim names the call it timed, its input, Node's version and what
    the call answered. A fix of the product proves itself: its tests, run on the commit before it,
@@ -80,12 +92,14 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    reconsider the approach.
 6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
    status and evidence, numbered in its slice's range from slice 12 (slice N: F N000 to N999, a hundred a
-   part, `CLAUDE.md`), and a review reads it first: no rejected claim raised again without new
-   evidence, and a fixed one that comes back filed as a regression. What Alexis caught and missed
+   part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
+   rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
+   evidence, and a fixed one that comes back filed as a regression. A flaky test that passed on its
+   second run is no ledger row: `.claude/tmp/unsteady.log` keeps it. What Alexis caught and missed
    goes into the review log, with each branch's rounds, tokens and hours (measured against slice
    4's). At each slice's end, the dream (`CLAUDE.md`) reads the agents' reports, the learnings, the
-   log and the ledger, and proposes the rules and memories a repeated miss calls for; Alexis
-   accepts each.
+   log and the ledger, and proposes the rules and memories a repeated miss calls for, and the
+   rules, tests and checks to remove, each with what it costs and what it caught; Alexis accepts each.
 7. **Measure the harness by its findings.** Each `/pre-merge` writes to the review log how many
    verified findings it found in the harness itself (`scripts/`, `.githooks/`, `.claude/`). If
    that number does not fall over three merges, the harness is simplified, not extended: a guard
@@ -95,6 +109,28 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
    most at once; the chief session plans, integrates and runs the full gate. Agents are fresh,
    briefed from files, four at most at once, each asked for a short report: its findings, one row
    each with its evidence. A workspace is reviewed whole once per slice, at its true last merge.
+   A commit's gate runs the unit tests related to its change, the whole suite at a part's end
+   (`check.sh --tests-all`) and at every merge (`docs/HARNESS.md`, "The gate"). A fix of about 20
+   product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
+   failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
+   design pass unless it moves an approved picture. Design still being tried goes to the workshop
+   (`docs/DEVELOPMENT.md`, "The workshop") and lands later, in one tested batch. A part may raise one
+   chunk's size cap by up to 256 B without asking, never the first screen's: the new cap, its size
+   and no more, in a commit of its own with a `Lowered-floor:` line, both numbers in its report
+   (Alexis, 2026-11-04).
+
+### A part's weight by its kind (Alexis, 2026-11-04)
+
+| Kind | For | What runs |
+|---|---|---|
+| Retouch | a look tried live in the workshop (ping-pong) | at the batch's end: the gate, the pictures of the screens it touches, one `reviewer` |
+| Small fix | about 20 product lines, no tier-1 or harness file | its test seen failing, the gate, the journeys that watch it, one `reviewer` |
+| Feature | product code with no tier-1 or harness file | tests first and the red pass, one combined review (the design apart only for how space looks), two lots at most |
+| Sensitive | a tier-1 file or the harness | all of the above, the `security-reviewer` (and the `gno-auditor` for a realm), up to three rounds, effort xhigh |
+| Radical (until the hardening slice) | a part that touches no tier-1 file and no harness file | no test written and no agent review while it builds; the types, the lint, the build, the secrets' scan, the copies' check and the first screen's cap hold; the hardening slice writes its tests and reviews it before `main` |
+
+The `security-reviewer` weighs what harms people or the system: injection, who may call what, secrets, overload, leaks.
+A way to game a display's ranking or count (a ticker, a trend) is a low, kept for after the demo, never a round of its own.
 
 ## Before a push
 

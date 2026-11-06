@@ -9,7 +9,7 @@ export interface PlanetThumbProps {
   size?: "s" | "m" | "l";
   /** Beside its name already, as in a row: the picture says nothing more. */
   decorative?: boolean;
-  /** Grows under the pointer, as the dock's planets do; never under reduced motion. */
+  /** Grows by the dock's magnification its list writes on it as `--_mag`, as a dock's planets do; never under reduced motion. */
   magnify?: boolean;
 }
 

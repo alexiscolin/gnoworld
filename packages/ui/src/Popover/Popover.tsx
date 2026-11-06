@@ -13,6 +13,7 @@ import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { rove } from "../roving.ts";
 import { floating, usePlaced } from "./floating.ts";
+import soon from "../ComingSoon/ComingSoon.module.css";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -53,24 +54,45 @@ function useAnchored(kind: "dialog" | "menu") {
   return { open, panelRef, trigger, panel };
 }
 
+// A trigger with none of a button's look: what opens the panel, and the plain class alone.
+const plainOf = ({ ref, popoverTarget, "aria-haspopup": haspopup }: ReturnType<typeof useAnchored>["trigger"]) => ({
+  ref,
+  popoverTarget,
+  "aria-haspopup": haspopup,
+  className: soon["plain"],
+});
+
 export interface PopoverProps {
-  /** The trigger's words. */
-  trigger: string;
+  /** The trigger's words, or what it shows. */
+  trigger: ReactNode;
+  /** A trigger with no button's look: the words it holds as they are (a name in a line, which opens a person's card). */
+  plain?: boolean;
+  /** Its panel drawn only while open: a popover of each of many rows (a person's card on each line) costs nothing closed. */
+  lazy?: boolean;
+  /** Whether the trigger is a Tab stop: a list that is one stop (a room's lines) leaves its rows' controls out until in focus. */
+  tabbable?: boolean;
   /** What the panel is, for assistive technology. */
   label: string;
   children: ReactNode;
 }
 
 /** A panel under its trigger, closed by a click outside or Esc. */
-export function Popover({ trigger: words, label, children }: PopoverProps) {
-  const { trigger, panel } = useAnchored("dialog");
+export function Popover({
+  trigger: words,
+  plain = false,
+  lazy = false,
+  tabbable = true,
+  label,
+  children,
+}: PopoverProps) {
+  const { open, trigger, panel } = useAnchored("dialog");
   return (
     <>
-      <button type="button" {...trigger}>
+      <button type="button" {...(plain ? plainOf(trigger) : trigger)} {...(tabbable ? {} : { tabIndex: -1 })}>
         {words}
       </button>
       <div {...panel} aria-label={label}>
-        {children}
+        {lazy && !open ? null : children}
       </div>
     </>
   );
@@ -81,6 +103,8 @@ export interface MenuItem {
   onSelect: () => void;
   /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
   tone?: "danger";
+  /** The act's icon before its words. */
+  icon?: IconName;
 }
 
 export interface MenuProps {
@@ -94,12 +118,31 @@ export interface MenuProps {
   emphasis?: "outline" | "plain";
   /** An icon trigger's size: small in a toolbar (docs/DESIGN-SYSTEM.md, "a toolbar's small controls stay at 32"). */
   size?: "s" | "m";
+  /** Drawn before the words of a trigger with words: the account's face; with it, the words may be for assistive technology alone. */
+  lead?: ReactNode;
+  /** The words of a trigger with a lead, read and not drawn. */
+  wordsHidden?: boolean;
+  /** Open as it is drawn: a menu whose code came at its trigger's first press, drawn in its place. */
+  openAtOnce?: boolean;
 }
 
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
  * items, round the ends, Home and End go to the ends, and an act closes it first (WAI-ARIA's menu). */
-export function Menu({ trigger: words, label, items, icon, emphasis = "outline", size = "m" }: MenuProps) {
+export function Menu({
+  trigger: words,
+  label,
+  items,
+  icon,
+  emphasis = "outline",
+  size = "m",
+  lead,
+  wordsHidden = false,
+  openAtOnce = false,
+}: MenuProps) {
   const { open, panelRef, trigger, panel } = useAnchored("menu");
+  useLayoutEffect(() => {
+    if (openAtOnce) panelRef.current?.showPopover();
+  }, [openAtOnce, panelRef, trigger.ref]);
   // The danger acts come last, apart: a separator before the first.
   const apart = items.findIndex((item) => item.tone === "danger");
   // Its first item, once placed and so seen: a hidden item takes no focus.
@@ -117,7 +160,8 @@ export function Menu({ trigger: words, label, items, icon, emphasis = "outline",
     <>
       {icon === undefined ? (
         <button type="button" {...trigger}>
-          {words}
+          {lead}
+          {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
         </button>
       ) : (
         <Tooltip label={words}>
@@ -145,6 +189,7 @@ export function Menu({ trigger: words, label, items, icon, emphasis = "outline",
               }}
             >
               {item.tone === "danger" ? <Icon name="alert" /> : null}
+              {item.icon === undefined ? null : <Icon name={item.icon} />}
               {item.label}
             </button>
           </Fragment>

@@ -1,6 +1,20 @@
 import type { RouteConfigEntry } from "@react-router/dev/routes";
-import { expect, test } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { render } from "../tests/render.tsx";
 import routes from "./routes.ts";
+import Earth, { loader as earthLoader } from "./routes/earth.tsx";
+import Home, { loader as homeLoader } from "./routes/home.tsx";
+import List from "./routes/list.tsx";
+import Realm, { clientLoader as realmLoader } from "./routes/realm.tsx";
+import World, { loader as worldLoader } from "./routes/world.tsx";
+
+const { useEntered } = vi.hoisted(() => ({ useEntered: vi.fn() }));
+vi.mock(import("./features/universe/index.ts"), async (original) => ({ ...(await original()), useEntered }));
+// A realm's view reads the chain once in the browser: its page alone is asked here.
+vi.mock("./features/realms/index.ts", async (original) => ({
+  ...(await original<typeof import("./features/realms/index.ts")>()),
+  RealmView: () => null,
+}));
 
 // Every route with its whole path, nested or flat: [path, file].
 function flat(entries: readonly RouteConfigEntry[], base = ""): [string, string][] {
@@ -32,4 +46,35 @@ test("each path of the site is drawn by its own file: home, the Earth, the list,
 test("no two routes share an id: a file at two paths is told apart", () => {
   const ids = routes.map((entry) => entry.id ?? entry.file);
   expect(new Set(ids).size).toBe(routes.length);
+});
+
+// ADR-0003 §4: a reader is new until they enter a place. The pages that are places keep it, the Earth's, a world's and a realm's view, a
+// world's page for one with no hub; the home and the list are none.
+describe("the places a reader enters", () => {
+  test.each([
+    {
+      page: "the Earth's",
+      path: "/earth",
+      route: { path: "/earth", Component: Earth, loader: earthLoader },
+      enters: true,
+    },
+    {
+      page: "a world's",
+      path: "/w/bubble",
+      route: { path: "/w/:world", Component: World, loader: worldLoader },
+      enters: true,
+    },
+    {
+      page: "a realm's view",
+      path: "/r/gnoland/coins",
+      route: { path: "/r/*", Component: Realm, loader: realmLoader },
+      enters: true,
+    },
+    { page: "the home", path: "/", route: { path: "/", Component: Home, loader: homeLoader }, enters: false },
+    { page: "the list", path: "/list", route: { path: "/list", Component: List }, enters: false },
+  ])("$page page keeps that its reader entered a place, or not", async ({ path, route, enters }) => {
+    useEntered.mockClear();
+    await render(route, path);
+    expect(useEntered.mock.calls.length > 0).toBe(enters);
+  });
 });

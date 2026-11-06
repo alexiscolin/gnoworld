@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { act } from "react";
+import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { mount } from "../../../tests/mount.tsx";
@@ -29,7 +30,42 @@ function answering(response: () => Response) {
   return vi.fn<ChainFetch>(() => Promise.resolve(response()));
 }
 
+// The block again, its realm's proposals read as `value`.
+async function readingAs(value: Proposal[]) {
+  vi.resetModules();
+  vi.doMock("../../lib/chain/proposal.ts", async (original) => ({
+    ...(await original<typeof import("../../lib/chain/proposal.ts")>()),
+    readProposals: (): Promise<ChainRead<Proposal[]>> =>
+      Promise.resolve({
+        ok: true,
+        value,
+        source: { url: "https://rpc.onyx.testnets.gno.land:443", at: "2026-10-31T06:00:00.000Z" },
+      }),
+  }));
+  return (await import("./Proposals.tsx")).default;
+}
+
+// Its proposals read as one that gave its tally, invented: no recorded page has one.
+const tallied = () => readingAs([{ id: 15, title: "A proposal", state: "active", yes: 33, threshold: 66.66 }]);
+
+// Its newest proposal accepted and the one before open, read with its yes and no as gnoland-1's #14 states them.
+const opened = () =>
+  readingAs([
+    { id: 15, title: "Set node halt height", state: "ACCEPTED" },
+    { id: 14, title: "Add valoper lurien to the valset", state: "ACTIVE", yes: 33.33333333333333, no: 0 },
+  ]);
+
 describe("a world's proposals", () => {
+  it("rings the open proposal, not the newest, with its yes and no and no mark, and its pill says them (F4308)", async () => {
+    const Open = await opened();
+    const onRing = vi.fn();
+    const el = mount(<Open path={PATH} onRing={onRing} />);
+    await flush();
+    expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 14 · YES 33% · NO 0%");
+    expect(onRing).toHaveBeenLastCalledWith({ lit: 33.33333333333333 / 100, against: 0 });
+    vi.doUnmock("../../lib/chain/proposal.ts");
+  });
+
   it("draws the newest proposal under its pill and the newest three as cards, each with its gnoweb link, and no tally", async () => {
     const el = mount(
       <Proposals
@@ -47,6 +83,81 @@ describe("a world's proposals", () => {
     expect(el.querySelector("a[href='https://onyx.testnets.gno.land/r/gov/dao:37']")).not.toBeNull();
     expect(el.textContent).not.toMatch(/YES|66\.66/);
     expect(el.querySelector("svg")).toBeNull();
+  });
+
+  it("hands the page no ring for a proposal that gave no tally", async () => {
+    const onRing = vi.fn();
+    mount(
+      <Proposals
+        path={PATH}
+        onRing={onRing}
+        options={{ fetch: answering(() => new Response(JSON.stringify(queryEnvelope({ data: HOME })))) }}
+      />,
+    );
+    await flush();
+    expect(onRing).toHaveBeenCalledExactlyOnceWith(undefined);
+  });
+
+  it("hands the page no ring of the last realm while another's read is on its way (7e's review, B1-2)", async () => {
+    vi.resetModules();
+    const read = vi
+      .fn<() => Promise<ChainRead<Proposal[]>>>()
+      .mockResolvedValueOnce({
+        ok: true,
+        value: [{ id: 15, title: "A proposal", state: "active", yes: 33, threshold: 66.66 }],
+        source: { url: "https://rpc.example", at: "2026-10-31T06:00:00.000Z" },
+      })
+      .mockReturnValue(new Promise(() => undefined));
+    vi.doMock("../../lib/chain/proposal.ts", async (original) => ({
+      ...(await original<typeof import("../../lib/chain/proposal.ts")>()),
+      readProposals: read,
+    }));
+    const { default: Moving } = await import("./Proposals.tsx");
+    const onRing = vi.fn();
+    const box = document.createElement("div");
+    const root = createRoot(box);
+    await act(async () => {
+      root.render(<Moving path="/r/gov/dao" onRing={onRing} />);
+      await new Promise((done) => setTimeout(done, 0));
+    });
+    expect(onRing).toHaveBeenLastCalledWith({ lit: 0.33, mark: 0.6666 });
+    await act(async () => {
+      root.render(<Moving path="/r/bubble" onRing={onRing} />);
+      await new Promise((done) => setTimeout(done, 0));
+    });
+    expect(onRing).toHaveBeenLastCalledWith(undefined);
+    expect(box.textContent).not.toContain("Proposal 15");
+    act(() => {
+      root.unmount();
+    });
+    vi.doUnmock("../../lib/chain/proposal.ts");
+  });
+
+  it("takes its ring back from the page when the read fails, and when it leaves", async () => {
+    const onRing = vi.fn();
+    const failed = mount(
+      <Proposals
+        path={PATH}
+        onRing={onRing}
+        options={{ fetch: answering(() => new Response("down", { status: 503 })) }}
+      />,
+    );
+    await flush();
+    expect(onRing).toHaveBeenLastCalledWith(undefined);
+    expect(failed.textContent).not.toContain("YES");
+    const Tallied = await tallied();
+    const leaving = vi.fn();
+    const root = createRoot(document.createElement("div"));
+    await act(async () => {
+      root.render(<Tallied path={PATH} onRing={leaving} />);
+      await new Promise((done) => setTimeout(done, 0));
+    });
+    expect(leaving).toHaveBeenLastCalledWith({ lit: 0.33, mark: 0.6666 });
+    act(() => {
+      root.unmount();
+    });
+    expect(leaving).toHaveBeenLastCalledWith(undefined);
+    vi.doUnmock("../../lib/chain/proposal.ts");
   });
 
   it("says a realm lists no proposal when its page lists none", async () => {
@@ -77,22 +188,15 @@ describe("a world's proposals", () => {
     expect(el.querySelector("h3")).toBeNull();
   });
 
-  it("draws the ring of a proposal that gave its tally, and the words of it", async () => {
-    vi.resetModules();
-    vi.doMock("../../lib/chain/proposal.ts", async (original) => ({
-      ...(await original<typeof import("../../lib/chain/proposal.ts")>()),
-      readProposals: (): Promise<ChainRead<Proposal[]>> =>
-        Promise.resolve({
-          ok: true,
-          value: [{ id: 15, title: "A proposal", state: "active", yes: 33, threshold: 66.66 }],
-          source: { url: "https://rpc.onyx.testnets.gno.land:443", at: "2026-10-31T06:00:00.000Z" },
-        }),
-    }));
-    const { default: Tallied } = await import("./Proposals.tsx");
-    const el = mount(<Tallied path={PATH} />);
+  it("hands the page the ring of a proposal that gave its tally, and draws the words of it", async () => {
+    const Tallied = await tallied();
+    const onRing = vi.fn();
+    const el = mount(<Tallied path={PATH} onRing={onRing} />);
     await flush();
     expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 15 · YES 33% of 66.66%");
-    expect(el.querySelectorAll("svg circle")).toHaveLength(3);
+    // 7e: the ring is the scene's tilted orbit, never a flat one on the plate (decision of 2026-10-31): the page hands it the tally.
+    expect(el.querySelector("svg")).toBeNull();
+    expect(onRing).toHaveBeenCalledExactlyOnceWith({ lit: 0.33, mark: 0.6666 });
     vi.doUnmock("../../lib/chain/proposal.ts");
   });
 });

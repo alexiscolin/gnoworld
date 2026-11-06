@@ -43,6 +43,14 @@ export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
+    // A bound in wall-clock time, or a test whose timeout holds one: a commit's gate leaves it, the merge check and --full run it
+    // (Alexis, 2026-11-04, "Oui, les deux": other gates' load failed them for nothing; check.sh, docs/HARNESS.md).
+    tags: [
+      {
+        name: "timing",
+        description: "a bound in wall-clock time: the merge check and --full run it, a commit's gate does not",
+      },
+    ],
     // The `beforeAll` that draws a RoomView once, to load its lazy lines' view, takes under a second alone and past Vitest's
     // 10 s on a machine at load 50 to 120, where the files' first transforms queue (F3200): a hook gets a minute.
     hookTimeout: 60_000,
@@ -108,13 +116,25 @@ export default defineConfig({
         "jarvis/src/main.ts",
       ],
       reporter: ["text-summary", "json"],
-      // 85% everywhere (Alexis, 2026-10-17); core's rules at 100%, branches 95%.
+      // 85% everywhere (Alexis, 2026-10-17). Core at what slices 7 and 8's hardening measured, never under 90 (Alexis, 2026-11-05);
+      // docs/REVIEW.md's tier-1 files at 100% of lines, functions and statements, their branches as measured (the rest are `??` no
+      // input reaches: 8n's and 8r's lists). A glob's thresholds hold its files together, so 100 there is 100 for each file.
       thresholds: {
         lines: 85,
         functions: 85,
         branches: 85,
         statements: 85,
-        "packages/core/**": { lines: 100, functions: 100, branches: 95, statements: 100 },
+        "packages/core/**": { lines: 99.9, functions: 100, branches: 92.3, statements: 99.7 },
+        "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,packages/core/src/chain,packages/core/src/markdown,app/src/sw,server/src/ergo}/**":
+          { lines: 100, functions: 100, statements: 100, branches: 97.2 },
+        "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}":
+          { lines: 100, functions: 100, statements: 100, branches: 97.3 },
+        "{packages/service/src/net.ts,packages/service/src/settings.ts}": {
+          lines: 100,
+          functions: 100,
+          statements: 100,
+          branches: 97.2,
+        },
       },
     },
   },

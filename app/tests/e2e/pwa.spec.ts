@@ -1,3 +1,7 @@
+import { placesFrom } from "../../src/dataPlaces.ts";
+import ecosystems from "../../data/ecosystems.json" with { type: "json" };
+import hubs from "../../data/hubs.json" with { type: "json" };
+import universes from "../../data/universes.json" with { type: "json" };
 import { cacheContents, controlled, expect, hydrated, PAGES, test, type Answer, type Page } from "./fixtures.ts";
 import { GUARDED, UPDATING } from "./sites.ts";
 
@@ -25,15 +29,11 @@ const SHELL = [
   "/net/onyx/_.data",
   "/net/onyx/earth",
   "/net/onyx/earth.data",
-  "/net/onyx/w/bubble",
-  "/net/onyx/w/bubble.data",
-  "/net/onyx/w/govdao",
-  "/net/onyx/w/govdao.data",
-  "/w/bubble",
-  "/w/bubble.data",
-  "/w/govdao",
-  "/w/govdao.data",
-];
+  // Each world of the data (8l's stations too), at its path and its canonical address.
+  ...placesFrom({ universes, hubs, ecosystems })
+    .filter(({ kind }) => kind === "world")
+    .flatMap(({ path, canonical }) => [...new Set([path, canonical])].flatMap((each) => [each, `${each}.data`])),
+].sort();
 const VERSION = /^gnoworld-precache-[A-Za-z0-9]{16}$/;
 const RECORD = /^gnoworld-precache-active-[A-Za-z0-9]{16}-(?:none|[A-Za-z0-9]{16})$/;
 
@@ -356,7 +356,7 @@ test("the app opens with no network: the home, a world, a reload on it, and a pa
   });
   await page.reload();
   await hydrated(page);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("2 worlds in Onyx");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
   // The router's own move to a world needs its route files and data, which are the cache's too.
   await page.getByRole("link", { name: "Bubble", exact: true }).click();
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
@@ -500,9 +500,10 @@ test.describe("updates", () => {
       if (second !== undefined) await cache.put(second, new Response("a file someone changed"));
       return second?.url ?? "";
     });
-    // The region the prompt fills is there, empty, before it: a screen reader announces the change.
-    await page.locator("div[role='status']").evaluate((region) => {
-      region.id = "there-before";
+    // The region the prompt fills is there, empty, before it: a screen reader announces the change. The header's arrival pill (d303d6f1)
+    // has a region of its own, so every one is marked and the prompt's is found by its words.
+    await page.locator("div[role='status']").evaluateAll((regions) => {
+      for (const region of regions) region.id = "there-before";
     });
     await bump(page, request, { site });
     await expect(noticeOf(page)).toBeVisible();
@@ -519,7 +520,7 @@ test.describe("updates", () => {
     await open(page);
     await bump(page, request, { site });
     await expect(noticeOf(page)).toBeVisible();
-    await page.locator("div[role='status']").evaluate((region) => {
+    await promptOf(page).evaluate((region) => {
       region.id = "kept";
     });
     await promptOf(page).getByRole("button", { name: "Close" }).click();
@@ -715,5 +716,5 @@ test("a worker that cannot register reports its error, and the page still works"
   await page.goto("/");
   await hydrated(page);
   await expect.poll(() => errors.some((message) => message.includes("ServiceWorker"))).toBe(true);
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText("2 worlds in Onyx");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
 });

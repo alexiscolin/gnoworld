@@ -9,6 +9,7 @@ reports/
 .stryker-tmp/
 .eslintcache
 /app/build/
+/app/build-gate/
 /app/.react-router/
 /app/test-results/
 /app/test-results-stories/

@@ -1,15 +1,27 @@
-// The strip at the foot of the home (frame 6): the data's news and events in a line that scrolls, 34 px high, with a button
-// that pauses it, first in the page's order so a keyboard reaches it before any link. With nothing to show it is not drawn.
+// The strip at the foot of the home (frame 6): the chain's trends and the data's news and events in a line that scrolls, 34 px high, with a
+// button that pauses it, first in the page's order so a keyboard reaches it before any link. With nothing to show it is not drawn. A trend,
+// or an on-air line of a world, opens its world here, through the router; a news, an event or an on-air line of another site opens that site.
 import { Icon } from "@gnoworld/ui";
 import { useState } from "react";
+import { Link } from "react-router";
 import styles from "./Ticker.module.css";
 import type { TickerItem } from "./ticker.ts";
+
+// Each kind in a word, upper case as the video draws them (frames 4, 16, 18).
+const KINDS: Record<TickerItem["kind"], string> = {
+  trending: "Trending",
+  rising: "Rising",
+  new: "New",
+  news: "News",
+  event: "Event",
+  onair: "On air",
+};
 
 export function Ticker({ items }: { items: TickerItem[] }) {
   const [paused, setPaused] = useState(false);
   if (items.length === 0) return null;
   return (
-    <section className={styles["ticker"]} data-ticker="" data-paused={paused} aria-label="News and events">
+    <section className={styles["ticker"]} data-ticker="" data-paused={paused} aria-label="Trends, news and events">
       <button
         type="button"
         className={styles["pause"]}
@@ -26,11 +38,18 @@ export function Ticker({ items }: { items: TickerItem[] }) {
           {items.map((item) => (
             <li key={item.id} className={styles["item"]}>
               <b className={styles["kind"]} data-kind={item.kind}>
-                {item.kind === "news" ? "News" : "Event"}
+                {item.label ?? KINDS[item.kind]}
               </b>
-              <a href={item.link} target="_blank" rel="noopener noreferrer" className={styles["link"]}>
-                {item.text}
-              </a>
+              {/* Another site's address opens a new tab; the site's own page opens here, through the router. */}
+              {item.link.startsWith("https://") ? (
+                <a href={item.link} target="_blank" rel="noopener noreferrer" className={styles["link"]}>
+                  {item.text}
+                </a>
+              ) : (
+                <Link to={item.link} title={item.source} className={styles["link"]}>
+                  {item.text}
+                </Link>
+              )}
             </li>
           ))}
         </ul>

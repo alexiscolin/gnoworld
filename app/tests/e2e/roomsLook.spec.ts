@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { lineOf, lines } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { calmed } from "./figures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 
@@ -24,6 +25,7 @@ test.describe("a world's rooms, as they look", () => {
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(page.getByText("Who is up for a round of")).toBeVisible();
+    await calmed(page);
   }
 
   for (const [screen, width] of [

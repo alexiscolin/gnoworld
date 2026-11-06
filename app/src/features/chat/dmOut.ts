@@ -1,6 +1,6 @@
 // A direct message's lines as the link sends them (slice 4's 4e, and 4d's DM bar), moved out of link.ts for the lint's
 // sizes: a line to an account's nick, labelled so Ergo's answer to it is known, from an account's connection alone.
-import { isTagMsgid, reactionLine, type Composed, type Line, type Reacting } from "@gnoworld/core";
+import { isCountryCode, isTagMsgid, reactionLine, type Composed, type Line, type Reacting } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import type { createAppStore } from "../../store/index.ts";
@@ -44,6 +44,10 @@ function marksOf({ reply, edit }: { reply?: string | undefined; edit?: string | 
   ];
 }
 
+// The tag a line declares its speaker's country with (ADR-0001 §7): what is no country goes untagged, and the line still goes.
+const declared = (country: string | undefined): string[] =>
+  country !== undefined && isCountryCode(country) ? [`+gnoworld/country=${country}`] : [];
+
 /** The msgids of the corrections of mine to the line `id`, in the order the conversation holds them: a correction is a line of
  * its own, which a REDACT of its line does not take, and Ergo lets an author delete its own lines alone. Only the
  * lines the store holds are looked through: a correction it never heard is not named (R2's ceiling). */
@@ -78,14 +82,15 @@ export function sayTo(
 }
 
 /** What the composer composed for the room `to.room`, which `to.inside` says the page is in, tagged as a reply or a
- * correction; whether it went. */
+ * correction, and with the country it declares; whether it went. */
 export function speakIn(
   o: DmOut,
   to: { room: string; composed: Composed; inside: boolean },
-  tags: { reply?: string | undefined; edit?: string | undefined },
+  tags: { reply?: string | undefined; edit?: string | undefined; country?: string | undefined },
 ): boolean {
   const marks = marksOf(tags);
-  return marks !== undefined && to.inside && sendTo(o, { target: to.room, composed: to.composed }, marks);
+  if (marks === undefined || !to.inside) return false;
+  return sendTo(o, { target: to.room, composed: to.composed }, [...marks, ...declared(tags.country)]);
 }
 
 /** A reaction to a line of a room the page is in (`inside`), or its take-back; an account's alone. Whether it went. */

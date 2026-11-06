@@ -1,9 +1,19 @@
 import { Markets } from "@gnoworld/schemas";
-import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { logger } from "@gnoworld/service/log";
+import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
 import { MAX_BYTES, startPrices } from "./prices.ts";
 
 // CoinGecko's /simple/price as it answered on 2026-10-30 (api.coingecko.com, keyless, read in this session) for
@@ -175,13 +185,36 @@ describe("the prices timer: a good answer", () => {
     expect(Markets.parse(JSON.parse(written(file))).tokens).toEqual(TOKENS);
     // A write in place keeps the file's inode; a rename brings another one.
     expect(statSync(file).ino).not.toBe(before);
-    expect(readdirSync(folder)).toEqual(["markets.json"]);
+    // The prices' day beside it (8i), and no temporary.
+    expect(readdirSync(folder)).toEqual(["markets-history.json", "markets.json"]);
+  });
+
+  it("appends each read's prices to the history beside it, and hands the day to the server", async () => {
+    const { file, folder, timer } = setup([json(ANSWER)]);
+    await wrote(file);
+    const day: unknown = JSON.parse(readFileSync(join(folder, "markets-history.json"), "utf8"));
+    expect(day).toEqual({
+      updated: new Date(NOW).toISOString(),
+      tokens: TOKENS.map(({ symbol, usd }) => ({ symbol, usd: [usd] })),
+    });
+    expect(timer.history()).toEqual(day);
+  });
+
+  it("writes markets.json even when the history's file refuses, and says so", async () => {
+    const folder = fresh();
+    mkdirSync(join(folder, "markets-history.json"));
+    const { file, lines } = setup([json(ANSWER)], { folder });
+    await wrote(file);
+    await failed(lines);
+    expect(Markets.parse(JSON.parse(written(file))).tokens).toEqual(TOKENS);
+    expect(lines.map(kindOf)).toContain("history_write");
+    expect(existsSync(`${file}.tmp`)).toBe(false);
   });
 
   it("creates the file when there is none, and leaves no temporary file next to it", async () => {
     const { folder, file } = setup([json(ANSWER)]);
     await wrote(file);
-    expect(readdirSync(folder)).toEqual(["markets.json"]);
+    expect(readdirSync(folder)).toEqual(["markets-history.json", "markets.json"]);
   });
 });
 
@@ -487,6 +520,24 @@ describe("the prices timer: when it runs", () => {
     });
   });
 
+  it.each([
+    ["the way out's name has no address yet", unresolved, [15_000, 300_000]],
+    ["nothing listens where the way out will be", refused, [15_000, 300_000]],
+    ["the way out refuses CoinGecko's host, which a soon retry would not change", proxyRefused, [300_000]],
+  ])("waits as long as the cause says when %s at the first tick (F4872)", async (_name, fault, wanted) => {
+    const waits = timerWaits();
+    const timer = startPrices({
+      file: join(fresh(), "markets.json"),
+      log: logger("a-pepper-of-forty-characters-0123456789", () => undefined),
+      now: () => NOW,
+      send: failingFirst(fault, json(ANSWER)),
+    });
+    running.push(timer);
+    await vi.waitFor(() => {
+      expect(waits).toEqual(wanted);
+    });
+  });
+
   it("does not start a second request while the first has not answered", async () => {
     let release: (response: Response) => void = () => undefined;
     const slow = () =>
@@ -565,12 +616,19 @@ describe("the prices timer: when it runs", () => {
 const read = (path: string): string => readFileSync(new URL(path, import.meta.url), "utf8");
 
 describe("the egress proxy's list", () => {
-  // The block height (decision of 2026-10-31) adds the default universe's RPC, the door's names (D120) the mainnet's node;
-  // universes.test.ts ties both to their sources.
-  it("lets out CoinGecko's API, OpenAI's, the default universe's RPC and the names' node, and no other host", () => {
+  // The block height (decision of 2026-10-31) adds the default universe's RPC, the door's names (D120) the mainnet's node, the
+  // worlds job (7c) the indexers; universes.test.ts ties them to their sources.
+  it("lets out CoinGecko's, OpenAI's, the default universe's RPC, the names' node and the indexers, and no other host", () => {
     const acl = read("../../../deploy/egress/acl.yaml");
     const hosts = [...acl.matchAll(/^\s+-\s+(\S+)\s*$/gm)].map((match) => match[1]);
-    expect(hosts).toEqual(["api.coingecko.com", "api.openai.com", "rpc.onyx.testnets.gno.land", "rpc.gno.land"]);
+    expect(hosts).toEqual([
+      "api.coingecko.com",
+      "api.openai.com",
+      "rpc.onyx.testnets.gno.land",
+      "rpc.gno.land",
+      "indexer.onyx.testnets.gno.land",
+      "indexer.gno.land",
+    ]);
   });
 
   it("names CoinGecko by the API's own name, never a wildcard or its parent domain", () => {
@@ -622,7 +680,7 @@ describe("deploy/test.sh", () => {
 
   it("names its mutants by checks that exist: the renamed one cannot be orphaned (F695)", () => {
     expect(script).not.toContain("lets one host out");
-    for (const wanted of ["the way out lets four hosts out", "the server does not reach CoinGecko"]) {
+    for (const wanted of ["the way out lets six hosts out", "the server does not reach CoinGecko"]) {
       // Once in a mutant that must be killed by the check, once in the check itself.
       expect(script.split(wanted).length - 1, wanted).toBeGreaterThanOrEqual(2);
     }
@@ -871,6 +929,23 @@ describe("the prices timer: the block height", () => {
     "rpc.onyx.example",
     "https://u:p@rpc.onyx.example",
     "https://rpc.example/x?y#z",
+    "https://127.0.0.1/",
+    "https://localhost/",
+    "https://169.254.169.254/",
+    "https://rpc/",
+    "https://rpc.example:0/",
+    "https://0x7f.1/",
+    "https://2130706433/",
+    "https://127.1/",
+    "https://10.0.0.1/",
+    "https://192.168.1.1/",
+    "https://1.1.1.1/",
+    "https://app.localhost/",
+    "https://printer.local/",
+    "https://rpc.internal/",
+    "https://rpc:8443/",
+    "https://rpc.example.org:00/",
+    "https://rpc.example.org:65536/",
     "",
   ])("refuses to start with an RPC that is no bare https address: %j", (rpc) => {
     expect(() =>

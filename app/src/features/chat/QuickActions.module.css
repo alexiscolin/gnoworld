@@ -21,8 +21,49 @@
     cursor: pointer;
   }
 
+  /* A later slice's pill: its place in the row, its face the pill's, greyed by ComingSoon. */
+  .soon {
+    /* layout: the slot is a row, so the inert button and its face fill it */
+    display: flex;
+    /* layout: the slot grows as a pill does */
+    flex: 1 0 auto;
+  }
+
+  .soon > *,
+  .soon button {
+    /* layout: the tooltip's box, then the inert button, fill the slot */
+    display: flex;
+    /* layout: the tooltip's box, then the inert button, fill the slot */
+    flex: 1 0 auto;
+  }
+
+  /* The greyed pill's face: a pill as the others, its words centred. */
+  .soon .action {
+    /* layout: its words centred, as a button's are */
+    display: grid;
+    /* layout: its words centred, as a button's are */
+    place-items: center;
+  }
+
+  /* Catch up, where the row is narrow (a dock's, a phone's): the pills that work keep the row. */
+  @container quick (inline-size < 560px) {
+    .soon[data-wide] {
+      display: none;
+    }
+  }
+
   .action:hover {
     border-color: var(--color-line-strong);
     background: var(--color-fill-hover);
+  }
+
+  /* The quick actions and the composer under the lines, set off by a rule across the conversation. */
+  .dock {
+    /* layout: the row reads its own width (Catch up), not the window's */
+    container: quick / inline-size;
+    /* the video's 21 px under the box, from the tokens: 16 and 4 */
+    padding-block-end: calc(var(--space-s) + var(--space-3xs));
+    padding-inline: var(--chat-inset);
+    border-block-start: var(--line-width) solid var(--color-line);
   }
 }

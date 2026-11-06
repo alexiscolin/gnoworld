@@ -1,5 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
+import { calmed } from "./figures.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { open, PIN } from "./chatScreenOpen.ts";
@@ -48,6 +49,34 @@ test.describe("the chat as the video shows it", () => {
     await expect(page.getByRole("button", { name: "Shrink the chat" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Expand the chat" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Close the chat" })).toBeVisible();
+  });
+
+  test("names each world in the column of worlds and draws each with its own planet", async ({ page }) => {
+    await logIn(page, "screen-worlds");
+    await open(page, { width: 1280, as: ACCOUNT });
+    const links = worlds(page).getByRole("link");
+    const count = await links.count();
+    expect(count).toBeGreaterThan(1);
+    // A row is its planet alone: the world's name is the link's accessible name, and shows on hover.
+    const rows = await links.evaluateAll((all) =>
+      all.map((link) => ({ name: link.getAttribute("aria-label") ?? "", text: link.textContent })),
+    );
+    expect(rows.every(({ name, text }) => name.length > 0 && text === "")).toBe(true);
+    await expect(links.first()).toHaveAccessibleName("Earth");
+    // The Earth is listed once, first.
+    await expect(worlds(page).getByRole("link", { name: "Earth" })).toHaveCount(1);
+    await expect(links.filter({ has: page.locator("img") })).toHaveCount(count);
+    const pictures = () =>
+      worlds(page)
+        .locator("img")
+        .evaluateAll((all) => all.map((img) => img.getAttribute("src")));
+    expect(new Set(await pictures()).size, "each world draws its own picture").toBe(count);
+    // Each is a picture of the site, loaded: no world falls back to ui's disc.
+    await expect(worlds(page).locator("[data-fallback]")).toHaveCount(0);
+    await links.first().hover();
+    await expect(
+      page.getByText("Earth", { exact: true }).and(page.locator("[popover][data-shown=true]")),
+    ).toBeVisible();
   });
 
   test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {
@@ -104,7 +133,7 @@ test.describe("the chat as the video shows it", () => {
     await logIn(page, "screen-composer");
     await open(page, { width: 1280, as: ACCOUNT });
     const bar = page.getByRole("toolbar", { name: "Quick actions" });
-    await expect(bar.getByRole("button")).toHaveText(["Who's here"]);
+    await expect(bar.getByRole("button")).toHaveText(["Who's here", "Play", "Events", "Catch up", "Poll"]);
     const message = page.getByRole("group", { name: "Message box" });
     await expect(message.getByRole("textbox")).toBeVisible();
     await expect(message.getByRole("button", { name: "Send" })).toBeVisible();
@@ -169,6 +198,7 @@ test.describe("the chat as the video shows it", () => {
     page,
   }) => {
     await open(page, { width: 390, as: GUEST });
+    await calmed(page);
     await expect(worlds(page)).toBeHidden();
     await expect(info(page)).toBeHidden();
     await expect(roomsButton(page)).toBeVisible();

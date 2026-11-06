@@ -1,0 +1,48 @@
+/* The Earth's own part of its page: its blue over the plate and the dock, and its chat's height. The globe's place is globe.module.css's. */
+@layer components {
+  /* The realms deployed in 24 h, slice 9's: the stat's words with no figure, greyed by the coming soon round them (frame 40). */
+  .soon {
+    /* raw: a fact's height (Here.module.css): its figure's line, Stat's 3xs step and its caption's line, so the row stays as the count comes */
+    min-block-size: calc(2.75rem + var(--space-3xs) + 0.6875rem);
+    font: var(--font-body);
+  }
+
+  /* The Earth's two facts share a row at every width, as frame 40 sets them: the count coming never wraps the row. */
+  .talking > * > * {
+    /* layout: two columns, the realms' coming soon in the second */
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  /* Under the dock's breakpoint no dock holds the chat: a block of the page under the globe, most of a window, and the plate goes on below it. */
+  .chat {
+    /* raw: a chat of a few lines reads poorly */
+    block-size: 70vb;
+  }
+
+  /* raw: under the dock's breakpoint (ChatScreen.tsx) the plate is a block at the page's top: it keeps the arrival pill's room
+     above it, as a realm's view does (tokens.css), so the pill covers neither its trail nor its title */
+  @media (max-width: 1279px) {
+    .earth + * {
+      padding-block-start: var(--banner-room);
+    }
+  }
+
+  /* raw: the dock's breakpoint (ChatScreen.tsx) */
+  @media (min-width: 1280px) {
+    .earth,
+    .earth + * {
+      /* raw: the frames' blue tints the plate (f0039: #162238), as a world's colour tints its own */
+      --world: #5eaafd;
+      /* raw: the same 16% the plate takes (Panel.module.css) */
+      --_tinted: color-mix(in oklab, var(--world) 16%, var(--color-surface));
+    }
+
+    .chat {
+      /* The dock takes the plate's tint, as frames 43 to 85 have it: the fill as the page's own, read above the chat. */
+      --color-surface: var(--_tinted);
+
+      /* layout: the dock's own height */
+      block-size: 100%;
+    }
+  }
+}

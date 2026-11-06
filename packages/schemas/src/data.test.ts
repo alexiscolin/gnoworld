@@ -2,18 +2,18 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import {
   BubbleRules,
+  EarthOrbit,
+  EarthRooms,
   DATA_CAPS,
   Ecosystems,
   EMBED_PREFIXES,
   Events,
-  Expedition,
   Genres,
   Hubs,
   News,
-  Quests,
-  Stations,
   Universes,
 } from "./data.ts";
+import { Expedition, Quests } from "./discovery.ts";
 
 // Slice 5's 5c: the data files' schemas (ADR-0002 §8 row 10), checked when the app builds. Every list accepts the empty
 // list but the universes', which names the default one. The caps (DATA_CAPS) are tested at the cap and one past it.
@@ -27,12 +27,21 @@ const universe = {
   testnet: true,
 };
 const hub = { slug: "bubble", name: "Bubble", description: "d".repeat(60), universe: "onyx" };
-const world = { slug: "moon", name: "Moon", description: "d".repeat(60), universe: "onyx" };
 const eco = { slug: "tokens", name: "Tokens", description: "Tokens.", universe: "onyx" };
 const genre = { slug: "game", name: "Game" };
 const event = { id: "launch", title: "Launch", start: "2026-11-01T18:00:00.000Z", link: "https://gno.land/" };
-const stop = { id: "start", title: "Start", description: "Begin here.", link: "https://gno.land/" };
-const quest = { id: "first", title: "First", description: "Say hello." };
+const stop = { id: "start", universe: "onyx", realm: "gno.land/r/demo/start", name: "Start", why: "Begin here." };
+const quest = {
+  id: "first",
+  universe: "onyx",
+  title: "First",
+  description: "Say hello.",
+  reward: "Hello",
+  steps: [
+    { id: "go", kind: "visit", title: "Go", hub: "bubble" },
+    { id: "sign", kind: "call", title: "Sign", realm: "gno.land/r/demo/x", function: "Do" },
+  ],
+};
 const news = { id: "n1", title: "News", date: "2026-10-29", link: "https://gno.land/" };
 
 type Row = Record<string, unknown>;
@@ -43,7 +52,6 @@ interface Schema {
 const LISTS: readonly (readonly [string, Schema, Row])[] = [
   ["Hubs", Hubs, hub],
   ["Ecosystems", Ecosystems, eco],
-  ["Stations", Stations, world],
   ["Genres", Genres, genre],
   ["Events", Events, event],
   ["Expedition", Expedition, stop],
@@ -54,9 +62,9 @@ const LISTS: readonly (readonly [string, Schema, Row])[] = [
 /** The same row as another one: its id or slug changed. */
 const other = (row: Row, name = "b"): Row => ({ ...row, ["id" in row ? "id" : "slug"]: name });
 
-/** The longest a string field of a list may be (DATA_CAPS), a hub's or a station's description 160. */
+/** The longest a string field of a list may be (DATA_CAPS), a hub's description 160. */
 const capOf = (list: string, field: string): number | undefined =>
-  field === "description" && (list === "Hubs" || list === "Stations")
+  field === "description" && list === "Hubs"
     ? DATA_CAPS.seoDescription
     : field === "id" || field === "slug" || field === "universe"
       ? DATA_CAPS.key
@@ -115,7 +123,6 @@ describe("a world's key in a universe", () => {
   it.each([
     ["Hubs", Hubs, hub],
     ["Ecosystems", Ecosystems, eco],
-    ["Stations", Stations, world],
   ] as const)("is unique to a universe in %s: the same name in another is taken", (_, schema, row) => {
     expect(schema.safeParse([row, { ...row, universe: "gnoland" }]).success).toBe(true);
     expect(schema.safeParse([row, { ...row }]).success).toBe(false);
@@ -128,8 +135,6 @@ describe("a name in a path", () => {
     ["Hubs.universe", (universe) => Hubs.safeParse([{ ...hub, universe }]).success],
     ["Ecosystems.slug", (slug) => Ecosystems.safeParse([{ ...eco, slug }]).success],
     ["Ecosystems.universe", (universe) => Ecosystems.safeParse([{ ...eco, universe }]).success],
-    ["Stations.slug", (slug) => Stations.safeParse([{ ...world, slug }]).success],
-    ["Stations.universe", (universe) => Stations.safeParse([{ ...world, universe }]).success],
     ["Genres.slug", (slug) => Genres.safeParse([{ ...genre, slug }]).success],
     ["Universes.id", (id) => Universes.safeParse([{ ...universe, id, default: true }]).success],
   ];
@@ -157,10 +162,7 @@ describe("a name in a path", () => {
 });
 
 describe("a hub's and a station's description", () => {
-  it.each([
-    ["Hubs", Hubs, hub],
-    ["Stations", Stations, world],
-  ] as const)("in %s", (_, schema, row) => {
+  it.each([["Hubs", Hubs, hub]] as const)("in %s", (_, schema, row) => {
     for (const [n, ok] of [
       [49, false],
       [50, true],
@@ -202,12 +204,23 @@ describe("a date", () => {
   ])("refuses an event's start %j", (start) => {
     expect(Events.safeParse([{ ...event, start }]).success).toBe(false);
   });
+
+  it.each([["AMA"], ["Demo day"], ["Workshopping"]])("takes an event's kind %j, a word or two (8p)", (kind) => {
+    expect(Events.safeParse([{ ...event, kind }]).success).toBe(true);
+  });
+
+  it.each([[""], ["AMA!"], ["A very long kind"], [" AMA"], ["<b>"], ["AMA\nnow"]])(
+    "refuses an event's kind %j",
+    (kind) => {
+      expect(Events.safeParse([{ ...event, kind }]).success).toBe(false);
+    },
+  );
 });
 
 describe("a link", () => {
   const links = (href: string) => [
     Events.safeParse([{ ...event, link: href }]).success,
-    Expedition.safeParse([{ ...stop, link: href }]).success,
+    EarthOrbit.safeParse([{ name: "gnosh.ai", url: href }]).success,
     News.safeParse([{ ...news, link: href }]).success,
     Universes.safeParse([{ ...universe, default: true, rpc: href }]).success,
   ];
@@ -496,5 +509,84 @@ describe("BubbleRules", () => {
         },
       ),
     );
+  });
+});
+
+// 7f2: where the Earth's side rooms stand (ADR-0002 §10). A file of the team's, so a room is pinned by a reviewed change, and no room's name
+// reaches a place by chance.
+describe("EarthRooms", () => {
+  const row = { room: "#earth/lisbon", lat: 38.7, lon: -9.1 };
+
+  it("takes a side room of the Earth and a point of the globe", () => {
+    expect(EarthRooms.safeParse([row]).success).toBe(true);
+    expect(EarthRooms.safeParse([]).success).toBe(true);
+  });
+
+  it.each([
+    [90, 180],
+    [-90, -180],
+  ])("takes the globe's own edges, %d and %d", (lat, lon) => {
+    expect(EarthRooms.safeParse([{ ...row, lat, lon }]).success).toBe(true);
+  });
+
+  it.each([
+    ["the main room, which is the globe itself", { room: "#earth" }],
+    ["another world's room", { room: "#bubble/lisbon" }],
+    ["a word that only starts like the Earth's", { room: "#earthworks/lisbon" }],
+    ["a name that is no room's", { room: "#earth/Lisbon" }],
+    ["a room under a room", { room: "#earth/a/b" }],
+    ["no name at all", { room: "#earth/" }],
+    ["a name past a room's 32 characters", { room: `#earth/${"a".repeat(33)}` }],
+    ["a latitude past the pole", { lat: 90.5 }],
+    ["a longitude past the antimeridian", { lon: -180.5 }],
+    ["no number", { lat: "38" }],
+    ["a field more", { name: "Lisbon" }],
+  ])("refuses %s", (_name, over) => {
+    expect(EarthRooms.safeParse([{ ...row, ...over }]).success).toBe(false);
+  });
+
+  it("holds as many rows as a data file may, and no more", () => {
+    const rows = (count: number) =>
+      Array.from({ length: count }, (_, n) => ({ room: `#earth/r${String(n)}`, lat: 0, lon: 0 }));
+    expect(EarthRooms.safeParse(rows(DATA_CAPS.rows)).success).toBe(true);
+    expect(EarthRooms.safeParse(rows(DATA_CAPS.rows + 1)).success).toBe(false);
+  });
+
+  it("refuses a room pinned twice", () => {
+    const result = EarthRooms.safeParse([row, { ...row, lat: 0 }]);
+    expect(result.success).toBe(false);
+  });
+});
+
+// What turns round the Earth (7v; Alexis, 2026-11-03): projects the team adds by hand, even with no realm, each a name and its own address,
+// and a world's page where it has one; a file the team reviews, the admin console after (slice 12).
+describe("EarthOrbit", () => {
+  const row = { name: "gnosh.ai", url: "https://gnosh.ai" };
+
+  it("accepts a project by its name and address, a world's slug beside them, and the empty list", () => {
+    expect(EarthOrbit.safeParse([row]).success).toBe(true);
+    expect(EarthOrbit.safeParse([{ ...row, slug: "bubble" }]).success).toBe(true);
+    expect(EarthOrbit.safeParse([]).success).toBe(true);
+  });
+
+  it.each([
+    ["an address that is not https", { url: "http://gnosh.ai" }],
+    ["a script for an address", { url: "javascript:alert(1)" }],
+    ["an address with credentials", { url: "https://user:secret@gnosh.ai" }],
+    ["an address with a space", { url: "https://gnosh.ai/a b" }],
+    ["an address past 2,048 characters", { url: `https://gnosh.ai/${"a".repeat(2048)}` }],
+    ["no name", { name: "" }],
+    ["a name past 80 characters", { name: "a".repeat(81) }],
+    ["a slug that is no slug", { slug: "Bubble" }],
+    ["a field more", { realm: "gno.land/r/gnosh" }],
+  ])("refuses %s", (_name, over) => {
+    expect(EarthOrbit.safeParse([{ ...row, ...over }]).success).toBe(false);
+  });
+
+  it("refuses a project named twice, and holds as many rows as a data file may", () => {
+    expect(EarthOrbit.safeParse([row, { ...row, url: "https://gnosh.ai/other" }]).success).toBe(false);
+    const rows = (count: number) => Array.from({ length: count }, (_, n) => ({ ...row, name: `p${String(n)}` }));
+    expect(EarthOrbit.safeParse(rows(DATA_CAPS.rows)).success).toBe(true);
+    expect(EarthOrbit.safeParse(rows(DATA_CAPS.rows + 1)).success).toBe(false);
   });
 });

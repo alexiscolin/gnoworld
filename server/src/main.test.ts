@@ -1,18 +1,20 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
 import { Challenge, Ticket } from "@gnoworld/schemas";
+import { Presence, Trends } from "@gnoworld/schemas/indexer";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { CATEGORIES } from "./moderation/provider.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
+import { loadRoles } from "./roles/roles.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
 
 interface Server {
@@ -22,6 +24,8 @@ interface Server {
 
 const SERVER = fileURLToPath(new URL("..", import.meta.url));
 const ENTRY = fileURLToPath(new URL("main.ts", import.meta.url));
+// The worlds of the roles file the server ships, by name, as its rooms are listed.
+const shippedWorlds = () => [...loadRoles(join(SERVER, "roles.json")).worlds.keys()].toSorted();
 // As the image starts it (ADR-0002 §7).
 const FLAGS = ["--disallow-code-generation-from-strings"];
 const started: Server[] = [];
@@ -224,48 +228,54 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await listening(server);
     const peer = await ergo.peer(0);
     await welcome(peer, { echo: false });
-    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual(["JOIN #bubble,#earth,#govdao"]);
+    // Every world of the roles file the server ships, the stations round the Earth among them (8l), by name.
+    const rooms = shippedWorlds().map((world) => `#${world}`);
+    expect(peer.lines.filter((line) => line.startsWith("JOIN "))).toEqual([`JOIN ${rooms.join(",")}`]);
     const left = once(peer.socket, "close");
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     await left;
   });
 
-  it("never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)", async () => {
-    const ergo = await fakeErgo();
-    const env = settings();
-    const oper = join(folder("gnoworld-oper-"), "oper");
-    writeFileSync(oper, `${PASSWORD}\n`);
-    const team = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-    const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
-    const roles = join(folder("gnoworld-roles-"), "roles.json");
-    const rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
-    writeFileSync(
-      roles,
-      JSON.stringify({ team: [team], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
-    );
-    const server = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
-    await listening(server);
-    const peer = await ergo.peer(0);
-    await welcome(peer);
-    for (let n = 0; n < 5; n += 1) {
-      peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
-      peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
-    }
-    // The mute's own line: the room's flags go out first, with the JOINs (3m).
-    expect(await peer.next(/^SAMODE #bubble [+-]b /)).toBe(`SAMODE #bubble +b m:${other}`);
-    peer.say("PING :settled");
-    await peer.next(/^PONG settled$/);
-    expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);
-    server.child.kill("SIGTERM");
-    expect(await exited(server)).toBe(0);
-    const db = new DatabaseSync(env["DATABASE"] ?? "");
-    const index = db
-      .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'verdicts_by_account'")
-      .all();
-    db.close();
-    expect(index).toEqual([{ name: "verdicts_by_account" }]);
-  });
+  it(
+    "never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)",
+    { timeout: 60_000 },
+    async () => {
+      const ergo = await fakeErgo();
+      const env = settings();
+      const oper = join(folder("gnoworld-oper-"), "oper");
+      writeFileSync(oper, `${PASSWORD}\n`);
+      const team = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
+      const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
+      const roles = join(folder("gnoworld-roles-"), "roles.json");
+      const rules = { bannedWords: ["spam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+      writeFileSync(
+        roles,
+        JSON.stringify({ team: [team], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+      );
+      const server = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
+      await listening(server);
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      for (let n = 0; n < 5; n += 1) {
+        peer.say(message(`account=${team};msgid=t${String(n)}`, `${team}!u@h`, ["#bubble", "buy spam"]));
+        peer.say(message(`account=${other};msgid=o${String(n)}`, `${other}!u@h`, ["#bubble", "buy spam"]));
+      }
+      // The mute's own line: the room's flags go out first, with the JOINs (3m).
+      expect(await peer.next(/^SAMODE #bubble [+-]b /)).toBe(`SAMODE #bubble +b m:${other}`);
+      peer.say("PING :settled");
+      await peer.next(/^PONG settled$/);
+      expect(peer.lines.filter((line) => line.includes(`m:${team}`))).toEqual([]);
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      const db = new DatabaseSync(env["DATABASE"] ?? "");
+      const index = db
+        .prepare("SELECT name FROM sqlite_master WHERE type = 'index' AND name = 'verdicts_by_account'")
+        .all();
+      db.close();
+      expect(index).toEqual([{ name: "verdicts_by_account" }]);
+    },
+  );
 
   it("makes and archives a room over the real process, for the team of its roles file, and no stranger (3l)", async () => {
     const origin = "http://gnoworld.test";
@@ -496,6 +506,246 @@ describe("the server's process", { timeout: 30_000 }, () => {
     } finally {
       way.close();
     }
+  });
+
+  // The worlds job (7c) tunnels to the default universe's RPC alone: the other universe's is not on the way out.
+  it("starts the worlds job when WORLDS_FILE and UNIVERSES_FILE are set: it asks the default universe's RPC, and stops on SIGTERM", async () => {
+    const way = await tunnels();
+    try {
+      const dir = folder("gnoworld-worlds-");
+      const base = { name: "U", gnoweb: "https://gnoweb.example", testnet: true };
+      const universes = join(dir, "universes.json");
+      writeFileSync(
+        universes,
+        JSON.stringify([
+          {
+            ...base,
+            id: "a",
+            chainId: "a-1",
+            rpc: "https://rpc.not-default.example:443",
+            indexer: "https://indexer.not-default.example/graphql",
+          },
+          {
+            ...base,
+            id: "b",
+            chainId: "b-1",
+            rpc: "https://rpc.the-default.example:443",
+            indexer: "https://indexer.the-default.example/graphql",
+            default: true,
+          },
+        ]),
+      );
+      writeFileSync(join(dir, "hubs.json"), "[]");
+      const server = start({
+        ...settings(),
+        WORLDS_FILE: join(dir, "worlds.json"),
+        UNIVERSES_FILE: universes,
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => server.out.stdout.includes('"event":"worlds_failed"'));
+      expect(way.seen).toEqual(["rpc.the-default.example:443"]);
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+      // 7t3: the chain's habits are kept beside the database, never beside the file nginx serves.
+      expect(readdirSync(dir).filter((name) => name.startsWith("trends-"))).toEqual([]);
+    } finally {
+      way.close();
+    }
+  });
+
+  // The preview job (8f) reads the default universe's hubs' pages through its RPC alone, and only with the check that reads each capture.
+  it("starts the preview job with PREVIEWS_FILE, UNIVERSES_FILE and OpenAI's key: it asks the default universe's RPC alone, and stops on SIGTERM", async () => {
+    const way = await tunnels();
+    try {
+      const dir = folder("gnoworld-previews-");
+      const base = { name: "U", testnet: true };
+      const universes = join(dir, "universes.json");
+      writeFileSync(
+        universes,
+        JSON.stringify([
+          {
+            ...base,
+            id: "a",
+            chainId: "a-1",
+            rpc: "https://rpc.not-default.example:443",
+            gnoweb: "https://gnoweb.not-default.example",
+            indexer: "https://indexer.not-default.example/graphql",
+          },
+          {
+            ...base,
+            id: "b",
+            chainId: "b-1",
+            rpc: "https://rpc.the-default.example:443",
+            gnoweb: "https://gnoweb.the-default.example",
+            indexer: "https://indexer.the-default.example/graphql",
+            default: true,
+          },
+        ]),
+      );
+      const hub = {
+        name: "GovDAO",
+        description: "GovDAO, the governance of gno.land: its proposals and its votes, on chain.",
+      };
+      writeFileSync(
+        join(dir, "hubs.json"),
+        JSON.stringify([
+          { ...hub, slug: "govdao", universe: "b", realms: ["gno.land/r/gov/dao"] },
+          { ...hub, slug: "other", universe: "a", realms: ["gno.land/r/else/where"] },
+        ]),
+      );
+      writeFileSync(join(dir, "key"), "sk-a-key-of-at-least-thirty-two-characters");
+      const server = start({
+        ...settings(),
+        PREVIEWS_FILE: join(dir, "previews.json"),
+        UNIVERSES_FILE: universes,
+        OPENAI_API_KEY_FILE: join(dir, "key"),
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => server.out.stdout.includes('"event":"previews_written"'));
+      expect(way.seen).toEqual(["rpc.the-default.example:443"]);
+      expect(server.out.stdout).not.toContain("gov/dao");
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+    } finally {
+      way.close();
+    }
+  });
+
+  it.each([
+    ["no UNIVERSES_FILE", {}, "setting UNIVERSES_FILE: required"],
+    [
+      "no OPENAI_API_KEY_FILE: no check, so no job",
+      { UNIVERSES_FILE: "/nowhere/universes.json" },
+      "setting OPENAI_API_KEY_FILE: required",
+    ],
+  ])("does not start with a PREVIEWS_FILE and %s: it fails closed, naming the setting", async (_, over, said) => {
+    const server = start({
+      ...settings(),
+      PREVIEWS_FILE: join(folder("gnoworld-previews-"), "previews.json"),
+      ...over,
+    });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(said);
+  });
+
+  it("does not start with a WORLDS_FILE and no UNIVERSES_FILE: it fails closed, naming the setting", async () => {
+    const server = start({ ...settings(), WORLDS_FILE: join(folder("gnoworld-worlds-"), "worlds.json") });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain("setting UNIVERSES_FILE: required");
+  });
+
+  it("counts who is here beside its database: /api/presence answers each world, and its history is written as it stops (7h)", async () => {
+    const env = settings();
+    const server = start(env);
+    const port = await listening(server);
+    const answer = await fetch(`http://127.0.0.1:${String(port)}/api/presence`);
+    expect(answer.status).toBe(200);
+    expect(Presence.parse(await answer.json()).worlds.map(({ world }) => world)).toEqual(shippedWorlds());
+    server.child.kill("SIGTERM");
+    expect(await exited(server)).toBe(0);
+    expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
+    expect(
+      JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence-messages.json"), "utf8")),
+      "7t3",
+    ).toEqual({});
+  });
+
+  it("answers the ticker's trends at /api/trends, none with no worlds job and no one here, never a 404 (7t)", async () => {
+    for (const env of [settings(), { ...settings(), DATABASE: ":memory:" }]) {
+      const port = await listening(start(env));
+      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/trends`);
+      expect(answer.status).toBe(200);
+      expect(answer.headers.get("cache-control")).toBe("public, max-age=60");
+      expect(Trends.parse(await answer.json())).toEqual({ items: [] });
+    }
+  });
+
+  // 7t3: a hub whose rooms surge against its own 14 days is Trending by its chat, and the Rising item names no world already Trending.
+  it("names at /api/trends the hub whose people here surge against its own 14 days as Trending, and not again as rising (7t, 7t3)", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    // Bubble's last 47 hours held one person each: six now is a rise of 5 on its usual hour (core's riseOf).
+    const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
+    const past = Array.from({ length: 47 }, (_, back) => ({ at: hour - (back + 1) * 3_600_000, people: 1 })).reverse();
+    writeFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), JSON.stringify({ bubble: past }));
+    const port = await listening(start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper }));
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    await peer.next(/^NAMES #bubble$/);
+    peer.say(":ergo.test 324 gnoworld #bubble +nt");
+    peer.say(":ergo.test 347 gnoworld #bubble :End");
+    peer.say(":ergo.test 353 gnoworld = #bubble :~@gnoworld ada bo cy dee eve fay");
+    peer.say(":ergo.test 366 gnoworld #bubble :End");
+    await expect
+      .poll(async () => Trends.parse(await (await fetch(`http://127.0.0.1:${String(port)}/api/trends`)).json()).items, {
+        timeout: 10_000,
+      })
+      .toEqual([
+        { kind: "trending", by: "here", world: "bubble", count: 6, rise: 5, at: expect.any(String) as unknown },
+      ]);
+  });
+
+  // 7t3: the chain's habits beside the database, counts alone; a database held in memory keeps none.
+  it("keeps each world's chain windows beside its database, and none for a database held in memory", async () => {
+    const habits = (env: Record<string, string>) => {
+      const dir = folder("gnoworld-worlds-");
+      writeFileSync(
+        join(dir, "universes.json"),
+        readFileSync(new URL("../../app/data/universes.json", import.meta.url), "utf8"),
+      );
+      writeFileSync(join(dir, "hubs.json"), "[]");
+      return { ...env, WORLDS_FILE: join(dir, "worlds.json"), UNIVERSES_FILE: join(dir, "universes.json") };
+    };
+    const env = settings();
+    const kept = start(habits(env));
+    await listening(kept);
+    kept.child.kill("SIGTERM");
+    expect(await exited(kept)).toBe(0);
+    expect(
+      readdirSync(dirname(env["DATABASE"] ?? ""))
+        .filter((name) => name.startsWith("trends-"))
+        .sort(),
+    ).toEqual(["trends-addresses.json", "trends-transactions.json"]);
+    const memory = habits({ ...settings(), DATABASE: ":memory:" });
+    const none = start(memory);
+    await listening(none);
+    none.child.kill("SIGTERM");
+    expect(await exited(none)).toBe(0);
+    expect(readdirSync(dirname(memory.WORLDS_FILE)).filter((name) => name.startsWith("trends-"))).toEqual([]);
+  });
+
+  it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {
+    const port = await listening(start({ ...settings(), DATABASE: ":memory:" }));
+    expect((await fetch(`http://127.0.0.1:${String(port)}/api/presence`)).status).toBe(404);
+  });
+
+  it("starts no worlds job without WORLDS_FILE: nothing is asked of a chain", async () => {
+    const way = await tunnels();
+    try {
+      const server = start({ ...settings(), HTTPS_PROXY: way.proxy, NODE_USE_ENV_PROXY: "1" });
+      await listening(server);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      expect(way.seen).toEqual([]);
+      expect(server.out.stdout).not.toContain("worlds");
+    } finally {
+      way.close();
+    }
+  });
+
+  // 7t3: the trends read a hub's rooms and its realms as one world, from the hubs beside the universes the job reads.
+  it("does not start a worlds job with no hubs.json beside UNIVERSES_FILE: it fails closed, naming the file", async () => {
+    const dir = folder("gnoworld-worlds-");
+    const universes = join(dir, "universes.json");
+    writeFileSync(universes, readFileSync(new URL("../../app/data/universes.json", import.meta.url), "utf8"));
+    const server = start({ ...settings(), WORLDS_FILE: join(dir, "worlds.json"), UNIVERSES_FILE: universes });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toContain(join(dir, "hubs.json"));
   });
 
   it("does not start with a UNIVERSES_FILE that holds no default universe: it fails closed, naming the file", async () => {

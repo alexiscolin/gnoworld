@@ -42,9 +42,6 @@
 
   /* A link that leaves gnoweb: a button that reads as the page's own links do (inherited colour), underlined to say it is one. */
   .external {
-    padding: 0;
-    border: 0;
-    background: none;
     color: inherit;
     font: inherit;
     text-decoration: underline;

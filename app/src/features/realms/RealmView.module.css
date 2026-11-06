@@ -1,5 +1,10 @@
 /* A realm's view (5h): where the page was read, in the page's own small type. */
 @layer components {
+  /* The top centre's slot stays free above the view's first line (tokens.css, --banner-room). */
+  .view {
+    padding-block-start: var(--banner-room);
+  }
+
   .meta {
     color: var(--color-text-muted);
     font: var(--font-meta);

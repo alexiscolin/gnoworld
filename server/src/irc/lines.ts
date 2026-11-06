@@ -1,6 +1,6 @@
 // The lines the server's IRC link writes and reads (slice 3's plan, 3h, 3j, 3k): each through formatLine;
 // the commands the bot may send, each in its only forms; a room's message as the link hands it on.
-import { formatLine, toIrcCommand, type IrcMessage } from "@gnoworld/core";
+import { formatLine, isCountryCode, toIrcCommand, type IrcMessage } from "@gnoworld/core";
 
 /** A room's message, as Ergo marked it: the account it set, the message's id and its time, and the id
  * of the line it corrects when it is an edit. */
@@ -11,6 +11,8 @@ export interface Said {
   text: string;
   time?: string;
   edits?: string;
+  /** The country its speaker declares (+gnoworld/country, two capitals, ADR-0001 §7): opt-in, never guessed; none when it declares none. */
+  country?: string;
   /** A message of several lines the link could not read whole: hidden by this id, whatever its text says. */
   unreadable?: true;
   /** A line to the room's operators or voices alone (@#room, +#room): moderated, never handed to the whole room. */
@@ -76,11 +78,17 @@ export function joins(rooms: readonly string[]): string[] {
 
 // Ergo's time, in server-time's form alone, so a mark is always a time Ergo can read back; and the id an
 // edit names (+gnoworld/edit, 3b's table), 128 characters at most, or the line is no edit.
-function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string } {
-  const [time = "", edits = ""] = [tags.get("time"), tags.get("+gnoworld/edit")];
+function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string; country?: string } {
+  const [time = "", edits = "", country = ""] = [
+    tags.get("time"),
+    tags.get("+gnoworld/edit"),
+    tags.get("+gnoworld/country"),
+  ];
   return {
     ...(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(time) ? { time } : {}),
     ...(edits.length > 0 && edits.length <= 128 ? { edits } : {}),
+    // Any client may write anything there: two capitals, or none (core's chat/room.ts reads it the same way).
+    ...(isCountryCode(country) ? { country } : {}),
   };
 }
 

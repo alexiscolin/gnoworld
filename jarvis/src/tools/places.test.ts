@@ -66,9 +66,9 @@ describe("loadPlaces: the places' data, read once at start", () => {
       "places: universes.json: (file): custom",
     ],
     [
-      "a station in a universe not listed",
-      { stations: [world("tower", "Tower"), world("tower", "Tower", "planted-mars")] },
-      "places: stations.json: [1].universe: not a universe of universes.json",
+      "a hub in a universe not listed",
+      { hubs: [world("tower", "Tower"), world("tower", "Tower", "planted-mars")] },
+      "places: hubs.json: [1].universe: not a universe of universes.json",
     ],
     [
       "an ecosystem's extra field",

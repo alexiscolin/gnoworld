@@ -1,10 +1,10 @@
 // The places of gnoworld's data (ADR-0002 §5, "the places and their URLs"; D101): universes, hubs, ecosystems and
-// stations, read once at start from the folder JARVIS_DATA_DIR names, each through packages/schemas' own schema, as
+// the Earth's orbit aside, read once at start from the folder JARVIS_DATA_DIR names, each through packages/schemas' own schema, as
 // the site's build reads them, then core's placesOf. find_place answers a place's path and canonical address from
 // them alone; a fault stops the start, naming its file and nothing it holds.
 import { join } from "node:path";
 import { jsonOf, type Place, placeIn, placesOf } from "@gnoworld/core";
-import { Ecosystems, Hubs, Stations, Universes } from "@gnoworld/schemas";
+import { Ecosystems, Hubs, Universes } from "@gnoworld/schemas";
 import { readDataFile } from "@gnoworld/service/files";
 import { z } from "zod";
 import type { Ran } from "../gnomcp.ts";
@@ -60,7 +60,7 @@ export function loadPlaces(folder: string): Places {
   const universes = fileOf(folder, "universes", Universes);
   const ids = new Set(universes.map(({ id }) => id));
   const rows = { hubs: fileOf(folder, "hubs", Hubs), ecosystems: fileOf(folder, "ecosystems", Ecosystems) };
-  const all = { ...rows, stations: fileOf(folder, "stations", Stations) };
+  const all = rows;
   for (const [name, list] of Object.entries(all)) {
     const at = list.findIndex((row) => !ids.has(row.universe));
     if (at !== -1) throw new Error(`places: ${name}.json: [${String(at)}].universe: not a universe of universes.json`);
@@ -69,7 +69,7 @@ export function loadPlaces(folder: string): Places {
   const places = placesOf({ defaultUniverse, universes, ...all });
   const byId = new Map(universes.map(({ id, name, chainId, rpc, gnoweb }) => [id, { id, name, chainId, rpc, gnoweb }]));
   const names = new Map<string, string>();
-  for (const { slug, universe, name } of [...all.hubs, ...all.stations]) names.set(`${universe} world ${slug}`, name);
+  for (const { slug, universe, name } of all.hubs) names.set(`${universe} world ${slug}`, name);
   for (const { slug, universe, name } of all.ecosystems) names.set(`${universe} ecosystem ${slug}`, name);
   const found = places.map(({ kind, universe, slug, path, canonical }) => {
     // The cosmos and the Earth have no name; JSON leaves an undefined one out.

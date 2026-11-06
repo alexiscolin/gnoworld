@@ -24,9 +24,11 @@
     --_fill: color-mix(in oklab, var(--world) 16%, var(--color-surface));
 
     /* raw: the dot grid, white at 7% on a 14 px pitch (the prototype's #fPlate) */
-    background:
+    --_ground:
       radial-gradient(color-mix(in oklab, var(--color-text) 7%, transparent) 1px, transparent 1.3px) 0 0 / 14px 14px,
       var(--_fill);
+
+    background: var(--_ground);
   }
 
   /* Seen only on the wide plate: a block in the page keeps its height to its words (the room under it needs the screen). */
@@ -69,6 +71,12 @@
       border-end-end-radius: var(--radius-l);
     }
 
+    /* Alone over the scene, no plate beside it (frame 143): round at every corner, on the night's own fill. */
+    .dock[data-alone] {
+      border-radius: var(--radius-l);
+      background: var(--color-surface);
+    }
+
     .place {
       position: fixed;
       /* raw: the header's clearance of 96 and the 2 px the frame keeps under it (frame 20) */
@@ -100,8 +108,32 @@
       border: 0;
       border-start-end-radius: 0;
       border-end-end-radius: 0;
-      /* raw: the fade: the last 64 px go to space, so the planet keeps the frame's free area */
-      mask-image: linear-gradient(to right, #000 calc(100% - 64px), transparent);
+      /* raw: the fill's own layer holds the background now, so the words stack over it */
+      isolation: isolate;
+      background: none;
+    }
+
+    /* The fill stands apart from the words: the fade and a globe's circle are cut out of it alone, and no word fades with them. */
+    .panel[data-look="plate"]::before {
+      content: "";
+      position: absolute;
+      inset-block: 0;
+      inline-size: 100%;
+      /* raw: under its own words, inside the panel's stacking */
+      z-index: -1;
+      border-start-start-radius: var(--radius-l);
+      border-end-start-radius: var(--radius-l);
+      background: var(--_ground);
+      /* raw: the last 64 px go to space, so the planet keeps the frame's free area; a page that draws a globe over the plate's right side
+         opens a circle for it, for the canvas lies under the plate */
+      mask-image:
+        linear-gradient(to right, #000 calc(100% - 64px), transparent),
+        radial-gradient(
+          circle var(--globe-hole) at calc(var(--globe-x) - var(--space-m)) calc(var(--globe-y) - 98px),
+          transparent 95%,
+          #000
+        );
+      mask-composite: intersect;
     }
 
     .panel[data-look="plate"] .content {
@@ -114,8 +146,9 @@
       padding-block-start: 27px;
     }
 
-    /* The kicker is the crumbs' row in the world's page: 24 px tall, its words centred in it (frame 26), so the title keeps its place. */
-    .panel[data-look="plate"] .content p:has(+ h1) {
+    /* The kicker, or the crumbs (8g), is the row over the title: 24 px tall, its words centred in it (frame 26), so the title keeps its place;
+       never a heading inside a dialog or an inert picture (8f). */
+    .panel[data-look="plate"] .content :is(p, nav):not(:is(dialog, [inert]) *):has(+ h1) {
       /* layout: the kicker's words centred in the crumbs' row */
       display: flex;
       /* layout: centred in the row */
@@ -124,9 +157,10 @@
       min-block-size: 24px;
     }
 
-    /* The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
+    /* The plate's own title, never a heading drawn on it in a dialog or a picture (a page's capture, 8f), which keeps its own scale.
+       The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
        step the longest name the 474 px column holds at 0.58 em a letter. */
-    .panel[data-look="plate"] h1 {
+    .panel[data-look="plate"] h1:not(:is(dialog, [inert]) *) {
       /* raw: 7 px off the crumbs, which sets the title's ink at y 183 (frame 37) */
       /* layout: the arrangement the prototype and the frames draw */
       margin-block-start: 7px;
@@ -137,7 +171,7 @@
       line-height: 0.9;
     }
 
-    .panel[data-look="plate"] h1 + p {
+    .panel[data-look="plate"] h1:not(:is(dialog, [inert]) *) + p {
       /* raw: 11 px more under the title, which sets the description's ink at y 310 (frame 26) */
       /* layout: the arrangement the prototype and the frames draw */
       margin-block-start: 11px;
@@ -149,32 +183,32 @@
       font: 400 16px/1.55 var(--family-sans);
     }
 
-    .panel[data-look="plate"][data-fit="8"] h1 {
+    .panel[data-look="plate"][data-fit="8"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: max(36px, min(10.93vb, 102px));
     }
 
-    .panel[data-look="plate"][data-fit="10"] h1 {
+    .panel[data-look="plate"][data-fit="10"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 81.7px;
     }
 
-    .panel[data-look="plate"][data-fit="12"] h1 {
+    .panel[data-look="plate"][data-fit="12"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 68px;
     }
 
-    .panel[data-look="plate"][data-fit="16"] h1 {
+    .panel[data-look="plate"][data-fit="16"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 51px;
     }
 
-    .panel[data-look="plate"][data-fit="20"] h1 {
+    .panel[data-look="plate"][data-fit="20"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 40.9px;
     }
 
-    .panel[data-look="plate"][data-fit="more"] h1 {
+    .panel[data-look="plate"][data-fit="more"] h1:not(:is(dialog, [inert]) *) {
       /* raw: the prototype's and the frames' own value */
       font-size: 36px;
     }

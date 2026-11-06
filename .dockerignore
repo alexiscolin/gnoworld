@@ -32,6 +32,7 @@ packages/core/src/**/*.test.ts
 packages/schemas/src/**/*.test.ts
 !packages/service/src
 packages/service/src/**/*.test.ts
+packages/service/src/testing
 # And the app's: the chain-read package both import, without its tests and their helpers.
 !packages/chain/src
 packages/chain/src/**/*.test.ts
