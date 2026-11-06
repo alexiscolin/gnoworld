@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { button, click, mount, settled } from "../../../tests/mount.tsx";
 import { StoreProvider } from "../../storeContext.tsx";
 import type { SessionDeps } from "./logIn.ts";
-import { LoginControl, useLogin } from "./LoginControl.tsx";
+import { Account } from "./testing/Account.tsx";
 
 // The login in the header (4a): the session read as the page starts, again on the waits the page's leaving cancels; Adena's code asked at
 // the click that logs in, with the page's own Adena, its connect and its signer; a logout. What logIn.ts does with them is its own test's.
@@ -29,20 +29,6 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// The header's account holds the hook and the way out (8p): this stands in for it, the way out shown once the session is in.
-function Account() {
-  const { login, logIn, logOut } = useLogin();
-  return (
-    <>
-      <LoginControl login={login} logIn={logIn} />
-      {login.session.kind === "in" ? (
-        <button type="button" onClick={logOut}>
-          Log out
-        </button>
-      ) : null}
-    </>
-  );
-}
 
 const depsOf = (call: unknown[] | undefined) => call?.[0] as SessionDeps;
 

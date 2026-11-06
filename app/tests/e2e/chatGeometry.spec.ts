@@ -147,8 +147,8 @@ test.describe("the chat at the video's size", () => {
     ).toBe("32px");
     const [row1, row2] = await Promise.all([people.nth(0).boundingBox(), people.nth(1).boundingBox()]);
     if (row1 === null || row2 === null) throw new Error("no people");
-    // 57, not the frame's 41: each row holds 8c's Follow button, 40 px high (red on slice-8 at d63a03b7 already).
-    near(row2.y - row1.y, 57);
+    // 61, not the frame's 41: each row holds 8c's Follow button, a control 44 px high since the 9m tokens (--control-m, F5967).
+    near(row2.y - row1.y, 61);
     // Send is round, 32 px; the format bar's icons 13 px in the muted grey; the field has no handle or ring of its own.
     const send = await page.getByRole("button", { name: "Send" }).evaluate((element) => {
       const css = getComputedStyle(element);

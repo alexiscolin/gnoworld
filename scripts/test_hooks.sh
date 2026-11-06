@@ -209,7 +209,7 @@ for step in "run format:check" "run typecheck" "run lint" "run test" "run test:c
 	"python3 -I ../scripts/mutate.py" "go vet ./tools/..." "go run ./tools/sealvec | cmp" "python3 -I scripts/check_docs.py" \
 	"sh scripts/test_hooks.sh" "python3 -I scripts/probe.py" "run coverage" "python3 -I scripts/patch_coverage.py" "sh scripts/ergo.sh" \
 	"run mutate" "sh scripts/scan_secrets.sh" "python3 -I scripts/harness_mutate.py" "python3 -I scripts/check_regressions.py" "python3 -I scripts/check_migrations.py" "python3 -I scripts/bench.py" "python3 -I scripts/batch_size.py" "python3 -I scripts/load.py" \
-	'unset GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py" \
+	'unset COVERAGE_ALL GNOWORLD_BUILD AUDIT_ANSWER PROVE_FIX_VITEST PROVE_FIX_GNO PROVE_FIX_GO' '[ "$took" -gt "$budget" ]' "python3 -I scripts/prove_fix.py" "python3 -I scripts/audit.py" \
 	"PICTURES_OF=tokens-- node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts"; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
@@ -366,16 +366,27 @@ assert len(writes) == len(set(writes)) and len(deny) == len(set(deny)), "a rule 
 rules = [(m[1], m[2]) for r in deny if (m := re.fullmatch(r"(Read|Edit)\((.+)\)", r))]
 assert all(p.startswith(("/", "~/")) for k, p in rules), "a Read or Edit deny with no anchor, which no twin follows (R6)"
 own_writes = [w for w in writes if not w.startswith(("/", "~"))]
+# Alexis's unlock (2026-11-06, the speed plan): a worktree's harness, rules and configs are open to its session; its twins keep the
+# gate's own hooks, the guard, the secret scan, the dependency files, git's folder and the instructions alone.
+KEPT = {"**/.claude/skills", "**/CLAUDE.local.md", ".git/hooks", ".git/config", ".git/commondir", ".githooks/pre-commit", ".githooks/pre-push",
+        ".githooks/records.sh", ".mcp.json", ".node-version", ".npmrc", ".pnpmfile.cjs", ".pnpmfile.mjs", "CLAUDE.local.md", "package.json",
+        "pnpm-lock.yaml", "pnpm-workspace.yaml", "scripts/.gitleaksignore", "scripts/gitleaks-private.toml", "scripts/gitleaks.toml",
+        "scripts/guard.py", "scripts/install_hooks.sh", "scripts/scan_secrets.sh", "scripts/worktree.sh"}
+twin_writes = sorted(KEPT)
 own_rules = [(k, p) for k, p in rules if p.startswith("/") and not p.startswith("//")]
 # The twins, derived from the tree's own rules, and the folders above: nothing more is closed, nothing less.
 rule_of = lambda n: f"{n}/**" if n == ".claude/rules" else n
-want_writes = {f"{WT}/*/{w}" for w in own_writes} | {f"{WT}/*/.git"} | {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
-want_writes |= {f"{NEW}/*/{w}" for w in own_writes} | {f"{NEW}/*/.git"} | {f"{NEW}/{n}" for n in INSTRUCTIONS}
+want_writes = {f"{WT}/*/{w}" for w in twin_writes} | {f"{WT}/*/.git"} | {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
+want_writes |= {f"{NEW}/*/{w}" for w in twin_writes} | {f"{NEW}/*/.git"} | {f"{NEW}/{n}" for n in INSTRUCTIONS}
 # The next parts' folder's own .claude, whole: the chief's --add-dir of it loads its skills, commands and agents (Claude Code 2.1.318's
 # loaders read an added folder's; lot 2's S2-2), and no tree lives there.
 want_writes |= {f"{NEW}/.claude"}
-want_rules = {f"{k}(/{w}/*{p})" for k, p in own_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
-want_rules |= {f"{k}({NEW}/*{p})" for k, p in own_rules} | {f"Edit({NEW}/*/.git)"}
+# The unlock opens these in a worktree (the main checkout keeps them closed); of .githooks, the hooks that guard main stay closed.
+OPENED = {"/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**", "/**/.claude/rules/**",
+          "/scripts/stop_gate.sh", "/scripts/code_changed.sh", "/scripts/borrow_node_modules.sh"}
+twin_rules = [(k, p) for k, p in own_rules if p not in OPENED] + [("Edit", f"/.githooks/{h}") for h in ("pre-commit", "pre-push", "records.sh")]
+want_rules = {f"{k}(/{w}/*{p})" for k, p in twin_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
+want_rules |= {f"{k}({NEW}/*{p})" for k, p in twin_rules} | {f"Edit({NEW}/*/.git)"}
 want_rules |= {f"Edit({MAIN}/scripts/**)"}  # 10a (F5058): the main checkout's scripts, out of every worktree session's file tools
 want_rules |= {f"Edit(/{w}/*/.git)" for w in (WT, TMP_WT)}
 want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) for n in INSTRUCTIONS}
@@ -464,15 +475,15 @@ def denied(kind, path):
 
 
 one = lambda p: p.replace("**", "x").replace("*", "core")  # a path a rule names, each glob made one name
-# The two the brief names: a file that does not exist yet under a sibling's .githooks/, and an edit of a sibling's scripts/.
+# The two the brief names, narrowed by the unlock: a sibling's hook that guards main, and an edit of a sibling's guard.
 for tree in (f"{WT}/slice-7", f"{TMP_WT}/slice-7", f"{WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
-    assert refused(f"{tree}/.githooks/probe"), f"a command can write {tree}/.githooks/probe"
-    assert denied("Edit", f"{tree}/scripts/stop_gate.sh"), f"the file tools can edit {tree}/scripts/stop_gate.sh"
+    assert refused(f"{tree}/.githooks/pre-push"), f"a command can write {tree}/.githooks/pre-push"
+    assert denied("Edit", f"{tree}/scripts/guard.py"), f"the file tools can edit {tree}/scripts/guard.py"
 # Every closed path of a sibling, an existing one or one made tomorrow, by both spellings; and the main checkout's, to the file tools.
 for tree in (f"{WT}/slice-7", f"{WT}/tomorrow", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
-    for w in own_writes + [".git"]:
+    for w in twin_writes + [".git"]:
         assert refused(f"{tree}/{one(w)}"), f"a command can write {tree}/{w}"
-    for k, p in own_rules + [("Edit", "/.git")]:
+    for k, p in twin_rules + [("Edit", "/.git")]:
         assert denied(k, f"{tree}{one(p)}"), f"the file tools can {k.lower()} {tree}{p}"
 for k, p in own_rules:
     assert denied(k, f"{HOME}/Server/gnoworld{one(p)}"), f"the file tools can {k.lower()} the main checkout's {p}"
@@ -482,8 +493,12 @@ for k, p in own_rules:
 for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{HOME}/Server/gnoworld"):
     for p in ("app/CLAUDE.md", "docs/plans/CLAUDE.local.md", "packages/core/AGENTS.md", "app/.claude/CLAUDE.md", "app/.claude/AGENTS.md",
               "server/src/.claude/rules/x.md", "app/.claude/skills/s/SKILL.md", "CLAUDE.md", "AGENTS.md"):
+        # A sibling's rules are open since the unlock (2026-11-06), and its other instructions to the file tools alone.
+        sibling = tree not in (ROOT, f"{HOME}/Server/gnoworld")
+        if sibling and ".claude/rules/" in p:
+            continue
         assert denied("Edit", f"{tree}/{p}"), f"the file tools can write {tree}/{p}, which Claude Code reads as instructions (S2-3)"
-        assert refused(f"{tree}/{p}"), f"a command can write {tree}/{p}, which Claude Code reads as instructions (S2-3)"
+        assert sibling or refused(f"{tree}/{p}"), f"a command can write {tree}/{p}, which Claude Code reads as instructions (S2-3)"
     for p in ("docs/notes-CLAUDE.md", "docs/CLAUDE.md.orig", "app/src/agents.ts", "app/claude/rules.ts", "app/.claude-x/skills/a.md"):
         assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed, and Claude Code reads no instructions there"
 for p in ("skills/s/SKILL.md", "commands/c.md", "agents/a.md", "settings.json"):
@@ -8011,8 +8026,11 @@ const base = (files) => (l) =>
   // A failure stays a failure whatever the line says.
   t = await run((l, p) => (l === "merge check" ? { ...gateOf(["app/src/a.ts"]), passed: false, failingLane: "probe", lastLine: "all checks passed in 5 s" } : base(["app/src/a.ts"])(l, p)));
   ok(t.r.status.startsWith("blocked"), `a merge check the agent called failed passed on its line: ${t.r.status}`);
-  t = await run((l, p) => (l === "red pass" ? null : base(["app/src/a.ts"])(l, p)));
+  // The red pass runs on tier-1 and harness tests alone (the speed plan, 2026-11-06): dead there, it blocks the build; product tests skip it.
+  t = await run((l, p) => (l === "red pass" ? null : l === "tests" ? { files: ["scripts/t.py"], seenFailing: true, notes: "" } : base(["scripts/a.py"])(l, p)));
   ok(t.r.status.startsWith("blocked") && !t.labels.includes("build"), `a dead red pass let the build run: ${t.r.status} ${t.labels}`);
+  t = await run((l, p) => (l === "red pass" ? null : base(["app/src/a.ts"])(l, p)));
+  ok(!t.labels.includes("red pass") && t.r.status === "ready for the chief", `a product branch's tests waited on a red pass: ${t.r.status} ${t.labels}`);
   t = await run((l, p) => (l === "reviewer" ? null : base(["app/src/a.ts"])(l, p)));
   ok(t.r.status.startsWith("blocked"), `a dead reviewer counted as a clean review: ${t.r.status}`);
   t = await run((l, p) => (l === "reviewer" ? { findings: [finding("high", "app/src/a.ts")] } : base(["app/src/a.ts"])(l, p)));

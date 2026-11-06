@@ -6,7 +6,8 @@
     "**/node_modules/**",
     "**/*.test.ts",
     "**/.git/**",
-    "app/tests/chain/recorded/**"
+    "app/tests/chain/recorded/**",
+    "stryker.all.config.json"
   ],
   "exitCode": 1,
   "similarity": 0.8

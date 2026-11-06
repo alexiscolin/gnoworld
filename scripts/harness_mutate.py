@@ -1296,9 +1296,9 @@ def mutants():
     # stays JSON: a line cut last in its list would leave a comma, and the run fail on that, the red pass's T2), narrowed to one
     # tree or widened past the worktrees' folder (F4890, F4891, F4892).
     wt, tmp_wt = "/private/tmp/claude-501/gnoworld-wt", "/tmp/claude-501/gnoworld-wt"
-    for entry, why in ((".githooks", "a sibling's .githooks (F4890)"), ("scripts", "a sibling's hook scripts (F4890)"), (".git", "a sibling's .git (F4891)")):
+    for entry, why in ((".githooks/pre-commit", "a sibling's pre-commit hook (F4890)"), ("scripts/guard.py", "a sibling's guard (F4890)"), (".git", "a sibling's .git (F4891)")):
         yield from each(".claude/settings.json", f'"{wt}/*/{entry}"', f'"{wt}/*/{entry}-off"', "hooks", f"the sandbox keeps commands out of {why}")
-    for rule, why in ((f"Edit(/{wt}/*/scripts/stop_gate.sh)", "a sibling's Stop hook (F4890)"), (f"Edit(/{tmp_wt}/*/scripts/stop_gate.sh)", "a sibling's Stop hook, by /tmp (F4890)"),
+    for rule, why in ((f"Edit(/{wt}/*/scripts/guard.py)", "a sibling's guard (F4890)"), (f"Edit(/{tmp_wt}/*/scripts/guard.py)", "a sibling's guard, by /tmp (F4890)"),
                       (f"Edit(/{wt}/*/.claude/settings.json)", "a sibling's settings, which its session reloads (F4890)"), (f"Edit(/{tmp_wt}/*/.git)", "a sibling's .git, by /tmp (F4891)"),
                       ("Edit(~/Server/gnoworld/scripts/stop_gate.sh)", "the main checkout's Stop hook (F4890)"), ("Edit(~/Server/gnoworld/.git/config)", "the main checkout's git config (F4890)"),
                       (f"Read(/{wt}/*/deploy/secrets/**)", "a sibling's secrets (F4892)"), ("Read(~/Server/gnoworld/deploy/secrets/**)", "the main checkout's secrets (F4892)")):
@@ -1313,21 +1313,21 @@ def mutants():
     for rule, why in (("Edit(~/Server/CLAUDE.md)", "above the main checkout"), ("Edit(//tmp/CLAUDE.md)", "above every worktree, by /tmp"),
                       ("Edit(~/.claude/rules/**)", "of the home folder")):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep the instructions {why} out of the file tools (7z, S4)")
-    yield from each(".claude/settings.json", f'"{wt}/*/CLAUDE.md"', f'"{wt}/slice-7/CLAUDE.md"', "hooks", "a twin covers a worktree made tomorrow, not one named (F4890)")
-    yield from each(".claude/settings.json", f'"{wt}/*/.gitignore"', '"/private/tmp/claude-501/**/.gitignore"', "hooks", "no twin closes a throwaway tree in $TMPDIR (F4890)")
-    yield from each(".claude/settings.json", f'"Edit(/{wt}/*/.githooks/**)"', f'"Edit(/{wt}/**)"', "hooks", "no twin closes a sibling's open files (F4890)")
+    yield from each(".claude/settings.json", f'"{wt}/*/CLAUDE.local.md"', f'"{wt}/slice-7/CLAUDE.local.md"', "hooks", "a twin covers a worktree made tomorrow, not one named (F4890)")
+    yield from each(".claude/settings.json", f'"{wt}/*/package.json"', '"/private/tmp/claude-501/**/package.json"', "hooks", "no twin closes a throwaway tree in $TMPDIR (F4890)")
+    yield from each(".claude/settings.json", f'"Edit(/{wt}/*/.githooks/pre-commit)"', f'"Edit(/{wt}/**)"', "hooks", "no twin closes a sibling's open files (F4890)")
     # 7w3: the file tools write the session's folders alone; the next parts' folder's twins and the instructions above them; the
     # instructions below a tree's root (S2-3), and StrykerJS's copies left out of what those close.
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true', '"blockWritesOutsideWorkingDirectories": false', "hooks",
                     "settings keep the file tools in the session's folders (7w3)")
     new = "~/Server/gnoworld-wt"
-    for entry, why in ((".githooks", "a .githooks of the next parts' folder"), (".git", "a .git of the next parts' folder"), ("**/CLAUDE.md", "a nested CLAUDE.md there")):
+    for entry, why in ((".githooks/pre-commit", "a pre-commit hook of the next parts' folder"), (".git", "a .git of the next parts' folder"), ("**/CLAUDE.local.md", "a nested CLAUDE.local.md there")):
         yield from each(".claude/settings.json", f'"{new}/*/{entry}"', f'"{new}/*/{entry}-off"', "hooks", f"the sandbox keeps the chief's commands out of {why} (7w3)")
     yield from each(".claude/settings.json", f'"{new}/CLAUDE.md"', f'"{new}/CLAUDE.md-off"', "hooks", "the sandbox keeps the chief's commands out of the instructions above the next parts' trees (7w3)")
-    for rule, why in ((f"Edit({new}/*/scripts/stop_gate.sh)", "a Stop hook of the next parts' folder"), (f"Read({new}/*/deploy/secrets/**)", "a sibling's secrets there"),
+    for rule, why in ((f"Edit({new}/*/scripts/guard.py)", "a guard of the next parts' folder"), (f"Read({new}/*/deploy/secrets/**)", "a sibling's secrets there"),
                       (f"Edit({new}/*/.git)", "a sibling's .git there"), (f"Edit({new}/.claude/rules/**)", "the rules above the next parts' trees")):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {why} out of the file tools (7w3)")
-    yield from each(".claude/settings.json", f'"{new}/*/scripts"', f'"{new}/slice-7/scripts"', "hooks", "a twin covers a tree of the next parts' folder made tomorrow (7w3)")
+    yield from each(".claude/settings.json", f'"{new}/*/scripts/guard.py"', f'"{new}/slice-7/scripts/guard.py"', "hooks", "a twin covers a tree of the next parts' folder made tomorrow (7w3)")
     for entry in ("**/CLAUDE.md", "**/CLAUDE.local.md", "**/AGENTS.md", "**/.claude/rules", "**/.claude/skills"):
         yield from each(".claude/settings.json", f'        "{entry}",\n', "", "hooks", f"the sandbox keeps commands out of {entry}, below the root (7w3, S2-3)")
     for rule in ("Edit(/**/CLAUDE.md)", "Edit(/**/CLAUDE.local.md)", "Edit(/**/AGENTS.md)", "Edit(/**/.claude/rules/**)", "Edit(/**/.claude/skills/**)"):
@@ -2342,7 +2342,7 @@ MOST = 100  # what --changed judges at most: no variable or flag moves it (Alexi
 
 
 NAME_CHAR = r"\w.$\[\]@+%~-"  # what a file's name is made of, besides the folder's slash: `$id.tsx` and `[slug].tsx` (React Router) are names
-WORDS = re.compile(f"[{NAME_CHAR}]+")
+NAME_WORDS = re.compile(f"[{NAME_CHAR}]+")
 ONE =re.compile(f"[{NAME_CHAR}]")
 
 
@@ -2370,10 +2370,10 @@ def named_in(context, memo={}):
             # A worktree's .git is a file naming its copy, another each run: read, it made every key new.
             files += [os.path.relpath(os.path.join(top, n), WORKTREE) for n in names if n != ".git"]
         words = set()
-        for word in WORDS.findall(context):  # a full stop that ends a sentence, a dash that opens an option: the word without them too
+        for word in NAME_WORDS.findall(context):  # a full stop that ends a sentence, a dash that opens an option: the word without them too
             words |= {word, word.rstrip("."), word.lstrip("-"), word.lstrip("-").rstrip(".")}
         # A basename of name characters alone is a word of the context; any other (a space, a bracket pair, a quote) is searched for.
-        memo[context] = sorted(f for f in files if f in ALWAYS or (os.path.basename(f) in words if WORDS.fullmatch(os.path.basename(f)) else bounded(context, os.path.basename(f))))
+        memo[context] = sorted(f for f in files if f in ALWAYS or (os.path.basename(f) in words if NAME_WORDS.fullmatch(os.path.basename(f)) else bounded(context, os.path.basename(f))))
     return memo[context]
 
 

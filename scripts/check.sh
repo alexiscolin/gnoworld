@@ -665,6 +665,53 @@ if ! $full && [ "$took" -gt "$budget" ]; then
 	fi
 fi
 
+# What both full checks share (the strict one of before the speed plan, and the slim one), written once.
+if $full; then
+	# The coverage lane's tools take half the machine each, the harness lane beside them the rest: at the machine's width, their load
+	# outlasted Ergo's 9 s auth script (F777). StrykerJS runs alone, after every other lane, on every core.
+	cores=$(node -p "require('os').availableParallelism()")
+	half=$((cores / 2))
+	[ "$half" -ge 1 ] || half=1
+fi
+parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
+check_nginx() {
+	step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
+	python3 -I scripts/check_nginx.py
+}
+core_chromium() {
+	step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
+	CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
+}
+# StrykerJS's cache: this run's copy, taken only if the cache reads as JSON (lane_stryker puts it back the same way).
+stryker_cache() {
+	cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
+	# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
+	# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
+	if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
+	mkdir -p "${cache%/*}"
+	! parses "$cache" || cp "$cache" "$own"
+}
+mutate_harness() {
+	step harness_mutate # each guard switched off must fail a test (several minutes)
+	if $merge; then
+		python3 -I scripts/harness_mutate.py --changed "$base"
+		return 0
+	fi
+	python3 -I scripts/harness_mutate.py
+}
+# A phase is the lanes that run side by side. --full stops at the first phase with a failure, which fixes nothing of what comes after; a
+# merge check's phases all run (the dream of 2026-11-01, 5: a failed lane or a bench refused for the load stopped the 20 minutes that find
+# the survivors), and the end of it fails, saying every failure.
+phase() {
+	finish "$@" || {
+		$merge || {
+			echo "check.sh: the lanes after $* did not run: $* failed first" >&2
+			exit 1
+		}
+		carried=1
+	}
+}
+
 if $full && $strict; then
 	base=$(git merge-base HEAD "$base_ref") || { echo "check.sh --full: needs $base_ref to compare with (git fetch, or a ref that exists)" >&2; exit 1; }
 	changes=$(git -c core.quotePath=false diff --no-renames --name-only "$base" -- && git -c core.quotePath=false ls-files --others --exclude-standard)
@@ -721,23 +768,15 @@ EOF
 			python3 -I scripts/bench.py
 		fi
 		if $merge && $nginx; then
-			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
-			python3 -I scripts/check_nginx.py
+			check_nginx
 		fi
 	}
 	lane_stories() {
-		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
-		CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
+		core_chromium
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
 		port=$(free_ports 1) # its own, as the pictures' lane: two worktrees' gates both took 6007 and one failed (2026-10-29)
 		STORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot
 	}
-	# The coverage lane's tools take half the machine each, the harness lane beside them the rest: at the machine's
-	# width, their load outlasted Ergo's 9 s auth script (F777). StrykerJS runs alone, after every other lane, on every core.
-	cores=$(node -p "require('os').availableParallelism()")
-	half=$((cores / 2))
-	[ "$half" -ge 1 ] || half=1
-	parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
 	lane_coverage() {
 		step coverage # 85% everywhere, core 100%
 		# A test that fails once under the coverage's load runs again, as in the fast gate (F3384: one failure cost an hour of a gate that was
@@ -760,12 +799,7 @@ EOF
 		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
 		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
-		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
-		# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
-		# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
-		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
-		mkdir -p "${cache%/*}"
-		! parses "$cache" || cp "$cache" "$own"
+		stryker_cache
 		config=
 		! $everything || config=stryker.all.config.json # the whole of the TypeScript, as before the speed plan
 		if $merge; then
@@ -804,24 +838,7 @@ EOF
 	lane_harness() {
 		! $harness_judged || return 0 # judged by the last green --full (above)
 		harness --quiet "$base" && return 0 # records.sh's list
-		step harness_mutate # each guard switched off must fail a test (several minutes)
-		if $merge; then
-			python3 -I scripts/harness_mutate.py --changed "$base"
-			return 0
-		fi
-		python3 -I scripts/harness_mutate.py
-	}
-	# A phase is the lanes that run side by side. --full stops at the first phase with a failure, which fixes nothing of what comes after; a
-	# merge check's phases all run (the dream of 2026-11-01, 5: a failed lane or a bench refused for the load stopped the 20 minutes that find
-	# the survivors), and the end of it fails, saying every failure.
-	phase() {
-		finish "$@" || {
-			$merge || {
-				echo "check.sh: the lanes after $* did not run: $* failed first" >&2
-				exit 1
-			}
-			carried=1
-		}
+		mutate_harness
 	}
 	start probe
 	phase probe
@@ -868,23 +885,15 @@ if $full && ! $strict; then
 			fi
 		fi
 		if $nginx; then
-			step nginx # the image's nginx.conf with the build's table in a pinned nginx, then the built pages served: each answers its own policy (5f's F2459, F2460)
-			python3 -I scripts/check_nginx.py
+			check_nginx
 		fi
 	}
 	lane_stories() {
-		step core_chromium # core's tests again in Chromium, whose engine reads some regexes and Unicode otherwise (F816)
-		CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium # vitest.config.ts opens it then alone
+		core_chromium
 		step stories # the design system's stories in a browser: axe, the invariants and the CSS jsdom cannot see
 		port=$(free_ports 1) # its own: two worktrees' gates both took 6007 and one failed (2026-10-29)
 		STORIES_PORT=$port node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --reporter=dot app/tests/stories/stories.spec.ts app/tests/stories/behaviours.spec.ts # not pictures.spec.ts nor compositions.spec.ts: --everything
 	}
-	# The coverage lane's tools take half the machine, the harness lane beside it the rest: at the machine's
-	# width, their load outlasted Ergo's 9 s auth script (F777).
-	cores=$(node -p "require('os').availableParallelism()")
-	half=$((cores / 2))
-	[ "$half" -ge 1 ] || half=1
-	parses() { python3 -Ic 'import json, sys; json.load(open(sys.argv[1]))' "$1" 2>/dev/null; }
 	lane_coverage() {
 		step coverage # tier-1 files at 100% (vitest.config.ts: its `include` is tier 1)
 		# A test that fails once under the coverage's load runs again, as in the fast gate (F3384: one failure cost an hour of a gate that was
@@ -902,12 +911,7 @@ if $full && ! $strict; then
 		# StrykerJS works on this run's copy, taken only if the cache reads as JSON, and the copy goes back whole only if it reads
 		# in turn: StrykerJS rethrows a file it cannot parse, so a run cut short would fail every tree's. Two runs that end at once
 		# keep the last one's verdicts: the other's are judged again, never lost to a half-written file.
-		cache="$HOME/.cache/gnoworld-tools/stryker-incremental.json" own="$logs/stryker-incremental.json"
-		# A run cut short leaves its sandboxes in .stryker-tmp, which a bench measured (5n: Cmd-K at 27 to 41 ms instead of 2 to 4):
-		# emptied before StrykerJS starts. A link is removed, never followed: what it leads to is not StrykerJS's.
-		if [ -L .stryker-tmp ]; then rm .stryker-tmp; elif [ -d .stryker-tmp ]; then find .stryker-tmp -mindepth 1 -delete; fi
-		mkdir -p "${cache%/*}"
-		! parses "$cache" || cp "$cache" "$own"
+		stryker_cache
 		config=
 		lines=0
 		python3 -I scripts/stryker_lines.py "$base" "$logs/stryker.json" || lines=$?
@@ -933,24 +937,7 @@ if $full && ! $strict; then
 	}
 	lane_harness() {
 		$harness_changed || return 0 # records.sh's list: no harness file changed since the base
-		step harness_mutate # each guard switched off must fail a test (several minutes)
-		if $merge; then
-			python3 -I scripts/harness_mutate.py --changed "$base"
-			return 0
-		fi
-		python3 -I scripts/harness_mutate.py
-	}
-	# A phase is the lanes that run side by side. --full stops at the first phase with a failure, which fixes nothing of what comes after; a
-	# merge check's phases all run (the dream of 2026-11-01, 5: a failed lane or a bench refused for the load stopped the 20 minutes that find
-	# the survivors), and the end of it fails, saying every failure.
-	phase() {
-		finish "$@" || {
-			$merge || {
-				echo "check.sh: the lanes after $* did not run: $* failed first" >&2
-				exit 1
-			}
-			carried=1
-		}
+		mutate_harness
 	}
 	start probe
 	phase probe
