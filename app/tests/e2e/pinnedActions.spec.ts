@@ -46,9 +46,13 @@ for (const width of [390, 1280] as const) {
 }
 
 test("GovDAO shows no pinned Vote anywhere when vm/qfuncs does not list its function", async ({ page }) => {
-  const answered = page.waitForResponse((response) => decodeURIComponent(response.url()).includes("vm/qfuncs"));
+  // The plate and the bar each read the functions: both answers, before any absence is asserted (the combined review of 9e-1).
+  let answers = 0;
+  page.on("response", (response) => {
+    if (decodeURIComponent(response.url()).includes("vm/qfuncs")) answers += 1;
+  });
   await opened(page, 1280, []);
-  await answered;
+  await expect.poll(() => answers).toBe(2);
   await expect(bar(page).getByRole("button", { name: "Who's here" })).toBeVisible();
   await expect(plate(page).getByRole("link", { name: "Read the proposals" })).toBeVisible();
   // The answer parsed and drawn: a task after the response, as callFixtures' after() waits in the unit tests.
