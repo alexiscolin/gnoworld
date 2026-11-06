@@ -133,7 +133,14 @@ export function Field({
       {prefix === undefined ? (
         box
       ) : (
-        <div data-part="box" className={styles["frame"]}>
+        // A click on the prefix or the frame's padding is a click in the box.
+        <div
+          data-part="box"
+          className={styles["frame"]}
+          onClick={(event) => {
+            event.currentTarget.querySelector<HTMLElement>("input, textarea")?.focus();
+          }}
+        >
           <span id={`${id}-prefix`} className={styles["prefix"]}>
             {prefix}
           </span>

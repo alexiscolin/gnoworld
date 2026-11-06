@@ -51,6 +51,20 @@ test.describe("the name dialog against the frames", () => {
     expect(prefix.x + prefix.width).toBeLessThanOrEqual(field.x + field.width);
   });
 
+  // F5972: a prefixed field is a control, 40 px like the others, its frame's edge inside that height.
+  test("draws the field's box 40 px tall, as the other fields are", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    expect((await box(page, "dialog[open] [data-part='box']")).height).toBe(40);
+  });
+
+  // F5963: the focus ring is the frame's, so it encloses the prefix; the bare input inside draws none.
+  test("rings the whole box when its input has the focus, not the input alone", async ({ page }) => {
+    await opened(page, [1728, 1080]);
+    await expect(dialog(page).getByRole("textbox", { name: "Name" })).toBeFocused();
+    expect(await style(page, "dialog[open] [data-part='box']", "outline-style")).toBe("solid");
+    expect(await style(page, "dialog[open] [data-part='box'] input", "outline-style")).toBe("none");
+  });
+
   test("sets the field's label in mono caps at 11 px", async ({ page }) => {
     await opened(page, [1728, 1080]);
     expect(await style(page, LABEL, "text-transform")).toBe("uppercase");

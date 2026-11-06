@@ -184,6 +184,19 @@ describe("Field", () => {
     expect(said).toEqual(["nym-", "5 to 13 letters"]);
   });
 
+  // F5976: the prefix and the frame's padding are part of the box, as a person sees it: a click anywhere in it types.
+  it("focuses its input when the prefix or the frame around it is clicked", async () => {
+    render(<Field label="Name" prefix="nym-" value="" onChange={vi.fn()} />);
+    const input = screen.getByRole("textbox", { name: "Name" });
+    await userEvent.click(screen.getByText("nym-"));
+    expect(document.activeElement).toBe(input);
+    input.blur();
+    const frame = input.closest("[data-part='box']");
+    expect(frame).not.toBeNull();
+    if (frame !== null) await userEvent.click(frame);
+    expect(document.activeElement).toBe(input);
+  });
+
   it("reads its prefix, help, error and the page's words in that order, and is invalid inside the box", () => {
     render(
       <>
