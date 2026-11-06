@@ -124,7 +124,3 @@ export const TxAnswer = z.object({
   error: z.optional(z.object({ data: z.optional(z.string()) })),
 });
 export type TxAnswer = z.infer<typeof TxAnswer>;
-
-// The chain's events the server tells (slice 9g) are read through this path too: a page loads them on its first event, in a chunk of its own,
-// which the package's barrel would pull into the first screen's.
-export { ChainEvent, RealmsDeployed } from "./chainEvents.ts";

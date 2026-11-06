@@ -5,6 +5,11 @@
     color: var(--color-text-muted);
   }
 
+  /* The line under the title is the frames' 13 px reading size. */
+  .note[data-size="reading"] {
+    font: var(--font-reading);
+  }
+
   /* The frames draw the registry's path in the text colour, not as a chip on a fill. */
   .note code {
     padding-inline: 0;

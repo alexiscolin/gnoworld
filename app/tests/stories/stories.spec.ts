@@ -292,8 +292,9 @@ for (const touch of [false, true]) {
       expect(await page.evaluate(() => matchMedia("(pointer: coarse)").matches)).toBe(touch);
     });
 
-    test("controls are as tall as their size's control, the default 44 px by touch", async ({ page }) => {
-      const m = touch ? 44 : 40;
+    // F5967 (answer 9k-3): the video's default control is 44 px with a pointer too.
+    test("controls are as tall as their size's control, the default 44 px", async ({ page }) => {
+      const m = 44;
       expect((await sizes(page, "button--sizes")).heights).toEqual({ s: 32, m, l: 56 });
       expect(await sizes(page, "button-iconbutton--sizes"), "icon buttons").toEqual({
         heights: { s: 32, m, l: 56 },
@@ -301,9 +302,9 @@ for (const touch of [false, true]) {
       });
     });
 
-    // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a
-    // field's box and a popover's trigger at the default one, 44 by touch.
-    test("chips, tabs and fields are as tall as their size's control", async ({ page }) => {
+    // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a popover's trigger at
+    // the default one, and a field's box at the default one with its two edges, 46 px (frame 10, F5967).
+    test("chips, tabs and triggers are as tall as their size's control, a field 2 px taller", async ({ page }) => {
       const heights = async (id: string, selector: string) => {
         await open(page, id);
         return [
@@ -317,8 +318,8 @@ for (const touch of [false, true]) {
       expect(await heights("chip--marks", "[data-tone]"), "marks").toEqual([24]);
       expect(await heights("chip--control", "button"), "a chip that acts").toEqual([32]);
       expect(await heights("tabs--segmented", "[role='tab']"), "tabs").toEqual([32]);
-      expect(await heights("field--text", "input"), "a field").toEqual([touch ? 44 : 40]);
-      expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([touch ? 44 : 40]);
+      expect(await heights("field--text", "input"), "a field").toEqual([46]);
+      expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([44]);
     });
 
     // iOS Safari zooms into a field whose text is under 16 px when it takes the focus (F371).
@@ -333,6 +334,34 @@ for (const touch of [false, true]) {
     });
   });
 }
+
+// F5968 (answer 9k-3): a field rests on the strong line, frame 10's edge, and keeps it under the pointer; an invalid one is coral.
+test("a field's edge is the strong line at rest and under the pointer, the danger line when invalid", async ({
+  page,
+}) => {
+  const token = (name: string) =>
+    page.evaluate((n) => {
+      const probe = document.createElement("i");
+      probe.style.color = `var(${n})`;
+      document.body.append(probe);
+      const colour = getComputedStyle(probe).color;
+      probe.remove();
+      return colour;
+    }, name);
+  const edge = () =>
+    page
+      .locator("#storybook-root :is([data-part='box'], input)")
+      .first()
+      .evaluate((e) => getComputedStyle(e).borderTopColor);
+  await open(page, "field--text");
+  await page.mouse.move(0, 0);
+  expect(await edge(), "at rest").toBe(await token("--color-line-strong"));
+  await page.locator("#storybook-root input").first().hover();
+  expect(await edge(), "under the pointer").toBe(await token("--color-line-strong"));
+  await open(page, "field--with-error");
+  await page.mouse.move(0, 0);
+  expect(await edge(), "invalid").toBe(await token("--color-danger-line"));
+});
 
 test("a busy button's spinner turns, and stops under reduced motion", async ({ page }) => {
   const spin = async () => {
@@ -519,7 +548,8 @@ test("the base styles text with the tokens, and the label keeps its case where c
       .first()
       .evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), property);
   expect(await style("h1", "font-size")).toBe("36px");
-  expect(await style("h2", "font-size")).toBe("28px");
+  // F5969 (answer 9k-3): the panel and dialog title is frame 10's 26 px.
+  expect(await style("h2", "font-size")).toBe("26px");
   expect(await style("h3", "font-size")).toBe("20px");
   expect(await style("small", "font-size")).toBe("12px");
   expect(await style("code", "font-family")).toContain("Geist Mono Variable");

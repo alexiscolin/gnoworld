@@ -109,7 +109,7 @@ second between two frames, the 3D art (slice 7), a voice-and-tone guide.
 
 1. One secondary grey. 2. One label style (mono 11 caps 0.14em), the header's links included.
 3. Selected is the cream fill; current row a quiet fill. 4. Targets 24 px with a pointer, 44 by
-touch. 5. Spacing on the 4 px grid, no 2 px token. 6. Panel and dialog titles 28/300.
+touch. 5. Spacing on the 4 px grid, no 2 px token. 6. Panel and dialog titles 28/300 (26/300 since answer 9k-3, the video's).
 7. The astronaut from the name replaces planets and uploads (ADR-0002 §6). 8. Transactions are
 call cards in the thread (ADR-0002 §4). 9. No blue in the system. 10. Seven new components, the
 rule of two uses. 11. Search becomes a ⌘K palette. 12. The dead UI is not rebuilt. 13. Three tiers

@@ -98,10 +98,10 @@ for (const width of WIDTHS) {
             });
           }),
         );
-        // The search control is the default control, 40 px with a mouse (44 by touch: search.spec.ts).
+        // The search control is the default control, 44 px (F5967).
         const search = await page.getByRole("button", { name: /^Search/ }).boundingBox();
-        expect(search?.width).toBeGreaterThanOrEqual(40);
-        expect(search?.height).toBeGreaterThanOrEqual(40);
+        expect(search?.width).toBeGreaterThanOrEqual(44);
+        expect(search?.height).toBeGreaterThanOrEqual(44);
         const middles = boxes.map(({ top, bottom }) => (top + bottom) / 2);
         expect(boxes.filter(({ top, bottom }) => middles.some((m) => m < top || m > bottom))).toEqual([]);
         // The header keeps to the gutter too, logged in.

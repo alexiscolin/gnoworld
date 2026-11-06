@@ -26,6 +26,8 @@
 # (docs/DEVELOPMENT.md, "Toolchain"). Node comes from .node-version, through nvm when the
 # shell's own differs.
 set -eu
+# ESLint over the whole project passed 4 GB once slice 9 joined (2026-11-06): every node of the gate gets 8 GB of heap.
+export NODE_OPTIONS="${NODE_OPTIONS:-} --max-old-space-size=8192"
 started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set

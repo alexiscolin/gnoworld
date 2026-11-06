@@ -65,7 +65,7 @@ export const Switcher: Story = {
 export const Center: Story = {
   render: () => (
     <layout.Center max="dialog" space="m">
-      <p>A dialog holds its text at 460 px, and the measure at 65 characters.</p>
+      <p>A dialog holds its text at 490 px, and the measure at 65 characters.</p>
     </layout.Center>
   ),
 };

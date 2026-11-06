@@ -68,8 +68,9 @@ test.describe("at the video's size", () => {
     const search = await box(page, "header nav[aria-label='Views'] button[aria-label='Search']");
     expect(search.x).toBeGreaterThan(list.x + list.width);
     expect(search.x + search.width).toBeLessThanOrEqual(pill.x + pill.width);
-    // A control's own size, 40 px, centred in the 34 px between the pill's padding (touch asks 44: search.spec.ts).
+    // A control's own size, 44 px (F5967), centred in the 34 px between the pill's padding, its overflow shared by both sides.
     expect(search.width).toBeGreaterThanOrEqual(34);
+    near(search.height, 44, "the search's height");
     near(search.y + search.height / 2, 56, "the search's middle");
   });
 

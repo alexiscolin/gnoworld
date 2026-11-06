@@ -80,8 +80,9 @@ Semantic roles, all computed from them:
 | Role | Made of | Use |
 |---|---|---|
 | `--color-fill`, `--color-fill-hover` | text at 5% and 10% | The resting fill of fields, chips and cards; hover |
+| `--color-text-faint` | muted at 80% | A field's placeholder alone, dimmer than the prefix as frame 10's (F5980): 5.1:1 on a field over night, 5.4:1 over space, 4.6:1 inside a card (WCAG AA; D311) |
 | `--color-ink-hover` | space at 10% | Hover on a filled control, the cream or the coral, where the text's veil would not show (F369) |
-| `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover |
+| `--color-line`, `--color-line-strong` | text at 10% and 20% | Borders and dividers; secondary buttons, hover; a field's resting edge is the strong one (frame 10, F5968) |
 | `--color-panel`, `--color-glass` | night at 86% and 60% | Docked panels; what floats over the scene |
 | `--color-surface` | night | What floats over the page: popovers, menus, tooltips, dialogs |
 | `--color-scrim` | space at 70% | Behind a dialog |
@@ -142,12 +143,13 @@ the brightest planet behind the header's pills.
 | `--font-meta` | 12 px, leading 1.4 | Geist 400 | Timestamps, secondary lines, fine print |
 | `--font-data` | 12 px | Geist Mono 400 | Addresses, hashes, code, the ticker, chart axes |
 | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
+| `--font-reading` | 13 px, leading 1.5 | Geist 400 | The sentence under a card's or a dialog's title (frames 10 and 110): a line read, not a control |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
 | `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus (F371) |
 | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
 | `--font-action` | 16 px | Geist 500 | The 56 px main action |
 | `--font-title-s` | 20 px | Geist 400 | Small headers (notifications) |
-| `--font-title-m` | 28 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts |
+| `--font-title-m` | 26 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts (frame 10's dialog title, F5969) |
 | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
 | `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat` (Alexis, 2026-10-31): the board "Instrument" of the counter-proposal; its caption is the label |
 | `--font-display` | `clamp(4.5rem, 8vw, 7rem)`, -0.04em, leading 0.9 | Geist 600 | A world's name on its plate |
@@ -171,18 +173,18 @@ the brightest planet behind the header's pills.
 | Token | Values |
 |---|---|
 | `--space-3xs` … `--space-2xl` | 4, 8, 12, 16, 24, 32, 48, 64 px, a 4 px grid; section space is fluid with `clamp()` |
-| `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 40 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. Under `pointer: coarse`, `--control-m` is 44 |
+| `--control-xs` / `--control-s` / `--control-m` / `--control-l` | 24 / 32 / 44 / 56 px: badges and reactions / toolbars, chips, tabs / default / the main action. The default is 44 with a pointer too, as the video's (F5967); a field's box is the default and its two edges, 46 |
 | `--radius-s` / `--radius-m` / `--radius-l` / `--radius-pill` | 8 / 12 / 24 / 999 px: small controls, rows, menus / cards, fields, popovers, bubbles / panels, dialogs / buttons, chips, tabs |
 | `--icon-m` / `--icon-l` | 16 / 20 px, the only icon sizes |
 | `--size-counter` / `--size-progress` | 18 px (an unread count) / 4 px (every progress bar) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-s` / `-m` / `-l` | 32 / 48 / 64 px: a row's lead / a card / the rail; 16 and 24 join with their first readers |
-| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 460 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
+| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 490 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.
 - A target is at least 24 px (WCAG 2.2, 2.5.8; a link inside a sentence aside), and the default
-  control is 44 px by touch; a toolbar's small controls stay at 32.
+  control is 44 px; a toolbar's small controls stay at 32.
 - Interface text and controls do not scale with the window; section space and titles do.
 - **Density:** `comfortable` (default) or `compact`, set once with `data-density` on a container;
   it remaps the control and row aliases, so no component holds a density rule of its own.
@@ -292,7 +294,7 @@ walk every story in Chromium, in the full gate.
   runs in `check.sh --everything`; the approved video is the reference, compared by eye, and the design is decided live.
 - **Invariants,** measured in the browser on every story and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
-  - every target is at least 24 px, the default control 44 px by touch;
+  - every target is at least 24 px, the default control 44 px;
   - `:focus-visible` draws its ring;
   - no horizontal scroll from 320 px wide; text still fits at 200% zoom;
   - forced colours keep every control visible; reduced motion stops transitions;
@@ -330,7 +332,7 @@ component with its CSS Module, documented by its props.
 | Component | Variants and states | Notes |
 |---|---|---|
 | `Button` | emphasis solid, outline, quiet; tone neutral, danger; sizes s, m, l; with an icon; disabled; busy | The solid neutral (cream) is the primary: one per region. A danger button names its act |
-| `IconButton` | sizes s, m, l (the header, 44 by touch); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
+| `IconButton` | sizes s, m, l (the header, m: 44); outline, plain; pressed; a count | Always an `aria-label`, and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
 | `Chip` | interactive (default, selected, with a count); static, at `--control-xs`, with a tone (a card's state, a badge) | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3); "Testnet" and "Sponsored" are uses of the static chip |
 | `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Cosmos, List), notifications, the library filter, a world's rooms in the dock |
 | `ChoiceGroup` | segmented, list | ARIA `radiogroup`, one look: each option a boxed row; the chosen one cream with the check. The days to rent, a poll's and a quiz's answers |
@@ -397,7 +399,7 @@ assembly in its own slice, with its story.
 
 | Region | Place | Size |
 |---|---|---|
-| Header | Top, 34 px from the edge, the same on every view | Controls at `--control-m` (44 by touch). Logo left; the views (Earth, Cosmos, List), the network (the universe switcher, "Testnet" on a testnet) and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings). When narrow, labels drop before icons; the network and the account never drop. Its pills have a backdrop that keeps them readable over any planet |
+| Header | Top, 34 px from the edge, the same on every view | Controls at `--control-m` (44); the logged-in account's pill is the frames' 40 (f0031). Logo left; the views (Earth, Cosmos, List), the network (the universe switcher, "Testnet" on a testnet) and search centre; Jarvis, chat, passport, bell, account right. The account button opens the menu (passport, saved, settings, help, log out); on a phone, a menu button holds it with the navigation (ADR-0002 §1, menu and settings). When narrow, labels drop before icons; the network and the account never drop. Its pills have a backdrop that keeps them readable over any planet |
 | Top centre | Under the header, centred in the scene's free area (between the plate and the dock) | One slot: the flight panel, the expedition pill, the flash |
 | Hero | Bottom left of the cosmos | The number, one line that says what gnoworld is, two big actions, the markets row; the scene keeps it clear (a safe area) |
 | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines; as tall as its worlds; labels keep out of it |

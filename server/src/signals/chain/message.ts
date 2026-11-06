@@ -1,7 +1,7 @@
 // One transaction row of the indexer's answer (slice 9g) read into the events a room shows. Outside data: every row through Zod with
 // caps; the filter the server asks for lets other messages through, so each message's realm and function are checked again here;
 // what a transaction's args or memo hold never leaves this file.
-import { ChainEvent } from "@gnoworld/schemas/indexer";
+import { ChainEvent } from "@gnoworld/schemas/chainEvents";
 import { z } from "zod";
 
 /** A watched realm's world, and the functions the world's filter asks for (none: every function). */

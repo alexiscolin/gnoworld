@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
-import * as indexer from "./indexer.ts";
 
 // Slice 9g (D260 to D269): what the server tells a page of the chain, through the stream's own events `chain` and `realms`.
 // Every text is a name the chain's own rules bound (an address, a realm's path, a function's name), and no text of a
@@ -27,11 +26,9 @@ const DEPLOY = {
 const bidi = String.fromCodePoint(0x202e);
 
 describe("a chain event", () => {
-  it("takes a call to a world's realm, and a deploy that names no world, and is read through the indexer's path, which keeps it out of the first screen", () => {
+  it("takes a call to a world's realm, and a deploy that names no world", () => {
     expect(ChainEvent.parse(CALL)).toEqual(CALL);
     expect(ChainEvent.parse(DEPLOY)).toEqual(DEPLOY);
-    expect(indexer.ChainEvent).toBe(ChainEvent);
-    expect(indexer.RealmsDeployed).toBe(RealmsDeployed);
   });
 
   it.each([

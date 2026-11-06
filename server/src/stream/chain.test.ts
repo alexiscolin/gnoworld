@@ -1,5 +1,5 @@
 import { Address } from "@gnoworld/schemas";
-import { ChainEvent, RealmsDeployed } from "@gnoworld/schemas/indexer";
+import { ChainEvent, RealmsDeployed } from "@gnoworld/schemas/chainEvents";
 import { logger } from "@gnoworld/service/log";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";

@@ -28,11 +28,11 @@ function contrast(a: string, b: string) {
   return ((light ?? 0) + 0.05) / ((dark ?? 0) + 0.05);
 }
 
-// A translucent token laid over a ground, mixed in sRGB as docs/DESIGN-SYSTEM.md measures it: the
-// token's primitive at its share, the ground under the rest.
+// A translucent token laid over a ground (a base colour's name or a #rrggbb), mixed in sRGB as docs/DESIGN-SYSTEM.md
+// measures it: the token's primitive at its share, the ground under the rest.
 function over(name: string, ground: string) {
   const [, primitive = "", share = "0"] = /var\(--p-(\w+)\) (\d+)%, transparent/.exec(value(name) ?? "") ?? [];
-  const [top, under] = [BASE[primitive] ?? "", BASE[ground] ?? ""];
+  const [top, under] = [BASE[primitive] ?? "", BASE[ground] ?? ground];
   const mixed = [1, 3, 5].map((at) => {
     const channel = (hex: string) => Number.parseInt(hex.slice(at, at + 2), 16);
     const blend = (Number(share) / 100) * channel(top) + (1 - Number(share) / 100) * channel(under);
@@ -180,7 +180,7 @@ describe("the tokens", () => {
     ["--radius-s", "8px"],
     ["--radius-m", "12px"],
     ["--radius-l", "24px"],
-    ["--dialog-w", "460px"],
+    ["--dialog-w", "490px"],
     ["--dialog-wide", "760px"],
     ["--popover-w", "300px"],
     ["--thumb-s", "32px"],
@@ -198,7 +198,7 @@ describe("the tokens", () => {
     ["--icon-m", "16px"],
     ["--icon-l", "20px"],
     ["--control-s", "32px"],
-    ["--control-m", "40px"],
+    ["--control-m", "44px"],
     ["--control-l", "56px"],
     ["--radius-pill", "999px"],
     ["--space-3xs", "4px"],
@@ -207,8 +207,11 @@ describe("the tokens", () => {
     expect(value(name)).toBe(px);
   });
 
-  it("set the medium control to 44 px under a coarse pointer, for touch", () => {
-    expect(css).toMatch(/@media \(pointer: coarse\)\s*\{\s*:root\s*\{\s*--control-m:\s*44px;/);
+  // F5967 (answer 9k-3): the video's controls are 44 px on a computer too, so a coarse pointer has no height of its own.
+  it("set the medium control to 44 px on every pointer, a coarse one setting none of its own", () => {
+    const coarse = /@media \(pointer: coarse\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
+    expect(value("--control-m")).toBe("44px");
+    expect(parseTokens(`:root {${coarse}}`).map(({ name }) => name)).not.toContain("--control-m");
   });
 
   it("still the fast and the base motion under reduced motion, and keep the wait", () => {
@@ -226,6 +229,37 @@ describe("the New mark's colours", () => {
   it("names coral for what is new, and its rule above 3:1 on the page", () => {
     expect(value("--color-new")).toBe("var(--p-coral)");
     expect(contrast(over("--color-new-line", "space"), BASE["space"] ?? "")).toBeGreaterThanOrEqual(3);
+  });
+});
+
+// F5954 (frames 10 and 110): the sentence under a title is 13 px with a reading leading, which --font-ui (leading 1, weight 500) is not.
+describe("the reading font", () => {
+  it("is Geist 400 at 13 px with a leading of 1.5, in a token of its own", () => {
+    expect(value("--font-reading")).toBe("400 0.8125rem/1.5 var(--family-sans)");
+  });
+});
+
+// F5969 (answer 9k-3): frame 10's dialog title has capitals 19 px tall (rows 390 to 408), where Geist 300 at 28 px draws 20.
+describe("the panel and dialog title", () => {
+  it("is Geist 300 at 26 px", () => {
+    expect(value("--font-title-m")).toBe("300 1.625rem/1 var(--family-sans)");
+  });
+});
+
+// F5980 (answer 9k-3): frame 10's placeholder is dimmer than the field's prefix (luma 128 against 174); a placeholder is
+// text, so it keeps WCAG AA's 4.5:1 on the field's fill wherever a field sits: the dialog's night, the page's space, and a
+// card's fill under the field's own (the call card), which the frame's 4.44:1 grey would not.
+describe("the placeholder's grey", () => {
+  it("holds 4.5:1 on a field over night, over space and on a card over either, and is clearly dimmer than muted", () => {
+    for (const ground of ["night", "space"]) {
+      for (const fill of [over("--color-fill", ground), over("--color-fill", over("--color-fill", ground))]) {
+        const faint = contrast(over("--color-text-faint", fill), fill);
+        expect(faint, `on ${fill} over ${ground}`).toBeGreaterThanOrEqual(4.5);
+        expect(faint, `a fifth dimmer than muted on ${fill}`).toBeLessThanOrEqual(
+          0.8 * contrast(BASE["muted"] ?? "", fill),
+        );
+      }
+    }
   });
 });
 

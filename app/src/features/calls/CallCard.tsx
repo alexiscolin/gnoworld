@@ -161,9 +161,7 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
         <CallStatus card={card} />
         {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
       </Card.Body>
-      <div className={styles["tall"]}>
-        <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
-      </div>
+      <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
     </Card>
   );
 }

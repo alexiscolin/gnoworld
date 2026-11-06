@@ -11,7 +11,7 @@ export interface DialogProps {
   open: boolean;
   /** Asked to close, by Esc or Close: the page sets open to false. */
   onClose: () => void;
-  /** 760 px, for the palette, the lightbox and the passport; 460 otherwise. */
+  /** 760 px, for the palette, the lightbox and the passport; 490 otherwise. */
   wide?: boolean;
   /** The line above the title, in the one label style, read with the description. */
   kicker?: string;

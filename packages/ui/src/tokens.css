@@ -18,6 +18,8 @@
     --color-space: var(--p-space);
     --color-text: var(--p-text);
     --color-text-muted: var(--p-muted);
+    /* A placeholder, dimmer than muted as frame 10's (F5980), at 4.5:1 or more on a field over night, space or a card. */
+    --color-text-faint: color-mix(in oklab, var(--p-muted) 80%, transparent);
     --color-primary: var(--p-cream);
     --color-ink: var(--p-space);
     --color-mine: var(--p-mint);
@@ -51,6 +53,7 @@
     --font-meta: 400 0.75rem/1.4 var(--family-sans);
     --font-data: 400 0.75rem/1.4 var(--family-mono);
     --font-ui: 500 0.8125rem/1 var(--family-sans);
+    --font-reading: 400 0.8125rem/1.5 var(--family-sans);
     --font-chat: 400 0.84375rem/1.45 var(--family-sans);
     --font-hint: 400 0.65625rem/1.4 var(--family-sans);
     --font-body: 400 0.875rem/1.5 var(--family-sans);
@@ -58,7 +61,7 @@
     --font-action: 500 1rem/1 var(--family-sans);
     --font-title-s: 400 1.25rem/1.4 var(--family-sans);
     --font-title-room: 300 1.375rem/1 var(--family-sans);
-    --font-title-m: 300 1.75rem/1 var(--family-sans);
+    --font-title-m: 300 1.625rem/1 var(--family-sans);
     --font-title-l: 300 2.25rem/1 var(--family-sans);
     --font-figure: 500 2.75rem/1 var(--family-mono);
     --tracking-caps: 0.14em;
@@ -75,7 +78,7 @@
 
     --control-xs: 24px;
     --control-s: 32px;
-    --control-m: 40px;
+    --control-m: 44px;
     --control-l: 56px;
     --icon-m: 16px;
     --icon-l: 20px;
@@ -86,7 +89,7 @@
     --column-l: 384px;
     --measure: 65ch;
     --switch-at: 38rem;
-    --dialog-w: 460px;
+    --dialog-w: 490px;
     --dialog-wide: 760px;
     --popover-w: 300px;
     /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
@@ -142,7 +145,6 @@
 
   @media (pointer: coarse) {
     :root {
-      --control-m: 44px;
       /* Under 16 px, iOS Safari zooms into a field that takes the focus (F371). */
       --font-field: 400 1rem/1.5 var(--family-sans);
     }

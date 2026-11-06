@@ -89,6 +89,25 @@ test.describe("a write function's call card", () => {
     expect(look).toEqual({ edge: "1px", drawn: "solid", gap: "16px" });
   });
 
+  // F5954 (frame f0110): the sentence under the title is 13 px with a 1.5 leading.
+  test("draws its first sentence in the 13 px reading size", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setup(page);
+    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    const lede = card(page).getByText("A call to").first();
+    expect(await lede.evaluate((el) => getComputedStyle(el).fontSize)).toBe("13px");
+    expect(await lede.evaluate((el) => getComputedStyle(el).lineHeight)).toBe("19.5px");
+  });
+
+  // F5735, F5967: frame f0110's Cancel border runs from row 630 to 673, the default control's 44 px.
+  test("draws Sign in Adena and Cancel 44 px tall, as the frame does", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await setup(page);
+    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    for (const name of ["Sign in Adena", "Cancel"])
+      expect((await card(page).getByRole("button", { name }).boundingBox())?.height, name).toBe(44);
+  });
+
   test("draws the note small and muted, as the frame does (F5740)", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
