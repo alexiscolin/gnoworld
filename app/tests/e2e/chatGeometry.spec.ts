@@ -225,6 +225,8 @@ test.describe("the chat at the video's size", () => {
     const worlds = await page.locator('[data-region="worlds"]').boundingBox();
     if (worlds === null) throw new Error("no worlds");
     near(first.y - worlds.y, 23, 2);
+    // And 23 px from the column's left edge (frame 80: x 23 to 66).
+    near(first.x - worlds.x, 23, 2);
     const link = await page.locator('[data-region="worlds"] a').first().boundingBox();
     if (link === null) throw new Error("no link");
     near(link.height, 44);

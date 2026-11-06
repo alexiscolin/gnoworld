@@ -10,6 +10,8 @@ import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
 import { Info } from "./Info.tsx";
 import type { UniverseView } from "../../places.ts";
+import { worldsFollowedIn } from "../follow/index.ts";
+import { useApp } from "../../storeContext.tsx";
 import { useCompact } from "./useCompact.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
@@ -165,6 +167,8 @@ export function ChatScreen(props: ChatScreenProps) {
   const screenRef = useRef<HTMLDivElement>(null);
   const compact = useCompact(screenRef, NARROW);
   const navigate = useNavigate();
+  const follows = useApp((state) => state.device.follows);
+  const followed = worldsFollowedIn(follows, place.universe.id);
   const here = usePeople({ screenRef, people, compact, talking, closeThread: threads.close });
   const thread = threadAside(threads);
   return (
@@ -199,7 +203,7 @@ export function ChatScreen(props: ChatScreenProps) {
               }}
             />
           }
-          worlds={<Worlds worlds={place.worlds} current={place.slug} />}
+          worlds={<Worlds worlds={place.worlds} current={place.slug} followed={followed} />}
           rooms={compact ? undefined : <div className={styles["rail"]}>{rail}</div>}
           info={
             thread ??

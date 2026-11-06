@@ -7,7 +7,9 @@
     "app": {
       "entry": ["src/**/*.test.{ts,tsx}", "lab/main.ts", "tests/e2e/workshopBackend.mjs"],
       "react-router": { "config": ["react-router.config.ts"] },
-      "playwright": { "config": ["playwright.config.ts", "playwright.stories.config.ts"] }
+      "playwright": {
+        "config": ["playwright.config.ts", "playwright.stories.config.ts", "playwright.pictures.config.ts"]
+      }
     },
     "packages/ui": { "ignoreDependencies": ["@fontsource-variable/geist", "@fontsource-variable/geist-mono"] },
     "server": { "ignoreDependencies": ["@hono/zod-validator"] }

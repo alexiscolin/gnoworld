@@ -11,7 +11,7 @@ declare module "node:fs" {
   export function rmSync(path: string, options: { recursive?: true; force?: true }): void;
   export function cpSync(from: string, to: string, options?: { recursive: true }): void;
   export function symlinkSync(target: string, path: string): void;
-  export function writeFileSync(path: string, data: string): void;
+  export function writeFileSync(path: string, data: string | Uint8Array): void;
 }
 declare module "node:path" {
   export function join(...parts: string[]): string;

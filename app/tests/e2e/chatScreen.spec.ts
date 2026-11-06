@@ -56,15 +56,24 @@ test.describe("the chat as the video shows it", () => {
     const links = worlds(page).getByRole("link");
     const count = await links.count();
     expect(count).toBeGreaterThan(1);
-    const names = await links.evaluateAll((all) => all.map((link) => link.textContent));
-    expect(names.every((name) => name.length > 0)).toBe(true);
-    await expect(links.filter({ hasText: "Bubble" })).toHaveCount(1);
-    // The pictures' code is a chunk asked once the column is drawn: till it comes every row holds ui's one fallback disc.
+    // A row is its planet alone: the world's name is the link's accessible name, and shows on hover.
+    const rows = await links.evaluateAll((all) =>
+      all.map((link) => ({ name: link.getAttribute("aria-label") ?? "", text: link.textContent })),
+    );
+    expect(rows.every(({ name, text }) => name.length > 0 && text === "")).toBe(true);
+    await expect(links.first()).toHaveAccessibleName("Earth");
+    await expect(links.filter({ has: page.locator("img") })).toHaveCount(count);
     const pictures = () =>
       worlds(page)
         .locator("img")
         .evaluateAll((all) => all.map((img) => img.getAttribute("src")));
-    await expect.poll(async () => new Set(await pictures()).size, "each world draws its own picture").toBe(count);
+    expect(new Set(await pictures()).size, "each world draws its own picture").toBe(count);
+    // Each is a picture of the site, loaded: no world falls back to ui's disc.
+    await expect(worlds(page).locator("[data-fallback]")).toHaveCount(0);
+    await links.first().hover();
+    await expect(
+      page.getByText("Earth", { exact: true }).and(page.locator("[popover][data-shown=true]")),
+    ).toBeVisible();
   });
 
   test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {

@@ -13,7 +13,11 @@ export const chatPlace = (
   ...place,
   kicker,
   home: universe.home.path,
-  worlds: universe.worlds.map(({ path: href, ...world }) => ({ ...world, href })),
+  // The Earth first, as the video's column starts (frame 80): its page is the universe's, not a hub's.
+  worlds: [
+    { slug: EARTH_CHAT.slug, name: EARTH_CHAT.name, href: universe.earth.path },
+    ...universe.worlds.map(({ path: href, ...world }) => ({ ...world, href })),
+  ],
   universe,
 });
 

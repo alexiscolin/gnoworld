@@ -17,9 +17,8 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
  * absent: the chunk alone. Each cap's history is here or beside its chunk's pattern in budgets.spec.ts, before 7y's steady names. */
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
   // 159,847 B in this measure with the Earth's stations' three classes (Alexis, 2026-11-04, "Oui, 160 256"); 160,325 B once 7v2, 7b9,
-  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening); 160,357 B with 8l's restIn;
-  // 160,512 B with the chat's worlds' pictures, whose chunk made the look's `shares` a file of its own (slice-8, chat planets).
-  { chunk: "scene", after: ["mountUniverse"], cap: 160_512 },
+  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening); 160,357 B with 8l's restIn.
+  { chunk: "scene", after: ["mountUniverse"], cap: 160_357 },
   // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
   // 7x2's loader and text box, 7v2's ratio, bands and a Plan half lit, 7b9's star's warmth (the night's +1 KiB, the chief), measured.
   { chunk: "cosmos", after: ["scene"], cap: 17_345 },
@@ -45,8 +44,7 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2652 },
   { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
   // 12,607 B with the loader of a station's page's view (8l), the night's +1 KiB (night-caps.md; the chief, 2026-11-05).
-  // 12,626 B with the chat's worlds' pictures, which changed how the look's files are split (slice-8, chat planets).
-  { chunk: "part", after: ["scene"], cap: 12_626 },
+  { chunk: "part", after: ["scene"], cap: 12_607 },
   // A station's page's view (8l): its station in the planet's place; a new limit at its size (the chief, 2026-11-05), 5,170 B.
   { chunk: "stationView", after: ["scene", "part"], cap: 5170 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
