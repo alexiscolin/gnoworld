@@ -96,6 +96,26 @@ describe("CallCard, the preview", () => {
     expect(inputs.map((input) => input.labels?.[0]?.textContent)).toEqual(["bio", "times"]);
   });
 
+  // F5966: the frames draw an argument's name in its own case, mono; the caps label would turn a Go name (bio) into BIO.
+  it("draws each argument's name in its own case, aside the caps label, which its field keeps for assistive technology", () => {
+    const box = view();
+    const names = all(box, "[class*='name']");
+    expect(names.map((name) => name.textContent)).toEqual(["bio", "times"]);
+    expect(names.every((name) => name.getAttribute("aria-hidden") === "true")).toBe(true);
+    const labels = all(box, "label");
+    expect(labels.map((label) => label.textContent)).toEqual(["bio", "times"]);
+    expect(labels.some((label) => label.classList.contains("label"))).toBe(false);
+  });
+
+  it("names a field that has no name by its place, Argument 1", () => {
+    const nameless = {
+      ...preview,
+      params: [PARAMS[0] ?? { Name: "", Type: "" }, { Name: "", Type: "string" }],
+      texts: ["x"],
+    };
+    expect(all(view({ card: nameless }), "label").map((label) => label.textContent)).toEqual(["Argument 1"]);
+  });
+
   it("warns under a text field only, with the realm named: 'This text goes to {realm} on gno.land, publicly and forever'", () => {
     const box = view();
     const warning = `This text goes to ${REALM} on gno.land, publicly and forever`;
@@ -406,6 +426,12 @@ describe("CallCard, the look of the frame (F5731 to F5735)", () => {
     expect(all(block, "dt").map((dt) => dt.textContent)).toEqual(["REALM", "FUNCTION", "ARGUMENTS", "NETWORK", "FEE"]);
     expect(all(block, "dd")).toHaveLength(5);
     expect(block.className).toContain("block");
+  });
+
+  // F5953: the block's hairline edge is the one the composer's box and the header's pill share (edge.module.css).
+  it("wears the shared edge on its block", () => {
+    const classes = (all(view(), "dl")[0] ?? document.body).className.split(" ");
+    expect(classes).toEqual([expect.stringContaining("edge"), expect.stringContaining("block")]);
   });
 
   it("sets the line under the title in its own class, muted by the stylesheet (F5731)", () => {
