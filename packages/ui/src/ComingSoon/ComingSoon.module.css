@@ -16,9 +16,11 @@
 
   /* A face that is no control: no pill, the words as they are. */
   .plain {
-    /* raw: the least a target can be (WCAG 2.5.8), as the extra-small control */
-    min-block-size: var(--control-xs);
     padding: 0;
+    /* raw: 2 px each side lifts the box past 24 px (WCAG 2.5.8) and the matching negative margin gives the room back, so a line keeps its measures */
+    padding-block: 2px;
+    /* layout: the room the padding took, given back */
+    margin-block: -2px;
     border: 0;
     background: none;
     color: inherit;
