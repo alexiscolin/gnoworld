@@ -533,7 +533,19 @@ describe("a world's pinned actions", () => {
       { ...hub, slug: "dao", realms: [DAO], actions: [vote(), { ...vote(), label: "Other", realm: "gno.land/r/x" }] },
     ]);
     expect(parsed.success).toBe(false);
-    expect(parsed.error?.issues.map((issue) => issue.path)).toEqual([[1, "actions", 1, "realm"]]);
+    expect(parsed.error?.issues.map(({ path, message }) => [path, message])).toEqual([
+      [[1, "actions", 1, "realm"], "an action's realm is one of the world's realms"],
+    ]);
+  });
+
+  it("says which row, action and field read as another's label, and which label", () => {
+    const parsed = Hubs.safeParse([
+      hub,
+      { ...hub, slug: "dao", realms: [DAO], actions: [vote(), { ...vote(), label: "vote" }] },
+    ]);
+    expect(parsed.error?.issues.map(({ path, message }) => [path, message])).toEqual([
+      [[1, "actions", 1, "label"], 'a label reads as another: "vote"'],
+    ]);
   });
 
   it("refuses a realm that is no realm's path, a field it does not know, and a missing one", () => {

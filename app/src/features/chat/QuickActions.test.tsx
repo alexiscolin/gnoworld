@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { useState } from "react";
+import { act, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
@@ -158,6 +158,18 @@ describe("the quick actions of a world with pinned actions", () => {
     expect(all(box, "article")).toHaveLength(1);
     expect(one(box, "article").textContent).toContain("Join");
     expect(one(box, "article").textContent).not.toContain("MustVoteOnProposalSimple");
+  });
+
+  it("draws no pill and no card, and asks the chain nothing, for a universe the site does not know", async () => {
+    const read = vi.fn();
+    vi.stubGlobal("fetch", read);
+    const box = draw([VOTE], { id: "nowhere", isDefault: false });
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(all(box, "button").map((b) => b.textContent)).toEqual(["Who's here"]);
+    expect(all(box, "article")).toHaveLength(0);
+    expect(read).not.toHaveBeenCalled();
   });
 
   it("asks the chain nothing for a world with no pinned action", () => {
