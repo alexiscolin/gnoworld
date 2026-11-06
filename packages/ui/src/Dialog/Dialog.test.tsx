@@ -199,6 +199,117 @@ describe("Dialog", () => {
     expect(dialog().open).toBe(false);
   });
 
+  // 9k (answer 9f-1, F5856): the kicker above the title, in the one label style, read with the description.
+  it("draws its kicker above its title in the label style, and says it in its description before the description", () => {
+    render(
+      <Dialog
+        title="Pick a name"
+        kicker="YOUR GNO.LAND NAME"
+        description="Kept by r/sys/namereg"
+        open
+        onClose={vi.fn()}
+      >
+        <p>Body</p>
+      </Dialog>,
+    );
+    const kicker = screen.getByText("YOUR GNO.LAND NAME");
+    const title = screen.getByRole("heading", { name: "Pick a name" });
+    expect(kicker.classList.contains("label")).toBe(true);
+    expect(kicker.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const said = (dialog().getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(said).toEqual(["YOUR GNO.LAND NAME", "Kept by r/sys/namereg"]);
+    expect(dialog().getAttribute("aria-labelledby")).toBe(title.id);
+  });
+
+  it("is described by its kicker alone when it has no description, and draws no kicker unless given one", () => {
+    const { rerender } = render(
+      <Dialog title="Pick a name" kicker="YOUR NAME" open onClose={vi.fn()}>
+        <p>Body</p>
+      </Dialog>,
+    );
+    expect(document.getElementById(dialog().getAttribute("aria-describedby") ?? "")?.textContent).toBe("YOUR NAME");
+    rerender(
+      <Dialog title="Pick a name" open onClose={vi.fn()}>
+        <p>Body</p>
+      </Dialog>,
+    );
+    expect(dialog().hasAttribute("aria-describedby")).toBe(false);
+    expect(document.querySelector("dialog .label")).toBeNull();
+  });
+
+  it("draws nothing for an empty kicker, and leaves it out of its description", () => {
+    render(
+      <Dialog title="Pick" kicker="" open onClose={vi.fn()}>
+        <p>Body</p>
+      </Dialog>,
+    );
+    expect(document.querySelector("dialog .label")).toBeNull();
+    expect(dialog().hasAttribute("aria-describedby")).toBe(false);
+  });
+
+  it("shows a kicker made of markup, or very long, as text", () => {
+    staysText((text) => (
+      <Dialog title="Pick" kicker={text} open={false} onClose={vi.fn()}>
+        <p>Body</p>
+      </Dialog>
+    ));
+  });
+
+  // 9k (F5868): another way out is drawn (the name dialog's Later); Esc still asks the page.
+  it("draws no Close button when asked, and Esc still asks its page to close", () => {
+    const { rerender } = render(
+      <Dialog title="Passport" open onClose={vi.fn()}>
+        <p>Stamps</p>
+      </Dialog>,
+    );
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    const onClose = vi.fn();
+    rerender(
+      <Dialog title="Passport" hideClose open onClose={onClose}>
+        <p>Stamps</p>
+      </Dialog>,
+    );
+    expect(screen.queryByRole("button", { name: "Close", hidden: true })).toBeNull();
+    expect(screen.queryAllByRole("button", { hidden: true })).toHaveLength(0);
+    const cancel = esc();
+    expect(cancel.defaultPrevented).toBe(true);
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the focus on its field with Close hidden, and closes on Esc", async () => {
+    function Opener() {
+      const [open, setOpen] = useState(false);
+      return (
+        <>
+          <Button
+            onClick={() => {
+              setOpen(true);
+            }}
+          >
+            Open
+          </Button>
+          <Dialog
+            title="Pick"
+            hideClose
+            open={open}
+            onClose={() => {
+              setOpen(false);
+            }}
+          >
+            <Field label="Name" value="" onChange={vi.fn()} />
+          </Dialog>
+        </>
+      );
+    }
+    render(<Opener />);
+    await userEvent.click(screen.getByRole("button", { name: "Open" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Name" }));
+    esc();
+    expect(dialog().open).toBe(false);
+  });
+
   it("stays open on Esc when its page keeps it open, the browser's own close refused", () => {
     const onClose = vi.fn();
     render(
@@ -348,6 +459,8 @@ describe("Dialog", () => {
 
   it("has stories standard and wide, one with a field, one opened from a button", () => {
     const shown = eachStory(stories, (container) => ({
+      kicker: container.querySelector("dialog .label") !== null,
+      noClose: container.querySelector("dialog") !== null && container.querySelector("dialog button") === null,
       width: container.querySelector("dialog")?.dataset["width"],
       field: container.querySelector("dialog input") !== null,
       opener: container.querySelector(":scope > button") !== null,
@@ -355,5 +468,7 @@ describe("Dialog", () => {
     expect(shown.some((s) => s.width === "standard") && shown.some((s) => s.width === "wide")).toBe(true);
     expect(shown.some((s) => s.field)).toBe(true);
     expect(shown.some((s) => s.opener)).toBe(true);
+    expect(shown.some((s) => s.kicker)).toBe(true);
+    expect(shown.some((s) => s.noClose)).toBe(true);
   });
 });

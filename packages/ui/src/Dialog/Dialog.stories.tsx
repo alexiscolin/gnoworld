@@ -9,7 +9,7 @@ const stamps = <p>A stamp for each world you visited: 12 so far, in 3 constellat
 
 // A dialog as a page holds it: closed until its button opens it, closed again by Esc or Close, each
 // close counted, so a journey sees one close called once.
-function Opener() {
+function Opener({ hideClose = false }: { hideClose?: boolean }) {
   const [open, setOpen] = useState(false);
   const [closed, setClosed] = useState(0);
   return (
@@ -24,6 +24,7 @@ function Opener() {
       </Button>
       <Dialog
         title="Your passport"
+        hideClose={hideClose}
         open={open}
         onClose={() => {
           setOpen(false);
@@ -53,6 +54,14 @@ export const WithField: Story = {
     children: (
       <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />
     ),
+  },
+};
+export const WithKicker: Story = { args: { kicker: "YOUR GNO.LAND NAME", title: "Pick a name and a face" } };
+export const WithoutClose: Story = {
+  args: {
+    hideClose: true,
+    title: "Pick a name",
+    children: <Field label="Name" prefix="nym-" help="5 to 13 letters" value="" onChange={() => undefined} />,
   },
 };
 export const WithAction: Story = {
@@ -85,3 +94,4 @@ export const Asking: Story = {
   },
 };
 export const FromAButton: Story = { render: () => <Opener />, tags: ["!viewport"] };
+export const FromAButtonWithoutClose: Story = { render: () => <Opener hideClose />, tags: ["!viewport"] };

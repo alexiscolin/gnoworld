@@ -115,6 +115,19 @@ test.describe("Dialog", () => {
     }
   });
 
+  // 9k (F5868): with Close hidden the name dialog's other way out, and Esc, still give the focus back.
+  test("with Close hidden, Esc closes it and the focus goes back to the opener", async ({ page }) => {
+    await open(page, "dialog--from-a-button-without-close");
+    const opener = page.getByRole("button", { name: "Open the passport" });
+    await opener.click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Close" })).toHaveCount(0);
+    await page.keyboard.press("Escape");
+    await expect(dialog).toBeHidden();
+    expect(await focused(page)).toBe("Open the passport");
+  });
+
   test("its Close button closes it once, focus back on the opener", async ({ page }) => {
     await passport(page);
     await page.getByRole("dialog").getByRole("button", { name: "Close" }).click();
@@ -209,6 +222,7 @@ test.describe("Dialog", () => {
   test("is 460 px wide, or 760 when wide, never wider than the screen", async ({ page }) => {
     for (const [id, width] of [
       ["dialog--standard", 460],
+      ["dialog--without-close", 460],
       ["dialog--wide", 760],
     ] as const) {
       await page.setViewportSize({ width: 1280, height: 800 });

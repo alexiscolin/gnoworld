@@ -15,6 +15,10 @@
     --_w: var(--dialog-wide);
   }
 
+  .kicker {
+    overflow-wrap: anywhere;
+  }
+
   .description {
     color: var(--color-text-muted);
     overflow-wrap: anywhere;

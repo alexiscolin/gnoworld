@@ -1,5 +1,5 @@
 import { useId, useRef, type KeyboardEvent } from "react";
-import { Sidebar, Stack } from "../compositions/index.ts";
+import { Stack } from "../compositions/index.ts";
 import styles from "./Field.module.css";
 
 export interface FieldProps {
@@ -15,7 +15,7 @@ export interface FieldProps {
   error?: string;
   /** What the empty box says it is for, muted in the box: the chat's "Message #general". */
   placeholder?: string | undefined;
-  /** Words before the box, outside its value: "@" before a name. */
+  /** Words inside the box before its value, not editable and read with the field: "nym-" before a name. */
   prefix?: string;
   /** A box of lines has a handle to drag its height by, unless it grows on its own, as a chat's does to ten lines. */
   resizable?: boolean | undefined;
@@ -85,6 +85,29 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, 
   );
 }
 
+const ids = (id: string) => ({ prefix: `${id}-prefix`, help: `${id}-help`, error: `${id}-error` });
+
+// What reads with the box, in order: its prefix, its help, its error, then the page's words.
+function describing(
+  id: string,
+  {
+    prefix,
+    help,
+    error,
+    describedBy,
+  }: Partial<Record<"prefix" | "help" | "error" | "describedBy", string | undefined>>,
+) {
+  const named = ids(id);
+  return [
+    prefix === undefined ? "" : named.prefix,
+    help === undefined ? "" : named.help,
+    error === undefined ? "" : named.error,
+    describedBy ?? "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
 /** A labelled box, described by its help and its error, which also marks it invalid. */
 export function Field({
   label,
@@ -101,18 +124,14 @@ export function Field({
   placeholder,
 }: FieldProps) {
   const id = useId();
-  const helpId = `${id}-help`;
-  const errorId = `${id}-error`;
-  const described = [help === undefined ? null : helpId, error === undefined ? null : errorId, describedBy].filter(
-    Boolean,
-  );
+  const described = describing(id, { prefix, help, error, describedBy });
   const box = (
     <Box
       kind={kind}
       id={id}
       value={value}
       invalid={error !== undefined}
-      described={described.join(" ") || undefined}
+      described={described || undefined}
       enterAddsLine={enterAddsLine}
       placeholder={placeholder}
       resizable={resizable}
@@ -121,26 +140,28 @@ export function Field({
   );
   return (
     <Stack space="2xs">
-      <label htmlFor={id} className={hideLabel === true ? "visually-hidden" : styles["label"]}>
+      <label htmlFor={id} className={hideLabel === true ? "visually-hidden" : "label"}>
         {label}
       </label>
       {prefix === undefined ? (
         box
       ) : (
-        <Sidebar space="2xs">
-          <span className={styles["prefix"]}>{prefix}</span>
+        <div data-part="box" className={styles["frame"]}>
+          <span id={ids(id).prefix} className={styles["prefix"]}>
+            {prefix}
+          </span>
           {box}
-        </Sidebar>
+        </div>
       )}
       {help === undefined ? null : (
-        <p id={helpId} className={styles["help"]}>
+        <p id={ids(id).help} className={styles["help"]}>
           {help}
         </p>
       )}
       {/* Shown, and described to the box; said by the region below with its field's name, waiting on the
           page empty so the error is announced when it comes (F335, F356). */}
       {error === undefined ? null : (
-        <p id={errorId} className={styles["error"]} aria-hidden="true">
+        <p id={ids(id).error} className={styles["error"]} aria-hidden="true">
           {error}
         </p>
       )}

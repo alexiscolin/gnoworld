@@ -1,9 +1,5 @@
 /* The field: a box on the resting fill, one line at the default control's height, or a box of lines of two rows or more; invalid, coral. */
 @layer components {
-  .label {
-    font: var(--font-ui);
-  }
-
   .box {
     --_line: var(--color-line);
 
@@ -48,9 +44,38 @@
     --_line: var(--color-danger-line);
   }
 
+  /* With a prefix the frame is the one box (border and fill); the input inside is bare. */
+  .frame {
+    --_line: var(--color-line);
+
+    /* layout: the prefix and the input share the one frame */
+    display: flex;
+    /* layout: the prefix sits level with the input's text */
+    align-items: center;
+    padding-inline-start: var(--space-s);
+    border: var(--line-width) solid var(--_line);
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+  }
+
+  .frame:hover {
+    --_line: var(--color-line-strong);
+  }
+
+  .frame:has([aria-invalid="true"]) {
+    --_line: var(--color-danger-line);
+  }
+
+  .frame .box {
+    /* layout: the input takes what the prefix leaves */
+    flex: 1;
+    min-inline-size: 0;
+    padding-inline-start: var(--space-2xs);
+    border: 0;
+    background: transparent;
+  }
+
   .prefix {
-    /* layout: the prefix sits level with the box's text */
-    align-self: center;
     color: var(--color-text-muted);
     font: var(--font-field);
   }

@@ -165,6 +165,59 @@ describe("Field", () => {
     expect(screen.getByRole<HTMLInputElement>("textbox", { name: "Name" }).value).toBe("alexis");
   });
 
+  // 9k (answer 9f-1, F5860): the prefix is drawn inside the field's box, which is the one frame (border and fill), not
+  // editable, and read with the field, before its help.
+  it("draws its prefix inside the box that holds the input, not editable, and reads it with the field", () => {
+    render(<Field label="Name" prefix="nym-" help="5 to 13 letters" value="alexis" onChange={vi.fn()} />);
+    const input = screen.getByRole<HTMLInputElement>("textbox", { name: "Name" });
+    const prefix = screen.getByText("nym-");
+    const box = input.closest("[data-part='box']");
+    expect(box).not.toBeNull();
+    expect(box?.contains(prefix)).toBe(true);
+    expect(box?.querySelectorAll("input,textarea")).toHaveLength(1);
+    expect(prefix.closest("label")).toBeNull();
+    expect(prefix.matches("input,textarea,[contenteditable]")).toBe(false);
+    expect(input.value).toBe("alexis");
+    const said = (input.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(said).toEqual(["nym-", "5 to 13 letters"]);
+  });
+
+  it("reads its prefix, help, error and the page's words in that order, and is invalid inside the box", () => {
+    render(
+      <>
+        <p id="about">Kept by the registry</p>
+        <Field
+          label="Name"
+          prefix="nym-"
+          help="5 to 13 letters"
+          error="Too short"
+          describedBy="about"
+          value="a"
+          onChange={vi.fn()}
+        />
+      </>,
+    );
+    const input = screen.getByRole<HTMLInputElement>("textbox", { name: "Name" });
+    const said = (input.getAttribute("aria-describedby") ?? "")
+      .split(" ")
+      .map((id) => document.getElementById(id)?.textContent);
+    expect(said).toEqual(["nym-", "5 to 13 letters", "Too short", "Kept by the registry"]);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.closest("[data-part='box']")).not.toBeNull();
+  });
+
+  // 9k (F5861): every label in the one label style (mono caps, muted), the utility class the Kicker uses.
+  it("sets its visible label in the one label style", () => {
+    render(<Field label="Message" value="" onChange={vi.fn()} />);
+    expect(screen.getByText("Message").classList.contains("label")).toBe(true);
+  });
+
+  it("sets a very long label in the label style too, as text", () => {
+    staysText((text) => <Field label={text} value="" onChange={vi.fn()} />);
+  });
+
   it("hands each keystroke's value to its handler", async () => {
     const onChange = vi.fn();
     render(<Field label="Name" value="" onChange={onChange} />);
