@@ -1,7 +1,7 @@
 // The account's menu in the header (ADR-0002 §1, Menu and settings; DESIGN-SYSTEM.md, Layout; 8p, frames 6 and 17): logged out, the way in,
 // Connect Adena, beside the device's menu (passport, settings); logged in, one pill, the account's face and its address, opening the menu
-// that holds the passport, the saved messages, the settings and the way out. The name comes with slice 9. The menu's code comes at the
-// trigger's first press, never with the first screen.
+// that holds the passport, the saved messages, the settings, a name to pick (9f) and the way out. The name shown, its dialog and the menu's code
+// come after the first screen, never with it.
 import { shortAddress } from "@gnoworld/schemas";
 import { Button, IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useState, type ReactNode } from "react";
@@ -9,20 +9,40 @@ import { LoginControl, useLogin } from "../login/index.ts";
 
 const Face = lazy(async () => ({ default: (await import("./Face.tsx")).Face }));
 const Opened = lazy(async () => ({ default: (await import("./Opened.tsx")).Opened }));
+// The name (9f) is read once the first screen is up: the short address stands in until it is there.
+const NameLabel = lazy(async () => ({ default: (await import("../names/index.ts")).NameLabel }));
+const PickName = lazy(async () => ({ default: (await import("../names/index.ts")).PickName }));
 
 // The account's pill (frame 17): its face and its short address, on the menu's trigger before and after its code comes.
-function AccountPill({ face, address }: { face: ReactNode; address: string }) {
+function AccountPill({
+  face,
+  address,
+  universe,
+  again,
+  onPickable,
+}: {
+  face: ReactNode;
+  address: string;
+  universe: string;
+  again: number;
+  onPickable: (pickable: boolean) => void;
+}) {
   return (
     <>
       {face}
-      <span title={address}>{shortAddress(address)}</span>
+      <Suspense fallback={<span title={address}>{shortAddress(address)}</span>}>
+        <NameLabel account={address} universe={universe} again={again} onPickable={onPickable} />
+      </Suspense>
     </>
   );
 }
 
-export function AccountMenu() {
+export function AccountMenu({ universe }: { universe: string }) {
   const { login, logIn, logOut } = useLogin();
   const [asked, setAsked] = useState(false);
+  const [naming, setNaming] = useState(false);
+  const [again, setAgain] = useState(0);
+  const [pickable, setPickable] = useState(false);
   const address = login.session.kind === "in" ? login.session.address : undefined;
   const ask = () => {
     setAsked(true);
@@ -39,7 +59,7 @@ export function AccountMenu() {
       <IconButton icon="menu" label="Menu" onClick={ask} />
     ) : (
       <Button onClick={ask}>
-        <AccountPill face={face} address={address} />
+        <AccountPill face={face} address={address} universe={universe} again={again} onPickable={setPickable} />
         <span className="visually-hidden">Your account</span>
       </Button>
     );
@@ -49,12 +69,38 @@ export function AccountMenu() {
         <Suspense fallback={trigger}>
           <Opened
             address={address}
-            lead={address === undefined ? null : <AccountPill face={face} address={address} />}
+            lead={
+              address === undefined ? null : (
+                <AccountPill face={face} address={address} universe={universe} again={again} onPickable={setPickable} />
+              )
+            }
             onLogOut={logOut}
+            {...(pickable
+              ? {
+                  onPickName: () => {
+                    setNaming(true);
+                  },
+                }
+              : {})}
           />
         </Suspense>
       ) : (
         trigger
+      )}
+      {address === undefined || !naming ? null : (
+        <Suspense fallback={null}>
+          <PickName
+            account={address}
+            universe={universe}
+            open={naming}
+            onSettled={() => {
+              setAgain((count) => count + 1);
+            }}
+            onClose={() => {
+              setNaming(false);
+            }}
+          />
+        </Suspense>
       )}
       <LoginControl login={login} logIn={logIn} />
     </>

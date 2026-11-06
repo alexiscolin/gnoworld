@@ -227,20 +227,48 @@ grep -v '^[[:space:]]*#' "$gate_file" | grep -qE '^[[:space:]]*(STORIES_PORT=\$p
 # wants each declared on main, merge.sh shows each first (F129), worktree.sh checks out none other
 # than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
 # what Claude Code starts, .mcp.json's servers.
-python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
-import ast, fnmatch, re, sys
+python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" "$here/guard.py" "$here/../.claude/settings.json" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
+import ast, fnmatch, json, re, sys
 text = lambda n: open(sys.argv[n]).read()
 assert 'harness --quiet "$base"' in text(1), "check.sh has its own harness list"
 assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
 assert 'harness --name-only HEAD..."$tip"' in text(3), "merge.sh shows no harness list"
 assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
-assert not [n for n in (1, 2, 3, 6) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
+assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
+assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
 tree = ast.parse(text(5))
 guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
 missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in listed)]
 assert not missed, missed
+# Every harness file is one the sandbox keeps a shell from writing (a denyWrite path, or an Edit deny, which Claude Code adds to
+# them), read as its runtime reads them: from the project's root, * within one folder, **/ across any, a folder with all it holds.
+# A shell it misses writes a file pre-commit then refuses (D241). .claude is open for its tmp/, the slices' shared folder; each part
+# Claude Code loads, .claude/CLAUDE.md among them (code.claude.com/docs/en/memory), has its ban. No ban reaches StrykerJS's
+# copy of the tree, which a merge check with product code writes in the sandbox (F111: **/*.config.ts did, 9j's review).
+import os
+settings = json.load(open(sys.argv[8]))
+def rule(p):
+    out, i = "", 0
+    while i < len(p):
+        step = next((s for s in ("**/", "**", "*", "?") if p.startswith(s, i)), p[i])
+        out, i = out + {"**/": "(.*/)?", "**": ".*", "*": "[^/]*", "?": "[^/]"}.get(step, re.escape(step)), i + len(step)
+    return re.compile(out + "(/.*)?$")
+bans = [rule(p) for p in settings["sandbox"]["filesystem"]["denyWrite"] + [r[6:-1] for r in settings["permissions"]["deny"] if r.startswith("Edit(/")] if not p.startswith("~")]
+root = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[8])))
+on_disk = []
+for d, dirs, files in os.walk(root):
+    dirs[:] = [x for x in dirs if x not in ("node_modules", ".git", ".stryker-tmp", "dist", "coverage", "test-results") and os.path.join(d, x) != os.path.join(root, ".claude")]
+    on_disk += [os.path.relpath(os.path.join(d, f), root) for f in files]
+specs = [s.lower() for s in listed if s != ".claude"]
+harnessed = sorted({f for f in on_disk if any(f.lower() == s or f.lower().startswith(s + "/") or fnmatch.fnmatchcase(f.lower(), s) for s in specs)}
+                   | {s for s in specs if "*" not in s}
+                   | {".claude/" + p for p in ("CLAUDE.md", "settings.json", "settings.local.json", "agents/a.md", "commands/a.md", "skills/a/SKILL.md", "rules/a.md", "hooks/a.sh", "workflows/a.js")})
+open_ = [f for f in harnessed if not any(b.match(f) for b in bans)]
+assert not open_, f"the sandbox lets a shell write these harness files: {open_}"
+copies = [f for f in harnessed if any(b.match(".stryker-tmp/sandbox-x/" + f) for b in bans)]
+assert not copies, f"a write ban reaches StrykerJS's copies of {copies}, which a merge check writes (F111)"
 PY
 # The full gate judges every harness mutant: an argument (--changed) would judge a part of them.
 grep -qxE '[[:space:]]*python3 -I scripts/harness_mutate\.py' "$gate_file" || fail "check.sh's full gate runs harness_mutate with arguments, so maybe not every mutant"
@@ -2682,7 +2710,7 @@ printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.s
 echo code >"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let a commit through a failing gate"
 [ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
-printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add -A
+printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" commit -qm gate scripts/check.sh # a harness file is committed outside (D241)
 precommit || fail "pre-commit stopped a commit whose gate passes"
 grep -qxF "$(cd "$c2" && . "$hooks/records.sh" && code_print "$(git write-tree)")" "$c2/.claude/tmp/green-fast" || fail "pre-commit did not record the code it passed (F076)"
 # A secret in what is staged stops the commit, docs included.
@@ -2698,11 +2726,12 @@ printf 'ab\n' >"$c2/docs/hidden.md"
 precommit && fail "pre-commit let a docs-only commit through with a hidden character staged under a clean work tree (F5087)"
 git -C "$c2" rm -qf docs/hidden.md
 (cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
-# The staged gate is the one that runs: it must match the working tree's, or a commit gates itself.
+# A staged harness file is committed in Alexis's Terminal alone, never in the sandbox (D241): a gate a commit brings gates
+# nothing, staged as it is on disk or not.
 git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
 blob=$(printf '#!/bin/sh\nexit 0\n' | git -C "$c2" hash-object -w --stdin) && git -C "$c2" update-index --cacheinfo "100755,$blob,scripts/check.sh"
 echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit && fail "pre-commit let a staged gate differ from the working tree's"
+precommit && fail "pre-commit let a commit in the sandbox through with a gate of its own"
 # An edit of the harness that is not staged is not in the commit: it does not stop one.
 git -C "$c2" reset -q && printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm green
 printf '#!/bin/sh\nexit 0\n# being edited\n' >"$c2/scripts/check.sh" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
@@ -2716,26 +2745,71 @@ precommit && fail "pre-commit ran an unstaged helper that emptied the gate"
 git -C "$c2" checkout -q -- scripts/borrow_node_modules.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/code_changed.sh"
 precommit && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
 git -C "$c2" checkout -q -- scripts/code_changed.sh
-# Every staged harness file is compared, whatever its name: a space or an accent included.
-printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh
-for name in 'my file.sh' 'é.sh'; do
-	echo 'exit 0' >"$c2/scripts/$name" && git -C "$c2" add "scripts/$name" && echo 'exit 1' >"$c2/scripts/$name"
-	precommit && fail "pre-commit let a staged scripts/$name differ from the working tree's"
-	git -C "$c2" rm -qf --cached "scripts/$name" && rm "$c2/scripts/$name"
+# Every harness file of .githooks/records.sh's list is refused, by name and as it is on disk, its name in any case (F151), with
+# a space or an accent; a path that only looks like one is not, and goes to the gate.
+printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" commit -qm green scripts/check.sh
+harnessed() { (cd "$c2" && sh "$hooks/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone"; }
+for f in 'scripts/my file.sh' 'scripts/é.sh' Scripts/tool.sh .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
+	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
+	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts; do
+	mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
+	[ "$(git -C "$c2" diff --cached --name-only | wc -l | tr -d ' ')" = 1 ] || fail "the case of $f staged other than one path"
+	harnessed || fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
+	git -C "$c2" reset -q && rm "$c2/$f" # by the index's spelling, which may not be $f's (Scripts/)
 done
-# The hooks and the settings are harness too; a code file partly staged is not.
-for f in .githooks/pre-push .github/workflows/gate.yml .claude/settings.json; do
-	mkdir -p "$c2/${f%/*}" && echo '{}' >"$c2/$f" && git -C "$c2" add "$f" && echo '{"x":1}' >"$c2/$f"
-	precommit && fail "pre-commit let a staged $f differ from the working tree's"
-	git -C "$c2" rm -qf --cached "$f" && rm "$c2/$f"
+# A variable that makes git read pathspecs otherwise leaves the list whole: GIT_NOGLOB_PATHSPECS made its globs literal names,
+# GIT_GLOB_PATHSPECS kept their * from crossing a folder, and a commit with either took a harness file (9j's review).
+for v in GIT_NOGLOB_PATHSPECS GIT_GLOB_PATHSPECS; do
+	for f in packages/core/package.json app/vite.config.ts; do
+		mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
+		(cd "$c2" && env "$v=1" sh "$hooks/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+			fail "pre-commit let a staged $f through in the sandbox with $v=1 (D241)"
+		git -C "$c2" reset -q && rm "$c2/$f"
+	done
 done
+for f in app/src/scripts/a.ts scriptsx/a.ts app/src/config.ts docs/stryker.config.json.md packages/core/src/args/args.ts; do
+	mkdir -p "$c2/$(dirname "$f")" && echo x >"$c2/$f" && git -C "$c2" add "$f"
+	precommit || fail "pre-commit refused $f, which only looks like a harness file"
+	git -C "$c2" reset -q && rm -f "$c2/$f"
+done
+# A letter the disk folds (ſ is s on APFS) names a harness file no list can match (F164): a staged path with a non-ASCII
+# character is refused too. A harness file deleted or moved out is a harness change, and so is one a merge brings.
+fold=$(printf '\305\277') && printf 'x\n' >"$c2/${fold}cripts-tool.sh" && git -C "$c2" add -- "${fold}cripts-tool.sh"
+harnessed || fail "pre-commit let a staged path with a folded letter through in the sandbox (F164, D241)"
+git -C "$c2" reset -q && rm -f "$c2/${fold}cripts-tool.sh"
+mkdir -p "$c2/.github" && echo x >"$c2/.github/gone.yml" && echo x >"$c2/scripts/moved.sh" && git -C "$c2" add .github/gone.yml scripts/moved.sh && git -C "$c2" commit -qm planted
+git -C "$c2" rm -q --cached .github/gone.yml
+harnessed || fail "pre-commit let the deletion of a harness file through in the sandbox (D241)"
+git -C "$c2" reset -q && git -C "$c2" mv scripts/moved.sh moved.sh
+harnessed || fail "pre-commit let a harness file moved out of the harness through in the sandbox (D241)"
+git -C "$c2" reset -q --hard && echo x >"$c2/scripts/merged.sh" && git -C "$c2" add scripts/merged.sh
+(cd "$c2" && sh "$hooks/pre-commit" --merge 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+	fail "pre-commit let a merge bring a harness file in the sandbox (D241)"
+git -C "$c2" reset -q && rm "$c2/scripts/merged.sh"
+# SANDBOX_RUNTIME unset is no way out (D241): the sandbox cannot open the hook for writing, whatever its environment says, and
+# Alexis's Terminal can; with SANDBOX_RUNTIME set, a hook that can be written is still the sandbox.
+rh="$t/hooks-copy" && mkdir "$rh" && cp "$hooks"/* "$here/code_changed.sh" "$rh/" && secrets_into "$rh/"
+echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
+(cd "$c2" && . "$rh/records.sh" && put "$(code_print "$(git write-tree)")" fast) # the gate passed on it: nothing but the guard refuses it
+outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$rh/pre-commit" 2>&1 >/dev/null); }
+chmod a-w "$rh/pre-commit"
+outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
+chmod u+w "$rh/pre-commit"
+outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal, its gate recorded"
+outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
+git -C "$c2" rm -qf --cached scripts/tool.sh && rm "$c2/scripts/tool.sh"
+# A git that cannot list what is staged lets nothing through unchecked.
+mkdir "$t/diffless" && printf '#!/bin/sh\ncase " $* " in *" diff "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$(command -v git)" >"$t/diffless/git" && chmod +x "$t/diffless/git"
+(cd "$c2" && PATH="$t/diffless:$PATH" sh "$hooks/pre-commit" 2>&1 >/dev/null) | grep -qF "git could not list the staged harness files" ||
+	fail "pre-commit went on when git could not list the staged harness files (D241)"
+# A code file partly staged is no harness file.
 echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
 precommit || fail "pre-commit refused a code file only partly staged"
 # A code_changed.sh that fails is no proof of prose alone, in the sandbox too (F133).
-git -C "$c2" checkout -q -- a.ts && printf 'exit 2\n' >"$c2/scripts/code_changed.sh" && git -C "$c2" add scripts/code_changed.sh
+git -C "$c2" checkout -q -- a.ts && printf 'exit 2\n' >"$c2/scripts/code_changed.sh" && git -C "$c2" commit -qm broken scripts/code_changed.sh
 echo broken >>"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit took a failing code_changed.sh for prose alone (F133)"
-git -C "$c2" checkout -q HEAD -- scripts/code_changed.sh a.ts
+git -C "$c2" checkout -q HEAD -- a.ts && git -C "$c2" checkout -q HEAD~1 -- scripts/code_changed.sh && git -C "$c2" commit -qm mended scripts/code_changed.sh
 # It hands the staged gate what the commit changes, one path a line: a rename's two paths, what is
 # staged only, so check.sh checks those areas alone.
 printf '#!/bin/sh\nprintf "%%s" "$GATE_CHANGED" >"%s/gate-changed"\nprintf "%%s" "${GATE_MERGE-unset}" >"%s/gate-merge"\n' "$t" "$t" >"$c2/scripts/check.sh" && echo x >"$c2/c.ts" && echo x >"$c2/g.ts"
@@ -3773,6 +3847,9 @@ unsteady_case() { # $1 the step, $2 the tool, $3 the file it fails in (and one t
 	rm -rf "${unsteady:?}"
 	out=$(LOAD_1="305 160" LOAD_2="305 160" LOAD_3="305 160" LOAD_4="305 160" LOAD_5="305 160" LOAD_6="305 160" FLAKY=$1 gate $gm) || fail "check.sh failed a $2 run that passed the second time: $out"
 	[ "$(tries "$1")" = 2 ] || fail "check.sh ran $1 $(tries "$1") times for one failure, not twice: $out"
+	# Neither run of the journeys writes a missing picture: the second compared with what the first wrote, and passed (F5625).
+	[ "$1" != playwright ] || [ "$(grep -cE "^playwright .* --update-snapshots=none( |$)" "$log")" = 2 ] ||
+		fail "check.sh let a run of the journeys write a missing picture, which its second run then passed on (F5625): $(grep '^playwright' "$log")"
 	grep -qF "$6" "$log" || fail "check.sh did not give the failed file to the second $1 run"
 	grep -qF "$5" "$log" && fail "check.sh ran a file that passed again ($1)"
 	[ "$(grep -c "" "$unsteady")" = 1 ] || fail "check.sh did not log the one unsteady file of $1 once: $(cat "$unsteady")"
@@ -4574,7 +4651,7 @@ done
 # No commit yet: nothing to compare, and the commit is not refused for it.
 c4="$t/precommit_unborn" && regr_fixture "$c4" && rm -f "$t/reg.log"
 git -C "$c4" add -A
-precommit_in "$c4" 1 || fail "pre-commit refused the first commit of a repository, check_regressions having nothing to compare"
+precommit_in "$c4" 1 && fail "pre-commit let a first commit stage a harness file in the sandbox (D241)"
 [ ! -e "$t/reg.log" ] || fail "pre-commit ran check_regressions with no commit yet: $(cat "$t/reg.log")"
 fi
 
@@ -5869,6 +5946,69 @@ sh scripts/worktree.sh u v w; true"; do
 	at_ "$root" "$cmd" 2
 done
 sh_ "sh scripts/worktree.sh x y z" 2
+# A subagent edits no harness file with Edit or Write (D240): the sandbox stops a shell's writes, never the file tools', and two
+# agents of slice 9 changed stryker.config.json with Edit after their shell was refused (f792bf47, 359e8040). The harness is
+# .githooks/records.sh's list, in the tree the file sits in, however its path is written; the session itself, with no agent_id
+# in the hook's input, is not refused here (pre-commit is the wall, D241).
+agent=',"agent_id":"a1","agent_type":"reviewer"'
+file_() { # $1: the tool, $2: the file's path, $3: the exit code expected, $4: the event's agent fields (default: a subagent's), $5: its folder
+	guarded "{\"tool_name\":\"$1\",\"tool_input\":{\"file_path\":$(python3 -I -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$2")},\"cwd\":\"${5:-$root}\"${4-$agent}}" "$3" "$1 of $2 with {${4-$agent}} in ${5:-$root}"
+}
+for f in scripts/check.sh scripts/new.py stryker.config.json .claude/settings.json .claude/agents/reviewer.md .claude/workflows/branch.js \
+	.githooks/pre-commit .github/workflows/gate.yml .mcp.json package.json app/package.json packages/core/package.json \
+	packages/core/tsconfig.json pnpm-lock.yaml .node-version app/vite.config.ts lint/shared.config.ts knip.json .gitignore \
+	deploy/test.sh app/tests/stories/pictures.spec.ts; do
+	file_ Edit "$root/$f" 2
+done
+file_ Write "$root/scripts/guard.py" 2
+# The same files, their paths written otherwise: dots, the disk's case, a relative path, a link, another tree (a worktree's .git is a file).
+ln -s "$root" "$t/guard-link" && ln -s "$root/scripts" "$t/guard-scripts" && mkdir -p "$t/guard-other/.claude/tmp" && ln -s ../../scripts "$t/guard-other/.claude/tmp/link" && mkdir -p "$t/guard-other/scripts" "$t/guard-wt" && git -C "$t/guard-other" init -q && printf 'gitdir: x\n' >"$t/guard-wt/.git"
+for f in "$root/./scripts/../scripts/check.sh" "$root/SCRIPTS/check.sh" "$root/Stryker.Config.JSON" "$t/guard-link/scripts/check.sh" "$t/guard-scripts/check.sh" "$t/guard-scripts/new.sh" "$root/.claude/tmp/../settings.json" \
+	"$root/.claude/tmpx/a.md" "$t/guard-other/.claude/tmp/link/x.sh" "$root/$(printf '\305\277')cripts/check.sh" \
+	"$t/guard-other/scripts/x.sh" "$t/guard-other/app/package.json" "$t/guard-wt/stryker.config.json" "$t/guard-wt/.claude/rules/a.md"; do
+	file_ Write "$f" 2
+done
+file_ Edit scripts/check.sh 2
+file_ Edit ../scripts/guard.py 2 "$agent" "$root/docs"
+# The guard's own tree with no .git, as pre-commit's copy of the staged files: still the tree its files sit in (D240).
+mkdir -p "$t/guard-bare/scripts" "$t/guard-bare/.githooks" && cp "$gd" "$t/guard-bare/scripts/" && cp "$root/.githooks/records.sh" "$t/guard-bare/.githooks/"
+kept=$gd && gd=$t/guard-bare/scripts/guard.py
+file_ Edit "$t/guard-bare/scripts/check.sh" 2 "$agent" "$t/guard-bare"
+file_ Edit "$t/guard-bare/docs/a.md" 0 "$agent" "$t/guard-bare"
+# An empty .git a shell plants in a folder of the tree makes no other tree of it: the guard's own tree, and every tree above a
+# file, names its harness files (9j's review: deploy/.git let deploy/test.sh through).
+mkdir -p "$t/guard-bare/deploy" "$t/guard-bare/packages/core" && : >"$t/guard-bare/deploy/.git" && : >"$t/guard-bare/packages/.git"
+file_ Write "$t/guard-bare/deploy/test.sh" 2 "$agent" "$t/guard-bare"
+file_ Write "$t/guard-bare/packages/core/tsconfig.json" 2 "$agent" "$t/guard-bare"
+gd=$kept
+mkdir -p "$t/guard-other/deploy" && : >"$t/guard-other/deploy/.git"
+file_ Write "$t/guard-other/deploy/test.sh" 2
+# The list the guard reads is records.sh's, not a copy of its own: one that names zzz.cfg alone refuses it, and scripts/ no more.
+mkdir -p "$t/guard-zzz/scripts" "$t/guard-zzz/.githooks" && cp "$gd" "$t/guard-zzz/scripts/" &&
+	printf '%s\n' "harness() ( git diff \"\$@\" -- 'zzz.cfg' )" >"$t/guard-zzz/.githooks/records.sh"
+kept=$gd && gd=$t/guard-zzz/scripts/guard.py
+file_ Write "$t/guard-zzz/zzz.cfg" 2 "$agent" "$t/guard-zzz"
+file_ Write "$t/guard-zzz/scripts/check.sh" 0 "$agent" "$t/guard-zzz"
+gd=$kept
+# What only looks like one, and what an agent writes: its report under .claude/tmp/, a product file, a file in no tree.
+for f in "$root/scriptsx/a.ts" "$root/app/src/scripts/a.ts" "$root/docs/scripts.md" "$root/app/src/config.ts" "$root/docs/HARNESS.md" \
+	"$root/packages/core/src/args/args.ts" "$root/.claude/tmp/slice-9/reports/a.md" "$t/guard-other/src/a.ts" "$t/guard-loose/scripts/x.sh" "$t/guard-other/.claude/tmp/a.md"; do
+	file_ Write "$f" 0
+done
+# The hook's input without the field is the session's own call; an agent_type alone is a session started with --agent.
+file_ Edit "$root/scripts/check.sh" 0 ""
+file_ Edit "$root/scripts/check.sh" 0 ',"agent_type":"Explore"'
+file_ Edit "$root/scripts/check.sh" 2 ',"agent_id":""'
+guarded '{"tool_name":"Write","tool_input":{},"agent_id":"a1"}' 0 "a subagent's Write with no file_path"
+# A harness path ending in .gno, the gno skill loaded: still a harness file.
+guarded "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$root/scripts/x.gno\"},\"transcript_path\":\"$t/skilled.jsonl\",\"agent_id\":\"a1\"}" 2 "a subagent's Write of scripts/x.gno, the skill loaded"
+# A records.sh with no list it can read refuses every subagent's write: no list is no harness.
+mkdir -p "$t/guard-root/scripts" "$t/guard-root/.githooks" && cp "$gd" "$t/guard-root/scripts/" && git -C "$t/guard-root" init -q
+for listed in '' "harness() ( git diff \"\$@\" -- '' )"; do
+	printf '%s\n' "$listed" >"$t/guard-root/.githooks/records.sh"
+	code=0 && printf '{"tool_name":"Write","tool_input":{"file_path":"%s/a.ts"},"agent_id":"a1"}' "$t/guard-root" | python3 -I "$t/guard-root/scripts/guard.py" >/dev/null 2>&1 || code=$?
+	[ "$code" = 2 ] || fail "guard gave $code, not 2, for a subagent's write with a records.sh that lists no harness: $listed"
+done
 fi
 
 if part prove_fix; then
@@ -7622,6 +7762,7 @@ const base = (files) => (l) =>
   };
   // Two files of each folder, so a prefix cut to one file fails (server/src/login/ is also ticket.ts and routes.ts).
   for (const file of ["app/src/csp.ts", "app/src/cspOrigins.ts", "app/src/cspForms.ts", "app/src/lib/chain/evalCall.ts", "deploy/test.sh", "deploy/compose.yaml", "deploy/web/nginx.conf", "packages/core/src/markdown/inline.ts", "packages/core/src/markdown/scan.ts",
+    "packages/core/src/args/args.ts", "packages/core/src/args/args.test.ts",
     "app/src/lib/adena/adena.ts", "app/src/lib/adena/digest.ts", "server/src/login/login.ts", "server/src/login/ticket.ts", "server/src/roles/roles.ts", "server/roles.json",
     "packages/service/src/net.ts", "packages/service/src/settings.ts", "app/src/sw/worker.ts", "app/src/sw/register.ts", "server/src/ergo/auth.ts", "app/src/features/login/logIn.ts", "app/src/features/login/LoginView.tsx",
     "app/src/lib/api/login.ts", "app/src/lib/ergo/ergo.ts", "app/src/lib/ergo/handshake.ts"]) {
@@ -7629,7 +7770,7 @@ const base = (files) => (l) =>
     ok(labels.includes("security"), `a change of ${file} alone ran no security lens: ${labels}`);
   }
   // A lookalike is no tier-1 file.
-  for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md"]) {
+  for (const file of ["deploy-notes/x.md", "server/src/loginx.ts", "app/src/lib/adenax/a.ts", "app/src/sw.ts.md", "packages/core/src/markdown.md", "packages/core/src/args.md"]) {
     const labels = await lensOf(file);
     ok(!labels.includes("security"), `${file}, a lookalike of a tier-1 path, started the security lens: ${labels}`);
   }

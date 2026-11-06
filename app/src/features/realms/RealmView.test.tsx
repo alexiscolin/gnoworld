@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
+import { CUR, inputs } from "../../../tests/callFixtures.ts";
 import type { ChainFetch } from "@gnoworld/chain/read";
+import { StoreProvider } from "../../storeContext.tsx";
 import { RealmView } from "./RealmView.tsx";
 
 // 5h: a realm's view reads its page and the block height once through lib/chain, and shows what it read, the cap's state or the
@@ -73,9 +75,11 @@ function chain(
 
 async function view(fetcher: ChainFetch, realm = "gno.land/r/gnoland/wugnot", chainOf = CHAIN) {
   const box = mount(
-    <MemoryRouter>
-      <RealmView realm={realm} chain={chainOf} home="/" options={{ fetch: fetcher }} />
-    </MemoryRouter>,
+    <StoreProvider>
+      <MemoryRouter>
+        <RealmView realm={realm} chain={chainOf} home="/" options={{ fetch: fetcher }} />
+      </MemoryRouter>
+    </StoreProvider>,
   );
   // The page, the height and the chat's drawing arrive as promises: let them settle inside act.
   for (let turn = 0; turn < 40 && box.querySelector("[aria-busy]") !== null; turn += 1) {
@@ -111,9 +115,11 @@ describe("a realm's view", () => {
     vi.useFakeTimers();
     const fetcher = chain(WUGNOT?.body ?? null);
     mount(
-      <MemoryRouter>
-        <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/" options={{ fetch: fetcher }} />
-      </MemoryRouter>,
+      <StoreProvider>
+        <MemoryRouter>
+          <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/" options={{ fetch: fetcher }} />
+        </MemoryRouter>
+      </StoreProvider>,
     );
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
@@ -161,8 +167,11 @@ describe("a realm's view", () => {
 
   test("shows a page's form read only, and a link off gnoweb behind a button, whatever the realm wrote", async () => {
     const box = await view(chain(COINS?.body ?? null), "gno.land/r/gnoland/coins");
+    // The form's call card is a chunk of its own, asked as it is drawn.
+    await vi.waitFor(() => {
+      expect(box.textContent).toContain("path: balances");
+    });
     expect(all(box, "form, input, textarea, select")).toHaveLength(0);
-    expect(box.textContent).toContain("path: balances");
     expect(
       all(box, "a").some((a) => /^https:\/\/(?!onyx\.testnets\.gno\.land)/.test(a.getAttribute("href") ?? "")),
     ).toBe(false);
@@ -270,17 +279,19 @@ describe("a realm's view", () => {
   async function backFrom(entries: string[], index: number) {
     const fetcher = chain(WUGNOT?.body ?? null);
     const box = mount(
-      <MemoryRouter initialEntries={entries} initialIndex={index}>
-        <Routes>
-          <Route
-            path="/r/*"
-            element={
-              <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/home" options={{ fetch: fetcher }} />
-            }
-          />
-          <Route path="*" element={<Here />} />
-        </Routes>
-      </MemoryRouter>,
+      <StoreProvider>
+        <MemoryRouter initialEntries={entries} initialIndex={index}>
+          <Routes>
+            <Route
+              path="/r/*"
+              element={
+                <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/home" options={{ fetch: fetcher }} />
+              }
+            />
+            <Route path="*" element={<Here />} />
+          </Routes>
+        </MemoryRouter>
+      </StoreProvider>,
     );
     click(button(box, "Back"));
     await act(async () => {
@@ -301,3 +312,149 @@ describe("a realm's view", () => {
 function Here() {
   return <p data-at="">{useLocation().pathname}</p>;
 }
+
+// 9e: a page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
+describe("a realm's view, with a form on its page", () => {
+  const WRITES = [{ FuncName: "SetBio", Params: [CUR, { Name: "bio", Type: "string" }], Results: null }];
+  const form = (exec: string) =>
+    `# Bio\n\n<gno-form exec="${exec}">\n<gno-input name="bio" type="text" value="hi" />\n</gno-form>`;
+  const fetcher = (page: string) =>
+    vi.fn<ChainFetch>((url) =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify(
+            url.includes("/status")
+              ? statusEnvelope(786661, "2026-10-30T23:43:10Z")
+              : queryEnvelope({ data: url.includes("vm%2Fqfuncs") ? JSON.stringify(WRITES) : page }),
+          ),
+        ),
+      ),
+    );
+  const callOf = (box: HTMLElement) =>
+    vi.waitFor(() => {
+      const found = button(one(box, "figure"), "Call SetBio");
+      if (found === undefined) throw new Error("no Call yet");
+      return found;
+    });
+
+  test("shows a Call on a page's form for a write function the chain lists, and opens its card prefilled in the view", async () => {
+    const box = await view(fetcher(form("SetBio")));
+    click(await callOf(box));
+    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["hi"]);
+  });
+
+  test("keeps the form read only for a function the chain does not list", async () => {
+    const box = await view(fetcher(form("Drain")));
+    // The write rows below the page are drawn from the same list: the form had its answer by then.
+    await vi.waitFor(() => {
+      expect(button(box, "Call SetBio")).toBeDefined();
+    });
+    expect(all(one(box, "figure"), "button")).toHaveLength(0);
+    expect(one(box, "figure").textContent).toContain("read only");
+  });
+
+  test("gives the form and the write row of one function a card each, with the form's own texts", async () => {
+    const box = await view(fetcher(form("SetBio")));
+    const formCall = await callOf(box);
+    click(all(box, '[aria-label="Write functions"] button').find((b) => b.textContent === "Call SetBio"));
+    click(formCall);
+    const [formCard, rowCard] = all(box, "article");
+    expect(all(box, "article")).toHaveLength(2);
+    expect(formCard?.previousElementSibling).toBe(one(box, "figure"));
+    expect(inputs(formCard ?? box).map((i) => i.value)).toEqual(["hi"]);
+    expect(inputs(rowCard ?? box).map((i) => i.value)).toEqual([""]);
+  });
+
+  test("reads the functions' list once for the page's form and the write rows together", async () => {
+    const asked = fetcher(form("SetBio"));
+    const box = await view(asked);
+    await callOf(box);
+    await vi.waitFor(() => {
+      expect(button(box, "Call SetBio")).toBeDefined();
+    });
+    expect(asked.mock.calls.filter(([url]) => url.includes("vm%2Fqfuncs"))).toHaveLength(1);
+  });
+});
+
+// 9e (reviewer-1-1, security-1-2): a view that moves to another realm shows nothing of the first realm's functions, whatever
+// the order the two reads answer in.
+describe("a realm's view that moves from one realm to another", () => {
+  const A = "gno.land/r/demo/realma";
+  const B = "gno.land/r/demo/realmb";
+  const hex = (text: string) =>
+    [...new TextEncoder().encode(text)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const only = (name: string) => JSON.stringify([{ FuncName: name, Params: [CUR], Results: null }]);
+  function moving() {
+    const held = new Map<string, (answer: string) => void>();
+    const asked = vi.fn<ChainFetch>((url) => {
+      if (url.includes("/status"))
+        return Promise.resolve(new Response(JSON.stringify(statusEnvelope(1, "2026-10-30T23:43:10Z"))));
+      if (!url.includes("vm%2Fqfuncs"))
+        return Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: "# Page" }))));
+      const realm = url.includes(hex(A)) ? A : B;
+      return new Promise((resolve) => {
+        held.set(realm, (answer) => {
+          resolve(new Response(JSON.stringify(queryEnvelope({ data: answer }))));
+        });
+      });
+    });
+    function Switch() {
+      const [realm, setRealm] = useState(A);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setRealm(B);
+            }}
+          >
+            Move
+          </button>
+          <RealmView realm={realm} chain={CHAIN} home="/" options={{ fetch: asked }} />
+        </>
+      );
+    }
+    const box = mount(
+      <StoreProvider>
+        <MemoryRouter>
+          <Switch />
+        </MemoryRouter>
+      </StoreProvider>,
+    );
+    const answer = async (realm: string, name: string) => {
+      await vi.waitFor(() => {
+        expect(held.has(realm)).toBe(true);
+      });
+      await act(async () => {
+        held.get(realm)?.(only(name));
+        await new Promise((resolve) => setTimeout(resolve, 5));
+      });
+    };
+    return { box, answer };
+  }
+
+  test("shows the first realm's functions no longer while the second's are read", async () => {
+    const { box, answer } = moving();
+    await answer(A, "OnlyInA");
+    await vi.waitFor(() => {
+      expect(button(box, "Call OnlyInA")).toBeDefined();
+    });
+    click(button(box, "Move"));
+    expect(box.textContent).not.toContain("Call OnlyInA");
+  });
+
+  test("keeps the second realm's functions when the first realm's read answers last", async () => {
+    const { box, answer } = moving();
+    await vi.waitFor(() => {
+      expect(all(box, "button").length).toBeGreaterThan(0);
+    });
+    click(button(box, "Move"));
+    await answer(B, "OnlyInB");
+    await vi.waitFor(() => {
+      expect(button(box, "Call OnlyInB")).toBeDefined();
+    });
+    await answer(A, "OnlyInA");
+    expect(box.textContent).not.toContain("Call OnlyInA");
+    expect(button(box, "Call OnlyInB")).toBeDefined();
+  });
+});

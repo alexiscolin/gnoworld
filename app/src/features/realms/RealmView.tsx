@@ -7,11 +7,14 @@ import { useLocation, useNavigate } from "react-router";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { bigLine } from "./RealmCard.tsx";
+import type { CallPlace } from "./InlineCard.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
 import { RealmFacts } from "./RealmFacts.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
+import { RealmWrites } from "./RealmWrites.tsx";
 import styles from "./RealmView.module.css";
 import { isHeight, useRealm, type Height, type Realm } from "./useRealm.ts";
+import { ListingContext, useRead } from "./useCallable.ts";
 import { useRealmFacts } from "./useRealmFacts.ts";
 
 export interface RealmViewProps {
@@ -36,7 +39,17 @@ function Read({ height, rpc }: { height: Height | Failure; rpc: string }) {
   );
 }
 
-function Body({ state, origin, link }: { state: Realm; origin: string | undefined; link: string | undefined }) {
+function Body({
+  state,
+  origin,
+  link,
+  call,
+}: {
+  state: Realm;
+  origin: string | undefined;
+  link: string | undefined;
+  call: CallPlace;
+}) {
   if (state.state === "loading") {
     return (
       <div aria-busy="true" aria-label="Reading the page">
@@ -68,6 +81,7 @@ function Body({ state, origin, link }: { state: Realm; origin: string | undefine
     <RealmBlocks
       blocks={state.page.blocks}
       via={state.via}
+      call={call}
       {...(origin === undefined ? {} : { origin })}
       {...(link === undefined ? {} : { more: link })}
     />
@@ -91,39 +105,44 @@ export function RealmView({ realm, chain, home, options }: RealmViewProps) {
   const origin = chain.gnoweb;
   const link = gnowebLink(origin, realm);
   const state = useRealm({ rpc: chain.rpc, realm, origin }, options);
+  const place: CallPlace = { realm, chain, options };
+  const listing = useRead({ rpc: chain.rpc, realm, options });
   const navigate = useNavigate();
   const { key } = useLocation();
   return (
-    <section aria-labelledby="realm-title" className={styles["view"]}>
-      <Center gutter="all">
-        <Stack space="m">
-          <Cluster space="s">
-            <Button
-              emphasis="quiet"
-              onClick={() => {
-                Promise.resolve(key === "default" ? navigate(home) : navigate(-1)).catch((error: unknown) => {
-                  reportError(error);
-                });
-              }}
-            >
-              Back
-            </Button>
-            <Kicker>{chain.name}</Kicker>
-          </Cluster>
-          <h1 id="realm-title" dir="ltr">
-            {realm}
-          </h1>
-          {link === undefined ? null : (
-            <Cluster>
-              <Button href={link}>Open it on gnoweb</Button>
+    <ListingContext value={listing}>
+      <section aria-labelledby="realm-title" className={styles["view"]}>
+        <Center gutter="all">
+          <Stack space="m">
+            <Cluster space="s">
+              <Button
+                emphasis="quiet"
+                onClick={() => {
+                  Promise.resolve(key === "default" ? navigate(home) : navigate(-1)).catch((error: unknown) => {
+                    reportError(error);
+                  });
+                }}
+              >
+                Back
+              </Button>
+              <Kicker>{chain.name}</Kicker>
             </Cluster>
-          )}
-          <Body state={state} origin={origin} link={link} />
-          {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
-          <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
-          <Facts indexer={chain.indexer} realm={realm} options={options} />
-        </Stack>
-      </Center>
-    </section>
+            <h1 id="realm-title" dir="ltr">
+              {realm}
+            </h1>
+            {link === undefined ? null : (
+              <Cluster>
+                <Button href={link}>Open it on gnoweb</Button>
+              </Cluster>
+            )}
+            <Body state={state} origin={origin} link={link} call={place} />
+            {state.state === "read" ? <Read height={state.height} rpc={chain.rpc} /> : null}
+            <RealmFunctions realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
+            <RealmWrites realm={realm} chain={chain} {...(options === undefined ? {} : { options })} />
+            <Facts indexer={chain.indexer} realm={realm} options={options} />
+          </Stack>
+        </Center>
+      </section>
+    </ListingContext>
   );
 }

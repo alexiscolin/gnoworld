@@ -9,6 +9,7 @@ import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, withFull } from "./full.ts";
 import { Info } from "./Info.tsx";
+import type { Pinned } from "./QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
 import { worldsFollowedIn } from "../follow/index.ts";
 import { useApp } from "../../storeContext.tsx";
@@ -48,6 +49,8 @@ export interface ChatPlace {
    * gnoweb. */
   realms?: readonly string[] | undefined;
   universe: Pick<UniverseView, "id" | "isDefault" | "gnoweb">;
+  /** The calls the world's team pins (D271): their pills in the quick actions, and the cards they open over them. */
+  pinned?: Pinned | undefined;
 }
 
 /** What Who's here does: where the chat has an info panel it takes the reader to the people in it, closing the thread that

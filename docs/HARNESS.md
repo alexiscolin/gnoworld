@@ -100,7 +100,14 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    of what is staged, scoped to the commit's paths (`GATE_CHANGED`), and records the code it
    passed; a staged code a green `check.sh` run already recorded runs no second gate (the harness
    audit, 2026-11-04). In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate
-   recorded green (`.githooks/records.sh`, F076).
+   recorded green (`.githooks/records.sh`, F076). A harness file (`records.sh`'s list) is committed in his
+   Terminal alone: from the sandbox, told by `SANDBOX_RUNTIME` or, that unset, by the hook failing to open
+   itself for writing, which the sandbox forbids, pre-commit refuses it (D241). So a harness change reaches
+   a branch as a patch Alexis applies in his Terminal, the sandboxed gate passes on it and records it, and
+   he commits it there. pre-commit reaches `git commit` and `git merge` alone: cherry-pick, revert, rebase, am
+   and git's plumbing (`stash create` then `update-ref`, as F129's `commit-tree`) commit with no hook, so such a
+   commit meets its wall later, at pre-push's `Harness-changed:` lines and in `merge.sh`, which shows Alexis
+   every harness file before `main` (F129, F153).
 6. **A push of a work branch.** `pre-push` wants a gate that passed on its code, nothing
    uncommitted, and scans the history for secrets.
 7. **Before a merge.** `/pre-merge` (`docs/REVIEW.md`): `check.sh --merge`, one combined review
@@ -236,7 +243,8 @@ machine's loads (`scripts/load.py`), to `.claude/tmp/unsteady.log`, which `/pre-
 first step and the dream reads (F2070); a log it cannot write fails it. The budget is a measure, not a wall.
 
 A Vitest file that fails in the fast gate (a journey fails only at the merge check) runs once more, alone
-(`scripts/unsteady.py`, F1700): the gate passes if it passes, and logs the file, its failed
+(`scripts/unsteady.py`, F1700; neither run of the journeys writes a missing picture, `--update-snapshots=none`, or the
+second would pass on what the first wrote, F5625): the gate passes if it passes, and logs the file, its failed
 tests and the machine's load to `.claude/tmp/unsteady.log`. It refuses, with nothing run again,
 when the report names no failed file or is missing, and when the run had anything a second run
 of those files cannot clear (an unhandled error, a file that failed to load, Playwright's own
@@ -366,7 +374,10 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   in his terminal, never another session's (F5055, F5058). In his shell the hooks run nothing of
   the repository but the records the sandboxed gate wrote (F076).
 - **The sandbox** around shell commands: they write only in the project, its worktrees and its
-  caches, never in `.git/hooks` or `.git/config`, nor in a worktree's `.git` or `commondir` under `.git/worktrees` (so a stale worktree is pruned by Alexis: `git worktree prune`, F5095); another
+  caches, never in `.git/hooks` or `.git/config`, nor in a worktree's `.git` or `commondir` under `.git/worktrees` (so a stale worktree is pruned by Alexis: `git worktree prune`, F5095), nor in a harness path of
+  `records.sh`'s list but `.claude/`, whose `tmp/` is the slices' shared folder and whose other parts Claude Code
+  loads have their bans, a project CLAUDE.md in it included; no ban reaches StrykerJS's copy of the tree in `.stryker-tmp/`,
+  which a merge check writes (a `wiring` case, read as the sandbox reads its paths; D242, F111); another
   worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). They reach
   only the npm and Go registries and github.com. One command of the project's settings leaves the
   sandbox, `sh scripts/worktree.sh *` (`excludedCommands`), which writes the trees it makes and
@@ -439,7 +450,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
   and gnomcp was used, and no `worktree.sh` run but alone, as `sh scripts/worktree.sh` and plain
   words, from the project's root: elsewhere those words would run a script the session can write,
-  and behind anything else in the call, something else outside the sandbox (F5058). Every check reads the command from every word on, so a wrapper it does not know
+  and behind anything else in the call, something else outside the sandbox (F5058); and no subagent's Edit or Write of a harness file (`agent_id` in the hook's input; `records.sh`'s list,
+  in every tree above the file, its own included when it has no `.git`, so a planted `.git` hides nothing; its path
+  read through links, dots and case; `.claude/tmp/` is none), as the sandbox covers a shell, never a file tool (D240). Every check reads the command from every word on, so a wrapper it does not know
   runs nothing past it (git-core's dashed programs read as git): it fails closed, refusing a bare `gnokey`
   word (the Grep tool searches for one) and asking before `echo git push`. It reads a shell's `-c`
   wherever it stands among the options, `eval`, env's `-S` line, `$(...)`, `<(...)`, backticks, `${...}`,

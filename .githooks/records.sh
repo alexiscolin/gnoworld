@@ -37,9 +37,9 @@ reviewed() ( git show "$1:docs/review-passes.txt" 2>/dev/null | cut -d' ' -f2 | 
 # The harness: the files that make the gate and Claude's limits, or that run at Alexis's install
 # or in Claude Code outside the sandbox. A branch declares each one it changes (pre-push, F089),
 # the full gate mutates them (check.sh), and a merge shows them first (merge.sh, F129).
-# Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151). $@: git diff's
-# options and commits.
-harness() ( GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
+# Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151), and read as globs whatever a caller's
+# GIT_*_PATHSPECS say (one let a commit's hook read its * as a name, 9j's review). $@: git diff's options and commits.
+harness() ( env -u GIT_NOGLOB_PATHSPECS -u GIT_GLOB_PATHSPECS -u GIT_LITERAL_PATHSPECS GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
 	jarvis/package.json jarvis/tsconfig.json 'packages/*/package.json' 'packages/*/tsconfig.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
 	tsconfig.base.json app/tsconfig.json stryker.config.json knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore app/tests/stories/pictures.spec.ts deploy/test.sh )
 # Whether the change $@ (git diff's options and commits) holds a path with a non-ASCII byte: the

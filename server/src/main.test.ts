@@ -65,6 +65,19 @@ const until = async (seen: () => boolean): Promise<void> => {
   while (!seen()) await new Promise((resolve) => setTimeout(resolve, 10));
 };
 
+// What a stream says up to its `since` word, which follows any replay; then it is left.
+const untilSince = async (body: ReadableStream<Uint8Array> | null): Promise<string> => {
+  const reader = body?.getReader();
+  let text = "";
+  while (!text.includes("event: since")) {
+    const chunk = await reader?.read();
+    if (chunk === undefined || chunk.done) break;
+    text += new TextDecoder().decode(chunk.value);
+  }
+  await reader?.cancel();
+  return text;
+};
+
 const exited = (server: Server): Promise<number | null> =>
   new Promise((resolve) =>
     server.child.once("exit", (code) => {
@@ -757,6 +770,61 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(server.out.stderr).toContain(universes);
   });
 
+  // The chain's two data files: one good universe, and the hubs file's text as given.
+  const chainFiles = (hubsText: string) => {
+    const dir = folder("gnoworld-chain-");
+    const universes = join(dir, "universes.json");
+    const hubs = join(dir, "hubs.json");
+    writeFileSync(
+      universes,
+      JSON.stringify([
+        {
+          id: "b",
+          name: "U",
+          chainId: "b-1",
+          rpc: "https://rpc.example:443",
+          gnoweb: "https://gnoweb.example",
+          indexer: "https://indexer.the-chain.example/graphql/query",
+          testnet: true,
+          default: true,
+        },
+      ]),
+    );
+    writeFileSync(hubs, hubsText);
+    return { universes, hubs };
+  };
+
+  // Slice 9g: the chain's rooms. The data's two files start one poll of each universe's indexer, which the egress way
+  // sees as a tunnel; SIGTERM stops it with the rest.
+  it("follows each universe's indexer when UNIVERSES_FILE and HUBS_FILE name the data, and stops on SIGTERM", async () => {
+    const way = await tunnels();
+    try {
+      const { universes, hubs } = chainFiles("[]");
+      const server = start({
+        ...settings(),
+        UNIVERSES_FILE: universes,
+        HUBS_FILE: hubs,
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      await listening(server);
+      await until(() => way.seen.includes("indexer.the-chain.example:443"));
+      server.child.kill("SIGTERM");
+      expect(await exited(server)).toBe(0);
+    } finally {
+      way.close();
+    }
+  });
+
+  it("does not start with a HUBS_FILE that is no good list: it fails closed, naming the file", async () => {
+    // The universes are good, so it is the hubs that are judged.
+    const { universes, hubs } = chainFiles('{"not":"a list"}');
+    const server = start({ ...settings(), UNIVERSES_FILE: universes, HUBS_FILE: hubs });
+    expect(await exited(server)).not.toBe(0);
+    expect(server.out.stderr).toMatch(/hubs: .*hubs\.json does not hold a good list/);
+    expect(server.out.stderr).not.toMatch(/universes: /);
+  });
+
   it("exits on SIGTERM within a bound even with a price read still open on a proxy that never answers (F2758)", async () => {
     const way = await tunnels(true);
     try {
@@ -1168,6 +1236,95 @@ describe("the server's process", { timeout: 30_000 }, () => {
       jarvis.close();
     }
   });
+
+  // Slice 9h: the first signals over the real process. The unit tests hand each part its neighbour; here the routes are
+  // mounted, the store is a migration of the database, the chat's moderation hands its passed line to the first words,
+  // and one stream tells both signals to a page that follows the world's room.
+  it(
+    "serves the first signals: a guest reads none and cannot chart, an account charts a world once, a line that passed is its first words, both told on the stream (9h)",
+    { timeout: 45_000 },
+    async () => {
+      const origin = "https://gnoworld.test";
+      const ergo = await fakeErgo();
+      const oper = join(folder("gnoworld-oper-"), "oper");
+      writeFileSync(oper, `${PASSWORD}\n`);
+      const roles = join(folder("gnoworld-roles-"), "roles.json");
+      const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+      writeFileSync(
+        roles,
+        JSON.stringify({ team: [], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+      );
+      const keys = folder("gnoworld-openai-");
+      writeFileSync(join(keys, "openai"), `sk-made-up-${"k".repeat(40)}\n`);
+      const hook = join(keys, "openai.mjs");
+      writeFileSync(hook, OPENAI_PASSES);
+      const env = {
+        ...settings(),
+        ORIGINS: origin,
+        ROLES_FILE: roles,
+        ERGO_PORT: String(ergo.port),
+        ERGO_OPER_PASSWORD_FILE: oper,
+        OPENAI_API_KEY_FILE: join(keys, "openai"),
+      };
+      const first = start(env, [...FLAGS, "--import", hook]);
+      let port = await listening(first);
+      const peer = await ergo.peer(0);
+      await welcome(peer);
+      const at = (path: string): string => `http://127.0.0.1:${String(port)}${path}`;
+      const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+        fetch(at(path), {
+          method: "POST",
+          headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+          body: JSON.stringify(body),
+        });
+      expect((await posted("/api/signals/chart", { world: "bubble" })).status).toBe(401);
+      const stream = await fetch(at("/api/stream?rooms=%23bubble"));
+      const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = stream.body?.getReader();
+      let heard = "";
+      const told = async (): Promise<string[]> => {
+        const kinds = (): string[] =>
+          [...heard.matchAll(/event: signal\ndata: .*"kind":"(\w+)"/g)].map(([, kind = ""]) => kind);
+        while (kinds().length < 2) {
+          const chunk = await reader?.read();
+          if (chunk === undefined || chunk.done) break;
+          heard += new TextDecoder().decode(chunk.value);
+        }
+        return kinds().toSorted();
+      };
+      const who = wallet();
+      const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
+      const verified = await posted("/api/login/verify", {
+        nonce: made.nonce,
+        address: who.address,
+        proof: who.sign("onyx-1", made.text),
+      });
+      const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+      expect(await (await posted("/api/signals/chart", { world: "bubble" }, cookie)).json()).toEqual({
+        world: "bubble",
+        first: true,
+      });
+      expect(await (await posted("/api/signals/chart", { world: "bubble" }, cookie)).json()).toEqual({
+        world: "bubble",
+        first: false,
+      });
+      const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
+      peer.say(message(`account=${other};msgid=m1;time=2026-11-04T12:00:00.000Z`, `${other}!u@h`, ["#bubble", "gm"]));
+      expect(await told()).toEqual(["chart", "words"]);
+      expect(heard).toContain(`"kind":"chart","world":"bubble","account":"${who.address}"`);
+      expect(heard).toContain(`"kind":"words","world":"bubble","account":"${other}"`);
+      // A restart: the page's plate learns who is first from the stream alone, so the new server tells the database's
+      // firsts to a reader who comes after, before its `since`.
+      await reader?.cancel();
+      const gone = exited(first);
+      first.child.kill("SIGTERM");
+      await gone;
+      port = await listening(start(env, [...FLAGS, "--import", hook]));
+      const replayed = await untilSince((await fetch(at("/api/stream?rooms=%23bubble"))).body);
+      const kinds = [...replayed.matchAll(/event: signal\ndata: .*"kind":"(\w+)"/g)].map(([, kind = ""]) => kind);
+      expect(kinds.toSorted()).toEqual(["chart", "words"]);
+      expect(replayed).toContain(who.address);
+    },
+  );
 
   it("opens no admin listener and no door without their settings", async () => {
     const server = start({ ...settings(), ORIGINS: "https://gnoworld.test" });

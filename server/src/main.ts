@@ -30,6 +30,7 @@ import { roomsRoutes } from "./rooms/routes.ts";
 import { startWorlds } from "./worlds/job.ts";
 import { trendsRoutes } from "./worlds/trends.ts";
 import { dirname, join } from "node:path";
+import { bootSignals } from "./signals/boot.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -85,6 +86,8 @@ const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
 // The login's sessions, read for the rooms' routes (3l) and the rooms a reader may see (3m).
 const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
+// The first signals (9h) and the chain in the rooms (9g), told on the one stream; the chain none without both data files.
+const { stream, signals, chain } = bootSignals({ app, db, roles, config, log, session });
 const chat = startChat(
   db,
   {
@@ -100,6 +103,8 @@ const chat = startChat(
     log,
     pepper: config.pepper,
     session,
+    stream,
+    signals,
     ...(config.database === ":memory:" ? {} : { presence: join(dirname(config.database), "presence.json") }),
   },
 );
@@ -199,10 +204,7 @@ const drain = (): void => {
   if (draining) return;
   draining = true;
   log("stopping");
-  retention.stop();
-  prices?.stop();
-  worlds?.stop();
-  previews?.stop();
+  for (const job of [retention, prices, worlds, previews, chain]) job?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).
@@ -218,8 +220,7 @@ const drain = (): void => {
   };
   auth.close(closed);
   const close = (): void => {
-    stop(server, closed);
-    if (admin !== undefined) stop(admin, closed);
+    for (const listener of [server, admin]) if (listener !== undefined) stop(listener, closed);
   };
   chat.stop().then(close, close);
 };

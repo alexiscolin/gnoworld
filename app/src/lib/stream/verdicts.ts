@@ -4,12 +4,15 @@
 // of a shape or state this page does not know is dropped, said once (F675, slice 4's plan §1). After its replay, the
 // stream says when it began following, on the server's clock (F890). An answer not 200 (a 429, a restart's 502)
 // ends it for good, which the page is told (F888).
-import { jsonOf } from "@gnoworld/core";
-import { StreamEvent, StreamSince } from "@gnoworld/schemas";
+import { Signal, StreamEvent, StreamSince } from "@gnoworld/schemas";
+import { read } from "./read.ts";
 
 /** What the page's EventSource offers, so a test hands its own. */
 export interface VerdictSource {
-  addEventListener: (type: "verdict" | "since" | "error", listener: (event: { data: unknown }) => void) => void;
+  addEventListener: (
+    type: "verdict" | "since" | "signal" | "chain" | "realms" | "error",
+    listener: (event: { data: unknown }) => void,
+  ) => void;
   close: () => void;
   /** EventSource's: 2, CLOSED, once it gives up; it reconnects by itself from any other. */
   readonly readyState: number;
@@ -19,33 +22,28 @@ const CLOSED = 2;
 
 export interface VerdictOptions {
   open: (url: string) => VerdictSource;
-  log: (what: "verdict_unknown" | "since_unknown") => void;
+  log: (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => void;
+  /** A first signal of a world the rooms belong to (slice 9h). */
+  signal?: ((signal: Signal) => void) | undefined;
+  /** The data of a `chain` and of a `realms` event (slice 9g), unread: their schemas are the feed's (chainFeed.ts), which a page loads on the first. */
+  chain?: ((data: unknown) => void) | undefined;
+  realms?: ((data: unknown) => void) | undefined;
   /** The stream's word of when it began following, in ms. */
   since?: (time: number) => void;
   /** The stream ended for good: the browser will not reconnect it. */
   dead?: () => void;
 }
 
-// An event's data, read: JSON of the schema's shape, or none.
-function read<T>(
-  data: unknown,
-  schema: { safeParse: (value: unknown) => { success: true; data: T } | { success: false } },
-): T | undefined {
-  if (typeof data !== "string") return undefined;
-  const parsed = schema.safeParse(jsonOf(data));
-  return parsed.success ? parsed.data : undefined;
-}
-
 /** Follows the rooms' verdicts, handing each on; stops when called. */
 export function followVerdicts(
   rooms: readonly string[],
   onVerdict: (event: StreamEvent) => void,
-  { open, log, since, dead }: VerdictOptions,
+  { open, log, signal, chain, realms, since, dead }: VerdictOptions,
 ): () => void {
   if (rooms.length === 0) return () => undefined;
   const source = open(`/api/stream?rooms=${encodeURIComponent(rooms.join(","))}`);
   const told = new Set<string>();
-  const once = (what: "verdict_unknown" | "since_unknown") => {
+  const once = (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => {
     if (told.has(what)) return;
     told.add(what);
     log(what);
@@ -55,6 +53,21 @@ export function followVerdicts(
     if (event !== undefined) onVerdict(event);
     else once("verdict_unknown");
   });
+  if (signal !== undefined)
+    source.addEventListener("signal", ({ data }) => {
+      const event = read(data, Signal);
+      if (event !== undefined) signal(event);
+      else once("signal_unknown");
+    });
+  // The chain's events (9g) go on unread: the feed that reads them is a chunk a page loads on the first.
+  for (const [type, on] of [
+    ["chain", chain],
+    ["realms", realms],
+  ] as const)
+    if (on !== undefined)
+      source.addEventListener(type, ({ data }) => {
+        on(data);
+      });
   source.addEventListener("since", ({ data }) => {
     const word = read(data, StreamSince);
     if (word === undefined) once("since_unknown");
@@ -77,10 +90,17 @@ export function followVerdicts(
 /** The page's own stream, on its EventSource; an unknown event reported once, as the page reports an error. */
 export const pageVerdicts = (
   rooms: readonly string[],
-  on: { verdict: (event: StreamEvent) => void; since: (time: number) => void; dead: () => void },
+  on: Pick<VerdictOptions, "signal" | "chain" | "realms"> & {
+    verdict: (event: StreamEvent) => void;
+    since: (time: number) => void;
+    dead: () => void;
+  },
 ) =>
   followVerdicts(rooms, on.verdict, {
     open: (url) => new EventSource(url),
+    signal: on.signal,
+    chain: on.chain,
+    realms: on.realms,
     log: (what) => {
       reportError(new Error(`verdicts: ${what}`));
     },

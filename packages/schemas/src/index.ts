@@ -20,8 +20,11 @@ export {
 } from "./data.ts";
 export { Expedition, Quests } from "./discovery.ts";
 export { OnAir, XPosts } from "./feeds.ts";
+export { CallRequest } from "./call.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";
+// The chain events' schemas are values at "@gnoworld/schemas/indexer" (a page loads them on its first event, in a chunk of its own); here, the types.
+export type { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
 export {
   AnswerButton,
   Digest,
@@ -51,6 +54,8 @@ export {
 export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
+export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
+export { Key, Slug } from "./slug.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 // The worlds' count (7n2), which the home's hero reads, in the barrel and so in the store's chunk: its head is the worlds' file's too (behind

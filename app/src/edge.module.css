@@ -1,0 +1,7 @@
+/* The one hairline edge of a boxed block, in the line colour: the call block, the composer's box and the header's pill each
+   bring their own corners and fill. */
+@layer components {
+  .edge {
+    border: var(--line-width) solid var(--color-line);
+  }
+}

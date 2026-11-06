@@ -209,7 +209,13 @@ export function Loaded(props: LoadedProps) {
             ...threads.view,
           }}
           composer={
-            <Dock onWhoIsHere={ask} place={place} dm={shown?.kind === "dm"} writes={session.kind === "in"}>
+            <Dock
+              onWhoIsHere={ask}
+              place={place}
+              dm={shown?.kind === "dm"}
+              writes={session.kind === "in"}
+              pinned={place.pinned}
+            >
               {writer}
             </Dock>
           }

@@ -1,0 +1,67 @@
+<!doctype html>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Adena recording</title>
+<body style="font: 16px system-ui; max-width: 42rem; margin: 2rem auto; padding: 0 1rem">
+  <h1>Adena recording (test only)</h1>
+  <p>
+    Nothing is asked of Adena until you press a button. Press them in order. Only the buttons 4 and 5 ask it to send a
+    transaction, and Adena then asks you: this page signs nothing.
+  </p>
+  <p>
+    <label>Realm <input id="realm" size="40" value="gno.land/r/demo/profile" /></label><br />
+    <label>Function <input id="func" value="SetStringField" /></label><br />
+    <label
+      >Arguments, one per line
+      <textarea id="args" rows="2">
+Bio
+gnoworld test</textarea>
+    </label>
+  </p>
+  <p>
+    <button id="connect">1. Let this page in (Adena asks you)</button>
+    <button id="read">2. Read the account and the network</button>
+    <button id="switch">3. Switch to Onyx</button>
+    <button id="sign">4. Call, and sign it in Adena</button>
+    <button id="refuse">5. Call, and reject it in Adena</button>
+  </p>
+  <pre id="log"></pre>
+  <script src="/recorder.js"></script>
+  <script>
+    const universe = __UNIVERSE__;
+    const entries = [];
+    let account = "";
+    async function keep(added) {
+      entries.push(...added);
+      document.getElementById("log").textContent = JSON.stringify(entries, null, 2);
+      await fetch("/save", { method: "POST", body: JSON.stringify(entries, null, 2) });
+    }
+    async function run(label, step) {
+      const entry = await Recorder.record(window.adena, label, step);
+      if (step.call === "GetAccount") account = Recorder.accountOf(entry) || account;
+      await keep([entry]);
+    }
+    // The step itself lives in record.ts (recordCall): it reads the account, parses the request, calls nothing without one.
+    const call = (label) => async () => {
+      const form = {
+        account,
+        universe: { chainId: universe.chainId, name: universe.name, rpc: universe.rpc },
+        realm: document.getElementById("realm").value,
+        func: document.getElementById("func").value,
+        args: document.getElementById("args").value,
+      };
+      const done = await Recorder.recordCall(window.adena, label, form);
+      account = done.account;
+      await keep(done.entries);
+    };
+    document.getElementById("connect").onclick = () => run("connect", { call: "AddEstablish" });
+    document.getElementById("read").onclick = async () => {
+      await run("account", { call: "GetAccount" });
+      await run("network", { call: "GetNetwork" });
+    };
+    document.getElementById("switch").onclick = () =>
+      run("switch", { call: "SwitchNetwork", chainId: universe.chainId });
+    document.getElementById("sign").onclick = call("call, signed");
+    document.getElementById("refuse").onclick = call("call, rejected");
+  </script>
+</body>

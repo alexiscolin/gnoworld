@@ -242,6 +242,7 @@ describe("loadData", () => {
         universe: "onyx",
         realms: ["gno.land/r/gov/dao"],
         kind: "dao",
+        actions: [{ label: "Vote", realm: "gno.land/r/gov/dao", function: "MustVoteOnProposalSimple", args: {} }],
       },
     ]);
     // The crumbs' one genre (8g, frame 104: "GAMES › DAPP").

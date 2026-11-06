@@ -5,7 +5,7 @@
 import { comingEvents, comingIn, type CalendarEvent } from "../../lib/coming.ts";
 export interface TickerItem {
   id: string;
-  kind: "trending" | "rising" | "new" | "news" | "event" | "onair";
+  kind: "trending" | "rising" | "new" | "news" | "event" | "onair" | "chain";
   text: string;
   link: string;
   /** Where a trend's data comes from and when, said on its link. */
@@ -18,7 +18,7 @@ interface Row {
   title: string;
   link: string;
 }
-const MOST = 6;
+export const MOST = 6;
 
 /** The ticker's events and news at `now`; an event's `place` is its world's name, none for a world the page does not list. */
 export function tickerItems(

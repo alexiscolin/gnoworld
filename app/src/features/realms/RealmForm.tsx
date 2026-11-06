@@ -46,18 +46,26 @@ function fieldRow(field: FormField, at: number): ReactNode[] {
 const leftOut = (left: number): string =>
   `${String(left)} more field${left === 1 ? " is" : "s are"} not shown here, a hidden one may be among them.`;
 
-/** A form as a read-only list of its fields, under a line that says nothing here sends anything; `left` fields were not
- * drawn, which the form says. */
+// What a form says it is when nothing about it can be called.
+const READ_ONLY = "read only, nothing here sends anything";
+
+/** A form as a list of its fields, to be read, under a line that says what it is: by default that nothing here sends anything
+ * (`note`). A form a call was confirmed for (CallableForm, ActionForm) says so, and brings its Call and card as `children`;
+ * `left` fields were not drawn, which the form says. */
 export function RealmForm({
   exec,
   path,
   fields,
   left,
+  note = READ_ONLY,
+  children,
 }: {
   exec: string;
   path: string;
   fields: readonly FormField[];
   left: number;
+  note?: string;
+  children?: ReactNode;
 }) {
   return createElement(
     "figure",
@@ -67,9 +75,10 @@ export function RealmForm({
       { dir: "ltr" },
       exec === "" ? "Form" : `Form: ${exec}`,
       path === "" ? undefined : createElement("small", { className: styles["kind"] }, ` · path: ${path}`),
-      createElement("small", { className: styles["kind"] }, " · read only, nothing here sends anything"),
+      createElement("small", { className: styles["kind"] }, ` · ${note}`),
     ),
     createElement("dl", null, ...fields.flatMap(fieldRow)),
     left === 0 ? undefined : createElement("p", { className: styles["kind"], "data-left": "" }, leftOut(left)),
+    children,
   );
 }

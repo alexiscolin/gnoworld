@@ -1,4 +1,4 @@
-import { adena } from "./adena.ts";
+import { adena, changeAccount } from "./adena.ts";
 import { logIn } from "./irc.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { accountPill, logOutHere, phoneWith } from "./account.ts";
@@ -8,9 +8,18 @@ import { accountPill, logOutHere, phoneWith } from "./account.ts";
 const logInButton = (page: Page) => page.getByRole("button", { name: "Connect Adena" });
 
 test.describe("the login with Adena", () => {
+  test("offers a control reading 'Connect Adena' to nobody logged in, on a computer's screen", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await adena(page);
+    await page.goto("/");
+    await hydrated(page);
+    await expect(logInButton(page)).toHaveText("Connect Adena");
+  });
+
   test("signs the server's text unchanged, and the server takes the proof: logged in, across a reload", async ({
     page,
   }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
     await adena(page);
     await page.goto("/");
     await hydrated(page);
@@ -52,6 +61,20 @@ test.describe("the login with Adena", () => {
     expect(await page.evaluate(async () => (await fetch("/api/login/me")).json() as Promise<unknown>)).toEqual({
       address: null,
     });
+  });
+
+  test("ends the session when Adena's account changes: the page logs out and the server is told (D200)", async ({
+    page,
+  }) => {
+    await adena(page);
+    await page.goto("/");
+    await hydrated(page);
+    await logInButton(page).click();
+    await expect(accountPill(page)).toBeVisible();
+    const logout = page.waitForRequest((request) => request.url().endsWith("/api/login/logout"));
+    await changeAccount(page, "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
+    await logout;
+    await expect(logInButton(page)).toBeVisible();
   });
 
   for (const [mode, words] of [

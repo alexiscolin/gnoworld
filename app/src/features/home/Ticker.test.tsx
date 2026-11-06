@@ -248,10 +248,12 @@ describe("the ticker", () => {
     expect(strip.getAttribute("data-paused")).toBe("false");
     const pause = button(box, "Pause the ticker");
     expect(pause?.getAttribute("aria-pressed")).toBe("false");
+    expect(pause?.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("pause");
     click(pause);
     expect(strip.getAttribute("data-paused")).toBe("true");
     const play = button(box, "Play the ticker");
     expect(play?.getAttribute("aria-pressed")).toBe("true");
+    expect(play?.querySelector("[data-icon]")?.getAttribute("data-icon")).toBe("play");
     click(play);
     expect(strip.getAttribute("data-paused")).toBe("false");
     expect(button(box, "Pause the ticker")).toBeDefined();

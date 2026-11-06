@@ -12,6 +12,12 @@ const Calendar = lazy(async () => (await import("../events/index.ts")).calendar(
 /** What a conversation is, for its pills: the Earth's general chat, a world's with a realm or without, a direct message. */
 type PillsOf = "earth" | "realm" | "hub" | "dm";
 
+/** A world's pinned actions as its route hands them, drawn as their code comes. */
+export interface Pinned {
+  pills: ReactNode;
+  cards: ReactNode;
+}
+
 export interface QuickActionsProps {
   onWhoIsHere: () => void;
   /** The world the chat is in, by its slug: its events come first in the calendar. */
@@ -21,6 +27,8 @@ export interface QuickActionsProps {
   realm?: string | undefined;
   /** Whether the reader writes here: Poll starts a poll in the composer. */
   writes: boolean;
+  /** The world's pinned actions (D271) after the row's own, each a button or a link drawn as a pill. */
+  pinned?: ReactNode;
 }
 
 // One pill of the row: an edge, the words centred, the row's width shared among the pills.
@@ -95,7 +103,7 @@ function useCalendar(world: string) {
   };
 }
 
-export function QuickActions({ onWhoIsHere, world, pills, realm, writes }: QuickActionsProps) {
+export function QuickActions({ onWhoIsHere, world, pills, realm, writes, pinned }: QuickActionsProps) {
   const calendar = useCalendar(world);
   const who = <Action key="who" label="Who's here" onClick={onWhoIsHere} />;
   const events = (label: string) => <Action key="events" label={label} onClick={calendar.open} />;
@@ -111,6 +119,7 @@ export function QuickActions({ onWhoIsHere, world, pills, realm, writes }: Quick
   return (
     <div role="toolbar" aria-label="Quick actions" className={styles["bar"]}>
       {rows[pills]}
+      {pinned === undefined ? null : <span className={styles["pinned"]}>{pinned}</span>}
       {calendar.dialog}
     </div>
   );

@@ -13,7 +13,8 @@ import { BUILD } from "./sites.ts";
 const FIRST_SCREEN_JS = 187_569;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-const PLAIN_FIRST_SCREEN_JS = 185_999;
+// 189,694 B once slice 9 met slice 8 (the chain's deploys in the ticker, the Earth's room followed, the store's chain and signals), measured on that merge.
+const PLAIN_FIRST_SCREEN_JS = 189_694;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -154,6 +155,9 @@ const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // where the bytes come from: hardening).
 const PROPOSALS = /\/assets\/Proposals-[\w-]+\.js$/;
 const PROPOSALS_JS = 22_724;
+// A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
+// world that pins one alone: weighed with the proposals.
+const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 // A plate's blocks that wait for a read (8g, Alexis's "Charger avec leur donnée"): the realm card, the hours and their chart, each asked as its
 // read starts and capped at its size measured on 2026-11-04 and 256 B (the chief's call). The connected worlds wait for the worlds' file,
 // which the journeys' site does not serve: their chunk never loads here.
@@ -503,8 +507,41 @@ async function captureWithin(page: Page, capture: readonly string[], there: read
   return own;
 }
 
-for (const path of PAGES) {
-  test(`${path} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
+// A world someone charted (slice 9h, D210): its plate names who, from the stream, so a guest's first screen also asks for the
+// plate's line; the stream is handed the signal here, as no journey charts Bubble (D218).
+const CHARTED = "/w/bubble";
+const signalFrame = () =>
+  `event: signal\ndata: ${JSON.stringify({
+    kind: "chart",
+    world: "bubble",
+    account: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
+    at: new Date().toISOString(),
+  })}\n\nevent: since\ndata: ${JSON.stringify({ time: new Date().toISOString() })}\n\n`;
+
+// The stream handed the signal of a charted world; the plate's line, once it shows.
+const chartedStream = async (page: Page, charted: boolean) => {
+  if (charted)
+    await page.route("**/api/stream?*", (route) =>
+      route.fulfill({ contentType: "text/event-stream", body: signalFrame() }),
+    );
+};
+const chartedShown = async (page: Page, charted: boolean) => {
+  if (charted) await expect(page.getByText(/^First charted by @g1jg8m/)).toBeVisible();
+};
+// A world that pins asks for the pinned actions' code once the proposals' code has drawn the plate, after the chat's scripts may all have
+// come: measured once it has, not as the timing falls. Only GovDAO pins an action.
+const pinnedCodeOf = (page: Page, path: string) =>
+  path.includes("govdao") ? page.waitForResponse((response) => PINNED.test(response.url())) : undefined;
+const expectPinned = (scripts: ReadonlySet<string>, path: string) => {
+  const pinned = [...scripts].filter((url) => PINNED.test(url));
+  expect(pinned.length, "a world asks for the pinned actions' code when it pins one").toBe(
+    path.includes("govdao") ? 1 : 0,
+  );
+};
+
+for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [CHARTED, true] as const]) {
+  test(`${path}${charted ? ", charted," : ""} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
+    await chartedStream(page, charted);
     const seen = watch(page);
     const { scripts, all, pending } = seen;
     const world = isWorld(path);
@@ -513,13 +550,17 @@ for (const path of PAGES) {
     const chat = world ? page.waitForResponse((response) => CHAT.test(response.url())) : undefined;
     // A world page opens its verdicts stream: measured once it has, every run, not as the timing falls.
     const stream = world ? page.waitForResponse((response) => response.url().includes("/api/stream")) : undefined;
+    const pinnedCode = pinnedCodeOf(page, path);
     const early = await firstScreenOf(page, path, seen);
     await stream;
     await chat;
+    await pinnedCode;
+    await chartedShown(page, charted);
     await expect.poll(() => pending.size, "the scripts the chat's code asks for come").toBe(0);
     const asked = [...scripts].filter((url) => PROPOSALS.test(url));
     // Only a world with a realm asks for the proposals' code.
     expect(asked.length > 0, "a world asks for the proposals' code when it has a realm").toBe(path.includes("govdao"));
+    expectPinned(scripts, path);
     const chatLate = await lateChat(page, path, seen);
     const capture = await lateCapture(path, scripts);
     // A plate's late chunk landing meanwhile is named late, never weighed as the first screen's.

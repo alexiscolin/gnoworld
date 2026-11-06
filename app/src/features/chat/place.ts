@@ -6,7 +6,7 @@ import type { ChatPlace } from "./ChatScreen.tsx";
 /** What the chat's header, its column of worlds, its info panel and its pills say of a place in `universe`: `kicker` says
  * where it is; the place's own `earth` and `realms` choose its pills (Dock.tsx). */
 export const chatPlace = (
-  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage" | "earth" | "realms">,
+  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage" | "earth" | "realms" | "pinned">,
   universe: UniverseView,
   kicker = `${universe.name} · ${place.name}`,
 ): ChatPlace => ({

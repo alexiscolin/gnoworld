@@ -1,7 +1,7 @@
 import { Address, toAddress } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Roles } from "../roles/roles.ts";
-import { desired, listed, mayRead, publicRoom, roomType } from "./types.ts";
+import { desired, listed, mayRead, openRoom, publicRoom, roomType } from "./types.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const MOD = Address.parse("g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9");
@@ -94,6 +94,32 @@ describe("who reads a room", () => {
     expect(
       ["#earth", "#earth/news", "#earth/door", "#earth/crew", "#earth/desk"].map((room) => publicRoom(ROLES, room)),
     ).toEqual([true, true, true, false, false]);
+  });
+});
+
+// Slice 9h, D214: a world's first words are served to anyone with their author's address, so only a line of a room open to
+// all to read and write, and listed, can be them.
+describe("the rooms whose lines may be a world's first words", () => {
+  it("are the open and listed ones: no announcement, accounts, members or hidden room, and a room the file does not type is open", () => {
+    const hidden: Roles = {
+      ...ROLES,
+      worlds: new Map([
+        [
+          "mint",
+          {
+            moderators: new Set<Address>(),
+            rules: RULES,
+            rooms: new Map([["#mint/back", { type: "open" as const, hidden: true }]]),
+          },
+        ],
+      ]),
+    };
+    expect(
+      ["#earth", "#earth/news", "#earth/door", "#earth/crew", "#earth/desk", "#earth/vault", "#bubble/games"].map(
+        (room) => openRoom(ROLES, room),
+      ),
+    ).toEqual([true, false, false, false, false, false, true]);
+    expect([openRoom(hidden, "#mint/back"), openRoom(hidden, "#mint")]).toEqual([false, true]);
   });
 });
 

@@ -31,4 +31,8 @@
     font: var(--font-body);
     font-weight: 500;
   }
+
+  .title[data-size="large"] {
+    font: var(--font-title-m);
+  }
 }

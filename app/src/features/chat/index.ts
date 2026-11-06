@@ -1,9 +1,20 @@
 // The chat (slice 4's 4b): a world's rooms by section, a room's lines and people, the page's link to Ergo.
 import { lazy } from "react";
 
+export { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 export { Chat } from "./Chat.tsx";
 export { LOADING } from "./Loading.tsx";
-export { dmHref, roomHref, roomIds, roomLabel, roomParams, roomWorld, shownRoom, whoIs } from "./names.ts";
+export {
+  dmHref,
+  roomHref,
+  roomIds,
+  roomLabel,
+  roomParams,
+  roomWorld,
+  shortAddress,
+  shownRoom,
+  whoIs,
+} from "./names.ts";
 
 /** The chat's drawing of marks, paragraphs, code and lists, for a realm's page. Loaded on asking, never by the barrel:
  * a static re-export put the Markdown reader in every world page's first screen (budgets.spec.ts, accountLater.spec.ts). */

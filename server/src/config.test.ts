@@ -69,6 +69,18 @@ describe("loadConfig", () => {
     });
   });
 
+  // D218: every world can be first charted (D210) unless the setting names the worlds that can; the journeys' server names
+  // govdao alone, so the worlds the other journeys open are never charted.
+  it("reads the worlds that can be first charted: every world when unset, else the slugs named, refusing any other word", () => {
+    expect(loadConfig(ENV).firstToChart).toBeUndefined();
+    expect(loadConfig({ ...ENV, FIRST_TO_CHART_WORLDS: "govdao" }).firstToChart).toEqual(new Set(["govdao"]));
+    expect(loadConfig({ ...ENV, FIRST_TO_CHART_WORLDS: "govdao,fresh-mint" }).firstToChart).toEqual(
+      new Set(["govdao", "fresh-mint"]),
+    );
+    for (const bad of ["", "GovDAO", "govdao,", "gov dao", "a".repeat(41)])
+      expect(failure({ ...ENV, FIRST_TO_CHART_WORLDS: bad })).toMatch(/setting FIRST_TO_CHART_WORLDS: /);
+  });
+
   it("reads the socket Ergo's auth script dials, an absolute path a socket can hold; none by default", () => {
     expect(loadConfig(ENV).authSocket).toBeUndefined();
     expect(loadConfig({ ...ENV, AUTH_SOCKET: "/run/gnoworld/auth.sock" }).authSocket).toBe("/run/gnoworld/auth.sock");
@@ -195,6 +207,15 @@ describe("loadConfig", () => {
     }
   });
 
+  it("reads the hubs' data file the chain's polls need: absolute, none by default, and never without the universes'", () => {
+    const universes = { ...ENV, UNIVERSES_FILE: "/app/app/data/universes.json" };
+    expect(loadConfig(universes).hubs).toBeUndefined();
+    expect(loadConfig({ ...universes, HUBS_FILE: "/app/app/data/hubs.json" }).hubs).toBe("/app/app/data/hubs.json");
+    for (const value of ["", "hubs.json", "/", "/srv/../hubs.json"])
+      expect(failure({ ...universes, HUBS_FILE: value })).toMatch(/setting HUBS_FILE: /);
+    expect(failure({ ...ENV, HUBS_FILE: "/app/app/data/hubs.json" })).toMatch(/setting UNIVERSES_FILE: required/);
+  });
+
   it("names the entry of a list setting it refuses, never its value (F434)", () => {
     const error = failure({ ...ENV, ORIGINS: "https://gnoworld.test,https://bad.test/path" });
     expect(error).toMatch(/setting ORIGINS: \w+ \(at 1\)/);
@@ -244,6 +265,7 @@ describe("loadConfig", () => {
     ["ERGO_PORT", { ERGO_PORT: "0" }],
     ["ERGO_PORT", { ERGO_PORT: "06667" }],
     ["ERGO_PORT", { ERGO_PORT: "6667x" }],
+    ["ERGO_PORT", { ERGO_PORT: "6667 " }],
     ["ERGO_PORT", { ERGO_PORT: "-1" }],
     ["ERGO_HOST", { ERGO_HOST: "" }],
     ["ERGO_HOST", { ERGO_HOST: "h".repeat(254) }],

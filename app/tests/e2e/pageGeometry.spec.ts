@@ -3,16 +3,11 @@ import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { calmed, pinFigures } from "./figures.ts";
-import { box, brightness, near } from "./geometry.ts";
+import { box, brightness, near, style } from "./geometry.ts";
 
 // Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
 // frames 1, 6, 20, 26, 37, 90 and 102 (docs/design/video-screens.md; frames in ~/.cache/gnoworld-tools/video-frames/). A box is
 // held to 2 px of the frame's, for anti-aliasing and compression; the pictures' own numbers are read off the frames' pixels.
-const style = (page: Page, selector: string, property: string) =>
-  page
-    .locator(selector)
-    .first()
-    .evaluate((el, name) => getComputedStyle(el).getPropertyValue(name), property);
 
 // A plate as frames 20, 37 and 90 draw it: 24 px from the left, 98 from the top, 808 wide with its fade, and the box it stands in.
 const plateAt = async (page: Page, path: string) => {

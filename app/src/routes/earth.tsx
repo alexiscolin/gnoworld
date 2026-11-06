@@ -10,13 +10,15 @@ import { Activity } from "../features/world/Activity.tsx";
 import { Here } from "../features/world/Here.tsx";
 import { LatestOnX } from "../features/home/LatestOnX.tsx";
 import { OutLinks } from "../features/realms/OutLinks.tsx";
+import { RealmsToday } from "../features/world/RealmsToday.tsx";
+import { useEarthChain } from "../features/world/useEarthChain.ts";
 import { useHours } from "../features/world/useHours.ts";
 import { DOCS, explorerLink } from "../lib/chain/explorer.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
-import { useAppStore } from "../storeContext.tsx";
+import { useApp, useAppStore } from "../storeContext.tsx";
 import { useLateRead } from "../lateRead.ts";
 import universes from "../../data/universes.json" with { type: "json" };
 import styles from "./earth.module.css";
@@ -36,12 +38,13 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
 }
 
 // Who is talking and from how many countries, which are the relay's, whose rooms are the default universe's (8i); the realms deployed in
-// 24 h beside, slice 9's (the indexer's events), greyed.
+// 24 h beside, slice 9's (the indexer's events), greyed until the stream has told a count.
 // The people's read is the home's own (8i), in its chunk.
 const readPeople = (_: string, signal: AbortSignal) =>
   import("../features/home/people.ts").then((people) => people.readPeople({ signal }));
 
 function Talking({ universe }: { universe: UniverseView }) {
+  const count = useApp((app) => app.realmsDeployed[universe.id]);
   const countries = useLateRead(universe.isDefault ? "people" : undefined, readPeople)?.countries ?? 0;
   return (
     <div className={styles["talking"]}>
@@ -49,12 +52,16 @@ function Talking({ universe }: { universe: UniverseView }) {
         unit="talking"
         caption={countries > 0 ? `right now · ${String(countries)} countries` : "right now"}
         beside={
-          <ComingSoon name="Realms deployed in 24 h">
-            <span className={styles["soon"]}>
-              realms <br />
-              <span className="label nowrap">deployed in 24 h</span>
-            </span>
-          </ComingSoon>
+          count === undefined ? (
+            <ComingSoon name="Realms deployed in 24 h">
+              <span className={styles["soon"]}>
+                realms <br />
+                <span className="label nowrap">deployed in 24 h</span>
+              </span>
+            </ComingSoon>
+          ) : (
+            <RealmsToday count={count} />
+          )
         }
       />
     </div>
@@ -95,6 +102,7 @@ export default function Earth() {
   // The chat comes once the door to space has: this page holds both, and the first screen's budget carries the door (budgets.spec.ts).
   const chatDue = useSpace("earth", page);
   const hours = useHours(EARTH.slug);
+  useEarthChain();
   return (
     <>
       {/* The globe's place: the page lays it out, the scene draws in it, and the universe says how far it came. */}

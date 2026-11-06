@@ -1,12 +1,14 @@
 // The one store (docs/ARCHITECTURE.md, "State"): a slice per feature, here so the store imports no feature.
 // React reads it through zustand's useStore in the features; the scene through subscribe.
 import { createStore } from "zustand/vanilla";
+import { chainSlice, type ChainSlice } from "./chain.ts";
 import { chatSlice, type ChatSlice } from "./chat.ts";
 import { dmSlice, type DmSlice } from "./dms.ts";
 import { deviceSlice, keepSlice, type DeviceSlice, type KeepSlice } from "./keep.ts";
 import { loginSlice, type LoginSlice } from "./login.ts";
 import { noticeSlice, type NoticeSlice } from "./notices.ts";
 import { pinsSlice, type PinsSlice } from "./pins.ts";
+import { signalsSlice, type SignalsSlice } from "./signals.ts";
 import { verdictsSlice, type VerdictsSlice } from "./verdicts.ts";
 
 export type AppState = LoginSlice &
@@ -16,7 +18,14 @@ export type AppState = LoginSlice &
   VerdictsSlice &
   KeepSlice &
   PinsSlice &
-  DeviceSlice;
+  DeviceSlice &
+  SignalsSlice &
+  ChainSlice & {
+    /** The page's Adena, set by a call card's first gesture so the login follows its account (F5651). Absent until then. */
+    wallet?: unknown;
+  };
+// The calls' slice (lib/calls.ts) is added when a realm view draws its first card, so it is not in this type: features/calls/slice.ts
+// reads it through `callsIn`, which says when it is absent.
 
 /** A store of its own: the page makes one, each test another. */
 export const createAppStore = () => {
@@ -29,6 +38,8 @@ export const createAppStore = () => {
     ...keepSlice(...args),
     ...pinsSlice(...args),
     ...deviceSlice(...args),
+    ...signalsSlice(...args),
+    ...chainSlice(...args),
   }));
   // A session that follows another leaves nothing of the last one's rooms, notices, conversations, saved lines or pins,
   // whether or not the chat is open to begin the new one (the link then reads its account's device). The first session,

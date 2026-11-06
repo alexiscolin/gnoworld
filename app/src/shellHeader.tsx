@@ -115,7 +115,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
             />
           </span>
           <BellSlot />
-          <AccountMenu />
+          <AccountMenu universe={universe.id} />
         </Cluster>
       </div>
     </header>

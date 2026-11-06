@@ -67,8 +67,12 @@ const TARGET = ["chrome112", "edge112", "firefox125", "safari17", "ios17"];
 // The order of the CSS layers does not hang on these groups: root.tsx links the layers' sheet first (F3260).
 const CHUNKS = [
   // saveData goes with the store: the chat and the universe share it, and a file of its own costs a world's first screen 131 B. So does its
-  // React binding, now the Earth's page and the chat both read it.
-  { name: "store", test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts)/ },
+  // React binding, now the Earth's page and the chat both read it. The pages' one JSON call and the copy join it too: the first screen and the
+  // first signals' chunk (features/world/Banners.tsx) share them, and a chunk of their own costs every world's first screen (slice 9h).
+  {
+    name: "store",
+    test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts|lib\/api\/http\.ts$|lib\/copy\.ts$)/,
+  },
   // Not the activity chart (F304), the stat (F2868), Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState,
   // Combobox, Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i): the chunks
   // that need them load them after the first screen.

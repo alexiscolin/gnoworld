@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { realmView } from "../../places.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { QuickActions, type QuickActionsProps } from "./QuickActions.tsx";
+import { QuickActions, type Pinned, type QuickActionsProps } from "./QuickActions.tsx";
 import styles from "./QuickActions.module.css";
 
 const pillsOf = (place: ChatPlace, dm: boolean): QuickActionsProps["pills"] => {
@@ -22,18 +22,22 @@ export interface DockProps extends Pick<QuickActionsProps, "onWhoIsHere" | "writ
   place: ChatPlace;
   /** A direct message in view: its own row. */
   dm: boolean;
+  /** The calls the world's team pins (D271): their pills in the row, and the cards they open over it. */
+  pinned?: Pinned | undefined;
   children: ReactNode;
 }
 
-export function Dock({ place, dm, onWhoIsHere, writes, children }: DockProps) {
+export function Dock({ place, dm, onWhoIsHere, writes, pinned, children }: DockProps) {
   return (
     <div className={styles["dock"]}>
+      {pinned === undefined ? null : <div className={styles["cards"]}>{pinned.cards}</div>}
       <QuickActions
         onWhoIsHere={onWhoIsHere}
         world={place.slug}
         pills={pillsOf(place, dm)}
         realm={realmOf(place)}
         writes={writes}
+        pinned={pinned?.pills}
       />
       {children}
     </div>
