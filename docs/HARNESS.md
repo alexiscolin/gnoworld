@@ -96,10 +96,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, onto the branch
    checked out (`main`, or a part's), which shows each harness file the merge changes (git
    merge-tree's tree, with HEAD's attributes), with its diff, before git writes it, and refuses
-   a harness file in conflict and a non-empty `.git/info/attributes` or `.git/info/grafts`; a merge
+   a harness file in conflict and a non-empty `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`; a merge
    stopped on a conflict outside the harness (the ledgers, every time) it commits itself, with its
    own message, once resolved, on Enter; then it undoes any commit that is not the merge shown
-   (its parents, its harness). Pushing `main` wants
+   (its parents, its harness), with `git reset --hard` (it began on a clean tree). Pushing `main` wants
    the hooks installed from it, the full gate recorded green on that code, the committed review
    pass for exactly that tree, and each harness file changed since the remote's `main` declared on
    a line `Harness-changed: <path> - why`. Claude can do neither: the sandbox refuses the merge's
@@ -336,7 +336,7 @@ costs context in every session.
   check (F153). pre-commit compares only the merge's harness files with git merge-tree's merge of
   the commit merge.sh marked: one changed during the resolution, or in conflict, is refused; the
   other files are resolved by hand and gated (9n), and so is a merge read through a non-empty
-  `.git/info/attributes` or `.git/info/grafts`, which a sandboxed command can write. A mark anyone
+  `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`, which a sandboxed command can write. A mark anyone
   types by hand for a clean merge merge.sh never showed still passes (a backlog row on
   slice-9n, answer 9n-4): merge.sh never asks Alexis to type one.
 - **A merge refuses a path with a non-ASCII character** (F164).

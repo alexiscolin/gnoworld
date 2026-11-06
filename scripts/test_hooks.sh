@@ -2745,8 +2745,9 @@ cat >"$t/swapping/git" <<EOF
 #!/bin/sh
 "$real_git" "\$@" || exit
 [ "\$1" = commit ] || exit 0
-echo '# swapped after the hooks' >>.githooks/pre-push
-"$real_git" add .githooks/pre-push
+# The index alone, as a hook held on a FIFO lets a session swap it; the disk keeps the merged file (9n's /pre-merge, round 2).
+swapped=\$({ "$real_git" show :.githooks/pre-push && echo '# swapped after the hooks'; } | "$real_git" hash-object -w --stdin)
+"$real_git" update-index --cacheinfo "\$("$real_git" ls-files -s .githooks/pre-push | cut -d' ' -f1),\$swapped,.githooks/pre-push"
 swapped=\$("$real_git" commit-tree "\$("$real_git" write-tree)" -p HEAD^1 -p HEAD^2 -m swapped)
 "$real_git" update-ref HEAD "\$swapped"
 EOF
@@ -2781,24 +2782,24 @@ git -C "$i" reset -q --hard nvmrc-main
 echo wrong | in_i sh .git/hooks/merge.sh nvmrc-dir >"$t/out" 2>&1 && fail "merge.sh merged on a wrong answer"
 grep -qx '.nvmrc' "$t/out" && grep -q '^-22' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not show a harness file a file/directory conflict moves away (9n's /pre-merge)"; }
 untouched_main "$(git -C "$i" rev-parse nvmrc-main)" || fail "merge.sh began a merge on a wrong answer"
-# .git/info/attributes and .git/info/grafts change how git merges whatever the trees hold, and Claude's sandbox can write
-# .git/info: merge.sh refuses to merge while either holds anything (9n's /pre-merge).
-for f in attributes grafts; do
+# .git/info/attributes, .git/info/grafts and .git/shallow change how git merges whatever the trees hold, and Claude's sandbox
+# can write them: merge.sh refuses to merge while any holds anything (9n's /pre-merge, rounds 1 and 2).
+for f in info/attributes info/grafts shallow; do
 	git -C "$i" reset -q --hard clash-main
-	case $f in attributes) echo '.githooks/* merge=union' ;; grafts) git -C "$i" rev-parse clash-main ;; esac >"$i/.git/info/$f"
+	case $f in info/attributes) echo '.githooks/* merge=union' ;; *) git -C "$i" rev-parse clash-main ;; esac >"$i/.git/$f"
 	mark_i "$(git -C "$i" merge-tree --write-tree clash-main clash)" fast
-	echo clash | in_i sh .git/hooks/merge.sh clash >"$t/out" 2>&1 && fail "merge.sh merged with .git/info/$f set (9n's /pre-merge)"
-	grep -q "info/$f" "$t/out" || { cat "$t/out" >&2; fail "merge.sh refused .git/info/$f for another reason (9n's /pre-merge)"; }
-	untouched_main "$(git -C "$i" rev-parse clash-main)" || fail "merge.sh began a merge with .git/info/$f set"
-	rm "$i/.git/info/$f"
+	echo clash | in_i sh .git/hooks/merge.sh clash >"$t/out" 2>&1 && fail "merge.sh merged with .git/$f set (9n's /pre-merge)"
+	grep -q ".git/$f" "$t/out" || { cat "$t/out" >&2; fail "merge.sh refused .git/$f for another reason (9n's /pre-merge)"; }
+	untouched_main "$(git -C "$i" rev-parse clash-main)" || fail "merge.sh began a merge with .git/$f set"
+	rm "$i/.git/$f"
 done
 # .git/info/attributes and .git/info/grafts change how git merged: pre-commit refuses a merge of the harness while either
 # holds anything, and reads the merge with HEAD's attributes, whatever a .gitattributes the merge wrote says (9n's /pre-merge).
-for f in attributes grafts; do
+for f in info/attributes info/grafts shallow; do
 	conflicted ledger-main ledger
-	case $f in attributes) echo 'docs/* merge=union' ;; grafts) git -C "$i" rev-parse ledger-main ;; esac >"$i/.git/info/$f"
-	refused "a merge of the harness took .git/info/$f set (9n's /pre-merge)" "info/$f"
-	rm "$i/.git/info/$f"
+	case $f in info/attributes) echo 'docs/* merge=union' ;; *) git -C "$i" rev-parse ledger-main ;; esac >"$i/.git/$f"
+	refused "a merge of the harness took .git/$f set (9n's /pre-merge)" ".git/$f"
+	rm "$i/.git/$f"
 done
 conflicted clash-main union
 git -C "$i" show "$(git -C "$i" merge-tree --write-tree clash-main union | sed -n 1p)":.githooks/pre-push >"$i/.githooks/pre-push"

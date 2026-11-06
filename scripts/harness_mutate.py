@@ -791,8 +791,9 @@ def mutants():
     yield from each(rs, 'grep -xF -e "$ours"', 'grep -xF "$ours"', "hooks", "a harness path that starts with - is a name, not an option (9n's review)")
     yield from each(rs, ' || [ $? = 1 ]\n)', '\n)', "hooks", "a merge with no harness file in conflict is no failure (9n)")
     yield from each(rs, 'git rev-parse -q --verify "$tree^{tree}" >/dev/null || exit 0', ":", "hooks", "a mark that names no commit merges nothing (F129)")
-    for f in ("attributes", "grafts"):
-        yield from each(rs, "for f in attributes grafts; do", f"for f in {'grafts' if f == 'attributes' else 'attributes'}; do", "hooks", f"the hooks refuse a merge read through .git/info/{f} (9n's /pre-merge)")
+    rewiring = ("info/attributes", "info/grafts", "shallow")
+    for f in rewiring:
+        yield from each(rs, f"for f in {' '.join(rewiring)}; do", f"for f in {' '.join(g for g in rewiring if g != f)}; do", "hooks", f"the hooks refuse a merge read through .git/{f} (9n's /pre-merge)")
     yield from each(".githooks/pre-commit", '	sh "$(dirname "$0")/code_changed.sh" --staged', "	sh scripts/code_changed.sh --staged", "hooks", "pre-commit runs its own code_changed.sh, not the working tree's (F129)")
     yield from each(".githooks/pre-commit", '	sh "$(dirname "$0")/scan_secrets.sh" --staged', "	sh scripts/scan_secrets.sh --staged", "hooks", "pre-commit runs its own scan, not the working tree's (F129)")
     yield from each(".githooks/pre-merge-commit", " --merge", "", "hooks", "pre-merge-commit tells pre-commit it is a merge (F129)")
@@ -815,7 +816,8 @@ def mutants():
     yield from each(ms, '[ "$(git rev-parse -q --verify HEAD^2)" = "$tip" ] &&', "true &&", "hooks", "merge.sh undoes a merge of another commit than the one shown (9n's /pre-merge)")
     yield from each(ms, '! git rev-parse -q --verify HEAD^3 >/dev/null &&', "true &&", "hooks", "merge.sh undoes a merge with a third parent (9n's /pre-merge)")
     yield from each(ms, '[ -z "$(harness --name-only "$shown_tree" HEAD)" ] &&', "true &&", "hooks", "merge.sh undoes a merge whose harness changed after the hooks (9n's /pre-merge)")
-    yield from each(ms, '\tgit reset -q --keep "$start"\n', '\t:\n', "hooks", "merge.sh puts the branch back when it undoes a merge (9n's /pre-merge)")
+    yield from each(ms, 'git reset -q --hard "$start" ||', ': ||', "hooks", "merge.sh puts the branch back when it undoes a merge (9n's /pre-merge)")
+    yield from each(ms, 'git reset -q --hard "$start" ||', 'git reset -q --keep "$start" ||', "hooks", "merge.sh undoes even a commit whose index alone was swapped (9n's /pre-merge, round 2)")
     yield from each(ms, 'is back at $start" >&2\n\texit 1', 'is back at $start" >&2\n\texit 0', "hooks", "merge.sh fails when it undoes a merge (9n's /pre-merge)")
     yield from each(ms, '[ -n "$(git diff --name-only --diff-filter=U)" ] || exit 1', "true || exit 1", "hooks", "merge.sh waits only on a merge in conflict (9n)")
     yield from each(ms, "while read -r _; do", "while false; do", "hooks", "merge.sh commits a merge in conflict itself, once resolved (9n's review)")

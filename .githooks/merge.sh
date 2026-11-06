@@ -10,13 +10,14 @@ tip=$(git rev-parse --verify "$branch^{commit}")
 onto=$(git symbolic-ref -q --short HEAD) || { echo "merge.sh: check out the branch to merge onto first" >&2; exit 1; }
 start=$(git rev-parse --verify HEAD)
 [ -z "$(git status --porcelain)" ] || { echo "merge.sh: $onto has uncommitted or untracked files; commit or remove them first" >&2; exit 1; }
+# .git/info/attributes, .git/info/grafts and .git/shallow change how git merges and diffs whatever the trees hold, and any
+# session can write them: checked first, before any git command reads history through them.
+rewiring=$(rewired)
+[ -z "$rewiring" ] || { printf 'merge.sh: %s changes how git merges, and any session can write it; empty it first. Nothing merged\n' "$rewiring" >&2; exit 1; }
 if foreign HEAD..."$tip"; then
 	echo "merge.sh: the branch changes a path with a non-ASCII character, which this disk may read as another path; nothing merged (F164)" >&2
 	exit 1
 fi
-# .git/info/attributes and .git/info/grafts change how git merges whatever the trees hold, and any session can write them.
-rewiring=$(rewired)
-[ -z "$rewiring" ] || { printf 'merge.sh: %s changes how git merges, and any session can write it; empty it first. Nothing merged\n' "$rewiring" >&2; exit 1; }
 # What the merge does to this branch's harness (records.sh's merge_of), not what the branch changed: a rename on this side
 # carries the branch's edit into the harness, a file/directory conflict moves a harness file out of it, and HEAD...tip reads
 # one merge base of several (9n's /pre-merge). A harness file in conflict has no resolution that could be shown.
@@ -43,7 +44,8 @@ fi
 kept() {
 	[ "$(git rev-parse -q --verify HEAD^1)" = "$start" ] && [ "$(git rev-parse -q --verify HEAD^2)" = "$tip" ] &&
 		! git rev-parse -q --verify HEAD^3 >/dev/null && [ -z "$(harness --name-only "$shown_tree" HEAD)" ] && exit 0
-	git reset -q --keep "$start"
+	# --hard: merge.sh began on a clean tree, so nothing of Alexis's is lost; --keep refuses when only the index was swapped.
+	git reset -q --hard "$start" || { echo "merge.sh: the commit made is not the merge you saw and could not be undone; $onto holds it: run git reset --hard $start" >&2; exit 1; }
 	echo "merge.sh: the commit made is not the merge you saw (its parents or its harness changed while it was made); undone, $onto is back at $start" >&2
 	exit 1
 }

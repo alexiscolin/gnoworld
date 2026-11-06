@@ -62,6 +62,6 @@ merge_of() (
 	# -e: a harness path may start with - (*.config.ts)
 	printf '%s\n' "$merged" | sed 1d | grep -xF -e "$ours" || [ $? = 1 ]
 )
-# The files of .git/info that change how git merges whatever the trees hold, and that Claude's sandbox can write: attributes
-# (merge drivers, union) and grafts (other parents, other merge bases) (9n's /pre-merge). Each one that holds anything.
-rewired() ( for f in attributes grafts; do [ ! -s "$(git rev-parse --git-path "info/$f")" ] || echo ".git/info/$f"; done )
+# The files of .git that change how git merges whatever the trees hold, and that Claude's sandbox can write: info/attributes
+# (merge drivers, union), info/grafts and shallow (other parents, other merge bases) (9n's /pre-merge). Each one that holds anything.
+rewired() ( for f in info/attributes info/grafts shallow; do [ ! -s "$(git rev-parse --git-path "$f")" ] || echo ".git/$f"; done )
