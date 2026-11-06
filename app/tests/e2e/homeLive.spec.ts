@@ -188,7 +188,7 @@ test.describe("the home at the video's size", () => {
         probe.remove();
         return color;
       }, name);
-    for (const kind of ["news", "event"]) {
+    for (const kind of ["trending", "news"]) {
       const selector = `[data-ticker] b[data-kind="${kind}"]`;
       expect(await style(page, selector, "text-transform")).toBe("uppercase");
       expect(await style(page, selector, "color")).toBe(await token("--color-mine"));

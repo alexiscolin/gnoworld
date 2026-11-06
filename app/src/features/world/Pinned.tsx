@@ -6,6 +6,7 @@ import type { ReadOptions } from "@gnoworld/chain/read";
 import { pinnedOf, type PinnedCall, type PinnedRow } from "../../pinned.ts";
 import { realmAt } from "../../realmAt.ts";
 import { ActionForm, InlineCard } from "../realms/index.ts";
+import styles from "./Pinned.module.css";
 
 // The realm and chain an action is read and signed on: its view's, when that view is its own realm's.
 function placed(call: PinnedCall) {
@@ -22,18 +23,22 @@ export interface PinnedFormsProps {
 }
 
 export function PinnedForms({ pinned, options }: PinnedFormsProps) {
-  return pinned.map((call, index) => {
-    const found = placed(call);
-    return found === undefined ? null : (
-      <ActionForm
-        key={keyOf(index, call)}
-        action={call.action}
-        label={call.label}
-        chain={found.chain}
-        options={options}
-      />
-    );
-  });
+  return (
+    <div className={styles["forms"]}>
+      {pinned.map((call, index) => {
+        const found = placed(call);
+        return found === undefined ? null : (
+          <ActionForm
+            key={keyOf(index, call)}
+            action={call.action}
+            label={call.label}
+            chain={found.chain}
+            options={options}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 /** What the chat's bar draws of a world's pinned actions: its pills, or the cards they open; a card's id holds the bar's (`at`). */

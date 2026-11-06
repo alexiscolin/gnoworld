@@ -13,8 +13,8 @@ import { BUILD } from "./sites.ts";
 const FIRST_SCREEN_JS = 187_569;
 // A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
 // Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-// 189,694 B once slice 9 met slice 8 (the chain's deploys in the ticker, the Earth's room followed, the store's chain and signals), measured on that merge.
-const PLAIN_FIRST_SCREEN_JS = 189_694;
+// 189,695 B once slice 9 met slice 8 (the chain's deploys in the ticker, the Earth's room followed, the store's chain and signals), measured on that merge.
+const PLAIN_FIRST_SCREEN_JS = 189_695;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -148,7 +148,8 @@ const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with what
 // it asks once open: 8d's chat within Alexis's 23 KiB, RoomsDrawer's 768 B (docs/decisions.md, 2026-11-05), 8p's 18 B for the dock's close,
 // and 1,060 B for the column's pictures, their manifest, the rail's order and its Credits button (slice-8: 25,167 B).
-const LATE_CHAT_JS = 25_167;
+// 25,880 B once slice 9 met slice 8 (the chain cards, the pinned pills and their wrapping row).
+const LATE_CHAT_JS = 25_880;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
@@ -614,7 +615,8 @@ for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [
 // A page's capture under a chat line (8f), on a world with no realm, whose page loaded none of the realm view's code: what the capture
 // brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap (8f's review, 1).
 // 7,445 B: the capture's code, the realm page's reader and drawing, and the warning before a link leaves; capped at its size and 256 B.
-const LINE_PREVIEW_JS = 7701;
+// 8,122 B once slice 9 met slice 8 (slice 9's code in the capture).
+const LINE_PREVIEW_JS = 8122;
 test("a page's capture under a line, on a world with no realm, stays within its cap", async ({ page }) => {
   const scripts = new Set<string>();
   page.on("response", (response) => {

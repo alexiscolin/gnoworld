@@ -4,6 +4,8 @@
   .bar {
     /* layout: the pills side by side, sharing the row; no composition lets each child grow by its own width */
     display: flex;
+    /* layout: a world's pinned pills after the row's own that do not fit go to a line of their own, never off the dock */
+    flex-wrap: wrap;
     /* layout: a step between the pills */
     gap: var(--space-2xs);
     padding-block: var(--space-s);
@@ -86,8 +88,8 @@
 
   /* The card a pinned action opens over the row (D271): it scrolls in its own box, so the row and what writes stay on screen. */
   .cards {
-    /* raw: half the window at most, the conversation keeping the rest */
-    max-block-size: 50dvb;
+    /* raw: under half the window, the conversation keeping the rest and the row's two lines (a phone's) their room */
+    max-block-size: 44dvb;
     overflow: auto;
   }
 }
