@@ -38,7 +38,7 @@ export function nameAsk(address: string): AbciAsk | null {
 // A filter on a message's value reaches only the type it names and lets every other message through (onyx-1's auth sessions), so the
 // transactions are chosen by a call's type and a message that is no call is left out here. A negative bound answers nothing: the first page
 // has none.
-const FIELDS = "block_height messages { value { __typename ... on MsgCall { pkg_path caller } } }";
+const FIELDS = "block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } }";
 const CALLS = 'messages: { typeUrl: { eq: "exec" } }';
 const ORDER = "order: { heightAndIndex: ASC }";
 
@@ -58,4 +58,12 @@ export const callsAbove = (above: number, limit: number): IndexerAsk => ({
 export const callsInBlock = (height: number): IndexerAsk => ({
   query: `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${FIELDS} } }`,
   variables: { height },
+});
+
+/** The time of each block of `heights`, one alias each, `b<i>` for the variable `h<i>` (the rollup's days, slice 13a). */
+export const blockTimes = (heights: readonly number[]): IndexerAsk => ({
+  query: `query(${heights.map((_, i) => `$h${String(i)}: Int!`).join(", ")}) { ${heights
+    .map((_, i) => `b${String(i)}: getBlocks(where: { height: { eq: $h${String(i)} } }) { height time }`)
+    .join(" ")} }`,
+  variables: Object.fromEntries(heights.map((height, i) => [`h${String(i)}`, height])),
 });

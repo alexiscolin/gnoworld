@@ -52,12 +52,14 @@ const Page = z.object({
       z.array(
         z.object({
           block_height: ChainCount,
+          success: z.optional(z.boolean()),
           messages: z.array(
             z.object({
               value: z.object({
                 __typename: z.string(),
                 pkg_path: z.nullish(z.string()),
                 caller: z.nullish(z.string()),
+                func: z.nullish(z.string()),
               }),
             }),
           ),
@@ -71,10 +73,13 @@ const Page = z.object({
 interface Call {
   readonly path: string;
   readonly caller: string | undefined;
+  /** The function it named, as the indexer wrote it: unchecked. */
+  readonly func: string | undefined;
 }
-/** A transaction as the read gives it: its height and its calls. */
+/** A transaction as the read gives it: its height, whether it succeeded (an answer that does not say counts as failed), its calls. */
 export interface Row {
   readonly height: number;
+  readonly success: boolean;
   readonly calls: readonly Call[];
   readonly skipped: number;
 }
@@ -85,7 +90,7 @@ function rowsOf(json: unknown, from: number, to = Number.MAX_SAFE_INTEGER): Row[
   const page = Page.safeParse(json);
   if (!page.success) throw new Failure("shape");
   let floor = from;
-  return (page.data.data.getTransactions ?? []).map(({ block_height: height, messages }) => {
+  return (page.data.data.getTransactions ?? []).map(({ block_height: height, success, messages }) => {
     if (height < floor || height > to) throw new Failure("shape");
     floor = height;
     let skipped = 0;
@@ -94,9 +99,9 @@ function rowsOf(json: unknown, from: number, to = Number.MAX_SAFE_INTEGER): Row[
       const [path, caller] = [value.pkg_path ?? undefined, value.caller ?? undefined];
       const odd = path === undefined || (caller !== undefined && !isAddress(caller));
       if (odd) skipped += 1;
-      return path === undefined ? [] : [{ path, caller: odd ? undefined : caller }];
+      return path === undefined ? [] : [{ path, caller: odd ? undefined : caller, func: value.func ?? undefined }];
     });
-    return { height, calls, skipped };
+    return { height, success: success === true, calls, skipped };
   });
 }
 
