@@ -6,7 +6,7 @@ import { countShifts, running, shifted, stats } from "./sceneStage.ts";
 // The hero's number (7n, 7n2): the worlds the cosmos draws, read from the count the job writes beside the worlds' file, so a home whose scene
 // does not run keeps it (no WebGL; this browser's software GPU without `?test-gpu`) and a phone asks nothing of the cosmos before View in space.
 // The host serves neither file (the job writes them): each test serves Onyx's recorded file and its count.
-const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
+const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const NUMBER = "[data-hero='number']";
 // The recorded file's 533 worlds, each once in its namespace, and the Earth: written out, so a counting fault cannot move it with the page
 // nor with the count the fixtures serve.

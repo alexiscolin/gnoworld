@@ -12,6 +12,7 @@ import {
   RealmPath,
 } from "@gnoworld/schemas/indexer";
 import { readFileSync, statSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import { renderAsk } from "@gnoworld/chain/asks";
 import type { Log } from "@gnoworld/service/log";
 import { decide, type Thresholds } from "../moderation/decide.ts";
@@ -43,8 +44,6 @@ export const PAUSE_MS = 250;
 export const READ_MS = 10_000;
 /** The most bytes of a page the chain is asked for: a page past them is no capture. */
 export const PAGE_READ_MAX_BYTES = 64 * 1024;
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** A page's first CAPTURE_MAX_BYTES bytes in UTF-8, cut after the last line's end within them, else between two characters. */
 export function capturedOf(page: string): string {

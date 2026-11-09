@@ -5,7 +5,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { EARTH, hubWorldOf } from "@gnoworld/core";
 import { z } from "zod";
-import { mapNamesOf, worldOf } from "../../src/scene/planet/generated.ts";
+import { mapNamesOf, worldOf } from "../../src/space/planet/generated.ts";
+import { mapUrl } from "../../src/space/planet/mapUrl.ts";
 
 const here = (path: string) => fileURLToPath(new URL(path, import.meta.url));
 /** The folder of the pictures, ending in a slash, and the manifest the site's code imports. */
@@ -30,8 +31,8 @@ export function inputsHash(id: string): string {
   const names = id === EARTH ? EARTH_MAPS : mapNamesOf(worldOf(id));
   const parts = [
     id === EARTH ? id : JSON.stringify(worldOf(id)),
-    ...names.map((name) => sha(readFileSync(here(`../../public/textures/${name}.webp`)))),
-    sha(readFileSync(here("../../src/scene/portraits.ts"))),
+    ...names.map((name) => sha(readFileSync(here(`../../public${mapUrl(name, "/")}`)))),
+    sha(readFileSync(here("../../src/space/portraits.ts"))),
   ];
   return sha(new TextEncoder().encode(parts.join("|"))).slice(0, 8);
 }

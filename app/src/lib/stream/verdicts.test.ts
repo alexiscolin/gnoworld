@@ -56,6 +56,12 @@ describe("followVerdicts: the room's verdicts, as the server streams them", () =
     expect(source.opened).toEqual(["/api/stream?rooms=%23a%2C%23b%2Fc"]);
   });
 
+  it("asks a stream the page follows for its events alone to go uncounted in the world's here (presence=0, D374)", () => {
+    const source = fakeSource();
+    followVerdicts(["#earth"], () => undefined, { open: source.open, log: () => undefined, uncounted: true });
+    expect(source.opened).toEqual(["/api/stream?rooms=%23earth&presence=0"]);
+  });
+
   it("drops what is no verdict it knows, saying so once, and goes on", () => {
     const source = fakeSource();
     const heard: StreamEvent[] = [];

@@ -1,0 +1,118 @@
+/* The tags at the hero's foot (D425): a rule, then plain words in one row; 66 px high whatever it holds, as the markets row it replaces
+   was, so the actions above never move. Everything that changes eases; nothing snaps. */
+@layer components {
+  .lenses {
+    box-sizing: border-box;
+    /* raw: the markets row's 66 px, kept so the hero's actions above never move (frame 6) */
+    block-size: 66px;
+    /* the prototype's 16 px between the rule and the line */
+    padding-block-start: var(--space-2xs);
+    border-block-start: var(--line-width) solid var(--color-line);
+    opacity: 0;
+    transition: var(--transition-fade);
+  }
+
+  /* The row fades in once the worlds' file is read, in its room. */
+  .lenses[data-ready] {
+    opacity: 1;
+  }
+
+  /* The tags on one line that scrolls across on a phone (the design system's scroll-row), sharing a middle. */
+  .row {
+    /* layout: they share a middle */
+    align-items: center;
+  }
+
+  .end {
+    /* raw: the scroll-row's fade, 32 px (utilities.css) */
+    inline-size: 32px;
+  }
+
+  .tag,
+  .more > button {
+    /* layout: a tag keeps its width, the row scrolling instead */
+    flex: none;
+    /* layout: the tag's parts apart */
+    gap: var(--space-2xs);
+    block-size: var(--control-m);
+    padding-inline: var(--space-xs);
+    border: 0;
+    background: transparent;
+    color: var(--color-text-muted);
+    /* raw: 16 px, larger than the interface's 13 (Alexis, 2026-11-09: "plus gros") */
+    font: 500 16px/1 var(--family-sans);
+    white-space: nowrap;
+    transition: var(--transition-tint);
+  }
+
+  /* More's menu, its trigger a tag of the row. */
+  .more {
+    /* layout: its trigger an item of the row */
+    display: contents;
+  }
+
+  .tag:hover,
+  .tag:focus-visible,
+  .more > button:hover,
+  .more > button:focus-visible {
+    background: var(--color-fill-hover);
+    color: var(--color-text);
+  }
+
+  .tag[aria-pressed="true"] {
+    background: var(--color-primary);
+    color: var(--color-ink);
+  }
+
+  .tag > svg {
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
+  }
+
+  .count svg {
+    inline-size: var(--icon-s);
+    block-size: var(--icon-s);
+  }
+
+  /* The count and the × open beside the picked tag's word, their room growing as they fade in: the row slides, never jumps. */
+  .count {
+    /* raw: none of its room at rest */
+    max-inline-size: 0;
+    overflow: hidden;
+    opacity: 0;
+    font: var(--font-label);
+    transition:
+      max-inline-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard),
+      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .tag[aria-pressed="true"] .count {
+    /* raw: room for a count of four figures and its × */
+    max-inline-size: 7ch;
+    opacity: 1;
+  }
+
+  /* Someone is in a world now: amber, as people here are everywhere, pulsing once as it comes. */
+  /* Live's mark: a dot the size of the other marks' ink, grey while nobody is in a world, amber once someone is, pulsing once as it comes. */
+  .live {
+    inline-size: var(--size-dot-l);
+    background: var(--color-text-muted);
+    transition: background-color calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .live[data-on] {
+    background: var(--color-warm);
+    animation: came calc(var(--motion-slow) * 2 * var(--motion-scale)) var(--ease-standard) 1;
+  }
+
+  @keyframes came {
+    from {
+      box-shadow: 0 0 0 0 var(--color-warm-line);
+    }
+
+    to {
+      /* raw: the pulse's ring spreads 6 px and fades */
+      box-shadow: 0 0 0 6px transparent;
+    }
+  }
+}

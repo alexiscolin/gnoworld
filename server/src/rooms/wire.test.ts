@@ -10,6 +10,13 @@ describe("the rooms as the routes use them", () => {
     create: (world, name) => (name === "garden" ? { made: `#${world}/${name}` } : "exists"),
     archive: (_, name) => (name === "garden" ? "archived" : "not_found"),
     archived: () => false,
+    exists: () => false,
+    mayEarth: () => "ok",
+    mayRealm: () => "ok",
+    isRealm: () => false,
+    earth: (_, name) => (name === "cafe" ? { made: `#earth/${name}` } : "exists"),
+    maker: () => undefined,
+    realm: (room) => (room === "#bubble/golf-0123456789" ? { made: room } : "exists"),
   };
   const wired = () => {
     const calls: string[] = [];
@@ -35,6 +42,21 @@ describe("the rooms as the routes use them", () => {
       { made: "#bubble/garden" },
     ]);
     expect(calls).toEqual(["putOn #bubble/garden bubble"]);
+  });
+
+  it("puts the world's mutes on a realm's room made, and on nothing for one that exists", () => {
+    const { calls, rooms } = wired();
+    expect([rooms.realm("#bubble/other-0000000000"), rooms.realm("#bubble/golf-0123456789")]).toEqual([
+      "exists",
+      { made: "#bubble/golf-0123456789" },
+    ]);
+    expect(calls).toEqual(["putOn #bubble/golf-0123456789 bubble"]);
+  });
+
+  it("puts the Earth's mutes on a public room made, and on nothing for one refused", () => {
+    const { calls, rooms } = wired();
+    expect([rooms.earth("g1x", "pond"), rooms.earth("g1x", "cafe")]).toEqual(["exists", { made: "#earth/cafe" }]);
+    expect(calls).toEqual(["putOn #earth/cafe earth"]);
   });
 
   it("asks the reconciler for a room archived, and for nothing when no such room is found", () => {

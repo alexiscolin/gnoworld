@@ -53,7 +53,8 @@ interface Codec<T> {
   write: (value: T, strange: unknown) => unknown;
 }
 
-const isRecord = (raw: unknown): raw is Record<string, unknown> =>
+/** Whether `raw` is a plain object: not null, not a list. */
+export const isRecord = (raw: unknown): raw is Record<string, unknown> =>
   typeof raw === "object" && raw !== null && !Array.isArray(raw);
 
 // A record by key: the entries its schema reads, at most `kept`; the others kept aside.

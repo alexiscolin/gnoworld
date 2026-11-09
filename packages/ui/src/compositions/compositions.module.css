@@ -102,6 +102,10 @@
     flex-wrap: wrap;
   }
 
+  .sidebar[data-align="center"] {
+    align-items: center;
+  }
+
   .sidebar[data-side="start"] > :first-child,
   .sidebar[data-side="end"] > :last-child {
     flex-grow: 1;

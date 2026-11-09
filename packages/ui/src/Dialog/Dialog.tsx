@@ -11,8 +11,8 @@ export interface DialogProps {
   open: boolean;
   /** Asked to close, by Esc or Close: the page sets open to false. */
   onClose: () => void;
-  /** 760 px, for the palette, the lightbox and the passport; 490 otherwise. */
-  wide?: boolean;
+  /** 760 px, for the lightbox and the passport; "sheet" for the search's large sheet, Discover's; 490 otherwise. */
+  wide?: boolean | "sheet";
   /** The line above the title, in the one label style, read with the description. */
   kicker?: string;
   /** No Close button, where the page draws another way out; Esc still asks to close. */
@@ -48,7 +48,7 @@ interface TitleRowProps extends Pick<DialogProps, "title" | "onClose"> {
 // The title wraps its own words beside Close, which keeps the row's end at any width (U6). A drawer's title is for assistive technology alone.
 function TitleRow({ headingRef, id, title, hideClose, onClose, side }: TitleRowProps) {
   return (
-    <Sidebar side="end" space="s">
+    <Sidebar side="end" space="s" align="center">
       <h2 ref={headingRef} id={id} tabIndex={-1} className={side === undefined ? undefined : "visually-hidden"}>
         {title}
       </h2>
@@ -132,7 +132,7 @@ export function Dialog({
     <dialog
       ref={dialogRef}
       className={surface(styles["dialog"])}
-      data-width={wide ? "wide" : "standard"}
+      data-width={wide === "sheet" ? "sheet" : wide ? "wide" : "standard"}
       data-side={side}
       aria-labelledby={titleId}
       aria-describedby={describedBy || undefined}

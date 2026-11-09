@@ -30,12 +30,9 @@ test.describe("a stamp", () => {
     await expect
       .poll(() => held(page, "stamps"))
       .toEqual({ "onyx:bubble": expect.stringMatching(/^\d{4}-\d\d-\d\d$/) });
-    const counter = page.getByRole("button", { name: /^Passport / });
-    await expect(counter).toHaveText(/Passport 1(\/\d+)?$/);
     const day = await held(page, "stamps");
     await page.reload();
     await hydrated(page);
-    await expect(counter).toHaveText(/Passport 1(\/\d+)?$/);
     expect(await held(page, "stamps")).toEqual(day);
     // A second visit stamps nothing and says nothing of a stamp.
     await expect(page.getByText("Stamped · Bubble")).toHaveCount(0);

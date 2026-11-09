@@ -8,6 +8,7 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
+import { makeGuests } from "../guest/guests.ts";
 
 // Ergo's `expire-time` (deploy/ergo/ircd.yaml.tmpl): a line older than that is gone from Ergo, and so is its pin.
 const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;
@@ -42,6 +43,10 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     ),
     // A pin ends with Ergo's history: its line's time (Ergo's ISO time, which sorts as a string) past `expire-time`.
     pins: db.prepare("DELETE FROM pins WHERE time < ?"),
+    // A guest's lines by the hour: those older than 25 hours go, each room's latest hour kept for the sweep's idle test.
+    said: db.prepare(
+      "DELETE FROM room_said WHERE hour < ? AND hour < (SELECT max(hour) FROM room_said AS later WHERE later.room = room_said.room)",
+    ),
     count: db.prepare("SELECT count(*) AS n FROM verdicts"),
     // Counted up to the tick's budget, which is all a tick may take of them.
     old: db.prepare("SELECT count(*) AS n FROM (SELECT 1 FROM verdicts WHERE at < ? AND action <> 'pending' LIMIT ?)"),
@@ -49,6 +54,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       "SELECT (page_count - freelist_count) * page_size AS n FROM pragma_page_count, pragma_freelist_count, pragma_page_size",
     ),
   };
+  const guests = makeGuests(db, { now });
   const count = (): number => N.parse(sql.count.get()).n;
   // Whether an alert's condition holds now and did not at the last tick: one alert a crossing, armed again once
   // it no longer holds. Each alert is logged by its name written out, which scripts/check_docs.py reads.
@@ -78,6 +84,9 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       let budget = batch * batches;
       // At most 10 a room: no batch.
       sql.pins.run(new Date(now() - ERGO_EXPIRE_MS).toISOString());
+      // The guests unused for 24 hours, with their ended strikes and mutes (D430).
+      guests.purge();
+      sql.said.run(Math.floor((now() - 25 * 60 * 60_000) / (60 * 60_000)));
       // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
       const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000, budget)).n;
       for (let over = Math.max(old, count() - maxVerdicts), removed = 1; over > 0 && budget > 0 && removed > 0;) {

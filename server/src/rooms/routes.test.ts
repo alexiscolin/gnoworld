@@ -5,7 +5,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import type { Room, Roles } from "../roles/roles.ts";
-import { makeRooms, ROOM_STATE } from "./create.ts";
+import { EARTH_TABLES, makeRooms, REALM_TABLES, ROOM_STATE } from "./create.ts";
 import { ensureNamed, ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
 import { roomsRoutes } from "./routes.ts";
 
@@ -25,7 +25,15 @@ const ROLES: Roles = {
   team: new Set([TEAM]),
   trusted: new Set([TRUSTED]),
   worlds: new Map([
-    ["earth", { moderators: new Set([EARTH_MOD]), rules: RULES }],
+    [
+      "earth",
+      {
+        moderators: new Set([EARTH_MOD]),
+        rules: RULES,
+        rooms: new Map<string, Room>([["#earth/lounge", { type: "open", hidden: false }]]),
+        sections: [{ name: "Talk", rooms: ["#earth/ghost"] }],
+      },
+    ],
     [
       "bubble",
       {
@@ -57,8 +65,13 @@ afterEach(() => {
   for (const db of opened.splice(0)) db.close();
 });
 
-const setup = ({ max = 20 }: { max?: number } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE]);
+type Named = "pass" | "hide" | "unchecked" | "throws";
+const setup = ({
+  max = 20,
+  named = "pass",
+  checked = true,
+}: { max?: number; named?: Named; checked?: boolean } = {}) => {
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
   opened.push(db);
   ensureRooms(db, ["bubble", "earth", LONG], T0);
   const clock = { now: T0 };
@@ -72,8 +85,24 @@ const setup = ({ max = 20 }: { max?: number } = {}) => {
   const lines: string[] = [];
   const log = logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line));
   const app = makeApp(log, () => true);
+  const checks: string[] = [];
+  const nameCheck = (world: string, name: string): Promise<"pass" | "hide" | "unchecked"> => {
+    checks.push(`${world}/${name}`);
+    return named === "throws" ? Promise.reject(new Error("down")) : Promise.resolve(named);
+  };
   const session = (token: string | undefined) => TOKENS.get(token ?? "");
-  app.route("/api/rooms", roomsRoutes({ roles: ROLES, rooms, session, origins: [ORIGIN], log, now: () => clock.now }));
+  app.route(
+    "/api/rooms",
+    roomsRoutes({
+      roles: ROLES,
+      rooms,
+      session,
+      origins: [ORIGIN],
+      log,
+      now: () => clock.now,
+      ...(checked ? { nameCheck } : {}),
+    }),
+  );
   interface Ask {
     body?: unknown;
     who?: string;
@@ -98,7 +127,7 @@ const setup = ({ max = 20 }: { max?: number } = {}) => {
   const archive = (path: string, more: Ask = {}) => ask("DELETE", `/api/rooms/${path}`, more);
   // The log's lines, their time left out.
   const events = () => lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{"));
-  return { db, clock, sent, create, archive, events };
+  return { db, rooms, clock, sent, create, archive, events, checks };
 };
 const answer = async (response: Response) => [
   response.status,
@@ -346,5 +375,156 @@ describe("archiving a room", () => {
     await create({ world: "bubble", name: "garden" }, { who: "team" });
     expect((await archive("bubble/garden", { who: "team", origin: "https://evil.test" })).status).toBe(403);
     expect((await archive("bubble/garden", { who: "team", type: null })).status).toBe(415);
+  });
+});
+
+// D394: on the Earth a signed-in account makes a room: 3 a day, its name checked as a message is, never a guest.
+describe("archiving a realm's room", () => {
+  it("refuses a moderator of the hub and the team alike to archive a room made for a realm: it keeps +M, never +m +s", async () => {
+    const { rooms, sent, archive } = setup();
+    rooms.realm("#bubble/golf-0123456789");
+    sent.splice(0);
+    for (const who of ["bubble", "team"]) {
+      expect(await answer(await archive("bubble/golf-0123456789", { who }))).toEqual([
+        403,
+        '{"error":"forbidden"}',
+        "no-store",
+      ]);
+    }
+    expect(rooms.archived("#bubble/golf-0123456789")).toBe(false);
+    expect(sent).toEqual([]);
+  });
+
+  it("still lets a moderator archive a room the moderators made", async () => {
+    const { rooms, create, archive } = setup();
+    rooms.realm("#bubble/golf-0123456789");
+    await create({ world: "bubble", name: "garden" }, { who: "team" });
+    expect((await archive("bubble/garden", { who: "bubble" })).status).toBe(204);
+  });
+});
+
+describe("a room anyone makes on the Earth", () => {
+  const earth = (name: string) => ({ world: "earth", name });
+
+  it("is made by any signed-in account as #earth/name, a guest refused 401 and the other worlds still the moderators'", async () => {
+    const { db, create, checks } = setup();
+    expect(await answer(await create(earth("coffee")))).toEqual([401, '{"error":"unauthenticated"}', "no-store"]);
+    expect(await answer(await create(earth("coffee"), { who: "stranger" }))).toEqual([
+      201,
+      '{"room":"#earth/coffee"}',
+      "no-store",
+    ]);
+    expect((await create({ world: "bubble", name: "coffee" }, { who: "stranger" })).status).toBe(403);
+    expect(listRooms(db).map(({ name }) => name)).toContain("#earth/coffee");
+    expect(checks).toEqual(["earth/coffee"]);
+  });
+
+  it("refuses a name the check hides with 400, makes nothing and takes nothing of the day", async () => {
+    const { db, create } = setup({ named: "hide" });
+    for (const name of ["a", "b", "c", "d"])
+      expect(await answer(await create(earth(name), { who: "stranger" }))).toEqual([400, REFUSED, "no-store"]);
+    expect(listRooms(db).map(({ name }) => name)).not.toContain("#earth/a");
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 0 });
+  });
+
+  it("answers 503 not_ready when the name could not be checked, making nothing: it fails closed", async () => {
+    const { sent, create } = setup({ named: "unchecked" });
+    expect(await answer(await create(earth("coffee"), { who: "stranger" }))).toEqual([
+      503,
+      '{"error":"not_ready"}',
+      "no-store",
+    ]);
+    expect(sent).toEqual([]);
+  });
+
+  it("is refused to every account when the server has no name check, as a moderator's route is not", async () => {
+    const { sent, create } = setup({ checked: false });
+    expect((await create(earth("coffee"), { who: "stranger" })).status).toBe(403);
+    expect((await create(earth("staff"), { who: "earth" })).status).toBe(201);
+    expect(sent).toContain("JOIN #earth/staff");
+  });
+
+  it("is 3 a day: the 4th answers 429 too_many without the check being asked, a day later it is made", async () => {
+    const { clock, create, checks } = setup();
+    for (const name of ["a", "b", "c"]) expect((await create(earth(name), { who: "stranger" })).status).toBe(201);
+    checks.length = 0;
+    expect(await answer(await create(earth("d"), { who: "stranger" }))).toEqual([
+      429,
+      '{"error":"too_many"}',
+      "no-store",
+    ]);
+    expect(checks).toEqual([]);
+    expect((await create(earth("d"), { who: "trusted" })).status).toBe(201);
+    clock.now += 24 * HOUR + 1;
+    expect((await create(earth("d2"), { who: "stranger" })).status).toBe(201);
+  });
+
+  it("does not check a name taken: 400 with no check asked", async () => {
+    const { create, checks } = setup();
+    await create(earth("coffee"), { who: "stranger" });
+    checks.length = 0;
+    expect((await create(earth("coffee"), { who: "trusted" })).status).toBe(400);
+    expect(checks).toEqual([]);
+  });
+
+  it("limits an account's tries, refused names included, to 10 an hour: 429 with no check asked", async () => {
+    const { create, checks } = setup({ named: "hide" });
+    for (let n = 0; n < 10; n += 1) await create(earth(`try-${String(n)}`), { who: "stranger" });
+    checks.length = 0;
+    expect((await create(earth("one-more"), { who: "stranger" })).status).toBe(429);
+    expect(checks).toEqual([]);
+  });
+
+  it("leaves a world's moderator on the earth with the old way: no check, no 3 a day, the world's cap", async () => {
+    const { create, checks } = setup();
+    for (const name of ["a", "b", "c", "d"]) expect((await create(earth(name), { who: "earth" })).status).toBe(201);
+    expect(checks).toEqual([]);
+  });
+
+  it("lets its maker archive it, no other stranger, and the maker of another room not that one", async () => {
+    const { archive, create } = setup();
+    await create(earth("mine"), { who: "stranger" });
+    await create(earth("theirs"), { who: "trusted" });
+    expect((await archive("earth/mine", { who: "trusted" })).status).toBe(403);
+    expect((await archive("earth/theirs", { who: "stranger" })).status).toBe(403);
+    expect((await archive("earth/mine", { who: "stranger" })).status).toBe(204);
+    expect((await archive("earth/mine")).status).toBe(401);
+    expect((await archive("earth/none", { who: "stranger" })).status).toBe(403);
+  });
+
+  it("lets only the world's moderators archive a room it has no maker for, as before", async () => {
+    const { archive, create } = setup();
+    await create(earth("staff"), { who: "earth" });
+    expect((await archive("earth/staff", { who: "stranger" })).status).toBe(403);
+    expect((await archive("earth/staff", { who: "earth" })).status).toBe(204);
+  });
+
+  it("refuses a name the roles file types or places in a section, and makes its asker nobody's maker", async () => {
+    const { create, db } = setup();
+    for (const name of ["lounge", "ghost"]) {
+      expect((await create(earth(name), { who: "stranger" })).status).toBe(400);
+    }
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 0 });
+  });
+
+  it("holds a burst: 30 at once make 3 rooms and ask the check 10 times at most, one name once", async () => {
+    const { create, checks, db } = setup();
+    const burst = await Promise.all(
+      Array.from({ length: 30 }, (_, n) => Promise.resolve(create(earth(`room-${String(n)}`), { who: "stranger" }))),
+    );
+    expect(burst.filter(({ status }) => status === 201)).toHaveLength(3);
+    expect(checks.length).toBeLessThanOrEqual(10);
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 3 });
+    const twins = await Promise.all([
+      create(earth("same"), { who: "trusted" }),
+      create(earth("same"), { who: "trusted" }),
+    ]);
+    expect(twins.map(({ status }) => status).toSorted()).toEqual([201, 400]);
+  });
+
+  it("answers 503 and makes nothing when the check itself throws", async () => {
+    const { db, create } = setup({ named: "throws" });
+    expect((await create(earth("coffee"), { who: "stranger" })).status).toBe(503);
+    expect(db.prepare("SELECT count(*) AS n FROM earth_rooms").get()).toEqual({ n: 0 });
   });
 });

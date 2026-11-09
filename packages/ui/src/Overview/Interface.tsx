@@ -14,6 +14,7 @@ import { PlanetThumb } from "../PlanetThumb/PlanetThumb.tsx";
 import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
+import { Switch } from "../Switch/Switch.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
 import { Comboboxes } from "./Comboboxes.tsx";
 import { ADDRESS, disc, short } from "./samples.ts";
@@ -144,10 +145,12 @@ export function Rows() {
 }
 
 export function Fields() {
+  const [calm, setCalm] = useState(false);
   return (
     <Stack>
       <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />
       <Comboboxes />
+      <Switch label="Reduce animations" description="Nothing flies or flares." checked={calm} onChange={setCalm} />
     </Stack>
   );
 }

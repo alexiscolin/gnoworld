@@ -9799,7 +9799,7 @@ grep -qxF "node tests/e2e/workshopBackend.mjs $api_port $irc_port $ws_port http:
 	fail "workshop.sh did not start its backend on its ports, the app's origins allowed, from the app: $(cat "$w/log")"
 [ "$(grep -n '^ergo$' "$w/log" | cut -d: -f1)" -lt "$(grep -n '^node tests/e2e/workshopBackend.mjs ' "$w/log" | cut -d: -f1)" ] ||
 	fail "workshop.sh started its backend before scripts/ergo.sh built Ergo: $(cat "$w/log")"
-until_ 'grep -q "the worlds job and the prices. timer do not" "$w/one.out"' || fail "workshop.sh did not say what stays empty without the chain: $(cat "$w/one.out")"
+until_ 'grep -q "and so do the worlds job and the prices. timer" "$w/one.out"' || fail "workshop.sh did not say the worlds job and the prices' timer run on the backend: $(cat "$w/one.out")"
 # Each of its three processes, and ergo.sh's check of the Ergo binary, under the workshop's Seatbelt profile, its folders the profile's
 # parameters, each its real path: the home folder, what of it they read (the checkout, the one node_modules lead to, Node, the tools'
 # cache, GNOWORLD_TOOLS here), and what they write (lot 2's S1, F4962).

@@ -4,8 +4,10 @@ import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { iconLook, iconSize, type IconControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
-export interface IconButtonProps {
-  icon: IconName;
+// What the button draws: an icon, or an emoji in its place (a reaction).
+type Face = { icon: IconName; emoji?: never } | { emoji: string; icon?: never };
+
+export type IconButtonProps = Face & {
   // Its name without the count: the button adds the count as shown ("Notifications, 8", "Notifications,
   // over 99"), since the icon and the badge are hidden and WCAG's label in name wants the count.
   label: string;
@@ -16,7 +18,7 @@ export interface IconButtonProps {
   /** The count's tone: the design system's mint, or its coral for what is new to the reader, the bell's alone (frames 6, 86, 87). */
   countTone?: "mine" | "new";
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
-}
+};
 
 /** What the count shows and says: nothing at zero, below it or for no number; 99+, over 99, past 99. */
 function shown(count: number | undefined) {
@@ -28,6 +30,7 @@ function shown(count: number | undefined) {
  * tooltip. */
 export function IconButton({
   icon,
+  emoji,
   label,
   size = "m",
   emphasis = "outline",
@@ -46,7 +49,7 @@ export function IconButton({
         {...iconLook(emphasis, size)}
         onClick={onClick}
       >
-        <Icon name={icon} size={iconSize(size)} />
+        {icon === undefined ? <span aria-hidden="true">{emoji}</span> : <Icon name={icon} size={iconSize(size)} />}
         {counted === null ? null : (
           <span
             className={`${String(styles["badge"])} ${String(styles["count"])}`}

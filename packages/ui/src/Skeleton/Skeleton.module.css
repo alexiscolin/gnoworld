@@ -33,6 +33,12 @@
     border-radius: var(--radius-l);
   }
 
+  .skeleton[data-shape="disc"] {
+    inline-size: var(--avatar-m);
+    block-size: var(--avatar-m);
+    border-radius: var(--radius-pill);
+  }
+
   @keyframes wait {
     from,
     to {

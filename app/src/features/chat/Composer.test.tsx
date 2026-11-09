@@ -6,8 +6,8 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, markup, one } from "../../../tests/mount.tsx";
-import { Composer, Preview, typingOf } from "./Composer.tsx";
-import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable, withHint } from "./said.ts";
+import { Composer, typingOf } from "./Composer.tsx";
+import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./said.ts";
 import { tooFast } from "./pace.ts";
 import { refusalAfter } from "./composerHooks.ts";
 
@@ -95,74 +95,21 @@ describe("Composer", () => {
     expect(toPartner()).not.toContain("see when you type");
   });
 
-  it("previews the line out of the keyboard's and the screen reader's reach, its links too", () => {
-    const markup = renderToStaticMarkup(
-      <Preview composed={compose(ROOM, "**see** [docs](https://gno.land/docs)", NICK)} />,
-    );
-    expect(markup).toMatch(
-      /^<div(?=[^>]* inert="")[^>]*><span><strong>see<\/strong> <a href="https:\/\/gno.land\/docs"/,
-    );
-    expect(markup).not.toContain("aria-hidden");
-  });
-
-  // 4d: the preview reads the line as the room will, the account's own mention apart as it will be.
-  it("previews a mention of the account itself apart, as the room will show it, and another's plain", () => {
-    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+  // The ping-pong's one rounded box holds the field alone: nothing of the draft is drawn beneath it (it was a Preview, now gone).
+  it("starts from the room's draft in the field, and draws no preview of it beside", () => {
     const markup = renderToStaticMarkup(
       <Composer
         room={ROOM}
         nick={NICK}
         rooms={[]}
         members={[]}
-        draft={`note to @${NICK} and @${ALICE}`}
-        onSay={() => true}
-      />,
-    );
-    expect(markup).toContain(`<span data-mention="me" title="${NICK}">`);
-    expect(markup).toContain(`<span data-mention="" title="${ALICE}">`);
-  });
-
-  // F812: the preview shortens as the room will, a ground lookalike (BOB's short form) whole.
-  it("previews a member's mention shortened and anyone else's whole, as the room will show them (F812)", () => {
-    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-    const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
-    const markup = renderToStaticMarkup(
-      <Composer
-        room={ROOM}
-        nick={NICK}
-        rooms={[]}
-        members={[ALICE, NICK]}
-        draft={`@${ALICE} @${ground} @${NICK}`}
-        onSay={() => true}
-      />,
-    );
-    expect(markup).toContain(`<span data-mention="" title="${ALICE}">@g10gh7…3y5tv</span>`);
-    expect(markup).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
-    expect(markup).toContain(`<span data-mention="me" title="${NICK}">@g1jg8m…vsqf5</span>`);
-  });
-
-  it("starts from the room's draft, its preview with it", () => {
-    const markup = renderToStaticMarkup(
-      <Composer
-        room={ROOM}
-        nick={NICK}
-        rooms={[]}
-        members={[]}
-        draft="kept **draft**"
+        draft="kept **draft** ++under++"
         onDraft={() => undefined}
         onSay={() => true}
       />,
     );
-    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\*<\/textarea>/);
-    expect(markup).toContain("<strong>draft</strong>");
-  });
-
-  // 8k: the U of frame 73 writes `++`; the preview shows it as the room will.
-  it("shows an underlined draft underlined in its preview", () => {
-    const markup = renderToStaticMarkup(
-      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft="kept ++draft++" onSay={() => true} />,
-    );
-    expect(markup).toContain("<u>draft</u>");
+    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\* \+\+under\+\+<\/textarea>/);
+    expect(markup).not.toMatch(/<strong>|<u>|data-mention|inert/);
   });
 
   it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
@@ -264,20 +211,6 @@ describe("what the composer's field says of three completions", () => {
   });
 });
 
-describe("the composer's preview", () => {
-  const preview = (draft: string) => renderToStaticMarkup(<Preview composed={compose(ROOM, draft, NICK)} />);
-  it("shows the line as the room will read it: an action as one, one slash of two", () => {
-    expect(preview("/me **waves**")).toMatch(/inert="">\* <span><strong>waves<\/strong><\/span><\/div>$/);
-    expect(preview("//shrug")).toMatch(/inert=""><span>\/shrug<\/span><\/div>$/);
-  });
-
-  it("shows nothing of a line that cannot go", () => {
-    expect(preview("a".repeat(600))).toBe("");
-    expect(preview("/nick bob")).toBe("");
-    expect(preview("   ")).toBe("");
-  });
-});
-
 // 4d's pre-merge: a draft given lets a render show what the composer says of it.
 describe("the composer, from a draft", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -303,14 +236,10 @@ describe("the composer, from a draft", () => {
   });
 
   // The UX review (U9): typing is told from the first key, so the field says so, until it has something else to say.
-  it("tells the writer the room sees them type, unless the field has another help to give", () => {
-    const told = "People in this room see when you type.";
-    expect(from("")).toContain(told);
-    expect(from("hello")).toContain(told);
-    expect(from("/m")).not.toContain(told);
-    expect(from("a".repeat(400))).not.toContain(told);
-    // An error is the field's word alone: the line too long to go.
-    expect(from("a".repeat(600))).not.toContain(told);
+  // D418 (Alexis, 2026-11-08): the field no longer tells of the typing; its words are a completion, a count near the cap, an error.
+  it("tells nothing of the typing while a draft is written, and still what Tab completes", () => {
+    expect(from("hello")).not.toContain("see when you type");
+    expect(from("/m")).toContain("/me");
   });
 
   // N3: the hint is read from the draft as typed or completed, from the room's own rule, none in a direct message.
@@ -399,7 +328,7 @@ describe("the composer, from a draft", () => {
 });
 
 // draft/multiline (docs/decisions.md row 255): Shift+Enter adds a line to the draft, Enter sends it; a message of
-// several lines is previewed as the room reads it, and what keeps it from going is said.
+// several lines goes as it is, and what keeps it from going is said.
 describe("the composer, a draft of several lines", () => {
   const from = (draft: string) =>
     renderToStaticMarkup(
@@ -411,26 +340,11 @@ describe("the composer, a draft of several lines", () => {
     expect(from("")).not.toMatch(/<input[^>]*type="text"/);
   });
 
-  it("previews a draft of several lines as the room reads it, a list as a list", () => {
-    expect(renderToStaticMarkup(<Preview composed={compose(ROOM, "- one\n- two", NICK)} />)).toMatch(
-      /<ul><li>one<\/li><li>two<\/li><\/ul>/,
-    );
-  });
-
-  it("describes the box by the hint that Shift+Enter adds a line, which a message near its cap's help replaces", () => {
+  // Alexis, 2026-11-08 (D418): no standing hint under the field, of the typing nor of how to add a line.
+  it("says nothing under an empty field", () => {
     const markup = from("");
-    const described = /<textarea[^>]* aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "?";
-    expect(markup).toMatch(new RegExp(`id="${described}"[^>]*>[^<]*Shift\\+Enter adds a line\\.<`));
-  });
-
-  // F1714 (CR2, by Alexis): on a touch screen Enter adds a line and Send sends; the help names the form that applies.
-  it("hints that Enter adds a line and Send sends on a touch screen, Shift+Enter on a computer", () => {
-    expect(withHint({}, true, true).help).toBe("Enter adds a line; Send sends it.");
-    expect(withHint({}, true, false).help).toBe("Shift+Enter adds a line.");
-    expect(withHint({}, false, true).help).toBe(
-      "People in this room see when you type. Enter adds a line; Send sends it.",
-    );
-    expect(withHint({ error: "No." }, false, true)).toStrictEqual({ error: "No." });
+    expect(markup).not.toContain("Shift+Enter adds a line.");
+    expect(markup).not.toContain("see when you type");
   });
 
   it("says what keeps a draft from going in the box, in place of the hint", () => {

@@ -13,7 +13,7 @@ import Ecosystem, {
   meta as ecosystemMeta,
 } from "./routes/ecosystem.tsx";
 import Home, { ErrorBoundary as HomeError, loader as home, meta as homeMeta } from "./routes/home.tsx";
-import List, { clientLoader as listLoader, meta as listMeta } from "./routes/list.tsx";
+import { clientLoader as listLoader } from "./routes/list.tsx";
 import World, { ErrorBoundary as WorldError, loader as world } from "./routes/world.tsx";
 
 // The routes on a site that holds what the real data does not: an ecosystem, and a world in a second universe.
@@ -106,10 +106,11 @@ describe("the Earth of a universe that holds worlds", () => {
     expect(html).not.toMatch(/<a [^>]*href="\/e\/tokens"/);
   });
 
-  test("has frame 40's crumb: its universe's cosmos, then the home, the general chat", async () => {
+  // The crumb is gone with the plate (the header's views lead up: D344, D428); the plate's kicker says it is the home's general chat.
+  test("says in its plate's kicker that it is the home, the general chat, and draws no crumb to the universe", async () => {
     const html = await page("earth", "/net/gnoland/earth");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
-    expect(html).toMatch(/aria-current="page"[^>]*>Home · the general chat</);
+    expect(html).toMatch(/<p class="label[^"]*">(?:<span[^>]*><\/span>)?Home · the general chat<\/p>/);
+    expect(html).not.toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
   });
 
   test("carries the loader's own address in its tags", () => {
@@ -168,10 +169,11 @@ describe("a universe's index", () => {
 });
 
 describe("a world of another universe", () => {
-  test("is at its universe's path, its crumb leading to that universe", async () => {
+  test("is at its universe's path, its plate saying it is a hub and no crumb leading to that universe", async () => {
     const html = await page("world", "/net/gnoland/w/other");
     expect(html).toContain("<h1>Other</h1>");
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
+    expect(html).toMatch(/<p class="label[^"]*">(?:<span[^>]*><\/span>)?Hub<\/p>/);
+    expect(html).not.toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
   });
 
   test.each(["/net/gnoland/w/bubble", "/w/other", "/net/nowhere/w/other", "/net/onyx/w/other"])(
@@ -182,35 +184,12 @@ describe("a world of another universe", () => {
   );
 });
 
-describe("the page that lists the places", () => {
-  test("lists the places of every universe, as links to their pages", async () => {
-    const html = await render({ path: "/list", Component: List }, "/list");
-    expect(html).toMatch(/href="\/net\/gnoland\/w\/other"/);
-    expect(html).toMatch(/href="\/e\/tokens"/);
-  });
-
-  // F2209: a chip for a genre no place has would only empty the list.
-  test("offers no genre that no place has, though the data lists some", async () => {
-    const html = await render({ path: "/list", Component: List }, "/list");
-    expect(html).not.toContain('aria-label="Genres"');
-    expect(html).not.toContain("Game");
-  });
-
-  test("has a trail to the home, ending on the list", async () => {
-    const html = await render({ path: "/list", Component: List }, "/list");
-    expect(html).toMatch(/<a [^>]*href="\/"[^>]*>Home<\/a>/);
-    expect(html).toMatch(/aria-current="page"[^>]*>Places</);
-  });
-
+describe("the page /list, which goes to the search palette", () => {
   test.each(["/LIST", "/List", "/list/x"])("refuses %s in the browser with a 404", (path) => {
     expect(is404(() => listLoader(asked(path)))).toBe(true);
   });
 
   test.each(["/list", "/list/", "/list?genre=game", "/list#top"])("serves %s", (path) => {
     expect(is404(() => listLoader(asked(path)))).toBe(false);
-  });
-
-  test("names /list as its canonical address", () => {
-    expect(listMeta()).toEqual(expect.arrayContaining([expect.objectContaining({ href: "https://gno.world/list" })]));
   });
 });

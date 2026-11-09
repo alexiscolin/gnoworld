@@ -7,3 +7,4 @@ type Story = StoryObj<typeof meta>;
 
 export const Lines: Story = { args: { lines: 3 } };
 export const CardShape: Story = { args: { shape: "card" } };
+export const Disc: Story = { args: { shape: "disc" } };

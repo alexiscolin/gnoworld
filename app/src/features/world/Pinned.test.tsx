@@ -36,6 +36,17 @@ function draw(pinned: ReturnType<typeof vote>[], under = vi.fn<ChainFetch>(ANSWE
   );
 }
 
+// Draws `pinned`, lets the page's reads settle, and checks that nothing stands on it and the chain was asked nothing.
+async function drawsNothing(pinned: ReturnType<typeof vote>[]) {
+  const under = vi.fn<ChainFetch>(ANSWER);
+  const box = draw(pinned, under);
+  await act(async () => {
+    await Promise.resolve();
+  });
+  expect(box.firstElementChild?.childElementCount).toBe(0);
+  expect(under).not.toHaveBeenCalled();
+}
+
 describe("a world's pinned actions on its page", () => {
   it("draws each confirmed action as a form under its label, in the data's order, and its card names the realm and function", async () => {
     const box = draw([
@@ -68,13 +79,7 @@ describe("a world's pinned actions on its page", () => {
   });
 
   it("draws nothing, and asks the chain nothing, for a view of another realm than the action's", async () => {
-    const under = vi.fn<ChainFetch>(ANSWER);
-    const box = draw([vote({ view: "/r/demo/boards" })], under);
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(box.childElementCount).toBe(0);
-    expect(under).not.toHaveBeenCalled();
+    await drawsNothing([vote({ view: "/r/demo/boards" })]);
   });
 
   it("only opens the card on its button: no wallet asked, the card's Sign in Adena left for the person", async () => {
@@ -91,18 +96,12 @@ describe("a world's pinned actions on its page", () => {
   it.each(["/w/govdao", "/net/nowhere/r/gov/dao", "https://evil.example/r/gov/dao"])(
     "draws nothing, and asks the chain nothing, for an action whose view %j is no realm view",
     async (view) => {
-      const under = vi.fn<ChainFetch>(ANSWER);
-      const box = draw([vote({ view })], under);
-      await act(async () => {
-        await Promise.resolve();
-      });
-      expect(box.childElementCount).toBe(0);
-      expect(under).not.toHaveBeenCalled();
+      await drawsNothing([vote({ view })]);
     },
   );
 
   it("draws nothing for no action", () => {
-    expect(draw([]).childElementCount).toBe(0);
+    expect(draw([]).firstElementChild?.childElementCount).toBe(0);
   });
 });
 

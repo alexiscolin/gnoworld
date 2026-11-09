@@ -7,7 +7,7 @@ interface Spot {
   y: number;
   radius: number;
 }
-export interface CosmosStats {
+interface CosmosStats {
   shown: boolean;
   bodies: number;
   stars: number;
@@ -54,7 +54,6 @@ interface Stats {
   geometries: number;
   textures: number;
   eye: { x: number; y: number; z: number };
-  turn: { yaw: number; pitch: number };
   seconds: number;
   cosmos: CosmosStats | undefined;
   flight: FlightStats | undefined;
@@ -116,19 +115,6 @@ export const landed = (page: Page) =>
       async () => {
         const dive = (await stats(page)).cosmos?.dive;
         return dive?.along === 1 && dive.veil === 0;
-      },
-      { timeout: 90_000 },
-    )
-    .toBe(true);
-
-/** The Earth's view standing (7x2): the Earth and its stations drawn. The view at rest draws no system's body (decisions 698 and 701), so
- * a journey that waits for the cosmos to stand waits for this. */
-export const earthStanding = (page: Page) =>
-  expect
-    .poll(
-      async () => {
-        const cosmos = (await stats(page)).cosmos;
-        return cosmos?.earth === true && (cosmos.stations?.close ?? 0) > 0;
       },
       { timeout: 90_000 },
     )

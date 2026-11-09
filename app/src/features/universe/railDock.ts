@@ -2,11 +2,14 @@
 // grows most and its neighbours less by their distance, each easing there frame by frame, and no frame is asked once all stand still. As a
 // dock's, distances are read on the column at rest, measured with nothing grown nor shifted, and the column shifts so the pointed planet
 // stays under the pointer. Never under reduced motion, nor for a finger or where nothing hovers, a touch screen.
+import { onResize } from "../../space/onResize.ts";
 
 /** How much the planet at the pointer grows, and how far from it, in pixels, its neighbours still do. */
-export const MAGNIFIED = 1.55;
-export const REACH = 230;
+const MAGNIFIED = 1.55;
+const REACH = 230;
+// The share of the way a planet eases each 60 Hz frame; a longer frame takes more of it.
 const EASE = 0.2;
+const FRAME_MS = 1000 / 60;
 const STILL = 0.002;
 const QUIET = "(prefers-reduced-motion: reduce), (pointer: coarse)";
 
@@ -66,28 +69,36 @@ interface Column {
   readonly top: number;
 }
 
-// How far the list must move so the place `at` its link held at rest, its planet's middle and the offset from it as the planet grew, comes
-// back under `at`: read off the page once the planets have their new sizes. A link with no planet keeps its place.
+// How far the list must move so the place `at` its link held at rest comes back under `at`, read off the page once the planets have their
+// new sizes, at the same share of its link: the column's pace then changes smoothly, where a planet's part and a name's part each held
+// gave it a jerk at their line (Alexis, 2026-11-07). Two neighbours grow alike at their line, so no link hands over with a jump.
 function driftOf({ links, rests, top }: Column, at: number): number {
   const held = heldAt(rests, top, at);
   const [link, rest] = [links[held], rests[held]];
   if (link === undefined || rest === undefined) return 0;
   const live = link.getBoundingClientRect();
-  const planet = link.firstElementChild?.getBoundingClientRect().height ?? 0;
-  if (rest.planet <= 0) return live.top - (top + rest.offset);
-  const scale = planet / rest.planet;
-  return live.top + planet / 2 + (at - (top + rest.offset + rest.planet / 2)) * scale - at;
+  const into = at - (top + rest.offset);
+  if (into <= 0) return live.top + into - at;
+  if (into >= rest.height) return live.bottom + into - rest.height - at;
+  return live.top + (into * live.height) / rest.height - at;
+}
+
+// Where the pointer or the focus is, and the share of the way a planet goes this frame.
+interface Aim {
+  readonly at: number | undefined;
+  readonly ease: number;
 }
 
 // Each planet a step nearer the size `at` gives it, written on it; whether any changed.
-function grow({ links, rests, top }: Column, sizes: WeakMap<Element, number>, at: number | undefined): boolean {
+function grow({ links, rests, top }: Column, sizes: WeakMap<Element, number>, aim: Aim): boolean {
+  const { at, ease } = aim;
   let moving = false;
   for (const [index, link] of links.entries()) {
     const rest = rests[index];
     const target =
       at === undefined || rest === undefined ? 1 : magnifiedAt(Math.abs(at - top - rest.offset - rest.height / 2));
     const now = sizes.get(link) ?? 1;
-    const next = Math.abs(target - now) < STILL ? target : now + (target - now) * EASE;
+    const next = Math.abs(target - now) < STILL ? target : now + (target - now) * ease;
     moving ||= next !== now;
     sizes.set(link, next);
     if (link.firstElementChild instanceof HTMLElement)
@@ -107,7 +118,7 @@ export function dock(list: HTMLElement, signal: AbortSignal, cut: (cut: boolean)
   let pointer: number | undefined;
   let focused: Element | undefined;
   // The place the column holds still: the last one aimed at, while the planets shrink back.
-  let [anchor, shift, frame] = [0, 0, 0];
+  let [anchor, shift, frame, last] = [0, 0, 0, Number.NaN];
   // The links at rest, measured once the list holds other links: a link's height is its own, 98 px at least, whatever its name's font.
   const read = (): Column => {
     const links = [...list.querySelectorAll<HTMLElement>("li > a")];
@@ -115,18 +126,22 @@ export function dock(list: HTMLElement, signal: AbortSignal, cut: (cut: boolean)
     const { rests, lead } = same ? column : restOf(list, scroller, links);
     return { links, rests, lead, top: scroller.getBoundingClientRect().top + lead - scroller.scrollTop };
   };
-  const step = () => {
+  const step = (now: number) => {
     frame = 0;
+    // The share of the way a planet goes keeps its pace whatever the screen's rate: the 60 Hz frame's, scaled by the time since the last.
+    const ease = 1 - (1 - EASE) ** (Number.isNaN(last) ? 1 : Math.min(now - last, 100) / FRAME_MS);
+    last = now;
     column = read();
     const { rests, top } = column;
     const focus = rests[column.links.findIndex((link) => link === focused)];
     const at = matchMedia(QUIET).matches ? undefined : (pointer ?? (focus && top + focus.offset + focus.height / 2));
-    const moving = grow(column, sizes, at);
+    const moving = grow(column, sizes, { at, ease });
     anchor = at ?? anchor;
     // The drift is read off the page once the planets have their sizes, so one shift puts the anchor back under the pointer.
     shift += driftOf(column, anchor);
     list.style.setProperty("translate", `0 ${String(-shift)}px`);
     if (moving) frame = requestAnimationFrame(step);
+    else last = Number.NaN;
   };
   const aim = () => {
     frame ||= requestAnimationFrame(step);
@@ -168,12 +183,14 @@ export function dock(list: HTMLElement, signal: AbortSignal, cut: (cut: boolean)
   list.parentElement?.addEventListener("scroll", aim, on);
   // The column's own box tells it is cut: it grows with its list up to its cap, so it changes as its list crosses the cap, or the window
   // moves the cap.
-  const watch = new ResizeObserver(() => {
-    cut(scroller.scrollHeight > scroller.clientHeight);
-  });
-  watch.observe(scroller);
+  onResize(
+    scroller,
+    () => {
+      cut(scroller.scrollHeight > scroller.clientHeight);
+    },
+    signal,
+  );
   signal.addEventListener("abort", () => {
     cancelAnimationFrame(frame);
-    watch.disconnect();
   });
 }

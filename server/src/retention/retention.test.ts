@@ -18,6 +18,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
+import { GUEST_TABLES } from "../guest/guests.ts";
+import { ROOM_SAID } from "../rooms/earth.ts";
 import { LOGIN_TABLES, NONCE_HOST } from "../login/login.ts";
 import { TICKET_TABLES } from "../login/ticket.ts";
 import { PROGRESS_TABLES } from "../moderation/catchup.ts";
@@ -25,7 +27,7 @@ import { VERDICT_TABLES } from "../moderation/check.ts";
 import { MUTE_TABLES } from "../moderation/mute.ts";
 import { STRIKE_TABLES } from "../moderation/strikes.ts";
 import { PIN_TABLES } from "../pins/pins.ts";
-import { ROOM_STATE } from "../rooms/create.ts";
+import { REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { makeRetention, sizeOf, startRetention } from "./retention.ts";
 
@@ -43,7 +45,10 @@ const TABLES = [
   MUTE_TABLES,
   STRIKE_TABLES,
   ROOM_STATE,
+  REALM_TABLES,
   PIN_TABLES,
+  GUEST_TABLES,
+  ROOM_SAID,
 ];
 const opened: DatabaseSync[] = [];
 const folders: string[] = [];

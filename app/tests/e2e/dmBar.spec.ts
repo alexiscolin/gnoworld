@@ -356,16 +356,16 @@ test.describe("a direct message's bar", () => {
     await expect(barOf(page, 1).getByRole("button").first()).toBeFocused();
   });
 
-  test("stands on one row on a phone's screen, the three quick reactions behind one React menu", async ({ page }) => {
+  test("stands on one row on a phone's screen, its small icons as a computer's (D376)", async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     const dm = await inDm(page);
     dm.theirs("p1", "the first", { at: 0 });
     await expect(lines(page)).toHaveCount(1);
     await lines(page).nth(0).focus();
     const bar = barOf(page, 0);
-    for (const name of ["React", "Reply", "More actions"])
+    for (const name of ["React with 👍", "Add reaction", "Reply", "More actions"])
       await expect(bar.getByRole("button", { name, exact: true })).toBeVisible();
-    await expect(bar.getByRole("button")).toHaveCount(3);
+    await expect(bar.getByRole("button")).toHaveCount(6);
     // One row of controls is about 40 px tall: two would be twice that.
     expect((await bar.boundingBox())?.height ?? Infinity).toBeLessThan(56);
   });

@@ -1,0 +1,383 @@
+/* Discover (D373): the shelves, the cards, a realm's detail; on a phone, the cards alone, the detail over them. */
+@layer components {
+  .discover {
+    /* raw: the shelves' column, narrower than the detail's */
+    --_shelves: 208px;
+
+    /* layout: the shelves, the cards, the detail: the cards take the room left */
+    display: grid;
+    /* layout: the sheet's two columns */
+    grid-template-columns: var(--_shelves) minmax(0, 1fr);
+    min-block-size: 0;
+  }
+
+  .discover[data-detail] {
+    /* layout: the detail's column opens at the end */
+    grid-template-columns: var(--_shelves) minmax(0, 1fr) var(--column-l);
+  }
+
+  .shelves {
+    font: var(--font-ui);
+    /* layout: the items start on the dialog's inset, as the field does; a step before the column's line */
+    padding-inline-end: var(--space-s);
+    border-inline-end: var(--line-width) solid var(--color-line);
+    overflow: auto;
+    min-block-size: 0;
+  }
+
+  /* A group: a step to its first item, a larger one from the group before. */
+  .group {
+    /* layout: the items as wide as the column, a hair apart so a lit pill never touches the next item */
+    display: grid;
+    /* layout: the rooms column's step apart, so a lit pill stands clear of the next (Alexis, 2026-11-08: "trop collé") */
+    gap: var(--chat-item-gap);
+  }
+
+  .group + .group {
+    /* layout: the larger step between groups */
+    margin-block-start: var(--space-m);
+  }
+
+  .groupName {
+    /* layout: the kicker on the items' left edge, a step above its first item */
+    padding: 0 var(--space-xs) var(--space-2xs);
+  }
+
+  .shelf {
+    /* layout: the style's dot, the name, the count */
+    display: flex;
+    /* layout: the dot and the words share a line */
+    align-items: center;
+    color: var(--color-text-muted);
+    text-align: start;
+    transition:
+      background-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard),
+      color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .shelf:hover {
+    background: var(--color-fill);
+    color: var(--color-text);
+  }
+
+  /* The current item, as the rooms' column's: the cream pill. */
+  .shelf[aria-selected="true"] {
+    background: var(--color-primary);
+    color: var(--color-ink);
+    font-weight: 500;
+  }
+
+  .name {
+    /* layout: the name takes the room, the count at the end */
+    flex: 1;
+  }
+
+  .dot {
+    /* layout: the dot keeps its size, a step before the name */
+    flex: none;
+    /* layout: a step before the name */
+    margin-inline-end: var(--space-xs);
+    inline-size: var(--size-dot);
+    block-size: var(--size-dot);
+    border-radius: var(--radius-pill);
+    background: var(--_tint, transparent);
+  }
+
+  .count {
+    /* layout: a step off a long name */
+    padding-inline-start: var(--space-xs);
+    color: var(--color-text-faint);
+    font: var(--font-data);
+  }
+
+  .shelf[aria-selected="true"] .count {
+    color: inherit;
+    opacity: 0.6;
+  }
+
+  /* A style's tint: its shelf's dot and its chip's. Five palette colours, then their mixes. */
+  [data-style="games"] {
+    --_tint: var(--color-danger);
+  }
+
+  [data-style="tokens"] {
+    --_tint: var(--color-warm);
+  }
+
+  [data-style="nft"] {
+    --_tint: var(--color-signal);
+  }
+
+  [data-style="defi"] {
+    --_tint: var(--color-mine);
+  }
+
+  [data-style="dao"] {
+    --_tint: var(--world);
+  }
+
+  [data-style="social"] {
+    /* raw: a tint between two palette colours */
+    --_tint: color-mix(in oklab, var(--color-danger) 55%, var(--color-signal));
+  }
+
+  [data-style="markets"] {
+    /* raw: a tint between two palette colours */
+    --_tint: color-mix(in oklab, var(--color-warm) 60%, var(--color-mine));
+  }
+
+  [data-style="identity"] {
+    /* raw: a tint between two palette colours */
+    --_tint: color-mix(in oklab, var(--color-mine) 50%, var(--color-text-muted));
+  }
+
+  [data-style="ai"] {
+    /* raw: a tint between two palette colours */
+    --_tint: color-mix(in oklab, var(--color-signal) 60%, var(--world));
+  }
+
+  [data-style="lab"] {
+    --_tint: var(--color-text-muted);
+  }
+
+  .content {
+    min-inline-size: 0;
+    min-block-size: 0;
+    /* layout: a step off the shelves' line, its end on the sheet's own inset, as the field (Alexis, 2026-11-08) */
+    padding-inline: var(--space-s) 0;
+    overflow: auto;
+  }
+
+  .discover[data-detail] .content {
+    /* layout: the rows' end a step off the detail's rule, not glued to it */
+    padding-inline-end: var(--space-s);
+  }
+
+  .rowHead {
+    /* layout: the title, what it is made of, See all at the end */
+    display: flex;
+    /* layout: the palette's own arrangement */
+    align-items: baseline;
+    /* layout: the palette's own arrangement */
+    gap: var(--space-xs);
+  }
+
+  .rowHead h3,
+  .stats dd {
+    /* layout: the palette's own arrangement */
+    margin: 0;
+    font: var(--font-title-s);
+  }
+
+  .why {
+    /* layout: See all goes to the end */
+    flex: 1;
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .all {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .all:hover {
+    color: var(--color-text);
+  }
+
+  .strip {
+    /* layout: ten cards in a row, which scrolls across */
+    display: grid;
+    /* layout: the palette's own arrangement */
+    grid-auto-flow: column;
+    /* raw: a card's width, the row's rhythm */
+    /* layout: the palette's own arrangement */
+    grid-auto-columns: minmax(var(--column-s), 240px);
+    /* layout: the palette's own arrangement */
+    gap: var(--space-s);
+    /* Room inside the clip for a card's focus ring and edge, never cut (Alexis, 2026-11-08: "coupé en hauteur"). */
+    padding: calc(var(--focus-width) + var(--focus-offset));
+    overflow: auto hidden;
+    /* A row cut by the column's edge fades out there, so the cut reads as more to scroll, and each card stops at the row's start. */
+    scroll-snap-type: x mandatory;
+    /* raw: the fade over the last 48 px, about a quarter card */
+    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+  }
+
+  .strip > * {
+    scroll-snap-align: start;
+  }
+
+  .card,
+  .stop {
+    inline-size: 100%;
+    padding: var(--space-xs);
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-box);
+    background: var(--color-fill);
+    text-align: start;
+    transition: background-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .card {
+    /* layout: a card's words from its top, so every card of a row has its name on one line, as wide as the card whatever a name is */
+    display: flex;
+    /* layout: the words one under the other */
+    flex-direction: column;
+    /* layout: from its top */
+    justify-content: flex-start;
+  }
+
+  .card[aria-current="true"] {
+    border-color: var(--color-mine-line);
+  }
+
+  .card[data-unseen] {
+    border-style: dashed;
+  }
+
+  .name {
+    font: var(--font-ui);
+  }
+
+  .sub {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+
+  .meta {
+    min-block-size: var(--size-counter);
+    font: var(--font-label);
+  }
+
+  .tag {
+    color: var(--color-text-muted);
+  }
+
+  .new {
+    color: var(--color-new);
+  }
+
+  .here {
+    color: var(--color-mine);
+  }
+
+  .quiet {
+    color: var(--color-text-faint);
+  }
+
+  .detail {
+    min-inline-size: 0;
+    min-block-size: 0;
+    padding-inline-start: var(--space-s);
+    border-inline-start: var(--line-width) solid var(--color-line);
+    overflow: auto;
+    animation: detail-in calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  @keyframes detail-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* The detail's head: the planet at its start, its close at the end, on the planet's top line. */
+  .detailHead {
+    /* layout: the planet and the close apart on one row */
+    display: flex;
+    /* layout: the close at the row's end */
+    justify-content: space-between;
+    /* layout: both on the head's top line */
+    align-items: start;
+  }
+
+  .note {
+    color: var(--color-text-muted);
+  }
+
+  .path {
+    /* layout: the detail's stack steps it */
+    margin: 0;
+    color: var(--color-text-muted);
+    font: var(--font-data);
+    /* Detail.tsx puts a zero-width space after each "/": the path breaks there, inside a part only if it is longer than the column */
+    overflow-wrap: break-word;
+  }
+
+  .stats {
+    /* layout: three figures in a row */
+    display: grid;
+    /* layout: three equal columns on the detail's edges */
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    /* layout: the palette's own arrangement */
+    gap: var(--space-xs);
+    /* layout: the figures own the line */
+    margin: 0;
+    padding-block: var(--space-xs);
+    border-block: var(--line-width) solid var(--color-line);
+  }
+
+  .stats dt {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .stats div {
+    /* layout: the figure over its name */
+    display: flex;
+    /* layout: the palette's own arrangement */
+    flex-direction: column-reverse;
+  }
+
+  /* The styles' chips stand in for the shelves' column, on a phone alone. */
+  .styleChips {
+    display: none;
+  }
+
+  /* A phone has the shelves out of the way, and the detail over the cards. */
+  @media (max-width: 900px) {
+    .styleChips {
+      display: block;
+    }
+
+    .discover,
+    .discover[data-detail] {
+      /* layout: one column */
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .shelves {
+      display: none;
+    }
+
+    .discover[data-detail] .content {
+      display: none;
+    }
+
+    .content {
+      /* layout: the cards on the field's own edges */
+      padding-inline: 0;
+    }
+
+    .rowHead {
+      /* layout: the title and See all on a line, what the row is made of under them */
+      flex-wrap: wrap;
+    }
+
+    .why {
+      /* layout: its own line */
+      flex-basis: 100%;
+      order: 1;
+    }
+
+    .all {
+      /* layout: See all at the line's end */
+      margin-inline-start: auto;
+    }
+
+    .detail {
+      padding-inline-start: 0;
+      border-inline-start: 0;
+    }
+  }
+}

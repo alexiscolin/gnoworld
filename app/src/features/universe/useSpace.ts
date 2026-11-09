@@ -1,96 +1,115 @@
-// The scene's door. Only a page that shows space calls it, the cosmos, the Earth and a world's, so a page that never does asks for none of its code, and
-// the first screen of the others holds none of it (ADR-0001 §12's budget). The universe comes after the text and stays once it came:
-// leaving covers it, for the way back. A chunk that does not come leaves the page as it is, and the next page that shows space asks again.
-import { useEffect, useState } from "react";
-import type { CosmosPage, EarthPage, Shown, WorldPage, WorldShown } from "./host.ts";
+// A page's hold on space (D401): the place it shows (the home's view, a system or the universe by its address, the Earth, a world),
+// kept while it is on screen; its planet's circle watched as the page lays it out; its text entering at once when no flight brings
+// it, and its chrome ghosted out as it leaves. True once the first frame is drawn, or 2.5 s after the page is on screen.
+import { EARTH } from "@gnoworld/core";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useLocation, useNavigate, useParams } from "react-router";
+import { HOME_SYSTEM, isHome } from "../../cosmosAt.ts";
+import type { Place } from "../../space/place.ts";
+import { useHere } from "../../useHere.ts";
+import { enterPage } from "./arrival.ts";
+import { ghost } from "./rise.ts";
+import { drawnYet, flying, hold, onDrawn, release, show } from "./space.ts";
 
-const loadUniverse = () => import("./mountUniverse.tsx");
-
-let wanted: Shown = false;
-let asked = false;
-type Page = EarthPage | WorldPage | CosmosPage;
-
-let page: Page | undefined;
-let draw: ((shown: Shown, page?: Page) => void) | undefined;
-let doorAnswered: Promise<void> = Promise.resolve();
-
-const drawn = (to: (shown: Shown, page?: Page) => void) => {
-  if (page === undefined) to(wanted);
-  else to(wanted, page);
-};
-
-function show(shown: Shown, from?: Page): void {
-  wanted = shown;
-  page = from;
-  if (draw !== undefined) drawn(draw);
-  else if (shown && !asked) {
-    asked = true;
-    doorAnswered = loadUniverse()
-      .then(({ mountUniverse }) => {
-        draw = mountUniverse();
-        drawn(draw);
-      })
-      .catch(() => {
-        asked = false;
-      });
-  }
+/** A world a page shows, by its id. */
+export interface WorldShown {
+  readonly world: string;
+  readonly name?: string;
 }
 
-const pageLoaded = (signal: AbortSignal) =>
-  new Promise<void>((done) => {
-    if (document.readyState === "complete") done();
-    else
-      window.addEventListener(
-        "load",
-        () => {
-          done();
-        },
-        { once: true, signal },
-      );
-  });
-
-// The longest the chat waits on the door and the load once its page is on screen: ADR-0002 §2's LCP budget, 2.5 s on a mid-range mobile
-// profile. Past it the first screen's budget is spent, so waiting protects nothing, and the door's chunk (5,950 B gzip, about 30 ms at
-// Lighthouse's 1.6 Mbit/s) is held, not slow: a hung chunk, a refused WebGL or a slow network leaves no world without its chat (F4306).
 const FIRST_SCREEN_MS = 2_500;
 
-const waited = (ms: number, signal: AbortSignal) =>
-  new Promise<void>((done) => {
-    const timer = setTimeout(done, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-      },
-      { once: true },
-    );
-  });
+// The kind of page standing now, the one that left as it came, and the one it came after: a cosmos view replacing a cosmos view (the
+// galaxy at /universe, the Earth's ecosystem at /, a system) shows the same chrome where it was, so it leaves no ghost and rises nothing.
+const pages: { standing?: string | undefined; left?: string | undefined; cameAfter?: string | undefined } = {};
 
-/** Shows space while the calling page is on screen, with the Earth, the worlds or one world in it if the page asks, and what its signs need of
- * the page. A world is named by its id: the same id is the same world. True once the first screen is done: the page has loaded and the door
- * has answered, whichever way, or 2.5 s after the page is on screen. */
-export function useSpace(body?: "earth" | "cosmos" | WorldShown, from?: Page): boolean {
-  const [firstScreenDone, setFirstScreenDone] = useState(false);
-  const world = typeof body === "object" ? body.world : undefined;
-  const name = typeof body === "object" ? body.name : undefined;
-  const named = typeof body === "object" ? undefined : body;
-  useEffect(() => {
-    show(world === undefined ? (named ?? true) : { world, ...(name === undefined ? {} : { name }) }, from);
-    return () => {
-      show(false);
+/** Whether the page standing came after a page of its own kind (the cosmos after the cosmos): its chrome stays as it was (Alexis,
+ * 2026-11-09: "ne pas recharger ce titre sur l'écosystème de la Terre qui a le même"). */
+export const sameKind = (): boolean => pages.standing !== undefined && pages.standing === pages.cameAfter;
+
+const kindOf = (body: "earth" | "cosmos" | WorldShown | undefined): string =>
+  typeof body === "object" ? "world" : (body ?? "none");
+// A page with no planet's box (the home) is looked at for five seconds' frames, then left.
+const LOOK_FRAMES = 300;
+
+// The cosmos's place is its address's: `/universe`, `/s/<namespace>` (the router's `system`, decoded), or the home's view; as a kind and an
+// id, two strings React compares as they are.
+function placeOf(
+  body: "earth" | "cosmos" | WorldShown | undefined,
+  path: string,
+  system: string | undefined,
+): readonly [Place["kind"] | "none", string] {
+  if (body === undefined) return ["none", ""];
+  if (body === "earth") return ["world", EARTH];
+  if (typeof body === "object") return ["world", body.world];
+  if (path.endsWith("/universe")) return ["universe", ""];
+  // The home's own path is the Earth's first screen; a namespace that orbits the Earth is the Earth's system, `/s/gnoland` (D501).
+  if (system === undefined) return ["home", ""];
+  return ["system", isHome(system) ? HOME_SYSTEM : system];
+}
+
+const placeFrom = (kind: Place["kind"] | "none", id: string): Place | undefined => {
+  if (kind === "none") return undefined;
+  return kind === "world" || kind === "system" ? { kind, id } : { kind };
+};
+
+/** Shows space at the page's place (`body`: the Earth, the cosmos or a world) while the page is on screen. */
+export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  // The page's one reading of who is here, held while space shows: every world's name carries it (D562).
+  useHere(true);
+  const [kind, id] = placeOf(body, pathname, useParams()["system"]);
+  // A page that comes once space drew finds it drawn: its chat and its loader know it from the first render.
+  const [firstScreenDone, setFirstScreenDone] = useState(drawnYet);
+  // Whether this page stands: a strict second run (development) or the same page asked again keeps it, and it leaves no ghost.
+  const standingRef = useRef(false);
+  // Before the page paints: a flight this page asks hides its plate in the same frame, so it never shows for one.
+  const pageKind = kindOf(body);
+  useLayoutEffect(() => {
+    standingRef.current = true;
+    pages.cameAfter = pages.left ?? pages.standing;
+    pages.standing = pageKind;
+    pages.left = undefined;
+    show(placeFrom(kind, id), (href) => {
+      Promise.resolve(navigate(href)).catch(reportError);
+    });
+    if (!flying()) enterPage();
+    // The planet's circle as the page lays its box out (a page's parts come late: looked for each frame till it comes), and as it moves.
+    const watching = new ResizeObserver(hold);
+    let [frame, tries] = [0, 0];
+    const look = () => {
+      const box = document.querySelector("[data-globe]");
+      if (box !== null)
+        for (const part of [box, ...document.querySelectorAll("[data-look='plate'], [data-dock]")])
+          watching.observe(part);
+      else if ((tries += 1) < LOOK_FRAMES) frame = requestAnimationFrame(look);
+      hold();
     };
-  }, [world, name, named, from]);
-  useEffect(() => {
-    const stop = new AbortController();
-    const done = () => {
-      if (!stop.signal.aborted) setFirstScreenDone(true);
-    };
-    Promise.race([Promise.all([doorAnswered, pageLoaded(stop.signal)]), waited(FIRST_SCREEN_MS, stop.signal)]).then(
-      done,
-      done,
-    );
+    frame = requestAnimationFrame(look);
+    addEventListener("resize", hold);
     return () => {
-      stop.abort();
+      cancelAnimationFrame(frame);
+      watching.disconnect();
+      removeEventListener("resize", hold);
+      standingRef.current = false;
+      pages.left = pageKind;
+      pages.standing = undefined;
+      release();
+      // No ghost where the page that follows is of this one's kind: its chrome stands where this one's stood.
+      ghost(() => standingRef.current || pages.standing === pageKind);
+    };
+  }, [kind, id, navigate, pageKind]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFirstScreenDone(true);
+    }, FIRST_SCREEN_MS);
+    const stop = onDrawn(() => {
+      setFirstScreenDone(true);
+    });
+    return () => {
+      clearTimeout(timer);
+      stop();
     };
   }, []);
   return firstScreenDone;

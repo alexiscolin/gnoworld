@@ -10,6 +10,9 @@ import type { Ring } from "./statusRing.ts";
 const realmPart = () => import("./Proposals.tsx");
 const none = () => ({ default: () => null });
 const Proposals = lazy<ComponentType<ProposalsProps>>(() => realmPart().catch(none));
+const Status = lazy<ComponentType<Pick<ProposalsProps, "path" | "onRing">>>(() =>
+  realmPart().then((chunk) => ({ default: chunk.Status }), none),
+);
 const PinnedBar = lazy<ComponentType<PinnedBarProps>>(() =>
   realmPart().then((chunk) => ({ default: chunk.PinnedBar }), none),
 );
@@ -48,6 +51,28 @@ export function Proposed({
   return (
     <Suspense fallback={null}>
       <Proposals path={realmPath} onRing={onRing} {...pinned} />
+    </Suspense>
+  );
+}
+
+// A realm that can take a vote: the file's functions name one that votes and one that proposes. A realm that does not is not asked.
+const takesVotes = (functions: readonly string[]) =>
+  functions.some((name) => /vote/i.test(name)) && functions.some((name) => /propos/i.test(name));
+
+/** A realm's open proposal as a pill, and its ring for the planet, for a realm whose functions say it takes votes (none asked of any other). */
+export function Voted({
+  path,
+  functions,
+  onRing,
+}: {
+  path: string;
+  functions: readonly string[];
+  onRing: (ring: Ring | undefined) => void;
+}) {
+  if (!takesVotes(functions)) return null;
+  return (
+    <Suspense fallback={null}>
+      <Status path={path} onRing={onRing} />
     </Suspense>
   );
 }

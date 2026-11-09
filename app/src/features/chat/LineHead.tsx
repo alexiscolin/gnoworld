@@ -1,5 +1,6 @@
 // A line's head (slice 4's 4b, moved out of LineView.tsx): the face, the name, the marks and the time.
 import type { Line, ShownLine } from "@gnoworld/core";
+import type { MouseEvent } from "react";
 import { Avatar, Cluster, Icon } from "@gnoworld/ui";
 import { Country } from "./Country.tsx";
 import { Person } from "./Person.tsx";
@@ -29,6 +30,11 @@ export function openAuthorCard(): void {
   const name = document.activeElement?.closest("li")?.querySelector<HTMLButtonElement>("[data-author] > button");
   name?.focus();
   name?.click();
+}
+
+// The face opens the author's card as their name does, for a pointer: the keyboard has the name's way (More, View profile).
+function openCardFrom(event: MouseEvent<HTMLElement>): void {
+  event.currentTarget.parentElement?.querySelector<HTMLButtonElement>("[data-author] > button")?.click();
 }
 
 // "Edited" in the head, before the time, when the author's later edit is what the line shows (4d, U5).
@@ -77,14 +83,44 @@ interface HeadProps {
   mentioned: boolean;
   saved: boolean;
   pinned: boolean;
+  grouped?: boolean;
+}
+
+// The head of a line that goes on its author's group: the author for a screen reader alone, the marks it has, and the time in the
+// gutter, shown as the line is pointed at or focused.
+function GroupedHead({
+  line,
+  mine,
+  me,
+  mentioned,
+  saved,
+  pinned,
+}: Pick<HeadProps, "line" | "mine" | "me" | "mentioned" | "saved" | "pinned">) {
+  const marked = mentioned || saved || pinned || line.edited === true;
+  return (
+    <div className={marked ? styles["head"] : undefined} data-line-head="" data-grouped="">
+      <span className="visually-hidden">
+        <Author line={line} mine={mine} me={me} />
+      </span>
+      <Marks mentioned={mentioned} notice={false} saved={saved} pinned={pinned} />
+      <Edited edited={line.edited} />
+      <time dateTime={line.time} className={styles["groupTime"]}>
+        {CLOCK.format(new Date(line.time))}
+      </time>
+    </div>
+  );
 }
 
 // The head: the face, the name, what the line is marked, and the time at the far end.
-export function Head({ line, mine, me, mentioned, saved, pinned, newHere }: HeadProps) {
+export function Head({ line, mine, me, mentioned, saved, pinned, newHere, grouped = false }: HeadProps) {
+  if (grouped)
+    return <GroupedHead line={line} mine={mine} me={me} mentioned={mentioned} saved={saved} pinned={pinned} />;
   return (
     <div className={styles["head"]} data-line-head="">
       <Cluster space="2xs">
-        <Avatar address={line.account ?? line.from} name={line.from} size="s" decorative />
+        <span className={styles["face"]} data-face="" onClick={openCardFrom}>
+          <Avatar address={line.account ?? line.from} name={line.from} size="s" decorative />
+        </span>
         <Country code={line.country} />
         {line.kind === "action" ? "* " : null}
         <Author line={line} mine={mine} me={me} />{" "}

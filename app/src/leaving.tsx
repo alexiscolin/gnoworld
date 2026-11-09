@@ -1,7 +1,7 @@
 // The warning before a link off the site (plan §3, ADR-0002 §4): a page we do not control may wear a trusted name. The link is a button, so
 // no click, middle click or "open in a new tab" goes there unasked; pressing it opens a dialog that names the host the address really goes
 // to and shows the whole address. Only the dialog's own link leaves. A realm's page, the calendar and the bell share it.
-import { Button, Dialog, Stack } from "@gnoworld/ui";
+import { Button, Cluster, Dialog, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { hostOf } from "@gnoworld/chain/read";
 
@@ -29,14 +29,17 @@ export function useLeaving() {
           open={open}
           onClose={close}
         >
-          <Stack space="s">
+          <Stack space="m">
             <p>
               The address, whole: <code dir="ltr">{asked}</code>
             </p>
-            <Button href={asked} emphasis="solid">
-              {`Go to ${host}`}
-            </Button>
-            <Button onClick={close}>Stay here</Button>
+            {/* Staying first, going last and filled, at the dialog's end, as every confirmation's pair. */}
+            <Cluster space="xs" justify="end">
+              <Button onClick={close}>Stay here</Button>
+              <Button href={asked} emphasis="solid">
+                {`Go to ${host}`}
+              </Button>
+            </Cluster>
           </Stack>
         </Dialog>
       ),

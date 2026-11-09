@@ -664,6 +664,11 @@ describe("markdown: blocks", () => {
     reads("**a** b", paragraph(strong(text("a")), text(" b")));
   });
 
+  test("reads a whole table as paragraphs in the chat, and an alert as a quote with no severity", () => {
+    expect(markdown("| a |\n|---|\n| 1 |").map(({ type }) => type)).toEqual(["paragraph"]);
+    expect(markdown("> [!NOTE]\n> x")[0]).not.toHaveProperty("severity");
+  });
+
   test.each(["# Heading", "## Heading", "<script>alert(1)</script>", "---", "***", "| a | b |"])(
     "reads no heading, HTML, rule or table: %j stays text",
     plain,

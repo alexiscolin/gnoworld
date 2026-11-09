@@ -41,12 +41,18 @@ describe("a world's activity", () => {
     const el = await draw(day, 30);
     const text = el.textContent;
     const at = (part: RegExp) => text.search(part);
-    expect(at(/activity\s*·\s*last 24 h/i)).toBeLessThan(at(/30 msgs\/h now/i));
-    expect(at(/30 msgs\/h now/i)).toBeLessThan(at(/24 h ago/i));
+    expect(at(/activity\s*·\s*last 24 h/i)).toBeLessThan(at(/23 msgs\/h now/i));
+    expect(at(/23 msgs\/h now/i)).toBeLessThan(at(/24 h ago/i));
     expect(at(/24 h ago/i)).toBeLessThan(at(/peak 43\/h/i));
     expect(text.match(/peak/gi)).toHaveLength(1);
     const peak = el.querySelector("time");
     expect(peak?.getAttribute("dateTime")).toBe(new Date(FROM + 18 * 3_600_000).toISOString());
+  });
+
+  it("says the last bar's count as the rate now, whatever pace the server gave: 0 never beside a bar of 48 (D374)", async () => {
+    const el = await draw([...day.slice(0, 23), 48], 0);
+    expect(el.textContent).toMatch(/48 msgs\/h now/i);
+    expect(el.textContent).not.toMatch(/\b0 msgs\/h now/i);
   });
 
   it("says the last hour's count as the rate now when the server gave no pace", async () => {

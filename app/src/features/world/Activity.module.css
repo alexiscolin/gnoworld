@@ -1,11 +1,11 @@
-/* A plate's activity as frames 26 and 40 set it: its rows of words as wide as the bars under them, the chart's room held whether the hours
-   came or not, so nothing under it moves as they come. */
+/* A plate's activity as frames 26 and 40 set it: its rows of words as wide as the bars under them, the chart's room held while it is drawn, so nothing
+   under it moves as it comes. The plate sets the room around it (Panel.module.css, D470). */
 @layer components {
   .activity {
     /* raw: the chart's own column (ActivityChart.module.css) */
     max-inline-size: var(--column-l);
-    /* raw: two label rows (--font-label, 0.6875rem/1), the chart's 48 px drawing (ActivityChart.tsx's HEIGHT) and the two 2xs steps between */
-    min-block-size: calc(2 * 0.6875rem + 48px + 2 * var(--space-2xs));
+    /* raw: two label rows (--font-label, 0.6875rem/1), the chart's 48 px drawing (ActivityChart.tsx's HEIGHT) and the two xs steps between */
+    min-block-size: calc(2 * 0.6875rem + 48px + 2 * var(--space-xs));
   }
 
   .bars {

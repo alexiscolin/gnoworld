@@ -1,5 +1,6 @@
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Stack } from "../compositions/index.ts";
+import { Icon } from "../icons/Icon.tsx";
 import { ids } from "../ids.ts";
 import styles from "./Field.module.css";
 
@@ -95,6 +96,42 @@ function describing(
   return ids(...own.map((name) => `${id}-${name}`), parts.describedBy);
 }
 
+// The box in a frame with what stands before it: a search's magnifier (as Slack's and Discord's), a prefix that reads with it. A click
+// on either or the frame's padding is a click in the box.
+function Framed({
+  id,
+  prefix,
+  search,
+  box,
+}: {
+  id: string;
+  prefix: string | undefined;
+  search: boolean;
+  box: ReactNode;
+}) {
+  return (
+    <div
+      data-part="box"
+      className={styles["frame"]}
+      onClick={(event) => {
+        event.currentTarget.querySelector<HTMLElement>("input, textarea")?.focus();
+      }}
+    >
+      {search ? (
+        <span className={styles["prefix"]}>
+          <Icon name="search" />
+        </span>
+      ) : null}
+      {prefix === undefined ? null : (
+        <span id={`${id}-prefix`} className={styles["prefix"]}>
+          {prefix}
+        </span>
+      )}
+      {box}
+    </div>
+  );
+}
+
 /** A labelled box, described by its help and its error, which also marks it invalid. */
 export function Field({
   label,
@@ -130,22 +167,10 @@ export function Field({
       <label htmlFor={id} className={hideLabel === true ? "visually-hidden" : "label"}>
         {label}
       </label>
-      {prefix === undefined ? (
+      {prefix === undefined && kind !== "search" ? (
         box
       ) : (
-        // A click on the prefix or the frame's padding is a click in the box.
-        <div
-          data-part="box"
-          className={styles["frame"]}
-          onClick={(event) => {
-            event.currentTarget.querySelector<HTMLElement>("input, textarea")?.focus();
-          }}
-        >
-          <span id={`${id}-prefix`} className={styles["prefix"]}>
-            {prefix}
-          </span>
-          {box}
-        </div>
+        <Framed id={id} prefix={prefix} search={kind === "search"} box={box} />
       )}
       {help === undefined ? null : (
         <p id={`${id}-help`} className={styles["help"]}>

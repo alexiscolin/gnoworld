@@ -1,25 +1,48 @@
-// ⌘K and the header's search button, which open the search drawer (frames 98 to 100) over the places the page holds; a full Plan's "+N" opens
-// it on its namespace, by an event (F5462). The drawer is a chunk of its own, asked at the first opening and kept after, so it closes as a
-// dialog does; a new page closes it (a place chosen, Go explore).
+// ⌘K, "/" and the header's search buttons, which open the search palette (D355) over the places the page holds; a full Plan's "+N" and the
+// rail's second tab open it too, by an event (F5462). The palette is a chunk of its own, fetched once the page rests (D504) and kept
+// after, so its first opening is at once; a new page closes it (a place chosen, Go explore).
 import { IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation } from "react-router";
 import type { UniverseView } from "../../places.ts";
-import { SEARCH } from "../../scene/openEvent.ts";
-import { opensPalette } from "./chord.ts";
+import { SEARCH } from "../../space/openEvent.ts";
+import { afterLoad } from "../../later.ts";
+import { opensPalette, SEARCH_HASH } from "./chord.ts";
 
-const SearchDrawer = lazy(() => import("./SearchDrawer.tsx"));
+const loadDialog = () => import("./SearchDialog.tsx");
+const SearchDialog = lazy(loadDialog);
+// raw: the palette's chunk is fetched this long after the page rests, clear of the first screen and the dive
+const FETCH_AFTER_MS = 4000;
+
+/** A control that opens the palette, as the rail's See all does: beside the bell on a computer, `outline`; in the views' pill on a phone,
+ * `plain` (shellHeader.tsx). */
+export function SearchButton({ className, emphasis }: { className: string; emphasis: "outline" | "plain" }) {
+  return (
+    <span className={className}>
+      <IconButton
+        icon="search"
+        label="Search"
+        emphasis={emphasis}
+        onClick={() => {
+          window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
+        }}
+      />
+    </span>
+  );
+}
 
 export function SearchPalette({ universe }: { universe: UniverseView }) {
   const [open, setOpen] = useState(false);
   const [asked, setAsked] = useState(false);
-  // The words it opens on, none but a full Plan's ask: other words start the drawer anew on them.
+  // The words it opens on, none but a full Plan's ask: other words start the palette anew on them.
   const [start, setStart] = useState("");
-  const { pathname } = useLocation();
+  const { pathname, hash } = useLocation();
   const [at, setAt] = useState(pathname);
   if (at !== pathname) {
     setAt(pathname);
-    setOpen(false);
+    // The address /list leads to asks it open.
+    setOpen(hash === SEARCH_HASH);
+    if (hash === SEARCH_HASH) setAsked(true);
   }
   const show = () => {
     setStart("");
@@ -28,6 +51,14 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
   };
   useEffect(() => {
     const controller = new AbortController();
+    afterLoad(
+      () => {
+        // A fetch that fails is asked again at the first opening, by lazy's own import.
+        loadDialog().catch(reportError);
+      },
+      controller.signal,
+      FETCH_AFTER_MS,
+    );
     document.addEventListener(
       "keydown",
       (event) => {
@@ -53,10 +84,9 @@ export function SearchPalette({ universe }: { universe: UniverseView }) {
   }, []);
   return (
     <>
-      <IconButton icon="search" label="Search" emphasis="plain" onClick={show} />
       {asked ? (
         <Suspense fallback={null}>
-          <SearchDrawer
+          <SearchDialog
             key={start}
             start={start}
             universe={universe}

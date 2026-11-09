@@ -85,7 +85,7 @@ export function RealmWrites(props: RealmWritesProps) {
   return (
     <section aria-label="Write functions">
       <Stack space="xs">
-        <h2>Write functions</h2>
+        <h2 className={styles["title"]}>Write functions</h2>
         <Body {...props} />
       </Stack>
     </section>

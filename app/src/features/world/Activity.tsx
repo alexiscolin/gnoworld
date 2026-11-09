@@ -1,8 +1,8 @@
-// A plate's activity (frames 26, 40, 93): "ACTIVITY · LAST 24 H" and the rate now over the bars, "24 H AGO", the peak with its hour and
-// "NOW" under them, as the frames write them; the bars are the chart's, which writes no figure of its own here. With no history the same
-// chart is drawn flat, with no peak hour, and named "No activity recorded yet" for assistive technology (Alexis, 2026-11-06). An hour no
-// sample read is drawn as none. The block keeps the chart's room whatever its hours (Alexis, 2026-11-04).
-import { Cluster, Stack } from "@gnoworld/ui";
+// A plate's activity (frames 26, 40, 93; D530): "CHAT · LAST 24 H" over the bars of the chat's messages an hour, never a realm's calls,
+// the current hour's count at the right, "24 H AGO", the peak with its hour and "NOW" under them. With no message counted, or no hours
+// read, nothing is drawn: no flat block (it was one, Alexis, 2026-11-06), no claim the dock may contradict (D534). An hour no sample
+// read is drawn as none.
+import { Cluster, Icon, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useSyncExternalStore } from "react";
 import type { Hours } from "./useHours.ts";
 import styles from "./Activity.module.css";
@@ -30,20 +30,32 @@ export function Activity({ hours }: { hours?: Hours | undefined }) {
   const known = hours !== undefined && hours.hours.length > 0;
   const counts = known ? hours.hours.map(counted) : Array.from({ length: DAY }, () => 0);
   const peak = Math.max(...counts);
-  const peakAt = known ? hours.from + counts.indexOf(peak) * HOUR : null;
-  const now = !known || hours.now === null ? (counts.at(-1) ?? 0) : Math.round(hours.now);
+  const peakAt = hours === undefined ? null : hours.from + counts.indexOf(peak) * HOUR;
+  // The current hour's count so far, the last bar's own figure, never a separate pace that can read 0 beside a bar of 48 (D374).
+  const now = counts.at(-1) ?? 0;
+  // Hours the server gave none of (or not yet) draw nothing: nobody counted holds no place.
+  if (!known) return null;
+  // No message counted: the server's hours may not hold what the dock lists (a sim's), so nothing is claimed, nothing drawn (D534).
+  if (peak === 0) return null;
   return (
     <div className={styles["activity"]}>
-      <Stack space="2xs">
+      <Stack space="xs">
         <div className="label">
           <Cluster justify="between" space="s">
-            <span>Activity · last {counts.length} h</span>
-            <span>{grouped(now)} msgs/h now</span>
+            {/* The section's kicker, with the dot every kicker of the plate has; the rate after its icon, as a figure's caption. */}
+            <span>
+              <span className="dot" data-tone="world" aria-hidden="true" />
+              Chat · last {counts.length} h
+            </span>
+            <Cluster space="2xs">
+              <Icon name="chat" size="s" />
+              <span>{grouped(now)} msgs/h now</span>
+            </Cluster>
           </Cluster>
         </div>
         {running ? (
           <Suspense fallback={<div className={styles["bars"]} />}>
-            <Bars values={counts} none={!known} />
+            <Bars values={counts} />
           </Suspense>
         ) : (
           <div className={styles["bars"]} />

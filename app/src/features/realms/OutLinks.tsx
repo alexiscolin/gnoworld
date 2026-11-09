@@ -8,7 +8,7 @@ export function OutLinks({ links }: { links: readonly { label: string; href: str
   const shown = links.flatMap(({ label, href }) => (href === undefined ? [] : [{ label, href }]));
   if (shown.length === 0) return null;
   return (
-    <Cluster as="ul" space="m">
+    <Cluster as="ul" space="xl">
       {shown.map(({ label, href }) => (
         <li key={label}>
           <a className={`label ${String(styles["out"])}`} href={href} target="_blank" rel="noopener noreferrer">

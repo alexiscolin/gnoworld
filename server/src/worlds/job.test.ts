@@ -679,29 +679,34 @@ describe("runWorlds", () => {
       expect(logged.filter(({ error }) => error === "list")).toEqual([{ event: "worlds_shed", error: "list" }]);
     }, 60_000);
 
-    it("writes a file for the recorded list of 743 realms under the default cap, with room to spare", async () => {
+    // D346: of the recorded list's 743 realms, the chain's own 10 (r/sys) are no world's.
+    it("writes a file for the recorded list of 743 realms, the chain's own left out, under the default cap, with room to spare", async () => {
       const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
         .split("\n")
         .filter((line) => line !== "");
       const { file, outcome } = await run(chainRoutes(onyx));
       expect(outcome).toEqual({ wrote: true });
-      expect(written(file).worlds).toHaveLength(533);
+      expect(written(file).worlds).toHaveLength(525);
       expect(readFileSync(file).byteLength).toBeLessThan(WORLDS_MAX_BYTES / 4);
     });
 
     // 7k3: the per-realm reads 7c wrote made 2,231 calls of this list, the indexer's 743 at 1.2 to 1.5 s each on onyx-1 (2026-11-04).
-    it("reads the recorded chain's 743 realms in 1,492 calls: the list, two reads a package, the one deployer's name, four of the indexer", async () => {
+    it("reads the recorded chain's 743 realms, 733 of them worlds', in 1,472 calls: the list, two reads a package, the one deployer's name, four of the indexer", async () => {
       const onyx = readFileSync(new URL("./onyxPaths.txt", import.meta.url), "utf8")
         .split("\n")
         .filter((line) => line !== "");
       const { chain, file, logged, outcome } = await run(chainRoutes(onyx));
       expect(outcome).toEqual({ wrote: true });
       expect(logged).toEqual([{ event: "worlds_written", ms: 0 }]);
-      expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ calls }) => calls))).toEqual(onyx.map(() => 2));
+      const worlds = onyx.filter((path) => !path.startsWith("gno.land/r/sys/"));
+      expect(worlds).toHaveLength(733);
+      expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ calls }) => calls))).toEqual(
+        worlds.map(() => 2),
+      );
       const count = (kind: string) => chain.asked.filter((asked) => asked.kind === kind).length;
       expect(onyx).toHaveLength(743);
-      expect(["vm/qpaths", "vm/qdoc", "vm/qfile", "vm/qeval", "indexer"].map(count)).toEqual([1, 743, 743, 1, 4]);
-      expect(chain.asked).toHaveLength(1_492);
+      expect(["vm/qpaths", "vm/qdoc", "vm/qfile", "vm/qeval", "indexer"].map(count)).toEqual([1, 733, 733, 1, 4]);
+      expect(chain.asked).toHaveLength(1_472);
     });
 
     it("writes the plan's 10,000 worlds (12,000 realms, past the chain's 10,000 per answer) under the default cap", async () => {
@@ -824,9 +829,9 @@ describe("the worlds' count, beside their file", () => {
     expect(readdirSync(join(file, "..")).sort()).toEqual(["worlds-count.json", "worlds.json"]);
   });
 
-  it("counts the recorded chain's file as the scene does, core's count of the file written: 534", async () => {
+  it("counts the recorded chain's file as the scene does, core's count of the file written: 526", async () => {
     const { file } = await run(chainRoutes(ONYX));
-    expect(countOf(file).count).toBe(534);
+    expect(countOf(file).count).toBe(526);
     expect(countOf(file).count).toBe(worldsDrawn(written(file).worlds));
   }, 60_000);
 

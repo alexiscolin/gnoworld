@@ -31,14 +31,9 @@
     --_line: var(--color-mine);
   }
 
+  /* Clear at the field's end: the box-end utility centres it on the field's height. */
   .clear {
-    position: absolute;
-    inset-block: 0;
     inset-inline-end: var(--space-2xs);
-    /* layout: Clear centred on the field's height */
-    display: grid;
-    /* layout: Clear centred on the field's height */
-    place-items: center;
   }
 
   .scroll {

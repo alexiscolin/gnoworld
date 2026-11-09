@@ -6,11 +6,16 @@ import layers from "@gnoworld/ui/layers.css?url";
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { PageError } from "./features/errors/index.ts";
+import { markFullEarly } from "./fullChat.ts";
 import { Shell } from "./shell.tsx";
+
+// Before the first draw: a page opened with the full chat covers itself at once (fullChat.ts).
+markFullEarly();
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // The root's marks set before React draws (fullChat.ts's data-chat): the page's own, never a mismatch to report.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

@@ -1,7 +1,6 @@
 /* A person's card (the video's frame 76): the name 18 px over its line of capitals. */
 @layer components {
   .name {
-    /* raw: the frame's name, 18 px */
-    font: 400 18px/1.2 var(--family-sans);
+    font: var(--font-card-name);
   }
 }

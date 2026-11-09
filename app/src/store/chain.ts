@@ -5,7 +5,7 @@ import type { ChainEvent, RealmsDeployed } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 
 export type ChainCall = Extract<ChainEvent, { kind: "call" }>;
-export type ChainDeploy = Extract<ChainEvent, { kind: "deploy" }>;
+type ChainDeploy = Extract<ChainEvent, { kind: "deploy" }>;
 /** A call as the page heard it: with the time of its hearing, which places it among a room's messages (a chain event has no time). */
 export type ChainHeard = ChainCall & { at: string };
 

@@ -17,7 +17,7 @@ import styles from "./Thread.module.css";
 /** The graphemes of a root's words the title keeps. */
 export const TITLE_LENGTH = 60;
 
-const LINES = [shared["plain"], shared["scrolls"], room["lines"]].join(" ");
+const LINES = [shared["plain"], shared["scrolls"], room["lines"], styles["list"]].join(" ");
 
 export interface ThreadProps {
   /** The msgid of the thread's root: a line of the room's lines, or a line the window no longer holds. */
@@ -76,35 +76,39 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   };
   return (
     <aside ref={boxRef} aria-label="Thread" className={styles["panel"]} onKeyDown={escape}>
-      <Stack space="s">
+      <header className={styles["head"]}>
         <Sidebar side="end" space="2xs">
           <h3 className={styles["title"]}>{title === "" ? "Thread" : `Thread: ${title}`}</h3>
           <IconButton icon="close" label="Close the thread" size="s" emphasis="plain" onClick={onClose} />
         </Sidebar>
-        <p className={styles["count"]}>{countOf(replies.length)}</p>
-        <ol aria-label="In this thread" className={LINES}>
-          {rows.map((line) => (
-            <LineView
-              key={line.id}
-              line={line}
-              me={me}
-              members={known}
-              stop={false}
-              actions={null}
-              fresh={false}
-              verdict={undefined}
-              players={false}
-              saved={false}
-              pinned={false}
-              chips={undefined}
-              react={undefined}
-              answers={undefined}
-              inThread
-            />
-          ))}
-        </ol>
-        {composer}
-      </Stack>
+      </header>
+      <div className={styles["body"]}>
+        <Stack space="s">
+          <p className={styles["count"]}>{countOf(replies.length)}</p>
+          <ol aria-label="In this thread" className={LINES}>
+            {rows.map((line) => (
+              <LineView
+                key={line.id}
+                line={line}
+                me={me}
+                members={known}
+                stop={false}
+                actions={null}
+                fresh={false}
+                verdict={undefined}
+                players={false}
+                saved={false}
+                pinned={false}
+                chips={undefined}
+                react={undefined}
+                answers={undefined}
+                inThread
+              />
+            ))}
+          </ol>
+          {composer}
+        </Stack>
+      </div>
     </aside>
   );
 }

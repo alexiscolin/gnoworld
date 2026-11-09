@@ -1,5 +1,5 @@
 // What the composer's field says of a draft (moved out of Composer.tsx, which grew past the lint's size): why it cannot
-// go, what Tab completes, the bytes left near the end, and the hint of how to add a line.
+// go, what Tab completes, and the bytes left near the end.
 import {
   LINE_BYTES,
   markdown,
@@ -12,12 +12,6 @@ import {
 import type { FieldProps } from "@gnoworld/ui";
 import type { Completion } from "./complete.ts";
 import { isAccount, shortAddress } from "./names.ts";
-
-// What the field says while it has nothing else to say: the room is told of the typing from the first key (4f; its
-// switch waits for slice 8's settings, docs/decisions.md 2026-10-26), which the writer reads here (UX review's U9).
-const TELLS = "People in this room see when you type.";
-const ADDS_LINE = "Shift+Enter adds a line.";
-const ADDS_LINE_TOUCH = "Enter adds a line; Send sends it.";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
@@ -147,11 +141,3 @@ export function said(
   const help = nearEnd(composed, context) ?? actionOnly(composed, context);
   return help === undefined ? {} : { help };
 }
-
-// Nothing else to say, no error either: how to add a line (a touch screen's keyboard has no Shift), and the disclosure
-// to a room's writer; a direct message tells no typing (4e).
-export const withHint = (says: ReturnType<typeof said>, direct: boolean, coarse: boolean): ReturnType<typeof said> => {
-  if (says.error !== undefined || says.help !== undefined) return says;
-  const adds = coarse ? ADDS_LINE_TOUCH : ADDS_LINE;
-  return { help: direct ? adds : `${TELLS} ${adds}` };
-};

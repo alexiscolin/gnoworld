@@ -1,6 +1,6 @@
 // The login in the page: the session read as the page starts, again until the server says, a login with the page's Adena, a logout. The
 // header's account menu holds the way out (8p, frame 17): the hook hands it the logout, the view draws the way in.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { knowSession, logIn, logOut, type SessionDeps } from "./logIn.ts";
@@ -51,7 +51,14 @@ export function useLogin() {
   };
 }
 
-/** The way in, its step and why the last login stopped, for `login` as `useLogin` holds it. */
-export function LoginControl({ login, logIn }: Pick<ReturnType<typeof useLogin>, "login" | "logIn">) {
-  return <LoginView session={login.session} step={login.step} problem={login.problem} onLogIn={logIn} />;
+/** The way in, its step and why the last login stopped, for `login` as `useLogin` holds it; `network`, the network's name the button
+ * carries after its words (D340). */
+export function LoginControl({
+  login,
+  logIn,
+  network = null,
+}: Pick<ReturnType<typeof useLogin>, "login" | "logIn"> & { network?: ReactNode }) {
+  return (
+    <LoginView session={login.session} step={login.step} problem={login.problem} onLogIn={logIn} network={network} />
+  );
 }

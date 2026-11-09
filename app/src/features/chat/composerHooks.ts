@@ -8,7 +8,7 @@ import { completions, type Completion } from "./complete.ts";
 import type { Edit } from "./format.ts";
 import { peopleOf } from "./names.ts";
 import { useMedia } from "./useMedia.ts";
-import { editRefusal, roomHint, said, sendable, withHint } from "./said.ts";
+import { editRefusal, roomHint, said, sendable } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
 export interface Refused {
@@ -116,13 +116,10 @@ export function useHelp(
   const refusal = editRefusal(composed, editing === true);
   return {
     coarse,
-    shown: withHint(
-      hinted(
-        { ...said(composed, failed, context), ...refusal },
-        to === undefined ? roomHint(composed, groups ?? false) : undefined,
-      ),
-      to !== undefined,
-      coarse,
+    // Nothing said while there is nothing to say: no standing hint under the field (Alexis, 2026-11-08).
+    shown: hinted(
+      { ...said(composed, failed, context), ...refusal },
+      to === undefined ? roomHint(composed, groups ?? false) : undefined,
     ),
     goes: sendable(composed, multiline) && refusal.error === undefined,
   };

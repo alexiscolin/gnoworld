@@ -54,7 +54,7 @@ function useToggled(tipRef: RefObject<HTMLSpanElement | null>, shown: boolean): 
 }
 
 /** An icon-only control's name above it: under the pointer after a moment, at once with the keyboard's
- * focus; it stays while the pointer is on it, and Esc hides it (WCAG 1.4.13). */
+ * focus; it stays while the pointer is on it, a press or Esc hides it (WCAG 1.4.13). */
 export function Tooltip({ label, children }: TooltipProps) {
   // The pointer's hold and the keyboard focus's, each its own (F334), and Esc, which hides the words
   // until the pointer or the focus comes again.
@@ -104,6 +104,10 @@ export function Tooltip({ label, children }: TooltipProps) {
       }}
       onPointerLeave={() => {
         setPointer("away");
+      }}
+      // A press is the answer the words were waiting for: they go, and come back with the pointer's next visit.
+      onPointerDown={() => {
+        setDismissed(true);
       }}
       onFocus={(event) => {
         if (!keyboardFocus(event)) return;

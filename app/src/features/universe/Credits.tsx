@@ -6,7 +6,7 @@ import styles from "./Universe.module.css";
 // The dialog's code is asked at the first press, as the full chat's is: one chunk of its own that neither page carries.
 const CreditsDialog = lazy(async () => ({ default: (await import("../credits/index.ts")).CreditsDialog }));
 
-export function Credits({ overTicker = false }: { overTicker?: boolean }) {
+export function Credits() {
   const [asked, setAsked] = useState(false);
   const [open, setOpen] = useState(false);
   return (
@@ -14,7 +14,6 @@ export function Credits({ overTicker = false }: { overTicker?: boolean }) {
       <button
         type="button"
         className={styles["credits"]}
-        data-over-ticker={overTicker ? "" : undefined}
         onClick={() => {
           setAsked(true);
           setOpen(true);

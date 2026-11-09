@@ -7,6 +7,7 @@ import { openDatabase } from "@gnoworld/service/db";
 import { stop } from "@gnoworld/service/http";
 import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
+import { guestSettings } from "./guest/wire.ts";
 import { adminRoutes } from "./door/admin.ts";
 import { askRoutes } from "./door/ask.ts";
 import { digestRoutes } from "./door/digest.ts";
@@ -26,7 +27,7 @@ import { checkFor, startPreviews } from "./previews/job.ts";
 import { defaultUniverse, hubRealms, hubWorlds } from "./prices/universes.ts";
 import { habitsBeside } from "./worlds/habitsFiles.ts";
 import { startRetention } from "./retention/retention.ts";
-import { roomsRoutes } from "./rooms/routes.ts";
+import { roomsBoot } from "./rooms/roomsBoot.ts";
 import { startWorlds } from "./worlds/job.ts";
 import { trendsRoutes } from "./worlds/trends.ts";
 import { dirname, join } from "node:path";
@@ -97,6 +98,7 @@ const chat = startChat(
     moderation: config.moderation,
     trustedProxy: config.trustedProxy,
     spared: spared(roles),
+    ...guestSettings(config, roles),
   },
   // Who is here keeps its history beside the database (7h); a database held in memory keeps none.
   {
@@ -109,6 +111,8 @@ const chat = startChat(
   },
 );
 app.route("/api/activity", chat.activity);
+// The guest chat (D430): a name and a cookie, then a line the bot says; both answer 404 under GUEST_CHAT=off.
+if (chat.guest !== undefined) app.route("/api/guest", chat.guest);
 if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
 // The markets row's sparklines (8i): the prices timer's day, a 404 while it has none or without the timer.
 app.route("/api/markets/history", historyRoutes(prices?.history ?? (() => undefined)));
@@ -126,10 +130,7 @@ app.route(
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
-app.route(
-  "/api/rooms",
-  roomsRoutes({ roles, rooms: chat.rooms, session, origins: config.origins, log, now: Date.now }),
-);
+const roomsAhead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck });
 app.route(
   "/api/pins",
   pinsRoutes({
@@ -204,7 +205,7 @@ const drain = (): void => {
   if (draining) return;
   draining = true;
   log("stopping");
-  for (const job of [retention, prices, worlds, previews, chain]) job?.stop();
+  for (const job of [retention, prices, worlds, previews, chain, roomsAhead]) job?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).

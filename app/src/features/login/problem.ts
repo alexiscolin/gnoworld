@@ -42,3 +42,33 @@ const SAID: Record<Exclude<LoginProblem["reason"], "address">, string> = {
 /** The sentence a stopped login shows. */
 export const sayProblem = (problem: LoginProblem): string =>
   problem.reason === "address" ? ADDRESS[problem.problem] : SAID[problem.reason];
+
+// The same, in the few words the login's button holds in place of its own (D377): the whole sentence is its description.
+const SHORT: Record<LoginProblem["reason"], string> = {
+  address: "Check Adena's address",
+  missing: "Install Adena",
+  outdated: "Update Adena",
+  declined: "Declined · try again",
+  locked: "Unlock Adena",
+  "no-account": "Create an Adena account",
+  mismatch: "Check Adena's account",
+  "too-long": "Too long to sign",
+  failed: "Adena failed · try again",
+  refused: "Refused · try again",
+  too_many: "Wait a minute",
+  network: "Offline · try again",
+  unavailable: "Server down · try again",
+  internal: "Server down · try again",
+  not_ready: "Server down · try again",
+  unauthenticated: "Log in again",
+  forbidden: "Not allowed here",
+  // The page itself sent what the server could not take: a retry fails the same way, a reload may not.
+  malformed: "Reload the page",
+  not_found: "Reload the page",
+  too_large: "Reload the page",
+  unsupported: "Reload the page",
+  full: "Try again",
+};
+
+/** The few words a stopped login's button says. */
+export const sayShort = (problem: LoginProblem): string => SHORT[problem.reason];

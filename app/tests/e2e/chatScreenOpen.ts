@@ -23,7 +23,7 @@ export async function open(
     scriptedErgo(ergo, as, {
       history: [
         ["m1", "2026-10-25T15:31:00.000Z", "Lagos builders, we have a room now"],
-        ["m2", "2026-10-25T15:32:00.000Z", `hello @${MEMBER}`],
+        ["m2", "2026-10-25T15:40:00.000Z", `hello @${MEMBER}`],
       ],
     });
   });

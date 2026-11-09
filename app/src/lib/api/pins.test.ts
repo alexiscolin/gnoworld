@@ -69,6 +69,7 @@ describe("a room's pins, from the server", () => {
     expect(await server({ status, json: { error } }).api.pin("#bubble/games", "m1")).toEqual({
       ok: false,
       reason: error,
+      body: { error },
     });
   });
 

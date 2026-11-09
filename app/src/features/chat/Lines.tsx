@@ -13,17 +13,18 @@ import {
   type ShownLine,
 } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
-import { Flash, type FlashMessage } from "@gnoworld/ui";
 import { ChainCard } from "./ChainCard.tsx";
-import { useEntries } from "./chainEntries.ts";
+import { useEntries, type Entry } from "./chainEntries.ts";
 import { lineKeeping } from "./LineKeeping.tsx";
 import type { RoomKeeping } from "./RoomKeeping.ts";
+import { needing } from "./BarButtons.tsx";
 import { LineActions } from "./LineActions.tsx";
 import { forLine, useCopy, useRemoval } from "./lineFlash.ts";
 import { useLineFocus } from "./lineFocus.ts";
 import { LineView } from "./LineView.tsx";
+import { Told } from "./Told.tsx";
 import { mentionable } from "./names.ts";
-import { chipsOn, firstWordsOf, votesOf } from "./lineMarks.ts";
+import { chipsOn, firstWordsOf, groupedOf, votesOf } from "./lineMarks.ts";
 import { useListRead } from "./reading.ts";
 import styles from "./RoomView.module.css";
 
@@ -80,34 +81,6 @@ const NO_REACT = () => false;
 const NO_REPLY = () => undefined;
 const NO_REPLIES: ReadonlyMap<string, readonly Line[]> = new Map();
 
-// What Ergo refused, said until the page dismisses it: a delete first, then a reaction; none, the page's own word.
-const toldOf = (refused: string | undefined, cannotReact: true | undefined): FlashMessage | undefined => {
-  if (refused !== undefined) return { title: "Could not delete the message.", line: "The chat refused it." };
-  return cannotReact === undefined ? undefined : { title: "Could not react." };
-};
-
-// The flash: what Ergo refused, else the page's own word; closing it dismisses the refusal, or forgets the word.
-interface ToldProps {
-  refused: string | undefined;
-  cannotReact: true | undefined;
-  said: FlashMessage | null;
-  setSaid: (said: FlashMessage | null) => void;
-  onDismiss: () => void;
-}
-
-function Told({ refused, cannotReact, said, setSaid, onDismiss }: ToldProps) {
-  const told = toldOf(refused, cannotReact);
-  return (
-    <Flash
-      message={told ?? said}
-      onClose={() => {
-        if (told === undefined) setSaid(null);
-        else onDismiss();
-      }}
-    />
-  );
-}
-
 // What the list takes of the room: its lines as shown, what each shows of the reactions, and the line a msgid names.
 type ListProps = Omit<LinesProps, "lines"> & {
   lines: readonly ShownLine[];
@@ -121,6 +94,9 @@ type ListProps = Omit<LinesProps, "lines"> & {
   chips: ReadonlyMap<string, string>;
   /** Each poll line's votes as votesString writes them, by msgid. */
   votes: ReadonlyMap<string, string>;
+  /** The room's lines with the chain's calls among them, and the lines that go on their author's group (once per change). */
+  entries: readonly Entry<ShownLine>[];
+  grouped: ReadonlySet<string>;
   /** The lines that are an account's first words in the room. */
   firsts: ReadonlySet<string>;
   /** Each root's replies, by msgid (4d's threads): a chip counts them. */
@@ -128,6 +104,13 @@ type ListProps = Omit<LinesProps, "lines"> & {
   /** The newest edit shown in each corrected line's place, by the line's msgid: the verdict a player waits on is its. */
   newest: ReadonlyMap<string, string>;
 };
+
+// What a line shows beyond its words: its chips, its poll's votes, and whether it is its author's first words.
+const marksOf = ({ chips, votes, firsts }: ListProps, id: string) => ({
+  chips: chips.get(id),
+  votes: votes.get(id),
+  newHere: firsts.has(id),
+});
 
 // What the reader keeps of a line, on this device (saved) and in its room (pinned) (4d).
 const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
@@ -138,6 +121,13 @@ const keptOf = (keeping: RoomKeeping | undefined, id: string) => ({
 // The line a reply answers, when this room holds it: a reply naming its own msgid or another room's answers none here.
 const answeredBy = (line: ShownLine, byId: ReadonlyMap<string, Line>, lineOf: (id: string) => string) =>
   line.reply === line.id ? undefined : byId.get(lineOf(line.reply ?? ""));
+
+// A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's (F1921).
+const verdictIn = (
+  verdicts: LinesProps["verdicts"],
+  newest: ReadonlyMap<string, string>,
+  id: string,
+): StreamEvent["state"] | undefined => verdicts?.[newest.get(id) ?? id];
 
 /** The room's flash, then its lines, oldest first, as a list a screen reader hears grow. */
 export function Lines(props: LinesProps) {
@@ -157,8 +147,12 @@ export function Lines(props: LinesProps) {
   // Each line's chips as a string a line compares by value (F1222).
   const votes = votesOf({ lines, reactions: props.reactions ?? [], me: props.me, lineOf });
   const chips = chipsOn(shown, votes);
+  // Here, not in the list a pointer redraws: the grouping is read once as the lines change.
+  const entries = useEntries(lines, props.room);
   return (
     <List
+      entries={entries}
+      grouped={groupedOf(entries)}
       votes={votes}
       firsts={firstWordsOf(lines, { room: props.room, paged: props.paged === true })}
       {...props}
@@ -178,19 +172,16 @@ export function Lines(props: LinesProps) {
 function List(props: ListProps) {
   const { room, partner, known, me, refused, connected, cannotReact, lines, shown, lineOf, newest } = props;
   const { onDelete = NO_DELETE, onDismiss = NO_DISMISS, onReact = NO_REACT, onReply = NO_REPLY } = props;
-  const { verdicts, saving = false, keeping, byId, chips, votes, firsts, repliesOf, onThread, onEdit } = props;
+  const { verdicts, saving = false, keeping, byId, votes, repliesOf, onThread, onEdit } = props;
   const { fresh, listRef, onScroll } = useListRead(props);
-  const { stop, mounted, on, leave } = useLineFocus(lines, listRef, fresh);
+  const { stop, mounted, on, leave, asked } = useLineFocus(lines, listRef, fresh);
   const { said, setSaid, copy } = useCopy();
   const [deleting, remove] = useRemoval({ lines, refused, connected, onDelete, leave, setSaid, me, room });
-  // A corrected line's player waits on its newest edit's verdict, the words it shows being the edit's (F1921).
-  const verdictOf = (id: string) => verdicts?.[newest.get(id) ?? id];
   const react = (reaction: Reacting) => {
     const went = onReact(reaction);
     if (!went) setSaid({ title: "Could not react." });
     return went;
   };
-  const marks = (id: string) => ({ chips: chips.get(id), votes: votes.get(id), newHere: firsts.has(id) });
   const actionsOf = (line: Line) => (
     <LineActions
       line={line}
@@ -211,6 +202,8 @@ function List(props: ListProps) {
       }}
       onThread={onThread}
       onEdit={forLine(onEdit, line.id)}
+      onNeed={needing(me, setSaid)}
+      menuAt={asked?.id === line.id ? asked : undefined}
     />
   );
   return (
@@ -227,7 +220,7 @@ function List(props: ListProps) {
         aria-relevant="additions"
         className={LINES}
       >
-        {useEntries(lines, room).map((entry) =>
+        {props.entries.map((entry) =>
           "call" in entry ? (
             <ChainCard key={entry.key} call={entry.call} />
           ) : (
@@ -241,10 +234,11 @@ function List(props: ListProps) {
                 (room !== undefined || partner !== undefined) && mounted(entry.line.id) ? actionsOf(entry.line) : null
               }
               fresh={entry.line.id === fresh}
-              verdict={verdictOf(entry.line.id)}
+              grouped={props.grouped.has(entry.line.id)}
+              verdict={verdictIn(verdicts, newest, entry.line.id)}
               players={room !== undefined && !saving}
               {...keptOf(keeping, entry.line.id)}
-              {...marks(entry.line.id)}
+              {...marksOf(props, entry.line.id)}
               react={me === undefined || (!shown.has(entry.line.id) && !votes.has(entry.line.id)) ? undefined : react}
               answers={answeredBy(entry.line, byId, lineOf)}
               replies={repliesOf.get(entry.line.id)?.length}

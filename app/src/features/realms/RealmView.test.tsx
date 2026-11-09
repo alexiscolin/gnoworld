@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { act, useState } from "react";
-import { MemoryRouter, Route, Routes, useLocation } from "react-router";
+import { MemoryRouter } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { PAGES } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
@@ -22,46 +22,10 @@ const CHAIN = {
   indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
 };
 
-// 5k: the facts the indexer gives for the realm, in the shape the schema takes (synthetic: nothing is recorded, F2950).
-const FACTS = {
-  path: "gno.land/r/gnoland/wugnot",
-  deployer: "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5",
-  firstBlock: 12,
-};
-
-// A fetch that answers /status with a height, the indexer with `facts` (or as `indexer` says) and any query with `page`; or
+// A fetch that answers /status with a height and any query with `page`; or
 // fails as `fail` says.
-function chain(
-  page: string | null,
-  { status = true, error, indexer = "facts" }: { status?: boolean; error?: string; indexer?: "facts" | "down" } = {},
-) {
+function chain(page: string | null, { status = true, error }: { status?: boolean; error?: string } = {}) {
   return vi.fn<ChainFetch>((url) => {
-    if (url.startsWith("https://indexer.")) {
-      return Promise.resolve(
-        indexer === "down"
-          ? new Response("down", { status: 503 })
-          : new Response(
-              JSON.stringify({
-                data: {
-                  getTransactions: [
-                    {
-                      block_height: FACTS.firstBlock,
-                      messages: [
-                        {
-                          value: {
-                            __typename: "MsgAddPackage",
-                            creator: FACTS.deployer,
-                            package: { path: FACTS.path },
-                          },
-                        },
-                      ],
-                    },
-                  ],
-                },
-              }),
-            ),
-      );
-    }
     const body = url.includes("/status")
       ? status
         ? statusEnvelope(786661, "2026-10-30T23:43:10Z")
@@ -77,7 +41,7 @@ async function view(fetcher: ChainFetch, realm = "gno.land/r/gnoland/wugnot", ch
   const box = mount(
     <StoreProvider>
       <MemoryRouter>
-        <RealmView realm={realm} chain={chainOf} home="/" options={{ fetch: fetcher }} />
+        <RealmView realm={realm} chain={chainOf} options={{ fetch: fetcher }} />
       </MemoryRouter>
     </StoreProvider>,
   );
@@ -91,9 +55,8 @@ async function view(fetcher: ChainFetch, realm = "gno.land/r/gnoland/wugnot", ch
 }
 
 describe("a realm's view", () => {
-  test("shows the realm's title, its page, the block height it was read at and the link to gnoweb", async () => {
+  test("shows the realm's page, the block height it was read at and the link to gnoweb", async () => {
     const box = await view(chain(WUGNOT?.body ?? null));
-    expect(one(box, "#realm-title").textContent).toBe("gno.land/r/gnoland/wugnot");
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(box.textContent).toContain("Total supply");
     // The line is the last of the page itself; the read functions' panel, with its own text, follows it (5i).
@@ -117,7 +80,7 @@ describe("a realm's view", () => {
     mount(
       <StoreProvider>
         <MemoryRouter>
-          <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/" options={{ fetch: fetcher }} />
+          <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} options={{ fetch: fetcher }} />
         </MemoryRouter>
       </StoreProvider>,
     );
@@ -125,44 +88,13 @@ describe("a realm's view", () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
     vi.useRealTimers();
-    // 5i: the read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click. 5k: the indexer
-    // is a fourth, to its own address, asked once.
-    expect(fetcher).toHaveBeenCalledTimes(4);
+    // 5i: the read functions' list is a third request (vm/qfuncs), asked once; no result is asked before a click.
+    expect(fetcher).toHaveBeenCalledTimes(3);
     const urls = fetcher.mock.calls.map(([url]) => url);
-    expect(urls.filter((url) => url.startsWith("https://indexer.onyx.testnets.gno.land/graphql/query?"))).toHaveLength(
-      1,
-    );
     expect(urls.filter((url) => url.includes("/status"))).toHaveLength(1);
     expect(urls.filter((url) => url.includes("vm%2Fqrender"))).toHaveLength(1);
     expect(urls.filter((url) => url.includes("vm%2Fqfuncs"))).toHaveLength(1);
     expect(urls.filter((url) => url.includes("vm%2Fqeval"))).toHaveLength(0);
-  });
-
-  test("shows the realm's facts from the indexer with their source and time, and asks for the realm's own path", async () => {
-    const fetcher = chain(WUGNOT?.body ?? null);
-    const box = await view(fetcher);
-    const facts = one(box, '[aria-label="Facts from the indexer"]');
-    expect(facts.textContent).toContain("gno.land/r/gnoland/wugnot");
-    expect(facts.textContent).toContain("Read from indexer.onyx.testnets.gno.land at ");
-    const asked = fetcher.mock.calls.map(([url]) => url).find((url) => url.startsWith("https://indexer."));
-    expect(decodeURIComponent(asked ?? "")).toContain('"path":"gno.land/r/gnoland/wugnot"');
-  });
-
-  test("shows a state with its next step when the indexer is down, and the page and its height stand", async () => {
-    const box = await view(chain(WUGNOT?.body ?? null, { indexer: "down" }));
-    expect(box.querySelector('[aria-label="Facts from the indexer"]')).toBeNull();
-    const state = all(box, '[role="status"]').find((el) => el.textContent.includes("Read from indexer."));
-    expect(state?.textContent).toMatch(/did not answer/);
-    expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
-    expect(box.textContent).toContain("Read at block 786,661");
-    // The facts' failure does not take the page's alert.
-    expect(box.querySelector('[role="alert"]')).toBeNull();
-  });
-
-  test("shows the facts while the page could not be read, each read on its own", async () => {
-    const box = await view(chain(null, { error: "down" }));
-    expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
-    expect(one(box, '[aria-label="Facts from the indexer"]').textContent).toContain("gno.land/r/gnoland/wugnot");
   });
 
   test("shows a page's form read only, and a link off gnoweb behind a button, whatever the realm wrote", async () => {
@@ -221,16 +153,15 @@ describe("a realm's view", () => {
   test("shows the realm's read functions below its page, and a failed list leaves the page standing", async () => {
     const box = await view(chain(WUGNOT?.body ?? null));
     const functions = one(box, '[aria-label="Read functions"]');
-    expect(follows(one(box, "#realm-title"), functions)).toBe(true);
+    expect(follows(one(box, "#page"), functions)).toBe(true);
     // After "Read at block", which stays beside the page it dates, not parted from it by up to a hundred buttons.
     const read = all(box, "p").find((p) => p.textContent.startsWith("Read at block"));
     expect(read !== undefined && follows(read, functions)).toBe(true);
-    // This fetch answers vm/qfuncs with the page's text: the list is a state of its own, the page and the link stand.
+    // This fetch answers vm/qfuncs with the page's text: the list is a state of its own, the page stands.
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(functions.querySelector('[role="status"]')).not.toBeNull();
-    expect(all(functions, "a").map((a) => a.getAttribute("href"))).toContain(
-      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
-    );
+    // The panel draws no link of its own: the realm's link out is the page's (RealmFunctions, OutLinks).
+    expect(all(functions, "a")).toHaveLength(0);
   });
 
   test("shows the read functions' state beside a page that could not be read", async () => {
@@ -238,9 +169,8 @@ describe("a realm's view", () => {
     expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
     const functions = one(box, '[aria-label="Read functions"]');
     expect(one(functions, '[role="status"]').textContent).toMatch(/\S/);
-    expect(all(functions, "a").map((a) => a.getAttribute("href"))).toContain(
-      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
-    );
+    // The panel draws no link of its own: the realm's link out is the page's (RealmFunctions, OutLinks).
+    expect(all(functions, "a")).toHaveLength(0);
   });
 
   test("keeps the page when only the height fails, and says so", async () => {
@@ -250,7 +180,7 @@ describe("a realm's view", () => {
   });
 
   // R-F3 (F2906, F2952): the two addresses are the chain's own, read from the data it is given, never from a table by chain id.
-  test("links gnoweb and asks the indexer where the chain's data says, whatever the chain's id", async () => {
+  test("links gnoweb where the chain's data says, whatever the chain's id", async () => {
     const fetcher = chain(WUGNOT?.body ?? null);
     const other = {
       ...CHAIN,
@@ -262,10 +192,6 @@ describe("a realm's view", () => {
     expect(all(box, "a").map((link) => link.getAttribute("href"))).toContain(
       "https://gnoweb.other.example/r/gnoland/wugnot",
     );
-    expect(fetcher.mock.calls.some(([url]) => url.startsWith("https://indexer.other.example/graphql/query?"))).toBe(
-      true,
-    );
-    expect(fetcher.mock.calls.some(([url]) => url.includes("onyx.testnets.gno.land/graphql"))).toBe(false);
   });
 
   test("names no gnoweb link when the data's gnoweb is no https origin, and still shows the page", async () => {
@@ -274,44 +200,10 @@ describe("a realm's view", () => {
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(all(box, "a")).toHaveLength(0);
   });
-
-  // Back goes where the reader came from; opened by its address, with nothing behind it, to the universe's home.
-  async function backFrom(entries: string[], index: number) {
-    const fetcher = chain(WUGNOT?.body ?? null);
-    const box = mount(
-      <StoreProvider>
-        <MemoryRouter initialEntries={entries} initialIndex={index}>
-          <Routes>
-            <Route
-              path="/r/*"
-              element={
-                <RealmView realm="gno.land/r/gnoland/wugnot" chain={CHAIN} home="/home" options={{ fetch: fetcher }} />
-              }
-            />
-            <Route path="*" element={<Here />} />
-          </Routes>
-        </MemoryRouter>
-      </StoreProvider>,
-    );
-    click(button(box, "Back"));
-    await act(async () => {
-      await Promise.resolve();
-    });
-    return box.querySelector("[data-at]")?.textContent;
-  }
-
-  test("goes back to the universe's home when it was opened by its address", async () => {
-    expect(await backFrom(["/r/gnoland/wugnot"], 0)).toBe("/home");
-  });
-
-  test("goes back to the page it came from when the reader came by the site", async () => {
-    expect(await backFrom(["/w/bubble", "/r/gnoland/wugnot"], 1)).toBe("/w/bubble");
-  });
 });
 
-function Here() {
-  return <p data-at="">{useLocation().pathname}</p>;
-}
+// The call cards: the form's, after its figure, and the write rows'.
+const CARDS = "figure + article, #functions article";
 
 // 9e: a page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
 describe("a realm's view, with a form on its page", () => {
@@ -340,7 +232,7 @@ describe("a realm's view, with a form on its page", () => {
   test("shows a Call on a page's form for a write function the chain lists, and opens its card prefilled in the view", async () => {
     const box = await view(fetcher(form("SetBio")));
     click(await callOf(box));
-    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["hi"]);
+    expect(inputs(one(box, CARDS)).map((i) => i.value)).toEqual(["hi"]);
   });
 
   test("keeps the form read only for a function the chain does not list", async () => {
@@ -358,8 +250,8 @@ describe("a realm's view, with a form on its page", () => {
     const formCall = await callOf(box);
     click(all(box, '[aria-label="Write functions"] button').find((b) => b.textContent === "Call SetBio"));
     click(formCall);
-    const [formCard, rowCard] = all(box, "article");
-    expect(all(box, "article")).toHaveLength(2);
+    const [formCard, rowCard] = all(box, CARDS);
+    expect(all(box, CARDS)).toHaveLength(2);
     expect(formCard?.previousElementSibling).toBe(one(box, "figure"));
     expect(inputs(formCard ?? box).map((i) => i.value)).toEqual(["hi"]);
     expect(inputs(rowCard ?? box).map((i) => i.value)).toEqual([""]);
@@ -410,7 +302,7 @@ describe("a realm's view that moves from one realm to another", () => {
           >
             Move
           </button>
-          <RealmView realm={realm} chain={CHAIN} home="/" options={{ fetch: asked }} />
+          <RealmView realm={realm} chain={CHAIN} options={{ fetch: asked }} />
         </>
       );
     }

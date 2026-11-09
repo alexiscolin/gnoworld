@@ -51,12 +51,15 @@ describe("ActivityChart", () => {
     expect(said[23]).toEqual(["This hour", "23"]);
   });
 
-  it("scales the bars to the peak, so the tallest fills the height and none is negative", () => {
+  it("scales the bars to the peak, so the tallest fills the height, an hour with none a 2 px dash and none negative", () => {
     const { container } = render(<ActivityChart label="Calls" values={[0, 5, 10]} />);
     const tall = heights(container);
     expect(tall[1]).toBeGreaterThan(tall[0] ?? 0);
     expect(tall[2]).toBeGreaterThan(tall[1] ?? 0);
-    expect(tall[0]).toBe(0);
+    // An hour with none is a dash on the baseline (Alexis, 2026-11-07, option A), marked empty.
+    expect(tall[0]).toBe(2);
+    expect(container.querySelector('svg [data-hour="0"]')?.hasAttribute("data-empty")).toBe(true);
+    expect(container.querySelector('svg [data-hour="1"]')?.hasAttribute("data-empty")).toBe(false);
     expect(Math.max(...tall)).toBe(Number(container.querySelector("svg")?.getAttribute("height")));
   });
 
@@ -116,9 +119,9 @@ describe("ActivityChart", () => {
     expect(new Set(points.map((point) => point.split(",")[1])).size).toBe(1);
   });
 
-  it("draws a flat day without dividing by zero", () => {
+  it("draws a flat day without dividing by zero, each hour a dash", () => {
     const { container } = render(<ActivityChart label="Calls" values={[0, 0, 0]} />);
-    expect(heights(container)).toEqual([0, 0, 0]);
+    expect(heights(container)).toEqual([2, 2, 2]);
   });
 
   it("counts a negative or missing value as none, in the bars and in the words", () => {

@@ -1,0 +1,49 @@
+/* A plate's standing (D530): one hero figure, the others small under it. It stands under the actions, so what comes and goes in it moves
+   nothing above it (D534); an empty one takes no row of the plate's column. Under a hairline from the plate's breakpoint, as frame 26
+   draws its facts (the plate sets the step above, Panel.module.css, D470). */
+@layer components {
+  .standing:empty {
+    /* layout: an empty one takes no row of the plate's column, whatever the width */
+    display: none;
+  }
+
+  .hero {
+    /* raw: the hero figure, one step over the board's 44 px (--font-figure) */
+    --font-figure: 500 4rem/1 var(--family-mono);
+  }
+
+  .rest {
+    /* raw: the small figures, under the hero: a step under the board's 44 px (--font-figure) */
+    --font-figure: 500 1.75rem/1 var(--family-mono);
+
+    /* layout: a grid of small figures */
+    display: grid;
+    /* layout: two columns on a phone, three where the column is wide enough */
+    /* raw: each at least 9 rem, so two stand in a phone's 358 px and three in the plate's 484 */
+    grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+    /* layout: a step between the figures */
+    gap: var(--space-m) var(--space-s);
+    /* layout: a step between the hero and its small figures */
+    margin-block-start: var(--space-m);
+  }
+
+  .standing > :first-child {
+    /* layout: the first part stands at the box's top, whatever it is */
+    margin-block-start: 0;
+  }
+
+  /* A realm's one fact, a real line of the plate's body, never a footnote (D534). */
+  .note {
+    /* layout: a step under the figures above it */
+    margin-block-start: var(--space-s);
+  }
+
+  /* raw: the plate's one breakpoint, where it stands beside its dock (Panel.module.css) */
+  @media (min-width: 1280px) {
+    .standing {
+      /* raw: frame 26's figure box 9 px under its hairline: the figure's line rises 7 px over its box, and the hairline is 1 px */
+      padding-block-start: 15px;
+      border-block-start: var(--line-width) solid var(--color-line);
+    }
+  }
+}

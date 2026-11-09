@@ -129,7 +129,8 @@ class Reader {
     this.#dropAbove(label);
     this.#frames.pop();
     const href = this.#addresses.href(at + 1, end);
-    this.#push({ type: "link", href, children: labelOf(label.children, href, label.image) });
+    const children = labelOf(label.children, label.image);
+    this.#push(label.image ? { type: "link", href, children, image: true } : { type: "link", href, children });
     // No link inside a link: the labels around this one stay text.
     for (const frame of this.#frames) frame.active &&= frame.mark !== "[";
     this.#at = end + 1;

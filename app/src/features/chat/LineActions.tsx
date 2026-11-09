@@ -1,19 +1,17 @@
 // A line's actions (slice 4's 4c, 4d; docs/decisions.md, 2026-10-26): the prototype's bar, an account's three quick
-// reactions first and a Pin button for a reader who may pin (4d), its More menu holding Copy text, Copy link, Open
-// thread (4d's threads), View profile (8j), Save message and Mark unread for an account, Edit (the DM bar's, then the
-// room's: it puts one's own message back in the composer) and, on the reader's own line, Delete, asked first. More
-// reactions come with their merges; Report waits for slice 12's moderation queue.
+// reactions, Reply and a Pin button for a reader who may pin, its More menu holding Copy
+// text, Copy link, Open thread, View profile, Save message and Mark unread for an account, Edit and, on the reader's
+// own line, Delete, asked first. More reactions come with their merges; Report waits for slice 12's moderation queue.
 import { canEdit, type Line, type Shown } from "@gnoworld/core";
-import { Button, Chip, Cluster, Dialog, IconButton, Menu, Stack } from "@gnoworld/ui";
+import { Menu } from "@gnoworld/ui";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import styles from "./LineActions.module.css";
+import { AskDelete } from "./AskDelete.tsx";
+import { Reacting, Shortcuts, type Need } from "./BarButtons.tsx";
 import { openAuthorCard } from "./LineHead.tsx";
 import { keptItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
 import { menuItems } from "./menuItems.ts";
-import { quoted, roomLabel, shortAddress } from "./names.ts";
-
-// The prototype's three quick reactions (docs/prototype/source/app.js, withActions).
-const QUICK = ["👍", "❤️", "😂"];
+import { roomLabel, shortAddress } from "./names.ts";
 
 // A bar that would rise past the top of the list that scrolls comes down inside its line, as it shows (U10).
 function useInside() {
@@ -53,106 +51,12 @@ export interface LineActionsProps {
   onThread?: ((id: string) => void) | undefined;
   /** Puts the line's words in the composer to correct them; given by a view that has edits. */
   onEdit?: (() => void) | undefined;
+  /** What a guest presses that needs an account: says where to connect. Given for a guest alone. */
+  onNeed?: ((need: Need) => void) | undefined;
+  /** Opens the More menu now at this point, as a right-click's does; each new object asks once. */
+  menuAt?: { x: number; y: number } | undefined;
 }
 
-// The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
-function AskDelete({
-  line,
-  place,
-  open,
-  close,
-}: {
-  line: Line;
-  place: string;
-  open: boolean;
-  close: (go: boolean) => void;
-}) {
-  return (
-    <Dialog
-      title="Delete message?"
-      description={quoted(line.text)}
-      open={open}
-      onClose={() => {
-        close(false);
-      }}
-    >
-      <Stack space="s">
-        <p>It leaves {place}, and cannot come back.</p>
-        <Cluster justify="end">
-          <Button
-            emphasis="outline"
-            onClick={() => {
-              close(false);
-            }}
-          >
-            Keep it
-          </Button>
-          <Button
-            tone="danger"
-            onClick={() => {
-              close(true);
-            }}
-          >
-            Delete message
-          </Button>
-        </Cluster>
-      </Stack>
-    </Dialog>
-  );
-}
-
-// An account's quick reactions, each pressed when the reader gave it, pressed again to take it back. Wide, three chips;
-// narrow (the line's column under what the five controls need), one React menu of the same three, as the bar stands
-// on one row there (U1; LineActions.module.css).
-function QuickReactions({ given, onReact }: { given: ReadonlySet<string>; onReact: LineActionsProps["onReact"] }) {
-  const toggle = (emoji: string) => {
-    onReact(emoji, !given.has(emoji));
-  };
-  return (
-    <>
-      <span className={styles["quick"]}>
-        {QUICK.map((emoji) => (
-          <Chip
-            key={emoji}
-            label={`React with ${emoji}`}
-            selected={given.has(emoji)}
-            onClick={() => {
-              toggle(emoji);
-            }}
-          >
-            {emoji}
-          </Chip>
-        ))}
-      </span>
-      <span className={styles["react"]}>
-        <Menu
-          trigger="React"
-          icon="smile"
-          emphasis="plain"
-          size="s"
-          label="Reactions"
-          items={QUICK.map((emoji) => ({
-            label: `${given.has(emoji) ? "Take back" : "React with"} ${emoji}`,
-            onSelect: () => {
-              toggle(emoji);
-            },
-          }))}
-        />
-      </span>
-    </>
-  );
-}
-
-// What an account answers a line with: the quick reactions, the ones it gave pressed, and Reply (4d).
-function Answering({ reactions, onReact, onReply }: Pick<LineActionsProps, "reactions" | "onReact" | "onReply">) {
-  const given = new Set(reactions?.flatMap(({ emoji, mine }) => (mine ? [emoji] : [])));
-  return (
-    <>
-      <QuickReactions given={given} onReact={onReact} />
-      <IconButton icon="reply" label="Reply" size="s" emphasis="plain" onClick={onReply} />
-    </>
-  );
-}
 // Whether Edit is offered: an Edit to ask for, and canEdit's rule, which the composer holds as well (CR5).
 const asksEdit = (onEdit: (() => void) | undefined, line: Line, me: string | undefined) =>
   onEdit !== undefined && canEdit(line, me);
@@ -198,6 +102,8 @@ export function LineActions({
   onReply,
   onThread,
   onEdit,
+  onNeed,
+  menuAt,
 }: LineActionsProps) {
   const [asking, setAsking] = useState(false);
   const { barRef, inside } = useInside();
@@ -205,6 +111,7 @@ export function LineActions({
   const deletingRef = useRef(false);
   // Two missing values are no match: a guest's line has no account tag, a guest no address (M1).
   const own = me !== undefined && line.account === me;
+  const given = new Set(reactions?.flatMap(({ emoji, mine }) => (mine ? [emoji] : [])));
   // After the dialog's own close, as this effect runs after its: the line goes, handing the focus to a neighbour, or
   // stays, the delete unsent, the focus on More.
   useEffect(() => {
@@ -228,9 +135,18 @@ export function LineActions({
       className={styles["bar"]}
       data-inside={inside ? "" : undefined}
     >
-      {me === undefined ? null : <Answering reactions={reactions} onReact={onReact} onReply={onReply} />}
+      <Reacting given={given} onReact={onReact} onNeed={me === undefined ? onNeed : undefined} />
+      <Shortcuts {...{ line, dm, onCopy, onThread, onNeed: me === undefined ? onNeed : undefined, onReply }} />
       <PinButton line={line} pin={keeping?.pin} />
-      <Menu trigger="More actions" icon="more" emphasis="plain" size="s" label="Message actions" items={items} />
+      <Menu
+        trigger="More actions"
+        icon="more"
+        emphasis="plain"
+        size="xs"
+        label="Message actions"
+        items={items}
+        at={menuAt}
+      />
       {own ? <AskDelete line={line} place={placeOf(room, dm)} open={asking} close={close} /> : null}
     </div>
   );

@@ -31,7 +31,7 @@
     /* layout: a step from the name */
     margin-inline-start: var(--space-3xs);
     color: var(--color-text-muted);
-    /* raw: the count a step under the name, as the video's rooms' */
-    font-size: 10px;
+    /* the count a step under the name, as the video's rooms' */
+    font-size: var(--text-2xs);
   }
 }

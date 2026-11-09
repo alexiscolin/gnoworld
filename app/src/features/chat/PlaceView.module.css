@@ -1,0 +1,57 @@
+/* The small planet over the info panel's name: a bar of controls that stays, a box under it whose height eases to nothing and back, the
+   column below following it. The box keeps its own size while it folds, so the planet is never redrawn on the way. */
+@layer components {
+  .view {
+    padding-block-end: var(--space-s);
+  }
+
+  .bar {
+    padding-block-end: var(--space-2xs);
+  }
+
+  /* The fold's handle, centred over the planet's room: its chevron turns up as the box opens, down as it folds. */
+  .handle svg {
+    transition: transform calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .handle[data-shown] svg {
+    transform: rotate(180deg);
+  }
+
+  .fold {
+    /* layout: the row's height is what eases, from nothing to the box's own */
+    display: grid;
+    /* layout: the row's height is what eases, from nothing to the box's own */
+    grid-template-rows: 0fr;
+    transition: grid-template-rows calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .view[data-shown] .fold {
+    /* layout: the row's height is what eases, from nothing to the box's own */
+    grid-template-rows: 1fr;
+  }
+
+  .clip {
+    min-block-size: 0;
+    overflow: hidden;
+  }
+
+  /* The planet stands on the panel's own surface: no frame, no fill, no sky behind it. */
+  .box {
+    position: relative;
+    aspect-ratio: 4 / 3;
+    overflow: clip;
+  }
+
+  /* The Earth's signs over the canvas, gone in the Map, where the Earth is a speck. */
+  .signs {
+    position: absolute;
+    inset: 0;
+    transition: var(--transition-fade);
+  }
+
+  .signs[data-map] {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

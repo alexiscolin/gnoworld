@@ -1,11 +1,11 @@
 // What writes under a room's lines (slice 4's 4c, moved out of ChatPanel.tsx): the composer for an account, loaded
 // lazily, which writes through the link; a word for a guest.
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import type { Line } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
 import { Composer } from "./composerChunk.ts";
 import type { ComposerProps } from "./Composer.tsx";
-import { LOG_IN_TO_WRITE } from "./loginWords.ts";
+import { LogInToWrite } from "./LogInToWrite.tsx";
 import { roomLabel } from "./names.ts";
 import { answeredOf } from "./Replying.tsx";
 import { draftOf } from "./writerDraft.ts";
@@ -14,6 +14,8 @@ import { draftOf } from "./writerDraft.ts";
 // The word being typed completes to a room of the world's, by its label, or to another account in the room.
 export interface WriterProps {
   session: AppState["login"]["session"];
+  /** The room's quick actions, which the composer's + opens; none in a thread. */
+  quick?: ReactNode;
   room: string;
   /** The name of whom it writes to, in place of the room's: a direct message's partner. */
   label?: string | undefined;
@@ -55,7 +57,7 @@ export interface WriterProps {
 export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, groups, onSay, slow, onTyping, refused, focus, describedBy } = props;
   const { replying, asked, onCancelReply, editing, onCancelEdit, gone, multiline } = props;
-  if (session.kind !== "in") return <p>{LOG_IN_TO_WRITE}</p>;
+  if (session.kind !== "in") return <LogInToWrite />;
   return (
     <Suspense fallback={null}>
       <Composer
@@ -79,6 +81,7 @@ export function Writer(props: WriterProps) {
         editing={editing !== undefined}
         onCancelEdit={onCancelEdit}
         gone={gone}
+        quick={props.quick}
       />
     </Suspense>
   );

@@ -171,4 +171,11 @@ describe("a world's main action, in a room nobody spoke in", () => {
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} />);
     expect(box.querySelector("a[href='#chat']")?.textContent).toBe("Say hi in the chat");
   });
+
+  it("leads where a place with no chat yet says (a realm's page, D375), and keeps no link to the chat", async () => {
+    const lead = { label: "Read its page", href: "#page" };
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} />);
+    expect(box.querySelector("a[href='#page']")?.textContent).toBe("Read its page");
+    expect(box.querySelector("a[href='#chat']")).toBeNull();
+  });
 });

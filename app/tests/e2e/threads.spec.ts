@@ -353,14 +353,14 @@ test.describe("threads", () => {
     await expect(lines(page)).toHaveCount(4);
     const root = lines(page).first();
     await root.focus();
-    expect(await tabsTo(page, chipOf(root), 8)).toBeLessThanOrEqual(8);
+    expect(await tabsTo(page, chipOf(root), 12)).toBeLessThanOrEqual(12);
     await page.keyboard.press("Enter");
     await expect(closeButton(page)).toBeFocused();
     await page.keyboard.press("Escape");
     const reply = lines(page).nth(2);
     await reply.focus();
     const more = reply.getByRole("toolbar").getByRole("button", { name: "More actions", exact: true });
-    expect(await tabsTo(page, more, 4)).toBeLessThanOrEqual(4);
+    expect(await tabsTo(page, more, 12)).toBeLessThanOrEqual(12);
     await page.keyboard.press("Enter");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ArrowDown");

@@ -139,7 +139,7 @@ test.describe("reactions", () => {
       replayed: [tagmsg("r1", "+draft/react=🔥;+reply=m1", { at: 2, who: OTHER })],
     }));
     await lines(page).nth(0).focus();
-    await tabsTo(page, lineOf(page, "the first line").getByRole("button", { name: "🔥, 1" }), 8);
+    await tabsTo(page, lineOf(page, "the first line").getByRole("button", { name: "🔥, 1" }), 12);
     await page.keyboard.press("Enter");
     const mine = lineOf(page, "the first line").getByRole("button", { name: "🔥, 2, including you" });
     await expect(mine).toBeVisible();
@@ -152,8 +152,8 @@ test.describe("reactions", () => {
     ]);
   });
 
-  // F1171 (the UX review's U2): the bar stands before the chips in the Tab order, so Reply is 4 presses from the line
-  // whatever the line holds, and the chips follow More.
+  // F1171 (the UX review's U2): the bar stands before the chips in the Tab order, so Reply is 5 presses from the line
+  // whatever the line holds (three quick reactions and Add reaction come first, D376), and the chips follow More.
   test("reach a line's bar by Tab before its 20 chips, then the chips", async ({ page }) => {
     const emoji = [...new Intl.Segmenter().segment("😀😁😂🤣😃😄😅😆😉😊😋😎😍😘🥰😗😙🥲😚🙂")].map(
       ({ segment }) => segment,
@@ -166,8 +166,8 @@ test.describe("reactions", () => {
     const line = lineOf(page, "the first line");
     await expect(buttonsOf(line)).toHaveCount(20);
     await line.focus();
-    expect(await tabsTo(page, barOf(page, 0).getByRole("button", { name: "Reply" }), 24)).toBe(4);
-    expect(await tabsTo(page, line.getByRole("button", { name: "😀, 1" }), 3)).toBe(2);
+    expect(await tabsTo(page, barOf(page, 0).getByRole("button", { name: "Reply" }), 24)).toBe(5);
+    expect(await tabsTo(page, line.getByRole("button", { name: "😀, 1" }), 6)).toBeLessThanOrEqual(5);
   });
 
   // F1172 (U9): the chips are a group named for what they are.
@@ -197,11 +197,13 @@ test.describe("reactions", () => {
     await expect(lineOf(page, "the first line")).toContainText("👍 1");
   });
 
-  test("offer a guest no reaction on the bar", async ({ page }) => {
+  test("offer a guest the same bar, its reactions telling where to connect (D376)", async ({ page }) => {
     await opened(page, GUEST, { history: HISTORY });
     await lineOf(page, "the first line").hover();
-    await expect(barOf(page, 0).getByRole("button")).toHaveCount(1);
+    await expect(barOf(page, 0).getByRole("button", { name: "React with 👍" })).toBeVisible();
     await expect(barOf(page, 0).getByRole("button", { name: "More" })).toBeVisible();
+    await barOf(page, 0).getByRole("button", { name: "React with 👍" }).click();
+    await expect(page.getByText("Connect Adena to react.")).toBeVisible();
   });
 });
 

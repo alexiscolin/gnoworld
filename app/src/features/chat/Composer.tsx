@@ -7,17 +7,15 @@
 import type { Composed } from "@gnoworld/core";
 import { composeDraft } from "./polling.ts";
 import { Field, Stack } from "@gnoworld/ui";
-import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
+import { useRef, useState, type KeyboardEvent, type ReactNode, type SubmitEvent } from "react";
 import { completed } from "./complete.ts";
 import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { useEditing } from "./EditBar.tsx";
-import { formatted, inserted, type Edit, type Format } from "./format.ts";
-import { Message } from "./Message.tsx";
+import { formatted, type Edit, type Format } from "./format.ts";
 import { MessageBox } from "./MessageBox.tsx";
 import { roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
-import styles from "./Composer.module.css";
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
@@ -27,28 +25,10 @@ export function typingOf(draft: string): "active" | "done" | undefined {
   return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
 }
 
-/** The draft as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
- * out of reach of the keyboard and of a screen reader (the field says it already); nothing of a line that cannot go. */
-export function Preview({
-  composed,
-  me,
-  members,
-}: {
-  composed: Composed;
-  me?: string | undefined;
-  members?: ReadonlySet<string> | undefined;
-}) {
-  if (composed.kind !== "line" && composed.kind !== "lines") return null;
-  return (
-    <div className={styles["preview"]} inert>
-      {composed.kind === "line" && composed.action ? "* " : null}
-      <Message text={composed.text} me={me} members={members} />
-    </div>
-  );
-}
-
 export interface ComposerProps {
   room: string;
+  /** The room's quick actions, which the box's + opens (QuickActions.tsx); none in a thread. */
+  quick?: ReactNode;
   /** The account's nick, which Ergo puts before each line it relays: the line's room is what it leaves. */
   nick: string;
   /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
@@ -125,10 +105,6 @@ export function Composer(props: ComposerProps) {
     setFailed(false);
     refusal.said();
   };
-  const insert = (mark: string) => {
-    const start = box()?.selectionStart ?? draft.length;
-    apply(inserted({ text: draft, start, end: box()?.selectionEnd ?? start }, mark));
-  };
   const format = (kind: Format) => {
     const start = box()?.selectionStart ?? draft.length;
     apply(formatted({ text: draft, start, end: box()?.selectionEnd ?? start }, kind));
@@ -164,7 +140,7 @@ export function Composer(props: ComposerProps) {
       <Stack space="2xs">
         {editing.bar}
         {/* The video's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
-        <MessageBox onFormat={format} onInsert={insert} send={editing.send} goes={goes}>
+        <MessageBox onFormat={format} send={editing.send} goes={goes} quick={props.quick}>
           <Field
             kind="lines"
             enterAddsLine={coarse}
@@ -182,7 +158,6 @@ export function Composer(props: ComposerProps) {
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
         </MessageBox>
-        <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>
   );

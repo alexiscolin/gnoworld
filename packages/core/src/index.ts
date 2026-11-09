@@ -1,6 +1,7 @@
 export { escapeTagValue, formatLine, LINE_BYTES, parseLine, toIrcCommand, unescapeTagValue } from "./irc/irc.ts";
 export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc.ts";
 export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
+export { GUEST_ADJECTIVES, GUEST_ANIMALS, GUEST_NAME_BYTES, GUEST_PREFIX, guestName } from "./chat/guestName.ts";
 export { foldMultiline, MULTILINE, MULTILINE_BYTES, MULTILINE_LINES } from "./irc/multiline.ts";
 export {
   addLines,
@@ -29,7 +30,7 @@ export {
   type StarSystem,
   type WorldHeld,
 } from "./cosmos/system.ts";
-export { worldsDrawn } from "./cosmos/count.ts";
+export { planetCount, worldsDrawn } from "./cosmos/count.ts";
 export type { Planned, Rock } from "./lod/drawn.ts";
 export {
   BODY_PIXELS,
@@ -64,7 +65,7 @@ export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
 export { PART_KINDS, type Finish, type Part, type PartKind } from "./station/parts.ts";
-export { stationOf, type Station } from "./station/station.ts";
+export { stationOf, STATIONS_SHOWN, type Station } from "./station/station.ts";
 export { earthCamera, earthEye, earthTopEye, offEarthViews, sceneryOf, type Scenery } from "./station/scenery.ts";
 export { onOrbit, stationsRound, type Placed as PlacedStation } from "./station/round.ts";
 export { alikeStations, lookOf as stationLookOf } from "./station/variety.ts";
@@ -73,6 +74,7 @@ export { LENT, type Lent } from "./frame/lent.ts";
 export { rocksAt } from "./frame/rocks.ts";
 export { HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
 export * from "./frame/flight.ts";
+export { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "./frame/zoomPath.ts";
 export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
 export { FIELD_OF_VIEW, HERO_ZONE, REST_DISTANCE, REST_SCREENS, STAR_HEART, type RestView } from "./frame/rest.ts";
 export { BANDS } from "./frame/bands.ts";
@@ -97,6 +99,7 @@ export { auroraOf, BLOCK_MS, RUN_BLOCKS, stormsOf } from "./planet/activity.ts";
 export { statusOrbit, type StatusOrbit } from "./ring/status.ts";
 export { moonSize, nextMoons, type Moons, type RoomCount } from "./ring/moons.ts";
 export { EARTH, hubWorldOf, worldIdOf } from "./cosmos/worldId.ts";
+export { realmRoom } from "./cosmos/realmRoom.ts";
 export { neighboursOf, type Neighbour } from "./cosmos/links.ts";
 export { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./space/mass.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
@@ -155,7 +158,20 @@ export { firstGraphemes } from "./markdown/graphemes.ts";
 export { cutGraphemes, excerpt, words } from "./markdown/plain.ts";
 export { isBlank } from "./markdown/nodes.ts";
 export { originOf } from "./markdown/address.ts";
-export { PAGE_MAX_BYTES, page, type FormField, type Page, type PageBlock, type PageOptions } from "./markdown/page.ts";
+export {
+  MAX_LIST_DEPTH,
+  MAX_TABLE_COLUMNS,
+  MAX_TABLE_ROWS,
+  PAGE_MAX_BYTES,
+  page,
+  type Align,
+  type FormField,
+  type Outline,
+  type OutlineItem,
+  type Page,
+  type PageBlock,
+  type PageOptions,
+} from "./markdown/page.ts";
 export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { POLL_KEYS, pollAsked, pollOf, pollText, revote, votesOn, type Poll, type Votes } from "./chat/poll.ts";
 export { fold } from "./chat/fold.ts";
@@ -168,18 +184,6 @@ export { PHONE_QUERY } from "./frame/phone.ts";
 export { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "./frame/snapshot.ts";
 export * from "./space/index.ts";
 export * from "./discovery/index.ts";
+export * from "./store/index.ts";
 export { jsonOf, placeIn } from "./json/json.ts";
-export {
-  callArgs,
-  callFields,
-  HIDDEN,
-  isCarried,
-  realmType,
-  textProblem,
-  type Args,
-  type CallField,
-  type Fields,
-  type Kind,
-  type Param,
-  type Problem,
-} from "./args/args.ts";
+export * from "./args/args.ts";

@@ -4,7 +4,8 @@
 // come after the first screen, never with it.
 import { shortAddress } from "@gnoworld/schemas";
 import { Button, IconButton } from "@gnoworld/ui";
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
+import { onAsked } from "../../pageAsks.ts";
 import { LoginControl, useLogin } from "../login/index.ts";
 
 const Face = lazy(async () => ({ default: (await import("./Face.tsx")).Face }));
@@ -20,8 +21,10 @@ function AccountPill({
   universe,
   again,
   onPickable,
+  network,
 }: {
   face: ReactNode;
+  network: ReactNode;
   address: string;
   universe: string;
   again: number;
@@ -33,12 +36,34 @@ function AccountPill({
       <Suspense fallback={<span title={address}>{shortAddress(address)}</span>}>
         <NameLabel account={address} universe={universe} again={again} onPickable={onPickable} />
       </Suspense>
+      {network}
     </>
   );
 }
 
-export function AccountMenu({ universe }: { universe: string }) {
+// The trigger as the menu draws it before its code comes: the device's menu, or the account's pill.
+function Trigger({ pill, onClick }: { pill: ReactNode; onClick: () => void }) {
+  return pill === null ? (
+    <IconButton icon="menu" label="Menu" onClick={onClick} />
+  ) : (
+    <Button onClick={onClick}>
+      {pill}
+      <span className="visually-hidden">Your account</span>
+    </Button>
+  );
+}
+
+/** The account's menu; `network`, the network's name its pill carries once logged in (D330). */
+export function AccountMenu({ universe, network = null }: { universe: string; network?: ReactNode }) {
   const { login, logIn, logOut } = useLogin();
+  // A page's ask to log in (pageAsks.ts, the chat's composer for a guest): this one control answers it, the session watched once.
+  useEffect(() => {
+    const stop = new AbortController();
+    onAsked("log-in", logIn, stop.signal);
+    return () => {
+      stop.abort();
+    };
+  }, [logIn]);
   const [asked, setAsked] = useState(false);
   const [naming, setNaming] = useState(false);
   const [again, setAgain] = useState(0);
@@ -53,27 +78,26 @@ export function AccountMenu({ universe }: { universe: string }) {
         <Face address={address} />
       </Suspense>
     );
-  // The trigger as the menu draws it, until the menu's code takes its place, open.
-  const trigger =
-    address === undefined ? (
-      <IconButton icon="menu" label="Menu" onClick={ask} />
-    ) : (
-      <Button onClick={ask}>
-        <AccountPill face={face} address={address} universe={universe} again={again} onPickable={setPickable} />
-        <span className="visually-hidden">Your account</span>
-      </Button>
+  const pill =
+    address === undefined ? null : (
+      <AccountPill
+        face={face}
+        network={network}
+        address={address}
+        universe={universe}
+        again={again}
+        onPickable={setPickable}
+      />
     );
+  // The trigger as the menu draws it, until the menu's code takes its place, open.
+  const trigger = <Trigger pill={pill} onClick={ask} />;
   return (
     <>
       {asked ? (
         <Suspense fallback={trigger}>
           <Opened
             address={address}
-            lead={
-              address === undefined ? null : (
-                <AccountPill face={face} address={address} universe={universe} again={again} onPickable={setPickable} />
-              )
-            }
+            lead={pill}
             onLogOut={logOut}
             {...(pickable
               ? {
@@ -102,7 +126,7 @@ export function AccountMenu({ universe }: { universe: string }) {
           />
         </Suspense>
       )}
-      <LoginControl login={login} logIn={logIn} />
+      <LoginControl login={login} logIn={logIn} network={network} />
     </>
   );
 }

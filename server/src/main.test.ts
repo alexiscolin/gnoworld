@@ -372,6 +372,58 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
   });
 
+  it("serves the guest chat over the real process: a members room never reaches the link, an open room fails closed with no key, GUEST_CHAT=off is 404 (D430)", async () => {
+    const origin = "http://gnoworld.test";
+    const ergo = await fakeErgo();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    const crew = { room: "#bubble/crew", type: "members", readers: "crew" };
+    writeFileSync(
+      roles,
+      JSON.stringify({
+        team: [],
+        trusted: [],
+        worlds: [{ slug: "bubble", moderators: [], rules, groups: { crew: [] }, rooms: [crew] }],
+      }),
+    );
+    const env = {
+      ...settings(),
+      ORIGINS: origin,
+      ROLES_FILE: roles,
+      ERGO_PORT: String(ergo.port),
+      ERGO_OPER_PASSWORD_FILE: oper,
+    };
+    const port = await listening(start(env));
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const post = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}${path}`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const made = await post("/api/guest", {});
+    expect(made.status).toBe(200);
+    const cookie = (made.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    expect(cookie).toMatch(/^__Host-guest=/);
+    const members = await post("/api/guest/say", { room: "#bubble/crew", text: "hi" }, cookie);
+    expect([members.status, await members.json()]).toEqual([404, { error: "not_found" }]);
+    const open = await post("/api/guest/say", { room: "#bubble", text: "hi" }, cookie);
+    expect([open.status, await open.json()]).toEqual([503, { error: "not_ready", cause: "unchecked" }]);
+    peer.say("PING :sync");
+    await peer.next(/^PONG sync$/);
+    expect(peer.lines.filter((line) => line.includes("RELAYMSG"))).toEqual([]);
+    const off = await listening(start({ ...settings(), ORIGINS: origin, GUEST_CHAT: "off" }));
+    const refused = await fetch(`http://127.0.0.1:${String(off)}/api/guest`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json" },
+      body: "{}",
+    });
+    expect([refused.status, await refused.json()]).toEqual([404, { error: "not_found" }]);
+  });
+
   it("lists a world's rooms by section from the roles file, to a guest only the rooms it may see (4b)", async () => {
     const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
     const roles = join(folder("gnoworld-roles-"), "roles.json");

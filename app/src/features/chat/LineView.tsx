@@ -86,19 +86,29 @@ const quoteKnown = (answers: Line | undefined, members: ReadonlySet<string>, me:
 
 // How a row stands in its list: the list's tab stop or not, its links Tab stops, and its msgid on a line that opens a
 // thread (the focus comes back to it). A thread's own row is none of the list's: no stop, its links Tab stops.
+// A line that goes on its author's group draws no face and name, but for the one that opens the New divider.
 function rowOf({
   id,
   stop,
   inThread,
   threads,
+  grouped,
+  fresh,
 }: {
   id: string;
   stop: boolean;
   inThread: true | undefined;
   threads: boolean;
+  grouped: boolean | undefined;
+  fresh: boolean;
 }) {
-  const attrs = { ...(threads ? { "data-line": id } : {}), tabIndex: inThread === true ? undefined : stop ? 0 : -1 };
-  return { attrs, links: stop || inThread === true };
+  const show = grouped === true && !fresh;
+  const attrs = {
+    ...(threads ? { "data-line": id } : {}),
+    ...(show ? { "data-grouped": "" } : {}),
+    tabIndex: inThread === true ? undefined : stop ? 0 : -1,
+  };
+  return { attrs, links: stop || inThread === true, grouped: show };
 }
 
 interface ChipOf {
@@ -129,6 +139,8 @@ export interface LineViewProps {
   stop: boolean;
   /** Its bar, while pointed at or focused. */
   actions: ReactNode;
+  /** Whether it goes on its author's group: no face and name, its time in the gutter on hover. */
+  grouped?: boolean;
   /** Whether it is the first line past the reading place as the room opened (4f). */
   fresh: boolean;
   /** Its verdict from the server's stream, which a link's player waits on (4g). */
@@ -158,7 +170,14 @@ export interface LineViewProps {
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
   const { replies, onThread, inThread, votes, newHere } = props;
-  const row = rowOf({ id: line.id, stop, inThread, threads: onThread !== undefined });
+  const row = rowOf({
+    id: line.id,
+    stop,
+    inThread,
+    threads: onThread !== undefined,
+    grouped: props.grouped,
+    fresh,
+  });
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
   const embed = players ? embedIn(blocks) : undefined;
@@ -179,7 +198,7 @@ export function LineView(props: LineViewProps) {
       {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
-      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere }} />
+      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere, grouped: row.grouped }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
       <div data-line-text="" className={votes === undefined ? undefined : styles["wide"]}>
         <Body line={line} votes={votes} react={react}>

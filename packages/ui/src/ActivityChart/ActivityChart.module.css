@@ -29,6 +29,10 @@
     fill: var(--color-text);
   }
 
+  .bar[data-empty] {
+    fill: var(--color-line-strong);
+  }
+
   .line {
     fill: none;
     stroke: var(--color-text);

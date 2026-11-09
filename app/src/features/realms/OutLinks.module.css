@@ -1,4 +1,5 @@
-/* A plate's links out: the label's capitals in the text's colour, the arrow kept with its words in one row (frames 40, 93). */
+/* A plate's links out: the label's capitals in the text's colour, the arrow kept with its words in one row (frames 40, 93). The air over
+   them is the plate's section step (Panel.module.css, D470), or their card's stack's. */
 @layer components {
   .out {
     color: var(--color-text);

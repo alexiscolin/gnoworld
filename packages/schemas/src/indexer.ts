@@ -6,7 +6,10 @@
 import { z } from "./zod.ts";
 
 /** The most characters of the two texts a realm's facts hold; a realm path and a bech32 address are far shorter. */
-export const REALM_FACTS_CAPS = { path: 256, deployer: 128 } as const;
+export const REALM_FACTS_CAPS = { path: 256, deployer: 128, func: 128 } as const;
+
+/** The most calls a realm's last calls hold. */
+export const LAST_CALLS = 5;
 
 // Not z.int(): its class would sit in the store's chunk, which the first screen loads, for a schema only a realm's page uses (F2976).
 const count = z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.nonnegative());
@@ -24,6 +27,10 @@ const Message = z.object({
     __typename: z.string().check(z.maxLength(64)),
     creator: z.optional(z.string().check(z.maxLength(REALM_FACTS_CAPS.deployer))),
     package: z.optional(z.object({ path: z.string().check(z.maxLength(REALM_FACTS_CAPS.path)) })),
+    // A MsgCall's caller, realm and function.
+    caller: z.optional(z.string().check(z.maxLength(REALM_FACTS_CAPS.deployer))),
+    pkg_path: z.optional(z.string().check(z.maxLength(REALM_FACTS_CAPS.path))),
+    func: z.optional(z.string().check(z.maxLength(REALM_FACTS_CAPS.func))),
   }),
 });
 
@@ -40,6 +47,33 @@ export const RealmDeployAnswer = z.object({
   errors: z.optional(z.never()),
 });
 export type RealmDeployAnswer = z.infer<typeof RealmDeployAnswer>;
+
+/** The indexer's answer to a realm's newest calls, newest first, with the newest block it holds (the calls' age is told in blocks, the indexer
+ * having no time: F2950). A transaction may hold other messages: the reader keeps the calls to the realm asked. */
+export const RealmCallsAnswer = z.object({
+  data: z.object({
+    latestBlockHeight: count,
+    getTransactions: z.nullable(
+      z
+        .array(z.object({ block_height: count, messages: z.array(Message).check(z.maxLength(64)) }))
+        .check(z.maxLength(LAST_CALLS)),
+    ),
+  }),
+  errors: z.optional(z.never()),
+});
+
+/** A call of a realm: who, which function, in which block. */
+export interface LastCall {
+  caller: string;
+  func: string;
+  height: number;
+}
+
+/** A realm's newest calls and the block the indexer was at. */
+export interface LastCallsValue {
+  tip: number;
+  calls: LastCall[];
+}
 
 // The worlds' file sits behind this door, not in the barrel: the store's chunk group takes the barrel's modules, and a world's first screen
 // would pay 446 B for a schema the universe alone reads. It is what the server's job writes from the indexers.

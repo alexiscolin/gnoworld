@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import orbit from "../data/earthOrbit.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
+import { cosmosAt, homeOf, systemPath } from "./cosmosAt.ts";
 import { site, siteOf } from "./places.ts";
 import { FIXTURE } from "./placesFixture.ts";
 
@@ -76,12 +77,12 @@ describe("the site's worlds, by request", () => {
 });
 
 describe("the worlds of the data files", () => {
-  test("hold Bubble and GovDAO, then each station round the Earth (8l), at /w/<slug>, each canonical under /net/onyx", () => {
+  test("offer Bubble and GovDAO alone (the stations round the Earth are not offered, STATIONS_SHOWN), each canonical under /net/onyx, and each station's page stays routable", () => {
     const stations = new Map(orbit.map(({ slug, name }) => [slug, name]));
-    expect(site.worlds.slice(2).map(({ slug, name, kind, path }) => ({ slug, name, kind, path }))).toEqual(
-      [...stations].map(([slug, name]) => ({ slug, name, kind: "station", path: `/w/${slug}` })),
-    );
-    expect(site.worlds.slice(0, 2)).toEqual([
+    expect(site.worlds).toHaveLength(2);
+    for (const [slug, name] of stations)
+      expect(site.world(at(`/w/${slug}`)), slug).toMatchObject({ slug, name, kind: "station", path: `/w/${slug}` });
+    expect(site.worlds).toEqual([
       {
         slug: "bubble",
         name: "Bubble",
@@ -185,21 +186,55 @@ describe("the site's universe and view of a path", () => {
   });
 
   test("a view is current at its path and at its canonical address, a trailing slash or not", () => {
-    expect(viewAt(onyx(), "/earth")).toBe("earth");
-    expect(viewAt(onyx(), "/net/onyx/earth")).toBe("earth");
-    expect(viewAt(onyx(), "/net/onyx/earth/")).toBe("earth");
-    expect(viewAt(onyx(), "/")).toBe("cosmos");
-    expect(viewAt(onyx(), "/net/onyx/")).toBe("cosmos");
-    expect(viewAt(onyx(), "/net/onyx")).toBe("cosmos");
-    expect(viewAt(gnoland(), "/net/gnoland/earth")).toBe("earth");
-    expect(viewAt(onyx(), "/list")).toBe("list");
-    expect(viewAt(onyx(), "/list/")).toBe("list");
+    expect(viewAt(onyx(), "/earth")).toBe("world");
+    expect(viewAt(onyx(), "/net/onyx/earth")).toBe("world");
+    expect(viewAt(onyx(), "/net/onyx/earth/")).toBe("world");
+    // D501: the default universe's home is the Earth's first screen, no level of its own; another universe's home is its system.
+    expect(viewAt(onyx(), "/")).toBeUndefined();
+    expect(viewAt(onyx(), "/net/onyx/")).toBeUndefined();
+    expect(viewAt(onyx(), "/net/onyx")).toBeUndefined();
+    expect(viewAt(gnoland(), "/net/gnoland")).toBe("system");
+    expect(viewAt(gnoland(), "/net/gnoland/earth")).toBe("world");
+    expect(viewAt(onyx(), "/w/bubble")).toBe("world");
   });
 
-  test("no view is current on a page that is none of the three, nor on another universe's", () => {
-    expect(viewAt(onyx(), "/w/bubble")).toBeUndefined();
+  // D344: the cosmos's own addresses are the default universe's: /universe the whole cosmos far out, /s/<namespace> a system.
+  test("/universe is the Universe view and /s/<namespace> a System view, of the default universe alone", () => {
+    expect(viewAt(onyx(), "/universe")).toBe("universe");
+    expect(viewAt(onyx(), "/universe/")).toBe("universe");
+    expect(viewAt(onyx(), "/s/gnoswap")).toBe("system");
+    expect(viewAt(gnoland(), "/universe")).toBeUndefined();
+    expect(viewAt(onyx(), "/s")).toBeUndefined();
+    expect(viewAt(onyx(), "/s/a/b")).toBeUndefined();
+  });
+
+  test("the cosmos's addresses say a view and a system, round trip through systemPath, and are the home's page to its loader", () => {
+    expect(cosmosAt("/universe")).toEqual({ view: "universe" });
+    expect(cosmosAt("/s/gnoswap/")).toEqual({ view: "system", system: "gnoswap" });
+    expect(cosmosAt("/")).toBeUndefined();
+    expect(cosmosAt("/s/gnoland")).toEqual({ view: "system", system: "gnoland" });
+    expect(cosmosAt("/s/%E0%A4%A")).toBeUndefined();
+    // D501: the Earth's system is its own page, /s/gnoland, whichever of its namespaces is named.
+    expect(systemPath(undefined)).toBe("/s/gnoland");
+    expect(systemPath("gov")).toBe("/s/gnoland");
+    for (const system of ["gnoswap", "g1abc", "a b/c"])
+      expect(cosmosAt(systemPath(system))).toEqual({ view: "system", system });
+    expect(new URL(homeOf(new Request("http://x/s/gnoswap?a=1")).url).pathname).toBe("/");
+    expect(new URL(homeOf(new Request("http://x/universe")).url).pathname).toBe("/");
+    expect(new URL(homeOf(new Request("http://x/earth")).url).pathname).toBe("/earth");
+  });
+
+  test("no view is current on a page that is none of the three, nor on another universe's home or cosmos", () => {
     expect(viewAt(onyx(), "/earthly")).toBeUndefined();
-    expect(viewAt(onyx(), "/net/gnoland/earth")).toBeUndefined();
+    expect(viewAt(onyx(), "/list")).toBeUndefined();
+    expect(viewAt(onyx(), "/net/gnoland")).toBeUndefined();
+    expect(viewAt(onyx(), "/net/gnoland/universe")).toBeUndefined();
+  });
+
+  // The pages that hold a chat are the World view in any universe (fullChat.ts's CHAT_PAGE).
+  test("a page holding a chat is the World view, in any universe", () => {
+    expect(viewAt(onyx(), "/net/gnoland/earth")).toBe("world");
+    expect(viewAt(onyx(), "/r/gov/dao")).toBe("world");
   });
 });
 

@@ -3,11 +3,9 @@ import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, modals, noMedia, settled } from "../../../tests/mount.tsx";
 import { mountInStore, type AppStore } from "../../../tests/inStore.tsx";
-import { PassportCounter } from "./Counter.tsx";
 import { PassportView } from "./PassportView.tsx";
 
-// The passport (slice 8; ADR-0002 §1 and §3): the header's counter, the stamps out of the worlds the reader's view lists, the stamps alone
-// before the count; the dialog's constellations, each world counted once, a constellation with no stamp not shown (no 0%), the worlds
+// The passport (slice 8; ADR-0002 §1 and §3): the dialog's constellations, each world counted once, a constellation with no stamp not shown (no 0%), the worlds
 // charted here, the stamps newest first.
 const listed = vi.hoisted(() => ({
   count: undefined as number | null | undefined,
@@ -41,34 +39,6 @@ const stamp = (stamps: Record<string, string>, charted: Record<string, string> =
   localStorage.setItem("gnoworld:device:charted", JSON.stringify(charted));
 };
 const text = (element: Element) => element.textContent.replaceAll(/\s+/g, " ").trim();
-
-describe("the header's counter", () => {
-  it("shows the stamps alone before the count is known", async () => {
-    stamp({ "onyx:a/1": "2026-11-01", "onyx:a/2": "2026-11-02", "gnoland:a/1": "2026-11-02" });
-    const box = await drawn(<PassportCounter universe="onyx" listed={undefined} onOpen={() => undefined} />);
-    expect(text(box)).toBe("Passport 2");
-  });
-
-  it("shows the stamps out of the worlds listed, and opens the passport", async () => {
-    stamp({ "onyx:a/1": "2026-11-01", "onyx:a/2": "2026-11-02", "onyx:a/3": "2026-11-02" });
-    const open = vi.fn();
-    const box = await drawn(<PassportCounter universe="onyx" listed={19} onOpen={open} />);
-    expect(text(box)).toBe("Passport 3/19");
-    act(() => {
-      all(box, "button")[0]?.click();
-    });
-    expect(open).toHaveBeenCalledOnce();
-  });
-
-  it("counts a new stamp at once, with no reload", async () => {
-    const box = await drawn(<PassportCounter universe="onyx" listed={18} onOpen={() => undefined} />);
-    expect(text(box)).toBe("Passport 0/18");
-    act(() => {
-      store?.getState().deviceActions.change("stamps", (held) => ({ ...held, "onyx:a/1": "2026-11-05" }));
-    });
-    expect(text(box)).toBe("Passport 1/18");
-  });
-});
 
 describe("the passport dialog", () => {
   const open = () => <PassportView universe="onyx" open onClose={() => undefined} />;

@@ -8,6 +8,7 @@ import type { Line } from "@gnoworld/core";
 import { Address, PinId, RoomId, Time } from "@gnoworld/schemas";
 import type { DraftStorage } from "../drafts/drafts.ts";
 import { z } from "../jitless.ts";
+import { isRecord } from "./device.ts";
 
 /** The lines saved at most. */
 export const SAVED_KEPT = 200;
@@ -49,7 +50,7 @@ export interface Keep {
 // The device's list, or its object's entries, as the shape the key holds; none for any other.
 const itemsOf = (value: unknown): unknown[] | undefined => (Array.isArray(value) ? value : undefined);
 const entriesOf = (value: unknown): [string, unknown][] | undefined =>
-  typeof value === "object" && value !== null && !Array.isArray(value) ? Object.entries(value) : undefined;
+  isRecord(value) ? Object.entries(value) : undefined;
 
 /** An account's saved lines and places on the device `storage` reaches. */
 export function keep(storage: () => DraftStorage, account: Address): Keep {

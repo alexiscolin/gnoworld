@@ -186,7 +186,8 @@ describe("the tokens", () => {
     ["--thumb-s", "32px"],
     ["--thumb-m", "52px"],
     ["--plate-w", "808px"],
-    ["--chat-dock", "360px"],
+    ["--chat-dock", "420px"],
+    ["--chat-dock-s", "380px"],
     ["--thumb-l", "64px"],
     ["--avatar-s", "20px"],
     ["--avatar-m", "24px"],
@@ -214,11 +215,13 @@ describe("the tokens", () => {
     expect(parseTokens(`:root {${coarse}}`).map(({ name }) => name)).not.toContain("--control-m");
   });
 
-  it("still the fast and the base motion under reduced motion, and keep the wait", () => {
+  // D363: every other duration is multiplied by --motion-scale, 0 here.
+  it("still the fast and the base motion under reduced motion, and the scale of every other, and keep the wait", () => {
     const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(parseTokens(`:root {${reduced}}`).map(({ name, value: v }) => [name, v])).toEqual([
       ["--motion-fast", "0s"],
       ["--motion-base", "0s"],
+      ["--motion-scale", "0"],
     ]);
   });
 });

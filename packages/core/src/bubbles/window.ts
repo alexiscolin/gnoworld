@@ -2,9 +2,9 @@
 import { centreOf } from "./countries.ts";
 import type { BubbleMessage } from "./types.ts";
 
-/** Whether a line may reach the globe at all, a bubble or a count: public, its room joined, not hidden, its country known. */
+/** Whether a line may reach the globe at all, a bubble or a count: public, its room joined, not hidden, its country known (or a spot's). */
 export const isOpen = (m: BubbleMessage): boolean =>
-  m.visibility === "public" && m.joined && m.hidden !== true && centreOf(m.country) !== undefined;
+  m.visibility === "public" && m.joined && m.hidden !== true && (m.spot === true || centreOf(m.country) !== undefined);
 
 export const newestFirst = (a: BubbleMessage, b: BubbleMessage): number =>
   b.at - a.at || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);

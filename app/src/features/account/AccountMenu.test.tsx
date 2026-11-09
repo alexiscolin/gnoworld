@@ -25,7 +25,7 @@ describe("the account's menu", () => {
   it("ends with Log out for an account, which logs out once", () => {
     const onLogOut = vi.fn();
     const box = mount(<Opened address={ADDRESS} lead={null} onLogOut={onLogOut} />);
-    expect(items(box)).toEqual(["Passport", "Saved", "Settings", "Log out"]);
+    expect(items(box)).toEqual(["JarvisSoon", "Passport", "Saved", "Settings", "Log out"]);
     const out = [...box.querySelectorAll<HTMLButtonElement>("[role='menuitem']")].at(-1);
     act(() => {
       out?.click();
@@ -35,7 +35,7 @@ describe("the account's menu", () => {
 
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
-    expect(items(box)).toEqual(["Passport", "Settings"]);
+    expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings"]);
   });
 
   it("names its trigger the account and draws the lead it is given, the account's face and address", () => {
@@ -119,7 +119,7 @@ describe("the header's account", SLOW, () => {
       box.querySelector<HTMLButtonElement>("button[aria-label='Menu']")?.click();
     });
     await vi.waitFor(() => {
-      expect(items(box)).toEqual(["Passport", "Settings"]);
+      expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings"]);
     }, SOON);
   });
 

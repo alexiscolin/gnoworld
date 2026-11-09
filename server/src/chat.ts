@@ -6,15 +6,15 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Presence } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";
-import { makeActivity } from "./activity/activity.ts";
+import { makeActivity, type Activity } from "./activity/activity.ts";
 import { makeRecentLines, type RecentLines } from "./door/lines.ts";
 import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
-import { ircLink, type Link, type Said } from "./irc/link.ts";
+import type { Said } from "./irc/link.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Log } from "@gnoworld/service/log";
 import { makeProgress } from "./moderation/catchup.ts";
-import { checkerFor, strikesFor } from "./moderation/checker.ts";
+import { checkerFor, nameCheckerFor, providerOf, strikesFor } from "./moderation/checker.ts";
 import type { Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { moderate } from "./moderation/way.ts";
@@ -23,16 +23,15 @@ import { pinsFor } from "./pins/wire.ts";
 import { ensureNamed, ensureRooms, listRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
-import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
-import { getConnInfo } from "@hono/node-server/conninfo";
+import { mayRead, publicRoom, type World } from "./rooms/types.ts";
+import { linkFor, listedTo, verdictsFor } from "./chatParts.ts";
+import { guestFor, type GuestSettings } from "./guest/wire.ts";
 import { passedLines, type Signals } from "./signals/signals.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
-import { verdictRoutes } from "./stream/verdicts.ts";
-import { visitor } from "./visitor.ts";
-import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
+import { keeping, reconcilerFor, sweeping, typedRooms } from "./rooms/wire.ts";
 import { countriesTo, startPresent, type ChatWorld, type Present } from "./worlds/present.ts";
 
-export interface Chat {
+export interface Chat extends ReturnType<typeof guestFor> {
   activity: Hono;
   // A world's rooms by section, to whom may see them (4b).
   roomList: Hono;
@@ -41,6 +40,8 @@ export interface Chat {
   verdicts: Hono;
   // The moderators' rooms (3l), made and archived through the link.
   rooms: Rooms;
+  // A room's name checked as a message of its world is (D394), for the Earth's public rooms.
+  nameCheck: ReturnType<typeof nameCheckerFor>;
   // Each room's pins (4d), kept in the database: read from Ergo by their lines' ids, dropped as their lines leave.
   pins: Pins;
   // Whether an account may pin in a room: its world's moderators and the team.
@@ -58,7 +59,7 @@ export interface Chat {
   stop: () => Promise<void>;
 }
 
-interface Settings {
+export interface Settings extends Partial<Pick<GuestSettings, "origins" | "guests" | "defaults">> {
   // Each world's rules, and since 3m its moderators, groups and typed rooms (rooms/types.ts).
   worlds: ReadonlyMap<string, World>;
   team?: ReadonlySet<string> | undefined;
@@ -69,7 +70,7 @@ interface Settings {
   spared?: (account: string) => boolean;
 }
 
-interface Options {
+export interface Options {
   log: Log;
   pepper: string;
   now?: () => number;
@@ -77,6 +78,8 @@ interface Options {
   provider?: (text: string) => Promise<Answer | "unchecked">;
   // How often ended mutes are lifted.
   tickMs?: number;
+  // How often the Earth's public rooms nobody writes in are archived (D394).
+  sweepMs?: number;
   // How often every room is read from Ergo and put back as its type says (3m).
   reconcileMs?: number;
   // The account of a session's token (login.ts's session), for the rooms a reader may see.
@@ -95,36 +98,17 @@ interface Options {
 // A world's rooms at most, its main room aside (3l).
 const ROOMS_PER_WORLD = 20;
 
-// A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
-const unknownChannels =
-  (db: DatabaseSync, log: Log) =>
-  (names: readonly string[]): void => {
-    const known = new Set(listRooms(db).map(({ name }) => name));
-    for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
-  };
-
-// Whom a room is listed to: an archived room is a hidden one.
-const listedTo =
-  (settings: Settings, keeper: Rooms) =>
-  (room: string, who: string | undefined): boolean =>
-    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
-
-// The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
-function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => undefined, now = Date.now }: Options) {
-  return verdictRoutes({
-    db,
-    readable: (room, who) => mayRead(settings, room, who),
-    session,
-    visitor: (c) => visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), settings.trustedProxy),
-    now,
-  });
-}
-
 // What the chat hands on of who is here (7h, 7t3): its route, what it serves and the trends' signals; none without its file.
 const presentOf = (present: Present | undefined) =>
   present === undefined ? {} : { presence: present.routes, presenceNow: present.current, presenceChat: present.chat };
 
 // Who is here (7h), in the rooms a guest may see: none without its file.
+// What the presence reads of the stream: who has the site open (D352) and each world (D374).
+// What the presence reads of the activity: the accounts' pace, and the guests' beside it (D374).
+const ratesOf = ({ rates, guestRates }: Activity) => ({ rates, guestRates });
+
+const watchersOf = ({ watching, watchingIn }: Stream) => ({ watching, inWorlds: watchingIn });
+
 function presentFor(
   db: DatabaseSync,
   file: string | undefined,
@@ -167,7 +151,10 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const { log, pepper, now = Date.now } = options;
   ensureRooms(db, [...worlds.keys()], now());
   ensureNamed(db, typedRooms(worlds), now());
-  const check = checkerFor(db, settings, options);
+  // One provider behind one breaker for the lines, the rooms' names and the guests' lines.
+  const ask = providerOf(settings, { ...options, now });
+  const told = { ...options, ask };
+  const check = checkerFor(db, settings, told);
   const stream = options.stream ?? makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
@@ -180,11 +167,13 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
   const activity = makeActivity();
   const visible = listedTo(settings, keeper);
+  const open = (room: string): boolean => visible(room, undefined);
   const present = presentFor(db, options.presence, {
-    open: (room) => visible(room, undefined),
-    rates: activity.rates,
+    open,
+    ...ratesOf(activity),
     now,
     log,
+    ...watchersOf(stream),
   });
   const reconciler = reconcilerFor(db, settings, {
     seen: present?.seen,
@@ -194,38 +183,30 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     log,
   });
   const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
-  const kept = pinsFor(db, settings, { link: () => link, now, log });
-  const link: Link | undefined =
-    ergo === undefined
-      ? undefined
-      : ircLink({
-          ...ergo,
-          rooms: () => listRooms(db).map(({ name }) => name),
-          lastChecked: progress.last,
-          hold: progress.hold,
-          drained: () => queue.idle(),
-          ...(options.redactRetryMs === undefined ? {} : { redactRetryMs: options.redactRetryMs }),
-          onReady: () => {
-            reconciler.flags();
-            mutes.reapply();
-            reconciler.ask();
-          },
-          onJoin: reconciler.joined,
-          ...kept.hooks,
-          onRedact: (room, msgid) => {
-            kept.hooks.onRedact(room, msgid);
-            recent.taken(room, msgid);
-          },
-          onChannels: unknownChannels(db, log),
-          onMessage: hearing({ kept, recent, activity, present, visible, progress, queue, now }),
-          log,
-        });
+  const rooms = keeping(keeper, { mutes, reconciler });
+  const stopSweeping = sweeping(db, rooms, { now, ms: options.sweepMs ?? 60 * 60_000, roles: settings });
+  const kept = pinsFor(db, settings, { link: () => link, now, log, maker: keeper.maker });
+  const onMessage = hearing({ kept, recent, activity, present, visible, progress, queue, now });
+  const redactRetryMs = options.redactRetryMs;
+  const link = linkFor({ db, ergo, redactRetryMs, progress, queue, reconciler, mutes, kept, recent, log, onMessage });
   return {
+    ...guestFor(db, settings, {
+      ...options,
+      log,
+      pepper,
+      now,
+      provider: ask,
+      passed: recent.passed,
+      activity,
+      archived: keeper.archived,
+      link: () => link,
+    }),
     activity: activityRoutes(activity, { db, now, visible, session: options.session }),
-    roomList: listRoutes({ db, roles: settings, visible, session: options.session }),
+    roomList: listRoutes({ db, roles: settings, visible, session: options.session, here: present?.here, now }),
     stream: streamFor(stream, settings, options),
     verdicts: verdictsFor(db, settings, options),
-    rooms: keeping(keeper, { mutes, reconciler }),
+    rooms,
+    nameCheck: nameCheckerFor(settings, told),
     ...kept.api,
     ...presentOf(present),
     recent: recent.recent,
@@ -233,6 +214,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);
+      stopSweeping();
       present?.stop();
       // Nothing more starts once stopping: a line left waiting is caught up at the next start.
       queue.stop();

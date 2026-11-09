@@ -3,16 +3,60 @@
 @layer components {
   .dialog {
     --_w: var(--dialog-w);
+    --_enter: calc(var(--motion-base) * var(--motion-scale));
+    --_leave: calc(var(--motion-base) * 0.7 * var(--motion-scale));
+    --_ease: var(--ease-in);
 
     inline-size: var(--_w);
     max-inline-size: calc(100% - 2 * var(--space-s));
     padding: var(--space-m);
     border-radius: var(--radius-l);
     box-shadow: var(--shadow-popover);
+    /* Shut, it leaves as it came, a little faster: the exit's own curve and 70% of the enter's time. display and overlay keep it drawn, in
+       the top layer, until it is done. */
+    opacity: 0;
+    scale: 0.98;
+    translate: 0 var(--space-2xs);
+    transition:
+      opacity var(--_leave) var(--_ease),
+      scale var(--_leave) var(--_ease),
+      translate var(--_leave) var(--_ease),
+      overlay var(--_leave) allow-discrete,
+      display var(--_leave) allow-discrete;
+  }
+
+  .dialog[open] {
+    opacity: 1;
+    scale: 1;
+    translate: none;
+    --_ease: var(--ease-standard);
+
+    transition-duration: var(--_enter);
+  }
+
+  @starting-style {
+    .dialog[open] {
+      opacity: 0;
+      scale: 0.98;
+      translate: 0 var(--space-2xs);
+    }
   }
 
   .dialog[data-width="wide"] {
     --_w: var(--dialog-wide);
+  }
+
+  .dialog[data-width="sheet"] {
+    /* raw: Discover's sheet, three columns, wider than any dialog */
+    --_w: 1280px;
+  }
+
+  /* Close ends on the row's edge: the title row's last part grows a pixel or so, the button stays at the end of it. */
+  .close {
+    /* layout: the button at the part's end */
+    display: flex;
+    /* layout: at the end */
+    justify-content: flex-end;
   }
 
   /* The frames' kicker sits 33 px under the dialog's edge, 8 more than the padding gives. */
@@ -25,8 +69,27 @@
     overflow-wrap: anywhere;
   }
 
+  /* The scrim fades with the dialog: in at the enter's time, out at the exit's. */
   .dialog::backdrop {
     background: var(--color-scrim);
+    opacity: 0;
+    transition:
+      opacity var(--_leave) var(--_ease),
+      overlay var(--_leave) allow-discrete,
+      display var(--_leave) allow-discrete;
+  }
+
+  .dialog[open]::backdrop {
+    opacity: 1;
+    --_ease: var(--ease-standard);
+
+    transition-duration: var(--_enter);
+  }
+
+  @starting-style {
+    .dialog[open]::backdrop {
+      opacity: 0;
+    }
   }
 
   /* The drawer: the screen's start, its full height, 360 px, on the surface the dock and the plates use, so no word of the page reads
@@ -57,6 +120,25 @@
     gap: 0;
   }
 
+  /* Its slide: in from the start, out the same way; it stays whole in opacity and scale, as the page beside it stays seen. */
+  .dialog[data-side="start"] {
+    opacity: 1;
+    scale: none;
+    translate: -100% 0;
+  }
+
+  .dialog[data-side="start"][open] {
+    translate: none;
+  }
+
+  @starting-style {
+    .dialog[data-side="start"][open] {
+      opacity: 1;
+      scale: none;
+      translate: -100% 0;
+    }
+  }
+
   .dialog[data-side="start"]::backdrop {
     background: transparent;
   }
@@ -69,18 +151,5 @@
     inset-inline-end: 18px;
     /* raw: over the drawer's first part, which comes after it in the page */
     z-index: 1;
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .dialog[data-side="start"][open] {
-      /* raw: the drawer slides in from the start in 240 ms (frame 98 caught half way) */
-      animation: slide-in 240ms var(--ease-standard);
-    }
-  }
-
-  @keyframes slide-in {
-    from {
-      translate: -100% 0;
-    }
   }
 }

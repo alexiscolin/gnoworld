@@ -32,16 +32,18 @@ export interface VerdictOptions {
   since?: (time: number) => void;
   /** The stream ended for good: the browser will not reconnect it. */
   dead?: () => void;
+  /** The page follows the rooms for their events alone (the home's ticker): the server counts it in no world's "here" (D374). */
+  uncounted?: boolean | undefined;
 }
 
 /** Follows the rooms' verdicts, handing each on; stops when called. */
 export function followVerdicts(
   rooms: readonly string[],
   onVerdict: (event: StreamEvent) => void,
-  { open, log, signal, chain, realms, since, dead }: VerdictOptions,
+  { open, log, signal, chain, realms, since, dead, uncounted = false }: VerdictOptions,
 ): () => void {
   if (rooms.length === 0) return () => undefined;
-  const source = open(`/api/stream?rooms=${encodeURIComponent(rooms.join(","))}`);
+  const source = open(`/api/stream?rooms=${encodeURIComponent(rooms.join(","))}${uncounted ? "&presence=0" : ""}`);
   const told = new Set<string>();
   const once = (what: "verdict_unknown" | "since_unknown" | "signal_unknown") => {
     if (told.has(what)) return;
@@ -90,7 +92,7 @@ export function followVerdicts(
 /** The page's own stream, on its EventSource; an unknown event reported once, as the page reports an error. */
 export const pageVerdicts = (
   rooms: readonly string[],
-  on: Pick<VerdictOptions, "signal" | "chain" | "realms"> & {
+  on: Pick<VerdictOptions, "signal" | "chain" | "realms" | "uncounted"> & {
     verdict: (event: StreamEvent) => void;
     since: (time: number) => void;
     dead: () => void;
@@ -101,6 +103,7 @@ export const pageVerdicts = (
     signal: on.signal,
     chain: on.chain,
     realms: on.realms,
+    uncounted: on.uncounted,
     log: (what) => {
       reportError(new Error(`verdicts: ${what}`));
     },

@@ -8,7 +8,7 @@ import { landed, running, stats } from "./sceneStage.ts";
 // one and a second going there, the crumb back to the cosmos at a system. The scene is driven as 7g2's flights will, through its own call.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
-const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
+const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const SLOW = { timeout: 90_000 };
 
 test.describe.configure({ timeout: 180_000 });

@@ -2,12 +2,19 @@
 // itself. Node shows an IPv4 peer mapped into IPv6, read here as IPv4; an IPv6 address counts by its
 // /64, which one subscriber holds whole.
 import { isIP } from "node:net";
+import { getConnInfo } from "@hono/node-server/conninfo";
+import type { Context } from "hono";
 
-export function visitor(peer: string, header: string | undefined, proxy: string | undefined): string {
+// The address a limit counts: the proxy's header from the proxy itself, else the peer, an IPv4-mapped one as IPv4.
+function addressOf(peer: string, header: string | undefined, proxy: string | undefined): string {
   const from = unmapped(peer);
   const trusted = proxy !== undefined && same(from, unmapped(proxy));
-  const address = trusted && header !== undefined && isIP(header) !== 0 ? unmapped(header) : from;
-  return isIP(address) === 6 ? prefix64(address) : address;
+  return trusted && header !== undefined && isIP(header) !== 0 ? unmapped(header) : from;
+}
+
+export function visitor(peer: string, header: string | undefined, proxy: string | undefined): string {
+  const address = addressOf(peer, header, proxy);
+  return isIP(address) === 6 ? prefix(address, 4) : address;
 }
 
 // Any IPv4-mapped form, dotted or in hex, as the IPv4 address it is: its canonical form ends in two groups.
@@ -28,11 +35,24 @@ function canonical(address: string): string {
   return new URL(`http://[${address.split("%")[0] ?? ""}]`).hostname.slice(1, -1);
 }
 
-// The first four groups, the "::" of the canonical form written out.
-function prefix64(address: string): string {
+// The first `count` groups, the "::" of the canonical form written out: 4 are a /64, 3 a /48.
+function prefix(address: string, count: 3 | 4): string {
   const [head = "", tail = ""] = canonical(address).split("::");
   const left = head === "" ? [] : head.split(":");
   const right = tail === "" ? [] : tail.split(":");
   const groups = [...left, ...Array.from({ length: 8 - left.length - right.length }, () => "0"), ...right];
-  return `${groups.slice(0, 4).join(":")}::/64`;
+  return `${groups.slice(0, count).join(":")}::/${String(count * 16)}`;
 }
+
+/** The visitor a request is, from its connection and the proxy's header: the one place the line is written. */
+export const visitorOf = (c: Context, proxy: string | undefined): string =>
+  visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
+
+/** The same visitor in a wider bucket: an IPv6 address by its /48, an IPv4 address as itself (D430). */
+export function visitor48(peer: string, header: string | undefined, proxy: string | undefined): string {
+  const address = addressOf(peer, header, proxy);
+  return isIP(address) === 6 ? prefix(address, 3) : address;
+}
+
+export const visitor48Of = (c: Context, proxy: string | undefined): string =>
+  visitor48(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);

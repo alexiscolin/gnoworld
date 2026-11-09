@@ -15,7 +15,7 @@ export function groups() {
   return [
     { name: "Primitives", prefixes: ["--p-"] },
     { name: "Colour", prefixes: ["--color-", "--world"] },
-    { name: "Type", prefixes: ["--family-", "--font-", "--tracking-"] },
+    { name: "Type", prefixes: ["--family-", "--font-", "--text-", "--tracking-"] },
     { name: "Space", prefixes: ["--space-"] },
     {
       name: "Size",
@@ -34,11 +34,12 @@ export function groups() {
         "--chat-",
         "--flash-",
         "--banner-",
+        "--dock-",
         "--globe-",
       ],
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
-    { name: "Motion", prefixes: ["--motion-", "--ease-"] },
+    { name: "Motion", prefixes: ["--motion-", "--ease-", "--transition-"] },
     { name: "Effects", prefixes: ["--opacity-", "--shadow-"] },
   ];
 }

@@ -1,6 +1,6 @@
-/* The hero: bottom left of the cosmos, 48 px from the left and 64 from the bottom, the kicker, the number at 176 px in mono and a
-   row with its line and two actions of 52 px, 28 px apart (the prototype's #hero, lines 514 to 546; frames 1 to 8); a block in
-   the page on a phone and on a screen too short to hold it over the page. */
+/* The hero: bottom left of the cosmos, 48 px from the left and 32 from the bottom (the ticker's room given to it, Alexis, 2026-11-09), the kicker, the number at 176 px in mono with its
+   line at its right, then two actions of 52 px (the prototype's #hero, lines 514 to 546; frames 1 to 8; the line beside the number,
+   Alexis, 2026-11-09); a block in the page on a phone and on a screen too short to hold it over the page. */
 @layer components {
   .hero {
     /* layout: the kicker, the number and the row, one under the other */
@@ -10,21 +10,41 @@
     /* raw: 22 px between them (the prototype's #hero) */
     /* layout: the arrangement the prototype and the frames draw */
     gap: 22px;
+    /* raw: the number's 88 px to 176 px, 11vi between (the prototype's #hero .num); a system's name keeps its room */
+    --_size: clamp(88px, 11vi, 176px);
+    /* raw: the old row's width, the line and the two actions: a system's long name sends its line under it */
+    max-inline-size: 720px;
+
     /* The hero's own box takes no click from the page behind it; its words and actions do. */
     pointer-events: none;
-    /* raw: the hero comes back in the opening's own 600 ms as its words leave (Opening.module.css) */
-    transition: opacity 600ms var(--ease-standard);
   }
 
-  /* While the opening's words stand over the dive, the hero gives way to them (mock-up 1, ADR-0003 §1), taking no pointer; it stays the
-     page's reading, and shows again as the keyboard reaches it: a link the keyboard is on, never the heading View in space hands the focus
-     to, by a tap or a key (F4644, F4651). */
-  .hero[data-yield="opening"]:not(:has(:focus-visible:not([tabindex="-1"]))) {
-    opacity: 0;
+  /* The number or a system's name, its line at its right at its foot; under it where there is no room. */
+  .head {
+    /* layout: the number and its line on one row, the line under it when the row is full */
+    display: flex;
+    /* layout: the line wraps under the name it has no room beside */
+    flex-wrap: wrap;
+    /* layout: the line at the number's foot */
+    align-items: flex-end;
+    /* raw: the line 28 px off the number, the prototype's between the line and the actions; 22 px under it, the hero's */
+    /* layout: the arrangement the prototype and the frames draw */
+    gap: 22px 28px;
   }
 
-  .hero[data-yield="opening"]:not(:has(:focus-visible:not([tabindex="-1"]))) > * {
-    pointer-events: none;
+  /* As large as the hero's 1,000 px of letters let it, 112 px at most: a short name large, a long one on one line all the same. */
+  .name {
+    /* raw: the name's letters, counted by the page; ten where it counts none */
+    --_chars: 10;
+
+    /* layout: a heading with no margin of its own */
+    margin-block: 0;
+    font-family: var(--family-sans);
+    /* raw: 56 px to 112 px, 7vi between, under a thousand pixels shared among its letters */
+    font-size: min(clamp(56px, 7vi, 112px), calc(1000px / var(--_chars)));
+    font-weight: 600;
+    line-height: 1;
+    letter-spacing: -0.03em;
   }
 
   .hero > * {
@@ -38,8 +58,7 @@
 
   .number {
     font-family: var(--family-mono);
-    /* raw: 88 px to 176 px, 11vi between (the prototype's #hero .num) */
-    font-size: clamp(88px, 11vi, 176px);
+    font-size: var(--_size);
     font-weight: 400;
     /* raw: the prototype's tight tracking and line for the big number */
     letter-spacing: -0.06em;
@@ -47,38 +66,51 @@
     font-variant-numeric: tabular-nums;
   }
 
-  /* People online: "ONLINE" up the number's right side from its top, in mint, read top to bottom (frame 6: 14 px from the last digit). */
-  .number[data-online]::after {
-    /* raw: frame 6's word, which assistive technology reads after the count */
-    content: "ONLINE";
-    display: inline-block;
-    /* raw: 14 px from the last digit, frame 6 */
-    /* layout: the word beside the number */
-    margin-inline-start: 14px;
-    vertical-align: top;
-    writing-mode: vertical-rl;
-    color: var(--color-mine);
-    /* raw: 9 px mono, frame 6's "ONLINE" */
-    font: 400 9px/1 var(--family-mono);
-    /* raw: frame 6's wide tracking */
-    letter-spacing: 0.3em;
+  /* At the number's right: the line over the actions. */
+  .beside {
+    /* layout: the line over the actions */
+    display: flex;
+    /* layout: the line over the actions */
+    flex-direction: column;
+    /* layout: the line a step over the actions */
+    gap: var(--space-s);
   }
 
-  .row {
-    /* layout: the line and the actions on one row, wrapping when the screen is narrow */
-    display: flex;
-    /* layout: the arrangement the prototype and the frames draw */
-    align-items: center;
-    /* layout: the line and its actions apart */
-    /* raw: 28 px between the line and the actions (the prototype's #hero .heroRow) */
-    gap: 28px;
+  /* Who is here, live: the mint of "ONLINE" (frame 6), larger than a kicker, a dot beating slowly beside it; still under reduced motion. */
+  .online {
+    /* layout: the dot a step from the words */
+    gap: var(--space-2xs);
+    color: var(--color-mine);
+    /* raw: 13 px mono, a step over the kicker's, tracked as frame 6's word */
+    font: 500 13px/1 var(--family-mono);
+    /* raw: frame 6's wide tracking, a little closer at this size */
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+
+  .pulse {
+    inline-size: var(--size-dot-l);
+    background: var(--color-mine);
+    /* raw: a slow beat, two seconds, for as long as people are here */
+    animation: beat calc(2s * var(--motion-scale)) var(--ease-standard) infinite;
+  }
+
+  @keyframes beat {
+    from {
+      box-shadow: 0 0 0 0 var(--color-mine-line);
+    }
+
+    to {
+      /* raw: the ring spreads 8 px and fades, as the tags' live dot does once */
+      box-shadow: 0 0 0 8px transparent;
+    }
   }
 
   .line {
-    /* raw: the line's own grey and 17 px (the prototype's #hero .heroCap) */
+    /* raw: the line's own grey (the prototype's #hero .heroCap), 22 px over the number (Alexis, 2026-11-09: "en plus gros") */
     color: #c8d0de;
-    /* raw: the prototype's and the frames' own value */
-    font: 400 17px/1.5 var(--family-sans);
+    /* raw: the line over the number, a step over the prototype's 17 px */
+    font: 400 22px/1.35 var(--family-sans);
     letter-spacing: normal;
   }
 
@@ -136,9 +168,7 @@
   .worlds {
     /* layout: the list stands off the hero above it when the page holds them in a column */
     margin-block-start: var(--space-s);
-    /* raw: the list gives way and comes back with the hero, in the opening's 600 ms */
-    transition: opacity 600ms var(--ease-standard);
-    /* The ticker is fixed over the foot of the page, and "View in space" over a phone's: the last link scrolls above them. */
+    /* "View in space" stands over a phone's foot: the last link scrolls above it. */
     padding-block-end: calc(var(--space-xl) + var(--control-m) + var(--space-s));
   }
 
@@ -190,26 +220,11 @@
     text-transform: lowercase;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .hero,
-    .worlds {
-      transition: none;
-    }
-  }
-
-  /* Where the list stands in the page under the hero, a phone or a short screen, the opening's words come over it: it gives way with the
-     hero (F4648). Fixed at the top from 900 by 800 px, it stands clear of them, as mock-up 1 draws it. */
-  @media (max-width: 899px), (max-height: 799px) {
-    .worlds[data-yield="opening"]:not(:has(:focus-visible)) {
-      opacity: 0;
-      pointer-events: none;
-    }
-  }
-
   @media (max-width: 899px) {
-    .row {
-      /* layout: the actions go under the line when the phone is too narrow for both */
-      flex-wrap: wrap;
+    /* Under the ways' pill, which a phone fixes at the top right just under its header (shellHeader.module.css). */
+    .hero {
+      /* layout: the hero starts under the pill fixed over the page's top */
+      margin-block-start: calc(var(--size-bar) + 2 * var(--space-2xs));
     }
 
     .actions {
@@ -242,9 +257,11 @@
     display: none;
   }
 
-  /* From 900 px the cosmos's rail stands for the list while it stands (7i): one list of worlds on the page, the rail's. */
+  /* From 900 px the rail stands for the list (7i), and the list never shows while space loads or comes back: only where space cannot
+     stand, refused or failed, does the page show it (D372; the universe marks it "fallback"). Its links stay in the page for a reader
+     with no script. */
   @media (min-width: 900px) {
-    .worlds[data-rail="standing"] {
+    .worlds:not([data-rail="fallback"]) {
       display: none;
     }
   }
@@ -254,7 +271,7 @@
     .hero {
       position: fixed;
       inset-inline-start: var(--space-xl);
-      inset-block-end: var(--space-2xl);
+      inset-block-end: var(--space-l);
     }
 
     .worlds {

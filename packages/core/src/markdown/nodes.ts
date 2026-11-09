@@ -38,10 +38,10 @@ function unmentioned(nodes: readonly Inline[]): Inline[] {
 }
 
 /** A link's label from what it holds: no account is named in it, its mentions are text again; an image with no alt text
- * names its address. */
-export function labelOf(nodes: readonly Inline[], href: string, image: boolean): Inline[] {
+ * is called Image. */
+export function labelOf(nodes: readonly Inline[], image: boolean): Inline[] {
   const named = unmentioned(nodes);
-  return image && invisible(named) ? [{ type: "text", text: href }] : named;
+  return image && invisible(named) ? [{ type: "text", text: "Image" }] : named;
 }
 
 /** A node after the last: a text joins the text before it, and an empty one adds nothing. */

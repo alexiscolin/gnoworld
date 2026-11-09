@@ -2,7 +2,6 @@
 // Each visitor's login calls are limited before any work, and a failed login gets one answer whatever
 // failed, its cause going to the log alone.
 import type { DatabaseSync } from "node:sqlite";
-import { getConnInfo } from "@hono/node-server/conninfo";
 import { ChallengeRequest, TicketRequest, VerifyRequest, type ApiError, type Me, type Ticket } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
@@ -11,7 +10,7 @@ import type { Config } from "../config.ts";
 import { guard, json, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
-import { visitor } from "../visitor.ts";
+import { visitorOf as readVisitor } from "../visitor.ts";
 import { makeLogin, type Login } from "./login.ts";
 import { makeTickets, type Tickets } from "./ticket.ts";
 
@@ -40,8 +39,7 @@ export function loginRoutes(
   const mintsByAccount = limiter({ max: 10, windowMs: 60_000, keys: 100_000 });
 
   // The visitor the web proxy names in X-Real-IP, believed only from that proxy (3e sets it).
-  const visitorOf = (c: Context): string =>
-    visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), proxy);
+  const visitorOf = (c: Context): string => readVisitor(c, proxy);
   const answer = (c: Context, error: ApiError["error"], status: Status): Response =>
     c.json({ error } satisfies ApiError, status);
   // Each cause's answer: every failed login gets the same one, whatever failed.

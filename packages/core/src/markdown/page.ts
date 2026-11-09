@@ -1,5 +1,5 @@
 // A realm's page (5h): the Markdown that `vm/qrender` answers, read into the tree of blocks a page may draw, never HTML
-// (ADR-0002 §4; docs/plans/slice-5-part-2.md §1). The chat's reader plus headings, and gnoweb's alerts, columns and forms
+// (ADR-0002 §4; docs/plans/slice-5-part-2.md §1). The chat's reader plus headings, tables (GFM's, capped), and gnoweb's alerts, columns and forms
 // degraded to blocks (pageGrammar.ts); an image is a link to it; a link to a path resolves against gnoweb's origin when
 // given one, and is text without. A page past 256 KB is not read: its answer is the cap's state, never a part of the page
 // shown as whole. Linear in the page's bytes (benched at 16, 64 and 256 KB).
@@ -7,7 +7,9 @@ import { Blocks } from "./blocks.ts";
 import { originOf } from "./address.ts";
 import { pageDialect, type PageBlock, type PageExtra } from "./pageGrammar.ts";
 
-export type { FormField, PageBlock } from "./pageGrammar.ts";
+export { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS } from "./pageGrammar.ts";
+export { MAX_LIST_DEPTH } from "./pageGrammar.ts";
+export type { Align, FormField, Outline, OutlineItem, PageBlock } from "./pageGrammar.ts";
 
 /** The most bytes of a page that are read. */
 export const PAGE_MAX_BYTES = 256 * 1024;

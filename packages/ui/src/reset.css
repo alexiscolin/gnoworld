@@ -26,11 +26,18 @@
     color: inherit;
   }
 
-  /* The browser's own face of a button, its fill, edge and padding: each control draws its own. */
+  /* The browser's own face of a button, its fill, edge and padding: each control draws its own; its words read as those round it, a
+     label's tracking and capitals too, and the pointer says it acts. */
   button {
     padding: 0;
     border: 0;
     background: none;
+    letter-spacing: inherit;
+    text-transform: inherit;
+  }
+
+  button:not(:disabled) {
+    cursor: pointer;
   }
 
   svg {

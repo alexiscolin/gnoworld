@@ -180,8 +180,18 @@ by `scripts/ergo.sh` first), on 127.0.0.1:5195 for the server, 5196 and 5197 for
 origins. The app's dev server proxies `^/api/` and `^/ws$` there (`app/vite.config.ts`'s `workshopBackend`), the visitor's
 address set by the proxy, never the browser's; Vite's proxy is a dev server's, so no build holds it, and the lab's server has
 none. The chat, who is here and the rooms run on it; its roles are the journeys' (the shipped file and their test rooms). The
-worlds job and the prices' timer do not run, and nothing serves what they write: the worlds read from the chain
-(`worlds.json`) and the hero's prices and block (`markets.json`) stay empty. A login with Adena is untried here.
+worlds job and the prices' timer run in it alone, never in the journeys' (`startBackend`'s `jobs`), reading the default universe's chain
+and CoinGecko straight from this machine (the egress proxy is the deployment's) and writing into `.claude/tmp/workshop-data`
+(`WORKSHOP_DATA_DIR`), kept from one run to the next; the app's dev server serves exactly `/worlds.json`, `/worlds-count.json` and
+`/markets.json` from it, nothing else of it (`app/tests/e2e/workshopData.mjs`): the last run's at once, a 404 only before the very first
+pass has written them (the worlds' pass reads every realm's history, minutes). The jobs' lines (`worlds_…`, `prices_…`, `height_…`) show in
+the workshop's terminal. A login with Adena is untried here.
+
+**A crowd** (Alexis, 2026-11-07): `cd app && node tests/e2e/crowd.mjs [--people 12] [--writers 5] [--base http://127.0.0.1:5198]` opens
+simulated people on the running workshop, in headless Chromium, no scene, half on the Earth and the rest over the hubs' worlds; the
+writers log in with Adena's stand-in and a test wallet and say a line ending "(sim)" every 20-90 s. It refuses any base but
+127.0.0.1 or localhost (`node --test tests/e2e/crowd.test.mjs`), writes no file, and is in no gate. Ctrl-C leaves; the counts fall
+when the streams close. Inside Claude Code's sandbox Chromium runs one process per browser, so there each person is a browser.
 
 The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
 cannot reach the clipboard there; select the list instead.

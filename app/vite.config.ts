@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { build, defineConfig, parseSync, type Plugin } from "vite";
 import { glslSpaces } from "./src/glsl.ts";
 import { precached } from "./src/sw/precache.ts";
+import { workshopDataFiles } from "./tests/e2e/workshopData.mjs";
 
 // The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script, with the
 // files it precaches (hashed ones and the shell) and their digests. Built once the whole build is done:
@@ -119,6 +120,21 @@ export const workshopBackend = () => {
   };
 };
 
+// The files the workshop's backend writes into WORKSHOP_DATA_DIR (scripts/workshop.sh), served at their names and nothing else of the folder
+// (tests/e2e/workshopData.mjs); no plugin without the folder, and none in a build.
+export const workshopData = (dir: string | undefined): Plugin[] =>
+  dir === undefined || dir === ""
+    ? []
+    : [
+        {
+          name: "gnoworld:workshop-data",
+          apply: "serve",
+          configureServer(server) {
+            server.middlewares.use(workshopDataFiles(dir));
+          },
+        },
+      ];
+
 /** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
 export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 
@@ -130,6 +146,7 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
     glslSpaces(parsed),
     serviceWorker,
+    workshopData(process.env["WORKSHOP_DATA_DIR"]),
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
   server: { ...workshopServer(), proxy: workshopBackend() },

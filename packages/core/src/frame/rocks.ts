@@ -1,10 +1,9 @@
 // The ambient rocks of a system's dynamic view (part 7p for the home, 7v for a system; Alexis, 2026-11-03, "roches d'ambiance"): a few rocks
 // in front of everything, decor as the field of stars is, not worlds: no name, no click, nothing that claims data. They stand in space from
-// the view's own seed, so the same view sees the same rocks, the nearer larger, and slide with the eye as it moves; never over a body or the
+// the view's own seed, so the same view sees the same rocks, the nearer larger; never over a body or the
 // room of its label. The home's Earth view has none (Alexis, 2026-11-04, "Le retirer").
 import { PLACE } from "../lod/place.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { SWAY, SWAY_CORNERS } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
 import type { Lent } from "./lent.ts";
 import { STAR_HEART, type Look, type Seen } from "./restLook.ts";
@@ -32,11 +31,9 @@ const onRoom = (rock: Seen, body: Seen, margin = MARGIN) =>
     Math.abs(rock.y - body.y) < body.radius + PLACE.gap + LABEL.high + rock.radius + margin);
 
 // A rock seen on one screen: off the system's card, the star's heart, the Earth and its label's room, and every one of `rooms` and its
-// label's room, the rock sliding `drift` pixels past them as the eye sways.
-const clearOn = (look: Look, rock: Seen, { rooms, drift }: { rooms: readonly Seen[]; drift: number }) =>
-  look.clear(rock, MARGIN, "card") &&
-  !onRoom(rock, look.earth) &&
-  rooms.every((body) => !onRoom(rock, body, MARGIN + drift));
+// label's room.
+const clearOn = (look: Look, rock: Seen, rooms: readonly Seen[]) =>
+  look.clear(rock, MARGIN, "card") && !onRoom(rock, look.earth) && rooms.every((body) => !onRoom(rock, body));
 
 /** A rock on the map: its place, its radius, its shade and its turn, both from 0 to 1. */
 export interface Laid {
@@ -46,10 +43,9 @@ export interface Laid {
   readonly turn: number;
 }
 
-// What the rocks read of a view: its screens at rest and swayed, its lens, what stands on each, the functions lent.
+// What the rocks read of a view: its screens, its lens, what stands on each, the functions lent.
 interface Seeing {
   readonly looks: readonly Look[];
-  readonly swayed: readonly Look[];
   readonly focal: number;
   readonly balls: readonly Seen[][];
   readonly spots: readonly Seen[];
@@ -59,7 +55,7 @@ interface Seeing {
 // The rocks of a view whose eye is `view`'s, read through `judge`, from the view's own seed, on the map, their depths `scale` of the home's
 // once were, so they stand in front of its nearer worlds.
 function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): Laid[] {
-  const { looks, swayed, balls, focal, spots } = judge;
+  const { looks, balls, focal, spots } = judge;
   const [first] = looks;
   if (first === undefined) return [];
   let state = textHash(`rocks ${view.eye.x.toFixed(4)} ${view.eye.y.toFixed(4)} ${view.eye.z.toFixed(4)}`);
@@ -70,8 +66,8 @@ function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): L
   const { camera, width, height } = first;
   const { eye, ahead, right, up } = camera;
   const [rocks, seen]: [Laid[], Seen[]] = [[], []];
-  // A rock at `x`, `y` on the video's screen, `depth` units ahead and `pixels` in radius there, laid if it stands clear: on both screens at
-  // rest, whole unless `cut`, and swayed, clear of the Earth, the card and the star; apart from the rocks laid, in no row with them.
+  // A rock at `x`, `y` on the video's screen, `depth` units ahead and `pixels` in radius there, laid if it stands clear: on both screens,
+  // whole unless `cut`, clear of the Earth, the card and the star; apart from the rocks laid, in no row with them.
   const tryAt = ([x, y, depth, pixels]: readonly [number, number, number, number], cut = false) => {
     const [across, upward] = [((x - width / 2) * depth) / focal, ((height / 2 - y) * depth) / focal];
     const place: Point = {
@@ -81,14 +77,11 @@ function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): L
     };
     const rock = { place, radius: (pixels * depth) / focal, shade: next(), turn: next() };
     const spot = first.seen(place, rock.radius);
-    const drift = (Math.hypot(SWAY.across, SWAY.up) * focal) / depth;
     const clear =
       looks.every((look, at) => {
         const there = look.seen(place, rock.radius);
-        return (cut || look.whole(there, 0)) && clearOn(look, there, { rooms: balls[at] ?? [], drift });
-      }) &&
-      spots.every((body) => !onRoom(spot, body, MARGIN + drift)) &&
-      swayed.every((look) => clearOn(look, look.seen(place, rock.radius), { rooms: [], drift: 0 }));
+        return (cut || look.whole(there, 0)) && clearOn(look, there, balls[at] ?? []);
+      }) && spots.every((body) => !onRoom(spot, body));
     if (!clear || seen.some((other) => gap(spot, other) < APART) || judge.lent.evenRow([...seen, spot])) return false;
     rocks.push(rock);
     seen.push(spot);
@@ -118,7 +111,7 @@ function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): L
 /** The rocks of a system's dynamic view (7v; Alexis, 2026-11-03, "the ambient rocks" among its depth cues), from its own seed as the home's:
  * off each world it draws and its label's room, and off its own star's heart, which stands as one more room at the screen's centre. */
 export function rocksAt(arrival: Arrival, lent: Lent): Laid[] {
-  const { cameraTowards, drawnOf, focalOf, looksFrom, placeOf, swayed } = lent;
+  const { cameraTowards, drawnOf, focalOf, looksFrom, placeOf } = lent;
   const camera = cameraTowards(arrival.eye, arrival.look);
   const looks = looksFrom(camera);
   const { system } = arrival.postcard;
@@ -138,7 +131,6 @@ export function rocksAt(arrival: Arrival, lent: Lent): Laid[] {
     arrival,
     {
       looks,
-      swayed: SWAY_CORNERS.flatMap((sway) => looksFrom(swayed(camera, sway, arrival.look))),
       focal: focalOf(looks[0]?.height ?? 1),
       balls,
       spots: balls[0] ?? [],

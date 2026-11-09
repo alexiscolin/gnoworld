@@ -1,16 +1,14 @@
-/* The places' list as the prototype draws it (#board, .hubcard; the video's 2:24 cut shows none): on a computer a board over the
-   page, 98 px from the top and 24 from the other sides, holding cards of 240 px at least, 16 apart; on a phone a column of
-   the same cards in the page. */
+/* The places' list as the prototype draws it (.hubcard; the video's 2:24 cut shows none): cards of 240 px at least, 16 apart; on a
+   phone a column of the same cards in the page. */
 @layer components {
   .cards {
-    /* layout: the cards in as many columns of 240 px at least as the board holds */
+    /* layout: the cards in as many columns of 240 px at least as the list holds */
     display: grid;
     /* layout: the arrangement the prototype and the frames draw */
     /* raw: the prototype's and the frames' own value */
     grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-    /* raw: 16 px between the cards (the prototype's .cards) */
     /* layout: the arrangement the prototype and the frames draw */
-    gap: 16px;
+    gap: var(--space-s);
     /* layout: the list's own indent and margin go, the cards space themselves */
     margin-block: 0;
     padding-inline-start: 0;
@@ -22,13 +20,11 @@
     display: flex;
     /* layout: the arrangement the prototype and the frames draw */
     flex-direction: column;
-    /* raw: 16 px between the card's parts and inside its edge (the prototype's .hubcard) */
+    /* raw: 16 px between the card's parts (the prototype's .hubcard) */
     /* layout: the arrangement the prototype and the frames draw */
     gap: 16px;
-    /* raw: the prototype's and the frames' own value */
-    padding: 16px;
-    /* raw: the card's radius is 16 px (the prototype's .hubcard) */
-    border-radius: 16px;
+    padding: var(--space-s);
+    border-radius: var(--radius-box);
     border: var(--line-width) solid var(--color-line);
     /* raw: white at 3%, 6% under the pointer (the prototype's .hubcard) */
     background: color-mix(in oklab, var(--color-text) 3%, transparent);
@@ -62,15 +58,13 @@
     display: flex;
     /* layout: the arrangement the prototype and the frames draw */
     flex-direction: column;
-    /* raw: 4 px between the name and the description (the prototype's .hubcard .nm) */
     /* layout: the arrangement the prototype and the frames draw */
-    gap: 4px;
+    gap: var(--space-3xs);
     min-inline-size: 0;
   }
 
   .name {
-    /* raw: the name is 18 px at 400, tracking -0.01em (the prototype's .hubcard .nm b) */
-    font: 400 18px/1.2 var(--family-sans);
+    font: var(--font-card-name);
     letter-spacing: -0.01em;
   }
 
@@ -78,28 +72,5 @@
     color: var(--color-text-muted);
     /* raw: 12 px on 1.4 (the prototype's .hubcard .dd) */
     font: var(--font-meta);
-  }
-
-  .board h1 {
-    /* layout: the page's heading at the prototype's board heading size, 28 px light */
-    font: var(--font-title-m);
-    letter-spacing: var(--tracking-tight);
-  }
-
-  @media (min-width: 900px) {
-    .board {
-      position: fixed;
-      /* raw: 98 px from the top, under the header's 96, and 24 from the other sides (the prototype's #board) */
-      inset: 98px var(--space-m) var(--space-m);
-      overflow: auto;
-      box-sizing: border-box;
-      padding: var(--space-m);
-      /* raw: the radius is 24 (the prototype's #board) */
-      border-radius: var(--radius-l);
-      /* raw: the prototype's two glows over the space (#board): blue at the top right, amber at the bottom left */
-      background:
-        radial-gradient(1100px 520px at 75% -10%, rgb(92 120 200 / 16%), transparent 60%),
-        radial-gradient(800px 420px at 0% 110%, rgb(255 156 74 / 9%), transparent 60%), var(--color-space);
-    }
   }
 }

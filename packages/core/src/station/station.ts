@@ -4,10 +4,15 @@
 // a sign, read from the team's file, never from the name. Its parts stand within a reach of 1.
 import type { Point } from "../space/cell.ts";
 import { armsOf, dishOf, lamp, wingsOf, wheelOf } from "./around.ts";
-import { Draws, unitClamp } from "./draws.ts";
+import { Draws } from "./draws.ts";
+import { clamp01 } from "../space/smooth.ts";
 import { greatWheelOf, shellOf } from "./great.ts";
 import { at, reachOf, scaled, type Part } from "./parts.ts";
 import { sidesOf, spineOf, type Spine } from "./spine.ts";
+
+/** The one switch for the stations round the Earth (Alexis, 2026-11-08: "enlève les mcp, adena, gnosh etc. : plus aucun satellite et station pour
+ * le moment"). Off: the scene draws none, the hubs of kind "station" are not offered as places, and a direct URL still opens their page. */
+export const STATIONS_SHOWN = false as boolean;
 
 export interface Station {
   readonly seed: string;
@@ -55,7 +60,7 @@ function great(draws: Draws, inner: number, size: number): Part[] {
 /** The station `seed` builds at `size`, 0 a small satellite to 1 an artificial world. */
 export function stationOf(seed: string, size: number): Station {
   const draws = new Draws(seed);
-  const grown = unitClamp(size);
+  const grown = clamp01(size);
   const spine = spineOf(draws, grown);
   const parts = [...spine.parts, ...round(draws, spine, grown)];
   if (grown >= GREAT) parts.push(...great(draws, Math.max(...parts.map(reachOf)), grown));

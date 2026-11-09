@@ -1,13 +1,12 @@
 // A world's realm card (8g, frame 93): "REALM · FROM THE EXPLORER", its path, who deployed it and since which block, as the public indexer
-// read its deploy (F4875), and its calls as the worlds' file counts them, with the read's source and time; then "EXPLORER ↗" and "DOCS ↗".
-// A fact the indexer or the file did not give is left out, never a zero. The calls are every call the job read, not a day's: the indexer
-// has no time (F2974).
+// read its deploy (F4875), and the block of its last call as the worlds' file holds it (its calls are the plate's figure), with the read's source and time; then "EXPLORER ↗" and "DOCS ↗".
+// A fact the indexer or the file did not give is left out, never a zero.
 import { shortAddress } from "@gnoworld/schemas";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { Card, Grid, Stack } from "@gnoworld/ui";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
 import { realmAt, type RealmAt } from "../../realmAt.ts";
-import { ReadFailed, ReadSource } from "./ReadSource.tsx";
+import { ReadSource } from "./ReadSource.tsx";
 import { useRealmFacts } from "./useRealmFacts.ts";
 import { OutLinks } from "./OutLinks.tsx";
 
@@ -15,10 +14,10 @@ const grouped = (n: number): string => n.toLocaleString("en-US");
 
 function Fact({ label, children }: { label: string; children: string }) {
   return (
-    <div>
+    <dl>
       <dt className="label">{label}</dt>
       <dd dir="ltr">{children}</dd>
-    </div>
+    </dl>
   );
 }
 
@@ -34,17 +33,13 @@ function Facts({
   held: Held | undefined;
   firstBlock: number | undefined;
 }) {
-  const calls = held?.calls ?? null;
+  const last = held?.lastHeight ?? null;
   return (
-    <dl>
-      <Grid min="s" space="s">
-        {deployer === undefined ? null : (
-          <Fact label="Deployed by">{held?.deployerName ?? shortAddress(deployer)}</Fact>
-        )}
-        {firstBlock === undefined ? null : <Fact label="Since block">{grouped(firstBlock)}</Fact>}
-        {calls === null ? null : <Fact label="Calls · all time">{grouped(calls)}</Fact>}
-      </Grid>
-    </dl>
+    <Grid min="s" space="s">
+      {deployer === undefined ? null : <Fact label="Deployed by">{held?.deployerName ?? shortAddress(deployer)}</Fact>}
+      {firstBlock === undefined ? null : <Fact label="Since block">{grouped(firstBlock)}</Fact>}
+      {last === null ? null : <Fact label="Last call at block">{grouped(last)}</Fact>}
+    </Grid>
   );
 }
 
@@ -65,11 +60,8 @@ function RealmCard({ found, worlds }: { found: RealmAt; worlds: Worlds["worlds"]
         <Card.Header title={realm} kicker="Realm · from the explorer" level={2} />
         <Card.Body>
           <Facts deployer={facts.deployer ?? held?.deployer ?? undefined} held={held} firstBlock={facts.firstBlock} />
-          {read === undefined ? null : read.ok ? (
-            <ReadSource source={read.source} />
-          ) : (
-            <ReadFailed failure={read.failure} source={read.source} role="status" />
-          )}
+          {/* A read that failed says nothing here: the page's one error line is the Render card's (D534). */}
+          {read?.ok === true ? <ReadSource source={read.source} /> : null}
         </Card.Body>
       </Card>
       <OutLinks

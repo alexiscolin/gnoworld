@@ -10,6 +10,7 @@ import {
   roomHref,
   roomLabel,
   roomParams,
+  hereOf,
   talkingOf,
   roomsQuery,
   shortAddress,
@@ -202,18 +203,36 @@ describe("whom a mention may shorten", () => {
   });
 });
 
-// Review 18 of 5q: the filter on the bot was removed and no test failed; on a real Ergo the count was one too many.
+// D374: "talking now" is who wrote in the last 15 minutes, from the lines the room holds; "here now" is who has it open.
 describe("talkingOf", () => {
   const A = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const B = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-  it("counts those in the room, the moderation bot left out, once connected", () => {
-    expect(talkingOf(["gnoworld", A, B], true)).toBe(2);
-    expect(talkingOf([A], true)).toBe(1);
-    expect(talkingOf(["gnoworld"], true)).toBe(0);
+  const NOW = Date.parse("2026-11-07T10:30:00.000Z");
+  const said = (from: string, minutesAgo: number, account?: string) => ({
+    from,
+    time: new Date(NOW - minutesAgo * 60_000).toISOString(),
+    ...(account === undefined ? {} : { account }),
   });
 
-  it("says none before the connection, and none for a room not known", () => {
-    expect(talkingOf([A, B], false)).toBeUndefined();
-    expect(talkingOf(undefined, true)).toBeUndefined();
+  it("counts each person who wrote in the last 15 minutes once, the bot left out", () => {
+    const lines = [said(A, 1, A), said(A, 2, A), said(B, 14, B), said("gnoworld", 1), said("old", 16, "g1old")];
+    expect(talkingOf(lines, NOW, true)).toBe(2);
+  });
+
+  it("counts a guest by nick, apart from an account of the same nick", () => {
+    expect(talkingOf([said("ines", 1), said("ines", 2, "g1ines")], NOW, true)).toBe(2);
+  });
+
+  it("says none before the connection, and none talking in a room with no line", () => {
+    expect(talkingOf([said(A, 1, A)], NOW, false)).toBeUndefined();
+    expect(talkingOf([], NOW, true)).toBe(0);
+  });
+});
+
+describe("hereOf", () => {
+  it("counts the members, the moderation bot left out, once connected", () => {
+    expect(hereOf(["gnoworld", "a", "b"], true)).toBe(2);
+    expect(hereOf(["a"], false)).toBeUndefined();
+    expect(hereOf(undefined, true)).toBeUndefined();
   });
 });

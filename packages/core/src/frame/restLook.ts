@@ -101,13 +101,6 @@ export function cameraTowards(eye: Point, target: Point, upright: Point = MAP_UP
 
 const cameraFrom = (eye: Point): Camera => cameraTowards(eye, EARTH_PLACE);
 
-/** The eye moved `across` and `upward` along `camera`'s own axes, looking at `target` still, the Earth unless said: its sway. */
-export const swayed = (
-  { eye, right, up }: Camera,
-  [across, upward]: readonly [number, number],
-  target: Point = EARTH_PLACE,
-): Camera => cameraTowards(along(along(eye, right, across), up, upward), target);
-
 /** The focal length of a screen `height` pixels high, in pixels, through `fieldOfView` degrees, the home's unless said. */
 export const focalOf = (height: number, fieldOfView = FIELD_OF_VIEW): number =>
   height / 2 / Math.tan((fieldOfView * DEGREE) / 2);

@@ -198,7 +198,7 @@ for (const viewport of [
 // A world's size by its use against its universe (F4307, ADR-0002 §3): GovDAO the universe's busiest fills its circle, its quietest stands at
 // frame 22's share, and the real file of 2026-11-01, which carries no count, leaves every world at the scale's middle, Bubble too. A sphere's
 // outline under perspective falls a little under its share: within 6% of it.
-const RECORDED_WORLDS = JSON.parse(readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8")) as {
+const RECORDED_WORLDS = JSON.parse(readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8")) as {
   worlds: { id: string; realms: { callers: number | null }[] }[];
 };
 // The real file's worlds, each realm calling at its place on the way up, GovDAO's at `govdao`.

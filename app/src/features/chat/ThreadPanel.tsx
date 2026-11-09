@@ -56,7 +56,7 @@ export function ThreadPanel({
         renewComposer();
       }}
     >
-      <Suspense fallback={<Standing word="Opening the thread…" close={close} />}>
+      <Suspense fallback={<Standing word="Opening the thread…" close={close} busy />}>
         <Thread
           root={root}
           lines={state?.lines ?? []}

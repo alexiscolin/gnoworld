@@ -34,9 +34,8 @@
   }
 
   .trail li + li::before {
-    /* raw: the chevron stands 8 px off each step, at 60% (the prototype's #fCrumbs span) */
     /* layout: the arrangement the prototype and the frames draw */
-    margin-inline: 8px;
+    margin-inline: var(--space-2xs);
     content: "\203a";
     opacity: 0.6;
   }

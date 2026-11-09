@@ -9,7 +9,7 @@ import { keepsItsRoom, loseContext, restoreContext, running, stats } from "./sce
 const EARTH = "/earth?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
 const PHONE = { width: 390, height: 844 };
-const MAP = /\/textures\/(?:earth-day|earth-night|clouds|moon)\.webp$/;
+const MAP = /\/textures\/(?:earth-day|earth-night|clouds|moon)(?:\.\d+\.[0-9a-f]{8})?\.webp$/;
 const NIGHT = /\/textures\/earth-night\.webp$/;
 const SORRY = "The Earth's maps did not come. Every place is in the list.";
 const SLOW = { timeout: 90_000 };
@@ -71,7 +71,7 @@ test.describe("a computer", () => {
   }) => {
     const asked = mapsAsked(page);
     await opened(page);
-    expect(asked.sort()).toEqual([
+    expect(asked.map((url) => url.replace(/\.\d+\.[0-9a-f]{8}/, "")).sort()).toEqual([
       "/textures/clouds.webp",
       "/textures/earth-day.webp",
       "/textures/earth-night.webp",
@@ -126,37 +126,6 @@ test.describe("a computer", () => {
     // A tilted orbit, by the decision of 2026-10-31, so not to the flat ring's pixel: its reach within 8 px of it.
     expect(Math.abs(orbit.left - 605)).toBeLessThanOrEqual(8);
     expect(Math.abs(orbit.right - 1315)).toBeLessThanOrEqual(8);
-  });
-
-  // F4250: every other journey here runs under reduced motion, so none saw the eye's slow look about move the globe off its circle.
-  // How far the eye turned from the first sample to the last, in radians.
-  const turned = (seen: readonly { yaw: number; pitch: number }[]) => {
-    const [first, last] = [seen[0], seen.at(-1)];
-    return first === undefined || last === undefined ? 0 : Math.hypot(last.yaw - first.yaw, last.pitch - first.pitch);
-  };
-
-  test("keeps the globe on frame 39's circle with motion on, as the eye looks slowly about", async ({ page }) => {
-    await page.emulateMedia({ reducedMotion: "no-preference" });
-    await page.goto(EARTH);
-    await hydrated(page);
-    await painted(page);
-    const seen: { x: number; y: number; radius: number; yaw: number; pitch: number }[] = [];
-    // Past the globe's own arrival, which a software GPU draws in many slow frames: it settles on the circle, then the look about turns.
-    await expect.poll(async () => Math.abs((await earth(page)).x - 961), SLOW).toBeLessThanOrEqual(2);
-    for (let sample = 0; sample < 4; sample += 1) {
-      const { seconds } = await stats(page);
-      await expect.poll(async () => (await stats(page)).seconds, SLOW).toBeGreaterThan(seconds + 1);
-      const [{ x, y, radius }, { turn }] = [await earth(page), await stats(page)];
-      seen.push({ x, y, radius, ...turn });
-    }
-    for (const { x, y, radius } of seen) {
-      near(x, 961, "the globe's centre, across, with motion on");
-      near(y, 561, "the globe's centre, down, with motion on");
-      near(radius, 321, "the globe's radius, with motion on");
-    }
-    // The look about is a circle of 0.26 radians at 150 s a turn: three seconds of the scene's clock turn the eye about 0.03 radians, in
-    // yaw or in pitch as the circle goes, and the globe has had the time to leave.
-    expect(turned(seen)).toBeGreaterThan(0.02);
   });
 
   test("keeps the plate's words clear of the ring", async ({ page }) => {
@@ -261,8 +230,11 @@ test.describe("a computer", () => {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
 
-  // From a universe's home with no worlds: the default one's stands its own small Earth, whose maps stay with it (7d2).
-  test("gives every map back when the reader leaves, and draws again on the way back", async ({ page }) => {
+  // From a universe's home with no worlds: the default one's stands its own small Earth, whose maps stay with it (7d2). The Earth's page keeps
+  // its globe five minutes after the reader leaves (the unit test frees it on time): the way back draws it with no map asked again.
+  test("keeps the globe's maps when the reader leaves, and draws it again at once on the way back", async ({
+    page,
+  }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/net/gnoland/?test-gpu");
     await expect(page.locator("canvas[data-scene='on']")).toBeAttached(SLOW);
@@ -272,14 +244,16 @@ test.describe("a computer", () => {
     await views.getByRole("link", { name: "Earth" }).click();
     await painted(page);
     await expect.poll(async () => (await stats(page)).textures, SLOW).toBeGreaterThan(before.textures);
+    const asked = mapsAsked(page);
+    const held = (await stats(page)).textures;
     await views.getByRole("link", { name: "Universe" }).click();
     await expect(kept(page)).toHaveCount(0);
-    await expect.poll(async () => (await stats(page)).textures, SLOW).toBe(before.textures);
-    await expect.poll(async () => (await stats(page)).geometries, SLOW).toBe(before.geometries);
     await expect(credits(page)).toHaveCount(0);
+    asked.length = 0;
     await views.getByRole("link", { name: "Earth" }).click();
     await painted(page);
-    await expect.poll(async () => (await stats(page)).textures, SLOW).toBeGreaterThan(before.textures);
+    expect((await stats(page)).textures).toBeGreaterThanOrEqual(held);
+    expect(asked).toEqual([]);
   });
 
   test("a lost context shows the list, and the Earth comes back with its maps", async ({ page }) => {

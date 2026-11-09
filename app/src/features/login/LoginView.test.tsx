@@ -18,7 +18,7 @@ const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.te
   import: "default",
   eager: true,
 });
-const HERE = "../../features/login/LoginView.test.tsx";
+const HERE = "./LoginView.test.tsx";
 const STATIC = /^(?:import|export)\s(?!type\b)[^;]*?from\s+["'](\.[^"']*)["']/gm;
 const isNames = (file: string) => /\/features\/names\/|\/lib\/chain\/names\.ts$/.test(file);
 
@@ -103,6 +103,27 @@ describe("LoginView", () => {
       /role="status"[^>]*>The server could not be reached\. Check your connection, then try again\.</,
     );
   });
+
+  // Alexis, 2026-11-07: the login's error stood beside the button; it is the button's own words now, short, the whole sentence its
+  // description and its status region's, which shows nothing on its own (D377).
+  it.each([
+    [{ reason: "too_many" } as const, "Wait a minute", "Too many tries: wait a minute, then try again."],
+    [{ reason: "locked" } as const, "Unlock Adena", "Unlock Adena, then try again."],
+    [
+      { reason: "address", problem: "checksum" } as const,
+      "Check Adena's address",
+      "Adena's address does not match its checksum: a character in it is wrong.",
+    ],
+  ])(
+    "says why the last login stopped in its button, short, the whole sentence its description: %j",
+    (problem, short, whole) => {
+      const html = view({ problem });
+      const escaped = (words: string) => words.replaceAll("'", "&#x27;");
+      expect(buttons(html)).toEqual([escaped(short)]);
+      expect(html).toContain(`aria-description="${escaped(whole)}"`);
+      expect(html).toMatch(/<p role="status" class="[^"]*visually-hidden[^"]*">/);
+    },
+  );
 
   it("says why the last login stopped, in its status region", () => {
     const html = view({ problem: { reason: "address", problem: "checksum" } });

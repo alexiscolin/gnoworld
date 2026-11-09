@@ -52,6 +52,21 @@ describe("Tooltip", () => {
     expect(shown()).toBe("false");
   });
 
+  it("hides them when the control is pressed, and shows them again only once the pointer has left and come back", () => {
+    draw();
+    fireEvent.pointerEnter(button());
+    advance(500);
+    expect(shown()).toBe("true");
+    fireEvent.pointerDown(button());
+    expect(shown()).toBe("false");
+    advance(1_000);
+    expect(shown()).toBe("false");
+    fireEvent.pointerLeave(button());
+    fireEvent.pointerEnter(button());
+    advance(500);
+    expect(shown()).toBe("true");
+  });
+
   it("never shows them when the pointer goes before its half second", () => {
     draw();
     fireEvent.pointerEnter(button());

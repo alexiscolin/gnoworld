@@ -324,7 +324,7 @@ test.describe("a room's lines: Edit", () => {
     );
     await lines(page).nth(0).focus();
     const bar = barOf(page, 0);
-    await expect(bar.getByRole("button")).toHaveCount(3);
+    await expect(bar.getByRole("button")).toHaveCount(8);
     expect((await bar.boundingBox())?.height ?? Infinity).toBeLessThan(56);
     await startEdit(page, 0);
     await expect(editing(page)).toBeVisible();

@@ -1,6 +1,5 @@
 import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { box, near } from "./geometry.ts";
 import { landed, running, stats, type FlightStats } from "./sceneStage.ts";
 
 // Flights (7g; ADR-0001 §7; ADR-0002 §1, "Flight panel"; frames 18, 19, 36, 88, 89, 101, 128, 129, 142): the jump to a star the reader aims
@@ -8,16 +7,10 @@ import { landed, running, stats, type FlightStats } from "./sceneStage.ts";
 // test, slice 7 §1). Every journey runs under the page's CSP, and fails on a violation (fixtures.ts).
 const HOME = "/?test-gpu";
 const FRAME = { width: 1728, height: 1080 };
-const PHONE = { width: 390, height: 844 };
 // Small enough for twenty flights on the gate's software GPU, wide enough for a computer's layout.
 const SMALL = { width: 1000, height: 700 };
-// The panel's regions on frames 18, 36, 88, 89, 101 and 142, at device scale 1: its box, its target's left, its bar.
-const PANEL = { x: 586, y: 103, width: 558, height: 120 };
-const TARGET_LEFT = 610;
-const BAR = { x: 610, y: 205, width: 511 };
 const SLOW = { timeout: 90_000 };
-const PHASES = ["Course plotted · leaving orbit", "In transit", "Entering orbit"];
-const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
+const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 
 test.describe.configure({ timeout: 240_000 });
 
@@ -239,68 +232,6 @@ const labelsShown = (page: Page) =>
     (labels) => labels.filter((label) => Number(getComputedStyle(label).opacity) > 0.05).length,
   );
 
-const nearBox = (seen: Box | undefined, frame: Partial<Box>, what: string) => {
-  expect(seen, `${what} was never seen`).toBeDefined();
-  for (const key of ["x", "y", "width", "height"] as const) {
-    const want = frame[key];
-    if (want !== undefined) near(seen?.[key] ?? NaN, want, `${what}'s ${key}`);
-  }
-};
-
-test("stands the flight panel where the frames stand it, under the header in the middle, its regions in place", async ({
-  page,
-}) => {
-  await home(page);
-  await watchPanel(page);
-  await aimAtTheGreatStar(page);
-  await expect.poll(async () => (await flightOf(page))?.flights, SLOW).toBe(1);
-  await flown(page);
-  await expect(page.locator("[data-flight]")).toHaveCount(0);
-  const seen = await panelSeen(page);
-  expect(seen.named).toBe("gno.land");
-  nearBox(seen.panel, PANEL, "the panel");
-  near(seen.target?.x ?? NaN, TARGET_LEFT, "the target's left");
-  nearBox(seen.bar, BAR, "the bar");
-  expect(seen.phases).toEqual(PHASES);
-  // Frames 89 and 142 draw the border and the track at about #3c3b40 over black: the strong line, not the plain one (F3709).
-  expect(seen.lines.track).toBe(seen.lines.strong);
-  expect(seen.lines.border).toContain(seen.lines.strong);
-});
-
-// Frame 18's figures stand apart at four digits, "1,158 km/s" and its time: never run together, never cut. A far star of the recorded worlds
-// file (samcrew's, past 2,000 km/s on its way), as the great star's way is too short for four digits.
-test("keeps the panel's figures apart and whole at four digits", async ({ page }) => {
-  await page.route("**/worlds.json", (route) => route.fulfill({ body: RECORDED, contentType: "application/json" }));
-  await home(page);
-  await watchPanel(page);
-  await fly(page, { kind: "star", id: "samcrew" });
-  await expect.poll(async () => (await flightOf(page))?.flights, SLOW).toBe(1);
-  await flown(page);
-  const seen = await panelSeen(page);
-  expect(seen.widest).toMatch(/^\d,\d{3} km\/s$/);
-  expect(seen.cut).toEqual([]);
-  expect(seen.tightest, `the widest figure seen: ${seen.widest}`).toBeGreaterThanOrEqual(8);
-});
-
-test("keeps the panel in a phone's gutters, under its header", async ({ page }) => {
-  await page.setViewportSize(PHONE);
-  await page.goto(HOME);
-  await hydrated(page);
-  await page.getByRole("button", { name: "View in space" }).click();
-  await running(page);
-  await landed(page);
-  await expect.poll(async () => (await flightOf(page)) !== undefined, SLOW).toBe(true);
-  await watchPanel(page);
-  const header = await box(page, "header");
-  await fly(page, { kind: "star", id: "gno.land" });
-  await flown(page);
-  const { panel } = await panelSeen(page);
-  if (panel === undefined) throw new Error("the panel was never seen");
-  expect(panel.x).toBeGreaterThanOrEqual(16);
-  expect(panel.x + panel.width).toBeLessThanOrEqual(PHONE.width - 16);
-  expect(panel.y).toBeGreaterThanOrEqual(header.y + header.height);
-});
-
 test("jumps to the star aimed at, lands at once on Escape, and comes back on Escape", async ({ page }) => {
   await home(page);
   // The labels stand once the cosmos has looked: by then its stars can be aimed at.
@@ -382,25 +313,17 @@ test("crossfades under reduced motion: no camera moves between, no panel, the co
   expect((await panelSeen(page)).phases).toEqual([]);
 });
 
-test("flies from the cosmos to a world's page: the panel names it, and lands as the world comes into its circle", async ({
-  page,
-}) => {
+// The flight panel is not shown (D332): the flight is read off the scene alone.
+test("flies from the cosmos to a world's page, and lands as the world comes into its circle", async ({ page }) => {
   await home(page, SMALL);
-  await watchPanel(page);
   await page.locator("a[href='/w/bubble']").first().click();
   await expect.poll(async () => (await flightOf(page))?.kind, SLOW).toBe("body");
   await flown(page);
   await expect(page.locator("[data-globe]")).toHaveAttribute("data-world", "drawn", SLOW);
-  const seen = await panelSeen(page);
-  expect(seen.phases).toEqual(PHASES);
-  expect(seen.named).toBe("Bubble");
   // It waits in transit for the world, and is let go by the world drawn, never by the two seconds' end, on its own clock: the gate's
   // software GPU draws slow frames, which no wall clock tells from a wait.
   const { waited } = (await flightOf(page)) ?? { waited: NaN };
   expect(waited).toBeLessThan(2);
-  expect(seen.goneAt).toBeGreaterThanOrEqual(seen.drawnAt);
-  // The plate waits out of sight while the world comes, and is there once it has landed (F3707).
-  expect(seen.plates).toEqual(["hidden", "hidden", "hidden"]);
   await expect(page.locator("[data-look='plate']")).toBeVisible();
 });
 

@@ -31,11 +31,11 @@ export function Panel({ label, look = "docked", caption, children }: PanelProps)
       data-fit={look === "plate" ? fitOf(label) : undefined}
     >
       {look === "plate" && caption !== undefined ? (
-        <div className={styles["caption"]} aria-hidden="true">
+        <div className={styles["caption"]} aria-hidden="true" data-caption="">
           <Kicker vertical>{caption}</Kicker>
         </div>
       ) : null}
-      <div className={styles["content"]}>
+      <div className={styles["content"]} data-content="">
         <Stack space="m">{children}</Stack>
       </div>
     </section>
@@ -73,8 +73,10 @@ interface LayoutProps {
 function Layout({ plate, children }: LayoutProps) {
   return (
     <div>
-      <div className={styles["frame"]} aria-hidden="true" />
-      <div className={styles["place"]}>{plate}</div>
+      <div className={styles["frame"]} aria-hidden="true" data-frame="" />
+      <div className={styles["place"]} data-exit="">
+        {plate}
+      </div>
       {children === undefined ? null : <Dock>{children}</Dock>}
     </div>
   );
@@ -84,7 +86,7 @@ function Layout({ plate, children }: LayoutProps) {
  * `alone` over the scene with every corner round (the chat over the cosmos, frame 143). */
 function Dock({ alone = false, children }: { alone?: boolean; children: ReactNode }) {
   return (
-    <div className={styles["dock"]} data-alone={alone ? "" : undefined}>
+    <div className={styles["dock"]} data-dock="" data-alone={alone ? "" : undefined} data-exit="">
       {children}
     </div>
   );

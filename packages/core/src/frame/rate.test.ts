@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { carryOver, frameRate, frameWait, isDue, type LoopState } from "./rate.ts";
 
 const MINUTE = 60_000;
+const SETTLE = 20_000;
 const SCENERY: LoopState = {
   hidden: false,
   covered: false,
@@ -18,7 +19,10 @@ describe("frameRate", () => {
     ["only scenery moves", {}, 30],
     ["a flight or an interaction", { busy: true }, 60],
     ["a frame is owed", { owed: true }, 60],
-    ["59.999 s with no input", { sinceInput: MINUTE - 1 }, 30],
+    ["just after a gesture", { sinceInput: 0 }, 30],
+    ["19.999 s with no input", { sinceInput: SETTLE - 1 }, 30],
+    ["20 s with no input", { sinceInput: SETTLE }, 15],
+    ["59.999 s with no input", { sinceInput: MINUTE - 1 }, 15],
     ["a minute with no input", { sinceInput: MINUTE }, 10],
     ["an hour with no input", { sinceInput: 60 * MINUTE }, 10],
     ["a flight long after the last input", { busy: true, sinceInput: 60 * MINUTE }, 60],
@@ -52,7 +56,7 @@ describe("frameRate", () => {
         }),
         (state) => {
           const rate = frameRate(state);
-          expect([0, 10, 30, 60]).toContain(rate);
+          expect([0, 10, 15, 30, 60]).toContain(rate);
           if (state.hidden || state.covered) expect(rate).toBe(0);
         },
       ),
@@ -63,7 +67,7 @@ describe("frameRate", () => {
 const SECONDS = 20;
 
 // The frames a screen of `hz` draws at `rate` over 20 s, as the loop steps through them: its refreshes in order.
-function drawn(hz: number, rate: 10 | 30 | 60, jitter: (refresh: number) => number = () => 0): number {
+function drawn(hz: number, rate: 10 | 15 | 30 | 60, jitter: (refresh: number) => number = () => 0): number {
   let carried = 0;
   let draws = 0;
   for (let refresh = 0; refresh < hz * SECONDS; refresh += 1) {
@@ -78,9 +82,9 @@ function drawn(hz: number, rate: 10 | 30 | 60, jitter: (refresh: number) => numb
 
 describe("the budget carried over", () => {
   it.each([24, 30, 50, 60, 75, 90, 100, 120, 144, 165, 240])(
-    "keeps a %i Hz screen at 60, 30 and 10, or its own rate under",
+    "keeps a %i Hz screen at 60, 30, 15 and 10, or its own rate under",
     (hz) => {
-      for (const rate of [60, 30, 10] as const) {
+      for (const rate of [60, 30, 15, 10] as const) {
         const want = Math.min(rate, hz) * SECONDS;
         expect(Math.abs(drawn(hz, rate) - want), `${String(rate)} fps`).toBeLessThanOrEqual(1);
       }
@@ -95,7 +99,7 @@ describe("the budget carried over", () => {
 
   it("never draws faster than its rate, on any screen from 60 to 240 Hz", () => {
     fc.assert(
-      fc.property(fc.integer({ min: 60, max: 240 }), fc.constantFrom<10 | 30 | 60>(10, 30, 60), (hz, rate) => {
+      fc.property(fc.integer({ min: 60, max: 240 }), fc.constantFrom<10 | 15 | 30 | 60>(10, 15, 30, 60), (hz, rate) => {
         expect(drawn(hz, rate)).toBeLessThanOrEqual(rate * SECONDS + 1);
       }),
     );
@@ -131,7 +135,7 @@ describe("frameWait", () => {
   });
 
   it("wakes before the frame is due, by less than a 60 Hz refresh", () => {
-    for (const rate of [30, 10] as const) {
+    for (const rate of [30, 15, 10] as const) {
       const interval = 1000 / rate;
       expect(frameWait(0, rate)).toBeLessThan(interval);
       expect(frameWait(0, rate)).toBeGreaterThan(interval - 1000 / 60);

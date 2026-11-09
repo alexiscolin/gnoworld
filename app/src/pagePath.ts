@@ -6,9 +6,3 @@ const FILE = /\.[^/.]+$/;
 export function isPagePath(href: string): boolean {
   return !FILE.test(href.split(/[?#]/, 1)[0] ?? "");
 }
-
-/** True for a path of the site's own pages: from its root, never another host's (`//host`, `/\\host`, a tab the address parser drops), no
- * space and no escaped slash, a page and not a file (7v: what the Plan's names hand the router). */
-export function isOwnPage(href: string): boolean {
-  return /^\/(?![/\\])[^\s\\]*$/.test(href) && !/%2f|%5c/i.test(href) && isPagePath(href);
-}

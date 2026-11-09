@@ -10,7 +10,7 @@ const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
 const PHONE = { width: 390, height: 844 };
 const FRAME = { left: 1585, right: 1703, top: 98, bottom: 1024, planet: 64, pitch: 98 };
-const RECORDED = JSON.parse(readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8")) as {
+const RECORDED = JSON.parse(readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8")) as {
   worlds: { id: string; seen?: string | null; realms?: { callers: number | null }[] }[];
 };
 const SLOW = { timeout: 90_000 };
@@ -64,6 +64,8 @@ async function arrived(page: Page, motion: "reduce" | "no-preference" = "reduce"
   await page.goto(HOME);
   await hydrated(page);
   await running(page);
+  // The loader covers the page, taking every pointer, till the dive starts (D333).
+  await expect(page.getByRole("status", { name: "Loading space" })).toHaveCount(0, SLOW);
   await expect(railLinks(page).first()).toBeVisible(SLOW);
 }
 
@@ -103,8 +105,9 @@ test("stands where frame 4's rail stands, as tall as its worlds, its planets the
   const last = await railLinks(page).last().boundingBox();
   const under = y + height - (last?.y ?? 0) - (last?.height ?? 0);
   expect(under).toBeGreaterThan(0);
-  expect(under).toBeLessThanOrEqual(40);
-  expect(y + height).toBeLessThan(FRAME.bottom - 40);
+  // Under the last planet are its air and See all's 52 px (D355).
+  expect(under).toBeLessThanOrEqual(40 + 52);
+  expect(y + height).toBeLessThanOrEqual(FRAME.bottom);
   expect(await fadesOf(page)).toBe(1);
   const planets = await rail(page)
     .locator("li [data-kind]")
@@ -146,7 +149,8 @@ test("is one stop in the tab order, the arrows moving among its worlds, then lea
   await page.keyboard.press("Home");
   await expect(links.first()).toBeFocused();
   await page.keyboard.press("Tab");
-  await expect(rail(page).locator(":focus")).toHaveCount(0);
+  // The next stop is See all, a button; no world is focused.
+  await expect(rail(page).locator("a:focus")).toHaveCount(0);
 });
 
 test("goes to a world's page", async ({ page }) => {
@@ -181,12 +185,13 @@ test("grows the planet under the pointer like a dock, its neighbours less, and l
     expect(near).toBeGreaterThan(FRAME.planet);
     expect(near).toBeLessThan(under);
   }
-  // The pointed planet stays under the pointer, and once all stand still the dock writes nothing more.
-  const middle = await planets.nth(2).evaluate((thumb) => {
+  // The pointer stays on the planet it pointed at (the same share of its link, D359), and once all stand still the dock writes nothing more.
+  const pointed = target.y + target.height / 2;
+  const [top, bottom] = await planets.nth(2).evaluate((thumb) => {
     const box = thumb.getBoundingClientRect();
-    return box.y + box.height / 2;
+    return [box.top, box.bottom];
   });
-  expect(Math.abs(middle - (target.y + target.height / 2))).toBeLessThanOrEqual(3);
+  expect(top < pointed && pointed < bottom).toBe(true);
   const writes = await rail(page)
     .locator("ul")
     .evaluate(

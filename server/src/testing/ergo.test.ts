@@ -1,36 +1,38 @@
 import { spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { existsSync, mkdtempSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import type { AddressInfo } from "node:net";
 import { join as joinPath } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BatchReader,
-  compose,
-  foldMultiline,
+  type IrcMessage,
   LINE_BYTES,
   MULTILINE_BYTES,
   MULTILINE_LINES,
+  compose,
+  foldMultiline,
   parseLine,
   refusedOf,
   relayOf,
-  type IrcMessage,
 } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 import { z } from "zod";
 import { authServer } from "../ergo/auth.ts";
-import { ircLink, type Said } from "../irc/link.ts";
+import { type Link, type Said, ircLink } from "../irc/link.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
-import { LOGIN_TABLES, makeLogin, NONCE_ACTION, NONCE_HOST } from "../login/login.ts";
-import { makeTickets, TICKET_TABLES } from "../login/ticket.ts";
-import { startErgo, type Ergo } from "./ergo.ts";
+import { LOGIN_TABLES, NONCE_ACTION, NONCE_HOST, makeLogin } from "../login/login.ts";
+import { TICKET_TABLES, makeTickets } from "../login/ticket.ts";
+import { type Ergo, startErgo } from "./ergo.ts";
 import { wallet } from "./signer.ts";
-import { rawClient, type Raw } from "./rawClient.ts";
-
+import { type Raw, rawClient } from "./rawClient.ts";
 import {
   ADDRESS,
+  ORIGIN,
+  OTHERPW_HASH,
+  type Ws,
   cleanUp,
   finish,
   guest,
@@ -46,8 +48,6 @@ import {
   msgid,
   open,
   oper,
-  ORIGIN,
-  OTHERPW_HASH,
   replayed,
   sasl,
   say,
@@ -56,8 +56,8 @@ import {
   sync,
   wsConnect,
   wsRaw,
-  type Ws,
 } from "./ergoKit.ts";
+import type { Relayed } from "../irc/relay.ts";
 
 // Every expectation comes from .claude/tmp/ergo-spike/RESULTS.md, section 3 (Ergo v2.19.1, run for real).
 
@@ -1593,5 +1593,264 @@ describe("messages of several lines (draft/multiline)", { timeout: 30_000 }, () 
     await member.expect(/ 417 /);
     await sync(chief);
     expect(said(heard(chief))).toHaveLength(1);
+  });
+});
+
+// Moved here from relaymsg.test.ts: a test sits beside the file it tests.
+describe("RELAYMSG: the bot says a guest's line (D430)", () => {
+  // The chat for everyone speaks through the bot (D430, docs/plans/chat-for-everyone-spike.md, section 1): Ergo's RELAYMSG on the
+  // pinned build, with the rendered template's `server.relaymsg` and the `relaymsg` capability of the bot's class.
+  afterEach(cleanUp);
+
+  const NICK = "anon/brave-otter-ab23";
+  // The id Ergo gave a relayed line, or nothing for a refusal.
+  const msgidOf = (relayed: Relayed): string => (typeof relayed === "object" ? relayed.msgid : "");
+  const TAGS = "message-tags server-time account-tag echo-message batch draft/chathistory draft/relaymsg";
+
+  // A +M room an oper made, the way the server opens an open room: closed to nobody, only accounts speak.
+  const room = async (e: Ergo) => {
+    const chief = await oper(e, "chief");
+    await join(chief, "#lobby");
+    chief.send("SAMODE #lobby -i");
+    await chief.expect(/ MODE #lobby -i/);
+    await moderated(chief, "#lobby", true);
+    return chief;
+  };
+
+  describe("RELAYMSG on the rendered template (D430)", { timeout: 30_000 }, () => {
+    it("lets the bot's class say a guest's line in a +M room, where a reader sees anon/<name> and the relay's tag", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const reader = await guest(e, "gus", TAGS);
+      await join(reader, "#lobby");
+      chief.send(`RELAYMSG #lobby ${NICK} :hello from a guest`);
+      const line = await reader.expect(/PRIVMSG #lobby :hello from a guest$/);
+      expect(line).toMatch(new RegExp(`:${NICK}!`));
+      expect(line).toContain("draft/relaymsg=chief");
+    });
+
+    it("shows the relayed line to a reader that asked for no tag as an ordinary line from the nick", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const reader = await guest(e, "plain", "server-time");
+      await join(reader, "#lobby");
+      chief.send(`RELAYMSG #lobby ${NICK} :no tags`);
+      expect(await reader.expect(/PRIVMSG #lobby :no tags$/)).toMatch(new RegExp(`:${NICK}!`));
+    });
+
+    it("keeps the line in the room's history for a reader that comes later, from the same nick", async () => {
+      const e = await start();
+      const chief = await room(e);
+      chief.send(`RELAYMSG #lobby ${NICK} :kept for later`);
+      await sync(chief);
+      const late = await guest(e, "late", TAGS);
+      await join(late, "#lobby");
+      history(late, "#lobby");
+      const line = await late.expect(replayed("PRIVMSG #lobby :kept for later$"));
+      expect(line).toMatch(new RegExp(`:${NICK}!`));
+    });
+
+    it("refuses a direct message to the relayed nick, from an account and from a guest with none, so a guest is never reachable", async () => {
+      const e = await start();
+      const chief = await room(e);
+      chief.send(`RELAYMSG #lobby ${NICK} :hi`);
+      const alice = await login(e, "alice", { caps: TAGS });
+      const gus = await guest(e, "gus", TAGS);
+      for (const who of [alice, gus]) {
+        who.send(`PRIVMSG ${NICK} :psst`);
+        await who.expect(new RegExp(` 401 \\S+ ${NICK} :Relayed users cannot receive private messages`));
+      }
+    });
+
+    it("refuses RELAYMSG to an account that is not the bot's class: no privilege, even a room's own operator", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const alice = await login(e, "alice", { caps: TAGS });
+      await join(alice, "#lobby");
+      alice.send(`RELAYMSG #lobby ${NICK} :forged`);
+      await alice.expect(/FAIL RELAYMSG PRIVS_NEEDED/);
+      chief.send("SAMODE #lobby +o alice");
+      await alice.expect(/ MODE #lobby \+o alice/);
+      alice.send(`RELAYMSG #lobby ${NICK} :forged by an operator`);
+      await alice.expect(/FAIL RELAYMSG PRIVS_NEEDED/);
+      const reader = await guest(e, "gus", TAGS);
+      await join(reader, "#lobby");
+      await sync(reader);
+      expect(reader.lines().join("\n")).not.toContain("forged");
+    });
+
+    it("refuses RELAYMSG from a guest with no account, and a nick without the separator from the bot's class", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const gus = await guest(e, "gus", TAGS);
+      await join(gus, "#lobby");
+      gus.send(`RELAYMSG #lobby ${NICK} :no`);
+      await gus.expect(/FAIL RELAYMSG PRIVS_NEEDED/);
+      chief.send("RELAYMSG #lobby alice :as an account's name");
+      await chief.expect(/FAIL RELAYMSG INVALID_NICK/);
+    });
+
+    it("lets no connection take a nick holding the separator, so a line from anon/<name> can only be a relay's (the line filter's ground)", async () => {
+      const e = await start();
+      const taken = await open(e);
+      await hello(taken, TAGS);
+      await expect(finish(taken, NICK, / 432 | 376 | 422 /)).resolves.toContain(" 432 ");
+      const alice = await login(e, "alice", { caps: TAGS });
+      // An account's nick is its name (force-nick-equals-account), so a rename is refused with 400 before the separator is read.
+      alice.send(`NICK ${NICK}`);
+      await alice.expect(/ (432|400) alice NICK /);
+    });
+
+    it("carries a nick of 32 characters, Ergo's nicklen, whole: the longest a guest's name can make", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const longest = `anon/${"a".repeat(10)}-${"b".repeat(11)}-ab23`;
+      expect(longest).toHaveLength(32);
+      const reader = await guest(e, "gus", TAGS);
+      await join(reader, "#lobby");
+      chief.send(`RELAYMSG #lobby ${longest} :long nick`);
+      expect(await reader.expect(/PRIVMSG #lobby :long nick$/)).toContain(`:${longest}!`);
+    });
+
+    it("refuses a blank line and a room that does not exist, as the route's own checks never let them reach it", async () => {
+      const e = await start();
+      const chief = await room(e);
+      chief.send(`RELAYMSG #lobby ${NICK} :   `);
+      await chief.expect(/FAIL RELAYMSG BLANK_MSG/);
+      chief.send(`RELAYMSG #nowhere ${NICK} :hi`);
+      await chief.expect(/ 403 \S+ #nowhere /);
+    });
+  });
+
+  describe("taking a relayed line back (D430)", { timeout: 30_000 }, () => {
+    const REDACTING = `${TAGS} draft/message-redaction`;
+
+    it("lets the bot REDACT its relayed line by the msgid its own echo carries: the remedy for a line the provider missed", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const bot = await login(e, "botlike", { caps: REDACTING });
+      const reader = await guest(e, "gus", REDACTING);
+      await join(reader, "#lobby");
+      chief.send(`RELAYMSG #lobby ${NICK} :to be taken back`);
+      const id = msgid(await reader.expect(/PRIVMSG #lobby :to be taken back$/));
+      chief.send(`REDACT #lobby ${id} :moderated`);
+      await reader.expect(new RegExp(`REDACT #lobby ${id}`));
+      expect(bot).toBeDefined();
+    });
+
+    it("lets a room's operator REDACT a relayed line too, as any line of its room (measured on v2.19.1)", async () => {
+      const e = await start();
+      const chief = await room(e);
+      const alice = await login(e, "alice", { caps: REDACTING });
+      await join(alice, "#lobby");
+      chief.send("SAMODE #lobby +o alice");
+      await alice.expect(/ MODE #lobby \+o alice/);
+      chief.send(`RELAYMSG #lobby ${NICK} :operator's target`);
+      const id = msgid(await alice.expect(/PRIVMSG #lobby :operator's target$/));
+      alice.send(`REDACT #lobby ${id} :by an operator`);
+      const answer = await alice.expect(new RegExp(`(REDACT #lobby ${id}|FAIL REDACT \\S+)`));
+      // Measured on v2.19.1: an operator's REDACT of a relayed line is taken, as of any other line of its room.
+      expect(answer).toContain(`REDACT #lobby ${id}`);
+    });
+  });
+
+  describe("the server's link relays for a guest (D430)", { timeout: 40_000 }, () => {
+    const linked = (e: Ergo, rooms: readonly string[]) => {
+      const said: Said[] = [];
+      const link: Link = ircLink({
+        host: "127.0.0.1",
+        port: e.port,
+        password: e.operPassword,
+        rooms: () => rooms,
+        onMessage: (message) => said.push(message),
+        log: logger("a-pepper-of-forty-characters-0123456789", () => true),
+        retryMs: () => 200,
+      });
+      stops.push(() => link.stop());
+      return { said, link };
+    };
+    // The bot is in the room once NAMES lists it there, and the room is opened as the server opens an open room.
+    const ready = async (e: Ergo) => {
+      const watcher = await oper(e, "watcher");
+      for (;;) {
+        watcher.send("NAMES #bubble");
+        const names = await watcher.expect(/ (353|366) \S+ (= )?#bubble /);
+        if (names.includes(" 353 ") && / :.*@?gnoworld\b/.test(names)) break;
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      }
+      watcher.send("SAMODE #bubble -i");
+      await watcher.expect(/ MODE #bubble -i/);
+      return watcher;
+    };
+
+    it("resolves true once Ergo took the line, which a reader sees as anon/<name> with the tag", async () => {
+      const e = await start();
+      const { link } = linked(e, ["#bubble"]);
+      await ready(e);
+      const reader = await guest(e, "gus", TAGS);
+      await join(reader, "#bubble");
+      expect(msgidOf(await link.relay("#bubble", NICK, "through the link"))).toMatch(/^\w+$/);
+      const line = await reader.expect(/PRIVMSG #bubble :through the link$/);
+      expect(line).toContain(`:${NICK}!`);
+      expect(line).toContain("draft/relaymsg=gnoworld");
+    });
+
+    it("never hands its own relayed line to the chat as a message: nothing to check, count or hide as the bot's", async () => {
+      const e = await start();
+      const { link, said } = linked(e, ["#bubble"]);
+      await ready(e);
+      const alice = await login(e, "alice");
+      await join(alice, "#bubble");
+      expect(msgidOf(await link.relay("#bubble", NICK, "mine"))).toMatch(/^\w+$/);
+      // Alice has seen it, so the bot has too: only then does she speak, and the bot's list holds hers alone.
+      await alice.expect(/PRIVMSG #bubble :mine$/);
+      alice.send("PRIVMSG #bubble :an account's line");
+      await expect.poll(() => said.map(({ text }) => text)).toEqual(["an account's line"]);
+    });
+
+    it("resolves false for a room the bot is not in, a room that does not exist and a nick or text its lines refuse, sending nothing", async () => {
+      const e = await start();
+      const { link } = linked(e, ["#bubble"]);
+      await ready(e);
+      const reader = await guest(e, "gus", TAGS);
+      await join(reader, "#bubble");
+      const results = await Promise.all([
+        link.relay("#elsewhere", NICK, "not joined"),
+        link.relay("#bubble", "alice", "an account's nick"),
+        link.relay("#bubble", NICK, "two\nlines"),
+        link.relay("#bubble", NICK, ""),
+        link.relay("#bubble", NICK, "a".repeat(600)),
+        link.relay("#bubble", NICK, "\u0001ACTION waves\u0001"),
+      ]);
+      expect(results).toEqual([false, false, false, false, false, false]);
+      await link.relay("#bubble", NICK, "marker");
+      await reader.expect(/PRIVMSG #bubble :marker$/);
+      const spoken = reader.lines().filter((each) => each.includes(" PRIVMSG #bubble :"));
+      expect(spoken).toHaveLength(1);
+      expect(spoken.filter((each) => /not joined|an account's nick|two\\nlines/.test(each))).toEqual([]);
+    });
+
+    it("answers each of three relays by its own outcome: an Ergo-side refusal reaches its caller alone, not a local one", async () => {
+      const e = await start();
+      // A name the link's forms take and Ergo does not (a channel name holds no "*"): Ergo answers it with its own error.
+      const { link } = linked(e, ["#bubble", "#bad*room"]);
+      await ready(e);
+      const results = await Promise.all([
+        link.relay("#bubble", NICK, "first"),
+        link.relay("#bad*room", NICK, "second"),
+        link.relay("#bubble", "anon/calm-heron-cd34", "third"),
+      ]);
+      expect(results.map((each) => (each === false ? false : msgidOf(each) !== ""))).toEqual([true, false, true]);
+      expect(link.relaying()).toBe(0);
+    });
+
+    it("resolves false before the link is in its rooms, and after it is stopped", async () => {
+      const e = await start();
+      const { link } = linked(e, ["#bubble"]);
+      await expect(link.relay("#bubble", NICK, "too early")).resolves.toBe(false);
+      await ready(e);
+      await link.stop();
+      await expect(link.relay("#bubble", NICK, "too late")).resolves.toBe(false);
+    });
   });
 });

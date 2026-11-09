@@ -79,9 +79,22 @@ describe("Stat", () => {
       vi.advanceTimersByTime(60_000);
     });
     const { container } = render(<Stat value={21480} caption="Today" />);
-    advance(300);
+    advance(700);
     const now = Number((drawn(container) ?? "").replaceAll(",", ""));
     expect(now > 0 && now < 21480).toBe(true);
+  });
+
+  it("holds its count at nothing while a flight brings its page, and counts as it lands", () => {
+    motion(true);
+    const flight = document.body.appendChild(document.createElement("div"));
+    flight.dataset["flown"] = "flying";
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(2_000);
+    expect(drawn(container)).toBe("0");
+    document.body.replaceChildren();
+    advance(100);
+    advance(700);
+    expect(Number((drawn(container) ?? "").replaceAll(",", ""))).toBeGreaterThan(0);
   });
 
   it("stands at its value at once under reduced motion", () => {

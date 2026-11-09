@@ -2,11 +2,15 @@ import AxeBuilder from "@axe-core/playwright";
 import { inGames } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
-// Slice 5's 5n (docs/plans/slice-5.md §1): ⌘K, Ctrl+K and the header's control open a palette over the universe's places;
+// The search palette (D355): ⌘K, Ctrl+K, the slash and the header's control open it over the universe's places;
 // typing sends no request (the places are in the page); arrows, Enter and Escape work, and the focus goes back to the opener.
 const control = (page: Page) => page.getByRole("button", { name: /^Search/ });
 const palette = (page: Page) => page.getByRole("dialog", { name: "Search" });
-const field = (page: Page) => page.getByRole("combobox", { name: "Search places" });
+const choices = (page: Page, name?: RegExp) =>
+  page.getByRole("listbox", { name: "Places" }).getByRole("option", name === undefined ? {} : { name });
+const field = (page: Page) => page.getByRole("searchbox", { name: "Search places" });
+// The empty field is Discover (D373): its shelves stand where the results come once words are typed.
+const shelves = (page: Page) => page.getByRole("listbox", { name: "Shelves" });
 
 async function ready(page: Page, path = "/earth") {
   await page.goto(path);
@@ -83,8 +87,7 @@ test.describe("⌘K", () => {
     await expect(control(page)).toBeFocused();
     await control(page).click();
     await expect(field(page)).toHaveValue("");
-    await expect(page.getByRole("option", { name: /Bubble/ })).toBeVisible();
-    await expect(page.locator("[aria-selected='true']")).toHaveCount(0);
+    await expect(shelves(page)).toBeVisible();
     await field(page).fill("zzz");
     await page.keyboard.press("Escape");
     await control(page).click();
@@ -99,7 +102,6 @@ test.describe("⌘K", () => {
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/earth$/);
     await expect(palette(page)).toBeVisible();
-    await expect(field(page)).not.toHaveAttribute("aria-activedescendant", /.+/);
   });
 
   test("the no-place status shows with no result and goes with the first result", async ({ page }) => {
@@ -112,14 +114,33 @@ test.describe("⌘K", () => {
     await expect(page.getByText(/no place/i)).toHaveCount(0);
   });
 
+  test("the slash opens it, Escape closes it, and a slash typed in its field stays text", async ({ page }) => {
+    await ready(page, "/");
+    await page.keyboard.press("/");
+    await expect(palette(page)).toBeVisible();
+    await expect(field(page)).toHaveValue("");
+    await page.keyboard.type("/r/");
+    await expect(field(page)).toHaveValue("/r/");
+    await page.keyboard.press("Escape");
+    await expect(palette(page)).toBeHidden();
+  });
+
+  test("a prefix finds a room and a command goes: #bubb lists #bubble, > earth goes to the Earth", async ({ page }) => {
+    await ready(page, "/w/bubble");
+    await page.keyboard.press("Control+k");
+    await field(page).fill("#bubb");
+    await expect(choices(page, /#bubble · room/)).toBeVisible();
+    await field(page).fill("> earth");
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/earth$/);
+  });
+
   test("types, goes down with the arrows, chooses with Enter and lands on the place's page", async ({ page }) => {
     await ready(page);
     await control(page).click();
     await field(page).fill("bubb");
-    // 8i: frame 98's group heads, "HUBS AND DAOS · 1".
-    await expect(page.getByRole("group", { name: /^Hubs and DAOs · 1$/ })).toBeVisible();
     await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("option", { name: /Bubble/ })).toHaveAttribute("aria-selected", "true");
+    await expect(choices(page, /Bubble/)).toHaveAttribute("aria-selected", "true");
     await page.keyboard.press("Enter");
     await expect(page).toHaveURL(/\/w\/bubble$/);
     await expect(palette(page)).toBeHidden();
@@ -129,7 +150,8 @@ test.describe("⌘K", () => {
   test("a click on an option goes to its page too", async ({ page }) => {
     await ready(page);
     await control(page).click();
-    await page.getByRole("option", { name: /Bubble/ }).click();
+    await field(page).fill("bubb");
+    await choices(page, /Bubble/).click();
     await expect(page).toHaveURL(/\/w\/bubble$/);
   });
 
@@ -139,14 +161,14 @@ test.describe("⌘K", () => {
     // pill says both came, so neither lands in the count.
     await expect(page.getByRole("status").getByText("Stamped · Earth")).toBeVisible();
     await page.keyboard.press("Control+k");
-    await expect(page.getByRole("option").first()).toBeVisible();
+    await expect(shelves(page)).toBeVisible();
     // The page's own settling (the worker, a poll) and the palette's first words (the label font, loaded when first drawn) are over
     // before the count starts.
     await page.waitForLoadState("networkidle");
     const sent: string[] = [];
     page.on("request", (request) => sent.push(request.url()));
     await field(page).pressSequentially("bubble", { delay: 20 });
-    await expect(page.getByRole("option", { name: /Bubble/ })).toBeVisible();
+    await expect(choices(page, /Bubble/)).toBeVisible();
     await field(page).fill("");
     await field(page).pressSequentially("zzz");
     await expect(page.getByText(/no place/i)).toBeVisible();
@@ -161,10 +183,9 @@ test.describe("⌘K", () => {
       await ready(page);
       await control(page).click();
       await field(page).fill("b");
-      await expect(page.getByRole("option").first()).toBeVisible();
+      await expect(choices(page).first()).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
-      // Every box the drawer shows keeps 16 px from the viewport's sides (the shell's gutter); the drawer itself stands on the start edge, as
-      // frames 98 to 100 draw it (8i), and its title is for assistive technology alone.
+      // Every box the palette shows keeps 16 px from the viewport's sides (the shell's gutter).
       const outside = await palette(page).evaluate((dialog, gutter) => {
         const inner = [...dialog.querySelectorAll("input, [role='option'], button")];
         return inner
@@ -176,18 +197,19 @@ test.describe("⌘K", () => {
       await expect(page.getByText(/no place/i)).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       await field(page).fill("");
-      await expect(page.getByRole("option").first()).toBeVisible();
+      await expect(shelves(page)).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     });
   }
 
   test.describe("by touch", () => {
     test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
-    test("the header's control is 44 px each way", async ({ page }) => {
+    test("the header's control is as tall as the pill's links, 34 px", async ({ page }) => {
       await ready(page);
       const box = await control(page).boundingBox();
-      expect(box?.width).toBeGreaterThanOrEqual(44);
-      expect(box?.height).toBeGreaterThanOrEqual(44);
+      // The pill's links are 34 px inside its 44: the button fills the same height, round (Alexis, 2026-11-07).
+      expect(box?.width).toBeGreaterThanOrEqual(34);
+      expect(box?.height).toBeGreaterThanOrEqual(34);
     });
   });
 });

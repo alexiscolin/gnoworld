@@ -23,6 +23,7 @@ import { GuestLoaded } from "./GuestLoaded.tsx";
 import { LOADING } from "./Loading.tsx";
 import { groupRooms, roomIds, roomsQuery, shownRoom } from "./names.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
+import { keepListed, listedBefore, watchRoomsChanged } from "./roomsListed.ts";
 import { useOnHide } from "./useOnHide.ts";
 import { useVerdicts } from "./useVerdicts.ts";
 
@@ -66,11 +67,21 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
 // The rooms as the server lists them for `query`, asked again as it changes; none before the first answer.
 function useRoomsAsked(store: ReturnType<typeof useAppStore>, world: string, query: string | undefined) {
   const [asked, setAsked] = useState<Asked>();
+  // A room made on the page: the list is asked again behind the one shown, which stays until the new one comes.
+  const [again, setAgain] = useState(0);
+  useEffect(
+    () =>
+      watchRoomsChanged(() => {
+        setAgain((n) => n + 1);
+      }),
+    [],
+  );
   useEffect(() => {
     if (query === undefined) return;
     let live = true;
     const settle = (sections: Asked["sections"]) => {
       if (!live) return;
+      if (sections !== undefined) keepListed(query, sections);
       setAsked({ query, sections });
       store.getState().chatActions.listed(sections);
     };
@@ -87,9 +98,11 @@ function useRoomsAsked(store: ReturnType<typeof useAppStore>, world: string, que
     return () => {
       live = false;
     };
-  }, [store, world, query]);
-  const loaded = query !== undefined && asked?.query === query;
-  return { loaded, sections: loaded ? asked.sections : undefined };
+  }, [store, world, query, again]);
+  // A world listed before shows its rooms at once, the new list replacing them when it comes (roomsListed.ts).
+  if (query !== undefined && asked?.query === query) return { loaded: true, sections: asked.sections };
+  const before = listedBefore(query);
+  return { loaded: before !== undefined, sections: before };
 }
 
 // The shown room's verdicts, which a link's player waits on, followed and asked for the reader; and whether the reader
@@ -122,7 +135,7 @@ function useLinkAt(
   }, [linkRef, current]);
 }
 
-export function ChatPanel({ world, place }: { world: string; place: ChatPlace }) {
+export function ChatPanel({ world, place, room }: { world: string; place: ChatPlace; room?: string | undefined }) {
   const store = useAppStore();
   // The page's link to Ergo, made once the page runs: never in the build's pre-render.
   const linkRef = useRef<ChatLink>(undefined);
@@ -138,7 +151,7 @@ export function ChatPanel({ world, place }: { world: string; place: ChatPlace })
     };
   }, [store]);
   const { loaded, sections } = useRoomsAsked(store, world, query);
-  const current = sections === undefined ? undefined : shownRoom(world, sections, params.get("room"));
+  const current = sections === undefined ? undefined : shownRoom(world, sections, room ?? params.get("room"));
   // The page hidden: the reading places waiting their 2 s go at once (F940).
   useOnHide(() => {
     linkRef.current?.flush();

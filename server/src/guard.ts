@@ -2,7 +2,10 @@
 // request that is no GET comes from a listed Origin and in JSON, the CSRF guard: Hono's own csrf() checks
 // form types only.
 import { jsonOf } from "@gnoworld/core";
+import type { ApiError } from "@gnoworld/schemas";
 import type { Context, MiddlewareHandler } from "hono";
+import { routePath } from "hono/route";
+import type { Log } from "@gnoworld/service/log";
 
 // The host of the request's Origin, which the guard checked.
 export interface Guarded {
@@ -33,3 +36,15 @@ export function guard(
 export async function json(c: Context): Promise<unknown> {
   return jsonOf(await c.req.text());
 }
+
+/** A route's refusals: each cause's error word and status. */
+export type Refusals = Record<string, readonly [ApiError["error"], 400 | 401 | 403 | 404 | 409 | 415 | 429 | 503]>;
+
+/** The `refuse` of a route: logs `event` with the route, the status and the cause (and `extra`), answers the cause's error. */
+export const refuserOf =
+  <C extends string>(log: Log, event: string, refusals: Record<C, Refusals[string]>) =>
+  (c: Context, cause: C, extra: Record<string, unknown> = {}): Response => {
+    const [error, status] = refusals[cause];
+    log(event, { route: routePath(c), status, error: cause, ...extra });
+    return c.json({ error } satisfies ApiError, status);
+  };

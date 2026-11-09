@@ -8,11 +8,17 @@ export interface Group {
   readonly realms: string[];
 }
 
-/** The worlds of a list of realm paths, sorted by id, their realms sorted by path. A path that is no realm is dropped. */
+// The chain's own realms (names, users, params, validators…): its machinery, never a world (Alexis, 2026-11-07, D346).
+const SYSTEM = "gno.land/r/sys/";
+
+/** Whether `path` is one of the chain's own realms, which no pass reads nor writes. */
+export const isSystem = (path: string): boolean => path.startsWith(SYSTEM);
+
+/** The worlds of a list of realm paths, sorted by id, their realms sorted by path. A path that is no realm, or the chain's own, is dropped. */
 export function groupWorlds(paths: readonly string[]): Group[] {
   const worlds = new Map<string, Group>();
   for (const path of new Set(paths)) {
-    if (!RealmPath.safeParse(path).success) continue;
+    if (!RealmPath.safeParse(path).success || isSystem(path)) continue;
     const id = worldIdOf(path);
     const group = worlds.get(id) ?? { id, namespace: id.split("/")[0] ?? "", realms: [] };
     group.realms.push(path);

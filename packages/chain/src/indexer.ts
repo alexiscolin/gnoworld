@@ -3,7 +3,15 @@
 // `realmFacts` (F4875): the facts are the realm's deploy, its first successful MsgAddPackage, as recorded in
 // app/tests/chain/onyxRealmDeploy.json. The indexer has no time field (F2950), so every fact carries its age as a block height
 // and no chart by date stands on it (F2974).
-import { RealmDeployAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas/indexer";
+import {
+  LAST_CALLS,
+  RealmCallsAnswer,
+  RealmDeployAnswer,
+  REALM_FACTS_CAPS,
+  type LastCall,
+  type LastCallsValue,
+  type RealmFactsValue,
+} from "@gnoworld/schemas/indexer";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 
 // A filter on a message's value lets a message of another type through (history.ts, 7k3): the type is chosen by `typeUrl`, and the reader
@@ -36,6 +44,34 @@ export async function readFacts(
       firstBlock: deploy.block_height,
       ...(added.creator === undefined ? {} : { deployer: added.creator }),
     },
+    source: answer.source,
+  };
+}
+
+// The newest calls to a path, with the newest block (one request). The value's filter alone lets a message of another type through (it
+// returned create_session transactions, probed 2026-11-08): the type is chosen by `typeUrl` too, and each message is checked again.
+const CALLS_QUERY = `query($path: String!) { latestBlockHeight getTransactions(where: { success: { eq: true }, messages: { typeUrl: { eq: "exec" }, value: { MsgCall: { pkg_path: { eq: $path } } } } }, order: { heightAndIndex: DESC }, limit: ${String(LAST_CALLS)}) { block_height messages { value { __typename ... on MsgCall { caller pkg_path func } } } } }`;
+
+/** A realm's newest calls, newest first, for a path its caller checked, or why not. */
+export async function readLastCalls(
+  indexer: string,
+  path: string,
+  options: ReadOptions = {},
+): Promise<ChainRead<LastCallsValue>> {
+  if (path.length > REALM_FACTS_CAPS.path) return failedRead("bad-name", sourceOf(indexer, options));
+  const asked = `${indexer}?query=${encodeURIComponent(CALLS_QUERY)}&variables=${encodeURIComponent(JSON.stringify({ path }))}`;
+  const answer = await readChain(asked, RealmCallsAnswer, options);
+  if (!answer.ok) return answer;
+  const calls = (answer.value.data.getTransactions ?? []).flatMap(({ block_height: height, messages }) =>
+    messages.flatMap(({ value: { __typename, caller, pkg_path, func } }): LastCall[] =>
+      __typename === "MsgCall" && pkg_path === path && caller !== undefined && func !== undefined
+        ? [{ caller, func, height }]
+        : [],
+    ),
+  );
+  return {
+    ok: true,
+    value: { tip: answer.value.data.latestBlockHeight, calls: calls.slice(0, LAST_CALLS) },
     source: answer.source,
   };
 }

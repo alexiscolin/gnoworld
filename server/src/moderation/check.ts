@@ -33,7 +33,7 @@ export type Verdict = { action: "hide"; reason: RuleReason | Category } | { acti
 interface Options {
   db: DatabaseSync;
   rulesOf: (room: string) => Rules | undefined;
-  // None without a key: every message is then unchecked, and nothing leaves.
+  // None without a key: every message is then unchecked, and nothing leaves. Already behind the breaker (checker.ts's providerOf).
   provider: ((text: string) => Promise<Answer | "unchecked">) | undefined;
   // A room whose lines may go to the provider (3m: a members room's never leave), all by default.
   publicRoom?: (room: string) => boolean;
@@ -46,7 +46,7 @@ interface Options {
 
 /** The provider behind a breaker: five failures running leave it alone for 30 seconds, the messages
  * unchecked; one more failure after the pause pauses it again at once. A throw is a failure. */
-function withBreaker(
+export function withBreaker(
   provider: (text: string) => Promise<Answer | "unchecked">,
   { now, log }: { now: () => number; log: Log },
 ): (text: string) => Promise<Answer | "unchecked"> {
@@ -93,7 +93,7 @@ export function checkAgain(db: DatabaseSync, msgid: string): void {
 
 /** "seen": the line has its verdict; "busy": another run is checking it now, and settles it. */
 export function makeChecker(options: Options): (said: Said) => Promise<Verdict | "seen" | "busy"> {
-  const { db, rulesOf, provider, thresholds, pepper, log, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
+  const { db, rulesOf, provider, thresholds, pepper, now = Date.now, newAccountMs = 24 * 60 * 60_000 } = options;
   const { publicRoom = () => true } = options;
   const sql = {
     claim: db.prepare(
@@ -124,7 +124,6 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
   const FirstSeen = z.object({ first_seen: z.number() }).optional();
   // A line a stopped process left pending is checked again when it comes back (one process: 3a's lock).
   db.prepare("UPDATE verdicts SET action = 'unchecked' WHERE action = 'pending'").run();
-  const ask = provider === undefined ? undefined : withBreaker(provider, { now, log });
   // The world's rules, which a new account, a line too fast or another's edit may break.
   const byRules = (said: Said, rules: Rules, { hashed, at }: { hashed: string; at: number }) => {
     const manyLines = lines.add(hashed, { id: said.msgid, at, lines: said.text.split("\n").length });
@@ -163,8 +162,8 @@ export function makeChecker(options: Options): (said: Said) => Promise<Verdict |
     if (reason !== undefined) return settle({ action: "hide", reason });
     // Checked by its rules alone: the provider never reads it.
     if (!publicRoom(room)) return settle({ action: "pass" }, { why: "members_room" });
-    if (ask === undefined) return settle({ action: "unchecked" }, { why: "no_key" });
-    const answer = await ask(text);
+    if (provider === undefined) return settle({ action: "unchecked" }, { why: "no_key" });
+    const answer = await provider(text);
     if (answer === "unchecked") return settle({ action: "unchecked" });
     return settle(decide(answer, thresholds), { answer });
   };

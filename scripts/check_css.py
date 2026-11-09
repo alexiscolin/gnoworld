@@ -143,7 +143,11 @@ for p, blocks in sheets.items():
         for name in sorted(module_classes[p.resolve()] - named_by_module[p.resolve()]):
             problems.append(f"{p}: unused class .{name}; no component names it from this module")
         for attribute in {a for selector, _ in blocks for a in re.findall(r"\[(data-[\w-]+)", selector)}:
-            if not re.search(rf"\b{re.escape(attribute)}=|[\"']{re.escape(attribute)}[\"']\s*:", code_by_folder[p.parent]):
+            # Set as markup or an object's key, or through the element's dataset, which names it in camelCase.
+            words = attribute[5:].split("-")
+            camel = re.escape(words[0] + "".join(word.capitalize() for word in words[1:]))
+            set_as = rf"\b{re.escape(attribute)}=|[\"']{re.escape(attribute)}[\"']\s*:|\bdataset(?:\.{camel}\b|\[[\"']{camel}[\"']\])"
+            if not re.search(set_as, code_by_folder[p.parent]):
                 problems.append(f"{p}: [{attribute}] is a state no component sets in its folder")
 
 for p, text in plain.items():

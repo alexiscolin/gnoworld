@@ -83,6 +83,10 @@ print(d["Self"]["DNSName"].rstrip("."))' 2>/dev/null); then
 fi
 shared=$([ -x "$preview" ] && [ -n "$hosts" ] && echo 1 || :)
 
+# The folder the backend's worlds job and prices timer write and the app's dev server serves their files from (app/tests/e2e/workshopData.mjs).
+# Kept from one run to the next, so a run serves the last files at once while its jobs read the chain again (Alexis, 2026-11-07).
+data="$root/.claude/tmp/workshop-data"
+mkdir -p "$data" || exit 1
 servers= names= # what this run started and put on the tailnet, for its end
 what() { case $1 in backend) echo "the backend (the server and Ergo)" ;; *) echo "the $1's dev server" ;; esac; }
 stop() {
@@ -138,7 +142,7 @@ share() {
 }
 # The app's dev server proxies /api and /ws to the backend's ports (vite.config.ts's workshopBackend); the lab's proxies nothing.
 held "$api_port" && held "$irc_port" && held "$ws_port"
-start app "$app_port" env WORKSHOP_API_PORT="$api_port" WORKSHOP_WS_PORT="$ws_port" node_modules/.bin/react-router dev --port "$app_port"
+start app "$app_port" env WORKSHOP_API_PORT="$api_port" WORKSHOP_WS_PORT="$ws_port" WORKSHOP_DATA_DIR="$data" node_modules/.bin/react-router dev --port "$app_port"
 share app "$app_port"
 # The origins the backend allows, a POST's and a WebSocket's: this machine's address of the app and the tailnet's links to it.
 origins="http://127.0.0.1:$app_port $(printf '%s\n' "$shown" | grep -oE 'https?://[^ ]+' | tr '\n' ' ')"
@@ -148,13 +152,13 @@ echo
 # ergo.sh under the profile too: it runs the Ergo binary of the tools' cache, which a session can write; there it builds none.
 (boxed sh scripts/ergo.sh) >/dev/null || { echo "workshop: no Ergo built for the chat; a gate builds it (scripts/check.sh)" >&2; exit 1; }
 # shellcheck disable=SC2086 # each origin a word
-start backend "$api_port" node tests/e2e/workshopBackend.mjs "$api_port" "$irc_port" "$ws_port" $origins
+start backend "$api_port" env WORKSHOP_DATA_DIR="$data" node tests/e2e/workshopBackend.mjs "$api_port" "$irc_port" "$ws_port" $origins
 echo "the backend: the server on 127.0.0.1:$api_port, Ergo on $irc_port and its WebSocket on $ws_port, behind the app's /api and /ws"
 echo
 echo "workshop-app is the app's screens: the https link, then / for the home, /earth, /w/<world>. Each edit shows at once."
 echo "workshop-lab is the lab: the https link with /realism.html after it (/realism.html?view=cosmos for the site's scene); T shows its tuning panel."
-echo "The chat, who is here and the rooms run on the backend; the worlds job and the prices' timer do not, so what they write stays empty:"
-echo "the worlds read from the chain (worlds.json), the hero's prices and block (markets.json)."
+echo "The chat, who is here and the rooms run on the backend, and so do the worlds job and the prices' timer: their files (worlds.json, worlds-count.json,"
+echo "markets.json) are read from the chain and CoinGecko and served by the app's dev server; the last run's stay served till this run's are written."
 [ -n "$shared" ] || echo "From another device: run this where Tailscale runs and the tailnet-preview skill is installed (docs/DEVELOPMENT.md, \"The workshop\")."
 # Any process that stops ends the run, and the others with it.
 while :; do

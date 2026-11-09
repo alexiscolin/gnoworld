@@ -6,7 +6,7 @@ import { Worlds } from "@gnoworld/schemas/indexer";
 import type { BrowserContext } from "@playwright/test";
 import { readFileSync } from "node:fs";
 
-export const RECORDED_FILE = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
+export const RECORDED_FILE = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const RECORDED = Worlds.parse(JSON.parse(RECORDED_FILE));
 export const COUNTED = JSON.stringify(
   WorldsCount.parse({

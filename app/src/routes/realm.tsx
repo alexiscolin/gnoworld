@@ -5,8 +5,8 @@ import { labelName, worldIdOf } from "@gnoworld/core";
 import { data, useLoaderData, useLocation, type MetaArgs } from "react-router";
 import { Arrival } from "../features/passport/Later.tsx";
 import { PlaceError } from "../features/errors/index.ts";
-import { RealmView } from "../features/realms/index.ts";
-import { useEntered } from "../features/universe/index.ts";
+import { PlaceFrame } from "./placeFrame.tsx";
+import { RealmPage } from "./realmPage.tsx";
 import { realmMeta } from "../meta.ts";
 import { site } from "../places.ts";
 import { realmAt } from "../realmAt.ts";
@@ -23,18 +23,21 @@ export function meta({ loaderData }: MetaArgs<typeof clientLoader>) {
 
 export default function Realm() {
   const found = useLoaderData<typeof clientLoader>();
-  // A realm's view is a world's page, a place entered: the rail and the labels link a world with no hub there (ADR-0003 §4).
-  useEntered();
   const world = worldIdOf(found.realm);
   const { pathname } = useLocation();
   return (
     <>
-      <RealmView {...found} />
+      <RealmPage {...found} />
       <Arrival universe={site.universeAt(pathname).id} world={world} name={labelName(world) ?? world} path={pathname} />
     </>
   );
 }
 
 export function ErrorBoundary() {
-  return <PlaceError what="realm" />;
+  // Inside the plate, as any page's content is: never loose at the screen's corner (D535).
+  return (
+    <PlaceFrame label="Realm" plate={<PlaceError what="realm" />}>
+      {null}
+    </PlaceFrame>
+  );
 }

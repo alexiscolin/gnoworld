@@ -40,7 +40,7 @@ export function PinButton({ line, pin }: { line: Line; pin: LineKeeping["pin"] }
     <IconButton
       icon="pin"
       label={pin.pinned ? "Unpin message" : "Pin message"}
-      size="s"
+      size="xs"
       emphasis="plain"
       onClick={pin.pinned ? pin.onUnpin : pin.onPin}
     />

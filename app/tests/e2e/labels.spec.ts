@@ -10,7 +10,7 @@ const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
 const WIDE = { width: 1920, height: 1080 };
 const LAPTOP = { width: 1280, height: 800 };
-const RECORDED = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
+const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const ADDRESS = /g1[023456789acdefghjklmnpqrstuvwxyz]{38}/;
 const SLOW = { timeout: 90_000 };
 // Frame 4's gaps between a label and its body's outline, 20 to 29 px, and a few pixels either way for the outline's soft edge.

@@ -123,7 +123,7 @@ function After({ label, content }: { label: string; content: ReactNode }) {
 // Clear, at the field's end while it holds words.
 function Clear({ onClear }: { onClear: () => void }) {
   return (
-    <span className={styles["clear"]}>
+    <span className={["box-end", styles["clear"]].join(" ")}>
       <IconButton icon="close" label="Clear" emphasis="plain" size="s" onClick={onClear} />
     </span>
   );

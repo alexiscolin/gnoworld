@@ -3,8 +3,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Mutes } from "../moderation/mute.ts";
 import type { Rooms } from "./create.ts";
+import { reservedOnEarth, sweepIdle } from "./earth.ts";
 import { makeReconciler, type Reconciler } from "./reconcile.ts";
-import { listRooms, mainRoom } from "./rooms.ts";
+import { listRooms, mainRoom, worldOf } from "./rooms.ts";
 import { desired, type Typed, type World } from "./types.ts";
 
 // The roles file's typed rooms, each with its world (3m).
@@ -38,10 +39,37 @@ export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; re
       if (typeof made !== "string") mutes.putOn(made.made, world);
       return made;
     },
+    earth: (maker, name) => {
+      const made = keeper.earth(maker, name);
+      if (typeof made !== "string") mutes.putOn(made.made, "earth");
+      return made;
+    },
+    realm: (room, reserve) => {
+      const made = keeper.realm(room, reserve);
+      if (typeof made !== "string") mutes.putOn(made.made, worldOf(room));
+      return made;
+    },
     archive: (world, name) => {
       const done = keeper.archive(world, name);
       if (done === "archived") reconciler.ask(`${mainRoom(world)}/${name}`);
       return done;
     },
+  };
+}
+
+/** The Earth's public rooms nobody writes in are archived once an hour and at start (D394). The archive is a decision on the lines the
+ * verdicts hold, which the reconciler does not read: it only puts Ergo as the database says, at once for each room swept (keeping's archive). */
+export function sweeping(
+  db: DatabaseSync,
+  rooms: Rooms,
+  { now, ms, roles }: { now: () => number; ms: number; roles: Typed },
+): () => void {
+  const sweep = (): void => {
+    sweepIdle(db, rooms, { now: now(), reserved: (room) => reservedOnEarth(roles, room) });
+  };
+  sweep();
+  const timer = setInterval(sweep, ms);
+  return () => {
+    clearInterval(timer);
   };
 }

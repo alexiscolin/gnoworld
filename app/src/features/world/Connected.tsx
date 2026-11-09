@@ -12,7 +12,7 @@ export interface ConnectedWorld {
 export function Connected({ worlds }: { worlds: readonly ConnectedWorld[] }) {
   if (worlds.length === 0) return null;
   return (
-    <Stack space="2xs">
+    <Stack space="xs">
       <Kicker dot="world">Connected worlds</Kicker>
       <div>
         {worlds.map(({ name, path, line }) => (

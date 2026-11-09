@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { useLocation } from "react-router";
 import "./plugs.ts";
 import { DeviceViews } from "./features/account/index.ts";
+import { FullChatHost } from "./features/chat/index.ts";
 import { useSettingsApplied } from "./features/settings/applied.ts";
 import { UpdatePrompt } from "./features/update/index.ts";
 import { site } from "./places.ts";
@@ -34,6 +35,7 @@ export function Shell({ children }: { children: ReactNode }) {
         <UpdatePrompt />
         <DeviceViews universe={universe.id} />
         <PillHost />
+        <FullChatHost />
         <WatchSlot />
       </AppLinks>
     </StoreProvider>

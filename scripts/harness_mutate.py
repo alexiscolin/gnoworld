@@ -643,7 +643,7 @@ def mutants():
     yield from each(ws, 'sed "s/^/workshop-$1: /"', "cat", "hooks", "workshop.sh says each link beside the name it opens")
     yield from each(ws, 'echo "$$ $pid $port" >>"$pidfile"', ":", "hooks", "workshop.sh writes each process's pid and port")
     yield from each(ws, '\t\t\t[ "$up" = "$1" ] && return 0\n', "", "hooks", "workshop.sh finds a server a child of the process it started (F4961)")
-    yield from each(ws, 'start app "$app_port" env WORKSHOP_API_PORT="$api_port" WORKSHOP_WS_PORT="$ws_port" node_modules', 'start app "$app_port" node_modules', "hooks", "workshop.sh gives the app's dev server its backend's ports to proxy")
+    yield from each(ws, 'start app "$app_port" env WORKSHOP_API_PORT="$api_port" WORKSHOP_WS_PORT="$ws_port" WORKSHOP_DATA_DIR="$data" node_modules', 'start app "$app_port" node_modules', "hooks", "workshop.sh gives the app's dev server its backend's ports to proxy")
     yield from each(ws, "unset WORKSHOP_APP_PORT WORKSHOP_LAB_PORT WORKSHOP_API_PORT WORKSHOP_IRC_PORT WORKSHOP_WS_PORT #", ": #", "hooks", "workshop.sh gives the lab's dev server no backend to proxy")
     yield from each(ws, ' $(printf \'%s\\n\' "$shown" | grep -oE \'https?://[^ ]+\' | tr \'\\n\' \' \')"', '"', "hooks", "workshop.sh's backend allows the app's tailnet links")
     yield from each(ws, '(boxed sh scripts/ergo.sh) >/dev/null || { echo "workshop: no Ergo built for the chat; a gate builds it (scripts/check.sh)" >&2; exit 1; }', ":", "hooks", "workshop.sh checks Ergo before its backend, and stops when there is none")

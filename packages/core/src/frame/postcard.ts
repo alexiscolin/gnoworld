@@ -9,9 +9,10 @@ import { depthOf, levelled, normalOf, withNormal } from "./depth.ts";
 import { cameraTowards, type Camera } from "./restLook.ts";
 
 // Frame 4's densest group is four bodies, a postcard's at the home; a view may ask more (a system's dynamic view, 7v), chosen among its
-// eight largest.
+// twelve largest, the Plan's own (plan.ts draws the same twelve).
 const POSTCARD_BODIES = 4;
-const CHOICE = 8;
+export const PLAN_MOST = 12;
+const CHOICE = PLAN_MOST;
 // Between two neighbours, a third of the smaller one's width; a little more for the near side, larger on screen than the middle.
 const AIR = 1 / 3;
 const NEAR_SIDE = 1.15;
@@ -27,6 +28,9 @@ const ALIKE = 0.15;
 // world's debris (Alexis's pebbles, 2026-11-03); nor does grain stand on a body's path, its drawn width each side of its orbit, which the
 // planet cleared ("Poussière fine", F3594). The system turns as one, so what stands clear at rest stays clear.
 const SPECK_CLEAR = 0.5;
+// The bodies a postcard draws are brought down to this share of their size, a tenth at a time, before one is left out.
+const FIT_LEAST = 0.3;
+const FIT_STEP = 0.9;
 
 /** A postcard as drawn: its system, its plane opened towards the eye if need be and turned about the eye's line so no two neighbours stand
  * at one height, the worlds it draws as bodies, the share of its size each is drawn at by its nearness (7p), and those of its specks it
@@ -101,7 +105,29 @@ const groupsOf = (choice: readonly Orbiter[], count: number): Orbiter[][] =>
 /** The worlds a postcard of `system` draws as bodies, `most` at most, the home's four unless said, widened round its star: the most, then the
  * largest, that stand apart in its cell, inside its far belt if it has one (7d3: never among its rocks), and read as no figure; held
  * `still`, each at its own size, its largest at its crowd's cap. Its others are specks. */
-export function postcardWorlds(system: StarSystem, most = POSTCARD_BODIES, still = false): Orbiter[] {
+export const postcardWorlds = (system: StarSystem, most = POSTCARD_BODIES, still = false): Orbiter[] =>
+  worldsOf(system, { most, still });
+
+/** `postcardWorlds` held still, with the world `must` always among them, if the system holds one of that id big enough to be a body: a flight
+ * is bound for it. */
+export const postcardWorldsWith = (system: StarSystem, most: number, must: string | undefined): Orbiter[] =>
+  worldsOf(system, { most, still: true, must });
+
+// `worlds`, each `fit` of its size, widened to stand apart in `room` and read as no figure: placed so, or none if they do not.
+function standsAt(
+  worlds: readonly Orbiter[],
+  { fit, room, still }: { fit: number; room: number; still: boolean },
+): Orbiter[] | undefined {
+  const sized = fit === 1 ? worlds : worlds.map((world) => ({ ...world, radius: world.radius * fit }));
+  const spread = spreadOf(sized, room, still);
+  const fits = sized.every(({ orbit, radius }) => spread * orbit + radius <= room + ROUNDING);
+  return fits && natural(sized, spread) ? sized.map((world) => ({ ...world, orbit: spread * world.orbit })) : undefined;
+}
+
+function worldsOf(
+  system: StarSystem,
+  { most, still, must }: { most: number; still: boolean; must?: string | undefined },
+): Orbiter[] {
   const bodies = system.worlds.filter(({ radius }) => radius >= GRAIN);
   // A crowd's cap as one scale on its worlds' own sizes, not a clamp: gnoswap's 16 stood at one size (7v's design review, F4468).
   const scale =
@@ -109,14 +135,18 @@ export function postcardWorlds(system: StarSystem, most = POSTCARD_BODIES, still
   const choice = bodies
     .map(({ own, ...world }) => (still ? { ...world, radius: (own ?? world.radius) * scale } : world))
     .filter(({ radius }) => radius >= GRAIN)
-    .sort((a, b) => b.radius - a.radius)
-    .slice(0, CHOICE);
+    .sort((a, b) => b.radius - a.radius);
+  const held = choice.find(({ id }) => id === must);
+  const pool = choice.filter((world) => world !== held).slice(0, held === undefined ? CHOICE : CHOICE - 1);
+  const groups = (count: number) =>
+    held === undefined ? groupsOf(pool, count) : groupsOf(pool, count - 1).map((rest) => [held, ...rest]);
   const room = system.belt ? BELT_INNER : ROOM;
+  // The most bodies first, each size a tenth smaller than the last till they stand: a crowd's three stand in the view as in its Plan, never
+  // two for want of room.
   for (let count = Math.min(most, choice.length); count > 0; count -= 1)
-    for (const worlds of groupsOf(choice, count)) {
-      const spread = spreadOf(worlds, room, still);
-      const fits = worlds.every(({ orbit, radius }) => spread * orbit + radius <= room + ROUNDING);
-      if (fits && natural(worlds, spread)) return worlds.map((world) => ({ ...world, orbit: spread * world.orbit }));
+    for (let fit = 1; fit >= FIT_LEAST; fit *= FIT_STEP) {
+      const found = groups(count).find((worlds) => standsAt(worlds, { fit, room, still }) !== undefined);
+      if (found !== undefined) return standsAt(found, { fit, room, still }) ?? [];
     }
   return [];
 }

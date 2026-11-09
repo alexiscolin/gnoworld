@@ -335,6 +335,10 @@ Each slice that adds a resource proves it is released:
 - `react-router.config.ts` lists the places from `data/`. In phase 1, `r/gnoworld/hubs`
   and the signals are read at build time. Only planets are pre-rendered; dust uses the
   fallback and is `noindex` (ADR-0002 §3).
+- Search is one palette (`features/search`, D355), a chunk of its own: ⌘K, `/`, the header's button, the rail's
+  "See all" and `/list` (which goes to `/#search`) open it. `searchIndex.ts` indexes the site's places and the
+  worlds' file's systems and realms once; `search.ts` answers a keystroke with the best 50 and the count. The
+  Places page and the drawer are gone.
 - Each route exports its `meta`: title, description, canonical, Open Graph, Twitter Card
   and JSON-LD.
 - A build step renders one Open Graph image per world from its planet. It writes

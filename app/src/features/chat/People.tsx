@@ -32,7 +32,10 @@ export interface PeopleProps {
 function Who({ nick, account, said }: { nick: string; account: boolean; said?: string }) {
   return (
     <Cluster space="2xs">
-      <Avatar address={nick} name={nick} decorative />
+      {/* A guest has no address to draw a face from: its disc of night, ringed, keeps the names on one edge. */}
+      <span className={account ? undefined : styles["guest"]}>
+        <Avatar address={nick} name={nick} decorative />
+      </span>
       {said === undefined ? null : <span className="visually-hidden">{said}</span>}
       <Person name={nick} guest={!account} account={account} />
     </Cluster>

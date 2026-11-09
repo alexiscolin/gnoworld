@@ -1,5 +1,5 @@
-// A visitor's world, its rooms once listed (slice 4's 4b): the switcher, the room in view and its people, read alone:
-// no direct message, no notice, nothing kept, no composer. What an account adds is AccountChat's, loaded for one.
+// A visitor's world, its rooms once listed (slice 4's 4b): the switcher, the room in view and its people; in an open room a guest's line
+// (D430), else the word to log in; no direct message, no notice, nothing kept. What an account adds is AccountChat's, loaded for one.
 import type { RoomList } from "@gnoworld/schemas";
 import type { RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
@@ -7,17 +7,19 @@ import { chunked } from "./Failing.tsx";
 import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
 import { Dock } from "./Dock.tsx";
 import type { ChatLink } from "./link.ts";
-import { LOG_IN_TO_READ_DMS, LOG_IN_TO_WRITE } from "./loginWords.ts";
-import { BOT, roomIds, talkingOf } from "./names.ts";
+import { LOG_IN_TO_READ_DMS } from "./loginWords.ts";
+import { GuestWriter } from "./GuestWriter.tsx";
+import { LogInToWrite } from "./LogInToWrite.tsx";
+import { BOT, hereOf, roomIds, talkingOf } from "./names.ts";
 import { roomActs } from "./roomActs.ts";
-import { visitorMenu } from "./RoomMenu.tsx";
 import { useGuestKeeping } from "./RoomPins.ts";
 import { roomShown, type Shown } from "./roomShown.ts";
 import { RoomChips } from "./RoomChips.tsx";
-import { RoomSections, RoomsNav } from "./RoomSections.tsx";
+import { RoomsList, RoomsNav } from "./RoomsList.tsx";
 import type { PeopleProps } from "./People.tsx";
-import { RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
+import { NoRoomYet, RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
 import { useThreads } from "./Threading.tsx";
+import { useNow } from "./useNow.ts";
 import { usePins } from "./usePins.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { AppState } from "../../store/index.ts";
@@ -51,6 +53,10 @@ interface GuestLoadedProps {
   place: ChatPlace;
 }
 
+// The room in view where a guest may speak: an open room of the list (D430); the server holds the rest of the rule.
+const openRoom = (sections: RoomList["sections"], room: string | undefined) =>
+  sections.some(({ rooms }) => rooms.some((each) => each.room === room && each.type === "open")) ? room : undefined;
+
 // Who is here, for a visitor: none to write to, each with the country they declared.
 const peopleOf = (state: GuestLoadedProps["state"], connected: boolean) => (
   <PeopleHere
@@ -63,33 +69,35 @@ const peopleOf = (state: GuestLoadedProps["state"], connected: boolean) => (
   />
 );
 
-/** The room in view and what a visitor may not do in it: a direct message asked for says the login it needs, the room has
- * no composer but the word to log in. */
+/** The room in view and what a visitor may do in it: a direct message asked for says the login it needs; an open room takes a guest's
+ * line, any other has the word to log in. */
 function GuestRoom({
   asksDm,
   shown,
   view,
-  onWhoIsHere,
   place,
+  open,
 }: {
   asksDm: boolean;
   shown: Shown | undefined;
   view: RoomViewOver;
-  onWhoIsHere: () => void;
   place: ChatPlace;
+  open: string | undefined;
 }) {
   return (
     <>
       {asksDm ? <p role="status">{LOG_IN_TO_READ_DMS}</p> : null}
-      {shown === undefined ? null : (
+      {shown === undefined ? (
+        asksDm ? null : (
+          <NoRoomYet />
+        )
+      ) : (
         <RoomView
           key={shown.key}
           {...shown.view}
           {...view}
           composer={
-            <Dock onWhoIsHere={onWhoIsHere} place={place} dm={false} writes={false} pinned={place.pinned}>
-              <p>{LOG_IN_TO_WRITE}</p>
-            </Dock>
+            <Dock pinned={place.pinned}>{open === undefined ? <LogInToWrite /> : <GuestWriter room={open} />}</Dock>
           }
         />
       )}
@@ -124,9 +132,10 @@ export function GuestLoaded({
     rooms: roomIds(sections),
     acts,
   });
+  const now = useNow();
   const rail = (
     <RoomsNav label="Rooms">
-      <RoomSections sections={sections} current={room} />
+      <RoomsList sections={sections} current={room} />
     </RoomsNav>
   );
   return (
@@ -134,23 +143,22 @@ export function GuestLoaded({
       place={place}
       title={shown?.title ?? place.name}
       chips={<RoomChips sections={sections} current={room} />}
-      menu={visitorMenu(shown?.note)}
+      menu={{ label: "Rooms", content: <RoomsList sections={sections} current={room} /> }}
       rail={rail}
       unread={0}
-      talking={talkingOf(state?.members, chat === "connected")}
+      talking={talkingOf(state?.lines ?? [], now, chat === "connected")}
+      present={hereOf(state?.members, chat === "connected")}
       here={state}
       people={people}
       threads={threads}
     >
-      {(ask) => (
-        <GuestRoom
-          asksDm={asksDm}
-          shown={shown}
-          view={{ ...threads.view, chat, verdicts, saving, keeping, pins }}
-          onWhoIsHere={ask}
-          place={place}
-        />
-      )}
+      <GuestRoom
+        asksDm={asksDm}
+        shown={shown}
+        view={{ ...threads.view, chat, verdicts, saving, keeping, pins }}
+        place={place}
+        open={openRoom(sections, room)}
+      />
     </ChatScreen>
   );
 }

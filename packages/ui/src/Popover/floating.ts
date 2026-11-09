@@ -29,11 +29,16 @@ function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   const spots = { below: at.bottom + step, above: at.top - step - height };
   const fits = { below: spots.below + height <= clientHeight - step, above: spots.above >= step };
   const other = side === "below" ? "above" : "below";
-  const top = spots[fits[side] || !fits[other] ? side : other];
+  const chosen = fits[side] || !fits[other] ? side : other;
+  const top = spots[chosen];
   let start = at.left;
   if (align === "center") start = at.left + (at.width - width) / 2;
   else if (getComputedStyle(anchor).direction === "rtl") start = at.right - width;
-  box.style.left = `${String(Math.max(step, Math.min(start, clientWidth - step - width)))}px`;
+  const left = Math.max(step, Math.min(start, clientWidth - step - width));
+  box.style.left = `${String(left)}px`;
+  // It grows from its trigger's middle, on the side it faces: the exit's travel is toward it too (surface.module.css).
+  box.style.setProperty("--_dir", chosen === "below" ? "-1" : "1");
+  box.style.transformOrigin = `${String(at.left + at.width / 2 - left)}px ${chosen === "below" ? "0" : "100%"}`;
   box.style.top = `${String(Math.max(step, Math.min(top, clientHeight - step - height)))}px`;
   box.style.removeProperty("visibility");
 }

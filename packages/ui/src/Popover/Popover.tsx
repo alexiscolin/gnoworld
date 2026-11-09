@@ -10,8 +10,10 @@ import {
 } from "react";
 import { buttonLook, iconLook, iconSize } from "../Button/control.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
+import { Chip } from "../Chip/Chip.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { rove } from "../roving.ts";
+import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
 import soon from "../ComingSoon/ComingSoon.module.css";
 import styles from "./Popover.module.css";
@@ -19,7 +21,7 @@ import styles from "./Popover.module.css";
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
 // are the browser's), unseen until placed, as its toggle event comes after it shows; the focus back
 // on the trigger when it closes with the focus inside, which a browser that never focused it drops.
-function useAnchored(kind: "dialog" | "menu") {
+function useAnchored(kind: "dialog" | "menu", size: "s" | "m" = "m", emphasis: "outline" | "quiet" = "outline") {
   const id = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -28,7 +30,7 @@ function useAnchored(kind: "dialog" | "menu") {
   usePlaced(triggerRef, panelRef, { open, side: "below", align: "start" });
   const trigger = {
     ref: triggerRef,
-    ...buttonLook("outline", "neutral", "m"),
+    ...buttonLook(emphasis, "neutral", size),
     popoverTarget: id,
     "aria-haspopup": kind,
   };
@@ -98,14 +100,20 @@ export function Popover({
   );
 }
 
-export interface MenuItem {
+interface Entry {
   label: string;
-  onSelect: () => void;
-  /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
-  tone?: "danger";
   /** The act's icon before its words. */
   icon?: IconName;
 }
+
+/** An act of the menu; or one a later slice brings, greyed and inert, said to be coming soon as ComingSoon says it (`soon`). */
+export type MenuItem =
+  | (Entry & {
+      onSelect: () => void;
+      /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
+      tone?: "danger";
+    })
+  | (Entry & { soon: true });
 
 export interface MenuProps {
   /** The trigger's words; with an icon, its name, which assistive technology reads and its tooltip shows. */
@@ -114,16 +122,18 @@ export interface MenuProps {
   items: MenuItem[];
   /** An icon in place of the words: the trigger is then square, as an IconButton. */
   icon?: IconName;
-  /** An icon trigger's look, as an IconButton's: outline unless plain. */
+  /** The trigger's look: outline unless plain, an icon's as an IconButton's, words' as a quiet button's (a row of plain tags'). */
   emphasis?: "outline" | "plain";
-  /** An icon trigger's size: small in a toolbar (docs/DESIGN-SYSTEM.md, "a toolbar's small controls stay at 32"). */
-  size?: "s" | "m";
+  /** A trigger's size (a words trigger's too): small in a toolbar (docs/DESIGN-SYSTEM.md, "a toolbar's small controls stay at 32"), the smallest, 24 px, in a bar over a line. */
+  size?: "xs" | "s" | "m";
   /** Drawn before the words of a trigger with words: the account's face; with it, the words may be for assistive technology alone. */
   lead?: ReactNode;
   /** The words of a trigger with a lead, read and not drawn. */
   wordsHidden?: boolean;
   /** Open as it is drawn: a menu whose code came at its trigger's first press, drawn in its place. */
   openAtOnce?: boolean;
+  /** Open now at this point of the screen, as a right-click's menu does: each new object asks once. */
+  at?: { x: number; y: number } | undefined;
 }
 
 /** A list of acts under its trigger, its first item focused as it opens; the arrows move among the
@@ -138,13 +148,17 @@ export function Menu({
   lead,
   wordsHidden = false,
   openAtOnce = false,
+  at,
 }: MenuProps) {
-  const { open, panelRef, trigger, panel } = useAnchored("menu");
+  // A plain trigger with words is a quiet button's; an icon's look is IconButton's, which overrides it.
+  const look = emphasis === "plain" ? "quiet" : "outline";
+  const { open, panelRef, trigger, panel } = useAnchored("menu", size === "xs" ? "s" : size, look);
+  useAtPoint(panelRef, open, at);
   useLayoutEffect(() => {
     if (openAtOnce) panelRef.current?.showPopover();
   }, [openAtOnce, panelRef, trigger.ref]);
   // The danger acts come last, apart: a separator before the first.
-  const apart = items.findIndex((item) => item.tone === "danger");
+  const apart = items.findIndex((item) => "onSelect" in item && item.tone === "danger");
   // Its first item, once placed and so seen: a hidden item takes no focus.
   useLayoutEffect(() => {
     if (open) panelRef.current?.querySelector<HTMLElement>("[role='menuitem']")?.focus();
@@ -179,18 +193,27 @@ export function Menu({
               role="menuitem"
               tabIndex={-1}
               className={styles["item"]}
-              data-tone={item.tone}
-              onClick={() => {
-                panelRef.current?.hidePopover();
-                // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
-                // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
-                trigger.ref.current?.focus();
-                item.onSelect();
-              }}
+              {...("soon" in item
+                ? { "aria-disabled": true, "aria-label": `${item.label}, coming soon` }
+                : {
+                    "data-tone": item.tone,
+                    onClick: () => {
+                      panelRef.current?.hidePopover();
+                      // The trigger holds the focus as the item acts, which a browser that never focused it does not give back
+                      // on hiding: a dialog the item opens returns the focus there as it closes, never to the page.
+                      trigger.ref.current?.focus();
+                      item.onSelect();
+                    },
+                  })}
             >
-              {item.tone === "danger" ? <Icon name="alert" /> : null}
+              {"onSelect" in item && item.tone === "danger" ? <Icon name="alert" /> : null}
               {item.icon === undefined ? null : <Icon name={item.icon} />}
               {item.label}
+              {"soon" in item ? (
+                <span className={styles["soon"]}>
+                  <Chip>Soon</Chip>
+                </span>
+              ) : null}
             </button>
           </Fragment>
         ))}

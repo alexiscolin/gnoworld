@@ -12,7 +12,6 @@ const data = {
   universes: FIXTURE.universes.map((universe) => ({ ...universe, testnet: universe.id === "onyx" })),
 };
 const locs = (xml: string) => [...xml.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]);
-const LIST = "https://gno.world/list";
 
 describe("sitemapXml", () => {
   test("is a urlset of the sitemap protocol, one url a loc", () => {
@@ -31,12 +30,10 @@ describe("sitemapXml", () => {
     expect(read.length).toBeGreaterThan(1);
   });
 
-  test("names each mainnet place once, at its canonical address, and the list", () => {
+  test("names each mainnet place once, at its canonical address, ", () => {
     const mainnet = placesFrom(data).filter((place) => place.universe === "gnoland");
     expect(mainnet.map((place) => place.kind).sort()).toEqual(["cosmos", "earth", "ecosystem", "world"]);
-    expect(locs(sitemapXml(data)).sort()).toEqual(
-      [...mainnet.map((place) => `https://gno.world${place.canonical}`), LIST].sort(),
-    );
+    expect(locs(sitemapXml(data)).sort()).toEqual(mainnet.map((place) => `https://gno.world${place.canonical}`).sort());
   });
 
   test("names no testnet place, at its path or at its canonical address", () => {
@@ -51,7 +48,7 @@ describe("sitemapXml", () => {
   test("names each address once, none of a place's plain path", () => {
     const found = locs(sitemapXml(data));
     expect(new Set(found).size).toBe(found.length);
-    for (const loc of found) expect(loc === LIST || loc?.startsWith("https://gno.world/net/gnoland/")).toBe(true);
+    for (const loc of found) expect(loc?.startsWith("https://gno.world/net/gnoland/")).toBe(true);
   });
 
   // The cap is the protocol's: past it a second file and an index are needed, which the site does not have.
@@ -83,7 +80,7 @@ describe("sitemapXml", () => {
     const mainnet = placesFrom(swapped).filter((place) => place.universe === "gnoland");
     expect(mainnet.some((place) => place.path !== place.canonical)).toBe(true);
     expect(locs(sitemapXml(swapped)).sort()).toEqual(
-      [...mainnet.map((place) => `https://gno.world${place.canonical}`), LIST].sort(),
+      mainnet.map((place) => `https://gno.world${place.canonical}`).sort(),
     );
     expect(locs(sitemapXml(swapped))).not.toContain("https://gno.world/");
     expect(locs(sitemapXml(swapped))).not.toContain("https://gno.world/w/other");

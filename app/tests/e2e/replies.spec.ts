@@ -211,7 +211,16 @@ test.describe("replies", () => {
   }) => {
     await asAccount(page);
     await lines(page).nth(1).focus();
-    for (const name of ["React with 👍", "React with ❤️", "React with 😂", "Reply", "More"]) {
+    for (const name of [
+      "React with 👍",
+      "React with ❤️",
+      "React with 😂",
+      "Add reaction",
+      "Reply",
+      "Open thread",
+      "Copy room link",
+      "More actions",
+    ]) {
       await page.keyboard.press("Tab");
       await expect(barOf(page, 1).getByRole("button", { name })).toBeFocused();
     }

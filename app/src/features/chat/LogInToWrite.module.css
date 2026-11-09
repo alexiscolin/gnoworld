@@ -1,0 +1,17 @@
+/* A guest's place of the composer: inside the composer's own box (MessageBox.module.css), its words and the way in. */
+@layer components {
+  .inner {
+    /* layout: across the box's three columns */
+    grid-column: 1 / -1;
+    padding: var(--space-s);
+  }
+
+  .lead {
+    font: var(--font-ui);
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

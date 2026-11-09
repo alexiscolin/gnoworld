@@ -2,11 +2,10 @@
 // room's own rule of who reads (as /api/rooms and the stream), and POST /api/pins and POST /api/pins/unpin change them.
 // Each POST comes from a listed site in JSON (guard.ts) with the login's session; who may pin, a world's moderators and
 // the team, is checked before any work, and an account makes 30 requests a minute, each act and refusal logged.
-import { PinList, PinRequest, RoomId, type Address, type ApiError } from "@gnoworld/schemas";
+import { PinList, PinRequest, RoomId, type Address } from "@gnoworld/schemas";
 import { type Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
-import { routePath } from "hono/route";
-import { guard, json, type Guarded } from "../guard.ts";
+import { guard, json, refuserOf, type Refusals, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
 import { once } from "../stream/stream.ts";
@@ -28,8 +27,6 @@ interface Options {
   now: () => number;
 }
 
-type Status = 400 | 401 | 403 | 404 | 409 | 415 | 429 | 503;
-
 // A room's cap and an account's requests are two causes with two codes, which the page words apart; Ergo not
 // answering is the server not being ready for it, not a line that is gone.
 const refusals = {
@@ -43,15 +40,11 @@ const refusals = {
   full: ["full", 409],
   not_found: ["not_found", 404],
   unavailable: ["not_ready", 503],
-} as const satisfies Record<string, readonly [ApiError["error"], Status]>;
+} as const satisfies Refusals;
 
 export function pinsRoutes({ pins, mayPin, readable, session, origins, log, now }: Options): Hono<Guarded> {
   const requests = limiter({ max: PINS_PER_MINUTE, windowMs: 60_000, keys: 100_000 });
-  const refuse = (c: Context, cause: keyof typeof refusals, room?: string): Response => {
-    const [error, status] = refusals[cause];
-    log("pin_refused", { route: routePath(c), status, error: cause, ...(room === undefined ? {} : { room }) });
-    return c.json({ error } satisfies ApiError, status);
-  };
+  const refuse = refuserOf(log, "pin_refused", refusals);
   const account = (c: Context): Address | undefined => session(getCookie(c, "__Host-session"));
   const listOf = (room: string, who: string | undefined): PinList => ({
     room,
@@ -66,8 +59,8 @@ export function pinsRoutes({ pins, mayPin, readable, session, origins, log, now 
     const body = PinRequest.safeParse(await json(c));
     if (!body.success) return refuse(c, "body");
     const { room, msgid } = body.data;
-    if (!mayPin(room, who)) return refuse(c, "forbidden", room);
-    return requests.take(who, now()) ? { who, room, msgid } : refuse(c, "limit", room);
+    if (!mayPin(room, who)) return refuse(c, "forbidden", { room });
+    return requests.take(who, now()) ? { who, room, msgid } : refuse(c, "limit", { room });
   };
 
   const app = new Hono<Guarded>();
@@ -77,7 +70,7 @@ export function pinsRoutes({ pins, mayPin, readable, session, origins, log, now 
     const room = RoomId.safeParse(once(c.req.queries("room")));
     if (!room.success) return refuse(c, "body");
     const who = account(c);
-    if (!readable(room.data, who)) return refuse(c, "forbidden", room.data);
+    if (!readable(room.data, who)) return refuse(c, "forbidden", { room: room.data });
     return c.json(listOf(room.data, who));
   });
 
@@ -86,7 +79,7 @@ export function pinsRoutes({ pins, mayPin, readable, session, origins, log, now 
     if (asked instanceof Response) return asked;
     const { who, room, msgid } = asked;
     const added = await pins.add(room, msgid, who);
-    if (added !== "pinned" && added !== "already") return refuse(c, added, room);
+    if (added !== "pinned" && added !== "already") return refuse(c, added, { room });
     if (added === "pinned") log("pin_added", { room, msgid, account: who });
     return c.json(listOf(room, who));
   });
@@ -95,7 +88,7 @@ export function pinsRoutes({ pins, mayPin, readable, session, origins, log, now 
     const asked = await request(c);
     if (asked instanceof Response) return asked;
     const { who, room, msgid } = asked;
-    if (!pins.remove(room, msgid)) return refuse(c, "not_found", room);
+    if (!pins.remove(room, msgid)) return refuse(c, "not_found", { room });
     log("pin_removed", { room, msgid, account: who });
     return c.json(listOf(room, who));
   });

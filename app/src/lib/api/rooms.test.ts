@@ -111,6 +111,10 @@ describe("a world's rooms, from the server", () => {
     [json(429, { error: "too_many" }), "too_many"],
     [{ status: 502 }, "unavailable"],
   ])("gives the server's reason for %j", async (answer, reason) => {
-    expect(await server(answer).api.rooms("bubble")).toEqual({ ok: false, reason });
+    expect(await server(answer).api.rooms("bubble")).toEqual({
+      ok: false,
+      reason,
+      body: "json" in answer ? answer.json : undefined,
+    });
   });
 });

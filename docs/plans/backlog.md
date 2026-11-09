@@ -187,6 +187,35 @@ takes its lines. A slice's plan names the video's frames each of its screens is 
 | One staging of `deploy/web/nginx.conf` for a test: `app/tests/nginx.ts` repeats `scripts/check_nginx.py`'s (5m's review, row 14) | The next slice that touches either |
 | The ticker's five `sample-` rows (`app/data/news.json`, `events.json`) leave before a public deploy, with a refusal at deploy that counts them (5m's review, row 11) | The slice that deploys in public |
 | The home's sparklines and the frame's spacing of the live line (decisions, 2026-10-31) | The markets' history, once the file holds one |
+| Delete the flight panel, no longer shown (D332): `app/src/features/universe/FlightPanel.tsx`, its sheet and test, `SceneHost`'s `flown.flight`, the scene's `onFlight` said, and the journeys that read its phases (`flights.spec.ts`) | The ping-pong's landing, or the next slice that touches the flights |
+
+## After the ping-pong of 2026-11-07
+
+What the ping-pong decided or found and left for parts of their own (`.claude/tmp/slice-8/reports/pingpong-list.md` holds each remark).
+
+| What | Goes to |
+|---|---|
+| Anyone speaks in every room under a random name, unique, new at each visit; an Adena account keeps more (its registered name, what only an account does); the online count counts everyone; a world's trend counts no guest (D351–D353). Tier 1 (the relay's authorization, the login): a plan first (what Adena adds, a guest name's uniqueness, a guest's rate, the filter on every message, what is kept to bar one), tests first, the security-reviewer | A part of its own, planned in `docs/plans/` and read by Alexis before any code |
+| Search and the list as one: the views' bar without List; one panel for both, fewer duplicates, every shortcut and filter (prefixes `#`, `@`, `/r/`, `g1…`, `>`), Alexis to pick a layout among the artifact's A, B and C (https://claude.ai/artifact/9qAtswDFFT4AifRKinXaSo); the Places page goes | After Alexis's pick |
+| The online count counts each open stream: a guest's two tabs count twice, a visitor up to 8 (4 chat + 4 Earth slots), and a guest on Ergo twice (`present.ts` dedups by name); count guests as distinct visitor keys (`who`, one per /64). Tier 1 (`server/src/stream/stream.ts`): tests first, the red pass, the security review (the batch's security review, 2026-11-07) | After the demo |
+| `/universe` written ahead: today a reload or a shared link gets the host's 404 and the SPA fallback (the page draws, the status and the link preview lie); it needs a server loader in `routes/cosmos.tsx` before `prerenderPaths` can list it (the batch's review, 2026-11-07; tried: the build skips it) | The pages, after the ping-pong |
+| The home's `worlds.json` preload also runs on another universe's home (`/net/gnoland/`), which draws no scene: one wasted fetch there (the batch's review) | The pages, after the ping-pong |
+| A fresh `/list` on a computer opens the palette (`/#search`) under the home's loader, whose shield makes it inert and takes the focus; and the prerendered `/list` renders a `<Navigate>` the static router ignores (the build's warning) (the batch's review) | The search, after the ping-pong |
+| A chat's peek on a planet's hover: its two last lines and "Enter · chat →" (D371's proposal 2); the server serves no room's last lines outside the chat yet | After the ping-pong, with the chat for everyone |
+| Today's expedition: three places a day to visit (a live world, a new realm, a realm never seen), each visit stamping the passport, as the video's frame 18 (D371's proposal 4) | After the ping-pong, with the passport |
+| A poster of the home's view behind the canvas, crossfaded at the first frame; the loader over it (remarks 2, 25) | With the loader's final look |
+| Back from the Earth's page to the Universe at once: the Earth's globe and the cosmos kept in memory a few minutes, then freed; later, systems kept as one travels (remarks 26, 27) | The scene's memory |
+| The newcomer's opening aside no longer shows (its words are the loader's): Opening, HomeOpening, firstArrival, yieldHero, data-yield and their tests are dead | The loader's landing |
+| Labels that meet after a turn of the drag (a station's name under the header, on the Earth, "valopers" on Saturn); the stations spread for the view at rest alone (D349) | The labels' layout |
+| A "final" preview beside the workshop: the site built as in production, served with the same backend and data, to judge timings and the loader | The harness, if Alexis wants it |
+
+## After the ping-pong of 2026-11-09
+
+| What | Goes to |
+|---|---|
+| The realm plate, as approved (D566): the proposal `.claude/tmp/design/realm-explorer/` v7 built in the app: hero, talk bar, figures, calls per day with its calls, who calls it, what it can do, its page, Try it (Read/Write, Start here, call cards, typed reads), around it, the detail widgets; no tabs; every list bounded; the worlds job's per-realm rollup with exact days; `$help` links that open a call card. Acceptance tests in its plan | `docs/plans/slice-realm-plate.md` |
+| The name, plain to see (D13953): an account with no name on the page's chain gets the "Pick a name and a face" dialog (`features/names/NameDialog.tsx`) right after Connect, as the prototype does (`docs/prototype/source/index.html:1409`, `dialog#profile`), once, "Later" closing it; signed, the name is real on `r/sys/namereg/v0` | A slice after 13 |
+| A realm's author moderates its room (D13953): the deployer the worlds job reads is linked to the address that logs in through a proof the deployer's key signs on chain (a transaction from gnokey naming the Adena address), read by the server; the roles stay per world today | A slice after 13, designed first |
 
 ## Phase 1: social on chain
 

@@ -1,8 +1,9 @@
 // @vitest-environment jsdom
 import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } from "react-router";
 import { use } from "react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { fakeStream } from "../../tests/fakeStream.ts";
+import { noMedia } from "../../tests/mount.tsx";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
 import { ChainCard } from "../features/chat/ChainCard.tsx";
@@ -66,6 +67,11 @@ const failures: [string, () => never][] = [
     },
   ]),
 ];
+
+// The page holds the space behind it, which asks the screen's media.
+beforeEach(() => {
+  noMedia();
+});
 
 describe("a world's page", () => {
   // GovDAO has a realm (hubs.json): its page leads with reading the proposals, at the realm's view; Bubble has none.
@@ -338,8 +344,13 @@ describe("a world's page and the chain's stream", () => {
       kicker: "Onyx · GovDAO",
       home: "/",
       worlds: [
+        { slug: "earth", name: "Earth", href: "/earth" },
         { slug: "bubble", name: "Bubble", href: "/w/bubble" },
         { slug: "govdao", name: "GovDAO", href: "/w/govdao" },
+        { slug: "adena", name: "Adena", href: "/w/adena" },
+        { slug: "gnoswap", name: "GnoSwap", href: "/w/gnoswap" },
+        { slug: "gnomcp", name: "gnomcp", href: "/w/gnomcp" },
+        { slug: "gnosh-ai", name: "gnosh.ai", href: "/w/gnosh-ai" },
       ],
     });
   });

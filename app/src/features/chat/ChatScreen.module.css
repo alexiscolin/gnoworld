@@ -5,6 +5,29 @@
   .screen {
     /* layout: the screen fills the slot the page gives it, and the regions scroll alone, the page none */
     block-size: 100%;
+    /* the chat fades in over its skeleton (Loading.tsx) */
+    animation: arrive calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) backwards;
+  }
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Where no dock holds the chat (under 1280 px) it fades in as it mounts, on the entering curve; beside a plate or alone over the scene the
+     dock's glass fill-in does it (ui's Panel). */
+  @media (max-width: 1279px) {
+    .screen:not([data-full]) {
+      opacity: 1;
+      transition: var(--transition-fade);
+    }
+
+    @starting-style {
+      .screen:not([data-full]) {
+        opacity: 0;
+      }
+    }
   }
 
   /* Full bleed over the page, the video's frames 56 to 77, below a flash that stays, as the page is (F2165). */
@@ -15,11 +38,60 @@
     z-index: 3;
   }
 
-  /* Full bleed on a wide screen, the arrival's pill stands in its header's empty centre (frame 73), the 52 px band holding its
-     one row: the lines keep their place under the header (frame 66). */
+  /* The lines read larger than the site's 13.5 px chat text, in the full chat and in the dock alike (Alexis, 2026-11-07, "plus gros en mode
+     full size"; 2026-11-08, the dock "plus gros et convivial"); a phone's keeps the site's. */
+  .screen:not([data-compact]) {
+    --font-chat: var(--font-chat-l);
+  }
+
+  /* The full chat drawn, the cover its page wore from its first paint goes (shellHeader.module.css). */
+  :root:has(.screen[data-full])::before {
+    content: none;
+  }
+
+  /* The wide full chat's band, under the site's header, whose 96 px the chat leaves it (Alexis, 2026-11-09): the header stays where it
+     stood, the chat's surface under it. */
+  :root:has(.screen[data-full]:not([data-compact])) {
+    --chat-head: calc(var(--control-m) + 2 * var(--space-s));
+  }
+
+  /* Its columns from the site's header's foot, under a rule, as its still copy, marked as it, keeps them while it shrinks back to its dock (fullMove.ts); the place and the room the conversation's own title, over its first lines
+     (Alexis, 2026-11-09: "au-dessus du chat"). The band keeps its row, so the title stands over the conversation's column. */
+  [data-full]:not([data-compact]) [data-region="header"] {
+    /* layout: the band over the columns' top, out of their way */
+    position: absolute;
+    inset-block-start: var(--banner-under);
+    inset-inline: 0;
+    /* layout: the title on the lines' own edge (RoomView.module.css's room), past the band's padding */
+    /* raw: no inset where the chat sets none, the lines' 32 px then */
+    padding-inline-start: calc(var(--space-m) + max(var(--chat-inset, 0px), var(--space-l)));
+    border-block-end: 0;
+    pointer-events: none;
+  }
+
+  /* Only the band's controls take a click: the rest of it lets the columns under it have theirs. */
+  [data-full]:not([data-compact]) [data-region="header"] :is(a, button) {
+    pointer-events: auto;
+  }
+
+  /* The columns from the site's header's foot, under a rule across the window (Alexis, 2026-11-09). */
+  [data-full]:not([data-compact]) [data-region="header"] + * {
+    /* layout: the columns under the site's header, the band out of their flow */
+    margin-block-start: var(--banner-under);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  [data-full]:not([data-compact]) [data-region="conversation"] {
+    /* layout: the conversation's lines under its title */
+    padding-block-start: var(--chat-head);
+  }
+
+  /* Full bleed on a wide screen, the arrival's pill stands in its band's empty centre (frame 73), under the site's header: the lines
+     keep their place under the band (frame 66). */
   :root:has(.screen[data-full]) {
     --banner-top: calc(
-      var(--flash-room) + (var(--chat-head) - var(--control-s) - var(--space-2xs) * 2 - var(--line-width) * 2) / 2
+      var(--flash-room) + var(--banner-under) +
+        (var(--chat-head) - var(--control-s) - var(--space-2xs) * 2 - var(--line-width) * 2) / 2
     );
   }
 
@@ -37,6 +109,15 @@
   /* The dock: what the slot (320 under 1400 px, the video's 360) holds beside the scene, at the video's 24 px inset. */
   .screen:not([data-full]) {
     --chat-inset: var(--space-m);
+  }
+
+  /* The dock beside a place's plate: its header's first row on the plate's crumbs' line, the 24 px row 27 px under the plate's top (frame
+     20; Alexis, 2026-11-07), the row being a small control high. */
+  .screen:not([data-full]) [data-region="header"] {
+    /* raw: the crumbs' row's middle, 27 px and half its 24 px under the plate's top (ui Panel's plate), less half this row */
+    padding-block-start: calc(27px + 12px - var(--control-s) / 2);
+    /* layout: the name a step off the band's line, as frame 38 */
+    padding-block-end: var(--space-s);
   }
 
   /* raw: the 320 px dock of a window under 1400 px: the list keeps 300 px */

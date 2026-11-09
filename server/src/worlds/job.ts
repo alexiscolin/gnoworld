@@ -13,7 +13,7 @@ import { repeat, waitsAfterOutcome, type Outcome } from "../repeat.ts";
 import { besideOf, replaceFiles } from "../replaceFile.ts";
 import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
-import { keptPaths } from "./group.ts";
+import { isSystem, keptPaths } from "./group.ts";
 import { readHistories, type StampedHistory } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
@@ -21,6 +21,7 @@ import { readPackages } from "./packages.ts";
 import { kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
 import { habitsAt, makeTrends, type ChainRead } from "./chainTrends.ts";
+import { setTimeout as sleep } from "node:timers/promises";
 
 interface Universe {
   readonly id: string;
@@ -48,8 +49,6 @@ export interface RunOptions {
 
 export const EVERY_MS = 30 * 60_000;
 export const PAUSE_MS = 250;
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The options with their defaults, so the pass reads them as plain values.
 interface Settings {
@@ -122,7 +121,7 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
     last?.worlds.flatMap((world) => world.realms.map((realm) => [realm.path, realm] as const)),
   );
   if (list.paths.length === 0 && lastRealms.size > 0) return "empty";
-  const known = sorted(new Set([...list.paths, ...lastRealms.keys()]));
+  const known = sorted(new Set([...list.paths, ...lastRealms.keys()].filter((path) => !isSystem(path))));
   const paths = sorted(new Set(keptPaths(known)));
   if (paths.length < known.length) settings.log("worlds_shed", { error: "realms" });
   if (isStopped()) return "stopped";

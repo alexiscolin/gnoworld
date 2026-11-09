@@ -2,13 +2,11 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
-import { whenPhone3d } from "../universe/phone3d.ts";
-import { chosenTier, tierOf, watchQuality } from "../../scene/quality.ts";
-import { motionOf } from "../../scene/watch.ts";
+import { motionOf } from "../../space/motion.ts";
 import { useSettingsApplied } from "./applied.ts";
 
 // Each setting takes effect with no reload (slice 8, row 8): the page marks it on the root as it changes, where the stylesheets read the
-// motion and the scene, in its own chunk, reads the quality, the motion and the 3D on a phone, each following its changes.
+// motion, space the quality and the motion (space/frame.ts, space/motion.ts), and its foot the 3D on a phone (SpaceFoot.tsx).
 const root = () => document.documentElement.dataset;
 const flushed = () =>
   act(async () => {
@@ -92,31 +90,7 @@ describe("the settings on the page's root", () => {
   });
 });
 
-describe("the scene's reading of the settings", () => {
-  it("draws at the chosen tier, and at Auto's own for Auto", () => {
-    expect(chosenTier()).toBeUndefined();
-    expect(tierOf("high")).toBe("high");
-    root()["quality"] = "low";
-    expect(tierOf("high")).toBe("low");
-    root()["quality"] = "high";
-    expect(tierOf("low")).toBe("high");
-    root()["quality"] = "ultra";
-    expect(chosenTier()).toBeUndefined();
-  });
-
-  it("hears a quality change, and nothing once its signal aborts", async () => {
-    const changed = vi.fn();
-    const leaving = new AbortController();
-    watchQuality(changed, leaving.signal);
-    root()["quality"] = "low";
-    await flushed();
-    expect(changed).toHaveBeenCalledTimes(1);
-    leaving.abort();
-    root()["quality"] = "high";
-    await flushed();
-    expect(changed).toHaveBeenCalledTimes(1);
-  });
-
+describe("space's reading of the settings", () => {
   it("reduces motion at the system's word or the setting's, and hears the setting change", async () => {
     const motion = motionOf();
     expect(motion.matches).toBe(false);
@@ -134,34 +108,5 @@ describe("the scene's reading of the settings", () => {
     Reflect.deleteProperty(root(), "motion");
     await flushed();
     expect(changed).toHaveBeenCalledTimes(1);
-  });
-
-  it("loads a phone's 3D at once when the setting is on, else once as it turns on", async () => {
-    const now = vi.fn();
-    root()["phone3d"] = "on";
-    whenPhone3d(now, new AbortController().signal);
-    expect(now).toHaveBeenCalledOnce();
-    Reflect.deleteProperty(root(), "phone3d");
-    const later = vi.fn();
-    whenPhone3d(later, new AbortController().signal);
-    root()["quality"] = "low";
-    await flushed();
-    expect(later).not.toHaveBeenCalled();
-    root()["phone3d"] = "on";
-    await flushed();
-    Reflect.deleteProperty(root(), "phone3d");
-    root()["phone3d"] = "on";
-    await flushed();
-    expect(later).toHaveBeenCalledOnce();
-  });
-
-  it("loads nothing once its signal aborts", async () => {
-    const go = vi.fn();
-    const leaving = new AbortController();
-    whenPhone3d(go, leaving.signal);
-    leaving.abort();
-    root()["phone3d"] = "on";
-    await flushed();
-    expect(go).not.toHaveBeenCalled();
   });
 });

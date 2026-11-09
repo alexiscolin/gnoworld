@@ -1,7 +1,17 @@
 // What a text states that can be checked (ADR-0002 §4, "Grounded"; §5, points 4 and 5): its links as core's reader finds
 // them, and what a person reads once nothing unseen parts it: its numbers as written, its words, the accounts among them,
 // and its figures, numbers a letter or a mark touches. One extractor for a digest's grounding and a translation's check.
-import { fold, inlines, isBlank, markdown, mentionsRoom, page, type Inline, type PageBlock } from "@gnoworld/core";
+import {
+  fold,
+  inlines,
+  isBlank,
+  markdown,
+  mentionsRoom,
+  page,
+  type Inline,
+  type Outline,
+  type PageBlock,
+} from "@gnoworld/core";
 import type { Digest, DigestBlock, ProposedAction } from "@gnoworld/schemas";
 
 /** What a text states: its links, the accounts it names, its numbers as written, its figures, and whether it names the
@@ -116,13 +126,27 @@ export interface SourceFacts {
   readonly pieces: () => ReadonlySet<string>;
 }
 
-// A page's inline nodes: core's walk of a message's blocks, and each heading's line.
-function* pageInlines(blocks: readonly PageBlock[]): Generator<Inline> {
-  for (const block of blocks) {
-    if (block.type === "quote") yield* pageInlines(block.children);
-    else if (block.type === "heading") yield* inlines([{ type: "paragraph", children: block.children }]);
-    else if (block.type !== "form") yield* inlines([block]);
+// An outline's items and the lists under them, 6 deep at most (core's MAX_LIST_DEPTH).
+function* outlineInlines(list: Outline): Generator<Inline> {
+  for (const item of list.items) {
+    yield* inlines([{ type: "paragraph", children: item.children }]);
+    for (const sub of item.sub) yield* outlineInlines(sub);
   }
+}
+
+// A block's inline nodes: core's walk of a message's blocks, each heading's line, and what a page's own blocks hold.
+function* blockInlines(block: PageBlock): Generator<Inline> {
+  if (block.type === "quote") yield* pageInlines(block.children);
+  else if (block.type === "heading") yield* inlines([{ type: "paragraph", children: block.children }]);
+  else if (block.type === "table") {
+    for (const cell of [...block.head, ...block.rows.flat()]) yield* inlines([{ type: "paragraph", children: cell }]);
+  } else if (block.type === "outline") yield* outlineInlines(block);
+  else if (block.type === "columns") for (const column of block.columns) yield* pageInlines(column);
+  else if (block.type !== "form" && block.type !== "rule") yield* inlines([block]);
+}
+
+function* pageInlines(blocks: readonly PageBlock[]): Generator<Inline> {
+  for (const block of blocks) yield* blockInlines(block);
 }
 
 /** A piece as written, the punctuation that wraps it in prose left out: what a source holds a figure or an argument as. */

@@ -2,7 +2,19 @@ import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { MAX_QUOTE_DEPTH, markdown, type Inline } from "./markdown.ts";
 import { originOf } from "./address.ts";
-import { PAGE_MAX_BYTES, page, type FormField, type Page, type PageBlock } from "./page.ts";
+import {
+  MAX_TABLE_COLUMNS,
+  MAX_TABLE_ROWS,
+  MAX_LIST_DEPTH,
+  PAGE_MAX_BYTES,
+  page,
+  type Align,
+  type FormField,
+  type Outline,
+  type OutlineItem,
+  type Page,
+  type PageBlock,
+} from "./page.ts";
 
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
@@ -16,6 +28,25 @@ const heading = (level: 1 | 2 | 3 | 4 | 5 | 6, ...children: Inline[]): PageBlock
   children,
 });
 const br: Inline = { type: "break" };
+const picture = (href: string, label = "Image"): Inline => ({
+  type: "link",
+  href,
+  children: [text(label)],
+  image: true,
+});
+const rule: PageBlock = { type: "rule" };
+const columns = (...cols: PageBlock[][]): PageBlock => ({ type: "columns", columns: cols });
+const item = (children: Inline[], sub: PageBlock[] = [], task: OutlineItem["task"] = "none"): OutlineItem => ({
+  children,
+  task,
+  sub: sub as OutlineItem["sub"],
+});
+const outline = (ordered: boolean, items: OutlineItem[], start = 1): PageBlock => ({
+  type: "outline",
+  ordered,
+  start,
+  items,
+});
 const field = (tag: FormField["tag"], name: string, rest: Partial<FormField> = {}): FormField => ({
   tag,
   name,
@@ -38,23 +69,37 @@ const reads = (source: string, ...blocks: PageBlock[]) => {
 };
 
 // Each inline node of a tree, and each block, in order.
+function* within(nodes: readonly Inline[]): Generator<Inline> {
+  for (const node of nodes) {
+    yield node;
+    if ("children" in node) yield* within(node.children);
+  }
+}
 function* inlinesOf(blocks: readonly PageBlock[]): Generator<Inline> {
-  const within = function* (nodes: readonly Inline[]): Generator<Inline> {
-    for (const node of nodes) {
-      yield node;
-      if ("children" in node) yield* within(node.children);
-    }
-  };
   for (const block of blocks) {
     if (block.type === "quote") yield* inlinesOf(block.children);
     else if (block.type === "list") for (const item of block.items) yield* within(item);
     else if (block.type === "paragraph" || block.type === "heading") yield* within(block.children);
+    else yield* inlinesOfRest(block);
+  }
+}
+function* inlinesOfRest(block: PageBlock): Generator<Inline> {
+  if (block.type === "table") for (const cell of [...block.head, ...block.rows.flat()]) yield* within(cell);
+  else if (block.type === "outline") yield* inlinesOfOutline(block);
+  else if (block.type === "columns") for (const column of block.columns) yield* inlinesOf(column);
+}
+function* inlinesOfOutline(block: Outline): Generator<Inline> {
+  for (const it of block.items) {
+    yield* within(it.children);
+    yield* inlinesOf(it.sub);
   }
 }
 function* blocksIn(blocks: readonly PageBlock[]): Generator<PageBlock> {
   for (const block of blocks) {
     yield block;
     if (block.type === "quote") yield* blocksIn(block.children);
+    if (block.type === "outline") for (const it of block.items) yield* blocksIn(it.sub);
+    if (block.type === "columns") for (const column of block.columns) yield* blocksIn(column);
   }
 }
 // Everything a reader sees of a page, as one string: text, code, a form's every field.
@@ -91,8 +136,13 @@ const KEYS: Readonly<Record<string, string>> = {
   heading: "children,level,type",
   codeBlock: "text,type",
   quote: "children,type",
+  table: "align,cut,head,rows,type",
   form: "exec,fields,path,type",
+  rule: "type",
+  columns: "columns,type",
+  outline: "items,ordered,start,type",
 };
+const IMAGE_KEYS = "children,href,image,type";
 const FIELD_KEYS = "description,flags,inputType,name,placeholder,tag,value";
 const FORM_TAGS = new Set(["input", "textarea", "select", "other"]);
 // An address a link may name: the chat's own rule (markdown.test.ts): https, a plain ASCII host, a port, then a path with no
@@ -107,7 +157,7 @@ function leafAllowed(node: Inline, inLink: boolean): boolean {
   return node.type === "break";
 }
 function inlineAllowed(node: Inline, inLink: boolean): boolean {
-  if (KEYS[node.type] !== keysOf(node)) return false;
+  if ((node.type === "link" && "image" in node ? IMAGE_KEYS : KEYS[node.type]) !== keysOf(node)) return false;
   if (!("children" in node)) return leafAllowed(node, inLink);
   if (node.type === "link" && (inLink || !HREF.test(node.href))) return false;
   return node.children.length > 0 && inlinesAllowed(node.children, inLink || node.type === "link");
@@ -127,20 +177,54 @@ function linesOf(children: readonly Inline[]): Inline[][] {
   }
   return lines;
 }
+const cellAllowed = (cell: readonly Inline[]): boolean =>
+  cell.every((node) => node.type !== "break") && inlinesAllowed(cell, false);
 const fieldAllowed = (f: FormField): boolean =>
   keysOf(f) === FIELD_KEYS && FORM_TAGS.has(f.tag) && Object.values(f).every((v) => typeof v === "string");
 const keysAllowed = (block: PageBlock): boolean =>
-  (block.type === "list" && block.ordered ? "items,ordered,start,type" : (KEYS[block.type] ?? "items,ordered,type")) ===
-  keysOf(block);
+  (block.type === "list" && block.ordered
+    ? "items,ordered,start,type"
+    : block.type === "quote" && block.severity !== undefined
+      ? "children,severity,type"
+      : (KEYS[block.type] ?? "items,ordered,type")) === keysOf(block);
 const BLOCKS: Readonly<Record<string, (block: PageBlock) => boolean>> = {
   paragraph: (b) =>
     b.type === "paragraph" && linesOf(b.children).every((line) => line.length > 0 && inlinesAllowed(line, false)),
   heading: (b) =>
     b.type === "heading" && b.level >= 1 && b.level <= 6 && b.children.length > 0 && inlinesAllowed(b.children, false),
-  quote: (b) => b.type === "quote" && b.children.length > 0 && b.children.every(blockAllowed),
+  quote: (b) =>
+    b.type === "quote" &&
+    (b.severity === undefined || ["notice", "caution"].includes(b.severity)) &&
+    b.children.length > 0 &&
+    b.children.every(blockAllowed),
   list: (b) => b.type === "list" && b.items.length > 0 && b.items.every((item) => inlinesAllowed(item, false)),
   form: (b) => b.type === "form" && b.fields.every(fieldAllowed),
+  table: (b) =>
+    b.type === "table" &&
+    b.head.length >= 1 &&
+    b.align.length === b.head.length &&
+    b.align.every((a) => ["left", "right", "center", "none"].includes(a)) &&
+    typeof b.cut === "boolean" &&
+    b.head.length <= MAX_TABLE_COLUMNS &&
+    b.rows.length <= MAX_TABLE_ROWS &&
+    [b.head, ...b.rows].every((row) => row.length <= b.head.length && row.every((c) => cellAllowed(c))),
   codeBlock: (b) => b.type === "codeBlock",
+  rule: (b) => b.type === "rule",
+  columns: (b) =>
+    b.type === "columns" &&
+    b.columns.length > 0 &&
+    b.columns.every((column) => column.length > 0 && column.every(blockAllowed)),
+  outline: (b) =>
+    b.type === "outline" &&
+    b.items.length > 0 &&
+    Number.isInteger(b.start) &&
+    b.items.every(
+      (it) =>
+        keysOf(it) === "children,sub,task" &&
+        ["none", "open", "done"].includes(it.task) &&
+        inlinesAllowed(it.children, false) &&
+        it.sub.every(blockAllowed),
+    ),
 };
 const blockAllowed = (block: PageBlock): boolean => keysAllowed(block) && (BLOCKS[block.type]?.(block) ?? false);
 
@@ -222,8 +306,12 @@ describe("page: links and images", () => {
   });
 
   test("turns an image into a link to it, labelled by its alt text", () => {
-    reads("![logo](https://x.test/a.png)", paragraph(link("https://x.test/a.png", "logo")));
-    reads("see ![](https://x.test/a.png) here", paragraph(text("see "), link("https://x.test/a.png"), text(" here")));
+    reads("![logo](https://x.test/a.png)", paragraph(picture("https://x.test/a.png", "logo")));
+    reads(
+      "see ![](https://x.test/a.png) here",
+      paragraph(text("see "), picture("https://x.test/a.png"), text(" here")),
+    );
+    reads("[logo](https://x.test/a.png)", paragraph(link("https://x.test/a.png", "logo")));
   });
 
   test("shows an image that is not an https one as text", () => {
@@ -287,9 +375,14 @@ describe("page: links and images", () => {
     ["[a](/r/demo/dao:vote)", "https://gno.land/r/demo/dao:vote"],
     ["[a](/r/demo/dao$help&x=1)", "https://gno.land/r/demo/dao$help&x=1"],
     ["[a](/r/demo/dao?q=1#top)", "https://gno.land/r/demo/dao?q=1#top"],
-    ["![a](/static/a.png)", "https://gno.land/static/a.png"],
   ])("resolves %s to %s under the origin", (source, href) => {
     expect(blocksOf(source, "https://gno.land")).toStrictEqual([paragraph(link(href, "a"))]);
+  });
+
+  test("resolves an image's path under the origin, flagged", () => {
+    expect(blocksOf("![a](/static/a.png)", "https://gno.land")).toStrictEqual([
+      paragraph(picture("https://gno.land/static/a.png", "a")),
+    ]);
   });
 
   // The forms a realm writes that name no path of the origin: no base to resolve them against, so text.
@@ -342,6 +435,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
   test("turns an alert into a quote that opens with its kind in bold", () => {
     reads("> [!NOTE]\n> Be careful.", {
       type: "quote",
+      severity: "notice",
       children: [paragraph(strong(text("Note"))), paragraph(text("Be careful."))],
     });
   });
@@ -349,20 +443,23 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
   test("opens an alert with its title when it has one, whatever its kind", () => {
     reads("> [!WARNING] Heads up\n> Read this.", {
       type: "quote",
+      severity: "caution",
       children: [paragraph(strong(text("Heads up"))), paragraph(text("Read this."))],
     });
   });
 
   test.each([
-    ["[!TIP]", "Tip"],
-    ["[!caution]", "Caution"],
-    ["[!SUCCESS]", "Success"],
-    ["[!INFO]", "Info"],
-    ["[!MYSTERY]", "Info"],
-    ["[!NOTE]-", "Note"],
-  ])("labels the alert %s as %s", (mark, label) => {
+    ["[!TIP]", "Tip", "notice"],
+    ["[!caution]", "Caution", "caution"],
+    ["[!WARNING]", "Warning", "caution"],
+    ["[!SUCCESS]", "Success", "notice"],
+    ["[!INFO]", "Info", "notice"],
+    ["[!MYSTERY]", "Info", "notice"],
+    ["[!NOTE]-", "Note", "notice"],
+  ] as const)("labels the alert %s as %s, a %s", (mark, label, severity) => {
     reads(`> ${mark}\n> body`, {
       type: "quote",
+      severity,
       children: [paragraph(strong(text(label))), paragraph(text("body"))],
     });
   });
@@ -372,17 +469,41 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     expect(shown([block ?? paragraph()])).toContain("<script>alert(1)</script>");
   });
 
-  test("stacks columns: each column's blocks follow the one before, no tag shown", () => {
+  test("reads columns side by side: a block of the columns, each column its own blocks, no tag shown", () => {
     reads(
       "<gno-columns>\nleft\n<gno-columns-sep>\n# right\n- r1\n</gno-columns>",
-      paragraph(text("left")),
-      heading(1, text("right")),
-      { type: "list", ordered: false, items: [[text("r1")]] },
+      columns(
+        [paragraph(text("left"))],
+        [heading(1, text("right")), { type: "list", ordered: false, items: [[text("r1")]] }],
+      ),
+    );
+  });
+
+  test("reads a column's blocks like a page's: a form, a rule, a table, a quote", () => {
+    const [block] = blocksOf(
+      '<gno-columns>\n---\n<gno-columns-sep>\n> q\n<gno-columns-sep>\n<gno-form exec="X">\n<gno-input name="a" />\n</gno-form>\n</gno-columns>',
+    );
+    expect(block?.type === "columns" && block.columns.map((column) => column.map((b) => b.type))).toStrictEqual([
+      ["rule"],
+      ["quote"],
+      ["form"],
+    ]);
+  });
+
+  test("draws no column that is empty, and no columns holding nothing", () => {
+    reads("<gno-columns>\n</gno-columns>");
+    reads("<gno-columns>\n<gno-columns-sep>\n</gno-columns>");
+    reads(
+      "<gno-columns>\n\n<gno-columns-sep>\na\n<gno-columns-sep>\n  \n</gno-columns>",
+      columns([paragraph(text("a"))]),
     );
   });
 
   test("accepts the self-closing separator too", () => {
-    reads("<gno-columns>\na\n<gno-columns-sep/>\nb\n</gno-columns>", paragraph(text("a")), paragraph(text("b")));
+    reads(
+      "<gno-columns>\na\n<gno-columns-sep/>\nb\n</gno-columns>",
+      columns([paragraph(text("a"))], [paragraph(text("b"))]),
+    );
   });
 
   test("keeps a separator outside columns as text", () => {
@@ -568,6 +689,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     for (const name of ["constructor", "toString", "hasOwnProperty"]) {
       reads(`> [!${name}]\n> body`, {
         type: "quote",
+        severity: "notice",
         children: [paragraph(strong(text("Info"))), paragraph(text("body"))],
       });
     }
@@ -608,13 +730,16 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads(
       "<gno-columns-sep>\n<gno-columns>\na\n</gno-columns>",
       paragraph(text("<gno-columns-sep>")),
-      paragraph(text("a")),
+      columns([paragraph(text("a"))]),
     );
   });
 
   test("takes an indented tag of columns, and each spelling of the separator, as a tag (R-F8)", () => {
     for (const sep of ["<gno-columns-sep>", "<gno-columns-sep/>", "<gno-columns-sep />", "  <gno-columns-sep /> "]) {
-      reads(`  <gno-columns> \na\n${sep}\nb\n  </gno-columns>\t`, paragraph(text("a")), paragraph(text("b")));
+      reads(
+        `  <gno-columns> \na\n${sep}\nb\n  </gno-columns>\t`,
+        columns([paragraph(text("a"))], [paragraph(text("b"))]),
+      );
     }
   });
 
@@ -661,13 +786,10 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     );
   });
 
-  test("stacks columns inside columns, each tag gone", () => {
+  test("reads columns inside columns: the separators belong to the nearest pair", () => {
     reads(
       "<gno-columns>\na\n<gno-columns>\nb\n<gno-columns-sep>\nc\n</gno-columns>\n<gno-columns-sep>\nd\n</gno-columns>",
-      paragraph(text("a")),
-      paragraph(text("b")),
-      paragraph(text("c")),
-      paragraph(text("d")),
+      columns([paragraph(text("a")), columns([paragraph(text("b"))], [paragraph(text("c"))])], [paragraph(text("d"))]),
     );
   });
 
@@ -698,10 +820,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
   });
 
   test.each([
-    ["a rule", "---"],
-    ["a table", "| a | b |\n|---|---|\n| 1 | 2 |"],
     ["an entity", "&#106;avascript:alert(1)"],
-    ["a setext heading", "Title\n====="],
     ["a reference definition", "[a]: https://a.test"],
   ])("keeps %s as text, as the chat does", (_name, source) => {
     const blocks = blocksOf(source);
@@ -814,16 +933,82 @@ describe("page: the caps", () => {
     expect(shown(blocks)).toContain("> > > deep");
   });
 
-  test("stacks columns nested to the byte cap, without a stack of its own", () => {
+  // gnoweb's cap on gno-* blocks nested, 4 (nestdepth.go): a fifth opener is no columns, and stays text.
+  const columnsDepth = (blocks: readonly PageBlock[]): number =>
+    Math.max(0, ...blocks.map((b) => (b.type === "columns" ? 1 + Math.max(0, ...b.columns.map(columnsDepth)) : 0)));
+
+  test("reads columns nested to the byte cap four deep at most, without a stack of its own", () => {
     const levels = Math.floor(PAGE_MAX_BYTES / ("<gno-columns>\n</gno-columns>\n".length + 1));
     const source = "<gno-columns>\n".repeat(levels) + "deep\n" + "</gno-columns>\n".repeat(levels);
     const blocks = blocksOf(source.slice(0, PAGE_MAX_BYTES));
-    expect(blocks).toStrictEqual([paragraph(text("deep"))]);
+    expect(columnsDepth(blocks)).toBe(4);
+    expect(shown(blocks)).toContain("deep");
   });
 
-  test("stacks columns forty deep, flat", () => {
+  test("keeps the cap through quotes: columns opened under growing quotes stay bounded and lose nothing", () => {
+    const quoted = (n: number, tag: string) => `${"> ".repeat(Math.min(n, 3))}${tag}`;
+    const opens = Array.from({ length: 12 }, (_, n) => quoted(n, "<gno-columns>"));
+    const closes = Array.from({ length: 12 }, (_, n) => quoted(11 - n, "</gno-columns>"));
+    const source = [...opens, "> > > deep", ...closes].join("\n");
+    const deep = (blocks: readonly PageBlock[]): number =>
+      Math.max(0, ...blocks.map((b) => (b.type === "quote" ? deep(b.children) : columnsDepth([b]))));
+    expect(deep(blocksOf(source))).toBeLessThanOrEqual(16);
+    expect(shown(blocksOf(source))).toContain("deep");
+  });
+
+  test("makes the outermost four of forty openers the columns, the innermost holds the text", () => {
     const source = "<gno-columns>\n".repeat(40) + "deep\n" + "</gno-columns>\n".repeat(40);
-    expect(blocksOf(source)).toStrictEqual([paragraph(text("deep"))]);
+    let block: PageBlock | undefined = blocksOf(source)[0];
+    for (let level = 0; level < 4; level += 1) {
+      expect(block?.type).toBe("columns");
+      block = block?.type === "columns" ? block.columns[0]?.[0] : undefined;
+    }
+    expect(block?.type).toBe("paragraph");
+    expect(shown(block === undefined ? [] : [block])).toContain("deep");
+  });
+
+  test("keeps a separator in a text opener with the column around it", () => {
+    const source = "<gno-columns>\n".repeat(5) + "a\n<gno-columns-sep>\nb\n" + "</gno-columns>\n".repeat(5);
+    const blocks = blocksOf(source);
+    expect(columnsDepth(blocks)).toBe(4);
+    expect(shown(blocks)).toContain("a");
+    expect(shown(blocks)).toContain("b");
+  });
+
+  test("keeps an empty middle column out, as the first and last", () => {
+    reads(
+      "<gno-columns>\na\n<gno-columns-sep>\n<gno-columns-sep>\nb\n</gno-columns>",
+      columns([paragraph(text("a"))], [paragraph(text("b"))]),
+    );
+  });
+
+  test("reads columns forty deep as four, the other openers and closers text, nothing lost", () => {
+    const source = "<gno-columns>\n".repeat(40) + "deep\n" + "</gno-columns>\n".repeat(40);
+    const blocks = blocksOf(source);
+    expect(columnsDepth(blocks)).toBe(4);
+    expect(shown(blocks)).toContain("deep");
+    expect(shown(blocks).split("<gno-columns>").length - 1).toBe(36);
+    expect(shown(blocks).split("</gno-columns>").length - 1).toBe(36);
+  });
+
+  test("reads rows of a textarea as gnoweb clamps them: 2 to 10, 4 when not a number", () => {
+    const flags = (rows: string) => {
+      const [form] = blocksOf(`<gno-form>\n<gno-textarea name="a" rows="${rows}" />\n</gno-form>`);
+      return form?.type === "form" ? form.fields[0]?.flags : undefined;
+    };
+    const written = ["1", "2", "10", "50", "-3", "x", "7 lines", " 7", "+5", "99999999999999999999"];
+    expect(written.map(flags)).toStrictEqual([
+      "rows 2",
+      "rows 2",
+      "rows 10",
+      "rows 10",
+      "rows 2",
+      "rows 4",
+      "rows 7",
+      "rows 7",
+      "rows 5",
+      "rows 4",
+    ]);
   });
 });
 
@@ -840,6 +1025,13 @@ describe("page: the allowlist, for any input", () => {
     "<gno-select name=s />",
     "> [!NOTE]",
     "> [!WARNING] t",
+    "|",
+    "\n| a | b |\n|:--|--:|\n| 1 |\n| `x|y` | [l](https://a.test) | 3 |\n",
+    "\n> | a |\n> |---|\n> | <b> |\n",
+    "\na|b\n-|-\n",
+    "| a | b |",
+    "|:--|--:|",
+    "\\|",
     ">",
     "# ",
     "###### ",
@@ -1004,6 +1196,279 @@ describe("page: nothing a field holds is left unseen", () => {
   });
 });
 
+describe("page: thematic breaks", () => {
+  test.each(["---", "***", "___", "- - -", "* * *", "_ _ _", "-----", "  ---", "---  ", "- - - - -"])(
+    "reads %j as a rule",
+    (source) => {
+      reads(source, rule);
+    },
+  );
+
+  test.each(["--", "**", "__", "---a", "-*-", "- -", "--- x", "\\---"])("keeps %j as text, not a rule", (source) => {
+    expect(blocksOf(source).some((block) => block.type === "rule")).toBe(false);
+  });
+
+  test("reads a rule between blocks, with or without blank lines round it", () => {
+    reads("a\n\n---\n\nb", paragraph(text("a")), rule, paragraph(text("b")));
+    reads("# T\n---\ntext", heading(1, text("T")), rule, paragraph(text("text")));
+    reads("```\nx\n```\n***\nb", { type: "codeBlock", text: "x" }, rule, paragraph(text("b")));
+  });
+
+  test("ends a list, and a quote's lines, as its own block", () => {
+    reads("- a\n* * *\n- b", { type: "list", ordered: false, items: [[text("a")]] }, rule, {
+      type: "list",
+      ordered: false,
+      items: [[text("b")]],
+    });
+    reads("> ---", { type: "quote", children: [rule] });
+  });
+
+  test("ends a table's rows", () => {
+    const [table, ...rest] = blocksOf("|a|\n|-|\n|1|\n---\nx");
+    expect(table?.type === "table" && table.rows.length).toBe(1);
+    expect(rest).toStrictEqual([rule, paragraph(text("x"))]);
+  });
+});
+
+describe("page: setext headings, and a rule after a paragraph", () => {
+  test("reads a line over equals signs as a title, over hyphens as a subtitle", () => {
+    reads("Title\n=====", heading(1, text("Title")));
+    reads("Title\n-----", heading(2, text("Title")));
+    reads("Title\n=", heading(1, text("Title")));
+    reads("Title\n--  ", heading(2, text("Title")));
+    reads("**Big** one\n---", heading(2, strong(text("Big")), text(" one")));
+  });
+
+  test("makes one title of a paragraph's lines, joined by a space", () => {
+    reads("a\nb\n---\nc", heading(2, text("a b")), paragraph(text("c")));
+  });
+
+  test("keeps a rule after a blank line, and after a block that is no paragraph", () => {
+    reads("a\n\n---", paragraph(text("a")), rule);
+    reads("- a\n---", { type: "list", ordered: false, items: [[text("a")]] }, rule);
+    reads("> a\n\n---", { type: "quote", children: [paragraph(text("a"))] }, rule);
+  });
+
+  test("reads one inside a quote", () => {
+    reads("> a\n> ---", { type: "quote", children: [heading(2, text("a"))] });
+  });
+
+  test("keeps a rule of its own after a paragraph, a title only over `=` or hyphens", () => {
+    for (const under of ["* * *", "___", "- - -"]) reads(`a\n${under}`, paragraph(text("a")), rule);
+    reads("> a\n---", { type: "quote", children: [paragraph(text("a"))] }, rule);
+    reads("- a\n===", { type: "list", ordered: false, items: [[text("a")]] }, paragraph(text("===")));
+    reads("# h\n===", heading(1, text("h")), paragraph(text("===")));
+    reads("```\nx\n```\n===", { type: "codeBlock", text: "x" }, paragraph(text("===")));
+    reads("+ + +", { type: "list", ordered: false, items: [[text("+ +")]] });
+    const [alert] = blocksOf("> [!NOTE]\n> ---");
+    expect(alert).toMatchObject({ type: "quote", severity: "notice" });
+    expect(alert?.type === "quote" && alert.children.map((child) => child.type)).toStrictEqual(["paragraph", "rule"]);
+  });
+
+  test("leaves a line of equals signs alone with no paragraph over it, and a table as a table", () => {
+    reads("===", paragraph(text("===")));
+    reads("a\n\\===", paragraph(text("a"), br, text("===")));
+    expect(blocksOf("a|b\n-|-").map((block) => block.type)).toStrictEqual(["table"]);
+  });
+
+  test("leaves the chat's reader as it was: no title, no rule", () => {
+    expect(markdown("a\n---").map((block) => block.type)).toStrictEqual(["paragraph"]);
+  });
+});
+
+describe("page: nested, mixed and task lists", () => {
+  test("nests a list under an item by its indentation", () => {
+    reads(
+      "- a\n  - b\n  - c\n- d",
+      outline(false, [item([text("a")], [outline(false, [item([text("b")]), item([text("c")])])]), item([text("d")])]),
+    );
+    reads("- a\n    - b", outline(false, [item([text("a")], [outline(false, [item([text("b")])])])]));
+    reads("- a\n\t- b", outline(false, [item([text("a")], [outline(false, [item([text("b")])])])]));
+  });
+
+  test("mixes ordered and unordered lists, each under an item", () => {
+    reads(
+      "1. a\n   - b\n2. c",
+      outline(true, [item([text("a")], [outline(false, [item([text("b")])])]), item([text("c")])]),
+    );
+    reads(
+      "- a\n  1. x\n  - y",
+      outline(false, [item([text("a")], [outline(true, [item([text("x")])]), outline(false, [item([text("y")])])])]),
+    );
+    reads("3. a\n   1. x", outline(true, [item([text("a")], [outline(true, [item([text("x")])])])], 3));
+  });
+
+  test("leaves a flat list the chat's list, and one space of indent a sibling", () => {
+    reads("- a\n - b", { type: "list", ordered: false, items: [[text("a")], [text("b")]] });
+    reads(
+      "- a\n1. b",
+      { type: "list", ordered: false, items: [[text("a")]] },
+      {
+        type: "list",
+        ordered: true,
+        start: 1,
+        items: [[text("b")]],
+      },
+    );
+  });
+
+  test("closes a nested list at a line less indented, back to the level it belongs to", () => {
+    reads(
+      "- a\n  - b\n    - c\n  - d\n- e",
+      outline(false, [
+        item(
+          [text("a")],
+          [outline(false, [item([text("b")], [outline(false, [item([text("c")])])]), item([text("d")])])],
+        ),
+        item([text("e")]),
+      ]),
+    );
+  });
+
+  test("reads a task as an item with its box, open or done; else the brackets are text", () => {
+    reads(
+      "- [ ] a\n- [x] b\n- [X] c",
+      outline(false, [item([text("a")], [], "open"), item([text("b")], [], "done"), item([text("c")], [], "done")]),
+    );
+    reads("1. [ ] a", outline(true, [item([text("a")], [], "open")]));
+    reads(
+      "- [ ] a\n  - [x] b",
+      outline(false, [item([text("a")], [outline(false, [item([text("b")], [], "done")])], "open")]),
+    );
+    for (const source of ["- [ ]", "- [x]no", "- [] a", "- [y] a"]) {
+      expect(blocksOf(source).some((block) => block.type === "outline")).toBe(false);
+    }
+    reads("- [x]no", { type: "list", ordered: false, items: [[text("[x]no")]] });
+  });
+
+  test("continues an item on the lines indented under it", () => {
+    reads("- a\n  more\n- b", outline(false, [item([text("a"), br, text("more")]), item([text("b")])]));
+    reads("- a\nmore", { type: "list", ordered: false, items: [[text("a")]] }, paragraph(text("more")));
+  });
+
+  test("ends the list at a block of its own, however indented", () => {
+    reads(
+      "- a\n  - b\n  # h",
+      outline(false, [item([text("a")], [outline(false, [item([text("b")])])])]),
+      heading(1, text("h")),
+    );
+    reads(
+      "- a\n  - b\n\n  text",
+      outline(false, [item([text("a")], [outline(false, [item([text("b")])])])]),
+      paragraph(text("text")),
+    );
+    expect(blocksOf("- a\n  - b\n  > q").map((block) => block.type)).toStrictEqual(["outline", "quote"]);
+  });
+
+  test("reads one inside a quote and keeps marks and links in its items", () => {
+    reads("> - a\n>   - b", {
+      type: "quote",
+      children: [outline(false, [item([text("a")], [outline(false, [item([text("b")])])])])],
+    });
+    reads(
+      "- **a** [x](https://x.test)\n  - b",
+      outline(false, [
+        item([strong(text("a")), text(" "), link("https://x.test", "x")], [outline(false, [item([text("b")])])]),
+      ]),
+    );
+  });
+
+  test("nests no deeper than the cap: deeper items stay on the last level, nothing lost", () => {
+    const deep = Array.from({ length: MAX_LIST_DEPTH + 5 }, (_, n) => `${"  ".repeat(n)}- n${String(n)}`).join("\n");
+    const blocks = blocksOf(deep);
+    const depthOf = (block: PageBlock): number =>
+      block.type === "outline" ? 1 + Math.max(0, ...block.items.flatMap((it) => it.sub.map(depthOf))) : 0;
+    expect(Math.max(...blocks.map(depthOf))).toBe(MAX_LIST_DEPTH);
+    // The items past the cap are siblings on the last level, the first of them n(cap - 1).
+    const last = (block: PageBlock | undefined): Outline | undefined =>
+      block?.type === "outline" && block.items[0]?.sub[0]
+        ? last(block.items[0].sub[0])
+        : block?.type === "outline"
+          ? block
+          : undefined;
+    expect(last(blocks[0])?.items.length).toBe(6);
+    for (let n = 0; n < MAX_LIST_DEPTH + 5; n += 1) expect(shown(blocks)).toContain(`n${String(n)}`);
+    expectAllowlisted(blocks);
+  });
+
+  test("closes a list at the first line indented less than its owner's text, as CommonMark's content offset does", () => {
+    const one = outline(false, [item([text("a")], [outline(false, [item([text("b")]), item([text("c")])])])]);
+    reads("- a\n    - b\n  - c", one);
+    reads("- a\n\t\t- b\n\t- c", one);
+    reads("- a\n      - b\n  - c", one);
+    reads(
+      "- a\n  - b\n - c",
+      outline(false, [item([text("a")], [outline(false, [item([text("b")])])]), item([text("c")])]),
+    );
+  });
+
+  test("nests under an ordered item from its text's column, and under a bullet from the third", () => {
+    expect(blocksOf("- a\n   - b").map((block) => block.type)).toStrictEqual(["outline"]);
+    expect(blocksOf("1. a\n  - b").map((block) => block.type)).toStrictEqual(["list", "list"]);
+    expect(blocksOf("10. a\n   - b").map((block) => block.type)).toStrictEqual(["list", "list"]);
+    expect(blocksOf("10. a\n    - b").map((block) => block.type)).toStrictEqual(["outline"]);
+  });
+
+  test("keeps a continuation to the item it is indented under, and a blank line ends the list", () => {
+    reads(
+      "- a\n  - b\n    more",
+      outline(false, [item([text("a")], [outline(false, [item([text("b"), br, text("more")])])])]),
+    );
+    reads("- [x] a\n  more", outline(false, [item([text("a"), br, text("more")], [], "done")]));
+    reads(
+      "- a\n  - b\n  more",
+      outline(false, [item([text("a")], [outline(false, [item([text("b")])])])]),
+      paragraph(text("more")),
+    );
+    expect(blocksOf("- a\n  - b\n\n- c").map((block) => block.type)).toStrictEqual(["outline", "list"]);
+  });
+
+  test("shows the brackets of a task with no words, mixes tasks and plain items, and ticks an ordered one", () => {
+    expect(shown(blocksOf("- [ ]"))).toContain("[ ]");
+    expect(shown(blocksOf("- [x]no"))).toContain("[x]no");
+    reads("- [ ] a\n- b", outline(false, [item([text("a")], [], "open"), item([text("b")])]));
+    reads("1. [x] a", outline(true, [item([text("a")], [], "done")]));
+  });
+
+  test("leaves the chat's lists as they were: nested and task lines are flat items", () => {
+    expect(markdown("- a\n  - b")).toStrictEqual([{ type: "list", ordered: false, items: [[text("a")], [text("b")]] }]);
+    expect(markdown("- [ ] a")).toStrictEqual([{ type: "list", ordered: false, items: [[text("[ ] a")]] }]);
+  });
+
+  test("shows no HTML and no link that is not https, in an item", () => {
+    const blocks = blocksOf("- <img src=x onerror=1>\n  - [a](javascript:alert(1))");
+    expectAllowlisted(blocks);
+    expect(shown(blocks)).toContain("<img src=x onerror=1>");
+    expect([...inlinesOf(blocks)].some((node) => node.type === "link")).toBe(false);
+  });
+});
+
+describe("page: images stay links to them, flagged", () => {
+  test("flags an image and no other link", () => {
+    const [block] = blocksOf("![a](https://x.test/a.png) [b](https://x.test/b)");
+    const links = [...inlinesOf(block === undefined ? [] : [block])].flatMap((node) =>
+      node.type === "link" ? [["image" in node, node.href]] : [],
+    );
+    expect(links).toStrictEqual([
+      [true, "https://x.test/a.png"],
+      [false, "https://x.test/b"],
+    ]);
+  });
+
+  test("labels an image with no alt text Image, not its address", () => {
+    reads("![](https://x.test/a.png)", paragraph(picture("https://x.test/a.png")));
+    reads("![ ](https://x.test/a.png)", paragraph(picture("https://x.test/a.png")));
+  });
+
+  test("keeps an image in a list item and in a cell flagged", () => {
+    reads("- ![a](https://x.test/a.png)", {
+      type: "list",
+      ordered: false,
+      items: [[picture("https://x.test/a.png", "a")]],
+    });
+  });
+});
+
 describe("page: linear in bytes (a guard against quadratic input; the bench measures the budget)", () => {
   const fill = (unit: string, bytes = PAGE_MAX_BYTES) => unit.repeat(Math.floor(bytes / unit.length));
   const STARTS = [
@@ -1055,6 +1520,49 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     ["openers of images", (n) => fill("![a](", n)],
     ["stars", (n) => fill("*a ", n)],
     ["headings", (n) => fill("# a\n", n)],
+    ["rules", (n) => fill("---\n", n)],
+    [
+      "columns each opened under four quotes",
+      (n) => fill("> > > > <gno-columns>\n> > > > a\n> > > > <gno-columns-sep>\n", n),
+    ],
+    [
+      "columns each holding a table",
+      (n) => "<gno-columns>\n" + fill("| a |\n|---|\n| 1 |\n<gno-columns-sep>\n", n) + "</gno-columns>",
+    ],
+    ["columns each with a separator", (n) => fill("<gno-columns>\na\n<gno-columns-sep>\nb\n</gno-columns>\n", n)],
+    [
+      "columns nested in a stair",
+      (n) => fill("<gno-columns>\na\n<gno-columns-sep>\n", n / 2) + fill("</gno-columns>\n", n / 2),
+    ],
+    [
+      "one columns of a thousand separators",
+      (n) => "<gno-columns>\n" + fill("a\n<gno-columns-sep>\n", n) + "</gno-columns>",
+    ],
+    ["spaced rules", (n) => fill("* * *\n", n)],
+    ["lines over a rule", (n) => fill("a\n---\n", n)],
+    ["a paragraph, then its underline", (n) => fill("a\n", n) + "---"],
+    ["lines of equals signs", (n) => fill("a\n===\n", n)],
+    ["a flat list", (n) => fill("- a\n", n)],
+    ["a flat list, then a nested item", (n) => fill("- a\n", n) + "  - b"],
+    ["items each nested", (n) => fill("- a\n  - b\n", n)],
+    [
+      "a staircase of items",
+      (n) => Array.from({ length: Math.floor(n / 40) }, (_, k) => `${" ".repeat(k % 40)}- a`).join("\n"),
+    ],
+    ["tasks", (n) => fill("- [ ] a\n", n)],
+    ["items with continuations", (n) => fill("- a\n  b\n", n)],
+    ["ordered items nested", (n) => fill("1. a\n   1. b\n", n)],
+    ["a list of rules", (n) => fill("- a\n---\n", n)],
+    ["pipes alone", (n) => fill("|", n)],
+    ["lines that could each head a table", (n) => fill("a|b\n", n)],
+    ["headers each with a delimiter", (n) => fill("a|b\n-|-\n", n)],
+    ["a table's rows", (n) => "| a | b | c |\n|---|---|---|\n" + fill("| 1 | [x](https://x.test) | `c` |\n", n)],
+    ["a table of empty cells", (n) => "|a|\n|-|\n" + fill("||||||||||||||||\n", n)],
+    ["a table's columns", (n) => `${fill("|a", n / 2)}\n${fill("|-", n / 2)}\n`],
+    ["code spans in cells", (n) => "| a |\n|---|\n" + fill("| `|`|`|`|\n", n)],
+    ["link openers in cells", (n) => "| a |\n|---|\n" + fill("| [a](| **| ![a](|\n", n)],
+    ["a table in four quotes", (n) => "> > > > | a |\n> > > > |---|\n" + fill("> > > > | 1 |\n", n)],
+    ["one cell as big as the page", (n) => "| a |\n|---|\n| " + fill("x ", n)],
     ["form lines", (n) => `<gno-form>\n${fill('<gno-input name="a" />\n', n)}</gno-form>`],
     ["form lines, none a field", (n) => `<gno-form>\n${fill("<gno-input name=\n", n)}</gno-form>`],
     ["tags with attributes never ending", (n) => `<gno-form>\n<gno-input ${fill("a=b ", n)}`],
@@ -1094,6 +1602,213 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     const start = Date.now();
     expect(page(make(PAGE_MAX_BYTES).slice(0, PAGE_MAX_BYTES)).kind).toBe("page");
     expect(Date.now() - start).toBeLessThan(5000); // the bench holds the budget; a quadratic regex takes half a minute
+  });
+});
+
+describe("page: tables, as GFM reads them", () => {
+  const table = (align: Align[], head: Inline[][], rows: Inline[][][]): PageBlock => ({
+    type: "table",
+    align,
+    head,
+    rows,
+    cut: false,
+  });
+
+  test("reads a header, its delimiter row's alignments and the body rows", () => {
+    reads(
+      "| Name | Yes | No | Both |\n| :--- | ---: | :---: | --- |\n| a | 1 | 2 | 3 |\n| b | 4 | 5 | 6 |",
+      table(
+        ["left", "right", "center", "none"],
+        [[text("Name")], [text("Yes")], [text("No")], [text("Both")]],
+        [
+          [[text("a")], [text("1")], [text("2")], [text("3")]],
+          [[text("b")], [text("4")], [text("5")], [text("6")]],
+        ],
+      ),
+    );
+  });
+
+  test("needs no outer pipes, and a table with a header alone has no rows", () => {
+    reads("a | b\n-|-", table(["none", "none"], [[text("a")], [text("b")]], []));
+  });
+
+  test("reads one column when the pipes are outside", () => {
+    reads("| a |\n|---|\n| 1 |", table(["none"], [[text("a")]], [[[text("1")]]]));
+  });
+
+  test("reads each cell as inline Markdown: links, marks, code", () => {
+    const [block] = blocksOf("| a | b |\n|---|---|\n| [x](https://x.test) **s** | `c` |");
+    expect(block).toMatchObject({
+      rows: [[[link("https://x.test", "x"), text(" "), strong(text("s"))], [{ type: "code", text: "c" }]]],
+    });
+  });
+
+  test("keeps an escaped pipe in its cell, in code too", () => {
+    reads(
+      "| a \\| b | c |\n|---|---|\n| `x \\| y` | z |",
+      table(["none", "none"], [[text("a | b")], [text("c")]], [[[{ type: "code", text: "x | y" }], [text("z")]]]),
+    );
+  });
+
+  test("keeps a short row's own cells, never padded, and cuts a long one to the header's width", () => {
+    reads(
+      "| a | b |\n|---|---|\n| 1 |\n| 1 | 2 | 3 | 4 |",
+      table(["none", "none"], [[text("a")], [text("b")]], [[[text("1")]], [[text("1")], [text("2")]]]),
+    );
+  });
+
+  test("an empty cell is an empty list of nodes", () => {
+    reads("| a | b |\n|---|---|\n|  | x |", table(["none", "none"], [[text("a")], [text("b")]], [[[], [text("x")]]]));
+  });
+
+  test("ends at a blank line, and the text after it is a paragraph", () => {
+    reads("| a |\n|---|\n| 1 |\n\nafter", table(["none"], [[text("a")]], [[[text("1")]]]), paragraph(text("after")));
+  });
+
+  test.each([
+    ["a heading", "# h", heading(1, text("h"))],
+    ["a quote", "> q", { type: "quote", children: [paragraph(text("q"))] } satisfies PageBlock],
+    ["a fence", "```\ncode\n```", { type: "codeBlock", text: "code" } satisfies PageBlock],
+  ])("ends at %s", (_name, after, block) => {
+    reads(`| a |\n|---|\n| 1 |\n${after}`, table(["none"], [[text("a")]], [[[text("1")]]]), block);
+  });
+
+  test("interrupts a paragraph, as GFM does, and sits in a quote", () => {
+    reads("intro\n| a |\n|---|", paragraph(text("intro")), table(["none"], [[text("a")]], []));
+    const [quote] = blocksOf("> | a |\n> |---|\n> | 1 |");
+    expect(quote).toMatchObject({ type: "quote", children: [{ type: "table" }] });
+  });
+
+  test.each([
+    ["a header with more cells than the delimiter", "| a | b |\n|---|"],
+    ["a header with fewer cells than the delimiter", "| a |\n|---|---|"],
+    ["a delimiter that is not hyphens", "| a | b |\n|---|-x-|"],
+    ["a delimiter of colons alone", "| a | b |\n|---|:|"],
+    ["a header with no pipe", "ab\n|---|"],
+    ["no delimiter at all", "| a | b |\n| c | d |"],
+    ["a delimiter first", "|---|---|\n| a | b |"],
+  ])("leaves %s as plain paragraphs", (_name, source) => {
+    const lines = source.split("\n");
+    const blocks = blocksOf(source);
+    expect(blocks.every((block) => block.type === "paragraph")).toBe(true);
+    expect(shown(blocks).split("\n").join("")).toBe(lines.join("").replace(/\*/g, ""));
+  });
+
+  test("counts an escaped pipe as no cell border, in the header too", () => {
+    reads("| a \\| b |\n|---|", table(["none"], [[text("a | b")]], []));
+  });
+
+  test("splits at a pipe inside a code span, as GFM does", () => {
+    reads("| `a|b` |\n|---|---|", table(["none", "none"], [[text("`a")], [text("b`")]], []));
+  });
+
+  test.each([
+    ["| - | - |", ["none", "none"]],
+    ["|:-:|:--|", ["center", "left"]],
+    ["|  ---  |---:  |", ["none", "right"]],
+  ] as const)("reads the delimiter row %j", (delimiter, align) => {
+    expect(blocksOf(`| a | b |\n${delimiter}`)[0]).toMatchObject({ type: "table", align });
+  });
+
+  test.each(["|::|--|", "|:|--|", "| -x |--|"])("refuses the delimiter row %j", (delimiter) => {
+    expect(blocksOf(`| a | b |\n${delimiter}`).every((block) => block.type === "paragraph")).toBe(true);
+  });
+
+  test("reads an empty header cell", () => {
+    reads("| | b |\n|--|--|", table(["none", "none"], [[], [text("b")]], []));
+  });
+
+  test("takes a line with no pipe as a row of one cell, as GFM does", () => {
+    reads("| a | b |\n|--|--|\nplain", table(["none", "none"], [[text("a")], [text("b")]], [[[text("plain")]]]));
+  });
+
+  test("ends at a list item, and the item is a list", () => {
+    const blocks = blocksOf("| a |\n|--|\n| 1 |\n- x");
+    expect(blocks.map((block) => block.type)).toEqual(["table", "list"]);
+  });
+
+  test("ends at a columns tag, and the rows after it are a column's text", () => {
+    const blocks = blocksOf("| a |\n|--|\n| 1 |\n<gno-columns>\n| 2 |\n</gno-columns>");
+    expect(blocks).toMatchObject([{ type: "table", rows: [[[text("1")]]] }, columns([paragraph(text("| 2 |"))])]);
+  });
+
+  test("a table inside a quote is a table, and an alert is a notice with a table in it", () => {
+    const [alert] = blocksOf("> [!NOTE]\n> | a |\n> |--|\n> | 1 |");
+    expect(alert).toMatchObject({ severity: "notice", children: [expect.anything(), { type: "table" }] });
+  });
+
+  test("gives an alert inside a quote its severity, and a quote inside an alert none", () => {
+    const [outer] = blocksOf("> text\n> > [!WARNING]\n> > x");
+    expect(outer).toMatchObject({ children: [expect.anything(), { severity: "caution" }] });
+    expect(outer).not.toHaveProperty("severity");
+    const [alert] = blocksOf("> [!NOTE]\n> > inner");
+    expect(alert).toMatchObject({ severity: "notice", children: [expect.anything(), { type: "quote" }] });
+    const inner = alert?.type === "quote" ? alert.children[1] : undefined;
+    expect(inner).not.toHaveProperty("severity");
+  });
+
+  test("keeps HTML in a cell as its text, never a tag", () => {
+    const source = "| <script>alert(1)</script> | <img src=x onerror=1> |\n|---|---|\n| <b>x</b> | [a](javascript:1) |";
+    const blocks = blocksOf(source);
+    expectAllowlisted(blocks);
+    expect(shown(blocks)).toContain("<script>alert(1)</script>");
+    expect(shown(blocks)).toContain("<img src=x onerror=1>");
+    expect(blocks[0]).toMatchObject({ type: "table", rows: [[[text("<b>x</b>")], [text("[a](javascript:1)")]]] });
+  });
+
+  test("shows a gnoweb tag in a row as text, and a form ends the table", () => {
+    const blocks = blocksOf('| a |\n|---|\n<gno-form exec="X">\n<gno-input name="n" />\n</gno-form>');
+    expect(blocks.map((b) => b.type)).toEqual(["table", "form"]);
+  });
+
+  test("cuts a header of 40 thousand columns, keeping the first 64", () => {
+    const n = 40_000;
+    const [block] = blocksOf(`${"|a".repeat(n)}\n${"|-".repeat(n)}\n${"|b".repeat(n)}`);
+    expect(block).toMatchObject({ type: "table", cut: true });
+    if (block?.type !== "table") throw new Error("no table");
+    expect(block.head).toHaveLength(MAX_TABLE_COLUMNS);
+    expect(block.rows[0]).toHaveLength(MAX_TABLE_COLUMNS);
+  });
+
+  test("holds as many cells as the page has bytes, whatever the shape of its tables", () => {
+    const table64 = `${"|a".repeat(64)}|\n${"|-".repeat(64)}|\n${"|x\n".repeat(MAX_TABLE_ROWS)}\n`;
+    const source = table64.repeat(Math.floor(PAGE_MAX_BYTES / table64.length));
+    const cells = blocksOf(source).reduce(
+      (sum, block) => sum + (block.type === "table" ? block.head.length + block.rows.flat().length : 0),
+      0,
+    );
+    expect(cells).toBeLessThanOrEqual(source.length);
+  });
+
+  test("cuts a header at the column cap and says so", () => {
+    const wide = (n: number) => Array.from({ length: n }, (_, i) => "c" + String(i)).join(" | ");
+    const dash = (n: number) => Array.from({ length: n }, () => "---").join("|");
+    const [block] = blocksOf(
+      `${wide(MAX_TABLE_COLUMNS + 5)}\n${dash(MAX_TABLE_COLUMNS + 5)}\n${wide(MAX_TABLE_COLUMNS + 9)}`,
+    );
+    expect(block).toMatchObject({ type: "table", cut: true });
+    if (block?.type !== "table") throw new Error("no table");
+    expect(block.head).toHaveLength(MAX_TABLE_COLUMNS);
+    expect(block.align).toHaveLength(MAX_TABLE_COLUMNS);
+    expect(block.rows[0]).toHaveLength(MAX_TABLE_COLUMNS);
+    const exact = blocksOf(`${wide(MAX_TABLE_COLUMNS)}\n${dash(MAX_TABLE_COLUMNS)}`)[0];
+    expect(exact).toMatchObject({ type: "table", cut: false });
+  });
+
+  test("keeps the rows to the row cap, says so, and reads the text after the table", () => {
+    const rows = (n: number) => Array.from({ length: n }, (_, i) => "| r" + String(i) + " |").join("\n");
+    const over = blocksOf(`| a |\n|---|\n${rows(MAX_TABLE_ROWS + 3)}\n\nafter`);
+    expect(over[0]).toMatchObject({ type: "table", cut: true });
+    if (over[0]?.type !== "table") throw new Error("no table");
+    expect(over[0].rows).toHaveLength(MAX_TABLE_ROWS);
+    expect(over[0].rows.at(-1)).toStrictEqual([[text("r" + String(MAX_TABLE_ROWS - 1))]]);
+    expect(over[1]).toStrictEqual(paragraph(text("after")));
+    const exact = blocksOf(`| a |\n|---|\n${rows(MAX_TABLE_ROWS)}`)[0];
+    expect(exact).toMatchObject({ type: "table", cut: false });
+  });
+
+  test("states the caps", () => {
+    expect([MAX_TABLE_COLUMNS, MAX_TABLE_ROWS]).toStrictEqual([64, 2000]);
   });
 });
 

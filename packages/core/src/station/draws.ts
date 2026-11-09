@@ -32,6 +32,3 @@ export class Draws {
     return from[this.count(0, from.length - 1)] ?? from[0];
   }
 }
-
-/** `value` held between 0 and 1. */
-export const unitClamp = (value: number): number => Math.min(1, Math.max(0, value));

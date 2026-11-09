@@ -1,0 +1,36 @@
+/* The network's name and its testnet's caution, in the header's row or in the account's pill (Network.tsx). */
+@layer components {
+  .network,
+  .inPill {
+    /* layout: the name, the icon and the chip on a line */
+    display: inline-flex;
+    /* layout: they share a middle */
+    align-items: center;
+    color: var(--color-text-muted);
+    font: var(--font-ui);
+  }
+
+  /* On a phone the header's row names the network: the pill keeps the name alone. */
+  .inPill {
+    display: none;
+    /* layout: a line off the account's name, as the views' pill's divider */
+    margin-inline-start: var(--space-2xs);
+    padding-inline-start: var(--space-xs);
+    /* raw: a hairline, the views' pill's 1 px divider */
+    border-inline-start: 1px solid var(--color-line-strong);
+  }
+
+  @media (min-width: 900px) {
+    .inPill {
+      /* layout: the name, the icon and the chip on a line */
+      display: inline-flex;
+    }
+  }
+
+  /* The warning icon and its chip on a line (the with-icon utility), off the network's name. */
+  .caution {
+    /* layout: the arrangement the prototype and the frames draw */
+    margin-inline-start: var(--space-2xs);
+    color: var(--color-warm);
+  }
+}

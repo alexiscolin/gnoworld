@@ -5,8 +5,7 @@
     /* layout: the rule under the pins stops at the lines' inset, as the lines do */
     margin-inline: var(--chat-inset);
     /* layout: the pin stands off the header's rule */
-    /* raw: 12 px, the prototype's #pinBar margin */
-    margin-block-start: 12px;
+    margin-block-start: var(--space-xs);
     border-block-end: var(--line-width) solid var(--color-line);
   }
 

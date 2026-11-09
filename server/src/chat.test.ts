@@ -18,7 +18,8 @@ import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
-import { ROOM_STATE } from "./rooms/create.ts";
+import { EARTH_TABLES, REALM_TABLES, ROOM_STATE } from "./rooms/create.ts";
+import { ROOM_SAID } from "./rooms/earth.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Room, Rules } from "./roles/roles.ts";
 import { listRooms, ROOM_TABLES } from "./rooms/rooms.ts";
@@ -75,6 +76,9 @@ const setup = (
     PROGRESS_TABLES,
     MUTE_TABLES,
     ROOM_STATE,
+    REALM_TABLES,
+    EARTH_TABLES,
+    ROOM_SAID,
     PIN_TABLES,
     SIGNAL_TABLES,
   ]);

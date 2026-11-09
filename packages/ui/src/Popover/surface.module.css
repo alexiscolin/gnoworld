@@ -8,17 +8,39 @@
     color: var(--color-text);
   }
 
+  /* Shut, it leaves at 70% of the enter's time on the exit's curve, 4 px nearer its trigger and a little smaller; display and overlay keep it
+     drawn until then. floating.ts writes on it which side of its trigger it took (--_dir) and where the trigger is (its origin), so it grows from there. */
   :where(.floating) {
+    --_dir: -1;
+
     inset: auto;
     /* layout: the browser centres a popover with its margins; ours is placed in script */
     margin: 0;
+    opacity: 0;
+    scale: 0.98;
+    translate: 0 calc(var(--_dir) * var(--space-3xs));
+    transform-origin: 50% 0;
+    transition:
+      opacity calc(var(--motion-fast) * 0.7 * var(--motion-scale)) var(--ease-in),
+      scale calc(var(--motion-fast) * 0.7 * var(--motion-scale)) var(--ease-in),
+      translate calc(var(--motion-fast) * 0.7 * var(--motion-scale)) var(--ease-in),
+      overlay calc(var(--motion-fast) * 0.7 * var(--motion-scale)) allow-discrete,
+      display calc(var(--motion-fast) * 0.7 * var(--motion-scale)) allow-discrete;
+  }
+
+  :where(.floating):popover-open {
     opacity: 1;
-    transition: opacity var(--motion-fast) var(--ease-standard);
+    scale: none;
+    translate: none;
+    transition-duration: calc(var(--motion-fast) * var(--motion-scale));
+    transition-timing-function: var(--ease-standard);
   }
 
   @starting-style {
     :where(.floating):popover-open {
       opacity: 0;
+      scale: 0.98;
+      translate: 0 calc(var(--_dir) * var(--space-3xs));
     }
   }
 }

@@ -24,7 +24,6 @@ export function sitemapXml(data: {
     ...placesFrom(data)
       .filter((place) => mainnet.has(place.universe))
       .map((place) => ORIGIN + place.canonical),
-    `${ORIGIN}/list`,
   ];
   // ponytail: one file; past the cap the protocol wants several and an index, which this site does not write.
   if (urls.length > MAX_URLS)

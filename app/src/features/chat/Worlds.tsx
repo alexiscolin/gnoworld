@@ -1,11 +1,15 @@
 // The full-screen chat's column of worlds (the video's left edge, frame 80): the picture of each world's real planet at 44 px, the world in
 // view ringed, no text under it; its name shows on hover (the tooltip) and names the link. A world with no picture keeps ui's disc.
 import { hubWorldOf } from "@gnoworld/core";
-import { Cluster, PlanetThumb, Tooltip } from "@gnoworld/ui";
+import { Cluster, Tooltip } from "@gnoworld/ui";
 import { useState } from "react";
 import { chunked } from "./Failing.tsx";
-import { pictureOf } from "../../lib/worldPictures.ts";
 import { RouterLink } from "../../routerLink.tsx";
+import { useApp } from "../../storeContext.tsx";
+import { listAhead } from "./roomsListed.ts";
+import { pictureOf } from "../../lib/worldPictures.ts";
+import { ColumnPlanet as Planet } from "./ColumnPlanet.tsx";
+import { WorldsMore } from "./WorldsMore.tsx";
 import styles from "./Worlds.module.css";
 
 // The credits' dialog is the universe's own, its code asked at the first press: the column carries only the button.
@@ -20,16 +24,8 @@ export interface WorldsProps {
   current: string;
   /** The worlds the reader follows, by their ids, the last followed first: they come after the Earth, as the universe's rail has them. */
   followed?: readonly string[];
-}
-
-// The picture at 44 px, loaded lazily as the column is (ui's disc is the rail's too, in the first screen, so it carries no such attributes).
-function Planet({ name, src }: { name: string; src: string | undefined }) {
-  if (src === undefined) return <PlanetThumb src="" name={name} decorative />;
-  return (
-    <span className={styles["planet"]}>
-      <img src={src} alt="" width={44} height={44} loading="lazy" decoding="async" className={styles["picture"]} />
-    </span>
-  );
+  /** The universe the column is of: its id (the follows' key) and whether its paths carry no /net prefix. */
+  universe: { id: string; isDefault: boolean };
 }
 
 const NONE: readonly string[] = [];
@@ -43,11 +39,12 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
   return worlds.toSorted((a, b) => place(a) - place(b));
 }
 
-export function Worlds({ worlds, current, followed = NONE }: WorldsProps) {
+export function Worlds({ worlds, current, followed = NONE, universe }: WorldsProps) {
+  const session = useApp(({ login }) => login.session);
   const [asked, setAsked] = useState(false);
   const [open, setOpen] = useState(false);
   return (
-    <nav aria-label="Worlds" className={styles["list"]}>
+    <nav aria-label="Worlds" className={[styles["list"], "fill-column"].join(" ")}>
       {/* One planet to a line: the column is no wider than one, so a Cluster wraps each onto its own. */}
       <Cluster as="ul" space="2xs" justify="center">
         {inRailOrder(worlds, followed).map((world) => (
@@ -55,16 +52,23 @@ export function Worlds({ worlds, current, followed = NONE }: WorldsProps) {
             <Tooltip label={world.name}>
               <RouterLink
                 href={world.href}
+                onPointerEnter={() => {
+                  listAhead(world.slug, session);
+                }}
                 aria-label={world.name}
                 aria-current={world.slug === current ? "page" : undefined}
                 className={styles["world"]}
               >
-                <Planet name={world.name} src={pictureOf(hubWorldOf(world))} />
+                <Planet name={world.name} id={hubWorldOf(world)} src={pictureOf(hubWorldOf(world))} />
               </RouterLink>
             </Tooltip>
           </li>
         ))}
       </Cluster>
+      <WorldsMore
+        universe={universe}
+        followed={followed.filter((id) => !worlds.some((world) => hubWorldOf(world) === id))}
+      />
       <button
         type="button"
         className={["label", styles["credits"]].join(" ")}

@@ -34,6 +34,8 @@ function setup() {
     send: () => false,
     state: () => Promise.resolve(undefined),
     line: (_, msgid) => Promise.resolve(held.get(msgid) ?? "gone"),
+    relay: () => Promise.resolve(false),
+    relaying: () => 0,
     stop: () => Promise.resolve(),
   };
   const { api, onEdit } = pinsFor(db, { worlds: new Map() }, { link: () => link, now: () => 0, log: () => undefined });
@@ -64,5 +66,27 @@ describe("the pins and an edit the link heard", () => {
     onEdit(said("m2", { edits: "m1", account: BOB }));
     onEdit(said("m4"));
     expect(ids()).toEqual(["m1"]);
+  });
+});
+
+// D394: the maker of a room anyone made on the Earth moderates it, so pins it, and no other room.
+describe("who may pin", () => {
+  it("is the room's world's moderators and the team, and the maker of the room alone for a room anyone made", () => {
+    const db = openDatabase(":memory:", [PIN_TABLES]);
+    opened.push(db);
+    const roles = { worlds: new Map([["earth", { rules: {} as never, moderators: new Set([MOD]) }]]) };
+    const { api } = pinsFor(db, roles, {
+      link: () => undefined,
+      now: () => 0,
+      log: () => undefined,
+      maker: (room) => (room === "#earth/cafe" ? ALICE : undefined),
+    });
+    expect([
+      api.mayPin("#earth/cafe", ALICE),
+      api.mayPin("#earth/cafe", BOB),
+      api.mayPin("#earth/cafe", MOD),
+      api.mayPin("#earth/other", ALICE),
+      api.mayPin("#earth/other", MOD),
+    ]).toEqual([true, false, true, false, true]);
   });
 });

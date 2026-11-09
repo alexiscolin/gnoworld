@@ -1,0 +1,63 @@
+/* The switch: a real checkbox drawn as its track, on the hover fill when off and cream when on, its knob sliding to the end; the
+   motion scale stills the slide under reduced motion. */
+@layer components {
+  .name {
+    font: var(--font-body);
+    font-weight: 500;
+    cursor: pointer;
+  }
+
+  .switch {
+    --_w: calc(var(--control-xs) + var(--space-s));
+    --_track: var(--color-fill-hover);
+    --_edge: var(--color-line-strong);
+    --_knob: var(--color-text-muted);
+    --_at: var(--space-3xs);
+    --_time: calc(var(--motion-base) * var(--motion-scale));
+
+    /* layout: the knob stands over the track */
+    position: relative;
+    /* layout: the track's own width, never grown or shrunk by its row */
+    flex: none;
+  }
+
+  .switch:hover {
+    --_knob: var(--color-text);
+  }
+
+  .switch:has(:checked) {
+    --_track: var(--color-primary);
+    --_edge: var(--color-primary);
+    --_knob: var(--color-ink);
+    --_at: calc(var(--_w) - var(--icon-m) - var(--space-3xs));
+  }
+
+  .track {
+    display: block;
+    inline-size: var(--_w);
+    block-size: var(--control-xs);
+    /* layout: a checkbox's own margin taken off */
+    margin: 0;
+    border: var(--line-width) solid var(--_edge);
+    border-radius: var(--radius-pill);
+    background: var(--_track);
+    appearance: none;
+    cursor: pointer;
+    transition:
+      background-color var(--_time) var(--ease-standard),
+      border-color var(--_time) var(--ease-standard);
+  }
+
+  /* A ring of border with no inside: forced colours keep a border's colour where they drop a fill, so the knob still says on or off. */
+  .knob {
+    position: absolute;
+    inset-block-start: calc((var(--control-xs) - var(--icon-m)) / 2);
+    inset-inline-start: var(--_at);
+    border: calc(var(--icon-m) / 2) solid var(--_knob);
+    border-radius: 50%;
+    pointer-events: none;
+    transition:
+      inset-inline-start var(--_time) var(--ease-standard),
+      border-color var(--_time) var(--ease-standard);
+  }
+}

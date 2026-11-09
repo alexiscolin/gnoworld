@@ -68,7 +68,7 @@ export function Watch({ onCount }: { onCount: (count: number) => void }) {
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     const timer = setInterval(() => {
-      setNow(Date.now());
+      if (!document.hidden) setNow(Date.now());
     }, MINUTE_MS);
     return () => {
       clearInterval(timer);

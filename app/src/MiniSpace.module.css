@@ -1,0 +1,37 @@
+/* The chat's small planet: the canvas fills its box and shows once its first frame is drawn; the names over it are the scene's own pills,
+   which here lead nowhere. */
+@layer components {
+  .host {
+    position: relative;
+    inline-size: 100%;
+    block-size: 100%;
+  }
+
+  /* layout: both fill the box, the names over the canvas, neither taking a pointer: a wheel over the box scrolls the column it stands in */
+  .canvas,
+  .labels {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .canvas {
+    inline-size: 100%;
+    block-size: 100%;
+    opacity: 0;
+    transition: var(--transition-fade);
+  }
+
+  .canvas.drawn {
+    opacity: 1;
+  }
+
+  .labels {
+    overflow: hidden;
+  }
+
+  /* layout: the scene's pill turns on its own pointer events; here a name is only read */
+  .labels button[type] {
+    pointer-events: none;
+  }
+}

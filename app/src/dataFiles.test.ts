@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from "node:fs";
+import type { ServerResponse } from "node:http";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { EarthOrbit, EarthRooms } from "@gnoworld/schemas";
@@ -20,6 +21,7 @@ import { loadData, MAX_FILE_BYTES } from "./dataFiles.ts";
 import { inlineScripts, policy, sha256 } from "./csp.ts";
 import { at, FAULTS, plant } from "./dataFixture.ts";
 import { headerRules, nginxTable } from "../tests/e2e/cspFiles.mjs";
+import { workshopDataFiles } from "../tests/e2e/workshopData.mjs";
 import { headingOf } from "../tests/render.tsx";
 
 /** The fault a planted change to the files makes `loadData` throw, or an empty string when the files load. */
@@ -514,10 +516,11 @@ const KEPT = [
   "src",
   "data",
   "public",
-  "lab",
   "lab.config.ts",
   "react-router.config.ts",
   "vite.config.ts",
+  // vite.config.ts serves the workshop's data files through it.
+  "tests/e2e/workshopData.mjs",
   "package.json",
   "tsconfig.json",
 ];
@@ -646,7 +649,6 @@ describe("react-router build", () => {
           [["net", "gnoland", "earth"], "Earth", "/net/gnoland/earth"],
           [["e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
           [["net", "onyx", "e", "tokens"], "Tokens", "/net/onyx/e/tokens"],
-          [["list"], "Places", "/list"],
         ];
         for (const [path, heading, canonical] of pages) {
           const html = page(...path);
@@ -824,7 +826,6 @@ describe("react-router build", () => {
       const locs = [...sitemap.matchAll(/<loc>([^<]*)<\/loc>/g)].map((match) => match[1]).sort();
       expect(locs).toEqual(
         [
-          "https://gno.world/list",
           "https://gno.world/net/gnoland/",
           "https://gno.world/net/gnoland/earth",
           "https://gno.world/net/gnoland/w/other",
@@ -1118,5 +1119,80 @@ describe("hubs.json's kind and genre", () => {
 
   it("stops the build on a kind the crumb does not know, naming the file and the field", () => {
     expect(loads((f) => void (f["hubs.json"] = hub({ kind: "planet" })))).toMatch(/^hubs\.json: \[0\]\.kind/);
+  });
+});
+
+// The workshop's dev server serves the files the backend writes, and nothing else of their folder (vite.config.ts's workshopData).
+let workshopDir = "";
+/** What the middleware did with a request: `next` when it let it go on, else the status and body it sent. */
+const asked = (url: string, method = "GET") =>
+  new Promise<{ next: true } | { status: number; body: string; type: string | undefined }>((done) => {
+    const headers: Record<string, string> = {};
+    const res = {
+      statusCode: 200,
+      setHeader: (name: string, value: string) => {
+        headers[name] = value;
+      },
+      end: (body?: Uint8Array) => {
+        done({ status: res.statusCode, body: new TextDecoder().decode(body), type: headers["content-type"] });
+      },
+    };
+    workshopDataFiles(workshopDir)({ url, method }, res as unknown as ServerResponse, () => {
+      done({ next: true });
+    });
+  });
+
+describe("the workshop's data files", () => {
+  beforeAll(() => {
+    workshopDir = mkdtempSync(join(tmpdir(), "workshop-data-"));
+    writeFileSync(join(workshopDir, "worlds.json"), '{"w":1}');
+    writeFileSync(join(workshopDir, "markets.json"), '{"m":1}');
+    writeFileSync(join(workshopDir, "secret.json"), '{"secret":1}');
+    mkdirSync(join(workshopDir, "sub"));
+    writeFileSync(join(workshopDir, "sub", "x.json"), "{}");
+  });
+  afterAll(() => {
+    rmSync(workshopDir, { recursive: true, force: true });
+  });
+
+  it("serves the worlds' file and the prices' from the folder", async () => {
+    expect(await asked("/worlds.json")).toEqual({ status: 200, body: '{"w":1}', type: "application/json" });
+    expect(await asked("/markets.json")).toEqual({ status: 200, body: '{"m":1}', type: "application/json" });
+  });
+
+  it("answers a HEAD without a body and refuses a POST", async () => {
+    expect(await asked("/worlds.json", "HEAD")).toEqual({ status: 200, body: "", type: "application/json" });
+    expect(await asked("/worlds.json", "POST")).toEqual({ next: true });
+  });
+
+  it("answers 404 for a name the job has not written yet", async () => {
+    expect(await asked("/worlds-count.json")).toMatchObject({ status: 404 });
+  });
+
+  it.each([
+    "/worlds.json/../secret.json",
+    "/worlds.json/../x",
+    "/worlds.json/",
+    "/worlds.json/x",
+    "/markets.json?x",
+    "/markets.json?x=1",
+    "/markets.json#x",
+    "/worlds.json%00",
+    "/worlds%2ejson",
+    "/%77orlds.json",
+    "/worlds.json%2f..%2fsecret.json",
+    "/..%2fsecret.json",
+    "/../secret.json",
+    "/secret.json",
+    "/sub/x.json",
+    "/sub/",
+    "/",
+    "//worlds.json",
+    "/WORLDS.json",
+    "worlds.json",
+    "",
+    "/markets.json.map",
+  ])("lets %j go on to the app, and reads nothing", async (url) => {
+    expect(await asked(url)).toEqual({ next: true });
   });
 });

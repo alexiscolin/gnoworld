@@ -17,7 +17,13 @@ const { useSpace, useWorldsCount, useResting, useNewcomer } = vi.hoisted(() => (
   useResting: vi.fn<() => string | undefined>(() => undefined),
   useNewcomer: vi.fn<() => boolean>(() => false),
 }));
-vi.mock("../features/universe/index.ts", () => ({ useSpace, useWorldsCount, useResting, useNewcomer }));
+vi.mock("../features/universe/index.ts", () => ({
+  useSpace,
+  useWorldsCount,
+  useResting,
+  useNewcomer,
+  useCosmosAddress: () => undefined,
+}));
 afterEach(() => {
   useResting.mockReturnValue(undefined);
 });

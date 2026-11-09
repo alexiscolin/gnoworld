@@ -3,10 +3,20 @@
 // page's read (RealmView): each is read on its own.
 import type { RealmFactsValue } from "@gnoworld/schemas/indexer";
 import { useEffect, useState } from "react";
+import { heldRead } from "../../lib/chain/heldRead.ts";
 import { readRealmFacts } from "../../lib/chain/indexer.ts";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 
 const NO_OPTIONS: ReadOptions = {};
+
+// The reads of a page of this session with no options of a test's own, by indexer and realm: the plate's standing and the realm's card
+// ask the same facts, one request for both (D530). A failed read is asked again.
+const held = new Map<string, Promise<ChainRead<RealmFactsValue>>>();
+
+const ask = (indexer: string, realm: string, options: ReadOptions) => {
+  if (options !== NO_OPTIONS) return readRealmFacts(indexer, realm, options);
+  return heldRead(held, `${indexer} ${realm}`, () => readRealmFacts(indexer, realm, options));
+};
 
 /** The facts of `realm` at `indexer`, or none while they are read. */
 export function useRealmFacts(
@@ -18,7 +28,7 @@ export function useRealmFacts(
   const key = `${indexer} ${realm}`;
   useEffect(() => {
     let live = true;
-    readRealmFacts(indexer, realm, options).then(
+    ask(indexer, realm, options).then(
       (value) => {
         if (live) setRead({ key, value });
       },

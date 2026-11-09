@@ -4,7 +4,15 @@ import { BELT_INNER, EARTH_PLACE, GRAIN, systemsOf, type Orbiter, type StarSyste
 import { BODY_PIXELS } from "../lod/ladder.ts";
 import type { Point } from "../space/cell.ts";
 import { orbitPlace } from "./disc.ts";
-import { drawnOf, easedOf, postcardFrom, postcardOf, postcardWorlds, type Postcard } from "./postcard.ts";
+import {
+  drawnOf,
+  easedOf,
+  postcardFrom,
+  postcardOf,
+  postcardWorlds,
+  postcardWorldsWith,
+  type Postcard,
+} from "./postcard.ts";
 import { cameraTowards, Look, placeOf as restPlaceOf, REST_SCREENS } from "./restLook.ts";
 
 // A system made by hand: its worlds' radii, orbits and phases as given, its plane flat unless said.
@@ -48,6 +56,18 @@ describe("a postcard's worlds", () => {
     });
     for (const spread of widened) expect(spread).toBeCloseTo(widened[0] ?? NaN, 12);
     expect(widened[0]).toBeGreaterThanOrEqual(1);
+  });
+
+  it("keeps the world a flight is bound for among them, though others are larger", () => {
+    const system = systemOf([
+      [0.6, 1.0, 0.2],
+      [0.4, 1.8, 2.1],
+      [0.3, 2.5, 4.4],
+    ]);
+    const smallest = system.worlds[2]?.id ?? "";
+    expect(postcardWorldsWith(system, 1, undefined).map(({ id }) => id)).not.toContain(smallest);
+    expect(postcardWorldsWith(system, 1, smallest).map(({ id }) => id)).toEqual([smallest]);
+    expect(postcardWorldsWith(system, 3, smallest).map(({ id }) => id)).toContain(smallest);
   });
 
   it("leaves a third of the smaller one's width between two worlds, seen half open, as the system turns", () => {
@@ -117,7 +137,7 @@ describe("a postcard's worlds", () => {
     }
   });
 
-  // 7d6's review (lots 3 and 4): the 15% rule and the eight largest at their limits. Worlds 0.3 across on an orbit of 3 keep it as it
+  // 7d6's review (lots 3 and 4): the 15% rule and the twelve largest at their limits. Worlds 0.3 across on an orbit of 3 keep it as it
   // is (each off its star, the nearest two 3 apart), so two at `arc` apart leave a gap of `6·sin(arc/2) − 0.6` between them.
   const arcFor = (gap: number) => 2 * Math.asin((gap + 0.6) / 6);
   const onOrbit = (phases: readonly number[]) => systemOf(phases.map((phase) => [0.3, 3, phase]));
@@ -135,9 +155,9 @@ describe("a postcard's worlds", () => {
     expect(postcardWorlds(onOrbit([0, 2, 0.8, 3.7]))).toHaveLength(4);
   });
 
-  it("chooses among its eight largest worlds: the eighth drawn, the ninth never", () => {
-    // Seven larger worlds past the cell's half, never drawn; the eighth and the ninth would stand apart, the ninth listed first.
-    const larger = Array.from({ length: 7 }, (_, at): [number, number, number] => [0.5 + 0.05 * at, 4.8, at]);
+  it("chooses among its twelve largest worlds: the twelfth drawn, the thirteenth never", () => {
+    // Eleven larger worlds past the cell's edge, whatever the size a postcard shrinks them to (a tenth at a time, to 0.3), never drawn; the twelfth and the thirteenth would stand apart, the thirteenth listed first.
+    const larger = Array.from({ length: 11 }, (_, at): [number, number, number] => [0.5 + 0.05 * at, 5.2, at]);
     const drawn = postcardWorlds(systemOf([[0.31, 1.5, Math.PI], [0.4, 1, 0], ...larger]));
     expect(drawn.map(({ radius }) => radius)).toEqual([0.4]);
   });

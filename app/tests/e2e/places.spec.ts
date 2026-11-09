@@ -69,18 +69,16 @@ test.describe("the pages added in 5d", () => {
     expect(await page.evaluate(() => "stayed" in window)).toBe(true);
   });
 
-  test("/list lists the worlds and, with the data holding no genre, offers no filter", async ({ page }) => {
-    await page.goto("/list");
-    await expect(page.getByRole("link", { name: "Bubble" })).toHaveAttribute("href", "/w/bubble");
-    await expect(page.getByRole("group", { name: "Genres" })).toHaveCount(0);
-  });
-
-  test("/list: the keyboard reaches a place's link and Enter follows it", async ({ page }) => {
+  test("/list goes to the home with the search palette open, Discover on its empty field (D355, D373)", async ({
+    page,
+  }) => {
     await page.goto("/list");
     await hydrated(page);
-    await page.getByRole("link", { name: "Bubble" }).focus();
-    await expect(page.getByRole("link", { name: "Bubble" })).toBeFocused();
-    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/#search$/);
+    await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
+    // Its empty field is Discover (D373): the places are found by their name.
+    await page.getByRole("searchbox", { name: "Search places" }).fill("bubb");
+    await page.getByRole("option", { name: /Bubble/ }).click();
     await expect(page).toHaveURL("/w/bubble");
   });
 

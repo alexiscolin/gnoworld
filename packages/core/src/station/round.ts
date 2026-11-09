@@ -1,9 +1,10 @@
 // Where the stations stand round the Earth (part 7x): the largest first, by the size the team's file gives each, then in the file's order,
-// never by chance. The first twelve each take the first place on their own orbit that the Earth's view reads clear: whole on the screen,
-// off the page's text, the Earth, the great star, the rail and the Moon's whole path, and with what stands already in no crowd, pile or
-// row (7p's judge). Every other station is a light in a far belt round the Earth, at its own place: none is dropped without a trace.
+// never by chance. The first twelve each take, of the places on their own orbits that the Earth's view reads clear (whole on the screen,
+// off the page's text, the Earth, the great star, the rail and the Moon's whole path, in no crowd, pile or row: 7p's judge), the one
+// farthest from those standing already (the best candidate, D349), so a list spreads again as it changes; others light a far belt.
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
 import { textHash, unitOf, nextState, type Point } from "../space/cell.ts";
+import { clamp01 } from "../space/smooth.ts";
 import { composed } from "../frame/composition.ts";
 import { offMoon, type MoonRing } from "../frame/earthMoon.ts";
 import { Look, looksFrom, type Seen } from "../frame/restLook.ts";
@@ -39,7 +40,7 @@ const [SMALLEST, LARGEST] = [0.5, 1.15];
 const PHONE = { width: 390, height: 844 };
 
 /** A station's reach for its size, in world units: a satellite two fifths of the Earth's, an artificial world nearly the Earth's. */
-const radiusOf = (size: number): number => SMALLEST + (LARGEST - SMALLEST) * Math.min(1, Math.max(0, size));
+const radiusOf = (size: number): number => SMALLEST + (LARGEST - SMALLEST) * clamp01(size);
 
 /** A place on an orbit: `reach` out, leaning `tilt` off the disc round the line at `node`, `phase` round it, on the map. */
 export function onOrbit({ reach, tilt, node }: Placed["orbit"], phase: number): Point {
@@ -52,13 +53,21 @@ export function onOrbit({ reach, tilt, node }: Placed["orbit"], phase: number): 
   };
 }
 
-// The `try`th place `asked`'s draws give: its orbit 2.8 to 8 Earth radii out, leaning, its phase anywhere; the nearest the Earth is tried first.
-function triedAt(asked: Asked, tried: number): Placed {
-  let state = textHash(`round ${asked.seed} ${String(tried)}`);
+// The place `key`'s draws give `asked`: its orbit `near` to `far` Earth radii out, leaning up to `lean`, its node and phase anywhere.
+function drawn(asked: Asked, key: string, { near, far, lean }: { near: number; far: number; lean: number }): Placed {
+  let state = textHash(key);
   const draw = () => unitOf((state = nextState(state)));
-  const orbit = { reach: (2.8 + 5.2 * draw()) * EARTH_RADIUS, tilt: (draw() - 0.5) * 2.2, node: draw() * 2 * Math.PI };
+  const orbit = {
+    reach: (near + (far - near) * draw()) * EARTH_RADIUS,
+    tilt: (draw() - 0.5) * lean,
+    node: draw() * 2 * Math.PI,
+  };
   return { ...asked, orbit, place: onOrbit(orbit, draw() * 2 * Math.PI), radius: radiusOf(asked.size) };
 }
+
+// The `try`th place of `asked`: 2.8 to 8 Earth radii out, leaning; the nearest the Earth is tried first.
+const triedAt = (asked: Asked, tried: number): Placed =>
+  drawn(asked, `round ${asked.seed} ${String(tried)}`, { near: 2.8, far: 8, lean: 2.2 });
 
 // Whether a station `seen` on `look` stands clear of all that stands there, `spots`, and of the scenery's planets, `scenery`.
 function clearOn(look: Look, seen: Seen, { spots, scenery, ring }: Standing): boolean {
@@ -94,11 +103,20 @@ function phoneHolds(phone: Look, seen: Seen): boolean {
 }
 
 // The belt's place of a station that stands no body: 10 to 15 Earth radii out, near the disc.
-function inBelt(asked: Asked): Placed {
-  let state = textHash(`belt ${asked.seed}`);
-  const draw = () => unitOf((state = nextState(state)));
-  const orbit = { reach: (10 + 5 * draw()) * EARTH_RADIUS, tilt: (draw() - 0.5) * 0.12, node: draw() * 2 * Math.PI };
-  return { ...asked, orbit, place: onOrbit(orbit, draw() * 2 * Math.PI), radius: radiusOf(asked.size) };
+const inBelt = (asked: Asked): Placed => drawn(asked, `belt ${asked.seed}`, { near: 10, far: 15, lean: 0.12 });
+
+// Of `clear`, nearest the Earth first, the one whose gap to the nearest of `spots` on `look` is the widest; the nearest itself with none.
+function farthest(clear: readonly Placed[], look: Look | undefined, spots: readonly Seen[]): Placed | undefined {
+  if (look === undefined || spots.length === 0) return clear[0];
+  let [best, widest] = [clear[0], -Infinity];
+  for (const placed of clear) {
+    const seen = look.ball(placed.place, placed.radius);
+    const gap = Math.min(
+      ...spots.map((other) => Math.hypot(seen.x - other.x, seen.y - other.y) - seen.radius - other.radius),
+    );
+    if (gap > widest) [best, widest] = [placed, gap];
+  }
+  return best;
 }
 
 /** The stations `asked` round the Earth, judged on the video's screens through the Earth's view at rest; `ring` the small Earth's Moon's. */
@@ -118,11 +136,11 @@ export function stationsRound(asked: readonly Asked[], ring: MoonRing): Round {
   const close: Placed[] = [];
   const belt: Placed[] = [];
   for (const { one } of order) {
-    const found =
+    const clear =
       close.length < CLOSE_MOST
         ? Array.from({ length: TRIES }, (_, tried) => triedAt(one, tried))
             .sort((a, b) => a.orbit.reach - b.orbit.reach)
-            .find(
+            .filter(
               (placed) =>
                 phoneHolds(phone, phone.ball(placed.place, placed.radius)) &&
                 looks.every((look, at) => {
@@ -130,7 +148,8 @@ export function stationsRound(asked: readonly Asked[], ring: MoonRing): Round {
                   return stood !== undefined && clearOn(look, look.ball(placed.place, placed.radius), stood);
                 }),
             )
-        : undefined;
+        : [];
+    const found = farthest(clear, looks[0], standing[0]?.spots ?? []);
     if (found === undefined) {
       belt.push(inBelt(one));
       continue;

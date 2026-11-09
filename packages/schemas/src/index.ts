@@ -51,11 +51,12 @@ export {
   ProposedAction,
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
-export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
+export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
 export { Key, Slug } from "./slug.ts";
+export { Guest, GuestCause, GuestRefusal, GuestSaid, GuestSayRequest } from "./guest.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 // The worlds' count (7n2), which the home's hero reads, in the barrel and so in the store's chunk: its head is the worlds' file's too (behind

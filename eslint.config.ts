@@ -17,6 +17,9 @@ import { BENCHES, CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } f
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const BOX = { ...BASELINE_ALSO, allowProperties: ["field-sizing", "resize"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
+// No scroll bar anywhere (D379): the base styles hide them with scrollbar-width, everywhere a browser has it since 2024. No blue under a
+// drag (Alexis, 2026-11-08): user-select, which a browser without it ignores.
+const BARS = { ...BASELINE_ALSO, allowProperties: ["scrollbar-width", "user-select"] };
 
 export default defineConfig(
   includeIgnoreFile(`${import.meta.dirname}/.gitignore`),
@@ -111,6 +114,7 @@ export default defineConfig(
   { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
   // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone (F1729).
   { files: ["packages/ui/src/Field/**/*.css"], rules: { "css/use-baseline": ["error", BOX] } },
+  { files: ["packages/ui/src/base.css"], rules: { "css/use-baseline": ["error", BARS] } },
   {
     // A module of the app, the services or the packages is TypeScript: one in another extension would pass the walls and
     // gnoworld/chain-read unread, which read .ts and .tsx (D123, F5277). Last, so no later list replaces it.

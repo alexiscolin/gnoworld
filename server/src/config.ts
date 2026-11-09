@@ -32,6 +32,8 @@ export interface Config {
   chains: string[];
   origins: string[];
   newAccountsPerHour: number;
+  // The guest chat (D430): its switch, and the new names an hour a visitor and in all, and the guests living at once (plan 3.3).
+  guests: { on: boolean; perVisitor: number; perHour: number; living: number };
   // The worlds that can be first charted (D218): every world when none is named.
   firstToChart: ReadonlySet<string> | undefined;
   authSocket: string | undefined;
@@ -90,6 +92,11 @@ const settingsSchema = () =>
         .transform(Number)
         .pipe(z.number().max(1000))
         .default(5),
+      // GUEST_CHAT=off puts the site back to read-only guests (plan section 8): both guest routes answer 404, nothing is relayed.
+      GUEST_CHAT: z.enum(["on", "off"]).default("on"),
+      GUEST_NAMES_PER_VISITOR_HOUR: whole(1000, 10),
+      GUEST_NAMES_PER_HOUR: whole(10_000, 600),
+      GUEST_LIVING: whole(50_000, 5000),
       // The worlds that can be first charted (D218): unset, every world (D210); else slugs, at least one.
       FIRST_TO_CHART_WORLDS: z
         .string()
@@ -165,6 +172,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     chains: CHAINS,
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
+    guests: {
+      on: settings.GUEST_CHAT === "on",
+      perVisitor: settings.GUEST_NAMES_PER_VISITOR_HOUR,
+      perHour: settings.GUEST_NAMES_PER_HOUR,
+      living: settings.GUEST_LIVING,
+    },
     firstToChart: settings.FIRST_TO_CHART_WORLDS === undefined ? undefined : new Set(settings.FIRST_TO_CHART_WORLDS),
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),

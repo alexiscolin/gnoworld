@@ -1,10 +1,11 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { Presence, PRESENCE_ANSWER_MAX, PresencePeople } from "@gnoworld/schemas/indexer";
+import { PRESENCE_ANSWER_MAX, Presence, PresencePeople } from "@gnoworld/schemas/indexer";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makePresence } from "./presence.ts";
-import { countriesTo, PRESENT_MS, startPresent } from "./present.ts";
+import { PRESENT_MS, countriesTo, startPresent } from "./present.ts";
+import { besideOf } from "../replaceFile.ts";
 
 // Who is here (slice 7, 7h, the sampler 7c left to the labels): the people the reconciler reads in each room a guest may see, a world's
 // counted once across its rooms, the bot left out; recorded into 7c's history, so a world rises against its own 14 days; and served as
@@ -38,6 +39,8 @@ interface Setup {
   rates?: Record<string, number>;
   rooms?: readonly { name: string; world: string }[];
   hidden?: Set<string>;
+  watching?: () => { guests: number; accounts: ReadonlySet<string> };
+  inWorlds?: () => ReadonlyMap<string, { guests: number; accounts: ReadonlySet<string> }>;
 }
 
 function setup({
@@ -45,12 +48,16 @@ function setup({
   rates = {},
   rooms = ROOMS,
   hidden = new Set(["#earth/desk", "#govdao/desk"]),
+  watching,
+  inWorlds,
 }: Setup = {}) {
   const logged: [string, unknown][] = [];
   const listed = vi.fn(() => rooms);
   const present = startPresent({
     file,
     now: () => Date.now(),
+    ...(watching === undefined ? {} : { watching }),
+    ...(inWorlds === undefined ? {} : { inWorlds }),
     open: (room) => !hidden.has(room),
     rooms: listed,
     rates: (asked) => new Map(asked.map((room) => [room, rates[room] ?? 0])),
@@ -85,6 +92,14 @@ describe("who is here", () => {
       { world: "bubble", here: 0, perHour: 0, rise: null },
       { world: "earth", here: 3, perHour: 0, rise: null },
     ]);
+  });
+
+  it("counts the people of one room, by nick, the bot left out, none for a room unread or read too long ago (D394)", () => {
+    const { present } = setup();
+    present.seen("#earth/kyoto", ["GnoWorld", "ada", "Ada", "bo"]);
+    expect([present.here("#earth/kyoto"), present.here("#earth/none")]).toEqual([2, undefined]);
+    vi.setSystemTime(T0 + 4 * MINUTE);
+    expect(present.here("#earth/kyoto")).toBeUndefined();
   });
 
   it("knows a person by their nick whatever its case, and the bot too", async () => {
@@ -447,6 +462,58 @@ describe("the people online", () => {
     expect(await counts(present)).toEqual({ online: 3, countries: 2 });
   });
 
+  it("counts every open stream, a guest's too, and falls as they close (D352)", async () => {
+    let site = { guests: 0, accounts: new Set<string>() };
+    const { present } = setup({ watching: () => site });
+    present.seen("#earth", ["ada"]);
+    site = { guests: 3, accounts: new Set() };
+    vi.advanceTimersByTime(MINUTE);
+    expect(await counts(present)).toEqual({ online: 4, countries: 0 });
+    site = { guests: 0, accounts: new Set() };
+    vi.advanceTimersByTime(MINUTE);
+    expect(await counts(present)).toEqual({ online: 1, countries: 0 });
+  });
+
+  it("counts a logged-in person once, by account, whether the relay holds them, the stream does or both", async () => {
+    const { present } = setup({ watching: () => ({ guests: 1, accounts: new Set(["ada", "bo"]) }) });
+    present.seen("#earth", ["Ada", "cy"]);
+    present.declared("bo", "FR", false);
+    present.declared("ada", "FR", false);
+    expect(await counts(present)).toEqual({ online: 4, countries: 1 });
+  });
+
+  it("leaves the guests out of a world's trends and history (D353), whatever the figure served counts (D374)", async () => {
+    const guest = { guests: 50, accounts: new Set(["ada"]) };
+    const { present, hereIn, file } = setup({
+      watching: () => guest,
+      inWorlds: () => new Map([["earth", guest]]),
+    });
+    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+    present.seen("#earth", ["bo"]);
+    // Served: bo, ada and the 50 guests; the trend and the history: bo alone.
+    expect(await hereIn("earth")).toBe(52);
+    expect(present.chat().find((each) => each.world === "earth")?.here.now).toBe(1);
+    vi.advanceTimersByTime(MINUTE);
+    // The file this presence wrote: its sample holds bo alone, never the 50 guests (the batch's review: a new file read nothing).
+    expect(makePresence({ file, now: () => T0 + PRESENT_MS }).history("earth")).toEqual([{ at: T0, people: 1 }]);
+  });
+
+  it("serves a world's here as its accounts once plus its guests, each world on its own (D374)", async () => {
+    const { present, worlds } = setup({
+      inWorlds: () =>
+        new Map([
+          ["earth", { guests: 2, accounts: new Set(["ada", "dee"]) }],
+          ["bubble", { guests: 2, accounts: new Set<string>() }],
+        ]),
+    });
+    // ada is in the relay and has a stream: once; dee has a stream alone: counted; bo is in the relay alone.
+    present.seen("#earth", ["Ada", "bo"]);
+    expect(await worlds()).toEqual([
+      { world: "bubble", here: 2, perHour: 0, rise: null },
+      { world: "earth", here: 5, perHour: 0, rise: null },
+    ]);
+  });
+
   it("evicts the account that spoke longest ago once 100,000 are kept", async () => {
     const { present } = setup();
     present.seen("#earth", ["first", "a1"]);
@@ -469,5 +536,179 @@ describe("the people online", () => {
     expect(declared).not.toHaveBeenCalled();
     to({ ...said, room: "#earth", country: "FR" }, true);
     expect(declared).toHaveBeenCalledWith("ada", "FR", true);
+  });
+});
+
+// Moved here from presence.test.ts: a test sits beside the file it tests.
+describe("guests and who is here (D430)", () => {
+  // A guest's relayed line counts in the plate's messages an hour and never in a trend or a history (D353, D374), and no
+  // anon/ nick is ever an account here (D430). Read in server/src/activity and worlds/present.ts: one `rates` feeds the plate,
+  // the trend and the history alike, so the guests' own rates are a second source the plate adds and the others do not.
+  const MINUTE = 60_000;
+  const T0 = Date.parse("2026-11-03T12:00:00.000Z");
+  const dir = mkdtempSync(join(tmpdir(), "gnoworld-guest-present-"));
+  afterAll(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+  let made = 0;
+  const running: { stop: () => void }[] = [];
+  beforeEach(() => {
+    vi.useFakeTimers({ now: T0 });
+  });
+  afterEach(() => {
+    for (const one of running.splice(0)) one.stop();
+    vi.useRealTimers();
+  });
+
+  interface Setup {
+    rates?: Record<string, number>;
+    guests?: Record<string, number>;
+    rooms?: readonly { name: string; world: string }[];
+    open?: { guests: number; accounts: readonly string[] };
+    watching?: { guests: number; accounts: readonly string[] };
+    spy?: (rooms: readonly string[]) => void;
+  }
+
+  const setup = ({ rates = {}, guests = {}, rooms, open, watching, spy }: Setup = {}) => {
+    made += 1;
+    const file = join(dir, `presence-${String(made)}.json`);
+    const present = startPresent({
+      file,
+      now: () => Date.now(),
+      open: () => true,
+      rooms: () => rooms ?? [{ name: "#earth", world: "earth" }],
+      rates: (asked: readonly string[]) => {
+        spy?.(asked);
+        return new Map(asked.map((room) => [room, rates[room] ?? 0]));
+      },
+      guestRates: (asked: readonly string[]) => new Map(asked.map((room) => [room, guests[room] ?? 0])),
+      ...(watching === undefined ? {} : { watching: () => watching }),
+      ...(open === undefined ? {} : { inWorlds: () => new Map([["earth", open]]) }),
+      log: () => undefined,
+    });
+    running.push(present);
+    const worlds = async () => Presence.parse(JSON.parse(await (await present.routes.request("/")).text())).worlds;
+    const people = async () => PresencePeople.parse(JSON.parse(await (await present.routes.request("/people")).text()));
+    return { present, file, worlds, people };
+  };
+
+  describe("a guest in who is here", () => {
+    it("counts no anon/ nick as a person, in a room or in a world: a relayed nick is no account's", async () => {
+      const { present, worlds } = setup();
+      present.seen("#earth", ["gnoworld", "ada", "anon/brave-otter-ab23", "Anon/Calm-Heron-cd34"]);
+      expect(present.here("#earth")).toBe(1);
+      expect((await worlds()).find(({ world }) => world === "earth")?.here).toBe(1);
+    });
+
+    it("counts no anon/ nick in the trends' signal either", () => {
+      const { present } = setup();
+      present.seen("#earth", ["gnoworld", "ada", "anon/brave-otter-ab23"]);
+      expect(present.chat()).toEqual([
+        { world: "earth", here: { now: 1, usual: null }, messages: { now: 0, usual: null } },
+      ]);
+    });
+  });
+
+  describe("a guest's lines in a world's messages an hour", () => {
+    it("shows them on the plate: its pace is the accounts' and the guests' together", async () => {
+      const { present, worlds } = setup({ rates: { "#earth": 1 }, guests: { "#earth": 0.5 } });
+      present.seen("#earth", ["gnoworld", "ada"]);
+      expect((await worlds()).find(({ world }) => world === "earth")?.perHour).toBe(90);
+    });
+
+    it("leaves them out of the trend's messages now: the accounts' pace alone", () => {
+      const { present } = setup({ rates: { "#earth": 1 }, guests: { "#earth": 0.5 } });
+      present.seen("#earth", ["gnoworld", "ada"]);
+      expect(present.chat()[0]?.messages).toEqual({ now: 60, usual: null });
+    });
+
+    it("leaves them out of the messages' history the trend's usual is made of", () => {
+      const { present, file } = setup({ rates: { "#earth": 1 }, guests: { "#earth": 0.5 } });
+      vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+      present.seen("#earth", ["gnoworld", "ada"]);
+      vi.advanceTimersByTime(MINUTE);
+      const read = makePresence({ file: besideOf(file, "messages"), now: () => T0 + PRESENT_MS });
+      expect(read.history("earth")).toEqual([{ at: T0, people: 60 }]);
+    });
+
+    it("still shows a world only guests talk in: its plate has the count, its trend none", async () => {
+      const { present, worlds } = setup({ guests: { "#earth": 0.5 } });
+      present.seen("#earth", ["gnoworld"]);
+      expect((await worlds()).find(({ world }) => world === "earth")?.perHour).toBe(30);
+      expect(present.chat()[0]?.messages).toEqual({ now: 0, usual: null });
+    });
+
+    it("changes nothing when no guest speaks", async () => {
+      const { present, worlds } = setup({ rates: { "#earth": 1 } });
+      present.seen("#earth", ["gnoworld", "ada"]);
+      expect((await worlds()).find(({ world }) => world === "earth")?.perHour).toBe(60);
+    });
+  });
+
+  describe("a reading guest's own Ergo nick is no account's (M4)", () => {
+    it("counts no Guest-<nick> as a person: a world's here is its accounts and its guest streams, once each", async () => {
+      const { present, worlds } = setup({ open: { guests: 1, accounts: [] } });
+      present.seen("#earth", ["gnoworld", "Guest-x", "guest-y"]);
+      expect(present.here("#earth")).toBe(0);
+      expect((await worlds()).find(({ world }) => world === "earth")?.here).toBe(1);
+    });
+
+    it("counts none in the trend or the history: a room with reading guests alone has 0 here, now and in the hour's record", () => {
+      const { present, file } = setup({ open: { guests: 1, accounts: [] } });
+      present.seen("#earth", ["gnoworld", "Guest-x", "GUEST-z"]);
+      expect(present.chat()[0]?.here).toEqual({ now: 0, usual: null });
+      vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+      present.seen("#earth", ["gnoworld", "Guest-x", "GUEST-z"]);
+      vi.advanceTimersByTime(MINUTE);
+      const read = makePresence({ file, now: () => T0 + PRESENT_MS });
+      // The history keeps no sample of an empty world: a reading guest left no person in it.
+      expect(read.history("earth").filter(({ people }) => people > 0)).toEqual([]);
+    });
+
+    it("counts a reading guest once in the site's online total, by its stream alone", async () => {
+      const { present, people } = setup({ watching: { guests: 1, accounts: [] } });
+      present.seen("#earth", ["gnoworld", "Guest-x", "ada"]);
+      expect((await people()).online).toBe(2);
+    });
+
+    it("still counts an account whose name only starts like the word: guesting, guestbook", () => {
+      const { present } = setup();
+      present.seen("#earth", ["gnoworld", "guesting", "guestbook", "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5"]);
+      expect(present.here("#earth")).toBe(3);
+    });
+  });
+
+  describe("the answer is built from each world once (L6)", () => {
+    it("builds 20,000 rooms of one world in a few milliseconds, a world's room list never copied for each room", () => {
+      // The clock is the real one here: fake timers fake performance.now too.
+      vi.useRealTimers();
+      const rooms = Array.from({ length: 20_000 }, (_, n) => ({ name: `#earth/room-${String(n)}`, world: "earth" }));
+      // Copied for each room, 20,000 rooms cost about 110 ms here; pushed, under 5. The best of five fresh answers (one is kept a
+      // minute), so a loaded machine's one slow run is not read as a copy (the gate's lanes took one to 230 ms); a copy is slow on each.
+      const runs = Array.from({ length: 5 }, () => {
+        const { present } = setup({ rooms });
+        present.seen("#earth/room-1", ["gnoworld", "ada"]);
+        const started = performance.now();
+        present.current();
+        return performance.now() - started;
+      });
+      expect(Math.min(...runs)).toBeLessThan(40);
+    });
+
+    it("asks the rates of a world's rooms once in an answer: the plate and the trend share one read", () => {
+      const asked: (readonly string[])[] = [];
+      const { present } = setup({
+        rooms: [
+          { name: "#earth", world: "earth" },
+          { name: "#bubble", world: "bubble" },
+        ],
+        spy: (rooms) => asked.push(rooms),
+      });
+      present.seen("#earth", ["gnoworld", "ada"]);
+      asked.length = 0;
+      vi.advanceTimersByTime(61_000);
+      present.current();
+      expect(asked).toHaveLength(2);
+    });
   });
 });

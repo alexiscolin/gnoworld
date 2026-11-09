@@ -6,6 +6,24 @@
     background: var(--color-space);
     color: var(--color-text);
     font: var(--font-body);
+    /* The site is controls and space, not a document: no blue spreads over the page under a drag or a click (Alexis, 2026-11-08). */
+    user-select: none;
+  }
+
+  /* What is read to be copied keeps its selection: a field, a chat's lines, code, and what a page marks so (a realm's page). */
+  input,
+  textarea,
+  [contenteditable="true"],
+  code,
+  ol[aria-label="Messages"],
+  [data-selectable] {
+    user-select: text;
+  }
+
+  /* No scroll bar anywhere (Alexis, 2026-11-07, D379): every box still scrolls by wheel, touch and keyboard; a cut list shows itself by
+     its fade (the rail, Discover's rows). */
+  * {
+    scrollbar-width: none;
   }
 
   h1 {

@@ -17,6 +17,10 @@ interface Pressed extends Look {
   type?: "button" | "submit";
   disabled?: boolean;
   busy?: boolean;
+  /** What the button's short words stand for, whole: its description to a screen reader and its title on hover. */
+  description?: string;
+  /** The key that does the same, for a screen reader (aria-keyshortcuts); never drawn on the button. */
+  keys?: string;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -29,6 +33,7 @@ interface Linked extends Look {
   type?: never;
   disabled?: never;
   busy?: never;
+  keys?: never;
   onClick?: never;
 }
 
@@ -57,7 +62,7 @@ export function Button(props: ButtonProps) {
       </Anchor>
     );
   }
-  const { type = "button", disabled, busy, onClick } = props;
+  const { type = "button", disabled, busy, onClick, description, keys } = props;
   return (
     <button
       type={type}
@@ -65,6 +70,9 @@ export function Button(props: ButtonProps) {
       disabled={disabled}
       aria-busy={busy}
       aria-disabled={busy}
+      aria-description={description}
+      aria-keyshortcuts={keys}
+      title={description}
       onClick={busy === true ? refuse : onClick}
     >
       {face}

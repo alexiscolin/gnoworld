@@ -29,8 +29,8 @@ export function defaultUniverse(file: string): { id: string; rpc: string; chainI
   return { id: chosen.id, rpc: chosen.rpc, chainId: chosen.chainId, indexer: chosen.indexer };
 }
 
-// The hubs of the default universe, from hubs.json beside the universes' file, through the data's schema: a bad file names itself alone.
-function defaultHubs(universesFile: string) {
+/** The hubs of the default universe, from hubs.json beside the universes' file, through the data's schema: a bad file names itself alone. */
+export function defaultHubs(universesFile: string) {
   const file = join(dirname(universesFile), "hubs.json");
   const parsed = Hubs.safeParse(dataOf(file, "hubs"));
   if (!parsed.success) throw new Error(`hubs: ${file} does not hold a good list of hubs`);

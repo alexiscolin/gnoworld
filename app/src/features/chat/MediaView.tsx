@@ -46,7 +46,7 @@ export function MediaView({ room, lines, open, onClose }: MediaViewProps) {
           {found.map(({ line, href, service }) => (
             <li key={line.id} className={[shared["card"], styles["line"]].join(" ")}>
               <Stack space="3xs">
-                <span className={styles["meta"]}>
+                <span className={"meta"}>
                   {service} ·{" "}
                   <b>
                     <Person name={line.account ?? line.from} guest={line.account === undefined} />

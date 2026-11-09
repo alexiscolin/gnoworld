@@ -22,7 +22,10 @@ const EARTH = "earth";
 /** A room by its own name: #games for #bubble/games, the world's main room by the world, the Earth's the general chat. */
 export const roomLabel = (room: string): string => {
   const { world, name } = partsOf(room);
-  return `#${name ?? (world === EARTH ? "general" : world)}`;
+  // A realm's room, and a world named by a long id, end in ten hex of the path or the id (core's realmRoom): the label is the name alone.
+  // A world named by its owner's address, a namespace of one, says it short, as a sender's (Alexis, 2026-11-09).
+  const label = (name ?? (world === EARTH ? "general" : world)).replace(/-[0-9a-f]{10}$/, "");
+  return `#${isAccount(label) ? shortAddress(label) : label}`;
 };
 
 /** A sender as a list names it: an account by its short address, a guest by its nick. */
@@ -111,6 +114,24 @@ export const mentionable = (members: readonly string[], lines: readonly Line[]):
 /** The server's moderation bot (server/src/irc/lines.ts), in every room, never listed. */
 export const BOT = "gnoworld";
 
-/** How many are talking here: those in the room, the bot left out, once connected; none before (a count of none says nothing). */
-export const talkingOf = (members: readonly string[] | undefined, connected: boolean): number | undefined =>
+/** How long a person counts as talking after their last line (D374). */
+const TALKING_MS = 15 * 60_000;
+
+/** How many are talking here now (D374): the people whose lines the room holds from the last 15 minutes, the bot left out, once
+ * connected; none before (a count of none says nothing). "Here now" is the members, never this. */
+export const talkingOf = (
+  lines: readonly { from: string; account?: string | undefined; time: string }[],
+  now: number,
+  connected: boolean,
+): number | undefined =>
+  connected
+    ? new Set(
+        lines.flatMap(({ from, account, time }) =>
+          from !== BOT && now - Date.parse(time) <= TALKING_MS ? [account ?? `guest ${from}`] : [],
+        ),
+      ).size
+    : undefined;
+
+/** How many have the room open: its members, the bot left out, once connected. */
+export const hereOf = (members: readonly string[] | undefined, connected: boolean): number | undefined =>
   connected && members !== undefined ? members.filter((nick) => nick !== BOT).length : undefined;

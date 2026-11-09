@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
-import { act, useState } from "react";
+import { act, useState, type ReactElement } from "react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
@@ -15,36 +16,69 @@ import {
 } from "../../../tests/callFixtures.ts";
 import type { PinnedRow } from "../../pinned.ts";
 import { PinnedBar } from "../world/Pinned.tsx";
-import type { ChatPlace } from "./ChatScreen.tsx";
 import { Dock } from "./Dock.tsx";
 import { QuickActions } from "./QuickActions.tsx";
 
-// 5q: the row of quick actions over the composer (frame 23.58.01, bottom); 8d: a place's own row, as the video draws each, what a
-// later slice brings greyed.
+// The quick actions behind the composer's + (Alexis, 2026-11-08): a menu named "Add to the conversation", an image first, then the
+// conversation's own; what a later slice brings is greyed and says "coming soon" (ui's Menu).
 describe("the quick actions", () => {
-  it("is a toolbar named Quick actions holding Who's here, which acts", () => {
-    const onWhoIsHere = vi.fn();
-    const box = mount(<QuickActions onWhoIsHere={onWhoIsHere} world="bubble" pills="hub" writes={false} />);
-    expect(one(box, '[role="toolbar"]').getAttribute("aria-label")).toBe("Quick actions");
-    click(button(box, "Who's here"));
-    expect(onWhoIsHere).toHaveBeenCalledTimes(1);
+  const draw = (element: ReactElement) => mount(<MemoryRouter>{element}</MemoryRouter>);
+  const items = (box: HTMLElement) =>
+    all(box, '[role="menuitem"]').map((each) => each.textContent.replace(/Soon$/, ""));
+  const POLL = { room: "#bubble", nick: "g1me", say: () => true };
+
+  it("is a menu named Add to the conversation, opened by a + button named Add", () => {
+    const box = draw(<QuickActions pills="hub" />);
+    expect(one(box, '[role="menu"]').getAttribute("aria-label")).toBe("Add to the conversation");
+    expect(one(box, 'button[aria-haspopup="menu"]').getAttribute("aria-label")).toBe("Add");
   });
 
-  it("draws a world's row with Play and Catch up greyed, and no Poll for a reader who does not write", () => {
-    const box = mount(<QuickActions onWhoIsHere={() => undefined} world="bubble" pills="hub" writes={false} />);
-    expect(all(box, "button").map((each) => each.textContent)).toEqual(["Who's here", "Play", "Events", "Catch up"]);
+  it("draws a world's row with no realm: Play and Catch up greyed, Jarvis greyed, and no Poll for a reader who does not write", () => {
+    const box = draw(<QuickActions pills="hub" />);
+    expect(items(box)).toEqual(["Image", "Play", "Catch up", "Jarvis"]);
     expect(all(box, '[aria-disabled="true"]').map((each) => each.getAttribute("aria-label"))).toEqual([
+      "Image, coming soon",
       "Play, coming soon",
       "Catch up, coming soon",
+      "Jarvis, coming soon",
     ]);
+  });
+
+  it("gives an account Poll, in a world's row, the Earth's and nowhere else", () => {
+    expect(items(draw(<QuickActions pills="hub" poll={POLL} />))).toEqual([
+      "Image",
+      "Play",
+      "Catch up",
+      "Poll",
+      "Jarvis",
+    ]);
+    expect(items(draw(<QuickActions pills="earth" poll={POLL} />))).toEqual(["Image", "Quiz", "Poll", "Jarvis"]);
+    expect(items(draw(<QuickActions pills="earth" />))).toEqual(["Image", "Quiz", "Jarvis"]);
+    expect(items(draw(<QuickActions pills="realm" poll={POLL} />))).not.toContain("Poll");
+  });
+
+  it("draws a world's row with a realm: Proposal, Realm which acts, Catch up, Jarvis", () => {
+    const box = draw(<QuickActions pills="realm" realm="/w/govdao/realm" />);
+    expect(items(box)).toEqual(["Image", "Proposal", "Realm", "Catch up", "Jarvis"]);
+    expect(button(box, "Realm")?.getAttribute("aria-disabled")).toBeNull();
+  });
+
+  it("gives a direct message Quiz alone after the image: Jarvis reads a room, so none in a private talk", () => {
+    expect(items(draw(<QuickActions pills="dm" poll={POLL} />))).toEqual(["Image", "Quiz"]);
+  });
+
+  it("opens Poll's dialog from its item", () => {
+    // jsdom has no popover API: the menu hides its panel as an item is chosen.
+    Object.assign(HTMLElement.prototype, { hidePopover: () => undefined });
+    const box = draw(<QuickActions pills="hub" poll={POLL} />);
+    click(button(box, "Poll"));
+    expect(one(box, "dialog").textContent).toContain("Ask a poll");
   });
 });
 
-// 9e-1 (Alexis, 2026-11-06): the world's pinned actions are pills of the bar after Who's here, each shown once vm/qfuncs confirms it;
+// 9e-1 (Alexis, 2026-11-06): the world's pinned actions are pills of their own bar, each shown once vm/qfuncs confirms it;
 // its card opens over the bar, prefilled, naming the realm and function the data says. NOT recorded: qfuncs' shape.
 describe("the quick actions of a world with pinned actions", () => {
-  // A hub's own row, which the pinned pills follow.
-  const ROW = ["Who's here", "Play", "Events", "Catch up"];
   const DAO = "gno.land/r/gov/dao";
   const VOTE: PinnedRow = { label: "Vote", realm: DAO, function: "MustVoteOnProposalSimple", args: { pid: "15" } };
   const ONYX = { id: "onyx", isDefault: true };
@@ -59,22 +93,9 @@ describe("the quick actions of a world with pinned actions", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
-  // The dock as a world's route hands it its pinned actions: the pills in the row, the cards over it.
-  const place: ChatPlace = {
-    slug: "govdao",
-    name: "GovDAO",
-    description: "The governance of the chain.",
-    kicker: "Onyx · GovDAO",
-    home: "/",
-    worlds: [],
-    universe: { id: "onyx", isDefault: true, gnoweb: "https://onyx.example" },
-  };
+  // The dock as a world's route hands it its pinned actions: the pills in the bar, the cards over it.
   const docked = (actions: PinnedRow[], universe = ONYX) => (
     <Dock
-      place={place}
-      dm={false}
-      writes={false}
-      onWhoIsHere={() => undefined}
       pinned={{
         pills: <PinnedBar part="pills" actions={actions} universe={universe} at="govdao" />,
         cards: <PinnedBar part="cards" actions={actions} universe={universe} at="govdao" />,
@@ -86,13 +107,13 @@ describe("the quick actions of a world with pinned actions", () => {
   const draw = (actions: PinnedRow[], universe = ONYX) =>
     mount(<StoreProvider>{docked(actions, universe)}</StoreProvider>);
 
-  it("puts each confirmed action in the toolbar after Who's here, a pill as Who's here is", async () => {
+  it("puts each confirmed action in the Pinned actions toolbar, one pill each", async () => {
     vi.stubGlobal("fetch", answer(VOTING));
     const box = draw([VOTE]);
     await calling(box, "Vote");
     const bar = one(box, '[role="toolbar"]');
-    expect(all(bar, "button").map((b) => b.textContent)).toEqual([...ROW, "Vote"]);
-    // The pinned pills stand last in the row, which gives each of them the pill's look.
+    expect(bar.getAttribute("aria-label")).toBe("Pinned actions");
+    expect(all(bar, "button").map((b) => b.textContent)).toEqual(["Vote"]);
     expect(bar.lastElementChild?.contains(button(bar, "Vote") ?? null)).toBe(true);
   });
 
@@ -115,7 +136,7 @@ describe("the quick actions of a world with pinned actions", () => {
     expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["16", ""]);
   });
 
-  it("keeps Who's here alone while qfuncs does not confirm the action", async () => {
+  it("draws no pill while qfuncs does not confirm the action", async () => {
     const read = answer([]);
     vi.stubGlobal("fetch", read);
     const box = draw([VOTE]);
@@ -124,7 +145,7 @@ describe("the quick actions of a world with pinned actions", () => {
     });
     await Promise.allSettled(read.mock.results.map((result) => result.value as unknown));
     await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(all(box, "button").map((b) => b.textContent)).toEqual(ROW);
+    expect(all(box, "button").map((b) => b.textContent)).toEqual([]);
   });
 
   it("reads the functions from the chain the view names, gno.land's for /net/gnoland, and its card names gnoland-1", async () => {
@@ -186,7 +207,7 @@ describe("the quick actions of a world with pinned actions", () => {
     await act(async () => {
       await Promise.resolve();
     });
-    expect(all(box, "button").map((b) => b.textContent)).toEqual(ROW);
+    expect(all(box, "button").map((b) => b.textContent)).toEqual([]);
     expect(all(box, "article")).toHaveLength(0);
     expect(read).not.toHaveBeenCalled();
   });
@@ -195,7 +216,7 @@ describe("the quick actions of a world with pinned actions", () => {
     const read = vi.fn();
     vi.stubGlobal("fetch", read);
     const box = draw([]);
-    expect(all(box, "button").map((b) => b.textContent)).toEqual(ROW);
+    expect(all(box, "button").map((b) => b.textContent)).toEqual([]);
     expect(read).not.toHaveBeenCalled();
   });
 });

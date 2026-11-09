@@ -25,10 +25,10 @@ export const WithTooltip: Story = {
 };
 
 export const Sizes: Story = {
-  render: (args) => (
+  render: () => (
     <Cluster>
       {(["s", "m", "l"] as const).map((size) => (
-        <IconButton key={size} {...args} size={size} label={`Search, size ${size}`} icon="search" />
+        <IconButton key={size} size={size} label={`Search, size ${size}`} icon="search" />
       ))}
     </Cluster>
   ),

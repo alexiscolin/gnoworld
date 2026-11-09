@@ -6,6 +6,8 @@ import { Figure } from "./Figure.tsx";
 import styles from "./PlaceInfo.module.css";
 
 export interface PlaceInfoProps {
+  /** Over the kicker: the place seen in space (PlaceView.tsx). */
+  view?: ReactNode;
   kicker: string;
   name: string;
   description: string;
@@ -21,10 +23,21 @@ export interface PlaceInfoProps {
   panelRef?: Ref<HTMLElement>;
 }
 
-export function PlaceInfo({ kicker, name, description, talking, countries, links, here, panelRef }: PlaceInfoProps) {
+export function PlaceInfo({
+  view,
+  kicker,
+  name,
+  description,
+  talking,
+  countries,
+  links,
+  here,
+  panelRef,
+}: PlaceInfoProps) {
   return (
     <aside ref={panelRef} tabIndex={-1} aria-label={name} className={styles["panel"]}>
       <Stack space="xs">
+        {view}
         <Kicker>{kicker}</Kicker>
         <h2 className={styles["name"]}>{name}</h2>
         <p className={styles["about"]}>{description}</p>

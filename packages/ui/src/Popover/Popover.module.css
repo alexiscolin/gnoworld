@@ -50,6 +50,21 @@
     color: var(--color-danger);
   }
 
+  /* A later slice's act: greyed and inert, its "Soon" at the row's end (ComingSoon's look). */
+  .item[aria-disabled="true"] {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+  }
+
+  .item[aria-disabled="true"]:is(:hover, :focus-visible) {
+    background: none;
+  }
+
+  .soon {
+    /* layout: the chip at the row's end, after the words */
+    margin-inline-start: auto;
+  }
+
   .separator {
     block-size: var(--line-width);
     /* layout: the rule apart from the rows on either side */

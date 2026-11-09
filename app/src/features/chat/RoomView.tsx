@@ -13,6 +13,7 @@ import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
 import { chunked } from "./Failing.tsx";
+import { NO_ROOM_YET } from "./loginWords.ts";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
@@ -23,6 +24,13 @@ const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBa
 // Who is typing is asked once someone is: a room where nobody types draws only its one empty line, kept so the composer never
 // moves, and the first screen does not carry the names' code (ADR-0001 §12).
 const NOBODY = <p className={styles["typing"]} />;
+
+/** What a chat says in its room's place when the place has no room yet, a visitor's and an account's alike. */
+export const NoRoomYet = () => (
+  <p role="status" className={styles["lead"]}>
+    {NO_ROOM_YET}
+  </p>
+);
 const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).Typists }), {
   waiting: NOBODY,
   failed: NOBODY,

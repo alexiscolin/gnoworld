@@ -1,10 +1,9 @@
-// The places of the data files, to filter by genre. One page for the site, at /list: it has no place of its own.
-import { Breadcrumb } from "@gnoworld/ui";
-import { data } from "react-router";
-import { Board, PlacesList, type ListedPlace } from "../features/list/index.ts";
+// The places' list is the search palette (D355): /list keeps working, and goes to the home with the palette open. It has no place of its own.
+import { Navigate, data } from "react-router";
 import { PlaceError } from "../features/errors/index.ts";
+import { SEARCH_HASH } from "../features/search/index.ts";
 import { listMeta } from "../meta.ts";
-import { pageOf, site } from "../places.ts";
+import { pageOf } from "../places.ts";
 
 export const meta = listMeta;
 
@@ -21,19 +20,8 @@ export function clientLoader({ request }: { request: Request }) {
   return onlyList(new URL(request.url));
 }
 
-// The list does not filter by a world's genre yet (its plate's crumb says it, 8g): each place lists with none.
-const placesOf = () => [...site.worlds, ...site.ecosystems].map((place): ListedPlace => ({ ...place, genres: [] }));
-
 export default function List() {
-  const places = placesOf();
-  const offered = site.genres.filter((genre) => places.some((place) => place.genres.includes(genre.slug)));
-  return (
-    <Board>
-      <Breadcrumb label="You are here" items={[{ label: "Home", href: "/" }, { label: "Places" }]} />
-      <h1>Places</h1>
-      <PlacesList places={places} genres={offered} />
-    </Board>
-  );
+  return <Navigate to={`/${SEARCH_HASH}`} replace />;
 }
 
 export function ErrorBoundary() {

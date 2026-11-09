@@ -114,19 +114,15 @@ test.describe("a computer", () => {
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
   });
 
-  test("the space opens like an iris, on the design system's easing, and leaves no clip behind", async ({ page }) => {
+  // D333: the canvas is not seen while its first frame is not whole; it opens as an iris once the dive started and leaves no clip behind.
+  test("the canvas stays unseen till the dive starts, then opens whole and leaves no clip behind", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
-    const iris = await page.locator("canvas").evaluate((canvas) =>
-      canvas.getAnimations().map((each) => ({
-        name: "animationName" in each ? each.animationName : "",
-        easing: each.effect?.getComputedTiming().easing,
-        duration: each.effect?.getComputedTiming().duration,
-      })),
-    );
-    expect(iris).toEqual([expect.objectContaining({ duration: 1500 })]);
+    await expect(page.locator("canvas[data-dive]")).toBeAttached({ timeout: 90_000 });
+    await expect(page.locator("canvas")).not.toHaveAttribute("data-wait");
     await expect.poll(() => page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length)).toBe(0);
     expect(await page.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).clipPath)).toBe("none");
+    expect(await page.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).opacity)).toBe("1");
   });
 
   test("a page that does not show space asks for none of its code, and the first that does asks", async ({ page }) => {

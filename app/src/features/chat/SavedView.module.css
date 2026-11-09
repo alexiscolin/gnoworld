@@ -3,9 +3,4 @@
   .line {
     padding: var(--space-2xs) var(--space-xs);
   }
-
-  .meta {
-    font: var(--font-meta);
-    color: var(--color-text-muted);
-  }
 }

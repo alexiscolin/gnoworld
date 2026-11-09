@@ -6,7 +6,7 @@
 // that signs as Adena would (signer.ts, the server's own).
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { request } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -29,13 +29,13 @@ const BUBBLE = {
   sections: [{ name: "Talk", rooms: ["#bubble/games", "#bubble"] }],
 };
 
-// The shipped roles file with the journeys' rooms, and Bubble's moderators (4d's pins): the test wallets named
-// moderator0 to moderator8 (/__wallet?as=moderator0), one a worker and the last for the cap's test, known before the server starts so their addresses
-// are in the file. Written where the server reads it; its worlds.
-function writeRoles(path) {
+// The shipped roles file, with the journeys' rooms and Bubble's moderators (test wallets moderator0 to moderator8, 4d's pins) for the
+// journeys alone; written where the server reads it; its worlds. The workshop takes the shipped file as it is, as the playground will (D398).
+function writeRoles(path, journeys) {
   const roles = JSON.parse(readFileSync(ROLES, "utf8"));
   const moderators = Array.from({ length: 9 }, (_, n) => walletOf({ url: `/?as=moderator${String(n)}` }).address);
-  roles.worlds = roles.worlds.map((world) => (world.slug === "bubble" ? { ...world, ...BUBBLE, moderators } : world));
+  if (journeys)
+    roles.worlds = roles.worlds.map((world) => (world.slug === "bubble" ? { ...world, ...BUBBLE, moderators } : world));
   writeFileSync(path, JSON.stringify(roles));
   return roles.worlds;
 }
@@ -43,11 +43,11 @@ const LISTENING = /"event":"listening".*"port":(\d+)/;
 const LINKED = /"event":"irc_ready"/;
 
 /**
- * Starts Ergo, then the server linked to it, allowing a POST and a WebSocket from `origins`, on free ports or the given ones
- * (the workshop's); resolves to the server's port and Ergo's WebSocket port once the server listens and its bot has opened
- * the rooms. Both stop, and their folders go, when the process ends.
+ * Starts Ergo, then the server linked to it, allowing a POST and a WebSocket from `origins`, on free ports or the given ones (the workshop's),
+ * with the worlds job and the prices timer into `jobs`'s folder (the workshop's alone: the journeys' stay hermetic); resolves to both ports
+ * once the server listens and its bot has opened the rooms. Both stop, and their folders go, when the process ends.
  */
-export async function startBackend(origins, { apiPort = 0, ergoPorts } = {}) {
+export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {}) {
   const dir = mkdtempSync(join(tmpdir(), "gnoworld-e2e-"));
   writeFileSync(join(dir, "pepper"), "a-pepper-of-forty-characters-0123456789");
   // The server takes the operator's password from a file, 32 characters at least (config.ts).
@@ -55,19 +55,28 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts } = {}) {
   writeFileSync(join(dir, "oper"), operPassword);
   // The ticket logins reach the server's auth handler through a port (authPort.mjs), on which Ergo's script dials.
   const authPort = await freePort();
-  const worlds = writeRoles(join(dir, "roles.json"));
-  const ergo = await startErgo({ origins, operPassword, authScript: { forward: authPort }, ports: ergoPorts }).catch(
-    (error) => {
-      rmSync(dir, { recursive: true, force: true });
-      throw new Error("serve.mjs: Ergo did not start; sh scripts/ergo.sh builds the binary the journeys need", {
-        cause: error,
-      });
-    },
-  );
+  const worlds = writeRoles(join(dir, "roles.json"), jobs === undefined);
+  // The workshop keeps its chat from one run to the next, as the playground does (Alexis, 2026-11-08: "le chat est vide?"): the
+  // server's database and Ergo's folder (its rooms, accounts and history) live in the workshop's data folder; the journeys' stay temporary.
+  const kept = jobs === undefined ? undefined : join(jobs.dir, "backend");
+  if (kept !== undefined) mkdirSync(join(kept, "ergo"), { recursive: true });
+  const ergoDir = kept === undefined ? {} : { dir: join(kept, "ergo") };
+  const ergo = await startErgo({
+    origins,
+    operPassword,
+    authScript: { forward: authPort },
+    ports: ergoPorts,
+    ...ergoDir,
+  }).catch((error) => {
+    rmSync(dir, { recursive: true, force: true });
+    throw new Error("serve.mjs: Ergo did not start; sh scripts/ergo.sh builds the binary the journeys need", {
+      cause: error,
+    });
+  });
   const child = spawn(process.execPath, ["--disallow-code-generation-from-strings", "--import", AUTH_PORT, ENTRY], {
     env: {
       PATH: process.env.PATH ?? "",
-      DATABASE: join(dir, "server.db"),
+      DATABASE: join(kept ?? dir, "server.db"),
       LOG_PEPPER_FILE: join(dir, "pepper"),
       PORT: String(apiPort),
       ORIGINS: origins.join(","),
@@ -79,10 +88,28 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts } = {}) {
       ROLES_FILE: join(dir, "roles.json"),
       // D218: only GovDAO can be first charted, which arrival.spec.ts owns: the worlds the other journeys open, Bubble and
       // Earth, are never charted, so their plates and pictures stay as they were and no journey earns a banner by its order.
-      FIRST_TO_CHART_WORLDS: "govdao",
+      ...(jobs === undefined ? { FIRST_TO_CHART_WORLDS: "govdao" } : {}),
+      // The workshop's jobs (config.ts): they read the default universe's chain and write these files, which its dev server serves.
+      ...(jobs === undefined
+        ? {}
+        : {
+            UNIVERSES_FILE: jobs.universes,
+            WORLDS_FILE: join(jobs.dir, "worlds.json"),
+            MARKETS_FILE: join(jobs.dir, "markets.json"),
+          }),
+      // A guest speaks only with moderation (D430, closed without it): the workshop alone may be given the key's file, by its absolute path (D564).
+      ...(jobs !== undefined && process.env.WORKSHOP_OPENAI_KEY_FILE
+        ? { OPENAI_API_KEY_FILE: process.env.WORKSHOP_OPENAI_KEY_FILE }
+        : {}),
     },
     stdio: ["ignore", "pipe", "inherit"],
   });
+  // The workshop's jobs say how each pass went (worlds_written, worlds_failed, …) in its terminal; the journeys' server stays quiet.
+  if (jobs !== undefined)
+    child.stdout.on("data", (chunk) => {
+      for (const line of String(chunk).split("\n"))
+        if (/"event":"(worlds|prices|height)_/.test(line)) process.stderr.write(`${line}\n`);
+    });
   const exited = new Promise((resolve) => child.once("exit", resolve));
   // The server leaves Ergo as it stops; the folder goes last, and a server that ignores TERM is killed.
   let stopping;

@@ -7,7 +7,7 @@ import { fakeErgo, message, PASSWORD, register, welcome, type Peer } from "../te
 import { ircLink, retryDelay, type Link, type Said } from "./link.ts";
 
 const CAPS =
-  "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline";
+  "CAP REQ :message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline labeled-response";
 // Stopped before the fake Ergo closes, so no link reconnects to a server that is gone.
 const links: Link[] = [];
 afterEach(async () => {
@@ -1988,5 +1988,145 @@ describe("the IRC link, kicked (the max review)", () => {
     peer.say(":gnoworld!u@h JOIN #bubble");
     expect(await peer.next(/^CHATHISTORY /)).toBe("CHATHISTORY AFTER #bubble timestamp=2026-10-22T07:59:59.999Z 50");
     expect(held.at(-1)).toEqual(["#bubble", "2026-10-22T07:59:59.999Z"]);
+  });
+});
+
+describe("the link's relays (D430)", () => {
+  const NICK = "anon/brave-otter-ab23";
+  const up = async (more: Partial<Parameters<typeof ircLink>[0]> = {}) => {
+    const ergo = await fakeErgo();
+    const { link, said } = start(ergo.port, { relayMs: 40, ...more });
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say("PING :sync");
+    await peer.next(/^PONG sync$/);
+    return { link, said, peer, ergo };
+  };
+
+  it("sends the relay with a label of its own and resolves true on the line Ergo answers it with", async () => {
+    const { link, peer } = await up();
+    const taken = link.relay("#bubble", NICK, "hello");
+    const sent = await peer.next(/RELAYMSG/);
+    const label = /^@label=(\S+) RELAYMSG #bubble anon\/brave-otter-ab23 :?hello$/.exec(sent)?.[1];
+    expect(label).toBeDefined();
+    peer.say(`@label=${label ?? ""};msgid=m1 :${NICK}!~u@h PRIVMSG #bubble :hello`);
+    await expect(taken).resolves.toEqual({ msgid: "m1" });
+    expect(link.relaying()).toBe(0);
+  });
+
+  it("resolves each relay by its own label, in any order: a FAIL or an error number refuses its caller alone", async () => {
+    const { link, peer } = await up({ relayMs: 2000 });
+    const results = [
+      link.relay("#bubble", NICK, "a"),
+      link.relay("#bubble", NICK, "b"),
+      link.relay("#bubble", NICK, "c"),
+    ];
+    const labels = (await Promise.all([1, 2, 3].map(() => peer.next(/RELAYMSG/)))).map(
+      (l) => /^@label=(\S+) /.exec(l)?.[1] ?? "",
+    );
+    peer.say(`@label=${labels[2] ?? ""} :ergo.test 403 gnoworld #bubble :No such channel`);
+    peer.say(`@label=${labels[0] ?? ""};msgid=ma :${NICK}!~u@h PRIVMSG #bubble :a`);
+    peer.say(`@label=${labels[1] ?? ""} :ergo.test FAIL RELAYMSG PRIVS_NEEDED :no`);
+    peer.say("@label=nobody :ergo.test ACK");
+    await expect(Promise.all(results)).resolves.toEqual([{ msgid: "ma" }, false, false]);
+    expect(link.relaying()).toBe(0);
+  });
+
+  it("resolves unsure after its bound when Ergo says nothing: the line may still come. It drops the entry and ignores a late answer", async () => {
+    const { link, peer, said } = await up();
+    const taken = link.relay("#bubble", NICK, "swallowed");
+    const sent = await peer.next(/RELAYMSG/);
+    expect(link.relaying()).toBe(1);
+    await expect(taken).resolves.toBe("unsure");
+    expect(link.relaying()).toBe(0);
+    peer.say(`@label=${/^@label=(\S+) /.exec(sent)?.[1] ?? ""} :${NICK}!~u@h PRIVMSG #bubble :swallowed`);
+    peer.say("PING :after");
+    await peer.next(/^PONG after$/);
+    expect(link.relaying()).toBe(0);
+    // A late echo is the bot's own relayed line: it never reaches the chat as a line from anon/...
+    expect(said).toEqual([]);
+  });
+
+  it("holds nothing over 10,000 relays Ergo swallows: exactly 500 wait and come back unsure, 9,500 are refused at once, 500 lines are sent", async () => {
+    const { link, peer } = await up();
+    const results = await Promise.all(
+      Array.from({ length: 10_000 }, (_, n) => link.relay("#bubble", NICK, `line ${String(n)}`)),
+    );
+    expect(results.filter((each) => each === "unsure")).toHaveLength(500);
+    expect(results.filter((each) => each === false)).toHaveLength(9500);
+    expect(link.relaying()).toBe(0);
+    peer.say("PING :count");
+    await peer.next(/^PONG count$/);
+    expect(peer.lines.filter((each) => each.includes("RELAYMSG"))).toHaveLength(500);
+    // The bound passed, the room is free again: one more relay is sent.
+    const again = link.relay("#bubble", NICK, "once more");
+    await vi.waitFor(() => {
+      expect(peer.lines.filter((each) => each.includes("RELAYMSG"))).toHaveLength(501);
+    });
+    await expect(again).resolves.toBe("unsure");
+  });
+
+  it("bounds a relay at 5 seconds by default: pending at 4,999 ms, unsure at 5,000", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say("PING :sync");
+    await peer.next(/^PONG sync$/);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    try {
+      let answer: unknown;
+      link.relay("#bubble", NICK, "slow").then(
+        (each) => {
+          answer = each;
+        },
+        () => undefined,
+      );
+      await peer.next(/RELAYMSG/);
+      await vi.advanceTimersByTimeAsync(4999);
+      expect(answer).toBeUndefined();
+      expect(link.relaying()).toBe(1);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(answer).toBe("unsure");
+      expect(link.relaying()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("settles a relay unsure when the link stops, and when Ergo drops the connection, with nothing left waiting", async () => {
+    const { link, peer } = await up({ relayMs: 60_000 });
+    const stopping = link.relay("#bubble", NICK, "one");
+    await peer.next(/RELAYMSG/);
+    peer.socket.destroy();
+    // Ergo may have taken the line before the connection ended: not a refusal.
+    await expect(stopping).resolves.toBe("unsure");
+    expect(link.relaying()).toBe(0);
+    const ergo2 = await up({ relayMs: 60_000 });
+    const pending = ergo2.link.relay("#bubble", NICK, "two");
+    await ergo2.peer.next(/RELAYMSG/);
+    await ergo2.link.stop();
+    await expect(pending).resolves.toBe("unsure");
+    expect(ergo2.link.relaying()).toBe(0);
+  });
+
+  it("refuses at once what the lines' forms refuse, a room it is not in, and before it is in its rooms, sending nothing", async () => {
+    const ergo = await fakeErgo();
+    const { link } = start(ergo.port, { relayMs: 40 });
+    const peer = await ergo.peer(0);
+    await expect(link.relay("#bubble", NICK, "too early")).resolves.toBe(false);
+    await welcome(peer);
+    const refused = await Promise.all([
+      link.relay("#elsewhere", NICK, "not in it"),
+      link.relay("#bubble", "alice", "an account's nick"),
+      link.relay("#bubble", NICK, "x".repeat(520)),
+      link.relay("#bubble", NICK, "a\ud800b"),
+      link.relay("#bubble", NICK, "a\r\nQUIT"),
+      link.relay("#bubble", NICK, "a\u0001b"),
+    ]);
+    expect(refused).toEqual([false, false, false, false, false, false]);
+    peer.say("PING :sync");
+    await peer.next(/^PONG sync$/);
+    expect(peer.lines.filter((each) => each.includes("RELAYMSG"))).toEqual([]);
   });
 });

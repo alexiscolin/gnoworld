@@ -64,23 +64,22 @@ test(
   "weighs a late chunk with what it brings, apart from the chunks before it, or alone where its row says",
   { tag: "@gate" },
   () => {
-    const files: Record<string, string> = { "mountUniverse-AAAAAAAA.js": "export const door=0;" };
-    for (const { chunk } of LATE) files[`${chunk}-AAAAAAAA.js`] = `export const ${chunk}=1;`;
+    const files: Record<string, string> = {};
+    for (const { chunk, after } of LATE) {
+      files[`${chunk}-AAAAAAAA.js`] = `export const ${chunk}=1;`;
+      for (const name of after ?? []) files[`${name}-AAAAAAAA.js`] = `export const ${name}=2;`;
+    }
     files["scene-AAAAAAAA.js"] = 'import"./three-TTTTTTTT.js";import"./shared-SSSSSSSS.js";';
     files["three-TTTTTTTT.js"] = "export const three=3;";
     files["shared-SSSSSSSS.js"] = "export const shared=4;";
-    files["cosmos-AAAAAAAA.js"] = 'import"./shared-SSSSSSSS.js";import"./maps-MMMMMMMM.js";';
+    files["root-AAAAAAAA.js"] = 'import"./shared-SSSSSSSS.js";import"./maps-MMMMMMMM.js";';
     files["maps-MMMMMMMM.js"] = "export const maps=5;";
     files["generated-AAAAAAAA.js"] = 'import"./shared-SSSSSSSS.js";export const g=6;';
     const folder = assets(files);
     const weights = new Map(lateWeights(folder).map((each) => [each.chunk, each]));
-    expect(weights.get("scene")?.files.sort()).toEqual([
-      "scene-AAAAAAAA.js",
-      "shared-SSSSSSSS.js",
-      "three-TTTTTTTT.js",
-    ]);
-    expect(weights.get("cosmos")?.files.sort()).toEqual(["cosmos-AAAAAAAA.js", "maps-MMMMMMMM.js"]);
-    expect(weights.get("cosmos")?.bytes).toBe(weigh(folder, ["cosmos-AAAAAAAA.js", "maps-MMMMMMMM.js"]));
+    // The scene brings three and what `root` does not already hold (`shared`, which `root` imports, is not its weight).
+    expect(weights.get("scene")?.files.sort()).toEqual(["scene-AAAAAAAA.js", "three-TTTTTTTT.js"]);
+    expect(weights.get("scene")?.bytes).toBe(weigh(folder, ["scene-AAAAAAAA.js", "three-TTTTTTTT.js"]));
     expect(weights.get("generated")?.files).toEqual(["generated-AAAAAAAA.js"]);
     expect([...weights.keys()].sort()).toEqual(LATE.map(({ chunk }) => chunk).sort());
     for (const { chunk, cap } of LATE) expect(weights.get(chunk)?.cap, chunk).toBe(cap);

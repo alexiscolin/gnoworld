@@ -65,7 +65,7 @@ test.describe("a realm's view", () => {
     await page.goto("/r/demo/hostile");
     await hydrated(page);
     const main = page.getByRole("main");
-    await expect(main.getByRole("heading", { level: 1, name: "gno.land/r/demo/hostile" })).toBeVisible();
+    await expect(main.getByRole("heading", { level: 1, name: "hostile", exact: true })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Welcome" })).toBeVisible();
     await expect(main).toContainText("<script>window.hacked = 1</script>");
     await expect(main).toContainText("<img src=x onerror=window.hacked=2>");
@@ -73,7 +73,10 @@ test.describe("a realm's view", () => {
     // Every field in view, a hidden one with its name and value.
     await expect(main.getByText("amount")).toBeVisible();
     await expect(main.getByText("g1attacker")).toBeVisible();
-    await expect(main.locator("script, img, input, textarea, select, form, a[href^='javascript:']")).toHaveCount(0);
+    // The realm's page, not the chat beside it, which has its composer.
+    await expect(
+      main.locator("#page").locator("script, img, input, textarea, select, form, a[href^='javascript:']"),
+    ).toHaveCount(0);
     expect(await page.evaluate(() => "hacked" in window)).toBe(false);
     // The height it was read at, and the link to the realm on gnoweb.
     await expect(main).toContainText("Read at block 786,661");
@@ -90,14 +93,14 @@ test.describe("a realm's view", () => {
     expect(asked.filter((path) => path === "vm/qeval")).toHaveLength(0);
   });
 
-  test("shows the realm's facts from the indexer with their source, once, and its failure as a state beside the page", async ({
+  test("shows the realm card's facts from the indexer with their source, once, and its failure as a state beside the page", async ({
     page,
   }) => {
     await chain(page, { "gno.land/r/demo/dao": "# DAO" });
     const { asked } = await indexer(page);
     await page.goto("/r/demo/dao");
     await hydrated(page);
-    const facts = page.getByRole("main").getByRole("region", { name: "Facts from the indexer" });
+    const facts = page.getByRole("main");
     await expect(facts).toContainText("12,345");
     await expect(facts).toContainText("Read from indexer.onyx.testnets.gno.land at ");
     expect(await violations(page)).toEqual([]);
@@ -158,7 +161,7 @@ test.describe("a realm's view", () => {
     );
   });
 
-  test("goes back to where the reader came from, and a path that is no realm's is not found", async ({ page }) => {
+  test("shows a realm reached from the site, and a path that is no realm's is not found", async ({ page }) => {
     await chain(page, { "gno.land/r/demo/dao": "# DAO" });
     await page.goto("/list");
     await hydrated(page);
@@ -167,8 +170,6 @@ test.describe("a realm's view", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     await expect(page.getByRole("main").getByRole("heading", { name: "DAO", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Back" }).click();
-    await expect(page).toHaveURL(/\/$|\/list$/);
     await page.goto("/r/Demo/dao");
     await hydrated(page);
     await expect(page.getByRole("alert")).toContainText("No realm here");

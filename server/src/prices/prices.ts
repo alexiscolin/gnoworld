@@ -4,6 +4,7 @@
 // package, on a node checked to be its chain (D120), so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is capped, parsed, checked field by field, only the file's fields written; a failure keeps the last file and is
 // logged by its kind, never by what it held. A coin without a price is no token (an unlisted id is left out of the answer).
+import { readFileSync } from "node:fs";
 import { readHeight } from "@gnoworld/chain/node";
 import type { Failure as ReadFailure, FailureKind } from "@gnoworld/chain/read";
 import { Markets, MARKET_SYMBOLS, MarketBlock } from "@gnoworld/schemas";
@@ -21,6 +22,7 @@ import {
 import { repeat, waits } from "../repeat.ts";
 import { besideOf, replaceFile } from "../replaceFile.ts";
 import { makeHistory, type History } from "./history.ts";
+import { seedLines } from "./seed.ts";
 
 interface Options {
   file: string;
@@ -43,6 +45,10 @@ export interface Prices {
 // CoinGecko asks by id, never by symbol (btc is shared by a dozen tokens).
 const IDS = { GNOT: "gno-land", ATONE: "atomone", BTC: "bitcoin" } as const;
 const URL_ASKED = `https://api.coingecko.com/api/v3/simple/price?ids=${MARKET_SYMBOLS.map((symbol) => IDS[symbol]).join(",")}&vs_currencies=usd&include_24hr_change=true`;
+// One read for the three coins' seven days (seed.ts), once a process, when the history is short.
+const URL_SEED = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&ids=${MARKET_SYMBOLS.map((symbol) => IDS[symbol]).join(",")}&sparkline=true&per_page=${String(MARKET_SYMBOLS.length)}`;
+// Three week-long lines are about 10 KB when spaced by the hour; the page does not say how they are spaced, so room for a five minute spacing.
+const SEED_MAX_BYTES = 512 * 1024;
 const TIMEOUT_MS = 10_000;
 // A good answer is under 1 KB; 64 KB leaves room and stops a stream that never ends.
 export const MAX_BYTES = 64 * 1024;
@@ -108,6 +114,25 @@ async function readBlock({ url: from, chainId }: { url: URL; chainId: string }, 
   return block.data;
 }
 
+// The average seconds between blocks over two reads, from the file's last block and the one just read: none unless the height rose and
+// both times parse; a figure the schema refuses (past 600 s) is none too, so it never costs the prices.
+function withInterval(block: MarketBlock | undefined, before: MarketBlock | undefined): MarketBlock | undefined {
+  if (block === undefined || before === undefined || block.height <= before.height) return block;
+  const seconds = (Date.parse(block.time) - Date.parse(before.time)) / 1000 / (block.height - before.height);
+  const timed = MarketBlock.safeParse({ ...block, interval: seconds });
+  return timed.success ? timed.data : block;
+}
+
+// The block of the markets.json this timer last wrote (so a restart has it at once), or none: no file, or one the schema refuses.
+function lastBlock(file: string): MarketBlock | undefined {
+  try {
+    const last = Markets.safeParse(JSON.parse(readFileSync(file, "utf8")));
+    return last.success ? last.data.block : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
   const { universe } = options;
@@ -116,10 +141,24 @@ export function startPrices(options: Options): Prices {
   const history = makeHistory(besideOf(file, "history"), now);
 
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
-  async function get(url: string): Promise<unknown> {
+  async function get(url: string, maxBytes = MAX_BYTES): Promise<unknown> {
     const init = { method: "GET", headers: { accept: "application/json" } };
-    const bytes = await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes: MAX_BYTES });
+    const bytes = await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes });
     return jsonOrFail(Buffer.from(bytes).toString("utf8"));
+  }
+
+  // The history's one seeding from CoinGecko's own past: once a process, right after a price was read (so the way out works), its failure only
+  // logged, the history then as today's.
+  let seeded = false;
+  async function seed(isStopped: () => boolean): Promise<void> {
+    if (seeded || !history.short()) return;
+    seeded = true;
+    try {
+      const lines = seedLines(await get(URL_SEED, SEED_MAX_BYTES), IDS);
+      if (!isStopped()) history.seed(lines, now());
+    } catch (error) {
+      log("prices_history_seed_failed", { error: error instanceof Failure ? error.kind : "shape" });
+    }
   }
 
   async function read(isStopped: () => boolean): Promise<void> {
@@ -132,7 +171,7 @@ export function startPrices(options: Options): Prices {
     if (priced.status === "rejected") throw priced.reason;
     const tokens = tokensOf(priced.value);
     let block: MarketBlock | undefined;
-    if (blocked.status === "fulfilled") block = blocked.value;
+    if (blocked.status === "fulfilled") block = withInterval(blocked.value, lastBlock(file));
     else log("height_failed", { error: blocked.reason instanceof Failure ? blocked.reason.kind : "shape" });
     const markets = Markets.parse({
       source: "CoinGecko",
@@ -141,6 +180,8 @@ export function startPrices(options: Options): Prices {
       ...(block === undefined ? {} : { block }),
     });
     if (!replaceFile(file, `${JSON.stringify(markets)}\n`)) throw new Failure("write");
+    await seed(isStopped);
+    if (isStopped()) return;
     // The history's file failing keeps markets.json new: the sparklines wait, the prices do not.
     if (!history.add(markets.tokens, Date.parse(markets.updated))) log("prices_failed", { error: "history_write" });
   }

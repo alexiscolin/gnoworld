@@ -297,6 +297,8 @@ if [ "${1:-}" = --mutants ]; then
 			fail "killed by other checks than \"$wanted\": $label; first: $(grep '^FAIL' "$tmp/run.log" | head -1 | cut -c7-120)"
 		else
 			fail "broken: $label, exit $code: $(tail -1 "$tmp/run.log")"
+			# Why is above that line (compose's own error, a build's), and the run's log goes with the next mutant.
+			tail -15 "$tmp/run.log" | sed 's/^/      /' >&2
 		fi
 	}
 	compose() { printf '%s\n' "$1"; }
@@ -402,6 +404,8 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "an origin of * taken" "Ergo starts with ORIGINS [*]" render_sh sed "s#'https?://\[A-Za-z0-9.-\]+(:\[0-9\]{1,5})?'#'.+'#"
 	mutant "rooms without +M by default" "in a room Ergo made with its default modes" template sed 's#default-modes: .*#default-modes: +nt#'
 	mutant "anyone makes a room" "a guest makes no room" template sed 's#operator-only-creation: true#operator-only-creation: false#'
+	mutant "a room's operator relays a guest's line" "Ergo's settings say available-to-chanops: false" \
+		template sed 's#available-to-chanops: false#available-to-chanops: true#'
 	mutant "guests' DMs let in, +R gone from the user modes" "Ergo's settings set +i and +R at each connection" \
 		template sed 's#default-user-modes: +iR#default-user-modes: +i#'
 	mutant "registration open" "a hand-made account is refused" \
@@ -904,7 +908,7 @@ print("%.2f %d" % (sum(float(s.get("cpus", 0)) for s in services), sum(size(s.ge
 		'default-modes: +ntCMi' 'expire-time: 90d' 'direct-messages: disabled' \
 		'allow-truncation: false' 'max-concurrent-connections: 16' 'max-connections-per-window: 32' \
 		'netname: gnoworld' 'messages-per-window: 2' 'max-attempts: 3' '"+draft/unreact"' \
-		'capabilities: [sajoin, samode, chanreg, history, nofakelag]' \
+		'capabilities: [sajoin, samode, chanreg, history, nofakelag, relaymsg]' 'available-to-chanops: false' \
 		'allow-individual-delete: true' 'enable-account-indexing: true' 'command: ""' 'socket: "/run/gnoworld/auth.sock"'; do
 		expect "Ergo's settings say $line" "$(grep -cF -- "$line" "$tmp/ircd.yaml")" 1
 	done

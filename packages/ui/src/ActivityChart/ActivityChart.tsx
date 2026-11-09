@@ -23,6 +23,8 @@ export interface ActivityChartProps {
 const HEIGHT = 48;
 const BAR = 6;
 const GAP = 2;
+// An hour with none: a dash on the baseline, so the row of hours reads even when all is quiet (Alexis, 2026-11-07, option A).
+const DASH = 2;
 const STEP = 16;
 // Half the line's width (--line-width, 1 px, which the stroke keeps whatever the drawing's scale): its
 // points sit that far inside the drawing, so neither the peak nor zero is cut in half (F337).
@@ -98,10 +100,11 @@ function Drawing({ points, sparkline, width }: { points: Point[]; sparkline: boo
             className={styles["bar"]}
             data-hour={at}
             data-current={at === last ? "true" : undefined}
+            data-empty={high === 0 ? "" : undefined}
             x={at * (BAR + GAP)}
-            y={HEIGHT - high}
+            y={HEIGHT - Math.max(high, DASH)}
             width={BAR}
-            height={high}
+            height={Math.max(high, DASH)}
           />
         ))
       )}

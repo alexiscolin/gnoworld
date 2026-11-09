@@ -2,5 +2,5 @@
 export { Actions } from "./Actions.tsx";
 export { Activity } from "./Activity.tsx";
 export { Arrival, FirstCharted } from "./Arrival.tsx";
-export { Here } from "./Here.tsx";
+export { Crowd, StandingBox } from "../../Standing.tsx";
 export type { Ring } from "./statusRing.ts";

@@ -1,6 +1,6 @@
 // A place's actions (frames 26, 86, 93): the main one, then Follow and Share as the video draws them, with the plate at its first paint
 // (Alexis, 2026-11-04: "Tout de suite, jusqu'à +512 o"); the share sheet's code comes at the first press.
-import { Button, Cluster } from "@gnoworld/ui";
+import { Button, Cluster, IconButton } from "@gnoworld/ui";
 import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";
 import { FollowButton } from "../follow/index.ts";
@@ -33,6 +33,8 @@ export interface ActionsProps {
   say?: string;
   /** The place's main room, by its id: once its history came with no message in it, the main action asks to be the first (frame 93). */
   room?: string;
+  /** Where the main action leads when the place has no chat to say hi in yet: a realm's page, its own page (D375). */
+  lead?: { label: string; href: string };
 }
 
 // Whether the room's history came and holds nobody's words, only notices: nobody has said hi yet. False while the chat has not shown it.
@@ -42,7 +44,7 @@ const useNobodySpoke = (room: string | undefined) =>
     return held?.paged === true && held.lines.every(({ kind }) => kind === "notice");
   });
 
-export function Actions({ place, follow, proposals, say = "Say hi in the chat", room }: ActionsProps) {
+export function Actions({ place, follow, proposals, say = "Say hi in the chat", room, lead }: ActionsProps) {
   const reading = proposals !== undefined && isSitePath(proposals);
   const first = useNobodySpoke(room);
   // The focus follows the link to the chat's composer (F2864).
@@ -53,7 +55,7 @@ export function Actions({ place, follow, proposals, say = "Say hi in the chat", 
     };
   }, []);
   return (
-    <Cluster space="2xs">
+    <Cluster space="3xs">
       {/* A world with a proposals realm leads with reading them (frames 22 and 27); the chat stays one click away. */}
       {reading ? (
         <Button href={proposals} emphasis="solid" size="l" icon="arrow">
@@ -63,19 +65,18 @@ export function Actions({ place, follow, proposals, say = "Say hi in the chat", 
       {/* The world's chat sits on the page: the one thing to do here is to say hi in it, unless the proposals lead, when the dock's
           composer is the way to the chat (frame 31: Read the proposals, Follow, Share, on one line). */}
       {reading ? null : (
-        <Button href="#chat" emphasis="solid" size="l" icon="arrow">
-          {first ? "Be the first to say hi" : say}
+        <Button href={lead?.href ?? "#chat"} emphasis="solid" size="l" icon="arrow">
+          {lead?.label ?? (first ? "Be the first to say hi" : say)}
         </Button>
       )}
-      <FollowButton kind="worlds" id={follow} />
-      <Button
-        size="l"
+      <FollowButton kind="worlds" id={follow} quiet />
+      <IconButton
+        icon="share"
+        label="Share"
         onClick={() => {
           sharePlace(place);
         }}
-      >
-        Share
-      </Button>
+      />
     </Cluster>
   );
 }

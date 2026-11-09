@@ -5,6 +5,7 @@ import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
 import { GOLDEN } from "../space/golden.ts";
 import { lerp } from "../space/smooth.ts";
 import { CELL, placeSystems, starSize, stepOf, type SystemPlace } from "./cosmos.ts";
+import { CLEAR_BODIES, CROWD_SLOTS } from "./crowd.ts";
 import { GNO_LAND, starDraws, starWarmth } from "./warmth.ts";
 
 export { GNO_LAND };
@@ -15,7 +16,7 @@ export const BELT_INNER = 0.84 * ROOM;
 /** Where its rocks start: half a unit past it, so no rock stands near a world's ground, for dust is a sign (ADR-0002 §10). */
 export const ROCKS_FROM = BELT_INNER + 0.5;
 /** A fixed place, beside the great star, and its size: frame 4's Earth, 47 pixels of radius at the rest's 30 units, 1,080 high. */
-export const EARTH_PLACE: Point = { x: -6.73, y: 0, z: 0.18 };
+export const EARTH_PLACE: Point = { x: -12, y: 0, z: 0.18 };
 export const EARTH_RADIUS = 1.2176;
 
 const WORLD_LEAST = 1.05;
@@ -28,10 +29,12 @@ const PACKING = (0.49 * 1.65) ** 2;
 /** Under this radius a world is grain: dust round its star, never a body. */
 export const GRAIN = 0.3;
 
+// The innermost orbit stands clear of its star's glow: the more of a star, the further out.
+const INNER_LEAST = 1.2;
+const INNER_STAR = 0.5;
+
 // A crowd reads as a few clear bodies over fine grain: its worlds well under what the lattice allows.
-const CROWD_SLOTS = 32;
 const CROWD = 0.55;
-const CLEAR_BODIES = 3;
 const CLEAR_RADIUS = 0.85;
 const CLEAR_ROOM = 0.49;
 const LOOSE = 1.1;
@@ -130,7 +133,8 @@ function latticeOf(
   slots: number,
   { star, start, edge }: { readonly star: number; readonly start: number; readonly edge: number },
 ): Orbiter[] {
-  const inner = 0.45 + 0.35 * star;
+  // ponytail: a huge system's star would push the inner orbit past the edge (NaN sizes from ~320 worlds): keep it a hair inside.
+  const inner = Math.min(INNER_LEAST + INNER_STAR * star, edge - 0.01);
   const most = Math.min(largest(slots, inner, edge) * (slots > CROWD_SLOTS ? CROWD : 1), WORLD_MOST);
   const outer = edge - most;
   const places = slotsOf(worlds, slots);
@@ -158,7 +162,7 @@ function orbitersOf(worlds: readonly WorldHeld[], star: number, start: number): 
     if (rank >= CLEAR_BODIES) return world;
     const nearest = Math.min(...clear.filter((other) => other !== world).map((other) => gap(world, other)));
     const { own = world.radius, ...kept } = world;
-    return { ...kept, ...sized(own, Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM)) };
+    return { ...kept, ...sized(own, Math.max(GRAIN, Math.min(CLEAR_RADIUS, nearest * CLEAR_ROOM))) };
   });
 }
 

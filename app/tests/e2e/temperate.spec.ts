@@ -11,6 +11,7 @@ import { askLab, circles, EARTH_INSTANT, EARTH_VIEW, heldQuiet, open, picture, t
 import { landDetailsOn, type LandDetail } from "./landDetail.ts";
 import { seaLightsOn } from "./seaLight.ts";
 import { facesApart, facesOn, GLANCE, type Face } from "./textures.ts";
+import { mapUrl } from "../../src/space/planet/mapUrl.ts";
 import { starWarmth } from "../../../packages/core/src/cosmos/warmth.ts";
 import { plantsOf } from "../../../packages/core/src/planet/recipe.ts";
 import { ROWS } from "../../../packages/core/src/planet/rows.ts";
@@ -97,7 +98,7 @@ async function earthOf(page: Page): Promise<Earth> {
     await landDetailsOn(page, shot, [[EARTH_VIEW, true]]),
     await seaLightsOn(page, shot, [EARTH_VIEW]),
   ];
-  const map = await mapClimateOn(page, await (await page.request.get("/textures/earth-day.webp")).body());
+  const map = await mapClimateOn(page, await (await page.request.get(mapUrl("earth-day", "/"))).body());
   if (shore === undefined || face === undefined || lit === undefined || land === undefined) throw new Error("no Earth");
   if (lit.greenLight === null || face.sea === null || !sea) throw new Error("no green land or sea on the Earth");
   earthRead = { shore, face, chroma: lit.chroma, map, land, greenOverSea: lit.greenLight - face.sea[0], sea };

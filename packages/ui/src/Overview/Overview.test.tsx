@@ -19,6 +19,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Flash: ["Flashes", "[role='status'] p"],
   EmptyState: ["Empty states", "h3 + p"],
   Icon: ["Icons", "svg[data-icon]"],
+  iconNode: ["Icons", "[data-icon-node] svg[data-icon]"],
   Stack: ["Buttons", "[data-space]"],
   Cluster: ["Kickers", "[data-justify]"],
   Grid: ["Compositions", "[data-min]"],
@@ -37,6 +38,7 @@ const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = 
   Row: ["Rows", "[data-look]"],
   Field: ["Fields", "input"],
   Combobox: ["Fields", "input[role='combobox']"],
+  Switch: ["Fields", "input[role='switch']"],
   Select: ["Fields", "select"],
   Stat: ["Stats", "[data-value]"],
   Progress: ["Stats", "[role='progressbar']"],
@@ -74,7 +76,8 @@ describe("Overview", () => {
   it("shows every icon, each named beside it", () => {
     render(<Overview />);
     const icons = screen.getByRole("region", { name: "Icons" });
-    expect(icons.querySelectorAll("svg")).toHaveLength(ICON_NAMES.length);
+    // Every glyph once, and the one iconNode draws beside them.
+    expect(icons.querySelectorAll("svg")).toHaveLength(ICON_NAMES.length + 1);
     for (const name of ICON_NAMES) expect(within(icons).getByText(name, { exact: true })).toBeTruthy();
   });
 

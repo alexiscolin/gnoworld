@@ -56,8 +56,10 @@ async function visit() {
     seen.push(count.useWorldsCount(wanted));
     return null;
   }
+  // The hero's reader of the scene's count (useWorldsDrawn is the module's own: the hook says it through useWorldsCount, whose read of the
+  // count file never comes here).
   function Hero() {
-    drawn.push(count.useWorldsDrawn());
+    drawn.push(count.useWorldsCount(true) ?? undefined);
     return null;
   }
   const mounted = (element: ReactElement) => {
@@ -84,6 +86,7 @@ async function visit() {
   };
   const open = (wanted = true) => opened(wanted).leave;
   const hero = () => {
+    read.count.mockImplementationOnce(() => new Promise(() => undefined));
     const root = mounted(<Hero />);
     return () => {
       act(() => {
@@ -97,7 +100,7 @@ async function visit() {
       count.worldsDrawn(n);
     });
   };
-  const scene = (leaving = new AbortController().signal) => act(() => worldsFile(leaving));
+  const scene = () => act(() => worldsFile());
   return { open, opened, hero, seen, drawn, served, told, scene };
 }
 
@@ -284,15 +287,15 @@ describe("the hero's number, from the worlds' count", () => {
 });
 
 describe("the scene's read of the worlds' file", () => {
-  it("reads the file at the site's base with the scene's signal, and counts what it brings, each world once and the Earth", async () => {
+  it("reads the file at the site's base, and counts what it brings, each world once and the Earth", async () => {
     read.worlds.mockResolvedValue(fileOf());
     const { hero, drawn, scene } = await visit();
     const leave = hero();
-    const leaving = new AbortController();
-    expect((await scene(leaving.signal))?.worlds).toHaveLength(4);
-    expect(read.worlds).toHaveBeenCalledWith("/", { signal: leaving.signal });
+    expect((await scene())?.worlds).toHaveLength(4);
+    // One read for the page's life, shared by space and its rail: it carries no signal a reader could cancel it by.
+    expect(read.worlds).toHaveBeenCalledWith("/");
     expect(drawn.at(-1)).toBe(3);
-    expect(read.count).not.toHaveBeenCalled();
+    expect(read.count, "the hero's own ask of the count file, none from the scene's read").toHaveBeenCalledTimes(1);
     leave();
   });
 

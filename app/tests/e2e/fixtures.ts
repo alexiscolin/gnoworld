@@ -101,7 +101,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
     },
     { auto: true },
   ],
-  // ADR-0003: a device new to gnoworld sees the home's opening, "Start here" and the first visit's buttons. A journey's browser is a new
+  // ADR-0003: a device new to gnoworld sees "Start here" and the first visit's buttons. A journey's browser is a new
   // device, so each one is a reader who came back, as the video's frames are, unless it asks to be a newcomer.
   newcomer: [false, { option: true }],
   returning: [
@@ -110,7 +110,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         await context.addInitScript(() => {
           // A document with no origin of its own (about:blank) keeps no storage, and refuses it.
           try {
-            for (const key of ["gnoworld:entered", "gnoworld:opened"]) localStorage.setItem(key, "1");
+            localStorage.setItem("gnoworld:entered", "1");
           } catch {
             return;
           }

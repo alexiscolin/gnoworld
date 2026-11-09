@@ -9,7 +9,7 @@ const LISTED = [
   ...["close", "plus", "arrow", "arrow-up-right", "chevron", "search", "chat", "thread", "reply", "bell"],
   ...["passport", "seal", "expand", "shrink", "image", "bookmark", "smile", "code", "code-block", "list-bulleted"],
   ...["list-numbered", "quote", "pause", "play", "pin", "more", "pencil", "link", "comet", "at"],
-  ...["mail", "check", "calendar", "spark", "news", "satellite", "planet", "cluster", "bold", "italic"],
+  ...["mail", "check", "calendar", "spark", "news", "satellite", "planet", "orbits", "bold", "italic"],
   ...["underline", "strikethrough", "slash", "caret", "share", "menu", "people", "star", "chart", "info"],
   ...["warning", "alert", "lock", "shield", "key", "sliders"],
 ] as const satisfies readonly IconName[];

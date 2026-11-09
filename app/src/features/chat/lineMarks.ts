@@ -2,6 +2,7 @@
 // "new here" (frame 56). Apart from Lines.tsx, which draws them.
 import { POLL_KEYS, pollOf, votesOn, type Reaction, type Shown, type ShownLine } from "@gnoworld/core";
 import { LINES_KEPT } from "../../store/chat.ts";
+import type { Entry } from "./chainEntries.ts";
 import { votesString } from "./PollView.tsx";
 import { chipsOf } from "./Reactions.tsx";
 
@@ -54,3 +55,45 @@ export const chipsOn = (
       chipsOf(votes.has(id) ? each.filter(({ emoji }) => !POLL_KEYS.includes(emoji)) : each),
     ]),
   );
+
+/** How long after its author's last line a line still joins its group: Slack and Discord group within minutes. */
+const GROUP_MS = 5 * 60_000;
+
+const NO_GROUPED: ReadonlySet<string> = new Set();
+
+interface Last {
+  author: string;
+  at: number;
+  day: string;
+}
+
+// Whether a message goes on the group of the line before it: its author, within GROUP_MS, the same day, no reply.
+const goesOn = (before: Last | undefined, here: Last, reply: string | undefined): boolean =>
+  before?.author === here.author &&
+  before.day === here.day &&
+  reply === undefined &&
+  here.at - before.at >= 0 &&
+  here.at - before.at <= GROUP_MS;
+
+/** The lines that go on a group: the same author's message within `GROUP_MS` of the one before it, on the same day, with no
+ * call of the chain, notice, action or reply between or in them. Read once per change of the list, never per line drawn. */
+export function groupedOf(entries: readonly Entry<ShownLine>[]): ReadonlySet<string> {
+  const grouped = new Set<string>();
+  let before: Last | undefined;
+  for (const entry of entries) {
+    if (!("line" in entry) || entry.line.kind !== "message") {
+      before = undefined;
+      continue;
+    }
+    const { id, account, from, reply, time } = entry.line;
+    const at = Date.parse(time);
+    const here = {
+      author: account === undefined ? `guest ${from}` : `account ${account}`,
+      at,
+      day: new Date(at).toDateString(),
+    };
+    if (goesOn(before, here, reply)) grouped.add(id);
+    before = here;
+  }
+  return grouped.size === 0 ? NO_GROUPED : grouped;
+}

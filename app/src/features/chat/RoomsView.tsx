@@ -4,14 +4,16 @@
 import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
-import { Avatar, Button, Cluster, NavItem, Row, Stack } from "@gnoworld/ui";
+import { Avatar, Button, Cluster, Icon, IconButton, NavItem, Row, Sidebar, Stack } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
 import { dmHref, roomHref, roomLabel, shortAddress, whoIs } from "./names.ts";
 import { noticeDone } from "../../told.ts";
 import { badged } from "./unread.ts";
-import { RoomSections, RoomsNav } from "./RoomSections.tsx";
+import { RoomsList, RoomsNav } from "./RoomsList.tsx";
+import { Folding } from "./RoomSections.tsx";
 import shared from "./lists.module.css";
+import { askFor } from "../../pageAsks.ts";
 import styles from "./RoomsView.module.css";
 
 export interface RoomsViewProps {
@@ -25,7 +27,7 @@ export interface RoomsViewProps {
   badges?: Readonly<Record<string, number>> | undefined;
   /** What the account was told: none for a guest (4f-n). */
   notices?: NoticesProps | undefined;
-  /** What stands between the rooms and the direct messages: the room's media (8d) and an account's saved messages (4d). */
+  /** What stands last, under the direct messages: an account's saved messages (4d) and the room's media (8d). */
   media?: ReactNode;
   saved?: ReactNode;
 }
@@ -73,7 +75,7 @@ function Notices({
   return (
     <Stack space="2xs" as="section">
       <Cluster space="xs" justify="between">
-        <h2 className={styles["section"]}>Notifications</h2>
+        <h2 className={["label", styles["section"]].join(" ")}>Notifications</h2>
         <Button
           size="s"
           emphasis="quiet"
@@ -106,7 +108,7 @@ function Notices({
 }
 
 // A partner in a room the page follows, with nothing unread: the video's dot at the row's end (frame 56), said "online".
-const ONLINE = { said: "online" };
+const ONLINE = { said: "online", status: true };
 
 function Dms({
   world,
@@ -119,11 +121,30 @@ function Dms({
   const full = useFull();
   const here = new Set(present?.split(" "));
   return (
-    <Stack space="2xs" as="section">
-      <h2 className={styles["section"]}>Direct messages</h2>
+    <Folding
+      name="Direct messages"
+      action={
+        <IconButton
+          icon="plus"
+          label="New direct message"
+          size="xs"
+          onClick={() => {
+            askFor("who-is-here");
+          }}
+        />
+      }
+    >
       {partners.length === 0 ? (
-        // How to start one, in lines as short as the list's own (U4).
-        <p className={styles["note"]}>No direct message yet. Start one in Who&apos;s here.</p>
+        // How to start one, a small card close under its label (U4; Alexis, 2026-11-07: "très vide et spacieux").
+        <div className={styles["empty"]}>
+          <Sidebar side="start" space="xs">
+            <Icon name="mail" />
+            <Stack space="3xs">
+              <span className={styles["lead"]}>No direct messages yet</span>
+              <span className={styles["note"]}>Pick someone in Who&apos;s here to start one.</span>
+            </Stack>
+          </Sidebar>
+        </div>
       ) : (
         <>
           <ul className={[shared["plain"], shared["items"]].join(" ")}>
@@ -148,7 +169,7 @@ function Dms({
       )}
       {/* Said in view, not behind the menu: a device that kept none of the choices is a risk the reader must not miss (CR5). */}
       {notKept === true ? <p className={styles["note"]}>Not kept on this device</p> : null}
-    </Stack>
+    </Folding>
   );
 }
 
@@ -166,7 +187,7 @@ export function NoticeStatus({ notices }: { notices: Pick<NoticesProps, "said" |
 export function RoomsView({ sections, current, dms, failed, badges, notices, media, saved }: RoomsViewProps) {
   const navRef = useRef<HTMLElement>(null);
   const listed = (
-    <RoomSections sections={sections} current={current} failed={failed} badge={(room) => badged(badges?.[room])} />
+    <RoomsList sections={sections} current={current} failed={failed} badge={(room) => badged(badges?.[room])} />
   );
   const body =
     dms === undefined ? (
@@ -174,14 +195,14 @@ export function RoomsView({ sections, current, dms, failed, badges, notices, med
     ) : (
       <Stack space="l">
         {listed}
-        {/* Between the rooms and the conversations, under a rule, as the video's column has it. */}
+        <Dms {...dms} badges={badges} />
+        {/* The reader's own shortcuts last, under a rule: the search first, the rooms, the conversations (Alexis, 2026-11-07). */}
         {saved === undefined && media === undefined ? null : (
           <div className={styles["saved"]}>
-            {media}
             {saved}
+            {media}
           </div>
         )}
-        <Dms {...dms} badges={badges} />
       </Stack>
     );
   return (

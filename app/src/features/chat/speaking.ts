@@ -4,7 +4,8 @@
 import type { Composed, IrcMessage, Reacting } from "@gnoworld/core";
 import { isPublicRoom } from "@gnoworld/core/bubbles";
 import { Address } from "@gnoworld/schemas";
-import { keptCountry } from "../../lib/country.ts";
+import { COUNTRIES } from "@gnoworld/core/bubbles";
+import { shownCountry } from "../../lib/country.ts";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { reactInRoom, reactTo, redactFrom, redactIn, sayTo, speakIn, type DmOut } from "./dmOut.ts";
@@ -92,14 +93,14 @@ export class Speaking {
     return this.#pace.slow(Date.now(), messages, lines);
   }
 
-  // The country a new line of `room` declares: the account's own choice, read as it speaks, in a room the list says anyone may read and none
+  // The country a new line of `room` shows: the account's own, its time zone's by default (D395), read as it speaks, in a room the list says anyone may read and none
   // heard closing since. What it says stays out of the rest, and one no of a list that names the room twice is a no (ADR-0001 §7).
   #country(room: string): string | undefined {
     const { key, store } = this.#host;
     const me = Address.safeParse(key());
     const listed = store.getState().chat.listed?.flatMap(({ rooms }) => rooms.filter((each) => each.room === room));
     const open = listed !== undefined && listed.length > 0 && listed.every(({ type }) => isPublicRoom(type));
-    return me.success && open && !this.#closed.has(room) ? keptCountry(me.data) : undefined;
+    return me.success && open && !this.#closed.has(room) ? shownCountry(me.data, COUNTRIES) : undefined;
   }
 
   #speak(room: string, composed: Composed, tags: Tags): boolean {

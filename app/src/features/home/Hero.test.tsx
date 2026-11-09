@@ -127,11 +127,6 @@ describe("the hero's actions for a newcomer", () => {
   });
 
   // F4518: the first visit's look holds only where the cosmos stands, which the universe marks (Universe.test); the build writes none.
-  // F4529: the opening marks the hero while its words show, mock-up 1's hero coming as the camera lands; the build writes none.
-  test("writes the hero as shown, which the opening marks while its words stand", async () => {
-    expect(await heroOf("main")).toMatch(/<div class="[^"]*" data-clear="" data-yield="none">/);
-  });
-
   test("writes its actions as standing beside no cosmos, which the universe marks once it stands", async () => {
     expect(actionsOf(await heroOf("main"))).toContain('data-cosmos="none"');
   });
@@ -146,28 +141,32 @@ describe("the hero's actions for a newcomer", () => {
   });
 });
 
-// F3267: the hero as the frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
+// D434, D438: the number is the people online with "Online now" over it, and the line continues it: "people exploring 18 worlds.";
+// the countries are no longer said. F3267: the hero as the frames draw it: a kicker with its dot over the number, and the line and the actions on one row.
 // 8i (frame 6): who is online, from the server; "coming" while it is asked, none where no server counts people.
 describe("the hero's people", () => {
   const withPeople = (people: People | undefined, worlds: number | undefined) =>
     render({ path: "/", Component: () => <Hero universe={universeOf("main")} worlds={worlds} people={people} /> }, "/");
   const lineText = (html: string) => /data-hero="line"[^>]*>(.*?)<\/div>/s.exec(html)?.[1]?.replace(/<[^>]*>/g, "");
 
-  test("makes the number the people online, marked as such, and the line their countries and the worlds", async () => {
+  test("makes the number the people online, marked as such, and the line what they explore", async () => {
     const html = await withPeople({ online: 671, countries: 31 }, 18);
     expect(numberOf(html)).toBe("671");
-    expect(html).toMatch(/data-hero="number" data-online=""/);
-    expect(headingOf(html)).toBe("People in 31 countries, across 18 worlds.");
+    expect(html).toContain("Online now");
+    expect(headingOf(html)).toBe("people exploring 18 worlds.");
   });
 
-  test("says country and world in the singular for one", async () => {
-    expect(headingOf(await withPeople({ online: 3, countries: 1 }, 1))).toBe("People in 1 country, across 1 world.");
+  test("says person and world in the singular for one", async () => {
+    expect(headingOf(await withPeople({ online: 1, countries: 1 }, 1))).toBe("person exploring 1 world.");
+    expect(headingOf(await withPeople({ online: 3, countries: 1 }, 1))).toBe("people exploring 1 world.");
   });
 
-  test("leaves the countries out while nobody online shows one", async () => {
-    const html = await withPeople({ online: 12, countries: 0 }, 18);
-    expect(headingOf(html)).toBe("People, across 18 worlds.");
-    expect(html).not.toContain('data-hero="countries"');
+  test("says no country, whatever the people online show", async () => {
+    for (const countries of [0, 31]) {
+      const html = await withPeople({ online: 12, countries }, 18);
+      expect(headingOf(html)).toBe("people exploring 18 worlds.");
+      expect(html).not.toContain('data-hero="countries"');
+    }
   });
 
   test("says a count of zero people as it is", async () => {
@@ -178,21 +177,19 @@ describe("the hero's people", () => {
   test("keeps the figure's room while the people are asked, with no number and no online mark", async () => {
     const html = await withPeople("coming", undefined);
     expect(html).toMatch(/data-hero="number"[^>]*>\s*<\/p>/);
-    expect(html).not.toContain("data-online");
+    expect(html).not.toContain("Online now");
     expect(lineText(html)).toBe("Worlds in Mainland. Each one is a place to talk.");
   });
 
   test("counts the worlds where no server counts people, as before, without the online mark", async () => {
     const html = await withPeople(undefined, 2);
     expect(numberOf(html)).toBe("2");
-    expect(html).not.toContain("data-online");
+    expect(html).not.toContain("Online now");
     expect(headingOf(html)).toBe("2 worlds in Mainland");
   });
 
   test("names the worlds still coming after the people", async () => {
-    expect(headingOf(await withPeople({ online: 5, countries: 2 }, undefined))).toMatch(
-      /^People in 2 countries, across Worlds\.?$/,
-    );
+    expect(headingOf(await withPeople({ online: 5, countries: 2 }, undefined))).toMatch(/^people exploring Worlds\.?$/);
   });
 });
 

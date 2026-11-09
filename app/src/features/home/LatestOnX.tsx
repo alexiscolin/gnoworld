@@ -13,7 +13,7 @@ export function LatestOnX() {
   );
   if (latest === undefined) return null;
   return (
-    <Stack space="2xs">
+    <Stack space="xs">
       <Kicker dot="world">Latest on X</Kicker>
       <Card compact>
         <Card.Header title={latest.handle} level={2} />

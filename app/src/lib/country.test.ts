@@ -2,7 +2,7 @@
 import { Address } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { DraftStorage } from "./drafts/drafts.ts";
-import { keepCountry, keptCountry, zoneCountry } from "./country.ts";
+import { keepCountry, keptCountry, shownCountry, zoneCountry } from "./country.ts";
 
 // 7j: the country an account declares (ADR-0001 §7): opt-in, on the device, a country or nothing. What the device gives back goes into a
 // line of the chat, so it is checked as what it is: outside data.
@@ -49,11 +49,11 @@ describe("the country an account keeps on its device", () => {
     expect(keptCountry(OTHER, reach)).toBeUndefined();
   });
 
-  it("takes it back: the device holds nothing of it, not a word for none", () => {
+  it("hides it (D395): the device holds the mark that it hides one, and nothing of the country", () => {
     const { map, reach } = device();
     keepCountry(ME, "JP", reach);
     expect(keepCountry(ME, undefined, reach)).toBe(true);
-    expect(map.size).toBe(0);
+    expect([...map.values()]).toEqual(['"hidden"']);
     expect(keptCountry(ME, reach)).toBeUndefined();
   });
 
@@ -74,6 +74,17 @@ describe("the country an account keeps on its device", () => {
 
   it("holds none on a device it cannot reach", () => {
     expect(keptCountry(ME, blocked)).toBeUndefined();
+  });
+
+  it("shows no country on a device it cannot read: a hidden choice it cannot see is never undone by the time zone's", () => {
+    const tokyo = vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({
+      ...new Intl.DateTimeFormat().resolvedOptions(),
+      timeZone: "Asia/Tokyo",
+    });
+    const countries = [{ code: "JP" }, { code: "FR" }];
+    expect(shownCountry(ME, countries, blocked)).toBeUndefined();
+    expect(shownCountry(ME, countries, device().reach)).toBe("JP");
+    expect(tokyo).toHaveBeenCalled();
   });
 
   it("holds none, what it holds being refused, on a device that will not forget it", () => {

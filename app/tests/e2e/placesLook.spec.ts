@@ -2,13 +2,12 @@ import { expect, hydrated, test } from "./fixtures.ts";
 import { calmed } from "./figures.ts";
 import { scriptedErgo } from "./scripted.ts";
 
-// How the pages of slice 5's 5d look: the Earth, the list and a world's plate, on a phone and on a computer. Each page
+// How the pages of slice 5's 5d look: the Earth and a world's plate, on a phone and on a computer. Each page
 // is the same every run (the header's account is masked; a world's chat is left out; its figures are the fixture's, its people a
 // scripted Ergo's, its arrival's pill closed).
 const WIDTHS = [390, 1280] as const;
 const PAGES: [name: string, path: string][] = [
   ["earth", "/earth"],
-  ["list", "/list"],
   ["gnoland-earth", "/net/gnoland/earth"],
   ["world-plate", "/w/bubble"],
 ];

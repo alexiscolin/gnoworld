@@ -5,8 +5,10 @@
   .box {
     /* layout: three rows on one grid, so the field's words, which the field draws itself, sit in the foot's row */
     display: grid;
-    /* layout: the marks, the words that take what is left, Send */
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* layout: the box's own width says how much of the format bar fits */
+    container-type: inline-size;
+    /* layout: the words that take what is left, Send */
+    grid-template-columns: minmax(0, 1fr) auto;
     border-radius: var(--radius-box);
     background: var(--color-fill);
   }
@@ -27,25 +29,21 @@
     color: var(--color-text-muted);
   }
 
-  /* The icons at the video's 62% of the muted grey and 13 px (prototype #fmtBar button, #fmtBar svg). */
+  /* The icons at the video's 62% of the muted grey, a size up from its 13 px (Alexis, 2026-11-08: "grossis un peu"). */
   .format button {
     /* raw: the video's 62% of the muted grey (the prototype's #fmtBar button) */
     --_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);
   }
 
   .format svg {
-    /* raw: the video's 13 px icon of the format bar */
-    inline-size: 13px;
-    /* raw: the video's 13 px icon of the format bar */
-    block-size: 13px;
+    inline-size: var(--icon-m);
+    block-size: var(--icon-m);
   }
 
-  /* A rule between the groups of tools: 1 px by 12 px, a step either side (prototype #fmtBar .sep). */
+  /* A rule between the groups of tools, as high as their icons (prototype #fmtBar .sep). */
   .rule {
-    /* raw: the video's rule, 1 px wide and 12 px high */
-    inline-size: 1px;
-    /* raw: the video's rule is 12 px high */
-    block-size: 12px;
+    inline-size: var(--line-width);
+    block-size: var(--icon-m);
     background: var(--color-line);
   }
 
@@ -57,9 +55,9 @@
   }
 
   .box textarea {
-    /* layout: across the box, on the second row, one line high until it grows */
+    /* layout: across the box, on the second row, two lines high until it grows (Alexis, 2026-11-08: a larger box) */
     grid-area: 2 / 1 / auto / -1;
-    min-block-size: calc(1lh + var(--space-s));
+    min-block-size: calc(2lh + var(--space-s));
     padding-block: var(--space-xs) var(--space-3xs);
     padding-inline: var(--space-s);
     border: 0;
@@ -70,11 +68,11 @@
 
   /* What the field says of the draft, or why it cannot go, at the foot's end, before Send. */
   .box p {
-    /* layout: in the foot's row, between the marks and Send, against Send */
-    grid-area: 3 / 2;
+    /* layout: in the foot's row, against Send */
+    grid-area: 3 / 1;
     /* layout: against Send, level with it */
     place-self: center end;
-    /* layout: a step from the marks and from Send */
+    /* layout: a step from the box's edge and from Send */
     margin-inline: var(--space-2xs);
   }
 
@@ -84,43 +82,28 @@
     font: var(--font-hint);
   }
 
-  .marks {
-    /* layout: the marks side by side at the foot's start */
-    display: flex;
-    /* layout: the foot's row, its first column */
+  /* The quick actions' + at the foot's start, level with Send. */
+  .acts {
+    /* layout: the foot's row, at its start, the field's words at its end */
     grid-area: 3 / 1;
-    padding: var(--space-3xs) var(--space-2xs);
+    /* layout: level with Send */
+    place-self: center start;
+    /* layout: a step from the box's edge, as Send's */
+    margin: var(--space-3xs) 0 var(--space-2xs) var(--space-2xs);
   }
 
-  /* The marks at the video's 34 px and 18 px icons, in the lighter grey (prototype .ctools .tbtn). */
-  .marks button {
-    /* raw: the video's 34 px tool */
-    --_h: 34px;
-    /* raw: the prototype's .ctools .tbtn colour */
-    --_ink: #c8d0de;
-  }
-
-  .marks svg {
-    /* raw: the video's 18 px icon of the foot's tools */
-    inline-size: 18px;
-    /* raw: the video's 18 px icon of the foot's tools */
-    block-size: 18px;
+  .acts:empty {
+    display: none;
   }
 
   /* Send: a round button with an arrow up, on the cream fill, at the foot's end. */
   .send {
-    /* layout: the arrow in the middle of its circle */
-    display: grid;
     /* layout: the foot's row, its last column */
-    grid-area: 3 / 3;
-    /* layout: the arrow level with its circle's middle */
-    place-items: center;
+    grid-area: 3 / 2;
     /* layout: a step from the box's edge and from the words beside it */
     margin: var(--space-3xs) var(--space-2xs) var(--space-2xs) 0;
     inline-size: var(--control-s);
-    aspect-ratio: 1;
     border: 0;
-    border-radius: 50%;
     background: var(--color-primary);
     color: var(--color-ink);
     cursor: pointer;
@@ -134,5 +117,24 @@
   .send:disabled {
     cursor: not-allowed;
     opacity: var(--opacity-disabled);
+  }
+}
+
+/* A narrow box (a thread's column): the format bar keeps one row, its tools at the smallest size, then without its lists. */
+@layer components {
+  /* raw: 24 rem, the width at which the nine tools of 32 px no longer fit one row */
+  @container (inline-size < 24rem) {
+    /* :enabled only outweighs the button's own size rule, which it must override */
+    .format button:enabled {
+      --_h: var(--control-xs);
+    }
+  }
+
+  /* raw: 18 rem, the width at which the nine tools of 24 px no longer fit one row; the lists (the cluster's last two tools and the rule before them) go */
+  @container (inline-size < 18rem) {
+    .format > div > :nth-last-child(-n + 2),
+    .format [role="separator"]:nth-last-child(3) {
+      display: none;
+    }
   }
 }

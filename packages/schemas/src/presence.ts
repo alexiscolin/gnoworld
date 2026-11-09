@@ -36,8 +36,7 @@ export const COUNTRIES_MOST = 26 * 26;
 /** The most bytes the people's answer weighs: two counts. */
 export const PRESENCE_PEOPLE_MAX_BYTES = 256;
 
-/** GET /api/presence/people (slice 8, 8i; the home's "671 ONLINE"): the people the relay holds in the rooms a guest may see, each once
- * whatever its rooms, and how many countries those of them who declare one name (ADR-0001 §7: opt-in, never detected). Counts alone. */
+/** GET /api/presence/people (slice 8, 8i; the home's "671 ONLINE"): everyone on the site, logged in or not (D352), each account once, and how many countries those of them who declare one name (ADR-0001 §7: opt-in, never detected). Counts alone. */
 export const PresencePeople = z.strictObject({
   online: People,
   countries: z

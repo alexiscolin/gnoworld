@@ -151,3 +151,15 @@ describe("a room's type (4b)", () => {
     expect(roomType(ROLES, room)).toBe(type);
   });
 });
+
+describe("a realm's room, which no file types", () => {
+  const room = "#bubble/golf-0123456789";
+  it("is open to every account and guest, and its world's moderators and the team are no more than anyone in it", () => {
+    expect(desired(ROLES, room, { archived: false })).toEqual({ modes: "M", invites: [], voiced: [] });
+    expect([mayRead(ROLES, room, undefined), listed(ROLES, room, undefined), openRoom(ROLES, room)]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+});

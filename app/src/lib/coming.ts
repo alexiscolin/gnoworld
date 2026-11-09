@@ -15,7 +15,6 @@ export interface CalendarEvent {
 
 /** How long an event is live after its start: the data gives no end. */
 export const LIVE_FOR_MS = 60 * 60 * 1000;
-const HOUR_MS = 60 * 60 * 1000;
 
 export const startOf = (event: CalendarEvent): number => Date.parse(event.start);
 
@@ -27,13 +26,3 @@ export const comingEvents = <Event extends CalendarEvent>(events: readonly Event
   events
     .filter((event) => isDated(event) && now < startOf(event) + LIVE_FOR_MS)
     .toSorted((a, b) => startOf(a) - startOf(b) || a.id.localeCompare(b.id));
-
-/** How soon `event` starts, from `now`, in the video's words (frames 4, 6: "AMA in 11 h"): "live now" within its hour, else "in 40 min",
- * "in 11 h", "in 3 days"; a part of a unit counts one. */
-export function comingIn(event: CalendarEvent, now: number): string {
-  const ahead = startOf(event) - now;
-  if (ahead <= 0) return "live now";
-  if (ahead < HOUR_MS) return `in ${String(Math.ceil(ahead / 60_000))} min`;
-  if (ahead < 48 * HOUR_MS) return `in ${String(Math.ceil(ahead / HOUR_MS))} h`;
-  return `in ${String(Math.ceil(ahead / (24 * HOUR_MS)))} days`;
-}

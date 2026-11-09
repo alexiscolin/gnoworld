@@ -7,8 +7,9 @@ import { lerp, smootherstep } from "../space/smooth.ts";
 import { DEGREE, eyeInto } from "./restLook.ts";
 
 /** Its timings, in seconds: the whole cosmos fading in, the way down; under reduced motion the cosmos held still, then its dissolve; and
- * how long the home waits for the whole cosmos before it gives the dive up. */
-export const DIVE = { fade: 0.8, seconds: 5.5, hold: 1.6, dissolve: 1.2, wait: 4 } as const;
+ * how long the canvas stays unseen, a loader in its place, for all the first frame draws before the dive starts with what is ready
+ * (Alexis, 2026-11-07: the loading lasts 2 to 3 s at most). */
+export const DIVE = { fade: 0.8, seconds: 5.5, hold: 1.6, dissolve: 1.2, wait: 2.5 } as const;
 
 // Where it starts: as near as the whole cosmos still holds the view (680) when its fade-in ends; over the disc; round from where it ends,
 // its turn done half way. On Onyx it opens on no ray of the systems' seats (the design review of 7d7): from the Earth's fixed eye (7x2),

@@ -18,6 +18,8 @@ export function Opened({
 }) {
   const [, open] = useDeviceView();
   const items: MenuItem[] = [
+    // Jarvis's place, till its slice lands (Alexis, 2026-11-07, D343).
+    { label: "Jarvis", icon: "spark", soon: true },
     {
       label: "Passport",
       icon: "passport",

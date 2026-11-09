@@ -16,7 +16,8 @@
     flex-flow: column;
     block-size: 100%;
     min-block-size: 0;
-    background: var(--color-surface);
+    /* raw: the surface, as much of it as the dock's glass lets stand (tokens.css) */
+    background: color-mix(in oklab, var(--color-surface) var(--dock-glass), transparent);
   }
 
   .header {
@@ -62,6 +63,50 @@
     border-inline-start: var(--line-width) solid var(--color-line);
   }
 
+  /* The drag handle on a border: a zero-width item of the row, its hit area drawn across the border, a line in the design system's
+     colours while it is hovered, focused or dragged. */
+  .handle {
+    /* layout: it takes no width of the row; the separator hangs over the border */
+    position: relative;
+    /* layout: it keeps no width */
+    flex: none;
+    inline-size: 0;
+    /* raw: above the regions' scroll, which the separator overhangs */
+    z-index: 1;
+  }
+
+  .separator {
+    /* layout: the hit area straddles the border, the body's whole height, its line drawn in the middle */
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--space-2xs) * -1);
+    inline-size: var(--space-s);
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+
+  .separator::after {
+    content: "";
+    /* layout: the line, centred in the hit area and as high */
+    position: absolute;
+    inset-block-start: 0;
+    block-size: 100%;
+    inset-inline-start: calc(50% - var(--line-width));
+    inline-size: calc(var(--line-width) * 2);
+    background: transparent;
+    transition: background-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .separator:hover::after {
+    background: var(--color-line-strong);
+  }
+
+  .separator:focus-visible::after,
+  .separator:active::after {
+    background: var(--color-mine-line);
+  }
+
   .conversation {
     /* layout: the conversation takes the width the other regions leave; a column of its own parts */
     display: flex;
@@ -78,7 +123,8 @@
      width: the conversation alone, the rooms behind a control */
   @container (inline-size <= 900px) {
     .worlds,
-    .info {
+    .info,
+    .handle {
       display: none;
     }
 

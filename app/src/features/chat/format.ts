@@ -20,13 +20,6 @@ const LIST = /^(?:[-*+]|1\.) /;
 const SAME = { quote: /^> /, bulleted: /^[-*+] /, numbered: /^1\. / } as const;
 const ADDRESS = "https://";
 
-/** The draft with `mark` put where the selection is, replacing it, and the caret after it: what the composer's @ and /
- * buttons do. */
-export function inserted({ text, start, end }: Edit, mark: string): Edit {
-  const at = start + mark.length;
-  return { text: text.slice(0, start) + mark + text.slice(end), start: at, end: at };
-}
-
 /** The draft once `format` is applied to its selection, and the selection after. */
 export function formatted(edit: Edit, format: Format): Edit {
   if (format === "link") return linked(edit);

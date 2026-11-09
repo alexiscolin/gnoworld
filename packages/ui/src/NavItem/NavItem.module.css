@@ -5,19 +5,35 @@
     position: relative;
     /* layout: the link and the badge side by side, the link taking what the badge leaves */
     display: grid;
-    /* layout: the link takes the width, the badge its own */
+    /* layout: the link takes the width, its end (the fact and the badge) its own */
     grid-template-columns: minmax(0, 1fr) auto;
     /* layout: the badge centred on the link's line */
     align-items: center;
-    min-block-size: var(--chat-item);
-    padding-inline: var(--space-xs);
-    border-radius: var(--radius-item);
     font: var(--font-body);
     cursor: pointer;
   }
 
+  /* As Discord's and Slack's columns: an item's words read quiet while it holds nothing unseen, in full and a half step heavier once it
+     does, or under the pointer; the item in view keeps its ink. */
+  .main {
+    color: var(--color-text-muted);
+  }
+
+  .item:hover .main,
+  .item[data-unread] .main {
+    color: var(--color-text);
+  }
+
+  .item[data-current] .main {
+    color: inherit;
+  }
+
   .item:hover {
     background: var(--color-fill);
+  }
+
+  .item[data-unread] .main {
+    font-weight: 500;
   }
 
   .item[data-current] {
@@ -50,6 +66,25 @@
   }
 
   .item[data-current] .lead {
+    color: inherit;
+  }
+
+  .end {
+    /* layout: the fact and the badge on one line, a step apart */
+    display: inline-flex;
+    /* layout: they share a middle */
+    align-items: center;
+    /* layout: a step between the fact and the badge */
+    gap: var(--space-xs);
+  }
+
+  /* The quiet fact: the with-icon utility lays its icon and figure. */
+  .meta {
+    color: var(--color-text-muted);
+    font: var(--font-label);
+  }
+
+  .item[data-current] .meta {
     color: inherit;
   }
 

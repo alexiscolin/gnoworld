@@ -11,6 +11,8 @@ export interface BubbleMessage {
   readonly text: string;
   /** The speaker's declared country (two capitals), or none: it is never guessed. */
   readonly country?: string;
+  /** A world's line (D565): `country` is only the key of its speaker's own spot, so none needs to be a country's code. */
+  readonly spot?: boolean;
   readonly visibility: "public" | "private" | "dm";
   readonly joined: boolean;
   readonly hub?: string;

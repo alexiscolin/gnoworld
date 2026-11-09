@@ -1,7 +1,6 @@
 @layer components {
   .panel {
-    /* raw: the video's 20 px round the panel (the prototype's #chatSide padding) */
-    padding: 20px;
+    padding: var(--chat-panel-inset);
   }
 
   /* Who's here lands here from code: the ring says where the reader is. */

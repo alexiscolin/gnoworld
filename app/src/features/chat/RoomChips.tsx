@@ -15,10 +15,16 @@ export interface RoomChipsProps {
   badges?: Readonly<Record<string, number>> | undefined;
 }
 
+// The Earth lists a thousand rooms: the row keeps the first ones (the busiest) and the room in view.
+const CHIPS_MOST = 12;
+
 export function RoomChips({ sections, current, badges }: RoomChipsProps) {
   const full = useFull();
-  const rooms = sections.flatMap((section) => section.rooms.map(({ room }) => room));
-  if (rooms.length === 0) return null;
+  const all = sections.flatMap((section) => section.rooms.map(({ room }) => room));
+  const rooms = all.slice(0, CHIPS_MOST);
+  if (current !== undefined && all.includes(current) && !rooms.includes(current)) rooms.push(current);
+  // One room is the header's name already: the row shows a choice, or nothing (Alexis, 2026-11-07: "pas besoin de doublon").
+  if (rooms.length < 2) return null;
   return (
     <nav aria-label="Room shortcuts" className={styles["row"]}>
       <Cluster as="ul" space="2xs">

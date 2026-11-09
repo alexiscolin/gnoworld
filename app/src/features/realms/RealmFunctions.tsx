@@ -5,7 +5,6 @@
 // hundred at a time and searched whole. Every state keeps the link to the realm on gnoweb, where the rest is done.
 import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
 import { useState } from "react";
-import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import edge from "./frame.module.css";
 import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
@@ -43,7 +42,7 @@ function Outcome({ name, result }: { name: string; result: Result | undefined })
       >
         {result.text}
       </pre>
-      <p className={styles["meta"]}>
+      <p className={"meta"}>
         read on chain, free, no signature
         {height === undefined
           ? null
@@ -68,6 +67,7 @@ function Items({ names, results, read }: { names: string[]; results: Functions["
           kind="search"
           label="Find a function"
           hideLabel
+          placeholder="Find a function"
           value={query}
           onChange={(value) => {
             setQuery(value);
@@ -93,7 +93,7 @@ function Items({ names, results, read }: { names: string[]; results: Functions["
       </ul>
       {found.length > shown ? (
         <Cluster space="s">
-          <span className={styles["meta"]}>
+          <span className={"meta"}>
             Showing {shown} of {new Intl.NumberFormat("en-US").format(found.length)}
           </span>
           <Button
@@ -118,21 +118,11 @@ function Body({ functions }: { functions: Functions }) {
 
 function Panel({ realm, chain, options }: RealmFunctionsProps) {
   const functions = useFunctions(chain.rpc, realm, options);
-  const page = gnowebLink(chain.gnoweb, realm);
-  // gnoweb's actions page for the realm (`$help`, v1.5.0), where the functions that take arguments or write are called.
-  const link = page === undefined ? undefined : `${page}$help`;
   return (
     <section aria-label="Read functions">
       <Stack space="xs">
-        <h2>Read functions</h2>
+        <h2 className={styles["title"]}>Read functions</h2>
         <Body functions={functions} />
-        {link === undefined ? null : (
-          <Cluster>
-            <Button href={link} emphasis="quiet">
-              Write and other functions, on gnoweb
-            </Button>
-          </Cluster>
-        )}
       </Stack>
     </section>
   );

@@ -17,6 +17,7 @@ app/test-results
 app/test-results-stories
 app/playwright-report
 app/tests
+!app/tests/e2e/workshopData.mjs
 app/**/*.test.ts
 app/**/*.test.tsx
 !deploy/web/nginx.conf
@@ -56,3 +57,6 @@ jarvis/src/testing
 !deploy/jarvis/gnomcp.toml
 # Named as well, should the list above ever open: the demo's secrets never reach a build.
 deploy/secrets
+# Claude Code's own folder, which a session leaves wherever it starts (packages/core/src, server/src, app): its .cc-writes is
+# private to its owner, so an image's user cannot list the folder that holds it (test-jarvis.sh's "jarvis's entry" read nothing).
+**/.claude

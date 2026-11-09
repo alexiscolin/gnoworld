@@ -191,7 +191,7 @@ describe("a checked action as a Form block", () => {
     expect(box.childElementCount).toBe(0);
   });
 
-  it.each(["gno.land/p/demo/x", "../", 'gno.land/r/x"y', "gno.land/r/x\ny"])(
+  it.each(["gno.land/p/demo/x", "..", 'gno.land/r/x"y', "gno.land/r/x\ny"])(
     "shows nothing, and asks the chain nothing, for the realm %j, which is no realm path",
     async (realm) => {
       const under = vi.fn<ChainFetch>(FUNCTIONS_ANSWER);

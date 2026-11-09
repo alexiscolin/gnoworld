@@ -20,7 +20,6 @@ const CHAIN = {
 };
 const SUPPLY = EVALS.find((row) => row.chain === "onyx-1" && row.expr === "TotalSupply()")?.body ?? "";
 const NON_ORIGIN = REFUSALS.find((row) => row.chain === "onyx-1" && row.data.endsWith(".Deposit()"));
-const GNOWEB = "https://onyx.testnets.gno.land/r/gnoland/wugnot$help";
 const LABEL = "read on chain, free, no signature";
 
 const dataOf = (url: string): string => {
@@ -124,9 +123,9 @@ describe("a realm's read functions", () => {
     const box = await panel(chain());
     const names = listed(box);
     expect(names).toEqual(["TotalSupply"]);
-    // Deposit, Withdraw and the others are not run from here: a write is gnoweb's, with its link.
+    // Deposit, Withdraw and the others are not run from here; the panel draws no link: the plate's out-links hold gnoweb's (OutLinks).
     expect(region(box).textContent).not.toContain("Withdraw");
-    expect(hrefs(box)).toContain(GNOWEB);
+    expect(hrefs(box)).toEqual([]);
     expect(all(box, "form, input")).toHaveLength(0);
   });
 
@@ -275,7 +274,7 @@ describe("a realm's read functions", () => {
 });
 
 describe("a read that fails", () => {
-  test("shows the chain's refusal as a state with its next step, the link to gnoweb still there", async () => {
+  test("shows the chain's refusal as a state with its next step", async () => {
     const box = await panel(
       chain({
         functions: [{ FuncName: "Deposit", Params: null, Results: [{ Name: ".res.0", Type: "int64", Value: "" }] }],
@@ -298,7 +297,7 @@ describe("a read that fails", () => {
     expect(state.textContent).toContain("The chain refused this read");
     expect(state.textContent).not.toContain("invalid non-origin call");
     expect(region(box).textContent).not.toContain(LABEL);
-    expect(hrefs(box)).toContain(GNOWEB);
+    expect(hrefs(box)).toEqual([]);
     // The other functions stay usable: the button is still there to try again.
     expect(button(box, "Read Deposit")?.hasAttribute("disabled")).toBe(false);
   });
@@ -321,18 +320,18 @@ describe("a read that fails", () => {
           new Response(JSON.stringify(queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } }))),
         ),
     ],
-  ])("shows a state, not a blank, and the link to gnoweb, when %s", async (_name, answer) => {
+  ])("shows a state, not a blank, and no link of its own, when %s", async (_name, answer) => {
     const box = await panel(vi.fn<ChainFetch>(answer));
     expect(one(region(box), '[role="status"]').textContent).toMatch(/\S/);
     expect(all(region(box), "button")).toHaveLength(0);
-    expect(hrefs(box)).toContain(GNOWEB);
+    expect(hrefs(box)).toEqual([]);
   });
 
   test("says so, and offers no button, when the realm has no function to read", async () => {
     const box = await panel(chain({ functions: [FUNCTIONS[0]] }));
     expect(all(region(box), "button")).toHaveLength(0);
     expect(region(box).textContent).toContain("no function to read here");
-    expect(hrefs(box)).toContain(GNOWEB);
+    expect(hrefs(box)).toEqual([]);
   });
 });
 
@@ -667,15 +666,14 @@ describe("another realm or another chain", () => {
     });
   }
 
-  test("a chain changed under the panel asks the list again, drops the old link and links its own gnoweb", async () => {
+  test("a chain changed under the panel asks the list again, and draws no gnoweb link before or after", async () => {
     const fetcher = chain();
     const box = mount(<Swap fetcher={fetcher} />);
     await settle(box);
-    expect(hrefs(box)).toContain(GNOWEB);
+    expect(hrefs(box)).toEqual([]);
     click(button(box, "to chain"));
     await settle(box);
-    expect(hrefs(box)).not.toContain(GNOWEB);
-    expect(hrefs(box)).toContain("https://gnoweb.nowhere.example/r/gnoland/wugnot$help");
+    expect(hrefs(box)).toEqual([]);
     expect(asked(fetcher, "vm/qfuncs")).toHaveLength(2);
   });
 });
@@ -756,10 +754,10 @@ describe("a list that grows with the universe", () => {
     expect(listed(box)).toEqual(["Get5999Value"]);
   });
 
-  test("a list past what the page reads is a state with its next step and the link to gnoweb, no part of it drawn", async () => {
+  test("a list past what the page reads is a state with its next step, no part of it drawn", async () => {
     const box = await panel(chain({ functions: MANY }), WUGNOT, { maxBytes: 100_000 });
     expect(one(region(box), '[role="status"]').textContent).toContain("larger than this page reads");
     expect(all(region(box), "button")).toHaveLength(0);
-    expect(hrefs(box)).toContain(GNOWEB);
+    expect(hrefs(box)).toEqual([]);
   });
 });

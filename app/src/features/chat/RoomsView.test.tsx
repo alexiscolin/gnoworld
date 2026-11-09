@@ -1,5 +1,6 @@
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { StoreProvider } from "../../storeContext.tsx";
 import { noticeSaid, NoticeStatus, RoomsView, type RoomsViewProps } from "./RoomsView.tsx";
 
 const SECTIONS: RoomsViewProps["sections"] = [
@@ -13,12 +14,18 @@ const SECTIONS: RoomsViewProps["sections"] = [
   { name: null, rooms: [{ room: "#bubble/news", type: "announcement" }] },
 ];
 const view = (over: Partial<RoomsViewProps> = {}) =>
-  renderToStaticMarkup(<RoomsView sections={SECTIONS} current="#bubble/games" {...over} />);
+  renderToStaticMarkup(
+    <StoreProvider>
+      <RoomsView sections={SECTIONS} current="#bubble/games" {...over} />
+    </StoreProvider>,
+  );
 const said = (html: string) =>
   html
     .replaceAll(/<[^>]+>/g, " ")
     .replaceAll(/\s+/g, " ")
     .trim();
+// Each section's name: a folding button's text for a room's section, a plain heading for the notifications.
+const headings = (html: string) => [...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/gs)].map((m) => said(m[1] ?? ""));
 const links = (html: string) => [...html.matchAll(/<a [^>]*>(.*?)<\/a>/gs)].map((m) => said(m[1] ?? ""));
 const hrefs = (html: string) => [...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1]);
 
@@ -32,8 +39,8 @@ describe("RoomsView", () => {
         dms: { world: "bubble", partners: [], current: undefined, onlyKnown: false, onOnlyKnown: () => undefined },
       }),
     ).toMatch(/^<nav[^>]*aria-label="Rooms and direct messages"/);
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
-    expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
+    expect(headings(html)).toEqual(["Talk", "Rooms"]);
+    expect(links(html)).toEqual(["bubble", "games", "news"]);
     expect(hrefs(html)).toEqual(["/w/bubble", "/w/bubble?room=games", "/w/bubble?room=news"]);
   });
 
@@ -44,12 +51,12 @@ describe("RoomsView", () => {
 
   it("names the section of the others Rooms when there is no other section", () => {
     const html = view({ sections: [{ name: null, rooms: [{ room: "#bubble", type: "open" }] }] });
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Rooms"]);
+    expect(headings(html)).toEqual(["Rooms"]);
   });
 
   it.each([
-    ["#bubble/games", "#games"],
-    ["#bubble", "#bubble"],
+    ["#bubble/games", "games"],
+    ["#bubble", "bubble"],
   ])("marks the room shown (%s), and it alone", (current, label) => {
     const html = view({ current });
     expect(html.match(/aria-current="true"/g)).toHaveLength(1);
@@ -78,15 +85,16 @@ describe("RoomsView", () => {
       ],
     ],
   ])("says so when the world has no room a reader may see: %s", (_, sections) => {
-    expect(said(view({ sections }))).toBe("No room here yet.");
+    expect(said(view({ sections }))).toBe("Search rooms No room here yet.");
   });
 
   // /code-review on 4e (CR8): with the rooms failed and a direct message in view, the navigation said "No room here
   // yet." beside "The rooms could not load.".
   it("says the rooms' failure in their place, never that there is no room", () => {
     const html = view({ sections: [], failed: <p role="alert">The rooms could not load.</p> });
-    expect(said(html)).toBe("The rooms could not load.");
-    expect(html).toMatch(/^<nav [^>]*><p role="alert">/);
+    expect(said(html)).toBe("Search rooms The rooms could not load.");
+    // The search over the rooms stands first; the failure takes the list's place right after it.
+    expect(html).toMatch(/^<nav [^>]*>.*<\/div><p role="alert">The rooms could not load\.<\/p>/);
   });
 
   it("leaves out a section with no room", () => {
@@ -118,7 +126,7 @@ describe("RoomsView: direct messages", () => {
   it("lists each conversation by its partner's short address, a link to its page, after the rooms", () => {
     // A conversation in view: no room is.
     const html = view({ current: undefined, dms: dms({ current: CAROL }) });
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms", "Direct messages"]);
+    expect(headings(html)).toEqual(["Talk", "Rooms", "Direct messages"]);
     // 4e's UX review (U6), 5q: the rows are the partner's nebula and short address; that they are not encrypted is said once,
     // in the small grey note under the list, as the video's note is.
     expect(links(html).slice(-2)).toEqual(["g10gh7…3y5tv", "g1l6m6…kkanc"]);
@@ -145,7 +153,7 @@ describe("RoomsView: direct messages", () => {
   it("says when there is none yet, and has no section for a guest", () => {
     // 4e's UX review (U4): the empty list says how to start one.
     expect(said(view({ dms: dms({ partners: [] }) })).replaceAll("&#x27;", "'")).toContain(
-      "No direct message yet. Start one in Who's here.",
+      "No direct messages yet Pick someone in Who's here to start one.",
     );
     expect(view()).not.toContain("Direct messages");
   });
@@ -185,20 +193,20 @@ describe("RoomsView: notifications", () => {
   describe("the badges", () => {
     it("shows a room's unseen count on its row, said as unseen, and nothing on a row that has none", () => {
       const html = view({ badges: { "#bubble/games": 3, "#bubble": 0 } });
-      expect(rowAt(html, "/w/bubble?room=games")).toBe("#games 3 3 unread");
-      expect(rowAt(html, "/w/bubble")).toBe("#bubble");
-      expect(rowAt(html, "/w/bubble?room=news")).toBe("#news");
+      expect(rowAt(html, "/w/bubble?room=games")).toBe("games 3 3 unread");
+      expect(rowAt(html, "/w/bubble")).toBe("bubble");
+      expect(rowAt(html, "/w/bubble?room=news")).toBe("news");
     });
 
     it("shows a conversation's unseen count on its row, the room's rows apart", () => {
       const html = view({ dms: dms, badges: { [ALICE]: 2, "#bubble": 1 } });
       expect(rowAt(html, `/w/bubble?dm=${ALICE}`)).toBe("g10gh7…3y5tv 2 unread");
-      expect(rowAt(html, "/w/bubble")).toBe("#bubble 1 1 unread");
+      expect(rowAt(html, "/w/bubble")).toBe("bubble 1 1 unread");
     });
 
     it("says 99+ past 99", () => {
-      expect(rowAt(view({ badges: { "#bubble": 100 } }), "/w/bubble")).toBe("#bubble 99+ 99+ unread");
-      expect(rowAt(view({ badges: { "#bubble": 99 } }), "/w/bubble")).toBe("#bubble 99 99 unread");
+      expect(rowAt(view({ badges: { "#bubble": 100 } }), "/w/bubble")).toBe("bubble 99+ 99+ unread");
+      expect(rowAt(view({ badges: { "#bubble": 99 } }), "/w/bubble")).toBe("bubble 99 99 unread");
     });
 
     it("draws no badge for a room not listed, a negative count or none", () => {
@@ -208,7 +216,7 @@ describe("RoomsView: notifications", () => {
 
     it("keeps the row a link named by the room alone: the count is not in the link", () => {
       const html = view({ badges: { "#bubble/games": 3 } });
-      expect(links(html)).toEqual(["#bubble", "#games", "#news"]);
+      expect(links(html)).toEqual(["bubble", "games", "news"]);
     });
   });
 
@@ -248,23 +256,14 @@ describe("RoomsView: notifications", () => {
       const html = view({
         notices: notices({ list: [note("mention", "#bubble"), note("reply", "#bubble/games")] }),
       });
-      expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1]).toSorted()).toEqual([
-        "Notifications",
-        "Rooms",
-        "Talk",
-      ]);
+      expect(headings(html).toSorted()).toEqual(["Notifications", "Rooms", "Talk"]);
       expect(said(html).indexOf("replied to you")).toBeLessThan(said(html).indexOf("mentioned you"));
     });
 
     // U4: a first notice came in above the rooms and pushed every row down; it comes in after them.
     it("puts the list after the rooms and the direct messages, so a notice moves no row", () => {
       const html = view({ dms, notices: notices({ list: [note("mention", "#bubble")] }) });
-      expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual([
-        "Talk",
-        "Rooms",
-        "Direct messages",
-        "Notifications",
-      ]);
+      expect(headings(html)).toEqual(["Talk", "Rooms", "Direct messages", "Notifications"]);
     });
 
     it("offers to clear them, a button, and only while there is one", () => {
@@ -274,7 +273,7 @@ describe("RoomsView: notifications", () => {
     });
 
     it("draws no list for a guest, none being given, and none while the list is empty", () => {
-      expect([...view().matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
+      expect(headings(view())).toEqual(["Talk", "Rooms"]);
       expect(view({ notices: notices() })).not.toContain("Notifications");
     });
 
@@ -293,12 +292,12 @@ describe("RoomsView: notifications", () => {
         <NoticeStatus notices={{ said: "g10gh7…3y5tv mentioned you in #games", saidId: "n1" }} />,
       );
       expect(told).toMatch(/<p[^>]*role="status"[^>]*>g10gh7…3y5tv mentioned you in #games<\/p>/);
-      expect(view({ notices: notices({ said: "told" }) })).not.toContain('role="status"');
+      expect(view({ notices: notices({ said: "told" }) })).not.toMatch(/<p[^>]*role="status"/);
       expect(renderToStaticMarkup(<NoticeStatus notices={undefined} />)).toBe("");
     });
 
     it("keeps a guest's navigation free of any status", () => {
-      expect(view()).not.toContain('role="status"');
+      expect(view()).not.toMatch(/<p[^>]*role="status"/);
     });
   });
 });

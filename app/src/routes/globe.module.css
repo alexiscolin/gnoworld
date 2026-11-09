@@ -2,6 +2,8 @@
    what is around it. The page lays it out only once space is on: until then the plate stands whole and no room is kept. */
 @layer components {
   .globe {
+    /* layout: what stands round the planet (the proposal's ring) is placed from its box */
+    position: relative;
     display: none;
     /* raw: the ring reaches 1.106 radii of the globe (frame 39), and keeps a step of space from the window's edge */
     inline-size: min(calc((100vi - 2 * var(--space-s)) / 1.106), 56vb);
@@ -17,16 +19,22 @@
     display: block;
   }
 
-  /* A flight brings the page's body: its plate waits out of sight, out of reach of a pointer, a key or a reader, and fades in as the body
-     lands, there at once to a key and a reader. Frames 19, 36 and 101 fly with the dock alone (7g). */
-  .globe + * {
-    transition: opacity var(--motion-base) var(--ease-standard);
-  }
-
-  .globe[data-flown="flying"] + * {
+  /* A flight brings the page's body: the frame and the plate wait out of sight, out of reach of a pointer, a key or a reader; the dock, the
+     layout's last part, flies with it, fading in, its chat's shape standing till its lines load (Alexis, 2026-11-09: "un skeleton"). The page
+     leaves `flown` "flying" from the click that asks the flight (host.ts). Frames 19, 36 and 101 fly with the dock alone. */
+  .globe[data-flown="flying"] + * > :not(:last-child) {
     opacity: 0;
     visibility: hidden;
-    transition: none;
+  }
+
+  .globe[data-flown="flying"] + * > :last-child {
+    animation: dock-in calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard) both;
+  }
+
+  @keyframes dock-in {
+    from {
+      opacity: 0;
+    }
   }
 
   /* A window this wide loads the scene by itself: the room is kept from the first paint, or the plate jumps half a screen under the reader. */
@@ -42,19 +50,18 @@
   @media (min-width: 1280px) {
     .globe,
     .globe + * {
-      /* raw: 320 under 1400 px (DESIGN-SYSTEM.md, Layout) */
-      --_dock: 320px;
+      --_dock: var(--chat-dock-s);
       /* raw: the plate's words end here */
       --_start: 578px;
       /* raw: the dock's left, from the window's width */
       --_end: calc(100vi - var(--space-m) - var(--_dock));
-      /* raw: the outline's top, 98 px */
-      --_top: 98px;
+      --_top: var(--dock-top);
       /* raw: the window's foot, a step of space off, and 16 px over the frame's middle */
       --_middle: calc((var(--_top) + 100vb - var(--space-m)) / 2 - 16px);
       /* raw: the ring keeps 28 px off the words and the dock; its height is held to 0.86 of the room under the outline (24 px kept), for the tilted ring and the Moon stand above the globe's top: on a 16:9 window they would reach the header and the outline (F3483) */
       --_reach: min(calc((var(--_end) - var(--_start)) / 2 - 28px), calc((var(--_middle) - var(--_top) - 24px) * 0.86));
-      --_x: calc((var(--_start) + var(--_end)) / 2);
+      /* raw: left of the room's middle by 8 % of it, toward the plate it stands over (Alexis, 2026-11-08: "la planète plus vers la gauche") */
+      --_x: calc((var(--_start) + var(--_end)) / 2 - (var(--_end) - var(--_start)) * 0.08);
       /* raw: the ring reaches 1.106 radii of the globe */
       --_radius: calc(var(--_reach) / 1.106);
     }
@@ -68,6 +75,25 @@
       );
     }
 
+    /* Close, larger than the window, lit at three quarters (D458): the study's centre, 76 % across and 68 % down, and radius, 37 % of the width, the
+       height capping it past 16:10. Cropped by the window's edges, it stands over the plate's empty right margin as before, never under
+       its words, and the dock stands over it as dark glass. */
+    .globe[data-framing] {
+      /* raw: the study's centre, across */
+      --_x: 76vi;
+      /* raw: the study's centre, down */
+      --_middle: 68vb;
+      /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; its air and its glow past it (1.18 radii) a step clear
+         of the words */
+      --_radius: min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-s)) / 1.18);
+    }
+
+    /* raw: the dock's fill lets the planet under it show, dark enough that its muted words keep 4.5:1 over the brightest limb and city
+       lights under it (D458) */
+    .globe[data-framing]:is([data-earth="drawn"], [data-world="drawn"]) + * {
+      --dock-glass: 91%;
+    }
+
     .globe {
       position: fixed;
       inset-block-start: calc(var(--_middle) - var(--_radius));
@@ -77,12 +103,95 @@
       margin: 0;
     }
 
-    /* The canvas lies under the plate: the plate opens a circle a little wider than the ring, and the scene paints the plate again in it. */
+    /* The canvas lies under the plate and paints the plate's fill itself where the globe is (scene/earth/ground.ts), one fill from the plate
+       to the planet's space with no hole cut in another: the page's own fill, and its arrival, give way to it. */
     .globe:is([data-earth="drawn"], [data-world="drawn"]) + * {
-      --globe-x: var(--_x);
-      --globe-y: var(--_middle);
-      --globe-hole: calc(var(--_reach) + 44px);
+      --plate-fill: hidden;
     }
+  }
+
+  /* The arrival's aiming tag (D459, D540): a name pill of the world labels' family (labels.module.css), a step larger, at the Earth's lit
+     limb (0.92 of a radius out, up and to the left at 45°) on a fine leader to a ring. It waits hidden: the page's arrival plays it once
+     the flight has landed (arrival.ts). */
+  .tag {
+    /* raw: the leader's length */
+    --_hair: 56px;
+    --_mark: var(--icon-s);
+
+    position: absolute;
+    /* raw: the point on the limb, in the planet's box: 50 % less 0.92 × 50 % × cos 45° */
+    inset-block-start: 17.5%;
+    /* raw: the same, across */
+    inset-inline-start: 17.5%;
+    padding: var(--space-2xs) var(--space-s);
+    border: var(--line-width) solid var(--color-line-strong);
+    /* raw: a little darker than the names' glass (72 %), so its words keep their contrast over the lit limb */
+    background: color-mix(in oklab, var(--color-surface) 85%, transparent);
+    color: var(--color-text);
+    translate: var(--_hair) -50%;
+  }
+
+  .tag:hover,
+  .tag:focus-visible {
+    border-color: var(--color-text);
+  }
+
+  .tag::before {
+    content: "";
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: 100%;
+    inline-size: var(--_hair);
+    border-block-start: var(--line-width) solid var(--color-text);
+  }
+
+  .tag::after {
+    content: "";
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: calc(100% + var(--_hair));
+    inline-size: var(--_mark);
+    block-size: var(--_mark);
+    border: var(--line-width) solid var(--color-text);
+    border-radius: 50%;
+    translate: 50% -50%;
+  }
+
+  .name {
+    font: var(--font-action);
+  }
+
+  /* The way in: a solid small button, a word and its arrow as the hero's (D554), the design system's solid emphasis, at the pill's end. */
+  .go {
+    block-size: var(--control-s);
+    padding-inline: var(--space-s) var(--space-xs);
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    color: var(--color-ink);
+    font: var(--font-ui);
+  }
+
+  /* The home's first screen (D459): the Earth close, lit at three quarters, cropped at the bottom right (86 % down, its radius the study's
+     42 % of the width or 67 % of the height), its glow a step clear of the hero's words, once space goes home, where the page frames it so. */
+  .arrival {
+    /* raw: a little right of the study's 80 %, so the hero's row keeps clear of it */
+    --_x: 84vi;
+    /* raw: the study's centre, down */
+    --_middle: 86vb;
+    /* raw: the study's radius, or less: its air and glow (1.18 radii) a step right of the hero, which ends 720 px past its 48 */
+    --_radius: min(42vi, 67vb, (var(--_x) - var(--space-xl) - 720px - var(--space-s)) / 1.18);
+
+    display: none;
+    position: fixed;
+    inset-block-start: calc(var(--_middle) - var(--_radius));
+    inset-inline-start: calc(var(--_x) - var(--_radius));
+    inline-size: calc(2 * var(--_radius));
+    aspect-ratio: 1;
+    pointer-events: none;
+  }
+
+  .arrival[data-arrival="drawn"][data-framing] {
+    display: block;
   }
 
   /* raw: the dock widens at 1400 px (DESIGN-SYSTEM.md, Layout), and the globe's span with it */

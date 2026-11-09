@@ -1,4 +1,4 @@
-// The 55 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
+// The 58 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
 // in the colour of the text around it.
 import type { ReactElement } from "react";
 
@@ -8,6 +8,7 @@ export const GLYPHS = {
   arrow: <path d="M3 8h10M9 4l4 4-4 4" />,
   "arrow-up-right": <path d="M5 11l6-6M6 5h5v5" />,
   chevron: <path d="M4 6l4 4 4-4" />,
+  hash: <path d="M6.5 2.5l-1.5 11M11 2.5l-1.5 11M3 6h10.5M2.5 10h10.5" />,
   search: (
     <>
       <circle cx="7" cy="7" r="4.5" />
@@ -127,11 +128,13 @@ export const GLYPHS = {
       <path d="M2 10c2 1.5 10 -1 12 -4" />
     </>
   ),
-  cluster: (
+  // Space seen flat (D427): a map folded in three.
+  map: <path d="M2 4l4-1.5 4 1.5 4-1.5v9.5L10 13l-4-1.5L2 13zM6 2.5v9M10 4v9" />,
+  orbits: (
     <>
-      <circle cx="5" cy="5.5" r="2" />
-      <circle cx="11" cy="5" r="1.5" />
-      <circle cx="8.5" cy="11" r="2.5" />
+      <circle cx="8" cy="8" r="1.5" />
+      <circle cx="8" cy="8" r="4" />
+      <circle cx="8" cy="8" r="6.5" />
     </>
   ),
   bold: <path d="M5 3h4a2.5 2.5 0 0 1 0 5H5zM5 8h4.5a2.5 2.5 0 0 1 0 5H5z" />,

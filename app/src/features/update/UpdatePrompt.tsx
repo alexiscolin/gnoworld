@@ -2,6 +2,7 @@
 // "New version available" (ADR-0001 §12): the worker's update waits for this click.
 import { Flash } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
+import { useAfterLoad } from "../../later.ts";
 import { hostAnswers, startServiceWorker } from "../../sw/register.ts";
 
 export const PRODUCTION = import.meta.env.PROD;
@@ -27,7 +28,10 @@ export function UpdateNotice({
 
 export function UpdatePrompt() {
   const [apply, setApply] = useState<(() => void) | null>(null);
+  // The worker fetches its whole list: it registers once the page has loaded and rested, never while the first screen loads.
+  const loaded = useAfterLoad();
   useEffect(() => {
+    if (!loaded) return undefined;
     const leaving = new AbortController();
     startServiceWorker({
       container: "serviceWorker" in navigator ? navigator.serviceWorker : undefined,
@@ -49,7 +53,7 @@ export function UpdatePrompt() {
     return () => {
       leaving.abort();
     };
-  }, []);
+  }, [loaded]);
   return (
     <UpdateNotice
       onReload={apply}

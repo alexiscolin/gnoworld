@@ -13,6 +13,8 @@ export function followEarth(store: ReturnType<typeof createAppStore>): () => voi
     dead: () => undefined,
     chain: feed.chain,
     realms: feed.realms,
+    // The ticker's stream: the Earth's chat counts who is on the Earth, never this (D374).
+    uncounted: true,
   });
   return () => {
     stop();

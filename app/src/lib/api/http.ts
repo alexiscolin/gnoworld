@@ -10,7 +10,8 @@ export const TIMEOUT_MS = 10_000;
 
 export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
 type Reason = ApiError["error"] | "unavailable" | "malformed" | "network";
-export type Result<T> = { ok: true; value: T } | { ok: false; reason: Reason };
+/** A refusal's `body` is the server's answer as it came, for a client that reads more than its code (the guest chat's cause). */
+export type Result<T> = { ok: true; value: T } | { ok: false; reason: Reason; body?: unknown };
 
 export interface Call<T> {
   /** The path on this site, from its root. */
@@ -49,7 +50,8 @@ async function answerOf<T>(response: Response, { schema }: Call<T>): Promise<Res
   const got = await read(response);
   if (got === "network") return { ok: false, reason: "network" };
   const value = got.text === "" ? undefined : jsonOf(got.text);
-  if (response.status !== 200 && response.status !== 204) return { ok: false, reason: refusal(response.status, value) };
+  if (response.status !== 200 && response.status !== 204)
+    return { ok: false, reason: refusal(response.status, value), body: value };
   const parsed = schema.safeParse(value);
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, reason: "malformed" };
 }

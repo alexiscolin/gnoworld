@@ -1,6 +1,7 @@
 import type { Line } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
+import { needWords } from "./BarButtons.tsx";
 import { LineActions } from "./LineActions.tsx";
 
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -47,23 +48,23 @@ describe("a line's actions", () => {
     // 4c's UX review (U15, U3): the toolbar and its button named apart from the menu, "Message actions"; the button
     // a toolbar's small control.
     expect(markup).toMatch(tagWith("div", 'role="toolbar"', 'aria-label="Actions on this message"', 'aria-live="off"'));
-    expect(markup).toMatch(tagWith("button", 'aria-label="More actions"', 'aria-haspopup="menu"', 'data-size="s"'));
+    expect(markup).toMatch(tagWith("button", 'aria-label="More actions"', 'aria-haspopup="menu"', 'data-size="xs"'));
     expect(markup).toMatch(tagWith("div", 'role="menu"', 'aria-label="Message actions"'));
     expect(markup).toContain('data-icon="more"');
     // U10: rising astride its line until its place is measured.
     expect(markup).not.toContain("data-inside");
   });
 
-  // F989 (U1): narrow, the three quick reactions are one React menu: each item reacts, or takes the reaction back.
-  it('hold a React menu of the three quick reactions, "Take back" the one the reader gave', () => {
+  // D376: an Add reaction menu holds the three quick reactions first and more: each item reacts, or takes the reaction back.
+  it('hold an Add reaction menu led by the three quick reactions, "Take back" the one the reader gave', () => {
     const markup = draw({ reactions: [{ emoji: "👍", count: 1, mine: true }] });
     const react = markup.slice(0, markup.indexOf('aria-label="More actions"'));
-    expect([...react.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((found) => found[1])).toEqual([
+    expect([...react.matchAll(/role="menuitem"[^>]*>([^<]+)</g)].map((found) => found[1]).slice(0, 3)).toEqual([
       "Take back 👍",
       "React with ❤️",
       "React with 😂",
     ]);
-    expect(react).toMatch(tagWith("button", 'aria-label="React"', 'aria-haspopup="menu"'));
+    expect(react).toMatch(tagWith("button", 'aria-label="Add reaction"', 'aria-haspopup="menu"'));
   });
 
   it("offer Copy text and Copy room link on another's line, no Delete and no Report", () => {
@@ -151,23 +152,27 @@ describe("a line's actions: quick reactions", () => {
     ]);
   });
 
-  it("offer a guest no reaction", () => {
-    expect(controls(draw({ me: undefined }))).toEqual(["More actions"]);
+  it("offer a guest the same reactions, none pressed", () => {
+    expect(controls(draw({ me: undefined })).slice(0, 3)).toEqual([
+      "React with 👍 (false)",
+      "React with ❤️ (false)",
+      "React with 😂 (false)",
+    ]);
   });
 });
 
-// 4d: Reply sits on the bar right before More, an account's alone.
+// 4d: Reply sits on the bar, a guest's too (D376), who is told where to connect.
 describe("a line's actions: Reply", () => {
   const names = (markup: string) => [...markup.matchAll(/<button[^>]*\saria-label="([^"]+)"/g)].map(([, name]) => name);
 
-  it("offer Reply right before More, with its icon, to an account", () => {
+  it("offer Reply, with its icon, before the room link and More, to an account", () => {
     const markup = draw();
-    expect(names(markup).slice(-2)).toEqual(["Reply", "More actions"]);
+    expect(names(markup).slice(-3)).toEqual(["Reply", "Copy room link", "More actions"]);
     expect(markup).toContain('data-icon="reply"');
   });
 
-  it("offer a guest no Reply", () => {
-    expect(names(draw({ me: undefined }))).not.toContain("Reply");
+  it("offer a guest Reply too", () => {
+    expect(names(draw({ me: undefined }))).toContain("Reply");
   });
 });
 
@@ -209,10 +214,15 @@ describe("a line's actions: Open thread", () => {
     expect(items(draw())).not.toContain("Open thread");
   });
 
-  it("add no control to the bar: its buttons are the same with and without it", () => {
-    expect(controls(draw({ onThread: () => undefined }))).toEqual(controls(draw()));
-    expect(controls(draw({ me: undefined, onThread: () => undefined }))).toEqual(["More actions"]);
-    expect(controls(draw({ onThread: () => undefined })).slice(-2)).toEqual(["Reply", "More actions"]);
+  it("put it on the bar too, after Reply, for a guest as well (D376); in More still", () => {
+    expect(controls(draw({ onThread: () => undefined })).slice(-4)).toEqual([
+      "Reply",
+      "Open thread",
+      "Copy room link",
+      "More actions",
+    ]);
+    expect(controls(draw({ me: undefined, onThread: () => undefined }))).toContain("Open thread");
+    expect(controls(draw())).not.toContain("Open thread");
   });
 });
 
@@ -250,7 +260,7 @@ describe("a line's actions in a direct message", () => {
   it("still lead with the quick reactions and Reply, an account's, with More last", () => {
     const markup = dm({ me: BOB });
     const names = [...markup.matchAll(/<button(?![^>]*role="menuitem")[^>]*\saria-label="([^"]+)"/g)].map(([, n]) => n);
-    expect(names).toEqual(["React with 👍", "React with ❤️", "React with 😂", "React", "Reply", "More actions"]);
+    expect(names).toEqual(["React with 👍", "React with ❤️", "React with 😂", "Add reaction", "Reply", "More actions"]);
   });
 
   it("ask before a delete, saying the line leaves the conversation for both, in the partner's short address", () => {
@@ -307,5 +317,25 @@ describe("a line's actions in a room: Edit", () => {
       "View profile",
       "Delete",
     ]);
+  });
+});
+
+// D376: a guest sees the same bar, and is told where to connect when it presses an act that needs an account.
+describe("a line's actions: a guest", () => {
+  it("sees the reactions and Reply, and the words that say where to connect", () => {
+    const names = [
+      ...draw({ me: undefined }).matchAll(/<button(?![^>]*role="menuitem")[^>]*\saria-label="([^"]+)"/g),
+    ].map((found) => found[1]);
+    expect(names).toEqual([
+      "React with 👍",
+      "React with ❤️",
+      "React with 😂",
+      "Add reaction",
+      "Reply",
+      "Copy room link",
+      "More actions",
+    ]);
+    expect(needWords("react")).toBe("Connect Adena to react.");
+    expect(needWords("reply")).toBe("Connect Adena to reply.");
   });
 });

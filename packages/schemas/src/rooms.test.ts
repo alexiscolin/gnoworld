@@ -97,13 +97,37 @@ describe("a world's rooms", () => {
   });
 
   // The roles file names 50 sections at most (server/src/roles/roles.ts), and the server adds the others.
-  it("takes 51 sections, the file's 50 and the others, and 500 rooms in a section", () => {
-    const rooms = Array.from({ length: 500 }, () => ({ room: "#bubble", type: "open" as const }));
+  it("takes 51 sections, the file's 50 and the others, and 1,100 rooms in a section", () => {
+    const rooms = Array.from({ length: 1100 }, () => ({ room: "#bubble", type: "open" as const }));
     const sections = [
       ...Array.from({ length: 50 }, (_, n) => ({ name: `s${String(n)}`, rooms: [] })),
       { name: null, rooms },
     ];
     expect(RoomList.safeParse({ world: "bubble", sections }).success).toBe(true);
+  });
+
+  // D394: a room's counts are additive: an answer with none (an older server) still parses, the fields kept when present.
+  it("takes a room with its people here and its messages in a day, or with neither", () => {
+    const room = { room: "#earth/cafe", type: "open" as const };
+    const list = (rooms: unknown[]) => ({ world: "earth", sections: [{ name: null, rooms }] });
+    expect(RoomList.parse(list([room, { ...room, here: 3, messages: 120 }])).sections[0]?.rooms).toEqual([
+      room,
+      { ...room, here: 3, messages: 120 },
+    ]);
+    for (const edge of [
+      { here: 0, messages: 0 },
+      { here: 1_000_000, messages: 10_000_000 },
+    ])
+      expect(RoomList.safeParse(list([{ ...room, ...edge }])).success).toBe(true);
+    for (const bad of [
+      { messages: 10_000_001 },
+      { here: -1 },
+      { here: 1.5 },
+      { messages: "3" },
+      { messages: -2 },
+      { here: 1_000_001 },
+    ])
+      expect(RoomList.safeParse(list([{ ...room, ...bad }])).success).toBe(false);
   });
 
   it.each(["s", "s".repeat(64)])("takes a section named %j, from 1 to 64 characters", (name) => {
@@ -127,10 +151,10 @@ describe("a world's rooms", () => {
     ["a world that is no slug", { world: "Bubble", sections: [] }],
     ["52 sections", { world: "bubble", sections: Array.from({ length: 52 }, () => ({ name: null, rooms: [] })) }],
     [
-      "501 rooms in a section",
+      "1,101 rooms in a section",
       {
         world: "bubble",
-        sections: [{ name: null, rooms: Array.from({ length: 501 }, () => ({ room: "#bubble", type: "open" })) }],
+        sections: [{ name: null, rooms: Array.from({ length: 1101 }, () => ({ room: "#bubble", type: "open" })) }],
       },
     ],
   ])("refuses %s", (_, list) => {

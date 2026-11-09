@@ -34,8 +34,10 @@ export interface Grammar<Extra> {
   extra?(at: number): (() => Read<Extra>) | undefined;
   /** Whether a fence's language, what follows its backticks, may stay unseen: a line whose is not is text. */
   fence?(language: string): boolean;
-  /** A quote's head, if its inside has one (an alert's title): that block, and the lines after the head. */
-  head?(inner: readonly string[]): { block: Tree<Extra>; rest: string[] } | undefined;
+  /** A quote's head, if its inside has one (an alert's title): that block, how loud it is, and the lines after the head. */
+  head?(inner: readonly string[]): { block: Tree<Extra>; severity: "notice" | "caution"; rest: string[] } | undefined;
+  /** Setext titles: the level a line underlines (`===`, `---`), and the title a paragraph's lines make over one. */
+  setext?: { under(line: string): 1 | 2 | undefined; title(level: 1 | 2, lines: string[]): Tree<Extra> };
 }
 
 /** A dialect: for the lines to read, their grammar. A quote's lines are read with the same dialect, one level in. */
@@ -106,7 +108,7 @@ export class Blocks<Extra> {
     if (start === "item") return this.#list(at);
     if (start === "extra") return this.#grammar.extra?.(at)?.() ?? { next: at + 1 };
     const code = start === "fence" ? this.#code(at) : undefined;
-    return code ?? this.#paragraph(at, this.#paragraphEnd(at));
+    return code ?? this.#text(at);
   }
 
   #fenced(body: string): boolean {
@@ -141,7 +143,11 @@ export class Blocks<Extra> {
     const head = this.#grammar.head?.(inner);
     const children = new Blocks(head?.rest ?? inner, this.#depth + 1, this.#dialect).read();
     if (head !== undefined) children.unshift(head.block);
-    return children.length === 0 ? this.#paragraph(at, end) : { next: end, block: { type: "quote", children } };
+    if (children.length === 0) return this.#paragraph(at, end);
+    return {
+      next: end,
+      block: head === undefined ? { type: "quote", children } : { type: "quote", severity: head.severity, children },
+    };
   }
 
   // A list's items, one a line, each led by a mark of the first one's kind (a bullet, any of three, or a number); a
@@ -155,6 +161,8 @@ export class Blocks<Extra> {
     for (; end < this.#lines.length; end += 1) {
       const item = itemOf(this.#body(end));
       if (item === undefined || (item.number !== undefined) !== ordered) break;
+      // A block of the dialect's (a rule `* * *`) ends the list, though it reads as an item.
+      if (end > at && this.#grammar.extra?.(end) !== undefined) break;
       items.push(this.#grammar.inline(item.text));
     }
     const block: Tree<Extra> =
@@ -164,11 +172,23 @@ export class Blocks<Extra> {
     return { next: end, block };
   }
 
-  // Where a paragraph from `at` ends: at a blank line or a block's start.
+  // Where a paragraph from `at` ends: at a blank line, a block's start or a setext title's underline.
   #paragraphEnd(at: number): number {
     let end = at + 1;
-    while (end < this.#lines.length && this.#start(end) === "text") end += 1;
+    while (end < this.#lines.length && this.#start(end) === "text" && !this.#underlined(end)) end += 1;
     return end;
+  }
+
+  #underlined(at: number): boolean {
+    return this.#grammar.setext?.under(this.#lines[at] ?? "") !== undefined;
+  }
+
+  // A paragraph from `at`, or the title its lines make when a line of `=` or `-` closes them.
+  #text(at: number): Read<Extra> {
+    const end = this.#paragraphEnd(at);
+    const level = end < this.#lines.length ? this.#grammar.setext?.under(this.#lines[end] ?? "") : undefined;
+    if (level === undefined || this.#grammar.setext === undefined) return this.#paragraph(at, end);
+    return { next: end + 1, block: this.#grammar.setext.title(level, this.#lines.slice(at, end)) };
   }
 
   // A paragraph's lines from `at` to `end`, each line's marks read apart, a break between two.

@@ -1,0 +1,37 @@
+/* The proposal's ring over the planet's place: 1.106 of its radius, so 5.3 % past the box on each side, the arcs from the top. */
+@layer components {
+  .ring {
+    position: absolute;
+    /* raw: the ring reaches 1.106 radii of the globe (frame 39), so it stands 5.3 % of the box past each side */
+    inset: -5.3%;
+    overflow: visible;
+    pointer-events: none;
+    fill: none;
+    /* layout: the arcs start at the top and go clockwise */
+    rotate: -90deg;
+  }
+
+  .track {
+    stroke: var(--color-line);
+    stroke-width: 0.35;
+  }
+
+  .yes,
+  .no {
+    stroke-width: 0.9;
+    stroke-linecap: round;
+  }
+
+  .yes {
+    stroke: var(--color-mine);
+  }
+
+  .no {
+    stroke: var(--color-danger);
+  }
+
+  .mark {
+    stroke: var(--color-text);
+    stroke-width: 0.5;
+  }
+}

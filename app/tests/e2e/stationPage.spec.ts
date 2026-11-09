@@ -51,8 +51,8 @@ test("stands Adena's station in the planet's circle, its code asked on its page 
   await expect(page.locator("h1")).toHaveText("GovDAO");
   await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
   await expect.poll(async () => (await station(page))?.name, SLOW).toBeUndefined();
-  await goInPage(page, "/w/supernova?test-gpu");
-  await expect.poll(async () => (await station(page))?.name, SLOW).toBe("Supernova");
+  await goInPage(page, "/w/gnoswap?test-gpu");
+  await expect.poll(async () => (await station(page))?.name, SLOW).toBe("GnoSwap");
   await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
   expect(scripts.filter((url) => STATION_VIEW.test(url))).toHaveLength(1);
   await goInPage(page, "/list");
@@ -74,8 +74,8 @@ test.describe("a station's code that does not come", () => {
     refuse = false;
     await goInPage(page, "/w/bubble?test-gpu");
     await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
-    await goInPage(page, "/w/gnoscan?test-gpu");
-    await expect.poll(async () => (await station(page))?.name, SLOW).toBe("Gnoscan");
+    await goInPage(page, "/w/gnoswap?test-gpu");
+    await expect.poll(async () => (await station(page))?.name, SLOW).toBe("GnoSwap");
     await expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
   });
 });

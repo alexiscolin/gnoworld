@@ -1,12 +1,10 @@
-/* A realm's view (5h): where the page was read, in the page's own small type. */
+/* A realm's page in its plate (5h, D375): where the page was read, in the page's own small type, and the page's own scroll. */
 @layer components {
-  /* The top centre's slot stays free above the view's first line (tokens.css, --banner-room). */
-  .view {
-    padding-block-start: var(--banner-room);
-  }
-
-  .meta {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
+  .page {
+    /* raw: the page's room in the plate: a long page scrolls inside it, the plate's other blocks stay in reach */
+    max-block-size: 28rem;
+    overflow: auto;
+    /* layout: the scrollbar leaves the words their room */
+    padding-inline-end: var(--space-2xs);
   }
 }

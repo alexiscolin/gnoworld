@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import { visitor } from "./visitor.ts";
+import { Hono } from "hono";
+import { visitor, visitor48, visitorOf } from "./visitor.ts";
 
 const PROXY = "10.0.0.2";
 const hextet = fc.integer({ min: 0, max: 0xffff }).map((n) => n.toString(16));
@@ -89,5 +90,74 @@ describe("visitor", () => {
         expect(key(a, x) === key(b, x)).toBe(a.every((h, i) => h === b[i]));
       }),
     );
+  });
+});
+
+describe("visitor48: the wider bucket of a household or a provider's customer (D430)", () => {
+  it("is an IPv4 address as itself", () => {
+    expect(visitor48("203.0.113.7", undefined, undefined)).toBe("203.0.113.7");
+    expect(visitor48("::ffff:203.0.113.7", undefined, undefined)).toBe("203.0.113.7");
+    expect(visitor48("::ffff:cb00:7107", undefined, undefined)).toBe("203.0.113.7");
+  });
+
+  it("is the first 48 bits of an IPv6 address, however it is written, so every /64 of one /48 is one bucket", () => {
+    const keys = ["2001:db8:1:2::1", "2001:db8:1:ffff:ffff::9", "2001:DB8:1::", "2001:0db8:0001:0:0:0:0:5"].map(
+      (peer) => visitor48(peer, undefined, undefined),
+    );
+    expect(new Set(keys).size).toBe(1);
+    expect(keys[0]).toBe("2001:db8:1::/48");
+  });
+
+  it("tells one /48 from the next, and fills a short address's missing groups with zeros", () => {
+    expect(visitor48("2001:db8:2::1", undefined, undefined)).toBe("2001:db8:2::/48");
+    expect(visitor48("2001:db8::1", undefined, undefined)).toBe("2001:db8:0::/48");
+    expect(visitor48("fd00::1", undefined, undefined)).toBe("fd00:0:0::/48");
+  });
+
+  it("follows the same proxy rule as the visitor: the header counts from the trusted proxy alone", () => {
+    expect(visitor48(PROXY, "2001:db8:1:2::1", PROXY)).toBe("2001:db8:1::/48");
+    expect(visitor48("203.0.113.7", "2001:db8:1:2::1", PROXY)).toBe("203.0.113.7");
+    expect(visitor48(PROXY, "unknown", PROXY)).toBe(PROXY);
+  });
+
+  it("holds, for any IPv6 address, one key with its own /64's: two /64s share a /48 key only when their first 48 bits agree", () => {
+    fc.assert(
+      fc.property(half, half, (a, b) => {
+        const [x, y] = [a.join(":"), b.join(":")];
+        const same48 =
+          a
+            .slice(0, 3)
+            .map((g) => g.padStart(4, "0"))
+            .join(":") ===
+          b
+            .slice(0, 3)
+            .map((g) => g.padStart(4, "0"))
+            .join(":");
+        expect(visitor48(`${x}::1`, undefined, undefined) === visitor48(`${y}::1`, undefined, undefined)).toBe(same48);
+      }),
+    );
+  });
+});
+
+describe("visitorOf: the one place a request's visitor is read", () => {
+  const ask = async (peer: string | undefined, headers: Record<string, string>, proxy: string | undefined) => {
+    const app = new Hono();
+    app.get("/", (c) => c.text(visitorOf(c, proxy)));
+    const res = await app.request("/", { headers }, { incoming: { socket: { remoteAddress: peer } } });
+    return res.text();
+  };
+
+  it("is the connection's peer, an IPv6 one by its /64", async () => {
+    expect(await ask("203.0.113.7", {}, undefined)).toBe("203.0.113.7");
+    expect(await ask("2001:db8:1:2:3::9", {}, undefined)).toBe("2001:db8:1:2::/64");
+  });
+
+  it("believes x-real-ip from the trusted proxy alone", async () => {
+    expect(await ask(PROXY, { "x-real-ip": "198.51.100.1" }, PROXY)).toBe("198.51.100.1");
+    expect(await ask("203.0.113.7", { "x-real-ip": "198.51.100.1" }, PROXY)).toBe("203.0.113.7");
+  });
+
+  it("is empty for a connection with no peer address, as the visitor of an empty one is", async () => {
+    expect(await ask(undefined, {}, undefined)).toBe("");
   });
 });

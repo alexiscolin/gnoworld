@@ -144,6 +144,8 @@ the brightest planet behind the header's pills.
 | `--font-data` | 12 px | Geist Mono 400 | Addresses, hashes, code, the ticker, chart axes |
 | `--font-ui` | 13 px | Geist 500 | Controls, chips, tabs |
 | `--font-reading` | 13 px, leading 1.5 | Geist 400 | The sentence under a card's or a dialog's title (frames 10 and 110): a line read, not a control |
+| `--font-chat` | 13.5 px, leading 1.45 | Geist 400 | A chat's lines on a phone |
+| `--font-chat-l` | 15 px, leading 1.5 | Geist 400 | A chat's lines with room for them: the full chat's and the dock's on a computer (D419) |
 | `--font-body` | 14 px, leading 1.5 | Geist 400 | Messages, panels; item titles at 500 |
 | `--font-field` | 14 px, 16 px under a coarse pointer, leading 1.5 | Geist 400 | A field's text and prefix: at 16 px iOS Safari does not zoom on focus (F371) |
 | `--font-lead` | 16 px, leading 1.5 | Geist 400 | A world's description |
@@ -179,7 +181,7 @@ the brightest planet behind the header's pills.
 | `--size-counter` / `--size-progress` | 18 px (an unread count) / 4 px (every progress bar) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-s` / `-m` / `-l` | 32 / 48 / 64 px: a row's lead / a card / the rail; 16 and 24 join with their first readers |
-| Layout | header clearance 96, dock 360 (320 under 1400), plate 620 with a 440 text column, rail 120, dialog 490 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
+| Layout | header clearance 96, dock 420 (`--chat-dock`; `--chat-dock-s` 380 under 1400; 360 and 320 before 2026-11-08, D419), plate 620 with a 440 text column, rail 120, dialog 490 and wide 760, popover 300 px; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
   the control instead of spilling out.
@@ -225,12 +227,22 @@ it again would show an action no one can press until then.
 | `--motion-fast` | 120 ms | Hover, press, a popover's fade |
 | `--motion-base` | 200 ms | Panels, tabs, chips |
 | `--motion-wait` | 300 ms | What waits before it shows: a skeleton |
-| `--motion-slow` | 400 ms | The dock sliding, the library view |
+| `--motion-slow` | 360 ms | The dock sliding, the library view |
+| `--motion-reveal` | 560 ms | Rise-ins, a landing's settle |
+| `--motion-iris` | 800 ms | The loader's iris |
 | `--motion-scene` | 1.3–3.2 s, by distance | Flights (the scene, not CSS) |
 | `--motion-spin` | 0.8 s | The spinner |
 | `--motion-ambient` | 3 s | Ambient loops (a breathing orb, rings) |
 | `--ease-standard` | `cubic-bezier(0.2, 0.7, 0.1, 1)` | Entering, moving |
 | `--ease-emphasized` | `cubic-bezier(0.7, 0, 0.2, 1)` | The loader's iris, big reveals |
+| `--ease-in` | `cubic-bezier(0.5, 0, 0.9, 0.4)` | Leaving |
+| `--arrival-play` | `running`, or `paused` | A page's arrival animations, held at their first frame while a flight brings the page |
+| `--motion-scale` | 1, or 0 | Every duration is multiplied by it: 0 under reduced motion, the system's or the site's own setting |
+
+Enter and leave (the motion pass, 2026-11-07): everything that appears also leaves. It enters on `--ease-standard`
+with a 4–12 px travel from where it comes, and leaves on `--ease-in` in about 70% of the time, with a fade and a few
+pixels at most. Dialogs and popovers use `@starting-style` and `transition-behavior: allow-discrete`. The scene sets the
+pace; the page follows its phases.
 
 Named behaviours:
 - **Arrival on a world:** the planet settles, the plate comes in, the figures count up. All of it
@@ -346,6 +358,7 @@ component with its CSS Module, documented by its props.
 | `SignPanel` | preview, waiting, signed, in a block, done; refused, failed, too late, wrong network, wallet missing or locked | The one signing block, whoever signs (Adena, a session, a signature that is not a transaction). It shows the account, the realm, the function, the arguments, the network with its label, the fee as an estimate and who pays, the steps in words, the ADR-0001 §11 warnings and a link to gnoweb. Only it renders the confirm control |
 | `Row` | plain, divided, boxed; current; with a thumbnail, an icon or an avatar | Lists, connected worlds, notifications, search results, agenda entries. The activity slot carries in words what the 3D shows |
 | `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. At rest it is one line (add, emoji, mention, send); the formatting tools show when it has focus. A name is typed at body size, never in data mono |
+| `Switch` | off, on; a description; disabled | A real checkbox with `role="switch"`, its name and description at the left and the switch at the right; on is cream with a dark knob, as chosen elsewhere; the slide follows `--motion-scale`. An on/off setting that takes effect at once (the settings, D450) |
 | `Select` | the small control's height; a name for assistive technology | The browser's own list, for a choice among many fixed rows (a country): a phone's picker does better than a list of ours |
 | `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's nebula is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; three clouds of colour on night and the address's constellation over them (five stars, one per fifth of the disc so the shape stays open, joined in one of three orders, one bright), the same at every size, readable at 20 px. Never an NFT: the face is computed from the address, which only its key controls (ADR-0001 §11). Where the clouds and stars sit always comes from the address; the palette is chosen in phase 1. A face tells people apart at a glance, never who they are: anyone can try addresses until a face looks like yours, so the name, and the short address where a person matters, identify; my own messages are marked by my name in mint and the word "you", never by the face. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
 | `PlanetThumb` | world, ecosystem cluster, star, station, signal; dock magnification | Rendered from the same look as the 3D world |
@@ -359,8 +372,7 @@ component with its CSS Module, documented by its props.
 | `Logo` | mark, mark and wordmark | The header and the loader |
 
 Later, each in its slice: `Message` (4, on Card), `Breadcrumb` and the ⌘K palette (5, on
-Dialog), the scene `Label` (7); `Table`, `Checkbox`, `Switch`, `Select` when the settings and the
-admin console need them (8, 12). Menu is a `Popover`, a badge a static `Chip`, a presence dot an
+Dialog), the scene `Label` (7); `Table`, `Checkbox` when the admin console needs them (12). Menu is a `Popover`, a badge a static `Chip`, a presence dot an
 `Avatar` slot, a divider a base `hr`. The flight panel is the flight feature's assembly.
 
 **Rich cards in the chat.** Every interactive structure of a room is one `Card`:
@@ -381,10 +393,10 @@ assembly in its own slice, with its story.
 
 ### Icons
 
-- One set of 56: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
+- One set of 58: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
   passport, seal, expand, shrink, image, bookmark, smile, code, code-block, list-bulleted,
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
-  spark, news, satellite, planet, cluster, bold, italic, underline, strikethrough, slash, caret,
+  spark, news, satellite, planet, orbits, map (space seen from above, D433), bold, italic, underline, strikethrough, slash, caret,
   share, menu, people, star, chart, info, warning, alert, lock, shield, key, sliders (the settings, slice 8). A new icon joins the
   list in the slice that needs it. Those that point along the text turn right to left: arrow,
   arrow-up-right, reply, list-bulleted, list-numbered and quote; the chevron and the caret point
@@ -404,7 +416,7 @@ assembly in its own slice, with its story.
 | Hero | Bottom left of the cosmos | The number, one line that says what gnoworld is, two big actions, the markets row; the scene keeps it clear (a safe area) |
 | Rail | Right of the cosmos | Planets at 64 px, magnified like a dock; names on two lines; as tall as its worlds; labels keep out of it |
 | Plate | Left of a world's frame | 620 px, a 440 px text column; its background fades into space over its last 64 px, with no border, so the planet keeps the frame's free area; the dot grid and the vertical atlas caption; a scroll cue when its content is cut |
-| Chat dock | Right | 360 px, 320 px under 1400 px, in the plain panel colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
+| Chat dock | Right | 420 px, 380 px under 1400 px (D419), in the plain panel colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
 | Ticker | Bottom | 34 px, pausable |
 | Credits | A fixed corner, wherever textures show, on phones too | One 11 px "Credits" link in the muted grey, opening the full attributions (CC BY 4.0 §3(a)(2) allows a link) |
 

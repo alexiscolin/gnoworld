@@ -1,5 +1,4 @@
 import { Button, Chip, Cluster, PlanetThumb, Stack } from "@gnoworld/ui";
-import type { ReactNode } from "react";
 import { useState } from "react";
 import { Link } from "react-router";
 import styles from "./PlacesList.module.css";
@@ -64,15 +63,5 @@ export function PlacesList({ places, genres }: { places: ListedPlace[]; genres: 
         </ul>
       )}
     </Stack>
-  );
-}
-
-/** The list's board: on a computer, the prototype's #board, a box of its own over the page from 98 px under the top to 24 px
- * over the foot; on a phone, the page itself. */
-export function Board({ children }: { children: ReactNode }) {
-  return (
-    <div className={styles["board"]}>
-      <Stack>{children}</Stack>
-    </div>
   );
 }

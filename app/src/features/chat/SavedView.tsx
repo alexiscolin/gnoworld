@@ -33,7 +33,7 @@ export function SavedView({ saved, open, onClose, onRemove, notKept = false }: S
             return (
               <li key={`${line.room} ${line.id}`} className={[shared["card"], styles["line"]].join(" ")}>
                 <Stack space="3xs">
-                  <span className={styles["meta"]}>
+                  <span className={"meta"}>
                     <b>
                       <Person name={name} guest={line.account === undefined} />
                     </b>{" "}

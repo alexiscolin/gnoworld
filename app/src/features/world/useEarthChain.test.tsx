@@ -55,7 +55,7 @@ describe("useEarthChain", () => {
     draw();
     expect(sources.opened).toEqual([]);
     await vi.waitFor(() => {
-      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth"]);
+      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth&presence=0"]);
     });
     const [source] = sources.opened;
     source?.emit("realms", { universe: "onyx", count: 17, height: 908297 });

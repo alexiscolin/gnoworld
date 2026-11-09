@@ -19,6 +19,44 @@
     overflow: visible;
   }
 
+  /* Loading: the moons turn round the heart, one each way (Alexis, 2026-11-07, the loader's proposal 1). */
+  .moon,
+  .moonFar {
+    /* raw: the mark's centre, in its 32 by 32 drawing */
+    transform-origin: 16px 16px;
+    animation: orbit linear infinite;
+  }
+
+  .moon {
+    /* raw: 2.5 s a turn */
+    animation-duration: 2.5s;
+  }
+
+  .moonFar {
+    /* raw: 3.8 s a turn, the other way */
+    animation-duration: 3.8s;
+    animation-direction: reverse;
+  }
+
+  /* The arc fills as the parts come, a step each. */
+  .arc {
+    /* raw: a step of the fill, short */
+    transition: stroke-dashoffset 200ms linear;
+  }
+
+  @keyframes orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .moon,
+    .moonFar {
+      animation: none;
+    }
+  }
+
   .word {
     /* raw: 19 px, 300, -0.03em (the prototype's #hnav .brand) */
     font: 300 19px/1 var(--family-sans);

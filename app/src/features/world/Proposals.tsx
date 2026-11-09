@@ -153,7 +153,9 @@ export default function Proposals({ path, options = NO_OPTIONS, onRing, pinned }
       )}
       <section aria-labelledby="proposals-title">
         <Stack space="xs">
+          {/* The plate's kicker's look, its dot included, on the section's heading. */}
           <h2 id="proposals-title" className="label">
+            <span className="dot" data-tone="world" aria-hidden="true" />
             Proposals
           </h2>
           {read === undefined || realm === undefined ? (
@@ -168,5 +170,17 @@ export default function Proposals({ path, options = NO_OPTIONS, onRing, pinned }
         </Stack>
       </section>
     </>
+  );
+}
+
+/** A realm's open proposal as its pill alone (D375), and its ring handed to the page: one read, nothing when none is open. */
+export function Status({ path, onRing }: Pick<ProposalsProps, "path" | "onRing">) {
+  const { read } = useProposals(path, NO_OPTIONS);
+  useRing(read, onRing);
+  const open = read?.ok === true ? openOf(read.value) : undefined;
+  return open === undefined ? null : (
+    <Cluster space="xs">
+      <StatusPill proposal={open} />
+    </Cluster>
   );
 }
