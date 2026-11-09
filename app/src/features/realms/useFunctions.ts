@@ -28,8 +28,9 @@ export interface Functions {
   read: (name: string, call?: Read) => void;
 }
 
-// A card's reads: when its last one started, the one under way, and the one waiting its turn.
+// A card's reads: how many were asked, when its last one started, the one under way, and the one waiting its turn.
 interface Card {
+  asked: number;
   at: number;
   flying?: AbortController | undefined;
   waiting?: ReturnType<typeof setTimeout> | undefined;
@@ -74,11 +75,16 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
     setResults((before) => ({ ...before, [name]: result }));
   };
   // The text first; the height, a neighbour of the read and a request of its own, follows when it comes. A height is kept only
-  // by the read it was asked for: a later click replaces that read, and its height is its own. A read a later one ended settles nothing.
-  const ask = (name: string, call: Read | undefined, signal: AbortSignal) => {
+  // by the read it was asked for: a later click replaces that read, and its height is its own. A read with a later one asked since,
+  // waiting or under way, settles nothing: its answer is not the later one's (F13318).
+  const ask = (
+    name: string,
+    call: Read | undefined,
+    { signal, latest }: { signal: AbortSignal; latest: () => boolean },
+  ) => {
     readEval(rpc, { realm, name, ...call }, { ...options, timeoutMs: 10_000, maxBytes: 64 * 1024, signal })
       .then((text) => {
-        if (signal.aborted) return undefined;
+        if (!latest()) return undefined;
         if (!text.ok) {
           settle(name, { state: "failed", next: text.failure.next });
           return undefined;
@@ -98,14 +104,16 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
   // A card's read starts at once, or 400 ms after its last one started, the last asked meanwhile kept; it ends the one under way.
   const read = (name: string, call?: Read) => {
     settle(name, { state: "busy" });
-    const card = cardsRef.current.get(name) ?? { at: -Infinity };
+    const card = cardsRef.current.get(name) ?? { asked: 0, at: -Infinity };
     cardsRef.current.set(name, card);
+    card.asked += 1;
     clearTimeout(card.waiting);
     const start = () => {
       card.flying?.abort();
       const flying = new AbortController();
+      const mine = card.asked;
       Object.assign(card, { at: Date.now(), flying, waiting: undefined });
-      ask(name, call, flying.signal);
+      ask(name, call, { signal: flying.signal, latest: () => card.asked === mine });
     };
     const wait = card.at + 400 - Date.now();
     if (wait > 0) card.waiting = setTimeout(start, wait);

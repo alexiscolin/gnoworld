@@ -899,6 +899,29 @@ describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 K
       ]);
     }));
 
+  // R1 of the review (F13318, S3 F13317): an earlier read that answers while a later one waits its turn is not the later one's answer.
+  test("lets no answer of an earlier read stand for a later one asked while it waits", () =>
+    faked(async () => {
+      const fetcher = evalChain((url) => {
+        const body = JSON.stringify(queryEnvelope({ data: `answer for ${dataOf(url)}` }));
+        const later = dataOf(url).includes('"A"') ? 200 : 0;
+        return new Promise<Response>((resolve) => {
+          setTimeout(() => {
+            resolve(new Response(body));
+          }, later);
+        });
+      });
+      const box = await harness(fetcher);
+      ask(box, "Search A");
+      await advance(100);
+      ask(box, "Search B");
+      await advance(200);
+      expect(evalsOf(fetcher)).toHaveLength(1);
+      expect(resultOf(box, "Search")).toEqual({ state: "busy" });
+      await advance(200);
+      expect(resultOf(box, "Search")).toMatchObject({ state: "read", text: `answer for ${WUGNOT}.Search("B", 1)` });
+    }));
+
   test("says a waiting read is busy at once, before its request goes", () =>
     faked(async () => {
       const fetcher = evalChain(() => reply("(7 int64)"));
