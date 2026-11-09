@@ -103,6 +103,7 @@ export { realmRoom } from "./cosmos/realmRoom.ts";
 export { neighboursOf, type Neighbour } from "./cosmos/links.ts";
 export { MASS, MASS_KIND, massOf, type Clump, type Mass, type MassNamespace, type MassWorld } from "./space/mass.ts";
 export { REALM_PREFIX } from "./chain/realm.ts";
+export { isExportedName, isRealmPath } from "./chain/realmPath.ts";
 export { realmRoute, worldRoute } from "./places/route.ts";
 export { GOLDEN } from "./space/golden.ts";
 export { NATURES } from "./planet/choice.ts";
