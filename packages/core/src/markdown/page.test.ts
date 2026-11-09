@@ -1346,6 +1346,16 @@ describe("page: nested, mixed and task lists", () => {
     reads("- a\nmore", { type: "list", ordered: false, items: [[text("a")]] }, paragraph(text("more")));
   });
 
+  // F13951: the continuation's nodes are kept whole and in order, however many: a fix that cut them would pass the hostile row alone.
+  test("keeps every node of a continuation of 5,000 code spans, in order", () => {
+    const spans = Array.from({ length: 5000 }, (_, n) => `\`${String(n)}\``).join(" ");
+    const [list] = blocksOf(`- a\n  ${spans}`);
+    const nodes = list?.type === "outline" ? (list.items[0]?.children ?? []) : [];
+    expect(nodes.slice(0, 3)).toStrictEqual([text("a"), br, { type: "code", text: "0" }]);
+    const codes = nodes.flatMap((node) => (node.type === "code" ? [node.text] : []));
+    expect(codes).toStrictEqual(Array.from({ length: 5000 }, (_, n) => String(n)));
+  });
+
   test("ends the list at a block of its own, however indented", () => {
     reads(
       "- a\n  - b\n  # h",
