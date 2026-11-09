@@ -121,13 +121,20 @@ class Lists {
         sub.push(read.list);
         next = read.next;
       } else if (under === undefined && sub.length === 0 && continues(line, item)) {
-        children.push({ type: "break" }, ...this.#inline(line.trim()));
-        this.rich = true;
+        this.#continue(children, line);
         next += 1;
       } else break;
     }
     this.rich ||= task !== "none" || sub.length > 0;
     return { item: { children, task, sub }, next };
+  }
+
+  // A line that continues an item: a break, then its nodes one push each; a spread of them passed the engine's arguments past ~62,000
+  // code spans (F13951).
+  #continue(children: Inline[], line: string): void {
+    children.push({ type: "break" });
+    for (const node of this.#inline(line.trim())) children.push(node);
+    this.rich = true;
   }
 }
 

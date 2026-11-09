@@ -1561,6 +1561,8 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     ],
     ["tasks", (n) => fill("- [ ] a\n", n)],
     ["items with continuations", (n) => fill("- a\n  b\n", n)],
+    // F13951: a continuation's nodes were spread into one `push`, past the engine's arguments at ~62,000 spans: a RangeError.
+    ["code spans in one item's continuation (F13951)", (n) => "- a\n  " + fill("`a` ", n)],
     ["ordered items nested", (n) => fill("1. a\n   1. b\n", n)],
     ["a list of rules", (n) => fill("- a\n---\n", n)],
     ["pipes alone", (n) => fill("|", n)],
