@@ -143,21 +143,28 @@ function problemOf(shape: Shape, text: string): Problem | undefined {
   }
 }
 
-type Resolved = { ok: true; fields: { field: CallField; shape: Shape }[] } | { ok: false; why: "read" | "gnoweb" };
+type Shaped = { field: CallField; shape: Shape }[];
+type Resolved = { ok: true; fields: Shaped } | { ok: false; why: "read" | "gnoweb" };
+
+// Each parameter's field, or undefined for one whose type is not carried or that `takes` refuses.
+function fieldsOf(params: readonly Param[], takes: (shape: Shape) => boolean): Shaped | undefined {
+  const fields: Shaped = [];
+  for (const { Name, Type } of params) {
+    const shape = shapeOf(Type);
+    if (shape === undefined || !takes(shape)) return undefined;
+    const field: CallField = { name: Name, type: Type, kind: shape.kind, freeText: shape.kind === "string" };
+    if (shape.kind === "bytes" && shape.length !== undefined) field.length = shape.length;
+    fields.push({ field, shape });
+  }
+  return fields;
+}
 
 function resolve(params: Params): Resolved {
   if (params?.[0]?.Type !== realmType()) return { ok: false, why: "read" };
   // `...byte` is written `[]uint8` too, and the chain would refuse its call once signed and paid (answer 9c-1).
   if (params.at(-1)?.Type === "[]uint8") return { ok: false, why: "gnoweb" };
-  const fields: { field: CallField; shape: Shape }[] = [];
-  for (const { Name, Type } of params.slice(1)) {
-    const shape = shapeOf(Type);
-    if (shape === undefined) return { ok: false, why: "gnoweb" };
-    const field: CallField = { name: Name, type: Type, kind: shape.kind, freeText: shape.kind === "string" };
-    if (shape.kind === "bytes" && shape.length !== undefined) field.length = shape.length;
-    fields.push({ field, shape });
-  }
-  return { ok: true, fields };
+  const fields = fieldsOf(params.slice(1), () => true);
+  return fields === undefined ? { ok: false, why: "gnoweb" } : { ok: true, fields };
 }
 
 /** The fields a call draws, the realm parameter left out: none for a read function, none for a type no call carries. */
