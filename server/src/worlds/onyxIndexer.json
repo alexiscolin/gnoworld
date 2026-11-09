@@ -1,7 +1,7 @@
 {
-  "source": "onyx-1 indexer, answers to the worlds job queries, recorded by 7k3 from the sandbox through its proxy (gnomcp shows no raw GraphQL); the queries with success and func re-recorded by 13a",
+  "source": "onyx-1 indexer, answers to the worlds job queries, recorded by 7k3 from the sandbox through its proxy (gnomcp shows no raw GraphQL)",
   "indexer": "https://indexer.onyx.testnets.gno.land/graphql/query",
-  "recorded": "2026-11-09T17:13:44.408Z",
+  "recorded": "2026-11-04T07:28:50.196Z",
   "answers": [
     {
       "what": "the per-realm filter 7c wrote",
@@ -14,36 +14,36 @@
     },
     {
       "what": "the first page",
-      "query": "query($limit: Int!) { getTransactions(where: { messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "query": "query($limit: Int!) { getTransactions(where: { messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
       "variables": {
         "limit": 3
       },
       "status": 200,
-      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":0,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/sys/names\",\"caller\":\"g1skl80cuz8zq3lul9pgz5pc35l2pfzgxgfpsqkx\",\"func\":\"Enable\"}}]},{\"block_height\":0,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1edq4dugw0sgat4zxcw9xardvuydqf6cgleuc8p\",\"func\":\"Register\"}}]},{\"block_height\":19656,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g17xcvw4uvehrywupnhncgpm6llat69syhne8s56\",\"func\":\"Register\"}}]}]}}"
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":0,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/sys/names\",\"caller\":\"g1skl80cuz8zq3lul9pgz5pc35l2pfzgxgfpsqkx\"}}]},{\"block_height\":0,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1edq4dugw0sgat4zxcw9xardvuydqf6cgleuc8p\"}}]},{\"block_height\":19656,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g17xcvw4uvehrywupnhncgpm6llat69syhne8s56\"}}]}]}}"
     },
     {
       "what": "a page with a session message beside a call",
-      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
       "variables": {
         "above": 253604,
         "limit": 3
       },
       "status": 200,
-      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":253605,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"UnexpectedMessage\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/samcrew/connect4\",\"caller\":\"g1cvr48r7l7lkmvp77cr6zg2zhu26jgfwr0y8pew\",\"func\":\"Offer\"}}]},{\"block_height\":253606,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnoradio/catalog/v1\",\"caller\":\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\",\"func\":\"CreateArtist\"}}]},{\"block_height\":253608,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnoradio/catalog/v1\",\"caller\":\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\",\"func\":\"CreateArtist\"}}]}]}}"
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":253605,\"messages\":[{\"value\":{\"__typename\":\"UnexpectedMessage\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/samcrew/connect4\",\"caller\":\"g1cvr48r7l7lkmvp77cr6zg2zhu26jgfwr0y8pew\"}}]},{\"block_height\":253606,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnoradio/catalog/v1\",\"caller\":\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\"}}]},{\"block_height\":253608,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnoradio/catalog/v1\",\"caller\":\"g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq\"}}]}]}}"
     },
     {
       "what": "a page with a transaction calling two realms",
-      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
       "variables": {
         "above": 65430,
         "limit": 2
       },
       "status": 200,
-      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":65431,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/sys/namereg/v0\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\",\"func\":\"Register\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnogolf/golf\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\",\"func\":\"PlayRoundPro\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnogolf/golf\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\",\"func\":\"Claim\"}}]},{\"block_height\":65539,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1gkeydy90k4epq70sayc8s8ql5g767vrf342pl2/tally\",\"caller\":\"g1gkeydy90k4epq70sayc8s8ql5g767vrf342pl2\",\"func\":\"Bump\"}}]}]}}"
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":65431,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/sys/namereg/v0\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnogolf/golf\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\"}},{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/nym-alexiscolin000/gnogolf/golf\",\"caller\":\"g15wmukt79xymnnu6c4de32trnufudqum60yrxu8\"}}]},{\"block_height\":65539,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1gkeydy90k4epq70sayc8s8ql5g767vrf342pl2/tally\",\"caller\":\"g1gkeydy90k4epq70sayc8s8ql5g767vrf342pl2\"}}]}]}}"
     },
     {
       "what": "a page above the tip",
-      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
       "variables": {
         "above": 999999999,
         "limit": 3
@@ -53,7 +53,7 @@
     },
     {
       "what": "a negative bound",
-      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
       "variables": {
         "above": -1,
         "limit": 3
@@ -63,12 +63,12 @@
     },
     {
       "what": "a block alone",
-      "query": "query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "query": "query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }) { block_height messages { value { __typename ... on MsgCall { pkg_path caller } } } } }",
       "variables": {
         "height": 41641
       },
       "status": 200,
-      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":41641,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1z360harzpshhdnlrdgj5ljkx2aeckzavkyl9g0\",\"func\":\"Register\"}}]},{\"block_height\":41641,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt/bazaar/c/bazaargens3\",\"caller\":\"g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt\",\"func\":\"AddDropItems\"}}]}]}}"
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":41641,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1z360harzpshhdnlrdgj5ljkx2aeckzavkyl9g0\"}}]},{\"block_height\":41641,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt/bazaar/c/bazaargens3\",\"caller\":\"g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt\"}}]}]}}"
     },
     {
       "what": "the call's type",

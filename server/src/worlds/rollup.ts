@@ -3,17 +3,17 @@
 // worlds' file, named by its path's hash, shed to its gzip cap. A fault is logged by its kind and never undoes the worlds' pass.
 import { blockTimes } from "@gnoworld/chain/asks";
 import { rollupName } from "@gnoworld/core";
-import { RealmRollup, ROLLUP_CAPS, ROLLUP_MAX_GZIP, type Worlds } from "@gnoworld/schemas/indexer";
+import { RealmPath, RealmRollup, ROLLUP_CAPS, ROLLUP_MAX_GZIP, type Worlds } from "@gnoworld/schemas/indexer";
 import type { Log } from "@gnoworld/service/log";
-import { mkdirSync } from "node:fs";
+import { mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
 import { Blocks, daysOf, timesOf } from "./blockDays.ts";
-import { readingOf, request, walkCalls, type Reader, type Reading } from "./history.ts";
+import { readingOf, request, walkCalls, type Reader, type Reading, type Row } from "./history.ts";
 import { Failure, kindOf, type Kind, type Send } from "./remote.ts";
 import { rollupStore, type RollupStore } from "./rollupStore.ts";
-import { replaceFiles } from "../replaceFile.ts";
+import { replaceFile } from "../replaceFile.ts";
 
 /** The most heights of last calls a pass asks the exact time of, past those the days' bisection asked. */
 const TIMES_PER_PASS = 1_000;
@@ -49,13 +49,16 @@ export async function readRollup(
   store: RollupStore,
   options: { known: ReadonlySet<string>; isStopped?: () => boolean },
 ): Promise<{ ok: true } | { ok: false; kind: Kind }> {
-  const reading = readingOf(reader, options.isStopped);
+  const reading = readingOf({ ...reader, rich: true }, options.isStopped);
   const ask = (heights: readonly number[]) => timesOf(reading, heights);
+  // A realm the list holds, or one a successful call proves deployed (a list may miss it this pass); a failed call may name any path.
+  const kept = (row: Row, path: string) =>
+    options.known.has(path) || (row.success && RealmPath.safeParse(path).success);
   try {
     const anchor = store.anchor();
     if (anchor !== undefined && !(await anchorHolds(reading, anchor))) store.reset();
     await walkCalls(reading, store.height(), async (rows, through) => {
-      const mine = rows.map((row) => ({ ...row, calls: row.calls.filter(({ path }) => options.known.has(path)) }));
+      const mine = rows.map((row) => ({ ...row, calls: row.calls.filter(({ path }) => kept(row, path)) }));
       const dated = await daysOf(
         mine.flatMap(({ height, calls }) => (calls.length > 0 ? [height] : [])),
         ask,
@@ -74,24 +77,34 @@ export async function readRollup(
   }
 }
 
-/** Every realm's file of `worlds` with calls or importers, shed to its cap, in `folder` by its path's hash; false when none is written. */
-export function writeRollups(folder: string, worlds: Worlds, store: RollupStore): { written: number } | false {
+/**
+ * Every realm's file of `worlds` with calls or importers, shed to its cap, in `folder` by its path's hash, each written whole on its own and
+ * the server's other work let run after each; false at the first the folder does not take.
+ */
+export async function writeRollups(
+  folder: string,
+  worlds: Worlds,
+  store: RollupStore,
+): Promise<{ written: number } | false> {
   const importers = importersOf(worlds);
-  const files = worlds.worlds.flatMap(({ realms }) =>
-    realms.flatMap(({ path }) => {
-      const whole = store.rollupOf(path, importers.get(path), worlds.updated);
-      const file = RealmRollup.safeParse(whole === undefined ? undefined : fitted(whole));
-      return file.success
-        ? [{ file: join(folder, `${rollupName(path)}.json`), text: `${JSON.stringify(file.data)}\n` }]
-        : [];
-    }),
-  );
   try {
     mkdirSync(folder, { recursive: true });
   } catch {
     return false;
   }
-  return replaceFiles(files) ? { written: files.length } : false;
+  const names = new Set<string>();
+  for (const { path } of worlds.worlds.flatMap(({ realms }) => realms)) {
+    const whole = store.rollupOf(path, importers.get(path), worlds.updated);
+    const file = RealmRollup.safeParse(whole === undefined ? undefined : fitted(whole));
+    if (file.success && !replaceFile(join(folder, `${rollupName(path)}.json`), `${JSON.stringify(file.data)}\n`))
+      return false;
+    if (file.success) names.add(`${rollupName(path)}.json`);
+    await new Promise((resolve) => setImmediate(resolve));
+  }
+  // A file this pass wrote none for would keep a realm's last counts, a restarted chain's among them.
+  for (const name of readdirSync(folder))
+    if (/^[0-9a-f]{32}\.json$/.test(name) && !names.has(name)) unlinkSync(join(folder, name));
+  return { written: names.size };
 }
 
 /** What a pass of the rollup reads and writes with: its settings (none: no rollup), the job's way out, its pace and its stop. */
@@ -124,7 +137,7 @@ export async function rollUp(pass: RollupPass, worlds: Worlds): Promise<void> {
   const known = new Set(worlds.worlds.flatMap(({ realms }) => realms.map(({ path }) => path)));
   const read = await readRollup(reader, store, { known, isStopped });
   if (!read.ok) failed(read.kind);
-  if (!isStopped() && writeRollups(rollup.dir, worlds, store) === false) failed("write");
+  if (!isStopped() && (await writeRollups(rollup.dir, worlds, store)) === false) failed("write");
 }
 
 const gzipped = (file: RealmRollup): number => gzipSync(JSON.stringify(file), { level: 6 }).length;

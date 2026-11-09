@@ -90,7 +90,8 @@ function writers(db: DatabaseSync) {
       caller.run(path, by);
       dayCaller.run(path, at.day, by);
     }
-    if (name !== null) func.run(path, name);
+    // A failed call may name any function: a successful one names one the realm has.
+    if (name !== null && row.success) func.run(path, name);
     call.run(path, row.height, name, by ?? null, row.success ? 1 : 0, at.time);
   };
   return {

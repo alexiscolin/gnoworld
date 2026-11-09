@@ -38,25 +38,30 @@ export function nameAsk(address: string): AbciAsk | null {
 // A filter on a message's value reaches only the type it names and lets every other message through (onyx-1's auth sessions), so the
 // transactions are chosen by a call's type and a message that is no call is left out here. A negative bound answers nothing: the first page
 // has none.
-const FIELDS = "block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } }";
+// A call's success and function only for the rollup (13a), which reads above its last height: the worlds file's whole-chain read pays for
+// neither (212 B a transaction with them, 180 B without, on onyx-1).
+const fields = (rich: boolean): string =>
+  rich
+    ? "block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } }"
+    : "block_height messages { value { __typename ... on MsgCall { pkg_path caller } } }";
 const CALLS = 'messages: { typeUrl: { eq: "exec" } }';
 const ORDER = "order: { heightAndIndex: ASC }";
 
-/** The first `limit` transactions with a call, from the chain's start. */
-export const callsFirst = (limit: number): IndexerAsk => ({
-  query: `query($limit: Int!) { getTransactions(where: { ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`,
+/** The first `limit` transactions with a call, from the chain's start; `rich`, each call's success and function too. */
+export const callsFirst = (limit: number, rich = false): IndexerAsk => ({
+  query: `query($limit: Int!) { getTransactions(where: { ${CALLS} }, ${ORDER}, limit: $limit) { ${fields(rich)} } }`,
   variables: { limit },
 });
 
 /** The first `limit` transactions with a call above a height. */
-export const callsAbove = (above: number, limit: number): IndexerAsk => ({
-  query: `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`,
+export const callsAbove = (above: number, limit: number, rich = false): IndexerAsk => ({
+  query: `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, ${CALLS} }, ${ORDER}, limit: $limit) { ${fields(rich)} } }`,
   variables: { above, limit },
 });
 
 /** Every transaction with a call in one block. */
-export const callsInBlock = (height: number): IndexerAsk => ({
-  query: `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${FIELDS} } }`,
+export const callsInBlock = (height: number, rich = false): IndexerAsk => ({
+  query: `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${fields(rich)} } }`,
   variables: { height },
 });
 

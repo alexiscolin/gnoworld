@@ -109,6 +109,8 @@ export interface Reader {
   readonly send: Send;
   readonly indexer: string;
   readonly pace?: (() => Promise<void>) | undefined;
+  /** Each call's success and function asked too (the rollup's read). */
+  readonly rich?: boolean | undefined;
 }
 // One read under way: where it asks, the rows a page asks, the requests it made and the characters it took.
 export interface Reading {
@@ -153,7 +155,8 @@ export async function request(reading: Reading, body: IndexerAsk): Promise<unkno
 // The page above `above`: one past the byte cap is asked again with half its rows, down to one.
 async function pageOf(reading: Reading, above: number | undefined): Promise<Row[]> {
   for (let size = reading.limit; ; size = Math.ceil(size / 2)) {
-    const body = above === undefined ? callsFirst(size) : callsAbove(above, size);
+    const { rich } = reading.reader;
+    const body = above === undefined ? callsFirst(size, rich) : callsAbove(above, size, rich);
     try {
       return rowsOf(await request(reading, body), above === undefined ? 0 : above + 1);
     } catch (error) {
@@ -172,13 +175,14 @@ export async function walkCalls(
   above: number | undefined,
   take: (rows: readonly Row[], through: number) => void | Promise<void>,
 ): Promise<void> {
+  const { rich } = reading.reader;
   for (let from = above; ;) {
     const rows = await pageOf(reading, from);
     const last = rows.at(-1)?.height;
     if (last === undefined) return;
     const whole = rows.filter(({ height }) => height < last);
     from = whole.length > 0 ? last - 1 : last;
-    await take(whole.length > 0 ? whole : rowsOf(await request(reading, callsInBlock(last)), last, last), from);
+    await take(whole.length > 0 ? whole : rowsOf(await request(reading, callsInBlock(last, rich)), last, last), from);
   }
 }
 
@@ -235,7 +239,6 @@ export async function readHistories(
   paths: readonly string[],
   hooks: { sinceOf: (path: string) => number | undefined; isStopped?: () => boolean },
 ): Promise<HistoriesRead> {
-  const reading = readingOf(reader, hooks.isStopped);
   const tallies = new Map<string, Tally>(
     paths.map((path) => [path, { calls: 0, callers: new Set(), last: null, marks: new Set(), recent: new Set() }]),
   );
@@ -247,7 +250,7 @@ export async function readHistories(
     }
   };
   try {
-    await walkCalls(reading, undefined, counted);
+    await walkCalls(readingOf(reader, hooks.isStopped), undefined, counted);
   } catch (error) {
     return { ok: false, kind: kindOf(error) };
   }

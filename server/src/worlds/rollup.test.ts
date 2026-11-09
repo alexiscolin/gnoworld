@@ -1,8 +1,8 @@
-import { blockTimes, callsFirst } from "@gnoworld/chain/asks";
+import { blockTimes, callsAbove, callsFirst, callsInBlock } from "@gnoworld/chain/asks";
 import { rollupName } from "@gnoworld/core";
 import { RealmRollup, ROLLUP_MAX_GZIP, type Worlds } from "@gnoworld/schemas/indexer";
 import { openDatabase } from "@gnoworld/service/db";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -101,9 +101,20 @@ describe("the indexer's words for the rollup (onyxRollup.json, recorded from ony
     });
   });
 
-  it("asks each call's success and function with the chain's calls", () => {
-    expect(callsFirst(2).query).toMatch(/\bsuccess\b/);
-    expect(callsFirst(2).query).toMatch(/\bfunc\b/);
+  // The worlds file's whole-chain read pays for neither field (F13010): 212 B a transaction with them, 180 B without.
+  it("asks each call's success and function for the rollup alone", () => {
+    for (const ask of [callsFirst(2, true), callsAbove(7, 2, true), callsInBlock(9, true)]) {
+      expect(ask.query).toMatch(/\bsuccess\b/);
+      expect(ask.query).toMatch(/\bfunc\b/);
+    }
+    for (const ask of [callsFirst(2), callsAbove(7, 2), callsInBlock(9)])
+      expect(ask.query).not.toMatch(/\bsuccess\b|\bfunc\b/);
+  });
+
+  it("reads the rollup's pages with both fields", async () => {
+    const { chain, reader } = reading([callRow(100, A)]);
+    expect(await readRollup(reader, store().rollups, { known: KNOWN })).toEqual({ ok: true });
+    expect(pagesOf(chain).every(({ query }) => /\bsuccess\b/.test(query) && /\bfunc\b/.test(query))).toBe(true);
   });
 
   it("reads onyx-1's answer of fifty aliases, the most it asks at once", () => {
@@ -256,7 +267,7 @@ describe("rollupStore, the rollup's state in sqlite", () => {
         { address: B, calls: 1 },
       ],
       functions: [
-        { name: "Register", calls: 4 },
+        { name: "Register", calls: 3 },
         { name: "Update", calls: 1 },
       ],
       importers: { total: 0, top: [] },
@@ -270,6 +281,22 @@ describe("rollupStore, the rollup's state in sqlite", () => {
       [100, A, "Register", true, null],
     ]);
     expect(RealmRollup.safeParse(file).error).toBeUndefined();
+  });
+
+  // Anyone can send a failed call naming any exported-looking function: only a call that ran names one the realm has (F13003).
+  it("counts the functions of successful calls alone, and shows a failed call's as it was named", () => {
+    const { rollups } = store();
+    rollups.add(
+      [row(5, [call(A, "Register")]), row(6, [call(B, "Fake")], false)],
+      dated({ 5: "2026-09-28", 6: "2026-09-28" }),
+      6,
+    );
+    const file = rollups.rollupOf(PATH, undefined, UPDATED);
+    expect(file?.functions).toEqual([{ name: "Register", calls: 1 }]);
+    expect(file?.last.map(({ func, success }) => [func, success])).toEqual([
+      ["Fake", false],
+      ["Register", true],
+    ]);
   });
 
   it("counts a call with an odd function or no caller, and shows neither; a text shaped like SQL stays text", () => {
@@ -589,14 +616,35 @@ describe("readRollup, the incremental read", () => {
     expect(file?.last.find(({ func }) => func === "Update")?.success).toBe(false);
   });
 
-  it("keeps the calls of the realms it is told alone: a path the list does not hold adds no row", async () => {
+  // A failed call costs its fee and may name any path; a successful one proves a deployed realm.
+  it("keeps no failed call to a path the list does not hold: no row for it", async () => {
     const { db, rollups } = store();
-    const junk = Array.from({ length: 50 }, (_, i) => callRow(100 + i, A, { path: `gno.land/r/junk/j${String(i)}` }));
+    const junk = Array.from({ length: 50 }, (_, i) =>
+      callRow(100 + i, A, { path: `gno.land/r/junk/j${String(i)}`, success: false }),
+    );
     expect(await readRollup(reading([...junk, callRow(500, A)]).reader, rollups, { known: KNOWN })).toEqual({
       ok: true,
     });
     expect(counted(db, "SELECT count(DISTINCT realm) AS n FROM rollup_calls")).toBe(1);
     expect(rollups.height()).toBe(500);
+  });
+
+  // A realm the list did not hold on one pass (a partial list, a shed realm, one deployed meanwhile) keeps its calls (F13007).
+  it("keeps the successful calls of a realm the list does not hold yet, so it counts them all once it does", async () => {
+    const { rollups } = store();
+    const NEW = "gno.land/r/late/comer";
+    const first = [callRow(100, A), callRow(110, B, { path: NEW }), callRow(120, C, { path: NEW })];
+    await readRollup(reading(first).reader, rollups, { known: KNOWN });
+    const later = reading([...first, callRow(200, A, { path: NEW })]);
+    expect(await readRollup(later.reader, rollups, { known: new Set([...KNOWN, NEW]) })).toEqual({ ok: true });
+    expect(rollups.rollupOf(NEW, undefined, UPDATED)).toMatchObject({ calls: 3, callers: 3 });
+  });
+
+  it("keeps no call, failed or not, to a path that is no realm's", async () => {
+    const { db, rollups } = store();
+    const odd = [callRow(100, A, { path: "gno.land/p/nt/avl/v0" }), callRow(110, A, { path: "<script>" })];
+    expect(await readRollup(reading(odd).reader, rollups, { known: KNOWN })).toEqual({ ok: true });
+    expect(counted(db, "SELECT count(*) AS n FROM rollup_calls")).toBe(0);
   });
 
   it("reads nothing of an empty chain, and has no file", async () => {
@@ -622,6 +670,19 @@ describe("readRollup, the incremental read", () => {
         top: [{ address: C, calls: 1 }],
       });
     }
+  });
+
+  // A pass with no new call of a known realm keeps the block it last dated, so a later restart is still seen.
+  it("keeps the dated block through a pass that dated none, and still starts over on a restarted chain", async () => {
+    const { rollups } = store();
+    await readRollup(reading([callRow(100, A), callRow(400, B)]).reader, rollups, { known: KNOWN });
+    const quiet = [callRow(100, A), callRow(400, B), callRow(500, C, { path: "gno.land/r/junk/j", success: false })];
+    expect(await readRollup(reading(quiet).reader, rollups, { known: KNOWN })).toEqual({ ok: true });
+    expect(rollups.height()).toBe(500);
+    expect(rollups.anchor()).toEqual({ height: 400, time: timeAt(400) });
+    const restarted = reading([callRow(50, C)], (h) => (h === 400 ? undefined : timeAt(h)));
+    expect(await readRollup(restarted.reader, rollups, { known: KNOWN })).toEqual({ ok: true });
+    expect(rollups.rollupOf(PATH, undefined, UPDATED)).toMatchObject({ calls: 1, height: 50 });
   });
 
   it("stops when the job stops", async () => {
@@ -689,7 +750,35 @@ describe("importersOf, the realms that import each realm", () => {
 });
 
 describe("writeRollups, the files", () => {
-  it("writes one file per realm with calls or importers, named by its path's hash, and none for the others", () => {
+  // The server's one thread serves the chat and logins while the job writes: every realm's file costs queries and gzips (F13001).
+  it("lets the server's other work run between realms, never one block over every file", async () => {
+    const { rollups } = store();
+    const paths = Array.from({ length: 20 }, (_, i) => `gno.land/r/many/r${String(i)}`);
+    rollups.add(
+      [
+        row(
+          5,
+          paths.map((path) => call(A, "Register", path)),
+        ),
+      ],
+      dated({ 5: "2026-09-28" }),
+      5,
+    );
+    let turns = 0;
+    const tick = (): void => {
+      turns += 1;
+      if (turns < 100) setImmediate(tick);
+    };
+    setImmediate(tick);
+    expect(
+      await writeRollups(join(dir, "turns"), worldsOf({ many: paths.map((path) => realmRow(path)) }), rollups),
+    ).toEqual({
+      written: 20,
+    });
+    expect(turns).toBeGreaterThanOrEqual(10);
+  });
+
+  it("writes one file per realm with calls or importers, named by its path's hash, and none for the others", async () => {
     const { rollups } = store();
     rollups.add([row(5, [call(A)])], dated({ 5: "2026-09-28" }), 5);
     const imported = "gno.land/r/gnops/lib";
@@ -697,7 +786,7 @@ describe("writeRollups, the files", () => {
       gnops: [realmRow(PATH, [imported], 3), realmRow(imported), realmRow("gno.land/r/gnops/quiet")],
     });
     const folder = join(dir, "written");
-    expect(writeRollups(folder, worlds, rollups)).toEqual({ written: 2 });
+    expect(await writeRollups(folder, worlds, rollups)).toEqual({ written: 2 });
     expect(readdirSync(folder).sort()).toEqual([`${rollupName(PATH)}.json`, `${rollupName(imported)}.json`].sort());
     const read = (path: string) =>
       RealmRollup.parse(JSON.parse(readFileSync(join(folder, `${rollupName(path)}.json`), "utf8")));
@@ -708,6 +797,19 @@ describe("writeRollups, the files", () => {
       importers: { total: 1, top: [{ path: PATH, calls: 3 }] },
     });
     expect(existsSync(join(folder, `${rollupName("gno.land/r/gnops/quiet")}.json`))).toBe(false);
+  });
+
+  // A file stays served under its name until removed: after a restarted chain it would show the last chain's counts (F13008).
+  it("removes the files of realms it wrote none for this pass, and leaves any other file of the folder", async () => {
+    const { rollups } = store();
+    rollups.add([row(5, [call(A)])], dated({ 5: "2026-09-28" }), 5);
+    const folder = join(dir, "stale");
+    const worlds = worldsOf({ gnops: [realmRow(PATH)] });
+    expect(await writeRollups(folder, worlds, rollups)).toEqual({ written: 1 });
+    writeFileSync(join(folder, "keep.txt"), "x");
+    rollups.reset();
+    expect(await writeRollups(folder, worlds, rollups)).toEqual({ written: 0 });
+    expect(readdirSync(folder)).toEqual(["keep.txt"]);
   });
 
   it("matches the file the job wrote from onyx-1 (onyxValopersRollup.json): the contract the plate reads", () => {
