@@ -7,6 +7,7 @@ import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain
 import { all, button, click, mount, nth, one } from "../../../tests/mount.tsx";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { RealmFunctions } from "./RealmFunctions.tsx";
+import { useFunctions } from "./useFunctions.ts";
 
 // 5i, tier 1 (it feeds `vm/qeval`): a realm's parameterless read functions, listed from `vm/qfuncs`, each a button that reads
 // its result once through `vm/qeval`. Free: the label says so, the block height says when, and Adena is never asked.
@@ -760,4 +761,262 @@ describe("a list that grows with the universe", () => {
     expect(all(region(box), "button")).toHaveLength(0);
     expect(hrefs(box)).toEqual([]);
   });
+});
+
+// Slice 13, B (plan §3, eval floods; D13301): a card keeps one read in flight, starts one per 400 ms (later asks wait, the last kept), gives
+// it 10 s and reads 64 KB of the answer. useFunctions is driven by a harness asking directly: the panel's busy button refuses a click while
+// a read is under way, which the plate's card (part C) may not.
+describe("the Try-it caller: one read in flight a card, 400 ms apart, 10 s, 64 KB", () => {
+  const INT = [{ Name: ".res.0", Type: "int64", Value: "" }];
+  const SEARCH = [
+    { Name: "q", Type: "string" },
+    { Name: "n", Type: "int" },
+  ];
+  const READABLE = [
+    { FuncName: "TotalSupply", Params: null, Results: INT },
+    { FuncName: "Decimals", Params: null, Results: INT },
+  ];
+  // A chain whose qeval answers as `answer` says, given the request's signal; the rest as `chain` answers.
+  function evalChain(answer: (url: string, signal: AbortSignal | null | undefined) => Promise<Response>) {
+    const inner = chain({ functions: READABLE });
+    return vi.fn<ChainFetch>((url, init) =>
+      queryOf(url) === "vm/qeval" ? answer(url, init?.signal) : inner(url, init),
+    );
+  }
+  const reply = (text: string) => Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data: text }))));
+  // An answer that never comes: it rejects as a fetch does once its signal aborts.
+  const never = (_url: string, signal: AbortSignal | null | undefined) =>
+    new Promise<Response>((_resolve, reject) => {
+      signal?.addEventListener("abort", () => {
+        reject(new DOMException("aborted", "AbortError"));
+      });
+    });
+  const advance = async (ms: number) => {
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  };
+  // The hook's reads, asked by a plain button each (Search with a text), and its results as text.
+  function Harness({ fetcher }: { fetcher: ChainFetch }) {
+    const [options] = useState(() => ({ fetch: fetcher }));
+    const { results, read } = useFunctions(CHAIN.rpc, WUGNOT, options);
+    const asks: [string, () => void][] = [
+      ...READABLE.map(({ FuncName }): [string, () => void] => [
+        FuncName,
+        () => {
+          read(FuncName);
+        },
+      ]),
+      ...["A", "B", "C"].map((text): [string, () => void] => [
+        `Search ${text}`,
+        () => {
+          read("Search", { params: SEARCH, texts: [text, "1"] });
+        },
+      ]),
+    ];
+    return (
+      <>
+        {asks.map(([label, onClick]) => (
+          <button key={label} type="button" onClick={onClick}>
+            {`Ask ${label}`}
+          </button>
+        ))}
+        <output>{JSON.stringify(results)}</output>
+      </>
+    );
+  }
+  function Leaving({ fetcher }: { fetcher: ChainFetch }) {
+    const [shown, setShown] = useState(true);
+    return (
+      <>
+        {shown ? <Harness fetcher={fetcher} /> : null}
+        <button
+          type="button"
+          onClick={() => {
+            setShown(false);
+          }}
+        >
+          Leave
+        </button>
+      </>
+    );
+  }
+  async function harness(fetcher: ChainFetch, leaving = false) {
+    const box = mount(leaving ? <Leaving fetcher={fetcher} /> : <Harness fetcher={fetcher} />);
+    await advance(50);
+    return box;
+  }
+  const ask = (box: HTMLElement, label = "TotalSupply") => {
+    click(button(box, `Ask ${label}`));
+  };
+  const resultOf = (box: HTMLElement, name = "TotalSupply"): unknown =>
+    (JSON.parse(one(box, "output").textContent) as Record<string, unknown>)[name];
+  const evalsOf = (fetcher: ReturnType<typeof evalChain>) =>
+    fetcher.mock.calls.filter(([url]) => queryOf(url) === "vm/qeval");
+  const signalOf = (fetcher: ReturnType<typeof evalChain>, at: number) => evalsOf(fetcher)[at]?.[1]?.signal;
+  const faked = async (run: () => Promise<void>) => {
+    vi.useFakeTimers();
+    try {
+      await run();
+    } finally {
+      vi.useRealTimers();
+    }
+  };
+
+  test("starts a card's read at once, then one every 400 ms at most: reads asked within that time wait, and one goes", () =>
+    faked(async () => {
+      const fetcher = evalChain(() => reply("(7 int64)"));
+      const box = await harness(fetcher);
+      ask(box);
+      await advance(0);
+      expect(evalsOf(fetcher)).toHaveLength(1);
+      for (let n = 0; n < 3; n += 1) {
+        await advance(100);
+        ask(box);
+      }
+      await advance(99);
+      expect(evalsOf(fetcher)).toHaveLength(1);
+      await advance(1);
+      expect(evalsOf(fetcher)).toHaveLength(2);
+      await advance(5_000);
+      expect(evalsOf(fetcher)).toHaveLength(2);
+      expect(resultOf(box)).toMatchObject({ state: "read", text: "(7 int64)" });
+    }));
+
+  test("keeps the last of the reads asked while one waits: its arguments are the ones sent", () =>
+    faked(async () => {
+      const fetcher = evalChain(() => reply("(1 int64)"));
+      const box = await harness(fetcher);
+      ask(box, "Search A");
+      await advance(100);
+      ask(box, "Search B");
+      await advance(100);
+      ask(box, "Search C");
+      await advance(1_000);
+      expect(evalsOf(fetcher).map(([url]) => dataOf(url))).toEqual([
+        `${WUGNOT}.Search("A", 1)`,
+        `${WUGNOT}.Search("C", 1)`,
+      ]);
+    }));
+
+  test("says a waiting read is busy at once, before its request goes", () =>
+    faked(async () => {
+      const fetcher = evalChain(() => reply("(7 int64)"));
+      const box = await harness(fetcher);
+      ask(box);
+      await advance(10);
+      ask(box);
+      await advance(0);
+      expect(resultOf(box)).toEqual({ state: "busy" });
+      expect(evalsOf(fetcher)).toHaveLength(1);
+      await advance(1_000);
+      expect(resultOf(box)).toMatchObject({ state: "read" });
+    }));
+
+  test("keeps one read in flight a card: the next ends the one under way when it starts, not when it is asked", () =>
+    faked(async () => {
+      let calls = 0;
+      const fetcher = evalChain((url, signal) => {
+        calls += 1;
+        return calls === 1 ? never(url, signal) : reply("(second int64)");
+      });
+      const box = await harness(fetcher);
+      ask(box);
+      await advance(100);
+      ask(box);
+      await advance(299);
+      expect(signalOf(fetcher, 0)?.aborted).toBe(false);
+      expect(evalsOf(fetcher)).toHaveLength(1);
+      await advance(1);
+      expect(signalOf(fetcher, 0)?.aborted).toBe(true);
+      expect(signalOf(fetcher, 1)?.aborted).toBe(false);
+      await advance(1_000);
+      expect(resultOf(box)).toMatchObject({ state: "read", text: "(second int64)" });
+    }));
+
+  test("lets the read it ended settle nothing: the card stays busy with the next one", () =>
+    faked(async () => {
+      const fetcher = evalChain(never);
+      const box = await harness(fetcher);
+      ask(box);
+      await advance(500);
+      ask(box);
+      await advance(0);
+      expect(signalOf(fetcher, 0)?.aborted).toBe(true);
+      await advance(1);
+      expect(resultOf(box)).toEqual({ state: "busy" });
+      await advance(5_000);
+      expect(resultOf(box)).toEqual({ state: "busy" });
+    }));
+
+  test("lets two cards read at the same time: the limits are each card's", () =>
+    faked(async () => {
+      const fetcher = evalChain(never);
+      const box = await harness(fetcher);
+      ask(box, "TotalSupply");
+      ask(box, "Decimals");
+      await advance(0);
+      expect(evalsOf(fetcher).map(([url]) => dataOf(url))).toEqual([`${WUGNOT}.TotalSupply()`, `${WUGNOT}.Decimals()`]);
+      expect([signalOf(fetcher, 0)?.aborted, signalOf(fetcher, 1)?.aborted]).toEqual([false, false]);
+    }));
+
+  test("gives a read 10 seconds: still asked at 9.9 s, too long at 10 s, and its request ended", () =>
+    faked(async () => {
+      const fetcher = evalChain(never);
+      const box = await harness(fetcher);
+      ask(box);
+      await advance(9_900);
+      expect(resultOf(box)).toEqual({ state: "busy" });
+      await advance(100);
+      expect(resultOf(box)).toMatchObject({ state: "failed" });
+      expect(JSON.stringify(resultOf(box))).toContain("took too long");
+      expect(signalOf(fetcher, 0)?.aborted).toBe(true);
+    }));
+
+  // The cap weighs the RPC's answer as sent (its JSON, the result in base64 inside), in bytes of UTF-8 (D13301).
+  test.each([
+    { name: "exactly 65,536 bytes of ASCII", bytes: 65_536, char: "e", state: "read" },
+    { name: "65,537 bytes of ASCII", bytes: 65_537, char: "e", state: "failed" },
+    { name: "fewer characters than 65,536, but more bytes in UTF-8", bytes: 65_538, char: "é", state: "failed" },
+  ])("reads an answer of $name ($bytes bytes) as $state", ({ bytes, char, state }) =>
+    faked(async () => {
+      const answer = () => {
+        const bare = JSON.stringify(queryEnvelope({ data: "(1 int64)" }));
+        const log = char.repeat(Math.floor((bytes - bare.length) / new TextEncoder().encode(char).length));
+        const body = JSON.stringify(queryEnvelope({ data: "(1 int64)", log }));
+        const sized = body + " ".repeat(bytes - new TextEncoder().encode(body).length);
+        expect(new TextEncoder().encode(sized).length).toBe(bytes);
+        return Promise.resolve(new Response(sized));
+      };
+      const box = await harness(evalChain(answer));
+      ask(box);
+      await advance(100);
+      expect(resultOf(box)).toMatchObject(state === "read" ? { state, text: "(1 int64)" } : { state });
+      expect(JSON.stringify(resultOf(box)).includes("larger than this page reads")).toBe(state === "failed");
+    }),
+  );
+
+  test("ends a card's read when it leaves, and leaves no timer", () =>
+    faked(async () => {
+      const fetcher = evalChain(never);
+      const box = await harness(fetcher, true);
+      ask(box);
+      await advance(0);
+      click(button(box, "Leave"));
+      await advance(0);
+      expect(signalOf(fetcher, 0)?.aborted).toBe(true);
+      expect(vi.getTimerCount()).toBe(0);
+    }));
+
+  test("starts no waiting read once it leaves", () =>
+    faked(async () => {
+      const fetcher = evalChain(() => reply("(1 int64)"));
+      const box = await harness(fetcher, true);
+      ask(box);
+      await advance(100);
+      ask(box);
+      click(button(box, "Leave"));
+      await advance(1_000);
+      expect(evalsOf(fetcher)).toHaveLength(1);
+    }));
 });
