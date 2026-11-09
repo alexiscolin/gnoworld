@@ -397,7 +397,8 @@ describe("rollupStore, the rollup's state in sqlite", () => {
       expect(counted(db, "SELECT count(*) AS n FROM rollup_days WHERE realm = ?", realm)).toBe(400);
       expect(counted(db, "SELECT count(DISTINCT day) AS n FROM rollup_day_callers WHERE realm = ?", realm)).toBe(400);
     }
-  });
+    // About 2 s on a quiet machine; the gate runs it at a load of 25 and more.
+  }, 30_000);
 
   it("sheds the last calls first, then the importers, the functions and the days, until the file fits; none when nothing fits", () => {
     const { rollups } = store();
