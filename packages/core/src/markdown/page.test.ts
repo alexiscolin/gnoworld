@@ -1614,6 +1614,20 @@ describe("page: a `$help` link to the page's own realm is an action, never an ad
     expect(blocksOf(source, ORIGIN, "")).toStrictEqual(blocksOf(source, ORIGIN));
   });
 
+  // R2 of the review (F13319): the pass reaches a link wherever the page holds words, however deep.
+  test.each([
+    ["a quote", "> [v](/r/gov/dao$help&func=F)"],
+    ["marks", "**[v](/r/gov/dao$help&func=F)**"],
+    ["a list under an item", "- a\n  - [v](/r/gov/dao$help&func=F)"],
+    ["a task", "- [ ] [v](/r/gov/dao$help&func=F)"],
+    ["a table's header", "| [v](/r/gov/dao$help&func=F) |\n|---|\n| x |"],
+    ["columns", "<gno-columns>\n[v](/r/gov/dao$help&func=F)\n<gno-columns-sep>\nb\n</gno-columns>"],
+  ])("makes the action in %s", (_name, source) => {
+    const read = JSON.stringify(own(source, ORIGIN));
+    expect(read).toContain('{"type":"action","func":"F","args":[],"children":[{"type":"text","text":"v"}]}');
+    expect(read).not.toContain("$help");
+  });
+
   test("keeps an image a link to its address, never an action", () => {
     expect(own("![v](/r/gov/dao$help&func=F)", ORIGIN)).toStrictEqual([
       paragraph(picture("https://gno.land/r/gov/dao$help&func=F", "v")),

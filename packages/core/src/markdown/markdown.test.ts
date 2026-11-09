@@ -355,7 +355,7 @@ describe("markdown: underline, `++` at word bounds", () => {
 });
 
 describe("markdown: links, https alone", () => {
-  // Slice 13 (R13 of B's red pass): a realm page's `$help` link is an action only through page()'s own option; the chat has none.
+  // Slice 13 (R13 of B's red pass): a realm page's `$help` link is an action only through withActions, which the chat never calls.
   test.each(["[a](/r/gov/dao$help&func=F)", "[a](https://gno.land/r/gov/dao$help&func=F&x=1)"])(
     "makes no action of %j, a `$help` link: text or a plain link",
     (source) => {
