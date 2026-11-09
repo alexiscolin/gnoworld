@@ -159,6 +159,7 @@ export { firstGraphemes } from "./markdown/graphemes.ts";
 export { cutGraphemes, excerpt, words } from "./markdown/plain.ts";
 export { isBlank } from "./markdown/nodes.ts";
 export { originOf } from "./markdown/address.ts";
+export { withActions } from "./markdown/actions.ts";
 export {
   MAX_LIST_DEPTH,
   MAX_TABLE_COLUMNS,
@@ -188,3 +189,4 @@ export * from "./discovery/index.ts";
 export * from "./store/index.ts";
 export { jsonOf, placeIn } from "./json/json.ts";
 export * from "./args/args.ts";
+export { helpCall, MAX_HELP_ARGS, prefill, type HelpArg, type HelpCall } from "./args/help.ts";

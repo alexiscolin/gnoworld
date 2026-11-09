@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { page, type Page } from "@gnoworld/core";
+import { page, withActions, type Page } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test } from "vitest";
 import { button, click, mount, one } from "../../../tests/mount.tsx";
@@ -37,6 +37,20 @@ const HOSTILE = [
 ].join("\n");
 
 describe("RealmBlocks: a realm page drawn from its tree", () => {
+  // Slice 13, B (D13300): a `$help` link to the page's own realm is an action, drawn as its words with no address until a card holds it.
+  test("draws a `$help` action as its label alone, with no link and no address", () => {
+    const blocks = withActions(blocksOf("[**Vote** YES](/r/gov/dao$help&func=Vote&option=YES&pid=14)"), {
+      origin: GNOWEB,
+      realm: "gno.land/r/gov/dao",
+    });
+    expect(blocks).toMatchObject([{ type: "paragraph", children: [{ type: "action", func: "Vote" }] }]);
+    const html = renderToStaticMarkup(<RealmBlocks via={via} origin={GNOWEB} blocks={blocks} />);
+    expect(html).not.toMatch(/<a[\s>]/);
+    expect(html).not.toContain("$help");
+    expect(textOf(html)).toContain("Vote YES");
+    expect(html).toContain("<strong>Vote</strong>");
+  });
+
   test("draws a heading at its level, a paragraph, a list and code", () => {
     const html = draw("# One\n\n## Two\n\ntext\n\n- a\n- b\n\n```\ncode\n```");
     expect(html).toMatch(/<h1[^>]*>One<\/h1>/);

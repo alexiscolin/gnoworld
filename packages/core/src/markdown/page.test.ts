@@ -2,6 +2,8 @@ import fc from "fast-check";
 import { describe, expect, test } from "vitest";
 import { MAX_QUOTE_DEPTH, markdown, type Inline } from "./markdown.ts";
 import { originOf } from "./address.ts";
+import { textProblem } from "../args/args.ts";
+import { withActions } from "./actions.ts";
 import {
   MAX_TABLE_COLUMNS,
   MAX_TABLE_ROWS,
@@ -19,9 +21,19 @@ import {
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
 const text = (value: string): Inline => ({ type: "text", text: value });
-const strong = (...children: Inline[]): Inline => ({ type: "strong", children });
-const link = (href: string, label = href): Inline => ({ type: "link", href, children: [text(label)] });
-const paragraph = (...children: Inline[]): PageBlock => ({ type: "paragraph", children });
+const strong = (...children: Inline[]): Inline => ({
+  type: "strong",
+  children,
+});
+const link = (href: string, label = href): Inline => ({
+  type: "link",
+  href,
+  children: [text(label)],
+});
+const paragraph = (...children: Inline[]): PageBlock => ({
+  type: "paragraph",
+  children,
+});
 const heading = (level: 1 | 2 | 3 | 4 | 5 | 6, ...children: Inline[]): PageBlock => ({
   type: "heading",
   level,
@@ -35,7 +47,10 @@ const picture = (href: string, label = "Image"): Inline => ({
   image: true,
 });
 const rule: PageBlock = { type: "rule" };
-const columns = (...cols: PageBlock[][]): PageBlock => ({ type: "columns", columns: cols });
+const columns = (...cols: PageBlock[][]): PageBlock => ({
+  type: "columns",
+  columns: cols,
+});
 const item = (children: Inline[], sub: PageBlock[] = [], task: OutlineItem["task"] = "none"): OutlineItem => ({
   children,
   task,
@@ -58,11 +73,12 @@ const field = (tag: FormField["tag"], name: string, rest: Partial<FormField> = {
   ...rest,
 });
 
-// The blocks of a page that fits the cap; a page past it is a test's failure here.
-function blocksOf(source: string, origin?: string): PageBlock[] {
+// The blocks of a page that fits the cap, under gnoweb's origin when given, and as the page of `realm` (its `$help` links actions,
+// withActions) when given with it; a page past the cap is a test's failure here.
+function blocksOf(source: string, origin?: string, realm?: string): PageBlock[] {
   const read = origin === undefined ? page(source) : page(source, { origin });
   if (read.kind !== "page") throw new Error("the page was read as too big");
-  return read.blocks;
+  return origin === undefined || realm === undefined ? read.blocks : withActions(read.blocks, { origin, realm });
 }
 const reads = (source: string, ...blocks: PageBlock[]) => {
   expect(blocksOf(source)).toStrictEqual(blocks);
@@ -130,6 +146,7 @@ const KEYS: Readonly<Record<string, string>> = {
   strike: "children,type",
   code: "text,type",
   link: "children,href,type",
+  action: "args,children,func,type",
   mention: "address,type",
   break: "type",
   paragraph: "children,type",
@@ -156,11 +173,27 @@ function leafAllowed(node: Inline, inLink: boolean): boolean {
   if (node.type === "mention") return !inLink && ACCOUNT.test(node.address);
   return node.type === "break";
 }
+// A `$help` action (slice 13): an exported function, its arguments by name each once, never a send, and no address.
+const actionAllowed = (node: Extract<Inline, { type: "action" }>): boolean =>
+  /^[A-Z][A-Za-z0-9_]{0,127}$/.test(node.func) &&
+  node.args.length <= 31 &&
+  node.args.every(
+    (a) =>
+      keysOf(a) === "name,value" &&
+      /^[A-Za-z_][A-Za-z0-9_]*$/.test(a.name) &&
+      a.name !== "send" &&
+      textProblem(a.value) === undefined,
+  ) &&
+  new Set(node.args.map((a) => a.name)).size === node.args.length;
+// A link's or an action's own checks: neither inside a link, a link's address https, an action's call clean.
+const holderAllowed = (node: Inline, inLink: boolean): boolean =>
+  node.type === "link" ? !inLink && HREF.test(node.href) : node.type !== "action" || (!inLink && actionAllowed(node));
 function inlineAllowed(node: Inline, inLink: boolean): boolean {
   if ((node.type === "link" && "image" in node ? IMAGE_KEYS : KEYS[node.type]) !== keysOf(node)) return false;
   if (!("children" in node)) return leafAllowed(node, inLink);
-  if (node.type === "link" && (inLink || !HREF.test(node.href))) return false;
-  return node.children.length > 0 && inlinesAllowed(node.children, inLink || node.type === "link");
+  if (!holderAllowed(node, inLink)) return false;
+  const holds = inLink || node.type === "link" || node.type === "action";
+  return node.children.length > 0 && inlinesAllowed(node.children, holds);
 }
 // Nodes side by side, each allowed, no two texts in a row.
 function inlinesAllowed(nodes: readonly Inline[], inLink: boolean): boolean {
@@ -257,10 +290,22 @@ describe("page: the blocks a realm's Markdown reads into", () => {
 
   test("reads the chat's blocks as the chat does: paragraphs, code, quotes, lists", () => {
     reads("one\ntwo", paragraph(text("one"), br, text("two")));
-    reads("```\ncode **kept**\n```", { type: "codeBlock", text: "code **kept**" });
+    reads("```\ncode **kept**\n```", {
+      type: "codeBlock",
+      text: "code **kept**",
+    });
     reads("> quoted", { type: "quote", children: [paragraph(text("quoted"))] });
-    reads("- a\n- b", { type: "list", ordered: false, items: [[text("a")], [text("b")]] });
-    reads("3. a\n4. b", { type: "list", ordered: true, start: 3, items: [[text("a")], [text("b")]] });
+    reads("- a\n- b", {
+      type: "list",
+      ordered: false,
+      items: [[text("a")], [text("b")]],
+    });
+    reads("3. a\n4. b", {
+      type: "list",
+      ordered: true,
+      start: 3,
+      items: [[text("a")], [text("b")]],
+    });
   });
 
   test("reads a whole page: a heading, its paragraph, a list, in order", () => {
@@ -284,7 +329,11 @@ describe("page: no underline, as gnoweb", () => {
   test("keeps `++` as text, in a heading and a list too", () => {
     reads("++x++ and ++y z++", paragraph(text("++x++ and ++y z++")));
     reads("## ++x++", heading(2, text("++x++")));
-    reads("- ++x++", { type: "list", ordered: false, items: [[text("++x++")]] });
+    reads("- ++x++", {
+      type: "list",
+      ordered: false,
+      items: [[text("++x++")]],
+    });
   });
 
   test("links a bare address with its `+` at the end, and none after a `+`", () => {
@@ -524,7 +573,11 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
         exec: "Vote",
         path: "",
         fields: [
-          field("input", "who", { inputType: "text", placeholder: "Your name", description: "Who votes" }),
+          field("input", "who", {
+            inputType: "text",
+            placeholder: "Your name",
+            description: "Who votes",
+          }),
           field("textarea", "why", { placeholder: "Reason" }),
           field("select", "pick", { value: "yes" }),
         ],
@@ -668,7 +721,11 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
       exec: "",
       path: "",
       fields: [
-        field("input", "a", { inputType: "checkbox", value: "y", flags: "required, readonly, checked" }),
+        field("input", "a", {
+          inputType: "checkbox",
+          value: "y",
+          flags: "required, readonly, checked",
+        }),
         field("textarea", "b", { flags: "required, rows 6" }),
         field("select", "c", { flags: "readonly" }),
         field("input", "d", { inputType: "text" }),
@@ -751,7 +808,10 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
 
   test("keeps markup in an attribute as a string", () => {
     const [form] = blocksOf('<gno-form>\n<gno-input name=\'"><script>alert(1)</script>\' value="x" />\n</gno-form>');
-    expect(form).toMatchObject({ type: "form", fields: [{ name: '"><script>alert(1)</script>', value: "x" }] });
+    expect(form).toMatchObject({
+      type: "form",
+      fields: [{ name: '"><script>alert(1)</script>', value: "x" }],
+    });
   });
 
   test("reads a form never closed as text, never as a form that swallows the page", () => {
@@ -833,7 +893,12 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads('> <gno-form>\n> <gno-input name="a" type="hidden" value="v" />\n> </gno-form>', {
       type: "quote",
       children: [
-        { type: "form", exec: "", path: "", fields: [field("input", "a", { inputType: "hidden", value: "v" })] },
+        {
+          type: "form",
+          exec: "",
+          path: "",
+          fields: [field("input", "a", { inputType: "hidden", value: "v" })],
+        },
       ],
     });
   });
@@ -886,7 +951,11 @@ describe("page: the caps", () => {
 
   test("answers a page one byte past the cap with the cap's state, and no blocks", () => {
     const read: Page = page("a".repeat(PAGE_MAX_BYTES + 1));
-    expect(read).toStrictEqual({ kind: "too-big", bytes: PAGE_MAX_BYTES + 1, cap: PAGE_MAX_BYTES });
+    expect(read).toStrictEqual({
+      kind: "too-big",
+      bytes: PAGE_MAX_BYTES + 1,
+      cap: PAGE_MAX_BYTES,
+    });
     expect("blocks" in read).toBe(false);
   });
 
@@ -908,7 +977,11 @@ describe("page: the caps", () => {
 
   test("counts bytes, not characters", () => {
     const read = page("é".repeat(PAGE_MAX_BYTES / 2 + 1));
-    expect(read).toStrictEqual({ kind: "too-big", bytes: PAGE_MAX_BYTES + 2, cap: PAGE_MAX_BYTES });
+    expect(read).toStrictEqual({
+      kind: "too-big",
+      bytes: PAGE_MAX_BYTES + 2,
+      cap: PAGE_MAX_BYTES,
+    });
     expect(page("é".repeat(PAGE_MAX_BYTES / 2)).kind).toBe("page");
   });
 
@@ -1056,6 +1129,10 @@ describe("page: the allowlist, for any input", () => {
     "./x",
     ":vote",
     "$help",
+    "[v](/r/demo/dao$help&func=Vote&pid=1&option=YES)",
+    "(/r/demo/dao$help&func=",
+    "&pid=1&.send=5ugnot&send=1)",
+    "&x=%E2%80%AE)",
     "https://gno.land@evil.example/",
     "javascript:alert(1)",
     "<script>",
@@ -1074,17 +1151,25 @@ describe("page: the allowlist, for any input", () => {
     "\0",
   ];
   const source = fc
-    .array(fc.oneof(fc.constantFrom(...PIECES), fc.string({ maxLength: 12 })), { maxLength: 60 })
+    .array(fc.oneof(fc.constantFrom(...PIECES), fc.string({ maxLength: 12 })), {
+      maxLength: 60,
+    })
     .map((parts) => parts.join(""));
 
   test("every node is on the list and every link is https, whatever the page", () => {
+    let actions = 0;
     fc.assert(
       fc.property(source, (page_) => {
         expectAllowlisted(blocksOf(page_));
         expectAllowlisted(blocksOf(page_, "https://gno.land"));
+        const own = blocksOf(page_, "https://gno.land", "gno.land/r/demo/dao");
+        expectAllowlisted(own);
+        actions += [...inlinesOf(own)].filter((node) => node.type === "action").length;
+        expectAllowlisted(blocksOf(page_, undefined, "gno.land/r/demo/dao"));
       }),
       PROPERTY,
     );
+    expect(actions).toBeGreaterThan(0);
   });
 
   test("holds on any text at all, not only the pieces above", () => {
@@ -1299,7 +1384,11 @@ describe("page: nested, mixed and task lists", () => {
   });
 
   test("leaves a flat list the chat's list, and one space of indent a sibling", () => {
-    reads("- a\n - b", { type: "list", ordered: false, items: [[text("a")], [text("b")]] });
+    reads("- a\n - b", {
+      type: "list",
+      ordered: false,
+      items: [[text("a")], [text("b")]],
+    });
     reads(
       "- a\n1. b",
       { type: "list", ordered: false, items: [[text("a")]] },
@@ -1338,7 +1427,11 @@ describe("page: nested, mixed and task lists", () => {
     for (const source of ["- [ ]", "- [x]no", "- [] a", "- [y] a"]) {
       expect(blocksOf(source).some((block) => block.type === "outline")).toBe(false);
     }
-    reads("- [x]no", { type: "list", ordered: false, items: [[text("[x]no")]] });
+    reads("- [x]no", {
+      type: "list",
+      ordered: false,
+      items: [[text("[x]no")]],
+    });
   });
 
   test("continues an item on the lines indented under it", () => {
@@ -1450,6 +1543,209 @@ describe("page: nested, mixed and task lists", () => {
     expectAllowlisted(blocks);
     expect(shown(blocks)).toContain("<img src=x onerror=1>");
     expect([...inlinesOf(blocks)].some((node) => node.type === "link")).toBe(false);
+  });
+});
+
+// Slice 13, B (docs/plans/slice-realm-plate.md §3): a realm's page links to its own functions as gnoweb's help page does,
+// `/r/<path>$help&func=<Name>&<arg>=<value>…` (gno.land/p/moul/txlink/v0, read on onyx-1 on 2026-11-10). On the page of that realm the
+// link is an action, its call read by core's args (help.ts), never an address; any other link reads as it did.
+describe("page: a `$help` link to the page's own realm is an action, never an address", () => {
+  const DAO = "gno.land/r/gov/dao";
+  const ORIGIN = "https://gno.land";
+  const action = (func: string, args: [string, string][], ...children: Inline[]): Inline => ({
+    type: "action",
+    func,
+    args: args.map(([name, value]) => ({ name, value })),
+    children,
+  });
+  const own = (source: string, origin?: string) => blocksOf(source, origin, DAO);
+  const fill_ = (unit: string, bytes: number) => unit.repeat(Math.floor(bytes / unit.length));
+
+  test("reads govDAO's recorded vote links as actions with their arguments, the text between them kept", () => {
+    const yes = "[Vote YES](/r/gov/dao$help&func=MustVoteOnProposalSimple&option=YES&pid=14)";
+    const no = "[Vote NO](/r/gov/dao$help&func=MustVoteOnProposalSimple&option=NO&pid=14)";
+    expect(own(`${yes} | ${no}`, ORIGIN)).toStrictEqual([
+      paragraph(
+        action(
+          "MustVoteOnProposalSimple",
+          [
+            ["option", "YES"],
+            ["pid", "14"],
+          ],
+          text("Vote YES"),
+        ),
+        text(" | "),
+        action(
+          "MustVoteOnProposalSimple",
+          [
+            ["option", "NO"],
+            ["pid", "14"],
+          ],
+          text("Vote NO"),
+        ),
+      ),
+    ]);
+  });
+
+  test("reads a link to its realm's call spelled whole under gnoweb's origin as the same action: the same address", () => {
+    expect(own("[Vote](https://gno.land/r/gov/dao$help&func=Vote&pid=1)", ORIGIN)).toStrictEqual([
+      paragraph(action("Vote", [["pid", "1"]], text("Vote"))),
+    ]);
+  });
+
+  test("changes nothing of the blocks it is given, a label's text joined to the text around it in a copy", () => {
+    const read = page("a [v](/r/gov/dao$help&func=A.B) b [w](/r/gov/dao$help&func=F)", { origin: ORIGIN });
+    const blocks = read.kind === "page" ? read.blocks : [];
+    const before: unknown = JSON.parse(JSON.stringify(blocks));
+    expect(withActions(blocks, { origin: ORIGIN, realm: DAO })).toStrictEqual([
+      paragraph(text("a v b "), action("F", [], text("w"))),
+    ]);
+    expect(blocks).toStrictEqual(before);
+  });
+
+  test("makes no action without gnoweb's origin, where a path link is text too", () => {
+    expect(own("[Vote](/r/gov/dao$help&func=Vote&pid=1)")).toStrictEqual([
+      paragraph(text("[Vote](/r/gov/dao$help&func=Vote&pid=1)")),
+    ]);
+  });
+
+  // R1 of the red pass: the realm's path on another host, or spelled whole, reads as it did: never an in-place card.
+  test.each([
+    ["another host", "https://evil.example/r/gov/dao$help&func=Transfer&to=g1evil"],
+    ["gnoweb's host with its port", "https://gno.land:443/r/gov/dao$help&func=F"],
+    ["gnoweb's host in capitals", "https://GNO.LAND/r/gov/dao$help&func=F"],
+    ["a host after two slashes", "//evil.example/r/gov/dao$help&func=F"],
+    ["a host after a slash and a backslash", "/\\evil.example/r/gov/dao$help&func=F"],
+    ["a path that walks back into it", "/r/gov/dao/../dao$help&func=F"],
+    ["a path with a dot segment", "/./r/gov/dao$help&func=F"],
+  ])("makes no action of a link to %s, with an origin or without", (_name, address) => {
+    const source = `[a](${address})`;
+    for (const origin of [ORIGIN, undefined]) {
+      const read = own(source, origin);
+      expect(read).toStrictEqual(blocksOf(source, origin));
+      expect([...inlinesOf(read)].some((node) => node.type === "action")).toBe(false);
+    }
+  });
+
+  test("keeps the label's marks, and makes its mentions text", () => {
+    const account = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    expect(own(`[**Vote** for @${account}](/r/gov/dao$help&func=Vote)`, ORIGIN)).toStrictEqual([
+      paragraph(action("Vote", [], strong(text("Vote")), text(` for @${account}`))),
+    ]);
+  });
+
+  test("drops a send amount, txlink's `.send` and a bare `send` alike", () => {
+    expect(own("[Buy](/r/gov/dao$help&func=Buy&id=1&.send=5ugnot&send=9ugnot)", ORIGIN)).toStrictEqual([
+      paragraph(action("Buy", [["id", "1"]], text("Buy"))),
+    ]);
+  });
+
+  test.each([
+    ["a selector", "&func=A.B"],
+    ["an unexported function", "&func=vote"],
+    ["an injection", "&func=A()%3B%20B()"],
+    ["a key twice", "&func=A&x=1&x=2"],
+    ["a hidden character", "&func=A&to=%E2%80%AEg1"],
+    ["a broken percent", "&func=A&x=%E2%9C"],
+  ])("shows the label alone, as text, for a call that is no call (%s)", (_name, query) => {
+    expect(own(`[Vote](/r/gov/dao$help${query})`, ORIGIN)).toStrictEqual([paragraph(text("Vote"))]);
+  });
+
+  test.each([
+    ["another realm", "[a](/r/demo/x$help&func=F)", "https://gno.land/r/demo/x$help&func=F"],
+    ["a realm whose path starts like it", "[a](/r/gov/daox$help&func=F)", "https://gno.land/r/gov/daox$help&func=F"],
+    ["a realm under it", "[a](/r/gov/dao/v3$help&func=F)", "https://gno.land/r/gov/dao/v3$help&func=F"],
+    ["its help page with no function", "[a](/r/gov/dao$help)", "https://gno.land/r/gov/dao$help"],
+    [
+      "a function after another key",
+      "[a](/r/gov/dao$help&pid=1&func=F)",
+      "https://gno.land/r/gov/dao$help&pid=1&func=F",
+    ],
+    ["its page", "[a](/r/gov/dao:proposals)", "https://gno.land/r/gov/dao:proposals"],
+  ])("leaves a link to %s as it was, an address under the origin", (_name, source, href) => {
+    expect(own(source, ORIGIN)).toStrictEqual([paragraph(link(href, "a"))]);
+  });
+
+  test("leaves another realm's `$help` link text when there is no origin, as before", () => {
+    expect(own("[a](/r/demo/x$help&func=F)")).toStrictEqual([paragraph(text("[a](/r/demo/x$help&func=F)"))]);
+  });
+
+  test("makes no action without the page's realm, nor of a realm with no path", () => {
+    const source = "[a](/r/gov/dao$help&func=F)";
+    expect(blocksOf(source, ORIGIN)).toStrictEqual([paragraph(link("https://gno.land/r/gov/dao$help&func=F", "a"))]);
+    expect(blocksOf(source, ORIGIN, "gno.land")).toStrictEqual(blocksOf(source, ORIGIN));
+    expect(blocksOf(source, ORIGIN, "")).toStrictEqual(blocksOf(source, ORIGIN));
+  });
+
+  test("keeps an image a link to its address, never an action", () => {
+    expect(own("![v](/r/gov/dao$help&func=F)", ORIGIN)).toStrictEqual([
+      paragraph(picture("https://gno.land/r/gov/dao$help&func=F", "v")),
+    ]);
+  });
+
+  test("keeps a blank label's link text, as a link's", () => {
+    expect(own("[ ](/r/gov/dao$help&func=F)", ORIGIN)).toStrictEqual([paragraph(text("[ ](/r/gov/dao$help&func=F)"))]);
+  });
+
+  test.each([
+    "[click](javascript:alert(1))",
+    '<a href="/r/gov/dao$help&func=F">x</a>',
+    "<script>alert(1)</script>",
+    "[a](/r/gov/dao$help&func=F&x=a b)",
+    '[a](/r/gov/dao$help&func=F&x=a"b)',
+  ])("still shows %j as text on the realm's own page", (source) => {
+    expect(own(source, ORIGIN)).toStrictEqual([paragraph(text(source))]);
+  });
+
+  test("makes no action in a link's label, and no link in an action's", () => {
+    expect(own("[a [b](/r/gov/dao$help&func=F) c](/r/gov/dao:x)", ORIGIN)).toStrictEqual([
+      paragraph(text("[a "), action("F", [], text("b")), text(" c](/r/gov/dao:x)")),
+    ]);
+    expect(own("[a [b](https://x.test) c](/r/gov/dao$help&func=F)", ORIGIN)).toStrictEqual([
+      paragraph(text("[a "), link("https://x.test", "b"), text(" c](/r/gov/dao$help&func=F)")),
+    ]);
+  });
+
+  test("reads an action in a heading, a list item and a table's cell", () => {
+    const vote = action("Vote", [["pid", "1"]], text("v"));
+    const link_ = "[v](/r/gov/dao$help&func=Vote&pid=1)";
+    const [head, list, table] = own(`## ${link_}\n\n- ${link_}\n\n| a |\n|---|\n| ${link_} |`, ORIGIN);
+    expect(head).toStrictEqual(heading(2, vote));
+    expect(list).toStrictEqual({
+      type: "list",
+      ordered: false,
+      items: [[vote]],
+    });
+    expect(table?.type === "table" ? table.rows : []).toStrictEqual([[[vote]]]);
+  });
+
+  test("reads a page of `$help` links at the cap in seconds, each an action, and one link of 50,000 pairs as text", () => {
+    const start = Date.now();
+    const unit = "[v](/r/gov/dao$help&func=Vote&pid=1&option=YES) ";
+    const count = Math.floor(PAGE_MAX_BYTES / unit.length);
+    const read = own(unit.repeat(count), ORIGIN);
+    expect([...inlinesOf(read)].filter((node) => node.type === "action")).toHaveLength(count);
+    const pairs = "&a=1".repeat(50_000);
+    expect(own(`[v](/r/gov/dao$help&func=Vote${pairs})`, ORIGIN)).toStrictEqual([paragraph(text("v"))]);
+    expect(Date.now() - start).toBeLessThan(5000);
+  });
+
+  // The hostile shapes of a page that reads its `$help` links (R11): its time grows with its size, not its square.
+  test.each([
+    ["links never closed", (n: number) => fill_("[v](/r/gov/dao$help&func=A&a=1", n)],
+    ["links of 31 pairs", (n: number) => fill_(`[v](/r/gov/dao$help&func=A${"&a=1".repeat(31)}) `, n)],
+    ["labels opened before one call", (n: number) => fill_("[", n - 40) + "[v](/r/gov/dao$help&func=A)"],
+  ])("reads %s in time that grows with its size", (_name, make) => {
+    const timeOf = (source: string) => {
+      own(source, ORIGIN);
+      const begin = Date.now();
+      own(source, ORIGIN);
+      return Date.now() - begin;
+    };
+    const small = make(32 * 1024);
+    const big = make(PAGE_MAX_BYTES - 64);
+    const linear = () => timeOf(big) < Math.max(32 * timeOf(small), 300);
+    expect("__stryker__" in globalThis || linear() || linear() || linear()).toBe(true);
   });
 });
 
@@ -1688,7 +1984,10 @@ describe("page: tables, as GFM reads them", () => {
   test("interrupts a paragraph, as GFM does, and sits in a quote", () => {
     reads("intro\n| a |\n|---|", paragraph(text("intro")), table(["none"], [[text("a")]], []));
     const [quote] = blocksOf("> | a |\n> |---|\n> | 1 |");
-    expect(quote).toMatchObject({ type: "quote", children: [{ type: "table" }] });
+    expect(quote).toMatchObject({
+      type: "quote",
+      children: [{ type: "table" }],
+    });
   });
 
   test.each([
@@ -1719,7 +2018,10 @@ describe("page: tables, as GFM reads them", () => {
     ["|:-:|:--|", ["center", "left"]],
     ["|  ---  |---:  |", ["none", "right"]],
   ] as const)("reads the delimiter row %j", (delimiter, align) => {
-    expect(blocksOf(`| a | b |\n${delimiter}`)[0]).toMatchObject({ type: "table", align });
+    expect(blocksOf(`| a | b |\n${delimiter}`)[0]).toMatchObject({
+      type: "table",
+      align,
+    });
   });
 
   test.each(["|::|--|", "|:|--|", "| -x |--|"])("refuses the delimiter row %j", (delimiter) => {
@@ -1746,15 +2048,23 @@ describe("page: tables, as GFM reads them", () => {
 
   test("a table inside a quote is a table, and an alert is a notice with a table in it", () => {
     const [alert] = blocksOf("> [!NOTE]\n> | a |\n> |--|\n> | 1 |");
-    expect(alert).toMatchObject({ severity: "notice", children: [expect.anything(), { type: "table" }] });
+    expect(alert).toMatchObject({
+      severity: "notice",
+      children: [expect.anything(), { type: "table" }],
+    });
   });
 
   test("gives an alert inside a quote its severity, and a quote inside an alert none", () => {
     const [outer] = blocksOf("> text\n> > [!WARNING]\n> > x");
-    expect(outer).toMatchObject({ children: [expect.anything(), { severity: "caution" }] });
+    expect(outer).toMatchObject({
+      children: [expect.anything(), { severity: "caution" }],
+    });
     expect(outer).not.toHaveProperty("severity");
     const [alert] = blocksOf("> [!NOTE]\n> > inner");
-    expect(alert).toMatchObject({ severity: "notice", children: [expect.anything(), { type: "quote" }] });
+    expect(alert).toMatchObject({
+      severity: "notice",
+      children: [expect.anything(), { type: "quote" }],
+    });
     const inner = alert?.type === "quote" ? alert.children[1] : undefined;
     expect(inner).not.toHaveProperty("severity");
   });
@@ -1765,7 +2075,10 @@ describe("page: tables, as GFM reads them", () => {
     expectAllowlisted(blocks);
     expect(shown(blocks)).toContain("<script>alert(1)</script>");
     expect(shown(blocks)).toContain("<img src=x onerror=1>");
-    expect(blocks[0]).toMatchObject({ type: "table", rows: [[[text("<b>x</b>")], [text("[a](javascript:1)")]]] });
+    expect(blocks[0]).toMatchObject({
+      type: "table",
+      rows: [[[text("<b>x</b>")], [text("[a](javascript:1)")]]],
+    });
   });
 
   test("shows a gnoweb tag in a row as text, and a form ends the table", () => {
