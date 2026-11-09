@@ -641,6 +641,38 @@ describe("readEval", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
+  // Slice 13, B: a read's typed arguments go through evalCall's serializer (core's readArgs), or nothing is asked.
+  it("asks the call with its arguments as Go literals", async () => {
+    const fetcher = answering(queryEnvelope({ data: "(5 int64)" }));
+    const params = [
+      { Name: "owner", Type: "string" },
+      { Name: "all", Type: "bool" },
+    ];
+    const read = readEval(
+      RPC_OK,
+      { realm: WUGNOT, name: "BalanceOf", params, texts: ['a"b', "true"] },
+      options(fetcher),
+    );
+    expect(valueOf(await read)).toBe("(5 int64)");
+    expect(askedOf(fetcher)).toEqual([queryUrl(RPC_OK, "vm/qeval", `${WUGNOT}.BalanceOf("a\\"b", true)`)]);
+  });
+
+  it("asks nothing and fails bad-name for another count of texts than parameters", async () => {
+    const fetcher = answering(queryEnvelope({ data: "(5 int64)" }));
+    const params = [{ Name: "owner", Type: "string" }];
+    const read = readEval(RPC_OK, { realm: WUGNOT, name: "BalanceOf", params, texts: [] }, options(fetcher));
+    expect(failureOf(await read).kind).toBe("bad-name");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("asks nothing and fails bad-name for arguments the serializer refuses", async () => {
+    const fetcher = answering(queryEnvelope({ data: "(5 int64)" }));
+    const params = [{ Name: "all", Type: "bool" }];
+    const read = readEval(RPC_OK, { realm: WUGNOT, name: "Read", params, texts: ["1); Evil("] }, options(fetcher));
+    expect(failureOf(await read).kind).toBe("bad-name");
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
   it("a function that needs a crossing (Deposit) is refused by the chain: chain-refused, not a value (recorded)", async () => {
     const fetcher = answering(
       queryEnvelope({ data: null, error: { "@type": "/abci.StringError", value: "invalid non-origin call" } }),

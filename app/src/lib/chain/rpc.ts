@@ -5,7 +5,7 @@
 // The app names no universe's chain to its reads yet (D118): each states null.
 import { readEvaluated, readFunctionList, readRender } from "@gnoworld/chain/node";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
-import { evalCall, isExportedName, isRealmPath, userCall } from "./evalCall.ts";
+import { evalCall, isExportedName, isRealmPath, userCall, type Read } from "./evalCall.ts";
 
 const badName = <T>(rpc: string, options: ReadOptions): Promise<ChainRead<T>> =>
   Promise.resolve(failedRead("bad-name", sourceOf(rpc, options)));
@@ -20,13 +20,14 @@ export function readPage(
   return readRender(rpc, `${realm}:${path}`, { ...options, chainId: null });
 }
 
-/** The typed text of one call of one exported name, one line a result. Nothing is asked when the builder gives no call. */
+/** The typed text of one call of one exported name, one line a result; a read's texts for its parameters, when it takes some. Nothing
+ * is asked when the builder gives no call. */
 export function readEval(
   rpc: string,
-  { realm, name }: { realm: string; name: string },
+  { realm, name, ...read }: { realm: string; name: string } & Read,
   options: ReadOptions = {},
 ): Promise<ChainRead<string>> {
-  const call = evalCall(realm, name);
+  const call = evalCall(realm, name, read);
   if (call === null) return badName(rpc, options);
   return readEvaluated(rpc, call, { ...options, chainId: null });
 }
