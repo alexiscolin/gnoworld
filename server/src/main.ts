@@ -25,7 +25,7 @@ import { isTeam, loadRoles, spared } from "./roles/roles.ts";
 import { startPrices } from "./prices/prices.ts";
 import { checkFor, startPreviews } from "./previews/job.ts";
 import { defaultUniverse, hubRealms, hubWorlds } from "./prices/universes.ts";
-import { habitsBeside } from "./worlds/habitsFiles.ts";
+import { keptBy } from "./worlds/habitsFiles.ts";
 import { startRetention } from "./retention/retention.ts";
 import { roomsBoot } from "./rooms/roomsBoot.ts";
 import { startWorlds } from "./worlds/job.ts";
@@ -69,7 +69,7 @@ const worlds =
         file: config.worlds,
         log,
         universe: defaultUniverse(config.universes),
-        ...habitsBeside(config.database),
+        ...keptBy(config.database, db, config.worlds),
       });
 const { openaiKey, thresholds } = config.moderation;
 const previews =

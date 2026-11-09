@@ -1,15 +1,25 @@
-import { NATURES, worldsDrawn } from "@gnoworld/core";
+import { NATURES, rollupName, worldsDrawn } from "@gnoworld/core";
 import { WorldsCount } from "@gnoworld/schemas";
-import { WORLD_NATURES, Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
+import { RealmRollup, WORLD_NATURES, Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
+import { openDatabase } from "@gnoworld/service/db";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import type { Send } from "@gnoworld/service/net";
-import { abciRefused, fakeChain, INDEXER, pagedCalls, RPC, type Routes } from "../testing/fakeWorldsChain.ts";
+import {
+  abciRefused,
+  fakeChain,
+  INDEXER,
+  pagedCalls,
+  RPC,
+  withBlocks,
+  type Routes,
+} from "../testing/fakeWorldsChain.ts";
 import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
 import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
 import { makePresence } from "./presence.ts";
+import { migrations } from "../migrations.ts";
 
 // The worlds job (slice 7, 7c), one pass of it: the list, the worlds, the packages read once, the history through the indexer, the
 // names, and a capped file written beside and renamed over. Every fault leaves the last file whole and is logged by its kind.
@@ -1344,5 +1354,84 @@ describe("the behaviours the pass states", () => {
     expect(pagesAsked(chain).length).toBeLessThanOrEqual(1);
     expect(existsSync(file)).toBe(false);
     expect(logged).toEqual(["worlds_failed"]);
+  });
+});
+
+// Each realm's rollup (slice 13a), read and written after worlds.json in the same pass, from the job's own sqlite state.
+describe("the rollups, beside the worlds' file", () => {
+  const timed = (
+    calls: Parameters<typeof withBlocks>[0],
+    timeOf: (h: number) => string | undefined = (h) => new Date(NOW + h).toISOString(),
+  ) => withBlocks(calls, timeOf);
+  const rolled = async (
+    indexer: Routes["indexer"],
+    extra: {
+      db?: ReturnType<typeof openDatabase>;
+      folder?: (file: string) => string;
+      isStopped?: (asked: { data: string }[]) => boolean;
+    } = {},
+  ) => {
+    const file = fresh();
+    const folder = extra.folder?.(file) ?? join(dirname(file), "rollups");
+    const logged: string[] = [];
+    const chain = fakeChain(chainRoutes([POOL, ROUTER], { indexer }));
+    const outcome = await runWorlds({
+      file,
+      log: (event, fields) => void logged.push(`${event}${fields?.error === undefined ? "" : `:${fields.error}`}`),
+      send: chain.send,
+      universe: { id: "onyx", rpc: RPC, indexer: INDEXER },
+      now: () => NOW,
+      wait: () => Promise.resolve(),
+      rollup: { db: extra.db ?? openDatabase(":memory:", migrations), dir: folder },
+      ...(extra.isStopped === undefined ? {} : { isStopped: () => extra.isStopped?.(chain.asked) ?? false }),
+    });
+    return { file, logged, outcome, folder };
+  };
+
+  it("writes a rollup for each called realm, named by its path's hash, in a folder beside worlds.json, on the server's migrations", async () => {
+    const { folder, outcome } = await rolled(timed(eachCalled([POOL, ROUTER], 2)));
+    expect(outcome).toEqual({ wrote: true });
+    expect(readdirSync(folder).sort()).toEqual([`${rollupName(POOL)}.json`, `${rollupName(ROUTER)}.json`].sort());
+    const pool = RealmRollup.parse(JSON.parse(readFileSync(join(folder, `${rollupName(POOL)}.json`), "utf8")));
+    expect(pool).toMatchObject({ path: POOL, universe: "onyx", calls: 2, callers: 2 });
+  });
+
+  it.each([
+    [
+      "its read fails",
+      () => ({ indexer: timed(eachCalled([POOL, ROUTER], 2), () => undefined) }),
+      "worlds_rollup_failed:shape",
+    ],
+    [
+      "its folder cannot be made",
+      () => ({ indexer: timed(eachCalled([POOL, ROUTER], 2)), folder: (file: string) => file }),
+      "worlds_rollup_failed:write",
+    ],
+    [
+      "its database has no tables",
+      () => ({ indexer: timed(eachCalled([POOL, ROUTER], 2)), db: openDatabase(":memory:", []) }),
+      "worlds_rollup_failed:write",
+    ],
+  ])("still writes worlds.json when %s, and logs it by its kind", async (_name, given, line) => {
+    const { indexer, ...extra } = given();
+    const { file, logged, outcome } = await rolled(indexer, extra);
+    expect(outcome).toEqual({ wrote: true });
+    expect(written(file).worlds.length).toBeGreaterThan(0);
+    expect(logged).toContain(line);
+  });
+
+  it("writes no rollup when the job stops during its read", async () => {
+    const { file, folder, outcome } = await rolled(timed(eachCalled([POOL, ROUTER], 2)), {
+      isStopped: (asked) => asked.some(({ data }) => data.includes("getBlocks")),
+    });
+    expect(outcome).toEqual({ wrote: true });
+    expect(existsSync(file)).toBe(true);
+    expect(existsSync(folder) ? readdirSync(folder) : []).toEqual([]);
+  });
+
+  it("reads no block time and writes no folder without the rollup's settings", async () => {
+    const { file, chain } = await run(chainRoutes([POOL, ROUTER]));
+    expect(chain.asked.some(({ data }) => data.includes("getBlocks"))).toBe(false);
+    expect(existsSync(join(dirname(file), "rollups"))).toBe(false);
   });
 });

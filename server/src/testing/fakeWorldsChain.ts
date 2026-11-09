@@ -72,6 +72,26 @@ export function pagedCalls(rows: readonly CallRow[]) {
   };
 }
 
+/**
+ * The indexer's answer to the rollup's block times (onyxRollup.json): each alias `b<i>` the block of height `h<i>`, or null for one `timeOf`
+ * does not know, as onyx-1 answers a height above its tip; any other request goes to `calls`.
+ */
+export function withBlocks(
+  calls: (request: { query: string; variables: Record<string, unknown> }) => string | Response,
+  timeOf: (height: number) => string | undefined,
+) {
+  return (request: { query: string; variables: Record<string, unknown> }): string | Response => {
+    if (!request.query.includes("getBlocks")) return calls(request);
+    const data = Object.fromEntries(
+      Object.entries(request.variables).map(([name, height]) => {
+        const time = typeof height === "number" ? timeOf(height) : undefined;
+        return [name.replace(/^h/, "b"), time === undefined ? null : [{ height, time }]];
+      }),
+    );
+    return JSON.stringify({ data });
+  };
+}
+
 const asResponse = (given: Given, plain: (text: string) => Response): Response | Error =>
   typeof given === "string" ? plain(given) : given;
 

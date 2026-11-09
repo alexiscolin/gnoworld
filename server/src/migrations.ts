@@ -13,6 +13,7 @@ import { PIN_TABLES } from "./pins/pins.ts";
 import { EARTH_TABLES, REALM_TABLES, ROOM_STATE } from "./rooms/create.ts";
 import { ROOM_SAID } from "./rooms/earth.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
+import { ROLLUP_TABLES } from "./worlds/rollupStore.ts";
 import { SIGNAL_TABLES } from "./signals/signals.ts";
 
 export const migrations: readonly string[] = [
@@ -33,4 +34,5 @@ export const migrations: readonly string[] = [
   EARTH_TABLES,
   GUEST_TABLES,
   ROOM_SAID,
+  ROLLUP_TABLES,
 ];

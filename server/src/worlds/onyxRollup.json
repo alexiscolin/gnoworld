@@ -1,0 +1,103 @@
+{
+  "source": "onyx-1 indexer, the rollup's queries (slice 13a), recorded from the sandbox through its proxy",
+  "indexer": "https://indexer.onyx.testnets.gno.land/graphql/query",
+  "recorded": "2026-11-09T17:08:11.121Z",
+  "answers": [
+    {
+      "what": "the time of blocks across 2026-09-29T00:00Z, one alias each, a height above the tip among them",
+      "query": "query($h0: Int!, $h1: Int!, $h2: Int!, $h3: Int!, $h4: Int!, $h5: Int!, $h6: Int!, $h7: Int!) { b0: getBlocks(where: { height: { eq: $h0 } }) { height time } b1: getBlocks(where: { height: { eq: $h1 } }) { height time } b2: getBlocks(where: { height: { eq: $h2 } }) { height time } b3: getBlocks(where: { height: { eq: $h3 } }) { height time } b4: getBlocks(where: { height: { eq: $h4 } }) { height time } b5: getBlocks(where: { height: { eq: $h5 } }) { height time } b6: getBlocks(where: { height: { eq: $h6 } }) { height time } b7: getBlocks(where: { height: { eq: $h7 } }) { height time } }",
+      "variables": {
+        "h0": 0,
+        "h1": 19656,
+        "h2": 25599,
+        "h3": 25600,
+        "h4": 25601,
+        "h5": 41641,
+        "h6": 65431,
+        "h7": 999999999
+      },
+      "status": 200,
+      "body": "{\"data\":{\"b0\":[{\"height\":0,\"time\":\"2026-09-28T00:00:00Z\"}],\"b1\":[{\"height\":19656,\"time\":\"2026-09-28T18:25:27.125065908Z\"}],\"b2\":[{\"height\":25599,\"time\":\"2026-09-28T23:59:53.987792568Z\"}],\"b3\":[{\"height\":25600,\"time\":\"2026-09-28T23:59:57.362032783Z\"}],\"b4\":[{\"height\":25601,\"time\":\"2026-09-29T00:00:00.742074998Z\"}],\"b5\":[{\"height\":41641,\"time\":\"2026-09-29T15:02:48.883031256Z\"}],\"b6\":[{\"height\":65431,\"time\":\"2026-09-30T13:38:56.535750574Z\"}],\"b7\":null}}"
+    },
+    {
+      "what": "a page with the success and the function of each call",
+      "query": "query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, messages: { typeUrl: { eq: \"exec\" } } }, order: { heightAndIndex: ASC }, limit: $limit) { block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } } } }",
+      "variables": {
+        "above": 25500,
+        "limit": 4
+      },
+      "status": 200,
+      "body": "{\"data\":{\"getTransactions\":[{\"block_height\":34657,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1e3vld469ekks28mhtd4aqua3mdaz64qgdtz29k\",\"func\":\"Register\"}}]},{\"block_height\":35034,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1etf3rd7dqghksj8r5yunkgmvpupdfszdjhuzju\",\"func\":\"Register\"}}]},{\"block_height\":35264,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/gnops/valopers\",\"caller\":\"g1dzwjx4s8t4damqqs8exufzvaww0g0jnqemcfcv\",\"func\":\"Register\"}}]},{\"block_height\":35698,\"success\":true,\"messages\":[{\"value\":{\"__typename\":\"MsgCall\",\"pkg_path\":\"gno.land/r/g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt/bazaar/bazaarv4\",\"caller\":\"g1n4pl5uc4yt5r96m9w6fmdznx3x0jyg8l6arhmt\",\"func\":\"Init\"}}]}]}}"
+    },
+    {
+      "what": "the time of that page's blocks",
+      "query": "query($h0: Int!, $h1: Int!, $h2: Int!, $h3: Int!) { b0: getBlocks(where: { height: { eq: $h0 } }) { height time } b1: getBlocks(where: { height: { eq: $h1 } }) { height time } b2: getBlocks(where: { height: { eq: $h2 } }) { height time } b3: getBlocks(where: { height: { eq: $h3 } }) { height time } }",
+      "variables": {
+        "h0": 34657,
+        "h1": 35034,
+        "h2": 35264,
+        "h3": 35698
+      },
+      "status": 200,
+      "body": "{\"data\":{\"b0\":[{\"height\":34657,\"time\":\"2026-09-29T08:29:38.743904439Z\"}],\"b1\":[{\"height\":35034,\"time\":\"2026-09-29T08:50:51.431459781Z\"}],\"b2\":[{\"height\":35264,\"time\":\"2026-09-29T09:03:48.068133955Z\"}],\"b3\":[{\"height\":35698,\"time\":\"2026-09-29T09:28:13.613281545Z\"}]}}"
+    },
+    {
+      "what": "fifty aliases in one request, the most the rollup asks at once",
+      "query": "query($h0: Int!, $h1: Int!, $h2: Int!, $h3: Int!, $h4: Int!, $h5: Int!, $h6: Int!, $h7: Int!, $h8: Int!, $h9: Int!, $h10: Int!, $h11: Int!, $h12: Int!, $h13: Int!, $h14: Int!, $h15: Int!, $h16: Int!, $h17: Int!, $h18: Int!, $h19: Int!, $h20: Int!, $h21: Int!, $h22: Int!, $h23: Int!, $h24: Int!, $h25: Int!, $h26: Int!, $h27: Int!, $h28: Int!, $h29: Int!, $h30: Int!, $h31: Int!, $h32: Int!, $h33: Int!, $h34: Int!, $h35: Int!, $h36: Int!, $h37: Int!, $h38: Int!, $h39: Int!, $h40: Int!, $h41: Int!, $h42: Int!, $h43: Int!, $h44: Int!, $h45: Int!, $h46: Int!, $h47: Int!, $h48: Int!, $h49: Int!) { b0: getBlocks(where: { height: { eq: $h0 } }) { height time } b1: getBlocks(where: { height: { eq: $h1 } }) { height time } b2: getBlocks(where: { height: { eq: $h2 } }) { height time } b3: getBlocks(where: { height: { eq: $h3 } }) { height time } b4: getBlocks(where: { height: { eq: $h4 } }) { height time } b5: getBlocks(where: { height: { eq: $h5 } }) { height time } b6: getBlocks(where: { height: { eq: $h6 } }) { height time } b7: getBlocks(where: { height: { eq: $h7 } }) { height time } b8: getBlocks(where: { height: { eq: $h8 } }) { height time } b9: getBlocks(where: { height: { eq: $h9 } }) { height time } b10: getBlocks(where: { height: { eq: $h10 } }) { height time } b11: getBlocks(where: { height: { eq: $h11 } }) { height time } b12: getBlocks(where: { height: { eq: $h12 } }) { height time } b13: getBlocks(where: { height: { eq: $h13 } }) { height time } b14: getBlocks(where: { height: { eq: $h14 } }) { height time } b15: getBlocks(where: { height: { eq: $h15 } }) { height time } b16: getBlocks(where: { height: { eq: $h16 } }) { height time } b17: getBlocks(where: { height: { eq: $h17 } }) { height time } b18: getBlocks(where: { height: { eq: $h18 } }) { height time } b19: getBlocks(where: { height: { eq: $h19 } }) { height time } b20: getBlocks(where: { height: { eq: $h20 } }) { height time } b21: getBlocks(where: { height: { eq: $h21 } }) { height time } b22: getBlocks(where: { height: { eq: $h22 } }) { height time } b23: getBlocks(where: { height: { eq: $h23 } }) { height time } b24: getBlocks(where: { height: { eq: $h24 } }) { height time } b25: getBlocks(where: { height: { eq: $h25 } }) { height time } b26: getBlocks(where: { height: { eq: $h26 } }) { height time } b27: getBlocks(where: { height: { eq: $h27 } }) { height time } b28: getBlocks(where: { height: { eq: $h28 } }) { height time } b29: getBlocks(where: { height: { eq: $h29 } }) { height time } b30: getBlocks(where: { height: { eq: $h30 } }) { height time } b31: getBlocks(where: { height: { eq: $h31 } }) { height time } b32: getBlocks(where: { height: { eq: $h32 } }) { height time } b33: getBlocks(where: { height: { eq: $h33 } }) { height time } b34: getBlocks(where: { height: { eq: $h34 } }) { height time } b35: getBlocks(where: { height: { eq: $h35 } }) { height time } b36: getBlocks(where: { height: { eq: $h36 } }) { height time } b37: getBlocks(where: { height: { eq: $h37 } }) { height time } b38: getBlocks(where: { height: { eq: $h38 } }) { height time } b39: getBlocks(where: { height: { eq: $h39 } }) { height time } b40: getBlocks(where: { height: { eq: $h40 } }) { height time } b41: getBlocks(where: { height: { eq: $h41 } }) { height time } b42: getBlocks(where: { height: { eq: $h42 } }) { height time } b43: getBlocks(where: { height: { eq: $h43 } }) { height time } b44: getBlocks(where: { height: { eq: $h44 } }) { height time } b45: getBlocks(where: { height: { eq: $h45 } }) { height time } b46: getBlocks(where: { height: { eq: $h46 } }) { height time } b47: getBlocks(where: { height: { eq: $h47 } }) { height time } b48: getBlocks(where: { height: { eq: $h48 } }) { height time } b49: getBlocks(where: { height: { eq: $h49 } }) { height time } }",
+      "variables": {
+        "h0": 200000,
+        "h1": 200097,
+        "h2": 200194,
+        "h3": 200291,
+        "h4": 200388,
+        "h5": 200485,
+        "h6": 200582,
+        "h7": 200679,
+        "h8": 200776,
+        "h9": 200873,
+        "h10": 200970,
+        "h11": 201067,
+        "h12": 201164,
+        "h13": 201261,
+        "h14": 201358,
+        "h15": 201455,
+        "h16": 201552,
+        "h17": 201649,
+        "h18": 201746,
+        "h19": 201843,
+        "h20": 201940,
+        "h21": 202037,
+        "h22": 202134,
+        "h23": 202231,
+        "h24": 202328,
+        "h25": 202425,
+        "h26": 202522,
+        "h27": 202619,
+        "h28": 202716,
+        "h29": 202813,
+        "h30": 202910,
+        "h31": 203007,
+        "h32": 203104,
+        "h33": 203201,
+        "h34": 203298,
+        "h35": 203395,
+        "h36": 203492,
+        "h37": 203589,
+        "h38": 203686,
+        "h39": 203783,
+        "h40": 203880,
+        "h41": 203977,
+        "h42": 204074,
+        "h43": 204171,
+        "h44": 204268,
+        "h45": 204365,
+        "h46": 204462,
+        "h47": 204559,
+        "h48": 204656,
+        "h49": 204753
+      },
+      "status": 200,
+      "body": "{\"data\":{\"b0\":[{\"height\":200000,\"time\":\"2026-10-06T05:09:00.287996671Z\"}],\"b1\":[{\"height\":200097,\"time\":\"2026-10-06T05:14:41.625051386Z\"}],\"b2\":[{\"height\":200194,\"time\":\"2026-10-06T05:20:17.68684346Z\"}],\"b3\":[{\"height\":200291,\"time\":\"2026-10-06T05:26:10.047144725Z\"}],\"b4\":[{\"height\":200388,\"time\":\"2026-10-06T05:32:05.017523846Z\"}],\"b5\":[{\"height\":200485,\"time\":\"2026-10-06T05:37:57.204022978Z\"}],\"b6\":[{\"height\":200582,\"time\":\"2026-10-06T05:43:48.77069943Z\"}],\"b7\":[{\"height\":200679,\"time\":\"2026-10-06T05:49:41.491977282Z\"}],\"b8\":[{\"height\":200776,\"time\":\"2026-10-06T05:55:34.086689Z\"}],\"b9\":[{\"height\":200873,\"time\":\"2026-10-06T06:01:28.03319394Z\"}],\"b10\":[{\"height\":200970,\"time\":\"2026-10-06T06:07:20.922167621Z\"}],\"b11\":[{\"height\":201067,\"time\":\"2026-10-06T06:13:14.300815078Z\"}],\"b12\":[{\"height\":201164,\"time\":\"2026-10-06T06:19:08.59406614Z\"}],\"b13\":[{\"height\":201261,\"time\":\"2026-10-06T06:25:01.107277474Z\"}],\"b14\":[{\"height\":201358,\"time\":\"2026-10-06T06:30:57.038640666Z\"}],\"b15\":[{\"height\":201455,\"time\":\"2026-10-06T06:36:47.247602811Z\"}],\"b16\":[{\"height\":201552,\"time\":\"2026-10-06T06:42:37.910061085Z\"}],\"b17\":[{\"height\":201649,\"time\":\"2026-10-06T06:48:31.086204946Z\"}],\"b18\":[{\"height\":201746,\"time\":\"2026-10-06T06:54:24.043075886Z\"}],\"b19\":[{\"height\":201843,\"time\":\"2026-10-06T07:00:16.85487807Z\"}],\"b20\":[{\"height\":201940,\"time\":\"2026-10-06T07:06:10.030281265Z\"}],\"b21\":[{\"height\":202037,\"time\":\"2026-10-06T07:12:00.980666356Z\"}],\"b22\":[{\"height\":202134,\"time\":\"2026-10-06T07:17:55.650583363Z\"}],\"b23\":[{\"height\":202231,\"time\":\"2026-10-06T07:23:48.37548816Z\"}],\"b24\":[{\"height\":202328,\"time\":\"2026-10-06T07:29:39.437960407Z\"}],\"b25\":[{\"height\":202425,\"time\":\"2026-10-06T07:35:35.242614975Z\"}],\"b26\":[{\"height\":202522,\"time\":\"2026-10-06T07:41:29.597883974Z\"}],\"b27\":[{\"height\":202619,\"time\":\"2026-10-06T07:47:26.02982238Z\"}],\"b28\":[{\"height\":202716,\"time\":\"2026-10-06T07:53:14.126302157Z\"}],\"b29\":[{\"height\":202813,\"time\":\"2026-10-06T07:59:06.378159658Z\"}],\"b30\":[{\"height\":202910,\"time\":\"2026-10-06T08:04:59.705441276Z\"}],\"b31\":[{\"height\":203007,\"time\":\"2026-10-06T08:10:54.120522852Z\"}],\"b32\":[{\"height\":203104,\"time\":\"2026-10-06T08:16:47.919799351Z\"}],\"b33\":[{\"height\":203201,\"time\":\"2026-10-06T08:22:40.149037147Z\"}],\"b34\":[{\"height\":203298,\"time\":\"2026-10-06T08:28:32.643745443Z\"}],\"b35\":[{\"height\":203395,\"time\":\"2026-10-06T08:34:25.610885563Z\"}],\"b36\":[{\"height\":203492,\"time\":\"2026-10-06T08:40:15.187951315Z\"}],\"b37\":[{\"height\":203589,\"time\":\"2026-10-06T08:46:08.159048211Z\"}],\"b38\":[{\"height\":203686,\"time\":\"2026-10-06T08:52:01.247602718Z\"}],\"b39\":[{\"height\":203783,\"time\":\"2026-10-06T08:57:53.138067405Z\"}],\"b40\":[{\"height\":203880,\"time\":\"2026-10-06T09:03:48.223856435Z\"}],\"b41\":[{\"height\":203977,\"time\":\"2026-10-06T09:09:40.188535776Z\"}],\"b42\":[{\"height\":204074,\"time\":\"2026-10-06T09:15:35.309981072Z\"}],\"b43\":[{\"height\":204171,\"time\":\"2026-10-06T09:21:27.952136466Z\"}],\"b44\":[{\"height\":204268,\"time\":\"2026-10-06T09:27:20.930959214Z\"}],\"b45\":[{\"height\":204365,\"time\":\"2026-10-06T09:33:12.525353676Z\"}],\"b46\":[{\"height\":204462,\"time\":\"2026-10-06T09:39:04.802004803Z\"}],\"b47\":[{\"height\":204559,\"time\":\"2026-10-06T09:44:56.870186849Z\"}],\"b48\":[{\"height\":204656,\"time\":\"2026-10-06T09:50:52.069712746Z\"}],\"b49\":[{\"height\":204753,\"time\":\"2026-10-06T09:56:44.264165177Z\"}]}}"
+    }
+  ]
+}
