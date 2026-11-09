@@ -21,19 +21,9 @@ import {
 // The same seed as core's other properties, so the gate never flaps on one.
 const PROPERTY = { seed: 20261017, numRuns: 300 };
 const text = (value: string): Inline => ({ type: "text", text: value });
-const strong = (...children: Inline[]): Inline => ({
-  type: "strong",
-  children,
-});
-const link = (href: string, label = href): Inline => ({
-  type: "link",
-  href,
-  children: [text(label)],
-});
-const paragraph = (...children: Inline[]): PageBlock => ({
-  type: "paragraph",
-  children,
-});
+const strong = (...children: Inline[]): Inline => ({ type: "strong", children });
+const link = (href: string, label = href): Inline => ({ type: "link", href, children: [text(label)] });
+const paragraph = (...children: Inline[]): PageBlock => ({ type: "paragraph", children });
 const heading = (level: 1 | 2 | 3 | 4 | 5 | 6, ...children: Inline[]): PageBlock => ({
   type: "heading",
   level,
@@ -47,10 +37,7 @@ const picture = (href: string, label = "Image"): Inline => ({
   image: true,
 });
 const rule: PageBlock = { type: "rule" };
-const columns = (...cols: PageBlock[][]): PageBlock => ({
-  type: "columns",
-  columns: cols,
-});
+const columns = (...cols: PageBlock[][]): PageBlock => ({ type: "columns", columns: cols });
 const item = (children: Inline[], sub: PageBlock[] = [], task: OutlineItem["task"] = "none"): OutlineItem => ({
   children,
   task,
@@ -290,22 +277,10 @@ describe("page: the blocks a realm's Markdown reads into", () => {
 
   test("reads the chat's blocks as the chat does: paragraphs, code, quotes, lists", () => {
     reads("one\ntwo", paragraph(text("one"), br, text("two")));
-    reads("```\ncode **kept**\n```", {
-      type: "codeBlock",
-      text: "code **kept**",
-    });
+    reads("```\ncode **kept**\n```", { type: "codeBlock", text: "code **kept**" });
     reads("> quoted", { type: "quote", children: [paragraph(text("quoted"))] });
-    reads("- a\n- b", {
-      type: "list",
-      ordered: false,
-      items: [[text("a")], [text("b")]],
-    });
-    reads("3. a\n4. b", {
-      type: "list",
-      ordered: true,
-      start: 3,
-      items: [[text("a")], [text("b")]],
-    });
+    reads("- a\n- b", { type: "list", ordered: false, items: [[text("a")], [text("b")]] });
+    reads("3. a\n4. b", { type: "list", ordered: true, start: 3, items: [[text("a")], [text("b")]] });
   });
 
   test("reads a whole page: a heading, its paragraph, a list, in order", () => {
@@ -329,11 +304,7 @@ describe("page: no underline, as gnoweb", () => {
   test("keeps `++` as text, in a heading and a list too", () => {
     reads("++x++ and ++y z++", paragraph(text("++x++ and ++y z++")));
     reads("## ++x++", heading(2, text("++x++")));
-    reads("- ++x++", {
-      type: "list",
-      ordered: false,
-      items: [[text("++x++")]],
-    });
+    reads("- ++x++", { type: "list", ordered: false, items: [[text("++x++")]] });
   });
 
   test("links a bare address with its `+` at the end, and none after a `+`", () => {
@@ -573,11 +544,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
         exec: "Vote",
         path: "",
         fields: [
-          field("input", "who", {
-            inputType: "text",
-            placeholder: "Your name",
-            description: "Who votes",
-          }),
+          field("input", "who", { inputType: "text", placeholder: "Your name", description: "Who votes" }),
           field("textarea", "why", { placeholder: "Reason" }),
           field("select", "pick", { value: "yes" }),
         ],
@@ -721,11 +688,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
       exec: "",
       path: "",
       fields: [
-        field("input", "a", {
-          inputType: "checkbox",
-          value: "y",
-          flags: "required, readonly, checked",
-        }),
+        field("input", "a", { inputType: "checkbox", value: "y", flags: "required, readonly, checked" }),
         field("textarea", "b", { flags: "required, rows 6" }),
         field("select", "c", { flags: "readonly" }),
         field("input", "d", { inputType: "text" }),
@@ -808,10 +771,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
 
   test("keeps markup in an attribute as a string", () => {
     const [form] = blocksOf('<gno-form>\n<gno-input name=\'"><script>alert(1)</script>\' value="x" />\n</gno-form>');
-    expect(form).toMatchObject({
-      type: "form",
-      fields: [{ name: '"><script>alert(1)</script>', value: "x" }],
-    });
+    expect(form).toMatchObject({ type: "form", fields: [{ name: '"><script>alert(1)</script>', value: "x" }] });
   });
 
   test("reads a form never closed as text, never as a form that swallows the page", () => {
@@ -893,12 +853,7 @@ describe("page: gnoweb's tags, degraded (ADR-0002 §4; gnoweb at gno v1.5.0)", (
     reads('> <gno-form>\n> <gno-input name="a" type="hidden" value="v" />\n> </gno-form>', {
       type: "quote",
       children: [
-        {
-          type: "form",
-          exec: "",
-          path: "",
-          fields: [field("input", "a", { inputType: "hidden", value: "v" })],
-        },
+        { type: "form", exec: "", path: "", fields: [field("input", "a", { inputType: "hidden", value: "v" })] },
       ],
     });
   });
@@ -951,11 +906,7 @@ describe("page: the caps", () => {
 
   test("answers a page one byte past the cap with the cap's state, and no blocks", () => {
     const read: Page = page("a".repeat(PAGE_MAX_BYTES + 1));
-    expect(read).toStrictEqual({
-      kind: "too-big",
-      bytes: PAGE_MAX_BYTES + 1,
-      cap: PAGE_MAX_BYTES,
-    });
+    expect(read).toStrictEqual({ kind: "too-big", bytes: PAGE_MAX_BYTES + 1, cap: PAGE_MAX_BYTES });
     expect("blocks" in read).toBe(false);
   });
 
@@ -977,11 +928,7 @@ describe("page: the caps", () => {
 
   test("counts bytes, not characters", () => {
     const read = page("é".repeat(PAGE_MAX_BYTES / 2 + 1));
-    expect(read).toStrictEqual({
-      kind: "too-big",
-      bytes: PAGE_MAX_BYTES + 2,
-      cap: PAGE_MAX_BYTES,
-    });
+    expect(read).toStrictEqual({ kind: "too-big", bytes: PAGE_MAX_BYTES + 2, cap: PAGE_MAX_BYTES });
     expect(page("é".repeat(PAGE_MAX_BYTES / 2)).kind).toBe("page");
   });
 
@@ -1151,9 +1098,7 @@ describe("page: the allowlist, for any input", () => {
     "\0",
   ];
   const source = fc
-    .array(fc.oneof(fc.constantFrom(...PIECES), fc.string({ maxLength: 12 })), {
-      maxLength: 60,
-    })
+    .array(fc.oneof(fc.constantFrom(...PIECES), fc.string({ maxLength: 12 })), { maxLength: 60 })
     .map((parts) => parts.join(""));
 
   test("every node is on the list and every link is https, whatever the page", () => {
@@ -1384,11 +1329,7 @@ describe("page: nested, mixed and task lists", () => {
   });
 
   test("leaves a flat list the chat's list, and one space of indent a sibling", () => {
-    reads("- a\n - b", {
-      type: "list",
-      ordered: false,
-      items: [[text("a")], [text("b")]],
-    });
+    reads("- a\n - b", { type: "list", ordered: false, items: [[text("a")], [text("b")]] });
     reads(
       "- a\n1. b",
       { type: "list", ordered: false, items: [[text("a")]] },
@@ -1427,11 +1368,7 @@ describe("page: nested, mixed and task lists", () => {
     for (const source of ["- [ ]", "- [x]no", "- [] a", "- [y] a"]) {
       expect(blocksOf(source).some((block) => block.type === "outline")).toBe(false);
     }
-    reads("- [x]no", {
-      type: "list",
-      ordered: false,
-      items: [[text("[x]no")]],
-    });
+    reads("- [x]no", { type: "list", ordered: false, items: [[text("[x]no")]] });
   });
 
   test("continues an item on the lines indented under it", () => {
@@ -1984,10 +1921,7 @@ describe("page: tables, as GFM reads them", () => {
   test("interrupts a paragraph, as GFM does, and sits in a quote", () => {
     reads("intro\n| a |\n|---|", paragraph(text("intro")), table(["none"], [[text("a")]], []));
     const [quote] = blocksOf("> | a |\n> |---|\n> | 1 |");
-    expect(quote).toMatchObject({
-      type: "quote",
-      children: [{ type: "table" }],
-    });
+    expect(quote).toMatchObject({ type: "quote", children: [{ type: "table" }] });
   });
 
   test.each([
@@ -2018,10 +1952,7 @@ describe("page: tables, as GFM reads them", () => {
     ["|:-:|:--|", ["center", "left"]],
     ["|  ---  |---:  |", ["none", "right"]],
   ] as const)("reads the delimiter row %j", (delimiter, align) => {
-    expect(blocksOf(`| a | b |\n${delimiter}`)[0]).toMatchObject({
-      type: "table",
-      align,
-    });
+    expect(blocksOf(`| a | b |\n${delimiter}`)[0]).toMatchObject({ type: "table", align });
   });
 
   test.each(["|::|--|", "|:|--|", "| -x |--|"])("refuses the delimiter row %j", (delimiter) => {
@@ -2048,23 +1979,15 @@ describe("page: tables, as GFM reads them", () => {
 
   test("a table inside a quote is a table, and an alert is a notice with a table in it", () => {
     const [alert] = blocksOf("> [!NOTE]\n> | a |\n> |--|\n> | 1 |");
-    expect(alert).toMatchObject({
-      severity: "notice",
-      children: [expect.anything(), { type: "table" }],
-    });
+    expect(alert).toMatchObject({ severity: "notice", children: [expect.anything(), { type: "table" }] });
   });
 
   test("gives an alert inside a quote its severity, and a quote inside an alert none", () => {
     const [outer] = blocksOf("> text\n> > [!WARNING]\n> > x");
-    expect(outer).toMatchObject({
-      children: [expect.anything(), { severity: "caution" }],
-    });
+    expect(outer).toMatchObject({ children: [expect.anything(), { severity: "caution" }] });
     expect(outer).not.toHaveProperty("severity");
     const [alert] = blocksOf("> [!NOTE]\n> > inner");
-    expect(alert).toMatchObject({
-      severity: "notice",
-      children: [expect.anything(), { type: "quote" }],
-    });
+    expect(alert).toMatchObject({ severity: "notice", children: [expect.anything(), { type: "quote" }] });
     const inner = alert?.type === "quote" ? alert.children[1] : undefined;
     expect(inner).not.toHaveProperty("severity");
   });
@@ -2075,10 +1998,7 @@ describe("page: tables, as GFM reads them", () => {
     expectAllowlisted(blocks);
     expect(shown(blocks)).toContain("<script>alert(1)</script>");
     expect(shown(blocks)).toContain("<img src=x onerror=1>");
-    expect(blocks[0]).toMatchObject({
-      type: "table",
-      rows: [[[text("<b>x</b>")], [text("[a](javascript:1)")]]],
-    });
+    expect(blocks[0]).toMatchObject({ type: "table", rows: [[[text("<b>x</b>")], [text("[a](javascript:1)")]]] });
   });
 
   test("shows a gnoweb tag in a row as text, and a form ends the table", () => {
