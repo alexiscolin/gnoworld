@@ -89,6 +89,8 @@ export {
   WORLDS_CAPS,
   WORLDS_MAX_BYTES,
 } from "./worlds.ts";
+// Each realm's rollup (13a) behind it too: only a realm's plate reads one, from a chunk of its own.
+export { RealmRollup, ROLLUP_CAPS, ROLLUP_MAX_GZIP } from "./realmRollup.ts";
 // Who is here (7h) behind the same door: only the universe's feed reads it, after the first screen.
 export {
   COUNTRIES_MOST,

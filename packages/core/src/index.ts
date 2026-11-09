@@ -31,6 +31,7 @@ export {
   type WorldHeld,
 } from "./cosmos/system.ts";
 export { planetCount, worldsDrawn } from "./cosmos/count.ts";
+export { rollupName } from "./rollupName.ts";
 export type { Planned, Rock } from "./lod/drawn.ts";
 export {
   BODY_PIXELS,

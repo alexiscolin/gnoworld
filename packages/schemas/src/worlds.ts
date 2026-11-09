@@ -22,7 +22,7 @@ export const ImportPath = z.string().check(
 );
 
 /** A gno address as the chain writes it: `g1` and 38 characters of bech32's alphabet, the checksum not checked. */
-const DeployerAddress = z.string().check(z.regex(/^g1[023456789acdefghjklmnpqrstuvwxyz]{38}$/));
+export const DeployerAddress = z.string().check(z.regex(/^g1[023456789acdefghjklmnpqrstuvwxyz]{38}$/));
 
 /** The name registered for an address: letters, digits, `_`, `.` and `-`, 1 to 128 characters. */
 export const DeployerName = z
