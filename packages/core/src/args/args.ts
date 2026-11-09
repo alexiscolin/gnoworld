@@ -22,6 +22,11 @@ export type Args =
   | { ok: true; args: string[] }
   | { ok: false; why: "read" | "gnoweb" }
   | { ok: false; why: "fields"; problems: (Problem | undefined)[] };
+export type ReadFields = { ok: true; fields: CallField[] } | { ok: false; why: "write" | "gnoweb" };
+export type ReadArgs =
+  | { ok: true; literals: string[] }
+  | { ok: false; why: "write" | "gnoweb" }
+  | { ok: false; why: "fields"; problems: (Problem | undefined)[] };
 
 type Shape =
   | { kind: "string" | "bool" }
@@ -183,4 +188,46 @@ export function callArgs(params: Params, texts: readonly string[]): Args {
   return problems.every((problem) => problem === undefined)
     ? { ok: true, args: [...texts] }
     : { ok: false, why: "fields", problems };
+}
+
+/** The most UTF-8 bytes a read's string argument holds: a read is a GET, its expression in hex in the address (D13301). */
+export const READ_STRING_MAX_BYTES = 256;
+
+type ReadResolved = { ok: true; fields: Shaped } | { ok: false; why: "write" | "gnoweb" };
+
+// A read's fields: strings, bools and integers alone, which `readArgs` writes as Go literals. qeval injects `cur` into a crossing call (gno
+// v1.5.0, keeper.go:1924) and runs it on a store thrown away: a first `realm` parameter is a write, whose success would be faked.
+function resolveRead(params: Params): ReadResolved {
+  if (params?.[0]?.Type === realmType()) return { ok: false, why: "write" };
+  const fields = fieldsOf(params ?? [], ({ kind }) => kind === "string" || kind === "bool" || kind === "integer");
+  return fields === undefined ? { ok: false, why: "gnoweb" } : { ok: true, fields };
+}
+
+/** The fields a read draws, every parameter a string, a bool or an integer; none for a write or another type. */
+export function readFields(params: Params): ReadFields {
+  const done = resolveRead(params);
+  return done.ok ? { ok: true, fields: done.fields.map(({ field }) => field) } : done;
+}
+
+// A Go interpreted string literal: a backslash, a quote, a newline and a tab escaped, the four textProblem lets through that Go's string
+// would not hold as typed; every other character as it is.
+function quoted(text: string): string {
+  return `"${text.replace(/[\\"\n\t]/g, (char) => (char === "\n" ? "\\n" : char === "\t" ? "\\t" : `\\${char}`))}"`;
+}
+
+/** A read's arguments as Go literals, one per field: a string quoted, a bool or an integer as its canonical text; else why not. A string
+ * is refused hidden or ill-formed (textProblem) and past READ_STRING_MAX_BYTES. Throws a RangeError for another count of texts than
+ * fields: a caller's bug. */
+export function readArgs(params: Params, texts: readonly string[]): ReadArgs {
+  const done = resolveRead(params);
+  if (!done.ok) return done;
+  if (texts.length !== done.fields.length) throw new RangeError("a text for each field");
+  const shaped = done.fields.map(({ shape }, index) => ({ shape, text: String(texts[index]) }));
+  const problems = shaped.map(({ shape, text }) =>
+    shape.kind === "string"
+      ? (textProblem(text) ?? (bytesUpTo(text, READ_STRING_MAX_BYTES) > READ_STRING_MAX_BYTES ? "long" : undefined))
+      : problemOf(shape, text),
+  );
+  if (problems.some((problem) => problem !== undefined)) return { ok: false, why: "fields", problems };
+  return { ok: true, literals: shaped.map(({ shape, text }) => (shape.kind === "string" ? quoted(text) : text)) };
 }
