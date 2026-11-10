@@ -470,6 +470,16 @@ if [ "${1:-}" = --mutants ]; then
 		nginx sed '/previews/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
 	mutant "web follows a link at previews.json" "web does not follow a link planted at previews.json" \
 		nginx awk '/location = \/previews\.json \{/ { inside = 1 } inside && /disable_symlinks/ { next } /\}/ { inside = 0 } { print }'
+	# Each realm's rollup (13a) rides the same volume, under a folder of hashed names.
+	mutant "rollups are not served" "web serves a rollup from the volume the server writes" \
+		nginx sed '/location ~ "\^\/rollups\//,/^ *}$/d'
+	mutant "rollups open without the password" "web serves a rollup only with the password" \
+		nginx awk '{ print } /location ~ "\^\/rollups\// { print "            auth_basic off;" }'
+	mutant "rollups kept a year" "web serves a rollup with a short cache" \
+		nginx sed '/rollups/s#"public, max-age=60"#"public, max-age=31536000, immutable"#'
+	# Its regex holds braces ({32}): the block ends at a line of a brace alone.
+	mutant "web follows a link at a rollup" "web does not follow a link planted at a rollup" \
+		nginx awk '/location ~ "\^\/rollups\// { inside = 1 } inside && /disable_symlinks/ { next } /^ *}$/ { inside = 0 } { print }'
 	mutant "the captures written where web serves none" "the running preview job reads the hubs' pages through the way out and writes only the captures the check passed" \
 		compose 'services: { server: { environment: { PREVIEWS_FILE: /markets/elsewhere.json } } }'
 	mutant "web follows a link in the markets volume" "web does not follow a link planted in the markets volume" \
@@ -1553,6 +1563,28 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "web serves previews.json only with the password" "$(status /previews.json 203.0.113.3)" 401
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/previews.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/previews.json')" >/dev/null 2>&1 || true
 	expect "web does not follow a link planted at previews.json" "$(status /previews.json 203.0.113.4 -u "$auth")" 404
+	# Each realm's rollup (13a), written by the worlds job's real pass in a folder of the same volume, by its path's hash: a regex location.
+	# They follow worlds.json in the same pass: up to five minutes after it.
+	# A file the pass wrote, never one planted: a pass removes, at its end, every rollup it did not write.
+	rollups_real=missing
+	for _ in $(seq 1 60); do
+		rollups_real=$(docker exec "$server" /nodejs/bin/node -e "try { console.log(require('fs').readdirSync('/markets/rollups').find((n) => /^[0-9a-f]{32}[.]json$/.test(n)) ?? 'none') } catch { console.log('missing') }" 2>/dev/null || true)
+		case $rollups_real in none | missing | "") sleep 5 ;; *) break ;; esac
+	done
+	case $rollups_real in none | missing | "") fail "the running worlds job writes no rollup beside worlds.json ($rollups_real)" ;; *) pass "the running worlds job writes the realms' rollups beside their file" ;; esac
+	rollup=/rollups/$rollups_real
+	expect "web serves a rollup from the volume the server writes" "$(status "$rollup" 203.0.113.1 -u "$auth")" 200
+	expect "web serves a rollup with a short cache" "$(header cache-control "$rollup" 203.0.113.1 -u "$auth")" "public, max-age=60"
+	expect "web serves a rollup as JSON, never sniffed" "$(header content-type "$rollup" 203.0.113.1 -u "$auth") $(header x-content-type-options "$rollup" 203.0.113.1 -u "$auth")" "application/json nosniff"
+	expect "web serves a rollup only with the password" "$(status "$rollup" 203.0.113.3)" 401
+	# A file of the volume no location serves (probe.json): only a way out of rollups/ would reach it.
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.writeFileSync('/markets/rollups/other.json', '{}'); f.writeFileSync('/markets/rollups/00112233445566778899AABBCCDDEEFF.json', '{}'); f.writeFileSync('/markets/probe.json', '{}')" >/dev/null 2>&1 || true
+	for path in /rollups/other.json /rollups/00112233445566778899AABBCCDDEEFF.json /rollups/ /rollups/%2e%2e/probe.json /rollups/..%2Fprobe.json /rollups../probe.json; do
+		case $(status "$path" 203.0.113.5 -u "$auth") in 400 | 404) pass "web serves no other name in rollups/ ($path)" ;; *) fail "web serves $path" ;; esac
+	done
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets$rollup'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets$rollup')" >/dev/null 2>&1 || true
+	expect "web does not follow a link planted at a rollup" "$(status "$rollup" 203.0.113.4 -u "$auth")" 404
+	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); for (const p of ['/markets$rollup', '/markets/rollups/other.json', '/markets/rollups/00112233445566778899AABBCCDDEEFF.json', '/markets/probe.json']) { try { f.unlinkSync(p) } catch {} }" >/dev/null 2>&1 || true
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); for (const p of ['/markets/worlds.json', '/markets/worlds-count.json', '/markets/previews.json']) { try { f.unlinkSync(p) } catch {} }" >/dev/null 2>&1 || true
 	# Whoever runs code in the server owns the volume: a link there to a file of web's own (its settings here) is not followed.
 	docker exec "$server" /nodejs/bin/node -e "const f = require('fs'); f.unlinkSync('/markets/markets.json'); f.symlinkSync('/etc/nginx/nginx.conf', '/markets/markets.json')" >/dev/null 2>&1 || true
@@ -1563,6 +1595,18 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 	expect "and it is the volume the server writes" "$(mounted "$web" /markets) $(mounted "$server" /markets)" "${project}_markets ${project}_markets"
 	docker exec "$server" /nodejs/bin/node -e "require('fs').unlinkSync('/markets/markets.json')" >/dev/null 2>&1 || true
 	expect "web answers a missing markets.json with a 404" "$(status /markets.json 203.0.113.2 -u "$auth")" 404
+	# D430's undo reaches the server (F13950): a guest's route is the server's (its origin check, 403) by default, and a 404 once the server
+	# restarts under GUEST_CHAT=off; then the default again.
+	expect "a guest's route answers by default (no origin: 403)" "$(status /api/guest/ 203.0.113.41 -u "$auth" -X POST)" 403
+	guest_limits() { docker exec "$(docker compose -p "$project" $files ps -q server)" /nodejs/bin/node -e \
+		"console.log([process.env.GUEST_NAMES_PER_VISITOR_HOUR, process.env.GUEST_NAMES_PER_HOUR, process.env.GUEST_LIVING].join(' '))" 2>&1 || true; }
+	GUEST_CHAT=off GUEST_LIVING=4999 docker compose -p "$project" $files up -d --wait server >/dev/null 2>&1 || fail "the server did not start under GUEST_CHAT=off"
+	expect "GUEST_CHAT=off: a guest's route answers 404" "$(status /api/guest/ 203.0.113.42 -u "$auth" -X POST)" 404
+	expect "a guest limit set in the environment reaches the server" "$(guest_limits)" "10 600 4999"
+	docker compose -p "$project" $files up -d --wait server >/dev/null 2>&1 || fail "the server did not start again by default"
+	expect "and on again by default" "$(status /api/guest/ 203.0.113.43 -u "$auth" -X POST)" 403
+	expect "with the server's own limits" "$(guest_limits)" "10 600 5000"
+	server=$(docker compose -p "$project" $files ps -q server)
 	# It resolves before it connects (smokescreen.go, safeResolve): a public name for a private address is refused,
 	# whatever its list says. An ad hoc proxy of the same image and the live settings, its list its own, in the
 	# guard's network on 4752 (4751 is jarvis's), asked from there: the guard's rules let no reply of 4752's out to a network.
