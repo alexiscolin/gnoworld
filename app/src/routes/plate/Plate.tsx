@@ -1,0 +1,100 @@
+// The plate, below its title (slice 13, D566): its blocks in their order, each drawn only from what the model holds. The hero (the status and rank
+// at the kicker's row, the lede, the actions, the talk bar), the figures band, then the bento of twelve columns: calls per day with who calls it,
+// the chat's hours, what only this kind has, what it can do, its page and Try it, around it, the squares; the links out last. The zones are a
+// zone step apart (--plate-zone, 48 px, 32 on a narrow plate), the cards in a zone a Stack step. Its code comes after the first screen: the routes
+// ask it as a chunk; its entrance is the proposal's score (the blocks' own sheets, and features/universe/arrival.ts for the title).
+import { lazy, Suspense } from "react";
+import type { RealmRollup } from "@gnoworld/schemas/indexer";
+import { Cell, Figures, Grid, Stack } from "@gnoworld/ui";
+import { OutLinks } from "../../features/realms/OutLinks.tsx";
+import { Around } from "./Around.tsx";
+import { Callers } from "./Callers.tsx";
+import { Calls } from "./Calls.tsx";
+import { Can } from "./Can.tsx";
+import { Hero, Pills } from "./Hero.tsx";
+import { Hours } from "./Hours.tsx";
+import type { PlateModel } from "./model.ts";
+import { Widgets } from "./Widgets.tsx";
+
+const FromExplorer = lazy(() => import("../../features/realms/FromExplorer.tsx"));
+const RealmView = lazy(() =>
+  import("../../features/realms/RealmView.tsx").then((chunk) => ({ default: chunk.RealmView })),
+);
+
+// The figures band, and the line that says what the figures cannot.
+function Band({ figures, note }: PlateModel["figures"]) {
+  return (
+    <>
+      {figures.length === 0 ? null : <Figures label="Figures" figures={figures} />}
+      {note === undefined ? null : <p className="meta">{note}</p>}
+    </>
+  );
+}
+
+// The rollup's calls per function, by name, for Try it's rows.
+const counted = (rollup: RealmRollup | undefined) => new Map(rollup?.functions.map(({ name, calls }) => [name, calls]));
+
+// The realm's own cards, in their order: its calls per day beside who calls it, what it can do, its page and Try it.
+function RealmCards({ realm, can }: { realm: NonNullable<PlateModel["realm"]>; can: PlateModel["can"] }) {
+  const { rollup } = realm;
+  const callers = rollup !== undefined && rollup.top.length > 0;
+  return (
+    <>
+      {rollup === undefined ? null : <Calls rollup={rollup} worlds={realm.worlds} beside={callers} />}
+      {rollup === undefined || !callers ? null : <Callers rollup={rollup} worlds={realm.worlds} />}
+      {(can?.length ?? 0) === 0 ? null : (
+        <Cell span={12}>
+          <Can can={can ?? []} />
+        </Cell>
+      )}
+      <Cell span={12}>
+        <Suspense fallback={null}>
+          <RealmView realm={realm.realm} chain={realm.chain} state={realm.state} counts={counted(rollup)} />
+        </Suspense>
+      </Cell>
+    </>
+  );
+}
+
+export function Plate({ model }: { model: PlateModel }) {
+  const { lede, actions, talk, figures, hours, extras, realm, can, around, widgets, links, explorer } = model;
+  const chart = hours !== undefined && realm === undefined;
+  return (
+    <div data-blocks="">
+      <Pills lede={lede} />
+      <Stack space="zone">
+        <Hero lede={lede} actions={actions} talk={talk} />
+        <Band {...figures} />
+        <Grid cols={12} space="s">
+          {chart ? (
+            <Cell span={12}>
+              <Hours hours={hours} />
+            </Cell>
+          ) : null}
+          {extras === undefined ? null : (
+            <Cell span={12}>
+              <Stack space="s">{extras}</Stack>
+            </Cell>
+          )}
+          {realm === undefined ? null : <RealmCards realm={realm} can={can} />}
+          {around === undefined ? null : (
+            <Cell span={12}>
+              <Around around={around} />
+            </Cell>
+          )}
+          {widgets.length === 0 ? null : (
+            <Cell span={12}>
+              <Widgets widgets={widgets} />
+            </Cell>
+          )}
+        </Grid>
+        {links === undefined ? null : <OutLinks links={links} />}
+        {explorer === undefined ? null : (
+          <Suspense fallback={null}>
+            <FromExplorer {...explorer} />
+          </Suspense>
+        )}
+      </Stack>
+    </div>
+  );
+}

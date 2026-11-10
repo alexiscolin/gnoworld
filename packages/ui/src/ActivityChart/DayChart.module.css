@@ -1,0 +1,101 @@
+/* The plate's day chart, in the proposal's drawing: bars in the muted grey, the latest in the text colour, a day with none a dot, the axis at its
+   steps, 176 px tall (216 on a wide plate). Its entrance is the proposal's score, the delays added to its card's --d. */
+@layer components {
+  .plot {
+    position: relative;
+    inline-size: 100%;
+  }
+
+  .box {
+    position: relative;
+    inline-size: 100%;
+    block-size: var(--chart-h);
+  }
+
+  @container plate (min-width: 62.5rem) {
+    .box {
+      block-size: var(--chart-h-l);
+    }
+  }
+
+  .chart {
+    display: block;
+    overflow: visible;
+  }
+
+  /* The pointer's ground: the plot's width past the axis, between the peak's room and the dates'. */
+  .hits {
+    position: absolute;
+    inset-block: var(--space-s) var(--space-m);
+    /* raw: the proposal's score */
+    inset-inline: 36px 0;
+  }
+
+  .gl {
+    stroke: var(--color-line);
+    stroke-width: var(--line-width);
+  }
+
+  .tk {
+    fill: var(--color-text-muted);
+    font: var(--font-tick);
+  }
+
+  .tk[data-strong] {
+    fill: var(--color-text);
+    font-weight: 500;
+  }
+
+  .bar {
+    fill: var(--color-text-muted);
+    transform-box: fill-box;
+    transform-origin: 50% 100%;
+  }
+
+  .bar[data-current="true"] {
+    fill: var(--color-text);
+  }
+
+  .zero {
+    fill: var(--color-line-strong);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .gl,
+    .tk {
+      /* raw: the proposal's score */
+      animation: appear 0.5s ease calc(var(--d, 0s) + 0.05s) backwards;
+      animation-play-state: var(--play, running);
+    }
+
+    .bar {
+      /* raw: the proposal's score */
+      animation: grow 0.6s var(--ease-out-3) calc(var(--d, 0s) + 0.13s + var(--j, 0) * 0.012s) backwards;
+      animation-play-state: var(--play, running);
+    }
+
+    .zero {
+      /* raw: the proposal's score */
+      animation: appear 0.5s ease calc(var(--d, 0s) + 0.25s) backwards;
+      animation-play-state: var(--play, running);
+    }
+
+    .peak {
+      /* raw: the proposal's score */
+      animation: appear 0.5s ease calc(var(--d, 0s) + var(--pk, 0.9s)) backwards;
+      animation-play-state: var(--play, running);
+    }
+  }
+
+  @keyframes appear {
+    from {
+      opacity: 0;
+    }
+  }
+
+  @keyframes grow {
+    from {
+      transform: scaleY(0);
+    }
+  }
+}

@@ -32,3 +32,17 @@ const letter = () => {
   return BECH32.charAt(seed >>> 27);
 };
 export const SPREAD = Array.from({ length: 200 }, () => `g1${Array.from({ length: 38 }, letter).join("")}`);
+
+// The figures band's four cells, for its story and the overview.
+export const FIGURES = [
+  {
+    key: "calls",
+    label: "Calls",
+    value: 21480,
+    sub: "direct calls · 912 in the last 30 days",
+    spark: [2, 5, 9, 4, 12, 30, 8, 3, 6, 21],
+  },
+  { key: "callers", label: "Callers", value: 312, sub: "distinct addresses, all time" },
+  { key: "last", label: "Last call", value: 2, unit: "min ago", sub: "Swap · Nov 9" },
+  { key: "importers", label: "Imported by", value: "Never", sub: "nothing imports it yet" },
+];

@@ -30,6 +30,15 @@
     font: var(--font-field);
   }
 
+  /* A list's filter: a pill on the space's ground with its line inside, one control high, in the data type. */
+  .box[data-shape="pill"] {
+    min-block-size: var(--control-s);
+    padding-block: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-space);
+    font: var(--font-data);
+  }
+
   .box::placeholder {
     color: var(--color-text-faint);
   }

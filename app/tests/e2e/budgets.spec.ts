@@ -7,13 +7,14 @@ import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type
 import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
-// ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
-// worker's precache. The Earth's page, the highest: 197,951 B (D386); 243,225 B on the ping-pong of 2026-11-09, the measure (+45,274 B); 243,371 B with the plate's wait and the composer's preview (D13959, D13962),
-// provisional.
-const FIRST_SCREEN_JS = 243_371;
+// ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
+// The Earth's or a world's page: 197,951 B (D386); 243,371 B after the ping-pong (D13961); 234,209 B with the realm plate a late chunk
+// once the door to space has come; 235,306 B with the plate built to the proposal (D13964), the hero's pieces shared on it, provisional.
+const FIRST_SCREEN_JS = 235_306;
 // A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the home and /net/onyx/, the rail on their first
 // screen; /net/gnoland/ 227,380 B), the measure (+39,027 B); 232,954 B with the plate's wait (D13959), provisional.
-const PLAIN_FIRST_SCREEN_JS = 232_954;
+// 233,983 B on 2026-11-10 with the realm plate built to the proposal (slice 13, D13964), provisional (+1,029 B over 232,954 B).
+const PLAIN_FIRST_SCREEN_JS = 233_983;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -143,9 +144,10 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's, which
 // the old door's chunk (mountUniverse, D401) replaced.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 25,880 B, 26,714 B on the ping-pong
-// (D386); 42,775 B on 2026-11-09 (42,519 B measured on a world's page, 42,368 B on the Earth's), 256 B ahead (+16,061 B).
-const LATE_CHAT_JS = 42_775;
+// What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09 (+16,061 B);
+// 45,161 B on 2026-11-10 with the realm plate (slice 13), provisional (44,905 B measured on the Earth's page, 44,283 B on a world's), 256 B
+// ahead (+2,386 B): bytes that moved (verdicts, follow, passport) off the first screen, not new ones.
+const LATE_CHAT_JS = 45_161;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
@@ -155,11 +157,20 @@ const PROPOSALS_JS = 35_631;
 // A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
 // world that pins one alone: weighed with the proposals.
 const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
-// A plate's blocks that wait for a read (8g): the realm card, the hours and their chart, each capped at its size and 256 B. FromExplorer
-// 6,088 B to 6,816 B (6,560 B measured, +472 B), ChartedBy 348 B to 608 B (352 B measured, +4 B) on 2026-11-09 (D386, provisional); the connected
-// worlds wait for the worlds' file, which the journeys' site does not serve.
-const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars|ChartedBy)-[\w-]+\.js$/;
-const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6816, hours: 618, Bars: 3336, ChartedBy: 608 };
+// A plate's late chunks, each capped at its size and 256 B (8g, D386, provisional). 2026-11-10, slice 13: EarthPlate 34,105 B, HubPlate 33,368 B,
+// followEarth 1,472 B, people 149 B beyond them; FromExplorer 6,816 B to 5,853 B (5,597 B measured: Plate left for the plate's chunk, weighed
+// once, in this order); no RealmPlate cap, no journey reaches it. ChartedBy 608 B, hours 618 B, Bars 3,336 B.
+const PLATE_LATE = /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy)-[\w-]+\.js$/;
+const PLATE_LATE_JS: Record<string, number> = {
+  EarthPlate: 34361,
+  HubPlate: 33624,
+  followEarth: 1728,
+  people: 405,
+  FromExplorer: 5853,
+  hours: 618,
+  Bars: 3336,
+  ChartedBy: 608,
+};
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads.
 const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
@@ -426,9 +437,12 @@ async function lateChat(page: Page, path: string, seen: Seen) {
 // Each of a plate's late chunks, with what it alone brings, within its own cap; what they bring, for the count of every chunk.
 async function plateWithin(page: Page, late: readonly string[], firstScreen: readonly string[]): Promise<string[]> {
   const brought: string[] = [];
-  for (const url of late) {
-    const name = PLATE_LATE.exec(url)?.[1] ?? "";
-    const own = ownOf(url, firstScreen);
+  // In the caps' order, each beyond what the ones before it brought: the plate's own files are weighed once, whatever order they were asked in.
+  const order = Object.keys(PLATE_LATE_JS);
+  const nameOf = (url: string) => PLATE_LATE.exec(url)?.[1] ?? "";
+  for (const url of [...late].sort((a, b) => order.indexOf(nameOf(a)) - order.indexOf(nameOf(b)))) {
+    const name = nameOf(url);
+    const own = ownOf(url, [...firstScreen, ...brought]);
     brought.push(...own);
     expect(await compressed(page, own), `the plate's ${name} stays within its cap`).toBeLessThanOrEqual(
       PLATE_LATE_JS[name] ?? 0,

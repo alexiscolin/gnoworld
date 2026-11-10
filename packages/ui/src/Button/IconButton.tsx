@@ -14,6 +14,8 @@ export type IconButtonProps = Face & {
   size?: IconControlSize;
   emphasis?: "outline" | "plain";
   pressed?: boolean;
+  /** Opens something in place: whether it is open now, said as aria-expanded. */
+  expanded?: boolean;
   count?: number;
   /** The count's tone: the design system's mint, or its coral for what is new to the reader, the bell's alone (frames 6, 86, 87). */
   countTone?: "mine" | "new";
@@ -35,6 +37,7 @@ export function IconButton({
   size = "m",
   emphasis = "outline",
   pressed,
+  expanded,
   count,
   countTone = "mine",
   onClick,
@@ -46,6 +49,7 @@ export function IconButton({
         type="button"
         aria-label={counted === null ? label : `${label}, ${counted.said}`}
         aria-pressed={pressed}
+        aria-expanded={expanded}
         {...iconLook(emphasis, size)}
         onClick={onClick}
       >

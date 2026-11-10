@@ -66,6 +66,35 @@
     --_ink: var(--color-ink);
   }
 
+  .chip[data-strong] {
+    --_font: var(--font-chip);
+  }
+
+  .dot {
+    inline-size: var(--size-dot);
+    background: currentcolor;
+  }
+
+  /* The live dot's beat: a ring in mint that grows and leaves (the home's hero has the same), from 0.85 s on. */
+  @media (prefers-reduced-motion: no-preference) {
+    .chip[data-tone="mine"] .dot {
+      /* raw: the proposal's score */
+      animation: beat 2.4s ease-out 0.85s infinite;
+    }
+  }
+
+  @keyframes beat {
+    0% {
+      box-shadow: 0 0 0 0 var(--color-mine-line);
+    }
+
+    70%,
+    100% {
+      /* raw: the proposal's score */
+      box-shadow: 0 0 0 8px transparent;
+    }
+  }
+
   .count {
     font: var(--font-data);
   }

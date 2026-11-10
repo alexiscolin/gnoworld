@@ -1,56 +1,29 @@
-/* A realm's read functions (5i): the list of buttons and what each read gave, in the page's own small type. */
+/* A realm's functions (the proposal's .fn): a result in its own box, a quiet box for what a row says in place of a button. */
 @layer components {
-  /* Read functions and Write functions: a plate's section titles, not the page's (Alexis, 2026-11-07). */
-  .title {
-    font: var(--font-title-s);
-  }
-
-  .list {
-    /* layout: the functions one under the other */
-    display: flex;
-    /* layout: one under the other */
-    flex-direction: column;
-    /* layout: a list's own space, which the browser gives it, taken off as the reset takes a paragraph's */
-    margin-block: 0;
+  .code {
     padding: 0;
-    list-style: none;
+    background: none;
+    font: var(--font-mono-ui);
   }
 
-  .line {
-    /* layout: the name and the button on one line, the name taking what is left */
-    display: flex;
-    /* layout: the name and the button share one centre line */
-    align-items: center;
-    /* layout: the button at the end */
-    justify-content: space-between;
-  }
-
-  .name {
-    color: var(--color-text-muted);
-    font: var(--font-data);
-  }
-
-  /* The frame's rows are told apart by a hairline above each, the first too, not by space (F5744, F5839). */
-  .item {
-    border-block-start: var(--line-width) solid var(--color-line);
-    padding-block: var(--space-2xs);
-    /* layout: a function's button and its result, one under the other, from the start */
-    display: grid;
-    /* layout: the step between them */
-    gap: var(--space-2xs);
-    min-inline-size: 0;
-    overflow-wrap: anywhere;
-  }
-
-  /* A result, in the frame the page's form shares (RealmFunctions.tsx): its text kept as written, scrolling on its own when long. */
+  /* A result, in its own box: its text kept as written, scrolling on its own when long (taller once the card is expanded). */
   .result {
-    /* raw: a share of the screen no token names, so a long result scrolls in its frame and the page stays put */
-    max-block-size: 20rem;
+    /* raw: the proposal's value, no token names it */
+    max-block-size: var(--_res, 180px);
     max-inline-size: 100%;
     overflow: auto;
     /* layout: a preformatted block's own margin, which the browser gives it, taken off */
-    margin-block: 0;
+    margin: 0;
+    padding: var(--space-xs) var(--space-s);
+    border-radius: var(--radius-m);
+    background: var(--color-space);
     font: var(--font-data);
+    line-height: 1.6;
     white-space: pre-wrap;
+  }
+
+  [data-try-open] .result {
+    /* raw: the proposal's value, no token names it */
+    --_res: 320px;
   }
 }

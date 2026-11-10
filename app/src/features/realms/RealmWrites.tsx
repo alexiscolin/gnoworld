@@ -3,16 +3,23 @@
 // has no Call, but a way to the realm on gnoweb. The read functions are RealmFunctions'. The list is read once from `vm/qfuncs`; a card
 // reads the indexer once, for its fee line, when it opens, and Adena is asked nothing until its signature.
 import { callFields } from "@gnoworld/core";
-import { Button, Stack } from "@gnoworld/ui";
+import { Button, Cluster, PagedList } from "@gnoworld/ui";
+import { use, useEffect } from "react";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { useAppStore } from "../../storeContext.tsx";
-import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
+import { Act, CallCountsContext, FunctionRow, Unlisted } from "./FunctionRow.tsx";
 import { InlineCard, openCard, type CallPlace } from "./InlineCard.tsx";
-import styles from "./RealmFunctions.module.css";
-import { useCallable, type Callable } from "./useCallable.ts";
+import calm from "./quiet.module.css";
+import { useCallable, type Callable, type Listing } from "./useCallable.ts";
 
 export interface RealmWritesProps extends CallPlace {
   chain: CallPlace["chain"] & { gnoweb: string };
+  /** Told how many write functions there are, once listed (the tab's count). */
+  onCount?: (count: number) => void;
+  /** The card is open in place: the hundred rows at once. */
+  expanded?: boolean;
+  /** A function to open, from outside (the Start here button). */
+  opening?: string | undefined;
 }
 
 // The functions a call can carry, and the write ones it cannot (a type it does not carry); a read, or a hostile name, is neither.
@@ -21,18 +28,32 @@ const carried = (each: Callable): boolean | undefined => {
   return fields.ok ? true : fields.why === "gnoweb" ? false : undefined;
 };
 
-// One function: its Call button, and its card under it once opened.
-function WriteRow({ write, ...place }: CallPlace & { write: Callable }) {
+/** Where to start: the write most called, as the rollup counts it, among those a call can carry; none before any was called. */
+export function startHere(
+  listing: Listing,
+  counts: ReadonlyMap<string, number>,
+): { name: string; calls: number } | undefined {
+  if (listing.state !== "listed") return undefined;
+  const called = listing.functions
+    .filter((each) => carried(each) === true)
+    .map(({ name }) => ({ name, calls: counts.get(name) ?? 0 }))
+    .filter(({ calls }) => calls > 0);
+  return called.toSorted((a, b) => b.calls - a.calls)[0];
+}
+
+// One function: its Call button in its open row, and its card under it once opened.
+function WriteRow({ write, open, ...place }: CallPlace & { write: Callable; open: boolean }) {
   const store = useAppStore();
   const id = `${place.chain.chainId} ${place.realm}.${write.name}`;
   return (
-    <FunctionRow
-      name={write.name}
-      verb="Call"
-      onClick={() => {
-        openCard(store, { id, place, write });
-      }}
-    >
+    <FunctionRow name={write.name} open={open}>
+      <Act
+        verb="Call"
+        name={write.name}
+        onClick={() => {
+          openCard(store, { id, place, write });
+        }}
+      />
       <InlineCard id={id} place={place} />
     </FunctionRow>
   );
@@ -41,53 +62,79 @@ function WriteRow({ write, ...place }: CallPlace & { write: Callable }) {
 // A function a call cannot carry: no Call, and the realm on gnoweb, which can.
 function GnowebRow({ name, href }: { name: string; href: string | undefined }) {
   return (
-    <li className={styles["item"]}>
-      <div className={styles["line"]}>
-        <span className={styles["name"]}>{name}</span>
-        {href === undefined ? null : (
-          <Button emphasis="outline" size="s" href={href}>
+    <FunctionRow name={name}>
+      <p className={[calm["box"], "fill-box"].join(" ")}>
+        Writes to the chain: its arguments are signed on the realm's page on gnoweb.
+      </p>
+      {href === undefined ? null : (
+        <Cluster>
+          <Button emphasis="outline" size="s" icon="arrow-up-right" href={href}>
             Open in gnoweb
             <span className="visually-hidden"> for {name}</span>
           </Button>
-        )}
-      </div>
-    </li>
+        </Cluster>
+      )}
+    </FunctionRow>
   );
 }
 
-function Rows({ functions, ...place }: RealmWritesProps & { functions: Callable[] }) {
+function Rows({
+  functions,
+  expanded,
+  opening,
+  ...place
+}: RealmWritesProps & { functions: Callable[]; expanded: boolean }) {
   const href = gnowebLink(place.chain.gnoweb, place.realm);
   const { chain, realm, options } = place;
   const here: CallPlace = { chain, realm, options };
+  const counts = use(CallCountsContext);
+  // The realm's own order, by calls once the rollup has counted them, by name.
+  const sorts = [
+    { id: "listed", label: "Listed", compare: () => 0 },
+    {
+      id: "calls",
+      label: "By calls",
+      compare: (a: Callable, b: Callable) => (counts.get(b.name) ?? 0) - (counts.get(a.name) ?? 0),
+    },
+    { id: "name", label: "By name", compare: (a: Callable, b: Callable) => a.name.localeCompare(b.name) },
+  ].filter(({ id }) => id !== "calls" || counts.size > 0);
   return (
-    <ul className={styles["list"]}>
-      {functions.map((write) =>
+    <PagedList
+      label="write functions"
+      items={functions}
+      keyOf={(write) => write.name}
+      textOf={(write) => write.name}
+      sorts={sorts}
+      expanded={expanded}
+      {...(href === undefined ? {} : { explorer: { href, label: "More on gnoweb" } })}
+      render={(write) =>
         carried(write) === true ? (
-          <WriteRow key={write.name} write={write} {...here} />
+          <WriteRow write={write} open={opening === write.name} {...here} />
         ) : (
-          <GnowebRow key={write.name} name={write.name} href={href} />
-        ),
-      )}
-    </ul>
+          <GnowebRow name={write.name} href={href} />
+        )
+      }
+    />
   );
 }
 
-function Body(props: RealmWritesProps) {
+function Body({ onCount, expanded = false, ...props }: RealmWritesProps) {
   const listing = useCallable(props.chain.rpc, props.realm, props.options);
+  const functions = listing.state === "listed" ? listing.functions.filter((each) => carried(each) !== undefined) : [];
+  const count = listing.state === "listed" ? functions.length : undefined;
+  useEffect(() => {
+    if (count !== undefined) onCount?.(count);
+  }, [count, onCount]);
   if (listing.state !== "listed") return <Unlisted listing={listing} />;
-  const functions = listing.functions.filter((each) => carried(each) !== undefined);
-  if (functions.length === 0) return <p>There is no write function to call here.</p>;
-  return <Rows {...props} functions={functions} />;
+  if (functions.length === 0) return <p className={calm["note"]}>There is no write function to call here.</p>;
+  return <Rows {...props} functions={functions} expanded={expanded} />;
 }
 
 /** A realm's write functions as rows, each opening its call card; read again, from nothing, when the realm or the chain change. */
 export function RealmWrites(props: RealmWritesProps) {
   return (
     <section aria-label="Write functions">
-      <Stack space="xs">
-        <h2 className={styles["title"]}>Write functions</h2>
-        <Body {...props} />
-      </Stack>
+      <Body {...props} />
     </section>
   );
 }

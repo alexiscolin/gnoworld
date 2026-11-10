@@ -35,3 +35,17 @@ export const Assistant: Story = {
 };
 export const Dashed: Story = { args: { dashed: true } };
 export const Compact: Story = { args: { compact: true } };
+export const Hub: Story = { args: { look: "hub" } };
+export const HubExpandable: Story = {
+  args: {
+    look: "hub",
+    children: (
+      <>
+        <Card.Header title="Calls per day" expand={{ open: false, onToggle: () => undefined }} />
+        <Card.Body>
+          <p>Three answers, 41 votes so far.</p>
+        </Card.Body>
+      </>
+    ),
+  },
+};

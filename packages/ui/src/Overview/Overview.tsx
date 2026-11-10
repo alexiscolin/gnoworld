@@ -6,7 +6,6 @@ import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { iconNode } from "../icons/iconNode.ts";
 import { Skeleton } from "../Skeleton/Skeleton.tsx";
-import { Activity } from "./Activity.tsx";
 import {
   Avatars,
   Cards,
@@ -22,6 +21,7 @@ import {
 } from "./Interface.tsx";
 import { NavItems } from "./NavItems.tsx";
 import { Compositions, Frames, Kickers, Layout } from "./Frames.tsx";
+import { PlateRegions } from "./Plate.tsx";
 import { Region } from "./Region.tsx";
 import { Soon } from "./Soon.tsx";
 
@@ -169,9 +169,7 @@ export function Overview() {
         <Stats />
         <Soon />
       </Region>
-      <Region name="Activity">
-        <Activity />
-      </Region>
+      <PlateRegions />
       <Region name="Planets">
         <Planets />
       </Region>

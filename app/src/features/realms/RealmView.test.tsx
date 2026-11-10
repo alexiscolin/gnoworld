@@ -8,7 +8,14 @@ import { all, button, click, follows, mount, one } from "../../../tests/mount.ts
 import { CUR, inputs } from "../../../tests/callFixtures.ts";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { StoreProvider } from "../../storeContext.tsx";
-import { RealmView } from "./RealmView.tsx";
+import { RealmView as View, type RealmViewProps } from "./RealmView.tsx";
+import { useRealm } from "./useRealm.ts";
+
+// The plate's adapter reads the page once and hands its state down (routes/plate/useRealmPlate.tsx); the test does as it does.
+function RealmView(props: Omit<RealmViewProps, "state">) {
+  const state = useRealm({ rpc: props.chain.rpc, realm: props.realm, origin: props.chain.gnoweb }, props.options);
+  return <View {...props} state={state} />;
+}
 
 // 5h: a realm's view reads its page and the block height once through lib/chain, and shows what it read, the cap's state or the
 // failed read's state, each with the link to the realm on gnoweb. The answers are the recorded ones (chainFixture.ts: PAGES).
@@ -203,7 +210,7 @@ describe("a realm's view", () => {
 });
 
 // The call cards: the form's, after its figure, and the write rows'.
-const CARDS = "figure + article, #functions article";
+const CARDS = "figure + article, #functions [aria-label='Write functions'] article";
 
 // 9e: a page's form gets its Call in the realm's own view, where the realm and the chain are known; the view passes them on.
 describe("a realm's view, with a form on its page", () => {

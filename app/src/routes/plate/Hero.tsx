@@ -1,0 +1,47 @@
+// The hero under the title (the proposal's .hero): the status and the rank at the kicker's row, the lede, the actions and the talk bar. The kicker
+// and the title are the route's, on the first screen; these come with the plate.
+import { Chip, Cluster, Panel, Stack } from "@gnoworld/ui";
+import { Actions } from "../../features/world/Actions.tsx";
+import type { PlateModel } from "./model.ts";
+import { TalkBar } from "./TalkBar.tsx";
+import styles from "./Hero.module.css";
+
+// Seen at the kicker's row, at the plate's right (a narrow plate: under the title).
+export function Pills({ lede }: { lede: PlateModel["lede"] }) {
+  const { status, rank } = lede;
+  if (status === undefined && rank === undefined) return null;
+  return (
+    <div className={styles["pills"]}>
+      <Cluster space="2xs" wrap="no">
+        {rank === undefined ? null : (
+          <span className={styles["pill"]}>
+            <Chip tone="signal" strong>
+              {rank}
+            </Chip>
+          </span>
+        )}
+        {status === undefined ? null : (
+          <span className={styles["pill"]}>
+            <Chip tone={status.tone} dot strong>
+              {status.label}
+            </Chip>
+          </span>
+        )}
+      </Cluster>
+    </div>
+  );
+}
+
+export function Hero({ lede, actions, talk }: Pick<PlateModel, "lede" | "actions" | "talk">) {
+  return (
+    <Stack space="s">
+      {lede.sentence === undefined ? null : <Panel.Lede>{lede.sentence}</Panel.Lede>}
+      <Stack space="m">
+        <div className={styles["acts"]}>
+          <Actions {...actions} />
+        </div>
+        {talk === undefined ? null : <TalkBar {...talk} />}
+      </Stack>
+    </Stack>
+  );
+}

@@ -1,0 +1,30 @@
+/* The plate's squares (slice 13): hub cards on the twelve columns; the narrow plate's tighter card padding is the plate's to set (its container is
+   37.5 rem, Panel). */
+@layer components {
+  /* raw: the narrow plate (37.5 rem, as the grid's own container query) */
+  @container plate (max-width: 37.5rem) {
+    .widgets {
+      --plate-pad: var(--space-s);
+      --plate-zone: var(--space-l);
+    }
+  }
+
+  /* The proposal's value reads at the body's size: its own step (--font-figure-s) is not defined there, so the font falls to the card's. */
+  .value {
+    font: var(--font-body);
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    /* layout: a long value (a name) wraps inside its square, never past it */
+    overflow-wrap: anywhere;
+  }
+
+  .sub {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .more {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+}

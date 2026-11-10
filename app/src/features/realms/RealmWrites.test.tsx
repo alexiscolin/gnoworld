@@ -103,7 +103,8 @@ describe("a realm's write functions, with the call card inline", () => {
     for (const name of ["Upload", "Configure"]) {
       const row = all(box, "li").find((li) => li.textContent.includes(name));
       expect(row, name).toBeDefined();
-      expect(row ? all(row, "button") : []).toHaveLength(0);
+      // The row's own toggle opens it in place; no button does anything else (no Call).
+      expect(row ? all(row, "button").filter((b) => b.getAttribute("aria-expanded") === null) : []).toHaveLength(0);
       const link = row?.querySelector("a");
       expect(link?.textContent).toContain("Open in gnoweb");
       expect(link?.getAttribute("href")).toBe(`${CHAIN.gnoweb}/r/demo/profile`);
@@ -271,17 +272,17 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(all(onyx, "article input")).toHaveLength(1);
   });
 
-  // The rows are the frame's (F5741 to F5744): an outlined small pill, the name in mono and muted on the pill's line. The stylesheet
-  // is read as empty here, so the rules (the hairlines, the step) are the Mac Studio's pictures.
-  it("draws each row's Call as a small outlined pill, and its name as its own mono, muted part on the pill's line (F5741, F5742, F5743)", async () => {
+  // The proposal's row: a solid small pill (its Run) inside the open row, whose name is the row's own mono title. The stylesheet is read as
+  // empty here, so the rules (the hairlines, the step) are the pictures'.
+  it("draws each row's Call as a small solid pill inside the row that opens in place, its name the row's title (the proposal's .fn)", async () => {
     const box = await panel();
     const call = button(box, "Call SetBio");
-    expect(call?.dataset["emphasis"]).toBe("outline");
+    expect(call?.dataset["emphasis"]).toBe("solid");
     expect(call?.dataset["size"]).toBe("s");
-    const name = all(box, "li span").find((s) => s.textContent === "SetBio");
-    expect(name?.className).toContain("name");
-    expect(name?.parentElement?.className).toContain("line");
-    expect(name?.parentElement?.contains(call ?? null)).toBe(true);
+    const row = all(box, "li").find((li) => li.textContent.includes("SetBio"));
+    const toggle = row?.querySelector("button[aria-expanded]");
+    expect(toggle?.textContent).toBe("SetBio");
+    expect(toggle?.getAttribute("aria-controls")).toBe(call?.closest("[id]")?.id);
   });
 });
 
@@ -372,14 +373,11 @@ describe("a vote on GovDAO", () => {
 });
 
 describe("a realm's write rows, as parts", () => {
-  it("draws a row that has no Call with the rows' own list, item, line and name, and a Call row's fee read through the view's options", async () => {
+  it("draws a row that has no Call as a row that opens in place, and a Call row's fee read through the view's options", async () => {
     const fetcher = chain();
     const box = await panel(fetcher);
     const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
-    expect(row?.className).toMatch(/item/);
-    expect(row?.firstElementChild?.className).toMatch(/line/);
-    expect(row?.querySelector("span")?.className).toMatch(/name/);
-    expect(one(box, "ul").className).toMatch(/list/);
+    expect(row?.querySelector("button[aria-expanded]")?.textContent).toBe("Upload");
     click(button(box, "Call SetBio"));
     await vi.waitFor(() => {
       expect(fetcher.mock.calls.some(([url]) => url.startsWith(CHAIN.indexer))).toBe(true);
@@ -396,6 +394,6 @@ describe("a realm's write rows, as parts", () => {
       expect(all(box, "li").length).toBeGreaterThan(0);
     });
     const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
-    expect(row?.querySelector("a, button")).toBeNull();
+    expect(row?.querySelector("a, button:not([aria-expanded])")).toBeNull();
   });
 });

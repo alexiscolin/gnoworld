@@ -4,6 +4,10 @@
 @layer components {
   .panel {
     --_fill: var(--color-surface);
+    /* raw: the title's size when the plate's label gives none: the proposal's default (Panel.tsx fits it to the words) */
+    --_tsz: 92px;
+    /* raw: the same on a narrow plate */
+    --_tsz-narrow: 72px;
 
     position: relative;
     border: var(--line-width) solid var(--color-line);
@@ -19,11 +23,56 @@
     padding: var(--space-m);
   }
 
-  /* The plate's rhythm (D470): its column's step (Stack, 16 px) between the crumbs, the title and the line under it, and twice that
-     between the sections after, whatever a page stacks there; never a heading in a dialog, a picture (8f) or an article (D382). */
-  .panel[data-look="plate"] h1:not(:is(dialog, [inert], article) *) ~ :not(h1 + *) {
-    /* layout: the column's step and one more: --space-l between sections, as frame 26's hairline and actions stand */
-    margin-block-start: var(--space-s);
+  /* The plate's blocks hold their own steps (Stack: 16 px inside a zone, --plate-zone between zones, the proposal's section 7); what stands at the
+     plate's corner (its pills) takes the body for its box. */
+  .body {
+    position: relative;
+  }
+
+  /* The title's clip: its words rise from 40 % below their own box (the arrival's), and the plate's title is fitted to its words (Panel.tsx),
+     500 weight over a 1.12 line; a narrow plate (a phone) fits its own width. Never a heading in a dialog, a picture (8f) or an article (a realm's Render, D382). */
+  .title {
+    overflow: hidden;
+  }
+
+  .title h1:not(:is(dialog, [inert], article) *) {
+    /* raw: the proposal's title, which the plate's label fits to its width */
+    font-family: var(--family-sans);
+    font-size: var(--_tsz);
+    font-weight: 500;
+    line-height: 1.12;
+    letter-spacing: var(--tracking-hero);
+  }
+
+  .lede {
+    /* raw: the proposal's lead, the text at 86 % */
+    color: color-mix(in oklab, var(--color-text) 86%, transparent);
+    font: var(--font-lead);
+  }
+
+  /* The fade into space at the plate's right edge: seen only on the wide plate. */
+  .fade {
+    display: none;
+  }
+
+  /* raw: the narrow plate (37.5 rem, this panel's container) */
+  @container plate (max-width: 37.5rem) {
+    .panel[data-look="plate"] .content {
+      --plate-pad: var(--space-s);
+      --plate-zone: var(--space-l);
+    }
+
+    .title h1:not(:is(dialog, [inert], article) *) {
+      font-size: var(--_tsz-narrow);
+    }
+  }
+
+  /* The plate is the container its blocks' queries ask (Grid's twelve columns): narrow or wide by its own width, never the screen's. */
+  .panel[data-look="plate"] {
+    /* The world's colour lit, from the plate's own --world (the root's follows the root's). */
+    --world-light: color-mix(in oklab, var(--world) 62%, var(--color-text));
+
+    container: plate / inline-size;
   }
 
   /* A page's arrival (D401): GSAP plays it (the app's features/universe/arrival.ts), the plate's fill by `--plate-in`. */
@@ -140,86 +189,28 @@
       background: var(--_ground);
       /* hidden where a page's canvas paints the plate's fill itself (globe.module.css); its colour stays readable for it */
       visibility: var(--plate-fill);
-      /* raw: the last 160 px go to space, softly (the video's fade is wide, with no edge), so the planet keeps the frame's free area; a page that
-         draws a globe beside it paints this fill in its canvas instead (the same fade, scene/earth/ground.ts) */
-      mask-image: linear-gradient(to right, #000 calc(100% - 160px), transparent);
     }
 
     .panel[data-look="plate"] .content {
       block-size: 100%;
-      overflow: auto;
+      overflow: hidden auto;
       box-sizing: border-box;
-      /* raw: the text column starts 76 px into the plate, at x 100, and is 484 px wide (frame 20) */
-      padding-inline: 76px calc(var(--plate-w) - 76px - 484px);
-      /* raw: the crumbs' 24 px row centred at y 137, 27 px under the plate's top (frame 20) */
-      padding-block-start: 27px;
+      /* The text column's one left edge (the app's, 76 px), its one right edge (where the fade begins) and a 48 px top and foot (the proposal's section 7). */
+      padding-inline: var(--plate-inset-start) var(--plate-inset-end);
+      padding-block: var(--space-xl);
     }
 
-    /* The kicker, or the crumbs (8g), is the row over the title: 24 px tall, its words centred in it (frame 26), so the title keeps its place;
-       never a heading inside a dialog or an inert picture (8f). */
-    .panel[data-look="plate"] .content :is(p, nav):not(:is(dialog, [inert], article) *):has(+ h1) {
-      /* layout: the kicker's words centred in the crumbs' row */
-      display: flex;
-      /* layout: centred in the row */
-      align-items: center;
-      /* raw: the crumbs' row */
-      min-block-size: 24px;
-    }
-
-    /* The plate's own title, never a heading in a dialog, a picture (8f) or an article (a realm's Render, D382), which keeps its own scale.
-       The title fits its words: 10.93vb is the video's 118 px at 1080 (the prototype's 12% of a window 983 px high), and each
-       step the longest name the 474 px column holds at 0.58 em a letter. */
-    .panel[data-look="plate"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: 7 px off the crumbs, which sets the title's ink at y 183 (frame 37) */
-      /* layout: the arrangement the prototype and the frames draw */
-      margin-block-start: 7px;
-      /* raw: the prototype's and the frames' own value */
-      font-size: max(36px, min(10.93vb, 136px));
-      font-weight: 500;
-      letter-spacing: -0.05em;
-      line-height: 0.9;
-    }
-
-    .panel[data-look="plate"] h1:not(:is(dialog, [inert], article) *) + p {
-      /* raw: 11 px more under the title, which sets the description's ink at y 310 (frame 26) */
-      /* layout: the arrangement the prototype and the frames draw */
-      margin-block-start: 11px;
-      /* raw: the prototype's and the frames' own value */
-      max-inline-size: 46ch;
-      /* raw: the prototype's and the frames' own value */
-      color: #c8d0de;
-      /* raw: the description is 16 px on 1.55, in its own grey (the prototype's #fText) */
-      font: 400 16px/1.55 var(--family-sans);
-    }
-
-    .panel[data-look="plate"][data-fit="8"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: the prototype's and the frames' own value */
-      font-size: max(36px, min(10.93vb, 102px));
-    }
-
-    .panel[data-look="plate"][data-fit="10"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: the prototype's and the frames' own value */
-      font-size: 81.7px;
-    }
-
-    .panel[data-look="plate"][data-fit="12"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: the prototype's and the frames' own value */
-      font-size: 68px;
-    }
-
-    .panel[data-look="plate"][data-fit="16"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: the prototype's and the frames' own value */
-      font-size: 51px;
-    }
-
-    .panel[data-look="plate"][data-fit="20"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: the prototype's and the frames' own value */
-      font-size: 40.9px;
-    }
-
-    .panel[data-look="plate"][data-fit="more"] h1:not(:is(dialog, [inert], article) *) {
-      /* raw: the prototype's and the frames' own value */
-      font-size: 36px;
+    .fade {
+      display: block;
+      position: absolute;
+      inset-block: 0;
+      inset-inline-end: 0;
+      inline-size: var(--plate-fade);
+      /* raw: the night at 55 % over the last 64 px: the plate's fade into space */
+      background: linear-gradient(to right, transparent, color-mix(in oklab, var(--color-space) 55%, transparent));
+      pointer-events: none;
+      /* raw: over the plate's words, under the frame's outline */
+      z-index: 3;
     }
   }
 }

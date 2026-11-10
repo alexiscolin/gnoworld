@@ -1,0 +1,52 @@
+/* Who calls it (the proposal's cal card): the callers' line at the plate's spark height, then a row for each caller, its face, its name over a track
+   in the line colour that a cream fill grows along (0.9 s from 0.3 s after its card), its count in the mono. */
+@layer components {
+  .spark {
+    block-size: var(--spark-h);
+    --spark-line: calc(var(--d) + 0.2s);
+    --spark-area: calc(var(--d) + 0.6s);
+  }
+
+  .caller {
+    font: var(--font-reading);
+  }
+
+  .count {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+
+  .track {
+    block-size: var(--space-3xs);
+    overflow: hidden;
+    border-radius: var(--radius-pill);
+    background: var(--color-line);
+  }
+
+  .track i {
+    display: block;
+    block-size: 100%;
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    transform-origin: 0 50%;
+  }
+
+  .more {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .track i {
+      /* raw: the proposal's score, 0.9 s from 0.3 s after its card */
+      animation: along 0.9s var(--ease-out-3) calc(var(--d) + 0.3s) backwards;
+      animation-play-state: var(--play);
+    }
+  }
+
+  @keyframes along {
+    from {
+      transform: scaleX(0);
+    }
+  }
+}

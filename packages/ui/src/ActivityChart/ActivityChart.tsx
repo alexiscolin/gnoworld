@@ -1,8 +1,9 @@
 import { Cluster, Stack } from "../compositions/index.ts";
 import { grouped } from "../format.ts";
-import { useLayoutEffect, useRef, type RefObject } from "react";
+import { useLayoutEffect, useRef, type ReactNode, type RefObject } from "react";
 import { surface, usePlaced } from "../Popover/floating.ts";
 import tooltip from "../Tooltip/Tooltip.module.css";
+import { Bar } from "./Bar.tsx";
 import { useReading } from "./useReading.ts";
 import styles from "./ActivityChart.module.css";
 
@@ -32,12 +33,12 @@ const INSET = 0.5;
 // A value's height on the line: from zero, half a pixel above the bottom, to the peak, half below the top.
 const lineY = (high: number) => HEIGHT - INSET - (high * (HEIGHT - 2 * INSET)) / HEIGHT;
 
-function when(back: number, unit: "hour" | "day") {
+export function when(back: number, unit: "hour" | "day") {
   if (back === 0) return unit === "hour" ? "This hour" : "Today";
   return `${String(back)} ${unit}${back === 1 ? "" : "s"} ago`;
 }
 
-interface Point {
+export interface Point {
   count: number;
   at: number;
   high: number;
@@ -45,16 +46,22 @@ interface Point {
 
 // Over the bar, placed in script as the tooltip's words are: above it, below when there is no room above, a step inside the
 // screen's edges (a chart at the top of the page, or at the edge of a phone's screen, keeps its words whole).
-function Tip({
+export function Tip({
   point,
   last,
   unit,
   plot,
+  words,
+  pill,
 }: {
   point: Point;
   last: number;
   unit: "hour" | "day";
   plot: RefObject<Element | null>;
+  /** What the tip says in place of the count and its "when" (a day chart's own date). */
+  words?: ReactNode;
+  /** The plate's day chart's: a pill with the world's colour on its date. */
+  pill?: boolean;
 }) {
   const anchorRef = useRef<Element | null>(null);
   const wordsRef = useRef<HTMLSpanElement>(null);
@@ -68,9 +75,10 @@ function Tip({
       className={surface([tooltip["tip"], styles["tip"]].join(" "))}
       aria-hidden="true"
       data-tip=""
+      data-look={pill === true ? "pill" : undefined}
       style={{ visibility: "hidden" }}
     >
-      {grouped(point.count)} · {when(last - point.at, unit)}
+      {words ?? `${grouped(point.count)} · ${when(last - point.at, unit)}`}
     </span>
   );
 }
@@ -95,17 +103,7 @@ function Drawing({ points, sparkline, width }: { points: Point[]; sparkline: boo
         />
       ) : (
         points.map(({ at, high }) => (
-          <rect
-            key={at}
-            className={styles["bar"]}
-            data-hour={at}
-            data-current={at === last ? "true" : undefined}
-            data-empty={high === 0 ? "" : undefined}
-            x={at * (BAR + GAP)}
-            y={HEIGHT - Math.max(high, DASH)}
-            width={BAR}
-            height={Math.max(high, DASH)}
-          />
+          <Bar key={at} at={at} last={last} high={high} x={at * (BAR + GAP)} width={BAR} dash={DASH} base={HEIGHT} />
         ))
       )}
     </svg>

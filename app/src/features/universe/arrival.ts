@@ -1,13 +1,15 @@
 // A page's arrival and leaving (D401, the dive's demo; the video's frames 19 and 20), with GSAP on the design system's own panel: first the
 // grounds, the plate's fill (space's own, frame.ts, on a page with a planet) and frame and the chat's panel; once they stand, the words:
-// the title rises from 40 % below, the rest follows 0.05 s apart, the activity bars grow, the chat's lines rise. It starts as the flight
+// the kicker, the title and the first screen's lines rise as the proposal's score has them (the plate's blocks play theirs in their own sheets), the chat's lines rise. It starts as the flight
 // nears its end, or at once on a page opened directly. Leaving plays the same back, 2.6 times as fast, on the page's ghost. Nothing moves
 // under reduced motion.
 import { gsap } from "gsap";
 import { motionOf } from "../../space/motion.ts";
 
 const PLATE = "[data-look='plate']";
-const ITEMS = "[data-content] > div > div > div > :not(h1)";
+// What the first screen holds besides the title and the kicker, which have steps of their own: the lede and the banners. The plate's blocks (its
+// root is [data-blocks]) come after it, with the entrance their own sheets play (the proposal's score).
+const ITEMS = "[data-content] > div > div > div > :not([data-title], [data-planet], [data-blocks])";
 // The dock is what leaves with the page and holds no plate; on a leaving page's ghost, its copy.
 const DOCK = ":not(:has([data-look='plate']))";
 // The chat's parts as the demo's: its header, the lines in view (it stands at its end: the last ten) and what follows them.
@@ -56,29 +58,38 @@ const STEPS: readonly Step[] = [
     to: { x: 0, autoAlpha: 1, duration: 0.7, ease: "power3.out" },
     at: 0,
   },
+  // The plate's own score (the proposal's): the kicker rises 12 px over 0.6 s at once; the title rises out of its clip from 40 % below over 1.1 s from
+  // 0.1 s, its opacity done at 45 % of it; the lede and the other lines of the first screen rise 16 px over 0.7 s from 0.35 s. The plate's blocks play
+  // theirs in their own sheets.
+  {
+    of: ({ plate }) => all(plate, "[data-planet]"),
+    from: { y: 12, autoAlpha: 0 },
+    to: { y: 0, autoAlpha: 1, duration: 0.6, ease: "power3.out" },
+    at: 0,
+  },
   {
     of: ({ plate }) => all(plate, "h1"),
-    from: { yPercent: 40, autoAlpha: 0 },
-    to: { yPercent: 0, autoAlpha: 1, duration: 1.1, ease: "power4.out" },
-    at: WORDS,
+    from: { yPercent: 40 },
+    to: { yPercent: 0, duration: 1.1, ease: "power4.out" },
+    at: 0.1,
+  },
+  {
+    of: ({ plate }) => all(plate, "h1"),
+    from: { autoAlpha: 0 },
+    to: { autoAlpha: 1, duration: 0.5, ease: "power4.out" },
+    at: 0.1,
   },
   {
     of: ({ plate }) => all(plate, ITEMS),
-    from: { y: 18, autoAlpha: 0 },
-    to: { y: 0, autoAlpha: 1, duration: 0.7, stagger: 0.05, ease: "power3.out" },
-    at: WORDS + 0.15,
+    from: { y: 16, autoAlpha: 0 },
+    to: { y: 0, autoAlpha: 1, duration: 0.7, ease: "power3.out" },
+    at: 0.35,
   },
   {
     of: ({ docks }) => docks.flatMap((dock) => all(dock, CHAT)),
     from: { y: 12, autoAlpha: 0 },
     to: { y: 0, autoAlpha: 1, duration: 0.5, stagger: 0.04, ease: "power3.out" },
     at: WORDS + 0.1,
-  },
-  {
-    of: ({ plate }) => all(plate, "svg rect"),
-    from: { scaleY: 0 },
-    to: { scaleY: 1, transformOrigin: "50% 100%", duration: 0.6, stagger: 0.01, ease: "power2.out" },
-    at: WORDS + 0.3,
   },
 ];
 
@@ -121,11 +132,20 @@ const TAGS = "[data-tag]";
 // The aiming tags rise as a page does (D411): the panel's ground first, then its title, then the rest of its lines 0.05 s apart.
 function tagsIn(root: ParentNode): gsap.core.Timeline {
   const timeline = gsap.timeline();
-  const [title, line] = [STEPS[3], STEPS[4]];
   const end = { clearProps: MOVED };
   timeline.fromTo(all(root, TAGS), { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.6, ease: "power1.out", ...end }, 0);
-  if (title !== undefined) timeline.fromTo(all(root, `${TAGS} b`), title.from, { ...title.to, ...end }, WORDS);
-  if (line !== undefined) timeline.fromTo(all(root, `${TAGS} span`), line.from, { ...line.to, ...end }, WORDS + 0.15);
+  timeline.fromTo(
+    all(root, `${TAGS} b`),
+    { yPercent: 40, autoAlpha: 0 },
+    { yPercent: 0, autoAlpha: 1, duration: 1.1, ease: "power4.out", ...end },
+    WORDS,
+  );
+  timeline.fromTo(
+    all(root, `${TAGS} span`),
+    { y: 18, autoAlpha: 0 },
+    { y: 0, autoAlpha: 1, duration: 0.7, ease: "power3.out", ...end },
+    WORDS + 0.15,
+  );
   return timeline;
 }
 

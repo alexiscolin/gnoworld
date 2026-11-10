@@ -3,11 +3,12 @@
 // so, with the block height it was read at, and no wallet is ever asked. One request a view for the list, two a click (the
 // call, shown first, and the height, which follows it); nothing polls. The names are lib/chain's (one exported identifier or none); a long list is drawn a
 // hundred at a time and searched whole. Every state keeps the link to the realm on gnoweb, where the rest is done.
-import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
-import { useState } from "react";
+import { PagedList } from "@gnoworld/ui";
 import type { ReadOptions } from "@gnoworld/chain/read";
-import edge from "./frame.module.css";
-import { FunctionRow, Unlisted } from "./FunctionRow.tsx";
+import { use, useEffect } from "react";
+import { gnowebLink } from "../../lib/chain/gnoweb.ts";
+import { Act, CallCountsContext, FunctionRow, Unlisted } from "./FunctionRow.tsx";
+import calm from "./quiet.module.css";
 import styles from "./RealmFunctions.module.css";
 import { useFunctions, type Functions, type Result } from "./useFunctions.ts";
 import { isHeight } from "./useRealm.ts";
@@ -19,12 +20,11 @@ export interface RealmFunctionsProps {
   chain: { name: string; chainId: string; rpc: string; gnoweb: string };
   /** lib/chain's options, for a test's fetch. */
   options?: ReadOptions;
+  /** Told how many read functions there are, once listed (the tab's count). */
+  onCount?: (count: number) => void;
+  /** The card is open in place: the hundred rows at once. */
+  expanded?: boolean;
 }
-
-/** Functions drawn at first, and added by each "Show more": the list is the realm's own and can be long. */
-const PAGE = 100;
-/** The search shows from this many functions on: a short list is read at a glance. */
-const SEARCH_FROM = 11;
 
 function Outcome({ name, result }: { name: string; result: Result | undefined }) {
   if (result === undefined || result.state === "busy") return null;
@@ -33,16 +33,10 @@ function Outcome({ name, result }: { name: string; result: Result | undefined })
   return (
     <>
       {/* A result taller than its frame scrolls: the frame takes focus and has a name, so a keyboard reaches the rest. */}
-      <pre
-        className={[edge["frame"], styles["result"]].join(" ")}
-        dir="ltr"
-        tabIndex={0}
-        role="region"
-        aria-label={`Result of ${name}`}
-      >
+      <pre className={styles["result"]} dir="ltr" tabIndex={0} role="region" aria-label={`Result of ${name}`}>
         {result.text}
       </pre>
-      <p className={"meta"}>
+      <p className={calm["note"]}>
         read on chain, free, no signature
         {height === undefined
           ? null
@@ -54,76 +48,71 @@ function Outcome({ name, result }: { name: string; result: Result | undefined })
   );
 }
 
-// The functions as rows, searchable from SEARCH_FROM on and drawn PAGE at a time.
-function Items({ names, results, read }: { names: string[]; results: Functions["results"]; read: Functions["read"] }) {
-  const [query, setQuery] = useState("");
-  const [shown, setShown] = useState(PAGE);
-  const needle = query.trim().toLowerCase();
-  const found = needle === "" ? names : names.filter((name) => name.toLowerCase().includes(needle));
+// The functions as rows: the design system's paged list, its filter, its closed orders, 12 then up to 100 and the realm on gnoweb past them.
+function Items({
+  names,
+  results,
+  read,
+  more,
+  expanded,
+}: {
+  names: string[];
+  results: Functions["results"];
+  read: Functions["read"];
+  more: string | undefined;
+  expanded: boolean;
+}) {
+  const counts = use(CallCountsContext);
+  // The realm's own order, by calls once the rollup has counted them, by name.
+  const sorts = [
+    { id: "listed", label: "Listed", compare: () => 0 },
+    { id: "calls", label: "By calls", compare: (a: string, b: string) => (counts.get(b) ?? 0) - (counts.get(a) ?? 0) },
+    { id: "name", label: "By name", compare: (a: string, b: string) => a.localeCompare(b) },
+  ].filter(({ id }) => id !== "calls" || counts.size > 0);
   return (
-    <>
-      {names.length >= SEARCH_FROM ? (
-        <Field
-          kind="search"
-          label="Find a function"
-          hideLabel
-          placeholder="Find a function"
-          value={query}
-          onChange={(value) => {
-            setQuery(value);
-            setShown(PAGE);
-          }}
-        />
-      ) : null}
-      {found.length === 0 ? <p>No function matches your search.</p> : null}
-      <ul className={styles["list"]}>
-        {found.slice(0, shown).map((name) => (
-          <FunctionRow
-            key={name}
-            name={name}
+    <PagedList
+      label="read functions"
+      items={names}
+      keyOf={(name) => name}
+      textOf={(name) => name}
+      sorts={sorts}
+      expanded={expanded}
+      {...(more === undefined ? {} : { explorer: { href: more, label: "More on gnoweb" } })}
+      empty="No function matches your search."
+      render={(name) => (
+        <FunctionRow name={name}>
+          <Act
             verb="Read"
+            name={name}
             busy={results[name]?.state === "busy"}
             onClick={() => {
               read(name);
             }}
-          >
-            <Outcome name={name} result={results[name]} />
-          </FunctionRow>
-        ))}
-      </ul>
-      {found.length > shown ? (
-        <Cluster space="s">
-          <span className={"meta"}>
-            Showing {shown} of {new Intl.NumberFormat("en-US").format(found.length)}
-          </span>
-          <Button
-            onClick={() => {
-              setShown(shown + PAGE);
-            }}
-          >
-            Show more
-          </Button>
-        </Cluster>
-      ) : null}
-    </>
+          />
+          <Outcome name={name} result={results[name]} />
+        </FunctionRow>
+      )}
+    />
   );
 }
 
-function Body({ functions }: { functions: Functions }) {
+function Body({ functions, more, expanded }: { functions: Functions; more: string | undefined; expanded: boolean }) {
   const { listing, results, read } = functions;
   if (listing.state !== "listed") return <Unlisted listing={listing} />;
-  if (listing.names.length === 0) return <p>There is no function to read here.</p>;
-  return <Items names={listing.names} results={results} read={read} />;
+  if (listing.names.length === 0) return <p className={calm["note"]}>There is no function to read here.</p>;
+  return <Items names={listing.names} results={results} read={read} more={more} expanded={expanded} />;
 }
 
-function Panel({ realm, chain, options }: RealmFunctionsProps) {
+function Panel({ realm, chain, options, onCount, expanded = false }: RealmFunctionsProps) {
   const functions = useFunctions(chain.rpc, realm, options);
+  const { listing } = functions;
+  const count = listing.state === "listed" ? listing.names.length : undefined;
+  useEffect(() => {
+    if (count !== undefined) onCount?.(count);
+  }, [count, onCount]);
   return (
     <section aria-label="Read functions">
-      <Stack space="xs">
-        <h2 className={styles["title"]}>Read functions</h2>
-        <Body functions={functions} />
-      </Stack>
+      <Body functions={functions} more={gnowebLink(chain.gnoweb, realm)} expanded={expanded} />
     </section>
   );
 }

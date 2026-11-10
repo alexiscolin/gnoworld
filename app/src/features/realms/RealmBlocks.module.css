@@ -229,7 +229,7 @@
 
   /* A link that leaves gnoweb: a button that reads as the page's own links do (inherited colour), underlined to say it is one. */
   .external {
-    color: inherit;
+    color: var(--color-link);
     font: inherit;
     text-decoration: underline;
     cursor: pointer;

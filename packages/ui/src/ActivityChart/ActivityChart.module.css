@@ -46,4 +46,18 @@
     color: var(--color-text-muted);
     font: var(--font-data);
   }
+
+  /* The plate's day chart's tooltip: a pill over the bar, the date in the world's light (the proposal's .tt). */
+  .tip[data-look="pill"] {
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-pill);
+    background: var(--color-space);
+    box-shadow: var(--shadow-popover);
+    font: var(--font-meta);
+  }
+
+  .tip[data-look="pill"] b {
+    color: var(--world-light);
+    font-weight: 500;
+  }
 }

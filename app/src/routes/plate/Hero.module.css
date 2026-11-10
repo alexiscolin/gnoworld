@@ -1,0 +1,61 @@
+/* The hero's entrance (the proposal's score): the pills pop at 0.35 s, each action rises 8 px from 0.45 s, 0.05 s apart; the title, the kicker and the
+   lede are the route's, played by the arrival (features/universe/arrival.ts). */
+@layer components {
+  /* At the kicker's row, the plate's right: its pills centred in the row's 28 px. A narrow plate puts them in the flow, under the title. */
+  .pills {
+    position: absolute;
+    /* raw: the pills' 24 px centred in the header controls' row */
+    inset-block-start: calc((var(--control-header) - var(--control-xs)) / 2);
+    inset-inline-end: 0;
+  }
+
+  @container plate (max-width: 37.5rem) {
+    .pills {
+      position: static;
+    }
+  }
+
+  .pill {
+    display: inline-block;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pill {
+      /* raw: the proposal's score, 0.45 s at 0.35 s */
+      animation: pop 0.45s var(--ease-out-3) 0.35s both;
+    }
+
+    .acts > div > * {
+      /* raw: the proposal's score, each action 0.5 s from 0.45 s, 0.05 s apart */
+      animation: rise 0.5s var(--ease-out-3) calc(0.45s + var(--n) * 0.05s) both;
+    }
+
+    .acts > div > :nth-child(2) {
+      --n: 1;
+    }
+
+    .acts > div > :nth-child(3) {
+      --n: 2;
+    }
+
+    .acts > div > :nth-child(4) {
+      --n: 3;
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      /* raw: the proposal's score */
+      transform: scale(0.9);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      /* raw: the proposal's score */
+      transform: translateY(8px);
+    }
+  }
+}

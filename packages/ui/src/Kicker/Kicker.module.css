@@ -1,4 +1,9 @@
 @layer components {
+  /* The plate's kicker: the planet's disc and the words in one row as tall as the header's controls, the disc centred in it. */
+  .row {
+    padding-block: calc((var(--control-header) - var(--avatar-m)) / 2);
+  }
+
   .kicker[data-orientation="vertical"] {
     rotate: 180deg;
     writing-mode: vertical-rl;

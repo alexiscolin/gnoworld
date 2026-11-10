@@ -1,9 +1,9 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
 import { Chip } from "../Chip/Chip.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
 import { grouped } from "../format.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import styles from "./Stat.module.css";
+import { useCounted } from "./useCounted.ts";
 
 export interface StatProps {
   value: number;
@@ -15,45 +15,6 @@ export interface StatProps {
   hot?: boolean;
   /** A line icon before the caption, in its colour: what the figure counts, seen at a glance. */
   icon?: IconName;
-}
-
-// The arrival's figures count up over 0.9 s, easing out as GSAP's power3.out (the dive's demo, D401), 0.25 s after the page's text
-// starts entering: once the flight that brings it nears its end (`data-flown`, set by the app's globe box).
-const COUNT = 900;
-const AFTER = 250;
-const FLYING = "[data-flown='flying']";
-
-const MOTION = "(prefers-reduced-motion: no-preference)";
-const unwatched = () => () => undefined;
-
-/** The figure as drawn: from nothing to its value on arrival, easing out, when motion is welcome; never
- * on the server, so the page it sends holds the value. A value that changes after shows at once. */
-function useCounted(value: number) {
-  const moving = useSyncExternalStore(
-    unwatched,
-    () => matchMedia(MOTION).matches,
-    () => false,
-  );
-  // How far the count has come, from nothing to its value: 0 to 1.
-  const [done, setDone] = useState(0);
-  useEffect(() => {
-    if (!moving) return;
-    // A frame's time can come just before the effect's: the count starts at nothing, never below.
-    let start = performance.now();
-    let frame = 0;
-    const step = (now: number) => {
-      // The count waits out a flight: it starts as the page lands.
-      if (document.querySelector(FLYING) !== null) start = now;
-      const far = Math.min(1, Math.max(0, (now - start - AFTER) / COUNT));
-      setDone(far);
-      if (far < 1) frame = requestAnimationFrame(step);
-    };
-    frame = requestAnimationFrame(step);
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-  }, [moving]);
-  return moving && done < 1 ? Math.round(value * (1 - (1 - done) ** 4)) : value;
 }
 
 function said(delta: number) {

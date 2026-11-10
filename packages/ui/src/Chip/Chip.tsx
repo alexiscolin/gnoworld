@@ -11,6 +11,10 @@ interface Mark {
   count?: never;
   label?: never;
   size?: never;
+  /** A dot in its ink before the words: what is live or quiet (the plate's status). */
+  dot?: boolean;
+  /** The words in the weight of a plate's pills (500). */
+  strong?: boolean;
 }
 
 // A chip that does something: a filter or a choice says whether it is selected, an action does not.
@@ -25,15 +29,23 @@ interface Control {
   label?: string;
   /** The smallest control's height, where many sit under a line (a reaction's, as Slack's and Discord's): the small one's otherwise. */
   size?: "xs" | "s";
+  dot?: never;
+  strong?: never;
 }
 
 export type ChipProps = Mark | Control;
 
 /** A short word: a button at the small control's size, or a static mark at the smallest, in a tone. */
-export function Chip({ children, tone = "neutral", onClick, selected, count, label, size }: ChipProps) {
+export function Chip({ children, tone = "neutral", onClick, selected, count, label, size, dot, strong }: ChipProps) {
   if (onClick === undefined) {
     return (
-      <span className={pill(styles["chip"])} data-tone={tone} data-size="xs">
+      <span
+        className={pill(styles["chip"])}
+        data-tone={tone}
+        data-size="xs"
+        data-strong={strong === true ? "" : undefined}
+      >
+        {dot === true ? <i className={["disc", styles["dot"]].join(" ")} aria-hidden="true" /> : null}
         {children}
       </span>
     );

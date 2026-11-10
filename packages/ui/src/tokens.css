@@ -39,7 +39,14 @@
     /* The world's own colour on its plate: a cool blue until the planet's colour comes with the scene (slice 7). At 16 % over the
        night it gives the frames' navy, #182033 sampled in frame 37 (amber at 16 % read brown). */
     --world: var(--p-dusk);
+    /* The world's colour lit, for its words and lines on the plate (the proposal: 62 % over white). */
+    /* A link's ink on a page that sets one (a realm's page in its plate); the words' own ink otherwise. */
+    --color-link: currentcolor;
+    --world-light: color-mix(in oklab, var(--world) 62%, var(--p-text));
     --color-fill: color-mix(in oklab, var(--p-text) 5%, transparent);
+    /* The hub card of a places' list: the text at 3 %, 6 % under the pointer. */
+    --color-card: color-mix(in oklab, var(--p-text) 3%, transparent);
+    --color-card-hover: color-mix(in oklab, var(--p-text) 6%, transparent);
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-ink-hover: color-mix(in oklab, var(--p-space) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
@@ -73,8 +80,21 @@
     --font-title-m: 300 1.625rem/1 var(--family-sans);
     --font-title-l: 300 2.25rem/1 var(--family-sans);
     --font-figure: 500 2.75rem/1 var(--family-mono);
+    /* The figures band's value, a step under the stat's. */
+    --font-figure-m: 500 2.25rem/1 var(--family-mono);
+    /* A card's title, and the chart's axis labels. */
+    --font-card-title: 500 0.9375rem/1 var(--family-sans);
+    --font-tick: 400 0.6875rem/1 var(--family-mono);
+    /* A function's signature in its row. */
+    --font-mono-ui: 500 0.8125rem/1.2 var(--family-mono);
     --tracking-caps: 0.14em;
     --tracking-tight: -0.03em;
+    /* The plate's title: tight, over a 1.12 line. */
+    --tracking-hero: -0.045em;
+    /* The sentence under the title. */
+    --font-lead: 400 1.0625rem/1.5 var(--family-sans);
+    /* A chip's words in the plate's pills. */
+    --font-chip: 500 0.75rem/1 var(--family-sans);
 
     --space-3xs: 4px;
     --space-2xs: 8px;
@@ -89,6 +109,8 @@
     --control-s: 32px;
     --control-m: 44px;
     --control-l: 56px;
+    /* A card's header row. */
+    --control-header: 28px;
     --icon-s: 12px;
     --icon-m: 16px;
     --icon-l: 20px;
@@ -100,6 +122,7 @@
     --column-s: 192px;
     --column-m: 288px;
     --column-l: 384px;
+    --column-2xs: 112px;
     --measure: 65ch;
     --switch-at: 38rem;
     --dialog-w: 490px;
@@ -107,6 +130,25 @@
     --popover-w: 300px;
     /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
     --plate-w: 808px;
+    /* The plate's inner step, the step between its zones, its side column and the day chart's height (docs/plans/slice-realm-plate.md); a narrow plate sets the first two smaller. */
+    --plate-pad: var(--space-m);
+    --plate-zone: var(--space-xl);
+    --plate-aside: 256px;
+    --chart-h: 176px;
+    --chart-h-l: 216px;
+    /* The plate's frame: the fade into space at its right edge, where its text column starts and stops (the proposal's section 7), its talk bar's height and the small line charts' (a figure's, who calls it). */
+    --plate-fade: 64px;
+    --plate-inset-start: 76px;
+    --plate-inset-end: var(--plate-fade);
+    --talk-h: 64px;
+    --spark-h: 96px;
+    --control-header: 28px;
+    /* The realm's page window in the plate, taller when expanded or on a wide plate, shorter on a narrow one; a function's row and a list row (the proposal's sizes). */
+    --web-h: 360px;
+    --web-h-l: 440px;
+    --web-h-s: 300px;
+    --fn-row-h: 44px;
+    --row-h: 36px;
     --thumb-s: 32px;
     --thumb-m: 52px;
     --thumb-l: 64px;
@@ -168,8 +210,19 @@
     --motion-wait: 300ms;
     --motion-iris: 800ms;
     --motion-ambient: 3s;
+    /* The plate's entrance (the proposal's score): the delay a card waits to rise (--d), whether its parts' animations run (--play), a part's place in its row
+       (--n, --j), where the chart's peak label comes in (--pk) and when a line and its area draw (--spark-line, --spark-area). A card or a chart sets them. */
+    --d: 0s;
+    --play: running;
+    --n: 0;
+    --j: 0;
+    --pk: 0.9s;
+    --spark-line: 0.9s;
+    --spark-area: 1.2s;
     --motion-spin: 0.8s;
     --ease-standard: cubic-bezier(0.2, 0.7, 0.1, 1);
+    /* The arrival's curve, GSAP's power3.out (D401), for what the arrival does in CSS (the title's power4.out is the arrival's own). */
+    --ease-out-3: cubic-bezier(0.215, 0.61, 0.355, 1);
     --ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
     --ease-emphasized: cubic-bezier(0.7, 0, 0.2, 1);
     /* 1 plays every duration; 0 stills them: a duration that wants to follow it is calc(var(--motion-x) * var(--motion-scale)) */

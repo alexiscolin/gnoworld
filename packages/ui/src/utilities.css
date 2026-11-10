@@ -185,6 +185,27 @@
     align-items: center;
   }
 
+  /* A quiet box: a step of air inside, the fill's tint, rounded; what a panel says in place of a list. */
+  .fill-box {
+    padding: var(--space-xs) var(--space-s);
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+  }
+
+  /* A line of figures or a path to read: the muted grey in the data type, broken anywhere where it is longer than its place. */
+  .data-text {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+    overflow-wrap: anywhere;
+  }
+
+  /* A lead, the words and a trailing part on one row, the words taking what the two leave: a row of a list. */
+  .icon-text-meta {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
   /* One box whose content sits in its middle: a round button's arrow. */
   .grid-center {
     display: grid;

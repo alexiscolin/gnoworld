@@ -1,0 +1,16 @@
+@layer components {
+  .planet {
+    /* The world's colour lit, for the words and lines drawn beside it. */
+    --world-light: color-mix(in oklab, var(--world) 62%, var(--color-text));
+
+    min-inline-size: var(--avatar-m);
+    inline-size: var(--avatar-m);
+    /* raw: a picture's stand-in, the world's colour lit from the upper left (the proposal's .planet) */
+    background: radial-gradient(
+      circle at 32% 30%,
+      color-mix(in oklab, var(--world) 40%, #fff),
+      var(--world) 48%,
+      color-mix(in oklab, var(--world) 30%, var(--color-space)) 100%
+    );
+  }
+}

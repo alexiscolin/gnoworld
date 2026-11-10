@@ -27,6 +27,75 @@
     --_pad: var(--space-s);
   }
 
+  /* The hub card: the fill and the line of a places' list's card (PlacesList), the plate's own padding; 6 % and the strong line under the pointer
+     unless it is fixed; dashed, no fill. */
+  .card[data-look="hub"] {
+    --_fill: var(--color-card);
+    --_pad: var(--plate-pad);
+
+    border-radius: var(--radius-box);
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard);
+  }
+
+  .card[data-look="hub"]:hover:not([data-fixed]) {
+    border-color: var(--color-line-strong);
+    background: var(--color-card-hover);
+  }
+
+  .card[data-look="hub"][data-edge="dashed"] {
+    --_fill: transparent;
+  }
+
+  .card[data-look="hub"] .title {
+    font: var(--font-card-title);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  /* The header row: 28 px and 8 more below it; its title, a hint that gives way, and the buttons at the end. */
+  .card[data-look="hub"] .header {
+    block-size: var(--control-header);
+    /* layout: the card's own */
+    margin-block-end: var(--space-2xs);
+  }
+
+  .header > * {
+    block-size: 100%;
+  }
+
+  /* The buttons and the hint at the end of the row keep their size; the title and the meta line give way. */
+  .end {
+    /* layout: this row's own arrangement */
+    flex: none;
+    min-inline-size: 0;
+  }
+
+  .meta {
+    min-inline-size: 0;
+    /* layout: this row's own arrangement */
+    flex: 0 1 auto;
+  }
+
+  /* A card that holds more than it shows opens in place: it settles into its new size (the proposal's expandIn). */
+  @keyframes open {
+    from {
+      opacity: 0.6;
+      transform: scale(0.985);
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .card[data-look="hub"]:has(.header[data-open]) {
+      animation: open var(--motion-slow) var(--ease-standard) backwards;
+    }
+  }
+
+  .card[data-look="hub"][data-flush] {
+    --_pad: 0;
+  }
+
   .title {
     font: var(--font-body);
     font-weight: 500;
@@ -34,5 +103,37 @@
 
   .title[data-size="large"] {
     font: var(--font-title-m);
+  }
+
+  /* An open card's chart is as tall as a wide plate's. */
+  .card[data-open] {
+    --chart-h: var(--chart-h-l);
+  }
+
+  /* The plate's entrance (the proposal's score): a card waits unseen, rises 16 px over 0.7 s once it is (--d, its place in the arrival), and its
+     parts' own entrances (a chart's bars, a line drawing) wait with it through --play. Without motion nothing waits. */
+  @media (prefers-reduced-motion: no-preference) {
+    .card[data-rise] {
+      --play: paused;
+    }
+
+    .card[data-rise]:not([data-state="in"]) {
+      opacity: 0;
+    }
+
+    .card[data-rise][data-state="in"] {
+      --play: running;
+
+      /* raw: the proposal's score */
+      animation: rise 0.7s var(--ease-out-3) var(--d, 0s) backwards;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        /* raw: the proposal's score */
+        transform: translateY(16px);
+      }
+    }
   }
 }

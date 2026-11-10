@@ -32,11 +32,4 @@
     background: linear-gradient(transparent, color-mix(in oklab, var(--color-surface) 80%, transparent));
     font: var(--font-title-s);
   }
-
-  /* The link as written, to be read, or selected where the device cannot copy. */
-  .link {
-    overflow-wrap: anywhere;
-    color: var(--color-text-muted);
-    font: var(--font-data);
-  }
 }

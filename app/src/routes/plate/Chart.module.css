@@ -1,0 +1,7 @@
+/* The lines under a chart (the proposal's .chart-foot): what it counts, in the meta type. */
+@layer components {
+  .foot {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

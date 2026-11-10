@@ -1,4 +1,4 @@
-/* The places' list as the prototype draws it (.hubcard; the video's 2:24 cut shows none): cards of 240 px at least, 16 apart; on a
+/* The places' list as the prototype draws it (Card look="hub"; the video's 2:24 cut shows none): cards of 240 px at least, 16 apart; on a
    phone a column of the same cards in the page. */
 @layer components {
   .cards {
@@ -15,27 +15,13 @@
     list-style: none;
   }
 
-  .card {
-    /* layout: the whole card is the link, a column: its head, then what the data holds under it */
-    display: flex;
-    /* layout: the arrangement the prototype and the frames draw */
-    flex-direction: column;
-    /* raw: 16 px between the card's parts (the prototype's .hubcard) */
-    /* layout: the arrangement the prototype and the frames draw */
-    gap: 16px;
+  /* The link fills the hub card (Card look="hub" flush): its own step is the card's padding. */
+  .link {
+    /* layout: the whole card is the link, a block the card's edges bound */
+    display: block;
     padding: var(--space-s);
-    border-radius: var(--radius-box);
-    border: var(--line-width) solid var(--color-line);
-    /* raw: white at 3%, 6% under the pointer (the prototype's .hubcard) */
-    background: color-mix(in oklab, var(--color-text) 3%, transparent);
     color: inherit;
     text-decoration: none;
-  }
-
-  .card:hover {
-    border-color: var(--color-line-strong);
-    /* raw: the prototype's and the frames' own value */
-    background: color-mix(in oklab, var(--color-text) 6%, transparent);
   }
 
   .head {

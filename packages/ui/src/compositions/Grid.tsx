@@ -2,10 +2,20 @@ import styles from "./compositions.module.css";
 import { place, type Composed } from "./place.tsx";
 
 export interface GridProps extends Composed {
-  min?: "s" | "m" | "l";
+  min?: "2xs" | "s" | "m" | "l";
+  /** Twelve columns instead: each child is a Cell. */
+  cols?: 12;
+  /** A fixed arrangement instead of columns that fit. */
+  template?: "icon-text-meta" | "text-meta" | "label-value" | "main-aside";
 }
 
-/** Columns as many as fit, each at least a column token wide. */
-export function Grid({ min = "m", ...rest }: GridProps) {
-  return place({ ...rest, className: styles["grid"], own: { "data-min": min } });
+/** Columns as many as fit, each at least a column token wide; or twelve, or a named template. */
+export function Grid({ min = "m", cols, template, ...rest }: GridProps) {
+  const own =
+    cols !== undefined
+      ? { "data-cols": String(cols) }
+      : template !== undefined
+        ? { "data-template": template }
+        : { "data-min": min };
+  return place({ ...rest, className: styles["grid"], own });
 }

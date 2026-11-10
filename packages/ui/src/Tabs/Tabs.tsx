@@ -21,13 +21,26 @@ export interface TabsProps {
   onSelect: (id: string) => void;
   /** Icons alone, each tab named by its label and wearing it as a tooltip. */
   iconOnly?: boolean;
-  /** Small: tighter tabs, for a narrow panel's row (the bell's kinds, frames 86, 87). */
-  size?: "s" | "m";
+  /** Small: tighter tabs, for a narrow panel's row (the bell's kinds, frames 86, 87); xs, a list's sort in the chip's type. */
+  size?: "xs" | "s" | "m";
+  /** The row takes the whole width of its place, its tabs from the start (a card's Read and Write). */
+  fill?: boolean;
+  /** Counts as plain figures after the words in the data type, not in a badge. */
+  plainCount?: boolean;
 }
 
 /** A tablist with one tab reached by the keyboard, the selected one; the arrows move and select, round
  * the ends and turned round right to left, and Home and End go to the ends (WAI-ARIA's tabs). */
-export function Tabs({ label, tabs, selected, onSelect, iconOnly = false, size = "m" }: TabsProps) {
+export function Tabs({
+  label,
+  tabs,
+  selected,
+  onSelect,
+  iconOnly = false,
+  size = "m",
+  fill = false,
+  plainCount = false,
+}: TabsProps) {
   const reached = Math.max(
     0,
     tabs.findIndex((tab) => tab.id === selected),
@@ -40,7 +53,14 @@ export function Tabs({ label, tabs, selected, onSelect, iconOnly = false, size =
     if (tab !== undefined) onSelect(tab.id);
   };
   return (
-    <div role="tablist" aria-label={label} className={styles["tabs"]} data-size={size} onKeyDown={move}>
+    <div
+      role="tablist"
+      aria-label={label}
+      className={styles["tabs"]}
+      data-size={size}
+      data-fill={fill ? "" : undefined}
+      onKeyDown={move}
+    >
       {tabs.map((tab, at) => {
         const counted = tab.count !== undefined && tab.count > 0;
         const name = counted ? `${tab.label} ${String(tab.count)}` : tab.label;
@@ -62,7 +82,11 @@ export function Tabs({ label, tabs, selected, onSelect, iconOnly = false, size =
             {counted ? (
               <>
                 {" "}
-                <span className={`${String(badge["badge"])} ${String(styles["count"])}`}>{tab.count}</span>
+                <span
+                  className={plainCount ? styles["figure"] : `${String(badge["badge"])} ${String(styles["count"])}`}
+                >
+                  {tab.count}
+                </span>
               </>
             ) : null}
           </button>

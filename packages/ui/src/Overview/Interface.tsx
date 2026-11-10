@@ -10,6 +10,7 @@ import { Dialog } from "../Dialog/Dialog.tsx";
 import { Field } from "../Field/Field.tsx";
 import { Icon } from "../icons/Icon.tsx";
 import { LinkProvider, type PageLinkProps } from "../link.tsx";
+import { Planet } from "../Planet/Planet.tsx";
 import { PlanetThumb } from "../PlanetThumb/PlanetThumb.tsx";
 import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
@@ -167,6 +168,7 @@ export function Stats() {
 export function Planets() {
   return (
     <Cluster space="m">
+      <Planet name="Bubble" />
       <PlanetThumb src={disc("5cf2c8")} name="Bubble" />
       <PlanetThumb src={disc("ffc46b")} name="The sun" kind="star" />
       <PlanetThumb src={disc("b79cff")} name="An uncharted signal" kind="signal" magnify />

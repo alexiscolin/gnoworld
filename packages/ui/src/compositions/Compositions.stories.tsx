@@ -127,3 +127,32 @@ export const WideSide: Story = {
     </layout.Sidebar>
   ),
 };
+
+export const Twelve: Story = {
+  render: () => (
+    <layout.Grid cols={12} space="s">
+      <layout.Cell span={8}>
+        <p>Calls per day: 8 of 12 columns, 12 on a narrow plate.</p>
+      </layout.Cell>
+      <layout.Cell span={4}>
+        <p>Who calls it: 4 of 12.</p>
+      </layout.Cell>
+    </layout.Grid>
+  ),
+};
+
+const TEMPLATES = ["icon-text-meta", "text-meta", "label-value", "main-aside"] as const;
+
+export const Templates: Story = {
+  render: () => (
+    <layout.Stack>
+      {TEMPLATES.map((template) => (
+        <layout.Grid key={template} template={template} space="s">
+          <p>{template}</p>
+          <Button size="s">Try it</Button>
+          {template === "icon-text-meta" ? <p>meta</p> : null}
+        </layout.Grid>
+      ))}
+    </layout.Stack>
+  ),
+};

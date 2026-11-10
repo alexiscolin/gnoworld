@@ -1,0 +1,128 @@
+/* The network: lanes of curves to the centre, dots in the world's colour over the space (a pure package's empty), the picked one ringed in the
+   text, the centre in the world's light. */
+@layer components {
+  .net {
+    display: block;
+    inline-size: 100%;
+    overflow: visible;
+  }
+
+  /* The curves keep their dash while the arrival is off, so a line is whole. */
+  .edge {
+    fill: none;
+    stroke: var(--color-line-strong);
+    stroke-width: 1.2;
+    stroke-dasharray: 1;
+  }
+
+  .node rect {
+    /* raw: the world's colour at 30 % over the space, the dot's fill (the proposal's .nd) */
+    fill: color-mix(in oklab, var(--world) 30%, var(--color-space));
+    stroke: var(--world-light);
+    stroke-width: 1.4;
+    transition: fill var(--motion-fast) var(--ease-standard);
+  }
+
+  .node[data-kind="pure"] rect {
+    fill: var(--color-space);
+    stroke: var(--color-line-strong);
+  }
+
+  .node[role="button"] {
+    cursor: pointer;
+  }
+
+  .node[role="button"]:hover rect {
+    fill: var(--color-fill-hover);
+  }
+
+  .node[aria-pressed="true"] rect {
+    stroke: var(--color-text);
+    stroke-width: 2;
+  }
+
+  .net text {
+    fill: var(--color-text-muted);
+    font: var(--font-tick);
+  }
+
+  .node text {
+    fill: var(--color-text);
+  }
+
+  .centre circle {
+    fill: var(--world-light);
+  }
+
+  .centre text {
+    fill: var(--color-ink);
+    font-weight: 500;
+  }
+
+  .halo {
+    fill: none;
+    stroke: var(--world-light);
+    opacity: 0.25;
+  }
+
+  .none {
+    fill-opacity: 0.6;
+  }
+
+  .legend {
+    /* layout: this row's own arrangement */
+    display: flex;
+    /* layout: this row's own arrangement */
+    flex-wrap: wrap;
+    /* layout: the two sides of the legend a step apart */
+    gap: var(--space-xs);
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .legend b {
+    color: var(--color-text);
+    font: var(--font-data);
+    font-weight: 500;
+  }
+
+  .caption {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+
+  /* The curves draw one after another and the halo breathes, once it is seen (the proposal's drawFrom and halo). */
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+  }
+
+  @keyframes breathe {
+    0%,
+    100% {
+      opacity: 0.12;
+    }
+
+    50% {
+      opacity: 0.4;
+    }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .net[data-seen] .edge {
+      /* raw: the proposal's value, no token names it */
+      animation: draw 0.9s var(--ease-out-3) calc(0.2s + var(--j, 0) * 0.06s) backwards;
+    }
+
+    .net[data-seen] .halo {
+      /* raw: the proposal's value, no token names it */
+      animation: breathe 3.2s ease-in-out infinite;
+    }
+
+    /* raw: held back till seen, so the first frame is empty rather than whole */
+    .net:not([data-seen]) .edge {
+      stroke-dashoffset: 1;
+    }
+  }
+}

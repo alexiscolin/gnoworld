@@ -1,0 +1,28 @@
+/* A paged list: its filter and sort on one row, rows told apart by a hairline, its count and "Show more" at the foot. */
+@layer components {
+  .filter {
+    /* layout: the filter takes the row's room, no narrower than a column */
+    flex: 1;
+    min-inline-size: var(--column-2xs);
+  }
+
+  .rows {
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows > li + li {
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .empty {
+    padding-block: var(--space-s);
+    color: var(--color-text-muted);
+    font: var(--font-reading);
+  }
+}

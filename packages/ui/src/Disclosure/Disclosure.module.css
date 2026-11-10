@@ -1,0 +1,72 @@
+/* A row that opens in place (the proposal's .fn-row and .fn-body): 44 or 36 px, its hover fill reaching 8 px past the words, the chevron turned
+   down once open, the body grown from nothing to its height. */
+@layer components {
+  .disclosure {
+    min-inline-size: 0;
+  }
+
+  .row {
+    /* layout: a step between the lead, the words and what trails (icon-text-meta, pointer) */
+    gap: var(--space-xs);
+    /* raw: the card's width and 8 px more each side's half, so the hover fill reaches past the words */
+    inline-size: calc(100% + var(--space-s));
+    block-size: var(--fn-row-h);
+    /* layout: this row's own arrangement */
+    margin-inline: calc(var(--space-2xs) * -1);
+    padding-inline: var(--space-2xs);
+    border: 0;
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    transition: background-color var(--motion-fast) var(--ease-standard);
+  }
+
+  .row[data-size="s"] {
+    block-size: var(--row-h);
+  }
+
+  .row:hover {
+    background: var(--color-fill);
+  }
+
+  .trail {
+    /* layout: what trails and the chevron a step apart */
+    gap: var(--space-2xs);
+    white-space: nowrap;
+  }
+
+  .chevron {
+    display: block;
+    color: var(--color-text-muted);
+    /* The chevron points along the text at rest, down once open. */
+    rotate: -90deg;
+    transition: rotate var(--motion-base) var(--ease-standard);
+  }
+
+  .row[aria-expanded="true"] .chevron {
+    rotate: 0deg;
+  }
+
+  .body {
+    /* layout: this row's own arrangement */
+    display: grid;
+    /* layout: this row's own arrangement */
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--motion-slow) var(--ease-standard);
+  }
+
+  .body[data-open] {
+    /* layout: this row's own arrangement */
+    grid-template-rows: 1fr;
+  }
+
+  .inner {
+    min-block-size: 0;
+    overflow: hidden;
+  }
+
+  .body[data-open] .inner {
+    padding-block: var(--space-3xs) var(--space-s);
+  }
+}

@@ -75,11 +75,11 @@ const CHUNKS = [
     test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts|lib\/api\/http\.ts$|lib\/copy\.ts$)/,
   },
   // Not the activity chart (F304), the stat (F2868), Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState,
-  // Combobox, Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i): the chunks
-  // that need them load them after the first screen.
+  // Combobox, Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i), and the plate's
+  // Figures, Network and PagedList (slice 13): the chunks that need them load them after the first screen.
   {
     name: "ui",
-    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row|Tabs|Progress|Sparkline)\/)/,
+    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row|Tabs|Progress|Sparkline|Figures|Network|PagedList)\/)/,
   },
   // three never: two lazy parts of the scene (the cosmos, a world's page) share some of it, and a share of two would put it on the first screen.
   { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },

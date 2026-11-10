@@ -2,39 +2,31 @@
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
 import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
-import { hubWorldOf, stampKey } from "@gnoworld/core";
-import { Kicker } from "@gnoworld/ui";
+import { hubWorldOf } from "@gnoworld/core";
+import { Kicker, Panel } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
-import { pageOf, realmView, site, universePrefix, type UniverseView } from "../places.ts";
+import { pageOf, site, type UniverseView } from "../places.ts";
 import { chatPlace, ChainCallsContext, ChainPlaceContext, LOADING, PlaceChat } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
-import { OutLinks } from "../features/realms/OutLinks.tsx";
-import { platePreview } from "../features/previews/plate.ts";
 import { useEntered, useSpace } from "../features/universe/index.ts";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
-import { Actions, Activity, Arrival as Banners, Crowd, FirstCharted, type Ring } from "../features/world/index.ts";
-import { pinnedBar, Proposed } from "../features/world/PlateRealm.tsx";
-import { useHours } from "../features/world/useHours.ts";
+import { Arrival as Banners, FirstCharted, type Ring } from "../features/world/index.ts";
+import { pinnedBar } from "../features/world/PlateRealm.tsx";
 import { chainKey, type ChainHeard } from "../store/chain.ts";
 import { useApp } from "../storeContext.tsx";
-import { useWorldsFile } from "../worldsFile.ts";
 import { PlaceFrame } from "./placeFrame.tsx";
 import styles from "./world.module.css";
 
 // No call of the chain told yet: a room draws no card.
 const NO_CALLS: readonly ChainHeard[] = [];
 
-// What the worlds' file says of this world, its links and its realm, comes in a chunk once the file has: the first screen holds neither.
-const Linked = lazy(() => import("../features/world/Linked.tsx"));
-const FromExplorer = lazy(() => import("../features/realms/FromExplorer.tsx"));
+// The plate's blocks (routes/plate), in a chunk once the first screen has drawn.
+const HubPlate = lazy(() => import("./plate/HubPlate.tsx"));
 
 // A world's kind as its crumb says it (frames 22, 93, 104); a world the data says nothing of is a hub.
 const KINDS: Record<string, string> = { hub: "Hub", dao: "DAO", dapp: "dApp", station: "Station" };
-// A world's page's capture (8f, frame 26), its own chunk too: the captures' file and the page's drawing come after the first screen.
-const Preview = lazy(async () => ({ default: (await import("../features/previews/Preview.tsx")).Preview }));
-
 export function loader({ request }: { request: Request }) {
   return site.world(pageOf(request));
 }
@@ -63,39 +55,6 @@ function useWorldSpace(world: SiteWorld) {
 const kickerOf = (world: ReturnType<typeof site.world>) =>
   [...(world.genre === undefined ? [] : [world.genre]), KINDS[world.kind ?? "hub"] ?? "Hub"].join(" · ");
 
-// What the worlds' file says of this world, once it has come: its connected worlds, then its realm's card (8f's Preview between them).
-function FromTheFile({
-  world,
-  realmPath,
-  prefix,
-}: {
-  world: ReturnType<typeof site.world>;
-  realmPath: string | undefined;
-  prefix: string;
-}) {
-  const worlds = useWorldsFile(true);
-  const universe = site.home(world);
-  return (
-    <>
-      {/* No file, or an empty one, links no world: the rows' code is not asked. */}
-      {worlds === undefined || worlds.length === 0 ? null : (
-        <Suspense fallback={null}>
-          <Linked id={hubWorldOf(world)} worlds={worlds} hubs={universe.worlds} prefix={prefix} />
-        </Suspense>
-      )}
-      {/* The Preview card (8f, frames 26 and 104) stands here, between the connected worlds and the realm's card. */}
-      {/* The card's room is held while its code and its read come, so nothing under it moves as it lands. */}
-      {realmPath === undefined ? null : (
-        <div className={styles["realm"]}>
-          <Suspense fallback={null}>
-            <FromExplorer view={realmPath} worlds={worlds} />
-          </Suspense>
-        </div>
-      )}
-    </>
-  );
-}
-
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
@@ -109,12 +68,6 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
   // A world's page is a place entered (ADR-0003 §4).
   useEntered();
   const chatDue = useWorldSpace(world);
-  const realm = world.realms?.[0];
-  const prefix = universePrefix(universe);
-  const realmPath = realm === undefined ? undefined : realmView(realm, universe);
-  // Who is here names a hub by its slug: its rooms' world (7h).
-  const hours = useHours(world.slug);
-  const preview = platePreview(world.realms, universe);
   // A station round the Earth (8l) keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
   const own = stationOf(world.slug)?.url;
   const address = ORIGIN + world.canonical;
@@ -129,35 +82,17 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
         label={world.name}
         plate={
           <>
-            <Kicker dot="world">{kickerOf(world)}</Kicker>
+            <Kicker planet>{kickerOf(world)}</Kicker>
             {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
             <Banners world={world.slug} name={world.name} address={address} />
-            <h1>{world.name}</h1>
-            <p>
+            <Panel.Title>{world.name}</Panel.Title>
+            <Panel.Lede>
               {world.description}
               <FirstCharted world={world.slug} />
-            </p>
-            <OutLinks links={[{ label: "Website", href: own }]} />
-            <Actions
-              place={{ name: world.name, path: world.canonical }}
-              follow={stampKey(universe.id, hubWorldOf(world))}
-              room={`#${world.slug}`}
-              {...(realmPath === undefined ? {} : { proposals: realmPath })}
-            />
-            {/* Who is here comes from the chat once it has connected; the rate and the day's history from the server's hours. */}
-            <Crowd
-              world={world.slug}
-              {...(realm === undefined ? { note: "No realm of this world is charted on this network yet." } : {})}
-            />
-            <Activity hours={hours} />
-            <Proposed world={world} realmPath={realmPath} universe={universe} onRing={setRing} />
-            <FromTheFile world={world} realmPath={realmPath} prefix={prefix} />
-            {/* Last on the plate, as frame 26 draws it: the world's page, captured. */}
-            {preview === undefined ? null : (
-              <Suspense fallback={null}>
-                <Preview path={preview} look="plate" />
-              </Suspense>
-            )}
+            </Panel.Lede>
+            <Suspense fallback={null}>
+              {chatDue && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
+            </Suspense>
           </>
         }
       >

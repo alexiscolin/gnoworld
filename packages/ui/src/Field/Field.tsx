@@ -23,6 +23,8 @@ export interface FieldProps {
   resizable?: boolean | undefined;
   /** The label is for assistive technology alone: the box says what it is for itself (a placeholder). */
   hideLabel?: boolean | undefined;
+  /** A pill on the space's own ground, a control's height: a list's filter. One line only. */
+  shape?: "pill" | undefined;
   /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
   describedBy?: string | undefined;
 }
@@ -40,7 +42,10 @@ function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boo
   event.currentTarget.form?.requestSubmit();
 }
 
-interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable"> {
+interface BoxProps extends Pick<
+  FieldProps,
+  "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable" | "shape"
+> {
   kind: NonNullable<FieldProps["kind"]>;
   id: string;
   invalid: boolean;
@@ -48,7 +53,18 @@ interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLin
 }
 
 // The box itself: a line of text, or the lines of a message.
-function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, resizable, onChange }: BoxProps) {
+function Box({
+  kind,
+  id,
+  value,
+  invalid,
+  described,
+  enterAddsLine,
+  placeholder,
+  resizable,
+  shape,
+  onChange,
+}: BoxProps) {
   const composingRef = useRef(false);
   const shared = {
     id,
@@ -58,6 +74,7 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, 
     "aria-invalid": invalid ? true : undefined,
     "aria-describedby": described,
     "data-fixed": resizable === false ? "" : undefined,
+    "data-shape": shape,
   };
   return kind === "lines" ? (
     <textarea
@@ -143,6 +160,7 @@ export function Field({
   prefix,
   describedBy,
   hideLabel,
+  shape,
   resizable,
   enterAddsLine,
   placeholder,
@@ -159,6 +177,7 @@ export function Field({
       enterAddsLine={enterAddsLine}
       placeholder={placeholder}
       resizable={resizable}
+      shape={shape}
       onChange={onChange}
     />
   );

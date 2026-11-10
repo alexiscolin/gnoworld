@@ -1,0 +1,32 @@
+/* A call's row (the proposal's .rc): a line over it, the function in the mono and the world's light, who called in the muted grey, the time in the
+   data type; its facts, once open, in the data type too. The row and its opening are the design system's Disclosure. */
+@layer components {
+  .call {
+    border-block-start: var(--line-width) solid var(--color-line);
+    font: var(--font-meta);
+    overflow-wrap: anywhere;
+  }
+
+  .func {
+    color: var(--world-light);
+    font: var(--font-mono-ui);
+  }
+
+  .who {
+    color: var(--color-text-muted);
+  }
+
+  .when {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+
+  .failed {
+    color: var(--color-danger);
+  }
+
+  .fact {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+  }
+}

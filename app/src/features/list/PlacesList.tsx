@@ -1,4 +1,4 @@
-import { Button, Chip, Cluster, PlanetThumb, Stack } from "@gnoworld/ui";
+import { Button, Card, Chip, Cluster, PlanetThumb, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { Link } from "react-router";
 import styles from "./PlacesList.module.css";
@@ -49,15 +49,17 @@ export function PlacesList({ places, genres }: { places: ListedPlace[]; genres: 
           {shown.map((place) => (
             <li key={place.path}>
               {/* No capture exists yet: the drawn fallback, never a picture from elsewhere. */}
-              <Link to={place.path} className={styles["card"]}>
-                <span className={styles["head"]}>
-                  <PlanetThumb src="" name={place.name} size="m" decorative />
-                  <span className={styles["words"]}>
-                    <span className={styles["name"]}>{place.name}</span>
-                    <span className={styles["description"]}>{place.description}</span>
+              <Card look="hub" flush>
+                <Link to={place.path} className={styles["link"]}>
+                  <span className={styles["head"]}>
+                    <PlanetThumb src="" name={place.name} size="m" decorative />
+                    <span className={styles["words"]}>
+                      <span className={styles["name"]}>{place.name}</span>
+                      <span className={styles["description"]}>{place.description}</span>
+                    </span>
                   </span>
-                </span>
-              </Link>
+                </Link>
+              </Card>
             </li>
           ))}
         </ul>
