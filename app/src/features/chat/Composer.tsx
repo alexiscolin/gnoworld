@@ -12,10 +12,12 @@ import { completed } from "./complete.ts";
 import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
 import { useEditing } from "./EditBar.tsx";
 import { formatted, type Edit, type Format } from "./format.ts";
+import { Message } from "./Message.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 import { roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
+import styles from "./Composer.module.css";
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
@@ -23,6 +25,26 @@ export function typingOf(draft: string): "active" | "done" | undefined {
   const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
   if (text === "") return "done";
   return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
+}
+
+/** The draft as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
+ * out of reach of the keyboard and of a screen reader (the field says it already); nothing of a line that cannot go. */
+export function Preview({
+  composed,
+  me,
+  members,
+}: {
+  composed: Composed;
+  me?: string | undefined;
+  members?: ReadonlySet<string> | undefined;
+}) {
+  if (composed.kind !== "line" && composed.kind !== "lines") return null;
+  return (
+    <div className={styles["preview"]} inert>
+      {composed.kind === "line" && composed.action ? "* " : null}
+      <Message text={composed.text} me={me} members={members} />
+    </div>
+  );
 }
 
 export interface ComposerProps {
@@ -158,6 +180,8 @@ export function Composer(props: ComposerProps) {
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
         </MessageBox>
+        {/* Under the box, the line as the room will read it (Alexis, 2026-11-10: lost in the one-box rebuild, put back). */}
+        <Preview composed={composed} me={nick} members={new Set(members)} />
       </Stack>
     </form>
   );

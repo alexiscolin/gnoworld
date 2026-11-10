@@ -4,8 +4,8 @@
    clear (core's RAIL), and which the rail writes on itself. */
 @layer components {
   .rail {
-    /* raw: frame 4's 25 px between the rail and the window's right edge */
-    --_edge: 25px;
+    /* The page's edge, the header's own (D13956) */
+    --_edge: var(--page-edge);
     /* The rail's footprint from the window's right edge (core's RAIL), written by the rail: unset, the rail takes its content's width. */
     --_footprint: initial;
 

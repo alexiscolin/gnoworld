@@ -74,7 +74,8 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
     show(placeFrom(kind, id), (href) => {
       Promise.resolve(navigate(href)).catch(reportError);
     });
-    if (!flying()) enterPage();
+    // A world's page (the Earth's, a world's, a realm's) has a plate, which may come after this: its arrival waits for it.
+    if (!flying()) enterPage(false, kind === "world");
     // The planet's circle as the page lays its box out (a page's parts come late: looked for each frame till it comes), and as it moves.
     const watching = new ResizeObserver(hold);
     let [frame, tries] = [0, 0];

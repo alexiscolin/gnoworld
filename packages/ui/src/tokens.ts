@@ -35,6 +35,7 @@ export function groups() {
         "--flash-",
         "--banner-",
         "--dock-",
+        "--page-",
         "--globe-",
       ],
     },

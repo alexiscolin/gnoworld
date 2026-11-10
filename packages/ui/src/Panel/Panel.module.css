@@ -78,7 +78,7 @@
       /* raw: above the page's header, which the full chat covers (shellHeader.module.css holds 2) */
       z-index: 3;
       inset-block: var(--dock-top) var(--space-m);
-      inset-inline-end: var(--space-m);
+      inset-inline-end: var(--page-edge);
       inline-size: var(--chat-dock-now);
       overflow: clip;
       /* raw: the outline's own colour and edge, drawn over its right side, which the dock covers */
@@ -97,7 +97,7 @@
       position: fixed;
       inset-block-start: var(--dock-top);
       inset-block-end: var(--space-m);
-      inset-inline-start: var(--space-m);
+      inset-inline-start: var(--page-edge);
       inline-size: var(--plate-w);
     }
 
@@ -106,7 +106,7 @@
       display: block;
       position: fixed;
       inset-block: var(--dock-top) var(--space-m);
-      inset-inline: var(--space-m);
+      inset-inline: var(--page-edge);
       /* raw: the prototype's and the frames' own value */
       border: var(--line-width) solid #2c313c;
       border-radius: var(--radius-l);

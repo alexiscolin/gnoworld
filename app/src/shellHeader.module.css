@@ -441,8 +441,8 @@
       grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
       /* a control's words stay on one line: the row never grows a second */
       white-space: nowrap;
-      /* raw: 34 px from the top, 32 each side, and 18 under the 44 px row: 96 high in all (DESIGN-SYSTEM.md, Layout) */
-      padding: 34px var(--space-l) 18px;
+      /* raw: 34 px from the top and 18 under the 44 px row, 96 high in all (DESIGN-SYSTEM.md, Layout); each side the page's edge, the rail's and the dock's */
+      padding: 34px var(--page-edge) 18px;
       /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it. */
       position: sticky;
       inset-block-start: 0;

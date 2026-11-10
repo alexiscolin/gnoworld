@@ -8,11 +8,12 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
-// worker's precache. The Earth's page, the highest: 197,951 B (D386); 243,225 B on the ping-pong of 2026-11-09, the measure (+45,274 B), provisional.
-const FIRST_SCREEN_JS = 243_225;
+// worker's precache. The Earth's page, the highest: 197,951 B (D386); 243,225 B on the ping-pong of 2026-11-09, the measure (+45,274 B); 243,371 B with the plate's wait and the composer's preview (D13959, D13962),
+// provisional.
+const FIRST_SCREEN_JS = 243_371;
 // A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the home and /net/onyx/, the rail on their first
-// screen; /net/gnoland/ 227,380 B), the measure (+39,027 B), provisional.
-const PLAIN_FIRST_SCREEN_JS = 232_807;
+// screen; /net/gnoland/ 227,380 B), the measure (+39,027 B); 232,954 B with the plate's wait (D13959), provisional.
+const PLAIN_FIRST_SCREEN_JS = 232_954;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 

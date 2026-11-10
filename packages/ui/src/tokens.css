@@ -142,6 +142,8 @@
     --banner-top: calc(var(--banner-under) + var(--space-s));
     /* Where a dock, the rail and a world's outline start: the header's clearance of 96 and the 2 px the frame keeps under it (frames 4, 20, 26). */
     --dock-top: 98px;
+    /* The page's side on a computer, one line for the header's ends, the rail, the dock, the plate and their outline (Alexis, 2026-11-09). */
+    --page-edge: var(--space-m);
     /* Whether the plate's own fill shows: a page that draws a globe beside it sets `hidden`, its canvas painting the fill. */
     --plate-fill: visible;
     /* How much of the plate's fill shows while a page arrives: the arrival tweens it from 0 to 1 (app's features/universe/arrival.ts). */

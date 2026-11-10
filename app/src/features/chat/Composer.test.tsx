@@ -6,7 +6,7 @@ import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, markup, one } from "../../../tests/mount.tsx";
-import { Composer, typingOf } from "./Composer.tsx";
+import { Composer, Preview, typingOf } from "./Composer.tsx";
 import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./said.ts";
 import { tooFast } from "./pace.ts";
 import { refusalAfter } from "./composerHooks.ts";
@@ -95,21 +95,74 @@ describe("Composer", () => {
     expect(toPartner()).not.toContain("see when you type");
   });
 
-  // The ping-pong's one rounded box holds the field alone: nothing of the draft is drawn beneath it (it was a Preview, now gone).
-  it("starts from the room's draft in the field, and draws no preview of it beside", () => {
+  it("previews the line out of the keyboard's and the screen reader's reach, its links too", () => {
+    const markup = renderToStaticMarkup(
+      <Preview composed={compose(ROOM, "**see** [docs](https://gno.land/docs)", NICK)} />,
+    );
+    expect(markup).toMatch(
+      /^<div(?=[^>]* inert="")[^>]*><span><strong>see<\/strong> <a href="https:\/\/gno.land\/docs"/,
+    );
+    expect(markup).not.toContain("aria-hidden");
+  });
+
+  // 4d: the preview reads the line as the room will, the account's own mention apart as it will be.
+  it("previews a mention of the account itself apart, as the room will show it, and another's plain", () => {
+    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
     const markup = renderToStaticMarkup(
       <Composer
         room={ROOM}
         nick={NICK}
         rooms={[]}
         members={[]}
-        draft="kept **draft** ++under++"
+        draft={`note to @${NICK} and @${ALICE}`}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain(`<span data-mention="me" title="${NICK}">`);
+    expect(markup).toContain(`<span data-mention="" title="${ALICE}">`);
+  });
+
+  // F812: the preview shortens as the room will, a ground lookalike (BOB's short form) whole.
+  it("previews a member's mention shortened and anyone else's whole, as the room will show them (F812)", () => {
+    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={[]}
+        members={[ALICE, NICK]}
+        draft={`@${ALICE} @${ground} @${NICK}`}
+        onSay={() => true}
+      />,
+    );
+    expect(markup).toContain(`<span data-mention="" title="${ALICE}">@g10gh7…3y5tv</span>`);
+    expect(markup).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
+    expect(markup).toContain(`<span data-mention="me" title="${NICK}">@g1jg8m…vsqf5</span>`);
+  });
+
+  it("starts from the room's draft, its preview with it", () => {
+    const markup = renderToStaticMarkup(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={[]}
+        members={[]}
+        draft="kept **draft**"
         onDraft={() => undefined}
         onSay={() => true}
       />,
     );
-    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\* \+\+under\+\+<\/textarea>/);
-    expect(markup).not.toMatch(/<strong>|<u>|data-mention|inert/);
+    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\*<\/textarea>/);
+    expect(markup).toContain("<strong>draft</strong>");
+  });
+
+  // 8k: the U of frame 73 writes `++`; the preview shows it as the room will.
+  it("shows an underlined draft underlined in its preview", () => {
+    const markup = renderToStaticMarkup(
+      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft="kept ++draft++" onSay={() => true} />,
+    );
+    expect(markup).toContain("<u>draft</u>");
   });
 
   it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
@@ -208,6 +261,20 @@ describe("what the composer's field says of three completions", () => {
     expect(said(compose(ROOM, "#a", NICK), false, { completion: completions("#a", choices) })).toStrictEqual({
       help: "Tab completes #a1; also #a2, #a3.",
     });
+  });
+});
+
+describe("the composer's preview", () => {
+  const preview = (draft: string) => renderToStaticMarkup(<Preview composed={compose(ROOM, draft, NICK)} />);
+  it("shows the line as the room will read it: an action as one, one slash of two", () => {
+    expect(preview("/me **waves**")).toMatch(/inert="">\* <span><strong>waves<\/strong><\/span><\/div>$/);
+    expect(preview("//shrug")).toMatch(/inert=""><span>\/shrug<\/span><\/div>$/);
+  });
+
+  it("shows nothing of a line that cannot go", () => {
+    expect(preview("a".repeat(600))).toBe("");
+    expect(preview("/nick bob")).toBe("");
+    expect(preview("   ")).toBe("");
   });
 });
 

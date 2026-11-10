@@ -47,7 +47,7 @@
      (Alexis, 2026-11-09: "effet double largeur"): ui Panel.module.css's dock, its inset and its width at each size. */
   @media (min-width: 1280px) {
     .place {
-      inset: var(--dock-top) var(--space-m) var(--space-m) auto;
+      inset: var(--dock-top) var(--page-edge) var(--space-m) auto;
       inline-size: var(--chat-dock-now);
     }
   }

@@ -83,6 +83,10 @@ const STEPS: readonly Step[] = [
 ];
 
 let running: gsap.core.Timeline | undefined;
+// A page whose plate comes after it lays out (its chat's door, its route's code: the plate popped in whole, Alexis, 2026-11-10) waits for
+// it, a few seconds at most, then plays; `waiting` stops that wait when another page comes or this one leaves.
+const PLATE_WAIT_MS = 6000;
+let waiting: (() => void) | undefined;
 // Whether the flight has landed: the tags that aim at the planet (data-tag) wait out of sight till then, and come as the page's words do.
 let landed = false;
 
@@ -150,16 +154,39 @@ export function landTags(): void {
   else tagsIn(document);
 }
 
-/** Plays the page's arrival, the flight bringing it near its end or none bringing it. */
-export function enterPage(flown = false): void {
+const platePresent = (): boolean => document.querySelector(`${PLATE}:not([data-ghost] *)`) !== null;
+
+/** Plays the page's arrival, the flight bringing it near its end or none bringing it. A page that has a plate (`plated`) and lays out
+ * before it plays as its plate comes, in the frame it comes in: its fill and words never stand whole before they rise. */
+export function enterPage(flown = false, plated = false): void {
+  waiting?.();
   running?.progress(1).kill();
   running = undefined;
   if (motionOf().matches) return;
-  running = arrivalOf(document, { flown });
+  if (!plated || platePresent()) {
+    running = arrivalOf(document, { flown });
+    return;
+  }
+  const arrive = (): void => {
+    stop();
+    running = arrivalOf(document, { flown });
+  };
+  const observer = new MutationObserver(() => {
+    if (platePresent()) arrive();
+  });
+  const timer = setTimeout(arrive, PLATE_WAIT_MS);
+  const stop = (): void => {
+    observer.disconnect();
+    clearTimeout(timer);
+    waiting = undefined;
+  };
+  waiting = stop;
+  observer.observe(document.body, { childList: true, subtree: true });
 }
 
 /** The page's copies in `layer` play the arrival back, 2.6 times as fast, and the layer goes with the end. */
 export function leavePage(layer: HTMLElement): void {
+  waiting?.();
   running?.kill();
   running = undefined;
   const back = arrivalOf(layer, { ghost: true });
