@@ -7,6 +7,7 @@ import { worldsDrawn } from "@gnoworld/core";
 import type { WorldsCount } from "@gnoworld/schemas";
 import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
 import { readFileSync } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
 import type { Log } from "@gnoworld/service/log";
 import { send as netSend, publicUrl } from "@gnoworld/service/net";
 import { repeat, waitsAfterOutcome, type Outcome } from "../repeat.ts";
@@ -17,6 +18,7 @@ import { isSystem, keptPaths } from "./group.ts";
 import { readHistories, type StampedHistory } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
+import { rollUp } from "./rollup.ts";
 import { readPackages } from "./packages.ts";
 import { kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
@@ -45,6 +47,8 @@ export interface RunOptions {
   isStopped?: () => boolean;
   /** Told each pass that wrote its files: the file, and the histories this pass read (7t's trends). */
   trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
+  /** Each realm's rollup (13a): its state's database and the folder of its files; none without it. */
+  rollup?: { db: DatabaseSync; dir: string };
 }
 
 export const EVERY_MS = 30 * 60_000;
@@ -63,6 +67,7 @@ interface Settings {
   readonly historyPage?: number;
   readonly isStopped: () => boolean;
   readonly trends?: RunOptions["trends"];
+  readonly rollup?: RunOptions["rollup"];
 }
 
 function settingsOf(options: RunOptions): Settings {
@@ -139,6 +144,16 @@ async function gather(settings: Settings): Promise<Gathered | Kind> {
   return { lastWorlds, lastRealms, paths, news, facts, fresh, earlierNames, names, histories };
 }
 
+// What follows a pass that wrote its files: the trends told, then each realm's rollup.
+async function passed(
+  settings: Settings,
+  worlds: Worlds,
+  histories: ReadonlyMap<string, StampedHistory>,
+): Promise<void> {
+  settings.trends?.passed(worlds, histories);
+  await rollUp({ ...settings, pace: pacer(settings.wait, settings.pauseMs, settings.now) }, worlds);
+}
+
 /** One pass. It never throws for a fault of the chain, the indexer or the disk: it says its kind and logs it. */
 export async function runWorlds(options: RunOptions): Promise<Outcome> {
   const settings = settingsOf(options);
@@ -168,7 +183,7 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
     ]);
     if (!written) return fail("write");
     settings.log("worlds_written", { ms: settings.now() - start });
-    settings.trends?.passed(file.data, read.histories);
+    await passed(settings, file.data, read.histories);
     return { wrote: true };
   } catch (error) {
     return fail(kindOf(error));

@@ -135,6 +135,12 @@ services:
       # The door to jarvis (10g), on the network only the two share; off unless JARVIS=on, the setting jarvis reads.
       JARVIS: ${JARVIS:-off}
       JARVIS_URL: http://jarvis:8081
+      # The guest chat (D430): on unless GUEST_CHAT=off, its undo; its limits, the server's own defaults (config.ts), an hour's names
+      # for one visitor and for all, and the guests alive at once (F13950: none of them reached the server).
+      GUEST_CHAT: ${GUEST_CHAT:-on}
+      GUEST_NAMES_PER_VISITOR_HOUR: ${GUEST_NAMES_PER_VISITOR_HOUR:-10}
+      GUEST_NAMES_PER_HOUR: ${GUEST_NAMES_PER_HOUR:-600}
+      GUEST_LIVING: ${GUEST_LIVING:-5000}
       # The admin API (10g, ADR-0002 §6): its sites are the console's, never a public one (ORIGINS).
       ADMIN_HOST: ${ADMIN_ADDRESS:-172.30.92.10}
       ADMIN_PORT: "8082"

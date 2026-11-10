@@ -52,12 +52,14 @@ const Page = z.object({
       z.array(
         z.object({
           block_height: ChainCount,
+          success: z.optional(z.boolean()),
           messages: z.array(
             z.object({
               value: z.object({
                 __typename: z.string(),
                 pkg_path: z.nullish(z.string()),
                 caller: z.nullish(z.string()),
+                func: z.nullish(z.string()),
               }),
             }),
           ),
@@ -71,9 +73,13 @@ const Page = z.object({
 interface Call {
   readonly path: string;
   readonly caller: string | undefined;
+  /** The function it named, as the indexer wrote it: unchecked. */
+  readonly func: string | undefined;
 }
-interface Row {
+/** A transaction as the read gives it: its height, whether it succeeded (an answer that does not say counts as failed), its calls. */
+export interface Row {
   readonly height: number;
+  readonly success: boolean;
   readonly calls: readonly Call[];
   readonly skipped: number;
 }
@@ -84,7 +90,7 @@ function rowsOf(json: unknown, from: number, to = Number.MAX_SAFE_INTEGER): Row[
   const page = Page.safeParse(json);
   if (!page.success) throw new Failure("shape");
   let floor = from;
-  return (page.data.data.getTransactions ?? []).map(({ block_height: height, messages }) => {
+  return (page.data.data.getTransactions ?? []).map(({ block_height: height, success, messages }) => {
     if (height < floor || height > to) throw new Failure("shape");
     floor = height;
     let skipped = 0;
@@ -93,19 +99,21 @@ function rowsOf(json: unknown, from: number, to = Number.MAX_SAFE_INTEGER): Row[
       const [path, caller] = [value.pkg_path ?? undefined, value.caller ?? undefined];
       const odd = path === undefined || (caller !== undefined && !isAddress(caller));
       if (odd) skipped += 1;
-      return path === undefined ? [] : [{ path, caller: odd ? undefined : caller }];
+      return path === undefined ? [] : [{ path, caller: odd ? undefined : caller, func: value.func ?? undefined }];
     });
-    return { height, calls, skipped };
+    return { height, success: success === true, calls, skipped };
   });
 }
 
-interface Reader {
+export interface Reader {
   readonly send: Send;
   readonly indexer: string;
   readonly pace?: (() => Promise<void>) | undefined;
+  /** Each call's success and function asked too (the rollup's read). */
+  readonly rich?: boolean | undefined;
 }
 // One read under way: where it asks, the rows a page asks, the requests it made and the characters it took.
-interface Reading {
+export interface Reading {
   readonly reader: Reader;
   readonly limit: number;
   readonly isStopped: () => boolean;
@@ -113,8 +121,17 @@ interface Reading {
   taken: number;
 }
 
-// One request of the read, if its pages are not spent and the pass goes on: the JSON it answers.
-async function request(reading: Reading, body: IndexerAsk): Promise<unknown> {
+/** A read that has asked nothing yet. */
+export const readingOf = (reader: Reader & { readonly page?: number }, isStopped?: () => boolean): Reading => ({
+  reader,
+  limit: reader.page ?? HISTORY_PAGE,
+  isStopped: isStopped ?? (() => false),
+  asked: 0,
+  taken: 0,
+});
+
+/** One request of the read, if its pages are not spent and the pass goes on: the JSON it answers. */
+export async function request(reading: Reading, body: IndexerAsk): Promise<unknown> {
   const { reader } = reading;
   if (reading.asked >= HISTORY_MAX_PAGES) throw new Failure("too_many");
   if (reading.isStopped()) throw new Failure("stopped");
@@ -138,12 +155,34 @@ async function request(reading: Reading, body: IndexerAsk): Promise<unknown> {
 // The page above `above`: one past the byte cap is asked again with half its rows, down to one.
 async function pageOf(reading: Reading, above: number | undefined): Promise<Row[]> {
   for (let size = reading.limit; ; size = Math.ceil(size / 2)) {
-    const body = above === undefined ? callsFirst(size) : callsAbove(above, size);
+    const { rich } = reading.reader;
+    const body = above === undefined ? callsFirst(size, rich) : callsAbove(above, size, rich);
     try {
       return rowsOf(await request(reading, body), above === undefined ? 0 : above + 1);
     } catch (error) {
       if (size === 1 || !(error instanceof Failure) || error.kind !== "too_large") throw error;
     }
+  }
+}
+
+/**
+ * The chain's calls above `above` (from its start without one), a batch at a time to `take` with the height every row up to which is read: a
+ * page's rows below its last height, then the next page above them, so a block cut by a page's end is read again whole; a page of one height
+ * is read as that block alone; only an empty page ends the read, for an indexer may give fewer rows than asked. A fault throws.
+ */
+export async function walkCalls(
+  reading: Reading,
+  above: number | undefined,
+  take: (rows: readonly Row[], through: number) => void | Promise<void>,
+): Promise<void> {
+  const { rich } = reading.reader;
+  for (let from = above; ;) {
+    const rows = await pageOf(reading, from);
+    const last = rows.at(-1)?.height;
+    if (last === undefined) return;
+    const whole = rows.filter(({ height }) => height < last);
+    from = whole.length > 0 ? last - 1 : last;
+    await take(whole.length > 0 ? whole : rowsOf(await request(reading, callsInBlock(last, rich)), last, last), from);
   }
 }
 
@@ -200,13 +239,6 @@ export async function readHistories(
   paths: readonly string[],
   hooks: { sinceOf: (path: string) => number | undefined; isStopped?: () => boolean },
 ): Promise<HistoriesRead> {
-  const reading: Reading = {
-    reader,
-    limit: reader.page ?? HISTORY_PAGE,
-    isStopped: hooks.isStopped ?? (() => false),
-    asked: 0,
-    taken: 0,
-  };
   const tallies = new Map<string, Tally>(
     paths.map((path) => [path, { calls: 0, callers: new Set(), last: null, marks: new Set(), recent: new Set() }]),
   );
@@ -218,19 +250,7 @@ export async function readHistories(
     }
   };
   try {
-    for (let above: number | undefined; ;) {
-      const rows = await pageOf(reading, above);
-      const last = rows.at(-1)?.height;
-      if (last === undefined) break;
-      const whole = rows.filter(({ height }) => height < last);
-      if (whole.length > 0) {
-        counted(whole);
-        above = last - 1;
-        continue;
-      }
-      counted(rowsOf(await request(reading, callsInBlock(last)), last, last));
-      above = last;
-    }
+    await walkCalls(readingOf(reader, hooks.isStopped), undefined, counted);
   } catch (error) {
     return { ok: false, kind: kindOf(error) };
   }
