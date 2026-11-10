@@ -2,7 +2,8 @@
 // asks for worlds.json (routes/home.tsx, D334). Written at build time (entry.server.tsx), so the first screen's script weighs nothing
 // more; a phone's media query leaves them unfetched, as the 3D waits there. The scene's chunk is not preloaded: measured at 10 Mbit/s,
 // it delayed the loader's leave from about 2 s to 4 to 7 s.
-import { PHONE_QUERY } from "@gnoworld/core";
+import { hubWorldOf, PHONE_QUERY } from "@gnoworld/core";
+import { mapNamesOf, worldOf } from "./space/planet/generated.ts";
 import { mapUrl } from "./space/planet/mapUrl.ts";
 
 // The widths the cosmos loads them at: a body's 2048, the Moon's 1024 (scene/earth/maps.ts, scene/cosmos/maps.ts).
@@ -14,15 +15,39 @@ const MAPS: readonly (readonly [string, number])[] = [
 ];
 const WORLDS = /<link rel="preload" href="[^"]*worlds\.json"[^>]*\/>/;
 
-/** The tags to preload the first-frame maps. */
-export const preloadTags = (): string =>
-  MAPS.map(
-    ([name, width]) =>
-      `<link rel="preload" href="${mapUrl(name, "/", width)}" as="fetch" crossorigin="anonymous" media="not ${PHONE_QUERY}"/>`,
-  ).join("");
+const tag = (href: string): string =>
+  `<link rel="preload" href="${href}" as="fetch" crossorigin="anonymous" media="not ${PHONE_QUERY}"/>`;
+const tags = (maps: readonly (readonly [string, number])[]): string =>
+  maps.map(([name, width]) => tag(mapUrl(name, "/", width))).join("");
 
-/** A page with the tags beside its worlds.json preload, which the pages that have the cosmos carry; any other page as it was. */
-export function withPreloads(html: string): string {
+/** The tags to preload the first-frame maps. */
+export const preloadTags = (): string => tags(MAPS);
+
+// A world's page preloads the maps its planet reads at 2048 (space/parts/maps.ts); the Earth's, the worlds file alone: its maps at 4096
+// would take a computer whose 3D never starts past ADR-0001 §12's 3 MB (3,509,982 B measured). Only the data: the scene's chunks stay off.
+const worldFile = tag("/worlds.json");
+
+const hasHub = (data: unknown): data is { slug: string; realms?: string[] } =>
+  typeof data === "object" &&
+  data !== null &&
+  "slug" in data &&
+  typeof data.slug === "string" &&
+  (!("realms" in data) ||
+    data.realms === undefined ||
+    (Array.isArray(data.realms) && data.realms.every((r) => typeof r === "string")));
+
+/** What an Earth's or a world's page preloads, by its route (routes.ts) and its loader's data: the worlds file and its maps; no other page. */
+export function pagePreloads(routeId: string, data: unknown): string {
+  if (routeId === "routes/earth" || routeId === "universe-earth") return worldFile;
+  if ((routeId === "routes/world" || routeId === "universe-world") && hasHub(data))
+    return worldFile + tags(mapNamesOf(worldOf(hubWorldOf(data))).map((name) => [name, 2048] as const));
+  return "";
+}
+
+/** A page with the tags beside its worlds.json preload, which the pages that have the cosmos carry; else `own` (pagePreloads) at the head's
+ * end, and a page with neither as it was. */
+export function withPreloads(html: string, own = ""): string {
   const worlds = WORLDS.exec(html)?.[0];
-  return worlds === undefined ? html : html.replace(worlds, worlds + preloadTags());
+  if (worlds !== undefined) return html.replace(worlds, worlds + preloadTags());
+  return own === "" ? html : html.replace("</head>", `${own}</head>`);
 }

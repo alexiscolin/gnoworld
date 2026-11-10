@@ -65,6 +65,11 @@ export class Scan {
     this.#time = radius === undefined || this.#still() ? -1 : 0;
   };
 
+  /** Whether it plays. */
+  get playing(): boolean {
+    return this.#time >= 0;
+  }
+
   /** A frame `delta` ms on: the shell stands on the planet, `at`, upright to the rig's up. */
   tick(rig: Rig, delta: number, at: Vec): void {
     const shell = this.#shell;

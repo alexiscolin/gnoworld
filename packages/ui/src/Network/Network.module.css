@@ -112,6 +112,7 @@
     .net[data-seen] .halo {
       /* raw: the proposal's value, no token names it */
       animation: breathe 3.2s ease-in-out infinite;
+      animation-play-state: var(--play, running);
     }
 
     /* raw: held back till seen, so the first frame is empty rather than whole */

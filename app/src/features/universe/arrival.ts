@@ -246,7 +246,7 @@ function wordsWhenBlocks(words: () => void, reduced: boolean): void {
     words();
     return;
   }
-  gsap.set(unseen(), { autoAlpha: 0 });
+  for (const part of unseen()) gsap.set(part, { autoAlpha: 0 });
   waitFor(blocksPresent, words, PLATE_WAIT_MS);
 }
 

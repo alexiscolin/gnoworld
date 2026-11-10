@@ -36,6 +36,7 @@ export { NavItem, type NavItemProps } from "./NavItem/NavItem.tsx";
 export { Progress, type ProgressProps } from "./Progress/Progress.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";
 export { Select, type SelectOption, type SelectProps } from "./Field/Select.tsx";
+export { sightRef } from "./offscreen.ts";
 export { Skeleton, type SkeletonProps } from "./Skeleton/Skeleton.tsx";
 export { Planet, type PlanetProps } from "./Planet/Planet.tsx";
 export { Sparkline, type SparklineProps } from "./Sparkline/Sparkline.tsx";

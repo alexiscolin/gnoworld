@@ -3,7 +3,7 @@
 // the chat's list. On another world (`world`, D565) the bubbles alone stand, each on its speaker's own spot (spot.ts).
 import { countryName, centreOf, cutText, type Bubble, type Count, type Trend } from "@gnoworld/core/bubbles";
 import { Address, shortAddress } from "@gnoworld/schemas";
-import { Cluster, Stack } from "@gnoworld/ui";
+import { Cluster, sightRef, Stack } from "@gnoworld/ui";
 import {
   useEffect,
   useLayoutEffect,
@@ -72,7 +72,7 @@ function TrendSign({ trend }: { trend: Trend }) {
       data-mark="spot"
       data-trend={trend.percent > 0 ? "up" : "down"}
     >
-      <i className={styles["rings"]} />
+      <i ref={sightRef} className={styles["rings"]} />
       <b data-dot="" className={styles["dot"]} />
       <span className={styles["pill"]}>{percent(trend.percent)}</span>
     </Mark>

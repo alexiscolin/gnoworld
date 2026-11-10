@@ -6,15 +6,17 @@ import { usesOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { draw } from "./frame.ts";
 import { arrivalOf, firstArrival, holdCircle, scans, slideFor } from "./framing.ts";
 import { homeGoal, middleOf, planetGoal, screenOf, systemGoal, universeGoal, type Circle } from "./goals.ts";
-import { listen } from "./input.ts";
+import { enterHit, wireHands } from "./hands.ts";
 import { labelOf, Labels } from "./labels.ts";
 import { layoutOf, type Planet, type System, type Universe } from "./layout.ts";
-import { divesInto, hitOf, pickAt, type Hit } from "./pick.ts";
+import { hitOf } from "./pick.ts";
 import { planetAt, sameAs, systemAt, type Place } from "./place.ts";
 import { createRenderer } from "./renderer.ts";
 import { REACH, Rig, type Goal } from "./rig/rig.ts";
 import { chatHides } from "./motion.ts";
 import { Stage } from "./stage.ts";
+import { ratioOf } from "./view.ts";
+import { Upkeep, type Plated } from "./upkeep.ts";
 import { See } from "./see.ts";
 import type { SpaceOptions } from "./spaceOptions.ts";
 
@@ -33,7 +35,8 @@ export class Space {
   place: Place | undefined;
   /** The page's circle, while a page shows a planet. */
   circle: Circle | undefined;
-  covered = false;
+  /** The loop's upkeep: what it keeps between frames, and what the page's calls tell it. */
+  readonly keep = new Upkeep();
   /** Gone for good: its loop stops. */
   disposed = false;
   seconds = 0;
@@ -48,47 +51,28 @@ export class Space {
   /** The worlds a lens lights, by their ids (D425); none, every world. */
   lens: ReadonlySet<string> | undefined;
   readonly #leaving = new AbortController();
+  #covered = false;
 
   constructor(options: SpaceOptions) {
     this.options = options;
-    this.renderer = createRenderer(options.canvas, true, options.inChat);
+    // Where the canvas draws two pixels to the page's one, its edges need no smoothing: the loop's cost and memory are the pixels'.
+    this.renderer = createRenderer(options.canvas, ratioOf() < 2, options.inChat);
     this.renderer.setClearColor(0x010101, options.inChat === true ? 0 : 1);
     this.stage = new Stage({ base: options.base, still: options.still, bare: options.inChat });
     this.labels = new Labels(options.labels, {
       ...options,
       enter: (item) => {
-        this.#enter(hitOf(item));
+        enterHit(options.events, hitOf(item));
       },
       name: (item) => labelOf(item, options.name),
     });
-    listen(
-      {
-        canvas: options.canvas,
-        labels: options.labels,
-        rig: this.rig,
-        camera: this.camera,
-        screen: this.see.screen,
-        under: (x, y, target) => {
-          const named = this.labels.itemAt(target);
-          if (named !== undefined || this.universe === undefined) return named && hitOf(named);
-          return pickAt(this.universe, { x, y }, { seen: this.see, seconds: this.seconds, only: this.lens });
-        },
-        // In a system a wheel in over a planet dives there (from the Map once it stands large); over the universe it only nears.
-        deeper: (hit) => divesInto(hit, this),
-        enter: (hit) => {
-          this.#enter(hit);
-        },
-        up: () => {
-          this.#up();
-        },
-      },
-      this.#leaving.signal,
-    );
-    draw(this);
+    wireHands(this, this.#leaving.signal);
+    draw(this, this.#leaving.signal);
   }
 
   /** The worlds' file: the universe is laid out anew, and what was asked comes. */
   worlds(worlds: readonly CosmosWorld[]): void {
+    this.touch();
     this.#file = worlds;
     this.#lay();
     if (this.#asked !== undefined) this.go(this.#asked);
@@ -108,9 +92,20 @@ export class Space {
 
   /** Lights the worlds `only` names, the rest dimming as the frame eases it (D425); none, every world. */
   light(only: ReadonlySet<string> | undefined): void {
+    this.touch();
     this.lens = only;
     this.labels.light(only);
     if (this.universe !== undefined) this.stage.light(this.universe, only);
+  }
+
+  /** Whether a page covers space: it draws nothing then, and its loop sleeps till this goes. */
+  get covered(): boolean {
+    return this.#covered;
+  }
+
+  set covered(on: boolean) {
+    this.#covered = on;
+    if (!on) this.touch();
   }
 
   /** Space drawn under nothing: no page covers it, nor the full chat (features/chat/full.ts marks the root), unless the view is the chat's own. */
@@ -121,6 +116,7 @@ export class Space {
   /** Goes to `place`: flies there, the first time from far out to the home; stands there at once where the camera never stood or
    * space was out of sight (the full chat: a place changed under it is never flown to). True while a flight runs to it. */
   go(place: Place): boolean {
+    this.touch();
     this.#asked = place;
     const universe = this.universe;
     if (universe === undefined || this.#there(place)) return this.rig.flying;
@@ -194,6 +190,7 @@ export class Space {
    * (a world reached from the Map, which leaves it) still nears: the plate's fill and the page come with it. */
   view(plan: boolean): void {
     if (plan === this.plan) return;
+    this.touch();
     this.plan = plan;
     const { place, universe, options, neared } = this;
     if (place === undefined || universe === undefined) return;
@@ -207,26 +204,31 @@ export class Space {
   }
 
   /** The page's plate, in the page's pixels, and where its words end: its fill is drawn behind the planet. */
-  plate(box: { left: number; top: number; right: number; bottom: number }, words: number): void {
-    this.stage.plate.place(box, words, { height: this.see.screen.height, ratio: this.renderer.getPixelRatio() });
+  plate(box: Plated["box"], words: number): void {
+    this.keep.plated = { box, words };
+    this.touch();
+    this.stage.plate.place(box, words, {
+      width: this.see.screen.width,
+      height: this.see.screen.height,
+      ratio: this.renderer.getPixelRatio(),
+    });
+  }
+
+  /** The plate again, where the buffer's pixel ratio changed under it. */
+  replate(): void {
+    const { plated } = this.keep;
+    if (plated !== undefined) this.plate(plated.box, plated.words);
+  }
+
+  /** Tells the loop something changed that its numbers do not show: the next frame is drawn. */
+  touch(): void {
+    this.keep.touch();
   }
 
   /** The page's circle where its planet stands; none, no page planet. */
   hold(circle: Circle | undefined): void {
+    this.touch();
     holdCircle(this, circle, (place, universe) => this.#goalOf(place, universe, {}));
-  }
-
-  #enter(hit: Hit): void {
-    if ("planet" in hit) this.options.events.world(hit.planet.id);
-    else this.options.events.system(hit.system.id);
-  }
-
-  // A level up, from where space is seen: never from under a page that covers it, nor from under the full chat.
-  #up(): void {
-    const { place, planet, seen } = this;
-    if (!seen) return;
-    if (planet !== undefined) this.options.events.system(planet.system.id);
-    else if (place?.kind === "system" || place?.kind === "home") this.options.events.universe();
   }
 
   /** The page's planet the camera is at, or goes to. */

@@ -38,8 +38,10 @@ export function fillPill(button: HTMLElement): void {
 function showCount(button: HTMLElement, here: number | undefined): void {
   const count = button.children[1];
   if (!(count instanceof HTMLElement) || count.lastChild === null) return;
-  count.hidden = here === undefined || here === 0;
-  count.lastChild.textContent = String(here ?? "");
+  const hidden = here === undefined || here === 0;
+  if (count.hidden !== hidden) count.hidden = hidden;
+  const text = String(here ?? "");
+  if (count.lastChild.textContent !== text) count.lastChild.textContent = text;
 }
 
 /** Puts a name `button` where its world stands (`on`, the world's middle on screen), 14 px over it, or on the home's first screen under the

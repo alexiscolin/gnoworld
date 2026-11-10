@@ -106,13 +106,13 @@ export class Rig {
   }
 
   /** `delta` ms on, `still` under reduced motion. */
-  advance(delta: number, still: boolean): void {
+  advance(delta: number, still: boolean, real = delta): void {
     const step = Math.min(delta, LONGEST_STEP_MS);
     const flight = this.#flight;
     if (flight?.advance(step, still, this.pose) === true) {
       this.#flight = undefined;
       flight.goal.landed?.();
-    } else if (flight === undefined) this.free.advance(step, still, this);
+    } else if (flight === undefined) this.free.advance(step, still, { pose: this.pose, reach: this.reach, real });
     this.#slide(step);
     eyeOf(this.pose, this.eye);
     const moved = Math.hypot(this.eye.x - this.#was.x, this.eye.y - this.#was.y, this.eye.z - this.#was.z);

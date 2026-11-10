@@ -1,5 +1,5 @@
 // The reader's hand on the pose (D401): a drag turns the view round what it looks at, a wheel brings it nearer what the pointer is
-// over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); still for 4 s, the view turns slowly on its own.
+// over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); still for 4 s, the view turns slowly on its own, and stops after a minute.
 import { Quaternion, Vector3 } from "three";
 import type { Pose, Spot } from "./pose.ts";
 
@@ -20,6 +20,9 @@ export const WANDER = {
   none: { speed: 0, after: 0 },
 } as const;
 const IDLE_RISE = 3;
+// With no input for a minute the turn eases to a stop over 3 s, and the scene then draws nothing (frame.ts); the next input turns it again.
+const QUIET_AFTER = 60;
+const QUIET_FALL = 3;
 // How near the view's up the way may turn, and how far under: the cosmos is seen from above it.
 const TOP = 0.985;
 const UNDER = -0.6;
@@ -38,6 +41,7 @@ export class Free {
   #idle = 0;
   #pull = 0;
   #held = false;
+  #still = false;
   /** Where the zoom goes, on the stage; none, what the view looks at. */
   readonly anchor: Spot = { x: NaN, y: NaN, z: NaN };
   /** The point a turn goes round, on the stage (the galaxy's core in its own view); none, what the view looks at. */
@@ -101,10 +105,21 @@ export class Free {
     return Math.abs(this.#yaw) + Math.abs(this.#pitch) + Math.abs(this.#zoom) > DONE || this.#pending.yaw !== 0;
   }
 
+  /** Whether the slow turn runs on its own now: each frame differs a little, so the loop does not sleep. */
+  get turning(): boolean {
+    return this.wander.speed > 0 && !this.#still && this.#idle > this.wander.after && this.#hush() > 0;
+  }
+
   /** `delta` ms on, `still` under reduced motion, on `pose`, within `reach`. */
-  advance(delta: number, still: boolean, { pose, reach }: { readonly pose: Pose; readonly reach: Reach }): void {
+  advance(
+    delta: number,
+    still: boolean,
+    { pose, reach, real = delta }: { readonly pose: Pose; readonly reach: Reach; readonly real?: number },
+  ): void {
+    this.#still = still;
     const dt = Math.min(delta, 50) / 1000;
-    this.#idle += dt;
+    // The rest is counted in real time: a slow machine's capped steps would stretch the minute.
+    this.#idle += real / 1000;
     if (this.#held) this.#turnBy(this.#pending.yaw, this.#pending.pitch, pose);
     else {
       const decay = Math.exp(-dt / TURN_TAU);
@@ -117,8 +132,14 @@ export class Free {
     this.#pending.yaw = this.#pending.pitch = 0;
     const { speed, after } = this.wander;
     if (speed > 0 && !still && this.#idle > after)
-      this.#turnBy(speed * dt * Math.min(1, (this.#idle - after) / IDLE_RISE), 0, pose);
+      this.#turnBy(speed * dt * Math.min(1, (this.#idle - after) / IDLE_RISE) * this.#hush(), 0, pose);
     if (Math.abs(this.#zoom) > DONE) this.#zoomBy(dt, pose, reach);
+  }
+
+  // The share of the slow turn left: all of it, then none once a minute of rest and the ease out are past.
+  #hush(): number {
+    const t = Math.min(1, Math.max(0, (this.#idle - QUIET_AFTER) / QUIET_FALL));
+    return 1 - t * t * (3 - 2 * t);
   }
 
   #zoomBy(dt: number, pose: Pose, reach: Reach): void {

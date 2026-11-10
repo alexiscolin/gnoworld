@@ -265,6 +265,20 @@
     border-radius: 50%;
   }
 
+  /* A round mark's ring: a disc of the mine line over it, still and unseen; the mark's own rule makes it beat (compositor properties only). */
+  .ring {
+    position: relative;
+  }
+
+  .ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--color-mine-line);
+    opacity: 0;
+  }
+
   /* A pill's ends. */
   .pill-ends {
     border-radius: var(--radius-pill);

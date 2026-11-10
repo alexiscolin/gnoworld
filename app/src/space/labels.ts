@@ -5,7 +5,8 @@ import { systemName } from "../placeName.ts";
 import { isAddress } from "@gnoworld/core";
 import { placeOf, type Planet, type System, type Universe, type Vec } from "./layout.ts";
 import type { Seen } from "./see.ts";
-import { assign, retire, type Slot } from "./labelSlots.ts";
+import { Planets } from "./labelPlanets.ts";
+import { assign, Rest, retire, type Slot } from "./labelSlots.ts";
 import { fillPill, midOf, tagOf, type LabelHooks } from "./midWorlds.ts";
 import styles from "./labels.module.css";
 
@@ -22,6 +23,7 @@ const PLANETS_FROM_PX = 140;
 const ROOM = { x: 110, y: 24 };
 const NONE: readonly Item[] = [];
 
+const [ON, OTHER] = [styles["on"] ?? "", styles["other"] ?? ""];
 type Item = Planet | System;
 const isPlanet = (item: Item): item is Planet => "system" in item;
 
@@ -38,10 +40,9 @@ export class Labels {
   readonly #items: Item[] = [];
   // Where the frame's names stand on screen, x then y.
   readonly #taken = new Float32Array(POOL * 2);
-  readonly #byUse = new WeakMap<System, readonly Planet[]>();
+  readonly #planets = new Planets();
   readonly #named: (item: Item) => string;
   readonly #fact: LabelHooks["fact"];
-  #first: { readonly marked: Planet; readonly of: readonly Planet[]; readonly list: readonly Planet[] } | undefined;
   // Far out, each system that may be named, its rank and weight once, its score each frame; and the frame's choice.
   #far: { readonly item: System; readonly rank: number; readonly weight: number; score: number }[] = [];
   readonly #farItems: System[] = [];
@@ -50,9 +51,9 @@ export class Labels {
   // What a lens lights (D425): the worlds by their ids, how many each system holds, and each system's lit planets by use.
   #only: ReadonlySet<string> | undefined;
   readonly #litIn = new Map<System, number>();
-  readonly #litPlanets = new Map<System, readonly Planet[]>();
   #seen: Seen | undefined;
   #seconds = 0;
+  readonly #rest = new Rest(POOL);
   /** The system the camera is in, whose planets it names when near. */
   system: System | undefined;
   /** Whether no name shows: on a page seen as it turns. */
@@ -102,7 +103,7 @@ export class Labels {
   light(only: ReadonlySet<string> | undefined): void {
     this.#only = only;
     this.#litIn.clear();
-    this.#litPlanets.clear();
+    this.#planets.clear();
     if (only !== undefined)
       for (const system of this.#all) {
         const lit = system.planets.filter((planet) => only.has(planet.id)).length;
@@ -118,10 +119,22 @@ export class Labels {
     retire(this.#slots);
   }
 
+  /** Whether the names are at rest: none came, went or moved for a fade's length, none is held about to go, and the settings the last tick
+   * read (`hidden`, `arrival`, `plan`, `system`, `marked`, `ready`) still stand. A tick may be skipped while it holds; ask again after
+   * `universe`, `light` or a fact changes. */
+  settled(): boolean {
+    return this.#rest.at(this.#settings());
+  }
+
+  #settings(): readonly unknown[] {
+    return [this.hidden, this.arrival, this.plan, this.system, this.marked, this.ready];
+  }
+
   /** A frame `seconds` on: the names of what `seen` shows. */
   tick(seen: Seen, seconds: number): void {
     this.#seen = seen;
     this.#seconds = seconds;
+    this.#rest.read(this.#settings());
     const items = this.#items;
     items.length = 0;
     const candidates =
@@ -134,8 +147,13 @@ export class Labels {
   }
 
   #assign(items: readonly Item[]): void {
-    const held = assign({ slots: this.#slots, byItem: this.#held, name: this.#name }, items);
-    for (const slot of this.#slots) this.#show(slot, held(slot) && (slot.item === undefined || this.ready(slot.item)));
+    const { held, chosen } = assign({ slots: this.#slots, byItem: this.#held, name: this.#name }, items);
+    this.#slots.forEach((slot, at) => {
+      const live = held(slot) && (slot.item === undefined || this.ready(slot.item));
+      this.#show(slot, live, at);
+      // A name held after it left the choice is about to fade: not at rest yet.
+      if (live && slot.item !== undefined && !chosen(slot)) this.#rest.busy();
+    });
   }
 
   // What may be named, the liveliest first: in a system its planets alone, once it is large enough to tell them apart (the universe's
@@ -148,7 +166,7 @@ export class Labels {
     // Its planets first, then the heaviest few other systems in sight: switching is a click away, the rest are their suns alone.
     const inside = this.#inside;
     inside.length = 0;
-    inside.push(...this.#marking(this.#planets(system)));
+    inside.push(...this.#planets.of(system, this.#only, this.marked));
     let others = 0;
     for (const other of this.#farOut(seen))
       if (other !== system && others < OTHERS) {
@@ -156,34 +174,6 @@ export class Labels {
         others += 1;
       }
     return inside;
-  }
-
-  // `planets` with the page's world first, made once for each world and system.
-  #marking(planets: readonly Planet[]): readonly Planet[] {
-    const { marked } = this;
-    if (marked === undefined) return planets;
-    if (this.#first?.marked !== marked || this.#first.of !== planets)
-      this.#first = { marked, of: planets, list: [marked, ...planets.filter((planet) => planet !== marked)] };
-    return this.#first.list;
-  }
-
-  #planets(system: System): readonly Planet[] {
-    const only = this.#only;
-    if (only !== undefined) {
-      const lit = this.#litPlanets.get(system) ?? this.#byUseOf(system).filter((planet) => only.has(planet.id));
-      this.#litPlanets.set(system, lit);
-      return lit;
-    }
-    return this.#byUseOf(system);
-  }
-
-  #byUseOf(system: System): readonly Planet[] {
-    let sorted = this.#byUse.get(system);
-    if (sorted === undefined) {
-      sorted = [...system.planets].sort((a, b) => b.use - a.use);
-      this.#byUse.set(system, sorted);
-    }
-    return sorted;
   }
 
   // Far out, by weight and the room its orbits take on screen (Alexis, 2026-11-09: "en fonction de là où on se situe et du zoom"): a heavy
@@ -220,18 +210,19 @@ export class Labels {
   }
 
   // `live`: the slot's name is still chosen or held; else it fades out where it stands (moving with its world while that is on screen).
-  #show(slot: Slot<Item, HTMLButtonElement>, live: boolean): void {
-    const { item } = slot;
+  #show(slot: Slot<Item, HTMLButtonElement>, live: boolean, index: number): void {
+    const { item, button } = slot;
     const at = this.#where(item);
-    const on = at !== undefined && this.#seen?.project(at, this.#on) === true;
-    slot.button.classList.toggle(styles["on"] ?? "", live && on);
-    if (!on || item === undefined) return;
+    if (item === undefined || at === undefined || this.#seen?.project(at, this.#on) !== true) {
+      button.classList.toggle(ON, false);
+      this.#rest.place(index, undefined);
+      return;
+    }
+    button.classList.toggle(ON, live);
+    this.#rest.place(index, live ? this.#on : undefined);
     // Another system named from inside one: another pill's look, so it reads as elsewhere, not as one of these planets.
-    slot.button.classList.toggle(
-      styles["other"] ?? "",
-      !isPlanet(item) && this.system !== undefined && item !== this.system,
-    );
-    tagOf(slot.button, { seen: this.#seen, at, item, on: this.#on, arrival: this.arrival, fact: this.#fact });
+    button.classList.toggle(OTHER, !isPlanet(item) && this.system !== undefined && item !== this.system);
+    tagOf(button, { seen: this.#seen, at, item, on: this.#on, arrival: this.arrival, fact: this.#fact });
   }
 
   // Writes `item`'s name into `slot`, its name alone (one number per fact: a system's worlds are its card's), once per item.

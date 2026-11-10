@@ -1,3 +1,4 @@
+import { pauseOffscreen } from "../offscreen.ts";
 import { useEffect, useRef, useState } from "react";
 
 /** The width a graph has before it is measured (the proposal's 360). */
@@ -16,10 +17,12 @@ export function useSeen() {
       if (node.clientWidth > 0) setSpan(node.clientWidth);
     };
     measure();
+    const unpause = pauseOffscreen(node);
     const resize = typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(measure);
     resize?.observe(node);
     return () => {
       resize?.disconnect();
+      unpause();
     };
   }, []);
   useEffect(() => {

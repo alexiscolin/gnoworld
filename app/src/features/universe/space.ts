@@ -11,7 +11,7 @@ import { savesData } from "../../lib/saveData.ts";
 import { labelWords } from "./worldFact.ts";
 import { site } from "../../places.ts";
 import { motionOf } from "../../space/motion.ts";
-import { feedMoons } from "./moonRooms.ts";
+import { feedMoons, stopMoons } from "./moonRooms.ts";
 import { enterPage, landTags, waitTags } from "./arrival.ts";
 import { layers } from "./firstLook.ts";
 import { attach } from "../../earthGround.ts";
@@ -188,6 +188,7 @@ export function release(): void {
     // Covered first: the circle's going turns the framing, and a framing that turns in sight flies, to a flight no page waits on.
     space.covered = true;
     space.hold(undefined);
+    stopMoons();
   });
 }
 

@@ -18,7 +18,6 @@
       opacity var(--motion-label) var(--ease-emphasized),
       border-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard),
       color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
-    will-change: transform;
   }
 
   /* On the home's first screen a world's name stands under its disc, centred, in the Earth tag's size and face (D543, D546, D549). */
@@ -39,7 +38,9 @@
     color: var(--color-mine);
   }
 
+  /* A layer only while the name shows and moves. */
   .pill.on {
+    will-change: transform;
     opacity: 1;
     pointer-events: auto;
   }

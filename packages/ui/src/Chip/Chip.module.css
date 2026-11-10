@@ -77,21 +77,25 @@
 
   /* The live dot's beat: a ring in mint that grows and leaves (the home's hero has the same), from 0.85 s on. */
   @media (prefers-reduced-motion: no-preference) {
-    .chip[data-tone="mine"] .dot {
-      /* raw: the proposal's score */
+    .chip[data-tone="mine"] .dot::after {
+      /* raw: the proposal's score; paused out of view (offscreen.ts) */
       animation: beat 2.4s ease-out 0.85s infinite;
+      animation-play-state: var(--play, running);
     }
   }
 
+  /* On the compositor: the ring grows 8 px past the 6 px dot (22/6 across) and fades. */
   @keyframes beat {
-    0% {
-      box-shadow: 0 0 0 0 var(--color-mine-line);
+    from {
+      opacity: 1;
+      transform: scale(1);
     }
 
     70%,
-    100% {
-      /* raw: the proposal's score */
-      box-shadow: 0 0 0 8px transparent;
+    to {
+      opacity: 0;
+      /* raw: the proposal's 8 px ring over the 6 px dot */
+      transform: scale(3.67);
     }
   }
 

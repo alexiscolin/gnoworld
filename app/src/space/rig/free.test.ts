@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Free } from "./free.ts";
+import { Free, WANDER } from "./free.ts";
 import { blankPose, type Pose } from "./pose.ts";
 import { REACH } from "./rig.ts";
 
@@ -38,5 +38,68 @@ describe("Free", () => {
     dragged(new Free(), a, { fps: 60, seconds: 2 });
     dragged(new Free(), b, { fps: 15, seconds: 2 });
     expect(Math.abs(a.way.x - b.way.x)).toBeLessThan(0.1);
+  });
+});
+
+// How far the view turns in one 16 ms frame, in radians, the galaxy's slow turn on.
+const stepOf = (free: Free, pose: Pose): number => {
+  const before = { ...pose.way };
+  free.advance(16, false, { pose, reach: REACH });
+  return Math.acos(Math.min(1, before.x * pose.way.x + before.y * pose.way.y + before.z * pose.way.z));
+};
+const idleFor = (free: Free, pose: Pose, seconds: number): void => {
+  for (let t = 0; t < seconds; t += 0.016) free.advance(16, false, { pose, reach: REACH });
+};
+
+describe("Free's slow turn", () => {
+  const galaxy = (): [Free, Pose] => {
+    const free = new Free();
+    free.wander = WANDER.galaxy;
+    const pose = poseAt([0, 0, 0], 100);
+    Object.assign(pose.way, { x: 0.6, y: 0.5, z: 0.6245 });
+    return [free, pose];
+  };
+
+  it("turns on its own after its second of rest", () => {
+    const [free, pose] = galaxy();
+    idleFor(free, pose, 5);
+    expect(stepOf(free, pose)).toBeGreaterThan(0.0015);
+  });
+
+  it("eases to a stop over 3 s once a minute has passed with no input", () => {
+    const [free, pose] = galaxy();
+    idleFor(free, pose, 59);
+    expect(stepOf(free, pose)).toBeGreaterThan(0.0015);
+    idleFor(free, pose, 1.4);
+    const easing = stepOf(free, pose);
+    expect(easing).toBeGreaterThan(0);
+    expect(easing).toBeLessThan(0.0019);
+    idleFor(free, pose, 3);
+    expect(stepOf(free, pose)).toBeLessThan(1e-6);
+  });
+
+  it("turns again at the first input, after its second of rest", () => {
+    const [free, pose] = galaxy();
+    idleFor(free, pose, 70);
+    free.wheel(0);
+    idleFor(free, pose, 6);
+    expect(stepOf(free, pose)).toBeGreaterThan(0.0015);
+  });
+
+  it("says it turns by itself after its second of rest, until the minute is past", () => {
+    const [free, pose] = galaxy();
+    idleFor(free, pose, 0.5);
+    expect(free.turning).toBe(false);
+    idleFor(free, pose, 5);
+    expect(free.turning).toBe(true);
+    idleFor(free, pose, 60);
+    expect(free.turning).toBe(false);
+  });
+
+  it("stops after a minute of real time at 12 frames a second, where each step is capped at 50 ms", () => {
+    const [free, pose] = galaxy();
+    for (let t = 0; t < 63.5; t += 1 / 12) free.advance(50, false, { pose, reach: REACH, real: 1000 / 12 });
+    expect(free.turning).toBe(false);
+    expect(stepOf(free, pose)).toBeLessThan(1e-6);
   });
 });

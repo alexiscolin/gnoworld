@@ -192,7 +192,9 @@ export class Near {
 
   #make(planet: Planet): void {
     if (this.#held.has(planet.index)) return;
-    const drawn = planet.id === EARTH ? this.#earth() : this.#world(planet.id);
+    // With a page's planet shown, the other worlds' maps wait for the page's own (Maps).
+    const page = this.#alone < 0 || this.#alone === planet.index;
+    const drawn = planet.id === EARTH ? this.#earth(page) : this.#world(planet.id, page);
     if (drawn === undefined) return;
     drawn.setPlate(this.#device.plate);
     const held: Held = { drawn, uploads: mapsOf(drawn.group), compiled: false, shown: false };
@@ -208,14 +210,14 @@ export class Near {
     );
   }
 
-  #world(id: string): Drawn | undefined {
+  #world(id: string, page: boolean): Drawn | undefined {
     const world = worldOf(id);
-    const maps = this.#device.maps.setOf(mapNamesOf(world));
+    const maps = this.#device.maps.setOf(mapNamesOf(world), page);
     return maps === undefined ? undefined : createWorld(world, maps, this.#sphere);
   }
 
-  #earth(): Drawn | undefined {
-    const maps = this.#device.maps.earth();
+  #earth(page: boolean): Drawn | undefined {
+    const maps = this.#device.maps.earth(page);
     return maps === undefined ? undefined : earthPlanet(maps, this.#sphere);
   }
 

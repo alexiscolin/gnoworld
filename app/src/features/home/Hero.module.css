@@ -91,18 +91,24 @@
   .pulse {
     inline-size: var(--size-dot-l);
     background: var(--color-mine);
-    /* raw: a slow beat, two seconds, for as long as people are here */
-    animation: beat calc(2s * var(--motion-scale)) var(--ease-standard) infinite;
   }
 
+  .pulse::after {
+    /* raw: a slow beat, two seconds, for as long as people are here and the dot is in view (offscreen.ts) */
+    animation: beat calc(2s * var(--motion-scale)) var(--ease-standard) infinite;
+    animation-play-state: var(--play, running);
+  }
+
+  /* On the compositor: the ring spreads 8 px past the 8 px dot (24/8 across) and fades, as the tags' live dot does once. */
   @keyframes beat {
     from {
-      box-shadow: 0 0 0 0 var(--color-mine-line);
+      opacity: 1;
+      transform: scale(1);
     }
 
     to {
-      /* raw: the ring spreads 8 px and fades, as the tags' live dot does once */
-      box-shadow: 0 0 0 8px transparent;
+      opacity: 0;
+      transform: scale(3);
     }
   }
 

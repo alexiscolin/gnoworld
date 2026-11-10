@@ -97,6 +97,7 @@ beforeEach(() => {
         sight.seen = seen;
       }
       observe = vi.fn();
+      unobserve = vi.fn();
       disconnect = vi.fn();
     },
   );

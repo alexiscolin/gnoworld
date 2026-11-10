@@ -3,7 +3,7 @@
 // la vidéo"); where the server does not say (another universe, a server down), the number counts the worlds the page gives it, as before.
 // No sample: none while none is known.
 import type { PresencePeople } from "@gnoworld/schemas/indexer";
-import { Icon, Kicker } from "@gnoworld/ui";
+import { Icon, Kicker, sightRef } from "@gnoworld/ui";
 import { useRef, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { UniverseView } from "../../places.ts";
@@ -151,7 +151,7 @@ function Actions({ universe, system, newcomer }: Pick<HeroProps, "universe" | "s
 function Lead({ universe, people, system }: HeroProps) {
   return system === undefined && typeof people === "object" ? (
     <p className={`inline-center ${String(styles["online"])}`}>
-      <i className={`disc ${String(styles["pulse"])}`} aria-hidden="true" />
+      <i ref={sightRef} className={`disc ring ${String(styles["pulse"])}`} aria-hidden="true" />
       Online now
     </p>
   ) : (

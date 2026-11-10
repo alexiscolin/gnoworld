@@ -42,7 +42,7 @@ export function motionOf(): Motion {
       const page = root();
       if (page === undefined) return;
       const marks = new MutationObserver(changed);
-      marks.observe(page, { attributes: true, attributeFilter: ["data-motion", "data-chat"] });
+      marks.observe(page, { attributes: true, attributeFilter: ["data-motion", "data-chat", "data-quality"] });
       signal.addEventListener("abort", () => {
         marks.disconnect();
       });

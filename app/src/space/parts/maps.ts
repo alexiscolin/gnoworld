@@ -27,23 +27,32 @@ export class Maps {
   readonly #leaving = new AbortController();
   #earth: EarthMaps | undefined;
   #earthAsked = false;
+  // The page's own maps still on their way: the other worlds' wait for them, so they never share the link with them.
+  #pageLeft = 0;
 
   /** For a site served at `base`. */
   constructor(base: string) {
     this.#base = base;
   }
 
-  /** The set of `names`, once all came; asks those not yet asked. */
-  setOf(names: readonly string[]): MapSet | undefined {
-    for (const name of [...names, "clouds", "ring"]) this.#ask(name);
+  /** The set of `names`, once all came; asks those not yet asked. A world that is not `page`'s waits until the page's maps came. */
+  setOf(names: readonly string[], page = true): MapSet | undefined {
+    if (page || this.#pageLeft === 0) for (const name of [...names, "clouds", "ring"]) this.#ask(name, page);
     return mapSetOf(names, this.#held);
   }
 
   /** The Earth's maps, once they came. */
-  earth(): EarthMaps | undefined {
-    if (!this.#earthAsked) {
+  earth(page = true): EarthMaps | undefined {
+    if (!this.#earthAsked && (page || this.#pageLeft === 0)) {
       this.#earthAsked = true;
-      loadEarthMaps(this.#base, { anisotropy: ANISOTROPY, halved: false, signal: this.#leaving.signal }).then(
+      const { signal } = this.#leaving;
+      const loading = loadEarthMaps(this.#base, {
+        anisotropy: ANISOTROPY,
+        halved: false,
+        signal,
+      });
+      this.#count(page, loading);
+      loading.then(
         (maps) => {
           this.#earth = maps;
         },
@@ -53,11 +62,23 @@ export class Maps {
     return this.#earth;
   }
 
-  #ask(name: string): void {
+  // The page's own loads are counted while they go.
+  #count(page: boolean, loading: Promise<unknown>): void {
+    if (!page) return;
+    this.#pageLeft += 1;
+    const done = (): void => {
+      this.#pageLeft -= 1;
+    };
+    loading.then(done, done);
+  }
+
+  #ask(name: string, page: boolean): void {
     if (this.#asked.has(name)) return;
-    this.#asked.add(name);
     const { signal } = this.#leaving;
-    loadMap(mapUrl(name, this.#base, WIDTH), { ...namedLoad(name), anisotropy: ANISOTROPY, signal }).then(
+    const loading = loadMap(mapUrl(name, this.#base, WIDTH), { ...namedLoad(name), anisotropy: ANISOTROPY, signal });
+    this.#asked.add(name);
+    this.#count(page, loading);
+    loading.then(
       (texture) => {
         this.#held.set(name, texture);
       },

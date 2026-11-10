@@ -21,6 +21,8 @@ interface Heard {
 }
 let timers: ReturnType<typeof setInterval>[] = [];
 let [heard, kept, keptAt]: [Heard | undefined, readonly string[], number] = [undefined, [], 0];
+// What the scene was last told, so the same list is not told again.
+let sent = "[]";
 
 // A world's rooms are named after its slug: #<slug> its main room, #<slug>/<name> the others.
 const slugOf = (id: string): string | undefined =>
@@ -45,15 +47,26 @@ function listOf({ slug, rates }: Heard, now: number): MoonRoom[] {
   return rooms.filter((room) => rates.has(room)).map((room) => ({ room, rate: rates.get(room) ?? 0 }));
 }
 
+/** Ends the asking and the looking: no world shows its moons. */
+export function stopMoons(): void {
+  timers.forEach(clearInterval);
+  [timers, heard, kept, sent] = [[], undefined, [], "[]"];
+}
+
 /** Moons for the world `id` space shows, none for no world: asked at once, then each 20 s while the tab is seen. */
 export function feedMoons(space: Space | undefined, place: Place): void {
   if (space === undefined) return;
   const slug = place.kind === "world" ? slugOf(place.id) : undefined;
   if (slug === heard?.slug && slug !== undefined) return;
-  timers.forEach(clearInterval);
-  [timers, heard, kept] = [[], undefined, []];
+  stopMoons();
   space.stage.moons.rooms([]);
   if (slug === undefined) return;
+  const tell = (list: MoonRoom[]) => {
+    const key = JSON.stringify(list);
+    if (key === sent) return;
+    sent = key;
+    space.stage.moons.rooms(list);
+  };
   const ask = () => {
     if (document.hidden) return;
     resultOf(queryClient.query(activityOptions(slug)))
@@ -63,13 +76,13 @@ export function feedMoons(space: Space | undefined, place: Place): void {
           read.value.rooms.filter((row) => row.world === slug).map(({ room, perMinute }) => [room, perMinute]),
         );
         heard = { slug, rates };
-        space.stage.moons.rooms(listOf(heard, Date.now()));
+        tell(listOf(heard, Date.now()));
       })
       .catch(reportError);
   };
   // The room the reader is in follows the address as it changes, without asking again.
   const look = () => {
-    if (heard?.slug === slug) space.stage.moons.rooms(listOf(heard, Date.now()));
+    if (!document.hidden && heard?.slug === slug) tell(listOf(heard, Date.now()));
   };
   heard = { slug, rates: new Map() };
   timers = [setInterval(ask, ASK_MS), setInterval(look, LOOK_MS)];

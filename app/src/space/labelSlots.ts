@@ -31,12 +31,12 @@ export interface Pool<Item, Button> {
   readonly name: (slot: Slot<Item, Button>, item: Item) => void;
 }
 
-/** Gives each of `items` its slot (its own, or a free one, written by `name`), stamps it now, and returns whether a slot is still shown: chosen
- * now or within the hold (none, under reduced motion). A slot is free once the hold and the fade have passed since it was chosen. */
+/** Gives each of `items` its slot (its own, or a free one, written by `name`), stamps it now, and returns `held`, whether a slot is still shown: chosen
+ * now or within the hold (none, under reduced motion), and `chosen`, whether it was chosen now. A slot is free once the hold and the fade have passed since it was chosen. */
 export function assign<Item, Button>(
   { slots, byItem, name }: Pool<Item, Button>,
   items: readonly Item[],
-): (slot: Slot<Item, Button>) => boolean {
+): { held: (slot: Slot<Item, Button>) => boolean; chosen: (slot: Slot<Item, Button>) => boolean } {
   const now = performance.now();
   const held = motionOf().matches ? 0 : HOLD_MS;
   byItem.clear();
@@ -52,5 +52,41 @@ export function assign<Item, Button>(
     }
     slot.seen = now;
   }
-  return (slot) => now - slot.seen <= held;
+  return { held: (slot) => now - slot.seen <= held, chosen: (slot) => slot.seen === now };
+}
+
+/** What says the names are at rest: when a name last came, went or moved, where each stands to a tenth of a pixel, and the settings the last
+ * tick read. */
+export class Rest {
+  #busyAt = performance.now();
+  #saw: readonly unknown[] = [];
+  readonly #placed: Float32Array;
+
+  constructor(slots: number) {
+    this.#placed = new Float32Array(slots * 2).fill(-2);
+  }
+
+  /** Something came, went or moved just now. */
+  busy(): void {
+    this.#busyAt = performance.now();
+  }
+
+  /** Slot `index` is shown at `spot`, or not at all: a change from its last call is busy. */
+  place(index: number, spot: { readonly x: number; readonly y: number } | undefined): void {
+    const [px, py] = spot === undefined ? [-1, -1] : [Math.round(spot.x * 10), Math.round(spot.y * 10)];
+    if (this.#placed[index * 2] !== px || this.#placed[index * 2 + 1] !== py) this.busy();
+    this.#placed[index * 2] = px;
+    this.#placed[index * 2 + 1] = py;
+  }
+
+  /** The settings this tick reads: a change from the last is busy. */
+  read(settings: readonly unknown[]): void {
+    if (this.#saw.length === 0 || settings.some((value, at) => value !== this.#saw[at])) this.busy();
+    this.#saw = settings;
+  }
+
+  /** Whether `settings` are those last read and nothing was busy for a fade's length. */
+  at(settings: readonly unknown[]): boolean {
+    return settings.every((value, at) => value === this.#saw[at]) && performance.now() - this.#busyAt > FADE_MS + 50;
+  }
 }

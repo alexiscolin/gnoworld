@@ -1,4 +1,5 @@
 import { pill } from "../Button/control.ts";
+import { sightRef } from "../offscreen.ts";
 import styles from "./Chip.module.css";
 
 type Tone = "neutral" | "mine" | "warm" | "signal" | "danger";
@@ -45,7 +46,9 @@ export function Chip({ children, tone = "neutral", onClick, selected, count, lab
         data-size="xs"
         data-strong={strong === true ? "" : undefined}
       >
-        {dot === true ? <i className={["disc", styles["dot"]].join(" ")} aria-hidden="true" /> : null}
+        {dot === true ? (
+          <i ref={sightRef} className={["disc ring", styles["dot"]].join(" ")} aria-hidden="true" />
+        ) : null}
         {children}
       </span>
     );

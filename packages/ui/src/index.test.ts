@@ -9,7 +9,7 @@ import type { Unstyled } from "./testing.tsx";
 type Exported = typeof ui;
 // `iconNode` makes a node of a glyph and `stillCopy` a still copy of a part: functions, not components, with no props to style.
 const unstyled: {
-  [Name in Exclude<keyof Exported, "iconNode" | "stillCopy">]: Unstyled<ComponentProps<Exported[Name]>>;
+  [Name in Exclude<keyof Exported, "iconNode" | "sightRef" | "stillCopy">]: Unstyled<ComponentProps<Exported[Name]>>;
 } = {
   Button: true,
   ActivityChart: true,
@@ -119,6 +119,7 @@ it("exports every component of the design system, iconNode and stillCopy, nothin
       "Tabs",
       "Tooltip",
       "iconNode",
+      "sightRef",
       "stillCopy",
     ].sort(),
   );

@@ -144,6 +144,7 @@ export class Plate {
   readonly #fade = this.mask.uFade;
   readonly #height = this.mask.uHeight;
   readonly #round = this.mask.uRound;
+  readonly #width = { value: 0 };
   readonly mesh = new Mesh(
     new PlaneGeometry(2, 2),
     new ShaderMaterial({
@@ -152,6 +153,7 @@ export class Plate {
         uFade: this.#fade,
         uShown: this.shown,
         uHeight: this.#height,
+        uWidth: this.#width,
         uRound: this.#round,
         // The plate's fill as the page's (--color-surface), before the grade: graded with the frame, straight or through the blur's pass.
         uFill: { value: new Vector3(...beforeGrade([0.118, 0.13, 0.176])) },
@@ -174,12 +176,18 @@ export class Plate {
   place(
     box: { left: number; top: number; right: number; bottom: number },
     fade: number,
-    { height, ratio }: { height: number; ratio: number },
+    { width, height, ratio }: { width?: number; height: number; ratio: number },
   ): void {
     this.#box.value.set(box.left * ratio, box.top * ratio, box.right * ratio, box.bottom * ratio);
     this.#fade.value = fade * ratio;
     this.#height.value = height * ratio;
+    this.#width.value = (width ?? 0) * ratio;
     this.#round.value = 18 * ratio;
+  }
+
+  /** Hides the quad while its fill is under half a level, so a frame with no page does not draw a layer of nothing. */
+  sync(): void {
+    this.mesh.visible = this.shown.value > 0.002;
   }
 
   dispose(): void {

@@ -18,8 +18,18 @@ export class Effects {
 
   /** A frame of `rig`'s, `delta` ms on; `at`, the page's planet, where the scan stands. */
   tick(rig: Rig, delta: number, at: Vec): void {
-    this.#speed.tick(rig);
+    this.#speed.tick(rig, delta);
     this.scan.tick(rig, delta, at);
+  }
+
+  /** Lets go of the blur's target in GPU memory; the next fast flight makes it again. */
+  free(): void {
+    this.#speed.free();
+  }
+
+  /** Whether an effect is on: the blur, the dust or the scan; each frame differs while it is. */
+  get busy(): boolean {
+    return this.#speed.busy || this.scan.playing;
   }
 
   /** Whether the frame goes through the flight's blur pass. */

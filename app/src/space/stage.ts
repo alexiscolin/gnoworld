@@ -90,11 +90,22 @@ export class Stage {
     this.maps = this.owner.add(new Maps(base));
     this.moons = new Moons(this.maps, this.round.lines);
     this.effects = new Effects(this.scene, this.owner, still);
-    if (!bare)
-      this.scene.add(
+    if (!bare) {
+      const far = [
         nebulaOf({ uGain: this.gains.stars, uThrough: this.frame.uThrough }),
         starsOf({ ...this.frame, uGain: this.gains.stars }),
-      );
+      ];
+      this.scene.add(...far);
+      // The nebula's materials free its baked cube as they go.
+      this.owner.add({
+        dispose: () => {
+          for (const part of far) {
+            part.geometry.dispose();
+            for (const material of [part.material].flat()) material.dispose();
+          }
+        },
+      });
+    }
     const { uLens: lens, uProj: proj, uPxK: pxK } = this.frame;
     this.sky = bare ? undefined : this.owner.add(new Sky({ ...this.gains, lens, proj, pxK }));
     this.scene.add(this.orbits.lines, this.links.lines, this.plate.mesh, this.round.lines, this.moons.group);

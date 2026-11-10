@@ -33,8 +33,8 @@ export const sameKind = (): boolean => pages.standing !== undefined && pages.sta
 
 const kindOf = (body: "earth" | "cosmos" | WorldShown | undefined): string =>
   typeof body === "object" ? "world" : (body ?? "none");
-// A page with no planet's box (the home) is looked at for five seconds' frames, then left.
-const LOOK_FRAMES = 300;
+// A page with no planet's box (the home) is looked at for five seconds, then left.
+const LOOK_MS = 5000;
 
 // The cosmos's place is its address's: `/universe`, `/s/<namespace>` (the router's `system`, decoded), or the home's view; as a kind and an
 // id, two strings React compares as they are.
@@ -82,21 +82,34 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
     // A world's page (the Earth's, a world's, a realm's) has a plate, which may come after this: its arrival waits for it.
     // The page the full chat gave back stands again with its plate coming in and its dock where it was: the chat holds its own (fullMove.ts).
     if (!flying()) enterPage(pages.cameAfter === FULL_PAGE, sameKind());
-    // The planet's circle as the page lays its box out (a page's parts come late: looked for each frame till it comes), and as it moves.
+    // The planet's circle as the page lays its box out (a page's parts come late: the page's changes are watched till it comes), and as it moves.
     const watching = new ResizeObserver(hold);
-    let [frame, tries] = [0, 0];
+    const coming = new MutationObserver(() => {
+      if (document.querySelector("[data-globe]") !== null) look();
+    });
+    let frame = 0;
+    let giveUp: ReturnType<typeof setTimeout> | undefined;
     const look = () => {
       const box = document.querySelector("[data-globe]");
-      if (box !== null)
+      if (box !== null) {
+        coming.disconnect();
+        clearTimeout(giveUp);
         for (const part of [box, ...document.querySelectorAll("[data-look='plate'], [data-dock]")])
           watching.observe(part);
-      else if ((tries += 1) < LOOK_FRAMES) frame = requestAnimationFrame(look);
+      } else if (giveUp === undefined) {
+        coming.observe(document.body, { childList: true, subtree: true });
+        giveUp = setTimeout(() => {
+          coming.disconnect();
+        }, LOOK_MS);
+      }
       hold();
     };
     frame = requestAnimationFrame(look);
     addEventListener("resize", hold);
     return () => {
       cancelAnimationFrame(frame);
+      coming.disconnect();
+      clearTimeout(giveUp);
       watching.disconnect();
       removeEventListener("resize", hold);
       standingRef.current = false;

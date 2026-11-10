@@ -76,7 +76,15 @@ export const RING_VERTEX = "void main() { gl_Position = projectionMatrix * model
 export const LINE_FRAGMENT =
   "uniform vec3 uColour; uniform float uGain; void main() { gl_FragColor = vec4(uColour * uGain, 1.0); }";
 
-export const PLATE_VERTEX = "void main() { gl_Position = vec4(position.xy, 0.99999, 1.0); }";
+// The quad is the plate's box and two pixels round it (beyond one the fill is nothing), the whole frame while the frame's width is unknown.
+export const PLATE_VERTEX = /* glsl */ `
+uniform vec4 uBox; uniform float uWidth; uniform float uHeight;
+void main() {
+  if (uWidth <= 0.0) { gl_Position = vec4(position.xy, 0.99999, 1.0); return; }
+  vec2 a = position.xy * 0.5 + 0.5;
+  vec2 px = vec2(mix(uBox.x - 2.0, uBox.z + 2.0, a.x), mix(uBox.w + 2.0, uBox.y - 2.0, a.y));
+  gl_Position = vec4(px.x / uWidth * 2.0 - 1.0, 1.0 - px.y / uHeight * 2.0, 0.99999, 1.0);
+}`;
 export const PLATE_FRAGMENT = /* glsl */ `
 uniform vec4 uBox; uniform float uFade; uniform float uShown; uniform float uHeight; uniform float uRound; uniform vec3 uFill;
 void main() {
