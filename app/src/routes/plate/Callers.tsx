@@ -1,7 +1,7 @@
 // Who calls it (the proposal's cal card, D566): the callers per day as a line, then the rollup's top callers by calls, each with its share as a bar,
 // named as the worlds' file names them; eight, and all twenty once the card is open.
-import { useState, type CSSProperties } from "react";
-import { Avatar, Card, Cell, Grid, Sparkline, Stack } from "@gnoworld/ui";
+import type { CSSProperties } from "react";
+import { Avatar, Card, Cell, Grid, Sparkline, Stack, useAlone } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { dayValues } from "./days.ts";
 import { grouped } from "./figures.ts";
@@ -12,7 +12,8 @@ import styles from "./Callers.module.css";
 const OPENS_WITH = 8;
 
 export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: Worlds["worlds"] | undefined }) {
-  const [open, setOpen] = useState(false);
+  const expand = useAlone("callers");
+  const { open } = expand;
   const { top, callers } = rollup;
   if (top.length === 0) return null;
   const days = dayValues(rollup.days, rollup.updated).map((day) => day.callers);
@@ -21,18 +22,7 @@ export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: World
   return (
     <Cell span={open ? 12 : 4}>
       <Card look="hub" fixed rises open={open}>
-        <Card.Header
-          icon="people"
-          title="Who calls it"
-          level={2}
-          hint="per day"
-          expand={{
-            open,
-            onToggle: () => {
-              setOpen(!open);
-            },
-          }}
-        />
+        <Card.Header icon="people" title="Who calls it" level={2} hint="per day" expand={expand} />
         <Card.Body>
           <Stack space="s">
             {days.length < 2 ? null : (

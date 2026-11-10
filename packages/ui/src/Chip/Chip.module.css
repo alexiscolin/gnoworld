@@ -75,11 +75,12 @@
     background: currentcolor;
   }
 
-  /* The live dot's beat: a ring in mint that grows and leaves (the home's hero has the same), from 0.85 s on. */
+  /* The live dot's beat: a ring in mint that grows and leaves (the home's hero has the same), from 0.85 s on, for a minute (25 beats), then it rests with the
+     ring gone; a new word in the chip beats it again (Chip.tsx keys the dot). */
   @media (prefers-reduced-motion: no-preference) {
     .chip[data-tone="mine"] .dot::after {
       /* raw: the proposal's score; paused out of view (offscreen.ts) */
-      animation: beat 2.4s ease-out 0.85s infinite;
+      animation: beat 2.4s ease-out 0.85s 25 forwards;
       animation-play-state: var(--play, running);
     }
   }

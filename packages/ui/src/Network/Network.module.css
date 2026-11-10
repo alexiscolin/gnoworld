@@ -111,7 +111,8 @@
 
     .net[data-seen] .halo {
       /* raw: the proposal's value, no token names it */
-      animation: breathe 3.2s ease-in-out infinite;
+      /* a minute of breaths (19), then it rests; a new graph breathes again (Network.tsx keys it) */
+      animation: breathe 3.2s ease-in-out 19 forwards;
       animation-play-state: var(--play, running);
     }
 

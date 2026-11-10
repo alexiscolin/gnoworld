@@ -1,6 +1,6 @@
 // Try it (the proposal's card): a quiet box that says where to start, the Read and Write tabs with their counts, each a paged list of rows that
 // open in place.
-import { Button, Card, Cluster, Stack, Tabs } from "@gnoworld/ui";
+import { Button, Card, Cluster, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import { use, useRef, useState } from "react";
 import { CallCountsContext } from "./FunctionRow.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
@@ -32,7 +32,8 @@ function StartHere({ start, onStart }: { start: { name: string; calls: number };
 }
 
 export function TryCard({ realm, chain, options }: Where) {
-  const [open, setOpen] = useState(false);
+  const expand = useAlone("try");
+  const { open } = expand;
   const [tab, setTab] = useState<"read" | "write">("read");
   const [reads, setReads] = useState(0);
   const [writes, setWrites] = useState(0);
@@ -41,7 +42,7 @@ export function TryCard({ realm, chain, options }: Where) {
   const start = startHere(useCallable(chain.rpc, realm, options), use(CallCountsContext));
   return (
     <section id="functions" aria-label="The realm's functions" ref={cardRef} data-try-open={open ? "" : undefined}>
-      <Card look="hub" rises>
+      <Card look="hub" rises open={open}>
         <Card.Header
           icon="play"
           title="Try it"
@@ -63,12 +64,7 @@ export function TryCard({ realm, chain, options }: Where) {
               }}
             />
           }
-          expand={{
-            open,
-            onToggle: () => {
-              setOpen(!open);
-            },
-          }}
+          expand={expand}
         />
         {start === undefined ? null : (
           <StartHere
@@ -88,7 +84,7 @@ export function TryCard({ realm, chain, options }: Where) {
             <RealmFunctions
               realm={realm}
               chain={chain}
-              expanded={open}
+              expanded={expand.rows}
               onCount={setReads}
               {...(options === undefined ? {} : { options })}
             />
@@ -102,7 +98,7 @@ export function TryCard({ realm, chain, options }: Where) {
               realm={realm}
               chain={chain}
               options={options}
-              expanded={open}
+              expanded={expand.rows}
               onCount={setWrites}
               opening={opening}
             />

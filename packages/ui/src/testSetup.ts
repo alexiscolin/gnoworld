@@ -55,6 +55,17 @@ function popovers() {
 
 Object.assign(HTMLElement.prototype, popovers());
 
+// ...and no `:popover-open`: a popover is open here when the stand-in shows it.
+const matches: unknown = Reflect.get(Element.prototype, "matches");
+Object.defineProperty(Element.prototype, "matches", {
+  configurable: true,
+  writable: true,
+  value(this: Element, selector: string) {
+    if (selector === ":popover-open") return this instanceof HTMLElement && this.style.display === "block";
+    return typeof matches === "function" && Boolean(Reflect.apply(matches, this, [selector]));
+  },
+});
+
 document.addEventListener("click", (event) => {
   const trigger = event.target instanceof Element ? event.target.closest("[popovertarget]") : null;
   const panel = document.getElementById(trigger?.getAttribute("popovertarget") ?? "");

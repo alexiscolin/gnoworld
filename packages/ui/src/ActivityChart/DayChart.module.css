@@ -9,13 +9,14 @@
   .box {
     position: relative;
     inline-size: 100%;
-    block-size: var(--chart-h);
-    transition: block-size var(--motion-slow) var(--ease-standard);
+    /* raw: a card open alone gives its chart more (Card.module.css), never less */
+    block-size: max(var(--chart-h), var(--chart-open));
   }
 
   @container plate (min-width: 62.5rem) {
     .box {
-      block-size: var(--chart-h-l);
+      /* raw: the same */
+      block-size: max(var(--chart-h-l), var(--chart-open));
     }
   }
 

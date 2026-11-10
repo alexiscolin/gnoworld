@@ -13,9 +13,10 @@ const ARRIVAL_MS = 1500;
 function delayOf(root: HTMLElement | null): string {
   if (root === null) return "0s";
   const now = performance.now();
-  const since = now - Number(root.dataset["riseAt"] ?? (root.dataset["riseAt"] = String(now)));
-  const count = Number(root.dataset["risen"] ?? 0);
-  root.dataset["risen"] = String(count + 1);
+  // `data-rise` is "when the first card came/how many have come": arrival.ts clears it as a new page begins.
+  const [at = now, count = 0] = (root.dataset["rise"] ?? `${String(now)}/0`).split("/").map(Number);
+  root.dataset["rise"] = `${String(at)}/${String(count + 1)}`;
+  const since = now - at;
   // The delay counts from the arrival's own start (the page's one clock, arrival.ts sets `arrivedAt` on the root), not from when this card was
   // seen: a card seen late in a slow frame is a little further on, so it still lands in step with the title and the figures.
   const lag = (now - Number(document.documentElement.dataset["arrivedAt"] ?? now)) / 1000;

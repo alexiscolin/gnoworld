@@ -34,15 +34,12 @@
     font: var(--font-meta);
   }
 
-  /* A square's detail grows from nothing as it opens (a grid row from 0 to its height), held shut and out of reach while closed. */
+  /* A square's detail is held shut and out of reach while closed; it opens with the card's own move, not a move of its own. */
   .fold {
     /* layout: one row, whose height is the detail's */
     display: grid;
     /* layout: shut */
     grid-template-rows: 0fr;
-    transition-property: grid-template-rows;
-    transition-duration: calc(var(--motion-slow) * var(--motion-scale));
-    transition-timing-function: var(--ease-standard);
   }
 
   .fold[data-open] {

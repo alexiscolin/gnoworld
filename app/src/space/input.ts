@@ -1,6 +1,7 @@
 // The reader's hand on space (D401, the demo's): a drag turns the view round what it looks at, with inertia; a wheel brings it nearer what
 // the pointer is over far out (a system, its middle), and in a system a wheel in over a planet dives there in one move; a click enters what
 // it aims at; a wheel out on a page, or Escape, goes up a level. A trackpad's momentum after a dive is spent, never a second dive.
+import { holdsEscape } from "@gnoworld/ui";
 import type { PerspectiveCamera } from "three";
 import type { Hit } from "./pick.ts";
 import type { Rig } from "./rig/rig.ts";
@@ -28,13 +29,6 @@ const GO_UP = 60;
 const LINE_PIXELS = 16;
 const PINCH = 10;
 
-// A key typed in a field, or with a dialog or a popover open (an open one alone: the page keeps closed ones), is theirs: Escape closes
-// them, and never goes up a level of space behind them.
-const typing = (event: KeyboardEvent) =>
-  (event.target instanceof Element &&
-    event.target.closest("input, textarea, select, [contenteditable='true']") !== null) ||
-  document.querySelector("dialog[open], :popover-open") !== null;
-
 /** Listens till `signal` aborts. */
 export function listen(hand: Hand, signal: AbortSignal): void {
   watchDrag(hand, signal);
@@ -42,7 +36,7 @@ export function listen(hand: Hand, signal: AbortSignal): void {
   window.addEventListener(
     "keydown",
     (event) => {
-      if (event.key === "Escape" && !event.defaultPrevented && !typing(event)) hand.up();
+      if (event.key === "Escape" && !event.defaultPrevented && !holdsEscape(event)) hand.up();
     },
     { signal },
   );

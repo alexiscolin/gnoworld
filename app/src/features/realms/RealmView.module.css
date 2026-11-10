@@ -45,7 +45,8 @@
   }
 
   .window[data-open] {
-    max-block-size: var(--web-h-l);
+    /* raw: the open card fills the pane (Room's --plate-room), less its header's and margins' room, 8 rem */
+    max-block-size: max(var(--web-h-l), calc(var(--plate-room, 0px) - 8rem));
   }
 
   /* The page's own blocks, in the proposal's reading type: a column at 14 px over 1.65, titles that step down, links in the world's light, the

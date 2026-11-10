@@ -24,8 +24,7 @@ export function draw(space: Space, signal: AbortSignal): void {
     work: ({ now, delta, slept, real }) => {
       if (resize(space, state.sized, state.freed)) space.touch();
       state.sized = state.freed = false;
-      space.seconds += slept;
-      advance(space, delta, real);
+      advance(space, delta, { real, slept });
       choose(space, state, now);
       paint(space, delta);
       space.stage.frame.uThrough.value = space.stage.effects.through ? 1 : 0;

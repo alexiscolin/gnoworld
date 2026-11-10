@@ -138,6 +138,9 @@
     --plate-aside: 256px;
     --chart-h: 176px;
     --chart-h-l: 216px;
+    /* A card open alone: the pane's height it fills (Room measures it) and the height its chart takes of it (Card). */
+    --plate-room: 0px;
+    --chart-open: 0px;
     /* The plate's frame: the fade into space at its right edge, where its text column starts and stops (the proposal's section 7), its talk bar's height and the small line charts' (a figure's, who calls it). */
     --plate-fade: 64px;
     --plate-inset-start: 76px;

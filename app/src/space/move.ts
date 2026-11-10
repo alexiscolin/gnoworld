@@ -9,6 +9,7 @@ import { followHome } from "./follow.ts";
 import { handOf } from "./hand.ts";
 import { eyeOf } from "./rig/pose.ts";
 import { coveredByChat } from "./motion.ts";
+import { tick } from "./view.ts";
 
 // On a page the universe dims as the demo's behind a plate: the suns to 0.45, the dust to 0.15, the stars to half.
 const PAGE = { sun: 0.45, dust: 0.15, stars: 0.5 } as const;
@@ -25,10 +26,15 @@ const ENTER = 1.2;
 // raw: how many orbits a system draws at their full strength
 const CLEAR_ORBITS = 12;
 
-export function advance(space: Space, delta: number, real = delta): void {
+// `slept` seconds more went by while the loop slept: the clock the orbits ride takes them, at its rate; the steps (`delta`) never do.
+export function advance(
+  space: Space,
+  delta: number,
+  { real = delta, slept = 0 }: { real?: number; slept?: number } = {},
+): void {
   const { rig, stage } = space;
   const still = space.options.still();
-  space.seconds += delta / 1000;
+  tick(space, delta + slept * 1000);
   rig.advance(delta, still, real);
   followHome(space, delta);
   const paged = space.place?.kind === "world";
@@ -127,7 +133,7 @@ export function paint(space: Space, delta: number): void {
   space.labels.ready = stage.intro.ready;
   space.labels.tick(space.see, space.seconds);
   orbits(space, delta);
-  round(space);
+  round(space, delta);
   stage.links.tick(space.plan ? (space.planet ?? space.system) : undefined, space, delta);
   const planet = space.planet;
   stage.effects.tick(rig, delta, planet === undefined ? rig.pose.look : placeOf(planet, space.seconds, PLANET_AT));
@@ -145,13 +151,16 @@ const closeUp = (space: Space): Planet | undefined =>
   space.arrival ? space.universe?.earth : space.circle?.close === true ? space.kept : undefined;
 
 // The orbit round a planet framed close comes once the flight has landed, as the page has; its moons stand round it as it comes (D463).
-function round(space: Space): void {
+function round(space: Space, delta: number): void {
   const planet = closeUp(space);
-  space.stage.round.follow(space.rig.flying ? undefined : planet, space.rig.pose, space.seconds);
+  space.stage.round.follow(space.rig.flying ? undefined : planet, space.rig.pose, {
+    seconds: space.seconds,
+    delta: delta / 1000,
+  });
   const { moons, round: ring } = space.stage;
   moons.follow(
     space.rig.flying ? undefined : planet,
-    { seconds: space.seconds, still: space.options.still() },
+    { seconds: space.seconds, delta: delta / 1000, still: space.options.still() },
     {
       turn: ring.lines.quaternion,
       eye: space.camera.position,

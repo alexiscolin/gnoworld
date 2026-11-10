@@ -1,0 +1,7 @@
+/* The column before its page mounts (an unprerendered route's first paint) has no box: what mounts into it shifts nothing the browser counts. */
+@layer components {
+  .unmounted:empty {
+    /* layout: no box while nothing stands in it */
+    display: none;
+  }
+}

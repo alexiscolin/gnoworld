@@ -7,11 +7,14 @@ import type { Unstyled } from "./testing.tsx";
 // No component the entry gives takes className or style (docs/DESIGN-SYSTEM.md, "No outside
 // styling"): tsc fails this object the day one does, or the day a component joins the entry.
 type Exported = typeof ui;
-// `iconNode` makes a node of a glyph and `stillCopy` a still copy of a part: functions, not components, with no props to style.
+// `iconNode` makes a node of a glyph and `stillCopy` a still copy of a part: functions, not components, with no props to style; `Room` takes children and data attributes alone.
 const unstyled: {
-  [Name in Exclude<keyof Exported, "iconNode" | "sightRef" | "stillCopy">]: Unstyled<ComponentProps<Exported[Name]>>;
+  [Name in Exclude<keyof Exported, "iconNode" | "sightRef" | "stillCopy" | "useAlone" | "holdsEscape">]: Unstyled<
+    ComponentProps<Exported[Name]>
+  >;
 } = {
   Button: true,
+  Room: true,
   ActivityChart: true,
   DayChart: true,
   Figures: true,
@@ -70,7 +73,7 @@ const parts: [
 
 // What @gnoworld/ui gives the app and the admin console: a component left out of the entry
 // would pass its own tests and still be out of their reach.
-it("exports every component of the design system, iconNode and stillCopy, nothing else", () => {
+it("exports every component of the design system, iconNode, stillCopy, sightRef and useAlone, nothing else", () => {
   expect(Object.keys(ui).sort()).toEqual(
     [
       "ActivityChart",
@@ -107,6 +110,7 @@ it("exports every component of the design system, iconNode and stillCopy, nothin
       "PlanetThumb",
       "Popover",
       "Progress",
+      "Room",
       "Row",
       "Select",
       "Sidebar",
@@ -121,6 +125,8 @@ it("exports every component of the design system, iconNode and stillCopy, nothin
       "iconNode",
       "sightRef",
       "stillCopy",
+      "holdsEscape",
+      "useAlone",
     ].sort(),
   );
   for (const component of Object.values(ui)) expect(typeof component).toBe("function");

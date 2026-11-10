@@ -100,3 +100,15 @@ describe("Chip: its label", () => {
     expect(labels).toContain("👍, 2, including you");
   });
 });
+
+// A live pulse beats for a minute and rests; a new content beats it again, which a new element does (the animation starts with its element).
+describe("the dot's pulse", () => {
+  it("beats the chip's dot again for a new word, and leaves it for the same one", () => {
+    const view = render(<Chip dot>Live · last call 3 hours ago</Chip>);
+    const dot = view.container.querySelector("i");
+    view.rerender(<Chip dot>Live · last call 3 hours ago</Chip>);
+    expect(view.container.querySelector("i")).toBe(dot);
+    view.rerender(<Chip dot>Live · last call 4 hours ago</Chip>);
+    expect(view.container.querySelector("i")).not.toBe(dot);
+  });
+});

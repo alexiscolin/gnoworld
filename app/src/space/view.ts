@@ -124,9 +124,10 @@ export function momentOf(space: Space, { numbers: { eye, shown }, pxPerSecond }:
   };
 }
 
-// Whether each frame differs by itself: a flight, the hand, an effect, an arrival or a planet framed close.
+// Whether each frame differs by itself: a flight, the hand, an effect, an arrival or a planet framed close; the last two only while the
+// scene's clock runs (rig/free.ts's rate: stopped after a minute's rest, the page's planet stands still).
 const moves = ({ rig, stage, arrival, circle }: Space): boolean =>
-  rig.flying || rig.free.moving || stage.effects.busy || arrival || circle?.close === true;
+  rig.flying || rig.free.moving || stage.effects.busy || ((arrival || circle?.close === true) && rig.free.rate > 0);
 
 // The pixels a second the fastest slow motion moves: a planet's orbit and its spin, those of the page's planet, the system's or all.
 function pixelsPerSecond(space: Space): number {
@@ -143,15 +144,23 @@ function pixelsPerSecond(space: Space): number {
   return fastest;
 }
 
-/** How long the loop may sleep after this frame; none, it stays awake. */
+/** How long the loop may sleep after this frame; none, it stays awake. A stopped clock (rate 0) moves nothing, so no slow motion keeps it up. */
 export const napOf = (space: Space, state: State, { need, calm }: { need: Need; calm: number }): number | undefined =>
   napFor({
     need,
     moving: moves(space) || space.rig.free.turning,
     settled: space.labels.settled(),
     calm,
-    pxPerSecond: state.pxPerSecond,
+    pxPerSecond: space.rig.free.rate === 0 ? 0 : state.pxPerSecond,
   });
+
+/** Runs the scene's clock `ms` on, at the rate the rest has left it (rig/free.ts). The place of a thing goes by it; an ease goes by the frame's own delta. */
+export const tick = (
+  space: { seconds: number; readonly rig: { readonly free: { readonly rate: number } } },
+  ms: number,
+): void => {
+  space.seconds += (ms / 1000) * space.rig.free.rate;
+};
 
 /** A few times a second: the slow motions' speed, and which near planets are drawn as themselves. */
 export function choose(space: Space, state: State, now: number): void {

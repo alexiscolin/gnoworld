@@ -46,3 +46,11 @@ test("leaving mid-words ends the chat seat's parts at their rest, not half drawn
   expect(style("#head")).toBe("||");
   expect(style("#line")).toBe("||");
 });
+
+test("a new page starts the plate's rise count again: the cards of the next place rise in their stagger, not all at once", () => {
+  show(`<main>${PLATE}</main>`);
+  const body = document.querySelector<HTMLElement>("[data-content]");
+  Object.assign(body?.dataset ?? {}, { rise: "12/7" });
+  newPage("realm:next");
+  expect(body?.dataset["rise"]).toBeUndefined();
+});

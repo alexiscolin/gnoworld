@@ -94,8 +94,8 @@
   }
 
   .pulse::after {
-    /* raw: a slow beat, two seconds, for as long as people are here and the dot is in view (offscreen.ts) */
-    animation: beat calc(2s * var(--motion-scale)) var(--ease-standard) infinite;
+    /* raw: a slow beat, two seconds, for a minute (30 beats) while the dot is in view (offscreen.ts), and again when the count changes (Hero.tsx keys it) */
+    animation: beat calc(2s * var(--motion-scale)) var(--ease-standard) 30 forwards;
     animation-play-state: var(--play, running);
   }
 

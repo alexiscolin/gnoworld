@@ -5,8 +5,8 @@
 // and the header and the hero rise in one after the other. The one seam of the loading screen: its look is this component and its CSS
 // alone. It names no network.
 import { Logo, Stack } from "@gnoworld/ui";
-import { useEffect, useRef, useState, type TransitionEvent } from "react";
-import { riseChrome } from "./rise.ts";
+import { useEffect, useLayoutEffect, useRef, useState, type TransitionEvent } from "react";
+import { holdChrome, riseChrome } from "./rise.ts";
 import styles from "./SpaceLoader.module.css";
 
 /** What gnoworld is, in the loader's words. */
@@ -43,8 +43,13 @@ export function SpaceLoader({ waiting, ready }: { waiting: boolean; ready: numbe
     own.focus();
     return shield(own);
   }, [waiting]);
-  useEffect(() => {
-    if (waited && !waiting) riseChrome(RISE_AFTER);
+  // Before the paint: the parts that rise stay hidden under the loader (their layout is never drawn), and the commit that ends the wait
+  // releases and rises them in one go, so no frame shows them between.
+  useLayoutEffect(() => {
+    if (!waited) return undefined;
+    if (waiting) return holdChrome();
+    riseChrome(RISE_AFTER);
+    return undefined;
   }, [waited, waiting]);
   if (gone || !waited) return null;
   const left = (event: TransitionEvent) => {

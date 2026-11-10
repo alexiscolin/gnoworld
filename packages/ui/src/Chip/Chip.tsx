@@ -47,7 +47,12 @@ export function Chip({ children, tone = "neutral", onClick, selected, count, lab
         data-strong={strong === true ? "" : undefined}
       >
         {dot === true ? (
-          <i ref={sightRef} className={["disc ring", styles["dot"]].join(" ")} aria-hidden="true" />
+          <i
+            key={typeof children === "string" ? children : undefined}
+            ref={sightRef}
+            className={["disc ring", styles["dot"]].join(" ")}
+            aria-hidden="true"
+          />
         ) : null}
         {children}
       </span>

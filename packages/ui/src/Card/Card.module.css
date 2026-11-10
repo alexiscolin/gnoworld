@@ -86,20 +86,6 @@
     margin-inline-end: auto;
   }
 
-  /* A card that holds more than it shows opens in place: it settles into its new size (the proposal's expandIn). */
-  @keyframes open {
-    from {
-      opacity: 0.6;
-      transform: scale(0.985);
-    }
-  }
-
-  @media (prefers-reduced-motion: no-preference) {
-    .card[data-look="hub"]:has(.header[data-open]) {
-      animation: open var(--motion-slow) var(--ease-standard) backwards;
-    }
-  }
-
   .card[data-look="hub"][data-flush] {
     --_pad: 0;
   }
@@ -119,9 +105,11 @@
     font: var(--font-title-m);
   }
 
-  /* An open card's chart is as tall as a wide plate's. */
-  .card[data-open] {
-    --chart-h: var(--chart-h-l);
+  /* An open card fills the pane (--plate-room, set by Room): its chart takes half of it, no less than a wide plate's. */
+  .card[data-alone] {
+    --chart-open: max(var(--chart-h-l), calc(var(--plate-room, 0px) * 0.45));
+
+    min-block-size: var(--plate-room, auto);
   }
 
   /* The plate's entrance (the proposal's score): a card waits unseen, rises 16 px over 0.7 s once it is (--d, its place in the arrival), and its

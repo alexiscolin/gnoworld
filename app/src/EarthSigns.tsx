@@ -72,7 +72,7 @@ function TrendSign({ trend }: { trend: Trend }) {
       data-mark="spot"
       data-trend={trend.percent > 0 ? "up" : "down"}
     >
-      <i ref={sightRef} className={styles["rings"]} />
+      <i key={trend.percent} ref={sightRef} className={styles["rings"]} />
       <b data-dot="" className={styles["dot"]} />
       <span className={styles["pill"]}>{percent(trend.percent)}</span>
     </Mark>

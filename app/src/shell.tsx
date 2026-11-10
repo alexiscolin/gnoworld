@@ -14,6 +14,7 @@ import { site } from "./places.ts";
 import { AppLinks } from "./routerLink.tsx";
 import { ShellHeader } from "./shellHeader.tsx";
 import header from "./shellHeader.module.css";
+import column from "./shell.module.css";
 import { WatchSlot } from "./slots.tsx";
 import { StoreProvider } from "./storeContext.tsx";
 import { PillHost } from "./topPill.tsx";
@@ -56,7 +57,7 @@ export function Shell({ children }: { children: ReactNode }) {
       <AppLinks>
         <ShellHeader universe={universe} />
         <Center max="page">
-          <main className={header["page"]}>{children}</main>
+          <main className={`${String(header["page"])} ${String(column["unmounted"])}`}>{children}</main>
         </Center>
         <UpdatePrompt />
         <DeviceViews universe={universe.id} />

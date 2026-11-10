@@ -335,4 +335,15 @@
     clip-path: inset(50%);
     white-space: nowrap;
   }
+
+  /* A card open alone (Card's `open`, Room): what is off its way is gone from the pane, out of the flow and unseen, as wide as it was and no taller than
+     nothing, its animations kept and never restarted. Room marks it. */
+  [data-aside] {
+    position: absolute;
+    inline-size: 100%;
+    block-size: 0;
+    overflow: clip;
+    visibility: hidden;
+    pointer-events: none;
+  }
 }

@@ -5,7 +5,7 @@
 // ask it as a chunk; its entrance is the proposal's score (the blocks' own sheets, and features/universe/arrival.ts for the title).
 import { lazy, Suspense } from "react";
 import type { RealmRollup } from "@gnoworld/schemas/indexer";
-import { Cell, Figures, Grid, Stack } from "@gnoworld/ui";
+import { Cell, Figures, Grid, Room, Stack } from "@gnoworld/ui";
 import { OutLinks } from "../../features/realms/OutLinks.tsx";
 import { Around } from "./Around.tsx";
 import { Callers } from "./Callers.tsx";
@@ -113,7 +113,7 @@ function Cards({ model }: { model: PlateModel }) {
 export function Plate({ model }: { model: PlateModel }) {
   const { lede, actions, talk, figures, links } = model;
   return (
-    <div data-blocks="">
+    <Room key={model.actions.place.path} data-blocks="">
       <Pills lede={lede} />
       <Stack space="zone">
         <Hero lede={lede} actions={actions} talk={talk} />
@@ -121,6 +121,6 @@ export function Plate({ model }: { model: PlateModel }) {
         <Cards model={model} />
         {links === undefined ? null : <OutLinks links={links} />}
       </Stack>
-    </div>
+    </Room>
   );
 }

@@ -1,9 +1,10 @@
-// The login in the page: the session read as the page starts, again until the server says, a login with the page's Adena, a logout. The
-// header's account menu holds the way out (8p, frame 17): the hook hands it the logout, the view draws the way in.
+// The login in the page: the session read as the page starts, again until the server says (paused while the tab is hidden, resting
+// after a round), a login with the page's Adena, a logout. The header's account menu holds the way out (8p, frame 17): the hook hands it
+// the logout, the view draws the way in.
 import { useEffect, useState, type ReactNode } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { knowSession, logIn, logOut, type SessionDeps } from "./logIn.ts";
+import { knowSession, logIn, logOut, pageClock, type SessionDeps } from "./logIn.ts";
 import { LoginView } from "./LoginView.tsx";
 
 // Adena's account followed, loaded with the first gesture that needs a wallet: a login's click, a call card's (F5651).
@@ -29,16 +30,10 @@ export function useLogin() {
     if (wallet !== undefined) follow(deps, wallet).catch(reportError);
   }, [deps, wallet]);
   useEffect(() => {
-    // A wait the page's leaving cancels: the session is then asked no more.
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    const wait = (ms: number) =>
-      new Promise<void>((resolve) => {
-        timer = setTimeout(resolve, ms);
-      });
-    knowSession(deps, wait).catch(reportError);
-    return () => {
-      clearTimeout(timer);
-    };
+    // The page's clock, which the page's leaving stops: the session is then asked no more.
+    const clock = pageClock(document);
+    knowSession(deps, clock.wait, clock.rest).catch(reportError);
+    return clock.stop;
   }, [deps]);
   return {
     login,

@@ -2,7 +2,7 @@
 // side picked. A dot picked says its path; picked again (or a row) it leads to that place's page; a package with no page has none.
 import { useState } from "react";
 import { useNavigate } from "react-router";
-import { Card, Cell, Grid, Network, PagedList, Planet, Stack, Tabs } from "@gnoworld/ui";
+import { Card, Cell, Grid, Network, PagedList, Planet, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import type { Around as AroundData, AroundNode } from "./around.ts";
 import styles from "./Around.module.css";
 import { rowPath } from "./around.ts";
@@ -61,29 +61,21 @@ export function Around({ around }: { around: AroundData }) {
   const { left, right } = around;
   const [side, setSide] = useState<Side>(right.total > 0 ? "right" : "left");
   const [picked, setPicked] = useState<string>();
-  const [open, setOpen] = useState(false);
+  const expand = useAlone("around");
+  const { open } = expand;
   const shown = side === "left" ? left : right;
   const go = (node: AroundNode) => {
     if (node.path !== undefined) Promise.resolve(navigate(node.path)).catch(reportError);
   };
   const find = (id: string) => [...left.nodes, ...right.nodes].find((node) => node.id === id);
   return (
-    <Card look="hub" rises>
+    <Card look="hub" rises open={open}>
       <Card.Header
         icon="orbits"
         title={around.title}
         level={2}
         actions={<Sides left={left} right={right} side={side} onSide={setSide} />}
-        {...(left.nodes.length > 12 || right.nodes.length > 12
-          ? {
-              expand: {
-                open,
-                onToggle: () => {
-                  setOpen(!open);
-                },
-              },
-            }
-          : {})}
+        {...(left.nodes.length > 12 || right.nodes.length > 12 ? { expand } : {})}
       />
       <Card.Body>
         <Grid cols={12} space="m">
@@ -110,7 +102,7 @@ export function Around({ around }: { around: AroundData }) {
                 items={shown.nodes}
                 keyOf={(node) => node.id}
                 textOf={(node) => node.id}
-                expanded={open}
+                expanded={expand.rows}
                 counted={shown.nodes.length > 12}
                 page={shown.nodes.length > 12 ? 6 : 12}
                 empty={side === "left" ? "It imports nothing." : "Nothing imports it yet."}

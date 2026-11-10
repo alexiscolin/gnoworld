@@ -146,6 +146,10 @@ function Nones({
   );
 }
 
+// What the graph counts, the halo beats again when it changes.
+const totals = (left: NetworkProps["left"], right: NetworkProps["right"]) =>
+  `${String(left.total ?? left.nodes.length)}/${String(right.total ?? right.nodes.length)}`;
+
 /** A minigraph of a place and what is linked to it: the centre, up to 7 dots on its left and 7 on its right joined by curves, a legend
  * with each side's total and a foot that names the dot picked. Each dot is a button when something answers a pick. Positions are
  * computed from the order, so the same links draw the same graph. */
@@ -174,7 +178,7 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
         role="group"
         aria-label={label}
       >
-        <circle className={styles["halo"]} cx={cx} cy={cy} r={halo} />
+        <circle key={totals(left, right)} className={styles["halo"]} cx={cx} cy={cy} r={halo} />
         <Lane nodes={lanes[0]} side={-1} cy={cy} width={width} span={span} selected={selected} onSelect={onSelect} />
         <Lane nodes={lanes[1]} side={1} cy={cy} width={width} span={span} selected={selected} onSelect={onSelect} />
         <g className={styles["centre"]}>

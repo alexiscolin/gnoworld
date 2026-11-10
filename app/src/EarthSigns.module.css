@@ -209,8 +209,8 @@
     border: var(--line-width) solid currentcolor;
     /* raw: the frames' faint fill */
     background: color-mix(in oklab, currentcolor 4%, transparent);
-    /* a slow beat, the frames'; paused out of view (offscreen.ts) */
-    animation: ring calc(var(--motion-ambient) * 0.8 * var(--motion-scale)) var(--ease-standard) infinite;
+    /* a slow beat, the frames', for a minute (25 beats) while in view (offscreen.ts); a new trend beats again (EarthSigns.tsx keys it) */
+    animation: ring calc(var(--motion-ambient) * 0.8 * var(--motion-scale)) var(--ease-standard) 25 forwards;
     animation-play-state: var(--play, running);
   }
 

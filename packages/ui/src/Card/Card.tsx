@@ -21,7 +21,7 @@ export interface CardProps {
   flush?: boolean;
   /** Under the pointer it stays as it is: a card with nothing to open. Hub only. */
   fixed?: boolean;
-  /** Opens in place: the card takes the whole row of a twelve-column grid and its parts grow (the chart's height, a list's page). */
+  /** Open alone: the plate's other blocks are gone and the card fills the pane, its parts grown (the chart's height, a list's page). */
   open?: boolean;
   /** Rises as it comes into view, on the plate's arrival or as it scrolls in (useRise.ts); its parts' own entrances wait for it. */
   rises?: boolean;
@@ -38,7 +38,7 @@ function looks({ tone = "neutral", dashed, compact, look, flush, fixed, open, ri
     "data-look": look,
     "data-flush": set(flush),
     "data-fixed": set(fixed),
-    "data-open": set(open),
+    "data-alone": set(open),
     "data-rise": set(rises),
   };
 }
@@ -75,7 +75,11 @@ export interface CardHeaderProps {
   /** Large is the light title of a card that is a screen's subject (F5730): the body's size otherwise. */
   size?: "large";
   /** An Expand button after the title (the dock's icon): whether the card is open, and the click that toggles it. */
-  expand?: { open: boolean; onToggle: () => void; /** The smallest button, a square's. */ small?: boolean };
+  expand?: {
+    open: boolean;
+    onToggle: (from: HTMLElement) => void;
+    /** The smallest button, a square's. */ small?: boolean;
+  };
   /** A short line before the Expand button, in the muted meta type ("reads run here without a wallet"). */
   hint?: string;
   /** Buttons before the hint and the Expand button, on the title's row. */
@@ -111,7 +115,9 @@ function End({
             emphasis="plain"
             size={expand.small === true ? "xs" : "s"}
             expanded={expand.open}
-            onClick={expand.onToggle}
+            onClick={(event) => {
+              expand.onToggle(event.currentTarget);
+            }}
           />
         )}
       </Cluster>
@@ -123,7 +129,7 @@ function Header({ title, icon, kicker, state, level = 3, size, expand, hint, act
   const Heading = HEADINGS[level];
   const titleId = use(TitleContext);
   return (
-    <div className={styles["header"]} data-open={expand?.open === true ? "" : undefined}>
+    <div className={styles["header"]}>
       <Cluster justify="between" space="xs" wrap="no">
         <Stack space="3xs">
           {kicker === undefined ? null : (

@@ -102,17 +102,15 @@ export class Round {
   readonly #up = new Vector3();
   readonly #way = new Vector3();
   readonly #side = new Vector3();
-  #seconds = 0;
 
   constructor() {
     this.lines.visible = false;
   }
 
-  /** Round `planet`, `seconds` on, as seen from `pose`, coming or going over a moment; none, it goes. */
-  follow(planet: Planet | undefined, pose: Pose, seconds: number): void {
+  /** Round `planet`, `seconds` on, as seen from `pose`, coming or going over a moment of `delta` real seconds a frame; none, it goes. */
+  follow(planet: Planet | undefined, pose: Pose, { seconds, delta }: { seconds: number; delta: number }): void {
     if (planet !== undefined && this.gain.value < 1e-3) this.#face(pose);
-    const share = 1 - Math.exp(-Math.max(seconds - this.#seconds, 0) / ROUND.ease);
-    this.#seconds = seconds;
+    const share = 1 - Math.exp(-delta / ROUND.ease);
     this.gain.value += ((planet === undefined ? 0 : ROUND.gain) - this.gain.value) * share;
     this.lines.visible = this.gain.value > 1e-3;
     if (planet === undefined || !this.lines.visible) return;

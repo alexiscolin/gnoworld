@@ -8,13 +8,13 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page: 197,951 B (D386); 243,371 B after the ping-pong (D13961); 235,306 B with the plate built to the proposal
-// (D13964); 256,839 B with TanStack and the perf pass's pause out of view (D13973, D13977), provisional.
-const FIRST_SCREEN_JS = 256_839;
-// A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the home and /net/onyx/, the rail on their first
-// screen; /net/gnoland/ 227,380 B), the measure (+39,027 B); 232,954 B with the plate's wait (D13959), provisional.
-// 233,983 B on 2026-11-10 with the realm plate built to the proposal (slice 13, D13964), provisional (+1,029 B over 232,954 B).
-const PLAIN_FIRST_SCREEN_JS = 255_657;
+// The Earth's or a world's page: 197,951 B (D386); 256,839 B with TanStack and the perf pass (D13973, D13977); 259,818 B with the card
+// opened alone's Room in the ui chunk (D13979, +2,979 B), provisional till vite.config.ts's ui group leaves it out.
+const FIRST_SCREEN_JS = 259_818;
+// A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the rail on its first screen); 255,657 B
+// with the realm plate and the perf pass (D13964, D13977); 258,080 B with the card opened alone's Room (D13979, +2,423 B), provisional
+// as FIRST_SCREEN_JS.
+const PLAIN_FIRST_SCREEN_JS = 258_080;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -144,10 +144,10 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 // (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's, which
 // the old door's chunk (mountUniverse, D401) replaced.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09 (+16,061 B);
-// 45,161 B on 2026-11-10 with the realm plate (slice 13), provisional (44,905 B measured on the Earth's page, 44,283 B on a world's), 256 B
-// ahead (+2,386 B): bytes that moved (verdicts, follow, passport) off the first screen, not new ones.
-const LATE_CHAT_JS = 45_824;
+// What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09; 45,824 B
+// with the realm plate's moved bytes (slice 13); 46,464 B on 2026-11-11, 46,208 B measured with the chat's move on Web Animations
+// (D13980), 256 B ahead.
+const LATE_CHAT_JS = 46_464;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;

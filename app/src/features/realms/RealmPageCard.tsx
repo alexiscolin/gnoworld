@@ -2,7 +2,7 @@
 // core's reader in a window of its own, a long one scrolling inside it. Every state names the way out: the link to the realm on gnoweb
 // (ADR-0002 §4, gnoweb is the source of truth) stands in its header whatever the page holds, with the height it was read at, the cap's
 // state or the failed read's state and its next step.
-import { Button, Card, Skeleton, Stack } from "@gnoworld/ui";
+import { Button, Card, Skeleton, Stack, useAlone } from "@gnoworld/ui";
 import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { useEffect, useRef, useState } from "react";
 import { bigLine } from "./RealmCard.tsx";
@@ -139,12 +139,13 @@ export function PageCard({
   place,
   ...where
 }: Omit<Where, "options"> & { state: Realm; link: string | undefined; place: CallPlace }) {
-  const [open, setOpen] = useState(false);
+  const expand = useAlone("page");
+  const { open } = expand;
   const { ref, end } = useWindow();
   const { realm, chain } = where;
   return (
     <section id="page" aria-label="The realm's page">
-      <Card look="hub" fixed rises>
+      <Card look="hub" fixed rises open={open}>
         <Card.Header
           icon="code"
           title="Its page"
@@ -157,12 +158,7 @@ export function PageCard({
               </Button>
             )
           }
-          expand={{
-            open,
-            onToggle: () => {
-              setOpen(!open);
-            },
-          }}
+          expand={expand}
         />
         <div
           ref={ref}

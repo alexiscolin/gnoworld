@@ -167,14 +167,15 @@ const SAME_RUN_MS = 50;
 /** A page begins (its hold on space), `key` its place: its arrival is still to play, once. The same page begun again in the same breath
  * (React's strict second run) keeps the arrival it has, never restarting it from nothing. */
 export function newPage(key: string): void {
-  const now = performance.now();
-  const again = begun?.key === key && now - begun.at < SAME_RUN_MS;
-  begun = { key, at: now };
+  const at = performance.now();
+  const again = begun?.key === key && at - begun.at < SAME_RUN_MS;
+  begun = { key, at };
   if (again) return;
   generation += 1;
   arrived = false;
-  delete document.documentElement.dataset["arrive"];
-  delete document.documentElement.dataset["arrivedAt"];
+  for (const key of ["arrive", "arrivedAt"]) Reflect.deleteProperty(document.documentElement.dataset, key);
+  // The plate's cards count from this page's first (Card/useRise.ts): a scroller that outlives a page starts the count again.
+  document.querySelector("[data-content]")?.removeAttribute("data-rise");
 }
 
 // Calls `go` once `ready()` holds (looked at as the page changes), or after `within` ms; `waiting` stops it when another page comes or this one

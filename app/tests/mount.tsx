@@ -38,6 +38,19 @@ afterEach(() => {
   }
 });
 
+/** A root in the page to draw into again and again, as a page's state changes (null: nothing); unmounted after each test. */
+export function drawer(): (element: ReactElement | null) => void {
+  const host = document.createElement("div");
+  document.body.append(host);
+  const root = createRoot(host);
+  roots.push({ root, host });
+  return (element) => {
+    act(() => {
+      root.render(element);
+    });
+  };
+}
+
 /** Draws `element` in the page and returns the box that holds it; unmounted after each test. */
 export function mount(element: ReactElement): HTMLElement {
   const host = document.createElement("div");

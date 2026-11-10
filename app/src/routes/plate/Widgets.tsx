@@ -1,19 +1,15 @@
-// The plate's foot: small squares, one fact and one large value each, for whoever checks rather than discovers; a square with detail opens in
-// place (its Expand button) over the whole row. Four a row on a wide plate, two on a narrow one.
-import { useState } from "react";
-import { Avatar, Card, Cell, Cluster, Grid, Stack } from "@gnoworld/ui";
+// The plate's foot: small squares, one fact and one large value each, for whoever checks rather than discovers; a square with detail opens alone
+// (its Expand button) over the whole pane. Four a row on a wide plate, two on a narrow one.
+import { Avatar, Card, Cell, Cluster, Grid, Stack, useAlone } from "@gnoworld/ui";
 import type { Widget } from "./model.ts";
 import styles from "./Widgets.module.css";
 
-function Square({ widget, open, onToggle }: { widget: Widget; open: boolean; onToggle: () => void }) {
+function Square({ widget, expand }: { widget: Widget; expand: ReturnType<typeof useAlone> }) {
   const { label, value, unit, face, detail, more } = widget;
+  const { open } = expand;
   return (
-    <Card look="hub" rises>
-      <Card.Header
-        title={label}
-        level={3}
-        {...(more === undefined ? {} : { expand: { open, onToggle, small: true } })}
-      />
+    <Card look="hub" rises open={open}>
+      <Card.Header title={label} level={3} {...(more === undefined ? {} : { expand: { ...expand, small: true } })} />
       <Stack space="s">
         <Cluster align="center" wrap="no" space="2xs">
           {face === undefined ? null : <Avatar address={face} name={value} size="m" decorative />}
@@ -41,26 +37,24 @@ function Square({ widget, open, onToggle }: { widget: Widget; open: boolean; onT
   );
 }
 
+// A square's cell: three columns of twelve, all of them once it is open alone.
+function Slot({ widget }: { widget: Widget }) {
+  const expand = useAlone(`square:${widget.label}`);
+  return (
+    <Cell span={expand.open ? 12 : 3} {...(expand.open ? {} : { narrow: 6 as const })}>
+      <Square widget={widget} expand={expand} />
+    </Cell>
+  );
+}
+
 export function Widgets({ widgets }: { widgets: readonly Widget[] }) {
-  const [open, setOpen] = useState<string>();
   if (widgets.length === 0) return null;
   return (
     <div className={styles["widgets"]}>
       <Grid cols={12} space="s">
-        {widgets.map((widget) => {
-          const shown = open === widget.label;
-          return (
-            <Cell key={widget.label} span={shown ? 12 : 3} {...(shown ? {} : { narrow: 6 as const })}>
-              <Square
-                widget={widget}
-                open={shown}
-                onToggle={() => {
-                  setOpen(shown ? undefined : widget.label);
-                }}
-              />
-            </Cell>
-          );
-        })}
+        {widgets.map((widget) => (
+          <Slot key={widget.label} widget={widget} />
+        ))}
       </Grid>
     </div>
   );

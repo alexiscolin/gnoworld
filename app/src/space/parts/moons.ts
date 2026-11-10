@@ -73,10 +73,10 @@ export class Moons {
   /** Round `planet`, `seconds` on, in the plane `turn` leans the page's ring to, seen from `eye`; none, they go. */
   follow(
     planet: Planet | undefined,
-    clock: { seconds: number; still: boolean },
+    clock: { seconds: number; delta: number; still: boolean },
     view: { turn: Quaternion; eye: Vector3 },
   ): void {
-    const delta = Math.min(Math.max(clock.seconds - this.#seconds, 0), 0.1);
+    const { delta } = clock;
     this.#seconds = clock.seconds;
     const gone = planet === undefined;
     if (gone) {
@@ -159,7 +159,11 @@ export class Moons {
       planet,
       clock,
       view,
-    }: { planet: Planet; clock: { seconds: number; still: boolean }; view: { turn: Quaternion; eye: Vector3 } },
+    }: {
+      planet: Planet;
+      clock: { seconds: number; delta: number; still: boolean };
+      view: { turn: Quaternion; eye: Vector3 };
+    },
   ): void {
     const { drawn } = slot;
     if (drawn === undefined) return;

@@ -117,7 +117,7 @@ export function Panel({
   // In the top layer, over the dock and its full chat alike; it closes itself (useDismiss), so the browser's light dismiss is not asked.
   useShown(panelRef, showing, onGone);
   return createPortal(
-    <div ref={panelRef} className={styles["place"]} popover="manual" inert={!showing}>
+    <div ref={panelRef} className={styles["place"]} popover="manual" data-takes-escape="" inert={!showing}>
       <Surface label="Notifications" look="floating">
         <Head
           onMarkAll={() => {

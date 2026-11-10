@@ -151,7 +151,7 @@ function Actions({ universe, system, newcomer }: Pick<HeroProps, "universe" | "s
 function Lead({ universe, people, system }: HeroProps) {
   return system === undefined && typeof people === "object" ? (
     <p className={`inline-center ${String(styles["online"])}`}>
-      <i ref={sightRef} className={`disc ring ${String(styles["pulse"])}`} aria-hidden="true" />
+      <i key={people.online} ref={sightRef} className={`disc ring ${String(styles["pulse"])}`} aria-hidden="true" />
       Online now
     </p>
   ) : (

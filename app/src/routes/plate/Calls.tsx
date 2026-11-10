@@ -2,7 +2,7 @@
 // first call (a day with none a dot), the range (all or 14 days), then its last calls as a paged list of three that Expand opens to a hundred: who,
 // which function, when. Every text is the rollup's, checked by its schema; nothing here is made up.
 import { useState } from "react";
-import { Card, Cell, Cluster, DayChart, PagedList, Stack, Tabs } from "@gnoworld/ui";
+import { Card, Cell, Cluster, DayChart, PagedList, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { CallRow } from "./CallRow.tsx";
 import { dayLabel, dayValues } from "./days.ts";
@@ -166,7 +166,8 @@ export function Calls({
 }) {
   const [scale, setScale] = useState<"log" | "linear">("log");
   const [range, setRange] = useState<"all" | "14">("all");
-  const [open, setOpen] = useState(false);
+  const expand = useAlone("calls");
+  const { open } = expand;
   const every = dayValues(rollup.days, rollup.updated);
   if (every.length === 0 && rollup.last.length === 0) return null;
   const failed = rollup.last.filter((call) => !call.success).length;
@@ -178,12 +179,7 @@ export function Calls({
           title="Calls per day"
           level={2}
           actions={<Segments scale={scale} range={range} onScale={setScale} onRange={setRange} />}
-          expand={{
-            open,
-            onToggle: () => {
-              setOpen(!open);
-            },
-          }}
+          expand={expand}
         />
         <Card.Body>
           <Stack space="s">
@@ -195,7 +191,7 @@ export function Calls({
                 all={rollup.last.length}
               />
             )}
-            {rollup.last.length === 0 ? null : <CallsList rollup={rollup} worlds={worlds} open={open} />}
+            {rollup.last.length === 0 ? null : <CallsList rollup={rollup} worlds={worlds} open={expand.rows} />}
           </Stack>
         </Card.Body>
       </Card>
