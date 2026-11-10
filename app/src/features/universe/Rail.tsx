@@ -1,9 +1,8 @@
 // The rail (frames 4 and 16; ADR-0002 §1's rail and §10; 7i): the Earth and the worlds of the moment down the right edge, each its planet and
 // its name, 25 at most, the column scrolling to its end, "See all" under it; one stop in the tab order, the arrows among the worlds; each
 // planet its real one once drawn (WorldPlanet), ui's disc till then. Where it stands, the page's plain list of worlds steps aside for it.
-import { RAIL } from "@gnoworld/core";
 import { Button } from "@gnoworld/ui";
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
 import type { WorldPlaces } from "../../lib/hubWorld.ts";
 import { nextLine } from "../../lib/nextLine.ts";
 import { RouterLink } from "../../routerLink.tsx";
@@ -20,9 +19,7 @@ import { inSystem, useResting } from "./views.ts";
 import { useLens, useLit } from "../../lenses.ts";
 import { loading, RETURN_AFTER, riseIn } from "./rise.ts";
 import styles from "./Rail.module.css";
-
-// The rail's footprint, which the labels keep clear (core's RAIL): its width comes from it.
-const FOOTPRINT = { "--_footprint": `${String(RAIL.footprint)}px` } as CSSProperties;
+import { FOOTPRINT } from "./railFootprint.ts";
 
 const unknown = () => undefined;
 const noEntries = () => NO_ENTRIES;

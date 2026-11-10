@@ -2,6 +2,7 @@
 // labels where they are. Its words say its state ("Following", the check), so a reader never reads a pressed state off a changed name.
 import { Button, IconButton } from "@gnoworld/ui";
 import { useState } from "react";
+import appear from "../../enter.module.css";
 import { useFollow, type FollowKind } from "./follow.ts";
 
 export function FollowButton({
@@ -37,7 +38,7 @@ export function FollowButton({
         </Button>
       )}
       {refused ? (
-        <span role="status" className="label">
+        <span role="status" className={`label ${String(appear["enter"])}`}>
           Kept for this visit only: this device keeps nothing
         </span>
       ) : null}

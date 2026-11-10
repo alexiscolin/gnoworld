@@ -1,12 +1,15 @@
 /* A plate's links out: the label's capitals in the text's colour, the arrow kept with its words in one row (frames 40, 93). The air over
    them is the plate's section step (Panel.module.css, D470), or their card's stack's. */
 @layer components {
-  .out {
+  a.out {
     color: var(--color-text);
-    text-decoration: none;
+    /* The underline is always there, clear till pointed at, so it fades in rather than appearing. */
+    text-decoration-line: underline;
+    text-decoration-color: transparent;
+    transition: text-decoration-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
   }
 
-  .out:hover {
-    text-decoration: underline;
+  a.out:hover {
+    text-decoration-color: currentcolor;
   }
 }

@@ -73,6 +73,8 @@ export class EarthGround {
   #hidden = false;
   #newest: { mark: GroundMark; ground: Vector3 } | undefined;
   #id = "";
+  // The lead each world left with, to start from when its page comes again: a world's angle never jumps with its page.
+  readonly #left = new Map<string, number>();
   readonly #axisOf: (id: string) => Axis;
   readonly #still: () => boolean;
   #lean = new Quaternion().setFromEuler(new Euler(EARTH.lean, 0, EARTH.tilt));
@@ -118,11 +120,12 @@ export class EarthGround {
     return keep !== undefined && x < keep && x >= (from?.x ?? -Infinity) && y >= (from?.y ?? -Infinity);
   }
 
-  // A planet other than the last starts with no lead, standing as its own axis says.
+  // A planet other than the last starts with the lead it left with (none the first time), standing as its own axis says.
   #stand(planet: Planet): void {
     if (planet.id === this.#id) return;
+    this.#left.set(this.#id, this.lead);
     this.#id = planet.id;
-    this.lead = this.#leadTo = 0;
+    this.lead = this.#leadTo = this.#left.get(planet.id) ?? 0;
     const { lean, tilt } = planet.id === EARTH_ID ? EARTH : this.#axisOf(planet.id);
     this.#lean.setFromEuler(new Euler(lean, 0, tilt));
     this.#back.copy(this.#lean).invert();

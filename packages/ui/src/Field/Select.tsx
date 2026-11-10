@@ -24,7 +24,7 @@ export function Select({ label, value, onChange, options, ref }: SelectProps) {
     <span className={styles["wrap"]}>
       <select
         ref={ref}
-        className={styles["select"]}
+        className={["tint", styles["select"]].join(" ")}
         aria-label={label}
         value={value}
         onChange={({ target }) => {

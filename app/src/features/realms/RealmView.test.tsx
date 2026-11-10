@@ -69,7 +69,7 @@ describe("a realm's view", () => {
     // The line is the last of the page itself; the read functions' panel, with its own text, follows it (5i).
     expect(
       all(box, "p").some((p) =>
-        /^Read at block 786,661, 2026-10-30T23:43:10Z, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
+        /^Read at block 786,661, Oct 30, 23:43 UTC, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
       ),
     ).toBe(true);
     // 5i: the read functions' panel carries the link too, in every state; the page's own is the one outside it.

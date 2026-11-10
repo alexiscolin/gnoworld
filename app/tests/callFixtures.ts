@@ -14,6 +14,8 @@ export const CHAIN = {
   gnoweb: "https://onyx.testnets.gno.land",
   indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
 };
+/** Another chain's address for a sibling panel: two panels of one chain and realm share one read, so one that must read on its own is on its own. */
+export const SIBLING_CHAIN = { ...CHAIN, rpc: "https://rpc.sibling.example:443" };
 export const CUR = { Name: "cur", Type: realmType(), Value: "" };
 export const field = (Name: string, Type: string) => ({ Name, Type, Value: "" });
 

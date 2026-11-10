@@ -39,6 +39,12 @@
       border-color var(--motion-fast) var(--ease-standard);
   }
 
+  /* The title near the card's top, a step less above it than at its sides (Alexis, 2026-11-10: "rapprocher les titres des hauts des sections"):
+     16 px on a wide plate, 12 on a narrow one. */
+  .card[data-look="hub"]:not([data-flush]) {
+    padding-block-start: max(var(--space-xs), calc(var(--_pad) - var(--space-2xs)));
+  }
+
   .card[data-look="hub"]:hover:not([data-fixed]) {
     border-color: var(--color-line-strong);
     background: var(--color-card-hover);
@@ -76,6 +82,8 @@
     min-inline-size: 0;
     /* layout: this row's own arrangement */
     flex: 0 1 auto;
+    /* layout: right after the title, the buttons pushed to the end (Alexis, 2026-11-10: "plus coller les 2") */
+    margin-inline-end: auto;
   }
 
   /* A card that holds more than it shows opens in place: it settles into its new size (the proposal's expandIn). */
@@ -101,6 +109,12 @@
     font-weight: 500;
   }
 
+  .lead {
+    /* layout: the icon's own box, no line's leading under it */
+    display: flex;
+    color: var(--color-text-muted);
+  }
+
   .title[data-size="large"] {
     font: var(--font-title-m);
   }
@@ -124,8 +138,9 @@
     .card[data-rise][data-state="in"] {
       --play: running;
 
-      /* raw: the proposal's score */
-      animation: rise 0.7s var(--ease-out-3) var(--d, 0s) backwards;
+      /* raw: the proposal's score, 0.7 s, scaled by the motion setting (0 where the app's calm setting asks) */
+      animation: rise calc(0.7s * var(--motion-scale)) var(--ease-out-3) calc(var(--d, 0s) * var(--motion-scale))
+        backwards;
     }
 
     @keyframes rise {

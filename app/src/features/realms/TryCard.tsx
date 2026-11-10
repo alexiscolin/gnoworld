@@ -6,6 +6,7 @@ import { CallCountsContext } from "./FunctionRow.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
 import type { Where } from "./RealmPageCard.tsx";
 import { RealmWrites, startHere } from "./RealmWrites.tsx";
+import appear from "../../enter.module.css";
 import calm from "./quiet.module.css";
 import { useCallable } from "./useCallable.ts";
 
@@ -40,11 +41,28 @@ export function TryCard({ realm, chain, options }: Where) {
   const start = startHere(useCallable(chain.rpc, realm, options), use(CallCountsContext));
   return (
     <section id="functions" aria-label="The realm's functions" ref={cardRef} data-try-open={open ? "" : undefined}>
-      <Card look="hub">
+      <Card look="hub" rises>
         <Card.Header
+          icon="play"
           title="Try it"
           level={2}
-          hint="reads run here without a wallet"
+          actions={
+            // The card's own switch stands in its header, as Calls per day's scale does: the title first, then what it shows
+            // (Alexis, 2026-11-10: "mauvaise hiérarchie avec le système d'onglets en dessous").
+            <Tabs
+              label="Function kind"
+              size="xs"
+              plainCount
+              tabs={[
+                { id: "read", label: "Read", count: reads },
+                { id: "write", label: "Write", count: writes },
+              ]}
+              selected={tab}
+              onSelect={(id) => {
+                setTab(id === "write" ? "write" : "read");
+              }}
+            />
+          }
           expand={{
             open,
             onToggle: () => {
@@ -65,20 +83,7 @@ export function TryCard({ realm, chain, options }: Where) {
             }}
           />
         )}
-        <Tabs
-          label="Function kind"
-          fill
-          plainCount
-          tabs={[
-            { id: "read", label: "Read", count: reads },
-            { id: "write", label: "Write", count: writes },
-          ]}
-          selected={tab}
-          onSelect={(id) => {
-            setTab(id === "write" ? "write" : "read");
-          }}
-        />
-        <div role="tabpanel" hidden={tab !== "read"}>
+        <div role="tabpanel" className={appear["enter"]} hidden={tab !== "read"}>
           <Stack space="s">
             <RealmFunctions
               realm={realm}
@@ -90,7 +95,7 @@ export function TryCard({ realm, chain, options }: Where) {
             <p className={calm["note"]}>No wallet needed: a read runs here and shows its result.</p>
           </Stack>
         </div>
-        <div role="tabpanel" hidden={tab !== "write"}>
+        <div role="tabpanel" className={appear["enter"]} hidden={tab !== "write"}>
           <Stack space="s">
             <p className={[calm["box"], "fill-box"].join(" ")}>Every write needs a connected wallet and a signature.</p>
             <RealmWrites

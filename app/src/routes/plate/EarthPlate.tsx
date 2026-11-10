@@ -3,34 +3,29 @@
 import { EARTH as EARTH_ID, stampKey } from "@gnoworld/core";
 import { EARTH_CHAT as EARTH } from "../../features/chat/index.ts";
 import { LatestOnX } from "../../features/home/LatestOnX.tsx";
-import { OutLinks } from "../../features/realms/OutLinks.tsx";
 import { useEarthChain } from "../../features/world/useEarthChain.ts";
 import { useHours } from "../../features/world/useHours.ts";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
-import { useLateRead } from "../../lateRead.ts";
-import type { UniverseView } from "../../places.ts";
+import { useQuery } from "@tanstack/react-query";
+import { peopleOptions } from "../../features/home/peopleQuery.ts";
+import { queryClient } from "../../lib/query/client.ts";
+import { universePrefix, type UniverseView } from "../../places.ts";
+import { aroundEarth } from "./around.ts";
 import { useHere } from "../../useHere.ts";
+import rooms from "../../../data/earthRooms.json" with { type: "json" };
 import universes from "../../../data/universes.json" with { type: "json" };
-import { chatFigures, hourWidgets, statusOf } from "./figures.ts";
+import { chatFigures, hourWidgets, roomsWidget, statusOf } from "./figures.ts";
 import type { PlateModel } from "./model.ts";
 import { Plate } from "./Plate.tsx";
 
-// The people's read is the home's own (8i), in its chunk; the default universe's rooms only.
-const readPeople = (_: string, signal: AbortSignal) =>
-  import("../../features/home/people.ts").then((people) => people.readPeople({ signal }));
-
 // Frame 40's three links out: the universe's gnoweb, its explorer and the docs.
-function EarthLinks({ universe }: { universe: string }) {
+function earthLinks(universe: string) {
   const chain = universes.find((each) => each.id === universe);
-  return (
-    <OutLinks
-      links={[
-        { label: "View on gnoweb", href: chain?.gnoweb },
-        { label: "Explorer", href: chain === undefined ? undefined : explorerLink(chain.chainId) },
-        { label: "Docs", href: DOCS },
-      ]}
-    />
-  );
+  return [
+    { label: "View on gnoweb", href: chain?.gnoweb },
+    { label: "Explorer", href: chain === undefined ? undefined : explorerLink(chain.chainId) },
+    { label: "Docs", href: DOCS },
+  ];
 }
 
 function useEarthPlate(universe: UniverseView): PlateModel {
@@ -38,10 +33,11 @@ function useEarthPlate(universe: UniverseView): PlateModel {
   useEarthChain();
   const here = useHere(true).get(EARTH.slug) ?? 0;
   const hours = useHours(EARTH.slug);
-  const countries = useLateRead(universe.isDefault ? "people" : undefined, readPeople)?.countries ?? 0;
+  // No read of the people (another universe's, or none came): no Countries figure; a read of none is a zero, and shows.
+  const countries = useQuery({ ...peopleOptions, enabled: universe.isDefault }, queryClient).data?.countries;
   return {
-    // The title and its line are the route's, on the first screen: the lede holds its marks.
-    lede: { status: statusOf(here, "Quiet") },
+    // The title is the route's; the line comes after the status, as a realm's does (the proposal's phone).
+    lede: { sentence: EARTH.description, status: statusOf(here, "Quiet") },
     // Frame 40: the Earth's plate says hi in its general room, and follows and shares as a world's does.
     actions: {
       place: { name: "Earth", path: universe.earth.canonical },
@@ -51,13 +47,10 @@ function useEarthPlate(universe: UniverseView): PlateModel {
     },
     figures: { figures: chatFigures({ here, countries, hours }) },
     hours,
-    extras: (
-      <>
-        <LatestOnX />
-        <EarthLinks universe={universe.id} />
-      </>
-    ),
-    widgets: hourWidgets(hours),
+    extras: <LatestOnX />,
+    links: earthLinks(universe.id),
+    around: aroundEarth({ hubs: universe.worlds, prefix: universePrefix(universe) }),
+    widgets: [...hourWidgets(hours), ...roomsWidget(rooms)],
   };
 }
 

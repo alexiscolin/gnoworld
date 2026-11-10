@@ -1,9 +1,10 @@
-import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
 import { surface } from "../Popover/floating.ts";
 import styles from "./Flash.module.css";
+import { stillCopy } from "../stillCopy.ts";
 
 export interface FlashMessage {
   title: string;
@@ -23,6 +24,38 @@ export interface FlashProps {
 // docs/DESIGN-SYSTEM.md, "Motion": 5 s, held while the pointer is over it or the focus in it, each a
 // hold of its own; with an action, it stays.
 const LIFETIME = 5_000;
+
+// Unmounted, a pill leaves by a copy of itself that fades out in its place (React removes the pill in one frame); nothing under reduced motion, nor where
+// there is no Web Animations API (jsdom), so a closed flash is gone at once for the tests and a screen reader.
+function leaveByCopy(pill: HTMLElement) {
+  if (typeof pill.animate !== "function") return;
+  if (getComputedStyle(document.documentElement).getPropertyValue("--motion-scale").trim() === "0") return;
+  const ghost = stillCopy(pill);
+  if (ghost === undefined) return;
+  ghost.inert = true;
+  document.body.append(ghost);
+  if (ghost.hasAttribute("popover")) ghost.showPopover();
+  const fade = ghost.animate([{ opacity: 1 }, { opacity: 0, translate: "0 -4px" }], {
+    duration: 140,
+    easing: "cubic-bezier(0.5, 0, 0.9, 0.4)",
+    fill: "forwards",
+  });
+  fade.onfinish = () => {
+    ghost.remove();
+  };
+}
+
+function usePillLayer(ref: RefObject<HTMLElement | null>, banner: boolean) {
+  useLayoutEffect(() => {
+    if (!banner) ref.current?.showPopover();
+  }, [ref, banner]);
+  useLayoutEffect(() => {
+    const pill = ref.current;
+    return () => {
+      if (pill !== null) leaveByCopy(pill);
+    };
+  }, [ref]);
+}
 
 // The flash itself, on the page while it has something to say: closed, it leaves with its holds, which
 // no pointerleave or blur would end.
@@ -59,9 +92,7 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
   // In the top layer, over a modal dialog's scrim when raised from it (F331), shown as it comes; its
   // region stays in the page, where it is announced. A banner, raised by the page and never from a
   // dialog, stays in the page: an open dialog's layer covers it (8j).
-  useLayoutEffect(() => {
-    if (!banner) pillRef.current?.showPopover();
-  }, [banner]);
+  usePillLayer(pillRef, banner);
   return (
     <div
       ref={pillRef}

@@ -12,9 +12,19 @@ import {
 } from "../../../tests/chain/chainFixture.ts";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { evalCall } from "./evalCall.ts";
+import { makeQueryClient, Unread } from "../query/client.ts";
 import type { ChainFetch, ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
 import { readHeight } from "@gnoworld/chain/node";
-import { readCallable, readEval, readFunctions, readPage, readUser } from "./rpc.ts";
+import {
+  readCallable,
+  readEval,
+  readFunctions,
+  readPage,
+  readUser,
+  realmFunctions,
+  toCallable,
+  toFunctions,
+} from "./rpc.ts";
 
 // 5g-reads: the four reads of a chain (vm/qrender, vm/qeval, vm/qfuncs, the block height), through read.ts. chainFixture.ts says
 // which answers are RECORDED through gnomcp and which are READ from gno's source at v1.5.0; a title says "recorded" or "read".
@@ -151,36 +161,36 @@ describe.each(CHAINS)("the reads on %s", (chain) => {
     });
   });
 
-  describe("two panels of one view asking for a realm's functions in the same moment", () => {
-    it("share one request when they ask with the same options, and a read that has ended is asked again", async () => {
+  describe("two panels of one view asking for a realm's functions in the same moment (the query shares the request)", () => {
+    it("share one request, and one read that has ended is kept for fifteen seconds", async () => {
       const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
-      const shared = options(fetcher);
+      const client = makeQueryClient();
       const [names, params] = await Promise.all([
-        readFunctions(rpc, WUGNOT, shared),
-        readCallable(rpc, WUGNOT, shared),
+        client.query(realmFunctions(rpc, WUGNOT, options(fetcher))).then(toFunctions),
+        client.query(realmFunctions(rpc, WUGNOT, options(fetcher))).then(toCallable),
       ]);
       expect([names.ok, params.ok]).toEqual([true, true]);
       expect(askedOf(fetcher)).toHaveLength(1);
-      await readFunctions(rpc, WUGNOT, shared);
+      await client.query(realmFunctions(rpc, WUGNOT, options(fetcher)));
+      expect(askedOf(fetcher)).toHaveLength(1);
+    });
+
+    it("do not share one across two realms", async () => {
+      const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
+      const client = makeQueryClient();
+      await Promise.all([
+        client.query(realmFunctions(rpc, WUGNOT, options(fetcher))),
+        client.query(realmFunctions(rpc, "gno.land/r/demo/other", options(fetcher))),
+      ]);
       expect(askedOf(fetcher)).toHaveLength(2);
     });
 
-    it("do not share one with options of another read, nor across two realms", async () => {
+    it("throw for a name that is no realm's, and keep nothing of it", async () => {
       const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
-      await Promise.all([
-        readFunctions(rpc, WUGNOT, options(fetcher)),
-        readFunctions(rpc, WUGNOT, options(fetcher)),
-        readFunctions(rpc, "gno.land/r/demo/other", options(fetcher)),
-      ]);
-      expect(askedOf(fetcher)).toHaveLength(3);
-    });
-
-    it("share one request when no options are given, as the page asks", async () => {
-      const fetcher = answering(queryEnvelope({ data: JSON.stringify(FUNCTIONS) }));
-      vi.stubGlobal("fetch", fetcher);
-      await Promise.all([readFunctions(rpc, WUGNOT), readCallable(rpc, WUGNOT)]);
-      expect(askedOf(fetcher)).toHaveLength(1);
-      vi.unstubAllGlobals();
+      const client = makeQueryClient();
+      await expect(client.query(realmFunctions(rpc, "../x", options(fetcher)))).rejects.toBeInstanceOf(Unread);
+      expect(client.getQueryData(realmFunctions(rpc, "../x").queryKey)).toBeUndefined();
+      expect(askedOf(fetcher)).toHaveLength(0);
     });
   });
 

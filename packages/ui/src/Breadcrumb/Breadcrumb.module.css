@@ -42,6 +42,7 @@
 
   /* A step is a target of 24 px at least, as every control (WCAG 2.5.8); one that acts is a button of the same look. */
   .trail :is(a, .back) {
+    transition: color var(--motion-fast) var(--ease-standard);
     /* layout: a step's words centred in its 24 px target */
     display: inline-flex;
     /* layout: a step's words centred in its 24 px target */

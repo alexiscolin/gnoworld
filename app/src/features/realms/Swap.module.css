@@ -1,0 +1,10 @@
+/* A changed text fades in where it stands (the motion tokens are 0 under reduced motion). */
+@layer components {
+  .swap {
+    transition: opacity var(--motion-slow) var(--ease-standard);
+
+    @starting-style {
+      opacity: 0;
+    }
+  }
+}

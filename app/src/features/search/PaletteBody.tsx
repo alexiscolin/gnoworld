@@ -8,6 +8,7 @@ import { parseQuery } from "./match.ts";
 import { PaletteLeft } from "./PaletteLeft.tsx";
 import { PlacePreview } from "./PlacePreview.tsx";
 import { PlaceResults } from "./PlaceResults.tsx";
+import appear from "../../enter.module.css";
 import styles from "./SearchDialog.module.css";
 import type { SearchItem } from "./types.ts";
 import type { usePalette } from "./usePalette.ts";
@@ -67,7 +68,7 @@ export function TypedSheet({
 }) {
   const { chosen, flat, active, choose } = palette;
   return (
-    <div className={styles["body"]}>
+    <div className={[styles["body"], appear["enter"]].join(" ")}>
       <PaletteLeft palette={palette}>
         {flat.length === 0 ? (
           <Empty query={palette.query} />

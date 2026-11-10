@@ -14,9 +14,9 @@ export function Pills({ lede }: { lede: PlateModel["lede"] }) {
     <div className={styles["pills"]}>
       <Cluster space="2xs" wrap="no">
         {rank === undefined ? null : (
-          <span className={styles["pill"]}>
+          <span className={styles["pill"]} title={rank.among}>
             <Chip tone="signal" strong>
-              {rank}
+              {rank.label}
             </Chip>
           </span>
         )}
@@ -32,16 +32,38 @@ export function Pills({ lede }: { lede: PlateModel["lede"] }) {
   );
 }
 
+// The sentence under the title: its words, or while it is read the room of its two lines, so it never pushes what is under it when it comes.
+function Sentence({ lede }: Pick<PlateModel, "lede">) {
+  if (lede.sentence !== undefined)
+    return (
+      <div className={styles["sentence"]}>
+        <Panel.Lede>{lede.sentence}</Panel.Lede>
+      </div>
+    );
+  if (lede.pending !== true) return null;
+  return (
+    <Panel.Lede>
+      <span className={styles["room"]} aria-hidden="true">
+        {"\u00a0"}
+        <br />
+        {"\u00a0"}
+      </span>
+    </Panel.Lede>
+  );
+}
+
 export function Hero({ lede, actions, talk }: Pick<PlateModel, "lede" | "actions" | "talk">) {
   return (
     <Stack space="s">
-      {lede.sentence === undefined ? null : <Panel.Lede>{lede.sentence}</Panel.Lede>}
-      <Stack space="m">
-        <div className={styles["acts"]}>
-          <Actions {...actions} />
-        </div>
-        {talk === undefined ? null : <TalkBar {...talk} />}
-      </Stack>
+      <Sentence lede={lede} />
+      <div className={styles["buttons"]}>
+        <Stack space="m">
+          <div className={styles["acts"]}>
+            <Actions {...actions} />
+          </div>
+          {talk === undefined ? null : <TalkBar {...talk} />}
+        </Stack>
+      </div>
     </Stack>
   );
 }

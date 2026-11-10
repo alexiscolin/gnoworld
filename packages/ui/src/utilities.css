@@ -206,6 +206,46 @@
     align-items: center;
   }
 
+  /* A row of a list a click opens (Around it, the Proposals card): its parts a step apart, a line high, the pointer lighting it. */
+  .list-row {
+    /* layout: the lead, the words and the trailing part a step apart */
+    gap: var(--space-s);
+    inline-size: 100%;
+    min-block-size: var(--row-h);
+    color: inherit;
+    font: var(--font-meta);
+    text-align: start;
+  }
+
+  .list-row[data-link] {
+    cursor: pointer;
+    transition: background-color var(--motion-fast) var(--ease-standard);
+  }
+
+  .list-row[data-link]:hover {
+    background: var(--color-fill);
+  }
+
+  /* A definition's value, the margin the browser gives it taken off: a fact of a card. */
+  .fact-value {
+    margin: 0;
+    min-inline-size: 0;
+  }
+
+  /* A code word in the interface's mono, with no box of its own (a number in a row). */
+  .plain-code {
+    padding: 0;
+    background: none;
+    font: var(--font-mono-ui);
+  }
+
+  /* The words and a trailing part on one row, the words taking what the trailing part leaves: a row with no lead. */
+  .text-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
   /* One box whose content sits in its middle: a round button's arrow. */
   .grid-center {
     display: grid;

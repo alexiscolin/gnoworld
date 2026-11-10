@@ -1,4 +1,5 @@
 // The plate's figures every kind shares (D530): who is here, as the standing's hero, and the counts a source gave, never a zero it did not.
+import { PRESENCE_HOURS } from "@gnoworld/schemas/indexer";
 import type { Figure } from "@gnoworld/ui";
 import type { Widget } from "./model.ts";
 
@@ -20,27 +21,34 @@ export const statusOf = (here: number, calm: string): { label: string; tone: "mi
 const HOUR = 3_600_000;
 const counted = (value: number | null) =>
   value !== null && Number.isFinite(value) && value > 0 ? Math.round(value) : 0;
-const clock = (at: number) =>
-  new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+const utcClock = (at: number) =>
+  new Date(at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" });
 
-const lastHours = (hours: { hours: readonly (number | null)[] } | undefined) => hours?.hours.map(counted) ?? [];
+/** The messages of each of the last 24 hours, oldest first, from a read of them: an hour no sample read is a quiet one, and a read that holds
+ * no hour at all (a world nobody spoke in) is a day of quiet hours: a zero is a count and shows. None while no read has come. */
+export const hourCounts = (hours: { hours: readonly (number | null)[] } | undefined): number[] | undefined =>
+  hours === undefined
+    ? undefined
+    : hours.hours.length === 0
+      ? Array<number>(PRESENCE_HOURS).fill(0)
+      : hours.hours.map(counted);
 
-/** The chat kinds' band (the proposal's section 9): who is here, from how many countries, the messages of this hour and of the last 24. A count no
- * source gave is left out, never a zero. */
+/** The chat kinds' band (the proposal's section 9): who is here, from how many countries, the messages of this hour and of the last 24. A count
+ * no source gave (no read of the countries, none of the hours) is left out; a zero that was read is a value and shows. */
 export function chatFigures({
   here,
   countries,
   hours,
 }: {
   here: number;
-  countries?: number;
+  countries?: number | undefined;
   hours: { hours: readonly (number | null)[] } | undefined;
 }): Figure[] {
-  const counts = lastHours(hours);
+  const counts = hourCounts(hours) ?? [];
   const total = counts.reduce((sum, count) => sum + count, 0);
   const made: (Figure | undefined)[] = [
     hereFigure(here),
-    countries === undefined || countries === 0
+    countries === undefined
       ? undefined
       : { key: "countries", label: "Countries", value: countries, sub: "speaking now" },
     counts.length === 0
@@ -53,18 +61,38 @@ export function chatFigures({
   return made.filter((figure) => figure !== undefined);
 }
 
-/** The squares a chat's hours give a place: the messages of the day and its busiest hour; none when nothing was said. */
+/** The squares a chat's hours give a place: the messages of the day and its busiest hour (UTC, as the proposal's); a quiet day is a zero and shows.
+ * None while no read has come. */
 export function hourWidgets(hours: { from: number; hours: readonly (number | null)[] } | undefined): Widget[] {
-  const counts = hours?.hours.map(counted) ?? [];
+  const counts = hourCounts(hours);
+  if (hours === undefined || counts === undefined) return [];
   const total = counts.reduce((sum, count) => sum + count, 0);
-  if (hours === undefined || total === 0) return [];
   const peak = Math.max(...counts);
   return [
-    { label: "Messages", value: grouped(total), detail: `last ${String(counts.length)} h` },
-    {
-      label: "Busiest hour",
-      value: clock(hours.from + counts.indexOf(peak) * HOUR),
-      detail: `${grouped(peak)} messages`,
-    },
+    { label: "Messages", value: grouped(total), unit: "last 24 h", detail: "in the world's chat" },
+    peak === 0
+      ? { label: "Busiest hour", value: "None", detail: "no message in the last 24 h" }
+      : {
+          label: "Busiest hour",
+          value: utcClock(hours.from + counts.indexOf(peak) * HOUR),
+          unit: "UTC",
+          detail: `${grouped(peak)} ${noun(peak, "message", "messages")} in the last 24 h`,
+        },
   ];
+}
+
+/** The Earth's side rooms, one square: how many, the first two by name, all of them once it opens. */
+export function roomsWidget(rooms: readonly { room: string }[]): Widget[] {
+  const names = rooms.map(({ room }) => room.split("/").at(-1) ?? room);
+  return names.length === 0
+    ? []
+    : [
+        {
+          label: "Rooms around",
+          value: grouped(names.length),
+          unit: "side rooms",
+          detail: names.slice(0, 2).join(", ") + (names.length > 2 ? "\u2026" : ""),
+          more: names,
+        },
+      ];
 }

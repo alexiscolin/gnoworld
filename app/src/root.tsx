@@ -14,8 +14,9 @@ markFullEarly();
 
 export function Layout({ children }: { children: ReactNode }) {
   return (
-    // The root's marks set before React draws (fullChat.ts's data-chat): the page's own, never a mismatch to report.
-    <html lang="en" suppressHydrationWarning>
+    // The root's marks set before React draws (fullChat.ts's data-chat): the page's own, never a mismatch to report. `data-first` holds the
+    // header out of sight till the page's arrival takes it (arrival.ts).
+    <html lang="en" data-first="" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

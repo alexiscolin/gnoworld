@@ -7,7 +7,9 @@ import universes from "../../../data/universes.json" with { type: "json" };
 import { callersIn, daysSince, hubWorldOf, isFresh, type Signals } from "@gnoworld/core";
 import type { Presence } from "@gnoworld/schemas/indexer";
 import type { CosmosWorld } from "../../space/cosmosWorld.ts";
-import { pagePresenceApi } from "../../lib/api/presence.ts";
+import { resultOf } from "../../lib/query/api.ts";
+import { presenceOptions } from "../../lib/query/apiReads.ts";
+import { queryClient } from "../../lib/query/client.ts";
 import { visitedIn } from "../../lib/visits.ts";
 
 /** Who is here in a world, how many messages an hour, and their rise, as the server says them. */
@@ -50,7 +52,7 @@ export const localSignals = (now: number): WorldSignals => fromPresence({ worlds
 
 /** Who is here now; none where the server does not say. */
 export async function readSignals(): Promise<WorldSignals | undefined> {
-  const read = await pagePresenceApi().read();
+  const read = await resultOf(queryClient.query(presenceOptions));
   return read.ok ? fromPresence(read.value, Date.now()) : undefined;
 }
 

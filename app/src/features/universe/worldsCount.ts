@@ -3,7 +3,21 @@
 // Apart from the scene's chunk, so the door and the chunk it opens do not import each other.
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { readWorldsCount } from "../../lib/chain/worldsCount.ts";
+import { queryOptions } from "@tanstack/react-query";
+import { queryClient, Unread } from "../../lib/query/client.ts";
+import { keys } from "../../lib/query/keys.ts";
+import { pageFetch } from "../../lib/query/policy.ts";
 import { Heard } from "../../lib/heard.ts";
+
+const worldsCountOptions = () =>
+  queryOptions({
+    queryKey: keys.worldsCount(import.meta.env.BASE_URL),
+    queryFn: async ({ signal }) => {
+      const file = await readWorldsCount(import.meta.env.BASE_URL, { fetch: pageFetch, signal });
+      if (file === undefined) throw new Unread(undefined);
+      return file;
+    },
+  });
 
 let drawnWorlds: number | undefined;
 const counting = new Heard();
@@ -22,16 +36,16 @@ const useWorldsDrawn = (): number | undefined =>
     () => undefined,
   );
 
-// The count's read under way, whoever asked it; one that brought nothing is let go, for the next home to ask again. Out of the hook: the
-// React Compiler refuses a hook that writes a module's variable, even from its effect.
-let reading: Promise<void> | undefined;
-
+// The count's read, whoever asked it: one request while it is in flight and fresh; one that brought nothing is asked again by the next home.
 function ask(): Promise<void> {
-  reading ??= readWorldsCount(import.meta.env.BASE_URL).then((file) => {
-    if (file === undefined) reading = undefined;
-    else if (drawnWorlds === undefined) worldsDrawn(file.count);
-  });
-  return reading;
+  return queryClient.query(worldsCountOptions()).then(
+    (file) => {
+      if (drawnWorlds === undefined) worldsDrawn(file.count);
+    },
+    (error: unknown) => {
+      if (!(error instanceof Unread)) throw error;
+    },
+  );
 }
 
 /** How many worlds the cosmos draws, while `wanted`: the page reads their count once a visit, whether the scene runs or not. Nothing while it

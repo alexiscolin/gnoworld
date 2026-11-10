@@ -19,6 +19,7 @@ import {
   type Lit,
 } from "./lenses.ts";
 import { inSystem } from "./features/universe/views.ts";
+import appear from "./enter.module.css";
 import styles from "./Lenses.module.css";
 
 // How many worlds `lens` lights, of `system`'s alone where space rests at one.
@@ -48,7 +49,7 @@ function Tag({ lens, count, on, live }: { lens: LensId; count: number; on: boole
   return (
     <button
       type="button"
-      className={`inline-center pill-ends pointer ${String(styles["tag"])}`}
+      className={`inline-center pill-ends pointer ${String(styles["tag"])} ${String(appear["enter"])}`}
       aria-pressed={on}
       onClick={() => {
         pickLens(on ? undefined : lens);

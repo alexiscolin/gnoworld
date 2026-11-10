@@ -1,0 +1,16 @@
+/* The Proposals card's rows (the proposal's .rc): the number in the world's light, a link over the whole row. */
+@layer components {
+  .row {
+    position: relative;
+  }
+
+  .row code {
+    color: var(--world-light);
+  }
+
+  .cover {
+    /* layout: the link's box is the whole row's */
+    position: absolute;
+    inset: 0;
+  }
+}

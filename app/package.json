@@ -10,6 +10,7 @@
     "@gnoworld/core": "workspace:*",
     "@gnoworld/schemas": "workspace:*",
     "@gnoworld/ui": "workspace:*",
+    "@tanstack/react-query": "5.107.1",
     "gsap": "3.13.0",
     "react": "19.3.1",
     "react-dom": "19.3.1",

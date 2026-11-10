@@ -3,7 +3,7 @@
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
 import { ChatLayout } from "@gnoworld/ui";
 import type { Line } from "@gnoworld/core";
-import { useRef, type ReactElement, type ReactNode } from "react";
+import { useEffect, useRef, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { PlaceButtons } from "./PlaceButtons.tsx";
@@ -12,7 +12,10 @@ import { useColumns } from "./columns.ts";
 import { chunked } from "./Failing.tsx";
 import { asksFull, FullProvider, useFull, useFullMark } from "./full.ts";
 import { useFullMove } from "./fullMove.ts";
+import { keyOf } from "./stillScreen.ts";
+import { useSwapMove } from "./swapMove.ts";
 import { FullButton } from "./FullButton.tsx";
+import { warmPictures } from "./ColumnPlanet.tsx";
 import { Info } from "./Info.tsx";
 import type { Pinned } from "./QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
@@ -118,6 +121,14 @@ function closeChat(place: ChatPlace, navigate: ReturnType<typeof useNavigate>) {
   else place.close();
 }
 
+// The screen's fade-in (ChatScreen.module.css) is its first draw's: a screen taken to another page's dock (fullHost.tsx) is drawn again by
+// the browser, and its fade would play once more over the room it holds.
+function arrived({ currentTarget, target }: SyntheticEvent<HTMLElement>) {
+  if (currentTarget !== target) return;
+  currentTarget.style.animation = "none";
+  currentTarget.style.transition = "none";
+}
+
 export function ChatScreen(props: ChatScreenProps) {
   const { place, title, chips, menu, mark, rail, unread, talking, present, here: room, people, threads } = props;
   const { status, children } = props;
@@ -127,7 +138,11 @@ export function ChatScreen(props: ChatScreenProps) {
   useFullMark(full);
   const screenRef = useRef<HTMLDivElement>(null);
   useFullMove(screenRef, full);
-  const compact = useCompact(screenRef, NARROW);
+  useSwapMove(screenRef, keyOf(place));
+  useEffect(() => {
+    warmPictures(place.worlds);
+  }, [place.worlds]);
+  const compact = useCompact(screenRef, NARROW, full);
   const navigate = useNavigate();
   const follows = useApp((state) => state.device.follows);
   const followed = worldsFollowedIn(follows, place.universe.id);
@@ -141,6 +156,9 @@ export function ChatScreen(props: ChatScreenProps) {
       <div
         ref={screenRef}
         className={styles["screen"]}
+        data-chat-screen=""
+        onAnimationEnd={arrived}
+        onTransitionEnd={arrived}
         data-full={full ? "" : undefined}
         data-compact={compact ? "" : undefined}
       >

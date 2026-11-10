@@ -70,11 +70,11 @@ describe("the hero's big number, on a planted site", () => {
 
   // ADR-0003 §3: the video's pair, "Go explore" then "Join the chat" (frame 4); "See the list" repeated the List tab. Go explore's address is
   // the Earth's, which a new tab opens; its click flies to the busiest world.
-  test("points its two actions, Go explore then Join the chat, at the universe's own Earth", async () => {
+  test("points its two actions, Go explore then Join the chat (the full chat), at the universe's own Earth", async () => {
     const html = await heroOf("lab");
     expect([...html.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)/g)].map((match) => [match[1], match[2]])).toEqual([
       ["/net/lab/earth", "Go explore"],
-      ["/net/lab/earth", "Join the chat"],
+      ["/net/lab/earth?chat=full", "Join the chat"],
     ]);
     expect(html).not.toContain("See the list");
   });

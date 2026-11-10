@@ -50,16 +50,14 @@
     font: var(--font-lead);
   }
 
-  /* The fade into space at the plate's right edge: seen only on the wide plate. */
-  .fade {
-    display: none;
-  }
-
   /* raw: the narrow plate (37.5 rem, this panel's container) */
   @container plate (max-width: 37.5rem) {
     .panel[data-look="plate"] .content {
       --plate-pad: var(--space-s);
       --plate-zone: var(--space-l);
+
+      /* the narrow plate's margin: 16 px, a card's inner margin too (the proposal's section 7) */
+      padding: var(--space-s);
     }
 
     .title h1:not(:is(dialog, [inert], article) *) {
@@ -73,6 +71,9 @@
     --world-light: color-mix(in oklab, var(--world) 62%, var(--color-text));
 
     container: plate / inline-size;
+    /* raw: the proposal's body sets it (s1.html, base); the plate's type is drawn as its pictures are */
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   /* A page's arrival (D401): GSAP plays it (the app's features/universe/arrival.ts), the plate's fill by `--plate-in`. */
@@ -95,6 +96,20 @@
     .panel[data-look="plate"] {
       /* layout: room under its last line for them */
       padding-block-end: var(--space-2xl);
+    }
+  }
+
+  /* raw: a phone's width: the plate is the page's width, no line and no corner (the proposal's data-m="phone") */
+  @media (max-width: 560px) {
+    .panel[data-look="plate"] {
+      border: 0;
+      border-radius: 0;
+      /* layout: out to the screen's edges, past the page column's gutter (shell.tsx's Center, its default step) */
+      margin-inline: calc(-1 * var(--space-s));
+    }
+
+    .panel[data-look="plate"]::before {
+      border-radius: 0;
     }
   }
 
@@ -168,7 +183,8 @@
 
     .panel[data-look="plate"] {
       block-size: 100%;
-      border: 0;
+      /* The outline above is drawn over this edge; the edge stays a line wide, as the proposal's plate (its text column sits inside it). */
+      border-color: transparent;
       border-start-end-radius: 0;
       border-end-end-radius: 0;
       /* raw: the fill's own layer holds the background now, so the words stack over it */
@@ -189,6 +205,9 @@
       background: var(--_ground);
       /* hidden where a page's canvas paints the plate's fill itself (globe.module.css); its colour stays readable for it */
       visibility: var(--plate-fill);
+      /* raw: the fill itself fades into space over the plate's last --plate-fade, never a layer over the scene, whose planet passes over
+         the plate's edge (Alexis, 2026-11-10: "la planète de ce côté doit passer au-dessus") */
+      mask-image: linear-gradient(to right, #000 calc(100% - var(--plate-fade)), transparent);
     }
 
     .panel[data-look="plate"] .content {
@@ -199,18 +218,21 @@
       padding-inline: var(--plate-inset-start) var(--plate-inset-end);
       padding-block: var(--space-xl);
     }
+  }
 
-    .fade {
-      display: block;
-      position: absolute;
-      inset-block: 0;
-      inset-inline-end: 0;
-      inline-size: var(--plate-fade);
-      /* raw: the night at 55 % over the last 64 px: the plate's fade into space */
-      background: linear-gradient(to right, transparent, color-mix(in oklab, var(--color-space) 55%, transparent));
-      pointer-events: none;
-      /* raw: over the plate's words, under the frame's outline */
-      z-index: 3;
+  /* A page loaded whole (the server's markup) paints before its code runs: its plate, frame and dock wait out of sight till the arrival (arrival.ts)
+     takes them, so nothing shows then goes, no edge before its box. `data-live` on the root says the code has taken the page. */
+  @media (prefers-reduced-motion: no-preference) {
+    :root:not([data-live]) :is(.frame, .dock, .panel[data-look="plate"]) {
+      opacity: 0;
+      /* raw: the hold's last word, 6 s, if the page's code never takes it (blocked, crashed) */
+      animation: held 0s 6s forwards;
+    }
+
+    @keyframes held {
+      to {
+        opacity: 1;
+      }
     }
   }
 }

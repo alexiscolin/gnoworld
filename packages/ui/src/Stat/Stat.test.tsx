@@ -97,6 +97,28 @@ describe("Stat", () => {
     expect(Number((drawn(container) ?? "").replaceAll(",", ""))).toBeGreaterThan(0);
   });
 
+  it("counts from the value drawn to a new one that comes after, never swapping in one frame, and lands within 0.5 s", () => {
+    motion(true);
+    const { container, rerender } = render(<Stat value={100} caption="Today" />);
+    advance(1_300);
+    expect(drawn(container)).toBe("100");
+    rerender(<Stat value={200} caption="Today" />);
+    expect(drawn(container)).toBe("100");
+    advance(200);
+    const between = Number(drawn(container));
+    expect(between > 100 && between < 200).toBe(true);
+    advance(300);
+    expect(drawn(container)).toBe("200");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stands at a new value at once under reduced motion", () => {
+    motion(false);
+    const { container, rerender } = render(<Stat value={100} caption="Today" />);
+    rerender(<Stat value={200} caption="Today" />);
+    expect(drawn(container)).toBe("200");
+  });
+
   it("stands at its value at once under reduced motion", () => {
     motion(false);
     const { container } = render(<Stat value={21480} caption="Today" />);

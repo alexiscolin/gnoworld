@@ -32,7 +32,7 @@ export function Disclosure({ lead, title, trail, size = "m", open: asked = false
     <div className={styles["disclosure"]}>
       <button
         type="button"
-        className={[styles["row"], "icon-text-meta", "pointer"].join(" ")}
+        className={[styles["row"], lead === undefined ? "text-meta" : "icon-text-meta", "pointer"].join(" ")}
         data-size={size}
         aria-expanded={open}
         aria-controls={bodyId}
@@ -40,7 +40,7 @@ export function Disclosure({ lead, title, trail, size = "m", open: asked = false
           setOpen(!open);
         }}
       >
-        <span>{lead}</span>
+        {lead === undefined ? null : <span>{lead}</span>}
         <span className="truncate">{title}</span>
         <span className={[styles["trail"], "row-center"].join(" ")}>
           {trail}

@@ -1,6 +1,7 @@
 import { hubWorldOf } from "@gnoworld/core";
 import { describe, expect, it, vi } from "vitest";
 import hubs from "../../../data/hubs.json" with { type: "json" };
+import { queryClient } from "../../lib/query/client.ts";
 import { localSignals, readSignals } from "./signals.ts";
 
 // What the server says is here, as the page asks it: the test's own answer.
@@ -12,6 +13,8 @@ vi.mock("../../lib/api/presence.ts", () => ({
 }));
 const said = async (worlds: typeof heard.worlds) => {
   heard.worlds = worlds;
+  // Each ask is the test's own: the page's kept answer of the last one would stand for fifteen seconds.
+  queryClient.clear();
   const signals = await readSignals();
   if (signals === undefined) throw new Error("the server's answer was dropped");
   return signals;

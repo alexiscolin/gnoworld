@@ -2,9 +2,11 @@
 // after it has run (its stream, its store), where render.tsx draws it once as the build does.
 import { act } from "react";
 import { createRoot } from "react-dom/client";
-import { createMemoryRouter, RouterProvider, type RouteObject } from "react-router";
+import { createMemoryRouter, Outlet, RouterProvider, type RouteObject } from "react-router";
 import { afterEach, expect, vi } from "vitest";
+import "./queries.ts";
 import { fakeStream } from "./fakeStream.ts";
+import { DockedChatHost } from "../src/features/chat/index.ts";
 import { StoreProvider } from "../src/storeContext.tsx";
 
 const leaving: (() => void)[] = [];
@@ -31,7 +33,17 @@ export function drawRoute(route: RouteObject, path: string) {
     box.remove();
   };
   leaving.push(leave);
-  const router = createMemoryRouter([route], { initialEntries: [path] });
+  // The shell's one docked chat (shell.tsx) stands over the route, as it does in the page.
+  const shell = {
+    element: (
+      <>
+        <DockedChatHost />
+        <Outlet />
+      </>
+    ),
+    children: [route],
+  };
+  const router = createMemoryRouter([shell], { initialEntries: [path] });
   act(() => {
     root.render(
       <StoreProvider>

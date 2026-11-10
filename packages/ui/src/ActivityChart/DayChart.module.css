@@ -10,6 +10,7 @@
     position: relative;
     inline-size: 100%;
     block-size: var(--chart-h);
+    transition: block-size var(--motion-slow) var(--ease-standard);
   }
 
   @container plate (min-width: 62.5rem) {
@@ -85,6 +86,31 @@
       animation: appear 0.5s ease calc(var(--d, 0s) + var(--pk, 0.9s)) backwards;
       animation-play-state: var(--play, running);
     }
+  }
+
+  /* A fresh read that changes a bar moves it from where it stands (its geometry is the drawing's attributes, which the browser animates as CSS);
+     the axis' lines and words and the peak's glide too. The motion tokens are 0 under reduced motion. */
+  .bar {
+    transition:
+      y var(--motion-slow) var(--ease-standard),
+      height var(--motion-slow) var(--ease-standard);
+  }
+
+  .gl {
+    transition:
+      y1 var(--motion-slow) var(--ease-standard),
+      y2 var(--motion-slow) var(--ease-standard);
+  }
+
+  .tk {
+    transition:
+      x var(--motion-slow) var(--ease-standard),
+      y var(--motion-slow) var(--ease-standard);
+  }
+
+  /* A draw that follows its box's easing size at every frame: the geometry is set by the frame, so no glide of its own (hundreds would start again at each). */
+  .chart[data-follow] :is(.bar, .gl, .tk) {
+    transition: none;
   }
 
   @keyframes appear {

@@ -28,7 +28,7 @@ vi.mock("./space.ts", () => ({
     return () => door.heard.delete(heard);
   },
 }));
-const arrival = vi.hoisted(() => ({ enterPage: vi.fn() }));
+const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), newPage: vi.fn() }));
 vi.mock("./arrival.ts", () => arrival);
 vi.mock("./rise.ts", () => ({ ghost: vi.fn() }));
 vi.mock("../../useHere.ts", () => ({ useHere: vi.fn() }));

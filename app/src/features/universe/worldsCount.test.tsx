@@ -292,8 +292,11 @@ describe("the scene's read of the worlds' file", () => {
     const { hero, drawn, scene } = await visit();
     const leave = hero();
     expect((await scene())?.worlds).toHaveLength(4);
-    // One read for the page's life, shared by space and its rail: it carries no signal a reader could cancel it by.
-    expect(read.worlds).toHaveBeenCalledWith("/");
+    // One read for the page's life, shared by space and its rail: the query's own signal, cut only when no reader is left.
+    expect(read.worlds).toHaveBeenCalledWith("/", {
+      fetch: expect.any(Function) as unknown,
+      signal: expect.any(AbortSignal) as unknown,
+    });
     expect(drawn.at(-1)).toBe(3);
     expect(read.count, "the hero's own ask of the count file, none from the scene's read").toHaveBeenCalledTimes(1);
     leave();

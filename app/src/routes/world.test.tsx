@@ -17,8 +17,10 @@ import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
 // The page's chat is the real one, but for the test that watches the stream's way to the room: there the chat is the room's wiring alone (its
 // stream followed through useVerdicts, its thread's cards drawn from the calls the page gave), the rooms' own service being no business of it.
+// The shell's host draws it (routed.tsx), the chain's contexts given from what the page holds.
+const NO_CALLS: readonly never[] = [];
 const probing = vi.hoisted(() => ({ on: false, place: undefined as { slug: string } | undefined }));
-vi.mock(import("../features/chat/index.ts"), async (original) => {
+vi.mock(import("../features/chat/Chat.tsx"), async (original) => {
   const actual = await original();
   const Probe = () => {
     useVerdicts(useAppStore(), { room: "#govdao", lines: undefined, reader: undefined, saving: false });
@@ -35,7 +37,14 @@ vi.mock(import("../features/chat/index.ts"), async (original) => {
     ...actual,
     Chat: (props: Parameters<typeof actual.Chat>[0]) => {
       probing.place = props.place;
-      return probing.on ? <Probe /> : <actual.Chat {...props} />;
+      if (!probing.on) return <actual.Chat {...props} />;
+      return (
+        <ChainPlaceContext value={props.chain?.place}>
+          <ChainCallsContext value={props.chain?.calls ?? NO_CALLS}>
+            <Probe />
+          </ChainCallsContext>
+        </ChainPlaceContext>
+      );
     },
   };
 });

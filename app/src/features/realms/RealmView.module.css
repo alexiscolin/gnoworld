@@ -1,31 +1,51 @@
 /* A realm's page in its plate: the window it scrolls in, the page's look in it (the proposal's .md), and the boxes of Try it. */
 @layer components {
-  /* The page's window: a fixed height, taller on a wide plate or once the card is expanded, shorter on a narrow one; its foot fades into the card
-     till it is scrolled to the end, and a wheel at either end goes on to the plate (RealmView.tsx). */
+  /* The page's window: as tall as its page, up to a height that is taller on a wide plate or once the card is expanded, shorter on a narrow one
+     (Alexis, 2026-11-10: a short page leaves no empty window); past it, its foot fades into the card till it is scrolled to the end, and a
+     wheel at either end goes on to the plate (RealmPageCard.tsx). */
   .window {
-    block-size: var(--web-h);
+    max-block-size: var(--web-h);
     overflow: auto;
   }
 
-  .window:not([data-end]) {
-    /* raw: the last 32 px fade into the card, the same mask the app's scroll rows use */
-    mask-image: linear-gradient(to bottom, #000 calc(100% - 32px), transparent);
+  .window {
+    transition: max-block-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* The foot's fade: a strip stuck to the window's foot, into the hub card's fill, that eases to nothing
+     as the page is scrolled to its end. */
+  .window::after {
+    content: "";
+    position: sticky;
+    inset-block-end: 0;
+    display: block;
+    /* raw: the last 32 px fade into the card, the same length as the app's scroll rows */
+    block-size: 2rem;
+    /* layout: the strip lies over the foot of the page, taking no room */
+    margin-block-start: -2rem;
+    background: linear-gradient(to bottom, transparent, var(--color-card));
+    pointer-events: none;
+    transition: opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .window[data-end]::after {
+    opacity: 0;
   }
 
   @container plate (min-width: 62.5rem) {
     .window {
-      block-size: var(--web-h-l);
+      max-block-size: var(--web-h-l);
     }
   }
 
   @container plate (max-width: 37.5rem) {
     .window {
-      block-size: var(--web-h-s);
+      max-block-size: var(--web-h-s);
     }
   }
 
   .window[data-open] {
-    block-size: var(--web-h-l);
+    max-block-size: var(--web-h-l);
   }
 
   /* The page's own blocks, in the proposal's reading type: a column at 14 px over 1.65, titles that step down, links in the world's light, the
@@ -56,15 +76,14 @@
     font: 600 0.9375rem/1.3 var(--family-sans);
   }
 
-  /* The proposal's air above a title (32 and 24) less the page's own 16 step. */
-  .window article > h2:not(:first-child) {
-    /* layout: the proposal's 32 px above a section title, less the page's own 16 px step */
-    margin-block-start: calc(var(--space-l) - var(--space-s));
+  .window article > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
+    /* layout: the proposal puts every title one 16 px step under what comes before, no air of its own (RealmBlocks gives the chat's) */
+    margin-block-start: 0;
   }
 
-  .window article > h3:not(:first-child) {
-    /* layout: the proposal's 24 px above a sub-section title, less the page's own 16 px step */
-    margin-block-start: calc(var(--space-m) - var(--space-s));
+  .window article :is(ul, ol) {
+    /* layout: the proposal's lists sit in the page's 16 px step like any block */
+    margin-block: 0;
   }
 
   .window article :is(li + li, aside p + p) {

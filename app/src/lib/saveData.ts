@@ -9,3 +9,13 @@ export function savesData(): boolean {
   const link: unknown = Reflect.get(connection, "effectiveType");
   return Reflect.get(connection, "saveData") === true || link === "2g" || link === "slow-2g";
 }
+
+/** Whether the link is a fast one, where the browser says (the Network Information API's effectiveType; Wi-Fi or 4G): what is asked ahead of a
+ * click, in a batch, waits for one. A browser that does not say is taken as fast; a reader who saves data never is. */
+export function fastLink(): boolean {
+  if (savesData()) return false;
+  const connection: unknown = typeof navigator === "undefined" ? undefined : Reflect.get(navigator, "connection");
+  if (typeof connection !== "object" || connection === null) return true;
+  const link: unknown = Reflect.get(connection, "effectiveType");
+  return link === undefined || link === "4g";
+}

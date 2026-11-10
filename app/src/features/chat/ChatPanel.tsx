@@ -8,33 +8,25 @@ import type { RoomList } from "@gnoworld/schemas";
 import { Button, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
-import { pageLoginApi } from "../../lib/api/login.ts";
-import { pageDmPrefs } from "../../lib/dms/page.ts";
-import { pageDrafts } from "../../lib/drafts/page.ts";
-import { pageKeep } from "../../lib/keep/page.ts";
-import { pageNoticePrefs } from "../../lib/notices/page.ts";
-import { pageRoomsApi } from "../../lib/api/rooms.ts";
-import { drawGuestNick } from "../../lib/ergo/ergo.ts";
-import { pageErgo } from "../../lib/ergo/page.ts";
+import { useQuery } from "@tanstack/react-query";
+import { roomsOptions } from "../../lib/query/apiReads.ts";
+import { queryClient } from "../../lib/query/client.ts";
+import { keys } from "../../lib/query/keys.ts";
 import { savesData } from "../../lib/saveData.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
-import { chatLink, type ChatLink } from "./link.ts";
+import type { ChatLink } from "./link.ts";
+import { dropLink, takeLink } from "./pageLink.ts";
 import { GuestLoaded } from "./GuestLoaded.tsx";
 import { LOADING } from "./Loading.tsx";
-import { groupRooms, roomIds, roomsQuery, shownRoom } from "./names.ts";
+import { groupRooms, roomIds, roomsQuery } from "./names.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
-import { keepListed, listedBefore, watchRoomsChanged } from "./roomsListed.ts";
+import { watchRoomsChanged } from "./roomsListed.ts";
+import { useDrawn } from "./useDrawn.ts";
 import { useOnHide } from "./useOnHide.ts";
 import { useVerdicts } from "./useVerdicts.ts";
 
 // An account's chat, its code asked once the session is an account's (the first screen's budget, ADR-0001 §12).
 const AccountChat = lazy(async () => ({ default: (await import("./AccountChat.tsx")).AccountChat }));
-
-// The rooms as last asked, and what came: undefined when the list could not load.
-interface Asked {
-  query: string;
-  sections: RoomList["sections"] | undefined;
-}
 
 // What says the rooms could not load, and asks again.
 function RoomsFailed({ onRetry }: { onRetry: () => void }) {
@@ -46,63 +38,29 @@ function RoomsFailed({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device (its direct
-// messages' choices and drafts, its saved lines and places).
-const pageLink = (store: ReturnType<typeof useAppStore>) =>
-  chatLink({
-    store,
-    connect: pageErgo,
-    ticket: pageLoginApi().ticket,
-    guest: drawGuestNick,
-    device: (account) => ({
-      prefs: pageDmPrefs(account),
-      drafts: pageDrafts(account),
-      notices: pageNoticePrefs(account),
-    }),
-    keep: pageKeep,
-    // What the link does for an account alone, asked as an account connects (the first screen's budget, ADR-0001 §12).
-    loadKit: async () => (await import("./accountKit.ts")).makeKit,
-  });
-
-// The rooms as the server lists them for `query`, asked again as it changes; none before the first answer.
+// The rooms as the server lists them for `query`, asked again as it changes; none before the first answer. A world listed before shows its rooms at
+// once, the new list replacing them when it comes; a fresh list that failed leaves the one shown (roomsListed.ts).
 function useRoomsAsked(store: ReturnType<typeof useAppStore>, world: string, query: string | undefined) {
-  const [asked, setAsked] = useState<Asked>();
+  const { data, isError } = useQuery(
+    { ...roomsOptions(world, query ?? ""), enabled: query !== undefined },
+    queryClient,
+  );
   // A room made on the page: the list is asked again behind the one shown, which stays until the new one comes.
-  const [again, setAgain] = useState(0);
   useEffect(
     () =>
       watchRoomsChanged(() => {
-        setAgain((n) => n + 1);
+        if (query !== undefined)
+          queryClient.invalidateQueries({ queryKey: keys.rooms(query) }).catch((error: unknown) => {
+            reportError(error);
+          });
       }),
-    [],
+    [query],
   );
+  const sections = data?.sections;
   useEffect(() => {
-    if (query === undefined) return;
-    let live = true;
-    const settle = (sections: Asked["sections"]) => {
-      if (!live) return;
-      if (sections !== undefined) keepListed(query, sections);
-      setAsked({ query, sections });
-      store.getState().chatActions.listed(sections);
-    };
-    pageRoomsApi()
-      .rooms(world)
-      .then(
-        (got) => {
-          settle(got.ok ? got.value.sections : undefined);
-        },
-        () => {
-          settle(undefined);
-        },
-      );
-    return () => {
-      live = false;
-    };
-  }, [store, world, query, again]);
-  // A world listed before shows its rooms at once, the new list replacing them when it comes (roomsListed.ts).
-  if (query !== undefined && asked?.query === query) return { loaded: true, sections: asked.sections };
-  const before = listedBefore(query);
-  return { loaded: before !== undefined, sections: before };
+    if (query !== undefined && (sections !== undefined || isError)) store.getState().chatActions.listed(sections);
+  }, [store, query, sections, isError]);
+  return { loaded: sections !== undefined || (query !== undefined && isError), sections };
 }
 
 // The shown room's verdicts, which a link's player waits on, followed and asked for the reader; and whether the reader
@@ -144,14 +102,12 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
   const session = useApp(({ login }) => login.session);
   const query = roomsQuery(world, session, attempt);
   useEffect(() => {
-    const made = pageLink(store);
-    linkRef.current = made;
-    return () => {
-      made.stop();
-    };
+    linkRef.current = takeLink(store);
+    return dropLink;
   }, [store]);
-  const { loaded, sections } = useRoomsAsked(store, world, query);
-  const current = sections === undefined ? undefined : shownRoom(world, sections, room ?? params.get("room"));
+  const asked = useRoomsAsked(store, world, query);
+  const { shown, loaded } = useDrawn(asked, { world, place, room: room ?? params.get("room") });
+  const { sections, current } = shown;
   // The page hidden: the reading places waiting their 2 s go at once (F940).
   useOnHide(() => {
     linkRef.current?.flush();
@@ -177,7 +133,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
       <Suspense fallback={LOADING}>
         <AccountChat
           loaded={loaded}
-          world={world}
+          world={shown.world}
           sections={sections}
           dm={params.get("dm")}
           current={current}
@@ -193,7 +149,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
           }}
           sayTo={(partner, say, tags) => linkRef.current?.sayTo(partner, say, tags) ?? false}
           failed={failed}
-          place={place}
+          place={shown.place}
         />
       </Suspense>
     );
@@ -212,7 +168,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
       link={linkRef}
       dismissed={dismissed}
       asksDm={params.get("dm") !== null}
-      place={place}
+      place={shown.place}
     />
   );
 }

@@ -1,7 +1,10 @@
 // One call of the last calls (the proposal's .rc row): the function in the world's light, who called it, when; a click opens its facts in place
-// (the design system's Disclosure, the plate's rows).
-import { Disclosure, Stack } from "@gnoworld/ui";
+// as the proposal's call card (the design system's Disclosure, the plate's rows): the labels and their values, the caller's face and full address,
+// the time read in words, the result as a chip.
+import type { ReactNode } from "react";
+import { Avatar, Chip, Cluster, Disclosure, Grid, Stack } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
+import { Fact } from "../../features/calls/index.ts";
 import { dayLabel } from "./days.ts";
 import { grouped } from "./figures.ts";
 import { callerName } from "./names.ts";
@@ -19,18 +22,37 @@ function when(time: string | null, height: number): string {
   return `${dayLabel(time.slice(0, 10))}, ${time.slice(11, 16)} UTC`;
 }
 
-export function CallRow({ call, worlds }: { call: Call; worlds: Worlds["worlds"] | undefined }) {
+// "Oct 24, 2026, 09:36 UTC": the moment in words, to the minute.
+const readable = (time: string) => `${dayLabel(time.slice(0, 10))}, ${time.slice(0, 4)}, ${time.slice(11, 16)} UTC`;
+
+// A fact of the card, in a grid of its own: its label, then its value.
+const Line = ({ label, children }: { label: string; children: ReactNode }) => (
+  <Grid template="label-value" space="s">
+    <Fact label={label}>{children}</Fact>
+  </Grid>
+);
+
+export function CallRow({
+  call,
+  worlds,
+  universe,
+}: {
+  call: Call;
+  worlds: Worlds["worlds"] | undefined;
+  /** The chain's name, for the card's label. */
+  universe: string;
+}) {
   const { func, caller, height, success, time } = call;
-  const exact = time === null ? `block ${grouped(height)}` : `${time.slice(0, 10)} ${time.slice(11, 19)} UTC`;
+  const who = callerName(worlds, caller);
   return (
     <div className={styles["call"]}>
       <Disclosure
-        size="s"
+        size="m"
         title={
-          <>
-            <span className={styles["func"]}>{func ?? "unknown function"}</span>{" "}
-            <span className={styles["who"]}>{callerName(worlds, caller)}</span>
-          </>
+          <Cluster space="xs" align="baseline" wrap="no">
+            <span className={styles["func"]}>{func ?? "unknown function"}</span>
+            <span className={["truncate", styles["who"]].join(" ")}>{who}</span>
+          </Cluster>
         }
         trail={
           <span className={styles["when"]}>
@@ -39,12 +61,35 @@ export function CallRow({ call, worlds }: { call: Call; worlds: Worlds["worlds"]
           </span>
         }
       >
-        <Stack space="2xs">
-          <span className={styles["fact"]}>{`function: ${func ?? "unknown"}`}</span>
-          <span className={styles["fact"]}>{`caller: ${caller ?? "unknown"}`}</span>
-          <span className={styles["fact"]}>{`time: ${exact}`}</span>
-          <span className={styles["fact"]}>{`result: ${success ? "succeeded" : "failed"} (indexer)`}</span>
-        </Stack>
+        <div className={styles["card"]}>
+          <div className={styles["inside"]}>
+            <Stack space="s">
+              <span className="label">{`Call · ${universe}`}</span>
+              <h5 className={styles["name"]}>{func ?? "Unknown function"}</h5>
+              <Stack as="dl" space="xs">
+                <Line label="Function">{func ?? "unknown"}</Line>
+                <Line label="Caller">
+                  {caller === null ? (
+                    "unknown"
+                  ) : (
+                    <Stack space="3xs">
+                      <Cluster space="xs" wrap="no">
+                        <Avatar address={caller} name={who} size="s" decorative />
+                        <span>{who}</span>
+                      </Cluster>
+                      <span className={styles["address"]}>{caller}</span>
+                    </Stack>
+                  )}
+                </Line>
+                <Line label="Time">{time === null ? "not read" : readable(time)}</Line>
+                <Line label="Block">{grouped(height)}</Line>
+                <Line label="Result">
+                  <Chip tone={success ? "mine" : "danger"}>{success ? "Succeeded" : "Failed"}</Chip>
+                </Line>
+              </Stack>
+            </Stack>
+          </div>
+        </div>
       </Disclosure>
     </div>
   );

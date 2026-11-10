@@ -15,6 +15,10 @@ import type { Realm } from "../../features/realms/useRealm.ts";
 export interface Widget {
   label: string;
   value: string;
+  /** Small beside the value ("block", "GNOT"). */
+  unit?: string;
+  /** An address whose face stands before the value (the author). */
+  face?: string;
   /** Under the value, in the label's style. */
   detail?: string;
   /** Lines that open under the value: its imports, its functions. A square without any has no Expand. */
@@ -34,9 +38,12 @@ interface RealmPart {
 export interface PlateModel {
   /** Under the title: a sentence of the place's own words; at the kicker's row, whether it lives and its rank. */
   lede: {
-    sentence?: string | undefined;
+    sentence?: ReactNode;
+    /** The sentence is still being read: its line's room is kept, so it never pushes what is under it when it comes. */
+    pending?: boolean;
     status?: { label: string; tone: "mine" | "warm" | "neutral" } | undefined;
-    rank?: string | undefined;
+    /** The rank's words, and what it ranks among (the pill's hint, the proposal's title). */
+    rank?: { label: string; among: string } | undefined;
   };
   actions: ActionsProps;
   /** The talk bar: what to call the place, and its room's id in the chat. */

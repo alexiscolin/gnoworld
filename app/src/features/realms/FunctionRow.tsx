@@ -1,6 +1,7 @@
 // One function of a realm as a row that opens in place (the proposal's .fn): its name in the mono with its calls and a chevron, and under it,
 // once opened, what it does: its Read or Call button and what that opens (a result, a call card). The list of read functions and the list of
 // write functions share it. The body is always drawn and held shut, so it grows (a grid row from 0 to its height) and a button in it is found by a test.
+import { realmType } from "@gnoworld/core";
 import { Button, Chip, Cluster, Disclosure, Skeleton, Stack } from "@gnoworld/ui";
 import { createContext, use, type ReactNode } from "react";
 import styles from "./RealmFunctions.module.css";
@@ -10,19 +11,25 @@ export const CallCountsContext = createContext<ReadonlyMap<string, number>>(new 
 
 export interface FunctionRowProps {
   name: string;
+  /** Its arguments, shown after the name as the signature; a read takes none. */
+  params?: readonly { Name: string; Type: string }[];
   /** Open from the start, or opened from outside (the Start here button). */
   open?: boolean;
   /** What the row opens under it. */
   children: ReactNode;
 }
 
-export function FunctionRow({ name, open, children }: FunctionRowProps) {
+const NO_PARAMS: readonly { Name: string; Type: string }[] = [];
+
+export function FunctionRow({ name, params = NO_PARAMS, open, children }: FunctionRowProps) {
   const calls = use(CallCountsContext).get(name);
+  const signature = `${name}(${params.map(({ Name, Type }) => `${Name} ${Type === realmType() ? "realm" : Type}`).join(", ")})`;
   return (
     <Disclosure
+      lead={null}
       title={
-        <code className={styles["code"]} title={name}>
-          {name}
+        <code className={styles["code"]} title={signature}>
+          {signature}
         </code>
       }
       trail={

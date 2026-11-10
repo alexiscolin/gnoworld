@@ -16,6 +16,11 @@
     max-inline-size: 100%;
   }
 
+  /* Held to its column: started at its start, a long name's own width would run under the chevron rather than end in its ellipsis. */
+  .trigger > :first-child {
+    max-inline-size: 100%;
+  }
+
   /* The place and the room in one row on the messages' edge, the row giving way before the controls. */
   .where {
     /* layout: one row that never wraps, each name shrinking to its ellipsis (the truncate utility on each) */

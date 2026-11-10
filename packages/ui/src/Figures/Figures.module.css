@@ -19,11 +19,6 @@
     .cell:nth-child(odd)::before {
       display: none;
     }
-
-    .value {
-      /* raw: the proposal's narrow figure, 30 px */
-      font-size: 1.875rem;
-    }
   }
 
   .label {
@@ -40,6 +35,14 @@
 
   .value[data-dim] {
     color: var(--color-text-faint);
+  }
+
+  /* After the figure's own font: a narrow plate's value is 30 px. */
+  @container plate (max-width: 37.5rem) {
+    .value {
+      /* raw: the proposal's narrow figure, 30 px */
+      font-size: 1.875rem;
+    }
   }
 
   .value small {

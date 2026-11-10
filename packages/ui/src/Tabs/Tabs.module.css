@@ -40,6 +40,8 @@
     --_font: var(--font-chip);
 
     min-inline-size: 0;
+    /* The proposal's segment draws no edge: its pill is as wide as its words and 12 px each side. */
+    border-width: 0;
   }
 
   .tab:hover {
@@ -60,6 +62,12 @@
   .tab[aria-selected="true"] .count {
     background: var(--color-ink);
     color: var(--color-primary);
+  }
+
+  /* The proposal's count follows its word by a space, not a control's gap. */
+  .tabs .tab:has(.figure) {
+    /* layout: the count follows its word by a space */
+    gap: var(--space-3xs);
   }
 
   /* A count as a plain figure: the data type, a little quieter than the words. */

@@ -12,11 +12,47 @@
   @container plate (max-width: 37.5rem) {
     .pills {
       position: static;
+      /* layout: the step to the lede, 16 px as every step inside the top */
+      margin-block-end: var(--space-s);
+    }
+
+    /* Under the title the status comes first, then the rank (the proposal's phone), each chip whole: the row wraps, never a chip. */
+    .pills > div {
+      /* layout: the proposal's phone order */
+      flex-flow: row-reverse wrap;
+      /* layout: packed to the start of the row */
+      justify-content: flex-end;
+    }
+
+    .pill {
+      white-space: nowrap;
+    }
+
+    /* Follow and Share stand at the kicker's row, to the right, as the pills do wide (the proposal's phone, s3b.js topr). */
+    .acts > div > :nth-last-child(-n + 2) {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+    }
+
+    /* each wrapped in its tooltip's anchor, the control inside is 32 px */
+    .acts > div > :nth-last-child(-n + 2) > :is(button, a) {
+      --_h: var(--control-s);
+    }
+
+    .acts > div > :nth-last-child(2) {
+      inset-inline-end: calc(var(--control-s) + var(--space-2xs));
     }
   }
 
   .pill {
     display: inline-block;
+  }
+
+  /* The plate's buttons with words sit 20 px in (a square one has no padding). */
+  .buttons a {
+    /* raw: the proposal's own value, s1.html .button */
+    --_pad: 20px;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -56,6 +92,22 @@
       opacity: 0;
       /* raw: the proposal's score */
       transform: translateY(8px);
+    }
+  }
+
+  /* The sentence still being read keeps its two lines' room (the lede's own font), so it never pushes what is under it. */
+  .room {
+    visibility: hidden;
+  }
+
+  /* A sentence that comes after the plate fades in where its room was kept. */
+  .sentence {
+    animation: sentence-in var(--motion-slow) var(--ease-emphasized) backwards;
+  }
+
+  @keyframes sentence-in {
+    from {
+      opacity: 0;
     }
   }
 }

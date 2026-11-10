@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useLayoutEffect } from "react";
 import { Stack } from "../compositions/index.ts";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import styles from "./Panel.module.css";
@@ -43,7 +43,6 @@ export function Panel({ label, look = "docked", caption, children }: PanelProps)
       <div className={styles["content"]} data-content="">
         <Stack space="m">{children}</Stack>
       </div>
-      {look === "plate" ? <div className={styles["fade"]} aria-hidden="true" /> : null}
     </section>
   );
 }
@@ -93,6 +92,10 @@ interface LayoutProps {
 /** A world's page: the plate and what stands beside it. On a wide screen the plate is fixed at the left, inside one outline
  * the scene and the dock share; under that width it is a block in the page. The width is this sheet's alone. */
 function Layout({ plate, children }: LayoutProps) {
+  // The page's code has it: what its server markup held out of sight (Panel.module.css) the arrival moves from here, in the same frame.
+  useLayoutEffect(() => {
+    document.documentElement.dataset["live"] = "";
+  }, []);
   return (
     <div>
       <div className={styles["frame"]} aria-hidden="true" data-frame="" />

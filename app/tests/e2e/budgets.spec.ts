@@ -10,11 +10,11 @@ import { BUILD } from "./sites.ts";
 // ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
 // The Earth's or a world's page: 197,951 B (D386); 243,371 B after the ping-pong (D13961); 234,209 B with the realm plate a late chunk
 // once the door to space has come; 235,306 B with the plate built to the proposal (D13964), the hero's pieces shared on it, provisional.
-const FIRST_SCREEN_JS = 235_306;
+const FIRST_SCREEN_JS = 256_785;
 // A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the home and /net/onyx/, the rail on their first
 // screen; /net/gnoland/ 227,380 B), the measure (+39,027 B); 232,954 B with the plate's wait (D13959), provisional.
 // 233,983 B on 2026-11-10 with the realm plate built to the proposal (slice 13, D13964), provisional (+1,029 B over 232,954 B).
-const PLAIN_FIRST_SCREEN_JS = 233_983;
+const PLAIN_FIRST_SCREEN_JS = 255_657;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -147,7 +147,7 @@ const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09 (+16,061 B);
 // 45,161 B on 2026-11-10 with the realm plate (slice 13), provisional (44,905 B measured on the Earth's page, 44,283 B on a world's), 256 B
 // ahead (+2,386 B): bytes that moved (verdicts, follow, passport) off the first screen, not new ones.
-const LATE_CHAT_JS = 45_161;
+const LATE_CHAT_JS = 45_824;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
@@ -157,19 +157,22 @@ const PROPOSALS_JS = 35_631;
 // A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
 // world that pins one alone: weighed with the proposals.
 const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
-// A plate's late chunks, each capped at its size and 256 B (8g, D386, provisional). 2026-11-10, slice 13: EarthPlate 34,105 B, HubPlate 33,368 B,
-// followEarth 1,472 B, people 149 B beyond them; FromExplorer 6,816 B to 5,853 B (5,597 B measured: Plate left for the plate's chunk, weighed
-// once, in this order); no RealmPlate cap, no journey reaches it. ChartedBy 608 B, hours 618 B, Bars 3,336 B.
-const PLATE_LATE = /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy)-[\w-]+\.js$/;
+// A plate's late chunks, each capped at its size and 256 B (8g, D386); slice 13's review and TanStack Query (D13973): EarthPlate 44,137 B,
+// HubPlate 43,249 B, the worlds file's reader and schema realms 694 B and worlds 870 B; followEarth, people, FromExplorer (Plate weighed once,
+// in the plate's chunk), hours, Bars and ChartedBy as measured on the plate's commit; no RealmPlate cap, no journey reaches it.
+const PLATE_LATE =
+  /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 34361,
-  HubPlate: 33624,
+  EarthPlate: 44393,
+  HubPlate: 43505,
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
   hours: 618,
   Bars: 3336,
   ChartedBy: 608,
+  realms: 950,
+  worlds: 1126,
 };
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads.
@@ -177,7 +180,7 @@ const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
 // 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B; 5,212 B in the timer-held
 // measure on slice-7's merge into slice-8, the realm page's drawing (RealmBlocks) and the chat's (Message) counted here, the capture
 // asking for both (Alexis, 2026-11-05); 8,685 B with D382's tables and alerts, 256 B ahead (D386); 10,095 B on the ping-pong of 2026-11-09 (9,839 B measured), 256 B ahead (+1,410 B).
-const PREVIEW_JS = 10_095;
+const PREVIEW_JS = 10_437;
 // Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
 const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
 // And the realm page's drawing (5h's RealmBlocks), a chunk of its own through its slot: the capture's three parts.

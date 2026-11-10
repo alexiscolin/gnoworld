@@ -1,0 +1,11 @@
+/* The plate's own placing: what a kind adds between its chart and its cards stands across the twelve columns, and takes no row, so no step, when it draws nothing. */
+@layer components {
+  .extras {
+    /* layout: across the twelve columns */
+    grid-column: 1 / -1;
+  }
+
+  .extras:not(:has(> * > *)) {
+    display: none;
+  }
+}

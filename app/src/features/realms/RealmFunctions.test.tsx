@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { queryClient } from "../../lib/query/client.ts";
 import fc from "fast-check";
 import { act } from "react";
 import { describe, expect, test, vi } from "vitest";
@@ -392,6 +393,8 @@ describe("a name from qfuncs", () => {
     let called = 0;
     await fc.assert(
       fc.asyncProperty(answers, async (list) => {
+        // A run's reads are its own: the held list of the last run would answer this one.
+        queryClient.clear();
         const fetcher = chain({ functions: list.map(reader), evals: {} });
         const box = await panel(fetcher);
         const buttons = all(region(box), "button").filter((b) => b.textContent.startsWith("Read "));

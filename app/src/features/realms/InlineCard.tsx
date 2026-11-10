@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { StoreApi } from "zustand/vanilla";
 import { CallCard, callsIn, ensureCalls, feeText, signInPage } from "../calls/index.ts";
 import type { CallCard as CallCardState } from "../../lib/calls.ts";
+import { askFor } from "../../pageAsks.ts";
 import type { AppState } from "../../store/index.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import type { Callable } from "./useCallable.ts";
@@ -64,6 +65,7 @@ function OpenCard({ card, place, level, title }: { card: CallCardState; place: C
       })
       .catch(report);
   }, [chain.indexer, realm, func, options]);
+  const signedIn = useApp((state) => state.login.session.kind === "in");
   const { callsActions } = ensureCalls(store).getState();
   const { name, chainId, rpc } = chain;
   return (
@@ -71,6 +73,12 @@ function OpenCard({ card, place, level, title }: { card: CallCardState; place: C
       card={card}
       level={level}
       title={title}
+      login={{
+        signedIn,
+        onLogIn: () => {
+          askFor("log-in");
+        },
+      }}
       network={{ name, chainId }}
       fee={feeText(fees)}
       onEdit={(index, text) => {

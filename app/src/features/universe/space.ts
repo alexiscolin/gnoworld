@@ -13,6 +13,7 @@ import { site } from "../../places.ts";
 import { motionOf } from "../../space/motion.ts";
 import { feedMoons } from "./moonRooms.ts";
 import { enterPage, landTags, waitTags } from "./arrival.ts";
+import { layers } from "./firstLook.ts";
 import { attach } from "../../earthGround.ts";
 import { circleOf } from "./pageCircle.ts";
 import { gpuCanDraw } from "./gpu.ts";
@@ -81,10 +82,7 @@ function offerOf(): SceneOffer {
 function start(): void {
   if (starting) return;
   starting = true;
-  const canvas = Object.assign(document.createElement("canvas"), { className: styles["canvas"] ?? "" });
-  const labels = document.createElement("div");
-  labels.style.cssText = "position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0";
-  document.body.prepend(canvas, labels);
+  const { canvas, labels } = layers(styles["canvas"] ?? "");
   // In development a module swapped in takes its canvas and its engine with it: no second universe draws under the new one. A hot reload
   // of an engine file brings this module back without its old instance's dispose (Vite runs the accepting module's alone): that one
   // leaves first, as it starts.
@@ -165,7 +163,8 @@ function go(place: Place): void {
   if (box !== null && place.kind === "world") box.dataset[place.id === EARTH ? "earth" : "world"] = "drawn";
   else if (box !== null && place.kind === "home") box.dataset["arrival"] = "drawn";
   // A flight to a page's planet hides the page till it nears; a jump there tells it at once, as an unchanged place lets it be.
-  if (space.go(place) && (place.kind === "world" || place.kind === "home")) markFlown(true);
+  const went = space.go(place);
+  if (went && (place.kind === "world" || place.kind === "home")) markFlown(true);
   tell(place);
 }
 
@@ -186,8 +185,9 @@ export function release(): void {
   queueMicrotask(() => {
     if (!releasing || space === undefined) return;
     releasing = false;
-    space.hold(undefined);
+    // Covered first: the circle's going turns the framing, and a framing that turns in sight flies, to a flight no page waits on.
     space.covered = true;
+    space.hold(undefined);
   });
 }
 

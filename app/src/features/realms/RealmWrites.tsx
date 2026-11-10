@@ -46,7 +46,7 @@ function WriteRow({ write, open, ...place }: CallPlace & { write: Callable; open
   const store = useAppStore();
   const id = `${place.chain.chainId} ${place.realm}.${write.name}`;
   return (
-    <FunctionRow name={write.name} open={open}>
+    <FunctionRow name={write.name} params={write.params} open={open}>
       <Act
         verb="Call"
         name={write.name}
@@ -60,9 +60,9 @@ function WriteRow({ write, open, ...place }: CallPlace & { write: Callable; open
 }
 
 // A function a call cannot carry: no Call, and the realm on gnoweb, which can.
-function GnowebRow({ name, href }: { name: string; href: string | undefined }) {
+function GnowebRow({ name, params, href }: { name: string; params: Callable["params"]; href: string | undefined }) {
   return (
-    <FunctionRow name={name}>
+    <FunctionRow name={name} params={params}>
       <p className={[calm["box"], "fill-box"].join(" ")}>
         Writes to the chain: its arguments are signed on the realm's page on gnoweb.
       </p>
@@ -111,7 +111,7 @@ function Rows({
         carried(write) === true ? (
           <WriteRow write={write} open={opening === write.name} {...here} />
         ) : (
-          <GnowebRow name={write.name} href={href} />
+          <GnowebRow name={write.name} params={write.params} href={href} />
         )
       }
     />

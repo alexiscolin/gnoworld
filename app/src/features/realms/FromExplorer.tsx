@@ -56,8 +56,8 @@ function RealmCard({ found, worlds }: { found: RealmAt; worlds: Worlds["worlds"]
   const facts = read?.ok === true ? read.value : {};
   return (
     <Stack space="m">
-      <Card compact>
-        <Card.Header title={realm} kicker="Realm · from the explorer" level={2} />
+      <Card look="hub" rises>
+        <Card.Header icon="satellite" title={realm} hint="from the explorer" level={2} />
         <Card.Body>
           <Facts deployer={facts.deployer ?? held?.deployer ?? undefined} held={held} firstBlock={facts.firstBlock} />
           {/* A read that failed says nothing here: the page's one error line is the Render card's (D534). */}

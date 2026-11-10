@@ -6,9 +6,9 @@
     line-height: 1.5;
   }
 
+  /* The proposal's heading of a box is the browser's bold, in the box's own colour. */
   .box b {
-    color: var(--color-text-muted);
-    font-weight: 500;
+    font-weight: 700;
   }
 
   /* A line under a list: what it is for, in the meta type. */

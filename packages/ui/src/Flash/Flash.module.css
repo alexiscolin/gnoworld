@@ -15,6 +15,37 @@
     box-shadow: var(--shadow-float);
   }
 
+  /* In, it fades and settles 4 px down from its place, as a popover does; the top layer and display keep a leaving one drawn until it is gone. A banner is in the
+     page, not the top layer: it enters from its starting style. The leave is drawn by Flash.tsx, which keeps a copy of the pill while it fades. */
+  .flash[popover] {
+    opacity: 0;
+    translate: 0 calc(var(--space-3xs) * -1);
+    transition:
+      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      translate calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      overlay calc(var(--motion-base) * var(--motion-scale)) allow-discrete,
+      display calc(var(--motion-base) * var(--motion-scale)) allow-discrete;
+  }
+
+  .flash:popover-open {
+    opacity: 1;
+    translate: none;
+  }
+
+  .flash[data-banner] {
+    transition:
+      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      translate calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  @starting-style {
+    .flash:popover-open,
+    .flash[data-banner] {
+      opacity: 0;
+      translate: 0 calc(var(--space-3xs) * -1);
+    }
+  }
+
   /* An arrival's banner: the top centre's slot (tokens.css, --banner-top), over the scene (frames 23, 93), in the page and not
      the top layer, so a dialog's layer covers it (8j: the search drawer at 390 px); above the dock and the full chat's 3. */
   .flash[data-banner] {

@@ -10,6 +10,7 @@ import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
 import type { CallFees } from "@gnoworld/chain/fees";
 import type { readName, Named } from "../../lib/chain/names.ts";
+import { queryClient } from "../../lib/query/client.ts";
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { AccountName } from "./AccountName.tsx";
 
@@ -72,6 +73,8 @@ const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 function control(universe: typeof ONYX_UNIVERSE, answers: Answers, options: Options = {}) {
   const { wallet = recordedAdena({ account: ACCOUNT }), landing = () => ({ ok: true, value: LANDED, source }) } =
     options;
+  // A control's reads are its own: a test that mounts two (other answers) must not find the first one's names held.
+  queryClient.clear();
   const { read, asked } = options.read === undefined ? reader(answers) : { read: options.read, asked: [] };
   let store: ReturnType<typeof useAppStore> | undefined;
   let change: (next: { account?: Address; universe?: typeof ONYX_UNIVERSE }) => void = () => undefined;
@@ -127,7 +130,11 @@ function register(box: HTMLElement, typed = "alexis042") {
   typeName(box, typed);
   click(button(box, "Register · 0 GNOT"));
 }
-const settled = () => act(() => Promise.resolve());
+// The query tells its readers a tick after its read ends, not in the same microtask.
+const settled = () =>
+  act(async () => {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
 // The pill is the way in; the dialog and what signs load on that first ask, so it is there a moment later.
 async function pick(box: HTMLElement) {
   click(button(box, PICK));

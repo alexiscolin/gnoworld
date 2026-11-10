@@ -3,6 +3,7 @@ import { page, type PageBlock } from "@gnoworld/core";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
+import { SignedIn } from "../../../tests/grabStore.tsx";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import {
   after,
@@ -12,6 +13,7 @@ import {
   field,
   inputs,
   listing,
+  SIBLING_CHAIN,
   typed,
   warnsMembers,
 } from "../../../tests/callFixtures.ts";
@@ -45,6 +47,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
   const sibling = vi.fn<ChainFetch>(() => after(under, answer));
   const box = mount(
     <StoreProvider>
+      <SignedIn />
       <div data-test="under">
         <RealmBlocks
           via={via}
@@ -58,7 +61,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(gnoForm("SetProfile", input("name")))}
-          call={{ realm: REALM, chain: CHAIN, options: { fetch: sibling } }}
+          call={{ realm: REALM, chain: SIBLING_CHAIN, options: { fetch: sibling } }}
         />
       </div>
     </StoreProvider>,
@@ -224,19 +227,19 @@ describe("a form whose drawing left fields out", () => {
   it("is the read-only form with no Call though what is drawn fits the function: a hidden field may be among those left out", async () => {
     const under = vi.fn<ChainFetch>(answer);
     const sibling = vi.fn<ChainFetch>(() => after(under, answer));
-    const at = (fetch: ChainFetch, left: number) => (
+    const at = (fetch: ChainFetch, left: number, chain: typeof CHAIN) => (
       <CallableForm
         exec="SetProfile"
         path=""
         left={left}
         fields={[input("name"), input("times")]}
-        call={{ realm: REALM, chain: CHAIN, options: { fetch } }}
+        call={{ realm: REALM, chain, options: { fetch } }}
       />
     );
     const box = mount(
       <StoreProvider>
-        <div data-test="under">{at(under, 1)}</div>
-        <div data-test="sibling">{at(sibling, 0)}</div>
+        <div data-test="under">{at(under, 1, CHAIN)}</div>
+        <div data-test="sibling">{at(sibling, 0, SIBLING_CHAIN)}</div>
       </StoreProvider>,
     );
     await vi.waitFor(() => {
@@ -276,6 +279,7 @@ describe("a GovDAO page's vote form", () => {
     ];
     const box = mount(
       <StoreProvider>
+        <SignedIn />
         <RealmBlocks
           via={via}
           origin={CHAIN.gnoweb}

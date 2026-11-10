@@ -1,6 +1,7 @@
 // The browser's client of a world's rooms (server/src/rooms/list.ts, mounted at /api/rooms), through the one
 // JSON call of lib/api/http.ts. The answer must name the world asked, and list its rooms alone.
 import { MadeRoom, RoomList } from "@gnoworld/schemas";
+import { pageFetch } from "../query/policy.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 
 // A room of this world: its main room, #<world>, or one of #<world>/<name>.
@@ -29,4 +30,4 @@ export function roomsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
 }
 
 /** The rooms' client of this page, on its own fetch. */
-export const pageRoomsApi = () => roomsApi((url, init) => fetch(url, init));
+export const pageRoomsApi = () => roomsApi(pageFetch);

@@ -4,7 +4,7 @@
 import { PerspectiveCamera, Vector3, type WebGLRenderer } from "three";
 import { usesOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { draw } from "./frame.ts";
-import { arrivalOf, holdCircle, scans, slideFor } from "./framing.ts";
+import { arrivalOf, firstArrival, holdCircle, scans, slideFor } from "./framing.ts";
 import { homeGoal, middleOf, planetGoal, screenOf, systemGoal, universeGoal, type Circle } from "./goals.ts";
 import { listen } from "./input.ts";
 import { labelOf, Labels } from "./labels.ts";
@@ -13,7 +13,7 @@ import { divesInto, hitOf, pickAt, type Hit } from "./pick.ts";
 import { planetAt, sameAs, systemAt, type Place } from "./place.ts";
 import { createRenderer } from "./renderer.ts";
 import { REACH, Rig, type Goal } from "./rig/rig.ts";
-import { coveredByChat } from "./motion.ts";
+import { chatHides } from "./motion.ts";
 import { Stage } from "./stage.ts";
 import { See } from "./see.ts";
 import type { SpaceOptions } from "./spaceOptions.ts";
@@ -115,7 +115,7 @@ export class Space {
 
   /** Space drawn under nothing: no page covers it, nor the full chat (features/chat/full.ts marks the root), unless the view is the chat's own. */
   get seen(): boolean {
-    return !this.covered && (this.options.inChat === true || !coveredByChat());
+    return !this.covered && (this.options.inChat === true || !chatHides());
   }
 
   /** Goes to `place`: flies there, the first time from far out to the home; stands there at once where the camera never stood or
@@ -180,9 +180,10 @@ export class Space {
 
   readonly #near = (): void => {
     this.neared = true;
-    // The scan comes with the page: as the flight nears its end, never later; none for a hop.
+    // The scan comes with the page: as the flight nears its end, never later; none for a hop, nor for the first arrival of a page opened from its
+    // URL, whose scene comes in from black (features/universe/firstLook.ts).
     const { planet } = this;
-    if (planet !== undefined && scans(planet, this.#trip.from, this.rig.eye))
+    if (!firstArrival(this.options.canvas) && planet !== undefined && scans(planet, this.#trip.from, this.rig.eye))
       this.stage.effects.scan.play(planet.radius);
     this.options.events.near();
   };

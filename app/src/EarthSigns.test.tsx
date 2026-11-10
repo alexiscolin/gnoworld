@@ -251,7 +251,7 @@ describe("a bubble", () => {
     marks(ground)
       .find(({ lat }) => lat === 36.1)
       ?.place(100, 400, false);
-    expect(signOf(box, "hello").hidden).toBe(false);
+    expect(signOf(box, "hello").hasAttribute("data-away")).toBe(false);
   });
 });
 
@@ -315,9 +315,9 @@ describe("a pin", () => {
     const place = marks(ground).find(({ lat }) => lat === 38.7)?.place;
     const sign = pin(box).closest<HTMLElement>("[data-mark]");
     place?.(500, 300, false);
-    expect(sign?.hidden).toBe(true);
+    expect(sign?.hasAttribute("data-away")).toBe(true);
     place?.(500, 300, true);
-    expect(sign?.hidden).toBe(false);
+    expect(sign?.hasAttribute("data-away")).toBe(false);
     expect(sign?.style.transform).toBe("translate(500px, 300px)");
   });
 
@@ -336,10 +336,10 @@ describe("a pin", () => {
     const mark = marks(ground).find(({ lat }) => lat === 38.7);
     pin(box).focus();
     mark?.place(500, 300, false);
-    expect(pin(box).closest<HTMLElement>("[data-mark]")?.hidden).toBe(false);
+    expect(pin(box).closest<HTMLElement>("[data-mark]")?.hasAttribute("data-away")).toBe(false);
     pin(box).blur();
     mark?.place(500, 300, false);
-    expect(pin(box).closest<HTMLElement>("[data-mark]")?.hidden).toBe(true);
+    expect(pin(box).closest<HTMLElement>("[data-mark]")?.hasAttribute("data-away")).toBe(true);
   });
 
   it("draws no navigation when no room has a place", async () => {
@@ -382,7 +382,7 @@ describe("a country's pill", () => {
     marks(ground)
       .find(({ lat }) => lat === 36.1)
       ?.place(10, 10, false);
-    expect(sign.hidden).toBe(true);
+    expect(sign.hasAttribute("data-away")).toBe(true);
   });
 });
 
@@ -452,11 +452,11 @@ describe("its life", () => {
     act(() => {
       sight.seen?.([{ intersectionRatio: 0.3 }]);
     });
-    expect(root.hidden).toBe(true);
+    expect(root.hasAttribute("data-away")).toBe(true);
     act(() => {
       sight.seen?.([{ intersectionRatio: 0.9 }]);
     });
-    expect(root.hidden).toBe(false);
+    expect(root.hasAttribute("data-away")).toBe(false);
     globe.remove();
   });
 

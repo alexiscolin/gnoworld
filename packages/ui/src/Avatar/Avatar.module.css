@@ -24,12 +24,23 @@
   }
 
   /* The ring, as wide as the focus ring and as far from the disc. */
-  .avatar[data-speaking]::after {
+  .avatar::after {
     position: absolute;
     inset: calc(-2 * var(--focus-width));
     border: var(--focus-width) solid var(--color-text);
     border-radius: var(--radius-pill);
     content: "";
+  }
+
+  /* The ring and the dot fade in and out as the avatar speaks or is here. */
+  .avatar::after,
+  .presence {
+    opacity: 0;
+    transition: var(--transition-fade);
+  }
+
+  .avatar[data-speaking]::after {
+    opacity: 1;
   }
 
   /* A picture: forced colours leave it as drawn, its night included; the ring and the dot stay theirs. */
@@ -77,5 +88,9 @@
     border: calc(var(--size-dot) / 2) solid var(--color-text);
     border-radius: var(--radius-pill);
     box-shadow: 0 0 0 var(--line-width) var(--color-space);
+  }
+
+  .presence[data-presence] {
+    opacity: 1;
   }
 }

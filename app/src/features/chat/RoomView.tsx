@@ -148,7 +148,7 @@ export function RoomView(props: RoomViewProps) {
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   return (
-    <div className={styles["main"]}>
+    <div className={styles["main"]} data-chat-state={chat}>
       <Lead status={connected ? null : NOTICES[chat]} />
       <PinsAbove key={`${String(room)} pins`} pins={pins} />
       <RoomLines

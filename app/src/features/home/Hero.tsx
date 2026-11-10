@@ -11,6 +11,7 @@ import { GoExplore } from "./GoExplore.tsx";
 import styles from "./Hero.module.css";
 import { Lenses } from "../../Lenses.tsx";
 import { useSwapped } from "../../swapped.ts";
+import { fullChatHref, leaveDock } from "../../fullChat.ts";
 
 // ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.
 const TALK = ". Each one is a place to talk.";
@@ -129,7 +130,15 @@ function Actions({ universe, system, newcomer }: Pick<HeroProps, "universe" | "s
         places={{ earth: universe.earth.path, worlds: universe.worlds, universe: universe.id }}
         className={styles["action"]}
       />
-      <Link to={universe.earth.path} className={styles["action"]} data-call="chat">
+      {/* The chat's grow comes out of this button, as the header's Chat's (fullChat.ts). */}
+      <Link
+        to={fullChatHref(universe.earth.path)}
+        className={styles["action"]}
+        data-call="chat"
+        onClick={(event) => {
+          leaveDock(event.currentTarget);
+        }}
+      >
         Join the chat
         <Icon name="arrow" />
       </Link>

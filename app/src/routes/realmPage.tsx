@@ -7,14 +7,13 @@ import { isAddress, realmName, realmRoom, worldIdOf } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
 import { pageRoomsApi } from "../lib/api/rooms.ts";
 import { Kicker, Panel } from "@gnoworld/ui";
-import { chatPlace, LOADING, PlaceChat, roomIds, roomsChanged } from "../features/chat/index.ts";
-import { useEntered, useSpace } from "../features/universe/index.ts";
+import { chatPlace, PlaceChat, roomIds, roomsChanged } from "../features/chat/index.ts";
+import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { site } from "../places.ts";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
 import type { Ring } from "../features/world/index.ts";
 import type { RealmAt } from "../realmAt.ts";
 import { PlaceFrame } from "./placeFrame.tsx";
-import styles from "./world.module.css";
 
 // The plate's blocks come in a chunk once the first screen has drawn: the frame and the title.
 const RealmPlate = lazy(() => import("./plate/RealmPlate.tsx"));
@@ -108,6 +107,8 @@ function RealmPlace({
   // The open proposal's ring round the planet, when the realm takes votes (Voted, StatusRing.tsx).
   const [ring, setRing] = useState<Ring>();
   const chatDue = useSpace({ world: worldIdOf(found.realm), name });
+  // The plate's chunk is asked once the page has loaded, never waiting for the door to space or the chat (the shapes stand till it comes).
+  const loaded = useLoaded();
   return (
     <>
       <PlaceFrame
@@ -119,15 +120,13 @@ function RealmPlace({
             <Panel.Title id="realm-title">{name}</Panel.Title>
             {/* The rest of the plate comes in a chunk once the first screen has drawn (D566): its blocks are the realm's own reads. */}
             <Suspense fallback={null}>
-              {chatDue && <RealmPlate found={found} name={name} talk={talk} room={room} onRing={setRing} />}
+              {loaded && <RealmPlate found={found} name={name} talk={talk} room={room} onRing={setRing} />}
             </Suspense>
           </>
         }
-      >
-        <div id="chat" className={styles["chat"]}>
-          {chatDue ? chat : LOADING}
-        </div>
-      </PlaceFrame>
+        chat={chat}
+        chatDue={chatDue}
+      />
       <WorldSigns world={worldIdOf(found.realm)} room={room} />
     </>
   );

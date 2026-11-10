@@ -35,9 +35,5 @@ export default function Realm() {
 
 export function ErrorBoundary() {
   // Inside the plate, as any page's content is: never loose at the screen's corner (D535).
-  return (
-    <PlaceFrame label="Realm" plate={<PlaceError what="realm" />}>
-      {null}
-    </PlaceFrame>
-  );
+  return <PlaceFrame label="Realm" plate={<PlaceError what="realm" />} />;
 }

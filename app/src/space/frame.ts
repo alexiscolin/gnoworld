@@ -7,9 +7,11 @@ import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
 import { ORBIT_GAIN } from "./parts/marks.ts";
 import { HOME_SYSTEM } from "../cosmosAt.ts";
 import { aloneOf, homeFrame } from "./framing.ts";
+import { sharpener } from "./sharp.ts";
 import { followHome } from "./follow.ts";
-import { WANDER } from "./rig/free.ts";
+import { handOf } from "./hand.ts";
 import { eyeOf } from "./rig/pose.ts";
+import { coveredByChat } from "./motion.ts";
 
 const LONGEST_STEP_MS = 50;
 const CHOOSE_MS = 100;
@@ -31,6 +33,7 @@ const CLEAR_ORBITS = 12;
 /** Runs `space`'s loop till it is disposed. */
 export function draw(space: Space): void {
   let [last, chose, drawn] = [performance.now(), 0, false];
+  const sharpen = sharpener(space, last);
   // What the near planets are chosen by, written each time: a frame makes nothing.
   const choosing = { pxK: 0, seconds: 0 };
   const step = (now: number) => {
@@ -56,6 +59,7 @@ export function draw(space: Space): void {
       drawn = true;
       space.options.events.drawn();
     }
+    sharpen(now);
   };
   requestAnimationFrame(step);
 }
@@ -87,13 +91,6 @@ function resize(space: Space): void {
   space.camera.aspect = width / Math.max(height, 1);
 }
 
-// The slow turn at rest: none on a page, on the home's Earth (D459: it would turn its light away) or under reduced motion; far
-// out the galaxy's own (not the Map's); else the one near a system.
-function wanderOf(space: Space, still: boolean): (typeof WANDER)[keyof typeof WANDER] {
-  if (still || space.place?.kind === "world" || space.arrival) return WANDER.none;
-  return space.place?.kind === "universe" && !space.plan ? WANDER.galaxy : WANDER.near;
-}
-
 function advance(space: Space, delta: number): void {
   const { rig, stage } = space;
   const still = space.options.still();
@@ -110,9 +107,7 @@ function advance(space: Space, delta: number): void {
   }
   if (!rig.flying) {
     rig.page = paged;
-    rig.free.wander = wanderOf(space, still);
-    rig.free.level = space.plan && space.place?.kind !== "universe";
-    rig.free.pointed = space.place?.kind === "universe";
+    handOf(space, still);
     settle(space);
   }
   rig.aim(space.camera, space.see.screen);
@@ -143,9 +138,12 @@ const sunGain = (space: Space, paged: boolean): number =>
 function dim(space: Space, paged: boolean, delta: number): void {
   const { gains, plate, frame } = space.stage;
   const share = 1 - Math.exp(-delta / 1000 / EASE_S);
-  ease(gains.sun, sunGain(space, paged), share);
-  ease(gains.dust, paged ? PAGE.dust : 1, share);
-  ease(gains.stars, paged ? PAGE.stars : 1, share);
+  // The full chat coming over the scene dims it out with the chat's growth (and back in with its shrinking): the scene draws on for that moment
+  // (scene.ts's `seen`), never freezing as the chat's mark is set.
+  const veil = space.options.inChat !== true && coveredByChat() ? 0 : 1;
+  ease(gains.sun, sunGain(space, paged) * veil, share);
+  ease(gains.dust, (paged ? PAGE.dust : 1) * veil, share);
+  ease(gains.stars, (paged ? PAGE.stars : 1) * veil, share);
   ease(plate.shown, plated(space) ? 1 : 0, 1 - Math.exp(-delta / 1000 / PLATE_S));
   const alone = aloneOf(space);
   ease(frame.uSolo, alone === undefined ? 0 : 1, share);

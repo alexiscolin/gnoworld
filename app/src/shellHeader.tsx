@@ -48,7 +48,7 @@ function LevelLink({
   return (
     <Link
       to={level.path}
-      className={`no-edge tint ${String(styles["view"])}`}
+      className={`no-edge ${String(styles["view"])}`}
       aria-current={level.view === current ? "page" : undefined}
       aria-description={level.holds}
       data-beyond={beyond ? "" : undefined}

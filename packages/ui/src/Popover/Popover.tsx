@@ -192,7 +192,7 @@ export function Menu({
               type="button"
               role="menuitem"
               tabIndex={-1}
-              className={styles["item"]}
+              className={["tint", styles["item"]].join(" ")}
               {...("soon" in item
                 ? { "aria-disabled": true, "aria-label": `${item.label}, coming soon` }
                 : {

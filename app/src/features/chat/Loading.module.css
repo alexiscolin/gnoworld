@@ -3,6 +3,8 @@
   .chat {
     box-sizing: border-box;
     padding: var(--space-m) var(--chat-inset);
+    /* raw: its shapes stand at once, not after the skeleton's 300 ms wait */
+    --motion-wait: 0s;
   }
 
   .chip,

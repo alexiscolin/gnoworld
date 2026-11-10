@@ -4,6 +4,7 @@ import { act, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeAll, vi } from "vitest";
+import "./queries.ts";
 
 const roots: { root: Root; host: HTMLElement }[] = [];
 // React flushes an update inside act only in an environment that says so; restored as the file ends.

@@ -140,7 +140,7 @@
   .named {
     /* layout: the word and the name, a grid of their own in the level */
     display: grid;
-    transition: gap calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+    transition: gap calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
   /* In the full chat a level's name folds into its word, and opens again as the chat closes: the links and the pill move with it (D503). */
@@ -173,7 +173,7 @@
     letter-spacing: 0;
     text-transform: none;
     transition-property: max-inline-size, padding, opacity;
-    transition-duration: calc(var(--motion-base) * var(--motion-scale));
+    transition-duration: calc(var(--motion-slow) * var(--motion-scale));
     transition-timing-function: var(--ease-standard);
   }
 
@@ -299,13 +299,23 @@
      kept so the levels beside them stand still. */
   .ways {
     transition:
-      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
-      visibility calc(var(--motion-base) * var(--motion-scale));
+      opacity calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard),
+      visibility calc(var(--motion-slow) * var(--motion-scale));
   }
 
   .ways[data-away] {
     opacity: 0;
     visibility: hidden;
+  }
+
+  /* The current level wears the cream itself till the fill is placed, then hands it over: that hand-over is no change to ease (the fill
+     slides in its place), so the current link eases its ink alone, never its background, and the first paint shows no fade. */
+  .views .view[aria-current="page"] {
+    transition-property: color;
+  }
+
+  .view:not([aria-current="page"]) {
+    transition: var(--transition-tint);
   }
 
   /* One cream in the header, where one is (D444): the way one looks wears a faint fill. */
@@ -512,6 +522,22 @@
   @keyframes chat-cover-out {
     to {
       visibility: hidden;
+    }
+  }
+
+  /* A page opened from its URL: the header and the page's column wait out of sight with the scene (root.tsx's data-first) till the arrival takes it (arrival.ts);
+     if the code never does, it shows after 6 s. */
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-first] :is(.header, .page) {
+      opacity: 0;
+      /* raw: the hold's last word, 6 s, past the slowest first draw */
+      animation: held 0s 6s forwards;
+    }
+
+    @keyframes held {
+      to {
+        opacity: 1;
+      }
     }
   }
 }

@@ -81,8 +81,9 @@ export class Near {
 
   /** The worlds a lens lights, by their ids: the others stay quads, which dim (D425); none, every one may be drawn as itself. */
   only: ReadonlySet<string> | undefined;
-  // The world whose ground is turned past its own spin, and by how many seconds of it, so a bubble stands clear of the dock (D488, D565).
-  #ahead = { id: EARTH as string, seconds: 0 };
+  // Each world's ground turned past its own spin, in seconds of it, so a bubble stands clear of the dock (D488, D565): kept when its page
+  // goes, so the world keeps the angle it has on screen and turns on at its own pace, never unwound or reset.
+  readonly #ahead = new Map<string, number>();
 
   constructor(device: NearDevice) {
     this.#device = device;
@@ -90,7 +91,7 @@ export class Near {
 
   /** Turns the ground of the world `id` on `seconds` past its own spin; its clouds keep time. */
   lead(id: string, seconds: number): void {
-    this.#ahead = { id, seconds };
+    this.#ahead.set(id, seconds);
   }
 
   /** Chooses which planets are drawn as themselves, seen from `eye` with `pxK` world units a pixel at distance 1: called a few
@@ -142,6 +143,11 @@ export class Near {
     this.#wanted.forEach(this.#placeOne);
   }
 
+  /** Whether planet `index` stands as itself (its maps on the GPU), not as its quad. */
+  shows(index: number): boolean {
+    return this.#held.get(index)?.shown === true;
+  }
+
   // Planet `index` shown as itself or as its quad: made once, called on frames.
   readonly #showOne = (held: Held, index: number): void => {
     const shown = this.#shows(index, held, this.#alone);
@@ -177,7 +183,7 @@ export class Near {
     drawn.group.scale.setScalar(planet.radius * scaleOf(planet.index));
     const { place } = planet.system;
     drawn.setSun(this.#sun.set(place.x - this.#at.x, place.y - this.#at.y, place.z - this.#at.z).normalize());
-    drawn.setTime(planet.id === this.#ahead.id ? seconds + this.#ahead.seconds : seconds, seconds);
+    drawn.setTime(seconds + (this.#ahead.get(planet.id) ?? 0), seconds);
     // A world a lens leaves unlit stays itself, darkened as the lens comes, never a flat quad (D502); the last lens's while it goes.
     if (this.only !== undefined) this.#lit = this.only;
     drawn.setFar(this.#lit?.has(planet.id) === false ? this.#device.lens.value : 0);

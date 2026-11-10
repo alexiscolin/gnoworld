@@ -38,6 +38,8 @@ export const haze = (rim: PlanetLook["rim"]): Rgb =>
 /** The Earth and its Moon: drawn from their real maps as they are, the Earth's clouds over it. */
 export interface HandMade extends PlanetLook {
   readonly clouds: number;
+  /** A second, high, fainter layer of the same clouds: 0 for none. */
+  readonly highClouds: number;
 }
 
 // What a world lacks is marked by value: one program holds every world of its kind.
@@ -86,6 +88,7 @@ export const noLights = (): Uniforms => ({
 export const handMadeUniforms = (look: HandMade, maps: MapSet): Uniforms => ({
   ...sharedUniforms(look, maps),
   cloudCover: { value: look.clouds },
+  highClouds: { value: look.highClouds },
   nightLights: { value: maps.night === undefined ? 0 : 1 },
 });
 

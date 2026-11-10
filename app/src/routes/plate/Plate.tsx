@@ -15,6 +15,7 @@ import { Hero, Pills } from "./Hero.tsx";
 import { Hours } from "./Hours.tsx";
 import type { PlateModel } from "./model.ts";
 import { Widgets } from "./Widgets.tsx";
+import styles from "./Plate.module.css";
 
 const FromExplorer = lazy(() => import("../../features/realms/FromExplorer.tsx"));
 const RealmView = lazy(() =>
@@ -42,9 +43,9 @@ function RealmCards({ realm, can }: { realm: NonNullable<PlateModel["realm"]>; c
     <>
       {rollup === undefined ? null : <Calls rollup={rollup} worlds={realm.worlds} beside={callers} />}
       {rollup === undefined || !callers ? null : <Callers rollup={rollup} worlds={realm.worlds} />}
-      {(can?.length ?? 0) === 0 ? null : (
+      {can === undefined ? null : (
         <Cell span={12}>
-          <Can can={can ?? []} />
+          <Can can={can} />
         </Cell>
       )}
       <Cell span={12}>
@@ -56,44 +57,69 @@ function RealmCards({ realm, can }: { realm: NonNullable<PlateModel["realm"]>; c
   );
 }
 
+// What the widgets draw, across the twelve columns: nothing when there are none.
+function WidgetCards({ widgets }: Pick<PlateModel, "widgets">) {
+  if (widgets.length === 0) return null;
+  return (
+    <Cell span={12}>
+      <Widgets widgets={widgets} />
+    </Cell>
+  );
+}
+
+// What the kind adds between its chart and its cards: nothing when it adds nothing.
+function ExtraCards({ extras }: Pick<PlateModel, "extras">) {
+  if (extras === undefined) return null;
+  return (
+    <div className={styles["extras"]}>
+      <Stack space="s">{extras}</Stack>
+    </div>
+  );
+}
+
+// The bento of twelve columns. The Earth's and a hub's order (the proposal's s3b.js): the widgets, what the kind adds (Latest on X, Proposals), the
+// network, then a hub's realm from the explorer; a realm's: what it adds, its cards, the network, the widgets.
+function Cards({ model }: { model: PlateModel }) {
+  const { hours, extras, realm, can, around, widgets, explorer } = model;
+  const place = realm === undefined;
+  return (
+    <Grid cols={12} space="s">
+      {hours !== undefined && place ? (
+        <Cell span={12}>
+          <Hours hours={hours} />
+        </Cell>
+      ) : null}
+      {place ? null : <ExtraCards extras={extras} />}
+      {place ? null : <RealmCards realm={realm} can={can} />}
+      {place ? <WidgetCards widgets={widgets} /> : null}
+      {place ? <ExtraCards extras={extras} /> : null}
+      {around === undefined ? null : (
+        <Cell span={12}>
+          <Around around={around} />
+        </Cell>
+      )}
+      {place ? null : <WidgetCards widgets={widgets} />}
+      {explorer === undefined ? null : (
+        <Cell span={12}>
+          <Suspense fallback={null}>
+            <FromExplorer {...explorer} />
+          </Suspense>
+        </Cell>
+      )}
+    </Grid>
+  );
+}
+
 export function Plate({ model }: { model: PlateModel }) {
-  const { lede, actions, talk, figures, hours, extras, realm, can, around, widgets, links, explorer } = model;
-  const chart = hours !== undefined && realm === undefined;
+  const { lede, actions, talk, figures, links } = model;
   return (
     <div data-blocks="">
       <Pills lede={lede} />
       <Stack space="zone">
         <Hero lede={lede} actions={actions} talk={talk} />
         <Band {...figures} />
-        <Grid cols={12} space="s">
-          {chart ? (
-            <Cell span={12}>
-              <Hours hours={hours} />
-            </Cell>
-          ) : null}
-          {extras === undefined ? null : (
-            <Cell span={12}>
-              <Stack space="s">{extras}</Stack>
-            </Cell>
-          )}
-          {realm === undefined ? null : <RealmCards realm={realm} can={can} />}
-          {around === undefined ? null : (
-            <Cell span={12}>
-              <Around around={around} />
-            </Cell>
-          )}
-          {widgets.length === 0 ? null : (
-            <Cell span={12}>
-              <Widgets widgets={widgets} />
-            </Cell>
-          )}
-        </Grid>
+        <Cards model={model} />
         {links === undefined ? null : <OutLinks links={links} />}
-        {explorer === undefined ? null : (
-          <Suspense fallback={null}>
-            <FromExplorer {...explorer} />
-          </Suspense>
-        )}
       </Stack>
     </div>
   );

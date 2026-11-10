@@ -16,15 +16,29 @@ export const holdsChat = (path: string): boolean => CHAT_PAGE.test(path);
  * dissolves in place under it (features/universe/rise.ts): the curve is space's flights' own, a cubic in and out. */
 export const FULL_MOVE = { duration: 0.9, ease: "power2.inOut" } as const;
 
-// The dock's box as the chat goes full, which the full chat grows out of (features/chat/fullMove.ts).
+// The dock's box as the chat goes full, which the full chat grows out of (features/chat/fullMove.ts), or where the control that opened it from
+// a page with no dock (the galaxy, a system) stood: the chat grows out of it, and shrinks back into it where it goes back to that page.
 let dock: DOMRect | undefined;
+let origin: DOMRect | undefined;
 
 /** The page's chat, docked: every place's page holds it in `#chat`. */
-export const dockBox = (): DOMRect | undefined => document.getElementById("chat")?.getBoundingClientRect();
+const dockBox = (): DOMRect | undefined => document.getElementById("chat")?.getBoundingClientRect();
 
-/** Before the chat goes full, from its own Expand or the header's Chat: the dock's box, which the full chat grows out of. */
-export function leaveDock(): void {
+/** Before the chat goes full, from its own Expand or the header's Chat: the dock's box, which the full chat grows out of; on a page with no
+ * dock, the box of the `control` that asked for it. */
+export function leaveDock(control?: Element): void {
   dock = dockBox();
+  origin = dock === undefined ? control?.getBoundingClientRect() : undefined;
+  dock ??= origin;
+}
+
+/** Where the chat shrinks to as it goes: the page's dock, else the control it came out of. The control's box stays until a dock is found or the
+ * chat opens again (a development build mounts, unmounts and mounts a chat once more, which would take it too soon). */
+export function takeBack(): DOMRect | undefined {
+  const box = dockBox();
+  if (box === undefined) return origin;
+  origin = undefined;
+  return box;
 }
 
 /** The dock's box the full chat grows out of, taken once. */

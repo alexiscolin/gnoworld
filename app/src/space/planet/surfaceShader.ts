@@ -26,11 +26,19 @@ void main() {
 // no nearer than a texel, so the detail a pixel can carry is shaded and no finer, soft-clipped so a crater's rim never becomes a line.
 const RELIEF = /* glsl */ `
 uniform float cloudCover;
+uniform float highClouds;
 uniform float nightLights;
 vec3 clouded(vec3 colour, vec3 high, float low, float shine, vec3 tint, out float cover) {
   cover = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(high)).r);
   float shadowed = smoothstep(low - 0.1, low + 0.72, read(cloudMap, lookupOf(normalize(high + spin * vSun * 0.016))).r);
   return cloudsOver(colour, cover, shadowed, shine, tint);
+}
+// A second, high layer: the same map read again, tilted and slower, thin and faint, with no shadow of its own, over the first.
+vec3 highClouded(vec3 colour, vec3 axis, float shine, vec3 tint) {
+  vec3 tilted = vec3(axis.x, axis.y * 0.8 + axis.z * 0.6, axis.z * 0.8 - axis.y * 0.6);
+  vec3 high = spin * normalize(turned(tilted, -cloudTime * 0.0022) + 0.14 * field(tilted * 2.3).yzx);
+  float cover = smoothstep(0.62, 1.02, read(cloudMap, lookupOf(high)).r);
+  return mix(colour, tint * shine + 0.0015, cover * highClouds);
 }
 const float TEXEL = 0.0032;
 const float REACH = 0.012;
@@ -79,6 +87,7 @@ void main() {
   if (cloudCover > 0.0) {
     vec3 high = spin * normalize(turned(axis, cloudTime * 0.006) + 0.09 * flow.yzx);
     colour = clouded(colour, high, 1.0 - cloudCover * 1.25, shine, vec3(0.84, 0.86, 0.9), overcast);
+    if (highClouds > 0.0) colour = highClouded(colour, axis, shine, vec3(0.84, 0.86, 0.9));
   }
   if (nightLights > 0.0) {
     Lookup place = lookupOf(direction);

@@ -13,6 +13,7 @@ import { placeOf, universeAt } from "../events/index.ts";
 import { isUnread, type Item, type NoticeKind } from "./feed.ts";
 import { Head, Line, WorldChips } from "./PanelParts.tsx";
 import { useFeed } from "./useFeed.ts";
+import appear from "../../enter.module.css";
 import styles from "./Panel.module.css";
 
 const KINDS: { id: "all" | NoticeKind; label: string }[] = [
@@ -141,7 +142,7 @@ export function Panel({
         {shown.length === 0 ? (
           <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />
         ) : (
-          <ol className={styles["list"]}>
+          <ol key={`${kind}:${world ?? ""}`} className={[styles["list"], appear["enter"]].join(" ")}>
             {shown.map((item) => (
               <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={open} />
             ))}

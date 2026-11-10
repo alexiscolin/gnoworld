@@ -193,6 +193,10 @@
     color: var(--color-text-muted);
   }
 
+  .worlds a {
+    transition: color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
   .worlds a:hover {
     color: var(--color-text);
   }

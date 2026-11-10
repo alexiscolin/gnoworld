@@ -14,7 +14,10 @@
     font: var(--font-label);
     opacity: 0;
     pointer-events: none;
-    transition: opacity var(--motion-base) var(--ease-standard);
+    transition:
+      opacity var(--motion-label) var(--ease-emphasized),
+      border-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard),
+      color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
     will-change: transform;
   }
 

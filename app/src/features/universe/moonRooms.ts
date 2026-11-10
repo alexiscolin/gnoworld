@@ -3,7 +3,9 @@
 // A world the server lists no room of has none.
 import { EARTH, hubWorldOf } from "@gnoworld/core";
 import hubs from "../../../data/hubs.json" with { type: "json" };
-import { pageActivityApi } from "../../lib/api/activity.ts";
+import { resultOf } from "../../lib/query/api.ts";
+import { activityOptions } from "../../lib/query/apiReads.ts";
+import { queryClient } from "../../lib/query/client.ts";
 import type { Place } from "../../space/place.ts";
 import type { Space } from "../../space/scene.ts";
 import type { MoonRoom } from "../../space/parts/moons.ts";
@@ -54,8 +56,7 @@ export function feedMoons(space: Space | undefined, place: Place): void {
   if (slug === undefined) return;
   const ask = () => {
     if (document.hidden) return;
-    pageActivityApi()
-      .read(slug)
+    resultOf(queryClient.query(activityOptions(slug)))
       .then((read) => {
         if (!read.ok) return;
         const rates = new Map(

@@ -5,9 +5,11 @@ import { EARTH } from "@gnoworld/core";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router";
 import { HOME_SYSTEM, isHome } from "../../cosmosAt.ts";
+import { asksFull } from "../../fullChat.ts";
 import type { Place } from "../../space/place.ts";
+import { warmView } from "../../plateWarm.ts";
 import { useHere } from "../../useHere.ts";
-import { enterPage } from "./arrival.ts";
+import { enterPage, newPage } from "./arrival.ts";
 import { ghost } from "./rise.ts";
 import { drawnYet, flying, hold, onDrawn, release, show } from "./space.ts";
 
@@ -18,6 +20,8 @@ export interface WorldShown {
 }
 
 const FIRST_SCREEN_MS = 2_500;
+// What a page that left for the full chat leaves as its kind: the page that comes back after it is no page of its kind.
+const FULL_PAGE = "full";
 
 // The kind of page standing now, the one that left as it came, and the one it came after: a cosmos view replacing a cosmos view (the
 // galaxy at /universe, the Earth's ecosystem at /, a system) shows the same chrome where it was, so it leaves no ghost and rises nothing.
@@ -71,11 +75,13 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
     pages.cameAfter = pages.left ?? pages.standing;
     pages.standing = pageKind;
     pages.left = undefined;
+    newPage(`${pageKind}:${kind}:${id}`);
     show(placeFrom(kind, id), (href) => {
       Promise.resolve(navigate(href)).catch(reportError);
     });
     // A world's page (the Earth's, a world's, a realm's) has a plate, which may come after this: its arrival waits for it.
-    if (!flying()) enterPage(false, kind === "world");
+    // The page the full chat gave back stands again with its plate coming in and its dock where it was: the chat holds its own (fullMove.ts).
+    if (!flying()) enterPage(pages.cameAfter === FULL_PAGE, sameKind());
     // The planet's circle as the page lays its box out (a page's parts come late: looked for each frame till it comes), and as it moves.
     const watching = new ResizeObserver(hold);
     let [frame, tries] = [0, 0];
@@ -94,7 +100,7 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
       watching.disconnect();
       removeEventListener("resize", hold);
       standingRef.current = false;
-      pages.left = pageKind;
+      pages.left = asksFull(new URLSearchParams(location.search)) ? FULL_PAGE : pageKind;
       pages.standing = undefined;
       release();
       // No ghost where the page that follows is of this one's kind: its chrome stands where this one's stood.
@@ -113,5 +119,7 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
       stop();
     };
   }, []);
+  // The plate's code and the worlds in view's files, asked ahead once the first screen stands, and the links' intent (plateWarm.ts).
+  useEffect(() => (firstScreenDone ? warmView({ kind, id }) : undefined), [firstScreenDone, kind, id]);
   return firstScreenDone;
 }

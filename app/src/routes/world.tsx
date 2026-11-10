@@ -7,17 +7,16 @@ import { Kicker, Panel } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
-import { chatPlace, ChainCallsContext, ChainPlaceContext, LOADING, PlaceChat } from "../features/chat/index.ts";
+import { chatPlace, PlaceChat } from "../features/chat/index.ts";
 import { isMissing, PageError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
-import { useEntered, useSpace } from "../features/universe/index.ts";
+import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
-import { Arrival as Banners, FirstCharted, type Ring } from "../features/world/index.ts";
+import { Arrival as Banners, type Ring } from "../features/world/index.ts";
 import { pinnedBar } from "../features/world/PlateRealm.tsx";
 import { chainKey, type ChainHeard } from "../store/chain.ts";
 import { useApp } from "../storeContext.tsx";
 import { PlaceFrame } from "./placeFrame.tsx";
-import styles from "./world.module.css";
 
 // No call of the chain told yet: a room draws no card.
 const NO_CALLS: readonly ChainHeard[] = [];
@@ -58,7 +57,14 @@ const kickerOf = (world: ReturnType<typeof site.world>) =>
 export default function World() {
   const world = useLoaderData<typeof loader>();
   const universe = site.home(world);
-  const chat = { world: world.slug, place: chatPlace({ ...world, pinned: pinnedBar(world, universe) }, universe) };
+  // What the chain told of this world's realms, from its events alone, drawn among its main room's messages.
+  const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
+  // The plate is the page and the chat a block under it on a phone, as the Earth's and a realm's (the proposal's section 5).
+  const chat = {
+    world: world.slug,
+    place: chatPlace({ ...world, pinned: pinnedBar(world, universe), inPage: true }, universe),
+    chain: { place: world, calls: calls ?? NO_CALLS },
+  };
   return <PlaceChat chat={chat} page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />} />;
 }
 
@@ -68,10 +74,11 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
   // A world's page is a place entered (ADR-0003 §4).
   useEntered();
   const chatDue = useWorldSpace(world);
+  // The plate's chunk is asked once the page has loaded, never waiting for the door to space or the chat (the shapes stand till it comes).
+  const loaded = useLoaded();
   // A station round the Earth (8l) keeps its project's own site a link on its page: its name round the Earth opens the page, never the site.
   const own = stationOf(world.slug)?.url;
   const address = ORIGIN + world.canonical;
-  const calls = useApp((app) => app.chainByWorld[chainKey(universe.id, world.slug)]);
   // The plate comes first in the page and the chat follows, so from 900 px the page reads and tabs as it is drawn; under 900 px
   // the chat is drawn above the plate (DESIGN-SYSTEM.md, Breakpoints: 900 px, chat first), and from 1728 px the plate stands fixed
   // at the left (Panel.Layout).
@@ -86,25 +93,14 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
             {/* The arrival banners (9h): nothing unless the server's signal says this account earned one. */}
             <Banners world={world.slug} name={world.name} address={address} />
             <Panel.Title>{world.name}</Panel.Title>
-            <Panel.Lede>
-              {world.description}
-              <FirstCharted world={world.slug} />
-            </Panel.Lede>
             <Suspense fallback={null}>
-              {chatDue && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
+              {loaded && <HubPlate world={world} universe={universe} own={own} onRing={setRing} />}
             </Suspense>
           </>
         }
-      >
-        {/* What the chain told of this world's realms, from its events alone, drawn among its main room's messages. */}
-        <ChainPlaceContext value={world}>
-          <ChainCallsContext value={calls ?? NO_CALLS}>
-            <div id="chat" className={styles["chat"]}>
-              {chatDue ? chat : LOADING}
-            </div>
-          </ChainCallsContext>
-        </ChainPlaceContext>
-      </PlaceFrame>
+        chat={chat}
+        chatDue={chatDue}
+      />
       <WorldSigns world={hubWorldOf(world)} room={`#${world.slug}`} />
       <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>
@@ -124,8 +120,6 @@ export function ErrorBoundary() {
           <PageError title="This world could not load" line="Try again in a moment." reload />
         )
       }
-    >
-      {null}
-    </PlaceFrame>
+    />
   );
 }

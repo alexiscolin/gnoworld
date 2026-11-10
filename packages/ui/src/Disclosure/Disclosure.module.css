@@ -6,7 +6,7 @@
   }
 
   .row {
-    /* layout: a step between the lead, the words and what trails (icon-text-meta, pointer) */
+    /* layout: a step between the lead, the words and what trails (icon-text-meta or text-meta, pointer) */
     gap: var(--space-xs);
     /* raw: the card's width and 8 px more each side's half, so the hover fill reaches past the words */
     inline-size: calc(100% + var(--space-s));
@@ -61,12 +61,27 @@
     grid-template-rows: 1fr;
   }
 
+  /* A shut body is not laid out nor painted (it is inert already): a hundred rows keep their cards at no cost. It shows from the first frame of its
+     opening and hides after the last of its closing (content-visibility eases as a discrete value). Where it is not known, visibility hides it. */
   .inner {
     min-block-size: 0;
     overflow: hidden;
+    visibility: hidden;
+    transition: visibility var(--motion-slow);
   }
 
   .body[data-open] .inner {
     padding-block: var(--space-3xs) var(--space-s);
+    visibility: visible;
+  }
+
+  @supports (content-visibility: hidden) {
+    .inner {
+      transition: content-visibility var(--motion-slow) allow-discrete;
+    }
+
+    .body:not([data-open]) .inner {
+      content-visibility: hidden;
+    }
   }
 }

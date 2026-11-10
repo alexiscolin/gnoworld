@@ -140,6 +140,8 @@ export function DayChart({
   const counts = values.slice(from).map((value) => (Number.isFinite(value) && value > 0 ? value : 0));
   const named = (at: number) => labels?.[from + at] ?? when(counts.length - 1 - at, "day");
   const { ref, box } = useBox();
+  // While the box's own height eases, the drawing is redrawn at every frame and follows it at once: a glide of its own would start again at each.
+  const [easing, setEasing] = useState(false);
   const points = counts.map((count, at) => ({ count, at, high: count }));
   const reading = useReading(points.length);
   const plotRef = useRef<HTMLDivElement>(null);
@@ -152,9 +154,30 @@ export function DayChart({
         style={{ "--pk": `${(0.13 + counts.length * 0.012 + 0.55).toFixed(2)}s` } as CSSProperties}
         {...group}
       >
-        <div ref={ref} className={styles["box"]}>
+        <div
+          ref={ref}
+          className={styles["box"]}
+          onTransitionRun={(event) => {
+            if (event.target === event.currentTarget) setEasing(true);
+          }}
+          onTransitionEnd={(event) => {
+            if (event.target === event.currentTarget) setEasing(false);
+          }}
+          onTransitionCancel={(event) => {
+            if (event.target === event.currentTarget) setEasing(false);
+          }}
+        >
           {box === undefined || counts.length === 0 ? null : (
-            <DayPlot key={scale} counts={counts} named={named} scale={scale} now={now} w={box.w} h={box.h} />
+            <DayPlot
+              key={scale}
+              counts={counts}
+              named={named}
+              scale={scale}
+              now={now}
+              w={box.w}
+              h={box.h}
+              follow={easing}
+            />
           )}
           {/* The pointer reads the slot it is in, across the plot's own width (the axis' numbers are not a slot). */}
           <div className={styles["hits"]} {...reading.plot} />

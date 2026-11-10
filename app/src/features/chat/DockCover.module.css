@@ -1,0 +1,20 @@
+/* The dock's skeleton over its chat (DockCover.tsx): the chat's own fill under its shapes, so what comes under it does not show through, and
+   a fade out once the chat is settled. */
+@layer components {
+  .cover {
+    /* layout: over the dock's whole box, the chat under it */
+    position: absolute;
+    inset-block: 0;
+    inset-inline: 0;
+    /* raw: over the chat's own parts, which stand at 1 */
+    z-index: 1;
+    /* raw: the chat's own fill, as much of it as the dock's glass lets stand (ChatLayout.module.css) */
+    background: color-mix(in oklab, var(--color-surface) var(--dock-glass), transparent);
+    --motion-wait: 0s;
+  }
+
+  .cover[data-leaving] {
+    opacity: 0;
+    transition: opacity calc(var(--motion-slow) * var(--motion-scale)) var(--ease-emphasized);
+  }
+}

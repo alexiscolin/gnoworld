@@ -1,6 +1,7 @@
-// The Earth's "LATEST ON X" (frame 40): the newest post the team copied by hand into xPosts.json (8i), its handle, its words, when, and its
-// address on X; a row written as an example says "Sample", as the frame does. The time is a clock time, never an age (F3066). None, no card.
-import { Card, Cluster, Icon, Kicker, Stack } from "@gnoworld/ui";
+// The Earth's "Latest on X" (frame 40, the proposal's cardLatest): the newest post the team copied by hand into xPosts.json (8i), as a card
+// of the plate: its handle, its words, when, and its address on X; a row written as an example is tagged "sample". The time is a clock time,
+// never an age (F3066). None, no card.
+import { Button, Card, Chip, Stack } from "@gnoworld/ui";
 import posts from "../../../data/xPosts.json" with { type: "json" };
 import { useClock } from "./clock.ts";
 import { stampOf } from "./stamp.ts";
@@ -13,23 +14,27 @@ export function LatestOnX() {
   );
   if (latest === undefined) return null;
   return (
-    <Stack space="xs">
-      <Kicker dot="world">Latest on X</Kicker>
-      <Card compact>
-        <Card.Header title={latest.handle} level={2} />
-        <Card.Body>
+    <Card look="hub" rises>
+      <Card.Header
+        icon="news"
+        title="Latest on X"
+        level={2}
+        actions={"sample" in latest && latest.sample ? <Chip tone="warm">sample</Chip> : undefined}
+      />
+      <Card.Body>
+        <Stack space="xs">
+          <b>{latest.handle}</b>
           <p>{latest.text}</p>
-          <a className="label" href={latest.link} target="_blank" rel="noopener noreferrer">
-            <Cluster space="3xs">
-              <span>
-                <time dateTime={latest.at}>{stampOf(latest.at, now)}</time>
-                {"sample" in latest && latest.sample ? " · Sample" : null}
-              </span>
-              <Icon name="arrow-up-right" />
-            </Cluster>
-          </a>
-        </Card.Body>
-      </Card>
-    </Stack>
+          <time className="meta" dateTime={latest.at}>
+            {stampOf(latest.at, now)}
+          </time>
+          <div>
+            <Button emphasis="quiet" size="s" icon="arrow-up-right" href={latest.link}>
+              Open on X
+            </Button>
+          </div>
+        </Stack>
+      </Card.Body>
+    </Card>
   );
 }

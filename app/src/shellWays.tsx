@@ -2,7 +2,7 @@
 // page's own, else the last this tab saw, the Earth's home the first time), and the chat full (?chat=full) of that world beside it; and
 // how one looks at it: space or the Map (space from above).
 import { Icon, type IconName } from "@gnoworld/ui";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 import { isHome, systemOfPage, systemPath, trimmed } from "./cosmosAt.ts";
 import { asksFull, fullChatHref, holdsChat, leaveDock } from "./fullChat.ts";
@@ -90,7 +90,7 @@ function Way(props: {
   name?: string;
   on: boolean;
   to?: string | undefined;
-  pick?: (() => void) | undefined;
+  pick?: ((event: MouseEvent<HTMLElement>) => void) | undefined;
   off?: boolean;
 }) {
   const { icon, label, name = label, on, to, pick, off = false } = props;
@@ -142,7 +142,13 @@ export function ChatWay({ world }: { world: Spot }) {
         name={`Chat of ${world.name}`}
         on={full}
         to={chatOf(`${pathname}${search}`, world)}
-        pick={full ? undefined : leaveDock}
+        pick={
+          full
+            ? undefined
+            : (event) => {
+                leaveDock(event.currentTarget);
+              }
+        }
       />
     </span>
   );

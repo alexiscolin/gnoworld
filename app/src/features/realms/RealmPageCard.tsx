@@ -7,17 +7,22 @@ import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { useEffect, useRef, useState } from "react";
 import { bigLine } from "./RealmCard.tsx";
 import type { CallPlace } from "./InlineCard.tsx";
+import { Swap } from "./Swap.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
 import styles from "./RealmView.module.css";
 import { shortPath } from "./shortPath.ts";
 import { isHeight, type Height, type Realm } from "./useRealm.ts";
+
+// A block's time as a reader says it: the day and the minute, UTC (the node's own is nanoseconds of ISO).
+const when = (time: string): string =>
+  `${new Date(time).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" })} UTC`;
 
 // Where the page was read: the block's height and time, or why neither is known.
 function Read({ height, rpc }: { height: Height | Failure; rpc: string }) {
   if (!isHeight(height)) return <p className={"meta"}>The block height could not be read. {height.next}</p>;
   return (
     <p className={"meta"}>
-      Read at block {new Intl.NumberFormat("en-US").format(height.height)}, {height.time}, from{" "}
+      Read at <Swap>{`block ${new Intl.NumberFormat("en-US").format(height.height)}, ${when(height.time)}`}</Swap>, from{" "}
       <span dir="ltr">{hostOf(rpc)}</span>
     </p>
   );
@@ -51,7 +56,7 @@ function Body({
           </p>
           {/* The page's one retry (D534): the facts and the calls under it say nothing of their own when the chain is down. */}
           <Button
-            icon="spark"
+            icon="retry"
             onClick={() => {
               location.reload();
             }}
@@ -139,8 +144,9 @@ export function PageCard({
   const { realm, chain } = where;
   return (
     <section id="page" aria-label="The realm's page">
-      <Card look="hub">
+      <Card look="hub" fixed rises>
         <Card.Header
+          icon="code"
           title="Its page"
           level={2}
           meta={`${shortPath(realm)} \u00b7 Render()`}

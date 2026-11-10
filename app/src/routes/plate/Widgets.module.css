@@ -9,18 +9,50 @@
     }
   }
 
-  /* The proposal's value reads at the body's size: its own step (--font-figure-s) is not defined there, so the font falls to the card's. */
+  /* The squares of a row are one height: each fills its cell. */
+  .widgets > * > * > * {
+    /* layout: the card fills the cell the grid stretched */
+    block-size: 100%;
+  }
+
   .value {
-    font: var(--font-body);
+    font: var(--font-figure-s);
     letter-spacing: -0.04em;
     font-variant-numeric: tabular-nums;
-    /* layout: a long value (a name) wraps inside its square, never past it */
-    overflow-wrap: anywhere;
+  }
+
+  .value small {
+    /* layout: the unit a small step after the value */
+    padding-inline-start: var(--space-2xs);
+    color: var(--color-text-muted);
+    font: var(--font-reading);
+    letter-spacing: normal;
   }
 
   .sub {
     color: var(--color-text-muted);
     font: var(--font-meta);
+  }
+
+  /* A square's detail grows from nothing as it opens (a grid row from 0 to its height), held shut and out of reach while closed. */
+  .fold {
+    /* layout: one row, whose height is the detail's */
+    display: grid;
+    /* layout: shut */
+    grid-template-rows: 0fr;
+    transition-property: grid-template-rows;
+    transition-duration: calc(var(--motion-slow) * var(--motion-scale));
+    transition-timing-function: var(--ease-standard);
+  }
+
+  .fold[data-open] {
+    /* layout: open to the detail's own height */
+    grid-template-rows: 1fr;
+  }
+
+  .fold > .more {
+    min-block-size: 0;
+    overflow: hidden;
   }
 
   .more {

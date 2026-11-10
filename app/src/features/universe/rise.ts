@@ -1,10 +1,11 @@
 // What rises in as the cosmos opens, from a step below, one after the other (the first load's one clock, SpaceLoader.tsx; a return from a
 // page's flight, routes/home.tsx and the rail), and what leaves as the page's flight begins: its chrome, ghosted where it stood. Nothing
 // moves under reduced motion, the system's or the site's.
+import { stillCopy } from "@gnoworld/ui";
 import { motionOf } from "../../space/motion.ts";
 import { gsap } from "gsap";
 import { asksFull, FULL_MOVE } from "../../fullChat.ts";
-import { leavePage, RISING } from "./arrival.ts";
+import { leavePage, pageNow, RISING } from "./arrival.ts";
 
 /** Rises `parts` in one after the other, the first `after` ms from now, as the dive's demo's text (D401): from 18 px below, 0.7 s,
  * power3.out, 0.05 s apart; `across`, from 30 px to the right, 0.6 s, 0.06 s apart (the rail's worlds). */
@@ -48,8 +49,7 @@ export function riseChrome(after: number, { header = true }: { header?: boolean 
 /** Whether the scene already stood when a page mounted: a return to the cosmos from a page, not the first load (SpaceLoader rises that). */
 export const returning = (): boolean => document.querySelector("canvas[data-scene='on']") !== null;
 
-/** Whether the loader still stands: what mounts under it rises with it. */
-export const loading = (): boolean => document.querySelector("[role='status'][aria-label='Loading space']") !== null;
+export { loading } from "./firstLook.ts";
 
 // The cosmos comes back under a flight: the hero and the worlds rise as it lands.
 export const RETURN_AFTER = 450;
@@ -57,6 +57,8 @@ export const RETURN_AFTER = 450;
 /** A fading ghost of each `[data-exit]` part in sight, as its page goes, so the page coming in is not cut in on them. Copied now, shown
  * once the commit is done unless the page `stayed` (React's strict second run, in development). Reduced motion: none. */
 export function ghost(stayed: () => boolean): void {
+  // The page that leaves, as it is told now: the page after it begins in this commit, before the copy is shown.
+  const leaving = pageNow();
   const parts = [...document.querySelectorAll("[data-exit]")].filter(
     (part) => getComputedStyle(part).visibility !== "hidden",
   );
@@ -68,15 +70,11 @@ export function ghost(stayed: () => boolean): void {
   layer.style.cssText =
     "position:fixed;inset:0;z-index:2;pointer-events:none;color:var(--color-text);font:var(--font-body)";
   for (const part of parts) {
-    const copy = part.cloneNode(true);
-    if (!(copy instanceof HTMLElement)) continue;
+    // The copy itself is not inert, which would draw a plate's title as any heading (Panel.module.css).
+    const copy = stillCopy(part);
+    if (copy === undefined) continue;
     copy.removeAttribute("data-exit");
     copy.setAttribute("data-ghost", "");
-    // Its controls take no focus; the copy itself is not inert, which would draw a plate's title as any heading (Panel.module.css).
-    for (const control of copy.querySelectorAll("a, button, input, select, textarea, [tabindex]"))
-      if (control instanceof HTMLElement) control.inert = true;
-    // Its ids go, but a picture's own (an avatar's gradients, which its shapes are filled by): the copy draws as the part did.
-    for (const named of [copy, ...copy.querySelectorAll("[id]:not(svg *)")]) named.removeAttribute("id");
     // What the page's place sets for it holds out of it too: a plate whose fill space draws keeps it hidden (globe.module.css).
     const fill = getComputedStyle(part).getPropertyValue("--plate-fill");
     if (fill !== "") copy.style.setProperty("--plate-fill", fill);
@@ -102,6 +100,6 @@ export function ghost(stayed: () => boolean): void {
           layer.remove();
         },
       });
-    else leavePage(layer);
+    else leavePage(layer, leaving);
   });
 }

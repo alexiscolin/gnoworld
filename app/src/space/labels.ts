@@ -5,6 +5,7 @@ import { systemName } from "../placeName.ts";
 import { isAddress } from "@gnoworld/core";
 import { placeOf, type Planet, type System, type Universe, type Vec } from "./layout.ts";
 import type { Seen } from "./see.ts";
+import { assign, retire, type Slot } from "./labelSlots.ts";
 import { fillPill, midOf, tagOf, type LabelHooks } from "./midWorlds.ts";
 import styles from "./labels.module.css";
 
@@ -24,18 +25,14 @@ const NONE: readonly Item[] = [];
 type Item = Planet | System;
 const isPlanet = (item: Item): item is Planet => "system" in item;
 
-interface Slot {
-  readonly button: HTMLButtonElement;
-  item: Item | undefined;
-}
-
 /** A label's words: a world's name, or a system's (placeName.ts's systemName), its address on hover (the label's title). */
 export const labelOf = (item: Item, name: (id: string) => string): string =>
   isPlanet(item) ? name(item.id) : systemName(item, name);
 
 export class Labels {
-  readonly #slots: Slot[] = [];
-  readonly #ofButton = new WeakMap<Element, Slot>();
+  readonly #slots: Slot<Item, HTMLButtonElement>[] = [];
+  readonly #held = new Map<Item, Slot<Item, HTMLButtonElement>>();
+  readonly #ofButton = new WeakMap<Element, Slot<Item, HTMLButtonElement>>();
   readonly #at: Vec = { x: 0, y: 0, z: 0 };
   readonly #on: Vec = { x: 0, y: 0, z: 0 };
   readonly #items: Item[] = [];
@@ -77,7 +74,7 @@ export class Labels {
       button.className = `nowrap row-center pill-ends ${styles["pill"] ?? ""}`;
       button.tabIndex = -1;
       fillPill(button);
-      const slot: Slot = { button, item: undefined };
+      const slot: Slot<Item, HTMLButtonElement> = { button, item: undefined, seen: 0, retired: false };
       button.addEventListener("click", () => {
         if (slot.item !== undefined) enter(slot.item);
       });
@@ -115,8 +112,8 @@ export class Labels {
     this.#far = pool
       .sort((a, b) => lit(b) - lit(a) || weight(b) - weight(a))
       .map((item, rank) => ({ item, rank, weight: weight(item), score: 0 }));
-    // Each name is said anew, with its count or without.
-    for (const slot of this.#slots) slot.item = undefined;
+    // Each name is said anew, with its count or without: the old ones fade out where they stand, the new ones fade in in other slots.
+    retire(this.#slots);
   }
 
   /** A frame `seconds` on: the names of what `seen` shows. */
@@ -131,7 +128,12 @@ export class Labels {
       const item = candidates[at];
       if (item !== undefined && this.#free(item, items.length)) items.push(item);
     }
-    this.#slots.forEach(this.#each);
+    this.#assign(items);
+  }
+
+  #assign(items: readonly Item[]): void {
+    const held = assign({ slots: this.#slots, byItem: this.#held, name: this.#name }, items);
+    for (const slot of this.#slots) this.#show(slot, held(slot));
   }
 
   // What may be named, the liveliest first: in a system its planets alone, once it is large enough to tell them apart (the universe's
@@ -209,23 +211,19 @@ export class Labels {
     return true;
   }
 
-  // Slot `at` shows the frame's item `at`: made once, called on frames.
-  readonly #each = (slot: Slot, at: number): void => {
-    this.#show(slot, this.#items[at]);
-  };
-
   // Where `item` stands now, none for none.
   #where(item: Item | undefined): Vec | undefined {
     if (item === undefined) return undefined;
     return isPlanet(item) ? placeOf(item, this.#seconds, this.#at) : item.place;
   }
 
-  #show(slot: Slot, item: Item | undefined): void {
+  // `live`: the slot's name is still chosen or held; else it fades out where it stands (moving with its world while that is on screen).
+  #show(slot: Slot<Item, HTMLButtonElement>, live: boolean): void {
+    const { item } = slot;
     const at = this.#where(item);
     const on = at !== undefined && this.#seen?.project(at, this.#on) === true;
-    slot.button.classList.toggle(styles["on"] ?? "", on);
+    slot.button.classList.toggle(styles["on"] ?? "", live && on);
     if (!on || item === undefined) return;
-    if (slot.item !== item) this.#name(slot, item);
     // Another system named from inside one: another pill's look, so it reads as elsewhere, not as one of these planets.
     slot.button.classList.toggle(
       styles["other"] ?? "",
@@ -235,7 +233,7 @@ export class Labels {
   }
 
   // Writes `item`'s name into `slot`, its name alone (one number per fact: a system's worlds are its card's), once per item.
-  #name(slot: Slot, item: Item): void {
+  readonly #name = (slot: Slot<Item, HTMLButtonElement>, item: Item): void => {
     slot.item = item;
     const name = slot.button.firstElementChild;
     const lit = isPlanet(item) ? undefined : this.#litIn.get(item);
@@ -245,7 +243,7 @@ export class Labels {
     slot.button.title = !isPlanet(item) && isAddress(item.id) ? item.id : "";
     slot.button.dataset["kind"] = isPlanet(item) ? "planet" : "system";
     slot.button.classList.toggle(styles["under"] ?? "", this.arrival);
-  }
+  };
 
   dispose(): void {
     for (const { button } of this.#slots) button.remove();

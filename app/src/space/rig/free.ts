@@ -7,6 +7,8 @@ import type { Pose, Spot } from "./pose.ts";
 const TURN = 2 * Math.PI;
 const TURN_TAU = 0.32;
 const ZOOM_TAU = 0.18;
+// How fast the anchor's pull comes in and out where a view hands the wheel over (a system's middle, the pointer): never in one frame.
+const PULL_TAU = 0.4;
 // A wheel's pixel, in the log of the distance per second of the zoom's speed: a mouse's notch (100) brings it about 1.24 times nearer.
 const ZOOM_PER_PIXEL = 0.012;
 const ZOOM_MOST = 6;
@@ -34,9 +36,12 @@ export class Free {
   #pitch = 0;
   #zoom = 0;
   #idle = 0;
+  #pull = 0;
   #held = false;
   /** Where the zoom goes, on the stage; none, what the view looks at. */
   readonly anchor: Spot = { x: NaN, y: NaN, z: NaN };
+  /** The point a turn goes round, on the stage (the galaxy's core in its own view); none, what the view looks at. */
+  readonly pivot: Spot = { x: NaN, y: NaN, z: NaN };
   /** The slow turn once still (WANDER): none on a page, none under reduced motion. */
   wander: { readonly speed: number; readonly after: number } = WANDER.near;
   /** Whether a drag turns the view round its up alone, never tilting it: a system seen from above. */
@@ -48,6 +53,8 @@ export class Free {
   readonly #right = new Vector3();
   readonly #tilt = new Vector3();
   readonly #turn = new Quaternion();
+  readonly #yawed = new Quaternion();
+  readonly #offset = new Vector3();
   readonly #pending = { yaw: 0, pitch: 0 };
 
   /** A drag of `dx`, `dy` pixels on a screen `height` high, `seconds` since the last move: it turns at once and keeps its speed. */
@@ -72,6 +79,8 @@ export class Free {
   /** A wheel of `pixels` (in, negative), towards `anchor` if it is told. */
   wheel(pixels: number): void {
     this.#idle = 0;
+    // A zoom begun from rest pulls to its anchor whole; one running when the anchor comes eases it in (#zoomBy).
+    if (Math.abs(this.#zoom) <= DONE) this.#pull = 1;
     this.#zoom = Math.max(-ZOOM_MOST, Math.min(ZOOM_MOST, this.#zoom + pixels * ZOOM_PER_PIXEL));
   }
 
@@ -99,7 +108,9 @@ export class Free {
     if (this.#held) this.#turnBy(this.#pending.yaw, this.#pending.pitch, pose);
     else {
       const decay = Math.exp(-dt / TURN_TAU);
-      this.#turnBy(this.#yaw * dt, this.#pitch * dt, pose);
+      // The turn the decaying speed makes over the frame, whole: the same distance at any frame rate (the speed times dt over-runs it).
+      const run = TURN_TAU * (1 - decay);
+      this.#turnBy(this.#yaw * run, this.#pitch * run, pose);
       this.#yaw *= decay;
       this.#pitch *= decay;
     }
@@ -111,15 +122,21 @@ export class Free {
   }
 
   #zoomBy(dt: number, pose: Pose, reach: Reach): void {
-    const distance = Math.max(reach.near, Math.min(reach.far, pose.distance * Math.exp(this.#zoom * dt)));
-    const share = 1 - distance / pose.distance;
-    if (!Number.isNaN(this.anchor.x)) {
+    const decay = Math.exp(-dt / ZOOM_TAU);
+    const distance = Math.max(
+      reach.near,
+      Math.min(reach.far, pose.distance * Math.exp(this.#zoom * ZOOM_TAU * (1 - decay))),
+    );
+    const anchored = !Number.isNaN(this.anchor.x);
+    this.#pull += ((anchored ? 1 : 0) - this.#pull) * (1 - Math.exp(-dt / PULL_TAU));
+    const share = (1 - distance / pose.distance) * this.#pull;
+    if (anchored) {
       pose.look.x += (this.anchor.x - pose.look.x) * share;
       pose.look.y += (this.anchor.y - pose.look.y) * share;
       pose.look.z += (this.anchor.z - pose.look.z) * share;
     }
     pose.distance = distance;
-    this.#zoom *= Math.exp(-dt / ZOOM_TAU);
+    this.#zoom *= decay;
   }
 
   // Turns the way round the view's up by `yaw`, then round its right by `pitch`, within the room above and under.
@@ -127,11 +144,27 @@ export class Free {
     if (yaw === 0 && pitch === 0) return;
     const { way, up } = pose;
     const axis = this.#axis.set(up.x, up.y, up.z);
-    const next = this.#way.set(way.x, way.y, way.z).applyQuaternion(this.#turn.setFromAxisAngle(axis, yaw));
+    const yawed = this.#yawed.setFromAxisAngle(axis, yaw);
+    const next = this.#way.set(way.x, way.y, way.z).applyQuaternion(yawed);
     const right = this.#right.crossVectors(axis, next).normalize();
-    const tilted = this.#tilt.copy(next).applyQuaternion(this.#turn.setFromAxisAngle(right, -pitch));
+    const turn = this.#turn.setFromAxisAngle(right, -pitch);
+    const tilted = this.#tilt.copy(next).applyQuaternion(turn);
     const height = tilted.dot(axis);
-    if (height < TOP && height > UNDER) next.copy(tilted);
+    const fits = height < TOP && height > UNDER;
+    if (fits) next.copy(tilted);
+    // Round a pivot that is not what the view looks at, the look goes round it as the way does: the pivot stays where it is on the screen.
+    // Only as far as the eye stands off it: close to a star far from the pivot, a turn would swing the look across the galaxy.
+    const { look } = pose;
+    if (!Number.isNaN(this.pivot.x)) {
+      const offset = this.#offset.set(look.x - this.pivot.x, look.y - this.pivot.y, look.z - this.pivot.z);
+      const share = Math.min(1, pose.distance / Math.max(offset.length(), 1e-6));
+      const [x, y, z] = [offset.x, offset.y, offset.z];
+      offset.applyQuaternion(yawed);
+      if (fits) offset.applyQuaternion(turn);
+      look.x += (offset.x - x) * share;
+      look.y += (offset.y - y) * share;
+      look.z += (offset.z - z) * share;
+    }
     way.x = next.x;
     way.y = next.y;
     way.z = next.z;

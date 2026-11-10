@@ -5,6 +5,7 @@ import { hubWorldOf, stampKey } from "@gnoworld/core";
 import { lazy, Suspense } from "react";
 import { OutLinks } from "../../features/realms/OutLinks.tsx";
 import { platePreview } from "../../features/previews/plate.ts";
+import { FirstCharted } from "../../features/world/Arrival.tsx";
 import { Proposed } from "../../features/world/PlateRealm.tsx";
 import type { Ring } from "../../features/world/statusRing.ts";
 import { useHours } from "../../features/world/useHours.ts";
@@ -71,7 +72,15 @@ function useHubPlate({
   const here = useHere(true).get(world.slug) ?? 0;
   const hours = useHours(world.slug);
   return {
-    lede: { status: statusOf(here, "Quiet") },
+    lede: {
+      sentence: (
+        <>
+          {world.description}
+          <FirstCharted world={world.slug} />
+        </>
+      ),
+      status: statusOf(here, "Quiet"),
+    },
     actions: {
       place: { name: world.name, path: world.canonical },
       follow: stampKey(universe.id, hubWorldOf(world)),

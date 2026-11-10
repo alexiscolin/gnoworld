@@ -3,7 +3,10 @@
 import { lazy, Suspense } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 
-const Signs = lazy(async () => ({ default: (await import("../../EarthSigns.tsx")).PageSigns }));
+// Asked as this module runs, not as the first render does: the plate's chunk, asked at the page's load, would hold the signs' code behind it
+// (the chat's budget counted it then, as the page's first screen no longer held it).
+const earth = import("../../EarthSigns.tsx");
+const Signs = lazy(async () => ({ default: (await earth).PageSigns }));
 const nothing = () => undefined;
 
 /** `room`'s newest words as bubbles on the planet `world`, the page's. */

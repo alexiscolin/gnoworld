@@ -1,14 +1,20 @@
-/* Who calls it (the proposal's cal card): the callers' line at the plate's spark height, then a row for each caller, its face, its name over a track
+/* Who calls it (the proposal's cal card): the callers' line as tall as the calls' chart beside it (Alexis, 2026-11-10), then a row for each caller, its face, its name over a track
    in the line colour that a cream fill grows along (0.9 s from 0.3 s after its card), its count in the mono. */
 @layer components {
   .spark {
-    block-size: var(--spark-h);
+    block-size: var(--chart-h);
     --spark-line: calc(var(--d) + 0.2s);
     --spark-area: calc(var(--d) + 0.6s);
   }
 
   .caller {
     font: var(--font-reading);
+  }
+
+  /* The name and its count over the track, across the two columns the face leaves. */
+  .body {
+    /* layout: across the two columns the face leaves */
+    grid-column: span 2;
   }
 
   .count {

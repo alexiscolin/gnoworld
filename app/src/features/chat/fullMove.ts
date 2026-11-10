@@ -3,8 +3,9 @@
 // box as the page comes back in, and goes. Nothing moves under reduced motion.
 import { gsap } from "gsap";
 import { useLayoutEffect, type RefObject } from "react";
-import { dockBox, FULL_MOVE, takeDock } from "../../fullChat.ts";
+import { FULL_MOVE, takeBack, takeDock } from "../../fullChat.ts";
 import { motionOf } from "../../space/motion.ts";
+import { restoreScrolls, stillFull, takeClosing } from "./stillScreen.ts";
 
 // Space's flights' own curve, a cubic in and out (space/rig/flight.ts's inOut), a little longer than before: the chat eases off and lands
 // as a flight does (Alexis, 2026-11-09: "plus smooth à la fin et au début … en cohérence avec … les planètes").
@@ -14,8 +15,6 @@ const SHRINK_S = 0.8;
 const FADE_S = 0.3;
 // raw: the dock's corners, the outline's
 const ROUND = 16;
-// What the full chat's mark sets for its parts (ChatScreen.module.css), which its copy keeps without the mark.
-const KEPT = ["--font-chat", "--chat-head", "--chat-inset"];
 
 // The clip of `box` that shows `within` alone, its corners `round`.
 const clipOf = (box: DOMRect, within: DOMRect, round: number) =>
@@ -44,30 +43,18 @@ function growFull(screen: HTMLElement): void {
     .fromTo(screen, { opacity: 0 }, { opacity: 1, duration: FADE_S, ease: "power1.out", clearProps: "opacity" }, 0);
 }
 
-// The full chat's `screen`, going: a still copy of it shrinks into the dock the page lays out, or fades where there is none.
+// The full chat's `screen`, going: a still copy of it (taken before the commit changed it, stillScreen.ts, else now) shrinks into the dock the
+// page lays out, or fades where there is none.
 function shrinkFull(screen: HTMLElement): void {
-  const copy = screen.cloneNode(true);
-  if (!(copy instanceof HTMLElement) || motionOf().matches) return;
-  const box = screen.getBoundingClientRect();
-  const look = getComputedStyle(screen);
-  // Where its lines stood: a copy starts at the top of every list it holds.
-  const scrolled = [...screen.querySelectorAll("*")].flatMap((part, at) =>
-    part.scrollTop > 0 ? [[at, part.scrollTop] as const] : [],
-  );
-  // Its class goes, its mark stays: the copy keeps the full chat's layout under the site's header (ChatScreen.module.css), and stands
-  // for no open chat (`.screen[data-full]`).
-  copy.className = "";
-  copy.inert = true;
-  copy.setAttribute("aria-hidden", "true");
-  for (const named of copy.querySelectorAll("[id]")) named.removeAttribute("id");
-  for (const name of KEPT) copy.style.setProperty(name, look.getPropertyValue(name));
-  copy.style.cssText += `;position:fixed;margin:0;z-index:3;pointer-events:none;left:${String(box.left)}px;top:${String(box.top)}px;width:${String(box.width)}px;height:${String(box.height)}px`;
+  if (motionOf().matches) return;
+  const still = takeClosing() ?? stillFull(screen);
+  if (still === undefined) return;
+  const { copy, box } = still;
   document.body.append(copy);
-  const parts = copy.querySelectorAll("*");
-  for (const [at, top] of scrolled) parts[at]?.scrollTo({ top });
+  restoreScrolls(copy, still.scrolls);
   // The page that takes the chat back lays its dock out in the frame after.
   requestAnimationFrame(() => {
-    const to = dockBox();
+    const to = takeBack();
     const going = gsap.timeline({
       onComplete: () => {
         copy.remove();

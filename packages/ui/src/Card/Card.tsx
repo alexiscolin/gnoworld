@@ -126,15 +126,23 @@ function Header({ title, icon, kicker, state, level = 3, size, expand, hint, act
     <div className={styles["header"]} data-open={expand?.open === true ? "" : undefined}>
       <Cluster justify="between" space="xs" wrap="no">
         <Stack space="3xs">
-          {kicker === undefined && icon === undefined ? null : (
+          {kicker === undefined ? null : (
             <Cluster space="2xs">
               {icon === undefined ? null : <Icon name={icon} />}
-              {kicker === undefined ? null : <Kicker>{kicker}</Kicker>}
+              <Kicker>{kicker}</Kicker>
             </Cluster>
           )}
-          <Heading id={titleId} className={styles["title"]} data-size={size}>
-            {title}
-          </Heading>
+          {/* With no kicker, the type's icon leads the title on its row, muted: a card known at a glance (Alexis, 2026-11-10). */}
+          <Cluster space="2xs" wrap="no">
+            {icon === undefined || kicker !== undefined ? null : (
+              <span className={styles["lead"]}>
+                <Icon name={icon} />
+              </span>
+            )}
+            <Heading id={titleId} className={styles["title"]} data-size={size}>
+              {title}
+            </Heading>
+          </Cluster>
         </Stack>
         {meta === undefined ? null : <span className={[styles["meta"], "meta", "truncate"].join(" ")}>{meta}</span>}
         {state === undefined ? null : <Chip>{state}</Chip>}

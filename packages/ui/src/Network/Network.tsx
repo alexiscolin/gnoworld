@@ -1,11 +1,19 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
-import { Stack } from "../compositions/index.ts";
+import type { CSSProperties } from "react";
+import { Cluster, Stack } from "../compositions/index.ts";
 import styles from "./Network.module.css";
+import { useSeen } from "./useSeen.ts";
 
 /** The most dots in a lane: the rest is a number in the legend. */
 const LANE_MAX = 7;
-const WIDTH = 320;
-const GAP = 30;
+/** A dot and the step to the next: 12 px of air between two dots (the proposal packs them 8 px apart). */
+const GAP = 34;
+/** The air kept at the graph's edges, and between a dot and the centre's halo. */
+const MARGIN = 8;
+const HALO_R = 36;
+const CLEAR = 12;
+const CENTRE_R = 24;
+/** The room the words of an empty side take under the centre. */
+const SAID = 22;
 const NODE_H = 22;
 /** The longest word in a dot. */
 const WORD_MAX = 14;
@@ -28,8 +36,8 @@ export interface NetworkProps {
   /** The one in the middle. */
   centre: NetworkNode;
   /** The two lanes, left and right, each with its word in the legend and its total when it is more than the dots drawn (the first 7 are drawn). */
-  left: { word: string; nodes: readonly NetworkNode[]; total?: number };
-  right: { word: string; nodes: readonly NetworkNode[]; total?: number };
+  left: { word: string; nodes: readonly NetworkNode[]; total?: number; none?: string };
+  right: { word: string; nodes: readonly NetworkNode[]; total?: number; none?: string };
   /** The node picked, which stands out and says its path. */
   selected?: string | undefined;
   onSelect?: (id: string) => void;
@@ -37,26 +45,35 @@ export interface NetworkProps {
   pickedHint?: string;
 }
 
-const cut = (word: string) => (word.length > WORD_MAX ? `${word.slice(0, WORD_MAX - 1)}…` : word);
+// The tick type is 6.6 px a letter; a dot keeps 10 px of air before its word, 8 after its count and 6 between them: a word is cut where
+// the room the count leaves ends, so the two never touch.
+const LETTER = 6.6;
+const cut = (word: string, width: number, count: number | undefined) => {
+  const counted = count === undefined ? 0 : (String(count).length + 1) * LETTER + 6;
+  const room = Math.min(WORD_MAX, Math.max(3, Math.floor((width - 18 - counted) / LETTER)));
+  return word.length > room ? `${word.slice(0, room - 1)}…` : word;
+};
 
 interface LaneProps {
   nodes: readonly NetworkNode[];
   side: -1 | 1;
-  height: number;
+  /** The centre's height in the drawing. */
+  cy: number;
   width: number;
+  /** The graph's own width: the dots keep their size, the curves take the room. */
+  span: number;
   selected: string | undefined;
   onSelect: ((id: string) => void) | undefined;
 }
 
 // One lane: its curves from the centre first, then its dots, each a button when something answers a pick.
-function Lane({ nodes, side, height, width, selected, onSelect }: LaneProps) {
-  const cy = height / 2;
-  const cx = WIDTH / 2;
-  const gap = Math.min(GAP, (height - 24) / Math.max(nodes.length, 1));
+function Lane({ nodes, side, cy, width, span, selected, onSelect }: LaneProps) {
+  const cx = span / 2;
+  const gap = GAP;
   const y0 = cy - ((nodes.length - 1) * gap) / 2;
-  const x = side < 0 ? 4 : WIDTH - 4 - width;
+  const x = side < 0 ? MARGIN : span - MARGIN - width;
   const edgeAt = side < 0 ? x + width : x;
-  const centreAt = side < 0 ? cx - 24 : cx + 24;
+  const centreAt = side < 0 ? cx - CENTRE_R : cx + CENTRE_R;
   const mid = (edgeAt + centreAt) / 2;
   return (
     <>
@@ -93,9 +110,10 @@ function Lane({ nodes, side, height, width, selected, onSelect }: LaneProps) {
                   },
                 })}
           >
+            <title>{node.detail ?? node.label}</title>
             <rect x={x} y={y - NODE_H / 2} width={width} height={NODE_H} rx={pure ? 5 : NODE_H / 2} />
             <text x={x + 10} y={y + 3.5}>
-              {cut(node.label)}
+              {cut(node.label, width, node.count)}
             </text>
             {node.count === undefined ? null : (
               <text x={x + width - 8} y={y + 3.5} textAnchor="end">
@@ -109,40 +127,42 @@ function Lane({ nodes, side, height, width, selected, onSelect }: LaneProps) {
   );
 }
 
-// The graph draws its curves once it is in view (an arrival of its own: each curve after the one before).
-function useSeen() {
-  const ref = useRef<SVGSVGElement>(null);
-  const [seen, setSeen] = useState(false);
-  useEffect(() => {
-    const node = ref.current;
-    if (node === null || typeof IntersectionObserver === "undefined") {
-      setSeen(true);
-      return undefined;
-    }
-    const watch = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setSeen(true);
-        watch.disconnect();
-      }
-    });
-    watch.observe(node);
-    return () => {
-      watch.disconnect();
-    };
-  }, []);
-  return { ref, seen };
+// What a side with no dot says, under the centre where it always has the room (beside it a narrow column cut it).
+function Nones({
+  left,
+  right,
+  empty,
+  cx,
+  y,
+}: Pick<NetworkProps, "left" | "right"> & { empty: [boolean, boolean]; cx: number; y: number }) {
+  const said = [
+    ...(empty[0] ? [left.none ?? `${left.word} nothing`] : []),
+    ...(empty[1] ? [right.none ?? `no ${right.word} yet`] : []),
+  ];
+  return said.length === 0 ? null : (
+    <text className={styles["none"]} x={cx} y={y} textAnchor="middle">
+      {said.join(" · ")}
+    </text>
+  );
 }
 
 /** A minigraph of a place and what is linked to it: the centre, up to 7 dots on its left and 7 on its right joined by curves, a legend
  * with each side's total and a foot that names the dot picked. Each dot is a button when something answers a pick. Positions are
  * computed from the order, so the same links draw the same graph. */
 export function Network({ label, centre, left, right, selected, onSelect, pickedHint }: NetworkProps) {
-  const { ref, seen } = useSeen();
+  const { ref, seen, span } = useSeen();
   const lanes = [left.nodes.slice(0, LANE_MAX), right.nodes.slice(0, LANE_MAX)] as const;
-  const height = Math.max(150, Math.max(lanes[0].length, lanes[1].length) * GAP + 24);
-  const width = Math.min(120, Math.floor((WIDTH - 96) / 2));
-  const cx = WIDTH / 2;
-  const cy = height / 2;
+  const rows = Math.max(lanes[0].length, lanes[1].length);
+  const empty: [boolean, boolean] = [lanes[0].length === 0, lanes[1].length === 0];
+  // The drawing is as tall as its longest lane (the halo's size at least), the words of an empty side under the centre.
+  const core = Math.max(rows * GAP, 2 * HALO_R);
+  const height = core + 2 * MARGIN + (empty[0] || empty[1] ? SAID : 0);
+  // The proposal's rule: the dots take what the centre leaves, at most 120 px.
+  const width = Math.min(120, Math.floor((span - 96) / 2));
+  // The halo gives up room before a dot has to: it keeps CLEAR px of air to the dots in a narrow column.
+  const halo = Math.min(HALO_R, Math.max(CENTRE_R + 4, span / 2 - MARGIN - width - CLEAR));
+  const cx = span / 2;
+  const cy = MARGIN + core / 2;
   const picked = [...lanes[0], ...lanes[1]].find((node) => node.id === selected);
   return (
     <Stack space="2xs">
@@ -150,38 +170,32 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
         ref={ref}
         className={styles["net"]}
         data-seen={seen ? "" : undefined}
-        viewBox={`0 0 ${String(WIDTH)} ${String(height)}`}
+        viewBox={`0 0 ${String(span)} ${String(height)}`}
         role="group"
         aria-label={label}
       >
-        <circle className={styles["halo"]} cx={cx} cy={cy} r={36} />
-        <Lane nodes={lanes[0]} side={-1} height={height} width={width} selected={selected} onSelect={onSelect} />
-        <Lane nodes={lanes[1]} side={1} height={height} width={width} selected={selected} onSelect={onSelect} />
+        <circle className={styles["halo"]} cx={cx} cy={cy} r={halo} />
+        <Lane nodes={lanes[0]} side={-1} cy={cy} width={width} span={span} selected={selected} onSelect={onSelect} />
+        <Lane nodes={lanes[1]} side={1} cy={cy} width={width} span={span} selected={selected} onSelect={onSelect} />
         <g className={styles["centre"]}>
-          <circle cx={cx} cy={cy} r={24} />
+          <circle cx={cx} cy={cy} r={CENTRE_R} />
           <text x={cx} y={cy + 4} textAnchor="middle">
             {centre.label.length > 6 ? `${centre.label.slice(0, 5)}…` : centre.label}
           </text>
         </g>
-        {lanes[0].length === 0 ? (
-          <text className={styles["none"]} x={cx - 40} y={cy + 3} textAnchor="end">
-            {left.word} nothing
-          </text>
-        ) : null}
-        {lanes[1].length === 0 ? (
-          <text className={styles["none"]} x={cx + 40} y={cy + 3}>
-            no {right.word} yet
-          </text>
-        ) : null}
+        <Nones left={left} right={right} empty={empty} cx={cx} y={cy + HALO_R + 16} />
       </svg>
-      <p className={styles["legend"]}>
-        <span>
-          ← {left.word} <b>{left.total ?? left.nodes.length}</b>
-        </span>
-        <span>
-          {right.word} <b>{right.total ?? right.nodes.length}</b> →
-        </span>
-      </p>
+      {/* The two sides of the legend 8 px apart (the proposal's). */}
+      <div className={styles["legend"]}>
+        <Cluster space="2xs">
+          <span>
+            ← {left.word} <b>{left.total ?? left.nodes.length}</b>
+          </span>
+          <span>
+            {right.word} <b>{right.total ?? right.nodes.length}</b> →
+          </span>
+        </Cluster>
+      </div>
       <p className={styles["legend"]}>square = pure package, round = realm</p>
       <p className={styles["caption"]}>
         {picked === undefined

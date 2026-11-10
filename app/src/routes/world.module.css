@@ -2,6 +2,8 @@
    plate's sections, its figures and its actions among them, are spaced by the plate itself (Panel.module.css, D470). */
 @layer components {
   .chat {
+    /* layout: the chat's skeleton stands over it while it comes (features/chat/DockCover.tsx) */
+    position: relative;
     /* layout: the chat takes the dock's height */
     block-size: 100%;
   }

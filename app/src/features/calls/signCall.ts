@@ -4,6 +4,8 @@
 import type { Landed } from "@gnoworld/chain/tx";
 import type { ChainRead, FailureKind } from "@gnoworld/chain/read";
 import type { callContract, Universe } from "../../lib/adena/call.ts";
+import { queryClient } from "../../lib/query/client.ts";
+import { invalidateRealm } from "../../lib/query/keys.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { callRequest } from "./request.ts";
 import { callsIn } from "./slice.ts";
@@ -37,6 +39,9 @@ const BOUND_MS = 120_000;
 // What a moment can change; any other answer of the node is final for this hash.
 const AGAIN: readonly FailureKind[] = ["not-landed", "down", "timeout", "chain-refused"];
 
+/** What a card's course holds: its parts, and the realm its call is on. */
+type Course = SignDeps & { realm: string };
+
 interface Sent {
   hash: string;
   /** Adena's log of a call it named a hash for and said failed. */
@@ -44,7 +49,7 @@ interface Sent {
 }
 
 // Reads the hash until it is in a block, or the bound; the card's state is the chain's answer.
-async function follow(id: string, { hash, adena }: Sent, deps: SignDeps): Promise<void> {
+async function follow(id: string, { hash, adena }: Sent, deps: Course): Promise<void> {
   const { done, failed } = actionsOf(deps);
   const { read, wait, now = Date.now } = deps;
   const started = now();
@@ -53,7 +58,11 @@ async function follow(id: string, { hash, adena }: Sent, deps: SignDeps): Promis
     if (landed.ok) {
       const { failed: refused, log, data, height } = landed.value;
       if (refused) failed(id, { reason: "chain", log, hash });
-      else done(id, { height, value: data });
+      else {
+        done(id, { height, value: data });
+        // The call is in a block: the realm's page and facts are read again at the next look (a mounted view reads them at once).
+        await invalidateRealm(queryClient, deps.realm);
+      }
       return;
     }
     // A final answer is said with its own sentence; only a wait that ran out says the wait (F5725).
@@ -69,7 +78,7 @@ async function follow(id: string, { hash, adena }: Sent, deps: SignDeps): Promis
 
 // Adena's answer to the card's call: a hash is followed to its block, a failure without one is the card's state. A call that may
 // have been sent, with a hash, is followed as a sent one: the chain says what became of it (F5728).
-async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>, deps: SignDeps): Promise<void> {
+async function settle(id: string, signed: Awaited<ReturnType<SignDeps["call"]>>, deps: Course): Promise<void> {
   const { landing, failed } = actionsOf(deps);
   const hash = signed.ok || signed.reason === "maybe-sent" ? signed.hash : undefined;
   if (hash !== undefined) {
@@ -103,5 +112,5 @@ export async function signCall(id: string, deps: SignDeps): Promise<void> {
     failed(id, { reason: "failed" });
     return;
   }
-  await settle(id, await call(adena, built.request, universe), deps);
+  await settle(id, await call(adena, built.request, universe), { ...deps, realm: card.realm });
 }

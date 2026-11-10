@@ -4,8 +4,19 @@ import { MemoryRouter } from "react-router";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
+import { SignedIn } from "../../../tests/grabStore.tsx";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
-import { after, calling, CHAIN, CUR, field, inputs, listing, typed } from "../../../tests/callFixtures.ts";
+import {
+  after,
+  calling,
+  CHAIN,
+  CUR,
+  field,
+  inputs,
+  listing,
+  SIBLING_CHAIN,
+  typed,
+} from "../../../tests/callFixtures.ts";
 import { ActionForm } from "./ActionForm.tsx";
 import { InlineCard } from "./InlineCard.tsx";
 
@@ -43,6 +54,7 @@ async function draw(action: Action, more: { label?: string; read?: () => Promise
   const sibling = vi.fn<ChainFetch>(() => after(under, FUNCTIONS_ANSWER));
   const box = mount(
     <StoreProvider>
+      <SignedIn />
       <div data-test="under">
         <ActionForm
           action={action}
@@ -53,7 +65,7 @@ async function draw(action: Action, more: { label?: string; read?: () => Promise
         />
       </div>
       <div data-test="sibling">
-        <ActionForm action={VOTE} chain={CHAIN} options={{ fetch: sibling }} />
+        <ActionForm action={VOTE} chain={SIBLING_CHAIN} options={{ fetch: sibling }} />
       </div>
     </StoreProvider>,
   );
@@ -389,7 +401,7 @@ describe("a pinned action in the quick actions bar", () => {
       <StoreProvider>
         <ActionForm
           action={VOTE}
-          chain={CHAIN}
+          chain={SIBLING_CHAIN}
           options={{ fetch: vi.fn<ChainFetch>(() => after(under, FUNCTIONS_ANSWER)) }}
         />
       </StoreProvider>,

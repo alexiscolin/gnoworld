@@ -14,6 +14,16 @@
     visibility: visible;
   }
 
+  /* A page opened from its URL: the scene is out of sight till its planet is itself (frame.ts's data-sharp), then comes in from black on the
+     arrival's clock (arrival.ts starts the box in that frame). */
+  .canvas[data-first] {
+    transition: opacity calc(var(--motion-arrive) * var(--motion-scale)) var(--ease-emphasized);
+  }
+
+  .canvas[data-first]:not([data-sharp]) {
+    opacity: 0;
+  }
+
   /* Above the views' bar on a phone, in the gutter, within reach. */
   .offer,
   .status {
@@ -40,6 +50,9 @@
 
   /* Wherever textures show (DESIGN-SYSTEM.md, Regions): one word in the page's bottom margin, under the frame's corner. */
   .credits {
+    /* The rail's footprint (core's RAIL), written by the button as the rail writes its own: under it, the word is centred on the rail. */
+    --_footprint: initial;
+
     position: fixed;
     /* raw: the 24 px margin under the frame, all of it, for a finger */
     inset: auto var(--space-m) 0 auto;
@@ -75,8 +88,21 @@
     }
   }
 
+  .credits {
+    transition: color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
   .credits:hover {
     color: var(--color-text);
+  }
+
+  /* Where the rail stands (core's RAIL.from), the word is centred on the rail's column, under its See all (Alexis, 2026-11-10). */
+  @media (min-width: 900px) {
+    :root:has([data-rail]) .credits {
+      /* layout: the rail's own width (Rail.module.css) */
+      inline-size: calc(var(--_footprint) - var(--page-edge));
+      text-align: center;
+    }
   }
 
   /* Level with the hero's foot, left of the rail's column (frames 4 and 17: 118 px wide, 25 from the edge). */

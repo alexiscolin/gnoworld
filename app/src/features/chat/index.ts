@@ -4,7 +4,7 @@ import { lazy } from "react";
 export { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
 export { Chat } from "./Chat.tsx";
 export { useChatAlone } from "./full.ts";
-export { FullChatHost, PlaceChat } from "./fullHost.tsx";
+export { chatHeld, DockedChatHost, FullChatHost, PlaceChat } from "./fullHost.tsx";
 export type { ChatProps } from "./Chat.tsx";
 export { LOADING } from "./Loading.tsx";
 export { roomsChanged } from "./roomsListed.ts";

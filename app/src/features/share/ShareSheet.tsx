@@ -6,6 +6,7 @@ import { Button, Cluster, Dialog, Stack } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { linkOf, type SharedPlace } from "./link.ts";
+import appear from "../../enter.module.css";
 import styles from "./ShareSheet.module.css";
 
 // How long the sheet waits for the scene's next frame before it shows no picture: a frame is due within one at any rate the loop runs.
@@ -110,7 +111,9 @@ function Sheet({ place, open, onClose }: { place: SharedPlace; open: boolean; on
       <Stack space="s">
         {picture === null ? null : (
           <figure className={styles["picture"]} data-waiting={picture === undefined || undefined}>
-            {picture === undefined ? null : <img src={picture.url} alt={`${place.name}, as the view shows it now`} />}
+            {picture === undefined ? null : (
+              <img className={appear["enter"]} src={picture.url} alt={`${place.name}, as the view shows it now`} />
+            )}
             <figcaption className={styles["caption"]}>
               <span className="label">gnoworld</span>
               <span>{place.name}</span>

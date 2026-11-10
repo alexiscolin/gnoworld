@@ -70,12 +70,6 @@
   }
 
   .legend {
-    /* layout: this row's own arrangement */
-    display: flex;
-    /* layout: this row's own arrangement */
-    flex-wrap: wrap;
-    /* layout: the two sides of the legend a step apart */
-    gap: var(--space-xs);
     color: var(--color-text-muted);
     font: var(--font-meta);
   }

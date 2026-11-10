@@ -112,7 +112,7 @@ function CallsList({
         expanded={open}
         empty={kind === "failed" ? "No failed call." : "No call matches."}
         note={`the last ${grouped(rollup.last.length)} of ${grouped(rollup.calls)} calls`}
-        render={(call) => <CallRow call={call} worlds={worlds} />}
+        render={(call) => <CallRow call={call} worlds={worlds} universe={rollup.universe} />}
       />
     </>
   );
@@ -174,6 +174,7 @@ export function Calls({
     <Cell span={open || !beside ? 12 : 8}>
       <Card look="hub" fixed rises open={open}>
         <Card.Header
+          icon="chart"
           title="Calls per day"
           level={2}
           actions={<Segments scale={scale} range={range} onScale={setScale} onRange={setRange} />}

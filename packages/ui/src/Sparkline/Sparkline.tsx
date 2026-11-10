@@ -38,7 +38,11 @@ export function Sparkline({ values, tone, from = "range", fills = false, arrives
       : span === 0
         ? HEIGHT / 2
         : INSET + (1 - (value - low) / span) * (HEIGHT - 2 * INSET);
-  const line = shown.map((value, at) => `${(at * step).toFixed(2)},${y(value).toFixed(2)}`).join(" ");
+  const points = shown.map((value, at) => `${(at * step).toFixed(2)},${y(value).toFixed(2)}`);
+  // Paths, not polylines: the browser animates a path's `d` as CSS, so a fresh read moves the line from where it stands (the same number of
+  // values; with another count it swaps).
+  const line = `M${points.join(" L")}`;
+  const area = `M0,${String(HEIGHT)} L${points.join(" L")} L${String(WIDTH)},${String(HEIGHT)} Z`;
   return (
     <svg
       className={styles["spark"]}
@@ -55,14 +59,11 @@ export function Sparkline({ values, tone, from = "range", fills = false, arrives
           <stop offset="1" className={styles["foot"]} />
         </linearGradient>
       </defs>
-      <polygon
-        className={styles["area"]}
-        points={`0,${String(HEIGHT)} ${line} ${String(WIDTH)},${String(HEIGHT)}`}
-        fill={`url(#${fillId})`}
-      />
-      <polyline
+      <path className={styles["area"]} d={area} style={{ d: `path("${area}")` }} fill={`url(#${fillId})`} />
+      <path
         className={styles["line"]}
-        points={line}
+        d={line}
+        style={{ d: `path("${line}")` }}
         pathLength={arrives ? 1 : undefined}
         fill="none"
         strokeLinejoin="round"

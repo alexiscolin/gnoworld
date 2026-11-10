@@ -131,6 +131,10 @@
     translate: var(--_hair) -50%;
   }
 
+  .tag {
+    transition: border-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
   .tag:hover,
   .tag:focus-visible {
     border-color: var(--color-text);

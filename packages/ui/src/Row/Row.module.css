@@ -9,6 +9,7 @@
     padding-inline: var(--space-xs);
     border-radius: var(--radius-s);
     background: var(--_fill);
+    transition: background-color var(--motion-fast) var(--ease-standard);
   }
 
   .row:hover {

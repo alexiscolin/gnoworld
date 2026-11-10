@@ -8,8 +8,8 @@ import * as stories from "./Overview.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Storybook shows everything": one page shows every component at once.
 // Each component the entry gives, by the region that shows it and the mark it leaves there: tsc
-// fails this object the day a component joins the entry with nothing named here.
-const SHOWN: Record<keyof typeof ui, readonly [region: string, mark: string]> = {
+// fails this object the day a component joins the entry with nothing named here. stillCopy is a helper with nothing to draw.
+const SHOWN: Record<Exclude<keyof typeof ui, "stillCopy">, readonly [region: string, mark: string]> = {
   Breadcrumb: ["Links", "nav[aria-label] [aria-current='page']"],
   Button: ["Buttons", "button[data-emphasis]:not([aria-label])"],
   IconButton: ["Icon buttons", "button[data-emphasis][aria-label]"],

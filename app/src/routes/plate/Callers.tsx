@@ -6,6 +6,7 @@ import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { dayValues } from "./days.ts";
 import { grouped } from "./figures.ts";
 import { callerName } from "./names.ts";
+import appear from "../../enter.module.css";
 import styles from "./Callers.module.css";
 
 const OPENS_WITH = 8;
@@ -21,6 +22,7 @@ export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: World
     <Cell span={open ? 12 : 4}>
       <Card look="hub" fixed rises open={open}>
         <Card.Header
+          icon="people"
           title="Who calls it"
           level={2}
           hint="per day"
@@ -47,26 +49,32 @@ export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: World
                 <li key={address} className={styles["caller"]}>
                   <Grid template="icon-text-meta" space="xs">
                     <Avatar address={address} name={callerName(worlds, address)} decorative />
-                    <Stack space="2xs">
-                      <span className="truncate">{callerName(worlds, address)}</span>
-                      <span className={styles["track"]}>
-                        <i
-                          style={
-                            {
-                              inlineSize: `${Math.max(3, (calls / most) * 100).toFixed(1)}%`,
-                              "--j": at,
-                            } as CSSProperties
-                          }
-                        />
-                      </span>
-                    </Stack>
-                    <span className={styles["count"]}>{grouped(calls)}</span>
+                    <div className={styles["body"]}>
+                      <Stack space="2xs">
+                        <Grid template="text-meta" space="xs">
+                          <span className="truncate">{callerName(worlds, address)}</span>
+                          <span className={styles["count"]}>{grouped(calls)}</span>
+                        </Grid>
+                        <span className={styles["track"]}>
+                          <i
+                            style={
+                              {
+                                inlineSize: `${Math.max(3, (calls / most) * 100).toFixed(1)}%`,
+                                "--j": at,
+                              } as CSSProperties
+                            }
+                          />
+                        </span>
+                      </Stack>
+                    </div>
                   </Grid>
                 </li>
               ))}
             </Stack>
             {callers > shown.length ? (
-              <p className={styles["more"]}>{`+ ${grouped(callers - shown.length)} more addresses`}</p>
+              <p
+                className={[styles["more"], appear["enter"]].join(" ")}
+              >{`+ ${grouped(callers - shown.length)} more addresses`}</p>
             ) : null}
           </Stack>
         </Card.Body>

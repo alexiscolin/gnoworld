@@ -33,6 +33,11 @@
     vector-effect: non-scaling-stroke;
   }
 
+  .line,
+  .area {
+    transition: d var(--motion-slow) var(--ease-standard);
+  }
+
   .top {
     stop-color: var(--_tone);
     /* raw: the area's shade at the line's height, frame 6 */

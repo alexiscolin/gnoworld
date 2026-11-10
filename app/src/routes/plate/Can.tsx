@@ -8,10 +8,10 @@ export function Can({ can }: { can: readonly Capability[] }) {
   const [picked, setPicked] = useState<string>();
   const line = can.find(({ label }) => label === picked);
   return (
-    <Card look="hub">
-      <Card.Header title="What it can do" level={2} hint="read from its imports" />
+    <Card look="hub" rises>
+      <Card.Header icon="shield" title="What it can do" level={2} hint="read from its imports" />
       <Card.Body>
-        <Stack space="xs">
+        <Stack space="s">
           <Cluster space="2xs">
             {can.map(({ label }) => (
               <Chip
@@ -25,7 +25,7 @@ export function Can({ can }: { can: readonly Capability[] }) {
               </Chip>
             ))}
             {can.length === 0 ? (
-              <span className={styles["hint"]}>No token, NFT or governance capability found.</span>
+              <span className={styles["hint"]}>No coin-taking, admin or token capability found.</span>
             ) : null}
           </Cluster>
           <p className="data-text" aria-live="polite">

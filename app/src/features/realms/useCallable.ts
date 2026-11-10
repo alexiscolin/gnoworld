@@ -1,9 +1,11 @@
 // A realm's exported functions with their parameters, read once from `vm/qfuncs` (9e): what the write rows, a page's `<gno-form>` and a
 // proposed action are each checked against before a Call shows. Panels of one view that ask in the same moment share one request.
 import { callFields, type CallField } from "@gnoworld/core";
-import type { ReadOptions } from "@gnoworld/chain/read";
-import { createContext, use, useEffect, useState } from "react";
-import { readCallable } from "../../lib/chain/rpc.ts";
+import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
+import { useQuery } from "@tanstack/react-query";
+import { createContext, use } from "react";
+import { realmFunctions, toCallable } from "../../lib/chain/rpc.ts";
+import { isUnread, queryClient } from "../../lib/query/client.ts";
 
 export interface Callable {
   name: string;
@@ -11,11 +13,6 @@ export interface Callable {
 }
 export type Listing =
   { state: "loading" } | { state: "listed"; functions: Callable[] } | { state: "failed"; next: string };
-
-// A rejection here is a bug, not a state: the browser's own report, as the other panels' are.
-const report = (error: unknown): void => {
-  reportError(error);
-};
 
 /** The listing a realm view already read, for the forms its page holds: they mount after the page is read, when the panels'
  * shared request has ended, and would ask again. It names the chain and realm it was read for: a reader of another one ignores it. */
@@ -47,25 +44,17 @@ export function useRead({
 }): Shared {
   const key = `${rpc} ${realm}`;
   const mine = shared?.key === key;
-  const [read, setRead] = useState<Shared | undefined>(undefined);
-  useEffect(() => {
-    if (mine) return;
-    let live = true;
-    readCallable(rpc, realm, options)
-      .then((answer) => {
-        if (!live) return;
-        const listing: Listing = answer.ok
-          ? { state: "listed", functions: answer.value }
-          : { state: "failed", next: answer.failure.next };
-        setRead({ key, listing });
-      })
-      .catch(report);
-    return () => {
-      live = false;
-    };
-  }, [key, rpc, realm, options, mine]);
+  // A listing shared by the view above is taken as it is, unread; the kept one (a place seen again) shows at once, and a fresh read that
+  // failed leaves it.
+  const { data, error } = useQuery(
+    { ...realmFunctions(rpc, realm, options), enabled: !mine, select: toCallable },
+    queryClient,
+  );
   if (mine) return shared;
-  return read?.key === key ? read : { key, listing: { state: "loading" } };
+  if (data?.ok === true) return { key, listing: { state: "listed", functions: data.value } };
+  if (isUnread<ChainRead<unknown>>(error) && !error.read.ok)
+    return { key, listing: { state: "failed", next: error.read.failure.next } };
+  return { key, listing: { state: "loading" } };
 }
 
 /** The function `name` as a call carries it (a write, of the types a call carries) with its fields, or none: no such function,

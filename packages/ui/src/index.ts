@@ -23,6 +23,7 @@ export { Figures, type Figure, type FiguresProps } from "./Figures/Figures.tsx";
 export { Flash, type FlashMessage, type FlashProps } from "./Flash/Flash.tsx";
 export { Icon, type IconName, type IconProps } from "./icons/Icon.tsx";
 export { iconNode } from "./icons/iconNode.ts";
+export { stillCopy } from "./stillCopy.ts";
 export { Kicker, type KickerProps } from "./Kicker/Kicker.tsx";
 export { Logo, type LogoProps } from "./Logo/Logo.tsx";
 export { LinkProvider, type PageLinkProps } from "./link.tsx";

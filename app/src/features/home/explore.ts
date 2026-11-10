@@ -5,7 +5,9 @@
 import type { Presence } from "@gnoworld/schemas/indexer";
 import type { FlashMessage } from "@gnoworld/ui";
 import type { Result } from "../../lib/api/http.ts";
-import { pagePresenceApi } from "../../lib/api/presence.ts";
+import { resultOf } from "../../lib/query/api.ts";
+import { presenceOptions } from "../../lib/query/apiReads.ts";
+import { queryClient } from "../../lib/query/client.ts";
 
 /** The places the page lists: the Earth's page, and each world's by its roles file's slug, the presence's key; the universe whose expedition
  * it follows, if any, and how its pill opens the passport over a page (the hero that raised it is gone once the flight leaves). */
@@ -26,7 +28,7 @@ const LIVE_HERE = 5;
 /** The page "Go explore" opens from `places`, by the presence `read` gives. */
 export async function exploreTo(
   places: ExplorePlaces,
-  read: () => Promise<Result<Presence>> = pagePresenceApi().read,
+  read: () => Promise<Result<Presence>> = () => resultOf(queryClient.query(presenceOptions)),
 ): Promise<string> {
   const answer = await read();
   let best: { path: string; people: number } = { path: places.earth, people: 0 };

@@ -70,6 +70,23 @@
     inset: 0 auto auto 0;
   }
 
+  /* Fading out and in as a label does (0.4 s, tokens.css), drawn till it ends, then out of the tab order; none under reduced motion. */
+  .anchor,
+  .signs {
+    transition: opacity var(--motion-label) var(--ease-emphasized);
+  }
+
+  .anchor[data-away],
+  .signs[data-away] {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    /* raw: the box leaves the tab order and the pointer only once its fade has ended: no delay in, 0.4 s out */
+    transition:
+      opacity var(--motion-label) var(--ease-emphasized),
+      visibility 0s linear var(--motion-label);
+  }
+
   .anchor[data-mark="bubble"] {
     /* raw: the bubble's place from its point, and how far it moved clear of another: the script writes them */
     --_x: 6px;
@@ -260,6 +277,10 @@
     background: var(--color-primary);
     /* raw: a small glow */
     box-shadow: 0 0 8px var(--color-primary);
+  }
+
+  .pin {
+    transition: border-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
   }
 
   .pin:hover {

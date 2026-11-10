@@ -73,6 +73,10 @@
     background: var(--color-fill-hover);
   }
 
+  .list [role="option"] {
+    transition: background-color var(--motion-fast) var(--ease-standard);
+  }
+
   .list [aria-selected="true"] {
     background: var(--color-fill-hover);
   }

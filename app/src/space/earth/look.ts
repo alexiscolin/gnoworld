@@ -30,6 +30,7 @@ export const EARTH: HandMade = {
   lean: 0.1,
   relief: 0,
   clouds: 0.34,
+  highClouds: 0.22,
   rim: { colour: [0.2, 0.32, 0.54], thickness: 0.05 },
 };
 
@@ -41,5 +42,6 @@ export const MOON: HandMade = {
   lean: 0,
   relief: 0.02,
   clouds: 0,
+  highClouds: 0,
   rim: null,
 };

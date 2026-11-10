@@ -1,24 +1,5 @@
 /* Around it: a row of the list beside the graph, a planet, a path and what it is. */
 @layer components {
-  .row {
-    /* layout: the planet, the path and its kind a step apart */
-    gap: var(--space-s);
-    inline-size: 100%;
-    min-block-size: var(--row-h);
-    color: inherit;
-    font: var(--font-meta);
-    text-align: start;
-  }
-
-  .row[data-link] {
-    cursor: pointer;
-    transition: background-color var(--motion-fast) var(--ease-standard);
-  }
-
-  .row[data-link]:hover {
-    background: var(--color-fill);
-  }
-
   .note {
     color: var(--color-text-muted);
     font: var(--font-data);

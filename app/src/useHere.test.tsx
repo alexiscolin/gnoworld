@@ -20,7 +20,8 @@ const served = () =>
 
 describe("useHere", () => {
   beforeEach(() => {
-    vi.useFakeTimers();
+    // Only the minute is the clock's: the query tells its readers by a real timer of its own.
+    vi.useFakeTimers({ toFake: ["setInterval", "clearInterval", "Date"] });
     vi.stubGlobal("reportError", vi.fn());
   });
   afterEach(() => {
@@ -33,7 +34,7 @@ describe("useHere", () => {
     vi.stubGlobal("fetch", fetcher);
     const host = document.body.appendChild(document.createElement("div"));
     const root = createRoot(host);
-    await act(async () => {
+    act(() => {
       root.render(
         <>
           <Asker id="a" />
@@ -41,16 +42,21 @@ describe("useHere", () => {
           <Asker id="c" open={false} />
         </>,
       );
-      await vi.advanceTimersByTimeAsync(0);
+    });
+    await vi.waitFor(() => {
+      expect(host.querySelector("#a")?.textContent).toBe("7");
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
     expect(host.querySelector("#a")?.textContent).toBe("7");
     expect(host.querySelector("#b")?.textContent).toBe("7");
-    expect(host.querySelector("#c")?.textContent).toBe("none");
+    // A closed asker holds no read of its own (one request in all); it sees the page's reading when another holds it.
+    expect(host.querySelector("#c")?.textContent).toBe("7");
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
     });
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    await vi.waitFor(() => {
+      expect(fetcher).toHaveBeenCalledTimes(2);
+    });
     act(() => {
       root.unmount();
     });

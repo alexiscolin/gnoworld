@@ -65,3 +65,10 @@ export function homeFrame(space: Space, alone: Planet | undefined, share: number
   else uBoost.value += (1 - uBoost.value) * share;
   boosts.gate = uBoost.value - 1;
 }
+
+/** Whether this is the first arrival of a scene that came in from black (a page opened from its URL): asked once per arrival, it marks the canvas. */
+export function firstArrival({ dataset }: HTMLCanvasElement): boolean {
+  const first = dataset["first"] !== undefined && dataset["scanned"] === undefined;
+  dataset["scanned"] = "";
+  return first;
+}

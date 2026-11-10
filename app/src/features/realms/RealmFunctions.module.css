@@ -10,6 +10,7 @@
   .result {
     /* raw: the proposal's value, no token names it */
     max-block-size: var(--_res, 180px);
+    transition: max-block-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
     max-inline-size: 100%;
     overflow: auto;
     /* layout: a preformatted block's own margin, which the browser gives it, taken off */

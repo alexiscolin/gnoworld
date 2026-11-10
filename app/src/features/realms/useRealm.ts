@@ -2,10 +2,13 @@
 // requests through lib/chain, and the chat's drawing, a lazy chunk. Nothing polls: one request each per view. A read that
 // fails is a state with its next step, never a blank; the height failing leaves the page standing, said so.
 import { page, type Page } from "@gnoworld/core";
-import { useEffect, useState } from "react";
+import { queryOptions, useQuery } from "@tanstack/react-query";
 import { readHeight } from "@gnoworld/chain/node";
 import { readPage } from "../../lib/chain/rpc.ts";
 import type { Failure, ReadOptions } from "@gnoworld/chain/read";
+import { isUnread, queryClient, Unread } from "../../lib/query/client.ts";
+import { pageFetch } from "../../lib/query/policy.ts";
+import { keys } from "../../lib/query/keys.ts";
 import { drawing, type Drawing } from "../chat/index.ts";
 
 export interface Height {
@@ -31,33 +34,38 @@ export interface RealmSource {
   origin: string | undefined;
 }
 
-const NO_OPTIONS: ReadOptions = {};
+// The page, the height and the chat's drawing, as one state.
+async function load({ rpc, realm, origin }: RealmSource, options: ReadOptions): Promise<Realm> {
+  try {
+    const [body, height, via] = await Promise.all([
+      readPage(rpc, { realm }, options),
+      readHeight(rpc, { ...options, chainId: null }),
+      drawing(),
+    ]);
+    if (!body.ok) return { state: "failed", failure: body.failure };
+    const at = height.ok ? height.value : height.failure;
+    return { state: "read", page: page(body.value, origin === undefined ? {} : { origin }), via, height: at };
+  } catch {
+    return { state: "failed", failure: undefined };
+  }
+}
 
-/** A realm's page and the height it was read at, read when the view first draws and again only if the realm or the RPC change. */
-export function useRealm({ rpc, realm, origin }: RealmSource, options: ReadOptions = NO_OPTIONS): Realm {
-  const [read, setRead] = useState<{ key: string; value: Realm }>();
-  const key = `${rpc} ${realm} ${origin ?? ""}`;
-  useEffect(() => {
-    let live = true;
-    const done = (value: Realm) => {
-      if (live) setRead({ key, value });
-    };
-    Promise.all([readPage(rpc, { realm }, options), readHeight(rpc, { ...options, chainId: null }), drawing()]).then(
-      ([body, height, via]) => {
-        if (!body.ok) {
-          done({ state: "failed", failure: body.failure });
-          return;
-        }
-        const at = height.ok ? height.value : height.failure;
-        done({ state: "read", page: page(body.value, origin === undefined ? {} : { origin }), via, height: at });
-      },
-      () => {
-        done({ state: "failed", failure: undefined });
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [key, rpc, realm, origin, options]);
-  return read?.key === key ? read.value : { state: "loading" };
+/** A realm's page and height as a query: kept by its chain, realm and origin, so a view seen again draws it at once and reads it again quietly,
+ * and a link's hover or the flight asks it ahead (warm.ts). A page that failed is no answer: it throws, and the last good one stays. */
+export const realmPage = ({ rpc, realm, origin }: RealmSource, options?: ReadOptions) =>
+  queryOptions({
+    queryKey: keys.page(rpc, realm, origin),
+    queryFn: async ({ signal }) => {
+      const read = await load({ rpc, realm, origin }, { fetch: pageFetch, ...options, signal });
+      if (read.state === "failed") throw new Unread(read, read.failure);
+      return read;
+    },
+  });
+
+/** A realm's page and the height it was read at: what is kept at once, then the fresh read (a failed one leaves what is shown), read again
+ * only if the realm or the RPC change. */
+export function useRealm(source: RealmSource, options?: ReadOptions): Realm {
+  const { data, error } = useQuery(realmPage(source, options), queryClient);
+  if (data !== undefined) return data;
+  return isUnread<Realm>(error) ? error.read : { state: "loading" };
 }

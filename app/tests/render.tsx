@@ -5,6 +5,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { createStaticHandler, createStaticRouter, StaticRouterProvider, type RouteObject } from "react-router";
 import type { PlaceKind } from "@gnoworld/core";
 import { expect } from "vitest";
+import "./queries.ts";
 import { site } from "../src/places.ts";
 import { StoreProvider } from "../src/storeContext.tsx";
 

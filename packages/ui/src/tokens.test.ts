@@ -221,6 +221,8 @@ describe("the tokens", () => {
     expect(parseTokens(`:root {${reduced}}`).map(({ name, value: v }) => [name, v])).toEqual([
       ["--motion-fast", "0s"],
       ["--motion-base", "0s"],
+      ["--motion-slow", "0s"],
+      ["--motion-label", "0s"],
       ["--motion-scale", "0"],
     ]);
   });

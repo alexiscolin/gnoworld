@@ -14,6 +14,7 @@
 
   .fill {
     fill: var(--color-primary);
+    transition: width var(--motion-slow) var(--ease-standard);
   }
 
   .steps {
@@ -30,6 +31,9 @@
     block-size: 8px;
     border: var(--line-width) solid var(--color-line-strong);
     border-radius: var(--radius-pill);
+    transition:
+      background-color var(--motion-base) var(--ease-standard),
+      border-color var(--motion-base) var(--ease-standard);
   }
 
   .step[data-done] {
@@ -60,6 +64,7 @@
 
   .arcFill {
     stroke: var(--color-primary);
+    transition: stroke-dasharray var(--motion-slow) var(--ease-standard);
   }
 
   .shown {

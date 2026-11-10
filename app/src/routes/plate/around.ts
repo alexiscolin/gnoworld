@@ -21,6 +21,8 @@ interface Side {
   label: string;
   nodes: readonly AroundNode[];
   total: number;
+  /** The graph's words when the side has no dot. */
+  none?: string;
 }
 
 export interface Around {
@@ -72,6 +74,12 @@ export const rowPath = (path: string): string => shortPath(path.replace(/^gno\.l
 const uniqueNodes = (nodes: readonly AroundNode[]): AroundNode[] =>
   nodes.filter((node, at, all) => all.findIndex((n) => n.id === node.id) === at).slice(0, MOST);
 
+// A live realm of a world: its own view, its name for the dot and its short path for the row.
+const liveNode = (prefix: string, path: string): AroundNode => {
+  const view = viewOf(prefix, path);
+  return { id: view, path: view, label: realmName(path).name, kind: "realm", detail: rowPath(path), note: "realm" };
+};
+
 const packageNode = (prefix: string, path: string, calls?: number): AroundNode => {
   const pure = path.startsWith("gno.land/p/");
   const view = path.startsWith(REALM_PREFIX) ? viewOf(prefix, path) : undefined;
@@ -104,6 +112,7 @@ function aroundRealm(known: Files, where: Where & { realm: string }): Around | u
     right: {
       word: "imported by",
       label: "Imported by",
+      none: "no importers yet",
       nodes: uniqueNodes(importing),
       total: importers?.total ?? inverted.length,
     },
@@ -125,16 +134,34 @@ export function aroundOf(worlds: Files | undefined, where: Where): Around | unde
     const name = hub?.name ?? labelName(other) ?? other;
     return path === undefined ? [] : [{ id: path, path, label: name, kind: "realm", detail: name, note: "hub world" }];
   });
-  const live = (known.find((world) => world.id === id)?.realms ?? []).map(({ path }): AroundNode => {
-    const view = viewOf(where.prefix, path);
-    return { id: view, path: view, label: realmName(path).name, kind: "realm", detail: rowPath(path), note: "realm" };
-  });
+  const live = (known.find((world) => world.id === id)?.realms ?? []).map(({ path }) => liveNode(where.prefix, path));
   if (linked.length === 0 && live.length === 0) return undefined;
   return {
     title: "Explore from here",
     hint: "hub worlds and live realms",
     centre: { id: "centre", label: centre, kind: "realm" },
     left: { word: "hub worlds", label: "Hub worlds", nodes: uniqueNodes(linked), total: linked.length },
+    right: { word: "live realms", label: "Live realms", nodes: uniqueNodes(live), total: live.length },
+  };
+}
+
+/** The Earth's dots: every hub world of its universe, and the realms those worlds are about. */
+export function aroundEarth(where: Pick<Where, "hubs" | "prefix">): Around | undefined {
+  const hubs = where.hubs.map((hub): AroundNode => ({
+    id: hub.path,
+    path: hub.path,
+    label: hub.name,
+    kind: "realm",
+    detail: hub.name,
+    note: "hub world",
+  }));
+  const live = where.hubs.flatMap((hub) => (hub.realms ?? []).map((path) => liveNode(where.prefix, path)));
+  if (hubs.length === 0 && live.length === 0) return undefined;
+  return {
+    title: "Explore from here",
+    hint: "hub worlds and live realms",
+    centre: { id: "centre", label: "Earth", kind: "realm" },
+    left: { word: "hub worlds", label: "Hub worlds", nodes: uniqueNodes(hubs), total: hubs.length },
     right: { word: "live realms", label: "Live realms", nodes: uniqueNodes(live), total: live.length },
   };
 }

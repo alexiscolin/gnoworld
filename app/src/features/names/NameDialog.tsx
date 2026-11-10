@@ -4,6 +4,7 @@
 import { Avatar, Button, Cluster, Dialog, Field, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
 import { NOT_CHECKED, networkOf, publicForever } from "../calls/index.ts";
+import appear from "../../enter.module.css";
 import styles from "./NameDialog.module.css";
 import { NAMEREG, NYM_PREFIX, nymProblem, NYM_RULE } from "./nym.ts";
 import type { Phase } from "./phase.ts";
@@ -31,8 +32,10 @@ const feeWords = ({ name, real }: NameDialogProps["network"], fee: string) =>
 function State({ phase }: { phase: Phase }) {
   return (
     <p role="status" className={styles["state"]}>
-      {phase.kind === "working" || phase.kind === "failed" ? phase.text : null}
-      {phase.kind === "done" ? `${phase.name} is registered, in block ${COUNT.format(phase.height)}.` : null}
+      <span key={phase.kind} className={appear["enter"]}>
+        {phase.kind === "working" || phase.kind === "failed" ? phase.text : null}
+        {phase.kind === "done" ? `${phase.name} is registered, in block ${COUNT.format(phase.height)}.` : null}
+      </span>
     </p>
   );
 }

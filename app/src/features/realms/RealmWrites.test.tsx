@@ -5,7 +5,7 @@ import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { Grab, state } from "../../../tests/grabStore.tsx";
+import { Grab, SignedIn, state } from "../../../tests/grabStore.tsx";
 import { Address } from "@gnoworld/schemas";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import { typed, warnsMembers } from "../../../tests/callFixtures.ts";
@@ -49,6 +49,7 @@ const chain = (functions: unknown = FUNCTIONS) =>
 async function panel(fetcher: ChainFetch = chain()) {
   const box = mount(
     <StoreProvider>
+      <SignedIn />
       <RealmWrites realm={REALM} chain={CHAIN} options={{ fetch: fetcher }} />
     </StoreProvider>,
   );
@@ -80,6 +81,21 @@ describe("a realm's write functions, with the call card inline", () => {
     for (const name of ["a", "b", "c"])
       expect(all(card, "label").some((l) => l.textContent.startsWith(name))).toBe(true);
     expect(all(box, "dialog, [role=dialog], [aria-modal]")).toHaveLength(0);
+  });
+
+  it("offers the login as the card's first button when nobody is logged in: Connect Adena, never a Sign that would fail", async () => {
+    const box = mount(
+      <StoreProvider>
+        <RealmWrites realm={REALM} chain={CHAIN} options={{ fetch: chain() }} />
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(box.querySelector("[aria-busy]")).toBeNull();
+    });
+    click(button(box, "Call Deposit"));
+    const card = one(box, "article");
+    expect(button(card, "Connect Adena")).toBeDefined();
+    expect(button(card, "Sign in Adena")).toBeUndefined();
   });
 
   it("opens a write with no field as a card with nothing to fill and a Sign button that is enabled, and asks Adena nothing yet (D254)", async () => {
@@ -281,7 +297,7 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(call?.dataset["size"]).toBe("s");
     const row = all(box, "li").find((li) => li.textContent.includes("SetBio"));
     const toggle = row?.querySelector("button[aria-expanded]");
-    expect(toggle?.textContent).toBe("SetBio");
+    expect(toggle?.textContent).toBe("SetBio(cur realm, bio string)");
     expect(toggle?.getAttribute("aria-controls")).toBe(call?.closest("[id]")?.id);
   });
 });
@@ -316,6 +332,7 @@ describe("a vote on GovDAO", () => {
     const box = mount(
       <StoreProvider>
         <Grab />
+        <SignedIn />
         <RealmWrites realm={DAO} chain={CHAIN} options={{ fetch: chain([VOTE]) }} />
       </StoreProvider>,
     );
@@ -377,7 +394,7 @@ describe("a realm's write rows, as parts", () => {
     const fetcher = chain();
     const box = await panel(fetcher);
     const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
-    expect(row?.querySelector("button[aria-expanded]")?.textContent).toBe("Upload");
+    expect(row?.querySelector("button[aria-expanded]")?.textContent).toBe("Upload(cur realm, data []uint8)");
     click(button(box, "Call SetBio"));
     await vi.waitFor(() => {
       expect(fetcher.mock.calls.some(([url]) => url.startsWith(CHAIN.indexer))).toBe(true);

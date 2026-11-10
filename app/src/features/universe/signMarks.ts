@@ -26,6 +26,9 @@ function reachOf() {
   return width > 0 ? left + (width * (1 + RING)) / 2 : innerWidth;
 }
 
+// A sign or the signs' box fades out (the page's label fade, EarthSigns.module.css) and in again: `data-away`, never `hidden`, which would cut it.
+const away = (element: HTMLElement, gone: boolean) => element.toggleAttribute("data-away", gone);
+
 const moved = (element: HTMLElement, x: number, y: number) => {
   element.style.transform = `translate(${String(Math.round(x))}px, ${String(Math.round(y))}px)`;
 };
@@ -67,7 +70,7 @@ const spotMark = (element: HTMLElement, lat: number, lon: number): GroundMark =>
   lat,
   lon,
   place: (x, y, front) => {
-    element.hidden = !front && !element.contains(document.activeElement);
+    away(element, !front && !element.contains(document.activeElement));
     moved(element, x, y);
   },
 });
@@ -101,9 +104,10 @@ function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, k
       }
       own.x = offsetX;
       own.y = offsetY;
-      style.visibility = "visible";
       // A world's bubble shows only while its point stands in the free area, the view's side: it comes in as the world turns it there.
-      if (from !== undefined) element.hidden = !(front && stands({ x, y }, from, keep));
+      const gone = from !== undefined && !(front && stands({ x, y }, from, keep));
+      away(element, gone);
+      style.visibility = gone ? "hidden" : "visible";
     },
   };
 }
@@ -166,7 +170,7 @@ export function useUnderRing(box: RefObject<HTMLElement | null>, inside: boolean
     sized.observe(globe);
     const seen = new IntersectionObserver(
       ([entry]) => {
-        root.hidden = (entry?.intersectionRatio ?? 1) < IN_SIGHT;
+        away(root, (entry?.intersectionRatio ?? 1) < IN_SIGHT);
       },
       { threshold: IN_SIGHT },
     );

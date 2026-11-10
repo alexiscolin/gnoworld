@@ -16,11 +16,11 @@ function Entry({ node, onOpen }: { node: AroundNode; onOpen: (node: AroundNode) 
     </>
   );
   return node.path === undefined ? (
-    <div className={[styles["row"], "icon-text-meta"].join(" ")}>{row}</div>
+    <div className={"list-row icon-text-meta"}>{row}</div>
   ) : (
     <button
       type="button"
-      className={[styles["row"], "icon-text-meta"].join(" ")}
+      className={"list-row icon-text-meta"}
       data-link=""
       onClick={() => {
         onOpen(node);
@@ -31,10 +31,35 @@ function Entry({ node, onOpen }: { node: AroundNode; onOpen: (node: AroundNode) 
   );
 }
 
+type Side = "left" | "right";
+
+function Sides({
+  left,
+  right,
+  side,
+  onSide,
+}: Pick<AroundData, "left" | "right"> & { side: Side; onSide: (side: Side) => void }) {
+  return (
+    <Tabs
+      label="Which side"
+      size="xs"
+      plainCount
+      tabs={[
+        { id: "left", label: left.label, count: left.total },
+        { id: "right", label: right.label, count: right.total },
+      ]}
+      selected={side}
+      onSelect={(id) => {
+        onSide(id === "left" ? "left" : "right");
+      }}
+    />
+  );
+}
+
 export function Around({ around }: { around: AroundData }) {
   const navigate = useNavigate();
   const { left, right } = around;
-  const [side, setSide] = useState<"left" | "right">(right.total > 0 ? "right" : "left");
+  const [side, setSide] = useState<Side>(right.total > 0 ? "right" : "left");
   const [picked, setPicked] = useState<string>();
   const [open, setOpen] = useState(false);
   const shown = side === "left" ? left : right;
@@ -43,21 +68,26 @@ export function Around({ around }: { around: AroundData }) {
   };
   const find = (id: string) => [...left.nodes, ...right.nodes].find((node) => node.id === id);
   return (
-    <Card look="hub">
+    <Card look="hub" rises>
       <Card.Header
+        icon="orbits"
         title={around.title}
         level={2}
-        hint={around.hint}
-        expand={{
-          open,
-          onToggle: () => {
-            setOpen(!open);
-          },
-        }}
+        actions={<Sides left={left} right={right} side={side} onSide={setSide} />}
+        {...(left.nodes.length > 12 || right.nodes.length > 12
+          ? {
+              expand: {
+                open,
+                onToggle: () => {
+                  setOpen(!open);
+                },
+              },
+            }
+          : {})}
       />
       <Card.Body>
         <Grid cols={12} space="m">
-          <Cell span={5}>
+          <Cell span={6}>
             <Network
               label={`${around.title}: places linked to ${around.centre.label}`}
               centre={around.centre}
@@ -72,20 +102,8 @@ export function Around({ around }: { around: AroundData }) {
               }}
             />
           </Cell>
-          <Cell span={7}>
+          <Cell span={6}>
             <Stack space="xs">
-              <Tabs
-                label="Which side"
-                size="s"
-                tabs={[
-                  { id: "left", label: `${left.label} ${String(left.total)}` },
-                  { id: "right", label: `${right.label} ${String(right.total)}` },
-                ]}
-                selected={side}
-                onSelect={(id) => {
-                  setSide(id === "left" ? "left" : "right");
-                }}
-              />
               <PagedList
                 key={side}
                 label={shown.label.toLowerCase()}
@@ -94,6 +112,7 @@ export function Around({ around }: { around: AroundData }) {
                 textOf={(node) => node.id}
                 expanded={open}
                 counted={shown.nodes.length > 12}
+                page={shown.nodes.length > 12 ? 6 : 12}
                 empty={side === "left" ? "It imports nothing." : "Nothing imports it yet."}
                 render={(node) => <Entry node={node} onOpen={go} />}
               />

@@ -3,12 +3,14 @@
 // chat differ. On a computer the planet stands larger than the window, lit at three quarters (D458).
 import type { ReactNode } from "react";
 import { Panel, Stack } from "@gnoworld/ui";
+import { chatHeld, LOADING } from "../features/chat/index.ts";
 import { useMedia } from "../features/chat/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { StatusRing } from "../features/world/StatusRing.tsx";
 import type { Ring } from "../features/world/statusRing.ts";
 import { useApp } from "../storeContext.tsx";
 import place from "./globe.module.css";
+import styles from "./world.module.css";
 
 /** Where a page frames its planet close, larger than the window (D458): the dock's width for a place's page. */
 export const DOCKED = "(min-width: 1280px)";
@@ -24,13 +26,16 @@ export function PlaceFrame({
   label,
   plate,
   ring,
-  children,
+  chat,
+  chatDue = false,
 }: {
   label: string;
   plate: ReactNode;
   /** The open proposal's ring round the planet, where its realm reports a tally. */
   ring?: Ring | undefined;
-  children: ReactNode;
+  /** The dock's chat, and whether its door to space has come (useSpace). */
+  chat?: ReactNode;
+  chatDue?: boolean;
 }) {
   const framed = useFraming(DOCKED);
   return (
@@ -54,9 +59,30 @@ export function PlaceFrame({
           </Panel>
         }
       >
-        {children}
+        {chat === undefined ? null : (
+          <DockChat className={styles["chat"]} due={chatDue}>
+            {chat}
+          </DockChat>
+        )}
       </Panel.Layout>
       <SpaceFoot />
     </>
+  );
+}
+
+/** The dock's chat of a place's page: the chat once its door to space has come or it is held, the loading shape till then. */
+export function DockChat({
+  className,
+  due,
+  children,
+}: {
+  className: string | undefined;
+  due: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div id="chat" className={className}>
+      {due || chatHeld() ? children : LOADING}
+    </div>
   );
 }

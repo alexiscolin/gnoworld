@@ -64,9 +64,6 @@
   }
 
   .value {
-    /* layout: a value's own margin, which the browser gives a definition, taken off */
-    margin-inline-start: 0;
-    min-inline-size: 0;
     font: var(--font-data);
     /* layout: a realm's path or a long text breaks where it must, so the card never scrolls sideways */
     overflow-wrap: anywhere;

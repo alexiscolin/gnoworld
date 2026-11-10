@@ -116,7 +116,7 @@ export function Avatar(props: AvatarProps) {
       data-speaking={speaking === true ? "" : undefined}
     >
       {kind === "bot" ? <Icon name="code" /> : <Face address={address} kind={kind} />}
-      {here === true ? <span className={styles["presence"]} data-presence="" /> : null}
+      <span className={styles["presence"]} data-presence={here === true ? "" : undefined} />
     </span>
   );
 }

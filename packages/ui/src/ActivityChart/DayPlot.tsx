@@ -13,6 +13,8 @@ export interface DayPlotProps {
   now: string;
   w: number;
   h: number;
+  /** The drawing follows its box, whose size is easing: no geometry glide of its own. */
+  follow?: boolean;
 }
 
 // The date under a slot: the first at the plot's edge, the last as the axis' "now", then one in every few, none too near the last.
@@ -78,13 +80,20 @@ function Peak({
 }
 
 /** The drawing: the axis' lines and numbers, a bar for each day with a count (a dot for one with none), the dates, the peak's words. */
-export function DayPlot({ counts, named, scale, now, w, h }: DayPlotProps) {
+export function DayPlot({ counts, named, scale, now, w, h, follow = false }: DayPlotProps) {
   const plot = plotOf({ counts, scale, w, h });
   const peak = Math.max(0, ...counts);
   const current = counts.findLastIndex((count) => count > 0);
   const last = counts.length - 1;
   return (
-    <svg className={styles["chart"]} width={w} height={h} viewBox={`0 0 ${String(w)} ${String(h)}`} aria-hidden="true">
+    <svg
+      className={styles["chart"]}
+      data-follow={follow ? "" : undefined}
+      width={w}
+      height={h}
+      viewBox={`0 0 ${String(w)} ${String(h)}`}
+      aria-hidden="true"
+    >
       {plot.ticks.map((tick) => (
         <g key={tick}>
           <line className={styles["gl"]} x1={LEFT} x2={w} y1={plot.y(tick)} y2={plot.y(tick)} />

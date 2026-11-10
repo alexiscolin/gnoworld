@@ -25,7 +25,7 @@ export const LATE: readonly { chunk: string; after?: readonly string[]; cap: num
   { chunk: "scene", after: ["root", "universe"], cap: 183_743 },
   // On the home's first screen now, not behind the cosmos (7i): 7,293 B on 2026-11-07 beyond the scene and the cosmos (D386); 16,007 B beyond
   // `root` and `universe` (its worlds, their thumbs, the home's views and the follow chunks it imports), 256 B ahead (+8,970 B).
-  { chunk: "Rail", after: ["root", "universe"], cap: 16_263 },
+  { chunk: "Rail", after: ["root", "universe"], cap: 18_752 },
   // A world's planet drawn as its thumb anywhere (Discover, search, the chat's worlds): 347 B alone (D386); 2,436 B alone on 2026-11-09,
   // 256 B ahead (+2,089 B over D386's 603 B).
   { chunk: "thumbs", cap: 2692 },

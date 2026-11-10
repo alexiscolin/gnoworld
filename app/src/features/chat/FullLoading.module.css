@@ -1,0 +1,58 @@
+/* The full chat's skeleton (FullLoading.tsx): at the full chat's own place, over it, its shapes at once (the skeleton's 300 ms wait is none here),
+   fading out as the chat is drawn under it. */
+@layer components {
+  .shape {
+    /* layout: the full chat's own place (ChatScreen.module.css), over the chat while it fades in */
+    position: fixed;
+    inset: var(--flash-room) 0 0;
+    /* raw: over the chat's own layer, which is 3 */
+    z-index: 4;
+    background: var(--color-surface);
+    --motion-wait: 0s;
+  }
+
+  .shape[data-leaving] {
+    animation: gone calc(var(--motion-slow) * var(--motion-scale)) var(--ease-emphasized) forwards;
+  }
+
+  @keyframes gone {
+    to {
+      opacity: 0;
+    }
+  }
+
+  .worlds,
+  .rooms,
+  .info,
+  .lines {
+    padding: var(--space-m);
+  }
+
+  .lines {
+    /* raw: the lines' own side inset (ChatScreen.module.css) */
+    padding-inline: max(var(--chat-inset, 0px), var(--space-l));
+  }
+
+  .conversation {
+    /* layout: the lines over the composer, which stays at the foot */
+    display: grid;
+    /* layout: the lines take what the composer leaves */
+    grid-template-rows: 1fr auto;
+    block-size: 100%;
+  }
+
+  .composer {
+    /* raw: the lines' own side inset (ChatScreen.module.css) */
+    padding: var(--space-m) max(var(--chat-inset, 0px), var(--space-l));
+  }
+
+  .composer > span {
+    /* raw: the composer's own height, a box of two lines */
+    block-size: calc(var(--control-m) * 2);
+  }
+
+  /* The full chat's cover, which its page wore from the first paint (shellHeader.module.css), goes as the skeleton stands in its place. */
+  :root:has([data-chat-skeleton])::before {
+    content: none;
+  }
+}

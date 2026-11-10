@@ -12,6 +12,17 @@
     transition: background-color var(--motion-fast) var(--ease-standard);
   }
 
+  /* The words give way (cut with an ellipsis) before the bar's button does: a long line never runs out of the bar. */
+  .talk > * > :first-child {
+    /* layout: the faces and words take what the button leaves */
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+
+  .talk > * > :first-child > :last-child {
+    min-inline-size: 0;
+  }
+
   .talk:hover {
     background: var(--color-fill-hover);
   }

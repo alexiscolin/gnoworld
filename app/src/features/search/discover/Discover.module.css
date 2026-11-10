@@ -7,8 +7,10 @@
     /* layout: the shelves, the cards, the detail: the cards take the room left */
     display: grid;
     /* layout: the sheet's two columns */
-    grid-template-columns: var(--_shelves) minmax(0, 1fr);
+    grid-template-columns: var(--_shelves) minmax(0, 1fr) 0;
     min-block-size: 0;
+    /* A track list of one length interpolates: the detail's column grows from 0 as it opens. */
+    transition: grid-template-columns calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
   .discover[data-detail] {
@@ -179,6 +181,10 @@
   .all {
     color: var(--color-text-muted);
     font: var(--font-meta);
+  }
+
+  .all {
+    transition: color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
   }
 
   .all:hover {

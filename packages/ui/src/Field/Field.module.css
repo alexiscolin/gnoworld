@@ -10,6 +10,9 @@
     border: var(--line-width) solid var(--_line);
     border-radius: var(--radius-m);
     background: var(--color-fill);
+    transition:
+      border-color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard);
   }
 
   .box[aria-invalid="true"],

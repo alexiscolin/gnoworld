@@ -1,6 +1,7 @@
 // A realm's page and Try it, the plate's lower half (5h, D375, D566): its page in a card of its own, then its functions to try. The frame, the title and
 // the realm's facts are the plate's (routes/plate).
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
+import { Stack } from "@gnoworld/ui";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import type { CallPlace } from "./InlineCard.tsx";
 import { CallCountsContext } from "./FunctionRow.tsx";
@@ -30,10 +31,12 @@ export function RealmView({ realm, chain, options, state, counts = NONE }: Realm
   const listing = useRead({ rpc: chain.rpc, realm, options });
   return (
     <ListingContext value={listing}>
-      <PageCard realm={realm} chain={chain} state={state} link={link} place={place} />
-      <CallCountsContext value={counts}>
-        <TryCard realm={realm} chain={chain} options={options} />
-      </CallCountsContext>
+      <Stack space="s">
+        <PageCard realm={realm} chain={chain} state={state} link={link} place={place} />
+        <CallCountsContext value={counts}>
+          <TryCard realm={realm} chain={chain} options={options} />
+        </CallCountsContext>
+      </Stack>
     </ListingContext>
   );
 }

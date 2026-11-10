@@ -1,4 +1,4 @@
-// The 58 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
+// The 59 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
 // in the colour of the text around it.
 import type { ReactElement } from "react";
 
@@ -90,12 +90,7 @@ export const GLYPHS = {
       <path d="M9 7L3 13M7 5L3 9M11 9l-4 4" />
     </>
   ),
-  at: (
-    <>
-      <circle cx="8" cy="8" r="2.5" />
-      <path d="M10.5 8v1a2 2 0 0 0 4 0V8a6.5 6.5 0 1 0-2.5 5.1" />
-    </>
-  ),
+  at: <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0M10.5 8v1a2 2 0 0 0 4 0V8a6.5 6.5 0 1 0-2.5 5.1" />,
   mail: (
     <>
       <rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
@@ -110,6 +105,7 @@ export const GLYPHS = {
     </>
   ),
   spark: <path d="M8 2v4M8 10v4M2 8h4M10 8h4" />,
+  retry: <path d="M13.3 7.3a5.3 5.3 0 1 0-1.5 3.8M13.3 3.3v4h-4" />,
   news: (
     <>
       <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
