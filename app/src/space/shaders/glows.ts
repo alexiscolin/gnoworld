@@ -1,7 +1,7 @@
 // The demo's lights (D401): the suns as additive glows on quads turned to the eye, never under a few pixels, a sun seen near wearing a wide
 // warm bloom and a soft limb (D495); the dust and the stars as round points; orbits as faint lines; the page's plate drawn behind the planet.
 // Their colours are what the screen shows, added.
-import { LENS_DIM } from "./planets.ts";
+import { INTRO_SHARE, LENS_DIM } from "./planets.ts";
 
 // The linear value three 0.187's grade (its ACES fit at exposure 1, then sRGB; renderer.ts) takes to `seen`, in closed form: the fit's
 // quadratic solved for its positive root between the matrices' inverses. White is held just under, where the fit would run to infinity.
@@ -16,11 +16,12 @@ vec3 ungrade(vec3 seen) {
 }`;
 
 export const SUNS_VERTEX = /* glsl */ `
-attribute vec3 aPlace; attribute vec4 aSun; attribute float aLit; uniform float uPxK; uniform float uLens;
-varying vec2 vUv; varying vec3 vColour; varying float vCore; varying float vDim; varying float vNear;
+attribute vec3 aPlace; attribute vec4 aSun; attribute float aLit; attribute float aDelay; uniform float uPxK; uniform float uLens; uniform float uIntro;
+varying vec2 vUv; varying vec3 vColour; varying float vCore; varying float vDim; varying float vNear; varying float vIntro;
 void main() {
   float d = distance(cameraPosition, aPlace);
-  float core = max(aSun.w, 1.3 * uPxK * d);
+  vIntro = ${INTRO_SHARE};
+  float core = max(aSun.w, 1.3 * uPxK * d) * (0.35 + 0.65 * vIntro);
   vNear = smoothstep(2.0, 14.0, aSun.w / (uPxK * d));
   float halo = core * mix(11.0, 20.0, vNear);
   // The quad stands square to the screen (never to the sun's own direction, whose disc the off-axis frustum stretches at the frame's edge,
@@ -33,7 +34,7 @@ void main() {
 }`;
 
 export const SUNS_FRAGMENT = /* glsl */ `
-uniform float uGain; uniform float uThrough; varying vec2 vUv; varying vec3 vColour; varying float vCore; varying float vDim; varying float vNear;
+uniform float uGain; uniform float uThrough; varying vec2 vUv; varying vec3 vColour; varying float vCore; varying float vDim; varying float vNear; varying float vIntro;
 ${UNGRADE}
 void main() {
   float rr = length(vUv); float c = vCore; float fade = 1.0 - smoothstep(0.5, 1.0, rr);
@@ -41,17 +42,17 @@ void main() {
   float warmth = (exp(-rr * 5.5) * 0.24 + exp(-rr * 14.0) * 0.3) * fade * vNear;
   float disk = 1.0 - smoothstep(c * mix(0.75, 0.5, vNear), c * mix(1.05, 1.25, vNear), rr);
   vec3 warm = mix(vColour, vec3(1.0, 0.8, 0.56), 0.4);
-  vec3 light = (vColour * glow + warm * warmth + vec3(1.0, 0.97, 0.92) * disk) * uGain * vDim;
+  vec3 light = (vColour * glow + warm * warmth + vec3(1.0, 0.97, 0.92) * disk) * uGain * vDim * vIntro;
   // Through the flight's blur the whole frame is graded anew: the glow goes in ungraded, so it shows the same in flight and at rest.
   gl_FragColor = vec4(uThrough > 0.5 ? ungrade(light) : light, 1.0);
 }`;
 
 export const DUST_VERTEX = /* glsl */ `
-attribute vec4 aColour; uniform float uProj; varying vec3 vColour; varying float vBright;
+attribute vec4 aColour; attribute float aDelay; uniform float uProj; uniform float uIntro; varying vec3 vColour; varying float vBright;
 void main() {
   vec4 seen = viewMatrix * vec4(position, 1.0);
   float size = aColour.w * uProj / max(-seen.z, 1e-3);
-  gl_PointSize = clamp(size, 1.0, 2.6); vBright = clamp(size, 0.2, 1.0); vColour = aColour.rgb;
+  gl_PointSize = clamp(size, 1.0, 2.6); vBright = clamp(size, 0.2, 1.0) * ${INTRO_SHARE}; vColour = aColour.rgb;
   gl_Position = projectionMatrix * seen;
 }`;
 

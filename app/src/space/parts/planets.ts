@@ -46,7 +46,7 @@ export class Planets {
   readonly #lit: InstancedBufferAttribute;
 
   /** The planets of `universe`, sharing the frame's `uniforms`. */
-  constructor(universe: Universe, uniforms: Record<string, IUniform>) {
+  constructor(universe: Universe, uniforms: Record<string, IUniform>, delays: readonly number[]) {
     const geometry = quads(universe.planets.length);
     const { planets } = universe;
     const vec = (pick: (planet: (typeof planets)[number]) => { x: number; y: number; z: number }) =>
@@ -71,6 +71,7 @@ export class Planets {
     geometry.setAttribute("aShown", this.#shown);
     this.#lit = new InstancedBufferAttribute(new Float32Array(planets.length).fill(1), 1);
     geometry.setAttribute("aLit", this.#lit);
+    each(geometry, "aDelay", { values: planets.map((p) => delays[p.system.index] ?? 0), size: 1 });
     each(geometry, "aReach", { values: planets.map((p) => p.system.reach), size: 1 });
     const material = new ShaderMaterial({
       uniforms: {

@@ -4,7 +4,8 @@ import { Address } from "@gnoworld/schemas";
 import { Avatar } from "@gnoworld/ui";
 import type { Landed } from "@gnoworld/chain/tx";
 import { act, useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { notifyManager } from "@tanstack/react-query";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { all, button, click, faceOf, mount, one } from "../../../tests/mount.tsx";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
@@ -130,7 +131,11 @@ function register(box: HTMLElement, typed = "alexis042") {
   typeName(box, typed);
   click(button(box, "Register · 0 GNOT"));
 }
-// The query tells its readers a tick after its read ends, not in the same microtask.
+// The query tells its readers in a timer by default, which raced this timer turn under load (3 runs in 8 failed): told in a microtask,
+// they know before the turn ends.
+beforeAll(() => {
+  notifyManager.setScheduler(queueMicrotask);
+});
 const settled = () =>
   act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 0));

@@ -37,12 +37,19 @@ export interface Suns {
 }
 
 /** The suns, one quad each. */
-export function sunsOf({ systems }: Universe, uniforms: Uniforms): Suns {
+export function sunsOf({ systems }: Universe, uniforms: Uniforms, delays: readonly number[]): Suns {
   const geometry = quads(systems.length);
   const at = systems.flatMap(({ place }) => [place.x, place.y, place.z]);
   geometry.setAttribute("aPlace", new InstancedBufferAttribute(new Float32Array(at), 3));
   const sun = systems.flatMap(({ sun: colour, core }) => [...colour, core]);
   geometry.setAttribute("aSun", new InstancedBufferAttribute(new Float32Array(sun), 4));
+  geometry.setAttribute(
+    "aDelay",
+    new InstancedBufferAttribute(
+      Float32Array.from(systems, (_, at) => delays[at] ?? 0),
+      1,
+    ),
+  );
   const lit = new InstancedBufferAttribute(new Float32Array(systems.length).fill(1), 1);
   geometry.setAttribute("aLit", lit);
   const mesh = new Mesh(geometry, additive(uniforms, SUNS_VERTEX, SUNS_FRAGMENT));
@@ -65,8 +72,8 @@ const points = (positions: number[], colours: number[], material: ShaderMaterial
 };
 
 /** Each system's dust, in its plane, tinted by its sun. */
-export function dustOf({ systems }: Universe, uniforms: Uniforms): Points {
-  const [positions, colours]: [number[], number[]] = [[], []];
+export function dustOf({ systems }: Universe, uniforms: Uniforms, delays: readonly number[]): Points {
+  const [positions, colours, late]: [number[], number[], number[]] = [[], [], []];
   for (const system of systems) {
     const { place, across, along, normal, reach, sun } = system;
     for (let at = 0; at < 90 + system.planets.length * 14; at += 1) {
@@ -77,11 +84,14 @@ export function dustOf({ systems }: Universe, uniforms: Uniforms): Points {
         positions.push(
           place[axis] + (across[axis] * Math.cos(a) + along[axis] * Math.sin(a)) * r + normal[axis] * lift,
         );
+      late.push(delays[system.index] ?? 0);
       const k = 0.2 + hashOf(key, 6) * 0.25;
       colours.push(sun[0] * k, sun[1] * k, sun[2] * k, 0.18 + hashOf(key, 7) * 0.3);
     }
   }
-  return points(positions, colours, additive(uniforms, DUST_VERTEX, POINT_FRAGMENT));
+  const dust = points(positions, colours, additive(uniforms, DUST_VERTEX, POINT_FRAGMENT));
+  dust.geometry.setAttribute("aDelay", new Float32BufferAttribute(late, 1));
+  return dust;
 }
 
 /** The far stars, a shell round the eye. */

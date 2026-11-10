@@ -61,6 +61,8 @@ export class Labels {
   arrival = false;
   /** Whether space is seen from above (the Map): every planet of the system in view is named, whatever its size on screen. */
   plan = false;
+  /** Whether the name of a world of the system at an index may show: the galaxy's arrival has lit it (intro.ts). */
+  ready: (item: Item) => boolean = () => true;
   /** The page's world, named first so that its name is never the one left out. */
   marked: Planet | undefined;
 
@@ -133,7 +135,7 @@ export class Labels {
 
   #assign(items: readonly Item[]): void {
     const held = assign({ slots: this.#slots, byItem: this.#held, name: this.#name }, items);
-    for (const slot of this.#slots) this.#show(slot, held(slot));
+    for (const slot of this.#slots) this.#show(slot, held(slot) && (slot.item === undefined || this.ready(slot.item)));
   }
 
   // What may be named, the liveliest first: in a system its planets alone, once it is large enough to tell them apart (the universe's

@@ -110,7 +110,8 @@ function advance(space: Space, delta: number): void {
     handOf(space, still);
     settle(space);
   }
-  rig.aim(space.camera, space.see.screen);
+  stage.intro.tick(delta, space);
+  stage.intro.aim(space);
   const { frame } = stage;
   frame.uTime.value = space.seconds;
   frame.uPxK.value = space.see.pxK;
@@ -188,6 +189,7 @@ function paint(space: Space, delta: number): void {
   // No name while a flight runs: they come as it lands, never popping in and out on the way (Alexis, 2026-11-09).
   space.labels.hidden = rig.flying || space.kept !== undefined;
   space.labels.arrival = space.arrival;
+  space.labels.ready = stage.intro.ready;
   space.labels.tick(space.see, space.seconds);
   orbits(space, delta);
   round(space);

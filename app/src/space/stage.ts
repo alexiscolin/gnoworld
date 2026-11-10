@@ -3,6 +3,7 @@
 // worlds' file, all disposed together.
 import { Scene, type PerspectiveCamera, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
+import { DONE, Intro } from "./intro.ts";
 import type { Universe } from "./layout.ts";
 import { nebulaOf } from "./parts/nebula.ts";
 import { dustOf, starsOf, sunsOf, type Suns } from "./parts/lights.ts";
@@ -33,6 +34,8 @@ export interface Frame {
   readonly uLens: { value: number };
   /** 1 while the frame goes through the flight's blur pass, which grades it anew: a sun's glow is drawn ungraded then (D497). */
   readonly uThrough: { value: number };
+  /** The galaxy's arrival clock, in seconds (intro.ts); DONE once over or never run. */
+  readonly uIntro: { value: number };
 }
 
 export interface Gains {
@@ -54,7 +57,10 @@ export class Stage {
     uBoost: { value: 1 },
     uLens: { value: 0 },
     uThrough: { value: 0 },
+    uIntro: { value: DONE },
   };
+  /** The galaxy's arrival, once per visit. */
+  readonly intro = new Intro(this.frame.uIntro);
   readonly gains: Gains = { sun: { value: 1 }, dust: { value: 1 }, stars: { value: 1 } };
   readonly orbits = new Orbits();
   readonly plate = new Plate();
@@ -103,10 +109,11 @@ export class Stage {
   stand(universe: Universe, { renderer, camera }: { renderer: WebGLRenderer; camera: PerspectiveCamera }): void {
     this.#clear();
     this.sky?.stand(universe);
-    const planets = new Planets(universe, { ...this.frame });
-    const suns = sunsOf(universe, { ...this.frame, uGain: this.gains.sun });
+    const delays = this.intro.stand(universe);
+    const planets = new Planets(universe, { ...this.frame }, delays);
+    const suns = sunsOf(universe, { ...this.frame, uGain: this.gains.sun }, delays);
     this.suns = suns;
-    const dust = this.#bare ? undefined : dustOf(universe, { ...this.frame, uGain: this.gains.dust });
+    const dust = this.#bare ? undefined : dustOf(universe, { ...this.frame, uGain: this.gains.dust }, delays);
     this.scene.add(planets.mesh, suns.mesh, ...(dust === undefined ? [] : [dust]));
     this.planets = planets;
     this.moons.use({ renderer, camera, scene: this.scene });

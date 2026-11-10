@@ -1,6 +1,7 @@
 // Every planet far out, as the demo draws them (D401): a quad turned to the eye, on which the GPU traces a true sphere, never under
 // 2.4 px across, on its orbit by the clock; its colours are its generated look's, graded as the generated planet is, so the hand-over
 // to the planet itself, once it is a few pixels across, shows nothing.
+import { INTRO } from "../intro.ts";
 
 const NOISE = /* glsl */ `
 float h13(vec3 p) { p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
@@ -18,6 +19,9 @@ export const LENS_DIM = "mix(1.0, 0.15, uLens * (1.0 - aLit))";
 /** How whole the galaxy's view is, 0 to 1 (uDisc, uHeart): the eye 2.05 of the disc's radii or more from the heart, none within one. */
 export const GALAXY_VIEW = "smoothstep(uDisc, uDisc * 2.05, distance(cameraPosition, uHeart))";
 
+/** How far a world's arrival has come (intro.ts), 0 to 1, eased out: its clock `uIntro` less its own `aDelay`, over INTRO.each. */
+export const INTRO_SHARE = `(1.0 - pow(1.0 - clamp((uIntro - aDelay) / ${INTRO.each.toFixed(2)}, 0.0, 1.0), 3.0))`;
+
 export const FACING = /* glsl */ `
 void facing(vec3 c, out vec3 right, out vec3 up) {
   vec3 toCam = normalize(cameraPosition - c);
@@ -29,10 +33,10 @@ void facing(vec3 c, out vec3 right, out vec3 up) {
 
 export const PLANETS_VERTEX = /* glsl */ `
 attribute vec3 aCentre; attribute vec3 aAcross; attribute vec3 aAlong; attribute vec4 aOrbit; attribute vec4 aLow; attribute vec4 aHigh; attribute float aShown;
-attribute float aLit; attribute float aReach; uniform float uTime; uniform float uPxK; uniform float uAlone; uniform float uSolo; uniform float uSoloPx; uniform float uBoost; uniform float uFeat[6];
+attribute float aLit; attribute float aReach; attribute float aDelay; uniform float uIntro; uniform float uTime; uniform float uPxK; uniform float uAlone; uniform float uSolo; uniform float uSoloPx; uniform float uBoost; uniform float uFeat[6];
 uniform float uLens; uniform float uDisc; uniform vec3 uHeart;
 varying vec3 vOff; varying vec3 vC; varying float vR; varying vec3 vSun; varying vec3 vAxis; varying vec3 vAcross; varying vec3 vAlong;
-varying vec4 vLow; varying vec4 vHigh; varying float vSpin; varying float vDim; varying float vScale;
+varying vec4 vLow; varying vec4 vHigh; varying float vSpin; varying float vDim; varying float vScale; varying float vIntro;
 ${FACING}
 void main() {
   float a = aOrbit.y + aOrbit.z * uTime;
@@ -51,7 +55,8 @@ void main() {
   // From the galaxy's view a system's planets show once it spans 50 to 90 px (pick.ts aims at them past 70) or they near a pixel, so a
   // swarm never shows from afar; within the disc, as ever.
   float apart = max(smoothstep(50.0, 90.0, aReach / (uPxK * distance(cameraPosition, aCentre))), smoothstep(0.45, 1.2, rad / (uPxK * d)));
-  float r = max(rad, 1.2 * uPxK * d) * alone * mix(1.0, apart, ${GALAXY_VIEW});
+  vIntro = ${INTRO_SHARE};
+  float r = max(rad, 1.2 * uPxK * d) * alone * mix(1.0, apart, ${GALAXY_VIEW}) * (0.35 + 0.65 * vIntro);
   // The quad stands square to the screen, never to the planet's own direction, and the sphere is traced straight on in it: a world far
   // off the view's axis stays a round disc, where a ray through its pixel stretched it (D510).
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
@@ -67,7 +72,7 @@ void main() {
 export const PLANETS_FRAGMENT = /* glsl */ `
 uniform mat4 projectionMatrix; uniform float uTime;
 varying vec3 vOff; varying vec3 vC; varying float vR; varying vec3 vSun; varying vec3 vAxis; varying vec3 vAcross; varying vec3 vAlong;
-varying vec4 vLow; varying vec4 vHigh; varying float vSpin; varying float vDim; varying float vScale;
+varying vec4 vLow; varying vec4 vHigh; varying float vSpin; varying float vDim; varying float vScale; varying float vIntro;
 ${NOISE}
 vec3 surface(vec3 lp, float seed, float kind) {
   if (kind > 1.5) {
@@ -90,7 +95,7 @@ void main() {
   vec3 back = vec3(viewMatrix[0][2], viewMatrix[1][2], viewMatrix[2][2]); vec3 rd = -back;
   float perp2 = dot(vOff, vOff); float perp = sqrt(perp2);
   float cov = clamp((vR - perp) / max(fwidth(perp), 1e-6) + 0.5, 0.0, 1.0);
-  if (cov <= 0.0) discard;
+  if (cov <= 0.0 || vIntro <= 0.0) discard;
   vec3 hit = vC + vOff + back * sqrt(max(vR * vR - perp2, 0.0));
   vec3 n = normalize(hit - vC);
   vec4 clip = projectionMatrix * viewMatrix * vec4(hit, 1.0);
@@ -106,7 +111,7 @@ void main() {
   lit *= mix(1.0, 0.5 + 0.5 * pow(mu, 0.5), rich);
   float fres = pow(1.0 - mu, 3.0);
   lit += vec3(0.74, 0.7, 1.0) * fres * (0.08 + 0.9 * smoothstep(-0.25, 0.35, ndl)) * (0.6 + 0.7 * rich);
-  gl_FragColor = vec4(lit * vDim, cov);
+  gl_FragColor = vec4(lit * vDim, cov * vIntro);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;
