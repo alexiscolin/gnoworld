@@ -130,6 +130,12 @@ describe("the asks refused without the model", () => {
     expect(refused(question)).toBe(true);
   });
 
+  it("refuses a link no browser can read, and takes a translation of exactly 300 characters as short", () => {
+    expect(refused("see https://[oops")).toBe(true);
+    expect(refused(`translate ${"a".repeat(290)}`)).toBe(false);
+    expect(refused(`translate ${"a".repeat(291)}`)).toBe(true);
+  });
+
   it("reads a link's host as a browser does, a backslash included", () => {
     expect(refused("https://evil.com\\@gno.land/x")).toBe(true);
     expect(refused("https://gno.land./r/demo")).toBe(false);

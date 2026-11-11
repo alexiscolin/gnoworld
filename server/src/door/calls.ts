@@ -38,16 +38,9 @@ interface Deps {
 
 /** What the page reads of an answer: never its cost; a `failed` is no answer but a failure, so none. */
 function forPage(answer: JarvisPaidAnswer): JarvisAnswer | undefined {
-  switch (answer.status) {
-    case "answered":
-      return { status: "answered", markdown: answer.markdown, buttons: answer.buttons };
-    case "declined":
-    case "spent":
-    case "off":
-      return { status: answer.status };
-    case "failed":
-      return undefined;
-  }
+  if (answer.status === "failed") return undefined;
+  if (answer.status === "answered") return { status: "answered", markdown: answer.markdown, buttons: answer.buttons };
+  return { status: answer.status };
 }
 
 /** A call as the door's relay answers it: what the page reads, or the failure. */
@@ -79,7 +72,7 @@ export function callsOf({ quota, named, recent, jarvis, day, served }: Deps) {
     if (nothing(called)) quota.giveBack(who, started);
     if (nothing(called) || (!called.ok && called.error === "down")) cap.give(room, started);
     const cost = costOf(called);
-    if (cost > 0) day.spend(who, cost, started);
+    day.spend(who, cost, started);
     const page = called.ok ? forPage(called.answer) : undefined;
     if (page !== undefined) served.set(key, page, { room, started });
   };

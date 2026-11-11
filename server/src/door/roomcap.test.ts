@@ -33,6 +33,14 @@ describe("a room's cap", () => {
     expect([cap.take("#a", T0 + 100), cap.take("#a", T0 + 100)]).toEqual([true, false]);
   });
 
+  it("frees nothing for a room never asked in, or a time it does not hold", () => {
+    const cap = makeRoomCap();
+    cap.give("#none", T0);
+    fill(cap, "#a");
+    cap.give("#a", T0 + 500);
+    expect(cap.take("#a", T0 + 100)).toBe(false);
+  });
+
   it("holds a number of rooms: the room asked in longest ago is forgotten first", () => {
     const cap = makeRoomCap({ max: 2 });
     fill(cap, "#a");

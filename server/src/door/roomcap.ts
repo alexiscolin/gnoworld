@@ -24,9 +24,9 @@ export function makeRoomCap({ max = 10_000 }: { max?: number } = {}): RoomCap {
       return true;
     },
     give(room, at) {
-      const times = rooms.get(room);
-      const index = times?.indexOf(at) ?? -1;
-      if (times !== undefined && index >= 0) times.splice(index, 1);
+      const times = rooms.get(room) ?? [];
+      const index = times.indexOf(at);
+      if (index >= 0) times.splice(index, 1);
     },
   };
 }

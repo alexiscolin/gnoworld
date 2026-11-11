@@ -130,6 +130,10 @@ describe("keeps: a mention by name (10u-g, G-jarvis point 6)", () => {
     expect(keeps(original, translation)).toBe(false);
   });
 
+  it("drops an @room the original names only in code, where it pings nobody", () => {
+    expect(keeps("Use `@room` to ping", "Use @room to ping")).toBe(false);
+  });
+
   it.each([
     ["the same names in another order and number", "Hi @bob, ask @alice", "Salut @bob, demande \u00e0 @alice, @bob"],
     ["no name at all, one dropped", "Hi @bob", "Salut"],

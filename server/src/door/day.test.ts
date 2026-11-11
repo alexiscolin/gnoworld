@@ -124,6 +124,18 @@ describe("an account's own share", () => {
     expect(db.prepare("SELECT count(*) AS n FROM jarvis_strikes WHERE day = '2000-01-01'").get()).toEqual({ n: 100 });
   });
 
+  it("purges the days gone from a spend alone, and from a strike alone", () => {
+    for (const table of ["jarvis_spent", "jarvis_strikes"] as const) {
+      const { db, day } = setup();
+      const column = table === "jarvis_spent" ? "micros" : "count";
+      const old = db.prepare(`INSERT INTO ${table} (account, day, ${column}) VALUES (?, '2000-01-01', 1)`);
+      for (let at = 0; at < 600; at += 1) old.run(`a${String(at)}`);
+      if (table === "jarvis_spent") day.spend(ANNA, 1);
+      else day.strike(ANNA);
+      expect(db.prepare(`SELECT count(*) AS n FROM ${table} WHERE day = '2000-01-01'`).get()).toEqual({ n: 100 });
+    }
+  });
+
   it("purges the days gone, a bounded number a call", () => {
     const { db, day, clock } = setup();
     day.spend(ANNA, 1);

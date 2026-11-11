@@ -169,6 +169,8 @@ function deferred<T>() {
 const passed = async (response: Response) => {
   expect(await answerOf(response)).toEqual([200, ANSWER()]);
 };
+// A turn of the event loop: the microtasks of every request already made run first, each to its next wait.
+const idle = () => new Promise<void>((resolve) => setImmediate(resolve));
 const HERE = { ask: "here", room: "#bubble" } as const;
 const CATCH_UP = { ask: "catch-up", room: "#bubble" } as const;
 const EXPLAIN = {
@@ -796,13 +798,21 @@ describe("Jarvis's guards, second round", () => {
 
     it("share one call: every reader served, no cost shown, a question counted for the first asker alone", async () => {
       const { gate, answer } = gated();
-      const { ask, sent, counted } = setup({ perMinute: 100, answer: answer({ ok: true, answer: PAID(500) }) });
+      const { ask, sent, counted, events, work } = setup({
+        perMinute: 100,
+        answer: answer({ ok: true, answer: PAID(500) }),
+      });
       const asked = [ANNA_TOKEN, BEN_TOKEN, crowd(0), crowd(1), crowd(2)].map((token) => ask({ body: HERE, token }));
       await expect.poll(() => sent.length).toBe(1);
+      // Every request has read its room, and a turn of the event loop has run each to its wait on the call in flight.
+      await expect.poll(() => work.filter((line) => line === "read #bubble").length).toBe(5);
+      await idle();
       gate.resolve(undefined);
       for (const response of await Promise.all(asked)) expect(await answerOf(response)).toEqual([200, ANSWER()]);
       expect(sent).toHaveLength(1);
       expect(counted()).toEqual([{ account: ANNA, day: "2026-11-04", count: 1 }]);
+      const kinds = (event: string) => events().filter((line) => line.includes(event)).length;
+      expect([kinds("jarvis_answered"), kinds("jarvis_served")]).toEqual([1, 4]);
     });
 
     it("are served again from what the call made once it settled, and leave no call in flight", async () => {
@@ -1236,12 +1246,12 @@ describe("Jarvis's guards, step 4", () => {
 
   it("logs a waiter given a declined as served, never as a call of its own", async () => {
     const held = deferred<Asked>();
-    const { ask, sent, events } = setup({ perMinute: 100, answer: () => held.promise });
+    const { ask, sent, events, work } = setup({ perMinute: 100, answer: () => held.promise });
     const anna = ask({ body: HERE });
     await expect.poll(() => sent.length).toBe(1);
     const ben = ask({ body: HERE, token: BEN_TOKEN });
-    // Long enough for the second ask to reach the call in flight.
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await expect.poll(() => work.filter((line) => line === "read #bubble").length).toBe(2);
+    await idle();
     held.resolve({ ok: true, answer: { status: "declined", cost: 1 } });
     await Promise.all([anna, ben]);
     expect(sent).toHaveLength(1);
@@ -1285,7 +1295,7 @@ describe("Jarvis's guards, round 2", () => {
       },
       { incoming: { socket: { remoteAddress: PEER } } },
     );
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await idle();
     await passed(await ask1(app, distinct(0).body));
     send();
     expect(await answerOf(await held)).toEqual([200, { status: "capped" }]);

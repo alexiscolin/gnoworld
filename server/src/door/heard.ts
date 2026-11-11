@@ -14,6 +14,6 @@ export function makeHeard(max: number): Heard {
     said: (account) => {
       remember(accounts, [account, true], max);
     },
-    has: (account) => accounts.has(account),
+    has: (account) => accounts.get(account) === true,
   };
 }

@@ -29,7 +29,7 @@ const pasted = (question: string): boolean => /\btranslat/i.test(question) && qu
 const offTheList = (question: string, hosts: readonly string[]): boolean =>
   [...question.matchAll(LINK)].some((match) => {
     const host = hostOf(match[0]);
-    return host === undefined || host === "" || !hosts.some((listed) => host === listed || host.endsWith(`.${listed}`));
+    return host === undefined || !hosts.some((listed) => host === listed || host.endsWith(`.${listed}`));
   });
 
 const otherCode = (question: string): boolean => CODE.test(question) && OTHER.test(question) && !GNO.test(question);
