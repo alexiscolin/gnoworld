@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Space } from "./scene.ts";
 import { Round } from "./parts/marks.ts";
 import { blankPose } from "./rig/pose.ts";
-import { advance } from "./move.ts";
+import { advance, paint } from "./move.ts";
 import { napOf, stateOf, tick } from "./view.ts";
 
 // view.ts reads the pointer's media query as it loads.
@@ -94,6 +94,13 @@ describe("a stopped scene clock (rate 0, after a minute of rest)", () => {
     expect(napOf(pageAt(1), state, { need: "none", calm: 9000 })).toBeUndefined();
     expect(napOf(pageAt(0), state, { need: "none", calm: 9000 })).toBeGreaterThan(0);
   });
+
+  it("sleeps as long as the slow motions allow at the clock's rate: at half the rate, twice as long", () => {
+    const still = (rate: number): Space => Object.assign(pageAt(rate), { arrival: false, circle: undefined });
+    const state = { ...stateOf(pageAt(1)), pxPerSecond: 2 };
+    expect(napOf(still(1), state, { need: "none", calm: 9000 })).toBe(250);
+    expect(napOf(still(0.5), state, { need: "none", calm: 9000 })).toBe(500);
+  });
 });
 
 describe("an ease runs on the frame's own time", () => {
@@ -102,5 +109,30 @@ describe("an ease runs on the frame's own time", () => {
     round.gain.value = 0.2;
     for (let frame = 0; frame < 150; frame += 1) round.follow(undefined, blankPose(), { seconds: 5, delta: 0.016 });
     expect(round.gain.value).toBeLessThan(1e-3);
+  });
+});
+
+describe("a frame's paint", () => {
+  it("hands the ring and the moons the frame's own delta in seconds, whatever the scene clock does", () => {
+    const space = pageAt(0);
+    const follow = vi.fn<(...args: unknown[]) => void>();
+    const planet = { id: "p" };
+    Object.assign(space, { kept: planet });
+    Object.assign(space.labels, { tick: () => undefined });
+    Object.assign(space.stage, {
+      intro: { tick: () => undefined, aim: () => undefined, ready: true },
+      orbits: { of: () => undefined, gain: uniform() },
+      links: { tick: () => undefined },
+      effects: { busy: false, tick: () => undefined },
+      ground: { place: () => undefined },
+      round: { follow, lines: { quaternion: {} } },
+      moons: { follow },
+    });
+    paint(space, 16);
+    expect(follow).toHaveBeenCalledTimes(2);
+    for (const [, ...rest] of follow.mock.calls) {
+      const clock = rest.find((arg) => typeof arg === "object" && arg !== null && "delta" in arg);
+      expect(clock).toMatchObject({ delta: 0.016 });
+    }
   });
 });

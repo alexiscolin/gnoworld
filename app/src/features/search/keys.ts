@@ -1,10 +1,8 @@
 // The palette's keys, read at its root: ⌘C copies the chosen place's link, and in the field the arrows choose, Enter goes, Shift+Enter
 // opens the chat, Escape closes (the search field's own Escape would only clear it first).
+import { composing } from "@gnoworld/ui";
 import type { KeyboardEvent } from "react";
 import type { SearchItem } from "./types.ts";
-
-const composing = (event: KeyboardEvent) =>
-  event.nativeEvent.isComposing || Reflect.get(event.nativeEvent, "keyCode") === 229;
 
 const copies = (event: KeyboardEvent) => (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "c";
 
@@ -48,7 +46,7 @@ export function onPaletteKey(event: KeyboardEvent, keyed: Keyed): void {
     if (selecting(event.target)) return;
     event.preventDefault();
     copy(chosen);
-  } else if (event.target instanceof HTMLInputElement && !composing(event)) {
+  } else if (event.target instanceof HTMLInputElement && !composing(event.nativeEvent)) {
     inField(event, keyed, chosen);
   }
 }

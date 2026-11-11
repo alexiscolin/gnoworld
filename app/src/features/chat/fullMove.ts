@@ -5,7 +5,7 @@ import { gsap } from "gsap";
 import { useLayoutEffect, type RefObject } from "react";
 import { FULL_MOVE, takeBack, takeDock } from "../../fullChat.ts";
 import { motionOf } from "../../space/motion.ts";
-import { clipOf, fadeFrames, growFrames, parseInset, shrinkFrames, type Insets } from "./moveClip.ts";
+import { fadeFrames, growFrames, insetsOf, parseInset, shrinkFrames, type Insets } from "./moveClip.ts";
 import { restoreScrolls, stillFull, takeClosing } from "./stillScreen.ts";
 
 // Space's flights' own curve, a cubic in and out (space/rig/flight.ts's inOut), a little longer than before: the chat eases off and lands
@@ -82,7 +82,7 @@ function shrinkFull(screen: HTMLElement): void {
         }),
       ];
       if (to !== undefined) {
-        const end = parseInset(clipOf(box, to, ROUND)) ?? NONE;
+        const end = insetsOf(box, to);
         going.push(
           copy.animate(shrinkFrames(shown?.insets ?? NONE, end, { round: ROUND, curve: ease(EASE) }), {
             duration: SHRINK_S * 1000,

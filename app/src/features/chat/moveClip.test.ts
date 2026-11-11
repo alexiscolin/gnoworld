@@ -49,6 +49,15 @@ describe("the clips as keyframes the browser runs on a plain linear timing", () 
     expect(parseInset("none")).toBeUndefined();
   });
 
+  it("reads the shortest form Chromium writes a computed inset() in, its sides filled as a margin's", () => {
+    expect(parseInset("inset(10px 0px 30px round 16px)")).toEqual({ top: 10, right: 0, bottom: 30, left: 0 });
+    expect(parseInset("inset(10px 0px round 16px)")).toEqual({ top: 10, right: 0, bottom: 10, left: 0 });
+    expect(parseInset("inset(-16px round 16px)")).toEqual({ top: -16, right: -16, bottom: -16, left: -16 });
+    expect(parseInset("inset(5px)")).toEqual({ top: 5, right: 5, bottom: 5, left: 5 });
+    expect(parseInset("inset(1px 2px 3px 4px 5px)")).toBeUndefined();
+    expect(parseInset("inset(10% round 16px)")).toBeUndefined();
+  });
+
   it("shrinks from any inset to the dock's, on the curve, one radius", () => {
     const start = { top: 10, right: 20, bottom: 30, left: 40 };
     const to = { top: 24, right: 24, bottom: 20, left: 1080 };

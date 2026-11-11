@@ -23,25 +23,39 @@ const STEPS = 48;
 export const insetClip = ({ top, right, bottom, left }: Insets, round: number): string =>
   `inset(${String(top)}px ${String(right)}px ${String(bottom)}px ${String(left)}px round ${String(round)}px)`;
 
-/** The clip of `box` that shows `within` alone, its corners `round`. */
-export const clipOf = (box: Box, within: Box, round: number): string =>
-  insetClip(
-    {
-      top: within.top - box.top,
-      right: box.right - within.right,
-      bottom: box.bottom - within.bottom,
-      left: within.left - box.left,
-    },
-    round,
-  );
+/** How far `within` stands in from each edge of `box`. */
+export const insetsOf = (box: Box, within: Box): Insets => ({
+  top: within.top - box.top,
+  right: box.right - within.right,
+  bottom: box.bottom - within.bottom,
+  left: within.left - box.left,
+});
 
-/** The insets of a computed `inset(... round ...)` clip; none for any other value (no clip). */
+/** The clip of `box` that shows `within` alone, its corners `round`. */
+export const clipOf = (box: Box, within: Box, round: number): string => insetClip(insetsOf(box, within), round);
+
+// Which of one to four lengths each side takes, top, right, bottom, left, as a margin's.
+const MARGIN: readonly (readonly [number, number, number, number])[] = [
+  [0, 0, 0, 0],
+  [0, 1, 0, 1],
+  [0, 1, 2, 1],
+  [0, 1, 2, 3],
+];
+
+// The pixel lengths an `inset()` is written with, before its `round`; none when one is not in pixels.
+function lengthsOf(clip: string): number[] | undefined {
+  const words = /^inset\(([^)]*?)(?:\s+round\b[^)]*)?\)$/.exec(clip.trim())?.[1]?.trim().split(/\s+/);
+  return words?.every((word) => /^-?[\d.]+px$/.test(word)) === true ? words.map(Number.parseFloat) : undefined;
+}
+
+/** The insets of a computed `inset(... round ...)` clip, in one to four lengths as a margin's (Chromium writes the shortest); none for
+ * any other value (no clip). */
 export function parseInset(clip: string): Insets | undefined {
-  const sides = /^inset\(\s*(\S+)px\s+(\S+)px\s+(\S+)px\s+(\S+)px/.exec(clip)?.slice(1, 5).map(Number);
-  const [top, right, bottom, left] = sides ?? [];
-  return top === undefined || right === undefined || bottom === undefined || left === undefined
-    ? undefined
-    : { top, right, bottom, left };
+  const lengths = lengthsOf(clip);
+  const order = MARGIN[(lengths?.length ?? 0) - 1];
+  if (lengths === undefined || order === undefined) return undefined;
+  const side = (at: 0 | 1 | 2 | 3) => lengths[order[at]] ?? 0;
+  return { top: side(0), right: side(1), bottom: side(2), left: side(3) };
 }
 
 /** `value` at each step of `curve`, as keyframes spread over the first `span` of the timing. */

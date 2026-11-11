@@ -3,7 +3,14 @@ import { gsap } from "gsap";
 import { afterEach, expect, it, vi } from "vitest";
 import { holdChrome, riseChrome } from "./rise.ts";
 
-vi.mock("../../space/motion.ts", () => ({ motionOf: () => ({ matches: false }) }));
+const still = vi.hoisted(() => ({ on: false }));
+vi.mock("../../space/motion.ts", () => ({
+  motionOf: () => ({
+    get matches() {
+      return still.on;
+    },
+  }),
+}));
 
 // P408B: what rises in under the loader is not drawn while the loader covers it, so what loads into it (a count, a style sheet) shifts
 // nothing the browser counts; it is drawn again, or rises, the moment the loader goes.
@@ -22,6 +29,7 @@ const finish = (): void => {
 };
 
 afterEach(() => {
+  still.on = false;
   gsap.globalTimeline.clear();
   document.body.replaceChildren();
 });
@@ -88,4 +96,50 @@ it("holds the header's parts, and its fixed bar, hidden while held", () => {
   expect(hidden("header > div")).toBe("hidden");
   release();
   expect(hidden("header > a")).toBe("");
+});
+
+// A header with a plain part and a fixed bar, two heroes and the worlds' rail: the three slots of the rise, in their order.
+const fullPage = (): void => {
+  headerPage();
+  const hero = document.createElement("div");
+  hero.setAttribute("data-clear", "");
+  const rail = document.createElement("nav");
+  rail.setAttribute("aria-label", "Worlds");
+  document.body.append(hero, rail);
+};
+const tweenOf = (selector: string): gsap.core.Animation | undefined =>
+  gsap.globalTimeline
+    .getChildren()
+    .find((each) => (each as gsap.core.Tween).targets().some((target) => target === document.querySelector(selector)));
+
+it("keeps the worlds' rail transform after its rise, as the hero's", () => {
+  fullPage();
+  riseChrome(0);
+  finish();
+  expect(document.querySelector<HTMLElement>("nav")?.style.transform ?? "").not.toBe("");
+});
+
+it("starts each slot 50 ms after the one before it, the header's parts first", () => {
+  fullPage();
+  riseChrome(100);
+  const delays = ["header > a", "[data-clear]", "nav"].map((selector) => tweenOf(selector)?.delay());
+  expect(delays).toEqual([0.1, 0.15, 0.2]);
+});
+
+it("rises the parts of one slot together, with no stagger between them", () => {
+  page();
+  const second = document.body.appendChild(document.createElement("div"));
+  second.setAttribute("data-clear", "");
+  riseChrome(0, { header: false });
+  expect(tweenOf("[data-clear]")?.duration()).toBeCloseTo(0.7, 5);
+});
+
+it("fades the fixed parts of the header in, and moves nothing at all under reduced motion", () => {
+  fullPage();
+  riseChrome(0);
+  expect(tweenOf("header > div")?.duration()).toBeCloseTo(0.7, 5);
+  gsap.globalTimeline.clear();
+  still.on = true;
+  riseChrome(0);
+  expect(gsap.globalTimeline.getChildren()).toHaveLength(0);
 });

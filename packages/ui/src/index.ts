@@ -12,7 +12,7 @@ export { ChatLayout, type ChatLayoutProps } from "./ChatLayout/ChatLayout.tsx";
 export type { Edge as ChatEdge, Widths as ChatWidths } from "./ChatLayout/resize.ts";
 export { Card, type CardHeaderProps, type CardProps } from "./Card/Card.tsx";
 export { Room, useAlone } from "./alone.tsx";
-export { holdsEscape } from "./escape.ts";
+export { composing, holdsEscape, typedIn } from "./escape.ts";
 export { Chip, type ChipProps } from "./Chip/Chip.tsx";
 export { ComingSoon, type ComingSoonProps } from "./ComingSoon/ComingSoon.tsx";
 export { Combobox, type ComboboxGroup, type ComboboxOption, type ComboboxProps } from "./Combobox/Combobox.tsx";

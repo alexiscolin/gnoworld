@@ -5,7 +5,7 @@
 // third party here, whatever the moderation's verdict (4g draws the players, in the room's list).
 // Its composer, given, tags every line with the root's msgid; a guest gets a word in its place.
 import { excerpt, foldEdits, threadsOf, type Line } from "@gnoworld/core";
-import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
+import { composing, IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { LineView } from "./LineView.tsx";
 import shared from "./lists.module.css";
@@ -60,17 +60,9 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   useEffect(() => {
     start();
   }, []);
-  // An Escape that ends an input method's composition belongs to the composition: Safari marks it with keyCode 229, not
-  // isComposing (R5). The legacy keyCode is the one signal there is: read by name, as the types mark it deprecated.
+  // An Escape that ends an input method's composition belongs to the composition (R5, Safari's keyCode 229 included).
   const escape = (event: KeyboardEvent) => {
-    const { nativeEvent } = event;
-    if (
-      event.key !== "Escape" ||
-      event.defaultPrevented ||
-      nativeEvent.isComposing ||
-      Reflect.get(nativeEvent, "keyCode") === 229
-    )
-      return;
+    if (event.key !== "Escape" || event.defaultPrevented || composing(event.nativeEvent)) return;
     event.preventDefault();
     onClose();
   };

@@ -144,14 +144,15 @@ function pixelsPerSecond(space: Space): number {
   return fastest;
 }
 
-/** How long the loop may sleep after this frame; none, it stays awake. A stopped clock (rate 0) moves nothing, so no slow motion keeps it up. */
+/** How long the loop may sleep after this frame; none, it stays awake. The slow motions move at the scene clock's rate (rig/free.ts): a
+ * stopped clock moves nothing, one easing down moves that much less a real second. */
 export const napOf = (space: Space, state: State, { need, calm }: { need: Need; calm: number }): number | undefined =>
   napFor({
     need,
     moving: moves(space) || space.rig.free.turning,
     settled: space.labels.settled(),
     calm,
-    pxPerSecond: space.rig.free.rate === 0 ? 0 : state.pxPerSecond,
+    pxPerSecond: state.pxPerSecond * space.rig.free.rate,
   });
 
 /** Runs the scene's clock `ms` on, at the rate the rest has left it (rig/free.ts). The place of a thing goes by it; an ease goes by the frame's own delta. */

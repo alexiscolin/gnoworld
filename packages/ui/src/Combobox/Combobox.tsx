@@ -1,5 +1,6 @@
 import { useEffect, useId, useState, type KeyboardEvent, type ReactNode } from "react";
 import { IconButton } from "../Button/IconButton.tsx";
+import { composing } from "../escape.ts";
 import field from "../Field/Field.module.css";
 import menu from "../Popover/Popover.module.css";
 import styles from "./Combobox.module.css";
@@ -36,10 +37,6 @@ export interface ComboboxProps {
 
 /** A group draws its first options only: a list of thousands is a page's weight, and a query narrows it. */
 const SHOWN = 50;
-
-// The Enter that ends an input method's composition only picks the word; Safari sends it with isComposing false and keyCode 229.
-const composing = (event: KeyboardEvent) =>
-  event.nativeEvent.isComposing || Reflect.get(event.nativeEvent, "keyCode") === 229;
 
 /** The option an arrow moves to, round the ends; from none, down is the first and up the last. */
 function moved(key: string, at: number, length: number): number {
@@ -160,7 +157,7 @@ export function Combobox({
 
   function onKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     const chosen = flat[at];
-    if (event.key === "Enter" && chosen !== undefined && !composing(event)) {
+    if (event.key === "Enter" && chosen !== undefined && !composing(event.nativeEvent)) {
       event.preventDefault();
       onSelect(chosen.id);
     } else if ((event.key === "ArrowDown" || event.key === "ArrowUp") && flat.length > 0) {

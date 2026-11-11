@@ -313,17 +313,19 @@ describe("Tooltip", () => {
   });
 
   it("leaves no count and no listener behind when it leaves the page", () => {
-    const listened = vi.spyOn(document, "addEventListener");
+    const listened = [vi.spyOn(document, "addEventListener"), vi.spyOn(window, "addEventListener")];
     const { unmount } = draw();
     fireEvent.pointerEnter(button());
-    const signals = listened.mock.calls.flatMap(([, , options]) =>
-      typeof options === "object" && options.signal !== undefined ? [options.signal] : [],
+    const signals = listened.flatMap((spy) =>
+      spy.mock.calls.flatMap(([, , options]) =>
+        typeof options === "object" && options.signal !== undefined ? [options.signal] : [],
+      ),
     );
     unmount();
     expect(vi.getTimerCount()).toBe(0);
     expect(signals.length).toBeGreaterThan(0);
     expect(signals.every((signal) => signal.aborted)).toBe(true);
-    listened.mockRestore();
+    for (const spy of listened) spy.mockRestore();
   });
 
   it("keeps its words from assistive technology, which has the control's name already", () => {

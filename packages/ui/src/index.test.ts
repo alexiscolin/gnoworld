@@ -9,9 +9,12 @@ import type { Unstyled } from "./testing.tsx";
 type Exported = typeof ui;
 // `iconNode` makes a node of a glyph and `stillCopy` a still copy of a part: functions, not components, with no props to style; `Room` takes children and data attributes alone.
 const unstyled: {
-  [Name in Exclude<keyof Exported, "iconNode" | "sightRef" | "stillCopy" | "useAlone" | "holdsEscape">]: Unstyled<
-    ComponentProps<Exported[Name]>
-  >;
+  [
+    Name in Exclude<
+      keyof Exported,
+      "iconNode" | "sightRef" | "stillCopy" | "useAlone" | "holdsEscape" | "typedIn" | "composing"
+    >
+  ]: Unstyled<ComponentProps<Exported[Name]>>;
 } = {
   Button: true,
   Room: true,
@@ -126,6 +129,8 @@ it("exports every component of the design system, iconNode, stillCopy, sightRef 
       "sightRef",
       "stillCopy",
       "holdsEscape",
+      "typedIn",
+      "composing",
       "useAlone",
     ].sort(),
   );

@@ -55,7 +55,7 @@ export async function readSession({ api, store }: SessionDeps): Promise<void> {
 const FIRST_WAIT_MS = 1000;
 const LONGEST_WAIT_MS = 30_000;
 // One round's asks: the first, five doublings and ten 30 s waits, some five minutes (O3B, D13978); a later round, after a rest, asks at
-// once and then every 30 s, so a tab in use asks no more often than the old endless loop did.
+// once and then every 30 s: a gesture just after a round's last ask asks again at once, about one ask in 26 s at most.
 const TRIES = 16;
 
 /** Reads the session until the server says, a doubling second apart, 30 at most: until then the page offers no login and opens no chat.

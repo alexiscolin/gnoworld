@@ -266,6 +266,22 @@ describe("a card that opens alone", () => {
     expect(Number.parseFloat(room ?? "")).toBeGreaterThan(400);
   });
 
+  it("fills the room with the screen's share when it is lower than the scroller, less the scroller's padding", () => {
+    const { scroller } = plate();
+    const blocks = () => document.querySelector<HTMLElement>("[data-blocks]")?.style.getPropertyValue("--plate-room");
+    Object.defineProperty(scroller, "clientHeight", { value: 5000, configurable: true });
+    fireEvent.click(expand("Hours"));
+    expect(blocks()).toBe(`${String(window.innerHeight * 0.85)}px`);
+    fireEvent.click(close("Hours"));
+    Object.defineProperty(scroller, "clientHeight", { value: 500, configurable: true });
+    const style = window.getComputedStyle.bind(window);
+    vi.spyOn(window, "getComputedStyle").mockImplementation((node) =>
+      node === scroller ? ({ paddingBlockStart: "20px", paddingBlockEnd: "30px" } as CSSStyleDeclaration) : style(node),
+    );
+    fireEvent.click(expand("Hours"));
+    expect(blocks()).toBe("450px");
+  });
+
   it("still opens in place with no plate around it", () => {
     render(<Block id="Hours" />);
     fireEvent.click(expand("Hours"));
@@ -280,6 +296,9 @@ describe("the rows a card shows when open", () => {
     plate();
     fireEvent.click(expand("Hours"));
     await settle();
+    const [shut, shown] = [seen.findIndex(([open, rows]) => open && !rows), seen.findIndex(([, rows]) => rows)];
+    expect(seen[shut]).toEqual([true, false]);
+    expect(shut).toBeLessThan(shown);
     expect(seen.at(-1)).toEqual([true, true]);
     seen.length = 0;
     fireEvent.click(close("Hours"));
@@ -325,7 +344,7 @@ describe("Escape", () => {
     outside.remove();
   });
 
-  it("closes the card although a tooltip took its first Escape", () => {
+  it("leaves the Escape a tooltip took to the tooltip, and closes the card at the next one (WCAG 1.4.13)", () => {
     plate();
     fireEvent.click(expand("Hours"));
     const tip = document.body.appendChild(document.createElement("span"));
@@ -335,6 +354,10 @@ describe("Escape", () => {
     first.preventDefault();
     act(() => {
       document.dispatchEvent(first);
+    });
+    expect(alone()).toHaveLength(1);
+    act(() => {
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", cancelable: true, bubbles: true }));
     });
     expect(alone()).toHaveLength(0);
     tip.remove();
@@ -440,6 +463,39 @@ describe("the move", () => {
     expect(new Set(delays).size).toBe(delays.length);
   });
 
+  it("fades nothing out on a close, and swaps although a fade is pending", async () => {
+    plate();
+    const played = animating(true);
+    fireEvent.click(expand("Hours"));
+    act(() => {
+      for (const each of played) each.finish();
+    });
+    await settle();
+    played.length = 0;
+    fireEvent.click(close("Hours"));
+    await settle();
+    expect(played.filter(({ keyframes }) => keyframes[1]?.["opacity"] === 0)).toHaveLength(0);
+    expect(alone()).toHaveLength(0);
+  });
+
+  it("swaps all the same when a fade's finish is rejected, as one cancelled by the page", async () => {
+    plate();
+    Object.assign(Element.prototype, {
+      animate: () => ({ finished: Promise.reject(new Error("cancelled")), cancel: vi.fn() }),
+    });
+    fireEvent.click(expand("Hours"));
+    await settle();
+    expect(alone()).toHaveLength(1);
+  });
+
+  it("puts the focus back on the opening button without scrolling to it", () => {
+    plate();
+    const focus = vi.spyOn(HTMLElement.prototype, "focus");
+    fireEvent.click(expand("Hours"));
+    fireEvent.click(close("Hours"));
+    expect(focus).toHaveBeenCalledWith({ preventScroll: true });
+  });
+
   it("does not move under reduced motion, nor under the app's calm setting: the swap is at once", () => {
     plate();
     const played = animating();
@@ -452,5 +508,76 @@ describe("the move", () => {
     fireEvent.click(expand("Hours"));
     expect(alone()).toHaveLength(1);
     expect(played).toHaveLength(0);
+  });
+});
+
+// The plate's cards rise in their stagger as the plate comes (Card/useRise.ts): its tests sit here, beside the room, as the Card folder's
+// tests are display-only and a default run skips them.
+describe("a rising card's delay (--d)", () => {
+  const watchers: ((entries: { isIntersecting: boolean }[]) => void)[] = [];
+  let now = 0;
+
+  beforeEach(() => {
+    now = 0;
+    watchers.length = 0;
+    vi.spyOn(performance, "now").mockImplementation(() => now);
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(run: (entries: { isIntersecting: boolean }[]) => void) {
+          watchers.push(run);
+        }
+        observe = () => undefined;
+        disconnect = () => undefined;
+      },
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    delete document.documentElement.dataset["arrivedAt"];
+  });
+
+  const cards = (count: number) =>
+    render(
+      <div data-content="">
+        {Array.from({ length: count }, (_, at) => (
+          <Card key={at} rises>
+            <Card.Header title={`Card ${String(at)}`} />
+          </Card>
+        ))}
+      </div>,
+    );
+  const see = (at: number, time: number) => {
+    now = time;
+    act(() => {
+      watchers[at]?.([{ isIntersecting: true }]);
+    });
+  };
+  const delays = (view: ReturnType<typeof cards>) =>
+    [...view.container.querySelectorAll("article")].map((card) => card.style.getPropertyValue("--d"));
+
+  it("counts the cards that came with the plate: 0.90 s, then 0.05 s more for each", () => {
+    const view = cards(3);
+    [0, 1, 2].forEach((at) => {
+      see(at, at);
+    });
+    expect(delays(view)).toEqual(["0.90s", "0.95s", "1.00s"]);
+  });
+
+  it("is none for a card that scrolls in long after the first one came", () => {
+    const view = cards(3);
+    see(0, 0);
+    see(1, 1000);
+    see(2, 2000);
+    expect(delays(view)).toEqual(["0.90s", "0.95s", "0s"]);
+  });
+
+  it("counts from the arrival's own start, a card seen late landing in step", () => {
+    document.documentElement.dataset["arrivedAt"] = "800";
+    const view = cards(1);
+    see(0, 1000);
+    expect(delays(view)).toEqual(["0.70s"]);
   });
 });

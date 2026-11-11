@@ -33,8 +33,29 @@ describe("who holds an Escape", () => {
     expect(press(editor)).toBe(true);
   });
 
+  it.each(["", "plaintext-only"])(
+    "a field edited by contenteditable=%j holds it, as space's and the dialog's fields do",
+    (value) => {
+      const editor = add(document.createElement("div"));
+      editor.setAttribute("contenteditable", value);
+      expect(press(editor)).toBe(true);
+    },
+  );
+
   it("an input method's composition holds it", () => {
     expect(press(add(document.createElement("div")), { isComposing: true })).toBe(true);
+  });
+
+  it("Safari's composition, isComposing false with keyCode 229, holds it", () => {
+    expect(press(add(document.createElement("div")), { keyCode: 229 })).toBe(true);
+  });
+
+  it("an Escape a tooltip or a chart's reading already took (its default prevented) is held", () => {
+    const node = add(document.createElement("div"));
+    node.addEventListener("keydown", (event) => {
+      event.preventDefault();
+    });
+    expect(press(node, { cancelable: true })).toBe(true);
   });
 
   it("an open dialog holds it, wherever the key was pressed", () => {

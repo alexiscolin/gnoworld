@@ -84,3 +84,24 @@ it("does not go up a level when the Escape closed a card open alone: the reader 
     root.unmount();
   });
 });
+
+it("does not go up a level when the Escape comes from a field being typed in", () => {
+  const up = vi.fn();
+  const stop = new AbortController();
+  listen(handOf(up), stop.signal);
+  const field = document.body.appendChild(document.createElement("input"));
+  key(field);
+  expect(up).not.toHaveBeenCalled();
+  stop.abort();
+});
+
+it("does not go up a level while a dialog is open: the Escape is the dialog's", () => {
+  const up = vi.fn();
+  const stop = new AbortController();
+  listen(handOf(up), stop.signal);
+  const dialog = document.body.appendChild(document.createElement("dialog"));
+  dialog.setAttribute("open", "");
+  key(document.body);
+  expect(up).not.toHaveBeenCalled();
+  stop.abort();
+});

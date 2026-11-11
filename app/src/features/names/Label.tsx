@@ -9,8 +9,8 @@ interface Props {
   account: string;
   universe: string;
   again: number;
-  /** Told whether a name can be picked: the universe's chain answered and the account has none there. */
-  onPickable: (pickable: boolean) => void;
+  /** Told whether a name can be picked: the universe's chain answered and the account has none there; none till it answers. */
+  onPickable: (pickable: boolean | undefined) => void;
   /** A reader of a test's own. */
   read?: typeof readName;
 }
@@ -22,7 +22,8 @@ export function NameLabel({ account, universe, again, onPickable, read = readNam
   const { chains, universe: here } = pageNames(universe);
   const reads = useReads({ account, chains, read }, again);
   const shown = shownName(account, reads);
-  const pickable = reads[here.chainId === MAINNET_CHAIN ? "mainnet" : "onyx"]?.name === null;
+  const answer = reads[here.chainId === MAINNET_CHAIN ? "mainnet" : "onyx"];
+  const pickable = answer === undefined ? undefined : answer.name === null;
   useEffect(() => {
     onPickable(pickable);
   }, [pickable, onPickable]);
