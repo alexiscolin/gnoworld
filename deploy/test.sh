@@ -286,9 +286,11 @@ if [ "${1:-}" = --mutants ]; then
 		shift 2
 		# ONLY_MUTANTS, an extended regular expression: the mutants whose label it matches, alone.
 		[ -z "${ONLY_MUTANTS:-}" ] || printf '%s\n' "$label" | grep -qE -- "$ONLY_MUTANTS" || return 0
+		MUTANT_GATE=
 		"$@" >"$tmp/override.yaml"
 		code=0
-		STOP_AT=$wanted TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml sh "$0" >"$tmp/run.log" 2>&1 || code=$?
+		# MUTANT_GATE, set by a fault planted in the evals gate (test-jarvis.sh), is the one gate this run reads.
+		STOP_AT=$wanted TEST_PROJECT=gnoworld-demo-mutant-$$ TEST_OVERRIDE=$tmp/override.yaml TEST_EVALS_GATE=$MUTANT_GATE sh "$0" >"$tmp/run.log" 2>&1 || code=$?
 		if [ "$code" = 1 ] && grep '^FAIL' "$tmp/run.log" | grep -qF "$wanted"; then
 			pass "killed: $label, by \"$wanted\""
 		elif [ "$code" = 0 ]; then
@@ -615,12 +617,13 @@ FAKE
 	printf 'not a key\n' >"$tmp/ts_authkey" # Compose wants each secret's file, even one no started service reads
 	export TS_AUTHKEY_FILE="$tmp/ts_authkey"
 	# Slice 3's services (3e): secrets of their own, an origin, an internal network apart from the demo's.
-	for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key; do
+	for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key jarvis_door_key; do
 		openssl rand -hex 24 >"$tmp/$secret"
 		chmod 644 "$tmp/$secret"
 	done
 	export ERGO_OPER_PASSWORD_FILE="$tmp/ergo_oper_password" LOG_PEPPER_FILE="$tmp/log_pepper" OPENAI_API_KEY_FILE="$tmp/openai_api_key"
-	export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key" # a made-up key: jarvis stays off, and reads it only when on
+	export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key" # a made-up key: no key at all, jarvis reads it only when on, and no proof here asks the model
+	export JARVIS_DOOR_KEY_FILE="$tmp/jarvis_door_key" # the door's key, made up too: the server's and jarvis's, which prove each other (10u-g2)
 	export ORIGINS=http://gnoworld.test SERVER_NAME=irc.gnoworld.test
 	export INSIDE_SUBNET="${TEST_SUBNET:-172.30.90.0/24}" WEB_ADDRESS="${TEST_WEB_ADDRESS:-172.30.90.10}"
 	# jarvis's network and the admin API's, apart from the demo's (172.30.91 and 172.30.92) as the internal one is.
@@ -629,6 +632,9 @@ FAKE
 	# jarvis's way out's network and the guard's address there, and the server's address inside (10j's review, V2, V12).
 	export JARVIS_OUT_SUBNET="${TEST_JARVIS_OUT_SUBNET:-172.30.96.0/24}" GUARD_JARVIS_ADDRESS="${TEST_GUARD_JARVIS_ADDRESS:-172.30.96.2}"
 	export SERVER_ADDRESS="${TEST_SERVER_ADDRESS:-172.30.90.11}"
+	# The reader's network, its way out's, and the guard's address there (10u-g2).
+	export READER_SUBNET="${TEST_READER_SUBNET:-172.30.100.0/24}" READER_ADDRESS="${TEST_READER_ADDRESS:-172.30.100.10}"
+	export READER_OUT_SUBNET="${TEST_READER_OUT_SUBNET:-172.30.101.0/24}" GUARD_READER_ADDRESS="${TEST_GUARD_READER_ADDRESS:-172.30.101.2}"
 	# Each folder a service reads in its image lets every user in: a COPY --chmod with no execute bit gives the
 	# folder it makes that mode (moby/buildkit#5943), which kept Ergo's user out of /ergo. Checked before the
 	# start, which would only call the service unhealthy.
@@ -668,7 +674,7 @@ FAKE
 	reach "$inside" "the internal network" no
 
 	hardened "$guard" guard "user net-admin"
-	expect "the guard sits on the internal network, jarvis's way out's and its own" "$(networks_of "$guard")" "$inside ${project}_jarvis_out $outside "
+	expect "the guard sits on the internal network, jarvis's way out's, the reader's and its own" "$(networks_of "$guard")" "$inside ${project}_jarvis_out ${project}_reader_out $outside "
 	expect "its own network lets out" "$(docker network inspect --format '{{.Internal}}' "$outside")" false
 	expect "it is alone there" "$(docker network inspect --format '{{len .Containers}}' "$outside")" 1
 	reach "container:$guard" "the guard's network, which Tailscale shares," yes "$(guard_dns)"
@@ -697,7 +703,8 @@ FAKE
 		grep -vx -e "-A OUTPUT -d $WEB_ADDRESS/32 -o [^ ]* -p tcp -m tcp --dport 8080 -j ACCEPT" -e '-A OUTPUT -p tcp -m multiport --dports 80,443 -j ACCEPT' \
 			-e '-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT' \
 			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
-			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT' || true)" ""
+			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
+			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4753 -m conntrack --ctstate ESTABLISHED -j ACCEPT' || true)" ""
 	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
 	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address. Each
@@ -880,10 +887,10 @@ PY
 	hardened "$ergo" ergo
 	hardened "$server" server
 	hardened "$egress" egress network
-	# jarvis and its way out sit in a profile of their own (10j-4): the demo holds neither, and the server's name for
+	# jarvis, its reader and their ways out sit in a profile of their own (10j-4): the demo holds none, and the server's name for
 	# jarvis answers nothing, so its door answers off, or not_ready when on (10l-1).
-	expect "the demo profile holds no jarvis, nor its way out" \
-		"$(docker compose -p "$project" $files config --services | grep -cxE 'jarvis|egress_jarvis' || true)" 0
+	expect "the demo profile holds no jarvis, nor its reader, nor their ways out" \
+		"$(docker compose -p "$project" $files config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
 	expect "the server finds no jarvis in the demo" "$(docker exec "$server" /nodejs/bin/node -e \
 		"fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" refused
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "
@@ -1653,7 +1660,7 @@ else
 	guard=$(of guard)
 	web=$(of web)
 	ergo=$(of ergo) server=$(of server) egress=$(of egress)
-	jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis)
+	jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis) reader=$(of jarvis_reader) egress_reader=$(of egress_reader)
 	if [ -z "$ts" ] || [ -z "$guard" ] || [ -z "$web" ] || [ -z "$ergo" ] || [ -z "$server" ] || [ -z "$egress" ]; then
 		echo "test.sh: the demo is not running (docker compose -f deploy/compose.yaml --profile demo up -d --build)" >&2
 		exit 3
@@ -1668,22 +1675,24 @@ else
 		cpus=$((cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
 	done
 	if [ "$memory" -le 2147483648 ] && [ "$cpus" -le 2000000000 ]; then pass "the demo stays under 2 GB and 2 cores"; else fail "the demo: $memory bytes, $cpus nano-cpus"; fi
-	# Jarvis switched on: both or neither, locked as the rest, within their own caps, 448 MiB and 0.4 core (D184).
-	if [ -n "$jarvis$egress_jarvis" ]; then
-		if [ -z "$jarvis" ] || [ -z "$egress_jarvis" ]; then
-			fail "jarvis and its way out run together or not at all"
+	# Jarvis switched on: the four or none, locked as the rest, within their own caps, 656 MiB and 0.7 core (D184, 10u-g2).
+	if [ -n "$jarvis$egress_jarvis$reader$egress_reader" ]; then
+		if [ -z "$jarvis" ] || [ -z "$egress_jarvis" ] || [ -z "$reader" ] || [ -z "$egress_reader" ]; then
+			fail "jarvis, its reader and their ways out run together or not at all"
 		else
 			hardened "$jarvis" jarvis
 			hardened "$egress_jarvis" egress_jarvis network
+			hardened "$reader" jarvis_reader
+			hardened "$egress_reader" egress_reader network
 			jarvis_memory=0 jarvis_cpus=0
-			for id in $jarvis $egress_jarvis; do
+			for id in $jarvis $egress_jarvis $reader $egress_reader; do
 				jarvis_memory=$((jarvis_memory + $(docker inspect --format '{{.HostConfig.Memory}}' "$id")))
 				jarvis_cpus=$((jarvis_cpus + $(docker inspect --format '{{.HostConfig.NanoCpus}}' "$id")))
 			done
-			if [ "$jarvis_memory" -le 469762048 ] && [ "$jarvis_cpus" -le 400000000 ]; then
-				pass "jarvis and its way out stay under 448 MiB and 0.4 core"
+			if [ "$jarvis_memory" -le 687865856 ] && [ "$jarvis_cpus" -le 700000000 ]; then
+				pass "jarvis, its reader and their ways out stay under 656 MiB and 0.7 core"
 			else
-				fail "jarvis and its way out: $jarvis_memory bytes, $jarvis_cpus nano-cpus"
+				fail "jarvis, its reader and their ways out: $jarvis_memory bytes, $jarvis_cpus nano-cpus"
 			fi
 		fi
 	fi

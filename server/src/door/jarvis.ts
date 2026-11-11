@@ -4,6 +4,7 @@
 // stopped with the request that asked. It forwards no session, no cookie and no account. What comes back is read up to
 // 1 MiB and parsed with the client's own schema before anything passes it on; a failure is a value, never a hang.
 import {
+  JARVIS_KEY_HEADER,
   JARVIS_PATHS,
   JarvisBudgets,
   JarvisMadeDigest,
@@ -15,6 +16,7 @@ import {
   type JarvisTranslate,
 } from "@gnoworld/schemas";
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
+import type { Secret } from "@gnoworld/service/settings";
 
 export type Failure = "down" | "lost" | "slow" | "failed" | "shape" | "gone" | "refused";
 
@@ -68,10 +70,13 @@ function parsed<T>(schema: Schema<T>, json: unknown): Called<T> {
 export function jarvisClient({
   url,
   timeoutMs,
+  key,
   send = netSend,
 }: {
   url: string;
   timeoutMs: number;
+  // Sent in a header of every request; none when jarvis is run without one.
+  key?: Secret | undefined;
   send?: Send;
 }): Jarvis {
   const call = async <T>(
@@ -79,10 +84,11 @@ export function jarvisClient({
     path: string,
     { body, signal, ms }: { body?: unknown; signal?: AbortSignal; ms: number },
   ): Promise<Called<T>> => {
+    const proof = key === undefined ? {} : { [JARVIS_KEY_HEADER]: key.reveal() };
     const init: RequestInit =
       body === undefined
-        ? { method: "GET", headers: { accept: "application/json" } }
-        : { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) };
+        ? { method: "GET", headers: { accept: "application/json", ...proof } }
+        : { method: "POST", headers: { "content-type": "application/json", ...proof }, body: JSON.stringify(body) };
     try {
       const response = await send(`${url}${path}`, { ...init, signal: signal ?? null }, ms);
       const json = await readJson(response, MAX_BYTES);

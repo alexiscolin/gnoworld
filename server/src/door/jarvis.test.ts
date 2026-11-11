@@ -2,6 +2,8 @@ import { once } from "node:events";
 import { createServer, type IncomingHttpHeaders, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
+import { JARVIS_KEY_HEADER } from "@gnoworld/schemas";
+import { Secret } from "@gnoworld/service/settings";
 import { jarvisClient } from "./jarvis.ts";
 
 // 10g (D42, D94): the door's one call to jarvis a question, on the network the two share, tested against a fake jarvis.
@@ -57,6 +59,35 @@ const QUESTION = () => ({
 const ANSWERED = () => ({ status: "answered", markdown: "The poll closes today.", buttons: [], cost: 1234 });
 const BUDGETS = () => ({ ask: 45, translate: 5 });
 const live = () => new AbortController().signal;
+
+// 10u-g2: the door proves itself to jarvis with its key, in one header of every request.
+describe("the door's key", () => {
+  const KEY = `door-key-${"k".repeat(40)}`;
+  const BUDGET = { budget: "ask" as const, dollars: 3 };
+
+  it("sends the key with every call: a question, a translation, a digest, the budgets and a change of one", async () => {
+    const jarvis = await fakeJarvis(Array.from({ length: 5 }, () => json({})));
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000, key: new Secret(KEY) });
+    await client.ask(QUESTION(), live());
+    await client.translate({ text: "The vote closes.", language: "fr" }, live());
+    await client.digest({ universe: "onyx", realm: "gno.land/r/demo/poll" }, live());
+    await client.budgets();
+    await client.setBudget(BUDGET);
+    expect(jarvis.heard.map(({ headers }) => headers[JARVIS_KEY_HEADER])).toEqual([KEY, KEY, KEY, KEY, KEY]);
+  });
+
+  it("sends none when it has none", async () => {
+    const jarvis = await fakeJarvis([json({})]);
+    await jarvisClient({ url: jarvis.url, timeoutMs: 5000 }).budgets();
+    expect(jarvis.heard[0]?.headers[JARVIS_KEY_HEADER]).toBeUndefined();
+  });
+
+  it("answers failed for a jarvis that refuses the key with 401, never repeating it", async () => {
+    const jarvis = await fakeJarvis([json({ error: "unauthenticated" }, 401)]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000, key: new Secret(KEY) });
+    expect(await client.budgets()).toEqual({ ok: false, error: "failed" });
+  });
+});
 
 describe("asking jarvis", () => {
   it("posts the question as JSON to /ask, with no cookie, no session and nothing of the asker's", async () => {

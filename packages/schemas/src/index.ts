@@ -32,6 +32,7 @@ export {
   DOOR_CAPS,
   JARVIS_CAPS,
   JARVIS_LINES,
+  JARVIS_KEY_HEADER,
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisAsk,

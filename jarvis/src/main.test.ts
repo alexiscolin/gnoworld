@@ -11,6 +11,7 @@ import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes
 import {
   type AnswerButton,
   ApiError,
+  JARVIS_KEY_HEADER,
   JARVIS_PATHS,
   JarvisPaidAnswer,
   type JarvisAsk,
@@ -25,11 +26,20 @@ import { makeBudget } from "./budget.ts";
 import { jarvisMigrations } from "./migrations.ts";
 import { fakeAnthropic, type FakeStep, held } from "./testing/fakeAnthropic.ts";
 import { fakeGnomcp, type Scenario } from "./testing/fakeGnomcp.ts";
+import { fakeGnomcpTcp } from "./testing/fakeGnomcpTcp.ts";
 import { fakeGnoscope } from "./testing/fakeGnoscope.ts";
 import { bodyOf, onLoopback } from "./testing/loopback.ts";
 import { message, text, toolUse } from "./testing/fakeModel.ts";
 import { REALM_TYPE } from "./testing/realm.ts";
 import { loadPlaces } from "./tools/places.ts";
+
+// The door's key, as the test makes it up; every request of the test carries it, as the door's do (10u-g2).
+const DOOR_KEY = `door-key-${"d".repeat(40)}`;
+const fetch = (url: string, init: RequestInit = {}) =>
+  globalThis.fetch(url, {
+    ...init,
+    headers: { ...Object.fromEntries(new Headers(init.headers)), [JARVIS_KEY_HEADER]: DOOR_KEY },
+  });
 
 interface Jarvis {
   child: ChildProcessByStdio<null, Readable, Readable>;
@@ -82,6 +92,7 @@ const local = async (answer: (request: IncomingMessage, body: string) => { statu
 const setup = async (steps: FakeStep[] = [], over: { gnomcp?: Scenario } = {}) => {
   const dir = folder();
   writeFileSync(join(dir, "anthropic"), `${KEY}\n`);
+  writeFileSync(join(dir, "door-key"), `${DOOR_KEY}\n`);
   const model = await fakeAnthropic(steps);
   closers.push(model.close);
   const gnoscope = await fakeGnoscope();
@@ -98,6 +109,7 @@ const setup = async (steps: FakeStep[] = [], over: { gnomcp?: Scenario } = {}) =
     JARVIS_DATABASE: join(dir, "jarvis.db"),
     JARVIS_DRAIN_S: "60",
     ANTHROPIC_API_KEY_FILE: join(dir, "anthropic"),
+    JARVIS_DOOR_KEY_FILE: join(dir, "door-key"),
     JARVIS_GNOMCP_COMMAND: gnomcp.command,
     JARVIS_GNOMCP_CONFIG: "/etc/jarvis/gnomcp.toml",
     JARVIS_PROFILES: "onyx",
@@ -602,7 +614,7 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     socket.on("error", () => undefined);
     await once(socket, "connect");
     socket.write(
-      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"question`,
+      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n${JARVIS_KEY_HEADER}: ${DOOR_KEY}\r\nContent-Length: 100\r\n\r\n{"question`,
     );
     // events.once rejects on the reset a cut connection may give first.
     const closed = new Promise((resolve) => socket.on("close", resolve));
@@ -802,7 +814,7 @@ function workspaces(): string[] {
 }
 
 describe("the files jarvis's image takes", () => {
-  it("are its package, its skills, its places' data, the packages it imports and gnomcp's settings, nothing else", () => {
+  it("are its package, its skills, its places' data and the packages it imports, nothing else: no gnomcp's settings", () => {
     const allowed = new RegExp(
       [
         "^(package\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml)$",
@@ -811,7 +823,6 @@ describe("the files jarvis's image takes", () => {
         "^jarvis/skills/[a-z-]+/.+$",
         "^packages/(core|schemas|service|chain)/src/.+\\.ts$",
         "^app/data/[a-zA-Z]+\\.json$",
-        "^deploy/jarvis/gnomcp\\.toml$",
       ].join("|"),
     );
     const files = imageFiles();
@@ -819,7 +830,7 @@ describe("the files jarvis's image takes", () => {
     expect(files.filter((path) => !allowed.test(path))).toEqual([]);
   });
 
-  it("hold the package files the install reads and gnomcp's settings, past .dockerignore", () => {
+  it("hold the package files the install reads, past .dockerignore", () => {
     const files = imageFiles();
     for (const path of [
       "package.json",
@@ -827,7 +838,6 @@ describe("the files jarvis's image takes", () => {
       "pnpm-workspace.yaml",
       "jarvis/package.json",
       ...workspaces().map((name) => `packages/${name}/package.json`),
-      "deploy/jarvis/gnomcp.toml",
     ])
       expect(files, path).toContain(path);
   });
@@ -914,7 +924,7 @@ describe("jarvis's Dockerfile", () => {
     expect(dockerfile).not.toMatch(/^ADD /m);
     expect(dockerfile).not.toMatch(/^(ENV|ARG) /m);
     const froms = new Set(copiesOf(dockerfile).flatMap((copy) => (copy.from === undefined ? [] : [copy.from])));
-    expect([...froms].sort()).toEqual(["build", "gnomcp"]);
+    expect([...froms].sort()).toEqual(["build"]);
   });
 
   it("lays its last stage out where compose and jarvis's defaults read it, /app", () => {
@@ -939,7 +949,7 @@ describe("jarvis's Dockerfile", () => {
   it("runs Node 24 alone, pinned by digest, as a user of its own, with its flag and jarvis's entry", () => {
     const dockerfile = read("deploy/jarvis/Dockerfile");
     const froms = [...dockerfile.matchAll(/^FROM (\S+)/gm)].map((match) => match[1] ?? "");
-    expect(froms.length).toBeGreaterThanOrEqual(3);
+    expect(froms.length).toBeGreaterThanOrEqual(2);
     for (const from of froms) expect(from).toMatch(/@sha256:[0-9a-f]{64}$/);
     expect(froms.at(-1)).toMatch(/^gcr\.io\/distroless\/nodejs24-debian13:nonroot@/);
     const last = dockerfile.slice(dockerfile.lastIndexOf("\nFROM "));
@@ -951,21 +961,17 @@ describe("jarvis's Dockerfile", () => {
     expect(words.slice(1, -1)).toEqual([expect.stringMatching(/^--max-old-space-size=\d+$/)]);
   });
 
-  it("copies gnomcp 0.11.0 from its signed release's image, pinned by digest, and nothing else from it", () => {
-    const dockerfile = read("deploy/jarvis/Dockerfile");
-    const gnomcp =
-      "ghcr.io/gnoverse/gnomcp:0.11.0@sha256:b253d4238a236036b54cd6227c313e2609ce32dd361d71b2410d3096f6461a95";
-    expect(dockerfile).toContain(`FROM ${gnomcp} AS gnomcp\n`);
-    const fromIt = copiesOf(dockerfile).filter((copy) => copy.from === "gnomcp");
-    expect(fromIt.map((copy) => copy.sources)).toEqual([["/usr/local/bin/gnomcp"]]);
-    expect(dockerfile).toMatch(/^COPY --from=gnomcp \/usr\/local\/bin\/gnomcp \/gnomcp\/gnomcp$/m);
+  it("holds no gnomcp: no stage from its image, no copy of its binary or of its settings (10u-g2, the reader's)", () => {
+    const code = read("deploy/jarvis/Dockerfile")
+      .split("\n")
+      .filter((line) => !line.startsWith("#"))
+      .join("\n");
+    expect(code).not.toMatch(/gnomcp/i);
   });
 
-  it("gives its file's folder to jarvis's user alone, and copies gnomcp's settings it names", () => {
+  it("gives its file's folder to jarvis's user alone", () => {
     const dockerfile = read("deploy/jarvis/Dockerfile");
     expect(dockerfile).toMatch(/^COPY --from=build --chown=65533:65533 \/data \/data$/m);
-    expect(dockerfile).toMatch(/^COPY deploy\/jarvis\/gnomcp\.toml deploy\/jarvis\/$/m);
-    expect(read(".dockerignore").split("\n")).toContain("!deploy/jarvis/gnomcp.toml");
   });
 });
 
@@ -989,5 +995,56 @@ describe("the .dockerignore reader", () => {
     expect(ignoredBy(["/deploy/secrets"])("deploy/secrets/key")).toBe(true);
     expect(ignoredBy(["file[0-9].ts"])("file7.ts")).toBe(true);
     expect(ignoredBy(["file[!0-9].ts"])("file7.ts")).toBe(false);
+  });
+});
+
+describe("jarvis's process: its door's key", () => {
+  it("answers 401 to a request without the key, or with a wrong one, and serves one that carries it", async () => {
+    const { env, model } = await setup();
+    const url = await listening(start(env));
+    const asked = (headers: Record<string, string>) => globalThis.fetch(`${url}${JARVIS_PATHS.budgets}`, { headers });
+    expect((await asked({})).status).toBe(401);
+    expect((await asked({ [JARVIS_KEY_HEADER]: DOOR_KEY.replace("d", "e") })).status).toBe(401);
+    expect((await asked({ [JARVIS_KEY_HEADER]: DOOR_KEY })).status).toBe(200);
+    expect(model.seen).toEqual([]);
+  });
+
+  it("stops at start, never listening, when it is on with no key file, or one under 32 bytes, saying neither", async () => {
+    const { env, dir } = await setup();
+    const without = Object.fromEntries(Object.entries(env).filter(([name]) => name !== "JARVIS_DOOR_KEY_FILE"));
+    writeFileSync(join(dir, "short"), "s".repeat(31));
+    for (const [rest, word] of [
+      [without, "required"],
+      [{ ...without, JARVIS_DOOR_KEY_FILE: join(dir, "short") }, "too_short"],
+    ] as const) {
+      const jarvis = start({ ...rest });
+      expect(await exited(jarvis)).not.toBe(0);
+      expect(jarvis.out.stderr).toContain(`setting JARVIS_DOOR_KEY_FILE: ${word}`);
+      expect(jarvis.out.stderr + jarvis.out.stdout).not.toContain("s".repeat(31));
+      expect(lines(jarvis).some(({ event }) => event === "listening")).toBe(false);
+    }
+  });
+
+  it("logs no word of the key, a wrong one included", async () => {
+    const { env } = await setup();
+    const jarvis = start(env);
+    const url = await listening(jarvis);
+    await globalThis.fetch(`${url}${JARVIS_PATHS.budgets}`, { headers: { [JARVIS_KEY_HEADER]: "a-wrong-key-sent" } });
+    await fetch(`${url}${JARVIS_PATHS.budgets}`);
+    expect(jarvis.out.stdout + jarvis.out.stderr).not.toContain(DOOR_KEY);
+    expect(jarvis.out.stdout).not.toContain("a-wrong-key-sent");
+  });
+
+  it("reaches gnomcp over TCP when its address is set, spawning no child of its own", async () => {
+    const { env, dir } = await setup();
+    const rest = Object.fromEntries(
+      Object.entries(env).filter(([name]) => name !== "JARVIS_GNOMCP_COMMAND" && name !== "JARVIS_GNOMCP_CONFIG"),
+    );
+    const tcp = await fakeGnomcpTcp({ answers: pollReads() });
+    const jarvis = start({ ...rest, JARVIS_GNOMCP_ADDRESS: `${tcp.address.host}:${String(tcp.address.port)}` });
+    await listening(jarvis);
+    expect(tcp.connections()).toBe(1);
+    // gnomcp's own folders are made by the spawn alone.
+    expect(readdirSync(dir).filter((name) => name.startsWith("jarvis-gnomcp-"))).toEqual([]);
   });
 });

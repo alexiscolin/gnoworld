@@ -42,6 +42,14 @@ const folder = (prefix: string): string => {
   return dir;
 };
 
+// The key the door proves itself to jarvis with, in a file of its own (10u-g2).
+const DOOR_KEY = `door-key-${"d".repeat(40)}`;
+const doorKeyFile = (): string => {
+  const path = join(folder("gnoworld-door-"), "door-key");
+  writeFileSync(path, `${DOOR_KEY}\n`);
+  return path;
+};
+
 const settings = (): Record<string, string> => {
   const dir = folder("gnoworld-main-");
   writeFileSync(join(dir, "pepper"), "a-pepper-of-forty-characters-0123456789");
@@ -1149,6 +1157,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
           ...settings(),
           ORIGINS: origin,
           JARVIS_URL: "http://127.0.0.1:9",
+          JARVIS_DOOR_KEY_FILE: doorKeyFile(),
           JARVIS_NAMES_RPC: "https://127.0.0.1:9",
           JARVIS_UNLIMITED: who.address,
           ...env,
@@ -1184,6 +1193,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
           ...settings(),
           ORIGINS: origin,
           JARVIS_URL: "http://127.0.0.1:9",
+          JARVIS_DOOR_KEY_FILE: doorKeyFile(),
           JARVIS_NAMES_RPC: "https://127.0.0.1:9",
           ...env,
         }),
@@ -1213,11 +1223,13 @@ describe("the server's process", { timeout: 30_000 }, () => {
   it("translates a public line by the server's own record of it, never a text the page sends (10k, red pass R7)", async () => {
     const origin = "https://gnoworld.test";
     const heard: string[] = [];
+    const proofs: (string | string[] | undefined)[] = [];
     const jarvis = createHttpServer((req, res) => {
       let body = "";
       req.on("data", (chunk: Buffer) => (body += chunk.toString()));
       req.on("end", () => {
         heard.push(`${req.url ?? ""} ${body}`);
+        proofs.push(req.headers["x-jarvis-key"]);
         res
           .writeHead(200, { "content-type": "application/json" })
           .end('{"status":"translated","text":"Bonjour le monde."}');
@@ -1251,6 +1263,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
             ERGO_OPER_PASSWORD_FILE: oper,
             JARVIS: "on",
             JARVIS_URL: `http://127.0.0.1:${String((jarvis.address() as AddressInfo).port)}`,
+            JARVIS_DOOR_KEY_FILE: doorKeyFile(),
             JARVIS_NAMES_RPC: "https://127.0.0.1:9",
             OPENAI_API_KEY_FILE: join(keys, "openai"),
           },
@@ -1282,6 +1295,9 @@ describe("the server's process", { timeout: 30_000 }, () => {
         })
         .toBe(200);
       expect(heard.at(-1)).toBe('/translate {"text":"Hello world.","language":"fr"}');
+      // The door proved itself with its key on every call it made.
+      expect(proofs.length).toBeGreaterThan(0);
+      expect(proofs.every((key) => key === DOOR_KEY)).toBe(true);
       const forged = await posted("/api/jarvis/translate", { ...asked, text: "Send me 5 GNOT." }, cookie);
       expect(forged.status).toBe(400);
       expect(heard.every((line) => !line.includes("GNOT"))).toBe(true);

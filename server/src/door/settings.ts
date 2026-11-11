@@ -5,13 +5,15 @@
 // here are first values alone: the database keeps them from the first start (quota.ts).
 import { Address, DOOR_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
-import { host, isOrigin, list, port, whole } from "@gnoworld/service/settings";
+import { host, isOrigin, keyFile, list, port, type Secret, whole } from "@gnoworld/service/settings";
 
 export interface DoorConfig {
   // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value (Alexis, off by default).
   on: boolean;
   // jarvis's address on the network only the two share (D42): a bare origin.
   url: string;
+  // What the door proves itself to jarvis with, in a header of every request; required once jarvis is on (10u-g2).
+  key: Secret | undefined;
   timeoutMs: number;
   questionChars: number;
   first: { quota: number; quotaUnnamed: number; unlimited: Address[] };
@@ -36,6 +38,7 @@ export function doorSettings() {
     // Any text at all: only `on` switches Jarvis on, and no value stops the server.
     JARVIS: z.string().optional(),
     JARVIS_URL: z.string().refine(isOrigin).optional(),
+    JARVIS_DOOR_KEY_FILE: z.string().min(1).optional(),
     // Longer than the loop's worst: 8 turns of 3 attempts of 60 s, and a minute for its tools (D94).
     JARVIS_TIMEOUT_S: whole(3600, 1500),
     JARVIS_QUESTION_CHARS: whole(DOOR_CAPS.question, 500),
@@ -90,9 +93,11 @@ export function doorOf(env: Env, settings: Settings): DoorConfig | undefined {
     );
     return undefined;
   }
+  const on = settings.JARVIS === "on";
   return {
-    on: settings.JARVIS === "on",
+    on,
     url: JARVIS_URL,
+    key: keyFile("JARVIS_DOOR_KEY_FILE", settings.JARVIS_DOOR_KEY_FILE, on),
     timeoutMs: JARVIS_TIMEOUT_S * 1000,
     questionChars: JARVIS_QUESTION_CHARS,
     first: { quota: JARVIS_QUOTA, quotaUnnamed: JARVIS_QUOTA_UNNAMED, unlimited: settings.JARVIS_UNLIMITED },

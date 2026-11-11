@@ -152,7 +152,7 @@ const door =
     : {
         settings: config.jarvis,
         quota: makeQuota(db, { first: config.jarvis.first, now: Date.now }),
-        jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs }),
+        jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs, key: config.jarvis.key }),
       };
 if (door !== undefined)
   mountDoor(app, { door, chat, memory: memory.ask, session, signedAt, origins: config.origins, log });

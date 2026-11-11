@@ -334,7 +334,8 @@ describe("loadServed", () => {
   });
 
   it("turns jarvis on only when JARVIS is exactly on", () => {
-    expect(loadServed({ ...SERVED, JARVIS: "on" }).on).toBe(true);
+    const JARVIS_DOOR_KEY_FILE = file("served-door", "d".repeat(32));
+    expect(loadServed({ ...SERVED, JARVIS: "on", JARVIS_DOOR_KEY_FILE }).on).toBe(true);
   });
 
   it.each(["", "ON", "On", " on", "on ", "yes", "true", "1", "enabled", "off", String.fromCodePoint(0xff4f, 0xff4e)])(
@@ -403,6 +404,78 @@ describe("loadServed", () => {
       expect(() => loadServed({ ...SERVED, JARVIS: on, [key]: value })).toThrow(new RegExp(`^setting ${key}: `));
     }
   });
+});
+
+// 10u-g2: the key the door proves itself with, and gnomcp reached over TCP.
+describe("the door's key", () => {
+  const SERVED = { JARVIS_DATABASE: join(dir, "key.db") };
+  const DOOR = `d${"0".repeat(31)}`;
+  const named = (name: string, content: string) => ({ JARVIS_DOOR_KEY_FILE: file(name, content) });
+
+  it("reads the key from its file without its newline, into a value that never prints", () => {
+    const { doorKey } = loadServed({ ...SERVED, ...named("door-ok", `${DOOR}\n`) });
+    expect(doorKey?.reveal()).toBe(DOOR);
+    expect(inspect(doorKey) + JSON.stringify(doorKey)).not.toContain(DOOR);
+  });
+
+  it("starts with no key while it is off, and with one when it is given", () => {
+    expect(loadServed(SERVED).doorKey).toBeUndefined();
+    expect(loadServed({ ...SERVED, JARVIS: "off", ...named("door-off", DOOR) }).doorKey).toBeDefined();
+  });
+
+  it("refuses to start on without the file, naming the setting", () => {
+    expect(() => loadServed({ ...SERVED, JARVIS: "on" })).toThrow(/^setting JARVIS_DOOR_KEY_FILE: required/);
+  });
+
+  it.each([
+    ["an unreadable file", "/nonexistent/door-key", /unreadable/],
+    ["a key of 31 bytes", named("door-31", "k".repeat(31)).JARVIS_DOOR_KEY_FILE, /too_short/],
+    ["an empty file", named("door-empty", "\n").JARVIS_DOOR_KEY_FILE, /too_short/],
+    ["a key with a space", named("door-space", `${DOOR} x`).JARVIS_DOOR_KEY_FILE, /invalid_characters/],
+  ])("refuses to start on with %s, off or on, never printing the key", (_case, path, message) => {
+    for (const JARVIS of ["on", undefined]) {
+      expect(() => loadServed({ ...SERVED, ...(JARVIS && { JARVIS }), JARVIS_DOOR_KEY_FILE: path })).toThrow(message);
+    }
+  });
+
+  it("takes a key of 32 bytes, the shortest", () => {
+    expect(loadServed({ ...SERVED, JARVIS: "on", ...named("door-32", "k".repeat(32)) }).on).toBe(true);
+  });
+});
+
+describe("gnomcp over TCP", () => {
+  const BASE = Object.fromEntries(
+    Object.entries(ENV).filter(([name]) => name !== "JARVIS_GNOMCP_COMMAND" && name !== "JARVIS_GNOMCP_CONFIG"),
+  );
+
+  it("reads an address in place of the command and its configuration", () => {
+    const config = loadJarvisConfig({ ...BASE, JARVIS_GNOMCP_ADDRESS: "jarvis-reader:7070" });
+    expect(config.gnomcp).toEqual({ address: { host: "jarvis-reader", port: 7070 } });
+  });
+
+  it("keeps the spawn when no address is set", () => {
+    expect(loadJarvisConfig(ENV).gnomcp).toEqual({
+      command: "/usr/local/bin/gnomcp",
+      config: "/etc/gnomcp/profiles.toml",
+    });
+  });
+
+  it("prefers the address when both are set", () => {
+    expect(loadJarvisConfig({ ...ENV, JARVIS_GNOMCP_ADDRESS: "127.0.0.1:1" }).gnomcp).toEqual({
+      address: { host: "127.0.0.1", port: 1 },
+    });
+  });
+
+  it("refuses neither an address nor a command, naming the setting", () => {
+    expect(() => loadJarvisConfig(BASE)).toThrow(/JARVIS_GNOMCP_COMMAND/);
+  });
+
+  it.each(["jarvis-reader", ":7070", "host:0", "host:65536", "host:07070", "host:70a", "ho st:7070", "a:b:7070", ""])(
+    "refuses the address %j",
+    (address) => {
+      expect(() => loadJarvisConfig({ ...BASE, JARVIS_GNOMCP_ADDRESS: address })).toThrow(/JARVIS_GNOMCP_ADDRESS/);
+    },
+  );
 });
 
 describe("the Anthropic key", () => {
@@ -556,6 +629,7 @@ describe("the jarvis service", () => {
       "mem_limit",
       "pids_limit",
       "healthcheck",
+      "depends_on",
     ]);
     expect(service("jarvis")).toMatch(/^ {4}<<: \*locked$/m);
   });
@@ -577,8 +651,8 @@ describe("the jarvis service", () => {
         "JARVIS_TRANSLATION_BUDGET_USD",
         "JARVIS_DRAIN_S",
         "ANTHROPIC_API_KEY_FILE",
-        "JARVIS_GNOMCP_COMMAND",
-        "JARVIS_GNOMCP_CONFIG",
+        "JARVIS_DOOR_KEY_FILE",
+        "JARVIS_GNOMCP_ADDRESS",
         "JARVIS_PROFILES",
         "JARVIS_INDEXER_PROFILES",
         "JARVIS_GNOSCOPE",
@@ -615,7 +689,7 @@ describe("the jarvis service", () => {
 
   it("holds Anthropic's key alone, as a secret file it reads only when on, and no other service holds it", () => {
     expect(setting("jarvis", "ANTHROPIC_API_KEY_FILE")).toBe("/run/secrets/anthropic_api_key");
-    expect(service("jarvis")).toMatch(/^ {4}secrets: \[anthropic_api_key\]$/m);
+    expect(service("jarvis")).toMatch(/^ {4}secrets: \[anthropic_api_key, jarvis_door_key\]$/m);
     expect(names().filter((name) => /anthropic/i.test(service(name)))).toEqual(["jarvis"]);
     expect(block(compose(), 0, "secrets")).toMatch(
       /^ {2}anthropic_api_key:\n {4}file: \$\{ANTHROPIC_API_KEY_FILE:-\.\/secrets\/anthropic_api_key\}$/m,
@@ -631,9 +705,10 @@ describe("the jarvis service", () => {
     expect(compose()).not.toMatch(/NODE_OPTIONS/);
   });
 
-  it("starts gnomcp from the image with its read-only settings, on the profiles named after the data's universes", () => {
-    expect(setting("jarvis", "JARVIS_GNOMCP_COMMAND")).toBe("/gnomcp/gnomcp");
-    expect(setting("jarvis", "JARVIS_GNOMCP_CONFIG")).toBe("/app/deploy/jarvis/gnomcp.toml");
+  it("reaches gnomcp in the reader, over the network, on the profiles named after the data's universes (10u-g2)", () => {
+    expect(setting("jarvis", "JARVIS_GNOMCP_ADDRESS")).toBe("${READER_ADDRESS:-172.30.97.10}:8083");
+    expect(setting("jarvis", "JARVIS_GNOMCP_COMMAND")).toBeUndefined();
+    expect(setting("jarvis", "JARVIS_GNOMCP_CONFIG")).toBeUndefined();
     const ids = universes().map((universe) => universe.id);
     expect(setting("jarvis", "JARVIS_PROFILES")?.split(",").sort()).toEqual([...ids].sort());
     expect(setting("jarvis", "JARVIS_INDEXER_PROFILES")?.split(",").sort()).toEqual([...ids].sort());
@@ -647,7 +722,7 @@ describe("the jarvis service", () => {
       "CMD",
       "/nodejs/bin/node",
       "-e",
-      `"require('node:http').get({ host: process.env.JARVIS_HOST, port: 8081, path: '/budgets', headers: { host: 'jarvis' } }, (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"`,
+      `"require('node:http').get({ host: process.env.JARVIS_HOST, port: 8081, path: '/budgets', headers: { host: 'jarvis', 'x-jarvis-key': require('node:fs').readFileSync(process.env.JARVIS_DOOR_KEY_FILE, 'utf8').trim() } }, (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"`,
     ]);
   });
 
@@ -677,7 +752,14 @@ describe("the demo's ceiling", () => {
   it("puts jarvis and its way out in a profile of their own, jarvis, and nothing else there (10j-4)", () => {
     expect(profilesOf("jarvis")).toEqual(["jarvis"]);
     expect(profilesOf("egress_jarvis")).toEqual(["jarvis"]);
-    expect(names().filter((name) => profilesOf(name).includes("jarvis"))).toEqual(["jarvis", "egress_jarvis"]);
+    expect(profilesOf("jarvis_reader")).toEqual(["jarvis"]);
+    expect(profilesOf("egress_reader")).toEqual(["jarvis"]);
+    expect(names().filter((name) => profilesOf(name).includes("jarvis"))).toEqual([
+      "jarvis",
+      "jarvis_reader",
+      "egress_jarvis",
+      "egress_reader",
+    ]);
     expect(names().filter(inDemo)).toEqual(["web", "ergo", "server", "guard", "egress", "tailscale"]);
   });
 
@@ -713,14 +795,18 @@ describe("the demo's ceiling", () => {
 
   it("holds a running jarvis, switched on, to both containers, locked, under their own caps (F5159)", () => {
     const demo = read("deploy/test.sh").slice(read("deploy/test.sh").indexOf("\t# The running demo."));
-    expect(demo).toContain(`jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis)`);
-    expect(demo).toContain(`if [ -n "$jarvis$egress_jarvis" ]; then`);
-    expect(demo).toContain(`fail "jarvis and its way out run together or not at all"`);
+    expect(demo).toContain(
+      `jarvis=$(of jarvis) egress_jarvis=$(of egress_jarvis) reader=$(of jarvis_reader) egress_reader=$(of egress_reader)`,
+    );
+    expect(demo).toContain(`if [ -n "$jarvis$egress_jarvis$reader$egress_reader" ]; then`);
+    expect(demo).toContain(`fail "jarvis, its reader and their ways out run together or not at all"`);
     expect(demo).toMatch(/^\t\t\thardened "\$jarvis" jarvis$/m);
     expect(demo).toMatch(/^\t\t\thardened "\$egress_jarvis" egress_jarvis network$/m);
-    expect(demo).toContain("for id in $jarvis $egress_jarvis; do");
-    // 448 MiB and 0.4 core, the file's caps (D184), apart from the demo's 2 cores.
-    expect(demo).toContain(`[ "$jarvis_memory" -le ${String(448 * 2 ** 20)} ] && [ "$jarvis_cpus" -le 400000000 ]`);
+    expect(demo).toMatch(/^\t\t\thardened "\$reader" jarvis_reader$/m);
+    expect(demo).toMatch(/^\t\t\thardened "\$egress_reader" egress_reader network$/m);
+    expect(demo).toContain("for id in $jarvis $egress_jarvis $reader $egress_reader; do");
+    // 656 MiB and 0.7 core, the four files' caps (D184, 10u-g2), apart from the demo's 2 cores.
+    expect(demo).toContain(`[ "$jarvis_memory" -le ${String(656 * 2 ** 20)} ] && [ "$jarvis_cpus" -le 700000000 ]`);
   });
 
   it("keeps jarvis's and its way out's caps as measured, out of the demo's (D184; red pass, R5)", () => {
@@ -795,13 +881,16 @@ describe("the networks", () => {
       expect(network, name).toMatch(/^ {6}com\.docker\.network\.bridge\.gateway_mode_ipv6: isolated$/m);
     }
     expect(keysOf(networks(), 2)).toEqual(
-      expect.arrayContaining(["inside", "jarvis", "jarvis_out", "admin", "outside"]),
+      expect.arrayContaining(["inside", "jarvis", "jarvis_out", "reader", "reader_out", "admin", "outside"]),
     );
     expect(on("outside")).toEqual(["guard"]);
   });
 
-  it("put jarvis on its two alone, and the server on the internal one, jarvis's and the admin API's", () => {
-    expect(networksOf("jarvis")).toEqual(["jarvis", "jarvis_out"]);
+  it("put jarvis on its three alone, the reader on its two, and the server on the internal one, jarvis's and the admin API's", () => {
+    expect(networksOf("jarvis")).toEqual(["jarvis", "jarvis_out", "reader"]);
+    expect(networksOf("jarvis_reader")).toEqual(["reader", "reader_out"]);
+    expect(on("reader")).toEqual(["jarvis", "jarvis_reader"]);
+    expect(on("reader_out")).toEqual(["guard", "jarvis_reader"]);
     expect(networksOf("server")).toEqual(["admin", "inside", "jarvis"]);
     expect(on("jarvis")).toEqual(["jarvis", "server"]);
     expect(on("jarvis_out")).toEqual(["guard", "jarvis"]);
@@ -833,6 +922,8 @@ describe("the networks", () => {
       defaultOf(subnetOf("jarvis"), "JARVIS_SUBNET"),
       defaultOf(subnetOf("admin"), "ADMIN_SUBNET"),
       defaultOf(subnetOf("jarvis_out"), "JARVIS_OUT_SUBNET"),
+      defaultOf(subnetOf("reader"), "READER_SUBNET"),
+      defaultOf(subnetOf("reader_out"), "READER_OUT_SUBNET"),
     ].map((one) => one ?? "");
     expect(subnets.every((one) => one !== "")).toBe(true);
     for (const subnet of subnets) expect(isPrivate(subnet), subnet).toBe(true);
@@ -869,22 +960,18 @@ describe("jarvis's way out", () => {
     expect(setting("jarvis", "HTTPS_PROXY")).toBe("${JARVIS_EGRESS_PROXY:-http://guard:4751}");
     expect(setting("jarvis", "NODE_USE_ENV_PROXY")).toBe('"1"');
     expect(read("deploy/egress/Dockerfile")).toMatch(
-      /^COPY deploy\/egress\/config\.yaml deploy\/egress\/acl\.yaml deploy\/egress\/jarvis-acl\.yaml \/out\/etc\/$/m,
+      /^COPY deploy\/egress\/config\.yaml deploy\/egress\/acl\.yaml deploy\/egress\/jarvis-acl\.yaml deploy\/egress\/reader-acl\.yaml \/out\/etc\/$/m,
     );
     expect(read(".dockerignore").split("\n")).toContain("!deploy/egress/jarvis-acl.yaml");
   });
 
-  it("lets out Anthropic's API, each universe's node and indexer, and gnoscope, by full name, and nothing else", () => {
+  it("lets out Anthropic's API, each universe's node and gnoscope, by full name, and nothing else: no indexer (10u-g2)", () => {
     const hostOf = (url: string) => new URL(url).hostname;
-    const wanted = [
-      "api.anthropic.com",
-      "gnoscope.com",
-      ...universes().flatMap((universe) => [hostOf(universe.rpc), hostOf(universe.indexer)]),
-    ].sort();
+    const wanted = ["api.anthropic.com", "gnoscope.com", ...universes().map((universe) => hostOf(universe.rpc))].sort();
     expect(allowedBy(read("deploy/egress/jarvis-acl.yaml"))).toEqual(wanted);
   });
 
-  it.each(["deploy/egress/acl.yaml", "deploy/egress/jarvis-acl.yaml"])(
+  it.each(["deploy/egress/acl.yaml", "deploy/egress/jarvis-acl.yaml", "deploy/egress/reader-acl.yaml"])(
     "%s enforces its one list: no service rule, no other list, no wildcard",
     (path) => {
       const acl = read(path);
@@ -908,6 +995,40 @@ describe("jarvis's way out", () => {
     expect(shared.filter((host) => !nodes.includes(host))).toEqual([]);
     expect(server.has("api.anthropic.com")).toBe(false);
     expect(server.has("gnoscope.com")).toBe(false);
+  });
+});
+
+describe("jarvis's reader", () => {
+  const hosts = () =>
+    universes()
+      .flatMap((universe) => [new URL(universe.rpc).hostname, new URL(universe.indexer).hostname])
+      .sort();
+  it("names the same hosts in its way out's list, its relay's names and its /etc/hosts, all derived from the data (10u-g2)", () => {
+    expect(allowedBy(read("deploy/egress/reader-acl.yaml"))).toEqual(hosts());
+    expect(setting("jarvis_reader", "READER_HOSTS")?.split(",").sort()).toEqual(hosts());
+    const lines = [...service("jarvis_reader").matchAll(/^ {6}- "([a-z0-9.-]+):(\d+\.\d+\.\d+\.\d+)"$/gm)];
+    expect(lines.map((line) => line[1]).sort()).toEqual(hosts());
+    // One loopback address for all of them, where the relay listens (deploy/jarvis-reader/main.go, relayAddress).
+    expect(new Set(lines.map((line) => line[2]))).toEqual(new Set(["127.0.0.2"]));
+    expect(read("deploy/jarvis-reader/main.go")).toContain('const relayAddress = "127.0.0.2:443"');
+  });
+
+  it("holds at most 2 gnomcp, no secret and no volume, as a user of its own, and its way out on 4753 (10u-g2)", () => {
+    const reader = service("jarvis_reader");
+    expect(setting("jarvis_reader", "READER_MAX")).toBe('"2"');
+    expect(reader).toMatch(/^ {4}user: "65531:65531"$/m);
+    expect(reader).not.toMatch(/^ {4}(secrets|volumes):/m);
+    expect(reader).toMatch(/^ {4}cpus: 0\.2$/m);
+    expect(service("egress_reader")).toMatch(/^ {8}"4753",$/m);
+  });
+
+  it("is kept out of jarvis's image and held to the reader's own", () => {
+    expect(read(".dockerignore").split("\n")).toEqual(
+      expect.arrayContaining(["!deploy/egress/reader-acl.yaml", "!deploy/jarvis-reader"]),
+    );
+    expect(read("deploy/jarvis-reader/Dockerfile")).toMatch(
+      /^COPY deploy\/jarvis\/gnomcp\.toml \/etc\/gnomcp\/profiles\.toml$/m,
+    );
   });
 });
 
@@ -957,16 +1078,23 @@ describe("deploy/test.sh", () => {
   const jarvis = () => read("deploy/test-jarvis.sh");
   it("starts the demo without jarvis, proves it absent, then runs jarvis's proofs, which start it (10j-4)", () => {
     expect(script()).toContain(`export ANTHROPIC_API_KEY_FILE="$tmp/anthropic_api_key"`);
-    expect(script()).toMatch(/for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key; do/);
+    expect(script()).toMatch(
+      /for secret in ergo_oper_password log_pepper openai_api_key anthropic_api_key jarvis_door_key; do/,
+    );
     expect(script()).toMatch(/up -d --build --wait web guard ergo server egress; then$/m);
     expect(script()).not.toMatch(/up -d --build --wait [^\n]*jarvis/);
     const plain = script().slice(0, script().indexOf("\t# The running demo."));
     expect(plain).not.toMatch(/hardened "\$jarvis"|ps -q jarvis|ps -q egress_jarvis/);
-    for (const check of ["the demo profile holds no jarvis, nor its way out", "the server finds no jarvis in the demo"])
+    for (const check of [
+      "the demo profile holds no jarvis, nor its reader, nor their ways out",
+      "the server finds no jarvis in the demo",
+    ])
       expect(script(), check).toContain(check);
     // A search of containers the start never names proves nothing (F5301).
     expect(script()).not.toContain("the demo starts no");
-    expect(script()).toContain(`config --services | grep -cxE 'jarvis|egress_jarvis' || true)" 0`);
+    expect(script()).toContain(
+      `config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0`,
+    );
     expect(script()).toContain(`"$here/jarvis/Dockerfile"; do`);
     // Its stop takes jarvis's profile too, which a down of the demo's alone leaves up.
     expect(script()).toContain(
@@ -994,24 +1122,32 @@ describe("deploy/test.sh", () => {
     expect(sourced).toBeLessThan(at("\t# The running demo."));
     // Its start fails as the demo's does, once, with exit 3 (red pass, R6).
     expect(jarvis()).toContain(
-      `if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis; then`,
+      `if ! docker compose -p "$project" $files --profile jarvis up -d --build --wait --no-deps jarvis egress_jarvis jarvis_reader egress_reader; then`,
     );
     expect(jarvis()).toMatch(/test-jarvis\.sh: jarvis did not start: [^\n]*\n\texit 3\nfi$/m);
     expect(jarvis()).toMatch(/^hardened "\$jarvis" jarvis$/m);
     // In --mutants it plants its faults and returns, starting nothing (F5300).
-    expect(jarvis()).toMatch(/mutant "jarvis back in the demo" [^\n]*\n\treturn 0\nfi\n/);
+    expect(jarvis()).toMatch(/\n\tmutant "jarvis back in the demo" [^\n]*\n/);
+    expect(jarvis()).toMatch(/\n\tmutant [^\n]*\n\treturn 0\nfi\n/);
     expect(jarvis()).toMatch(/^hardened "\$egress_jarvis" egress_jarvis network$/m);
   });
 
   it("proves jarvis's networks, its way out, its file, its key and its image on the running stack", () => {
     for (const check of [
-      "jarvis sits on its two networks only",
+      "jarvis sits on its three networks only",
+      "the reader sits on its two networks only",
       "jarvis's network holds jarvis and the server alone",
       "the admin API's network holds the server alone",
       "the server reads jarvis's budgets by its name, not through its way out",
       "jarvis, off by default, answers a question off",
       "nothing on the internal network reaches jarvis",
-      "jarvis's way out lets six hosts out",
+      "jarvis's way out lets four hosts out",
+      "the reader's way out lets four hosts out",
+      "gnomcp's reads succeed through the reader",
+      "the reader holds no secret",
+      "only the server and jarvis hold the door's key",
+      "the evals gate refuses a failed injection case",
+      "jarvis answers 401 to a request with no key",
       "jarvis reaches Anthropic's API through its way out",
       "jarvis cannot use the server's way out",
       "the guard's rules refuse 4751 but from jarvis's network",
@@ -1047,16 +1183,28 @@ describe("deploy/test.sh", () => {
 
   it("plants each of jarvis's faults in `--mutants` from test-jarvis.sh, each killed by its own check", () => {
     const faults: [string, string][] = [
-      ["a host added to jarvis's way out", "jarvis's way out lets six hosts out"],
+      ["a host added to jarvis's way out", "jarvis's way out lets four hosts out"],
+      ["an indexer back in jarvis's way out", "jarvis's way out lets four hosts out"],
+      ["Anthropic's API let out by the reader", "the reader's way out lets four hosts out"],
+      ["an indexer dropped from the reader's way out", "the reader reaches indexer.gno.land through its way out"],
+      ["the reader's way out open to other networks", "the guard's rules refuse 4753 but from the reader's network"],
+      ["the guard drops the reader's replies", "the reader reaches an RPC host through its relay"],
+      ["the reader on the internal network", "the reader sits on its two networks only"],
+      ["Anthropic's key given to the reader", "the reader holds no secret"],
+      ["the door's key given to Ergo", "only the server and jarvis hold the door's key"],
+      ["the door's key kept from the server", "the server holds the door's key, read-only"],
+      ["Anthropic's key taken for the door's", "jarvis serves the door's key"],
+      ["the evals gate at 5 in 10", "the evals gate refuses 8 on-topic answers in 10"],
+      ["the evals gate blind to failures", "the evals gate refuses a failed injection case"],
       ["Anthropic's API dropped from jarvis's way out", "reach Anthropic's API through its way out"],
       ["jarvis's way out open to the internal network", "the guard's rules refuse 4751 but from jarvis's network"],
       ["the guard drops jarvis's replies", "reach Anthropic's API through its way out"],
-      ["jarvis on the internal network", "jarvis sits on its two networks only"],
+      ["jarvis on the internal network", "jarvis sits on its three networks only"],
       ["jarvis's root writable", "jarvis: read-only root"],
       ["jarvis's key given to the server", "the server holds no Anthropic key"],
       ["jarvis killed before its drain ends", "jarvis waits 35 s for its drain"],
       ["jarvis listening on all its networks", "jarvis's way out's network reaches no listener of jarvis's"],
-      ["jarvis back in the demo", "the demo profile holds no jarvis, nor its way out"],
+      ["jarvis back in the demo", "the demo profile holds no jarvis, nor its reader, nor their ways out"],
     ];
     for (const [fault, by] of faults) {
       expect(jarvis(), fault).toContain(`mutant "${fault}" "${by}"`);

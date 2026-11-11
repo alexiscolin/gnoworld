@@ -61,6 +61,7 @@ const routes = {
 };
 const jarvis = await serve(jarvisRoutes(routes), {
   ...served.listen,
+  key: served.doorKey,
   log,
   ready: () => !draining,
 });

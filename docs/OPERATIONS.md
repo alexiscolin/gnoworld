@@ -17,12 +17,14 @@ later, Docker Desktop, or OrbStack.
 | `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and a probe for its health; its auth script is the server's socket | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 512 MB, 1,024 processes (Go's threads count) | the `ergo` volume (accounts, history) | `ergo_oper_password` |
 | `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`) on its own address of `inside` (`SERVER_ADDRESS`); the `auth` volume's socket | `SERVER_ADDRESS:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
 | `egress` (profile `demo`) | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
-| `jarvis` (profile `jarvis`) | built from `deploy/jarvis/Dockerfile`: its package, the packages it imports and gnomcp 0.11.0 (its release image, by digest), on distroless Node 24 | 8081 on its address of `jarvis` (`JARVIS_ADDRESS`), the network it shares with the server alone | `GET /budgets`, by the name `jarvis` | 0.3 core, 384 MB, 128 processes | the `jarvis` volume (its budgets, its caches) | `anthropic_api_key`, read only when on |
+| `jarvis` (profile `jarvis`) | built from `deploy/jarvis/Dockerfile`: its package and the packages it imports, on distroless Node 24; no gnomcp (the reader's) | 8081 on its address of `jarvis` (`JARVIS_ADDRESS`), the network it shares with the server alone | `GET /budgets`, by the name `jarvis` | 0.3 core, 384 MB, 128 processes | the `jarvis` volume (its budgets, its caches) | `anthropic_api_key`, read only when on; `jarvis_door_key` |
 | `egress_jarvis` (profile `jarvis`) | the same image as `egress` | 4751 in `guard`'s network, reached from `jarvis_out` alone | its 4751 answers | 0.1 core, 64 MB, 64 processes | none | none |
+| `jarvis_reader` (profile `jarvis`) | built from `deploy/jarvis-reader/Dockerfile`: gnomcp 0.11.0 (its release image, by digest), a bridge and a relay in Go (standard library alone) | 8083 on its address of `reader` (`READER_ADDRESS`), the network it shares with jarvis alone | its 8083 answers | 0.2 core, 160 MB, 48 processes | none, a 32 MB tmpfs | none |
+| `egress_reader` (profile `jarvis`) | the same image as `egress` | 4753 in `guard`'s network, reached from `reader_out` alone | its 4753 answers | 0.1 core, 48 MB, 32 processes | none | none |
 
-All eight have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
+All ten have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
 and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `egress` and `egress_jarvis` run as
-65532, the user the auth socket's volume belongs to, and `jarvis` as 65533, a user of its own.
+65532 (`egress_reader` too), the user the auth socket's volume belongs to, `jarvis` as 65533 and `jarvis_reader` as 65531, users of their own.
 
 - `web` sits on `inside`, an internal network with no way out and no gateway, so it reaches no
   address of the host either.
@@ -42,16 +44,34 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (`JARVIS_NAMES_RPC`, D120).
 - `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
-  serves its budgets and answers `off`, reads no key and starts no gnomcp. It and `egress_jarvis` sit in the profile
+  serves its budgets and answers `off`, reads no key and reaches no gnomcp. It, `jarvis_reader` and the two ways out sit in the profile
   `jarvis`, out of the demo's (10j-4): started only with Jarvis switched on, `--profile demo --profile jarvis`. Ops, who
   run the file without the demo's profile, start it by its name, `docker compose up -d jarvis`, which switches its
   profile on, with their own way out in `JARVIS_EGRESS_PROXY`; `--profile jarvis` alone is refused, as `egress_jarvis`
-  needs the guard. It listens on its fixed address of
+  needs the guard. Switching it on has an order (below, "Switching Jarvis on"): the door's key, the evals, then `JARVIS=on`.
+  It listens on its fixed address of
   `jarvis` (`JARVIS_ADDRESS`, in `JARVIS_SUBNET`), a network it shares with the server alone; its `/ask` and
   `/budgets` ask no session, so that network is their wall (10i). It goes out through `egress_jarvis` alone, a
   smokescreen of its own on 4751 in `guard`'s network, which takes 4751 from `jarvis_out` alone and sends that network
-  nothing but its replies: Anthropic's API, each universe's node and indexer, and gnoscope
-  (`deploy/egress/jarvis-acl.yaml`). The two lists never mix. Its stop waits 35 s, its drain's 20 and 15 more.
+  nothing but its replies: Anthropic's API, each universe's node and gnoscope (`deploy/egress/jarvis-acl.yaml`).
+  The indexers left that list (10u-g2): only gnomcp read them (`gno_history`, `gno_activity`, `jarvis/src/gnomcpTools.ts`,
+  `indexerReads`), and gnomcp runs in the reader now. The lists never mix. Its stop waits 35 s, its drain's 20 and 15 more.
+- `jarvis_reader` (10u-g2, D13987) is gnomcp alone, in a container of its own: no Node, no secret, no volume but a tmpfs,
+  a user of its own (65531), `x-locked`, a network shared with jarvis alone (`reader`, `READER_ADDRESS` in
+  `READER_SUBNET`) and one of its own to the guard (`reader_out`, `GUARD_READER_ADDRESS` in `READER_OUT_SUBNET`).
+  gnomcp speaks over stdio, so the reader's bridge (`deploy/jarvis-reader/main.go`) serves it on 8083, one gnomcp a
+  connection, two at most (jarvis keeps one, a restart overlaps by one), its environment two names alone, ended with the
+  connection, its audit cut to tool, result and duration before it reaches the reader's log; jarvis reaches it by
+  `JARVIS_GNOMCP_ADDRESS`. gnomcp ignores `HTTPS_PROXY` (below), so all four chain hosts are named in `/etc/hosts` to one
+  loopback address (127.0.0.2), where a relay reads the TLS hello's server name (nothing else), refuses a name off
+  `READER_HOSTS` and opens a CONNECT tunnel to the rest through `egress_reader`, a smokescreen on 4753 in `guard`'s network
+  that takes 4753 from `reader_out` alone: the TLS stays between gnomcp and the host, and the list
+  (`deploy/egress/reader-acl.yaml`) lets out each universe's node and indexer, never Anthropic's API, never a private
+  address. A host added to the universes is added in four places, in any order: `gnomcp.toml`, `reader-acl.yaml`, the
+  reader's `READER_HOSTS` and its `extra_hosts`; `jarvis/src/config.test.ts` derives the hosts from
+  `app/data/universes.json` and fails when one of them differs. The reader's caps (0.2 core, 160 MB, 48 processes; its
+  way out 0.1 core, 48 MB, 32 processes) are a ceiling chosen for two gnomcp, not measured on a running stack:
+  `deploy/test.sh --demo` checks the four containers of Jarvis together under 656 MiB and 0.7 core.
 - The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
   jarvis's network reaches no port of the server's (10j's review, V12); web and the tests ask it as `server:8080`.
   The guard finds `jarvis_out` by its own address there (`GUARD_JARVIS_ADDRESS`, in `JARVIS_OUT_SUBNET`) and waits for
@@ -93,6 +113,10 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
    `deploy/secrets/openai_api_key`.
    Slice 10's: Anthropic's key, one line, in `deploy/secrets/anthropic_api_key`, a key of a workspace with its own
    spend limit (ADR-0002 §5); with Jarvis off, any line (Compose wants the file, jarvis reads it only when on).
+   The door's key, which the server and jarvis alone hold (10u-g2): `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`,
+   then `chmod 644 deploy/secrets/jarvis_door_key`. Make it before the next `up`, Jarvis off or on: the server and jarvis read
+   the file whenever Compose names it, which is always, and refuse to start on no file or a key under 32 bytes. A
+   placeholder line like Anthropic's key's stops the whole stack, the server included.
 7. On Linux, a clone made with a umask of 077 leaves `deploy/guard` and `deploy/tailscale`
    unreadable to the containers: `chmod -R a+rX deploy/guard deploy/tailscale`.
 
@@ -154,7 +178,8 @@ anything on `PATH` outside `/usr/bin` and `/bin` is the sessions' to rewrite.
 
 A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2
 cores and 1,504 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
-cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.4 core and 448 MB more when on. The
+cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.7 core and 656 MB more when on (jarvis, its
+reader and their two ways out). The
 limit lets one address 640 requests at once and 20 a second after that (F3665); `auth_basic` runs after it, so a
 burst with a wrong password costs about 640 password checks, at the name in the file, before the 429s begin. To cut the public URL at once:
 
@@ -502,7 +527,8 @@ Slice 3, the stack (3e):
   reaching OpenAI, `docker compose ... restart web egress` (F622, beside F203).
 - **The tailnet's policy stays closed.** In userspace mode, Tailscale hands a device's connection to
   the demo machine's own address on to `127.0.0.1`, so a device the policy let in would reach both ways
-  out, the server's on 4750 (its six hosts, `acl.yaml`) and jarvis's on 4751 (its six, `jarvis-acl.yaml`).
+  out, the server's on 4750 (its six hosts, `acl.yaml`), jarvis's on 4751 (its four, `jarvis-acl.yaml`) and the reader's
+  on 4753 (its four, `reader-acl.yaml`).
   `"acls": []` keeps every device out (F619; 10j's review, S8).
 - **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
@@ -524,19 +550,45 @@ Slice 4, pins and what an account keeps (4d):
 - **Saved messages and "Mark unread" are on the reader's device** (ADR-0002) and nowhere on the server: nothing
   to back up, and a cleared browser loses them.
 
-- **gnomcp reads no chain in the demo** (10j, F5296, question 10j-2). jarvis starts gnomcp with its home and keys'
-  path alone, beside the six names the MCP client passes on (HOME, LOGNAME, PATH, SHELL, TERM, USER): gnomcp never sees
-  `HTTPS_PROXY`, so neither its node reads nor its indexer reads reach out, and its node reads go through gno's own
-  RPC client (tm2), which dials the node itself and would ignore the proxy anyway. In the sealed demo, switched on,
-  every gnomcp read fails, the cards' height and page among them; only jarvis's own `vm/qfuncs` read and Anthropic's
-  API pass through `egress_jarvis`. Jarvis is off by default, so nothing breaks until it is switched on.
-- **gnomcp can read Anthropic's key** (10j, question 10j-3). gnomcp is jarvis's child, so it runs as jarvis's user and
-  can read `/run/secrets/anthropic_api_key`; no capability lets jarvis start it as another, and Compose keeps a secret
-  file's owner and mode from the host. The key is a workspace's with its own spend limit: revoke it at once if gnomcp's
-  image is ever in doubt (its digest is pinned, its provenance attested by GitHub).
+- **gnomcp reaches the chain through the reader's relay** (10j, F5296, question 10j-2; built by 10u-g2). gnomcp never
+  sees `HTTPS_PROXY`, and its node reads go through gno's own RPC client (tm2), which dials the node itself and would
+  ignore the proxy anyway, so the reader names each chain host to a loopback address in `/etc/hosts` and a relay there
+  tunnels it through `egress_reader` (see `jarvis_reader` above). Proven by `deploy/test-jarvis.sh` (gnomcp's reads
+  through the reader), with its mutants.
+- **gnomcp no longer runs where Anthropic's key is** (10j, question 10j-3, closed by 10u-g2). It is the reader's, a
+  container with no secret and no volume, so it cannot read `/run/secrets/anthropic_api_key`, which is jarvis's alone;
+  jarvis's image holds no gnomcp. What the reader can still do is read the public chain: its worst case is a read of
+  any public realm, through the four hosts of its list.
+- **The door's key** (10u-g2). The server sends it to jarvis in one header (`x-jarvis-key`) and jarvis answers 401 to
+  every request without it, on every route, before it reads a body. Both read `jarvis_door_key`; the network's wall stays.
 - **A model call past a minute of silence** (10j). `egress_jarvis` shares `config.yaml`'s `idle_timeout: 60s` with the
   server's way out: a request to Anthropic quiet for longer than a minute is cut, whatever `JARVIS_CALL_TIMEOUT_S`
   says (60 s by default, up to 600 s). Raise both together, or neither.
+
+## Switching Jarvis on
+
+Jarvis is off until all three steps are done, in this order (10u-g2, D13987):
+
+1. **The door's key**: step 6 of the set-up above, `openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then
+   `chmod 644` on it. Without it, `docker compose` refuses to start the stack.
+2. **The evals**, on a machine with Anthropic's key in a file nobody pastes (`evals/run.sh`'s header names the command),
+   and their result committed in `evals/results/`: the last result must pass the gate, `python3 -I
+   deploy/jarvis-evals-gate.py evals/results evals/cases`, which prints `ok` or says why not: every `injection` case, every
+   `allowlist` case, every `ground` decline passes, a case seen twice passes only if every row did, and at least 9 of the
+   `ground` suite's `on-topic-*` cases in 10. Only files named by their UTC time are read; a result it cannot read, one
+   that lacks a case of those suites, or none at all is a refusal.
+3. **`sh deploy/jarvis-on.sh`**, which runs that gate and writes `JARVIS=on` in `deploy/.env` only when it passes. Never
+   write that line by hand. Then `--profile jarvis` beside `--profile demo` (the table above).
+
+A green `deploy/test.sh` with its `skip  jarvis switched on is not started` line does not prove Jarvis on: those proofs (its
+start checks over the reader, the 401 when on) run only once the gate passes, and nothing but `jarvis-on.sh` and your own care
+stop `JARVIS=on` being written without it.
+
+The door's key changes by writing a new file and recreating the two that read it, the server and jarvis, together:
+`openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then `docker compose -f deploy/compose.yaml --profile demo --profile
+jarvis up -d --force-recreate server jarvis`. Between the two restarts the door's requests may meet a 401 (not checked: how the door answers one is the code's, 10u-g2's G2-code);
+`web` restarts with the server (F622). Nothing else holds it. A key that leaked is changed the same way at
+once: it opens jarvis's routes to anyone who can also reach jarvis's network, which is the server's alone.
 
 ## Secrets: rotation and revocation
 

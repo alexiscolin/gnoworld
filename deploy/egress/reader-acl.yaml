@@ -1,0 +1,14 @@
+# The hosts jarvis's reader may reach (10u-g2, D13987), through its own proxy (egress_reader, on 4753): the node and the
+# indexer of each universe of app/data/universes.json, by full name, never Anthropic's API, never a domain; gnomcp reads
+# them and nothing else (deploy/jarvis/gnomcp.toml). jarvis/src/config.test.ts derives the hosts from the data and holds this list, READER_HOSTS and extra_hosts to them. A host is
+# matched as the request names it, then resolved and refused if private.
+version: v1
+services: []
+default:
+  project: gnoworld-reader
+  action: enforce
+  allowed_domains:
+    - rpc.onyx.testnets.gno.land
+    - indexer.onyx.testnets.gno.land
+    - rpc.gno.land
+    - indexer.gno.land

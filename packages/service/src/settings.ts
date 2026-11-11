@@ -98,3 +98,11 @@ export function readSecret(setting: string, path: string): string {
   if (text.length < 32) throw new Error(`setting ${setting}: too_short`);
   return text;
 }
+
+/** A key a shared secret is read from, in a file: none when no file is named and none is required, else readWord's
+ * rules (32 bytes at least, one word of printable ASCII), in a value that never prints. */
+export function keyFile(setting: string, path: string | undefined, required: boolean): Secret | undefined {
+  if (path !== undefined) return new Secret(readWord(setting, path));
+  if (required) throw new Error(`setting ${setting}: required`);
+  return undefined;
+}

@@ -148,6 +148,8 @@ export type JarvisPaidAnswer = z.infer<typeof JarvisPaidAnswer>;
 
 /** Where jarvis takes a question, and where its budgets are read and changed, on the network only it and the server
  * share (D42). */
+/** The header the door proves itself to jarvis with: a shared secret, read from a file on both sides (10u-g2). */
+export const JARVIS_KEY_HEADER = "x-jarvis-key";
 export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest" } as const;
 
 /** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each

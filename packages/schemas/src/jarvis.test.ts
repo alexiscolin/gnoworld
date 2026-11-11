@@ -6,6 +6,7 @@ import {
   DOOR_CAPS,
   JARVIS_CAPS,
   JARVIS_LINES,
+  JARVIS_KEY_HEADER,
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisAsk,
@@ -522,6 +523,7 @@ describe("JarvisAsk", () => {
 
 describe("translation's contract (10k)", () => {
   it("names the translation's and the digest's paths beside the question's and the budgets'", () => {
+    expect(JARVIS_KEY_HEADER).toBe("x-jarvis-key");
     expect(JARVIS_PATHS).toEqual({ ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest" });
   });
 

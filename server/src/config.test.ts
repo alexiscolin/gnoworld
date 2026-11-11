@@ -543,9 +543,14 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
   });
 
   it("switches Jarvis on only for JARVIS=on exactly, off for anything else, never stopping the server (Alexis, off by default)", () => {
+    const JARVIS_DOOR_KEY_FILE = file("door-on", "d".repeat(32));
     const door = (value: string | undefined) =>
-      loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090", ...(value === undefined ? {} : { JARVIS: value }) }).jarvis
-        ?.on;
+      loadConfig({
+        ...ENV,
+        JARVIS_URL: "http://jarvis:8090",
+        JARVIS_DOOR_KEY_FILE,
+        ...(value === undefined ? {} : { JARVIS: value }),
+      }).jarvis?.on;
     expect([undefined, "", "ON", "yes", "1", " on", "on "].map(door)).toEqual([
       false,
       false,
@@ -559,10 +564,50 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(loadConfig({ ...ENV, JARVIS: "on" }).jarvis).toBeUndefined();
   });
 
+  // 10u-g2: the key the door proves itself to jarvis with, from a file, never printed.
+  describe("the door's key", () => {
+    const URL = { ...ENV, JARVIS_URL: "http://jarvis:8090" };
+    const DOOR = `d${"0".repeat(31)}`;
+
+    it("reads the key from its file without its newline, into a value that never prints", () => {
+      const key = loadConfig({ ...URL, JARVIS_DOOR_KEY_FILE: file("door-read", `${DOOR}\n`) }).jarvis?.key;
+      expect(key?.reveal()).toBe(DOOR);
+      expect(inspect(key) + JSON.stringify(key)).not.toContain(DOOR);
+    });
+
+    it("has none while off with no file", () => {
+      expect(loadConfig(URL).jarvis?.key).toBeUndefined();
+    });
+
+    it("refuses to start on without the file, naming the setting", () => {
+      expect(failure({ ...URL, JARVIS: "on" })).toMatch(/^Error: setting JARVIS_DOOR_KEY_FILE: required/);
+    });
+
+    it.each([
+      ["a file that does not exist", "/nonexistent/door", /unreadable/],
+      ["a key of 31 bytes", file("door-31", "k".repeat(31)), /too_short/],
+      ["an empty file", file("door-none", ""), /too_short/],
+    ])("refuses %s, off or on, never printing a key", (_case, path, message) => {
+      for (const JARVIS of ["on", "off"]) {
+        expect(failure({ ...URL, JARVIS, JARVIS_DOOR_KEY_FILE: path })).toMatch(message);
+      }
+    });
+
+    it("takes a key of 32 bytes, the shortest", () => {
+      const env = { ...URL, JARVIS: "on", JARVIS_DOOR_KEY_FILE: file("door-32", "k".repeat(32)) };
+      expect(loadConfig(env).jarvis?.on).toBe(true);
+    });
+
+    it("stops the server for a key file named with no jarvis address", () => {
+      expect(failure({ ...ENV, JARVIS_DOOR_KEY_FILE: file("door-orphan", DOOR) })).toContain("JARVIS_URL");
+    });
+  });
+
   it("reads every door setting it is given, the widest each allows", () => {
     const env = {
       ...ENV,
       JARVIS_URL: "https://jarvis.internal:8443",
+      JARVIS_DOOR_KEY_FILE: file("door-wide", "d".repeat(32)),
       JARVIS_TIMEOUT_S: "3600",
       JARVIS_QUESTION_CHARS: "8000",
       JARVIS_QUOTA: "1000",
@@ -571,7 +616,9 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       JARVIS_NAMES_RPC: "https://rpc.test5.gno.land",
       JARVIS_NAMES_CHAIN: `test5.${"x".repeat(44)}`,
     };
-    expect(loadConfig({ ...env, JARVIS: "on" }).jarvis).toEqual({
+    const { key, ...door } = loadConfig({ ...env, JARVIS: "on" }).jarvis ?? {};
+    expect(key?.reveal()).toBe("d".repeat(32));
+    expect(door).toEqual({
       on: true,
       url: "https://jarvis.internal:8443",
       timeoutMs: 3_600_000,

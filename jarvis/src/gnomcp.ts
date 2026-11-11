@@ -4,30 +4,29 @@
 // reads there with every field ours allows, and every profile read-only (D86). A call goes only to a read of 10b's
 // table with arguments its schema takes, has its timeout, and its result passes Zod; a child that ended starts again
 // at the next call, 3 times in 10 minutes at most (D87).
-import { jsonOf } from "@gnoworld/core";
 import { mkdtempSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Stream } from "node:stream";
-import { StringDecoder } from "node:string_decoder";
-import { Client, SdkError, SdkErrorCode } from "@modelcontextprotocol/client";
+import { Client, SdkError, SdkErrorCode, type Transport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
+import { SocketTransport, type Address } from "./socketTransport.ts";
+import { logLines } from "./gnomcpLog.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
-import { shown } from "./tracing.ts";
 import { visible } from "./untrusted.ts";
 
-interface Setup {
-  readonly command: string;
-  readonly config: string;
+// What gnomcp is: a child this process spawns, or, with an address, one long-lived connection to a gnomcp a container
+// of its own serves (10u-g2), over which the same checks, timeouts, bound and restarts hold.
+type Target = { readonly command: string; readonly config: string } | { readonly address: Address };
+type Setup = Target & {
   readonly profiles: { readonly read: readonly string[]; readonly indexed: readonly string[] };
   readonly log: Log;
   // A call's time and a start's, 30 s each by default, and the clock the restarts are counted on.
   readonly callTimeoutMs?: number | undefined;
   readonly startTimeoutMs?: number | undefined;
   readonly now?: (() => number) | undefined;
-}
+};
 /** What running an allowed call gave: a text, the tool's own error, or why it gave nothing. */
 type Failed = "timeout" | "down" | "malformed" | "error" | "refused";
 export type Ran = { ok: true; text: string; isError: boolean } | { ok: false; reason: Failed };
@@ -38,7 +37,8 @@ export interface Gnomcp {
 }
 interface Child {
   readonly client: Client;
-  readonly home: string;
+  // The child's folder; none over a connection.
+  readonly home: string | undefined;
   alive: boolean;
   // Dropped by the transport for a message past its buffer: the message failed, not the child.
   oversized: boolean;
@@ -62,7 +62,7 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
       setup.log("jarvis_gnomcp_down", { reason: "restarts" });
       return undefined;
     }
-    rmSync(child.home, { recursive: true, force: true });
+    removeHome(child);
     try {
       child = await spawn(setup);
       return child;
@@ -93,10 +93,14 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
       closed = true;
       await starting;
       await child.client.close();
-      rmSync(child.home, { recursive: true, force: true });
+      removeHome(child);
     },
   };
 }
+
+const removeHome = ({ home }: Child): void => {
+  if (home !== undefined) rmSync(home, { recursive: true, force: true });
+};
 
 type CallTool = Client["callTool"];
 const timedOut = (error: unknown) => error instanceof SdkError && error.code === SdkErrorCode.RequestTimeout;
@@ -116,8 +120,16 @@ async function sent(child: Child, params: Parameters<CallTool>[0], options: Para
   }
 }
 
-async function spawn(setup: Setup): Promise<Child> {
-  const timeout = setup.startTimeoutMs ?? 30_000;
+const MAX_MESSAGE = 1024 * 1024;
+
+// The transport to gnomcp, and the folder its child lives in, if it is a child.
+function transportOf(setup: Setup, timeout: number): { transport: Transport; home: string | undefined } {
+  if ("address" in setup) {
+    return {
+      transport: new SocketTransport(setup.address, { maxBufferSize: MAX_MESSAGE, connectMs: timeout }),
+      home: undefined,
+    };
+  }
   const home = realpathSync(mkdtempSync(join(tmpdir(), "jarvis-gnomcp-")));
   const flags = ["-config", setup.config, "-audit-path", "/dev/stderr", "-audit-reads"];
   const transport = new StdioClientTransport({
@@ -127,9 +139,15 @@ async function spawn(setup: Setup): Promise<Child> {
     env: { HOME: home, GNOMCP_AGENT_KEYS_PATH: join(home, "agent-keys") },
     cwd: home,
     stderr: "pipe",
-    maxBufferSize: 1024 * 1024,
+    maxBufferSize: MAX_MESSAGE,
   });
   logLines(transport.stderr, setup.log);
+  return { transport, home };
+}
+
+async function spawn(setup: Setup): Promise<Child> {
+  const timeout = setup.startTimeoutMs ?? 30_000;
+  const { transport, home } = transportOf(setup, timeout);
   const client = new Client({ name: "jarvis", version: "1.0.0" });
   const child: Child = { client, home, alive: true, oversized: false };
   client.onclose = () => {
@@ -148,7 +166,7 @@ async function spawn(setup: Setup): Promise<Child> {
   } catch (error) {
     // A start refused ends its child and leaves no folder behind.
     await client.close();
-    rmSync(home, { recursive: true, force: true });
+    removeHome(child);
     throw error;
   }
 }
@@ -210,36 +228,4 @@ function read(result: unknown): Ran {
   if (!parsed.success) return { ok: false, reason: "malformed" };
   const text = parsed.data.content.map((part) => (part.type === "text" ? part.text : part.resource.text)).join("\n");
   return { ok: true, text, isError: parsed.data.isError === true };
-}
-
-// A stream's lines into the log, each kept to 64 KiB, so a line with no end holds no more.
-function logLines(stream: Stream | null, log: Log): void {
-  const decoder = new StringDecoder();
-  let kept = "";
-  stream?.on("data", (chunk: Buffer) => {
-    const parts = (kept + decoder.write(chunk)).split("\n");
-    kept = (parts.pop() ?? "").slice(0, 64 * 1024);
-    for (const line of parts) logLine(log, line);
-  });
-}
-
-// An audit line, JSON, by its tool, its result and its time alone: its arguments are the model's, so a question's.
-// Any other JSON line logs no word of it either; a line of gnomcp's own words, cut, its hidden characters shown.
-function logLine(log: Log, line: string): void {
-  if (line.trim() === "") return;
-  if (!/^\s*[[{]/.test(line)) {
-    // Up to its first brace: an audit line written into an unended line of words is no word of gnomcp's.
-    const end = line.indexOf("{");
-    log("jarvis_gnomcp_stderr", { error: visible(line.slice(0, Math.min(512, end === -1 ? 512 : end)), false) });
-    return;
-  }
-  // What is no JSON reaches the schema as nothing, which it refuses.
-  const audit = z.object({ tool: z.string(), result: z.string(), duration_ms: z.number() }).safeParse(jsonOf(line));
-  // A malformed line's tool and result are no names, so shown as <malformed>, with no time.
-  const {
-    tool,
-    result,
-    duration_ms: ms,
-  } = audit.success ? audit.data : { tool: "", result: "", duration_ms: undefined };
-  log("jarvis_gnomcp_audit", { tool: shown(tool), reason: shown(result), ...(ms === undefined ? {} : { ms }) });
 }

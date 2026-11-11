@@ -2,12 +2,14 @@
 // nothing else, every refusal a typed code, never a stack or what the request sent (D174). A POST is JSON of strict
 // UTF-8, read up to 256 KiB before it is parsed; a handler gets a signal its client's leaving aborts. While jarvis
 // stops, every request is not ready. Node's own server, with the server's timeouts (packages/service).
+import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { jsonOf } from "@gnoworld/core";
-import type { ApiError } from "@gnoworld/schemas";
+import { JARVIS_KEY_HEADER, type ApiError } from "@gnoworld/schemas";
 import { serverOptions } from "@gnoworld/service/http";
 import type { Log } from "@gnoworld/service/log";
+import type { Secret } from "@gnoworld/service/settings";
 
 /** What a handler answers: a status, and the body written as JSON. */
 export interface Reply {
@@ -26,6 +28,8 @@ interface Options {
   // The names a request's Host may give, in lower case, without a port; any other is refused (F5288).
   readonly names: readonly string[];
   readonly log: Log;
+  // The key every request must carry in a header, asked before anything else; none asked when unset (10u-g2).
+  readonly key?: Secret | undefined;
   // False once jarvis stops: every request is then not ready, its connection closed.
   readonly ready: () => boolean;
 }
@@ -83,7 +87,9 @@ async function handle(
   const { asked, named } = askedOf(served, request);
   let reply: Made;
   try {
-    reply = await replyOf(asked, request, left.signal);
+    reply = holds(options.key, request)
+      ? await replyOf(asked, request, left.signal)
+      : refused("unauthenticated", 401, { close: true });
   } catch (error) {
     if (left.signal.aborted) return;
     // Its name alone: a message may quote what the request sent.
@@ -93,6 +99,15 @@ async function handle(
   if (reply.refused !== undefined)
     options.log("jarvis_refused", { ...named, status: reply.status, error: reply.refused });
   written(response, reply, asked.ready);
+}
+
+// Whether the request carries the key: both hashed, so the comparison takes one time whatever either length, and
+// a key sent twice (joined by a comma) matches none.
+function holds(key: Secret | undefined, request: IncomingMessage): boolean {
+  if (key === undefined) return true;
+  const sent = request.headers[JARVIS_KEY_HEADER];
+  const digest = (text: string) => createHash("sha256").update(text).digest();
+  return typeof sent === "string" && timingSafeEqual(digest(sent), digest(key.reveal()));
 }
 
 // The route and method a request asks, and how the log names them: a path or a method of the client's as one word,
