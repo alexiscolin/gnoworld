@@ -1,8 +1,8 @@
 // A flight (D401): one move from the pose the camera has to the pose asked, along van Wijk and Nuij's path (core), so it goes
-// straight and never comes back; the way and the up turn by a slerp, the field of view opens 5° mid-way (not on a turn). The goal is read each
-// frame, so a moving body is met where it is. Eased power2.inOut from rest, power2.out when the camera already moves.
+// straight and never comes back; the way and the up turn together, as one frame, by one slerp the short way, never faster than 180° a second
+// (D13903); the field of view opens 5° mid-way (not on a turn). The goal is read each frame. Eased power2.inOut from rest, out when moving.
 import { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "@gnoworld/core";
-import { Quaternion, Vector3 } from "three";
+import { Matrix4, Quaternion, Vector3 } from "three";
 import { blankPose, copyPose, type Pose } from "./pose.ts";
 
 /** Where a flight goes: the pose asked, read each frame (false while it cannot be told yet), and what it says on its way. */
@@ -20,6 +20,9 @@ const FOV_BUMP = 5;
 // The longest a goal is waited for before the flight lands where it is.
 const WAIT_S = 2;
 const inOut = (t: number): number => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
+// The ease's steepest slope is 3 (both eases), and the camera turns at most this fast, in radians a second.
+const EASE_PEAK = 3;
+const TURN_RATE = Math.PI;
 const outOnly = (t: number): number => 1 - (1 - t) ** 3;
 
 export class Flight {
@@ -30,6 +33,10 @@ export class Flight {
   readonly #step: ZoomStep = { along: 0, width: 0 };
   readonly #a = new Vector3();
   readonly #b = new Vector3();
+  readonly #up = new Vector3();
+  readonly #basis = new Matrix4();
+  readonly #frameFrom = new Quaternion();
+  readonly #frameTo = new Quaternion();
   readonly #turn = new Quaternion();
   readonly #part = new Quaternion();
   readonly #none = new Quaternion();
@@ -58,8 +65,28 @@ export class Flight {
     const { look } = this.#from;
     this.#apart.set(look.x - this.#to.look.x, look.y - this.#to.look.y, look.z - this.#to.look.z);
     this.#path = zoomPath(this.#apart.length(), { from: this.#from.distance, to: this.#to.distance }, this.#rho);
-    this.#seconds = zoomSeconds(this.#path.length);
+    this.#turnOf();
+    this.#seconds = Math.max(zoomSeconds(this.#path.length), (EASE_PEAK * this.#turn.angleTo(this.#none)) / TURN_RATE);
     return true;
+  }
+
+  // The frame (way, up) of `pose` as a rotation, into `out`: its up made square to its way.
+  #frame(pose: Pose, out: Quaternion): Quaternion {
+    const z = this.#a.set(pose.way.x, pose.way.y, pose.way.z);
+    const x = this.#b.set(pose.up.x, pose.up.y, pose.up.z).cross(z);
+    // An up along the way has no side: the world's up stands in.
+    if (x.lengthSq() < 1e-12) x.set(1, 0, 0);
+    x.normalize();
+    const y = this.#up.crossVectors(z, x);
+    return out.setFromRotationMatrix(this.#basis.makeBasis(x, y, z));
+  }
+
+  // The turn from the frame the camera has to the frame asked, the short way, into `#turn`.
+  #turnOf(): void {
+    this.#frame(this.#from, this.#frameFrom);
+    this.#frame(this.#to, this.#frameTo);
+    this.#turn.copy(this.#frameTo).multiply(this.#frameFrom.invert());
+    if (this.#turn.w < 0) this.#turn.set(-this.#turn.x, -this.#turn.y, -this.#turn.z, -this.#turn.w);
   }
 
   /** `delta` ms on, `still` under reduced motion (it lands at once), into `out`: whether it landed. */
@@ -93,21 +120,21 @@ export class Flight {
     out.look.z = to.look.z + this.#apart.z * left;
     // The goal's distance may change on the way (a page's circle laid out late): the path's end follows it, by the share flown.
     out.distance = this.#step.width * (1 + (to.distance / path.to - 1) * this.along);
-    this.#slerp(from.way, to.way, out.way);
-    this.#slerp(from.up, to.up, out.up);
+    this.#turnOf();
+    this.#part.slerpQuaternions(this.#none, this.#turn, this.along);
+    this.#rotate(from.way, to.way, out.way);
+    this.#rotate(from.up, to.up, out.up);
     const bump = this.goal.turn === true ? 0 : FOV_BUMP * Math.sin(Math.PI * t);
     out.fov = from.fov + (to.fov - from.fov) * this.along + bump;
   }
 
-  // `along` of the turn from unit `a` to unit `b`, into `out`.
-  #slerp(a: Pose["way"], b: Pose["way"], out: Pose["way"]): void {
-    this.#a.set(a.x, a.y, a.z);
-    this.#turn.setFromUnitVectors(this.#a, this.#b.set(b.x, b.y, b.z));
-    this.#part.slerpQuaternions(this.#none, this.#turn, this.along);
-    this.#a.applyQuaternion(this.#part);
-    out.x = this.#a.x;
-    out.y = this.#a.y;
-    out.z = this.#a.z;
+  // `from` turned by `#part`, into `out`; at the end exactly `to`.
+  #rotate(from: Pose["way"], to: Pose["way"], out: Pose["way"]): void {
+    this.#a.set(from.x, from.y, from.z).applyQuaternion(this.#part);
+    const done = this.along >= 1;
+    out.x = done ? to.x : this.#a.x;
+    out.y = done ? to.y : this.#a.y;
+    out.z = done ? to.z : this.#a.z;
   }
 
   /** Whether it went past its 68 %. */

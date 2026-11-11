@@ -15,13 +15,18 @@ export interface FunctionRowProps {
   params?: readonly { Name: string; Type: string }[];
   /** Open from the start, or opened from outside (the Start here button). */
   open?: boolean;
+  /** Told, with the state it now has, when the person opens or shuts the row (a read reads on its opening). */
+  onToggle?: (open: boolean) => void;
   /** What the row opens under it. */
   children: ReactNode;
 }
 
+/** How many rows a list draws before it pages: a shorter list needs no foot that counts it. */
+export const PAGE_ROWS = 12;
+
 const NO_PARAMS: readonly { Name: string; Type: string }[] = [];
 
-export function FunctionRow({ name, params = NO_PARAMS, open, children }: FunctionRowProps) {
+export function FunctionRow({ name, params = NO_PARAMS, open, onToggle, children }: FunctionRowProps) {
   const calls = use(CallCountsContext).get(name);
   const signature = `${name}(${params.map(({ Name, Type }) => `${Name} ${Type === realmType() ? "realm" : Type}`).join(", ")})`;
   return (
@@ -38,6 +43,7 @@ export function FunctionRow({ name, params = NO_PARAMS, open, children }: Functi
         )
       }
       {...(open === undefined ? {} : { open })}
+      {...(onToggle === undefined ? {} : { onToggle })}
     >
       <Stack space="xs">{children}</Stack>
     </Disclosure>
@@ -66,12 +72,38 @@ export function Act({
   );
 }
 
-/** What a list of functions shows while it is read, or when it could not be: the skeleton, or the next step. */
-export function Unlisted({ listing }: { listing: { state: "loading" } | { state: "failed"; next: string } }) {
-  if (listing.state === "failed") return <p role="status">{listing.next}</p>;
+/** The way out of a state that stops short: the realm on gnoweb, where the rest is done. */
+export function OpenOnGnoweb({ href }: { href: string | undefined }) {
+  if (href === undefined) return null;
+  return (
+    <Cluster>
+      <Button emphasis="outline" size="s" icon="arrow-up-right" href={href}>
+        Open on gnoweb
+      </Button>
+    </Cluster>
+  );
+}
+
+/** What a list of functions shows while it is read, or when it could not be: the skeleton (in words once a try has failed), or the next
+ * step with the way to gnoweb. */
+export function Unlisted({
+  listing,
+  href,
+}: {
+  listing: { state: "loading"; retrying?: boolean } | { state: "failed"; next: string };
+  href: string | undefined;
+}) {
+  if (listing.state === "failed")
+    return (
+      <Stack space="xs">
+        <p role="status">{listing.next}</p>
+        <OpenOnGnoweb href={href} />
+      </Stack>
+    );
   return (
     <div aria-busy="true" aria-label="Reading the functions">
       <Skeleton lines={2} />
+      {listing.retrying === true ? <p role="status">Trying again…</p> : null}
     </div>
   );
 }

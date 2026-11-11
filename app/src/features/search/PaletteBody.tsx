@@ -5,6 +5,7 @@ import { lazy, Suspense, type ReactNode } from "react";
 import type { UniverseView } from "../../places.ts";
 import type { Discovery } from "./discover/useDiscover.ts";
 import { parseQuery } from "./match.ts";
+import { HandOff } from "./HandOff.tsx";
 import { PaletteLeft } from "./PaletteLeft.tsx";
 import { PlacePreview } from "./PlacePreview.tsx";
 import { PlaceResults } from "./PlaceResults.tsx";
@@ -75,6 +76,7 @@ export function TypedSheet({
         ) : (
           <PlaceResults groups={palette.groups} active={active} more={palette.more} onChoose={go} onHover={choose} />
         )}
+        <HandOff query={palette.query} go={go} />
       </PaletteLeft>
       {chosen === undefined ? (
         <div className={["rule-start", styles["preview"]].join(" ")} />

@@ -1,4 +1,5 @@
 // What each moon slot holds (D490): its room, its drawn world and how far it has come in, and where its orbit lies.
+import { smoothstep } from "@gnoworld/core";
 import type { Planet as Drawn } from "../planet/planet.ts";
 
 export interface Slot {
@@ -37,13 +38,11 @@ export const sizeOf = (rate: number): number =>
 export const angleOf = (at: number, spin: number, { seconds, still }: { seconds: number; still: boolean }): number =>
   spin + (at * 1.9 + 0.4 * at * at) + (still ? 0 : (PACE / (1 + at * 0.6)) * seconds) * (at % 2 === 0 ? 1 : -1);
 
-const smooth = (x: number, from: number, to: number): number => {
-  const t = Math.min(Math.max((x - from) / (to - from), 0), 1);
-  return t * t * (3 - 2 * t);
-};
-
 /** How much of a moon shows (D521): all of it on the near half of its orbit, none as it nears the planet's limb from behind, so it never
  * looks cut by the limb or sunk into the ground. `depth` is its distance behind (negative) or before the planet's middle, `across` its
  * distance from the line of sight through it, both in the planet's radius `radius`, `size` the moon's. */
 export const showOf = (depth: number, across: number, { radius, size }: { radius: number; size: number }): number =>
-  1 - smooth(-depth, 0, 0.35 * radius) * (1 - smooth(across, radius + size, radius * 1.25 + size));
+  1 - smoothstep(0, 0.35 * radius, -depth) * (1 - smoothstep(radius + size, radius * 1.25 + size, across));
+
+/** The Earth's own room: its moon is the real Moon, hand-made (look.ts). */
+export const EARTH_ROOM = "#earth";

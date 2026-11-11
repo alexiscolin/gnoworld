@@ -1,7 +1,16 @@
 // Every world but the Earth, drawn from its look and its recipe (ADR-0002 §3): one program for them all, the recipe's surface handed as
 // one struct, its palettes as the recipe gives them, its real maps as detail. A chunk of its own: the cosmos asks for it with the maps.
-import { readsMinorMap, worldLook, worldRecipe, type Nature, type PlanetLook, type Recipe } from "@gnoworld/core";
+import {
+  EARTH,
+  readsMinorMap,
+  worldLook,
+  worldRecipe,
+  type Nature,
+  type PlanetLook,
+  type Recipe,
+} from "@gnoworld/core";
 import { Color, ShaderMaterial, Vector3, type BufferGeometry, type IUniform } from "three";
+import { EARTH_MAPS } from "../earth/mapNames.ts";
 import { GENERATED_FRAGMENT } from "./generatedShader.ts";
 import { planetFrom, type MapSet, type Planet } from "./planet.ts";
 import { SURFACE_VERTEX } from "./surfaceShader.ts";
@@ -38,6 +47,9 @@ export const mapNamesOf = ({ look, recipe }: World): string[] => [
   "clouds",
   "ring",
 ];
+
+/** The maps a world's planet is made from, by name: the Earth's, or a generated world's. */
+export const namesFor = (id: string): string[] => (id === EARTH ? EARTH_MAPS : mapNamesOf(worldOf(id)));
 
 /** What a generated world's program reads: its look's and its recipe's values, and its maps. */
 export function worldUniforms({ look, recipe }: World, maps: MapSet): Record<string, IUniform> {

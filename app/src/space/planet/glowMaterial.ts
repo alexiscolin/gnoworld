@@ -13,13 +13,14 @@ export const glowMaterial = (rim: PlanetLook["rim"]): ShaderMaterial =>
     fragmentShader: GLOW_FRAGMENT,
     transparent: true,
     depthWrite: false,
-    // Its glare is a lens's, over the limb it stands at (D482).
-    depthTest: false,
+    // Its glare is a lens's, over the limb it stands at (D482) and over its own planet, but behind a body in front of it: its quad stands at
+    // the planet's nearest depth (GLOW_VERTEX).
     ...ADDITIVE,
     uniforms: {
       sun: { value: new Vector3(1, 0, 0) },
       glowColour: { value: working(haze(rim)) },
       close: { value: 0 },
+      arrive: { value: 1 },
       ...newPlateMask(),
     },
   });

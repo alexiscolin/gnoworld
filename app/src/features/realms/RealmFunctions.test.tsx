@@ -288,7 +288,7 @@ describe("a read that fails", () => {
     expect(state.textContent).toContain("The chain refused this read");
     expect(state.textContent).not.toContain("invalid non-origin call");
     expect(region(box).textContent).not.toContain(LABEL);
-    expect(hrefs(box)).toEqual([]);
+    expect(hrefs(box)).toEqual(["https://onyx.testnets.gno.land/r/gnoland/wugnot"]);
     // The other functions stay usable: the button is still there to try again.
     expect(button(box, "Read Deposit")?.hasAttribute("disabled")).toBe(false);
   });
@@ -311,11 +311,11 @@ describe("a read that fails", () => {
           new Response(JSON.stringify(queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } }))),
         ),
     ],
-  ])("shows a state, not a blank, and no link of its own, when %s", async (_name, answer) => {
+  ])("shows a state, not a blank, with the way to gnoweb, when %s", async (_name, answer) => {
     const box = await panel(vi.fn<ChainFetch>(answer));
     expect(one(region(box), '[role="status"]').textContent).toMatch(/\S/);
     expect(all(region(box), "button")).toHaveLength(0);
-    expect(hrefs(box)).toEqual([]);
+    expect(hrefs(box)).toHaveLength(1);
   });
 
   test("says so, and offers no button, when the realm has no function to read", async () => {

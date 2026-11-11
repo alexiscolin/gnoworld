@@ -1,0 +1,44 @@
+/* The market card's body: a row a token, its price and change and its day's small line at the end; the high and the low are the row's title. */
+@layer components {
+  .body {
+    color: var(--color-text);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .symbol {
+    /* raw: ATONE's width, so the prices line up */
+    min-inline-size: 6ch;
+  }
+
+  .spark {
+    /* layout: the line sits at the row's end */
+    margin-inline-start: auto;
+    line-height: 0;
+  }
+
+  .price {
+    font: var(--font-title-s);
+  }
+
+  .unit {
+    font: var(--font-tick);
+    vertical-align: super;
+    color: var(--color-text-muted);
+  }
+
+  .delta {
+    font: var(--font-data);
+  }
+
+  .delta[data-delta="up"] {
+    color: var(--color-mine);
+  }
+
+  .delta[data-delta="down"] {
+    color: var(--color-danger);
+  }
+
+  .delta[data-delta="flat"] {
+    color: var(--color-text-muted);
+  }
+}

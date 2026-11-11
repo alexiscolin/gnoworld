@@ -4,6 +4,7 @@ import { pixelRatioFor } from "@gnoworld/core";
 import type { Space } from "./scene.ts";
 import { placeOf, type Vec } from "./layout.ts";
 import { lowered, raised, type Verdict } from "./pace.ts";
+import { lowQuality } from "./quality.ts";
 import { napFor } from "./rest.ts";
 import type { Moment, Need } from "./redraw.ts";
 import { shownOf } from "./shown.ts";
@@ -63,14 +64,7 @@ export function pace(space: Space, state: State, now: number): void {
 // the frames could not keep up (`cap`).
 const touch = matchMedia("(pointer: coarse)");
 export const ratioOf = (cap = Infinity): number =>
-  Math.min(
-    cap,
-    pixelRatioFor(
-      devicePixelRatio,
-      touch.matches,
-      document.documentElement.dataset["quality"] === "low" ? "low" : "high",
-    ),
-  );
+  Math.min(cap, pixelRatioFor(devicePixelRatio, touch.matches, lowQuality() ? "low" : "high"));
 
 // Whether the buffer changed: its size is read only once the canvas's box changed (a layout read), its ratio each frame.
 export function resize(space: Space, boxChanged: boolean, force: boolean): boolean {
@@ -124,10 +118,15 @@ export function momentOf(space: Space, { numbers: { eye, shown }, pxPerSecond }:
   };
 }
 
-// Whether each frame differs by itself: a flight, the hand, an effect, an arrival or a planet framed close; the last two only while the
+// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in from its skeleton, an arrival or a planet framed close; the last two only while the
 // scene's clock runs (rig/free.ts's rate: stopped after a minute's rest, the page's planet stands still).
 const moves = ({ rig, stage, arrival, circle }: Space): boolean =>
-  rig.flying || rig.free.moving || stage.effects.busy || ((arrival || circle?.close === true) && rig.free.rate > 0);
+  rig.flying ||
+  stage.near?.arriving === true ||
+  rig.free.moving ||
+  stage.effects.busy ||
+  stage.ground.turning ||
+  ((arrival || circle?.close === true) && rig.free.rate > 0);
 
 // The pixels a second the fastest slow motion moves: a planet's orbit and its spin, those of the page's planet, the system's or all.
 function pixelsPerSecond(space: Space): number {

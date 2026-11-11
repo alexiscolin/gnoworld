@@ -124,7 +124,7 @@ test.describe("Say hi in the chat", () => {
       await logIn(page, "say-hi-world");
       await open(page, { width, as: ACCOUNT, full: false });
       await page.getByRole("link", { name: "Say hi in the chat" }).click();
-      await expect(page.locator("#chat textarea")).toBeFocused();
+      await expect(page.locator("#chat [role='textbox']")).toBeFocused();
     });
   }
 });

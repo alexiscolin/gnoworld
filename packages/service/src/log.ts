@@ -21,6 +21,11 @@ interface Fields {
   setting?: string;
   value?: number;
   subject?: string;
+  // A moderation act or a link (owners' moderation): what gave the right, "owner" or "staff"; the address that holds the namespace, written as
+  // its HMAC like the account; the way a link was made.
+  as?: "owner" | "staff" | "maker";
+  owner?: string;
+  kind?: "adena" | "cli";
 }
 export type Log = (event: string, fields?: Fields) => void;
 
@@ -28,8 +33,25 @@ export function logger(pepper: string, write: (line: string) => void): Log {
   const hmac = (who: string | undefined): string | undefined =>
     who === undefined ? undefined : createHmac("sha256", pepper).update(who).digest("hex");
   return (event, fields = {}) => {
-    const { account, method, route, status, port, error, ms, room, msgid, tool, reason, setting, value, subject } =
-      fields;
+    const {
+      account,
+      method,
+      route,
+      status,
+      port,
+      error,
+      ms,
+      room,
+      msgid,
+      tool,
+      reason,
+      setting,
+      value,
+      subject,
+      as,
+      owner,
+      kind,
+    } = fields;
     const line = {
       time: new Date().toISOString(),
       event,
@@ -47,6 +69,9 @@ export function logger(pepper: string, write: (line: string) => void): Log {
       setting,
       value,
       subject: hmac(subject),
+      as,
+      owner: hmac(owner),
+      kind,
     };
     write(`${JSON.stringify(line)}\n`);
   };

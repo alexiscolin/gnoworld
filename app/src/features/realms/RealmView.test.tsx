@@ -72,11 +72,10 @@ describe("a realm's view", () => {
         /^Read at block 786,661, Oct 30, 23:43 UTC, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
       ),
     ).toBe(true);
-    // 5i: the read functions' panel carries the link too, in every state; the page's own is the one outside it.
+    // The page card's own link is the one inside it; the functions' failed states carry theirs (D13905).
     const links = all(box, "a").filter(
       (a) =>
-        a.getAttribute("href") === "https://onyx.testnets.gno.land/r/gnoland/wugnot" &&
-        a.closest('[aria-label="Read functions"]') === null,
+        a.getAttribute("href") === "https://onyx.testnets.gno.land/r/gnoland/wugnot" && a.closest("#page") !== null,
     );
     expect(links).toHaveLength(1);
   });
@@ -167,8 +166,8 @@ describe("a realm's view", () => {
     // This fetch answers vm/qfuncs with the page's text: the list is a state of its own, the page stands.
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(functions.querySelector('[role="status"]')).not.toBeNull();
-    // The panel draws no link of its own: the realm's link out is the page's (RealmFunctions, OutLinks).
-    expect(all(functions, "a")).toHaveLength(0);
+    // A failed list names the way out: the realm on gnoweb (D13905).
+    expect(all(functions, "a").map((a) => a.textContent)).toEqual(["Open on gnoweb"]);
   });
 
   test("shows the read functions' state beside a page that could not be read", async () => {
@@ -176,8 +175,8 @@ describe("a realm's view", () => {
     expect(one(box, '[role="alert"]').textContent).toContain("could not be read");
     const functions = one(box, '[aria-label="Read functions"]');
     expect(one(functions, '[role="status"]').textContent).toMatch(/\S/);
-    // The panel draws no link of its own: the realm's link out is the page's (RealmFunctions, OutLinks).
-    expect(all(functions, "a")).toHaveLength(0);
+    // A failed list names the way out: the realm on gnoweb (D13905).
+    expect(all(functions, "a").map((a) => a.textContent)).toEqual(["Open on gnoweb"]);
   });
 
   test("keeps the page when only the height fails, and says so", async () => {

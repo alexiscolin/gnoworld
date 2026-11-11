@@ -10,7 +10,7 @@ import type { AppState } from "../../store/index.ts";
 import { asksAfterJoin, followed, joined, outOf } from "./groups.ts";
 import { HISTORY_LINES } from "./history.ts";
 import { Joins } from "./joins.ts";
-import type { ChatLink, LinkDeps } from "./linkTypes.ts";
+import type { ChatLink, LinkDeps, PageTap } from "./linkTypes.ts";
 import { heardIn } from "./outgoing.ts";
 import { Kitting } from "./kitting.ts";
 import { beginSession, heardBy } from "./session.ts";
@@ -33,6 +33,7 @@ class Link implements ChatLink {
   #reader = new BatchReader();
   readonly #out = (line: string): boolean => this.#ergo?.send(line) === true;
   readonly #joins = new Joins(this.#out);
+  readonly taps = new Set<PageTap>();
   readonly #inside = this.#joins.inside;
   // An account's half (accountKit.ts), made as an account connects: none for a guest's link, which has no use for it.
   readonly #kitting: Kitting;
@@ -59,9 +60,13 @@ class Link implements ChatLink {
     this.#keep();
   }
 
+  readonly ask: ChatLink["ask"] = (line) => this.#out(line);
+
   show(room: string | undefined): void {
     if (this.#stopped) return;
-    if (this.#shown !== undefined && room !== this.#shown) this.#kit?.places.flush(this.#shown);
+    if (this.#shown !== undefined && room !== this.#shown) {
+      this.#kit?.places.flush(this.#shown);
+    }
     this.#shown = room;
     this.#keep();
   }
@@ -80,7 +85,9 @@ class Link implements ChatLink {
 
   readonly typing: ChatLink["typing"] = (...args) => this.#kit?.speaking.typing(...args);
 
+  // A room read around a found message is read at no place: its newest line in view is an old one.
   read(room: string, id: string): void {
+    if (this.#deps.store.getState().chat.rooms[room]?.jump !== undefined) return;
     const line = this.#deps.store.getState().chat.rooms[room]?.lines.findLast((each) => each.id === id);
     const marked = this.#key !== "guest" && room === this.#shown ? line : undefined;
     if (marked !== undefined) this.#deps.store.getState().noticeActions.seen(room, marked.time);
@@ -217,6 +224,7 @@ class Link implements ChatLink {
   // leaves the window short of lines (history.ts).
   #page(room: string, messages: readonly IrcMessage[]): void {
     const store = this.#deps.store;
+    if ([...this.taps].some((tap) => tap(room, messages))) return;
     store.getState().chatActions.page(room, messages);
     this.#kit?.paged(room, messages);
     const earlier = this.#joins.earlier(room, messages, store.getState().chat.rooms[room]?.lines.length ?? 0);

@@ -6,9 +6,9 @@ export function PaletteField({ palette }: { palette: ReturnType<typeof usePalett
   return (
     <Field
       kind="search"
-      label="Search places"
+      label="Search places, rooms and people"
       hideLabel
-      placeholder="Where to? a place, #room, @namespace, /r/…"
+      placeholder="Where to? a place, #room, @person, /r/…"
       value={palette.query}
       onChange={palette.ask}
     />

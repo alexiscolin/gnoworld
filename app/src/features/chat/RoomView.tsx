@@ -10,6 +10,7 @@ import { lazy, Suspense, use, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
+import { useJarvisItems } from "../../jarvisHere.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
 import { chunked } from "./Failing.tsx";
@@ -48,7 +49,8 @@ function RoomLines(props: LinesProps) {
   // A room the chain told a call of holds one item at least, as a card of its thread among no message.
   const place = use(ChainPlaceContext);
   const told = place !== undefined && props.room === `#${place.slug}` && use(ChainCallsContext).length > 0;
-  return props.lines.length === 0 && !told ? (
+  const asked = useJarvisItems(props.room, props.me).length > 0;
+  return props.lines.length === 0 && !told && !asked ? (
     waiting(false)
   ) : (
     <Suspense fallback={waiting(true)}>

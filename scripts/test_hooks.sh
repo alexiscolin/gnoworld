@@ -182,14 +182,14 @@ assert scripts["test:compiled"] == "vitest run --project compiled", scripts["tes
 assert "--project compiled" in scripts["test"], scripts["test"]
 PY
 # The type check builds incrementally, each project into its own .tsbuildinfo of TSC_CACHE (check.sh's; .claude/tmp/tsc when unset): the
-# graph a commit's lint reads (scripts/lint_scope.py). Seven projects, seven names, the cache's folder in each.
+# graph a commit's lint reads (scripts/lint_scope.py). Eight projects (the link reader the eighth, D13919), eight names, the cache's folder in each.
 python3 -I - "$here/.." <<'PY' || fail "package.json's typecheck does not build each project incrementally into a file of its own in TSC_CACHE"
 import json, os, sys
 scripts = json.load(open(os.path.join(sys.argv[1], "package.json")))["scripts"]
 projects = [c.split() for c in scripts["typecheck"].split(" && ")]
-assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json", "app/tsconfig.json", "packages/ui/tsconfig.json", "server/tsconfig.json", "packages/service/tsconfig.json", "packages/chain/tsconfig.json", "jarvis/tsconfig.json")], scripts["typecheck"]
+assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json", "app/tsconfig.json", "packages/ui/tsconfig.json", "server/tsconfig.json", "packages/service/tsconfig.json", "packages/chain/tsconfig.json", "jarvis/tsconfig.json", "link-reader/tsconfig.json")], scripts["typecheck"]
 assert all(len(c) == 6 and c[3:5] == ["--incremental", "--tsBuildInfoFile"] and c[5].startswith('"${TSC_CACHE:-.claude/tmp/tsc}/') for c in projects), scripts["typecheck"]
-assert len({c[5] for c in projects}) == 7, scripts["typecheck"]
+assert len({c[5] for c in projects}) == 8, scripts["typecheck"]
 PY
 # Alexis's install command, wherever it is given, reads the script itself, whatever a replace ref
 # shows (F132's class).

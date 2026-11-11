@@ -214,8 +214,39 @@ What the ping-pong decided or found and left for parts of their own (`.claude/tm
 | What | Goes to |
 |---|---|
 | The realm plate, as approved (D566): the proposal `.claude/tmp/design/realm-explorer/` v7 built in the app: hero, talk bar, figures, calls per day with its calls, who calls it, what it can do, its page, Try it (Read/Write, Start here, call cards, typed reads), around it, the detail widgets; no tabs; every list bounded; the worlds job's per-realm rollup with exact days; `$help` links that open a call card. Acceptance tests in its plan | `docs/plans/slice-realm-plate.md` |
-| The name, plain to see (D13953): an account with no name on the page's chain gets the "Pick a name and a face" dialog (`features/names/NameDialog.tsx`) right after Connect, as the prototype does (`docs/prototype/source/index.html:1409`, `dialog#profile`), once, "Later" closing it; signed, the name is real on `r/sys/namereg/v0` | A slice after 13 |
-| A realm's author moderates its room (D13953): the deployer the worlds job reads is linked to the address that logs in through a proof the deployer's key signs on chain (a transaction from gnokey naming the Adena address), read by the server; the roles stay per world today | A slice after 13, designed first |
+| The name, plain to see (D13953): an account with no name on the page's chain gets the "Pick a name and a face" dialog (`features/names/NameDialog.tsx`) right after Connect, as the prototype does (`docs/prototype/source/index.html:1409`, `dialog#profile`), once, "Later" closing it; signed, the name is real on `r/sys/namereg/v0` | Done 2026-11-11 (D13981, `features/account/`, the workshop's way) |
+| A realm's author moderates its room (D13953): the deployer the worlds job reads is linked to the address that logs in through a proof the deployer's key signs on chain (a transaction from gnokey naming the Adena address), read by the server; the roles stay per world today | Built as D13927's simpler way (the namespace's holder, linked accounts, a command-line proof): [owners-moderation.md](owners-moderation.md); see "Slice 13's days" below |
+
+## Slice 13's days, 2026-11-10 to 11-12
+
+Built on `pingpong`, not yet in `main`: `main` takes it after the hardening slice (tests and journeys for every behaviour, the pictures, no
+regression, a security review of the whole, `deploy/test.sh` green). The demo is on the evening of 2026-11-12 (D13944): no new big part
+before it.
+
+| What | State | Plan |
+|---|---|---|
+| The realm plate (Try it, Around it, the detail widgets) and its journeys | Built, the journeys brought back to the new plate (D13992) | [slice-realm-plate.md](slice-realm-plate.md) |
+| The owners' moderation, with linked accounts (the namespace's holder moderates: hide, mute, pins; a link by Adena or by a command-line proof; a release for a key linked by phishing) | Built: `server/src/login/` links, `roles/owners.ts`, `moderation/routes.ts`, the account menu's linked accounts | [owners-moderation.md](owners-moderation.md) |
+| Search: the chat's own search over the public rooms (`server/src/search/`) and the palette's hand-off | Built: the index, the route, the screens | [search.md](search.md) |
+| Link previews: a card under a line, read by the link reader (`link-reader/`, `server/src/cards/`) | Built, off by default: `LINK_CARDS=0` until `deploy/test.sh` has passed in Alexis's Terminal, then `LINK_CARDS=1` and `--profile links` (OPERATIONS.md, "Switching the link cards on") | [link-previews.md](link-previews.md) |
+| Jarvis: its answers as cards in the chat, kept explanations (7 days) and "here" (1 hour), gnomcp in its own keyless reader | Built | [slice-10.md](slice-10.md); OPERATIONS.md, "Forget Jarvis's kept explanations" |
+| The composer on Lexical, with `/`, `@` and `#` suggestions and `/market` (D13999, D13902, D13904) | Built | none |
+| The markets chart card, compact (D13997) | Built | none |
+| The planets' depth (D13993), the Earth's real hour (D13947), regions of the other worlds from their seed (D13996) | Built | none |
+| The calendar's dialog removed; Events and Media greyed "coming soon" (D13995, D13921) | Done | none |
+| Gnoworld online in one command | A plan only | [online.md](online.md) |
+
+**Waits after the demo** (D13944 and the rows above):
+
+| What | Plan |
+|---|---|
+| Private rooms | [private-rooms.md](private-rooms.md) |
+| The shared link's image (an Open Graph picture per link) | [share-image.md](share-image.md) |
+| Jarvis's queued ask | Not planned yet |
+| One timeline for every view's arrival (D13945): the scene, the header, the plate, the chat and the labels enter and leave on one clock | Not planned yet |
+| The 8K Earth map | Not planned yet |
+| CI and continuous improvement | After the demo (D13944) |
+| `lint/app.config.ts` and the design reviewer's trigger still name `app/src/scene/`, which is `app/src/space/` now; `scripts/workshop.sh` and `app/lab.config.ts` serve a lab whose pages are gone | A harness change, Alexis's |
 
 ## Phase 1: social on chain
 
@@ -236,7 +267,7 @@ phase 0 is done. Realms are written by Claude and audited (`docs/REVIEW.md`, tie
 | Voice rooms | Its ADR first; then a WebRTC voice room per world, with live moderation |
 | Room games | Its ADR first, after sessions and the sponsor; a game bot and a game realm, results on chain, no money |
 | Push | `draft/webpush` through the PWA: mentions, followed worlds, event reminders; and chosen chain events through gnotif (realms declare their triggers in its on-chain registry; our own gnotifd reads the public indexer, as it does, and pushes to our worker, which shows them). Before: ADR-0001 §12 nuanced (gnotif's push carries the text, which the chain made public; chat wake-ups stay empty), how gnotif authenticates an opt-in, one sender key for Ergo and gnotifd, gnotif's registry on mainnet |
-| Events by moderators | `/event` in a world, on the calendar and in its JSON-LD |
+| Events by moderators | `/event` in a world and in its JSON-LD; the chat header's Events is greyed "coming soon" since the calendar's dialog left (D13995), and a place's events will come from a realm on chain (D13901) |
 | Social details | "New here"; routed questions with opt-in helpers, "Thanks" and "helped N"; the weekly report, written by the team |
 | On-chain extras of ADR-0001 | Globe beacons as a ring buffer; tips and stamps in the same transaction |
 

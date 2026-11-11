@@ -77,7 +77,9 @@ const goesOn = (before: Last | undefined, here: Last, reply: string | undefined)
 
 /** The lines that go on a group: the same author's message within `GROUP_MS` of the one before it, on the same day, with no
  * call of the chain, notice, action or reply between or in them. Read once per change of the list, never per line drawn. */
-export function groupedOf(entries: readonly Entry<ShownLine>[]): ReadonlySet<string> {
+export function groupedOf(
+  entries: readonly (Entry<ShownLine> | { jarvis: unknown } | { day: string })[],
+): ReadonlySet<string> {
   const grouped = new Set<string>();
   let before: Last | undefined;
   for (const entry of entries) {
@@ -96,4 +98,72 @@ export function groupedOf(entries: readonly Entry<ShownLine>[]): ReadonlySet<str
     before = here;
   }
   return grouped.size === 0 ? NO_GROUPED : grouped;
+}
+
+const NO_DAYS: ReadonlyMap<string, string> = new Map();
+
+/** Where a day is read: the reader's own zone and language unless a test says another. */
+interface Reader {
+  timeZone?: string | undefined;
+  locale?: string | undefined;
+}
+
+/** The label above the lines of each day, on the first line of it (the first of the list included, once the list holds two days): "Today", "Yesterday", else
+ * the weekday and date, the year when it is not this year's. A day is the reader's own, as the clock changes make it (a day of
+ * 23 or 25 hours is one day): the key is the zone's calendar date, never 24 hours of milliseconds. */
+export function dayLabelsOf(
+  entries: readonly (Entry<ShownLine> | { jarvis: unknown })[],
+  now: Date,
+  { timeZone, locale }: Reader = {},
+): ReadonlyMap<string, string> {
+  const key = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
+  const words = (year: boolean) =>
+    new Intl.DateTimeFormat(locale, {
+      timeZone,
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      ...(year ? { year: "numeric" } : {}),
+    });
+  const today = key.format(now);
+  const yesterday = key.format(new Date(Date.parse(`${today}T12:00:00Z`) - 24 * 3_600_000));
+  const labels = new Map<string, string>();
+  let before: string | undefined;
+  for (const entry of entries) {
+    if (!("line" in entry)) continue;
+    const at = new Date(entry.line.time);
+    const day = key.format(at);
+    if (day === before) continue;
+    before = day;
+    labels.set(
+      entry.line.id,
+      day === today
+        ? "Today"
+        : day === yesterday
+          ? "Yesterday"
+          : words(day.slice(0, 4) !== today.slice(0, 4)).format(at),
+    );
+  }
+  // A room that shows one day alone has no change of day to tell (its lines' times keep their full date in their title).
+  return labels.size < 2 ? NO_DAYS : labels;
+}
+
+/** A day's opening standing among the entries (D13922): a separator no key stops on, which also ends its author's group. */
+export interface DayEntry {
+  day: string;
+  key: string;
+}
+
+/** The entries with a day's opening before each line `dayLabelsOf` names. */
+export function withDays<E extends Entry<ShownLine> | { jarvis: unknown }>(
+  entries: readonly E[],
+  now: Date,
+): readonly (E | DayEntry)[] {
+  const days = dayLabelsOf(entries, now);
+  if (days.size === 0) return entries;
+  return entries.flatMap((entry) => {
+    const id = "line" in entry ? entry.line.id : undefined;
+    const day = id === undefined ? undefined : days.get(id);
+    return id === undefined || day === undefined ? [entry] : [{ day, key: `day ${id}` }, entry];
+  });
 }

@@ -65,6 +65,22 @@
     block-size: var(--control-header);
     /* layout: the card's own */
     margin-block-end: var(--space-2xs);
+    /* The row measures its own width: a narrow square's title and hint follow it (below). */
+    container-type: inline-size;
+  }
+
+  /* raw: a narrow square (a third of a narrow plate), where the card title's size leaves its buttons no room (Alexis, 2026-11-11) */
+  @container (inline-size < 20rem) {
+    .card[data-look="hub"] .title {
+      font: var(--font-ui);
+    }
+  }
+
+  /* raw: the narrowest square, where even the smaller title and the buttons fill the row: the hint gives way */
+  @container (inline-size < 13rem) {
+    .hint {
+      display: none;
+    }
   }
 
   .header > * {

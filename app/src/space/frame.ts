@@ -16,7 +16,11 @@ export function draw(space: Space, signal: AbortSignal): void {
   let drawn = false;
   const beat: Beat = {
     gone: () => space.disposed,
-    unseen: () => !space.seen || document.hidden || space.renderer.getContext().isContextLost(),
+    unseen: () => {
+      const unseen = !space.seen || document.hidden || space.renderer.getContext().isContextLost();
+      if (unseen) space.stage.near?.settle();
+      return unseen;
+    },
     focused: () => document.hasFocus(),
     watch: (now) => {
       pace(space, state, now);

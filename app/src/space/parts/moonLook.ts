@@ -7,13 +7,11 @@ import { MOON, GROUND_TO_MAP } from "../earth/look.ts";
 import { createWorld, mapNamesOf } from "../planet/generated.ts";
 import { createPlanet, type Planet as Drawn } from "../planet/planet.ts";
 import type { Maps } from "./maps.ts";
+import { EARTH_ROOM } from "./moonSlot.ts";
 
 // The bare worlds a moon is: grey, dark or rust, never a sea, an ice nor an air.
 const KINDS: readonly Anchor[] = ["rocky", "rocky", "dark carbon", "desert"];
 const HEAD = "uniform float moonAlpha, moonFlare;\n";
-
-/** The Earth's own room: its moon is the real Moon, hand-made (look.ts). */
-const EARTH_ROOM = "#earth";
 
 /** A moon's world for `room`, once the maps are in: its alpha and its flare are uniforms of its surface. */
 export function moonOf(room: string, { maps, sphere }: Made): Drawn | undefined {

@@ -4,8 +4,7 @@
 // checked before any work, an account makes 10 rooms an hour, and each act and refusal goes to the log.
 import { CreateRoom, RoomName, type Address, type MadeRoom } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
-import { getCookie } from "hono/cookie";
-import { guard, json, refuserOf, type Refusals, type Guarded } from "../guard.ts";
+import { baseRefusals, guard, json, refuserOf, sessionOf, type Refusals, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
 import { mayCreateRoom, type Roles } from "../roles/roles.ts";
@@ -33,14 +32,10 @@ interface Made {
 }
 
 const refusals = {
-  origin: ["forbidden", 403],
-  type: ["unsupported", 415],
-  session: ["unauthenticated", 401],
+  ...baseRefusals,
   forbidden: ["forbidden", 403],
-  body: ["refused", 400],
   exists: ["refused", 400],
   too_long: ["refused", 400],
-  limit: ["too_many", 429],
   full: ["too_many", 429],
   not_found: ["not_found", 404],
   name: ["refused", 400],
@@ -52,7 +47,7 @@ export function roomsRoutes({ roles, rooms, session, nameCheck, origins, log, no
   // The tries at a public room, a refused name too: each costs a check, which may be a paid call.
   const tries = limiter({ max: 10, windowMs: 60 * 60_000, keys: 100_000 });
   const refuse = refuserOf(log, "room_refused", refusals);
-  const account = (c: Context): Address | undefined => session(getCookie(c, "__Host-session"));
+  const account = (c: Context): Address | undefined => sessionOf(c, session);
   // Who acts, and whether on that world: a session and the right, before anything else is read.
   const allowed = (c: Context, world: string): Address | Response => {
     const who = account(c);

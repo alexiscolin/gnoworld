@@ -7,7 +7,10 @@ import { Person } from "./Person.tsx";
 import { PersonCard } from "./PersonCard.tsx";
 import styles from "./RoomView.module.css";
 
-const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+export const CLOCK = new Intl.DateTimeFormat(undefined, { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+
+// A line's time in full, its title: the date and the time, in the reader's zone and language.
+export const FULL = new Intl.DateTimeFormat(undefined, { dateStyle: "full", timeStyle: "short" });
 
 // A line's author: its account's address shortened or its guest's nick, which opens their card, then "you" if it is mine.
 function Author({ line, mine, me }: { line: Line; mine: boolean; me: string | undefined }) {
@@ -104,7 +107,7 @@ function GroupedHead({
       </span>
       <Marks mentioned={mentioned} notice={false} saved={saved} pinned={pinned} />
       <Edited edited={line.edited} />
-      <time dateTime={line.time} className={styles["groupTime"]}>
+      <time dateTime={line.time} title={FULL.format(new Date(line.time))} className={styles["groupTime"]}>
         {CLOCK.format(new Date(line.time))}
       </time>
     </div>
@@ -127,7 +130,7 @@ export function Head({ line, mine, me, mentioned, saved, pinned, newHere, groupe
         {newHere === true ? <span className={styles["newHere"]}>new here</span> : null}
         <Marks mentioned={mentioned} notice={line.kind === "notice"} saved={saved} pinned={pinned} />
         <Edited edited={line.edited} />
-        <time dateTime={line.time} className={styles["time"]}>
+        <time dateTime={line.time} title={FULL.format(new Date(line.time))} className={styles["time"]}>
           {CLOCK.format(new Date(line.time))}
         </time>
       </Cluster>

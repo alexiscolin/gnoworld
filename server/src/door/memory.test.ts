@@ -2,7 +2,9 @@ import type { DatabaseSync } from "node:sqlite";
 import { Address, type JarvisAnswer } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "@gnoworld/service/db";
+import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { DAY_TABLES } from "./day.ts";
+import { hereKey, KEPT_TABLES } from "./kept.ts";
 import { doorMemory } from "./memory.ts";
 
 // What the door remembers: shared by the chat that feeds it and the ask route that reads it.
@@ -13,9 +15,9 @@ afterEach(() => {
   for (const db of opened.splice(0)) db.close();
 });
 const setup = (origins: string[]) => {
-  const db = openDatabase(":memory:", [DAY_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, DAY_TABLES, KEPT_TABLES]);
   opened.push(db);
-  return doorMemory(db, origins, () => T0);
+  return doorMemory(db, origins, { now: () => T0 });
 };
 
 describe("the door's memory", () => {
@@ -38,5 +40,18 @@ describe("the door's memory", () => {
     expect(ask.heard(ANNA)).toBe(false);
     chat.heard.said(ANNA);
     expect(ask.heard(ANNA)).toBe(true);
+  });
+
+  it("drops the room's kept answers in the database too when the chat tells a line was taken, and no other room's", () => {
+    const { ask, chat } = setup([]);
+    const answer: JarvisAnswer = { status: "answered", markdown: "x", buttons: [] };
+    ask.kept.set(hereKey("#a"), answer, { room: "#a", started: T0 - 1 });
+    ask.kept.set(hereKey("#b"), answer, { room: "#b", started: T0 - 1 });
+    chat.changed("#a");
+    expect([ask.kept.get(hereKey("#a")), ask.kept.get(hereKey("#b"))]).toEqual([undefined, answer]);
+  });
+
+  it("gives the ask route and the retention the one kept store, whose expire the retention calls", () => {
+    expect(setup([]).ask.kept.expire(1)).toBe(0);
   });
 });

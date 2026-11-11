@@ -54,7 +54,8 @@
     display: contents;
   }
 
-  .box textarea {
+  .box [role="textbox"],
+  .box [role="textbox"] + [aria-hidden="true"] {
     /* layout: across the box, on the second row, two lines high until it grows (Alexis, 2026-11-08: a larger box) */
     grid-area: 2 / 1 / auto / -1;
     min-block-size: calc(2lh + var(--space-s));
@@ -66,8 +67,8 @@
     font: var(--font-chat);
   }
 
-  /* What the field says of the draft, or why it cannot go, at the foot's end, before Send. */
-  .box p {
+  /* What the field says of the draft, or why it cannot go (the design system's FieldWords, in this wrapper), at the foot's end, before Send. */
+  .words {
     /* layout: in the foot's row, against Send */
     grid-area: 3 / 1;
     /* layout: against Send, level with it */
@@ -76,10 +77,15 @@
     margin-inline: var(--space-2xs);
   }
 
-  /* The hint is muted and small; a refusal, which the field draws in the same place, keeps its own danger colour and size. */
-  .box p:not([aria-hidden]) {
-    color: var(--color-text-muted);
-    font: var(--font-hint);
+  /* The suggestions over the box: a grid item on its first row, across it, lifted its own height above the box. */
+  .suggestions {
+    /* layout: a grid item of the box (the field's parts join its grid), on its first row, across it, lifted its own height above the box */
+    grid-area: 1 / 1 / 2 / -1;
+    /* layout: at the row's top, which the lift takes above the box */
+    align-self: start;
+    translate: 0 calc(-100% - var(--space-2xs));
+    /* raw: above the field and its words, under the page's dialogs */
+    z-index: 2;
   }
 
   /* The quick actions' + at the foot's start, level with Send. */

@@ -1,6 +1,6 @@
 // A room anyone signed in makes on the Earth (D394): a button, and a small dialog with the room's name, where the server's
 // refusal is said. The name is typed as words and sent as the slug the server takes (core's rule: a-z, 0-9, single hyphens).
-import { RoomName } from "@gnoworld/schemas";
+import { RoomName, type RoomList } from "@gnoworld/schemas";
 import { Button, Dialog, Field, IconButton, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
 import { useNavigate } from "react-router";
@@ -8,6 +8,7 @@ import { pageRoomsApi } from "../../lib/api/rooms.ts";
 import { useFull } from "./full.ts";
 import { roomHref } from "./names.ts";
 import { roomsChanged } from "./roomsListed.ts";
+import { useApp } from "../../storeContext.tsx";
 
 type Reason =
   Awaited<ReturnType<ReturnType<typeof pageRoomsApi>["make"]>> extends infer R
@@ -33,6 +34,16 @@ const slugOf = (typed: string): string =>
     .toLowerCase()
     .replaceAll(/[^a-z0-9]+/g, "-")
     .replaceAll(/^-+|-+$/g, "");
+
+// The Earth's list always holds its main room, which no other world's does by that name.
+const onEarth = (sections: RoomList["sections"]): boolean =>
+  sections.some(({ rooms }) => rooms.some(({ room }) => room === "#earth"));
+
+/** Whether the reader may make a room here: signed in, on the Earth (a guest and another world see no button). */
+export function useMayMakeRoom(sections: RoomList["sections"]): boolean {
+  const signedIn = useApp(({ login }) => login.session.kind === "in");
+  return signedIn && onEarth(sections);
+}
 
 export function NewRoom() {
   const [open, setOpen] = useState(false);
@@ -60,7 +71,8 @@ export function NewRoom() {
           setOpen(false);
           setTyped("");
           roomsChanged();
-          return navigate(roomHref(made.value.room, full));
+          const to = roomHref(made.value.room, full);
+          return to === undefined ? undefined : navigate(to);
         },
         () => {
           setWorking(false);

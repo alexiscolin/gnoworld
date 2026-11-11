@@ -49,7 +49,9 @@ describe("a world's actions", () => {
     const el = draw();
     const chat = document.createElement("div");
     chat.id = "chat";
-    const composer = document.createElement("textarea");
+    const composer = document.createElement("div");
+    composer.setAttribute("role", "textbox");
+    composer.tabIndex = 0;
     chat.append(composer);
     document.body.append(chat);
     const link = el.querySelector("a");

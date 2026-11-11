@@ -5,3 +5,4 @@ export { useLoaded } from "./useLoaded.ts";
 export { useResting, useRestingWorlds, views } from "./views.ts";
 export { useWorldsCount } from "./worldsCount.ts";
 export { holdsShell, revealShell } from "./firstLook.ts";
+export { warmWorld } from "./space.ts";

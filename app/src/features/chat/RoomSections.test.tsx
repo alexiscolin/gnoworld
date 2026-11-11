@@ -45,6 +45,19 @@ describe("RoomSections", () => {
   });
 });
 
+describe("a realm world's rooms", () => {
+  const own = "#nym-alexiscolin000-gnoradio-0123456789/home-0123456789";
+  const other = "#nym-alexiscolin000-gnoradio-0123456789/other-0123456789";
+  it("lists the room one is in, as the current one with no link, and no other room of that world", () => {
+    const sections = [{ name: null, rooms: [own, other].map((room) => ({ room, type: "open" as const })) }];
+    const html = renderToStaticMarkup(<RoomSections sections={sections} current={own} />);
+    expect(html).toContain("home");
+    expect(html).toContain('aria-current="true"');
+    expect(html).not.toContain("other");
+    expect(html).not.toContain("<a ");
+  });
+});
+
 describe("RoomsNav", () => {
   it("is a navigation named as it is told, reached by code and never by the tab key", () => {
     const html = renderToStaticMarkup(<RoomsNav label="Rooms">in it</RoomsNav>);

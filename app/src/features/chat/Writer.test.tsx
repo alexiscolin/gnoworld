@@ -62,7 +62,7 @@ function Page() {
     </div>
   );
 }
-const field = () => document.querySelector("aside input[type='text'], aside textarea");
+const field = () => document.querySelector("aside [role='textbox'], aside input[type='text']");
 // Until the field is there, or what the page shows has stood still for a while.
 async function settle(until: () => boolean = () => false) {
   for (let waits = 0; waits < 100 && !until(); waits++)

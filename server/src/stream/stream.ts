@@ -2,7 +2,15 @@
 // link's preview shows only once its message is checked. Public, as guests read, but for the rooms a
 // reader may not read (3m); bounded: 25 rooms a stream, 4 streams a visitor, a total, each room's last
 // events kept for a late client or one coming back.
-import type { ApiError, ChainEvent, RealmsDeployed, Signal, StreamEvent, StreamSince } from "@gnoworld/schemas";
+import type {
+  ApiError,
+  CardEvent,
+  ChainEvent,
+  RealmsDeployed,
+  Signal,
+  StreamEvent,
+  StreamSince,
+} from "@gnoworld/schemas";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { streamSSE, type SSEStreamingApi } from "hono/streaming";
@@ -23,6 +31,8 @@ export function stateOf(action: string): StreamEvent["state"] | undefined {
 
 export interface Stream {
   publish: (event: StreamEvent) => void;
+  // A link card's event (slice 13, L3), in the verdicts' sequence and ring.
+  card: (event: CardEvent) => void;
   // A first signal (slice 9h) to the readers of any room of its world they may read, in the verdicts' sequence of ids.
   signal: (signal: Signal) => void;
   // The chain's events (slice 9g): a call to the readers of its world, a deploy to the Earth's, live only.
@@ -101,8 +111,9 @@ function tellSince(stream: SSEStreamingApi, time: number): void {
   stream.write(`event: since\ndata: ${JSON.stringify(since)}\n\n`).then(done, done);
 }
 
-const frame = (id: number, event: StreamEvent): string =>
-  `id: ${String(id)}\nevent: verdict\ndata: ${JSON.stringify(event)}\n\n`;
+// A verdict, or a link card's event (told as `card`): one sequence of ids and one ring a room.
+const frame = (id: number, event: StreamEvent | CardEvent): string =>
+  `id: ${String(id)}\nevent: ${"state" in event ? "verdict" : "card"}\ndata: ${JSON.stringify(event)}\n\n`;
 
 interface Framed {
   id: number;
@@ -146,7 +157,7 @@ export function makeStream(options: Options = {}): Stream {
   // From the clock, so the ids a server gave before a restart stay below the next one's.
   let sequence = Date.now();
   // Each room's last events, oldest first; a room past the cap of rooms is not kept.
-  const rings = new Map<string, { id: number; event: StreamEvent }[]>();
+  const rings = new Map<string, { id: number; event: StreamEvent | CardEvent }[]>();
   const ring = signalRing();
   const clients = new Set<Client>();
   const places = admission(options);
@@ -161,19 +172,22 @@ export function makeStream(options: Options = {}): Stream {
   };
   const side = chainSide(tell, (rooms) => follows(rooms, EARTH));
 
+  const keep = (event: StreamEvent | CardEvent): void => {
+    sequence += 1;
+    const kept = rings.get(event.room) ?? [];
+    kept.push({ id: sequence, event });
+    if (kept.length > pending) kept.shift();
+    if (kept.length === 1 && rings.size < 10_000) rings.set(event.room, kept);
+    // One frame for every client that follows the room.
+    // ponytail: every client is asked whether it follows; 1,000 at most, about 7 us an event. Index
+    // the clients by room if the total grows.
+    const text = frame(sequence, event);
+    for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
+  };
+
   return {
-    publish(event) {
-      sequence += 1;
-      const kept = rings.get(event.room) ?? [];
-      kept.push({ id: sequence, event });
-      if (kept.length > pending) kept.shift();
-      if (kept.length === 1 && rings.size < 10_000) rings.set(event.room, kept);
-      // One frame for every client that follows the room.
-      // ponytail: every client is asked whether it follows; 1,000 at most, about 7 us an event. Index
-      // the clients by room if the total grows.
-      const text = frame(sequence, event);
-      for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
-    },
+    publish: keep,
+    card: keep,
     signal: (signal) => {
       tell(signal.world, (id) => ring.keep(id, signal));
     },

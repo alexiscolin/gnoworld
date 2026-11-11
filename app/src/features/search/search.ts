@@ -1,7 +1,7 @@
 // The palette's search: one pass over the index of the places the page already holds, so typing sends no request. A query is a name, or
 // opens with a mark: `#` a room, `@` a namespace, `/r/` a realm's path, `>` a command (D355). The best 50 come back, with how many answered.
 import { realmPage } from "../../lib/realmPage.ts";
-import { matchLower, parseQuery, wordsOf } from "./match.ts";
+import { matchLower, parseQuery, wordsOf, type Parsed } from "./match.ts";
 import type { Entry, SearchIndex } from "./searchIndex.ts";
 import {
   COMMANDS,
@@ -13,29 +13,8 @@ import {
   type SearchResult,
   type SearchSort,
 } from "./types.ts";
-
-const KIND_FILTERS: Readonly<Record<string, (item: SearchItem) => boolean>> = {
-  worlds: (item) => item.kind === "world" && item.tag !== "DAO",
-  dao: (item) => item.tag === "DAO",
-  stations: (item) => item.kind === "station",
-  systems: (item) => item.kind === "system",
-};
-const NARROWS: Readonly<Record<string, (item: SearchItem) => boolean>> = {
-  here: (item) => (item.here ?? 0) > 0,
-  active: (item) => item.active === true,
-  new: (item) => item.fresh === true,
-  unseen: (item) => (item.kind === "world" || item.kind === "station") && item.visited === false,
-};
-
-// The test of the chips and the namespace, made once for a search: kinds add to each other, the rest narrow.
-function keeping(filters: ReadonlySet<SearchFilter>, namespace: string | undefined): (item: SearchItem) => boolean {
-  const kinds = [...filters].flatMap((each) => KIND_FILTERS[each] ?? []);
-  const narrows = [...filters].flatMap((each) => NARROWS[each] ?? []);
-  return (item) =>
-    (kinds.length === 0 || kinds.some((test) => test(item))) &&
-    narrows.every((test) => test(item)) &&
-    (namespace === undefined || item.namespace === namespace);
-}
+import { keeping } from "./filters.ts";
+import { NONE, tabbed } from "./tabs.ts";
 
 /** The most results a list draws: past it, the words are to be refined. */
 export const SHOWN = 50;
@@ -50,8 +29,21 @@ interface Scored {
 interface Ask {
   keep: (item: SearchItem) => boolean;
   sort: SearchSort;
+  /** Whether a chip or a namespace narrows the places, which leaves no room nor person. */
+  narrowed?: boolean;
   note?: (entry: Entry) => string;
 }
+
+const resultOf = (
+  entry: Entry,
+  hits: readonly number[],
+  note: ((entry: Entry) => string) | undefined,
+): SearchResult => ({
+  item: entry.item,
+  hits,
+  ...(note === undefined ? {} : { note: note(entry) }),
+  ...(entry.room === undefined ? {} : { room: true as const }),
+});
 
 // The entries that pass the ask and answer `text`: the plain matches, and only when few, those a few letters off.
 function rank(entries: readonly Entry[], text: string, { keep, note }: Pick<Ask, "keep" | "note">): Scored[] {
@@ -61,11 +53,7 @@ function rank(entries: readonly Entry[], text: string, { keep, note }: Pick<Ask,
     if (!keep(entry.item)) continue;
     const m = matchLower(entry, text, false);
     if (m === undefined) missed.push(entry);
-    else
-      found.push({
-        score: m.score,
-        result: { item: entry.item, hits: m.hits, ...(note === undefined ? {} : { note: note(entry) }) },
-      });
+    else found.push({ score: m.score, result: resultOf(entry, m.hits, note) });
   }
   if (found.length < SHOWN / 5 && text.length >= 4) {
     // ponytail: past this many names a few letters off the pass stops: the best 50 come from the first ones, and the count says "more".
@@ -146,26 +134,51 @@ function inEverything(index: SearchIndex, text: string, ask: Ask): Found {
 
 const COMMAND_ENTRIES = COMMANDS.map((item) => ({ item, lower: item.name, words: wordsOf(item.name) }));
 
-/** The best results of `query` over the `index`: a name matches places, systems and stations; `#` their rooms; `@` the systems, and a
- * namespace named whole also lists its realms; `/r/` the realms; `>` the commands. The chips and the namespace narrow all but commands.
- * An empty name lists every place, for the groups of the empty field to cut. */
+const askOf = ({
+  filters = new Set<SearchFilter>(),
+  sort = "relevance",
+  namespace,
+  tab = "all",
+}: Partial<SearchOptions> = {}) => {
+  const ask: Ask = { keep: keeping(filters, namespace), sort, narrowed: filters.size > 0 || namespace !== undefined };
+  return { ask, tab };
+};
+
+// Every place, for the groups of the empty field to cut.
+function listing(index: SearchIndex, { keep, sort }: Ask): Found {
+  const places = all([...index.places, ...index.systems], keep);
+  return {
+    results: (sort === "relevance" ? places : places.sort(orderOf(sort))).map(({ result }) => result),
+    total: places.length,
+  };
+}
+
+// The places, rooms and people the words ask for, by their mark; whether a world's main room counts among the rooms.
+function partsOf(index: SearchIndex, { mode, text }: Parsed, ask: Ask) {
+  const anyone = { keep: () => true };
+  const people = ask.narrowed === true ? NONE : best(rank(index.people, text, anyone), ask.sort);
+  if (mode === "room") {
+    const note = ({ room }: Entry) => `${room ?? ""} · room`;
+    const rooms = best(rank(index.rooms, text, { ...ask, note }), ask.sort);
+    return { parts: { places: NONE, rooms, people: NONE }, mains: true };
+  }
+  if (mode === "namespace")
+    return { parts: { places: inNamespaces(index, text, ask), rooms: NONE, people }, mains: true };
+  const rooms = ask.narrowed === true ? NONE : best(rank(index.rooms, text, anyone), ask.sort);
+  return { parts: { places: inEverything(index, text, ask), rooms, people }, mains: false };
+}
+
+/** The best results of `query` over the `index`: a name matches places, systems and stations, then rooms and people; `#` rooms; `@` the
+ * systems, and a namespace named whole also lists its realms, then people; `/r/` the realms; `>` the commands. The chips and the
+ * namespace narrow places alone, so a narrowed search holds no room nor person. An empty name lists every place. */
 export function searchPlaces(index: SearchIndex, query: string, options?: Partial<SearchOptions>): Found {
-  const { filters = new Set<SearchFilter>(), sort = "relevance", namespace } = options ?? {};
   const { mode, text } = parseQuery(query);
   if (mode === "command") return best(rank(COMMAND_ENTRIES, text, { keep: () => true }), "relevance");
-  const ask: Ask = { keep: keeping(filters, namespace), sort };
-  if (mode === "room")
-    return best(rank(index.rooms, text, { ...ask, note: ({ room }) => `${room ?? ""} · room` }), sort);
-  if (mode === "namespace") return inNamespaces(index, text, ask);
+  const { ask, tab } = askOf(options);
   if (mode === "realm") return inRealms(index, text, ask);
-  if (text === "") {
-    const places = all([...index.places, ...index.systems], ask.keep);
-    return {
-      results: (sort === "relevance" ? places : places.sort(orderOf(sort))).map(({ result }) => result),
-      total: places.length,
-    };
-  }
-  return inEverything(index, text, ask);
+  if (text === "" && mode !== "room" && mode !== "namespace") return listing(index, ask);
+  const { parts, mains } = partsOf(index, { mode, text }, ask);
+  return tabbed(parts, tab, mains);
 }
 
 const ORDER: readonly { kind: SearchKind; label: string }[] = [

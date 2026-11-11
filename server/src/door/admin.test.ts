@@ -6,7 +6,7 @@ import { z } from "zod";
 import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
-import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_HOST } from "../login/login.ts";
+import { LOGIN_TABLES, makeLogin, makeSigned, NONCE_ACTION, NONCE_LINK, NONCE_HOST } from "../login/login.ts";
 import { wallet, type Wallet } from "../testing/signer.ts";
 import { adminRoutes } from "./admin.ts";
 import type { Jarvis } from "./jarvis.ts";
@@ -35,7 +35,7 @@ interface Options {
 }
 
 const setup = ({ budgets, setBudget, jarvis, nonceCap }: Options = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, QUOTA_TABLES]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK, QUOTA_TABLES]);
   opened.push(db);
   const clock = { now: T0 };
   const [lead, second, outsider] = [wallet(), wallet(), wallet()];

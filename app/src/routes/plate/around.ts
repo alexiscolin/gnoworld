@@ -112,7 +112,7 @@ function aroundRealm(known: Files, where: Where & { realm: string }): Around | u
     right: {
       word: "imported by",
       label: "Imported by",
-      none: "no importers yet",
+      none: "none yet",
       nodes: uniqueNodes(importing),
       total: importers?.total ?? inverted.length,
     },

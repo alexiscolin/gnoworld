@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Fetcher } from "./http.ts";
+import { realmOfRoom } from "../roomRealms.ts";
 import { roomsApi } from "./rooms.ts";
 
 const LIST = {
@@ -25,6 +26,16 @@ const server = (answer: { status: number; json?: unknown }) => {
 };
 
 describe("a world's rooms, from the server", () => {
+  it("remembers the realm a listed room names, for the links to its page", async () => {
+    const room = "#bubble/golf-0123456789";
+    const list = {
+      world: "bubble",
+      sections: [{ name: null, rooms: [{ room, type: "open", realm: "gno.land/r/bubble/golf" }] }],
+    };
+    await server(json(200, list)).api.rooms("bubble");
+    expect(realmOfRoom(room)).toBe("gno.land/r/bubble/golf");
+  });
+
   it("asks GET /api/rooms for the world, the cookie to this site alone, no redirect followed, no body", async () => {
     const { api, sent } = server(json(200, LIST));
     expect(await api.rooms("bubble")).toEqual({ ok: true, value: LIST });

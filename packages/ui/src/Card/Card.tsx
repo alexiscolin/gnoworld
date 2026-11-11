@@ -19,7 +19,7 @@ export interface CardProps {
   look?: "hub";
   /** No padding: its parts bring their own (the figures band). Hub only. */
   flush?: boolean;
-  /** Under the pointer it stays as it is: a card with nothing to open. Hub only. */
+  /** Under the pointer it stays as it is: a card with nothing to open, or one holding a card whose text must keep its contrast. Hub only. */
   fixed?: boolean;
   /** Open alone: the plate's other blocks are gone and the card fills the pane, its parts grown (the chart's height, a list's page). */
   open?: boolean;
@@ -106,7 +106,7 @@ function End({
   return (
     <div className={styles["end"]}>
       <Cluster space="2xs" wrap="no">
-        {hint === undefined ? null : <span className="meta truncate">{hint}</span>}
+        {hint === undefined ? null : <span className={["meta", "truncate", styles["hint"]].join(" ")}>{hint}</span>}
         {actions}
         {expand === undefined ? null : (
           <IconButton

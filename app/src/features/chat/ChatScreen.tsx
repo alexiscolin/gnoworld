@@ -1,12 +1,13 @@
 // The chat's screen on a world's page, whoever reads it (a visitor's or an account's): docked at the right of the page
 // (frames 20 to 35) or, expanded, full bleed over it (frames 56 to 77): the header over the column of worlds, the rooms, the
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
-import { ChatLayout } from "@gnoworld/ui";
+import { ChatLayout, Stack } from "@gnoworld/ui";
 import type { Line } from "@gnoworld/core";
-import { useEffect, useRef, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
+import { useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
 import { PlaceButtons } from "./PlaceButtons.tsx";
+import { PlaceBar } from "./PlaceView.tsx";
 import { usePeople } from "./usePeople.tsx";
 import { useColumns } from "./columns.ts";
 import { chunked } from "./Failing.tsx";
@@ -17,12 +18,12 @@ import { useSwapMove } from "./swapMove.ts";
 import { FullButton } from "./FullButton.tsx";
 import { warmPictures } from "./ColumnPlanet.tsx";
 import { Info } from "./Info.tsx";
+import { useSearching, type SearchInput } from "./Searching.tsx";
 import type { Pinned } from "./QuickActions.tsx";
 import type { UniverseView } from "../../places.ts";
 import { worldsFollowedIn } from "../follow/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { ChatWorld } from "./place.ts";
-import { useCompact } from "./useCompact.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
 import { Worlds } from "./Worlds.tsx";
@@ -30,8 +31,6 @@ import styles from "./ChatScreen.module.css";
 
 // The rooms of a narrow chat (a dock's, a phone's) sit behind a control and a drawer, whose code is asked once the box is
 // narrow: a wide one never carries it (the first screen's budget, ADR-0001 §12). A chunk that cannot be fetched leaves the
-// control's place with a word, never the page (F1763).
-const NARROW = 900;
 const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer.tsx")).RoomsDrawer }), {
   waiting: null,
   failed: <p role="status">The rooms could not load.</p>,
@@ -92,6 +91,8 @@ export interface ChatScreenProps {
   people: ReactNode;
   /** What the room's thread adds: its panel, which takes the info panel's place while one is open. */
   threads: Pick<ReturnType<typeof useThreads>, "view" | "aside" | "close">;
+  /** What the chat's search knows of the conversation in view (Searching.tsx). */
+  search: SearchInput;
   /** What is said under the screen, apart from the layout (a notice's status). */
   status?: ReactNode;
   /** The conversation, given what opens the people (`ask`): the info panel, or on a phone a dialog. */
@@ -115,6 +116,28 @@ const inPlaceView = (full: boolean, compact: boolean, thread: ReactNode): boolea
 // What closes the full chat: none where the page is the chat and would open it again.
 const closeFull = (dockable: boolean, place: ChatPlace) => (takesPage(dockable, place) ? null : <FullButton full />);
 
+interface Bar {
+  wide: boolean;
+  buttons: ReactNode;
+  close: ReactNode;
+}
+
+// What takes the info panel's place: a thread's panel, or the search's under the place's bar where the full chat is wide, so opening
+// it moves no button; none where neither is open.
+function asideOf({ thread, panel, bar }: { thread: ReactNode; panel: ReactNode; bar: Bar }) {
+  if (thread !== undefined || panel === undefined) return thread;
+  return (
+    <Stack space="xs">
+      {bar.wide ? (
+        <div className={styles["bar"]}>
+          <PlaceBar buttons={bar.buttons} close={bar.close} />
+        </div>
+      ) : null}
+      {panel}
+    </Stack>
+  );
+}
+
 // Closing goes where the place says, the universe's home by default.
 function closeChat(place: ChatPlace, navigate: ReturnType<typeof useNavigate>) {
   if (place.close === undefined) Promise.resolve(navigate(place.home)).catch(reportError);
@@ -129,9 +152,9 @@ function arrived({ currentTarget, target }: SyntheticEvent<HTMLElement>) {
   currentTarget.style.transition = "none";
 }
 
-export function ChatScreen(props: ChatScreenProps) {
-  const { place, title, chips, menu, mark, rail, unread, talking, present, here: room, people, threads } = props;
-  const { status, children } = props;
+// The screen's box: whether the chat docks, is full, and whether its layout has measured itself (true till it has, so no panel is drawn
+// before its width is known).
+function useBox(place: ChatPlace) {
   const dockable = useMedia(DOCKABLE);
   const [params] = useSearchParams();
   const full = takesPage(dockable, place) || asksFull(params);
@@ -142,15 +165,30 @@ export function ChatScreen(props: ChatScreenProps) {
   useEffect(() => {
     warmPictures(place.worlds);
   }, [place.worlds]);
-  const compact = useCompact(screenRef, NARROW, full);
+  const [compact, setCompact] = useState(true);
+  return { dockable, full, screenRef, compact, setCompact };
+}
+
+export function ChatScreen(props: ChatScreenProps) {
+  const { place, title, chips, menu, mark, rail, unread, talking, present, here: room, people, threads } = props;
+  const { status, children, search } = props;
+  const { dockable, full, screenRef, compact, setCompact } = useBox(place);
   const navigate = useNavigate();
   const follows = useApp((state) => state.device.follows);
   const followed = worldsFollowedIn(follows, place.universe.id);
   const columns = useColumns();
   const here = usePeople({ screenRef, people, compact, present, closeThread: threads.close });
+  const searching = useSearching(search, { world: place, full, compact, closeThread: threads.close });
   const thread = threadAside(threads);
   // The place's buttons stand in the planet's bar where the info panel shows, else in the header.
-  const buttons = <PlaceButtons world={place.slug} onWhoIsHere={here.ask} />;
+  const buttons = (
+    <>
+      {searching.button}
+      <PlaceButtons onWhoIsHere={here.ask} />
+    </>
+  );
+  const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
+  const aside = asideOf({ thread, panel: searching.panel, bar });
   return (
     <FullProvider value={full}>
       <div
@@ -181,7 +219,7 @@ export function ChatScreen(props: ChatScreenProps) {
           worlds={<Worlds worlds={place.worlds} current={place.slug} followed={followed} universe={place.universe} />}
           rooms={compact ? undefined : <div className={styles["rail"]}>{rail}</div>}
           info={
-            thread ??
+            aside ??
             (compact ? undefined : (
               <Info
                 place={place}
@@ -194,9 +232,12 @@ export function ChatScreen(props: ChatScreenProps) {
               />
             ))
           }
-          infoFirst={thread !== undefined}
+          infoFirst={aside !== undefined}
+          onCompact={setCompact}
+          moved={full}
         >
           <Docked>{chips}</Docked>
+          {searching.banner}
           {children}
         </ChatLayout>
       </div>

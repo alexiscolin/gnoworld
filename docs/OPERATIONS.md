@@ -5,7 +5,7 @@ Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login
 and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis`, off by default and under a profile of its own, comes with slice 10 (10j, 10j-4), and
 Grafana later (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
 and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
-later, Docker Desktop, or OrbStack.
+later, Docker Desktop, or OrbStack. Every setting, secret and switch is listed in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## The services
 
@@ -21,10 +21,13 @@ later, Docker Desktop, or OrbStack.
 | `egress_jarvis` (profile `jarvis`) | the same image as `egress` | 4751 in `guard`'s network, reached from `jarvis_out` alone | its 4751 answers | 0.1 core, 64 MB, 64 processes | none | none |
 | `jarvis_reader` (profile `jarvis`) | built from `deploy/jarvis-reader/Dockerfile`: gnomcp 0.11.0 (its release image, by digest), a bridge and a relay in Go (standard library alone) | 8083 on its address of `reader` (`READER_ADDRESS`), the network it shares with jarvis alone | its 8083 answers | 0.2 core, 160 MB, 48 processes | none, a 32 MB tmpfs | none |
 | `egress_reader` (profile `jarvis`) | the same image as `egress` | 4753 in `guard`'s network, reached from `reader_out` alone | its 4753 answers | 0.1 core, 48 MB, 32 processes | none | none |
+| `link_reader` (profile `links`) | built from `deploy/link-reader/Dockerfile`: its package and the two it imports, on distroless Node 24 | 8084 on its address of `links` (`LINK_READER_ADDRESS`), the network it shares with the server alone | `GET /health` on its address | 0.2 core, 256 MB, 48 processes | none | none |
+| `egress_links` (profile `links`) | the same image as `egress` | 4754 in `guard`'s network, reached from `links_out` alone | its 4754 answers | 0.1 core, 48 MB, 32 processes | none | none |
 
-All ten have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
+All twelve have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
 and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `egress` and `egress_jarvis` run as
-65532 (`egress_reader` too), the user the auth socket's volume belongs to, `jarvis` as 65533 and `jarvis_reader` as 65531, users of their own.
+65532 (`egress_reader` and `egress_links` too), the user the auth socket's volume belongs to, `jarvis` as 65533, `jarvis_reader` as 65531
+and `link_reader` as 65530, users of their own.
 
 - `web` sits on `inside`, an internal network with no way out and no gateway, so it reaches no
   address of the host either.
@@ -42,7 +45,7 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
   file the test reads too; the RPC's host is `app/data/universes.json`'s default, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
-  holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (`JARVIS_NAMES_RPC`, D120).
+  holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (D120).
 - `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
   serves its budgets and answers `off`, reads no key and reaches no gnomcp. It, `jarvis_reader` and the two ways out sit in the profile
   `jarvis`, out of the demo's (10j-4): started only with Jarvis switched on, `--profile demo --profile jarvis`. Ops, who
@@ -72,6 +75,15 @@ and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `e
   `app/data/universes.json` and fails when one of them differs. The reader's caps (0.2 core, 160 MB, 48 processes; its
   way out 0.1 core, 48 MB, 32 processes) are a ceiling chosen for two gnomcp, not measured on a running stack:
   `deploy/test.sh --demo` checks the four containers of Jarvis together under 656 MiB and 0.7 core.
+- `link_reader` (slice 13, D13919) fetches a public page's head and picture for a chat line's card, so it holds nothing worth taking:
+  no secret, no volume, a read-only root, a user of its own, and two networks, `links` (shared with the server alone, which asks it
+  `POST /card`) and `links_out` (its way out). It has no DNS: it goes out through `egress_links`, a smokescreen on 4754 in `guard`'s network
+  that takes 4754 from `links_out` alone, lets any public https host out (`deploy/egress/links-acl.yaml`, `action: open`) and refuses
+  every private answer; `guard`'s rules refuse every private range on each packet too, and the reader refuses a non-global address itself
+  (`link-reader/src/address.ts`). The server stays off the reader's network but for its API, which listens on its address of `inside`
+  alone. The reader serves 2 pages at once (`LINKS_MAX`), decodes one picture at a time, and its 256 MB is measured (210 MiB at the
+  2,000,000-pixel cap, `link-reader/src/memory.test.ts`). It is in a profile of its own, out of the demo's cap, as Jarvis: its 0.3 core
+  and 304 MB (reader and way out) come on top. "Switching the link cards on", below.
 - The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
   jarvis's network reaches no port of the server's (10j's review, V12); web and the tests ask it as `server:8080`.
   The guard finds `jarvis_out` by its own address there (`GUARD_JARVIS_ADDRESS`, in `JARVIS_OUT_SUBNET`) and waits for
@@ -130,12 +142,14 @@ tailnet; keep it so.
 |---|---|
 | Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
 | The same with Jarvis switched on (`JARVIS=on`) | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis up -d --build` |
+| The same with the link cards switched on (`LINK_CARDS=1`, "Switching the link cards on") | `docker compose -f deploy/compose.yaml --profile demo --profile links up -d --build` |
 | Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh`, from the commit you reviewed (below) |
 | Test that each check catches its fault | `sh deploy/test.sh --mutants`, from the commit you reviewed (below) |
 | Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
-| Its logs, jarvis's with them if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis logs -f` |
+| Its logs, jarvis's with them if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis --profile links logs -f` |
 | Stop, jarvis with it if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down` |
-| Remove it all | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down -v`, then delete the machine in the admin console |
+| Stop, with the link reader too when the cards are on | `docker compose -f deploy/compose.yaml --profile links --profile demo --profile jarvis down` |
+| Remove it all | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down -v`, then delete the machine in the admin console (with the cards on: `--profile links` first, as above) |
 
 Run `sh deploy/test.sh` after every change to `deploy/`, and when the app changes what it serves
 (a new kind of file, many more files on a first load); `--mutants` in `/pre-merge` of a branch
@@ -233,8 +247,7 @@ Slice 3, the login (3c; `docs/decisions.md`, 2026-10-22):
   every new login is refused until theirs expire, 5 minutes after each. Logins already made
   keep working.
 - **New accounts are free.** An address costs nothing, so a banned person comes back with a
-  new one; the limit of new accounts per visitor (`NEW_ACCOUNTS_PER_HOUR`) only slows a farm
-  (decision 144).
+  new one; the limit of new accounts per visitor only slows a farm (decision 144).
 - **Ten tokens an account.** An account keeps its 10 newest logins; an eleventh logs the oldest
   device out. Accounts are free, so the tokens are bounded by the accounts, ten each, not by a
   fixed number (F435).
@@ -250,8 +263,7 @@ Slice 9h, the first signals (`docs/decisions.md`, D210 to D218):
 
 - **First to chart.** The first logged-in account to open a world is recorded once, in `first_signals`
   (its own migration), with the first line of a public room that passed moderation (first words).
-  `FIRST_TO_CHART_WORLDS` names the worlds that can be charted, slugs separated by commas: unset,
-  every listed world can (D210); the journeys' server names `govdao` alone (D218). An account's
+  Every listed world can be charted (D210; the journeys' server names `govdao` alone, D218). An account's
   chart calls are 20 an hour, a refused one counted (D211).
 - **A restart** tells the stream every first the database holds, so a page opened after it still
   names who charted; a banner's day is counted from the record's own time (D213).
@@ -293,9 +305,9 @@ Slice 3, the check (3i):
 
 - **Its settings.** `OPENAI_API_KEY_FILE` holds OpenAI's key (one word, 32 characters at least);
   unset, nothing leaves the server, every message is unchecked and the alert says so at the start.
-  `MODERATION_THRESHOLDS` (JSON, a score above 0 and at most 1 by category; 0 would hide every line of its
-  category, so the server refuses it, F525) replaces OpenAI's own flag where set;
-  `NEW_ACCOUNT_HOURS` (24) is how long an account counts as new.
+  The thresholds that replace OpenAI's own flag and the hours an account counts as new are the server's defaults: compose does not
+  forward `MODERATION_THRESHOLDS` or `NEW_ACCOUNT_HOURS`, so `deploy/.env` cannot set them
+  ([CONFIGURATION.md](CONFIGURATION.md), section 3).
 - **What reaches OpenAI.** A message's text alone, with the model's name: no account, no room.
   The privacy policy must say so before a public launch (decision 154).
 - **Bare links pass the link rule.** A link counts with its scheme or `www.`; `bit.ly/x` does not.
@@ -340,9 +352,9 @@ Slice 3, the bot acts and the stream (3j):
 
 Slice 3, the mute and the edits (3k):
 
-- **Its settings.** `MUTE_STRIKES` (3) hides in `MUTE_WINDOW_MINUTES` (10) mute an account in that
-  world's rooms for `MUTE_MINUTES` (5); `MUTE_MAX` (50) mutes at once a world, the one ending first
-  lifted early to make room (Ergo's list holds 100: 3b). The roles file's team and trusted are never
+- **Its settings.** 3 hides in 10 minutes mute an account in that world's rooms for 5 minutes; 50 mutes at once
+  a world, the one ending first lifted early to make room (Ergo's list holds 100: 3b). These are the server's defaults
+  (`MUTE_*`), which compose does not forward ([CONFIGURATION.md](CONFIGURATION.md), section 3). The roles file's team and trusted are never
   muted, their lines still hidden.
 - **A line too fast** is the 21st of an account in a minute of Ergo's time: hidden, and a strike.
 - **A message of several lines the bot cannot hold whole** (a part holding a CTCP's mark, or from another
@@ -410,6 +422,10 @@ Slice 3, the server's retention (3n):
 - **The pins** end with Ergo's history: the same job removes each pin whose line is more than 90 days old
   (Ergo's `expire-time`), a link that stays up included, since the re-read of a pin runs only when the bot
   joins a room.
+- **The search index** (slice 13; `lines`, `line_edits` and a full-text table in the server's database): the lines moderation let through,
+  2,048 a room, 400,000 in all and 90 days (Ergo's `expire-time`), the oldest going first at the same retention tick; a line leaves with its
+  REDACT. SQLite's `secure_delete` is on for the connection, so a removed line's text is zeroed in its pages. No rebuild of it from Ergo's
+  history is written (read for: none found in `server/src/search/`).
 - **The alerts** `verdicts_near_cap` and `database_near_cap` fire once when the verdicts reach 80% of
   their cap, or the database's used pages 80% of 256 MB, and again only after a fall below. The
   database's file does not shrink: freed pages are reused, and its `-wal` file is not counted. A table
@@ -468,7 +484,7 @@ Slice 3, the server's retention (3n):
   the end of the last pass, the server reads the home page (`vm/qrender` of `<path>:`) of every realm the default universe's hubs list in
   `app/data/hubs.json`, 32 at most, through the default universe's RPC (already on the way out: no host is added for it), one call at a
   time a quarter-second apart, each within 10 s and 64 KiB. It keeps a page's first 4,096 bytes, cut at a line's end, has OpenAI's
-  moderation read exactly that text with `MODERATION_THRESHOLDS`, and writes the captures that passed by renaming a temporary file, 1 MiB
+  moderation read exactly that text with its thresholds, and writes the captures that passed by renaming a temporary file, 1 MiB
   at most; each pass that wrote logs `{"event":"previews_written","ms":<its length>}`. A page the check hides, that the chain says is
   gone, that is too large, empty or no text has no capture; a page whose read failed on the way, whose read the chain refused, or that the
   check could not read keeps its last checked capture, with its own time; each logs `{"event":"previews_skipped","error":"<kind>"}`, the
@@ -497,7 +513,8 @@ Slice 3, the server's retention (3n):
   `moderation_off` (no key: every message unchecked), `moderation_refused` (OpenAI refused the key or the
   call), `moderation_shape` (an answer of an unknown shape), `moderation_breaker` (checks paused 30 s
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
-  message left unchecked, the queue full); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
+  message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),
+  `card_backlog` and `card_queue_full` (the link cards' queue, as the two above); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
   and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history, or its
   messages' (7t3), beside the database: rising and Trending by the rooms stay dark until the folder takes it);
   `trends_write` (the worlds job could not write the chain's habits, trends-transactions.json and
@@ -562,8 +579,9 @@ Slice 4, pins and what an account keeps (4d):
 - **The door's key** (10u-g2). The server sends it to jarvis in one header (`x-jarvis-key`) and jarvis answers 401 to
   every request without it, on every route, before it reads a body. Both read `jarvis_door_key`; the network's wall stays.
 - **A model call past a minute of silence** (10j). `egress_jarvis` shares `config.yaml`'s `idle_timeout: 60s` with the
-  server's way out: a request to Anthropic quiet for longer than a minute is cut, whatever `JARVIS_CALL_TIMEOUT_S`
-  says (60 s by default, up to 600 s). Raise both together, or neither.
+  server's way out: a request to Anthropic quiet for longer than a minute is cut, whatever jarvis's own
+  `JARVIS_CALL_TIMEOUT_S` says (60 s by default, up to 600 s; compose does not forward it, so it is the code's 60 s unless
+  `compose.yaml` lists it). Raise both together, or neither.
 
 ## Switching Jarvis on
 
@@ -589,6 +607,44 @@ The door's key changes by writing a new file and recreating the two that read it
 jarvis up -d --force-recreate server jarvis`. Between the two restarts the door's requests may meet a 401 (not checked: how the door answers one is the code's, 10u-g2's G2-code);
 `web` restarts with the server (F622). Nothing else holds it. A key that leaked is changed the same way at
 once: it opens jarvis's routes to anyone who can also reach jarvis's network, which is the server's alone.
+
+### Forget Jarvis's kept explanations (D13920)
+
+A function's explanation is kept 7 days in the server's database, in the table `jarvis_kept`; its key holds the explain prompt's
+version, so a new prompt never serves an old row. To drop rows by hand (a wrong answer, a realm whose source changed on a chain that
+was reset), stop nothing and run, on the host, against the `server` volume's file (its folder is `docker volume inspect -f
+'{{.Mountpoint}}' <project>_server`; `<project>` is the compose project's name, `deploy` by default):
+
+```sh
+DB="$(docker volume inspect -f '{{.Mountpoint}}' deploy_server)/gnoworld.db"
+sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%';"                          # every explanation
+sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%,\"gnoland-1\",%';"        # one chain
+sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%,\"gno.land/r/gov/dao\",%';" # one realm
+```
+
+The kept rows are capped at 5,000 and 16 MiB, the oldest going first at the retention's tick. The next ask of that function calls the model again and keeps its answer. A room's kept "What can I do here?" rows
+(`key LIKE '[\"here\",%'`) last an hour and go by themselves.
+
+## Switching the link cards on
+
+The link cards (a card under a chat line that links a public page, slice 13, D13919) are off until three steps are done, in this order:
+
+1. **`sh deploy/test.sh`, first**, from the commit you reviewed (the box in "Run, test, stop"). It starts the reader and its way out under the
+   `links` profile and proves their isolation and the way out's refusals (`deploy/test-links.sh`, sourced by `test.sh`; it needs the network for
+   its controls, `example.com`); add `--mutants` when `deploy/` changed. Docker is needed, so the build sandbox cannot run it.
+2. **`LINK_CARDS=1`** in `deploy/.env` (`deploy/.env.example` names it, commented). It is the kill switch: `0` or unset, the server asks the reader
+   nothing and no card shows. The server stops at start with it on and no `LINK_READER_URL` (compose always sets it).
+3. **`--profile links`** beside `--profile demo`: `docker compose -f deploy/compose.yaml --profile demo --profile links up -d --build`. The
+   reader and its way out are in that profile alone, so without it the cards are on and the reader is not there: a page the server cannot
+   reach the reader for is believed down for an hour, and no card shows for it.
+
+To switch them off, set `LINK_CARDS=0` and recreate `server`; the profile can stay up. A card is held for a day (a refusal too), at most
+30 days, and the pages (2,000) and their picture bytes (32 MiB) are capped, oldest first, by the retention (`cards/expire.ts`); a REDACT, an edit or the author's or a
+moderator's removal takes a line's card away at once. The alerts `card_shape`, `card_backlog` and `card_queue_full` (above) are the ones to watch.
+
+Linked accounts, which the owners' moderation uses, need no switch: they live in the server's database (`identities` and `links`, up to ten
+addresses an identity). A person unlinks an address with their own session, or releases a command-line key with a file that key signs
+(`/api/links`, `login/release.ts`): ops write no row by hand, since the last link of an identity takes its identity with it.
 
 ## Secrets: rotation and revocation
 

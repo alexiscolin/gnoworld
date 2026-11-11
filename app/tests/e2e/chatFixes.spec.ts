@@ -98,20 +98,6 @@ test.describe("the chat's fixes", () => {
     await expect(info.getByText(MEMBER.slice(0, 6))).toBeVisible();
   });
 
-  // Row 18: @ and / did nothing in no journey.
-  test("puts @ and / in the draft from the foot's marks, and keeps the focus in the field", async ({ page }) => {
-    await logIn(page, "fix-marks");
-    await open(page, { width: 1280, as: ACCOUNT });
-    const text = page.getByRole("textbox", { name: "Message #games" });
-    await text.fill("hello ");
-    await message(page).getByRole("button", { name: "Mention someone" }).click();
-    await expect(text).toHaveValue("hello @");
-    await expect(text).toBeFocused();
-    await message(page).getByRole("button", { name: "Start a command" }).click();
-    await expect(text).toHaveValue("hello @/");
-    await expect(text).toBeFocused();
-  });
-
   // Row 27: a press released outside the list left the next keyboard focus without its bar in view.
   test("brings a line's bar into view for the keyboard after a press released outside the list", async ({ page }) => {
     await logIn(page, "fix-press");

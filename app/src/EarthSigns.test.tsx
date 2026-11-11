@@ -50,7 +50,6 @@ function parts(over: Partial<SignsDeps> = {}) {
   const ground = {
     setMarks: vi.fn<SignsDeps["ground"]["setMarks"]>(),
     facing: vi.fn(() => ({ lat: 36, lon: 138 })),
-    face: vi.fn(),
   };
   const open = vi.fn();
   const deps = { store, ground, rules, places: PLACES, ...over };

@@ -1,7 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, scriptsAsked, test, type Page } from "./fixtures.ts";
 import { logOutHere } from "./account.ts";
-import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
+import { inGames, lineOf, whoIsHere, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 import type { WebSocketRoute } from "@playwright/test";
@@ -11,15 +11,38 @@ import type { WebSocketRoute } from "@playwright/test";
 
 const field = (page: Page) => page.getByRole("textbox", { name: "Message #games" });
 const send = (page: Page) => page.getByRole("button", { name: "Send" });
-// A key pressed just after the box took its text or focus is sometimes lost (the caret stays: logged, a few in 200
-// runs at 16 workers), so Home or End is pressed until the caret is where it takes it.
-const caretAt = (page: Page, key: "Home" | "End", at: number) =>
-  expect
-    .poll(async () => {
-      await field(page).press(key);
-      return field(page).evaluate((box: HTMLTextAreaElement) => box.selectionStart);
-    })
-    .toBe(at);
+// The field is Lexical's, a contenteditable: its words are its text, a mark typed is drawn as its form (no `**` left to read), and a
+// selection is the page's. Fill puts words in as one insertion, so a line with marks to turn into their form is typed (`typed`).
+const typed = async (page: Page, words: string) => {
+  await field(page).click();
+  await field(page).pressSequentially(words);
+};
+// The characters from `from` to `to` of the field's text, selected as a hand would, across its nodes.
+const select = (page: Page, from: number, to: number) =>
+  field(page).evaluate(
+    (box, [start = 0, end = 0]: number[]) => {
+      // The text node holding a character offset, and the offset in it: the first whose span takes it in.
+      const at = (offset: number): [Node, number] | undefined => {
+        const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+        let seen = 0;
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          const size = node.textContent?.length ?? 0;
+          if (offset >= seen && offset <= seen + size) return [node, offset - seen];
+          seen += size;
+        }
+        return undefined;
+      };
+      const range = document.createRange();
+      const first = at(start);
+      const last = at(end);
+      if (first !== undefined) range.setStart(...first);
+      if (last !== undefined) range.setEnd(...last);
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+    },
+    [from, to],
+  );
 // The drafts the page's device holds, by key, sorted.
 const draftKeys = (page: Page) =>
   page.evaluate(() =>
@@ -28,12 +51,8 @@ const draftKeys = (page: Page) =>
       .sort(),
   );
 
-// The account menu is the page's header's, which the full chat covers: the chat is docked, then expanded again.
-async function logOut(page: Page) {
-  await page.getByRole("button", { name: "Shrink the chat" }).click();
-  await logOutHere(page);
-  await page.getByRole("button", { name: "Expand the chat" }).click();
-}
+// The account menu stands in the full chat's header, over the info column (ChatHeader.tsx).
+const logOut = logOutHere;
 
 test.describe("the composer", () => {
   test("sends a line with Enter, shown once Ergo echoes it, its Markdown as marks and its link https", async ({
@@ -41,7 +60,7 @@ test.describe("the composer", () => {
   }) => {
     const address = await inGames(page);
     const text = word("hello");
-    await field(page).fill(`${text} **bold** [docs](https://gno.land/docs)`);
+    await typed(page, `${text} **bold** [docs](https://gno.land/docs)`);
     await field(page).press("Enter");
     await expect(lineOf(page, text)).toHaveCount(1);
     await expect(lineOf(page, text).getByTitle(address)).toBeVisible();
@@ -49,7 +68,7 @@ test.describe("the composer", () => {
     const docs = lineOf(page, text).getByRole("link", { name: "docs" });
     await expect(docs).toHaveAttribute("href", "https://gno.land/docs");
     await expect(docs).toHaveAttribute("rel", "noopener noreferrer");
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
   });
 
   // F2092: the server hides the 21st message of a minute and strikes the account; the page holds it back and says why.
@@ -59,12 +78,12 @@ test.describe("the composer", () => {
     for (let each = 0; each < 20; each += 1) {
       await field(page).fill(`${text} ${String(each)}`);
       await field(page).press("Enter");
-      await expect(field(page)).toHaveValue("");
+      await expect(field(page)).toHaveText("");
     }
     await field(page).fill(`${text} 20`);
     await field(page).press("Enter");
     await expect(page.getByText(/Too fast: 20 messages a minute at most\. Try again in \d+ s\./).first()).toBeVisible();
-    await expect(field(page)).toHaveValue(`${text} 20`);
+    await expect(field(page)).toHaveText(`${text} 20`);
     await expect(lineOf(page, `${text} 20`)).toHaveCount(0);
   });
 
@@ -82,25 +101,39 @@ test.describe("the composer", () => {
     await expect(lineOf(page, slash)).not.toContainText(`//${slash}`);
   });
 
-  test("applies each format of the bar to the selection, as its name says", async ({ page }) => {
+  test("applies each format of the bar to the selection in place, as its name says", async ({ page }) => {
     await inGames(page);
-    for (const [name, result] of [
-      ["Bold", "make this **word**"],
-      ["Italic", "make this *word*"],
-      ["Strikethrough", "make this ~~word~~"],
-      ["Code", "make this `word`"],
-      ["Link", "make this [word](https://)"],
-      ["Quote", "> make this word"],
-      ["Bulleted list", "- make this word"],
-      ["Numbered list", "1. make this word"],
+    for (const [name, drawn] of [
+      ["Bold", "strong"],
+      ["Italic", "em"],
+      ["Strikethrough", "[class*=strike]"],
+      ["Code", "code"],
+      ["Quote", "blockquote"],
+      ["Bulleted list", "ul li"],
+      ["Numbered list", "ol li"],
     ] as const) {
       await field(page).fill("make this word");
-      await field(page).evaluate((box: HTMLInputElement) => {
-        box.setSelectionRange(10, 14);
-      });
+      await select(page, 10, 14);
       await page.getByRole("group", { name: "Format" }).getByRole("button", { name, exact: true }).click();
-      await expect(field(page)).toHaveValue(result);
+      // The mark is drawn as what it means and its characters are not in the field.
+      await expect(field(page).locator(drawn)).toBeVisible();
+      await expect(field(page)).toHaveText(/^make this word$/);
     }
+  });
+
+  test("makes the selection a link from the bar's popover, an https address alone", async ({ page }) => {
+    await inGames(page);
+    await field(page).fill("make this word");
+    await select(page, 10, 14);
+    await page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Link" }).click();
+    const address = page.getByRole("dialog", { name: "Link" }).getByLabel("Address");
+    await address.fill("javascript:alert(1)");
+    await address.press("Enter");
+    await expect(page.getByText("An address that starts with https://", { exact: true })).toBeVisible();
+    await address.fill("https://gno.land/docs");
+    await address.press("Enter");
+    await expect(field(page).getByRole("link", { name: "word" })).toHaveAttribute("href", "https://gno.land/docs");
+    await expect(field(page)).toBeFocused();
   });
 
   // 8k (frame 73's U): the bar's underline goes to Ergo as `++word++`, comes back to the room and is drawn as <u>, its line
@@ -108,25 +141,29 @@ test.describe("the composer", () => {
   test("underlines a word with the bar's U, sent through Ergo and drawn apart from a link", async ({ page }) => {
     await inGames(page);
     const tag = word("under");
-    await field(page).fill(`${tag} make this word, see [docs](https://gno.land/docs)`);
-    const from = `${tag} make this `.length;
-    await field(page).evaluate((box: HTMLTextAreaElement, at: number) => {
-      box.setSelectionRange(at, at + 4);
-    }, from);
-    await page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Underline", exact: true }).click();
-    await expect(field(page)).toHaveValue(`${tag} make this ++word++, see [docs](https://gno.land/docs)`);
-    // A key just after the box took its text is sometimes lost (caretAt above): the link is added by fill.
-    await field(page).fill(`${await field(page).inputValue()} ++[gno](https://gno.land)++`);
+    const bar = page.getByRole("group", { name: "Format" });
+    const before = `${tag} make this `;
+    await field(page).fill(`${before}word, see gno`);
+    await select(page, before.length, before.length + 4);
+    await bar.getByRole("button", { name: "Underline", exact: true }).click();
+    await expect(field(page).locator("[class*=underline]")).toHaveText("word");
+    // An underlined link is still the link it is: the underline in the anchor, its address whole.
+    const gno = `${before}word, see gno`.length;
+    await select(page, gno - 3, gno);
+    await bar.getByRole("button", { name: "Underline", exact: true }).click();
+    await bar.getByRole("button", { name: "Link" }).click();
+    const address = page.getByRole("dialog", { name: "Link" }).getByLabel("Address");
+    await address.fill("https://gno.land");
+    await address.press("Enter");
+    await field(page).press("End");
+    await field(page).pressSequentially(" [docs](https://gno.land/docs)");
     await field(page).press("Enter");
     const line = lineOf(page, tag);
     await expect(line).toHaveCount(1);
     await expect(line.locator("u").first()).toHaveText("word");
     await expect(line.locator("u").first().getByRole("link")).toHaveCount(0);
-    // An underlined link is still the link it is: the anchor inside the underline, its address whole.
-    await expect(line.locator("u").nth(1).getByRole("link", { name: "gno" })).toHaveAttribute(
-      "href",
-      "https://gno.land",
-    );
+    await expect(line.getByRole("link", { name: "gno" })).toHaveAttribute("href", "https://gno.land");
+    await expect(line.getByRole("link", { name: "gno" }).locator("u")).toHaveText("gno");
     await expect(line.getByRole("link", { name: "docs" })).toHaveAttribute("href", "https://gno.land/docs");
     const look = (selector: string) =>
       line.locator(selector).evaluate((element) => {
@@ -146,16 +183,16 @@ test.describe("the composer", () => {
     expect(underlined.offset).not.toBe(linked.offset);
   });
 
-  test("wraps the selection in a mark from the format bar, the selection kept", async ({ page }) => {
+  test("formats the selection from the format bar, the selection kept: what is typed over it is as bold", async ({
+    page,
+  }) => {
     await inGames(page);
     await field(page).fill("make this bold");
-    await field(page).evaluate((box: HTMLInputElement) => {
-      box.setSelectionRange(10, 14);
-    });
+    await select(page, 10, 14);
     await page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Bold" }).click();
-    await expect(field(page)).toHaveValue("make this **bold**");
+    await expect(field(page).locator("strong")).toHaveText("bold");
     await page.keyboard.type("strong");
-    await expect(field(page)).toHaveValue("make this **strong**");
+    await expect(field(page).locator("strong")).toHaveText("strong");
   });
 
   test("sends a line of the whole budget, shown once Ergo relays it", async ({ page }) => {
@@ -166,52 +203,35 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveAccessibleDescription("0 bytes left.");
     await field(page).press("Enter");
     await expect(lineOf(page, tag)).toHaveCount(1);
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
   });
 
   // A person's completion is the unit tests': who is in #games besides the test's account changes from run to run.
-  test("completes a command and a room with Tab, from the field alone and at the draft's end", async ({ page }) => {
+  test("suggests a command and a room as they are typed, and Tab or Enter takes the picked one", async ({ page }) => {
     await inGames(page);
     await field(page).fill("/");
-    // /poll is the second command (8d): Tab takes the first.
-    await expect(field(page)).toHaveAccessibleDescription("Tab completes /me; also /poll.");
+    const list = page.getByRole("listbox", { name: "Suggestions" });
+    await expect(list.getByRole("option")).toHaveText([/\/me/, /\/poll/]);
     await field(page).press("Tab");
-    await expect(field(page)).toHaveValue("/me ");
+    await expect(field(page)).toHaveText("/me");
     await expect(field(page)).toBeFocused();
-    expect(await field(page).evaluate((box: HTMLInputElement) => [box.selectionStart, box.selectionEnd])).toEqual([
-      4, 4,
-    ]);
+    await expect(list).toHaveCount(0);
     // Nothing to complete: Tab moves on (past Send, off for an empty action).
     await field(page).press("Tab");
     await expect(field(page)).not.toBeFocused();
-    await expect(field(page)).toHaveValue("/me ");
     await field(page).fill("see #ne");
-    await expect(field(page)).toHaveAccessibleDescription("Tab completes #news.");
-    // The caret elsewhere than the end: Tab moves on, the draft as it was; and Tab on Send completes nothing.
-    await caretAt(page, "Home", 0);
-    // Past the field come the box's marks (@ and /), then Send (5q: the video's box foot).
-    await field(page).press("Tab");
-    await expect(page.getByRole("button", { name: "Mention someone" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: "Start a command" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(send(page)).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(field(page)).toHaveValue("see #ne");
-    // Shift+Tab leaves for the format bar; Tab from its last button comes back to the field, completing nothing.
-    await field(page).press("End");
+    await expect(list.getByRole("option")).toHaveText(["#news"]);
+    await field(page).press("Escape");
+    await expect(list).toHaveCount(0);
+    await field(page).press("Backspace");
+    await field(page).pressSequentially("e");
+    await field(page).press("Enter");
+    await expect(field(page)).toHaveText("see #news");
+    // Shift+Tab leaves for the format bar; Tab from its last button comes back to the field.
     await field(page).press("Shift+Tab");
     await expect(
       page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Numbered list" }),
     ).toBeFocused();
-    await page.keyboard.press("Tab");
-    await expect(field(page)).toBeFocused();
-    await expect(field(page)).toHaveValue("see #ne");
-    // Come back by Tab: the caret at the end again, Tab completes.
-    await caretAt(page, "End", "see #ne".length);
-    await field(page).press("Tab");
-    await expect(field(page)).toHaveValue("see #news ");
-    await expect(field(page)).not.toHaveAccessibleDescription(/Tab completes/);
   });
 
   // A key pressed before the page has drawn the room the last one went to starts from that room, not the one drawn.
@@ -251,10 +271,6 @@ test.describe("the composer", () => {
     await expect(heading("#bubble")).toBeVisible();
     await page.keyboard.press("Alt+ArrowUp");
     await expect(heading("#games")).toBeVisible();
-    await page.getByRole("button", { name: "Close the chat" }).click();
-    await expect(page).toHaveURL(/\/$/);
-    await page.keyboard.press("Alt+ArrowDown");
-    await expect(page).toHaveURL(/\/$/);
   });
 
   // 4d: drafts kept on the device (ADR-0002's "Saved messages and drafts: Device"; F787).
@@ -265,30 +281,28 @@ test.describe("the composer", () => {
     const games = word("games");
     const bubble = word("bubble");
     await field(page).fill(`${games} bold`);
-    await field(page).evaluate((box: HTMLInputElement) => {
-      box.setSelectionRange(box.value.length - 4, box.value.length);
-    });
+    await select(page, `${games} `.length, `${games} bold`.length);
     await page.getByRole("group", { name: "Format" }).getByRole("button", { name: "Bold" }).click();
     await page.keyboard.press("Alt+ArrowDown");
     const bubbleField = page.getByRole("textbox", { name: "Message #bubble" });
-    await expect(bubbleField).toHaveValue("");
+    await expect(bubbleField).toHaveText("");
     await bubbleField.fill("/m");
     await bubbleField.press("Tab");
     // What Tab completed is kept as it is, before any more is typed.
     await page.keyboard.press("Alt+ArrowUp");
-    await expect(field(page)).toHaveValue(`${games} **bold**`);
+    await expect(field(page)).toHaveText(`${games} bold`);
     await page.keyboard.press("Alt+ArrowDown");
-    await expect(bubbleField).toHaveValue("/me ");
+    await expect(bubbleField).toHaveText("/me ");
     await bubbleField.press("End");
     await bubbleField.pressSequentially(bubble);
-    await expect(bubbleField).toHaveValue(`/me ${bubble}`);
-    await roomsNav(page).getByRole("link", { name: "#games" }).click();
-    await expect(field(page)).toHaveValue(`${games} **bold**`);
+    await expect(bubbleField).toHaveText(`/me ${bubble}`);
+    await page.keyboard.press("Alt+ArrowUp");
+    await expect(field(page)).toHaveText(`${games} bold`);
     await page.reload();
     await hydrated(page);
-    await expect(field(page)).toHaveValue(`${games} **bold**`);
-    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
-    await expect(bubbleField).toHaveValue(`/me ${bubble}`);
+    await expect(field(page)).toHaveText(`${games} bold`);
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(bubbleField).toHaveText(`/me ${bubble}`);
     await page.keyboard.press("Alt+ArrowUp");
     // Ergo having said the account is here, as inGames waits: a line sent before it goes nowhere, which the page's
     // few more requests (4d's pins) and a loaded machine made likely.
@@ -298,9 +312,9 @@ test.describe("the composer", () => {
     await expect.poll(() => draftKeys(page)).toEqual([`gnoworld:draft:${address}:#bubble`]);
     await page.reload();
     await hydrated(page);
-    await expect(field(page)).toHaveValue("");
-    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
-    await expect(bubbleField).toHaveValue(`/me ${bubble}`);
+    await expect(field(page)).toHaveText("");
+    await page.keyboard.press("Alt+ArrowDown");
+    await expect(bubbleField).toHaveText(`/me ${bubble}`);
   });
 
   // A shared device: each account finds its own drafts, the next account none of them, a guest nothing.
@@ -312,19 +326,20 @@ test.describe("the composer", () => {
     const draft = word("draft");
     await field(page).fill(draft);
     await logOut(page);
-    await expect(page.getByText("Log in to write in this room.")).toBeVisible();
-    await expect(page.getByRole("textbox", { name: /^Message/ })).toHaveCount(0);
+    // A guest writes one plain line (D430), in a textarea: the account's field is gone, and its draft with it.
+    await expect(page.locator("textarea")).toHaveValue("");
+    await expect(page.getByRole("textbox").and(page.locator("[contenteditable]"))).toHaveCount(0);
     expect(await draftKeys(page)).toEqual(kept);
     await logIn(page, word("bob"));
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     expect(await draftKeys(page)).toEqual(kept);
     await logOut(page);
     await logIn(page, alice);
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
-    await expect(field(page)).toHaveValue(draft);
+    await expect(field(page)).toHaveText(draft);
   });
 
   test("says why a line cannot go, and sends nothing", async ({ page }) => {
@@ -376,26 +391,24 @@ test.describe("the composer", () => {
     expect(first).toBeLessThan(last);
   });
 
-  test("tells a guest to log in to write, with no field, its page never asking the composer's code", async ({
+  test("gives a guest a plain line to write, with no format bar, its page never asking the composer's code", async ({
     page,
   }) => {
     const scripts = scriptsAsked(page);
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
-    await expect(page.getByText("Log in to write in this room.")).toBeVisible();
-    await expect(page.getByRole("textbox", { name: /^Message/ })).toHaveCount(0);
+    await expect(page.getByRole("textbox", { name: "Message #games" })).toBeVisible();
+    await expect(page.getByRole("group", { name: "Format" })).toHaveCount(0);
     expect(scripts.filter((url) => /\/ChatPanel-[\w-]+\.js$/.test(url))).toHaveLength(1);
     expect(scripts.filter((url) => /\/Composer-[\w-]+\.js$/.test(url))).toEqual([]);
   });
 
-  test("has no accessibility violation with the composer, its preview holding a link, and its hint", async ({
-    page,
-  }) => {
+  test("has no accessibility violation with the composer, its field holding a link, and its hint", async ({ page }) => {
     await inGames(page);
-    await field(page).fill("**see** [docs](https://gno.land/docs)");
-    await expect(page.getByRole("form", { name: "Write in #games" }).getByText("docs", { exact: true })).toBeVisible();
+    await typed(page, "**see** [docs](https://gno.land/docs)");
+    await expect(field(page).getByRole("link", { name: "docs" })).toBeVisible();
     expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
-    await field(page).fill(`**${"a".repeat(376)}**`);
+    await field(page).fill("a".repeat(376));
     await expect(field(page)).toHaveAccessibleDescription(/bytes left/);
     expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
   });
@@ -417,14 +430,14 @@ test.describe("the composer", () => {
     await expect(field(page)).toHaveAccessibleDescription(
       "Not sent: the chat is not ready yet. Try again in a moment.",
     );
-    await expect(field(page)).toHaveValue("are you there?");
+    await expect(field(page)).toHaveText("are you there?");
     await field(page).press("End");
     await field(page).press("!");
     await expect(field(page)).not.toHaveAccessibleDescription(/Not sent/);
     // A line not sent stays the room's draft, on the device.
     await page.reload();
     await hydrated(page);
-    await expect(field(page)).toHaveValue("are you there?!");
+    await expect(field(page)).toHaveText("are you there?!");
   });
 
   // A draft is written as it changes, never as the room changes around it: lines arriving write nothing, so an idle
@@ -494,13 +507,12 @@ test.describe("the composer", () => {
     await inGames(page);
     const line = word("blocked");
     await field(page).fill(line);
-    await expect(field(page)).toHaveAccessibleDescription(/Shift\+Enter adds a line\./);
     await field(page).press("Enter");
     await expect(lineOf(page, line)).toHaveCount(1);
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     await field(page).fill("kept nowhere");
     await page.reload();
     await hydrated(page);
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
   });
 });

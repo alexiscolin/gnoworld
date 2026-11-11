@@ -16,6 +16,7 @@ import {
   shortAddress,
   shownRoom,
 } from "./names.ts";
+import { rememberRealms } from "../../lib/roomRealms.ts";
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" as const }));
 const SECTIONS = [
@@ -38,8 +39,38 @@ describe("a room of the Earth", () => {
 
   it("leaves a world's rooms as they were, a world that starts with the word included", () => {
     expect(roomHref("#bubble")).toBe("/w/bubble");
-    expect(roomHref("#earthworks/news")).toBe("/w/earthworks?room=news");
     expect(roomLabel("#earthworks")).toBe("#earthworks");
+  });
+});
+
+describe("a realm's room, which has no page of its world", () => {
+  const room = "#gnogolf-golf-e00c30567c/golf-a-0123456789";
+
+  it("has no address until a rooms list has said its realm, then its realm's page", () => {
+    expect(roomHref(room)).toBeUndefined();
+    rememberRealms([{ name: null, rooms: [{ room, type: "open", realm: "gno.land/r/gnogolf/golf_a" }] }]);
+    expect(roomHref(room)).toBe("/r/gnogolf/golf_a");
+    expect(roomHref(room, true)).toBe("/r/gnogolf/golf_a?chat=full");
+  });
+
+  it("links to the default universe's page from another universe, never to a same path of another chain", () => {
+    const here = globalThis.location;
+    Object.defineProperty(globalThis, "location", { value: { pathname: "/net/onyx/earth" }, configurable: true });
+    rememberRealms([{ name: null, rooms: [{ room, type: "open", realm: "gno.land/r/gnogolf/golf_c" }] }]);
+    expect(roomHref(room)).toBe("/r/gnogolf/golf_c");
+    Object.defineProperty(globalThis, "location", { value: here, configurable: true });
+  });
+
+  it("is a stop of Alt+Up and Alt+Down once its realm is known, and not before", () => {
+    const ghost = "#gnogolf-golf-e00c30567c/golf-b-0123456789";
+    const sections = ["#bubble", ghost, "#bubble/games"];
+    expect(neighbour(sections, "#bubble", 1)).toBe("#bubble/games");
+    rememberRealms([{ name: null, rooms: [{ room: ghost, type: "open", realm: "gno.land/r/gnogolf/golf_b" }] }]);
+    expect(neighbour(sections, "#bubble", 1)).toBe(ghost);
+  });
+
+  it("stays unlinked when it has neither a page nor a realm", () => {
+    expect(roomHref("#nowhere/x-0123456789")).toBeUndefined();
   });
 });
 
@@ -234,5 +265,26 @@ describe("hereOf", () => {
     expect(hereOf(["gnoworld", "a", "b"], true)).toBe(2);
     expect(hereOf(["a"], false)).toBeUndefined();
     expect(hereOf(undefined, true)).toBeUndefined();
+  });
+});
+
+describe("a room of a realm's world", () => {
+  // Bug: a generated world (gnoradio's) has no /w/ page, so its rooms led to "No world here".
+  const ghost = "#nym-alexiscolin000-gnoradio-0123456789/home-0123456789";
+
+  it("has no address: the Earth's and a hub's rooms keep theirs", () => {
+    expect(roomHref(ghost)).toBeUndefined();
+    expect(roomHref("#nym-alexiscolin000-gnoradio-0123456789")).toBeUndefined();
+    expect(roomHref("#bubble/games")).toBe("/w/bubble?room=games");
+    expect(roomHref("#earth/lisbon")).toBe("/earth?room=lisbon");
+  });
+
+  it("is skipped by Alt+Up and Alt+Down: the next room is the next with a page", () => {
+    const rooms = ["#bubble", ghost, "#bubble/news"];
+    expect(neighbour(rooms, "#bubble", 1)).toBe("#bubble/news");
+    expect(neighbour(rooms, "#bubble/news", -1)).toBe("#bubble");
+    // A ghost room one is in is still in the list: the keys leave it, and come back to it.
+    expect(neighbour(rooms, ghost, 1)).toBe("#bubble/news");
+    expect(neighbour(rooms, ghost, -1)).toBe("#bubble");
   });
 });

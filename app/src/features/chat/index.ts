@@ -4,7 +4,18 @@ import { lazy } from "react";
 export { chatHeld, DockedChatHost, FullChatHost, PlaceChat } from "./fullHost.tsx";
 export { LOADING } from "./Loading.tsx";
 export { roomsChanged } from "./roomsListed.ts";
-export { dmHref, roomHref, roomIds, roomLabel, roomWorld, shortAddress, whoIs } from "./names.ts";
+export {
+  BOT,
+  dmHref,
+  hrefProp,
+  isAccount,
+  roomHref,
+  roomIds,
+  roomLabel,
+  roomWorld,
+  shortAddress,
+  whoIs,
+} from "./names.ts";
 
 /** The chat's drawing of marks, paragraphs, code and lists, for a realm's page. Loaded on asking, never by the barrel:
  * a static re-export put the Markdown reader in every world page's first screen (budgets.spec.ts, accountLater.spec.ts). */

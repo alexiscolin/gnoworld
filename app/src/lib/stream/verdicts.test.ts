@@ -247,6 +247,22 @@ describe("pageVerdicts: the page's own stream", () => {
     expect(told).toEqual(['{"kind":"x"}', '{"count":1}']);
   });
 
+  it("listens to `card` events only when the page has a handler, handing them on unread", () => {
+    const sources = fakeStream();
+    pageVerdicts(["#a"], { verdict: () => undefined, since: () => undefined, dead: () => undefined });
+    expect(sources.opened[0]?.heard()).not.toContain("card");
+    const told: unknown[] = [];
+    pageVerdicts(["#b"], {
+      verdict: () => undefined,
+      since: () => undefined,
+      dead: () => undefined,
+      card: (data) => told.push(data),
+    });
+    sources.opened[1]?.emit("card", { room: "#b", msgid: "m1", key: null });
+    expect(sources.opened[1]?.heard()).toContain("card");
+    expect(told).toEqual(['{"room":"#b","msgid":"m1","key":null}']);
+  });
+
   it("reports a frame it does not know once, as an error of the page", () => {
     const report = vi.fn();
     vi.stubGlobal("reportError", report);

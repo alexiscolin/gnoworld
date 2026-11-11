@@ -44,6 +44,8 @@ const SHOWN: Record<
   Combobox: ["Fields", "input[role='combobox']"],
   Switch: ["Fields", "input[role='switch']"],
   Select: ["Fields", "select"],
+  FieldWords: ["Fields", "p[id$='-help']"],
+  Listbox: ["Fields", "ul[role='listbox'] [role='option']"],
   Stat: ["Stats", "[data-value]"],
   Progress: ["Stats", "[role='progressbar']"],
   ComingSoon: ["Stats", "button[aria-disabled='true'][aria-label$='coming soon']"],

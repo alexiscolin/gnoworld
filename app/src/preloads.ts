@@ -23,8 +23,8 @@ const tags = (maps: readonly (readonly [string, number])[]): string =>
 /** The tags to preload the first-frame maps. */
 export const preloadTags = (): string => tags(MAPS);
 
-// A world's page preloads the maps its planet reads at 2048 (space/parts/maps.ts); the Earth's, the worlds file alone: its maps at 4096
-// would take a computer whose 3D never starts past ADR-0001 §12's 3 MB (3,509,982 B measured). Only the data: the scene's chunks stay off.
+// A world's page preloads the maps its planet reads at 2048 (space/parts/maps.ts); the Earth's, the same first-frame maps as the home's (the
+// planet is built from them, 0.93 MB, the full size comes later). Only the data: the scene's chunks stay off.
 const worldFile = tag("/worlds.json");
 
 const hasHub = (data: unknown): data is { slug: string; realms?: string[] } =>
@@ -38,7 +38,7 @@ const hasHub = (data: unknown): data is { slug: string; realms?: string[] } =>
 
 /** What an Earth's or a world's page preloads, by its route (routes.ts) and its loader's data: the worlds file and its maps; no other page. */
 export function pagePreloads(routeId: string, data: unknown): string {
-  if (routeId === "routes/earth" || routeId === "universe-earth") return worldFile;
+  if (routeId === "routes/earth" || routeId === "universe-earth") return worldFile + preloadTags();
   if ((routeId === "routes/world" || routeId === "universe-world") && hasHub(data))
     return worldFile + tags(mapNamesOf(worldOf(hubWorldOf(data))).map((name) => [name, 2048] as const));
   return "";

@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { chromium } from "@playwright/test";
+import { encodeWebp } from "./webp.mjs";
 
 const root = new URL("../../", import.meta.url).pathname;
 const folder = `${root}public/textures/`;
@@ -34,10 +35,12 @@ for (const [name, files] of [...sources].sort()) {
   );
   const source = decoded.reduce((best, each) => (each.width > best.width ? each : best));
   const outputs = [{ width: source.width, bytes: source.bytes }];
-  if (source.height * 2 === source.width) {
+  // A height map is read at the one size it is made (heightMaps.mjs): no variants.
+  if (source.height * 2 === source.width && !name.endsWith("-height")) {
     for (const width of WIDTHS.filter((each) => each < source.width)) {
-      const base64 = await page.evaluate(
-        async ({ base64, width, quality }) => {
+      const bytes = await encodeWebp(
+        page,
+        async ({ base64, width }) => {
           const bitmap = await createImageBitmap(await (await fetch(`data:image/webp;base64,${base64}`)).blob(), {
             resizeWidth: width,
             resizeHeight: width / 2,
@@ -45,16 +48,12 @@ for (const [name, files] of [...sources].sort()) {
           });
           const canvas = new OffscreenCanvas(width, width / 2);
           canvas.getContext("2d").drawImage(bitmap, 0, 0);
-          const blob = await canvas.convertToBlob({ type: "image/webp", quality });
-          const reader = new FileReader();
-          return new Promise((done) => {
-            reader.onload = () => done(String(reader.result).split(",")[1]);
-            reader.readAsDataURL(blob);
-          });
+          return canvas;
         },
-        { base64: source.bytes.toString("base64"), width, quality: QUALITY },
+        { base64: source.bytes.toString("base64"), width },
+        QUALITY,
       );
-      outputs.push({ width, bytes: Buffer.from(base64, "base64") });
+      outputs.push({ width, bytes });
     }
   }
   for (const { file } of decoded) rmSync(folder + file);

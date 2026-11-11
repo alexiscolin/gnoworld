@@ -1,5 +1,5 @@
 import type { Line } from "@gnoworld/core";
-import { Button, Cluster, Dialog, Stack } from "@gnoworld/ui";
+import { ConfirmDialog } from "../../ConfirmDialog.tsx";
 import { quoted } from "./names.ts";
 
 // The dialog that asks before a delete: which line, where, and that it cannot come back; `close` says whether to delete.
@@ -15,35 +15,15 @@ export function AskDelete({
   close: (go: boolean) => void;
 }) {
   return (
-    <Dialog
+    <ConfirmDialog
       title="Delete message?"
       description={quoted(line.text)}
       open={open}
-      onClose={() => {
-        close(false);
-      }}
+      cancel="Keep it"
+      go="Delete message"
+      close={close}
     >
-      <Stack space="s">
-        <p>It leaves {place}, and cannot come back.</p>
-        <Cluster justify="end">
-          <Button
-            emphasis="outline"
-            onClick={() => {
-              close(false);
-            }}
-          >
-            Keep it
-          </Button>
-          <Button
-            tone="danger"
-            onClick={() => {
-              close(true);
-            }}
-          >
-            Delete message
-          </Button>
-        </Cluster>
-      </Stack>
-    </Dialog>
+      It leaves {place}, and cannot come back.
+    </ConfirmDialog>
   );
 }

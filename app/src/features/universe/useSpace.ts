@@ -11,7 +11,7 @@ import { warmView } from "../../plateWarm.ts";
 import { useHere } from "../../useHere.ts";
 import { enterPage, newPage } from "./arrival.ts";
 import { ghost } from "./rise.ts";
-import { drawnYet, flying, hold, onDrawn, release, show } from "./space.ts";
+import { drawnYet, flying, hold, onDrawn, release, show, syncFlown } from "./space.ts";
 
 /** A world a page shows, by its id. */
 export interface WorldShown {
@@ -94,6 +94,7 @@ export function useSpace(body?: "earth" | "cosmos" | WorldShown): boolean {
       if (box !== null) {
         coming.disconnect();
         clearTimeout(giveUp);
+        syncFlown();
         for (const part of [box, ...document.querySelectorAll("[data-look='plate'], [data-dock]")])
           watching.observe(part);
       } else if (giveUp === undefined) {

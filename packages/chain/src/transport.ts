@@ -147,6 +147,15 @@ export interface SiteFileRead {
   signal?: AbortSignal;
 }
 
+/** The JSON `bytes` hold as `schema` reads it, or nothing: no valid UTF-8, no JSON, or a shape the schema refuses. */
+export function parseSiteBytes<T>(bytes: Uint8Array, schema: z.ZodMiniType<T>): T | undefined {
+  try {
+    return schema.safeParse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes))).data;
+  } catch {
+    return undefined;
+  }
+}
+
 /** A file the server's jobs write from a chain, at this site's `url` (slice 7): its own credentials and cache, under `maxBytes`, as `schema`
  * reads it, or nothing if it did not come whole. Never a throw, for a page has nothing to do with one. */
 export async function readSiteFile<T>(
@@ -160,10 +169,5 @@ export async function readSiteFile<T>(
     maxBytes,
     credentials: "same-origin",
   });
-  if ("kind" in answer) return undefined;
-  try {
-    return schema.safeParse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(answer.bytes))).data;
-  } catch {
-    return undefined;
-  }
+  return "kind" in answer ? undefined : parseSiteBytes(answer.bytes, schema);
 }

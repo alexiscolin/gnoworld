@@ -1,13 +1,10 @@
 // What the composer keeps beside its draft (moved out of Composer.tsx, which the merge of 4e's refusals and 4f's typing
-// grew past the lint's sizes): why Ergo refused the last line, the focus at its start, the selection an edit leaves.
+// grew past the lint's sizes): why Ergo refused the last line, the focus at its start.
 import type { Composed } from "@gnoworld/core";
-import { DRAFT_COMMANDS } from "./polling.ts";
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
-import { completions, type Completion } from "./complete.ts";
-import type { Edit } from "./format.ts";
-import { peopleOf } from "./names.ts";
 import { useMedia } from "./useMedia.ts";
+import type { MarketAsked } from "./marketCommand.ts";
 import { editRefusal, roomHint, said, sendable } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
@@ -54,32 +51,15 @@ export function useRefusal(
   };
 }
 
+/** The composer's field in a form: the editable box, which a textarea was. */
+export const FIELD = '[role="textbox"]';
+
 // The box takes the focus as the composer starts, when asked, never again: it is the reader's after.
 export function useFocusAtStart(formRef: RefObject<HTMLFormElement | null>, focus: boolean | undefined) {
   const [asked] = useState(focus === true);
   useEffect(() => {
-    if (asked) formRef.current?.querySelector("textarea")?.focus();
+    if (asked) formRef.current?.querySelector<HTMLElement>(FIELD)?.focus();
   }, [asked, formRef]);
-}
-
-const boxOf = (form: RefObject<HTMLFormElement | null>) => form.current?.querySelector("textarea") ?? undefined;
-
-/** The form's box, and the selection an edit leaves (`keep`), put back in the box once it shows the new `draft`. */
-export function useSelection(formRef: RefObject<HTMLFormElement | null>, draft: string) {
-  const selectionRef = useRef<Edit>(undefined);
-  useLayoutEffect(() => {
-    const selection = selectionRef.current;
-    if (selection === undefined) return;
-    selectionRef.current = undefined;
-    boxOf(formRef)?.focus();
-    boxOf(formRef)?.setSelectionRange(selection.start, selection.end);
-  }, [draft, formRef]);
-  return {
-    box: () => boxOf(formRef),
-    keep: (edit: Edit) => {
-      selectionRef.current = edit;
-    },
-  };
 }
 
 const COARSE = "(pointer: coarse)";
@@ -109,33 +89,21 @@ export function useHelp(
     groups?: boolean | undefined;
     editing?: boolean | undefined;
   },
-  { failed, completion, draft }: { failed: boolean | string; completion?: Completion | undefined; draft: string },
+  { failed, draft, market }: { failed: boolean | string; draft: string; market?: MarketAsked | undefined },
 ) {
   const coarse = useCoarsePointer();
-  const context = { nick, draft, multiline, completion };
+  const context = { nick, draft, multiline };
   const refusal = editRefusal(composed, editing === true);
   return {
     coarse,
     // Nothing said while there is nothing to say: no standing hint under the field (Alexis, 2026-11-08).
-    shown: hinted(
-      { ...said(composed, failed, context), ...refusal },
-      to === undefined ? roomHint(composed, groups ?? false) : undefined,
-    ),
-    goes: sendable(composed, multiline) && refusal.error === undefined,
+    shown:
+      market?.ok === false
+        ? { error: market.why }
+        : hinted(
+            { ...said(composed, failed, context), ...refusal },
+            to === undefined ? roomHint(composed, groups ?? false) : undefined,
+          ),
+    goes: market?.ok === true || (sendable(composed, multiline) && refusal.error === undefined),
   };
-}
-
-/** What Tab completes the draft's last word to. The room's accounts are sorted out of its members only while a word
- * after `@` is typed: the mention alone, not each key, is what the compiler recomputes them on (F793). */
-export function completionOf(
-  draft: string,
-  {
-    rooms,
-    members,
-    nick,
-    group,
-  }: { rooms: readonly string[]; members: readonly string[]; nick: string; group: boolean },
-) {
-  const people = /(^|\s)@\S*$/u.test(draft) ? peopleOf(members, nick) : [];
-  return completions(draft, { commands: DRAFT_COMMANDS, rooms, people, group });
 }

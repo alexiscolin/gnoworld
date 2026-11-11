@@ -27,17 +27,28 @@ export interface Answer {
   scores: Record<Category, number>;
 }
 
+/** What goes to OpenAI: a message's text, or a link card's text with its picture as a data URL (text and image_url parts). */
+export type ModerationInput = string | { text: string; image?: string };
+
 interface Options {
   key: string;
   log: Log;
   send?: typeof netSend;
 }
 
+const partsOf = (input: ModerationInput) =>
+  typeof input === "string"
+    ? input
+    : [
+        { type: "text", text: input.text },
+        ...(input.image === undefined ? [] : [{ type: "image_url", image_url: { url: input.image } }]),
+      ];
+
 export function moderationClient({
   key,
   log,
   send = netSend,
-}: Options): (text: string) => Promise<Answer | "unchecked"> {
+}: Options): (input: ModerationInput) => Promise<Answer | "unchecked"> {
   const byCategory = <T extends z.ZodType>(value: (category: Category) => T) =>
     z.strictObject(
       Object.fromEntries(CATEGORIES.map((category) => [category, value(category)])) as Record<Category, T>,
@@ -64,7 +75,7 @@ export function moderationClient({
         {
           method: "POST",
           headers: { authorization: `Bearer ${key}`, "content-type": "application/json" },
-          body: JSON.stringify({ model: "omni-moderation-latest", input: text }),
+          body: JSON.stringify({ model: "omni-moderation-latest", input: partsOf(text) }),
         },
         5000,
       );

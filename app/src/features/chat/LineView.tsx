@@ -1,5 +1,5 @@
 // A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
-// (4c), its link's player (4g), its link's page preview (8f) and its bar. One that mentions the reader says so (4d), one of the reader's own says
+// (4c), its link's player (4g), its link's page preview (8f), its link's card (L4) and its bar. One that mentions the reader says so (4d), one of the reader's own says
 // "you" (4e).
 import { markdown, mentions, pollOf, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
@@ -8,11 +8,13 @@ import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
 import { Markdown } from "./Message.tsx";
 import { Head } from "./LineHead.tsx";
+import { LineCard, type LineCardProps } from "./LineCard.tsx";
 import { LinePreview } from "./LinePreview.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { PollView } from "./PollView.tsx";
 import { Quote } from "./Replying.tsx";
 import { ThreadChip } from "./ThreadChip.tsx";
+import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";
 
 // A line's look by its kind: a message plain, a notice and an /me apart.
@@ -45,7 +47,13 @@ interface LineTextProps {
 
 function LineText({ blocks, me, known, stop }: LineTextProps) {
   return (
-    <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} tabbable={stop} />
+    <Markdown
+      blocks={blocks}
+      className={[styles["text"], rules["rules"]].join(" ")}
+      me={me}
+      members={new Set(known.split(" "))}
+      tabbable={stop}
+    />
   );
 }
 
@@ -147,6 +155,8 @@ export interface LineViewProps {
   verdict: StreamEvent["state"] | undefined;
   /** Whether a link's player is offered: not to a reader who saves data, nor in a direct message. */
   players: boolean;
+  /** What its card needs (link-previews L4, lineCard.ts's cardOf); none for a direct message's line, which has no card. */
+  card?: LineCardProps["card"];
   /** Whether it is saved on this device, and whether it is pinned in its room (4d). */
   saved: boolean;
   pinned: boolean;
@@ -169,7 +179,7 @@ export interface LineViewProps {
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread, votes, newHere } = props;
+  const { replies, onThread, inThread, votes, newHere, card } = props;
   const row = rowOf({
     id: line.id,
     stop,
@@ -207,6 +217,15 @@ export function LineView(props: LineViewProps) {
       </div>
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       <LinePreview blocks={blocks} verdict={verdict} tabbable={row.links} />
+      <LineCard
+        card={card}
+        text={line.text}
+        blocks={blocks}
+        player={embed !== undefined}
+        verdict={verdict}
+        mine={mine}
+        tabbable={row.links}
+      />
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
       <Chips to={line.id} chips={chips} react={react} />

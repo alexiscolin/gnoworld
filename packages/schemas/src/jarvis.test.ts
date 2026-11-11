@@ -21,6 +21,7 @@ import {
   JARVIS_LANGUAGES,
   JarvisQuestion,
   JarvisSettings,
+  JarvisState,
   JarvisTranslate,
   JarvisTranslateRequest,
   JarvisTranslation,
@@ -646,5 +647,23 @@ describe("the digest's contract (10k)", () => {
     expect(answer({ status: "digest", digest, proposal: null, height: 1204, made: true })).toBe(false);
     expect([answer({ status: "none" }), answer({ status: "none", made: false })]).toEqual([true, false]);
     expect([answer({ status: "spent" }), answer({ status: "off" })]).toEqual([true, true]);
+  });
+});
+
+// 10u-a: whether Jarvis is on, which any page may ask without a session.
+describe("whether Jarvis is on", () => {
+  const state = (value: unknown) => JarvisState.safeParse(value).success;
+  it.each([[{ on: true }], [{ on: false }]])("takes %j", (value) => {
+    expect(state(value)).toBe(true);
+  });
+  it.each([
+    ["no key", {}],
+    ["a string", { on: "yes" }],
+    ["a number", { on: 1 }],
+    ["an extra field", { on: true, budget: 3 }],
+    ["a bare boolean", true],
+    ["null", null],
+  ])("refuses %s", (_, value) => {
+    expect(state(value)).toBe(false);
   });
 });

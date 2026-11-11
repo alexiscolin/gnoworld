@@ -14,6 +14,7 @@ describe("the rooms as the routes use them", () => {
     mayEarth: () => "ok",
     mayRealm: () => "ok",
     isRealm: () => false,
+    tagRealm: () => undefined,
     earth: (_, name) => (name === "cafe" ? { made: `#earth/${name}` } : "exists"),
     maker: () => undefined,
     realm: (room) => (room === "#bubble/golf-0123456789" ? { made: room } : "exists"),
@@ -21,6 +22,7 @@ describe("the rooms as the routes use them", () => {
   const wired = () => {
     const calls: string[] = [];
     const mutes: Mutes = {
+      muteKeeping: () => "muted",
       mute: () => true,
       tick: () => undefined,
       reapply: () => undefined,

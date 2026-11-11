@@ -157,7 +157,7 @@
 
   .level {
     font: var(--font-label);
-    opacity: 0.7;
+    opacity: 0.75;
   }
 
   /* The place's name as the data gives it, in a small pill of its own, cut when long (truncate): no capitals, no spacing. */
@@ -416,21 +416,15 @@
     inset-inline-start: 0;
     /* raw: under the links, above the pill's own glass */
     z-index: -1;
-    inline-size: var(--_fill-w);
+    inline-size: var(--_fill-w, 0);
     border-radius: var(--radius-pill);
     background: var(--color-primary);
-    translate: var(--_fill-x) 0;
+    translate: var(--_fill-x, 0) 0;
   }
 
   .views:not([data-filled]) > .fill {
     /* layout: no fill till it is placed */
     display: none;
-  }
-
-  .views[data-placed] > .fill {
-    transition:
-      translate calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard),
-      inline-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
   /* A view not current lights under the pointer, its words brightening on a faint fill. */
@@ -453,7 +447,7 @@
       white-space: nowrap;
       /* raw: 34 px from the top and 18 under the 44 px row, 96 high in all (DESIGN-SYSTEM.md, Layout); each side the page's edge, the rail's and the dock's */
       padding: 34px var(--page-edge) 18px;
-      /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it. */
+      /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it, and the dialogs and popovers it holds (the palette, the account menu) are boxes of their own. */
       position: sticky;
       inset-block-start: 0;
       /* raw: above the page, the fixed plate and the full chat's 3, which runs under it to the window's top as it opens, stands and
@@ -462,7 +456,7 @@
       pointer-events: none;
     }
 
-    .header :is(a, button, nav, p) {
+    .header :is(a, button, nav, p, dialog, [popover]) {
       pointer-events: auto;
     }
 

@@ -36,3 +36,21 @@ export const saveProblem = (why: "full" | "none"): FlashMessage => ({
   title: "Could not save the message.",
   line: why === "full" ? "You have 200 saved messages. Remove one first." : "This message cannot be saved.",
 });
+
+// What an owner's hide or mute says when the server did not take it: `full` is a mute's table full, `forbidden` a room the reader does not
+// moderate or an account that is spared, `refused` a mute that would reach rooms the reader does not moderate or a line that cannot be hidden.
+const MODERATION: Record<Reason, string> = {
+  ...SAID,
+  full: "The mute list is full. Try again later.",
+  too_many: "Too many acts in a minute. Try again shortly.",
+  forbidden: "You do not moderate this room, or this account is spared: a moderator or a trusted account.",
+  refused: "This cannot be done here: the mute would reach a room of this world you do not moderate.",
+  not_ready: "Could not check, try again.",
+  not_found: "This message is no longer in the room's history.",
+};
+
+/** The flash of a hide or a mute the server refused. */
+export const moderationProblem = (reason: Reason, what: "hide" | "mute"): FlashMessage => ({
+  title: what === "hide" ? "Could not hide the message." : "Could not mute the account.",
+  line: MODERATION[reason],
+});

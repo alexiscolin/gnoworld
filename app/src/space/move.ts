@@ -123,7 +123,12 @@ function enter(space: Space, systems: readonly System[]): void {
 
 export function paint(space: Space, delta: number): void {
   const { stage, rig } = space;
-  stage.near?.tick(space.seconds, stage.frame.uSolo.value > 0.5 ? stage.frame.uAlone.value : -1, closeUp(space));
+  stage.near?.tick(space.seconds, {
+    alone: stage.frame.uSolo.value > 0.5 ? stage.frame.uAlone.value : -1,
+    close: closeUp(space),
+    delta: delta / 1000,
+    still: space.options.still(),
+  });
   space.labels.system = space.system;
   space.labels.plan = space.plan;
   space.labels.marked = space.planet;
@@ -137,7 +142,7 @@ export function paint(space: Space, delta: number): void {
   stage.links.tick(space.plan ? (space.planet ?? space.system) : undefined, space, delta);
   const planet = space.planet;
   stage.effects.tick(rig, delta, planet === undefined ? rig.pose.look : placeOf(planet, space.seconds, PLANET_AT));
-  signs(space);
+  signs(space, delta / 1000);
 }
 
 // The frame, blurred while fast, then the galaxy's body over it, never through the blur's pass, which grades the frame anew.
@@ -166,14 +171,19 @@ function round(space: Space, delta: number): void {
       eye: space.camera.position,
     },
   );
+  space.stage.near?.eclipse(space.rig.flying ? undefined : planet, moons.shadows);
 }
 
 // The page planet's signs, once it has come: their HTML stands where their ground does, and the planet turns on past its spin to show them.
-function signs(space: Space): void {
+function signs(space: Space, step: number): void {
   const { planet } = space;
-  if (planet === undefined || !space.neared) return;
-  space.stage.ground.place(planet, space.seconds, space.see);
-  space.stage.near?.lead(planet.id, space.stage.ground.ahead);
+  if (planet === undefined) return;
+  const { ground, near } = space.stage;
+  // Neither the spin nor the lean starts while a flight brings the planet or takes the eye from it, nor before the planet has come; the lean
+  // eases back to rest then.
+  if (space.neared && !space.rig.flying) ground.place(planet, { seconds: space.seconds, step }, space.see);
+  else ground.rest(planet, step);
+  near?.lead(planet.id, ground.ahead, ground.leaned);
 }
 
 // The orbits of the system the camera is in, seen from above alone (the plan; none in the 3D view nor behind a page), faint, fading as it

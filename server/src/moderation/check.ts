@@ -46,10 +46,10 @@ interface Options {
 
 /** The provider behind a breaker: five failures running leave it alone for 30 seconds, the messages
  * unchecked; one more failure after the pause pauses it again at once. A throw is a failure. */
-export function withBreaker(
-  provider: (text: string) => Promise<Answer | "unchecked">,
+export function withBreaker<Input = string>(
+  provider: (input: Input) => Promise<Answer | "unchecked">,
   { now, log }: { now: () => number; log: Log },
-): (text: string) => Promise<Answer | "unchecked"> {
+): ((input: Input) => Promise<Answer | "unchecked">) & { open: () => boolean } {
   const breaker = { failures: 0, until: 0 };
   const failed = (): void => {
     // Already paused by a probe that failed alongside: one pause, one alert.
@@ -60,7 +60,7 @@ export function withBreaker(
     breaker.until = now() + 30_000;
     log("alert", { error: "moderation_breaker" });
   };
-  return async (text) => {
+  const ask = async (text: Input): Promise<Answer | "unchecked"> => {
     if (now() < breaker.until) return "unchecked";
     let answer: Answer | "unchecked";
     try {
@@ -72,6 +72,8 @@ export function withBreaker(
     else [breaker.failures, breaker.until] = [0, 0];
     return answer;
   };
+  // Whether the pause is on now: the link cards ask before they spend a call (they have a breaker of their own, which never pauses the lines).
+  return Object.assign(ask, { open: () => now() < breaker.until });
 }
 
 /** An account as the verdicts keep it: its HMAC under the pepper, never the address. */

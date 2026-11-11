@@ -1,5 +1,5 @@
 import { adena } from "./adena.ts";
-import { calls, callWallet, connect, done, openRealm, sound, writeChain } from "./callCard.ts";
+import { calls, callWallet, connect, done, openCall, openRealm, openRow, sound, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
 // 9e's journeys at 390 and 1280 px: a write of three fields opens its card under its row and signs its three texts; a page's
@@ -24,7 +24,7 @@ for (const [name, size] of [
     page,
   }) => {
     await opened(page, size);
-    await calls(page).getByRole("button", { name: "Call SetThree" }).click();
+    await openCall(page, "SetThree");
     for (const label of ["a", "b", "c"]) await expect(card(page).getByRole("textbox", { name: label })).toBeVisible();
     await sound(page);
     if (size[0] < 600) return;
@@ -47,14 +47,18 @@ for (const [name, size] of [
   }) => {
     await opened(page, size);
     const form = page.getByRole("figure");
+    await openRow(page, "Upload");
     const upload = calls(page).getByRole("listitem").filter({ hasText: "Upload" });
     await expect(upload.getByRole("link", { name: /Open in gnoweb/ })).toBeVisible();
-    await expect(upload.getByRole("button")).toHaveCount(0);
+    await expect(upload.getByRole("button", { name: /^Call/ })).toHaveCount(0);
     await form.getByRole("button", { name: "Call SetProfile" }).click();
     const formCard = page.getByRole("article").first();
     await expect(formCard.getByRole("textbox", { name: "name", exact: true })).toHaveValue("bob");
     await expect(formCard.getByRole("textbox", { name: "times", exact: true })).toHaveValue("3");
     await expect(form).toContainText("hidden");
+    // The card opens whole inside the page's window: the window grows, it does not scroll to hold it.
+    const window = page.getByRole("region", { name: /^Rendered page of/ });
+    expect(await window.evaluate((el) => el.scrollHeight <= el.clientHeight)).toBe(true);
     await sound(page);
     if (size[0] < 600) return;
     await formCard.getByRole("textbox", { name: "times", exact: true }).fill("4");

@@ -17,6 +17,7 @@ import {
   type PerspectiveCamera,
   type WebGLRenderer,
 } from "three";
+import { smoothstep } from "@gnoworld/core";
 import type { Disposer } from "../disposer.ts";
 import type { Rig } from "./rig.ts";
 import { BLUR_FRAGMENT, BLUR_VERTEX, DUST_FRAGMENT, DUST_VERTEX } from "./speedShaders.ts";
@@ -35,11 +36,6 @@ const GONE = 1e-3;
 // How long after the blur's last frame its target is freed: 250 MB of GPU memory at a Retina size.
 const FREE_MS = 10_000;
 const DUST = 700;
-
-const smoothstep = (from: number, to: number, x: number): number => {
-  const t = Math.min(1, Math.max(0, (x - from) / (to - from)));
-  return t * t * (3 - 2 * t);
-};
 
 export class Speed {
   #target: WebGLRenderTarget | undefined;

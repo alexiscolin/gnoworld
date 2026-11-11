@@ -330,7 +330,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     ["here", { ask: "here", room: "#bubble", lines: [] }, "claude-sonnet-5-5"],
     [
       "function",
-      { ask: "function", room: "#bubble", realm: "gno.land/r/gov/dao", function: "Vote", lines: [] },
+      { ask: "function", room: "#bubble", realm: "gno.land/r/gov/dao", function: "Vote", chain: "onyx-1", lines: [] },
       "claude-sonnet-5-5",
     ],
     ["a person's own question", QUESTION, "claude-sonnet-5-5"],
@@ -340,7 +340,34 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     expect(JarvisPaidAnswer.parse(await (await ask(url, body)).json())).toMatchObject({ status: "answered" });
     expect(run.model.seen[0]?.body).toMatchObject({ model });
     const all = [...READS, "load_skill", "find_place", "give_button", "decline"];
-    expect(namesOf(run.model.seen[0]?.body)).toEqual(name === "catch-up" ? ["decline"] : all);
+    // A function's explanation reads the code alone: the four tools, no decline (D13920).
+    const code = ["gno_read", "load_skill", "find_place", "give_button"];
+    expect(namesOf(run.model.seen[0]?.body)).toEqual(
+      name === "catch-up" ? ["decline"] : name === "function" ? code : all,
+    );
+  });
+
+  it("explains a function on the profile of the chain the door named, and refuses a chain it has no profile for", async () => {
+    const run = await setup([ended("Done.")]);
+    const url = await listening(start(run.env));
+    const explain = { ask: "function", room: "#bubble", realm: "gno.land/r/gov/dao", function: "Vote", lines: [] };
+    // onyx is a universe and a profile; gnoland is a universe with no profile here; the last is neither.
+    expect((await ask(url, { ...explain, chain: "gnoland-1" })).status).toBe(400);
+    expect((await ask(url, { ...explain, chain: "nowhere-1" })).status).toBe(400);
+    // No chain at all: never the first profile, which would read a chain nobody named.
+    expect((await ask(url, explain)).status).toBe(400);
+    expect(run.model.seen).toHaveLength(0);
+    const answer = JarvisPaidAnswer.parse(await (await ask(url, { ...explain, chain: "onyx-1" })).json());
+    // No code read found the function, so jarvis does not say to keep it.
+    expect(answer).toMatchObject({ status: "answered" });
+    expect(answer).not.toHaveProperty("keep");
+    // The one profile it reads on is the chain's own.
+    const read = (
+      run.model.seen[0]?.body as {
+        tools?: { name: string; input_schema: { properties?: { profile?: { enum?: string[] } } } }[];
+      }
+    ).tools?.find(({ name }) => name === "gno_read");
+    expect(read?.input_schema.properties?.profile?.enum).toEqual(["onyx"]);
   });
 
   it("offers gnoscope's reads with its switch on, once it listed them at start", async () => {

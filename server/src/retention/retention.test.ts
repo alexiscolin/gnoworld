@@ -27,7 +27,7 @@ import { VERDICT_TABLES } from "../moderation/check.ts";
 import { MUTE_TABLES } from "../moderation/mute.ts";
 import { STRIKE_TABLES } from "../moderation/strikes.ts";
 import { PIN_TABLES } from "../pins/pins.ts";
-import { REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
+import { REALM_PATH, REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { makeRetention, sizeOf, startRetention } from "./retention.ts";
 
@@ -46,6 +46,7 @@ const TABLES = [
   STRIKE_TABLES,
   ROOM_STATE,
   REALM_TABLES,
+  REALM_PATH,
   PIN_TABLES,
   GUEST_TABLES,
   ROOM_SAID,

@@ -136,8 +136,10 @@ Anthropic key is Alexis's own for tests, then the company's.
 
 ## The workshop
 
-Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the app's screens and the lab's pages on Vite's dev
-servers, with hot reload, and the lab's tuning panel on the real renderer, opened from the MacBook or a phone over Tailscale. No
+Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the app's screens on Vite's dev server, with hot reload,
+opened from the MacBook or a phone over Tailscale. The lab (the realism page and its tuning panel) left with the 2026-11-09 batch:
+`app/lab/` is gone, though `scripts/workshop.sh` and `app/lab.config.ts` still start a lab server that has no page to serve (to
+remove, a harness change). No
 gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
 pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
 fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
@@ -170,8 +172,7 @@ which both configs use). The `tailnet-preview` skill's script prints two links f
 which. On the MacBook or the phone, open the https ones:
 - **`workshop-app`, the app's screens:** `https://<host>:<port>/` for the home, then `/earth`, `/w/<world>` and every route,
   the chat with them: the app's dev server alone proxies `/api` and `/ws` to the workshop's backend (below).
-- **`workshop-lab`, the lab:** `https://<host>:<port>/realism.html` for the planets' views, and `/realism.html?view=cosmos` for
-  the site's own scene (`&arrive=<system>` for a system's view).
+- **`workshop-lab`:** the second name the script puts on the tailnet; with `app/lab/` gone, no page answers there.
 
 **The backend**, started once the app's server is on the tailnet (Alexis, 2026-11-04: "avec le chat dedans et toute l'UI"):
 the journeys' real server and a local Ergo (`app/tests/e2e/workshopBackend.mjs`, through `api.mjs`'s `startBackend`, Ergo built
@@ -196,29 +197,35 @@ when the streams close. Inside Claude Code's sandbox Chromium runs one process p
 The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
 cannot reach the clipboard there; select the list instead.
 
-**The panel:** T shows and hides it, on either page of the lab, and so does its Tuning button in the corner, for a phone.
-- **Scene.** The scene's values the page's code has read: Exposure (the image grade, `app/src/scene/renderer.ts`), Lean at home
-  (`LEAN`) and, at a system's view, its share of that lean (`ARRIVAL_LEAN = LEAN / 2.2`), both in
-  `packages/core/src/space/drift.ts`. A Plan keeps its own share.
-- **Colours.** The palette's primitives (`--p-*`, read from the design system's sheet).
-- **Sizes.** The labels' font sizes (`--font-ui`, `--font-data`) and paddings (`--space-2xs`, `--space-xs`).
+**Landing a batch:** the accepted retouches land in code as one part, test first, in a session that reads the diff of what the workshop
+showed (the lab's Copy list went with the lab).
 
-Colours and sizes are set on `:root`'s own style; no product code is touched. Every change draws at once. Keys, drags and wheels
-inside the panel stay there. Copy lists the values changed, one line each, with where each lives in code; Reset puts back the
-code's values. A code edit reloads the page and loses the panel's values, so copy first.
+## Probes and tools worth knowing
 
-**Making a value tunable:**
-- **A size token of `tokens.css`** needs only its name in `app/lab/panel.ts`'s lists; every primitive colour is offered already.
-- **A scene value** gets a name in `TUNABLES` and a row in `app/lab/controls.ts`. It also gets one read where the value is used,
-  written on the lab's switch: `import.meta.env.GNOWORLD_TUNING === "1" ? tuned(name, VALUE) : VALUE`, or `applyTuned` for a value
-  set once on an object, as the renderer's exposure.
-
-Only `lab.config.ts` defines the switch. The site's build folds each read back to `VALUE` and drops the registry
-(`app/src/scene/tuning.ts`). Write the read so that it folds to the code that was there: in an expression, not a new variable the
-minifier keeps. Then build the site before and after and compare every file (`tuning.spec.ts` holds the names out of the site's
-build, and the budgets hold the bytes).
-
-**Landing a batch:** paste Copy's list to Claude. The values land in code as one part, test first.
+These are Playwright specs in `app/tests/e2e` (or `tests/tools`) that measure rather than guard; run one with
+`node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`, as any journey (the test build and its software GPU,
+`?test-gpu`). The scene's engine is reached through `window.__gnoworldSpace`, which `features/universe/spaceHook.ts` sets in a
+development or test-GPU build only; a production build holds no trace of it.
+- **`smoothness.spec.ts`** records each flow of a reader's first minutes frame by frame (`smoothness.ts`, `smoothAnalysis.ts`) and fails on a
+  jump or a bounce of what moves; a stall or a long frame is a number to compare between two trees, not a budget (the software GPU's times
+  are not real ones). One JSON line a flow goes to the file `SMOOTH_OUT` names (default `smoothness.jsonl` in the system's temporary folder).
+- **`earthSkeleton.spec.ts`** records the skeletons' lines and state in the Earth's page to the full chat, and in the arrival at the Earth
+  from the universe and from its system (`SKEL_OUT`, default `earthSkeleton.jsonl`).
+- **`chatTiming.spec.ts`** records, per frame, whether the camera is flying and the dock's opacity and place across a flight to a world's
+  page: the chat must not show before the flight has ended (`CHAT_OUT`, default `chatTiming.jsonl`).
+- **The picture tool** (`app/tests/tools/planetPictures.spec.ts`, its own config because the gate's journeys never walk `tests/tools`):
+  `node app/node_modules/@playwright/test/cli.js test -c app/playwright.pictures.config.ts planetPictures` takes each world's picture of the
+  chat's column once, from the engine as the rail draws it (`__gnoworldSpace.portraits`), at 88 px as WebP, and writes the manifest
+  (`app/src/lib/worldPictures.json`) that `worldPictures.test.ts` checks against `pictureInputs.ts`'s hash of the inputs. Run it when the
+  planets' look (`app/src/space/`) changes; the new pictures replace the old files in `app/public/world-pictures/`, which a commit declares
+  with `Updated-baseline:`.
+- **The link reader's tests** run with the unit tests (`pnpm run test`: `link-reader/src/**/*.test.ts` is in the `node` project). Its
+  transport tests (`transport.test.ts`) need the `openssl` command: `tlsFixtures.ts` makes a CA and a leaf per name, once per run, in a folder
+  of the system's temporary directory (never in the repository), and a missing or failing `openssl` fails the test with its message, it
+  never skips. `memory.test.ts` runs the real codecs at their cap in a child with the image's flags and reads the peak resident memory,
+  which must stay under the container's 256 MiB. What needs Docker (the reader's isolation, its way out, its guard rules) is
+  `deploy/test-links.sh`, which `deploy/test.sh` sources: run `deploy/test.sh` from the commit you reviewed (docs/OPERATIONS.md) after any
+  change to `deploy/`, the reader or what it fetches; it needs the network for its controls (`example.com`).
 
 ## Jarvis's evals
 

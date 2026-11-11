@@ -151,7 +151,8 @@ describe("RoomView", () => {
   it("names a guest's line by its nick and says it is a guest's, never by an account", () => {
     const html = part(view({ state: { ...ROOM, lines: [GUEST_LINE] } }), "Messages");
     expect(items(html)).toEqual([expect.stringMatching(/^guest-ab12cd \(guest\) \d{2}:\d{2} hello$/)]);
-    expect(html).not.toContain("title=");
+    // No title on the guest's name (an account's address is its title); the time's full date is the one title (D13922).
+    expect(html).not.toMatch(/<(?!time)[^>]* title=/);
   });
 
   // The account tag alone says who wrote: a nick is only a nick.

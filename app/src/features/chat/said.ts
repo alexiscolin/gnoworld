@@ -10,17 +10,11 @@ import {
   type Composed,
 } from "@gnoworld/core";
 import type { FieldProps } from "@gnoworld/ui";
-import type { Completion } from "./complete.ts";
-import { isAccount, shortAddress } from "./names.ts";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
 
 const bytes = (count: number) => `${String(count)} ${count === 1 ? "byte" : "bytes"}`;
-
-// An option as the help names it: an account by its short address.
-const named = (option: string) =>
-  option.startsWith("@") && isAccount(option.slice(1)) ? `@${shortAddress(option.slice(1))}` : option;
 
 /** What the field says as @room stands in the draft: whether it notifies in this room (4f-n, decisions 2026-10-27, N3). */
 export const ROOM_NOTIFIES = "@room notifies the members who keep notifications on for this room.";
@@ -63,7 +57,6 @@ export interface Context {
   nick?: string;
   draft?: string;
   /** What Tab completes the word being typed to. */
-  completion?: Completion | undefined;
   /** Whether the connection sends a message of several lines whole (draft/multiline); else each line goes alone. */
   multiline?: boolean | undefined;
 }
@@ -110,12 +103,6 @@ const actionOnly = (composed: Composed, { draft = "" }: Context): string | undef
     ? "An action is one line: its line breaks become spaces."
     : undefined;
 
-// What Tab completes the word to: the first option, and the others.
-function completes({ options }: Completion): string {
-  const [first = "", ...rest] = options.map(named);
-  return `Tab completes ${first}${rest.length === 0 ? "" : `; also ${rest.join(", ")}`}.`;
-}
-
 /** How a poll is asked, said under a draft that asks one wrong. */
 const POLL_FORM = "A poll is /poll A question? | an answer | another: two to nine answers.";
 
@@ -124,19 +111,18 @@ const unknownOf = (command: string): string =>
   command === "/poll" ? POLL_FORM : `${command} is not a command. /me sends an action.`;
 
 /** What the field says of the draft: that it was not sent or is too long (a line of several named, a message past
- * its lines or bytes), what Tab completes (a command not yet typed whole being no error), an unknown command, or
+ * its lines or bytes), an unknown command, or
  * help near the end or on an action; or nothing. */
 export function said(
   composed: Composed,
   failed: boolean | string,
   context: Context = {},
 ): Pick<FieldProps, "error" | "help"> {
-  const { completion, multiline } = context;
+  const { multiline } = context;
   if (typeof failed === "string") return { error: failed };
   if (failed) return { error: "Not sent: the chat is not ready yet. Try again in a moment." };
   const refusing = refusal(composed, multiline);
   if (refusing !== undefined) return { error: refusing };
-  if (completion !== undefined) return { help: completes(completion) };
   if (composed.kind === "unknown") return { error: unknownOf(composed.command) };
   const help = nearEnd(composed, context) ?? actionOnly(composed, context);
   return help === undefined ? {} : { help };

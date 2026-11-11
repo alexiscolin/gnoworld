@@ -31,6 +31,8 @@ const ListedRoom = z.object({
   type: RoomType,
   here: z.optional(z.int().check(z.minimum(0), z.maximum(PEOPLE_MOST))),
   messages: z.optional(z.int().check(z.minimum(0), z.maximum(PER_HOUR_MOST))),
+  /** A realm's room: the realm it is for, so the room links to its page (a hash is all its name holds of it). */
+  realm: z.optional(RealmPath),
 });
 
 /** A world's rooms a reader may see, in the sections its moderators set (roles file, 50 at most), then a

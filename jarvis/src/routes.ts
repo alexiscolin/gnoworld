@@ -5,6 +5,7 @@
 // /digest, a realm's digest, each answering off while jarvis is, once its body passed its schema.
 import {
   DOOR_CAPS,
+  EXPLAIN_VERSION,
   JARVIS_PATHS,
   JarvisAsk,
   JarvisBudget,
@@ -30,6 +31,8 @@ interface Parts {
   readonly ask: Ask | undefined;
   // The fast model's ask, for the fixed ask that catches a room up.
   readonly catchUp?: Ask | undefined;
+  // A function's explanation, on the loop that reads the code of one chain alone (D13920): none for a chain it has no profile for.
+  readonly explain?: ((chain: string | undefined) => Ask | undefined) | undefined;
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
@@ -40,7 +43,7 @@ interface Parts {
 const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answer });
 
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
-export function jarvisRoutes({ ask, catchUp, translate, digest, budget, log }: Parts): Routes {
+export function jarvisRoutes({ ask, catchUp, explain, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
     const caps = budget.caps();
     return {
@@ -60,7 +63,14 @@ export function jarvisRoutes({ ask, catchUp, translate, digest, budget, log }: P
         if (!asked.success) return refused(JARVIS_PATHS.ask);
         if (ask === undefined) return answered({ status: "off" });
         const { question, run } = questionOf(asked.data);
-        const asking = run === "fast" && catchUp !== undefined ? catchUp : ask;
+        // An explanation never falls back to the concierge's loop, whose tools read live state and the room.
+        const asking =
+          run === "explain"
+            ? explain?.("chain" in asked.data ? asked.data.chain : undefined)
+            : run === "fast" && catchUp !== undefined
+              ? catchUp
+              : ask;
+        if (asking === undefined) return refused(JARVIS_PATHS.ask);
         return replyOf(await asking(question, signal), log);
       },
     },
@@ -101,17 +111,22 @@ export function jarvisRoutes({ ask, catchUp, translate, digest, budget, log }: P
 // realm and name, go in as data blocks beside the room's lines.
 const HERE = "What can I do here, in this place? Say it briefly, with what the place's data tells.";
 const CATCH_UP = "Catch me up on this room: what was said, in a few short lines.";
+// An explanation is the same for every room, so it is written in English whatever the room says (D13920).
 const EXPLAIN =
-  "Explain the function in the function block, of the realm it names: what it does and how to call it, briefly.";
+  "Explain the function in the function block, of the realm it names: what it does and how to call it, briefly, in English.";
 
-function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast" } {
+function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast" | "explain" } {
   const room = asked.lines.map(lineOf);
   const place = { source: "place", text: asked.room };
   if ("question" in asked) return { question: { text: asked.question, room, read: [place] }, run: "main" };
   if (asked.ask === "catch-up") return { question: { text: CATCH_UP, room, read: [place] }, run: "fast" };
   if (asked.ask === "here") return { question: { text: HERE, room, read: [place] }, run: "main" };
+  // The code alone: no line of the room and no room name, so the answer can be kept for every room.
   const named = { source: "function", text: `${asked.realm} ${asked.function}` };
-  return { question: { text: EXPLAIN, room, read: [place, named] }, run: "main" };
+  return {
+    question: { text: EXPLAIN, room: [], read: [named], finds: { realm: asked.realm, name: asked.function } },
+    run: "explain",
+  };
 }
 
 // A room's line as data: who said it (the asker, or the others by their number, D91), when, and its words, so its line
@@ -128,7 +143,13 @@ function replyOf(result: Result, log: Log): Reply {
       return answered({ status: "failed", cost: result.cost });
     }
     const buttons = result.cards.buttons.map(({ button }) => button);
-    return answered({ status: "answered", markdown, buttons, cost: result.cost });
+    return answered({
+      status: "answered",
+      markdown,
+      buttons,
+      cost: result.cost,
+      ...(result.keep === true ? { keep: true, version: EXPLAIN_VERSION } : {}),
+    });
   }
   if (result.kind === "declined") return answered({ status: "declined", cost: result.cost });
   if (result.kind === "spent")

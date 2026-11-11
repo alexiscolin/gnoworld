@@ -18,8 +18,8 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this
 from repo_files import git, last_reviewed
 
 LIMIT, TIER_ONE = 600, 400
-PRODUCT = re.compile(r"^(app/src|packages/[^/]+/src|server/src|jarvis/src|gno)/")
-NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$|^server/src/testing/|^jarvis/src/testing/|^packages/[^/]+/src/testing/")  # test helpers
+PRODUCT = re.compile(r"^(app/src|packages/[^/]+/src|server/src|jarvis/src|link-reader/src|gno)/")
+NOT_PRODUCT = re.compile(r"(\.test\.tsx?|\.spec\.ts|\.stories\.tsx|_test\.gno|_filetest\.gno|_test\.go)$|^server/src/testing/|^jarvis/src/testing/|^link-reader/src/testdata/|^link-reader/src/testImages\.ts$|^packages/[^/]+/src/testing/")  # test helpers
 
 base = sys.argv[1]
 own = last_reviewed(base)

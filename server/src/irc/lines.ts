@@ -117,20 +117,25 @@ const STATUS = /^[~&@%+]+(?=#)/;
 
 // The bot's own line, or a relayed one (D430): said for a guest after the server judged it, so nothing to check, count or hide
 // again. A connection can take no nick with the relay's separator, so this holds whatever the tags say.
-const ours = (source: string | undefined): boolean => {
-  const sender = source?.split("!")[0] ?? "";
-  return sender === NICK || sender.includes("/");
-};
+const sender = (source: string | undefined): string => source?.split("!")[0] ?? "";
+const relayed = (source: string | undefined): boolean => sender(source).includes("/");
+const ours = (source: string | undefined, answering: boolean): boolean =>
+  sender(source) === NICK || (!answering && relayed(source));
+// A line's account: the tag Ergo sets, or for a relayed line asked about, the anon nick it was said under.
+const accountOf = ({ tags, source }: IrcMessage, answering: boolean): string =>
+  answering && relayed(source) ? sender(source) : (tags.get("account") ?? "");
 
 // A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
-// account and the id Ergo set, from someone else, with text.
-export function said(
-  { tags, source, params: [target = "", text = ""] }: IrcMessage,
-  joined: ReadonlySet<string>,
-): Said | undefined {
+// account and the id Ergo set, from someone else, with text. `answering`: the answer to a question about one line, where a
+// relayed guest's line is a line too, its account the anon nick as the relay's own record has it (F13720).
+export function said(message: IrcMessage, joined: ReadonlySet<string>, answering = false): Said | undefined {
+  const {
+    tags,
+    source,
+    params: [target = "", text = ""],
+  } = message;
   const room = target.replace(STATUS, "");
-  const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
-  const fields = [text, account, msgid];
-  if (fields.includes("") || ours(source) || !joined.has(room)) return undefined;
+  const [account, msgid] = [accountOf(message, answering), tags.get("msgid") ?? ""];
+  if ([text, account, msgid].includes("") || ours(source, answering) || !joined.has(room)) return undefined;
   return { room, account, msgid, text, ...marks(tags), ...(room === target ? {} : { few: true as const }) };
 }

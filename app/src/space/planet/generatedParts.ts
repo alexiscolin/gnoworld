@@ -1,5 +1,6 @@
 // What the generated worlds' program calls, apart from its main(): its noise, the forms a ground and a gas world take, and a real map's
 // detail. Comments live here, out of the strings that ship.
+export { SHADOWS } from "./generatedShadows.ts";
 
 // The noise: integer hashes, so a world is the same on every GPU (as chunks.ts's lattice). One octave's spread and mean absolute value
 // were measured on a port of it, 40,000 points of the sphere (0.192 and 0.156): a height's share among its world's then reads as a

@@ -55,7 +55,7 @@ function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
 
 // Where a right-click, a long-press or the context-menu key asks for a line's menu, when it is on the line's own words: not on
 // a link, a control, or the bar and its menu, which keep the browser's menu or their own.
-const OWN = "a, button, input, textarea, [role='toolbar'], [role='menu'], [role='dialog']";
+const OWN = "a, button, input, textarea, [role='textbox'], [role='toolbar'], [role='menu'], [role='dialog']";
 
 /** The point a line's menu opens at: the pointer's, or the line's own corner when the key asked, which gives no pointer. */
 export const menuPoint = (

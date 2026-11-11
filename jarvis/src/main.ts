@@ -54,6 +54,7 @@ let draining = false;
 const routes = {
   ask: running?.ask,
   catchUp: running?.catchUp,
+  explain: running?.explain,
   translate: running?.translate,
   digest: running?.digest,
   budget,
@@ -82,7 +83,27 @@ async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
     const profiles = { chains: config.profiles.read, indexed: config.profiles.indexed };
     const tools = toolbox({ profiles, gnomcp, skills, places: placesTool(places), cards, gnoscope, log });
     const { tracer } = tracing;
-    const loop = makeAskLoops({ send, budget, log, tracer, models: config.models, caps: config.caps, skills, tools });
+    // A chain is read on its universe's profile when Jarvis's gnomcp names one; none for a chain with none or no chain at all.
+    const byChain = new Map(
+      [...places.universes.values()]
+        .filter(({ id }) => profiles.chains.includes(id))
+        .map(({ chainId, id }) => [chainId, id]),
+    );
+    const explain = {
+      tools: tools.explain,
+      profileOf: (chain: string | undefined) => (chain === undefined ? undefined : byChain.get(chain)),
+    };
+    const loop = makeAskLoops({
+      send,
+      budget,
+      log,
+      tracer,
+      models: config.models,
+      caps: config.caps,
+      skills,
+      tools,
+      explain,
+    });
     // Translations and digests on the fast model (ADR-0002 §5, "Models").
     const fast = { send, budget, log, tracer, model: config.models.fast };
     const translator = makeTranslator({ ...fast, db, retries: config.caps.retries, now: Date.now });
@@ -90,6 +111,7 @@ async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
     return {
       ask: loop.ask,
       catchUp: loop.catchUp,
+      explain: loop.explain,
       translate: translator.translate,
       digest: digests.digest,
       close: async (): Promise<void> => {

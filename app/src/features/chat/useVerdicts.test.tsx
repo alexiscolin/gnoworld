@@ -8,6 +8,7 @@ import { fakeStream } from "../../../tests/fakeStream.ts";
 import { BATCH_MS } from "../../lib/stream/chainFeed.ts";
 import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
+import { cardsIn } from "./cardsIn.ts";
 import { useVerdicts, type Shown } from "./useVerdicts.ts";
 
 // The verdicts' asker reads a line's Markdown for a player's link: that code is asked once a room holds a line, never
@@ -186,7 +187,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const sources = await draw([]);
     sources.opened[0]?.emit("signal", CHART);
     expect(store.getState().signals.map(({ world, kind }) => `${world} ${kind}`)).toEqual(["bubble chart"]);
-    expect(sources.opened[0]?.heard()).toEqual(["chain", "error", "realms", "signal", "since", "verdict"]);
+    expect(sources.opened[0]?.heard()).toEqual(["card", "chain", "error", "realms", "signal", "since", "verdict"]);
   });
 
   it("hands a verdict of the stream to the store", async () => {
@@ -204,6 +205,33 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
       expect(store.getState().chainByWorld[chainKey("onyx", "bubble")]?.map(({ id }) => id)).toEqual(["h900030:0"]);
       expect(store.getState().realmsDeployed["onyx"]?.count).toBe(17);
     });
+  });
+
+  // Link previews L4: a `card` frame reaches the store through its lazily loaded feed, in the order it came; one it cannot read is said once.
+  it("hands a card frame to the store, a later one without a key taking the card away", async () => {
+    const sources = await draw([]);
+    const key = "a".repeat(64);
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m1", key });
+    await vi.waitFor(() => {
+      expect(cardsIn(store.getState())?.cards["#bubble"]).toEqual({ m1: key });
+    });
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m1", key: null });
+    await vi.waitFor(() => {
+      expect(cardsIn(store.getState())?.cards["#bubble"]).toEqual({});
+    });
+  });
+
+  it("says a card frame it cannot read once, and keeps the store as it was", async () => {
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const sources = await draw([]);
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m1", key: "../x" });
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m2", key: "../y" });
+    await vi.waitFor(() => {
+      expect(report).toHaveBeenCalledTimes(1);
+    });
+    expect(String(report.mock.calls[0]?.[0])).toContain("card_unknown");
+    expect(cardsIn(store.getState())).toBeUndefined();
   });
 
   it("says a chain frame it cannot read once, and keeps the store as it was", async () => {

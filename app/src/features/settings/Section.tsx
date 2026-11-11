@@ -4,11 +4,25 @@ import { Sidebar, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import styles from "./Settings.module.css";
 
-export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+export function Section({
+  id,
+  title,
+  aside,
+  children,
+}: {
+  id: string;
+  title: string;
+  /** A muted line at the title's end. */
+  aside?: string;
+  children: ReactNode;
+}) {
   return (
     <section aria-labelledby={id} className={styles["section"]}>
       <Stack space="xs">
-        <h3 id={id}>{title}</h3>
+        <Sidebar side="end" align="center">
+          <h3 id={id}>{title}</h3>
+          {aside === undefined ? null : <span className="meta">{aside}</span>}
+        </Sidebar>
         <Stack space="m">{children}</Stack>
       </Stack>
     </section>

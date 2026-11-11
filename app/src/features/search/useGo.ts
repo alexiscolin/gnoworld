@@ -2,7 +2,7 @@
 // but the copy. A command runs: the Earth, the universe, the map, Go explore.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { fullChatHref } from "../../fullChat.ts";
+import { fullChatHref, holdsChat } from "../../fullChat.ts";
 import { rememberPath } from "../../lib/recents.ts";
 import { site, universePath, type UniverseView } from "../../places.ts";
 import { useExplore } from "../home/index.ts";
@@ -24,13 +24,23 @@ export function useGo(universe: UniverseView, close: () => void) {
     };
   }, [copied]);
   const pathOf = (item: SearchItem): string => {
+    // The chat of the world in view, else the Earth's, opened on the words (features/chat/Searching.tsx).
+    if (item.kind === "messages")
+      return fullChatHref(
+        `${holdsChat(location.pathname) ? location.pathname : universe.earth.path}?find=${encodeURIComponent(item.find ?? "")}`,
+      );
     if (item.kind !== "command") return item.path;
     if (item.name === "earth") return universe.earth.path;
     return universePath(universe);
   };
-  const go = (item: SearchItem, to = pathOf(item)) => {
+  // A room or a person has its own address, which the full chat keeps in the full chat.
+  const addressOf = (item: SearchItem): string =>
+    (item.kind === "room" || item.kind === "person") && document.documentElement.dataset["chat"] === "full"
+      ? fullChatHref(item.path)
+      : pathOf(item);
+  const go = (item: SearchItem, to = addressOf(item)) => {
     close();
-    if (item.kind !== "command") rememberPath(item.path);
+    if (!["command", "room", "person", "messages"].includes(item.kind)) rememberPath(item.path);
     if (item.command === "explore") {
       explore();
       return;
@@ -41,6 +51,10 @@ export function useGo(universe: UniverseView, close: () => void) {
   // A world's chat is docked on its page, the Earth's on its own: any other place says its chat on its universe's Earth.
   // Opened from the full chat, it stays there: the place's own chat page, its room changing, no space (D393).
   const chat = (item: SearchItem, to?: string) => {
+    if (item.kind === "room" || item.kind === "person") {
+      go(item);
+      return;
+    }
     if (document.documentElement.dataset["chat"] === "full") {
       go(item, fullChatHref(item.path));
       return;

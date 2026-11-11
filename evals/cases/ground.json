@@ -161,6 +161,7 @@
         "room": "#gnoworld",
         "realm": "gno.land/r/demo/boards",
         "function": "CreateThread",
+        "chain": "onyx-1",
         "lines": []
       },
       "expect": {

@@ -2,6 +2,7 @@
 // mainnet's, else Onyx's, else the short address. The expressions are fixed ones over an address the schema proved (as
 // server/src/door/names.ts does, D92), built by evalCall.ts's `userCall` (D283). `ResolveAddress` gives nil for a
 // missing or deleted record, which `.Name()` would panic on, so `IsDeleted` is asked first (a nil receiver answers true).
+import { isName } from "@gnoworld/core";
 import { readHeight } from "@gnoworld/chain/node";
 import { Address, shortAddress } from "@gnoworld/schemas";
 import { failedRead, sourceOf, type ChainRead, type ReadOptions } from "@gnoworld/chain/read";
@@ -18,11 +19,8 @@ export interface Named {
   height: number;
 }
 
-// A name as r/sys/users keeps one (its validateName, read on onyx-1: `^[a-z][a-z0-9]*([_-][a-z0-9]+)*$`, 64 at most): legacy names
-// such as `aeddi` pass, so `nym-` is not assumed. Text a node sent that is not of this form is never shown.
-function isName(text: string): boolean {
-  return text.length <= 64 && /^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$/.test(text);
-}
+// A name as r/sys/users keeps one (core's `isName`): legacy names such as `aeddi` pass, so `nym-` is not assumed. Text a node sent
+// that is not of this form is never shown.
 
 // The record is asked about first: a missing or deleted one has no name to ask for, and its `Name` would panic.
 async function nameOf(rpc: string, account: string, options: ReadOptions): Promise<ChainRead<string | null>> {
@@ -45,19 +43,34 @@ export interface Chain {
   rpc: string;
 }
 
-/** The name of `account` on the chain `chainId` at `rpc`, or why it could not be read: a failure is never a no-name. */
+/** The name of `account` on the chain `chainId` at `rpc`, or why it could not be read: a failure is never a no-name. A `height` given is
+ * the block it is read at, and the node is not asked for one. */
 export async function readName(
   rpc: string,
-  { chainId, account }: { chainId: string; account: string },
+  { chainId, account, height }: { chainId: string; account: string; height?: number },
   options: ReadOptions = {},
 ): Promise<ChainRead<Named>> {
   // Nothing is asked for what is no address, and nothing of a node that is not the universe's chain (D118).
   if (!Address.safeParse(account).success) return failedRead("bad-name", sourceOf(rpc, options));
-  const at = await readHeight(rpc, { ...options, chainId });
+  const at = await blockOf(rpc, { chainId, given: height }, options);
   if (!at.ok) return at;
   const read = await nameOf(rpc, account, options);
   if (!read.ok) return read;
-  return { ok: true, value: { chainId, name: read.value, height: at.value.height }, source: at.source };
+  return { ok: true, value: { chainId, name: read.value, height: at.value }, source: at.source ?? read.source };
+}
+
+// The block a name is read at: the one given by a caller reading many accounts of a chain (the composer's member names), else the
+// node's own.
+async function blockOf(
+  rpc: string,
+  { chainId, given }: { chainId: string; given: number | undefined },
+  options: ReadOptions,
+): Promise<
+  { ok: true; value: number; source?: ChainRead<never>["source"] } | Extract<ChainRead<never>, { ok: false }>
+> {
+  if (given !== undefined) return { ok: true, value: given };
+  const at = await readHeight(rpc, { ...options, chainId });
+  return at.ok ? { ok: true, value: at.value.height, source: at.source } : at;
 }
 
 /** What the account control shows: a name with the chain and block it was read on, or the short address. */

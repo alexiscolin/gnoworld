@@ -8,13 +8,10 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page: 197,951 B (D386); 256,839 B with TanStack and the perf pass (D13973, D13977); 257,751 B with the
-// card opened alone (D13979) and the fonts (D13978); 258,074 B with the name asked after a Connect and in the chat (D13981, D13982).
-const FIRST_SCREEN_JS = 258_074;
-// A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the rail on its first screen); 255,657 B
-// with the realm plate and the perf pass (D13964, D13977); 256,017 B with the card opened alone (D13979) and the fonts (D13978);
-// 256,336 B with the name asked after a Connect and in the chat (D13981, D13982).
-const PLAIN_FIRST_SCREEN_JS = 256_336;
+// The Earth's or a world's page, exact: 265,038 B on 2026-11-12, a world's (D13948, provisional till the hardening; its history D386 on).
+const FIRST_SCREEN_JS = 265_038;
+// A page with no plate (the home), exact: 262,551 B on 2026-11-12 (D13948, provisional till the hardening; its history D386 on).
+const PLAIN_FIRST_SCREEN_JS = 262_551;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -146,8 +143,8 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09; 45,824 B
 // with the realm plate's moved bytes (slice 13); 46,464 B on 2026-11-11, 46,208 B measured with the chat's move on Web Animations
-// (D13980), 256 B ahead.
-const LATE_CHAT_JS = 46_464;
+// (D13980), 256 B ahead; 50,032 B on 2026-11-12 (49,776 B measured, 256 B ahead; D13948).
+const LATE_CHAT_JS = 50_032;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
@@ -163,15 +160,15 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 46791,
-  HubPlate: 45903,
+  EarthPlate: 51022, // 2026-11-12: 50,766 B measured, 256 B ahead (D13948)
+  HubPlate: 46963, // 2026-11-12: 46,707 B measured, 256 B ahead (D13948)
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
   hours: 618,
   Bars: 3336,
   ChartedBy: 608,
-  realms: 950,
+  realms: 8307, // D13948: two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,051 B of realm code; hardening splits them
   worlds: 1126,
 };
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).

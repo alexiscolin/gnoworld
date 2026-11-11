@@ -10,6 +10,7 @@ export {
   EarthRooms,
   Ecosystems,
   EMBED_PREFIXES,
+  holdsHidden,
   Events,
   Genres,
   Hubs,
@@ -19,17 +20,22 @@ export {
   Universes,
 } from "./data.ts";
 export { Expedition, Quests } from "./discovery.ts";
-export { OnAir, XPosts } from "./feeds.ts";
+export { BlogPost, OnAir } from "./feeds.ts";
 export { CallRequest } from "./call.ts";
+export { CARD_CAPS, CardEvent, CardRemove, LineCards, LinkCard, ReaderCard } from "./cards.ts";
+// The one rule for hidden (Cc, Cf) characters, which the link reader applies to a page's text.
+export { hasHidden, stripHidden } from "./hidden.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";
 // The chain events' schemas are values at "@gnoworld/schemas/chainEvents" (a page loads them on its first event, in a chunk of its own); here, the types.
 export type { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
 export {
+  ASK_WAIT_S,
   AnswerButton,
   Digest,
   DigestBlock,
   DOOR_CAPS,
+  EXPLAIN_VERSION,
   JARVIS_CAPS,
   JARVIS_LINES,
   JARVIS_KEY_HEADER,
@@ -47,6 +53,7 @@ export {
   JarvisPaidAnswer,
   JarvisQuestion,
   JarvisSettings,
+  JarvisState,
   JarvisTranslate,
   JarvisTranslateRequest,
   JarvisTranslation,
@@ -56,6 +63,15 @@ export {
 export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
+export {
+  SEARCH_PAGE,
+  SEARCH_Q_MAX,
+  SEARCH_Q_MIN,
+  SEARCH_SNIPPET,
+  SearchHit,
+  SearchPage,
+  SearchQuery,
+} from "./search.ts";
 export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
 export { Key, Slug } from "./slug.ts";
 export { Guest, GuestCause, GuestRefusal, GuestSaid, GuestSayRequest } from "./guest.ts";

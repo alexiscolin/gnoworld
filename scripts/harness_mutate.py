@@ -241,15 +241,15 @@ def mutants():
     yield from each(SERVER, '"packages/service/**/*.ts"', '"packages/service/**/*.nothing"', "probe", "eslint reaches the service package's files")
     # The walls (decision-isolation.md, D110 to D112): each folder's bans by name, the service package's zone; the zones'
     # exceptions are the names loop's above.
-    yield from each(SERVER, 'banned("jarvis", SERVER)', 'banned("never", SERVER)', "probe", "eslint the server refuses Jarvis by name")
-    yield from each(SERVER, 'banned("server", JARVIS)', 'banned("never", JARVIS)', "probe", "eslint Jarvis refuses the server by name")
-    listed = 'banned("server|jarvis|app|chain", SERVICE)'
+    yield from each(SERVER, 'banned("jarvis|link-reader", SERVER)', 'banned("never", SERVER)', "probe", "eslint the server refuses Jarvis by name")
+    yield from each(SERVER, 'banned("server|link-reader", JARVIS)', 'banned("never", JARVIS)', "probe", "eslint Jarvis refuses the server by name")
+    listed = 'banned("server|jarvis|link-reader|app|chain", SERVICE)'
     for name in ("server|", "jarvis|", "app|", "|chain"):
         yield from each(SERVER, listed, listed.replace(name, "", 1), "probe", f"eslint the service package refuses {name.strip('|')} by name")
     yield from each(SERVER, 'target: "./packages/service"', 'target: "./nowhere"', "probe", "eslint the service package reaches no path out of its folder")
     # A module in another extension, and a require made by hand (D123): each pattern and each module name.
-    yield from each("eslint.config.ts", '"{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",', '"nowhere/**",', "probe", "eslint refuses a module of the product in another extension")
-    yield from each("eslint.config.ts", '"{server,jarvis,packages/service}/**/*.tsx",', '"nowhere/**",', "probe", "eslint refuses a .tsx under the services")
+    yield from each("eslint.config.ts", '"{app/src,server,jarvis,link-reader,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",', '"nowhere/**",', "probe", "eslint refuses a module of the product in another extension")
+    yield from each("eslint.config.ts", '"{server,jarvis,link-reader,packages/service}/**/*.tsx",', '"nowhere/**",', "probe", "eslint refuses a .tsx under the services")
     yield from each(SERVER, '["node:module", "module"]', '["module"]', "probe", "eslint the services refuse createRequire from node:module")
     yield from each(SERVER, '["node:module", "module"]', '["node:module"]', "probe", "eslint the services refuse createRequire from module")
     yield from each(CHAIN, 'target: "./packages/chain"', 'target: "./nowhere"', "probe", "eslint the chain package reaches no path out of its folder")
@@ -354,10 +354,10 @@ def mutants():
     yield from each("lint/shared.config.ts", ', "**/*.bench.tsx"', "", "probe", "eslint a .tsx bench is never switched off")
     yield from each("eslint.config.ts", 'CLASS_AT_END, SWITCHED_OFF] },\n  },\n  {\n    files: ["**/*.css"]', 'CLASS_AT_END] },\n  },\n  {\n    files: ["**/*.css"]', "probe", "eslint the bench block holds the switched-off selector")
     # No state at a module's top (F412): the block for every workspace's source, core's and ui's own lists, the selector's parts.
-    both = '"server/src/**/*.ts", "jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
-    yield from each("eslint.config.ts", both, '"jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
-    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a Jarvis module's top")
-    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "jarvis/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
+    both = '"server/src/**/*.ts", "jarvis/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
+    yield from each("eslint.config.ts", both, '"jarvis/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a Jarvis module's top")
+    yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "jarvis/src/**/*.ts", "link-reader/src/**/*.ts"', "probe", "eslint keeps no state at a workspace module's top")
     yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", ...SWALLOWED, CLASS_AT_END]', "probe", "eslint's workspace block refuses state at a module's top")
     yield from each("eslint.config.ts", '"error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE]', '"error", CLASS_AT_END, MODULE_STATE]', "probe", "eslint's workspace block keeps the swallowed errors refused")
     yield from each("lint/core.config.ts", "...SWALLOWED, CLASS_AT_END, ", "...SWALLOWED, ", "probe", "eslint core refuses a u class right before $ (F821)")
@@ -1726,7 +1726,7 @@ def mutants():
     for find, replace, label in (
         ("\t\t\tall=true\n\t\t\tcase $path in\n", "\t\t\t:\n\t\t\tcase $path in\n", "a path of no known area runs everything"),
         ("$all && ts=true app=true gno=true\n", ":\n", "no change runs everything"),
-        (" | jarvis/src/* | packages/service/src/*)", ")", "a change of Jarvis or the service package is the server's kind (D110, D111)"),
+        (" | jarvis/src/* | link-reader/src/* | packages/service/src/*)", ")", "a change of Jarvis or the service package is the server's kind (D110, D111)"),
         (" | packages/chain/src/*", "", "a change of the chain package is core's kind (D112)"),
         ('"$@" &&\n\t\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\t\tgit -c core.quotePath=false ls-files', "a git that cannot list the change fails the gate"),
         ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),

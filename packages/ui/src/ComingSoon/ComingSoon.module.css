@@ -5,15 +5,6 @@
     cursor: not-allowed;
   }
 
-  /* An icon alone is square, as an IconButton. */
-  .soon[data-square] {
-    /* layout: as wide as high, its icon in the middle */
-    aspect-ratio: 1;
-    padding-inline: 0;
-    /* layout: the icon in the middle */
-    justify-content: center;
-  }
-
   /* A face that is no control: no pill, the words as they are. */
   .plain {
     padding: 0;

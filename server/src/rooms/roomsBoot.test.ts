@@ -10,7 +10,7 @@ import type { Roles } from "../roles/roles.ts";
 import { makeApp } from "../app.ts";
 import { loadConfig, type Config } from "../config.ts";
 import { fakeChain, RPC } from "../testing/fakeWorldsChain.ts";
-import { EARTH_TABLES, makeRooms, REALM_TABLES, ROOM_STATE } from "./create.ts";
+import { EARTH_TABLES, makeRooms, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
 import { roomsBoot } from "./roomsBoot.ts";
 import { ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
 
@@ -56,7 +56,7 @@ const configOf = (extra: Record<string, string>): Config =>
   loadConfig({ DATABASE: join(dir, "server.db"), LOG_PEPPER_FILE: pepper, ORIGINS: ORIGIN, ...extra });
 
 const boot = (config: Config, over: { send?: Send } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
   ensureRooms(db, ["earth"], 0);
   const rooms = makeRooms({ db, send: () => true, now: () => 0, max: 20 });
   const log = logger(PEPPER, () => undefined);

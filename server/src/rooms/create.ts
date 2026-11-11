@@ -16,6 +16,12 @@ export const REALM_TABLES = `
 CREATE TABLE realm_rooms (name TEXT PRIMARY KEY) STRICT;
 `;
 
+// The realm a realm's room was made for (its name holds only a hash of it), so a list can link the room to the realm's page; null for a
+// room made before this column, filled from the worlds file or at the first ask for the realm (tagRealm).
+export const REALM_PATH = `
+ALTER TABLE realm_rooms ADD COLUMN path TEXT;
+`;
+
 // The Earth's public rooms (D394): any signed-in account makes one, so each records its maker, who moderates it, and when.
 export const EARTH_TABLES = `
 CREATE TABLE earth_rooms (name TEXT PRIMARY KEY, maker TEXT NOT NULL, created_at INTEGER NOT NULL) STRICT;
@@ -40,7 +46,9 @@ const CHANNEL_MAX = 64;
 export interface Rooms {
   create: (world: string, name: string) => { made: string } | "exists" | "full" | "too_long";
   /** A realm's room, named by core's realmRoom: made once, in its world, whatever the world's moderators' cap. */
-  realm: (room: string, reserve?: number) => { made: string } | "exists" | "full";
+  realm: (room: string, reserve?: number, path?: string) => { made: string } | "exists" | "full";
+  /** Records the realm `path` of a realm's room that has none yet (made before the column); a room another's or already tagged is left alone. */
+  tagRealm: (room: string, path: string) => void;
   /** What `realm` would answer, with no work done: "ok", "exists" or "full". */
   mayRealm: (room: string, reserve?: number) => "ok" | "exists" | "full";
   /** Whether a room is a realm's (made for a realm, not a moderator's or the Earth's). */
@@ -86,7 +94,8 @@ const roomSql = (db: DatabaseSync) => ({
     "SELECT count(*) AS n FROM rooms WHERE world = ? AND name <> ? AND name NOT IN (SELECT name FROM realm_rooms UNION SELECT name FROM earth_rooms)",
   ),
   realms: db.prepare("SELECT count(*) AS n FROM realm_rooms"),
-  realm: db.prepare("INSERT INTO realm_rooms (name) VALUES (?)"),
+  realm: db.prepare("INSERT INTO realm_rooms (name, path) VALUES (?, ?)"),
+  tag: db.prepare("UPDATE realm_rooms SET path = ? WHERE name = ? AND path IS NULL"),
   isRealm: db.prepare("SELECT 1 AS yes FROM realm_rooms WHERE name = ?"),
   ...earthSql(db),
   add: db.prepare("INSERT INTO rooms (name, world, created_at) VALUES (?, ?, ?)"),
@@ -151,11 +160,14 @@ export function makeRooms({
       if (Count.parse(sql.count.get(world, mainRoom(world))).n >= max) return "full";
       return open(room, world);
     },
-    realm(room, reserve) {
+    realm(room, reserve, path) {
       const may = mayRealm(room, reserve);
       if (may !== "ok") return may;
-      sql.realm.run(room);
+      sql.realm.run(room, path ?? null);
       return open(room, worldOf(room));
+    },
+    tagRealm(room, path) {
+      sql.tag.run(path, room);
     },
     archive(world, name) {
       const room = `${mainRoom(world)}/${name}`;

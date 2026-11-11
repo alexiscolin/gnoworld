@@ -65,6 +65,11 @@
     opacity: 0.25;
   }
 
+  /* The centre's name written under it, when its dot is too small for it: the text's own colour, as the centre's. */
+  .name {
+    fill: var(--color-text);
+  }
+
   .none {
     fill-opacity: 0.6;
   }

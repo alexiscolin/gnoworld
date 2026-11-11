@@ -52,7 +52,6 @@ function setup(over: Partial<SignsDeps> = {}, list: RoomList["sections"] | undef
   const ground = {
     setMarks: vi.fn(),
     facing: vi.fn<() => { lat: number; lon: number } | undefined>(() => ({ lat: 36, lon: 138 })),
-    face: vi.fn(),
   };
   const signs = new Signs({ store, ground, rules, places: PLACES, ...over });
   const told = vi.fn();
@@ -129,7 +128,7 @@ describe("what comes up", () => {
     const store = createAppStore();
     store.getState().chatActions.follow(["#earth"]);
     store.getState().chatActions.connected(ME);
-    const ground = { setMarks: vi.fn(), facing: vi.fn(() => ({ lat: 36, lon: 138 })), face: vi.fn() };
+    const ground = { setMarks: vi.fn(), facing: vi.fn(() => ({ lat: 36, lon: 138 })) };
     const signs = new Signs({ store, ground, rules, places: PLACES });
     left.push(signs.start());
     say(store, "m1");
@@ -293,50 +292,19 @@ describe("what leaves at once (F3366)", () => {
 });
 
 describe("your own line", () => {
-  it("turns the globe to your country, once a line", async () => {
-    const { store, ground, stop } = await started();
-    left.push(stop);
-    ground.facing.mockReturnValue({ lat: 0, lon: -100 });
-    say(store, "m1", { from: ME, country: "FR" });
-    expect(ground.face).toHaveBeenCalledTimes(1);
-    expect(ground.face).toHaveBeenCalledWith({ lat: 46.7, lon: 2.6 });
-    await vi.advanceTimersByTimeAsync(2000);
-    expect(ground.face).toHaveBeenCalledTimes(1);
-  });
-
-  it("turns again for your next line", async () => {
-    const { store, ground, stop } = await started();
-    left.push(stop);
-    say(store, "m1", { from: ME, country: "FR" });
-    await vi.advanceTimersByTimeAsync(1000);
-    say(store, "m2", { from: ME, country: "JP" });
-    expect(ground.face).toHaveBeenLastCalledWith({ lat: 36.1, lon: 138.4 });
-  });
-
-  it("never turns for another's line", async () => {
-    const { store, ground, stop } = await started();
-    left.push(stop);
-    say(store, "m1");
-    expect(ground.face).not.toHaveBeenCalled();
-  });
-
-  it("shows no bubble of yours and no turn for an old line that history brought back", async () => {
+  it("shows its bubble, and flies nothing: the ground turns the planet to it alone (D13998)", async () => {
     const { store, signs, ground, stop } = await started();
+    left.push(stop);
+    say(store, "m1", { from: ME, country: "FR" });
+    expect(signs.snapshot().bubbles.map(({ own: yours }) => yours)).toEqual([true]);
+    expect(Object.keys(ground).sort()).toEqual(["facing", "setMarks"]);
+  });
+
+  it("shows no bubble of yours for an old line that history brought back", async () => {
+    const { store, signs, stop } = await started();
     left.push(stop);
     say(store, "m1", { from: ME, country: "FR", at: NOW - rules.maxAgeSeconds * 1000 - 1 });
     expect(signs.snapshot().bubbles).toEqual([]);
-    expect(ground.face).not.toHaveBeenCalled();
-  });
-
-  it("turns for no line of yours with no country, nor one in a room the list calls private", async () => {
-    const { store, ground, stop } = await started();
-    left.push(stop);
-    store.getState().chatActions.follow(["#earth", "#earth/kyoto"]);
-    const parsed = parseLine(`@msgid=m1;time=${new Date().toISOString()};account=${ME} :${ME}!u@h PRIVMSG #earth :hi`);
-    if (!parsed.ok) throw new Error("no line");
-    store.getState().chatActions.heard(parsed.message);
-    say(store, "m2", { from: ME, country: "FR", room: "#earth/kyoto" });
-    expect(ground.face).not.toHaveBeenCalled();
   });
 });
 

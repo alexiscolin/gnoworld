@@ -13,13 +13,13 @@ function isOwn(href: string, origin: string | undefined): boolean {
   }
 }
 
-/** The way a page draws its links: `link` is the reader's own drawing, which leaves a link on gnoweb to the usual anchor and
+/** The way a page draws its links (`also`: a second origin that is ours, the app's own): `link` is the reader's own drawing, which leaves a link on gnoweb to the usual anchor and
  * gives any other a button; `dialog` is the one warning they share, to be drawn once in the page. */
-export function useExternalLinks(origin: string | undefined) {
+export function useExternalLinks(origin: string | undefined, also?: string) {
   const { ask, dialog } = useLeaving();
   return {
     link: (href: string, label: ReactNode[]): ReactNode =>
-      isOwn(href, origin) ? undefined : (
+      isOwn(href, origin) || (also !== undefined && isOwn(href, also)) ? undefined : (
         <button
           type="button"
           className={styles["external"]}

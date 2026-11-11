@@ -65,6 +65,9 @@ export class Space {
         enterHit(options.events, hitOf(item));
       },
       name: (item) => labelOf(item, options.name),
+      warm: (item) => {
+        if ("system" in item) this.stage.near?.warm.planet(item, true);
+      },
     });
     wireHands(this, this.#leaving.signal);
     draw(this, this.#leaving.signal);
@@ -120,8 +123,8 @@ export class Space {
     this.#asked = place;
     const universe = this.universe;
     if (universe === undefined || this.#there(place)) return this.rig.flying;
-    this.place = place;
-    this.neared = false;
+    [this.place, this.neared] = [place, false];
+    this.stage.near?.warm.place({ planet: this.planet, system: this.system, universe, eye: this.rig.eye });
     this.stage.effects.scan.play(undefined);
     const goal = this.#goalOf(place, universe);
     if (goal === undefined) return false;

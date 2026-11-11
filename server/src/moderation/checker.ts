@@ -10,7 +10,7 @@ import { publicRoom, type World } from "../rooms/types.ts";
 import { makeChecker, withBreaker } from "./check.ts";
 import { makeMutes } from "./mute.ts";
 import { makeNameChecker } from "./name.ts";
-import { moderationClient, type Answer } from "./provider.ts";
+import { moderationClient, type Answer, type ModerationInput } from "./provider.ts";
 import { makeStrike } from "./strikes.ts";
 
 interface Checked {
@@ -28,18 +28,25 @@ interface Told {
   // The provider OpenAI's client stands for, given by the tests.
   provider?: (text: string) => Promise<Answer | "unchecked">;
   // The provider behind its one breaker (providerOf), made once and shared; made here when none is given.
-  ask?: ((text: string) => Promise<Answer | "unchecked">) | undefined;
+  ask?: Ask | undefined;
 }
 
-type Ask = (text: string) => Promise<Answer | "unchecked">;
+// What the provider takes: a message, or a link card's text and picture (provider.ts).
+// The provider behind the lines' breaker: whether it is paused, and the client itself for another breaker (the link cards').
+export type Provider = Ask & { open: () => boolean; raw: Ask };
+type Ask = (input: ModerationInput) => Promise<Answer | "unchecked">;
 
 /** OpenAI's client when a key is set, or the one the tests give, behind one breaker: made once, it is shared by the lines' check, the
  * rooms' names and the guests' lines, so an outage seen by one is seen by all. */
-export function providerOf({ moderation }: Checked, { provider, log, now = Date.now }: Told): Ask | undefined {
-  const client =
-    provider ??
-    (moderation.openaiKey === undefined ? undefined : moderationClient({ key: moderation.openaiKey.reveal(), log }));
-  return client === undefined ? undefined : withBreaker(client, { now, log });
+export function providerOf({ moderation }: Checked, { provider, log, now = Date.now }: Told): Provider | undefined {
+  // A given provider takes text: a card's parts reach it as their text.
+  const client: Ask | undefined =
+    provider === undefined
+      ? moderation.openaiKey === undefined
+        ? undefined
+        : moderationClient({ key: moderation.openaiKey.reveal(), log })
+      : (input) => provider(typeof input === "string" ? input : input.text);
+  return client === undefined ? undefined : Object.assign(withBreaker(client, { now, log }), { raw: client });
 }
 
 /** The check of a room's name, as the line's check reads a message: its world's rules, then the provider (D394). */

@@ -11,7 +11,21 @@ vi.mock("../planet/maps.ts", async (original) => ({
       loads.answer.set(url, resolve);
     }),
 }));
-vi.mock("../earth/maps.ts", () => ({ loadEarthMaps: () => new Promise(() => undefined) }));
+vi.mock("../quality.ts", () => ({ lowQuality: () => false }));
+vi.mock("../../later.ts", () => ({
+  afterLoad: (then: () => void) => {
+    then();
+  },
+}));
+const earth = vi.hoisted(() => ({ full: 0 }));
+vi.mock("../earth/maps.ts", () => ({
+  loadEarthMaps: () => Promise.resolve({ day: {}, night: {}, moon: {} }),
+  loadFullEarth: () => {
+    earth.full += 1;
+    return new Promise(() => undefined);
+  },
+  loadReliefMaps: () => new Promise(() => undefined),
+}));
 
 const { Maps } = await import("./maps.ts");
 const named = (name: string): string | undefined => loads.asked.find((url) => url.includes(`/${name}.`));
@@ -34,5 +48,28 @@ describe("Maps priority", () => {
     maps.setOf(["eris"]);
     maps.setOf(["jupiter"]);
     expect(named("eris") && named("jupiter")).toBeTruthy();
+  });
+});
+
+describe("the Earth's full-size maps", () => {
+  const asks = async (connection: object) => {
+    vi.stubGlobal("navigator", { connection });
+    earth.full = 0;
+    const maps = new Maps("/");
+    maps.earth();
+    maps.setOf(["clouds"]);
+    for (const resolve of loads.answer.values()) resolve({ dispose: () => undefined } as Texture);
+    await new Promise((done) => setTimeout(done, 20));
+    maps.fullEarth();
+    await new Promise((done) => setTimeout(done, 20));
+    return earth.full;
+  };
+
+  it("come on a link the browser calls 3g: only a reader who saves data keeps the half-size ones (the Earth looked blurry close up)", async () => {
+    expect(await asks({ effectiveType: "3g" })).toBe(1);
+  });
+
+  it("never come to a reader who saves data", async () => {
+    expect(await asks({ saveData: true })).toBe(0);
   });
 });

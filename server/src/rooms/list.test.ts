@@ -5,7 +5,7 @@ import { makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { VERDICT_TABLES } from "../moderation/check.ts";
-import { EARTH_TABLES, ROOM_STATE } from "./create.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
 import { ROOM_SAID } from "./earth.ts";
 import { ensureNamed, ensureRooms, ROOM_TABLES } from "./rooms.ts";
 import { listRoutes } from "./list.ts";
@@ -58,7 +58,15 @@ const setup = (
   see: typeof visible = visible,
   here: (room: string) => number | undefined = () => undefined,
 ) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, VERDICT_TABLES, ROOM_STATE, EARTH_TABLES, ROOM_SAID]);
+  const db = openDatabase(":memory:", [
+    ROOM_TABLES,
+    VERDICT_TABLES,
+    ROOM_STATE,
+    REALM_TABLES,
+    REALM_PATH,
+    EARTH_TABLES,
+    ROOM_SAID,
+  ]);
   opened.push(db);
   // Made in an order no sort would give: the order of the answer is the route's.
   ensureNamed(
@@ -100,6 +108,24 @@ const setup = (
 };
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" }));
+
+describe("GET /api/rooms?world=, a realm's room", () => {
+  it("carries its realm's path for a guest and an account, and no other room carries one", async () => {
+    const { db, sectionsFor } = setup();
+    ensureNamed(db, [{ name: "#bubble/golf-0123456789", world: "bubble" }], T0);
+    db.prepare(
+      "INSERT INTO realm_rooms (name, path) VALUES ('#bubble/golf-0123456789', 'gno.land/r/bubble/golf')",
+    ).run();
+    const rooms = (list: RoomList) => list.sections.flatMap((section) => section.rooms);
+    for (const who of [undefined, "member"]) {
+      const found = rooms((await sectionsFor(who, "bubble")).list);
+      expect(found.find(({ room }) => room === "#bubble/golf-0123456789")?.realm).toBe("gno.land/r/bubble/golf");
+      expect(found.filter(({ room }) => room !== "#bubble/golf-0123456789").every((one) => !("realm" in one))).toBe(
+        true,
+      );
+    }
+  });
+});
 
 describe("GET /api/rooms?world=", () => {
   it("answers a guest the sections in the file's order, then a section named null with the other rooms", async () => {

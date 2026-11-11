@@ -9,8 +9,9 @@ import { LoadingShape } from "./Loading.tsx";
 const SETTLED = "#chat [data-chat-state='connected']";
 const BOUND_MS = 3500;
 
-/** The skeleton over the dock; it leaves itself once the chat under it has settled. */
-export function DockCover() {
+/** The skeleton over the dock; it leaves itself once the chat under it has settled, or the bound has passed unless the chat is `waiting`
+ * to be made: an empty dock is never left standing. */
+export function DockCover({ waiting = false }: { waiting?: boolean }) {
   const [leaving, setLeaving] = useState(false);
   const [gone, setGone] = useState(false);
   useEffect(() => {
@@ -26,12 +27,12 @@ export function DockCover() {
       attributes: true,
       attributeFilter: ["data-chat-state"],
     });
-    const timer = setTimeout(leave, BOUND_MS);
+    const timer = waiting ? undefined : setTimeout(leave, BOUND_MS);
     return () => {
       watch.disconnect();
       clearTimeout(timer);
     };
-  }, []);
+  }, [waiting]);
   useEffect(() => {
     if (!leaving) return undefined;
     const timer = setTimeout(() => {

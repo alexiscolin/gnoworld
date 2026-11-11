@@ -3,7 +3,8 @@
 // off the page's text, the Earth, the great star, the rail and the Moon's whole path, in no crowd, pile or row: 7p's judge), the one
 // farthest from those standing already (the best candidate, D349), so a list spreads again as it changes; others light a far belt.
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
-import { textHash, unitOf, nextState, type Point } from "../space/cell.ts";
+import type { Point } from "../space/cell.ts";
+import { Draws } from "./draws.ts";
 import { clamp01 } from "../space/smooth.ts";
 import { composed } from "../frame/composition.ts";
 import { offMoon, type MoonRing } from "../frame/earthMoon.ts";
@@ -55,8 +56,8 @@ export function onOrbit({ reach, tilt, node }: Placed["orbit"], phase: number): 
 
 // The place `key`'s draws give `asked`: its orbit `near` to `far` Earth radii out, leaning up to `lean`, its node and phase anywhere.
 function drawn(asked: Asked, key: string, { near, far, lean }: { near: number; far: number; lean: number }): Placed {
-  let state = textHash(key);
-  const draw = () => unitOf((state = nextState(state)));
+  const draws = new Draws(key);
+  const draw = (): number => draws.unit();
   const orbit = {
     reach: (near + (far - near) * draw()) * EARTH_RADIUS,
     tilt: (draw() - 0.5) * lean,

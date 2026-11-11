@@ -47,9 +47,9 @@ describe("the home's preloads", () => {
 describe("the Earth's and a world's page preloads", () => {
   const hrefs = (tags: string) => [...tags.matchAll(/href="([^"]*)"/g)].map((match) => match[1]);
 
-  it("name the worlds file alone for each universe's Earth: its 4096 maps would pass the 3 MB budget where the 3D never starts", () => {
+  it("name the worlds file and the first-frame maps for each universe's Earth: its planet is built from them", () => {
     for (const id of ["routes/earth", "universe-earth"])
-      expect(hrefs(pagePreloads(id, undefined))).toEqual(["/worlds.json"]);
+      expect(hrefs(pagePreloads(id, undefined))).toEqual(["/worlds.json", ...hrefs(preloadTags())]);
   });
 
   it("name the worlds file and the maps the world's planet reads, from its hub's world", () => {

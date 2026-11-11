@@ -3,13 +3,25 @@
 // once each while in view, VERDICTS_ASKED a request. After a failure that may pass, nothing is asked for a rest, then the view last
 // given is asked again (F874).
 import type { Line } from "@gnoworld/core";
-import { type LineVerdicts, type Signal, type StreamEvent, VerdictId, VERDICTS_ASKED } from "@gnoworld/schemas";
+import {
+  type CardEvent,
+  type LineCards,
+  type LineVerdicts,
+  type Signal,
+  type StreamEvent,
+  VerdictId,
+  VERDICTS_ASKED,
+} from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
 import { own } from "../../store/record.ts";
 
 export interface Asking {
   /** The server's verdicts of these lines of a room (lib/api/verdicts.ts). */
   verdicts: (room: string, ids: readonly string[]) => Promise<Result<LineVerdicts>>;
+  /** The server's cards of these lines (lib/api/cards.ts), asked beside the verdicts; none: no card is asked. */
+  cards?: ((room: string, ids: readonly string[]) => Promise<Result<LineCards>>) | undefined;
+  /** The cards one answer gave, into the store. */
+  carded?: ((events: readonly CardEvent[]) => void) | undefined;
   /** A verdict the stream gave, into the store. */
   judged: (event: StreamEvent) => void;
   /** The verdicts one answer of the server gave, into the store at once (F1057). */
@@ -19,7 +31,7 @@ export interface Asking {
   /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts, its word of when it began following
    * (in ms), and its end for good; stops when called. */
   follow: (room: string, on: Told) => () => void;
-  /** Whether a line's text holds a link a player is shown for (linked.ts). */
+  /** Whether a line's text holds a link a player or a card is shown for (linked.ts). */
   linked: (text: string) => boolean;
   /** A first signal the same stream gave (slice 9h): the page follows one stream, not one for each thing it hears. */
   signal?: ((signal: Signal) => void) | undefined;
@@ -77,7 +89,13 @@ interface Following {
 
 // Asks the server of the lines in view said before the stream began (F884), once each while in view, VERDICTS_ASKED
 // a request; after a failure that may pass, rests, then asks the view last given again (F874).
-function serverAsker({ verdicts, judgedAll, linked }: Pick<Asking, "verdicts" | "judgedAll" | "linked">) {
+function serverAsker({
+  verdicts,
+  judgedAll,
+  linked,
+  cards,
+  carded,
+}: Pick<Asking, "verdicts" | "judgedAll" | "linked" | "cards" | "carded">) {
   const asked = new Map<string, Set<string>>();
   // The view last given, asked again when a rest ends; the rest under way, during which nothing is asked.
   let latest: { room: string; view: InView } | undefined;
@@ -95,6 +113,17 @@ function serverAsker({ verdicts, judgedAll, linked }: Pick<Asking, "verdicts" | 
       for (const id of ids) mine.delete(id);
       rest(ms);
     };
+    // The cards of the same lines: a failure that may pass rests and asks again as the verdicts' does (the same `failed`); the others never.
+    cards?.(room, ids).then(
+      (got) => {
+        if (got.ok) {
+          if (got.value.cards.length > 0) carded?.(got.value.cards.map(({ msgid, key }) => ({ msgid, room, key })));
+        } else if (PASSING.has(got.reason)) failed(got.reason === "too_many" ? BUSY_REST_MS : REST_MS);
+      },
+      () => {
+        failed(REST_MS);
+      },
+    );
     verdicts(room, ids).then(
       (got) => {
         if (got.ok) judgedAll(got.value.verdicts.map(({ msgid, state }) => ({ msgid, room, state })));
@@ -139,8 +168,8 @@ function serverAsker({ verdicts, judgedAll, linked }: Pick<Asking, "verdicts" | 
   };
 }
 
-export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked, signal }: Asking) {
-  const server = serverAsker({ verdicts, judgedAll, linked });
+export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked, signal, cards, carded }: Asking) {
+  const server = serverAsker({ verdicts, judgedAll, linked, cards, carded });
   let following: Following | undefined;
   // The shown lines said before the stream's word are the server's to answer; before its word, nothing is asked.
   const askShown = () => {

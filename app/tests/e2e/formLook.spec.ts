@@ -1,5 +1,5 @@
 import { adena } from "./adena.ts";
-import { calls, callWallet, connect, openRealm, writeChain } from "./callCard.ts";
+import { calls, callWallet, connect, openRealm, openRow, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
 // A page's form with a Call, and a write row that sends to gnoweb, as they look on a computer's screen (9e; frames 31 to 33): the
@@ -17,10 +17,18 @@ test.describe("a page's form and a gnoweb row, as they look", () => {
     const mask = [page.getByRole("banner")];
     const form = page.getByRole("figure");
     await expect(form).toHaveScreenshot("form-call.png", { mask });
+    await openRow(page, "Upload");
     await expect(calls(page).getByRole("listitem").filter({ hasText: "Upload" })).toHaveScreenshot("row-gnoweb.png", {
       mask,
     });
     await form.getByRole("button", { name: "Call SetProfile" }).click();
-    await expect(page.getByRole("article").first()).toHaveScreenshot("form-card.png", { mask });
+    // The call card opens whole inside the page card's window: the realm's page is an article too, and holds it.
+    await expect(page.getByText(/Stamped/)).toBeHidden({ timeout: 15_000 });
+    await expect(page.getByRole("article").filter({ hasText: "Signature request" }).last()).toHaveScreenshot(
+      "form-card.png",
+      {
+        mask,
+      },
+    );
   });
 });

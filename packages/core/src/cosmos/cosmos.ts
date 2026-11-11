@@ -3,6 +3,7 @@
 // consecutive ranks and near rays, one blob. Height comes from a smooth field of position, so no list of clusters. An arrival moves others
 // outward, a little, and what moved drifts there over a season. Only the sines differ between engines, in a last bit no cell depends on.
 import { cellHash, nextState, textHash, unitOf } from "../space/cell.ts";
+import { Draws } from "../station/draws.ts";
 import { heightField } from "../space/mood.ts";
 import { lerp, smoothstep } from "../space/smooth.ts";
 import { seatInRings, type Seat } from "./rings.ts";
@@ -96,11 +97,8 @@ function placeOf(seed: number, { ring, cell }: Seat): SystemPlace {
   const twist = unitOf(cellHash(RINGS, { x: ring, y: 0, z: 0 }));
   const angle = (TURN * (cell + twist)) / (6 * ring);
   // The stream's first number is the system's place in its wedge.
-  let state = nextState(seed);
-  const unit = (): number => {
-    state = nextState(state);
-    return unitOf(state);
-  };
+  const draws = new Draws(nextState(seed));
+  const unit = (): number => draws.unit();
   const away = TURN * unit();
   const reach = STRAY * Math.sqrt(unit());
   // A ring's cells take turns above and below the field, so two neighbours on a ring never share a side (7d6, a disc in 3D).

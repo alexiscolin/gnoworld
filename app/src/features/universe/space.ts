@@ -12,7 +12,10 @@ import { labelWords } from "./worldFact.ts";
 import { site } from "../../places.ts";
 import { motionOf } from "../../space/motion.ts";
 import { feedMoons, stopMoons } from "./moonRooms.ts";
-import { enterPage, landTags, waitTags } from "./arrival.ts";
+import { enterPage, landTags } from "./arrival.ts";
+import { markFlown, syncFlown } from "./flown.ts";
+
+export { syncFlown };
 import { layers } from "./firstLook.ts";
 import { attach } from "../../earthGround.ts";
 import { circleOf } from "./pageCircle.ts";
@@ -20,33 +23,26 @@ import { gpuCanDraw } from "./gpu.ts";
 import { lightSpace } from "../../lenses.ts";
 import { isMap, onMap } from "../../mapView.ts";
 import { views } from "./views.ts";
+import { exposeSpace } from "./spaceHook.ts";
 import { worldsFile } from "./worldsFile.ts";
 import styles from "./Universe.module.css";
 
 const loadEngine = () => import("../../space/scene.ts");
 
 let space: Space | undefined;
-let starting = false;
-let reading = false;
-let releasing = false;
+let [starting, reading, releasing] = [false, false, false];
 let asked: Place | undefined;
 let navigate: (href: string) => void = () => undefined;
 const drawn = { done: false, heard: new Set<() => void>() };
 
 // Each world's page as the rail's links say it (lib/hubWorld.ts): its hub's, else its first realm's view; the Earth's own.
 let pages: ReadonlyMap<string, string> = new Map();
-const hrefOf = (id: string) => pages.get(id);
 
 const globe = () => document.querySelector<HTMLElement>("[data-globe]");
-const markFlown = (flying: boolean) => {
-  const box = globe();
-  if (box !== null) box.dataset["flown"] = flying ? "flying" : "landed";
-  if (flying) waitTags();
-};
 
 const events = {
   world: (id: string) => {
-    const href = hrefOf(id);
+    const href = pages.get(id);
     if (href !== undefined) navigate(href);
   },
   system: (id: string) => {
@@ -57,13 +53,13 @@ const events = {
   },
   near: () => {
     markFlown(false);
-    enterPage(true);
+    enterPage();
   },
   // A flight that never neared (it stood where it was) still lets the page's text in.
   landed: () => {
     const flying = globe()?.dataset["flown"] === "flying";
     if (flying) markFlown(false);
-    if (flying) enterPage(true);
+    if (flying) enterPage();
     landTags();
   },
   drawn: () => {
@@ -110,7 +106,7 @@ function start(): void {
       canvas.dataset["scene"] = "on";
       attach(space);
       // The journeys and the workshop read the engine's state (a production build holds no trace of it).
-      if (import.meta.env.MODE === "development") Reflect.set(globalThis, "__gnoworldSpace", space);
+      exposeSpace(space);
       // The Map (D433): space from above at every level, flown to and from as it is picked; a place asked later is reached the same.
       space.view(isMap());
       import.meta.hot?.dispose(
@@ -235,8 +231,13 @@ export function hold(): void {
   if (space === undefined) return;
   space.hold(circleOf(globe()));
   const plate = document.querySelector("[data-look='plate']")?.getBoundingClientRect();
-  const words = document.querySelector("[data-look='plate'] [data-content]")?.getBoundingClientRect();
-  if (plate !== undefined) space.plate(plate, words?.right ?? plate.right);
+  const content = document.querySelector<HTMLElement>("[data-look='plate'] [data-content]");
+  // Where the words end: the content's right edge less its end padding (--plate-inset-end), where the fill starts to fade; its box alone reaches the plate's edge.
+  const words =
+    content === null
+      ? undefined
+      : content.getBoundingClientRect().right - parseFloat(getComputedStyle(content).paddingInlineEnd);
+  if (plate !== undefined) space.plate(plate, words ?? plate.right);
 }
 
 /** Whether space has drawn its first frame. */
@@ -250,4 +251,5 @@ export function onDrawn(heard: () => void): () => void {
 }
 
 /** Whether a flight brings the page's planet now. */
+export const warmWorld = (id: string): void => space?.stage.near?.warm.planet(space.universe?.byId.get(id), true);
 export const flying = (): boolean => space?.rig.flying === true;

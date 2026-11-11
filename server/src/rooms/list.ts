@@ -10,7 +10,7 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { roomCounts } from "./earth.ts";
-import { worldRooms } from "./rooms.ts";
+import { realmPaths, worldRooms } from "./rooms.ts";
 import { roomType, type Typed } from "./types.ts";
 
 // The Earth's thousand public rooms and the moderators' 20, as RoomList takes.
@@ -42,9 +42,9 @@ interface Counts {
 function sectionsOf(
   roles: Typed,
   world: string,
-  listed: { seen: readonly string[]; counts: Counts },
+  listed: { seen: readonly string[]; counts: Counts; realms: ReadonlyMap<string, string> },
 ): RoomList["sections"] {
-  const { seen, counts } = listed;
+  const { seen, counts, realms } = listed;
   const shown = new Set(seen);
   const named = roles.worlds.get(world)?.sections ?? [];
   const placed = new Set(named.flatMap(({ rooms }) => rooms));
@@ -58,11 +58,13 @@ function sectionsOf(
       rooms: rooms.slice(0, SECTION_ROOMS).map((room) => {
         const here = counts.here(room) ?? 0;
         const messages = counts.messages.get(room) ?? 0;
+        const realm = realms.get(room);
         return {
           room,
           type: roomType(roles, room),
           ...(here > 0 ? { here } : {}),
           ...(messages > 0 ? { messages } : {}),
+          ...(realm === undefined ? {} : { realm }),
         };
       }),
     }));
@@ -116,7 +118,10 @@ export function listRoutes({
     // The answer depends on the session: a shared cache keeps each cookie's apart (F585).
     c.header("cache-control", `${who === undefined ? "public" : "private"}, max-age=5`);
     c.header("vary", "cookie");
-    return c.json({ world, sections: sectionsOf(roles, world, { seen, counts }) } satisfies RoomList);
+    return c.json({
+      world,
+      sections: sectionsOf(roles, world, { seen, counts, realms: realmPaths(db, world) }),
+    } satisfies RoomList);
   });
   return app;
 }

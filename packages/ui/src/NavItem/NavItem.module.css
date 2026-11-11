@@ -34,6 +34,16 @@
     background: var(--color-fill);
   }
 
+  /* What a later slice brings: greyed, refusing the pointer's promise of an act, no fill under it (as ComingSoon). */
+  .item[data-soon] {
+    opacity: var(--opacity-disabled);
+    background: none;
+  }
+
+  .item[data-soon] .main {
+    cursor: not-allowed;
+  }
+
   .item[data-unread] .main {
     font-weight: 500;
   }

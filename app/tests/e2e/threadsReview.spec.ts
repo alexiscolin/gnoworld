@@ -49,18 +49,18 @@ test.describe("threads, from the review", () => {
     await page.keyboard.press("Escape");
     await expect(panel(page)).toHaveCount(0);
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("half a thought");
+    await expect(threadField(page)).toHaveText("half a thought");
     // Another thread has its own field; this one's words wait.
     await threadOf(lineOf(page, "an unrelated line"));
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     await threadField(page).fill("for the other");
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("half a thought");
-    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await expect(threadField(page)).toHaveText("half a thought");
+    await roomsNav(page).getByRole("link", { name: "bubble", exact: true }).click();
     await expect(panel(page)).toHaveCount(0);
-    await roomsNav(page).getByRole("link", { name: "#games" }).click();
+    await roomsNav(page).getByRole("link", { name: "games", exact: true }).click();
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("half a thought");
+    await expect(threadField(page)).toHaveText("half a thought");
     // Memory only: no draft of the panel's is on the device.
     const kept = await page.evaluate(() => JSON.stringify(localStorage));
     expect(kept).not.toContain("half a thought");
@@ -70,7 +70,7 @@ test.describe("threads, from the review", () => {
     expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :half a thought`]);
     await closeButton(page).click();
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
   });
 
   // R7: on a screen that shows both, the list beside the open panel is seen at its end: a live line is marked read.

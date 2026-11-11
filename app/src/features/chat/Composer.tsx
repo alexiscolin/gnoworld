@@ -3,22 +3,25 @@
 // it to an account alone, a room letting accounts alone speak (+M). The design system's field holds the line and
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
-// bar wraps the selection in Markdown's marks; the line shows below as it reads.
+// bar wraps the selection in Markdown's marks.
 import type { Composed } from "@gnoworld/core";
-import { composeDraft } from "./polling.ts";
-import { Field, Stack } from "@gnoworld/ui";
-import { useRef, useState, type KeyboardEvent, type ReactNode, type SubmitEvent } from "react";
-import { completed } from "./complete.ts";
-import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
+import { composeDraft, DRAFT_COMMANDS } from "./polling.ts";
+import { addMarketCard, MARKET, marketAsked } from "./marketCommand.ts";
+import { Stack } from "@gnoworld/ui";
+import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
+import { FIELD, useFocusAtStart, useHelp, useRefusal, type Refused } from "./composerHooks.ts";
+import { LinkTool } from "./composer/LinkTool.tsx";
+import { ComposerField, THEME } from "./composer/ComposerField.tsx";
+import { createComposerEditor } from "./composer/markdownEditor.ts";
+import { suggestions } from "./composer/suggest.ts";
 import { useEditing } from "./EditBar.tsx";
-import { formatted, type Edit, type Format } from "./format.ts";
-import { Message } from "./Message.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 import { NameNudge } from "./NameNudge.tsx";
-import { roomLabel } from "./names.ts";
+import { actsOf } from "./composer/acts.ts";
+import { useMemberNames } from "../names/index.ts";
+import { peopleOf, roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
-import styles from "./Composer.module.css";
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
@@ -26,26 +29,6 @@ export function typingOf(draft: string): "active" | "done" | undefined {
   const text = draft.replaceAll(/\p{Cc}/gu, " ").trim();
   if (text === "") return "done";
   return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
-}
-
-/** The draft as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
- * out of reach of the keyboard and of a screen reader (the field says it already); nothing of a line that cannot go. */
-export function Preview({
-  composed,
-  me,
-  members,
-}: {
-  composed: Composed;
-  me?: string | undefined;
-  members?: ReadonlySet<string> | undefined;
-}) {
-  if (composed.kind !== "line" && composed.kind !== "lines") return null;
-  return (
-    <div className={styles["preview"]} inert>
-      {composed.kind === "line" && composed.action ? "* " : null}
-      <Message text={composed.text} me={me} members={members} />
-    </div>
-  );
 }
 
 export interface ComposerProps {
@@ -57,6 +40,8 @@ export interface ComposerProps {
   /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
   rooms: readonly string[];
   members: readonly string[];
+  /** The members' gno.land names by address, for those who have one, in place of the chains' (a test's): `@` suggests them by name. */
+  names?: ReadonlyMap<string, string> | undefined;
   /** Whether a mention of the whole room counts in this room (4f-n); the field says so as `@room` stands in the draft. */
   groups?: boolean | undefined;
   /** Sends the draft as composed (and as written, which a refused direct message puts back); whether it went. */
@@ -113,41 +98,38 @@ export function Composer(props: ComposerProps) {
   const { draft, setDraft, change } = useDraft(props);
   const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
   const [failed, setFailed] = useState<boolean | string>(false);
+  const [editor] = useState(() => createComposerEditor(draft, THEME));
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
-  const composed = composeDraft(room, draft, nick);
-  const completion = completionOf(draft, { rooms, members, nick, group: to === undefined });
-  const { coarse, shown, goes } = useHelp(composed, props, { failed, completion, draft });
-  // The selection an edit leaves is put back in the box once it shows the new draft.
-  const { box, keep } = useSelection(formRef, draft);
+  // `/market` sends nothing: it adds the card to the room for the reader (a direct message has no room for it, so it is an unknown command there).
+  const market = to === undefined ? marketAsked(draft) : undefined;
+  const composed: Composed = market === undefined ? composeDraft(room, draft, nick) : { kind: "empty" };
+  const people = peopleOf(members, nick);
+  const read = useMemberNames(people, props.names === undefined && /(^|\s)@\S*$/u.test(draft));
+  const names = props.names ?? read;
+  const choices = {
+    rooms,
+    people,
+    commands: to === undefined ? [...DRAFT_COMMANDS, MARKET] : DRAFT_COMMANDS,
+    group: to === undefined,
+  };
+  const { coarse, shown, goes } = useHelp(composed, props, { failed, draft, market });
   useFocusAtStart(formRef, props.focus);
-  // An edit of the format bar or of a completion: the new draft, its selection, and no line not sent any more.
-  const apply = (next: Edit) => {
-    keep(next);
-    change(next.text);
+  const box = () => formRef.current?.querySelector(FIELD) ?? undefined;
+  // What the field does leaves no line not sent: the failure said for the last one goes as the draft changes.
+  const edited = () => {
     setFailed(false);
     refusal.said();
   };
-  const format = (kind: Format) => {
-    const start = box()?.selectionStart ?? draft.length;
-    apply(formatted({ text: draft, start, end: box()?.selectionEnd ?? start }, kind));
-  };
-  // Tab in the box takes the first completion while the caret ends the draft; else, and anywhere else in the form,
-  // it moves on, as it always does.
-  const complete = (event: KeyboardEvent<HTMLFormElement>) => {
-    if (event.key !== "Tab" || event.shiftKey || completion === undefined) return;
-    const input = box();
-    if (event.target !== input || input.selectionStart !== draft.length) return;
-    event.preventDefault();
-    apply(completed(draft, completion));
-  };
-  const answering = useAnswering(props, { formRef, box, otherwise: complete });
+  const { format, link, take } = actsOf(editor, draft, edited);
+  const answering = useAnswering(props, { formRef, box });
   const editing = useEditing(props, box, answering);
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!goes) return;
-    const slow = props.slow?.(composed);
-    const went = slow === undefined && onSay(composed, draft);
+    const slow = market === undefined ? props.slow?.(composed) : undefined;
+    const went =
+      market?.ok === true ? addMarketCard(room, nick, market.symbols) : slow === undefined && onSay(composed, draft);
     setFailed(slow ?? !went);
     refusal.said();
     if (went) change("");
@@ -163,26 +145,30 @@ export function Composer(props: ComposerProps) {
       <Stack space="2xs">
         {editing.bar}
         {/* The video's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
-        <MessageBox onFormat={format} send={editing.send} goes={goes} quick={props.quick}>
-          <Field
-            kind="lines"
+        <MessageBox
+          onFormat={format}
+          linkTool={<LinkTool onApply={link} />}
+          send={editing.send}
+          goes={goes}
+          quick={props.quick}
+        >
+          <ComposerField
+            editor={editor}
+            value={draft}
             enterAddsLine={coarse}
             label={`Message ${label}`}
             placeholder={`Message ${label}`}
-            hideLabel
-            resizable={false}
             describedBy={editing.describedBy}
-            value={draft}
+            names={names}
+            suggestions={suggestions(draft, { ...choices, names })}
+            onTake={take}
             onChange={(value) => {
               change(value);
-              setFailed(false);
-              refusal.said();
+              edited();
             }}
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
         </MessageBox>
-        {/* Under the box, the line as the room will read it (Alexis, 2026-11-10: lost in the one-box rebuild, put back). */}
-        <Preview composed={composed} me={nick} members={new Set(members)} />
         <NameNudge />
       </Stack>
     </form>

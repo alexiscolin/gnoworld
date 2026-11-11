@@ -350,6 +350,7 @@ component with its CSS Module, documented by its props.
 | `ChoiceGroup` | segmented, list | ARIA `radiogroup`, one look: each option a boxed row; the chosen one cream with the check. The days to rent, a poll's and a quiz's answers |
 | `Popover` | anchored; menu; listbox | The native `popover` attribute; outside click and `Esc` close it |
 | `Combobox` | mentions, commands, search | A list moved with the arrow keys in a `Popover`, ARIA `combobox`: `@`, `/` and ⌘K |
+| `Listbox` | rows of a label and a muted hint; the picked row marked | The words that complete a field, on the floating surface (`Popover`'s): the field keeps the focus and the keys (`aria-controls`, `aria-activedescendant`), a press on a row picks it without taking the focus. The composer's `/`, `@` and `#` suggestions |
 | `Tooltip` | | On every icon-only control |
 | `Toolbar` | | ARIA `toolbar` with roving focus: a message's actions, formatting, the composer's tools |
 | `Dialog` | standard, wide (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. An optional `kicker` line above the title (the one label style, read with the description) and `hideClose` where the page draws another way out (Esc still closes). Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
@@ -358,6 +359,8 @@ component with its CSS Module, documented by its props.
 | `SignPanel` | preview, waiting, signed, in a block, done; refused, failed, too late, wrong network, wallet missing or locked | The one signing block, whoever signs (Adena, a session, a signature that is not a transaction). It shows the account, the realm, the function, the arguments, the network with its label, the fee as an estimate and who pays, the steps in words, the ADR-0001 §11 warnings and a link to gnoweb. Only it renders the confirm control |
 | `Row` | plain, divided, boxed; current; with a thumbnail, an icon or an avatar | Lists, connected worlds, notifications, search results, agenda entries. The activity slot carries in words what the 3D shows |
 | `Field` | text, search, composer, date (the browser's `datetime-local`); label, help, error, prefix | The composer is a rich text box: bold shows as bold, Markdown on the wire. At rest it is one line (add, emoji, mention, send); the formatting tools show when it has focus. A name is typed at body size, never in data mono |
+| `Disclosure` | sizes m (44 px) and s (36); a lead, a title, a trail; closed, open | A row that opens in place: a chevron that turns, and the body grown from nothing to its height. The body is always drawn and held shut, so a test reaches it and opening costs no second render. It opens from outside when `open` turns true |
+| `Network` | a centre and two lanes of dots, each a realm (a round pill in the world's colour) or a pure package (square-cornered, empty); selected; one lane empty | The graph "Around it" on a realm's plate: what it imports and what imports it, at most 7 dots a lane and the rest a number in the legend; a word is cut where its count begins, and its full name is the dot's label. Drawn from its own width, with no `viewBox` scaling |
 | `Switch` | off, on; a description; disabled | A real checkbox with `role="switch"`, its name and description at the left and the switch at the right; on is cream with a dark knob, as chosen elsewhere; the slide follows `--motion-scale`. An on/off setting that takes effect at once (the settings, D450) |
 | `Select` | the small control's height; a name for assistive technology | The browser's own list, for a choice among many fixed rows (a country): a phone's picker does better than a list of ours |
 | `Avatar` | sizes s, m, l; kind person, assistant, bot; presence; speaking ring | A person's nebula is generated from the address (ADR-0002 §1, §8 row 9): `partsFrom(address)`, then `draw(parts)`; three clouds of colour on night and the address's constellation over them (five stars, one per fifth of the disc so the shape stays open, joined in one of three orders, one bright), the same at every size, readable at 20 px. Never an NFT: the face is computed from the address, which only its key controls (ADR-0001 §11). Where the clouds and stars sit always comes from the address; the palette is chosen in phase 1. A face tells people apart at a glance, never who they are: anyone can try addresses until a face looks like yours, so the name, and the short address where a person matters, identify; my own messages are marked by my name in mint and the word "you", never by the face. The short address shows wherever a person matters (person card, mention list, DM header, signing). An assistant or a bot has its own mark and a word, never mint. Never a planet. No uploaded picture (ADR-0002 §6). Never a badge granted by the platform |
@@ -387,15 +390,31 @@ its name, its source in the meta line, and its next steps as at most three chips
 Dev help"). A person's message stays a plain row; the composer's placeholder names it ("Message
 #general or ask @jarvis").
 
-This covers the calendar (an agenda of `Row`s by day, no calendar widget), who's here, catch up,
-realm and vote, station, quest and expedition, poll, room games and contest. A new kind is an
-assembly in its own slice, with its story.
+This covers who's here, catch up, realm and vote, station, quest and expedition, poll, room games
+and contest. A new kind is an assembly in its own slice, with its story. The calendar is gone (its
+dialog left with D13995: Events is greyed, `ComingSoon`, until a realm gives it events).
+
+The cards of slice 13, all in `app/src/features/`, none in `ui`:
+- **The link card** (`chat/LinkCard.tsx`, a chunk of its own, asked by a line that has a card): a media `Card` under the line with the page's
+  site, host, title, description and picture, as the server checked them. All its text is React's text, never markup; the picture is
+  the server's own copy (`referrerPolicy="no-referrer"`), absent for a reader who saves data; the whole card links to the line's own URL,
+  the text link being the keyboard's stop. Its author and the room's moderators have a Remove button.
+- **The market card, compact** (`chat/MarketCard.tsx`, from the quick action "Market chart" or `/market [gnot|atone|btc]`): one `Row` a token,
+  its symbol, price, 24 h change and a small `Sparkline` (58 by 22), Low and High in the row's `title`, the source in the header; the reader's
+  alone, on this device.
+- **Jarvis's cards** (`jarvis/AnswerCard.tsx`, `JarvisCard.tsx`, `chat/jarvisEntries.tsx`): a `Card` in the `signal` tone, compact, among the
+  lines, with the "AI CONCIERGE" chip and "AI · may be wrong"; the asker's alone, on this device, never sent to the room. A realm's rows
+  inline carry Read and Call.
+- **The confirm dialog** (`app/src/ConfirmDialog.tsx`): a `Dialog` that asks before something that cannot come back: a title, a description,
+  what it costs as children, an outline Cancel and a danger button that names the act; Esc and Cancel say no. Delete a line, moderate a
+  line, unlink an account use it.
 
 ### Icons
 
-- One set of 59: close, plus, arrow, arrow-up-right, chevron, search, chat, thread, reply, bell,
+- One set of 61: close, plus, arrow, arrow-up-right, chevron, hash, search, chat, search-messages (a magnifier in a speech bubble: the chat's own search, slice 13), thread, reply, bell,
   passport, seal, expand, shrink, image, bookmark, smile, code, code-block, list-bulleted,
   list-numbered, quote, pause, play, pin, more, pencil, link, comet, at, mail, check, calendar,
+  video (a video call, coming soon, D13995),
   spark, retry (a failed read tried again, slice 13), news, satellite, planet, orbits, map (space seen from above, D433), bold, italic, underline, strikethrough, slash, caret,
   share, menu, people, star, chart, info, warning, alert, lock, shield, key, sliders (the settings, slice 8). A new icon joins the
   list in the slice that needs it. Those that point along the text turn right to left: arrow,

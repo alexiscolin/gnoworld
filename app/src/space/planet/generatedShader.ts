@@ -3,7 +3,7 @@
 import { CONTINENTS_SEA } from "@gnoworld/core";
 import { FARAWAY, FIELD, LOOKUP, SEAMS } from "./chunks.ts";
 import { CRACKS } from "./generatedCracks.ts";
-import { DETAIL, FORMS, NOISE } from "./generatedParts.ts";
+import { DETAIL, FORMS, NOISE, SHADOWS } from "./generatedParts.ts";
 import { LIGHT_UNIFORMS, LIGHTS } from "./signShaders.ts";
 import { COMMON, PARTS, SHADE } from "./surfaceParts.ts";
 import { SPIN } from "./surfaceShader.ts";
@@ -30,7 +30,7 @@ ${SEAMS}
 ${LOOKUP}
 ${PARTS}
 ${NOISE}
-${FORMS}
+${FORMS}${SHADOWS}
 ${CRACKS}
 ${DETAIL}
 ${SHADE}
@@ -174,9 +174,9 @@ void main() {
   vec3 bent = normalize(mix(bentBy(relieved * relief * world * (1.0 - 0.3 * grooved), normal), normal, wet));
   float near = 1.0 - smoothstep(0.004, 0.008, pixel);
   if (banded < 0.5 && near > 0.0) bent = grained(bent, normalize(axis + warpAmount * flow), dot(own, LUMA), clamp(pixel, 0.0032, 0.012), relief * (continents ? 3.0 : min(shape.detail * 2.0, 1.0)) * (1.0 - wet) * near, angle);
-  float light;
-  float shine;
-  vec3 colour = litBy(albedo, wet, bent, normal, view, light, shine);
+  float lit = shadowOf(at, angle, pixel, near, wet);
+  float light, shine;
+  vec3 colour = shadowedBy(litBy(albedo, wet, bent, normal, view, light, shine), albedo, lit);
 
   float overcast = 0.0;
   if (shape.clouds > 0.0 && banded < 0.5) {
@@ -201,7 +201,7 @@ void main() {
   }
   if (air > 0.5) colour = nightAir(colour, albedo, light);
   gl_FragColor = vec4(colour, 1.0);
-  ${FARAWAY}
+  ${FARAWAY} gl_FragColor.a = arrive;
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

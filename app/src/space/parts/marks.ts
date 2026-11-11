@@ -28,7 +28,7 @@ const Y = new Vector3(0, 1, 0);
 const FLAT = { place: { x: 0, y: 0, z: 0 }, across: { x: 1, y: 0, z: 0 }, along: { x: 0, y: 0, z: 1 } } as const;
 
 // The orbit `orbit` of `system` as line segments: each segment's two ends, x, y, z.
-function ringOf({ place, across, along }: Pick<System, "place" | "across" | "along">, orbit: number): number[] {
+export function ringOf({ place, across, along }: Pick<System, "place" | "across" | "along">, orbit: number): number[] {
   const points: number[] = [];
   for (let at = 0; at < SEGMENTS; at += 1)
     for (const step of [at, at + 1]) {

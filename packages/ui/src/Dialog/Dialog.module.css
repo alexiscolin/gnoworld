@@ -3,6 +3,9 @@
 @layer components {
   .dialog {
     --_w: var(--dialog-w);
+
+    /* The top layer inherits from where the dialog sits in the page: a centred empty state once centred its words. */
+    text-align: start;
     --_enter: calc(var(--motion-base) * var(--motion-scale));
     --_leave: calc(var(--motion-base) * 0.7 * var(--motion-scale));
     --_ease: var(--ease-in);

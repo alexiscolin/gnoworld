@@ -2,13 +2,15 @@
 // asks, from `vm/qeval` and the height it was read at. A read that fails is a state with its next step, never a blank.
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import type { ChainRead, Failure, ReadOptions } from "@gnoworld/chain/read";
+import type { Failure, ReadOptions } from "@gnoworld/chain/read";
 import { readHeight } from "@gnoworld/chain/node";
 import { readEval, realmFunctions, toFunctions } from "../../lib/chain/rpc.ts";
-import { isUnread, queryClient } from "../../lib/query/client.ts";
+import { queryClient } from "../../lib/query/client.ts";
+import { listingOf } from "./useCallable.ts";
 import type { Height } from "./useRealm.ts";
 
-type Listing = { state: "loading" } | { state: "listed"; names: string[] } | { state: "failed"; next: string };
+type Listing =
+  { state: "loading"; retrying?: boolean } | { state: "listed"; names: string[] } | { state: "failed"; next: string };
 
 export type Result =
   | { state: "busy" }
@@ -28,21 +30,16 @@ export interface Functions {
   read: (name: string) => void;
 }
 
-const namesOf = (read: { name: string; readable: boolean }[]): Listing => ({
-  state: "listed",
+const namesOf = (read: { name: string; readable: boolean }[]) => ({
+  state: "listed" as const,
   names: [...new Set(read.filter(({ readable }) => readable).map(({ name }) => name))],
 });
 
 /** The functions that take nothing and give something, and what a click on each read. The list is the realm's kept one at once, then the fresh
  * one (a failed fresh read leaves the list already drawn); a new realm or RPC is a new key. */
 export function useFunctions(rpc: string, realm: string, options?: ReadOptions): Functions {
-  const { data, error } = useQuery({ ...realmFunctions(rpc, realm, options), select: toFunctions }, queryClient);
-  const listing: Listing =
-    data?.ok === true
-      ? namesOf(data.value)
-      : isUnread<ChainRead<unknown>>(error) && !error.read.ok
-        ? { state: "failed", next: error.read.failure.next }
-        : { state: "loading" };
+  const query = useQuery({ ...realmFunctions(rpc, realm, options), select: toFunctions }, queryClient);
+  const listing: Listing = listingOf(query, namesOf);
   const [results, setResults] = useState<Readonly<Record<string, Result>>>({});
 
   const settle = (name: string, result: Result) => {

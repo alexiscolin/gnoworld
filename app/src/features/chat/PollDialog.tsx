@@ -2,7 +2,7 @@
 // draft is), so nobody has to know the syntax. A line over the IRC limit is said in its own field, as the composer says its own.
 import { POLL_KEYS, pollText, type Composed } from "@gnoworld/core";
 import { Button, Dialog, Field, Cluster, IconButton, Sidebar, Stack } from "@gnoworld/ui";
-import { useRef, useState, type SubmitEvent } from "react";
+import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
 import { composeDraft } from "./polling.ts";
 
 /** Sends a composed line, as the composer's Send does; whether it went. */
@@ -60,22 +60,38 @@ interface RowProps {
   onRemove: () => void;
 }
 
-// One answer: its field and, at its end, its remove control; a blank of the control's width keeps the fields on one edge.
+// A field and, while answers can be removed, a column at its end: a remove control, or a blank of its width (the question's), so every
+// field of the form keeps one width (Alexis, 2026-11-11: "les fields ne sont pas tous égaux").
+function Row({ field, end }: { field: ReactNode; end: ReactNode | undefined }) {
+  return end === undefined ? (
+    field
+  ) : (
+    <Sidebar side="end" space="2xs">
+      {field}
+      {end}
+    </Sidebar>
+  );
+}
+
+const blank = <span aria-hidden="true" style={{ inlineSize: "var(--control-m)" }} />;
+
 function AnswerRow({ at, text, error, removable, onChange, onRemove }: RowProps) {
   return (
-    <Sidebar side="end" space="2xs">
-      <Field
-        label={`Answer ${String(at + 1)}`}
-        value={text}
-        onChange={onChange}
-        {...(error === undefined ? {} : { error })}
-      />
-      {removable ? (
-        <IconButton icon="close" label={`Remove answer ${String(at + 1)}`} emphasis="plain" onClick={onRemove} />
-      ) : (
-        <span aria-hidden="true" style={{ inlineSize: "var(--control-m)" }} />
-      )}
-    </Sidebar>
+    <Row
+      field={
+        <Field
+          label={`Answer ${String(at + 1)}`}
+          value={text}
+          onChange={onChange}
+          {...(error === undefined ? {} : { error })}
+        />
+      }
+      end={
+        removable ? (
+          <IconButton icon="close" label={`Remove answer ${String(at + 1)}`} emphasis="plain" onClick={onRemove} />
+        ) : undefined
+      }
+    />
   );
 }
 
@@ -102,11 +118,16 @@ function PollForm({ room, nick, say, onClose }: FormProps) {
   return (
     <form onSubmit={send} aria-label="Ask a poll">
       <Stack space="l">
-        <Field
-          label="Question"
-          value={question}
-          onChange={setQuestion}
-          {...(problems.question === undefined ? {} : { error: problems.question })}
+        <Row
+          field={
+            <Field
+              label="Question"
+              value={question}
+              onChange={setQuestion}
+              {...(problems.question === undefined ? {} : { error: problems.question })}
+            />
+          }
+          end={answers.length > START ? blank : undefined}
         />
         <Stack space="m">
           {answers.map((answer, at) => (

@@ -1,7 +1,7 @@
 import { Address, toAddress } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Roles } from "../roles/roles.ts";
-import { desired, listed, mayRead, openRoom, publicRoom, roomType } from "./types.ts";
+import { desired, listed, mayRead, openRoom, publicRoom, roomType, searchable } from "./types.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const MOD = Address.parse("g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9");
@@ -161,5 +161,49 @@ describe("a realm's room, which no file types", () => {
       true,
       true,
     ]);
+  });
+});
+
+// Slice 13, B1 (D13924): the rooms whose lines the index holds are those a guest or an account may read, listed or not
+// hidden: open, announcement and accounts rooms, never a members room, never a hidden one.
+describe("the rooms the search index holds", () => {
+  const typed = {
+    team: new Set<string>(),
+    worlds: new Map([
+      [
+        "earth",
+        {
+          rules: RULES,
+          groups: new Map([["readers", new Set([READER])]]),
+          rooms: new Map([
+            ["#earth/news", { type: "announcement" as const, hidden: false }],
+            ["#earth/club", { type: "accounts" as const, hidden: false }],
+            ["#earth/door", { type: "accounts" as const, hidden: true }],
+            ["#earth/hushed", { type: "announcement" as const, hidden: true }],
+            ["#earth/secret", { type: "open" as const, hidden: true }],
+            ["#earth/crew", { type: "members" as const, readers: "readers", hidden: false }],
+            ["#earth/desk", { type: "members-write" as const, readers: "readers", writers: "readers", hidden: false }],
+            ["#earth/vault", { type: "members" as const, readers: "readers", hidden: true }],
+          ]),
+        },
+      ],
+    ]),
+  };
+
+  it("are the open, announcement and accounts rooms, and a room the file does not type", () => {
+    expect(["#earth", "#earth/news", "#earth/club", "#earth/untyped"].map((room) => searchable(typed, room))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it("are never a members room, a members-write room, or a hidden one of any type", () => {
+    expect(
+      ["#earth/crew", "#earth/desk", "#earth/vault", "#earth/secret", "#earth/door", "#earth/hushed"].map((room) =>
+        searchable(typed, room),
+      ),
+    ).toEqual([false, false, false, false, false, false]);
   });
 });

@@ -22,7 +22,7 @@ export interface Item {
   /** Its time, in ms: when it came, or for an event when it starts. */
   readonly at: number;
   /** Where a press goes: a page of the site, or an address off it, which the warning comes before. */
-  readonly href: string;
+  readonly href?: string | undefined;
   readonly external?: boolean;
 }
 
@@ -49,7 +49,12 @@ export interface Sources {
 
 /** How the page names and places what the sources hold. */
 export interface Naming {
-  readonly notice: (notice: Notice) => { text: string; where: string; world: string | undefined; href: string };
+  readonly notice: (notice: Notice) => {
+    text: string;
+    where: string;
+    world: string | undefined;
+    href: string | undefined;
+  };
   readonly place: (world: string) => { name: string; href: string } | undefined;
   readonly live: (event: CalendarEvent, now: number) => boolean;
 }

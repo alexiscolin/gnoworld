@@ -6,10 +6,24 @@ import * as stories from "./Icon.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Icons": the one set, and the six that point along the text.
 const LISTED = [
-  ...["close", "plus", "arrow", "arrow-up-right", "chevron", "search", "chat", "thread", "reply", "bell"],
+  ...[
+    "close",
+    "plus",
+    "arrow",
+    "arrow-up-right",
+    "chevron",
+    "hash",
+    "search",
+    "chat",
+    "search-messages",
+    "thread",
+    "reply",
+    "bell",
+  ],
   ...["passport", "seal", "expand", "shrink", "image", "bookmark", "smile", "code", "code-block", "list-bulleted"],
   ...["list-numbered", "quote", "pause", "play", "pin", "more", "pencil", "link", "comet", "at"],
-  ...["mail", "check", "calendar", "spark", "news", "satellite", "planet", "orbits", "bold", "italic"],
+  ...["mail", "check", "calendar", "video", "spark", "retry", "news", "satellite", "planet", "map", "orbits"],
+  ...["bold", "italic"],
   ...["underline", "strikethrough", "slash", "caret", "share", "menu", "people", "star", "chart", "info"],
   ...["warning", "alert", "lock", "shield", "key", "sliders"],
 ] as const satisfies readonly IconName[];
@@ -23,8 +37,8 @@ function svgOf(name: IconName, size?: "m" | "l") {
 }
 
 describe("Icon", () => {
-  it("draws exactly the 56 icons the design system lists", () => {
-    expect(new Set(LISTED).size).toBe(56);
+  it("draws exactly the 61 icons the design system lists", () => {
+    expect(new Set(LISTED).size).toBe(61);
     expect([...ICON_NAMES].sort()).toEqual([...LISTED].sort());
   });
 
@@ -36,13 +50,13 @@ describe("Icon", () => {
     expect(svg.querySelectorAll("path, circle, rect").length).toBeGreaterThan(0);
   });
 
-  it("draws 56 different drawings", () => {
+  it("draws 61 different drawings", () => {
     const drawing = (svg: SVGSVGElement) =>
       [...svg.querySelectorAll("*")].map((shape) =>
         [shape.tagName, ...[...shape.attributes].map((a) => `${a.name}=${a.value}`)].join(" "),
       );
     const drawings = LISTED.map((name) => drawing(svgOf(name)).join("; "));
-    expect(new Set(drawings).size).toBe(56);
+    expect(new Set(drawings).size).toBe(61);
   });
 
   it.each(LISTED)("paints %s only in the text's colour", (name) => {
@@ -63,8 +77,8 @@ describe("Icon", () => {
     expect(svgOf(name).hasAttribute("data-mirror")).toBe(DIRECTIONAL.has(name));
   });
 
-  it("has a gallery story that shows all 56", () => {
+  it("has a gallery story that shows all 61", () => {
     const counts = eachStory(stories, (container) => container.querySelectorAll("svg").length);
-    expect(Math.max(...counts)).toBe(56);
+    expect(Math.max(...counts)).toBe(61);
   });
 });

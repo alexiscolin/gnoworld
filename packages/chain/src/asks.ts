@@ -1,6 +1,6 @@
 // What the server's jobs ask of a chain's node and its indexer (D113): the words of each request, written here and nowhere else.
 // A request is data (a path and its data, a query and its variables); the job sends it over its own way out.
-import { evalNameOf } from "@gnoworld/core";
+import { evalNameOf, evalOwner } from "@gnoworld/core";
 
 /** An abci_query: the route (it may carry `?limit=N`) and its data. */
 export interface AbciAsk {
@@ -32,6 +32,12 @@ export const fileAsk = (path: string): AbciAsk => ({ path: "vm/qfile", data: pat
 /** The name registered for an address, or null for a text that is no address. It composes core's one builder, never an expression given. */
 export function nameAsk(address: string): AbciAsk | null {
   const expression = evalNameOf(address);
+  return expression === null ? null : { path: "vm/qeval", data: expression };
+}
+
+/** The expression that gives the address holding a namespace, or null for a text that is no name. */
+export function ownerAsk(namespace: string): AbciAsk | null {
+  const expression = evalOwner(namespace);
   return expression === null ? null : { path: "vm/qeval", data: expression };
 }
 

@@ -1,11 +1,15 @@
 // The palette's results: groups of rows, each a place's picture, its name with the letters the query matched, and its marks.
-import { Cluster, Icon, PlanetThumb } from "@gnoworld/ui";
+import { Avatar, Chip, Cluster, Icon, PlanetThumb } from "@gnoworld/ui";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
+import { afterDwell } from "../../intent.ts";
+import { warmWorld } from "../universe/index.ts";
 import styles from "./SearchDialog.module.css";
 import type { SearchItem, SearchResult } from "./types.ts";
 
-/** A place's thumb: its world's planet where it has a world, ui's disc where it has none. */
+/** A place's thumb: its world's planet where it has a world, ui's disc where it has none; a room's `#`, a person's face. */
 export function PlaceThumb({ item, size }: { item: SearchItem; size: "s" | "l" }) {
+  if (item.kind === "room") return <Icon name="hash" />;
+  if (item.kind === "person") return <Avatar address={item.nick ?? ""} name={item.name} size={size} decorative />;
   return item.world === undefined ? (
     <PlanetThumb src="" name={item.name} size={size} decorative />
   ) : (
@@ -33,6 +37,7 @@ function Marks({ item }: { item: SearchItem }) {
         {item.fresh === true ? <span className={styles["tag"]}>New</span> : null}
         {(item.here ?? 0) === 0 ? null : <span className={styles["here"]}>{item.here} here</span>}
         {item.visited === true ? <Icon name="check" /> : null}
+        {item.message === true ? <Chip>Message</Chip> : null}
       </Cluster>
     </span>
   );
@@ -62,6 +67,13 @@ function Row({
         event.preventDefault();
       }}
       onMouseMove={onHover}
+      onMouseEnter={(event) => {
+        const { world } = item;
+        if (world !== undefined)
+          afterDwell(event.currentTarget, () => {
+            warmWorld(world);
+          });
+      }}
       onClick={onChoose}
     >
       <PlaceThumb item={item} size="s" />

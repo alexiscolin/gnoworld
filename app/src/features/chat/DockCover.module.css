@@ -8,8 +8,8 @@
     inset-inline: 0;
     /* raw: over the chat's own parts, which stand at 1 */
     z-index: 1;
-    /* raw: the chat's own fill, as much of it as the dock's glass lets stand (ChatLayout.module.css) */
-    background: color-mix(in oklab, var(--color-surface) var(--dock-glass), transparent);
+    /* raw: the chat's own fill (ChatLayout.module.css) */
+    background: var(--color-surface);
     --motion-wait: 0s;
   }
 

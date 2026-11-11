@@ -9,7 +9,7 @@ import { useWoken } from "./features/home/clock.ts";
 import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
-import { fillProps, useViewsIndicator } from "./viewsIndicator.ts";
+import { useViewsIndicator } from "./viewsIndicator.ts";
 import { SearchButton, SearchPalette } from "./features/search/index.ts";
 import { site, type UniverseView, type View } from "./places.ts";
 import { ChatWay, levelsOf, useSeenPlaces, Ways, type Level } from "./shellWays.tsx";
@@ -81,7 +81,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
   // The session known, the account's pill or the way in names the network (D330, D340): the header's own row waits for it alone.
   const pilled = useApp(({ login }) => login.session.kind !== "unknown");
   const barRef = useRef<HTMLElement>(null);
-  const { fill, placed } = useViewsIndicator(barRef, full ? "chat" : current, woken);
+  useViewsIndicator(barRef, full ? "chat" : current, woken);
   const { levels, world } = levelsOf(universe, pathname);
   const at = levels.findIndex((level) => level.view === current);
   useSeenPlaces(universe, pathname);
@@ -91,12 +91,7 @@ export function ShellHeader({ universe }: { universe: UniverseView }) {
         <Logo wordmark />
       </Link>
       <div className={styles["bars"]}>
-        <nav
-          aria-label="Views"
-          className={`${styles["views"] ?? ""} control-bar`}
-          ref={barRef}
-          {...fillProps(fill, placed)}
-        >
+        <nav aria-label="Views" className={`${styles["views"] ?? ""} control-bar`} ref={barRef}>
           <span className={styles["fill"]} aria-hidden="true" />
           {levels.map((level, index) => (
             // Drawn anew once the page wakes: a path served the page written at / hydrates the light that page holds, as hydration

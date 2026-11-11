@@ -44,8 +44,8 @@ export function keeping(keeper: Rooms, { mutes, reconciler }: { mutes: Mutes; re
       if (typeof made !== "string") mutes.putOn(made.made, "earth");
       return made;
     },
-    realm: (room, reserve) => {
-      const made = keeper.realm(room, reserve);
+    realm: (room, reserve, path) => {
+      const made = keeper.realm(room, reserve, path);
       if (typeof made !== "string") mutes.putOn(made.made, worldOf(room));
       return made;
     },

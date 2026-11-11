@@ -1,5 +1,6 @@
-import { useRef, type CSSProperties, type ReactNode } from "react";
-import { clampWidth, COLUMNS, CONVERSATION_MIN, type Edge, type Widths } from "./resize.ts";
+import { useLayoutEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { clampWidth, COLUMNS, COMPACT_MAX, CONVERSATION_MIN, type Edge, type Widths } from "./resize.ts";
+import { useCompact } from "./useCompact.ts";
 import { Separator } from "./Separator.tsx";
 import styles from "./ChatLayout.module.css";
 
@@ -14,6 +15,11 @@ export interface ChatLayoutProps {
   info?: ReactNode;
   /** The panel takes the conversation's place where the screen is narrow, as a thread's does. */
   infoFirst?: boolean;
+  /** Told whether the box the chat is given is `COMPACT_MAX` wide or less (true till it is measured): the worlds, the info panel and the handles
+   * are not drawn then, and the app leaves their slots empty. One measure, here, for the layout and the app. */
+  onCompact?: (compact: boolean) => void;
+  /** Changes when the box is taken to another place (the dock to the full chat): its width is read again at once. */
+  moved?: unknown;
   /** The widths of the rooms and the info columns this device keeps, in px; none leaves the tokens' and draws no handle. */
   widths?: Partial<Widths>;
   /** A column was dragged or stepped to a width, already held to its bounds and to the conversation's minimum; the default is `COLUMNS`'. */
@@ -45,9 +51,25 @@ function roomFor(box: HTMLElement | null, edge: Edge): number {
 /** The full-screen chat's frame (the video's frame 23.58.01): a header across, then the worlds, the rooms, the
  * conversation and the info panel, each a region that holds its own scroll. It places; the app fills the slots, and the conversation's own list scrolls
  * inside it, over a composer that stays. */
-export function ChatLayout({ header, worlds, rooms, info, infoFirst, widths, onResize, children }: ChatLayoutProps) {
-  const rootRef = useRef<HTMLDivElement>(null);
+export function ChatLayout({
+  header,
+  worlds,
+  rooms,
+  info,
+  infoFirst,
+  onCompact,
+  moved,
+  widths,
+  onResize,
+  children,
+}: ChatLayoutProps) {
   const vars = widthVars(widths);
+  // The root as state: the measure and the columns' room both read it once it is there.
+  const [root, setRoot] = useState<HTMLDivElement | null>(null);
+  const compact = useCompact(root, COMPACT_MAX, moved);
+  useLayoutEffect(() => {
+    onCompact?.(compact);
+  }, [compact, onCompact]);
   const handle = (edge: Edge) => {
     if (onResize === undefined) return null;
     return (
@@ -55,17 +77,22 @@ export function ChatLayout({ header, worlds, rooms, info, infoFirst, widths, onR
         edge={edge}
         value={widths?.[edge] ?? COLUMNS[edge].start}
         onChange={(px) => {
-          onResize(edge, clampWidth(edge, px, roomFor(rootRef.current, edge)));
+          onResize(edge, clampWidth(edge, px, roomFor(root, edge)));
         }}
         onReset={() => {
-          onResize(edge, clampWidth(edge, COLUMNS[edge].start, roomFor(rootRef.current, edge)));
+          onResize(edge, clampWidth(edge, COLUMNS[edge].start, roomFor(root, edge)));
         }}
       />
     );
   };
   return (
-    <div ref={rootRef} className={styles["root"]} style={vars}>
-      <div className={styles["frame"]} data-chat-layout="" data-info-first={infoFirst === true ? "" : undefined}>
+    <div ref={setRoot} className={styles["root"]} style={vars}>
+      <div
+        className={styles["frame"]}
+        data-chat-layout=""
+        data-info-first={infoFirst === true ? "" : undefined}
+        data-compact={compact ? "" : undefined}
+      >
         <div className={styles["header"]} data-region="header">
           {header}
         </div>

@@ -1,6 +1,7 @@
 import { adena, changeAccount } from "./adena.ts";
 import {
   callAndSign,
+  openCall,
   calls,
   callWallet,
   connect,
@@ -12,6 +13,7 @@ import {
   setNetwork,
   writeChain,
   violations,
+  writeTab,
   type Wallet,
 } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -39,7 +41,7 @@ test.describe("a write function's call card", () => {
   }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     const chain = await setup(page, { landing: "later" });
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     await expect(card(page)).toContainText("SIGNATURE REQUEST · ADENA");
     for (const word of ["REALM", "FUNCTION", "ARGUMENTS", "NETWORK", "FEE"])
       await expect(card(page)).toContainText(word);
@@ -67,7 +69,7 @@ test.describe("a write function's call card", () => {
   test("draws each label on its value's baseline, as the frame does (F5739)", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     expect(
       await card(page)
         .locator("dl")
@@ -79,7 +81,7 @@ test.describe("a write function's call card", () => {
   test("draws its block with a 1 px edge and 16 px between a label and its value", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     const look = await card(page)
       .locator("dl")
       .evaluate((el) => {
@@ -93,7 +95,7 @@ test.describe("a write function's call card", () => {
   test("draws its first sentence in the 13 px reading size", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     const lede = card(page).getByText("A call to").first();
     expect(await lede.evaluate((el) => getComputedStyle(el).fontSize)).toBe("13px");
     expect(await lede.evaluate((el) => getComputedStyle(el).lineHeight)).toBe("19.5px");
@@ -103,7 +105,7 @@ test.describe("a write function's call card", () => {
   test("draws Sign in Adena and Cancel 44 px tall, as the frame does", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     for (const name of ["Sign in Adena", "Cancel"])
       expect((await card(page).getByRole("button", { name }).boundingBox())?.height, name).toBe(44);
   });
@@ -111,7 +113,7 @@ test.describe("a write function's call card", () => {
   test("draws the note small and muted, as the frame does (F5740)", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     const style = (text: string, property: string) =>
       card(page)
         .getByText(text)
@@ -124,7 +126,7 @@ test.describe("a write function's call card", () => {
   test("says Adena sets the fee when the indexer cannot give one", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page, { fees: "down" });
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     await expect(card(page)).toContainText("Set by Adena when you sign");
     await expect(card(page)).not.toContainText("estimate");
   });
@@ -132,7 +134,7 @@ test.describe("a write function's call card", () => {
   test("puts a field's problem under it and signs nothing until it is fixed", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetProfile" }).click();
+    await openCall(page, "SetProfile");
     await card(page).getByRole("textbox", { name: "times" }).fill("three");
     await expect(card(page).getByRole("textbox", { name: "times" })).toHaveAttribute("aria-invalid", "true");
     await expect(card(page).getByRole("button", { name: "Sign in Adena" })).toBeDisabled();
@@ -144,7 +146,7 @@ test.describe("a write function's call card", () => {
   test("cancels before signing and asks Adena nothing", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await setup(page);
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     await card(page).getByRole("button", { name: "Cancel" }).click();
     await expect(card(page)).toHaveCount(0);
     expect(await done(page)).toBe(0);
@@ -219,7 +221,8 @@ test.describe("a write function's call card", () => {
     await writeChain(phone);
     await phone.goto(`/r/${REALM.slice("gno.land/r/".length)}`);
     await hydrated(phone);
-    await calls(phone).getByRole("button", { name: "Call SetBio" }).tap();
+    await writeTab(phone);
+    await openCall(phone, "SetBio", "tap");
     await expect(card(phone)).toContainText("To sign, use a computer");
     await expect(card(phone).getByRole("button", { name: "Sign in Adena" })).toBeHidden();
     expect(await done(phone)).toBe(0);
@@ -241,7 +244,7 @@ test.describe("a write function's call card", () => {
     test(`has no accessibility violation on ${name}: the preview, a problem and the result`, async ({ page }) => {
       await page.setViewportSize({ width, height });
       await setup(page);
-      await calls(page).getByRole("button", { name: "Call SetProfile" }).click();
+      await openCall(page, "SetProfile");
       expect(await violations(page)).toEqual([]);
       await card(page).getByRole("textbox", { name: "times" }).fill("three");
       expect(await violations(page)).toEqual([]);

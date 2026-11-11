@@ -1,8 +1,9 @@
-// The 59 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
+// The 61 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
 // in the colour of the text around it.
-import type { ReactElement } from "react";
+import { messageGlyphs, type Glyph } from "./messageGlyphs.tsx";
 
 export const GLYPHS = {
+  ...messageGlyphs,
   close: <path d="M4 4l8 8M12 4l-8 8" />,
   plus: <path d="M8 3v10M3 8h10" />,
   arrow: <path d="M3 8h10M9 4l4 4-4 4" />,
@@ -104,6 +105,9 @@ export const GLYPHS = {
       <path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" />
     </>
   ),
+  video: (
+    <path d="M3 4.5h6A1.5 1.5 0 0 1 10.5 6v4A1.5 1.5 0 0 1 9 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5zM10.5 7l4-2.5v7l-4-2.5" />
+  ),
   spark: <path d="M8 2v4M8 10v4M2 8h4M10 8h4" />,
   retry: <path d="M13.3 7.3a5.3 5.3 0 1 0-1.5 3.8M13.3 3.3v4h-4" />,
   news: (
@@ -197,4 +201,4 @@ export const GLYPHS = {
       <circle cx="11" cy="11.5" r="1.5" />
     </>
   ),
-} satisfies Record<string, ReactElement>;
+} satisfies Record<string, Glyph>;

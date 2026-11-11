@@ -1,0 +1,24 @@
+/* A link's card under a chat line (L4): as wide as a line's preview, its picture whole at its own proportions, its description muted. */
+@layer components {
+  .card {
+    max-inline-size: var(--column-l);
+  }
+
+  .open {
+    display: block;
+    border-radius: var(--radius-m);
+  }
+
+  .picture {
+    /* layout: an image sits on its line's baseline, leaving a gap under it */
+    vertical-align: top;
+    inline-size: 100%;
+    block-size: auto;
+    border-radius: var(--radius-m);
+  }
+
+  .description {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+}

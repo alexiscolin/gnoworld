@@ -1,5 +1,12 @@
 import type { Line } from "@gnoworld/core";
-import { Address, type LineVerdicts, type Signal, type StreamEvent } from "@gnoworld/schemas";
+import {
+  Address,
+  type CardEvent,
+  type LineCards,
+  type LineVerdicts,
+  type Signal,
+  type StreamEvent,
+} from "@gnoworld/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import { linked } from "./linked.ts";
@@ -426,7 +433,7 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
     kind: "message",
   });
 
-  it("names each line with a player, no verdict and not asked yet, in the lines' order", () => {
+  it("names each line with a player or a card's link, no verdict and not asked yet, in the lines' order", () => {
     const lines = [
       said("a", "https://youtu.be/dQw4w9WgXcQ"),
       said("b", "no link"),
@@ -435,8 +442,8 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
       said("e", "see https://gno.land"),
       said("f", "> https://youtu.be/dQw4w9WgXcQ"),
     ];
-    expect(unjudged(lines, { held: { c: "checked" }, asked: new Set(["d"]) }, linked)).toEqual(["a", "f"]);
-    expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["a", "c", "d", "f"]);
+    expect(unjudged(lines, { held: { c: "checked" }, asked: new Set(["d"]) }, linked)).toEqual(["a", "e", "f"]);
+    expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["a", "c", "d", "e", "f"]);
     expect(unjudged([], { held: undefined, asked: new Set() }, linked)).toEqual([]);
   });
 
@@ -482,5 +489,101 @@ describe("verdictAsker: the first signals on the room's one stream", () => {
     given?.(CHART);
     expect(heard).toEqual([CHART]);
     asker.stop();
+  });
+});
+
+// Link previews L4: the cards of the same lines are asked beside their verdicts (GET /api/cards), the answer into the store as a server's.
+describe("verdictAsker: the cards of the lines in view", () => {
+  const KEY = "a".repeat(64);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  function withCards(answer: (ids: readonly string[]) => Promise<Result<LineCards>>) {
+    const sent: string[][] = [];
+    const carded: CardEvent[][] = [];
+    const asker = verdictAsker({
+      verdicts: () => Promise.resolve(NONE),
+      judged: () => undefined,
+      judgedAll: () => undefined,
+      held: () => undefined,
+      linked,
+      follow: (_room, on) => {
+        on.since(OPENED);
+        return () => undefined;
+      },
+      cards: (_room, ids) => {
+        sent.push([...ids]);
+        return answer(ids);
+      },
+      carded: (events) => carded.push([...events]),
+    });
+    return { asker, sent, carded };
+  }
+  const page = (id: string): Line => ({ ...line(id), text: `${id} https://example.com/${id}` });
+
+  it("asks the cards of the lines it asks the verdicts of, and hands the answer on with the room", async () => {
+    const t = withCards(() =>
+      Promise.resolve({ ok: true, value: { room: "#bubble", cards: [{ msgid: "a", key: KEY }] } }),
+    );
+    t.asker.show("#bubble", [page("a"), page("b"), { ...line("n"), text: "no link" }]);
+    await settled();
+    expect(t.sent).toEqual([["a", "b"]]);
+    expect(t.carded).toEqual([[{ room: "#bubble", msgid: "a", key: KEY }]]);
+  });
+
+  it("asks nothing of the cards for a line from the stream's opening on, which the stream tells", async () => {
+    const t = withCards(() => Promise.resolve({ ok: true, value: { room: "#bubble", cards: [] } }));
+    t.asker.show("#bubble", [page("a"), { ...page("b"), time: "2026-10-26T12:05:00.000Z" }]);
+    await settled();
+    expect(t.sent).toEqual([["a"]]);
+  });
+
+  it.each([
+    ["unavailable", REST_MS],
+    ["too_many", BUSY_REST_MS],
+  ] as const)(
+    "asks the cards again after the verdicts' rest when the server answers %s, and holds nothing meanwhile",
+    async (reason, rest) => {
+      vi.useFakeTimers();
+      let answers = 0;
+      const t = withCards(() => {
+        answers += 1;
+        return Promise.resolve(
+          answers === 1
+            ? { ok: false, reason }
+            : { ok: true, value: { room: "#bubble", cards: [{ msgid: "a", key: KEY }] } },
+        );
+      });
+      t.asker.show("#bubble", [page("a")]);
+      await vi.advanceTimersByTimeAsync(rest - 1);
+      expect(t.sent).toEqual([["a"]]);
+      expect(t.carded).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(t.sent).toEqual([["a"], ["a"]]);
+      expect(t.carded).toEqual([[{ room: "#bubble", msgid: "a", key: KEY }]]);
+    },
+  );
+
+  it("a network error of the cards is retried the same way", async () => {
+    vi.useFakeTimers();
+    let answers = 0;
+    const t = withCards(() => {
+      answers += 1;
+      return answers === 1
+        ? Promise.reject(new Error("down"))
+        : Promise.resolve({ ok: true, value: { room: "#bubble", cards: [] } });
+    });
+    t.asker.show("#bubble", [page("a")]);
+    await vi.advanceTimersByTimeAsync(REST_MS);
+    expect(t.sent).toEqual([["a"], ["a"]]);
+  });
+
+  it("never asks again what the server refuses (refused, forbidden, malformed)", async () => {
+    vi.useFakeTimers();
+    const t = withCards(() => Promise.resolve({ ok: false, reason: "malformed" }));
+    t.asker.show("#bubble", [page("a")]);
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS * 2);
+    expect(t.sent).toEqual([["a"]]);
+    expect(t.carded).toEqual([]);
   });
 });

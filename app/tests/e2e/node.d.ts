@@ -1,5 +1,6 @@
 // Node's file reading, whose types this folder leaves out (fixtures.ts): the CSP and tuning journeys read the build, and chunks.ts weighs it.
 declare module "node:fs" {
+  export function appendFileSync(path: string, data: string): void;
   export function readFileSync(path: URL, encoding: "utf8"): string;
   export function readdirSync(path: URL, options: { recursive: true }): string[];
   export function readdirSync(path: string): string[];

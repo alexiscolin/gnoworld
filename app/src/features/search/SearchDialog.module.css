@@ -38,6 +38,13 @@
     padding-inline-end: var(--space-s);
   }
 
+  .head {
+    /* layout: the kinds, then the chips and the sort */
+    display: grid;
+    /* layout: the palette's own arrangement */
+    row-gap: var(--space-2xs);
+  }
+
   .results {
     /* layout: the list fills the room left and scrolls inside it */
     display: grid;
@@ -75,6 +82,12 @@
     border-radius: var(--radius-m);
     cursor: pointer;
     transition: background-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* The hand-off row under the list: the width of the list, its words at the start. */
+  .handOff {
+    inline-size: 100%;
+    text-align: start;
   }
 
   .row[aria-selected="true"] {
@@ -163,6 +176,37 @@
     /* layout: the palette's own arrangement */
     margin: 0;
     color: var(--color-text-muted);
+  }
+
+  .stats {
+    /* layout: the people, then the lines a day */
+    display: flex;
+    /* layout: the palette's own arrangement */
+    gap: var(--space-s);
+    /* layout: the paragraph's own margin goes */
+    margin: 0;
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .lines {
+    /* layout: the last lines, one under the other, in a box */
+    display: grid;
+    /* layout: the palette's own arrangement */
+    gap: var(--space-xs);
+    padding: var(--space-xs);
+    border-radius: var(--radius-m);
+    background: var(--color-fill-hover);
+  }
+
+  .line {
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .line b {
+    color: var(--color-text);
+    font-weight: 500;
   }
 
   /* A phone has the results alone. */

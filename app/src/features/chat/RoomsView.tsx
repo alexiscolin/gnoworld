@@ -7,7 +7,7 @@ import { useRef, type ReactNode } from "react";
 import { Avatar, Button, Cluster, Icon, IconButton, NavItem, Row, Sidebar, Stack } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
-import { dmHref, roomHref, roomLabel, shortAddress, whoIs } from "./names.ts";
+import { dmHref, hrefProp, roomHref, roomLabel, shortAddress, whoIs } from "./names.ts";
 import { noticeDone } from "../../told.ts";
 import { badged } from "./unread.ts";
 import { RoomsList, RoomsNav } from "./RoomsList.tsx";
@@ -98,7 +98,7 @@ function Notices({
             <Row
               title={noticeDone(whoIs(notice.by), notice.kind)}
               subtitle={notice.kind === "dm" ? "Direct message" : roomLabel(notice.where)}
-              href={notice.kind === "dm" ? dmHref(world, notice.where, full) : roomHref(notice.where, full)}
+              {...hrefProp(notice.kind === "dm" ? dmHref(world, notice.where, full) : roomHref(notice.where, full))}
             />
           </li>
         ))}

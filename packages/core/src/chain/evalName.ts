@@ -20,3 +20,22 @@ export function looksLikeAddress(text: string): boolean {
 export function evalNameOf(address: string): string | null {
   return isAddress(address) ? `gno.land/r/sys/users.ResolveAddress(address("${address}")).Name()` : null;
 }
+
+/** A name as r/sys/users keeps one (its validateName, read on onyx-1: `^[a-z][a-z0-9]*([_-][a-z0-9]+)*$`, 64 at most). */
+export function isName(text: string): boolean {
+  return text.length <= 64 && /^[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*$/.test(text);
+}
+
+/** The data `vm/qeval` is asked for the address holding a namespace, as one string (the address, or empty for nobody: nil, deleted or an old alias), or null for a text that is no name. */
+export function evalOwner(namespace: string): string | null {
+  return isName(namespace)
+    ? `gno.land/r/sys/users.func() string { d, ok := ResolveName("${namespace}"); if d == nil || !ok { return "" }; return string(d.Addr()) }()`
+    : null;
+}
+
+/** The answer to `evalOwner`'s: the address for a yes, null for a clean no, undefined for any text that is neither (never cached). */
+export function ownerOfAnswer(text: string): string | null | undefined {
+  const said = /^\("([^"]*)" string\)$/.exec(text)?.[1];
+  if (said === "") return null;
+  return isAddress(said ?? "") ? said : undefined;
+}

@@ -9,6 +9,9 @@ export const TURNED = /* glsl */ `vec3 turned(vec3 v, float angle) {
 }
 `;
 
+/** How many moons cast a shadow on their planet (and how many a page shows). */
+export const MOONS_MOST = 4;
+
 /** The uniforms and varyings both surface programs read. */
 export const COMMON = /* glsl */ `
 uniform mat4 modelMatrix;
@@ -18,10 +21,13 @@ uniform sampler2D ringMap;
 uniform sampler2D nightMap;
 uniform mat3 spin;
 uniform vec3 sun;
+uniform vec4 moonShadows[${String(MOONS_MOST)}];
 uniform vec3 hazeColour;
 uniform float time;
 uniform float cloudTime;
 uniform float relief;
+uniform float depth;
+uniform float arrive;
 uniform float air;
 uniform float hazeAmount;
 uniform float ringInner;
@@ -52,6 +58,20 @@ float toneOf(vec3 colour) {
   return sqrt(dot(colour, LUMA));
 }
 
+// The share of the sun the moons leave a point: each a sphere's shadow, a cylinder toward the sun, its edge softening with the distance.
+float eclipsed(vec3 world) {
+  float shade = 1.0;
+  for (int i = 0; i < ${String(MOONS_MOST)}; i++) {
+    vec4 moon = moonShadows[i];
+    vec3 to = moon.xyz - world;
+    float along = dot(to, sun);
+    if (moon.w <= 0.0 || along <= 0.0) continue;
+    float soft = moon.w * 0.3 + along * 0.03;
+    shade *= 1.0 - 0.85 * (1.0 - smoothstep(moon.w - soft, moon.w + soft, length(to - along * sun)));
+  }
+  return shade;
+}
+
 float ringShade() {
   if (ringOuter <= 0.0 || abs(vSun.y) < 0.001) return 1.0;
   float along = -vLocal.y / vSun.y;
@@ -72,6 +92,7 @@ vec3 litBy(vec3 albedo, float wet, vec3 bent, vec3 normal, vec3 view, out float 
   float dusty = 2.0 * light / (light + facing + 0.001) * smoothstep(0.0, 0.06, light);
   float soft = pow(light, 0.9) * pow(facing, 0.28);
   shine = mix(dusty, soft, mix(SOFT_BARE, SOFT_AIR, air)) * ringShade();
+  shine *= eclipsed(vWorld);
   vec3 colour = albedo * shine + albedo * NIGHT;
   if (wet > 0.0 && light > 0.0) {
     vec3 spot = normalize(vLocal) * 46.0 + vec3(0.0, cloudTime * 0.05, cloudTime * 0.03);
@@ -86,6 +107,11 @@ vec3 litBy(vec3 albedo, float wet, vec3 bent, vec3 normal, vec3 view, out float 
     colour += wet * smoothstep(0.0, 0.1, light) * lift * (0.4 + 0.6 * light);
   }
   return colour;
+}
+
+// What the relief's shadow leaves of the light: lit, 0 to 1, over the ground's own night.
+vec3 shadowedBy(vec3 colour, vec3 albedo, float lit) {
+  return mix(albedo * NIGHT, colour, lit);
 }
 
 vec3 cloudsOver(vec3 colour, float cover, float shadowed, float shine, vec3 tint) {

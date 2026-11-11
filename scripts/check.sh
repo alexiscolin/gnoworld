@@ -224,7 +224,7 @@ if [ -n "$changed" ]; then
 		pnpm-lock.yaml) audit=true ;;
 		esac
 		case $path in
-		server/src/* | jarvis/src/* | packages/service/src/*) ts=true ;;
+		server/src/* | jarvis/src/* | link-reader/src/* | packages/service/src/*) ts=true ;;
 		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
 		app/tests/*) ts=true ;; # the journeys, their helpers and recordings: the merge check and --full walk them
 		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;

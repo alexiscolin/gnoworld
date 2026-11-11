@@ -10,7 +10,7 @@ import { read } from "./read.ts";
 /** What the page's EventSource offers, so a test hands its own. */
 export interface VerdictSource {
   addEventListener: (
-    type: "verdict" | "since" | "signal" | "chain" | "realms" | "error",
+    type: "verdict" | "since" | "signal" | "chain" | "realms" | "card" | "error",
     listener: (event: { data: unknown }) => void,
   ) => void;
   close: () => void;
@@ -28,6 +28,8 @@ export interface VerdictOptions {
   /** The data of a `chain` and of a `realms` event (slice 9g), unread: their schemas are the feed's (chainFeed.ts), which a page loads on the first. */
   chain?: ((data: unknown) => void) | undefined;
   realms?: ((data: unknown) => void) | undefined;
+  /** The data of a `card` event (link-previews L4), unread too: its schema is the cards' feed's, a chunk a page loads on the first. */
+  card?: ((data: unknown) => void) | undefined;
   /** The stream's word of when it began following, in ms. */
   since?: (time: number) => void;
   /** The stream ended for good: the browser will not reconnect it. */
@@ -40,7 +42,7 @@ export interface VerdictOptions {
 export function followVerdicts(
   rooms: readonly string[],
   onVerdict: (event: StreamEvent) => void,
-  { open, log, signal, chain, realms, since, dead, uncounted = false }: VerdictOptions,
+  { open, log, signal, chain, realms, card, since, dead, uncounted = false }: VerdictOptions,
 ): () => void {
   if (rooms.length === 0) return () => undefined;
   const source = open(`/api/stream?rooms=${encodeURIComponent(rooms.join(","))}${uncounted ? "&presence=0" : ""}`);
@@ -61,10 +63,11 @@ export function followVerdicts(
       if (event !== undefined) signal(event);
       else once("signal_unknown");
     });
-  // The chain's events (9g) go on unread: the feed that reads them is a chunk a page loads on the first.
+  // The chain's events (9g) and the cards' (L4) go on unread: the feed that reads them is a chunk a page loads on the first.
   for (const [type, on] of [
     ["chain", chain],
     ["realms", realms],
+    ["card", card],
   ] as const)
     if (on !== undefined)
       source.addEventListener(type, ({ data }) => {
@@ -92,7 +95,7 @@ export function followVerdicts(
 /** The page's own stream, on its EventSource; an unknown event reported once, as the page reports an error. */
 export const pageVerdicts = (
   rooms: readonly string[],
-  on: Pick<VerdictOptions, "signal" | "chain" | "realms" | "uncounted"> & {
+  on: Pick<VerdictOptions, "signal" | "chain" | "realms" | "card" | "uncounted"> & {
     verdict: (event: StreamEvent) => void;
     since: (time: number) => void;
     dead: () => void;
@@ -103,6 +106,7 @@ export const pageVerdicts = (
     signal: on.signal,
     chain: on.chain,
     realms: on.realms,
+    card: on.card,
     uncounted: on.uncounted,
     log: (what) => {
       reportError(new Error(`verdicts: ${what}`));

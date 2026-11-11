@@ -79,10 +79,14 @@ const CHUNKS = [
   // Figures, Network, PagedList and Room (slice 13, D13979): the chunks that need them load them after the first screen.
   {
     name: "ui",
-    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row|Tabs|Progress|Sparkline|Figures|Network|PagedList)\/|(?:alone|flip|roomDom)\.tsx?$)/,
+    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Listbox|Row|Tabs|Progress|Sparkline|Figures|Network|PagedList)\/|(?:alone|flip|roomDom)\.tsx?$)/,
   },
   // three never: two lazy parts of the scene (the cosmos, a world's page) share some of it, and a share of two would put it on the first screen.
-  { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },
+  {
+    name: "vendor",
+    test: /^(?!.*\/node_modules\/three\/)(?!.*\/(?:useQueries|queriesObserver)\.js$).*\/node_modules\//,
+    minShareCount: 2,
+  },
 ];
 
 // The workshop's dev servers, the app's and the lab's (scripts/workshop.sh gives each its port): this machine alone, the exact names

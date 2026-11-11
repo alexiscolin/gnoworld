@@ -52,8 +52,8 @@ describe("the quick actions", () => {
       "Poll",
       "Jarvis",
     ]);
-    expect(items(draw(<QuickActions pills="earth" poll={POLL} />))).toEqual(["Image", "Quiz", "Poll", "Jarvis"]);
-    expect(items(draw(<QuickActions pills="earth" />))).toEqual(["Image", "Quiz", "Jarvis"]);
+    expect(items(draw(<QuickActions pills="earth" poll={POLL} />))).toEqual(["Image", "Poll", "Jarvis"]);
+    expect(items(draw(<QuickActions pills="earth" />))).toEqual(["Image", "Jarvis"]);
     expect(items(draw(<QuickActions pills="realm" poll={POLL} />))).not.toContain("Poll");
   });
 
@@ -63,8 +63,23 @@ describe("the quick actions", () => {
     expect(button(box, "Realm")?.getAttribute("aria-disabled")).toBeNull();
   });
 
-  it("gives a direct message Quiz alone after the image: Jarvis reads a room, so none in a private talk", () => {
-    expect(items(draw(<QuickActions pills="dm" poll={POLL} />))).toEqual(["Image", "Quiz"]);
+  it("gives a direct message the image alone: Jarvis reads a room, and a card needs one", () => {
+    expect(items(draw(<QuickActions pills="dm" poll={POLL} market={() => undefined} />))).toEqual(["Image"]);
+  });
+
+  it("gives Market chart, with its icon, last in a world's rows and first in the Earth's, and asks for the card on a click", () => {
+    const market = vi.fn();
+    Object.assign(HTMLElement.prototype, { hidePopover: () => undefined });
+    expect(items(draw(<QuickActions pills="earth" poll={POLL} market={market} />))).toEqual([
+      "Image",
+      "Market chart",
+      "Poll",
+      "Jarvis",
+    ]);
+    const box = draw(<QuickActions pills="hub" market={market} />);
+    expect(items(box).at(-1)).toBe("Market chart");
+    click(button(box, "Market chart"));
+    expect(market).toHaveBeenCalledTimes(1);
   });
 
   it("opens Poll's dialog from its item", () => {

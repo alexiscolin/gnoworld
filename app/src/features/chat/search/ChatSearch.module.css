@@ -1,0 +1,104 @@
+/* The chat's search panel beside the room (slice 13, C): the canvas's ChatSearch, States and Phone frames. */
+@layer components {
+  .panel {
+    inline-size: 100%;
+    font: var(--font-chat);
+  }
+
+  /* One meaning per mark: the browser's own cancel button of a search field is left out, the panel's close is the only cross. */
+  .head input[type="search"]::-webkit-search-cancel-button {
+    appearance: none;
+  }
+
+  .head,
+  .foot {
+    padding: var(--chat-panel-inset);
+  }
+
+  .body {
+    padding: var(--space-2xs);
+  }
+
+  .head {
+    border-block-end: var(--line-width) solid var(--color-line);
+  }
+
+  .foot {
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  .count {
+    font: var(--font-card-title);
+  }
+
+  /* The results scroll inside the panel, the filters and the note staying where they are. */
+  .results {
+    /* raw: a share of the screen's height, which no token names, so the list scrolls and the panel stays put */
+    max-block-size: 70vb;
+    overflow: auto;
+  }
+
+  .day {
+    padding: var(--space-xs) var(--space-xs) var(--space-3xs);
+  }
+
+  .hit {
+    inline-size: 100%;
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-item);
+    text-align: start;
+  }
+
+  .hit:hover {
+    background: var(--color-fill);
+  }
+
+  .hit[aria-current="true"] {
+    background: var(--color-fill-hover);
+  }
+
+  .row {
+    /* layout: the head over the words */
+    display: grid;
+    /* layout: a step between the head and the words */
+    gap: var(--space-3xs);
+  }
+
+  .top {
+    /* layout: who and where at the start, the time at the end */
+    display: flex;
+    /* layout: the time at the far end */
+    justify-content: space-between;
+    /* layout: a step between them */
+    gap: var(--space-2xs);
+  }
+
+  .who {
+    font-weight: 500;
+    color: var(--color-text);
+  }
+
+  .snippet {
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .hit[aria-current="true"] .snippet {
+    color: var(--color-text);
+  }
+
+  .snippet mark {
+    padding-inline: var(--space-3xs);
+    border-radius: var(--radius-s);
+    background: var(--color-mine-soft);
+    color: var(--color-text);
+  }
+
+  .recent {
+    color: var(--color-text-muted);
+  }
+
+  .recent:hover {
+    color: var(--color-text);
+  }
+}

@@ -3,7 +3,7 @@
 import type { Line } from "@gnoworld/core";
 import { IconButton, type FlashMessage } from "@gnoworld/ui";
 import type { Done } from "./askPins.ts";
-import { pinProblem, saveProblem } from "./problem.ts";
+import { moderationProblem, pinProblem, saveProblem } from "./problem.ts";
 import type { RoomKeeping } from "./RoomKeeping.ts";
 
 /** What an account may do with the line on its device and, for a moderator, in the room's pins. */
@@ -15,6 +15,32 @@ export interface LineKeeping {
   onMarkUnread: () => void;
   /** The room's pin and unpin of this line, for a reader who may pin there. */
   pin?: { pinned: boolean; onPin: () => void; onUnpin: () => void } | undefined;
+  /** Hide the line and mute its author, once confirmed, for a reader who moderates the room (the pin's right). */
+  moderate?: { onHide: () => void; onMute: () => void } | undefined;
+}
+
+/** The two acts of a moderator on another account's message, as the More menu's items; each asks `ask` for its confirm first. */
+export function moderationItems(
+  { line, own, keeping }: { line: Line; own: boolean; keeping: LineKeeping | undefined },
+  ask: (act: "hide" | "mute") => void,
+) {
+  if (keeping?.moderate === undefined || own || line.kind !== "message" || line.account === undefined) return [];
+  return [
+    {
+      label: "Hide message",
+      tone: "danger" as const,
+      onSelect: () => {
+        ask("hide");
+      },
+    },
+    {
+      label: "Mute account",
+      tone: "danger" as const,
+      onSelect: () => {
+        ask("mute");
+      },
+    },
+  ];
 }
 
 // The menu's items for an account: Save message or Remove from saved, which only a plain message takes (an /me or a
@@ -55,7 +81,26 @@ export function lineKeeping(
   say: (message: FlashMessage) => void,
 ): (line: Line) => LineKeeping | undefined {
   if (keeping === undefined || me === undefined) return () => undefined;
-  const { pin } = keeping;
+  const { pin, moderate } = keeping;
+  // A hide or a mute the server answered: its result in the room's flash, or why not.
+  const moderated = (call: Promise<Done>, what: "hide" | "mute"): void => {
+    call.then(
+      (done) => {
+        if (done.ok)
+          say({
+            title: what === "hide" ? "Message hidden." : "Account muted.",
+            line:
+              what === "hide"
+                ? "It is gone from the room for everyone."
+                : "The mute ends by itself after a few minutes; there is no unmute.",
+          });
+        else say(moderationProblem(done.reason, what));
+      },
+      () => {
+        say(moderationProblem("network", what));
+      },
+    );
+  };
   // A pin or an unpin the server answered: nothing to say when it took it, else why not.
   const told = (call: Promise<Done>, what: "pin" | "unpin"): void => {
     call.then(
@@ -83,6 +128,17 @@ export function lineKeeping(
     onMarkUnread: () => {
       keeping.onMarkUnread(line.id);
     },
+    moderate:
+      moderate === undefined || line.account === undefined
+        ? undefined
+        : {
+            onHide: () => {
+              moderated(moderate.hide(line.id), "hide");
+            },
+            onMute: () => {
+              if (line.account !== undefined) moderated(moderate.mute(line.account), "mute");
+            },
+          },
     pin:
       pin === undefined
         ? undefined

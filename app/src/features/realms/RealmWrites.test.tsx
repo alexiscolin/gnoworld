@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-import { realmType } from "@gnoworld/core";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
@@ -8,23 +7,14 @@ import { StoreProvider } from "../../storeContext.tsx";
 import { Grab, SignedIn, state } from "../../../tests/grabStore.tsx";
 import { Address } from "@gnoworld/schemas";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
-import { typed, warnsMembers } from "../../../tests/callFixtures.ts";
+import { CHAIN, CUR, field, typed, warnsMembers } from "../../../tests/callFixtures.ts";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { RealmWrites } from "./RealmWrites.tsx";
 
 // 9d, widened by 9e: every write function a call can carry is a "Call" row that opens the card under it, never a modal (frame
 // 33): any count of fields, none too (D254); a type a call does not carry gets a way to gnoweb. NOT recorded: the function list is
 // written in the shape of vm/qfuncs.
-const CHAIN = {
-  name: "Onyx",
-  chainId: "onyx-1",
-  rpc: "https://rpc.onyx.testnets.gno.land:443",
-  gnoweb: "https://onyx.testnets.gno.land",
-  indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
-};
 const REALM = "gno.land/r/demo/profile";
-const CUR = { Name: "cur", Type: realmType(), Value: "" };
-const field = (Name: string, Type: string) => ({ Name, Type, Value: "" });
 const FUNCTIONS = [
   { FuncName: "SetBio", Params: [CUR, field("bio", "string")], Results: null },
   { FuncName: "SetProfile", Params: [CUR, field("name", "string"), field("times", "int64")], Results: null },

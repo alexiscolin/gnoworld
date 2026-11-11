@@ -30,6 +30,7 @@ export function SavedView({ saved, open, onClose, onRemove, notKept = false }: S
         <Stack as="ul" space="xs">
           {saved.map((line) => {
             const name = line.account ?? line.from;
+            const to = roomHref(line.room, full);
             return (
               <li key={`${line.room} ${line.id}`} className={[shared["card"], styles["line"]].join(" ")}>
                 <Stack space="3xs">
@@ -41,9 +42,11 @@ export function SavedView({ saved, open, onClose, onRemove, notKept = false }: S
                   </span>
                   <span>{line.text}</span>
                   <Cluster space="2xs" justify="end">
-                    <Button href={roomHref(line.room, full)} emphasis="quiet" size="s">
-                      Open in room
-                    </Button>
+                    {to !== undefined && (
+                      <Button href={to} emphasis="quiet" size="s">
+                        Open in room
+                      </Button>
+                    )}
                     <IconButton
                       icon="close"
                       label={`Remove ${line.account === undefined ? line.from : shortAddress(line.account)}'s saved message`}

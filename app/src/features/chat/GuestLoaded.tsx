@@ -1,10 +1,11 @@
 // A visitor's world, its rooms once listed (slice 4's 4b): the switcher, the room in view and its people; in an open room a guest's line
 // (D430), else the word to log in; no direct message, no notice, nothing kept. What an account adds is AccountChat's, loaded for one.
 import type { RoomList } from "@gnoworld/schemas";
-import type { RefObject } from "react";
+import type { ReactNode, RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import { chunked } from "./Failing.tsx";
 import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
+import { JarvisTold } from "./jarvisTold.tsx";
 import { Dock } from "./Dock.tsx";
 import type { ChatLink } from "./link.ts";
 import { LOG_IN_TO_READ_DMS } from "./loginWords.ts";
@@ -86,6 +87,7 @@ function GuestRoom({
 }) {
   return (
     <>
+      <JarvisTold place={place} shown={shown} account={undefined} />
       {asksDm ? <p role="status">{LOG_IN_TO_READ_DMS}</p> : null}
       {shown === undefined ? (
         asksDm ? null : (
@@ -105,6 +107,8 @@ function GuestRoom({
   );
 }
 
+const titleOf = (shown: { title?: ReactNode } | undefined, name: ReactNode): ReactNode => shown?.title ?? name;
+
 export function GuestLoaded({
   sections,
   current,
@@ -118,12 +122,13 @@ export function GuestLoaded({
   place,
 }: GuestLoadedProps) {
   // A direct message asked for shows its problem in the room's place, as an account's does (U9).
+  const live = chat === "connected";
   const room = asksDm ? undefined : current;
   useRoomKeys(roomIds(sections), room);
   const acts = roomActs(link, room ?? "", dismissed);
   const { keeping, pins } = useGuestKeeping(room, usePins(useAppStore(), room, undefined));
   const shown = room === undefined ? undefined : roomShown(room, state, acts);
-  const people = peopleOf(state, chat === "connected");
+  const people = peopleOf(state, live);
   // A visitor reads a thread, whose panel says to log in where an account writes (4d's threads).
   const threads = useThreads({
     shown,
@@ -141,16 +146,17 @@ export function GuestLoaded({
   return (
     <ChatScreen
       place={place}
-      title={shown?.title ?? place.name}
+      title={titleOf(shown, place.name)}
       chips={<RoomChips sections={sections} current={room} />}
       menu={{ label: "Rooms", content: <RoomsList sections={sections} current={room} /> }}
       rail={rail}
       unread={0}
-      talking={talkingOf(state?.lines ?? [], now, chat === "connected")}
-      present={hereOf(state?.members, chat === "connected")}
+      talking={talkingOf(state?.lines ?? [], now, live)}
+      present={hereOf(state?.members, live)}
       here={state}
       people={people}
       threads={threads}
+      search={{ room, sections, members: state?.members ?? [], me: undefined, link }}
     >
       <GuestRoom
         asksDm={asksDm}

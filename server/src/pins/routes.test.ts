@@ -1,7 +1,10 @@
+import { createHmac } from "node:crypto";
 import { Address, PinList } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import { BODY_LIMIT, makeApp } from "../app.ts";
 import { logger } from "@gnoworld/service/log";
+import type { Right } from "../roles/mayModerate.ts";
 import { pinsRoutes } from "./routes.ts";
 import type { Pins } from "./pins.ts";
 
@@ -31,9 +34,15 @@ const pin = (id: string) => ({ id, time: "2026-10-25T10:00:00.000Z", account: AL
 function setup({
   answer = "pinned",
   breaks,
+  show,
+  right = (room, who) => Promise.resolve(mayPin(room, who) ? ({ as: "staff" } as const) : false),
 }: {
   answer?: "pinned" | "already" | "not_found" | "full" | "refused" | "unavailable";
   breaks?: "list" | "add";
+  // The room's right as the server gives it from step 2 of part 4: asynchronous, naming what gave it (an owner's, the owner's address).
+  right?: (room: string, who: string, visitor: string) => Promise<Right | false>;
+  // What the list's `may` asks, the display pool's: the action's by default.
+  show?: (room: string, who: string, visitor: string) => Promise<Right | false>;
 } = {}) {
   const held = new Map<string, ReturnType<typeof pin>[]>([["#bubble/games", [pin("m1")]]]);
   const calls: string[] = [];
@@ -69,7 +78,8 @@ function setup({
     "/api/pins",
     pinsRoutes({
       pins,
-      mayPin,
+      mayPin: right,
+      mayShow: show ?? right,
       readable,
       session: (token) => TOKENS.get(token ?? ""),
       origins: [ORIGIN],
@@ -79,23 +89,27 @@ function setup({
   );
   interface Ask {
     who?: string;
+    peer?: string;
     origin?: string | null;
     type?: string | null;
     body?: unknown;
   }
-  const ask = (method: string, query: string, { who, origin = ORIGIN, type = "application/json", body }: Ask = {}) =>
+  const headersOf = (method: string, { who, origin = ORIGIN, type = "application/json" }: Ask) => ({
+    ...(origin === null ? {} : { origin }),
+    ...(type === null || method === "GET" ? {} : { "content-type": type }),
+    ...(who === undefined ? {} : { cookie: `__Host-session=${who}` }),
+  });
+  const ask = (method: string, query: string, more: Ask = {}) =>
     app.request(
       `/api/pins${query}`,
       {
         method,
-        headers: {
-          ...(origin === null ? {} : { origin }),
-          ...(type === null || method === "GET" ? {} : { "content-type": type }),
-          ...(who === undefined ? {} : { cookie: `__Host-session=${who}` }),
-        },
-        ...(body === undefined ? {} : { body: typeof body === "string" ? body : JSON.stringify(body) }),
+        headers: headersOf(method, more),
+        ...(more.body === undefined
+          ? {}
+          : { body: typeof more.body === "string" ? more.body : JSON.stringify(more.body) }),
       },
-      { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+      { incoming: { socket: { remoteAddress: more.peer ?? "203.0.113.7" } } },
     );
   const room = (id: string) => `?room=${encodeURIComponent(id)}`;
   return {
@@ -336,5 +350,188 @@ describe("unpinning a line", () => {
     const response = await t.ask("POST", "/unpin", { body: request, who: "mod" });
     expect([response.status, await response.json()]).toEqual([400, { error: "refused" }]);
     expect(t.calls).toEqual([]);
+  });
+});
+
+// Part 4 (docs/plans/owners-moderation.md, section 3): the right is asynchronous and says what gave it. An owner of the realm's namespace
+// pins in its rooms, the log names the account and the owner, and a right that cannot be computed refuses before Ergo is asked.
+const hmac = (who: string): string =>
+  createHmac("sha256", "a-pepper-of-forty-characters-0123456789").update(who).digest("hex");
+const OWNER = Address.parse("g1mpkp5lm8lwpm0pym4388836d009zfe4maxlqsq");
+const REALM = "#acme-feed";
+const STAFF_RIGHT = { as: "staff" } as const;
+const OWNER_RIGHT = { as: "owner", owner: OWNER } as const;
+const owners = (room: string, who: string): Promise<Right | false> =>
+  Promise.resolve(room.startsWith("#acme") && who === OWNER ? OWNER_RIGHT : who === MOD ? STAFF_RIGHT : false);
+const logged = (t: ReturnType<typeof setup>, event: string) =>
+  t
+    .events()
+    .map((line) => z.record(z.string(), z.unknown()).parse(JSON.parse(line.replace(/^\{/, '{"time":"x",'))))
+    .find((line) => line["event"] === event);
+
+describe("an owner's right (part 4)", () => {
+  // The owner's session is added to the shared token table for these tests alone.
+  const withOwner = (more: Parameters<typeof setup>[0] = {}) => {
+    TOKENS.set("owner", OWNER);
+    return setup({ right: owners, ...more });
+  };
+
+  it("lets the holder of the realm's namespace pin in a realm room, the log naming the account, the owner and `as`", async () => {
+    const t = withOwner();
+    const response = await t.pin({ room: REALM, msgid: "m9" }, { who: "owner" });
+    expect(response.status).toBe(200);
+    expect(t.calls).toEqual([`add ${REALM} m9 ${OWNER}`]);
+    const line = logged(t, "pin_added");
+    expect(line).toMatchObject({ event: "pin_added", room: REALM, msgid: "m9", as: "owner" });
+    expect(Object.keys(line ?? {})).toEqual(expect.arrayContaining(["account", "owner"]));
+  });
+
+  it("logs a staff pin as staff, never as an owner's", async () => {
+    const t = withOwner();
+    await t.pin({ room: REALM, msgid: "m9" }, { who: "mod" });
+    expect(logged(t, "pin_added")).toMatchObject({ as: "staff" });
+  });
+
+  it("logs an owner's unpin with the account, the owner and `as`, and names no identity in the answer", async () => {
+    const t = withOwner();
+    await t.pin({ room: REALM, msgid: "m1" }, { who: "owner" });
+    const response = await t.unpin(REALM, "m1", { who: "owner" });
+    expect(logged(t, "pin_removed")).toMatchObject({ as: "owner", account: hmac(OWNER), owner: hmac(OWNER) });
+    expect(JSON.stringify(await response.json())).not.toContain("owner");
+  });
+
+  it("refuses an owner of another namespace in this room, before Ergo is asked", async () => {
+    const t = withOwner();
+    const response = await t.pin({ room: "#other-feed", msgid: "m9" }, { who: "owner" });
+    expect([response.status, await response.json()]).toEqual([403, { error: "forbidden" }]);
+    expect(t.calls).toEqual([]);
+  });
+
+  it("says in the list that an owner may pin, and that a reader may not", async () => {
+    const t = withOwner();
+    expect((await body(await t.get(REALM, "owner"))).may).toBe(true);
+    expect((await body(await t.get(REALM, "alice"))).may).toBe(false);
+  });
+
+  it("asks the right after the session and the body, never before", async () => {
+    const asked: string[] = [];
+    const t = withOwner({
+      right: (room, who) => {
+        asked.push(`${room} ${who}`);
+        return owners(room, who);
+      },
+    });
+    await t.pin({ room: REALM, msgid: "m9" });
+    await t.pin({ room: REALM }, { who: "owner" });
+    await t.pin({ room: REALM, msgid: "m9" }, { who: "owner", origin: "https://evil.test" });
+    expect(asked).toEqual([]);
+  });
+
+  it("refuses, with Ergo asked nothing, when the right's read fails (the 5-second outage), and the failure is no pin", async () => {
+    const t = withOwner({ right: () => Promise.reject(new Error("the chain said: secret")) });
+    const response = await t.pin({ room: REALM, msgid: "m9" }, { who: "owner" });
+    expect(response.status).toBeGreaterThanOrEqual(400);
+    expect(JSON.stringify(await response.json())).not.toContain("secret");
+    expect(t.calls).toEqual([]);
+  });
+
+  it("refuses a pin whose right resolves false after a slow read, as it does one that resolves at once", async () => {
+    const slow = (): Promise<false> =>
+      new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(false);
+        }, 20);
+      });
+    const t = withOwner({ right: slow });
+    const response = await t.pin({ room: REALM, msgid: "m9" }, { who: "owner" });
+    expect([response.status, await response.json()]).toEqual([403, { error: "forbidden" }]);
+    expect(t.calls).toEqual([]);
+  });
+
+  it("gives the right the visitor as the limits count it, an IPv6 one by its /64", async () => {
+    const seen: (string | undefined)[] = [];
+    const t = withOwner({
+      right: (room, who, visitor) => {
+        seen.push(visitor);
+        return owners(room, who);
+      },
+    });
+    await t.pin({ room: REALM, msgid: "m9" }, { who: "owner", peer: "2001:db8:1:2:aaaa:bbbb:cccc:dddd" });
+    await t.pin({ room: REALM, msgid: "m8" }, { who: "owner", peer: "203.0.113.7" });
+    // Each pin asks the right, then the list it answers asks it again.
+    expect([seen[0], seen[2]]).toEqual(["2001:db8:1:2::/64", "203.0.113.7"]);
+  });
+
+  it("answers a list with may false, not an error, when the right cannot be read, and asks nothing for a guest", async () => {
+    const asked: string[] = [];
+    const t = withOwner({
+      show: (room, who) => {
+        asked.push(`${room} ${who}`);
+        return Promise.reject(new Error("down"));
+      },
+    });
+    const response = await t.get(REALM, "owner");
+    expect([response.status, (await body(response)).may]).toEqual([200, false]);
+    await t.get(REALM);
+    expect(asked).toEqual([`${REALM} ${OWNER}`]);
+  });
+
+  it("answers a list with may false after 5 seconds when the right never settles, the pins still shown", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = withOwner({ show: () => new Promise<never>(() => undefined) });
+      const pending = Promise.resolve(t.get(REALM, "owner"));
+      await vi.advanceTimersByTimeAsync(4_999);
+      let settled = false;
+      pending.then(
+        () => {
+          settled = true;
+        },
+        () => undefined,
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      expect(settled).toBe(false);
+      await vi.advanceTimersByTimeAsync(1);
+      const response = await pending;
+      expect([response.status, (await body(response)).may]).toEqual([200, false]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("logs the acting account and the owner as the log's hashes, with `as`, when a linked account acts for its identity's owner", async () => {
+    const t = withOwner({ right: () => Promise.resolve({ as: "owner", owner: OWNER }) });
+    await t.pin({ room: REALM, msgid: "m9" }, { who: "alice" });
+    const line = logged(t, "pin_added");
+    expect(line).toMatchObject({ as: "owner", account: hmac(ALICE), owner: hmac(OWNER), msgid: "m9" });
+    expect(line?.["account"]).not.toBe(line?.["owner"]);
+  });
+
+  it("asks the display right for a list's `may` and the action right for a pin, so a flood of lists never spends an owner's reads", async () => {
+    const shown: string[] = [];
+    const acted: string[] = [];
+    const t = withOwner({
+      show: (room, who) => {
+        shown.push(`${room} ${who}`);
+        return owners(room, who);
+      },
+      right: (room, who) => {
+        acted.push(`${room} ${who}`);
+        return owners(room, who);
+      },
+    });
+    await t.get(REALM, "owner");
+    expect([shown.length, acted.length]).toEqual([1, 0]);
+    await t.pin({ room: REALM, msgid: "m9" }, { who: "owner" });
+    expect(acted).toEqual([`${REALM} ${OWNER}`]);
+    expect(shown).toHaveLength(2);
+  });
+
+  it("shows no identity in a room's pins: the list has no pinned_by and no owner", async () => {
+    const t = withOwner();
+    await t.pin({ room: REALM, msgid: "m9" }, { who: "owner" });
+    const text = JSON.stringify(await (await t.get(REALM, "owner")).json());
+    expect(text).not.toContain("pinned_by");
+    expect(text).not.toContain("owner");
   });
 });

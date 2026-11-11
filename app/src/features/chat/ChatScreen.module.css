@@ -136,4 +136,9 @@
     padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;
   }
+
+  /* The place's bar over the search panel: the inset the info panel gives it, so its buttons stay where they were. */
+  .bar {
+    padding: var(--chat-panel-inset) var(--chat-panel-inset) 0;
+  }
 }

@@ -1,7 +1,9 @@
 // The composer's reply bar (slice 4's 4d): over the field, the line the next one answers.
 import { IconButton, Sidebar } from "@gnoworld/ui";
 import { useId, useLayoutEffect, type KeyboardEvent, type RefObject } from "react";
+import { FIELD } from "./composerHooks.ts";
 import { Replying, type Answered } from "./Replying.tsx";
+import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";
 
 // The graphemes the reply bar shows of the line answered (docs/decisions.md, 2026-10-26).
@@ -22,7 +24,7 @@ interface ReplyBarProps {
 function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
   return (
     <Sidebar side="end" space="2xs">
-      <p id={id} className={styles["replying"]}>
+      <p id={id} className={[styles["replying"], rules["quote"]].join(" ")}>
         <Replying to={to} length={SHOWN} known={(address) => address === me || members.has(address)} />
       </p>
       <IconButton
@@ -33,7 +35,7 @@ function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
         onClick={(event) => {
           const form = event.currentTarget.closest("form");
           onCancel?.();
-          form?.querySelector("textarea")?.focus();
+          form?.querySelector<HTMLElement>(FIELD)?.focus();
         }}
       />
     </Sidebar>
@@ -45,15 +47,14 @@ function ReplyBar({ id, to, me, members, onCancel }: ReplyBarProps) {
 function useFocusOnReply(answers: boolean, asked: number, formRef: RefObject<HTMLFormElement | null>) {
   const answering = answers ? asked : undefined;
   useLayoutEffect(() => {
-    if (answering !== undefined) formRef.current?.querySelector("textarea")?.focus();
+    if (answering !== undefined) formRef.current?.querySelector<HTMLElement>(FIELD)?.focus();
   }, [answering, formRef]);
 }
 
-/** The composer's form, its box, and what it does with a key the reply does not take. */
+/** The composer's form and its box. */
 interface Form {
   formRef: RefObject<HTMLFormElement | null>;
   box: () => Element | undefined;
-  otherwise: (event: KeyboardEvent<HTMLFormElement>) => void;
 }
 
 /** What the composer is told of the line the next one answers (4d's replies), and who writes and where. */
@@ -67,7 +68,7 @@ interface AnsweringProps {
 
 // The line the next one answers (4d's replies): the bar over the field, which the field is described by; the focus
 // Reply puts in the field; and Escape in the box, which answers none as the bar's cancel does, the draft staying (U3).
-export function useAnswering(props: AnsweringProps, { formRef, box, otherwise }: Form) {
+export function useAnswering(props: AnsweringProps, { formRef, box }: Form) {
   const { replying, asked = 0, onCancelReply, nick, members } = props;
   const id = useId();
   useFocusOnReply(replying !== undefined, asked, formRef);
@@ -77,10 +78,9 @@ export function useAnswering(props: AnsweringProps, { formRef, box, otherwise }:
         <ReplyBar id={id} to={replying} me={nick} members={new Set(members)} onCancel={onCancelReply} />
       ),
     describedBy: replying === undefined ? undefined : id,
-    // A key of the form: Escape in the box, answering none, else what the form does with it.
+    // A key of the form: Escape in the box, answering none.
     keys: (event: KeyboardEvent<HTMLFormElement>) => {
       if (event.key === "Escape" && replying !== undefined && event.target === box()) onCancelReply?.();
-      else otherwise(event);
     },
   };
 }

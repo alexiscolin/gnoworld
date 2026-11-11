@@ -11,6 +11,8 @@ CREATE TABLE mutes (account TEXT NOT NULL, world TEXT NOT NULL, until INTEGER NO
 export interface Mutes {
   // False when the account is muted there already.
   mute: (account: string, world: string) => boolean;
+  // An owner's mute: the same, but a world at its cap refuses ("full") rather than end a live mute that staff or the bot made.
+  muteKeeping: (account: string, world: string) => "muted" | "already" | "full";
   // Lifts the ended mutes, keeping one whose lift the link could not send.
   tick: () => void;
   // When the link is back: the live mutes put on again, the ended ones lifted.
@@ -66,6 +68,14 @@ export function makeMutes({ db, send, roomsOf, now, forMs, max }: Options): Mute
       sql.add.run(account, world, at + forMs);
       mode("+", account, world);
       return true;
+    },
+    muteKeeping(account, world) {
+      const at = now();
+      if (sql.live.get(account, world, at) !== undefined) return "already";
+      if (Count.parse(sql.count.get(world, at)).n >= max) return "full";
+      sql.add.run(account, world, at + forMs);
+      mode("+", account, world);
+      return "muted";
     },
     tick,
     reapply() {

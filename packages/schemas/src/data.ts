@@ -1,6 +1,7 @@
 // The data files' schemas (slice 5's 5c; ADR-0002 §8 row 10): the lists in app/data, checked when the app builds, so a
 // malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
 // no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
+import { hasHidden } from "./hidden.ts";
 import { Key, SLUG_CAP } from "./slug.ts";
 import { z } from "./zod.ts";
 
@@ -114,10 +115,13 @@ const labelKey = (label: string): string =>
     .trim()
     .toLowerCase();
 
+/** Whether a label holds a hidden character (hidden.ts, the one rule), for the labels drawn on a button (a pinned call's, Jarvis's answer's). */
+export const holdsHidden = (label: string): boolean => hasHidden(label);
+
 // A label drawn on a button that leads to a signature: words a reader sees as they are (no control, format or separator character,
 // not blank), never read as the bar's own Who's here.
 const Label = text(CALL_CAPS.label).check(
-  z.refine((label) => !/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u.test(label), "a label holds no control or format character"),
+  z.refine((label) => !holdsHidden(label), "a label holds no control or format character"),
   z.refine((label) => labelKey(label) !== "", "a label draws more than blank"),
   z.refine((label) => labelKey(label) !== "who's here", "a label is not the bar's Who's here"),
 );

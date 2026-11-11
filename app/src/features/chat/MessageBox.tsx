@@ -3,13 +3,13 @@
 import { Cluster, Icon, IconButton, type IconName } from "@gnoworld/ui";
 import { Fragment, type ReactNode } from "react";
 import shared from "../../edge.module.css";
-import type { Format } from "./format.ts";
+import type { Format } from "./composer/kinds.ts";
 import { useFull } from "./full.ts";
 import styles from "./MessageBox.module.css";
 
 // The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
 // them: B, I, U, S. Underline goes as `++` (8k).
-const BAR: readonly (readonly { format: Format; icon: IconName; label: string }[])[] = [
+const BAR: readonly (readonly { format: Format | "link"; icon: IconName; label: string }[])[] = [
   [
     { format: "bold", icon: "bold", label: "Bold" },
     { format: "italic", icon: "italic", label: "Italic" },
@@ -28,7 +28,7 @@ const BAR: readonly (readonly { format: Format; icon: IconName; label: string }[
 ];
 
 // The format bar: each format of BAR, named, applied to the box's selection.
-function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
+function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void; linkTool: ReactNode }) {
   // Larger in the full chat, the screen its own (Alexis, 2026-11-07).
   const tools = useFull() ? "s" : "xs";
   return (
@@ -37,18 +37,22 @@ function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
         {BAR.map((group, at) => (
           <Fragment key={group[0]?.format}>
             {at === 0 ? null : <span role="separator" aria-orientation="vertical" className={styles["rule"]} />}
-            {group.map((tool) => (
-              <IconButton
-                key={tool.format}
-                icon={tool.icon}
-                label={tool.label}
-                size={tools}
-                emphasis="plain"
-                onClick={() => {
-                  onFormat(tool.format);
-                }}
-              />
-            ))}
+            {group.map((tool) => {
+              const { format } = tool;
+              if (format === "link") return <Fragment key="link">{linkTool}</Fragment>;
+              return (
+                <IconButton
+                  key={format}
+                  icon={tool.icon}
+                  label={tool.label}
+                  size={tools}
+                  emphasis="plain"
+                  onClick={() => {
+                    onFormat(format);
+                  }}
+                />
+              );
+            })}
           </Fragment>
         ))}
       </Cluster>
@@ -60,6 +64,7 @@ function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
 // (the field draws them, the box's grid places them) and Send. No @ nor / of its own: both are typed, and Tab completes them (Alexis, 2026-11-08).
 export function MessageBox({
   onFormat,
+  linkTool,
   send,
   goes,
   quick,
@@ -67,6 +72,8 @@ export function MessageBox({
 }: {
   /** The format bar's tools; none, no bar: a guest's line is one plain line (D430). */
   onFormat?: ((format: Format) => void) | undefined;
+  /** The bar's link tool, which is the composer's (a popover that asks for the address): it brings its own code. */
+  linkTool?: ReactNode;
   send: string;
   goes: boolean;
   /** The room's quick actions, behind a + at the foot's start; none in a thread's box. */
@@ -75,7 +82,7 @@ export function MessageBox({
 }) {
   return (
     <div role="group" aria-label="Message box" className={[shared["edge"], styles["box"]].join(" ")}>
-      {onFormat === undefined ? null : <FormatBar onFormat={onFormat} />}
+      {onFormat === undefined ? null : <FormatBar onFormat={onFormat} linkTool={linkTool} />}
       <div className={styles["field"]}>{children}</div>
       {quick === undefined ? null : <div className={styles["acts"]}>{quick}</div>}
       <button type="submit" className={`grid-center disc ${String(styles["send"])}`} disabled={!goes}>

@@ -15,6 +15,7 @@ import { z } from "zod";
 import { CATEGORIES } from "./moderation/provider.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { loadRoles } from "./roles/roles.ts";
+import { cliFile, cliKey } from "./testing/cliSigner.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
 
 interface Server {
@@ -204,6 +205,56 @@ describe("the server's process", { timeout: 30_000 }, () => {
     for (const path of ["/admin", "/api/admin", "/api/login/admin"]) {
       expect((await fetch(`http://127.0.0.1:${String(port)}${path}`)).status).toBe(404);
     }
+  });
+
+  it("links a command-line key over the real process: the block from the server, a file from the fixture, the list, and an unlink", async () => {
+    const origin = "http://gnoworld.test";
+    const port = await listening(start({ ...settings(), ORIGINS: origin }));
+    const call = (path: string, init: RequestInit = {}): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}/api/${path}`, init);
+    const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      call(path, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const who = wallet();
+    const made = Challenge.parse(await (await posted("login/challenge", { chainId: "onyx-1" })).json());
+    const verified = await posted("login/verify", {
+      nonce: made.nonce,
+      address: who.address,
+      proof: who.sign("onyx-1", made.text),
+    });
+    const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    const foreign = await call("links/challenge", {
+      method: "POST",
+      headers: { origin: "https://evil.test", "content-type": "application/json", cookie },
+      body: JSON.stringify({ kind: "cli", address: cliKey().address }),
+    });
+    expect(foreign.status).toBe(403);
+    expect((await posted("links/challenge", { kind: "cli", address: cliKey().address })).status).toBe(401);
+    const key = cliKey();
+    const code = z
+      .object({ nonce: z.string(), memo: z.string(), block: z.string(), expiresAt: z.string() })
+      .parse(await (await posted("links/challenge", { kind: "cli", address: key.address }, cookie)).json());
+    expect(code.block).toContain(key.address);
+    expect(code.block).toContain(code.memo);
+    expect(code.block).toContain("gnoworld-link");
+    const done = await posted(
+      "links/verify",
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo) },
+      cookie,
+    );
+    expect(done.status).toBe(200);
+    const listed = z
+      .object({ members: z.array(z.object({ address: z.string(), kind: z.string() })), linked: z.boolean() })
+      .parse(await (await call("links", { headers: { cookie } })).json());
+    expect(listed.linked).toBe(true);
+    expect(listed.members.map(({ address, kind }) => `${kind} ${address}`).toSorted()).toEqual(
+      [`adena ${who.address}`, `cli ${key.address}`].toSorted(),
+    );
+    expect((await posted("links/unlink", { address: key.address }, cookie)).status).toBe(200);
+    expect(await (await call("links", { headers: { cookie } })).json()).toMatchObject({ members: [], linked: false });
   });
 
   it("mints a ticket for Ergo over the real process, for the cookie's account", async () => {
@@ -481,6 +532,68 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await exited(second)).toBe(0);
     const after = new DatabaseSync(env["DATABASE"] ?? "");
     const kept = after.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all();
+    after.close();
+    expect(kept).toEqual([{ msgid: "new" }]);
+  });
+
+  it("hands Jarvis's kept answers to the retention: a row past its time goes when it starts, a live one stays (D13920)", async () => {
+    const env = settings();
+    const first = start(env);
+    await listening(first);
+    first.child.kill("SIGTERM");
+    expect(await exited(first)).toBe(0);
+    const seed = new DatabaseSync(env["DATABASE"] ?? "");
+    const add = seed.prepare(
+      "INSERT INTO jarvis_kept (key, answer, at, until, room, bytes) VALUES (?, '{}', ?, ?, NULL, 2)",
+    );
+    add.run("past", Date.now() - 2000, Date.now() - 1000);
+    add.run("live", Date.now(), Date.now() + 60_000);
+    seed.close();
+    const second = start(env);
+    await listening(second);
+    second.child.kill("SIGTERM");
+    expect(await exited(second)).toBe(0);
+    const after = new DatabaseSync(env["DATABASE"] ?? "");
+    const rows = after.prepare("SELECT key FROM jarvis_kept ORDER BY key").all();
+    after.close();
+    expect(rows).toEqual([{ key: "live" }]);
+  });
+
+  it("hands the search index to the retention and to the chat: old lines go when it starts, a REDACT heard drops its line (B1)", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    writeFileSync(
+      roles,
+      JSON.stringify({ team: [], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+    );
+    const first = start({ ...env, ROLES_FILE: roles });
+    await listening(first);
+    first.child.kill("SIGTERM");
+    expect(await exited(first)).toBe(0);
+    const day = 24 * 60 * 60_000;
+    const seed = new DatabaseSync(env["DATABASE"] ?? "");
+    const add = seed.prepare(
+      "INSERT INTO lines (room, world, msgid, account, at, link, text) VALUES ('#bubble', 'bubble', ?, 'g1a', ?, 0, ?)",
+    );
+    add.run("old", Date.now() - 91 * day, "ancient words");
+    add.run("new", Date.now() - day, "recent words");
+    add.run("taken", Date.now() - day, "regretted words");
+    seed.close();
+    const second = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
+    await listening(second);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":a!u@h REDACT #bubble taken");
+    peer.say("PING :settled");
+    await peer.next(/^PONG settled$/);
+    second.child.kill("SIGTERM");
+    expect(await exited(second)).toBe(0);
+    const after = new DatabaseSync(env["DATABASE"] ?? "");
+    const kept = after.prepare("SELECT msgid FROM lines ORDER BY msgid").all();
     after.close();
     expect(kept).toEqual([{ msgid: "new" }]);
   });
@@ -1183,6 +1296,36 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await ask({ JARVIS: "yes" })).toEqual([200, { status: "off" }]);
     // The allowlist skips the first-ask check, so the question reaches jarvis, which is not there (D13985).
     expect(await ask({ JARVIS: "on" })).toEqual([503, { error: "not_ready" }]);
+  });
+
+  it("tells any page whether Jarvis is on at GET /api/jarvis/state: on only with JARVIS_URL and JARVIS=on, never on the admin listener (10u-a)", async () => {
+    const state = async (env: Record<string, string>) => {
+      const port = await listening(start({ ...settings(), ORIGINS: "https://gnoworld.test", ...env }));
+      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/jarvis/state`);
+      return [answer.status, await answer.json()];
+    };
+    const door = {
+      JARVIS_URL: "http://127.0.0.1:9",
+      JARVIS_DOOR_KEY_FILE: doorKeyFile(),
+      JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+    };
+    expect(await state({})).toEqual([200, { on: false }]);
+    expect(await state({ JARVIS: "on" })).toEqual([200, { on: false }]);
+    expect(await state(door)).toEqual([200, { on: false }]);
+    expect(await state({ ...door, JARVIS: "yes" })).toEqual([200, { on: false }]);
+    expect(await state({ ...door, JARVIS: "on" })).toEqual([200, { on: true }]);
+    const server = start({
+      ...settings(),
+      ORIGINS: "https://gnoworld.test",
+      ...door,
+      JARVIS: "on",
+      ADMIN_PORT: "0",
+      ADMIN_ORIGINS: "https://admin.gnoworld.test",
+    });
+    await listening(server);
+    await until(() => server.out.stdout.includes('"event":"admin_listening"'));
+    const admin = Number(/"event":"admin_listening".*"port":(\d+)/.exec(server.out.stdout)?.[1]);
+    expect((await fetch(`http://127.0.0.1:${String(admin)}/api/jarvis/state`)).status).toBe(404);
   });
 
   it("opens the translation's and the digest's doors beside the question's, off unless JARVIS is on (10k)", async () => {

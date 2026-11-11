@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { buttonLook, iconSize, type ControlSize } from "../Button/control.ts";
+import { buttonLook, iconLook, iconSize, type ControlSize } from "../Button/control.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import styles from "./ComingSoon.module.css";
@@ -28,14 +28,19 @@ export function ComingSoon({ name, icon, words, size = "m", children }: ComingSo
     ) : (
       children
     );
-  const look = children === undefined ? buttonLook("outline", "neutral", size) : { className: styles["plain"] };
+  // An icon alone wears an IconButton's own look, so it stands at the same size beside them (the chat's header).
+  const look =
+    children !== undefined
+      ? { className: styles["plain"] }
+      : words === undefined
+        ? iconLook("outline", size)
+        : buttonLook("outline", "neutral", size);
   return (
     <Tooltip label="Coming soon">
       <button
         type="button"
         {...look}
         className={[look.className, styles["soon"]].join(" ")}
-        data-square={children === undefined && words === undefined ? "" : undefined}
         aria-disabled="true"
         aria-label={`${name}, coming soon`}
       >

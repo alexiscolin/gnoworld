@@ -9,15 +9,17 @@ import {
   Quaternion,
   SphereGeometry,
   Vector3,
+  Vector4,
   type PerspectiveCamera,
   type Scene,
   type WebGLRenderer,
 } from "three";
+import { MOONS_MOST } from "../planet/surfaceParts.ts";
 import { placeOf, type Planet, type Vec } from "../layout.ts";
 import type { Maps } from "./maps.ts";
-import { mapsOf } from "./near.ts";
+import { mapsOf } from "./mapsOf.ts";
 import { moonOf } from "./moonLook.ts";
-import { angleOf, emptySlot, LEANS, ORBITS, showOf, sizeOf, type Slot } from "./moonSlot.ts";
+import { angleOf, EARTH_ROOM, emptySlot, LEANS, ORBITS, showOf, sizeOf, type Slot } from "./moonSlot.ts";
 
 /** A room that has a moon: its id, its messages a minute, and whether the page is in it (the first, then). */
 export interface MoonRoom {
@@ -25,7 +27,6 @@ export interface MoonRoom {
   readonly rate: number;
 }
 
-const MOST = 4;
 const EASE_S = 0.7;
 const FLARE_S = 5;
 
@@ -33,7 +34,9 @@ const X = new Vector3(1, 0, 0);
 
 export class Moons {
   readonly group = new Group();
-  readonly #slots: Slot[] = Array.from({ length: MOST }, emptySlot);
+  readonly #slots: Slot[] = Array.from({ length: MOONS_MOST }, emptySlot);
+  /** Each moon's world x, y, z and radius, for the planet's eclipses; a radius of 0 is no moon (Planet.setMoons). */
+  readonly shadows: readonly Vector4[] = Array.from({ length: MOONS_MOST }, () => new Vector4(0, 0, 0, 0));
   readonly #sphere = new SphereGeometry(1, 64, 48);
   readonly #at: Vec = { x: 0, y: 0, z: 0 };
   readonly #sun = new Vector3();
@@ -84,9 +87,10 @@ export class Moons {
       [this.#of, this.#dirty] = [undefined, true];
       for (const slot of this.#slots) slot.alpha = 0;
     } else if (planet !== this.#of) this.#arrive(planet, view);
-    if (this.#dirty && !gone) this.#sync(planet.id === EARTH ? 1 : MOST, clock.still);
+    if (this.#dirty && !gone) this.#sync(planet.id === EARTH ? 1 : MOONS_MOST, clock.still);
     const ease = clock.still ? 1 : 1 - Math.exp(-delta / EASE_S);
     this.group.visible = false;
+    for (const shadow of this.shadows) shadow.w = 0;
     if (planet !== undefined) placeOf(planet, clock.seconds, this.#at);
     this.#slots.forEach((slot, at) => {
       this.#tick(slot, { ease, delta, shown: !gone && !slot.leaving && slot.room !== "" });
@@ -152,6 +156,11 @@ export class Moons {
     Object.assign(slot, emptySlot());
   }
 
+  // A moon in view lends its planet a shadow: where it stands and how large.
+  #cast(at: number, { group }: { group: Group }): void {
+    if (group.visible) this.shadows[at]?.set(group.position.x, group.position.y, group.position.z, group.scale.x);
+  }
+
   #place(
     slot: Slot,
     at: number,
@@ -182,10 +191,12 @@ export class Moons {
     const { place } = planet.system;
     drawn.setSun(this.#lit(place, view.eye, drawn.group.position));
     drawn.setTime(clock.still ? 0 : clock.seconds);
+    this.#maps.dress(drawn, slot.room === EARTH_ROOM ? "moon" : undefined, this.#device?.renderer);
     const { uniforms } = drawn.surface;
     if (uniforms["moonAlpha"] !== undefined) uniforms["moonAlpha"].value = shown;
     if (uniforms["moonFlare"] !== undefined) uniforms["moonFlare"].value = slot.flare;
     drawn.group.visible = shown > 0.01;
+    this.#cast(at, drawn);
     if (drawn.group.visible) this.group.visible = true;
   }
 

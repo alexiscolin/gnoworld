@@ -15,7 +15,8 @@ import type { Heard } from "./heard.ts";
 import type { Jarvis } from "./jarvis.ts";
 import type { Counted } from "./quota.ts";
 import { refusedWithoutModel } from "./refuse.ts";
-import { servedKey, type Served } from "./served.ts";
+import { keysOf, type Kept } from "./kept.ts";
+import type { Served } from "./served.ts";
 
 interface Options extends Front, Counted<"take" | "giveBack" | "unlimited"> {
   // Whether an account may read a room (rooms/types.ts's mayRead, through the chat).
@@ -31,6 +32,11 @@ interface Options extends Front, Counted<"take" | "giveBack" | "unlimited"> {
   hosts: readonly string[];
   day: Pick<Day, "strike" | "paused" | "spend" | "capped">;
   served: Pick<Served, "get" | "set">;
+  kept: Pick<Kept, "get" | "set">;
+  // The chain of a room's world, none for a room with none (chain.ts): a function is explained on it.
+  chainOf: (room: string) => string | undefined;
+  // The default universe's chain (chain.ts): a room with no chain of its own is read on it, and its answer is never kept.
+  defaultChain: () => string | undefined;
   jarvis: Pick<Jarvis, "ask">;
   questionChars: number;
   perMinute?: number;
@@ -96,8 +102,10 @@ export function askRoutes(options: Options): Hono<Guarded> {
   });
   const launch = async (who: Address, ask: JarvisQuestion, started: number): Promise<Result> => {
     const tail = last(ask.room);
+    const own = "ask" in ask && ask.ask === "function" ? options.chainOf(ask.room) : undefined;
     const asked: Asked = {
-      key: servedKey(ask, tail, who),
+      ...keysOf(ask, { last: tail, account: who, chain: own }),
+      chain: own ?? ("ask" in ask && ask.ask === "function" ? options.defaultChain() : undefined),
       who,
       room: ask.room,
       started,

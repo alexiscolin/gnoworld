@@ -98,6 +98,7 @@ export default defineConfig({
             "app/src/**/*.test.{ts,tsx}",
             "server/src/**/*.test.ts",
             "jarvis/src/**/*.test.ts",
+            "link-reader/src/**/*.test.ts",
           ],
           exclude: [
             ...configDefaults.exclude,
@@ -152,10 +153,16 @@ export default defineConfig({
       // `check.sh --everything` sets COVERAGE_ALL: every source file, tested or not (an untested one shows 0%), but the document
       // shell, the server entry and Storybook's pages, which the journeys walk; the display-only tests run too.
       include: process.env["COVERAGE_ALL"]
-        ? ["packages/*/src/**/*.{ts,tsx}", "app/src/**/*.{ts,tsx}", "server/src/**/*.ts", "jarvis/src/**/*.ts"]
+        ? [
+            "packages/*/src/**/*.{ts,tsx}",
+            "app/src/**/*.{ts,tsx}",
+            "server/src/**/*.ts",
+            "jarvis/src/**/*.ts",
+            "link-reader/src/**/*.ts",
+          ]
         : [
             "packages/core/src/**/*.{ts,tsx}",
-            "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,app/src/sw,server/src/ergo,jarvis/src}/**/*.{ts,tsx}",
+            "{server/src/login,app/src/features/login,app/src/lib/ergo,server/src/roles,app/src/lib/adena,app/src/sw,server/src/ergo,jarvis/src,link-reader/src}/**/*.{ts,tsx}",
             "{app/src/lib/api/login.ts,app/src/csp.ts,app/src/cspOrigins.ts,app/src/cspForms.ts,app/src/lib/chain/evalCall.ts,server/src/guard.ts,server/src/limit.ts,server/src/config.ts,app/src/features/chat/embeds.ts,app/src/features/chat/Embed.tsx,app/src/features/realms/useExternalLinks.tsx,app/src/leaving.tsx,app/src/pagePath.ts}",
             "{packages/service/src/net.ts,packages/service/src/settings.ts}",
           ],
@@ -168,6 +175,7 @@ export default defineConfig({
         // drive them.
         "server/src/main.ts",
         "jarvis/src/main.ts",
+        "link-reader/src/main.ts",
       ],
       reporter: ["text-summary", "json"],
       // 85% everywhere (Alexis, 2026-10-17). Core at what slices 7 and 8's hardening measured, never under 90 (Alexis, 2026-11-05);

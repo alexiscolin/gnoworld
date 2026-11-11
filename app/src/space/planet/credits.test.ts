@@ -11,9 +11,9 @@ import { FILED as CREDITS } from "./creditFiles.ts";
 const FOLDER = new URL("../../../public/textures", import.meta.url).pathname;
 const FILES = readdirSync(FOLDER, { recursive: true });
 const MAX_BYTES = 2 * 1024 * 1024;
-const ALL_BYTES = 10 * 1024 * 1024;
+const ALL_BYTES = 12 * 1024 * 1024;
 const WITH_VARIANTS_BYTES = 16 * 1024 * 1024;
-const LICENCES = ["CC BY 4.0"];
+const LICENCES = ["CC BY 4.0", "Public domain", "CC0 1.0"];
 // A file is `name.<width>.<hash>.webp`: its map's name, and the widest file of each map is its source, the others its variants.
 const nameOf = (file: string) => file.split(".")[0] ?? file;
 const widthOf = (file: string) => Number(file.split(".")[1]);
@@ -39,6 +39,8 @@ describe("the textures' credits", () => {
       "https://esahubble.org/images/heic1520a/",
       "https://esawebb.org/images/weic2205a/",
       "https://www.solarsystemscope.com/textures/",
+      "https://svs.gsfc.nasa.gov/4720/",
+      "https://www.ncei.noaa.gov/products/etopo-global-relief-model",
     ]);
     expect(CREDITS[0]?.line).toContain("warped and recoloured");
     expect(CREDITS[1]?.line).toContain("scaled to 4096 by 2048");
@@ -71,7 +73,12 @@ describe("the textures' credits", () => {
   });
 
   it("links every row to the licence itself, as CC BY 4.0 §3(a)(1)(c) asks: the words alone do not", () => {
-    for (const credit of CREDITS) expect(credit.licenceUrl).toBe("https://creativecommons.org/licenses/by/4.0/");
+    for (const credit of CREDITS.filter(({ licence }) => licence === "CC BY 4.0"))
+      expect(credit.licenceUrl).toBe("https://creativecommons.org/licenses/by/4.0/");
+    expect(CREDITS.slice(-2).map(({ licence, licenceUrl }) => [licence, licenceUrl])).toEqual([
+      ["Public domain", "https://svs.gsfc.nasa.gov/help"],
+      ["CC0 1.0", "https://doi.org/10.25921/Fd45-Gt74"],
+    ]);
   });
 
   it("notes that the worlds warp and recolour the Earth's day map, as CC BY 4.0 §3(a)(1)(b) asks", () => {
@@ -140,7 +147,7 @@ describe("the textures' files", () => {
     expect(sizeOf(join(FOLDER, widest("ring")))).toEqual({ width: 1024, height: 16 });
   });
 
-  it("weigh 10 MiB together at most for the sources, 16 with the variants, for every one of them ships", () => {
+  it("weigh 12 MiB together at most for the sources, 16 with the variants, for every one of them ships", () => {
     const size = (file: string) => statSync(join(FOLDER, file)).size;
     expect(NAMES.reduce((sum, name) => sum + size(widest(name)), 0)).toBeLessThanOrEqual(ALL_BYTES);
     expect(FILES.reduce((sum, file) => sum + size(file), 0)).toBeLessThanOrEqual(WITH_VARIANTS_BYTES);

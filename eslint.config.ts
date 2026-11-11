@@ -70,7 +70,7 @@ export default defineConfig(
   // No state at a module's top in a workspace's source; core's and ui's own lists, below, hold it too, and the
   // tests' lists replace it.
   {
-    files: ["server/src/**/*.ts", "jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
+    files: ["server/src/**/*.ts", "jarvis/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
     rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE] },
   },
   react,
@@ -119,9 +119,9 @@ export default defineConfig(
     // A module of the app, the services or the packages is TypeScript: one in another extension would pass the walls and
     // gnoworld/chain-read unread, which read .ts and .tsx (D123, F5277). Last, so no later list replaces it.
     files: [
-      "{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",
+      "{app/src,server,jarvis,link-reader,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",
       // The services hold no JSX: a .tsx there would pass their walls unread (F5281).
-      "{server,jarvis,packages/service}/**/*.tsx",
+      "{server,jarvis,link-reader,packages/service}/**/*.tsx",
     ],
     languageOptions: { parser: tseslint.parser },
     rules: {

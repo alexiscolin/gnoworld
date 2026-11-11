@@ -4,3 +4,6 @@ export { ReadFailed, ReadSource } from "./ReadSource.tsx";
 // A world's pinned actions (D271), on its page and in its chat's bar, from chunks asked after hydration.
 export { ActionForm } from "./ActionForm.tsx";
 export { InlineCard } from "./InlineCard.tsx";
+// What an answer of Jarvis is checked and drawn with (10u-a): the callable listing, the leaving warning's links and the call's place.
+export { useExternalLinks } from "./useExternalLinks.tsx";
+export type { CallPlace } from "./InlineCard.tsx";

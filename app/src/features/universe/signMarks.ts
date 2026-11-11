@@ -80,7 +80,7 @@ const stands = (at: { x: number; y: number }, from: { x: number; y: number }, ke
   at.x >= from.x && at.y >= from.y && at.x < keep;
 
 // The element stands on the point; the bubble is offset from it by the sheet, which eases a move clear of another or a change of side.
-function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, keep, from }: Fit): GroundMark {
+function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, keep, from, aim }: Fit): GroundMark {
   const [width, rise] = [BUBBLE_WIDTH * scale, BUBBLE_RISE * scale];
   const own: Box = { left: 0, top: 0, width, height: element.offsetHeight * scale, x: Number.NaN, y: Number.NaN };
   const { style } = element;
@@ -90,6 +90,7 @@ function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, k
     lon: Number(element.dataset["lon"]),
     keep,
     from,
+    aim,
     place: (x, y, front) => {
       const leftwards = x + BUBBLE_GAP + width > reach;
       own.left = Math.max(from?.x ?? EDGE, leftwards ? x - BUBBLE_GAP - width : x + BUBBLE_GAP);
@@ -120,6 +121,8 @@ export interface Fit {
   readonly floor: number;
   /** The page's x a bubble must stand left of to be read, which turns the Earth (D488); none in a small view. */
   readonly keep?: number | undefined;
+  /** Where a bubble's country is brought to: a point of the free area, as the frames keep it (D13916); none in a small view. */
+  readonly aim?: { readonly x: number; readonly y: number } | undefined;
   /** A world's: the plate's right edge and the header's foot, which its bubbles keep clear of (D565); none on the Earth, whose do not. */
   readonly from?: { readonly x: number; readonly y: number } | undefined;
 }
@@ -127,20 +130,31 @@ export interface Fit {
 // A plate that stands beside the dock leaves the room between them; one stacked over the planet, as on a narrow page, leaves none to keep.
 const LEAST_ROOM = 240;
 
-/** The free area of a world's page: right of the plate, under the header, left of the dock. */
-export function worldFit(): Fit {
+// Where the frames keep a country brought into view, as shares of the free area: across from the plate's edge, down from the header.
+const AIM_ACROSS = 0.4;
+const AIM_DOWN = 0.57;
+
+/** The free area of a page: right of the plate, under the header, left of the dock, down to the window's foot. */
+function freeArea() {
   const keep = keepOf();
   const plate = document.querySelector("[data-look='plate']")?.getBoundingClientRect();
   const aside = plate !== undefined && keep - plate.right >= LEAST_ROOM;
   const header = document.querySelector("header")?.getBoundingClientRect().bottom ?? 0;
   const from = { x: aside ? plate.right + EDGE : EDGE, y: header };
-  return { reach: Math.min(reachOf(), keep), scale: 1, floor: header, keep, from };
+  const aim = { x: from.x + (keep - from.x) * AIM_ACROSS, y: from.y + (innerHeight - from.y) * AIM_DOWN };
+  return { keep, from, aim, header };
+}
+
+/** The free area of a world's page: right of the plate, under the header, left of the dock. */
+export function worldFit(): Fit {
+  const { keep, from, aim, header } = freeArea();
+  return { reach: Math.min(reachOf(), keep), scale: 1, floor: header, keep, from, aim };
 }
 
 /** The marks of the signs drawn now, in their order: a later bubble moves clear of the earlier ones. */
 export function marksOf(
   elements: Iterable<HTMLElement>,
-  fit: Fit = { reach: reachOf(), scale: 1, floor: -Infinity, keep: keepOf() },
+  fit: Fit = { reach: reachOf(), scale: 1, floor: -Infinity, keep: keepOf(), aim: freeArea().aim },
 ): GroundMark[] {
   const boxes: Box[] = [];
   return Array.from(elements, (element) =>

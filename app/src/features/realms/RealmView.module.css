@@ -44,6 +44,11 @@
     }
   }
 
+  /* A call card opened inside the page (a form's Call) is never cut: the window grows to hold it. */
+  .window:has(article article) {
+    max-block-size: none;
+  }
+
   .window[data-open] {
     /* raw: the open card fills the pane (Room's --plate-room), less its header's and margins' room, 8 rem */
     max-block-size: max(var(--web-h-l), calc(var(--plate-room, 0px) - 8rem));

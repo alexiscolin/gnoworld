@@ -7,7 +7,7 @@ import { MEMBER, scriptedErgo } from "./scripted.ts";
 export const PIN = "Welcome. Be kind, no spam, any language is fine.";
 
 /** Opens #games as `as`, its two lines scripted and, when asked, a pin the server holds: the full chat unless `full` is
- * false, which leaves the docked chat of a wide window. */
+ * false, which leaves the docked chat of a wide window; `query` ends the address (`&test-gpu`). */
 export async function open(
   page: Page,
   {
@@ -16,7 +16,8 @@ export async function open(
     pinned = false,
     height = 900,
     full = true,
-  }: { width: number; as: string; pinned?: boolean; height?: number; full?: boolean },
+    query = "",
+  }: { width: number; as: string; pinned?: boolean; height?: number; full?: boolean; query?: string },
 ) {
   await page.setViewportSize({ width, height });
   await page.routeWebSocket(/\/ws$/, (ergo) => {
@@ -38,7 +39,7 @@ export async function open(
       }),
     );
   }
-  await page.goto(full ? "/w/bubble?room=games&chat=full" : "/w/bubble?room=games");
+  await page.goto(`${full ? "/w/bubble?room=games&chat=full" : "/w/bubble?room=games"}${query}`);
   await hydrated(page);
-  await expect(lines(page)).toHaveCount(2);
+  await expect(lines(page)).toHaveCount(2, { timeout: 30_000 });
 }

@@ -33,7 +33,10 @@ export function usePeople({
     // After the thread's panel is gone and the line has had the focus back, which the people take from it.
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        panelRef.current?.focus();
+        const panel = panelRef.current;
+        // The layout draws the panel exactly when it is not compact (ChatScreen): none then means a thread holds its place.
+        if (panel === null) setOpened(key);
+        else panel.focus();
       });
     });
   };
@@ -48,7 +51,7 @@ export function usePeople({
   return {
     panel: panelRef,
     ask,
-    dialog: compact ? (
+    dialog: (
       <Dialog
         title="Who's here"
         {...(present === undefined ? {} : { description: `${String(present)} here now` })}
@@ -65,7 +68,7 @@ export function usePeople({
             setOpened(undefined);
             requestAnimationFrame(() => {
               requestAnimationFrame(() => {
-                screenRef.current?.querySelector<HTMLElement>('[data-region="conversation"] textarea')?.focus();
+                screenRef.current?.querySelector<HTMLElement>('[data-region="conversation"] [role="textbox"]')?.focus();
               });
             });
           }}
@@ -73,6 +76,6 @@ export function usePeople({
           {opened === key ? people : null}
         </div>
       </Dialog>
-    ) : null,
+    ),
   };
 }

@@ -10,8 +10,8 @@ import { logger } from "@gnoworld/service/log";
 import { afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { aheadRooms } from "./ahead.ts";
 import { worldsListing } from "../worlds/known.ts";
-import { EARTH_TABLES, REALM_TABLES, ROOM_STATE, type Rooms, makeRooms } from "./create.ts";
-import { ROOM_TABLES, ensureRooms, listRooms, roomWorld, worldOf } from "./rooms.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE, type Rooms, makeRooms } from "./create.ts";
+import { ROOM_TABLES, ensureRooms, listRooms, realmPaths, roomWorld, worldOf } from "./rooms.ts";
 import { z } from "zod";
 
 // D413: the room of every realm the worlds job lists, and every hub's main room, exist before anyone opens a page.
@@ -81,7 +81,7 @@ const setup = ({
   seeded = false,
   send = true,
 }: { realmMax?: number; hubs?: typeof HUBS; perSecond?: number; seeded?: boolean; send?: boolean } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
   opened.push(db);
   // The hubs as the process has them before this part: chat.ts makes a main room for every world of the roles file.
   ensureRooms(db, seeded ? ["earth", ...HUBS.map(({ slug }) => slug)] : ["earth"], T0);
@@ -169,6 +169,16 @@ describe("rooms made ahead from the worlds job's list", () => {
     expect(sent).toContain("SAMODE #leon -i");
     expect(sent).toContain(`SAMODE ${golf} +M`);
     expect(sent).toContain(`SAMODE ${golf} -i`);
+  });
+
+  it("records the realm of each room it makes, and tells a room made before the path was kept (a backfill)", async () => {
+    const { db, rooms, start } = setup();
+    const golf = realmRoom("gno.land/r/gnogolf/golf_a/v2", []).room;
+    // Made as the version before this one made it: a row with no path.
+    rooms.realm("#leon");
+    await start(written(["gno.land/r/leon", "gno.land/r/gnogolf/golf_a/v2"])).check();
+    expect(realmPaths(db, "leon")).toEqual(new Map([["#leon", "gno.land/r/leon"]]));
+    expect([...realmPaths(db, worldOf(golf)).values()]).toEqual(["gno.land/r/gnogolf/golf_a/v2"]);
   });
 
   it("makes every hub's main room, even for a hub that lists no realm, and with no worlds file at all", async () => {

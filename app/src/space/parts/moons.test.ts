@@ -32,7 +32,7 @@ const device = {
 
 // A moon made on the first frame, ready once its program compiled, then one frame of `delta` seconds.
 async function afterFrame(delta: number): Promise<typeof uniforms> {
-  const moons = new Moons({} as Maps, new LineSegments());
+  const moons = new Moons({ dress: () => undefined } as Partial<Maps> as Maps, new LineSegments());
   moons.use(device as unknown as Parameters<Moons["use"]>[0]);
   moons.rooms([{ room: "r", rate: 5 }]);
   moons.follow(planet, { seconds: 0, delta: 0, still: false }, view);

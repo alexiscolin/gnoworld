@@ -76,7 +76,7 @@ test.describe("threads", () => {
     expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :from the panel`]);
     await expect(chipOf(lines(page).first())).toHaveText(/^3 replies\b/);
     await expect(lines(page)).toHaveCount(5);
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     // After a send the focus stays in the field, for the next line (R14).
     await expect(threadField(page)).toBeFocused();
     // The room's own composer says its line plain: the panel's tag is the panel's.
@@ -115,16 +115,16 @@ test.describe("threads", () => {
     const { address } = await open(page);
     await field(page).fill("keep me");
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     await threadField(page).fill("panel words, unsent");
     await closeButton(page).click();
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
     await chipOf(lines(page).first()).click();
     await threadField(page).fill("sent from the panel");
     await threadField(page).press("Enter");
     await expect(inThread(page)).toHaveCount(4);
     await closeButton(page).click();
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
     const kept = () =>
       page.evaluate(() =>
         Object.entries(localStorage)
@@ -135,7 +135,7 @@ test.describe("threads", () => {
     expect((await kept()).join()).toContain("keep me");
     await page.reload();
     await hydrated(page);
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
   });
 
   // R4: a thread opened over another is a new panel: nothing typed for the first goes to the second.
@@ -147,7 +147,7 @@ test.describe("threads", () => {
     await threadField(page).fill("half a thought");
     await threadOf(lineOf(page, "an unrelated line"));
     await expect(inThread(page)).toHaveText([/an unrelated line/]);
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     await expect(threadField(page)).toBeFocused();
     await threadField(page).fill("for the second");
     await threadField(page).press("Enter");
@@ -273,7 +273,7 @@ test.describe("threads", () => {
     await open(page);
     await chipOf(lines(page).first()).click();
     await expect(panel(page)).toBeVisible();
-    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await roomsNav(page).getByRole("link", { name: "bubble", exact: true }).click();
     await expect(panel(page)).toHaveCount(0);
   });
 

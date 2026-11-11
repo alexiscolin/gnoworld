@@ -5,7 +5,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import type { Room, Roles } from "../roles/roles.ts";
-import { EARTH_TABLES, makeRooms, REALM_TABLES, ROOM_STATE } from "./create.ts";
+import { EARTH_TABLES, makeRooms, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
 import { ensureNamed, ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
 import { roomsRoutes } from "./routes.ts";
 
@@ -71,7 +71,7 @@ const setup = ({
   named = "pass",
   checked = true,
 }: { max?: number; named?: Named; checked?: boolean } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
   opened.push(db);
   ensureRooms(db, ["bubble", "earth", LONG], T0);
   const clock = { now: T0 };

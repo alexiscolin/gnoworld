@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // Node's types, as Jarvis's: the link reader is a Node process of its own; the compiler flags come from the base.
+    "types": ["node"],
+    // The codecs' own declarations name `ImageData` and `WebAssembly`, which only the DOM library declares (the reader runs in Node).
+    "lib": ["es2024", "DOM"]
+  },
+  "include": ["src"]
+}

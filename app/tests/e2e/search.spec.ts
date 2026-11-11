@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
-import { inGames } from "./chat.ts";
+import { inGames, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { logIn } from "./irc.ts";
 
 // The search palette (D355): ⌘K, Ctrl+K, the slash and the header's control open it over the universe's places;
 // typing sends no request (the places are in the page); arrows, Enter and Escape work, and the focus goes back to the opener.
@@ -53,7 +54,7 @@ test.describe("⌘K", () => {
     const composer = page.getByRole("textbox", { name: "Message #games" });
     await composer.click();
     await page.keyboard.press("k");
-    await expect(composer).toHaveValue("k");
+    await expect(composer).toHaveText("k");
     await expect(palette(page)).toBeHidden();
   });
 
@@ -166,7 +167,10 @@ test.describe("⌘K", () => {
     // before the count starts.
     await page.waitForLoadState("networkidle");
     const sent: string[] = [];
-    page.on("request", (request) => sent.push(request.url()));
+    // A world's picture is a file the row draws, not a question asked of a server.
+    page.on("request", (request) => {
+      if (!request.url().includes("/world-pictures/")) sent.push(request.url());
+    });
     await field(page).pressSequentially("bubble", { delay: 20 });
     await expect(choices(page, /Bubble/)).toBeVisible();
     await field(page).fill("");
@@ -197,7 +201,8 @@ test.describe("⌘K", () => {
       await expect(page.getByText(/no place/i)).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
       await field(page).fill("");
-      await expect(shelves(page)).toBeVisible();
+      // A phone has the shelves out of the way: the styles' chips stand in for them (Discover's Controls).
+      await expect(width > 900 ? shelves(page) : palette(page).getByRole("button", { name: "Games" })).toBeVisible();
       expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     });
   }
@@ -211,5 +216,36 @@ test.describe("⌘K", () => {
       expect(box?.width).toBeGreaterThanOrEqual(34);
       expect(box?.height).toBeGreaterThanOrEqual(34);
     });
+  });
+});
+
+// Rooms and people beside the places (search.md part A): what the chat lists and knows, found with no request of their own.
+test.describe("rooms and people", () => {
+  test("a listed room is found under Rooms and opens; a person in it has Message, which opens the direct message", async ({
+    page,
+    playwright,
+    launchOptions,
+  }) => {
+    const { baseURL } = test.info().project.use;
+    if (baseURL === undefined) throw new Error("no baseURL");
+    const browser = await playwright.chromium.launch(launchOptions);
+    try {
+      const second = await (await browser.newContext({ baseURL })).newPage();
+      const other = await logIn(second, word("kin"));
+      await second.goto("/w/bubble?room=games&chat=full");
+      await hydrated(second);
+      await inGames(page);
+      await expect(whoIsHere(page).getByTitle(other)).toBeVisible();
+      await page.keyboard.press("Control+k");
+      await field(page).fill("games");
+      await expect(choices(page, /bubble\/games/)).toBeVisible();
+      await field(page).fill(other.slice(0, 6));
+      const person = choices(page, /Message/);
+      await expect(person).toHaveCount(1);
+      await person.click();
+      await expect(page).toHaveURL(new RegExp(`dm=${other}`));
+    } finally {
+      await browser.close();
+    }
   });
 });

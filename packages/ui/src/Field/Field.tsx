@@ -3,6 +3,7 @@ import { Stack } from "../compositions/index.ts";
 import { Icon } from "../icons/Icon.tsx";
 import { ids } from "../ids.ts";
 import styles from "./Field.module.css";
+import { FieldWords } from "./FieldWords.tsx";
 
 export interface FieldProps {
   label: string;
@@ -191,21 +192,7 @@ export function Field({
       ) : (
         <Framed id={id} prefix={prefix} search={kind === "search"} box={box} />
       )}
-      {help === undefined ? null : (
-        <p id={`${id}-help`} className={styles["help"]}>
-          {help}
-        </p>
-      )}
-      {/* Shown, and described to the box; said by the region below with its field's name, waiting on the
-          page empty so the error is announced when it comes (F335, F356). */}
-      {error === undefined ? null : (
-        <p id={`${id}-error`} className={styles["error"]} aria-hidden="true">
-          {error}
-        </p>
-      )}
-      <span role="status" className="visually-hidden">
-        {error === undefined ? "" : `${label}: ${error}`}
-      </span>
+      <FieldWords id={id} label={label} help={help} error={error} />
     </Stack>
   );
 }

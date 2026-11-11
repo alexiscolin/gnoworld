@@ -1,5 +1,6 @@
 // The reader's hand on the pose (D401): a drag turns the view round what it looks at, a wheel brings it nearer what the pointer is
 // over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); still for 4 s, the view turns slowly on its own, and stops after a minute.
+import { smoothstep } from "@gnoworld/core";
 import { Quaternion, Vector3 } from "three";
 import type { Pose, Spot } from "./pose.ts";
 
@@ -147,8 +148,7 @@ export class Free {
 
   // The share of the slow turn left: all of it, then none once a minute of rest and the ease out are past.
   #hush(): number {
-    const t = Math.min(1, Math.max(0, (this.#idle - QUIET_AFTER) / QUIET_FALL));
-    return 1 - t * t * (3 - 2 * t);
+    return 1 - smoothstep(QUIET_AFTER, QUIET_AFTER + QUIET_FALL, this.#idle);
   }
 
   #zoomBy(dt: number, pose: Pose, reach: Reach): void {

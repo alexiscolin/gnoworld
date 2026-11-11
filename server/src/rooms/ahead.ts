@@ -68,16 +68,24 @@ export function aheadRooms(options: AheadOptions): Ahead {
     remember(named, [path, room], roomKeys);
     return room;
   };
-  // The rooms to make, hubs first, each once.
-  const wanted = (): string[] => [...new Set([...hubs.map(({ slug }) => `#${slug}`), ...listing.paths().map(roomFor)])];
+  // Each listed room's realm (the first listed, for versions sharing one room), told to rooms made before their path was kept.
+  const realmsListed = (): Map<string, string> => {
+    const pathOf = new Map<string, string>();
+    for (const path of listing.paths()) if (!pathOf.has(roomFor(path))) pathOf.set(roomFor(path), path);
+    for (const [room, path] of pathOf) rooms.tagRealm(room, path);
+    return pathOf;
+  };
   const pass = async (): Promise<void> => {
     const at = listing.stamp();
     if (at !== undefined && at === finished) return;
-    const todo = wanted().filter((room) => !rooms.exists(room));
+    const pathOf = realmsListed();
+    // The rooms to make, hubs first, each once.
+    const wanted = [...new Set([...hubs.map(({ slug }) => `#${slug}`), ...pathOf.keys()])];
+    const todo = wanted.filter((room) => !rooms.exists(room));
     for (const [made, room] of todo.entries()) {
       if (made > 0 && made % perSecond === 0) await wait(1_000, stopper.signal);
       if (stopper.signal.aborted) return;
-      if (rooms.realm(room) === "full") {
+      if (rooms.realm(room, undefined, pathOf.get(room)) === "full") {
         // Never silently: how many rooms the cap left unmade.
         log("rooms_ahead_full", { value: todo.slice(made).filter((left) => !rooms.exists(left)).length });
         break;

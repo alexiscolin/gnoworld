@@ -5,7 +5,6 @@ import {
   countryTrends,
   isPublicRoom,
   pickBubbles,
-  turnTo,
   type Bubble,
   type Count,
   type EarthRoom,
@@ -70,7 +69,6 @@ export class Signs {
   readonly #state = createStore<Snapshot>(() => NOTHING);
   #said = JSON.stringify(NOTHING);
   #shown: readonly Bubble[] = [];
-  #faced: ReadonlySet<string> = new Set();
 
   constructor(deps: SignsDeps) {
     this.#deps = deps;
@@ -147,19 +145,8 @@ export class Signs {
       this.#publish({ ...NOTHING, bubbles });
       return;
     }
-    this.#face(bubbles);
     const whole = read.filter((each) => reaches(each.room, now)).flatMap((each) => each.messages);
     this.#publish({ bubbles, counts, trends: countryTrends(whole, now), pins: this.#pins() });
-  }
-
-  // The globe turns to a line of yours once, as it comes (ADR-0002 §1).
-  #face(bubbles: readonly Bubble[]): void {
-    const mine = bubbles.filter(({ own: yours }) => yours);
-    for (const { id, country } of mine) {
-      const place = this.#faced.has(id) ? undefined : turnTo(country);
-      if (place !== undefined) this.#deps.ground.face(place);
-    }
-    this.#faced = new Set(mine.map(({ id }) => id));
   }
 
   #publish(next: Snapshot): void {

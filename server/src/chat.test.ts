@@ -18,7 +18,7 @@ import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
-import { EARTH_TABLES, REALM_TABLES, ROOM_STATE } from "./rooms/create.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./rooms/create.ts";
 import { ROOM_SAID } from "./rooms/earth.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Room, Rules } from "./roles/roles.ts";
@@ -79,6 +79,7 @@ const setup = (
     MUTE_TABLES,
     ROOM_STATE,
     REALM_TABLES,
+    REALM_PATH,
     EARTH_TABLES,
     ROOM_SAID,
     PIN_TABLES,
@@ -224,6 +225,35 @@ describe("the chat, as the server starts it", () => {
     peer.say(message("account=g1a;msgid=m1", "a!u@h", ["+#bubble", "buy spam"]));
     await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "banned_word" }]);
     expect(await peer.next(/^REDACT /)).toMatch(/^REDACT #bubble m1 /);
+  });
+
+  it("hides a line for an owner with the link's REDACT, writing no verdict and no strike, whatever the count (part 4b, M9)", async () => {
+    const { peer, verdicts, chat, db } = await linked(
+      { worlds: worlds("bubble"), moderation: OFF },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    const ids = ["m1", "m2", "m3", "m4"];
+    for (const id of ids) peer.say(message(`account=g1a;msgid=${id}`, "a!u@h", ["#bubble", "hello"]));
+    await expect.poll(verdicts).toHaveLength(4);
+    const before = verdicts();
+    for (const id of ids) expect(chat.hide("#bubble", id)).toBe(true);
+    await expect
+      .poll(() => peer.lines.filter((line) => /^REDACT #bubble m\d :hidden by a moderator/.test(line)))
+      .toHaveLength(4);
+    expect(verdicts()).toEqual(before);
+    expect(peer.lines.some((line) => MUTE_LINE.test(line))).toBe(false);
+    expect(db.prepare("SELECT count(*) AS n FROM mutes").get()).toEqual({ n: 0 });
+  });
+
+  it("mutes for an owner in every room of the world, ending no live mute, and refuses the cap's next (part 4b)", async () => {
+    const { peer, chat } = await linked(
+      { worlds: worlds("bubble"), moderation: { ...OFF, mute: { ...MUTE, max: 1 } } },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    expect(chat.muteKeeping("g1a", "bubble")).toBe("muted");
+    await expect.poll(() => peer.lines.filter((line) => MUTE_LINE.test(line))).toContain("SAMODE #bubble +b m:g1a");
+    expect(chat.muteKeeping("g1b", "bubble")).toBe("full");
+    expect(chat.roomsOf("bubble")).toContain("#bubble");
   });
 
   it("passes the moderation's settings on: a new account's hours, and the thresholds", async () => {
@@ -1518,7 +1548,8 @@ describe("the chat, as the server starts it", () => {
           "/api/pins",
           pinsRoutes({
             pins: t.chat.pins,
-            mayPin: t.chat.mayPin,
+            mayPin: (room, who) => Promise.resolve(t.chat.mayPin(room, who) ? { as: "staff" } : false),
+            mayShow: (room, who) => Promise.resolve(t.chat.mayPin(room, who) ? { as: "staff" } : false),
             readable: t.chat.mayRead,
             session: (token) => {
               const who = tokens.get(token ?? "");
@@ -1551,9 +1582,11 @@ describe("the chat, as the server starts it", () => {
       it("answers a members room's pins to its members alone, through the route, and says who may pin", async () => {
         const { app } = here();
         const get = (who?: string) =>
-          app.request("/api/pins?room=%23bubble%2Fcrew", {
-            headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
-          });
+          app.request(
+            "/api/pins?room=%23bubble%2Fcrew",
+            { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
+            { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+          );
         for (const who of [undefined, "writer"]) expect((await get(who)).status).toBe(403);
         const member = PinList.parse(await (await get("member")).json());
         expect([member.may, member.pins.map(({ id }) => id)]).toEqual([false, ["m1"]]);
@@ -1564,15 +1597,19 @@ describe("the chat, as the server starts it", () => {
       it("refuses a pin and an unpin in this world to another world's moderator, and to a member", async () => {
         const { app, db } = here();
         const post = (path: string, who: string) =>
-          app.request(`/api/pins${path}`, {
-            method: "POST",
-            headers: {
-              origin: "https://gnoworld.test",
-              "content-type": "application/json",
-              cookie: `__Host-session=${who}`,
+          app.request(
+            `/api/pins${path}`,
+            {
+              method: "POST",
+              headers: {
+                origin: "https://gnoworld.test",
+                "content-type": "application/json",
+                cookie: `__Host-session=${who}`,
+              },
+              body: JSON.stringify({ room: "#bubble/crew", msgid: "m1" }),
             },
-            body: JSON.stringify({ room: "#bubble/crew", msgid: "m1" }),
-          });
+            { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+          );
         for (const who of ["writer", "member"]) {
           expect((await post("", who)).status).toBe(403);
           expect((await post("/unpin", who)).status).toBe(403);

@@ -5,9 +5,8 @@
 // once on the stream, never the answer's word alone.
 import { ChartRequest, type Address, type ChartAnswer, type Signal } from "@gnoworld/schemas";
 import { Hono } from "hono";
-import { getCookie } from "hono/cookie";
 import type { Log } from "@gnoworld/service/log";
-import { guard, json, refuserOf, type Refusals, type Guarded } from "../guard.ts";
+import { baseRefusals, guard, json, refuserOf, sessionOf, type Refusals, type Guarded } from "../guard.ts";
 import type { Roles } from "../roles/roles.ts";
 import { limiter } from "../limit.ts";
 import type { Signals } from "./signals.ts";
@@ -31,11 +30,7 @@ interface Options {
 }
 
 const refusals = {
-  origin: ["forbidden", 403],
-  type: ["unsupported", 415],
-  session: ["unauthenticated", 401],
-  body: ["refused", 400],
-  limit: ["too_many", 429],
+  ...baseRefusals,
   not_found: ["not_found", 404],
 } as const satisfies Refusals;
 
@@ -55,7 +50,7 @@ export function signalRoutes({
   app.use(guard(origins, refuse));
 
   app.post("/chart", async (c) => {
-    const who = session(getCookie(c, "__Host-session"));
+    const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
     if (!calls.take(who, now())) return refuse(c, "limit");
     const body = ChartRequest.safeParse(await json(c));

@@ -1,9 +1,10 @@
-// The docked chat's rooms as chips under its header (the video's frame 26): one link to each room, the one in view cream, a
+// The docked chat's rooms as chips under its header (the video's frame 26): one link to each room (and a "+" to make one, for an account on the Earth), the one in view cream, a
 // count after the one that holds something unseen. The full chat has its column, a phone its drawer; this row is the dock's.
 import type { RoomList } from "@gnoworld/schemas";
 import { Cluster } from "@gnoworld/ui";
 import { Link } from "react-router";
 import { useFull } from "./full.ts";
+import { NewRoom, useMayMakeRoom } from "./NewRoom.tsx";
 import { roomHref, roomLabel } from "./names.ts";
 import { badged } from "./unread.ts";
 import styles from "./RoomChips.module.css";
@@ -20,11 +21,21 @@ const CHIPS_MOST = 12;
 
 export function RoomChips({ sections, current, badges }: RoomChipsProps) {
   const full = useFull();
-  const all = sections.flatMap((section) => section.rooms.map(({ room }) => room));
+  const make = useMayMakeRoom(sections);
+  // A room with no address (a realm world's) is no shortcut.
+  const links = new Map(
+    sections.flatMap((section) =>
+      section.rooms.flatMap(({ room }) => {
+        const to = roomHref(room, full);
+        return to === undefined ? [] : [[room, to] as const];
+      }),
+    ),
+  );
+  const all = [...links.keys()];
   const rooms = all.slice(0, CHIPS_MOST);
   if (current !== undefined && all.includes(current) && !rooms.includes(current)) rooms.push(current);
   // One room is the header's name already: the row shows a choice, or nothing (Alexis, 2026-11-07: "pas besoin de doublon").
-  if (rooms.length < 2) return null;
+  if (rooms.length < 2 && !make) return null;
   return (
     <nav aria-label="Room shortcuts" className={styles["row"]}>
       <Cluster as="ul" space="2xs">
@@ -33,7 +44,7 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
           return (
             <li key={room}>
               <Link
-                to={roomHref(room, full)}
+                to={links.get(room) ?? ""}
                 className={styles["chip"]}
                 aria-current={room === current ? "true" : undefined}
               >
@@ -48,6 +59,11 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
             </li>
           );
         })}
+        {make ? (
+          <li>
+            <NewRoom />
+          </li>
+        ) : null}
       </Cluster>
     </nav>
   );

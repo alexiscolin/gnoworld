@@ -2,6 +2,8 @@
 // open in place.
 import { Button, Card, Cluster, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import { use, useRef, useState } from "react";
+import { callsIn } from "../calls/index.ts";
+import { useApp } from "../../storeContext.tsx";
 import { CallCountsContext } from "./FunctionRow.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
 import type { Where } from "./RealmPageCard.tsx";
@@ -37,12 +39,15 @@ export function TryCard({ realm, chain, options }: Where) {
   const [tab, setTab] = useState<"read" | "write">("read");
   const [reads, setReads] = useState(0);
   const [writes, setWrites] = useState(0);
-  const [opening, setOpening] = useState<string>();
+  const [opening, setOpening] = useState<{ name: string; n: number }>();
   const cardRef = useRef<HTMLElement>(null);
+  // A call card open in it keeps its surface under the pointer: lighter, its muted labels fall under 4.5:1.
+  const prefix = `${chain.chainId} ${realm}.`;
+  const holding = useApp((state) => Object.keys(callsIn(state)?.calls ?? {}).some((id) => id.startsWith(prefix)));
   const start = startHere(useCallable(chain.rpc, realm, options), use(CallCountsContext));
   return (
     <section id="functions" aria-label="The realm's functions" ref={cardRef} data-try-open={open ? "" : undefined}>
-      <Card look="hub" rises open={open}>
+      <Card look="hub" rises open={open} fixed={holding}>
         <Card.Header
           icon="play"
           title="Try it"
@@ -71,7 +76,7 @@ export function TryCard({ realm, chain, options }: Where) {
             start={start}
             onStart={() => {
               setTab("write");
-              setOpening(start.name);
+              setOpening({ name: start.name, n: (opening?.n ?? 0) + 1 });
               cardRef.current?.scrollIntoView({
                 behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
                 block: "nearest",
@@ -101,6 +106,9 @@ export function TryCard({ realm, chain, options }: Where) {
               expanded={expand.rows}
               onCount={setWrites}
               opening={opening}
+              onShut={() => {
+                setOpening(undefined);
+              }}
             />
           </Stack>
         </div>

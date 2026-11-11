@@ -1,7 +1,7 @@
 # The demo stack (docs/plans/slice-1c.md, ADR-0002 §7). Run it, from the repository's root:
 #   docker compose -f deploy/compose.yaml --profile demo up -d --build
-# and with Jarvis switched on (JARVIS=on), its profile too: --profile demo --profile jarvis (10j-4), once the door's key is
-# made and the evals pass (docs/OPERATIONS.md, "Switching Jarvis on").
+# with the link cards on (LINK_CARDS=1), --profile links too (slice 13), and with Jarvis switched on (JARVIS=on), its profile too:
+# --profile demo --profile jarvis (10j-4), once the door's key is made and the evals pass (docs/OPERATIONS.md, "Switching Jarvis on").
 # Ops runs the same file with its own settings (.env) and secrets. deploy/test.sh proves it.
 name: gnoworld-demo
 
@@ -101,6 +101,8 @@ services:
       inside:
         ipv4_address: ${SERVER_ADDRESS:-172.30.89.11}
       jarvis: {}
+      # The link reader's network (slice 13), the reader and the server alone: the server asks it for a page's card.
+      links: {}
       # The admin API's listener (10g), on an address of a network nobody else joins: a console joins it to reach it.
       admin:
         ipv4_address: ${ADMIN_ADDRESS:-172.30.92.10}
@@ -121,7 +123,7 @@ services:
       ERGO_DATA_MB: ${ERGO_DATA_MB:-1024}
       # The demo's way out; ops names its own proxy.
       HTTPS_PROXY: ${EGRESS_PROXY:-http://guard:4750}
-      NO_PROXY: ergo,jarvis,localhost,127.0.0.1
+      NO_PROXY: ergo,jarvis,link_reader,localhost,127.0.0.1
       NODE_USE_ENV_PROXY: "1"
       # The prices timer's file (5l): CoinGecko's prices every 5 minutes, in a volume of their own.
       MARKETS_FILE: /markets/markets.json
@@ -138,6 +140,10 @@ services:
       JARVIS_URL: http://jarvis:8081
       # The key the door sends jarvis in a header and jarvis asks of every request (10u-g2): one secret, the server's and jarvis's alone.
       JARVIS_DOOR_KEY_FILE: /run/secrets/jarvis_door_key
+      # Link previews (slice 13, D13919): off unless LINK_CARDS=1, the kill switch; the reader is in the links profile, so on needs it up
+      # (--profile links). The reader's name on the network the two share.
+      LINK_CARDS: ${LINK_CARDS:-0}
+      LINK_READER_URL: http://link_reader:8084
       # The guest chat (D430): on unless GUEST_CHAT=off, its undo; its limits, the server's own defaults (config.ts), an hour's names
       # for one visitor and for all, and the guests alive at once (F13950: none of them reached the server).
       GUEST_CHAT: ${GUEST_CHAT:-on}
@@ -288,6 +294,47 @@ services:
     depends_on:
       egress_reader: { condition: service_healthy, restart: true }
 
+  # The link reader (slice 13, D13919; docs/plans/link-previews.md): reads a public page's head and its picture for a chat line's card, in
+  # Node, its own image and user (65530), no secret, no volume, nothing of the stack's: it fetches what strangers link, so it is walled
+  # in. It listens on its address of the network it shares with the server alone, and goes out through egress_links (4754) on a network
+  # of its own, to any public https host, never a private one. Its profile alone, out of the demo's cap, as Jarvis (D184): LINK_CARDS=1 and
+  # --profile links turn the cards on. Its memory is 256 MiB, measured (F13951, D13943): the codecs at the 2 Mpx cap peak at 210 MiB resident with a 90 MiB JS heap, one picture at a time
+  # (link-reader/src/memory.test.ts); the plan's 64 MiB, and 128 MiB, could not hold them.
+  link_reader:
+    <<: *locked
+    profiles: [links]
+    build:
+      context: ..
+      dockerfile: deploy/link-reader/Dockerfile
+    user: "65530:65530"
+    init: true
+    networks:
+      links:
+        ipv4_address: ${LINK_READER_ADDRESS:-172.30.101.10}
+      links_out: {}
+    environment:
+      LINKS_LISTEN: ${LINK_READER_ADDRESS:-172.30.101.10}:8084
+      LINKS_PROXY: guard:4754
+      LINKS_MAX: "2"
+    cpus: 0.2
+    mem_limit: 256m
+    pids_limit: 48
+    healthcheck:
+      test:
+        [
+          CMD,
+          /nodejs/bin/node,
+          -e,
+          "fetch('http://' + process.env.LINKS_LISTEN + '/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 20s
+      start_interval: 1s
+    depends_on:
+      egress_links: { condition: service_healthy, restart: true }
+
   # The demo's only way out: it holds the network Tailscale shares, refuses every private address
   # (the host, its LAN, any tailnet), then sleeps. It alone has NET_ADMIN (docs/decisions.md).
   guard:
@@ -304,6 +351,8 @@ services:
       JARVIS_OUT_ADDRESS: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
       # And its address on the reader's way out's network (10u-g2).
       READER_OUT_ADDRESS: ${GUARD_READER_ADDRESS:-172.30.99.2}
+      # And on the link reader's way out's network (slice 13).
+      LINKS_OUT_ADDRESS: ${GUARD_LINKS_ADDRESS:-172.30.103.2}
     volumes:
       - ./guard:/guard:ro
     networks:
@@ -313,6 +362,8 @@ services:
         ipv4_address: ${GUARD_JARVIS_ADDRESS:-172.30.95.2}
       reader_out:
         ipv4_address: ${GUARD_READER_ADDRESS:-172.30.99.2}
+      links_out:
+        ipv4_address: ${GUARD_LINKS_ADDRESS:-172.30.103.2}
     cpus: 0.1
     mem_limit: 32m
     pids_limit: 16
@@ -415,6 +466,41 @@ services:
     depends_on:
       guard: { condition: service_healthy, restart: true }
 
+  # The link reader's way out (slice 13): any public https host (deploy/egress/links-acl.yaml, `action: open`), on 4754 in the guard's
+  # network, whose rules take 4754 from the link reader's network alone (guard.sh) and refuse every private range on each packet.
+  # smokescreen resolves each name and refuses a private answer itself. 8 tunnels at once, the reader serving 2 pages (LINKS_MAX), a
+  # picture's fetch each: the file's 32 tunnels hold (F13952: no flag of v0.1.0 read for a lower one, so none is set).
+  egress_links:
+    <<: *locked
+    profiles: [links]
+    build:
+      context: ..
+      dockerfile: deploy/egress/Dockerfile
+    user: "65532:65532"
+    network_mode: service:guard
+    entrypoint:
+      [
+        "/smokescreen",
+        "--config-file",
+        "/etc/smokescreen/config.yaml",
+        "--listen-port",
+        "4754",
+        "--egress-acl-file",
+        "/etc/smokescreen/links-acl.yaml",
+      ]
+    cpus: 0.1
+    mem_limit: 48m
+    pids_limit: 32
+    healthcheck:
+      test: [CMD, /probe, "127.0.0.1:4754"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+      start_interval: 1s
+    depends_on:
+      guard: { condition: service_healthy, restart: true }
+
   tailscale:
     <<: *locked
     profiles: [demo]
@@ -498,6 +584,25 @@ networks:
     ipam:
       config:
         - subnet: ${READER_OUT_SUBNET:-172.30.99.0/24}
+  # The link reader and the server alone, the reader's address fixed (LINKS_LISTEN): as sealed as the internal network (slice 13).
+  links:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
+    ipam:
+      config:
+        - subnet: ${LINKS_SUBNET:-172.30.101.0/24}
+  # The link reader and the guard alone, for the reader's way out (4754).
+  links_out:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+      com.docker.network.bridge.gateway_mode_ipv6: isolated
+    # Fixed, so the guard finds it by its own address in it (GUARD_LINKS_ADDRESS).
+    ipam:
+      config:
+        - subnet: ${LINKS_OUT_SUBNET:-172.30.103.0/24}
   # The admin API's listener alone: the console joins it (slice 12).
   admin:
     internal: true

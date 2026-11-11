@@ -19,10 +19,9 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 // 17 chunks (mountUniverse, cosmos, web, restSearch, flights, part...) are no file of the build. Raised on 2026-11-09 to the weights, 256 B ahead
 // (D386, provisional); the first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
-  // 159,847 B in the old measure with the Earth's stations' three classes (Alexis, 2026-11-04, "Oui, 160 256"); 160,382 B at slice 8's end,
-  // after `mountUniverse`, with 163,531 B on the ping-pong of 2026-11-07 (D386). 183,487 B on 2026-11-09 (the scene, three's `earth`, the
-  // generated worlds' chunk it imports, the shaders' `look`, `cell`, `sha256`, `signs` and `gauges`), 256 B ahead (+20,212 B).
-  { chunk: "scene", after: ["root", "universe"], cap: 183_743 },
+  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 190,507 B measured on 2026-11-12, 256 B ahead
+  // (D13948, provisional till the hardening; its history D386 and D13961).
+  { chunk: "scene", after: ["root", "universe"], cap: 190_763 },
   // On the home's first screen now, not behind the cosmos (7i): 7,293 B on 2026-11-07 beyond the scene and the cosmos (D386); 16,007 B beyond
   // `root` and `universe` (its worlds, their thumbs, the home's views and the follow chunks it imports), 256 B ahead (+8,970 B).
   { chunk: "Rail", after: ["root", "universe"], cap: 18_752 },

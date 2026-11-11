@@ -106,13 +106,15 @@ export function realmRoutes({
       // No await from the check to the spend: asks in flight together cannot pass the rate together.
       if (made.full(key, now())) return refuse(c, "limit");
       // A listed realm may use the whole cap; a path found on the chain stops at the reserve, here too, after the await.
-      const result = rooms.realm(room, known(path) ? 0 : realmReserve);
+      const result = rooms.realm(room, known(path) ? 0 : realmReserve, path);
       if (result === "full") return refuse(c, "full");
       if (result !== "exists") {
         made.take(key, now());
         log("room_made", { room });
       }
     }
+    // A room made before its path was kept learns it here, from a listed path alone: versions share a root room, so a visitor's own path proves nothing.
+    if (known(path)) rooms.tagRealm(room, path);
     return c.json({ room } satisfies MadeRoom);
   });
   return app;

@@ -31,7 +31,7 @@ export const LINES_KEPT = 200;
 /** The reactions a room keeps, after one an account, a line and an emoji: five on each line of a window. */
 export const REACTIONS_KEPT = 1000;
 
-interface RoomState {
+export interface RoomState {
   readonly lines: readonly Line[];
   /** Who is here, by nick: an account's nick is its address; a guest's is its own. */
   readonly members: readonly string[];
@@ -50,6 +50,8 @@ interface RoomState {
   readonly reactions?: readonly Reaction[];
   /** Ergo refused one of the page's reactions here (4d), until the page has said so. */
   readonly cannotReact?: true | undefined;
+  /** The msgid of the message the room is read around (a found message's window): its lines are that window, and live lines wait. */
+  readonly jump?: string | undefined;
 }
 
 interface ChatState {
@@ -100,7 +102,7 @@ function reactionsAfter(held: RoomState["reactions"], message: IrcMessage, room:
 
 // A room once a live line is read at `now`, the page's clock: the same object when the line changes nothing of it.
 function roomAfter(room: RoomState, message: IrcMessage, at: Where & { now: number }): RoomState {
-  const line = lineOf(message, at.room);
+  const line = room.jump === undefined ? lineOf(message, at.room) : undefined;
   const added = line === undefined ? room.lines : addLines(room.lines, [line], LINES_KEPT);
   const lines = redactedLines(added, message, at.room);
   const members = membersAfter(room.members, message, at);
@@ -187,7 +189,7 @@ export const chatSlice: StateCreator<ChatSlice> = (set, get) => {
       page: (id, messages) => {
         const { rooms } = get().chat;
         const room = own(rooms, id);
-        if (room === undefined) return;
+        if (room === undefined || room.jump !== undefined) return;
         const read = messages.flatMap((message) => lineOf(message, id) ?? []);
         const reacted = messages.flatMap((message) => reactionOf(message, id) ?? []);
         const lines = addLines(room.lines, read, LINES_KEPT);

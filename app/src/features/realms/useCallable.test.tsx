@@ -14,6 +14,6 @@ function Probe({ fetch }: { fetch: ChainFetch }) {
 describe("useCallable", () => {
   it("holds exactly the loading listing while its read is out", () => {
     const box = mount(<Probe fetch={vi.fn<ChainFetch>(() => new Promise<Response>(() => undefined))} />);
-    expect(box.querySelector("output")?.textContent).toBe('{"state":"loading"}');
+    expect(box.querySelector("output")?.textContent).toBe('{"state":"loading","retrying":false}');
   });
 });

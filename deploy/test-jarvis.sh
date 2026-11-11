@@ -7,6 +7,17 @@
 # that decides whether Jarvis may be switched on, so without a passing result they are skipped, said, and counted for nothing.
 # jarvis/src/config.test.ts and main.test.ts read the same files as text; this proves them on Docker.
 gate=${TEST_EVALS_GATE:-$here/jarvis-evals-gate.py}
+# Shared with test-links.sh, sourced after this file.
+members() { docker network inspect --format '{{range .Containers}}{{.Name}} {{end}}' "$1" | tr ' ' '\n' | grep . | sed "s/^${project}-//; s/-[0-9]*$//" | sort | tr '\n' ' '; }
+no_way_out() {
+	for net in "$@"; do
+		expect "$net has no way out" "$(docker network inspect --format '{{.Internal}}' "$net")" true
+		case $(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$net") in
+		"" | "invalid IP") pass "$net has no gateway" ;;
+		*) fail "$net has a gateway" ;;
+		esac
+	done
+}
 if [ "${1:-}" = --mutants ]; then
 	jarvis_acl() { over egress_jarvis /etc/smokescreen/jarvis-acl.yaml "$here/egress/jarvis-acl.yaml" "$@"; }
 	reader_acl() { over egress_reader /etc/smokescreen/reader-acl.yaml "$here/egress/reader-acl.yaml" "$@"; }
@@ -197,14 +208,7 @@ expect "the door's key is in no log of jarvis's, the server's or the reader's, a
 # alone; the reader's own way out's has the guard alone; the admin API's has the server alone. None lets out, none has a gateway.
 expect "jarvis sits on its three networks only" "$(networks_of "$jarvis")" "$jarvis_net $jarvis_out $reader_net "
 expect "the reader sits on its two networks only" "$(networks_of "$reader")" "$reader_net $reader_out "
-for net in "$jarvis_net" "$jarvis_out" "$reader_net" "$reader_out" "$admin_net"; do
-	expect "$net has no way out" "$(docker network inspect --format '{{.Internal}}' "$net")" true
-	case $(docker network inspect --format '{{range .IPAM.Config}}{{.Gateway}}{{end}}' "$net") in
-	"" | "invalid IP") pass "$net has no gateway" ;;
-	*) fail "$net has a gateway" ;;
-	esac
-done
-members() { docker network inspect --format '{{range .Containers}}{{.Name}} {{end}}' "$1" | tr ' ' '\n' | grep . | sed "s/^${project}-//; s/-[0-9]*$//" | sort | tr '\n' ' '; }
+no_way_out "$jarvis_net" "$jarvis_out" "$reader_net" "$reader_out" "$admin_net"
 expect "jarvis's network holds jarvis and the server alone" "$(members "$jarvis_net")" "jarvis server "
 expect "its way out's network holds jarvis and the guard alone" "$(members "$jarvis_out")" "guard jarvis "
 expect "the reader's network holds jarvis and the reader alone" "$(members "$reader_net")" "jarvis jarvis_reader "

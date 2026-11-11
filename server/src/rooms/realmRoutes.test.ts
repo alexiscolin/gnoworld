@@ -3,8 +3,8 @@ import { afterEach, describe, expect, it } from "vitest";
 import { makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
-import { EARTH_TABLES, REALM_TABLES, ROOM_STATE, makeRooms } from "./create.ts";
-import { ROOM_TABLES, ensureRooms, listRooms } from "./rooms.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE, makeRooms } from "./create.ts";
+import { ROOM_TABLES, ensureRooms, listRooms, realmPaths } from "./rooms.ts";
 import { realmRoutes } from "./realmRoutes.ts";
 import { roomsRoutes } from "./routes.ts";
 import { realmRoom } from "@gnoworld/core";
@@ -21,7 +21,7 @@ afterEach(() => {
 });
 
 const setup = ({ realmMax, per }: { realmMax?: number; per?: number } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
   opened.push(db);
   ensureRooms(db, ["earth"], T0);
   const clock = { now: T0 };
@@ -91,6 +91,24 @@ describe("POST /api/rooms/realm", () => {
     expect(await answer(response)).toEqual([200, '{"room":"#leon"}', "no-store"]);
     expect(listRooms(db)).toContainEqual({ name: "#leon", world: "leon" });
     expect(sent).toEqual(["JOIN #leon", "SAMODE #leon +M", "SAMODE #leon -i"]);
+  });
+
+  it("records the realm in the room it makes, and gives a room made without one its path at the next ask", async () => {
+    const { db, ask } = setup();
+    await ask({ body: { path: "gno.land/r/leon" } });
+    expect(realmPaths(db, "leon")).toEqual(new Map([["#leon", "gno.land/r/leon"]]));
+    db.prepare("UPDATE realm_rooms SET path = NULL").run();
+    await ask({ body: { path: "gno.land/r/leon" } });
+    expect(realmPaths(db, "leon")).toEqual(new Map([["#leon", "gno.land/r/leon"]]));
+  });
+
+  it("tags a room made before the path was kept only from a listed path, never from a visitor's own", async () => {
+    const { db, ask } = setup();
+    await ask({ body: { path: "gno.land/r/leon" } });
+    db.prepare("UPDATE realm_rooms SET path = NULL").run();
+    // An unlisted version maps to the same root room, and proves nothing.
+    await ask({ body: { path: "gno.land/r/leon/v999999" } });
+    expect(realmPaths(db, "leon")).toEqual(new Map());
   });
 
   it("names a realm of a hub's world under the hub's slug, and another realm by its tail and hash", async () => {
@@ -261,7 +279,7 @@ describe("realm rooms asked on the chain (D413)", () => {
     reserve?: number;
   }
   const setup = ({ per, reads, realmMax, inFlight, perHour, missingKeys, reserve }: Knobs = {}) => {
-    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
     opened.push(db);
     ensureRooms(db, ["earth"], T0);
     const clock = { now: T0 };

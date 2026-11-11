@@ -16,18 +16,13 @@ export function groundOn(): { ground: Ground; attach: (space: Space | undefined)
       setMarks: (next) => {
         marks = next;
         engine?.stage.ground.setMarks(next);
+        engine?.touch();
       },
       facing: () => {
         const earth = engine?.universe?.earth;
         return engine === undefined || earth === undefined
           ? undefined
           : engine.stage.ground.facing(earth, engine.seconds, engine.camera.position);
-      },
-      face: (place) => {
-        const space = engine;
-        const earth = space?.universe?.earth;
-        if (space !== undefined && earth !== undefined)
-          space.rig.fly(space.stage.ground.faceGoal(place, { earth, seconds: () => space.seconds }, space.rig.pose));
       },
     },
   };

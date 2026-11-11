@@ -232,6 +232,13 @@ describe("RoomsView: notifications", () => {
       expect(rowAt(html, "/w/bubble?room=news", true)).toContain("g1f6dc…fsksl mentioned the room #news");
     });
 
+    it("gives a notice of a realm world's room no link: that world has no page to open", () => {
+      const ghost = "#nym-alexiscolin000-gnoradio-0123456789/home-0123456789";
+      const html = view({ notices: notices({ list: [note("mention", ghost)] }) });
+      expect(html).toContain("mentioned you");
+      expect(html).not.toContain("/w/nym-");
+    });
+
     it.each([
       ["reply", "replied to you"],
       ["dm", "wrote to you"],

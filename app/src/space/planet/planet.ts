@@ -1,29 +1,24 @@
 // One world: a surface, its air if it has any, its rings if it has any. The Earth and its Moon draw their real maps (`createPlanet`), every
 // other world its recipe (generated.ts). It owns its materials and the rings' mesh; the maps and the sphere are shared by every world and
 // stay with their owner, the part that loads them.
-import type { PlanetLook, WorldSigns } from "@gnoworld/core";
+import { smoothstep, type PlanetLook, type WorldSigns } from "@gnoworld/core";
 import {
   BufferGeometry,
-  CustomBlending,
-  DoubleSide,
   Group,
   Mesh,
-  OneFactor,
-  OneMinusSrcAlphaFactor,
   PlaneGeometry,
   RingGeometry,
   ShaderMaterial,
   Vector3,
+  Vector4,
   type Texture,
 } from "three";
 import { Disposer } from "../disposer.ts";
-import { AIR_FRAGMENT, AIR_VERTEX } from "./airShader.ts";
 import { glowMaterial } from "./glowMaterial.ts";
 import type { PlateMask } from "./plateMask.ts";
-import { RING_FRAGMENT, RING_VERTEX } from "./ringShader.ts";
-import { HALO_FRAGMENT, HALO_VERTEX } from "./signShaders.ts";
+import { airMaterial, haloMaterial, ringMaterial } from "./planetMaterials.ts";
 import { SURFACE_FRAGMENT, SURFACE_VERTEX } from "./surfaceShader.ts";
-import { handMadeUniforms, setLights, setUniform, working, type HandMade, type MapSet } from "./uniforms.ts";
+import { handMadeUniforms, setLights, setUniform, type HandMade, type MapSet } from "./uniforms.ts";
 
 export type { HandMade, MapSet };
 
@@ -35,6 +30,11 @@ const RING_ORDER = 2;
 const HALO_ORDER = 3;
 // A seed's glow reaches this far past its small body, in front of it: frame 4's signal is a glow with a heart, not a ring round a disc.
 const HALO_REACH = 2.6;
+// Vector4's own default is w = 1, a moon of radius 1: none is radius 0.
+/** How long the real height takes to come in, in milliseconds. */
+const HEIGHT_MS = 600;
+const NO_SHADOW = new Vector4(0, 0, 0, 0);
+
 export interface Planet {
   readonly look: PlanetLook;
   readonly group: Group;
@@ -43,6 +43,16 @@ export interface Planet {
   setSun(direction: Vector3): void;
   /** Turns the ground to `seconds`, and the clouds over it to `clouds`, which the eye's own moves leave out. */
   setTime(seconds: number, clouds?: number): void;
+  /** Gives the Earth or the Moon its real height, once it came: its relief, its sea, its shadows. Any other world ignores it. */
+  setHeight(map: Texture): void;
+  /** Where its moons stand, each as world x, y, z and its radius: their shadows cross it (D13900). At most four; the rest, none. */
+  setMoons(shadows: readonly Vector4[]): void;
+  /** Swaps the Earth's day, night and cloud maps for others of the same pictures at another size. */
+  setEarthMaps(maps: { day: Texture; night: Texture; clouds: Texture }): void;
+  /** How far it has come in, 0 to 1: its surface, air and rings fade in together; below 1 its surface blends over what is behind. */
+  setArrive(share: number): void;
+  /** Whether the relief's shadows and cavities are drawn: off under the Low setting. */
+  setDepth(on: boolean): void;
   /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
   setLimb(light: number): void;
   /** How dim it stands, 0 to 1: a world a lens leaves unlit (D502). */
@@ -64,66 +74,12 @@ interface Parts {
 /** How hard the Earth lights the edge of its air: the bright limb of frame 39. */
 export const LIMB_LIGHT = 1.05;
 
-function airMaterial(rim: NonNullable<PlanetLook["rim"]>, glow: PlanetLook["glow"]): ShaderMaterial {
-  return new ShaderMaterial({
-    vertexShader: AIR_VERTEX,
-    fragmentShader: AIR_FRAGMENT,
-    transparent: true,
-    depthWrite: false,
-    blending: CustomBlending,
-    blendSrc: OneFactor,
-    blendDst: OneMinusSrcAlphaFactor,
-    uniforms: {
-      sun: { value: new Vector3(1, 0, 0) },
-      rimColour: { value: working(rim.colour) },
-      rimThickness: { value: rim.thickness },
-      limbLight: { value: 0 },
-      selfLight: { value: glow?.level ?? 0 },
-      faraway: { value: 0 },
-      close: { value: 0 },
-    },
-  });
-}
-
-function ringMaterial(rings: NonNullable<PlanetLook["rings"]>, map: Texture): ShaderMaterial {
-  return new ShaderMaterial({
-    vertexShader: RING_VERTEX,
-    fragmentShader: RING_FRAGMENT,
-    transparent: true,
-    depthWrite: false,
-    side: DoubleSide,
-    blending: CustomBlending,
-    blendSrc: OneFactor,
-    blendDst: OneMinusSrcAlphaFactor,
-    uniforms: {
-      ringMap: { value: map },
-      sun: { value: new Vector3(1, 0, 0) },
-      ringTint: { value: working(rings.tint) },
-      ringInner: { value: rings.inner },
-      ringOuter: { value: rings.outer },
-      ringOpacity: { value: rings.opacity },
-      faraway: { value: 0 },
-    },
-  });
-}
-
-const haloMaterial = (): ShaderMaterial =>
-  new ShaderMaterial({
-    vertexShader: HALO_VERTEX,
-    fragmentShader: HALO_FRAGMENT,
-    transparent: true,
-    depthWrite: false,
-    blending: CustomBlending,
-    blendSrc: OneFactor,
-    blendDst: OneMinusSrcAlphaFactor,
-    uniforms: { signal: { value: 0 } },
-  });
-
 class LivePlanet implements Planet {
   readonly #owner = new Disposer();
   readonly #parts: ShaderMaterial[] = [];
   readonly #sphere: BufferGeometry;
   readonly #hasLights: boolean;
+  #heightAt = 0;
   #halo: Mesh<BufferGeometry, ShaderMaterial> | undefined;
   #glow: Mesh<BufferGeometry, ShaderMaterial> | undefined;
   readonly look: PlanetLook;
@@ -146,7 +102,7 @@ class LivePlanet implements Planet {
       this.#glow.renderOrder = AIR_ORDER;
       this.#glow.visible = this.#glow.frustumCulled = false;
     }
-    if (look.rings !== null) this.#addRings(look.rings, maps.ring);
+    if (look.rings !== null) this.#addRings(look, look.rings, maps.ring);
   }
 
   #add(mesh: Mesh<BufferGeometry, ShaderMaterial>): Mesh<BufferGeometry, ShaderMaterial> {
@@ -156,9 +112,9 @@ class LivePlanet implements Planet {
     return mesh;
   }
 
-  #addRings(rings: NonNullable<PlanetLook["rings"]>, map: Texture): void {
+  #addRings(look: PlanetLook, rings: NonNullable<PlanetLook["rings"]>, map: Texture): void {
     const geometry = this.#owner.add(new RingGeometry(rings.inner, rings.outer, RING_SEGMENTS, 1));
-    const mesh = this.#add(new Mesh(geometry, ringMaterial(rings, map)));
+    const mesh = this.#add(new Mesh(geometry, ringMaterial(look, rings, map)));
     mesh.rotation.x = RING_FLAT;
     mesh.renderOrder = RING_ORDER;
   }
@@ -172,6 +128,43 @@ class LivePlanet implements Planet {
     if (time !== undefined) time.value = seconds;
     const drift = this.surface.uniforms["cloudTime"];
     if (drift !== undefined) drift.value = clouds;
+    for (const { uniforms } of this.#parts) setUniform(uniforms, "ringTime", clouds);
+  }
+
+  setHeight(map: Texture): void {
+    const { uniforms } = this.surface;
+    if (uniforms["heightMap"] === undefined) return;
+    if (uniforms["heightMap"].value !== map) {
+      uniforms["heightMap"].value = map;
+      this.#heightAt = performance.now();
+    }
+    // Its relief, sea and shadows come in over a moment, never in one frame.
+    setUniform(uniforms, "heightOn", smoothstep(0, HEIGHT_MS, performance.now() - this.#heightAt));
+  }
+
+  setEarthMaps({ day, night, clouds }: { day: Texture; night: Texture; clouds: Texture }): void {
+    const { uniforms } = this.surface;
+    for (const [name, map] of [
+      ["surface", day],
+      ["nightMap", night],
+      ["cloudMap", clouds],
+    ] as const)
+      if (uniforms[name] !== undefined) uniforms[name].value = map;
+  }
+
+  setArrive(share: number): void {
+    for (const { uniforms } of this.#parts) setUniform(uniforms, "arrive", share);
+    this.surface.transparent = share < 1;
+  }
+
+  setDepth(on: boolean): void {
+    const depth = this.surface.uniforms["depth"];
+    if (depth !== undefined && depth.value !== Number(on)) depth.value = Number(on);
+  }
+
+  setMoons(shadows: readonly Vector4[]): void {
+    const held = this.surface.uniforms["moonShadows"]?.value as Vector4[] | undefined;
+    held?.forEach((slot, at) => slot.copy(shadows[at] ?? NO_SHADOW));
   }
 
   setLimb(light: number): void {

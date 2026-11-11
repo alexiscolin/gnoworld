@@ -519,6 +519,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the names' node dropped from the way out" "the server does not reach the names' node" acl sed '/- rpc\.gno\.land/d'
 	# jarvis's faults (10j, 10j-4), planted from the file that holds its checks.
 	. "$here/test-jarvis.sh"
+. "$here/test-links.sh"
 	mutant "the admin API on the loopback alone" "the admin API answers on its own network" compose 'services: { server: { environment: { ADMIN_HOST: 127.0.0.1 } } }'
 	mutant "the way out lets private addresses through" "the way out lets http://10.0.0.1.nip.io/ through" \
 		proxy_config sed 's#^unsafe_allow_private_ranges:.*#unsafe_allow_private_ranges: true#'
@@ -635,6 +636,9 @@ FAKE
 	# The reader's network, its way out's, and the guard's address there (10u-g2).
 	export READER_SUBNET="${TEST_READER_SUBNET:-172.30.100.0/24}" READER_ADDRESS="${TEST_READER_ADDRESS:-172.30.100.10}"
 	export READER_OUT_SUBNET="${TEST_READER_OUT_SUBNET:-172.30.101.0/24}" GUARD_READER_ADDRESS="${TEST_GUARD_READER_ADDRESS:-172.30.101.2}"
+	# The link reader's network, its way out's, and the guard's address there (slice 13), apart from the demo's defaults and the others'.
+	export LINKS_SUBNET="${TEST_LINKS_SUBNET:-172.30.102.0/24}" LINK_READER_ADDRESS="${TEST_LINK_READER_ADDRESS:-172.30.102.10}"
+	export LINKS_OUT_SUBNET="${TEST_LINKS_OUT_SUBNET:-172.30.104.0/24}" GUARD_LINKS_ADDRESS="${TEST_GUARD_LINKS_ADDRESS:-172.30.104.2}"
 	# Each folder a service reads in its image lets every user in: a COPY --chmod with no execute bit gives the
 	# folder it makes that mode (moby/buildkit#5943), which kept Ergo's user out of /ergo. Checked before the
 	# start, which would only call the service unhealthy.
@@ -1645,6 +1649,7 @@ for row in json.load(open(sys.argv[1])): print(u.urlparse(row["indexer"]).hostna
 		"$GOLANG" go test ./... 2>&1 | tail -n 1 | cut -c1-2)" ok
 	# jarvis's own proofs (10j), which start it under its profile on the demo: its networks, way out, file, key, image.
 	. "$here/test-jarvis.sh"
+. "$here/test-links.sh"
 else
 	# The running demo.
 	if [ -z "${DEMO_PASSWORD:-}" ]; then # read, not typed on a command line: none in the shell's history

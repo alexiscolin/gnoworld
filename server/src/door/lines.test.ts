@@ -336,4 +336,18 @@ describe("what the recent lines tell the door (D13985)", () => {
     recent.edited(said("m3", "two", { edits: "m2" }));
     expect(changed).toEqual(["#bubble", "#bubble"]);
   });
+
+  it("tells the room of nothing when another account's edit replaces nothing: it must not drop a room's kept `here` (D13920)", () => {
+    const { recent, changed } = spy();
+    recent.passed(said("m1", "hello"));
+    recent.edited(said("m2", "forged", { account: BOB, edits: "m1" }));
+    expect(changed).toEqual([]);
+  });
+
+  it("tells the room of an edit of a line it never kept, whose author is unknown, as it tells a take of any line", () => {
+    const { recent, changed } = spy();
+    recent.edited(said("m3", "two", { edits: "m2" }));
+    recent.taken("#bubble", "m9");
+    expect(changed).toEqual(["#bubble", "#bubble"]);
+  });
 });

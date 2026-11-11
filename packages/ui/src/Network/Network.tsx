@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { Cluster, Stack } from "../compositions/index.ts";
 import styles from "./Network.module.css";
+import { CENTRE_R, Centre, nameHeight, Nones } from "./marks.tsx";
 import { useSeen } from "./useSeen.ts";
 
 /** The most dots in a lane: the rest is a number in the legend. */
@@ -11,7 +12,6 @@ const GAP = 34;
 const MARGIN = 8;
 const HALO_R = 36;
 const CLEAR = 12;
-const CENTRE_R = 24;
 /** The room the words of an empty side take under the centre. */
 const SAID = 22;
 const NODE_H = 22;
@@ -127,25 +127,6 @@ function Lane({ nodes, side, cy, width, span, selected, onSelect }: LaneProps) {
   );
 }
 
-// What a side with no dot says, under the centre where it always has the room (beside it a narrow column cut it).
-function Nones({
-  left,
-  right,
-  empty,
-  cx,
-  y,
-}: Pick<NetworkProps, "left" | "right"> & { empty: [boolean, boolean]; cx: number; y: number }) {
-  const said = [
-    ...(empty[0] ? [left.none ?? `${left.word} nothing`] : []),
-    ...(empty[1] ? [right.none ?? `no ${right.word} yet`] : []),
-  ];
-  return said.length === 0 ? null : (
-    <text className={styles["none"]} x={cx} y={y} textAnchor="middle">
-      {said.join(" · ")}
-    </text>
-  );
-}
-
 // What the graph counts, the halo beats again when it changes.
 const totals = (left: NetworkProps["left"], right: NetworkProps["right"]) =>
   `${String(left.total ?? left.nodes.length)}/${String(right.total ?? right.nodes.length)}`;
@@ -158,9 +139,10 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
   const lanes = [left.nodes.slice(0, LANE_MAX), right.nodes.slice(0, LANE_MAX)] as const;
   const rows = Math.max(lanes[0].length, lanes[1].length);
   const empty: [boolean, boolean] = [lanes[0].length === 0, lanes[1].length === 0];
-  // The drawing is as tall as its longest lane (the halo's size at least), the words of an empty side under the centre.
+  // The drawing is as tall as its longest lane (the halo's size at least), and with both sides empty their words under the centre.
   const core = Math.max(rows * GAP, 2 * HALO_R);
-  const height = core + 2 * MARGIN + (empty[0] || empty[1] ? SAID : 0);
+  const under = nameHeight(centre.label);
+  const height = core + 2 * MARGIN + under + (empty[0] && empty[1] ? SAID : 0);
   // The proposal's rule: the dots take what the centre leaves, at most 120 px.
   const width = Math.min(120, Math.floor((span - 96) / 2));
   // The halo gives up room before a dot has to: it keeps CLEAR px of air to the dots in a narrow column.
@@ -181,13 +163,16 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
         <circle key={totals(left, right)} className={styles["halo"]} cx={cx} cy={cy} r={halo} />
         <Lane nodes={lanes[0]} side={-1} cy={cy} width={width} span={span} selected={selected} onSelect={onSelect} />
         <Lane nodes={lanes[1]} side={1} cy={cy} width={width} span={span} selected={selected} onSelect={onSelect} />
-        <g className={styles["centre"]}>
-          <circle cx={cx} cy={cy} r={CENTRE_R} />
-          <text x={cx} y={cy + 4} textAnchor="middle">
-            {centre.label.length > 6 ? `${centre.label.slice(0, 5)}…` : centre.label}
-          </text>
-        </g>
-        <Nones left={left} right={right} empty={empty} cx={cx} y={cy + HALO_R + 16} />
+        <Centre label={centre.label} cx={cx} cy={cy} halo={halo} />
+        <Nones
+          left={left}
+          right={right}
+          empty={empty}
+          cx={cx}
+          near={halo + CLEAR}
+          cy={cy}
+          foot={MARGIN + core + under + 16}
+        />
       </svg>
       {/* The two sides of the legend 8 px apart (the proposal's). */}
       <div className={styles["legend"]}>

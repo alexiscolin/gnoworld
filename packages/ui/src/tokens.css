@@ -194,8 +194,6 @@
     --plate-fill: visible;
     /* How much of the plate's fill shows while a page arrives: the arrival tweens it from 0 to 1 (app's features/universe/arrival.ts). */
     --plate-in: 1;
-    /* How much of the dock's fill stands over the scene: whole, unless a page's planet stands under the dock as under dark glass (D458). */
-    --dock-glass: 100%;
     --banner-room: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
 
     --radius-s: 8px;

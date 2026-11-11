@@ -10,7 +10,9 @@ import { SEARCH } from "../../space/openEvent.ts";
 import { useApp } from "../../storeContext.tsx";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
 import { worldsFollowedIn } from "../follow/index.ts";
+import { afterDwell } from "../../intent.ts";
 import { dock } from "./railDock.ts";
+import { warmWorld } from "./space.ts";
 import { data, feed, subscribe } from "../../railFeed.ts";
 import { keptRail, RailOrder, type RailEntry } from "../../railWorlds.ts";
 import { useSwapped } from "../../swapped.ts";
@@ -172,8 +174,16 @@ export function Rail({ places, universe }: { places: WorldPlaces; universe: stri
                 href={href}
                 className={styles["world"]}
                 tabIndex={at === tabStop ? 0 : -1}
-                onFocus={() => {
+                onFocus={(event) => {
                   setStop(at);
+                  afterDwell(event.currentTarget, () => {
+                    warmWorld(id);
+                  });
+                }}
+                onPointerEnter={(event) => {
+                  afterDwell(event.currentTarget, () => {
+                    warmWorld(id);
+                  });
                 }}
               >
                 {/* A seed shows its disc: it is unknown till charted. */}

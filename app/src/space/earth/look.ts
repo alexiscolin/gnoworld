@@ -32,6 +32,8 @@ export const EARTH: HandMade = {
   clouds: 0.34,
   highClouds: 0.22,
   rim: { colour: [0.2, 0.32, 0.54], thickness: 0.05 },
+  // earth-height.webp: the shore is code 76 of 255; 5.5 km of land over 6371 km, five times exaggerated.
+  height: { sea: 76 / 255, span: 0.0043 },
 };
 
 export const MOON: HandMade = {
@@ -44,4 +46,6 @@ export const MOON: HandMade = {
   clouds: 0,
   highClouds: 0,
   rim: null,
+  // moon-height.webp: -9.2 to +10.9 km over 0 to 1, of 1737 km, three times exaggerated.
+  height: { sea: 0, span: 0.035 },
 };

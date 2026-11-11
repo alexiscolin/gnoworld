@@ -14,3 +14,6 @@ export function clampWidth(edge: Edge, value: number, room: number): number {
   const { min, max } = COLUMNS[edge];
   return Math.round(Math.max(min, Math.min(value, max, room)));
 }
+
+/** The chat's own width, in px, at which it is a phone's layout: the conversation alone, the rooms behind a control (docs/DESIGN-SYSTEM.md). */
+export const COMPACT_MAX = 900;

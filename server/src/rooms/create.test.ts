@@ -11,10 +11,11 @@ import {
   EARTH_ROWS_MAX,
   EARTH_TABLES,
   makeRooms,
+  REALM_PATH,
   REALM_TABLES,
   ROOM_STATE,
 } from "./create.ts";
-import { ensureRooms, listRooms, ROOM_TABLES } from "./rooms.ts";
+import { ensureRooms, listRooms, realmPaths, ROOM_TABLES } from "./rooms.ts";
 
 const T0 = Date.parse("2026-10-22T12:00:00.000Z");
 const opened: DatabaseSync[] = [];
@@ -27,7 +28,7 @@ const setup = ({
   earthMax,
   earthRowsMax,
 }: { max?: number; earthMax?: number; earthRowsMax?: number } = {}) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+  const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
   opened.push(db);
   ensureRooms(db, ["bubble", "earth"], T0);
   const link = { up: true };
@@ -125,7 +126,7 @@ describe("a moderator's room", () => {
       ensureRooms(before, ["earth"], T0);
       before.close();
       for (let n = 0; n < 2; n += 1) {
-        const db = openDatabase(file, [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+        const db = openDatabase(file, [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
         try {
           expect(db.prepare("SELECT name, archived FROM rooms").all()).toEqual([{ name: "#earth", archived: 0 }]);
         } finally {
@@ -144,9 +145,36 @@ describe("a moderator's room", () => {
   });
 });
 
+describe("a realm's room's path", () => {
+  const OLD = [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES];
+
+  it("is added to a database made before it, its old rooms kept with none", () => {
+    const file = join(mkdtempSync(join(tmpdir(), "rooms-")), "old.db");
+    const old = openDatabase(file, OLD);
+    ensureRooms(old, ["bubble"], T0);
+    old.prepare("INSERT INTO rooms (name, world, created_at) VALUES ('#leon', 'leon', 1)").run();
+    old.prepare("INSERT INTO realm_rooms (name) VALUES ('#leon')").run();
+    old.close();
+    const db = openDatabase(file, [...OLD, REALM_PATH]);
+    opened.push(db);
+    expect(realmPaths(db, "leon")).toEqual(new Map());
+    const rooms = makeRooms({ db, send: () => true, now: () => T0, max: 20 });
+    rooms.tagRealm("#leon", "gno.land/r/leon/home");
+    expect(realmPaths(db, "leon")).toEqual(new Map([["#leon", "gno.land/r/leon/home"]]));
+  });
+
+  it("is kept when the room is made, and tagged once: a room's path never changes", () => {
+    const { db, rooms } = setup();
+    rooms.realm("#bubble/golf-0123456789", 0, "gno.land/r/bubble/golf");
+    rooms.tagRealm("#bubble/golf-0123456789", "gno.land/r/other/golf");
+    rooms.tagRealm("#bubble", "gno.land/r/x/y");
+    expect(realmPaths(db, "bubble")).toEqual(new Map([["#bubble/golf-0123456789", "gno.land/r/bubble/golf"]]));
+  });
+});
+
 describe("a realm's room", () => {
   const realmSetup = (more: { max?: number; realmMax?: number } = {}) => {
-    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
     opened.push(db);
     ensureRooms(db, ["bubble"], T0);
     const sent: string[] = [];
@@ -339,7 +367,7 @@ describe("the realm rooms' reserve and who owns a room", () => {
   const again = (db: DatabaseSync, realmMax: number) =>
     makeRooms({ db, send: () => true, now: () => T0, max: 20, realmMax });
   const make = (realmMax: number) => {
-    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES]);
+    const db = openDatabase(":memory:", [ROOM_TABLES, ROOM_STATE, REALM_TABLES, REALM_PATH, EARTH_TABLES]);
     opened.push(db);
     ensureRooms(db, ["bubble"], T0);
     return { db, rooms: again(db, realmMax) };

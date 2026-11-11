@@ -11,8 +11,8 @@ const REQUEST = {
   args: ["1", "two"],
 };
 
-// What the property tests strip from generated text: the characters the request refuses.
-const CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}]/gu;
+// What the property tests strip from generated text: the characters the request refuses (hidden.ts's, but newline and tab).
+const CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}\u2028\u2029\u115f\u1160\u3164\uffa0]/gu;
 
 describe("CallRequest", () => {
   it("takes one call: a chain, a caller, a realm, an exported function and string arguments", () => {

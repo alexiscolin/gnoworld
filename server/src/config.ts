@@ -5,6 +5,7 @@ import { Key } from "@gnoworld/schemas";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { cardSettings, cardsConfigOf, cardsNeedReader, type CardsConfig } from "./cards/settings.ts";
 import { adminOf, apartFromPublic, doorOf, doorSettings, type AdminConfig, type DoorConfig } from "./door/settings.ts";
 import type { Thresholds } from "./moderation/decide.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
@@ -62,6 +63,8 @@ export interface Config {
   jarvis: DoorConfig | undefined;
   // The admin API's own listener (ADR-0002 §6): none without its port.
   admin: AdminConfig | undefined;
+  // Link cards (slice 13, D13906): a kill switch, off by default, with the link reader's address; the thresholds a card is held to.
+  cards: CardsConfig;
 }
 
 // Built at each read, not at import: StrykerJS can only turn on a mutant that runs inside a test (F412).
@@ -151,9 +154,11 @@ const settingsSchema = () =>
       MUTE_MINUTES: whole(10_080, 5),
       // Ergo's ban list holds 100 a room (3b's table): the mutes leave the moderators their share of it.
       MUTE_MAX: whole(100, 50),
+      ...cardSettings(),
       ...doorSettings(),
     })
-    .superRefine(apartFromPublic);
+    .superRefine(apartFromPublic)
+    .superRefine(cardsNeedReader);
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const settings = parseSettings(settingsSchema(), env);
@@ -198,6 +203,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     },
     jarvis: doorOf(env, settings),
     admin: adminOf(env, settings),
+    cards: cardsConfigOf(settings, MODERATION_THRESHOLDS),
   };
 }
 

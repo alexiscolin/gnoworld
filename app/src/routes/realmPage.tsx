@@ -6,7 +6,7 @@ import { useLocation } from "react-router";
 import { isAddress, realmName, realmRoom, worldIdOf } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
 import { pageRoomsApi } from "../lib/api/rooms.ts";
-import { Kicker, Panel } from "@gnoworld/ui";
+import { Button, Kicker, Panel, Stack } from "@gnoworld/ui";
 import { chatPlace, PlaceChat, roomIds, roomsChanged } from "../features/chat/index.ts";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { site } from "../places.ts";
@@ -18,42 +18,56 @@ import { PlaceFrame } from "./placeFrame.tsx";
 // The plate's blocks come in a chunk once the first screen has drawn: the frame and the title.
 const RealmPlate = lazy(() => import("./plate/RealmPlate.tsx"));
 
-// The realm's room, asked of the server once when the world's list lacks it (D390, D392): true once its world lists it, or the ask
-// failed, when the chat says the room is not there. The server's bot opens a room made a moment after it answers, so the list is asked
-// again till it holds the room, then the lists on the page are told (gnodice's "opens soon", 2026-11-08).
+// The realm's room, asked of the server once when the world's list lacks it (D390, D392). The server's bot opens a room made a moment
+// after it answers, so the list is asked again till it holds the room, then the lists on the page are told (gnodice's "opens soon").
+// A refused ask, or a room still missing after the tries, is "failed": the dock says so and offers another go, never an empty column.
 const LISTED_TRIES = 10;
 const LISTED_STEP_MS = 400;
 
-// Asks the room of `realm` when `world` does not list it, then asks the list again till it does, a few times.
-async function roomListed(
+type Made = "making" | "made" | "failed";
+
+/** Asks the room of `realm` when `world` does not list it, then asks the list again till it does, a few times. */
+export async function roomListed(
   { realm, world, room }: { realm: string; world: string; room: string },
   alive: () => boolean,
-) {
-  const api = pageRoomsApi();
+  api: Pick<ReturnType<typeof pageRoomsApi>, "rooms" | "realm"> = pageRoomsApi(),
+): Promise<boolean> {
   for (let tries = 0; tries < LISTED_TRIES && alive(); tries += 1) {
     const listed = await api.rooms(world);
-    if (listed.ok && roomIds(listed.value.sections).includes(room)) return;
-    if (tries === 0 && !(await api.realm(realm)).ok) return;
+    if (listed.ok && roomIds(listed.value.sections).includes(room)) return true;
+    if (tries === 0 && !(await api.realm(realm)).ok) return false;
     await new Promise((resolve) => setTimeout(resolve, LISTED_STEP_MS));
   }
+  return false;
 }
 
-function useRoomMade(realm: string, world: string, room: string): boolean {
-  const [done, setDone] = useState<string>();
+function useRoomMade(realm: string, world: string, room: string) {
+  const [done, setDone] = useState<{ room: string; made: Made }>();
+  const [again, setAgain] = useState(0);
   useEffect(() => {
     let live = true;
     roomListed({ realm, world, room }, () => live)
-      .then(() => {
+      .then((listed) => {
         if (!live) return;
         roomsChanged();
-        setDone(room);
+        setDone({ room, made: listed ? "made" : "failed" });
       })
-      .catch(reportError);
+      .catch((error: unknown) => {
+        reportError(error);
+        if (live) setDone({ room, made: "failed" });
+      });
     return () => {
       live = false;
     };
-  }, [realm, world, room]);
-  return done === room;
+  }, [realm, world, room, again]);
+  const made: Made = done?.room === room ? done.made : "making";
+  return {
+    made,
+    retry: () => {
+      setDone(undefined);
+      setAgain((n) => n + 1);
+    },
+  };
 }
 
 // The realm's chat: its room, made on the first open (useRoomMade), in its world (D389 to D392). The same element docks beside the
@@ -64,25 +78,44 @@ function useRealmChat({ realm, chain }: RealmAt) {
   // A namespace that is an address reads short.
   const namespace = isAddress(owner) ? shortAddress(owner) : owner;
   const where = realmRoom(realm, universe.worlds);
-  const made = useRoomMade(realm, where.world, where.room);
+  const { made, retry } = useRoomMade(realm, where.world, where.room);
   const place = chatPlace(
     { slug: where.world, name, description: `A realm of @${namespace} on ${chain.name}.`, inPage: true, realm },
     universe,
     `@${namespace} · ${name}`,
   );
-  const chat = made ? { world: where.world, room: where.room.split("/")[1], place } : undefined;
-  return { namespace, name, talk: where.world, room: where.room, chat };
+  const chat = made === "made" ? { world: where.world, room: where.room.split("/")[1], place } : undefined;
+  return { namespace, name, talk: where.world, room: where.room, chat, failed: made === "failed", retry };
 }
 
 export function RealmPage(found: RealmAt) {
-  const { namespace, name, talk, room, chat } = useRealmChat(found);
+  const { namespace, name, talk, room, chat, failed, retry } = useRealmChat(found);
   return (
     <PlaceChat
       chat={chat}
       page={(dock) => (
-        <RealmPlace found={found} namespace={namespace} name={name} talk={talk} room={room} chat={dock} />
+        <RealmPlace
+          found={found}
+          namespace={namespace}
+          name={name}
+          talk={talk}
+          room={room}
+          chat={failed ? <RoomFailed retry={retry} /> : dock}
+          failed={failed}
+        />
       )}
     />
+  );
+}
+
+function RoomFailed({ retry }: { retry: () => void }) {
+  return (
+    <div role="alert">
+      <Stack space="s">
+        <p>The chat of this realm could not be opened.</p>
+        <Button onClick={retry}>Try again</Button>
+      </Stack>
+    </div>
   );
 }
 
@@ -93,6 +126,7 @@ function RealmPlace({
   talk,
   room,
   chat,
+  failed,
 }: {
   found: RealmAt;
   namespace: string;
@@ -102,6 +136,8 @@ function RealmPlace({
   /** The realm's room, whose words are bubbles on its planet. */
   room: string;
   chat: ReactNode;
+  /** The realm's room could not be made: the dock says so at once, not waiting for the door to space. */
+  failed: boolean;
 }) {
   useEntered();
   // The open proposal's ring round the planet, when the realm takes votes (Voted, StatusRing.tsx).
@@ -125,7 +161,7 @@ function RealmPlace({
           </>
         }
         chat={chat}
-        chatDue={chatDue}
+        chatDue={chatDue || failed}
       />
       <WorldSigns world={worldIdOf(found.realm)} room={room} />
     </>

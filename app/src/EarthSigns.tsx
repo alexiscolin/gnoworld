@@ -1,7 +1,7 @@
 // The signs over the globe, as HTML anchored to the ground (ADR-0001 §7; frames 43 to 55, 85): who says what from where, each country's hour,
 // the far side's counts, the side rooms. Bubbles repeat the chat, so screen readers skip them; a pin is a link, and a room with no place stays in
 // the chat's list. On another world (`world`, D565) the bubbles alone stand, each on its speaker's own spot (spot.ts).
-import { countryName, centreOf, cutText, type Bubble, type Count, type Trend } from "@gnoworld/core/bubbles";
+import { countryName, centreOf, cutText, regionAt, type Bubble, type Count, type Trend } from "@gnoworld/core/bubbles";
 import { Address, shortAddress } from "@gnoworld/schemas";
 import { Cluster, sightRef, Stack } from "@gnoworld/ui";
 import {
@@ -42,18 +42,15 @@ function Mark({ at, ...rest }: { at: { lat: number; lon: number } | undefined } 
 
 function BubbleSign({ bubble, world }: { bubble: Bubble; world: string | undefined }) {
   const name = speaker(bubble.account);
+  const at = world === undefined ? centreOf(bubble.country) : spotOf(world, bubble.country);
+  const place =
+    world === undefined ? countryName(bubble.country) : at === undefined ? undefined : regionAt(world, at).name;
   return (
-    <Mark
-      at={world === undefined ? centreOf(bubble.country) : spotOf(world, bubble.country)}
-      className={styles["anchor"]}
-      data-mark="bubble"
-    >
+    <Mark at={at} className={styles["anchor"]} data-mark="bubble">
       <div className={styles["bubble"]} data-bubble="">
         <span className={styles["who"]}>{initial(name)}</span>
         <div>
-          <div className={`truncate ${String(styles["head"])}`}>
-            {world === undefined ? `${name} · ${countryName(bubble.country) ?? ""}` : name}
-          </div>
+          <div className={`truncate ${String(styles["head"])}`}>{`${name} · ${place ?? ""}`}</div>
           <p dir="auto" className={styles["words"]}>
             {bubble.text}
           </p>

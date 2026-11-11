@@ -3,12 +3,18 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Log } from "@gnoworld/service/log";
 import type { Rooms } from "./rooms/create.ts";
-import { listRooms } from "./rooms/rooms.ts";
+import type { Command } from "./irc/lines.ts";
+import type { Mutes } from "./moderation/mute.ts";
+import { listRooms, worldRooms } from "./rooms/rooms.ts";
 import { listed, mayRead, staffOf } from "./rooms/types.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitorOf } from "./visitor.ts";
 import type { Options, Settings } from "./chat.ts";
 import type { Config } from "./config.ts";
+import type { CardFlow } from "./cards/flow.ts";
+import type { makeQueue } from "./moderation/queue.ts";
+import type { Stream } from "./stream/stream.ts";
+import type { Present } from "./worlds/present.ts";
 import { ircLink, type Link, type Said } from "./irc/link.ts";
 import type { makeProgress } from "./moderation/catchup.ts";
 import type { pinsFor } from "./pins/wire.ts";
@@ -52,6 +58,7 @@ interface LinkParts {
   reconciler: ReturnType<typeof reconcilerFor>;
   mutes: { reapply: () => void };
   kept: ReturnType<typeof pinsFor>;
+  cards: { redacted: (room: string, msgid: string) => void } | undefined;
   recent: { taken: (room: string, msgid: string) => void };
   log: Log;
   onMessage: (said: Said, replayed: boolean) => void;
@@ -67,6 +74,7 @@ export function linkFor({
   reconciler,
   mutes,
   kept,
+  cards,
   recent,
   log,
   onMessage,
@@ -89,9 +97,52 @@ export function linkFor({
     onRedact: (room, msgid) => {
       kept.hooks.onRedact(room, msgid);
       recent.taken(room, msgid);
+      cards?.redacted(room, msgid);
     },
     onChannels: unknownChannels(db, log),
     onMessage,
     log,
   });
 }
+
+/** What an owner's hide and mute do (D13936): the link's REDACT with a word of ours, the mute that ends none, a world's rooms. */
+export const ownerActs = (
+  db: DatabaseSync,
+  send: (command: Command, params: readonly string[]) => boolean,
+  { muteKeeping }: Pick<Mutes, "muteKeeping">,
+) => ({
+  hide: (room: string, msgid: string): boolean => send("REDACT", [room, msgid, "hidden by a moderator of this world"]),
+  muteKeeping,
+  roomsOf: (world: string): readonly string[] => worldRooms(db, world),
+});
+
+/** The chat's stop: its timers cleared, nothing more started, the link and the queue let go, the stream closed. A line left waiting is caught up at the next start. */
+export const stopper =
+  ({
+    timers,
+    sweep,
+    present,
+    queue,
+    cards,
+    link,
+    stream,
+  }: {
+    timers: readonly ReturnType<typeof setInterval>[];
+    sweep: () => void;
+    present: Present | undefined;
+    queue: Pick<ReturnType<typeof makeQueue>, "stop" | "idle">;
+    cards: CardFlow | undefined;
+    link: () => Link | undefined;
+    stream: Stream;
+  }) =>
+  async (): Promise<void> => {
+    for (const timer of timers) clearInterval(timer);
+    sweep();
+    present?.stop();
+    queue.stop();
+    cards?.stop();
+    await link()?.stop();
+    await queue.idle();
+    await cards?.idle();
+    stream.close();
+  };

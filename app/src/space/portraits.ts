@@ -5,6 +5,7 @@ import { PerspectiveCamera, Scene, SphereGeometry, Vector3, Vector4, type Textur
 import { encoded, Packs, webgl2 } from "./pixels.ts";
 import { mapSetOf, namedLoad } from "./parts/maps.ts";
 import { earthPlanet } from "./earth/earth.ts";
+import { EARTH_MAPS } from "./earth/mapNames.ts";
 import { freeMap, loadMap, mapUrl } from "./planet/maps.ts";
 import type { Planet } from "./planet/planet.ts";
 
@@ -15,7 +16,6 @@ const PER_FRAME = 4;
 /** Where the star stands for every portrait: up and to the left, a little toward the eye, as frame 4's rail lights its planets. */
 const SUN = new Vector3(-0.55, 0.3, 0.78).normalize();
 const EARTH = "earth";
-const EARTH_MAPS = ["earth-day", "earth-night", "clouds"];
 const ANISOTROPY = 4;
 // The eye's distance, and the lens that fits the planet to the picture's side from there, a hair past it: the thumb's disc clips the edge,
 // so no black shows round it.
@@ -213,10 +213,7 @@ export async function portraitsOf(
   size: number,
 ): Promise<Map<string, string>> {
   const kit = await import("./planet/generated.ts");
-  const maps = await mapsFor(
-    device,
-    new Set(ids.flatMap((id) => (id === EARTH ? EARTH_MAPS : kit.mapNamesOf(kit.worldOf(id))))),
-  );
+  const maps = await mapsFor(device, new Set(ids.flatMap((id) => kit.namesFor(id))));
   const sphere = new SphereGeometry(1, 64, 48);
   const planets = new Map<string, Planet>();
   try {

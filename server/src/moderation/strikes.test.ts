@@ -80,6 +80,7 @@ describe("an account's mute, its hides settled out of order (the max review)", (
     const { db, verdict } = setup();
     const muted: string[] = [];
     const mutes: Mutes = {
+      muteKeeping: () => "muted",
       mute: (account, world) => {
         muted.push(`${account} ${world}`);
         return true;

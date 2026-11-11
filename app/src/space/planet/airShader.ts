@@ -23,7 +23,10 @@ void main() {
   vec3 toSun = (viewMatrix * vec4(sun, 0.0)).xyz;
   vSun = normalize(toSun.xy + 1.0e-6);
   vBehind = smoothstep(0.75, -0.45, toSun.z);
-  gl_Position = projectionMatrix * vec4(centre.xyz + vec3(position.xy * limb * REACH, 0.0), 1.0);
+  vec4 clip = projectionMatrix * vec4(centre.xyz + vec3(position.xy * limb * REACH, 0.0), 1.0);
+  // The quad stands at the depth of the planet's nearest point, so the planet never hides its own glare and a body in front of the planet does.
+  vec4 nearest = projectionMatrix * vec4(0.0, 0.0, min(centre.z + radius, 0.5 * centre.z), 1.0);
+  gl_Position = vec4(clip.xy, nearest.z / nearest.w * clip.w, clip.w);
 }
 `;
 
@@ -31,6 +34,7 @@ export const GLOW_FRAGMENT = /* glsl */ `
 ${PLATE_CLEAR}
 uniform vec3 glowColour;
 uniform float close;
+uniform float arrive;
 varying vec2 vAt;
 varying vec2 vSun;
 varying float vBehind;
@@ -48,7 +52,7 @@ void main() {
   float glare = exp(-length(off) * 11.0) * 0.75 + exp(-length(off) * 5.0) * 0.14;
   float streak = exp(-abs(off.y) * 90.0) * exp(-abs(off.x) * 3.0) * 0.2;
   light += mix(vec3(1.0, 0.86, 0.68), glowColour, 0.2) * (glare + streak) * vBehind;
-  gl_FragColor = vec4(light * close * plateClear(), 1.0);
+  gl_FragColor = vec4(light * close * arrive * plateClear(), 1.0);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }
@@ -74,6 +78,7 @@ uniform float rimThickness;
 uniform float limbLight, selfLight;
 uniform float faraway;
 uniform float close;
+uniform float arrive;
 varying vec3 vWorld;
 varying vec3 vCentre;
 varying float vOuter;
@@ -140,7 +145,7 @@ void main() {
   }
   float veil = 1.0 - exp(-dot(scatter, vec3(0.333)) * thick);
   gl_FragColor = vec4(light * 0.8, veil * 0.5 * min(dot(light, vec3(4.0)), 1.0));
-  ${FARAWAY}
+  ${FARAWAY} gl_FragColor *= arrive;
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }

@@ -95,7 +95,7 @@ test.describe("reactions, replies and edits, as they look", () => {
       await page.getByRole("menuitem", { name: "Edit" }).click();
       const form = page.getByRole("form", { name: "Write in #games" });
       await expect(form).toContainText("Editing a message");
-      await expect(field(page)).toHaveValue("the first line");
+      await expect(field(page)).toHaveText("the first line");
       expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
       await expect(form).toHaveScreenshot(`edit-bar-${screen}.png`);
     });

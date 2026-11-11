@@ -93,7 +93,7 @@ void main() {
   vec2 q = abs(p - centre) - extent + uRound;
   float edge = length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - uRound;
   float inside = 1.0 - smoothstep(-1.0, 1.0, edge);
-  gl_FragColor = vec4(uFill, inside * mix(0.95, 0.55, smoothstep(uFade, uBox.z, p.x)) * uShown);
+  gl_FragColor = vec4(uFill, inside * mix(0.95, 0.0, smoothstep(uFade, uBox.z, p.x)) * uShown);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
 }`;

@@ -2,6 +2,7 @@
 // sized by its worlds and the heart's soft gold, and one draw of a fine dense field of grains (haze.ts). It belongs to the galaxy's view,
 // gone within the disc, and is drawn after the frame, never through the speed's pass, which grades the frame anew and would flash it.
 // Nothing of it moves on its own; it reads the stage's uniforms. Low draws a quarter of the grains.
+import { lowQuality } from "../quality.ts";
 import {
   BufferGeometry,
   InstancedBufferAttribute,
@@ -57,8 +58,6 @@ function glowsOf(universe: Universe): InstancedBufferGeometry {
   return geometry;
 }
 
-const low = (): boolean => document.documentElement.dataset["quality"] === "low";
-
 export class Sky {
   readonly #scene = new Scene();
   readonly #heart = new Vector3(HEART.x, HEART.y, HEART.z);
@@ -111,7 +110,7 @@ export class Sky {
 
   // Low's share: a quarter of the grains.
   #show(): void {
-    const thin = low();
+    const thin = lowQuality();
     this.#grains.geometry.setDrawRange(0, thin ? GRAINS / 4 : GRAINS);
     this.#thin.value = thin ? 2 : 1;
   }

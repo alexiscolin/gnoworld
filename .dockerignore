@@ -47,6 +47,7 @@ deploy/probe/*_test.go
 !deploy/egress/acl.yaml
 !deploy/egress/jarvis-acl.yaml
 !deploy/egress/reader-acl.yaml
+!deploy/egress/links-acl.yaml
 # jarvis's reader (deploy/jarvis-reader/Dockerfile), without its tests.
 !deploy/jarvis-reader
 deploy/jarvis-reader/*_test.go
@@ -59,6 +60,14 @@ jarvis/src/**/*.bench.ts
 jarvis/src/testing
 !jarvis/skills
 !deploy/jarvis/gnomcp.toml
+# the link reader's image (deploy/link-reader/Dockerfile): its workspace, without its tests, its test pictures and its test helper.
+!link-reader/package.json
+!link-reader/src
+link-reader/src/**/*.test.ts
+link-reader/src/testdata
+link-reader/src/testImages.ts
+link-reader/src/tlsFixtures.ts
+link-reader/src/memory.ts
 # Named as well, should the list above ever open: the demo's secrets never reach a build.
 deploy/secrets
 # Claude Code's own folder, which a session leaves wherever it starts (packages/core/src, server/src, app): its .cc-writes is

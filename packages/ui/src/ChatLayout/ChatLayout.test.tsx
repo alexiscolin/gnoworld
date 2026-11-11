@@ -1,5 +1,5 @@
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { eachStory } from "../testing.tsx";
 import { ChatLayout } from "./ChatLayout.tsx";
 import * as stories from "./ChatLayout.stories.tsx";
@@ -48,5 +48,33 @@ describe("ChatLayout", () => {
   it("has stories for the full chat, one without its info panel, and one with the panel first", () => {
     const shown = eachStory(stories, (container) => [...container.querySelectorAll("[data-region]")].length);
     expect(shown).toEqual([5, 4, 5]);
+  });
+
+  describe("measuring its own box", () => {
+    let width = 0;
+    beforeAll(() => {
+      Object.defineProperty(HTMLElement.prototype, "offsetWidth", { get: () => width, configurable: true });
+    });
+    afterEach(() => {
+      width = 0;
+    });
+    afterAll(() => {
+      Reflect.deleteProperty(HTMLElement.prototype, "offsetWidth");
+    });
+
+    it.each([
+      [900, true],
+      [901, false],
+    ])("tells the app a box %i px wide is compact: %s, and marks its frame as so", (px, compact) => {
+      width = px;
+      const told = vi.fn();
+      const { container } = render(
+        <ChatLayout header="h" onCompact={told}>
+          <div>talk</div>
+        </ChatLayout>,
+      );
+      expect(told).toHaveBeenLastCalledWith(compact);
+      expect(container.querySelector("[data-chat-layout]")?.hasAttribute("data-compact")).toBe(compact);
+    });
   });
 });

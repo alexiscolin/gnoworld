@@ -39,7 +39,7 @@ interface Kept {
 
 const ROOMS = 10_000;
 // The lines taken or replaced before they came in, remembered: the oldest forgotten first.
-const GONE = 2000;
+export const GONE = 2000;
 
 export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLines {
   // The Map's first room is the one written longest ago: a room is set again at each line.
@@ -51,11 +51,11 @@ export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLi
   const lasts = new Map<string, string>();
   const key = (...parts: string[]): string => parts.join(" ");
   const drop = (room: string, msgid: string, by: string | null): void => {
-    changed?.(room);
     const kept = rooms.get(room) ?? { lines: [], bytes: 0 };
     const line = kept.lines.find((each) => each.msgid === msgid);
-    // Another account's edit of a line kept replaces nothing.
+    // Another account's edit of a line kept replaces nothing, so it drops no answer kept for the room either.
     if (line !== undefined && by !== null && line.account !== by) return;
+    changed?.(room);
     remember(gone, [by === null ? key(room, msgid) : key(room, msgid, by), true], GONE);
     if (line === undefined) return;
     kept.lines.splice(kept.lines.indexOf(line), 1);

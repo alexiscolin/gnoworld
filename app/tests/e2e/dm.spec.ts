@@ -154,7 +154,7 @@ test.describe("direct messages", () => {
     await field.fill(text);
     await field.press("Enter");
     await expect(field).toHaveAccessibleDescription(`Not sent: ${short(bob.address)} is not online.`);
-    await expect(field).toHaveValue(text);
+    await expect(field).toHaveText(text);
     await expect(lines(page)).toHaveCount(0);
     await bob.close();
   });

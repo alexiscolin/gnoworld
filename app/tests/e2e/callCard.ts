@@ -5,6 +5,7 @@ import { indexer } from "../chain/indexerRoute.ts";
 import recording from "../../recording/adena-recording.json" with { type: "json" };
 import type { Browser, BrowserType, LaunchOptions } from "@playwright/test";
 import { accountPill } from "./account.ts";
+import { calls, openCall, writeTab } from "./callRows.ts";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 
 // The call card's journeys' world (9d): Adena's stand-in (adena.ts) given the calls a signature needs, with the recorded
@@ -177,14 +178,15 @@ export async function writeChain(
   };
 }
 
-export const calls = (page: Page) => page.getByRole("region", { name: "Write functions" });
+export { calls, openCall, openRow, writeTab } from "./callRows.ts";
 
 /** Opens the realm's page logged in by cookie (the session of a login made first, the page loaded again). */
 export async function openRealm(page: Page, logIn: () => Promise<void>): Promise<void> {
   await logIn();
   await page.goto(`/r/${REALM.slice("gno.land/r/".length)}`);
   await hydrated(page);
-  await expect(calls(page).getByRole("button", { name: "Call SetBio" })).toBeVisible();
+  await writeTab(page);
+  await expect(calls(page).getByRole("button", { name: /^SetBio\(/ })).toBeVisible();
 }
 
 /** Logs in with the page's Adena on a computer's screen: the page's session is the cookie the server sets. */
@@ -197,16 +199,18 @@ export async function connect(page: Page): Promise<void> {
 
 /** Opens SetBio's card and clicks its "Sign in Adena". */
 export async function callAndSign(page: Page): Promise<void> {
-  await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+  await openCall(page, "SetBio");
   await calls(page).getByRole("article").getByRole("button", { name: "Sign in Adena" }).click();
 }
 
 // Axe reads colours as they are drawn: a button easing from the pressed cream to none read 4.06:1 once (F5746), so the
-// transitions running end first (a cancelled one too); the spinner's endless animation is no transition.
+// transitions and finite animations (a panel's fade-in) running end first (a cancelled one too); the spinner's endless one is left.
 export async function violations(page: Page) {
   await page.evaluate(async () => {
     const settled = () => undefined;
-    const running = document.getAnimations().filter((animation) => animation instanceof CSSTransition);
+    const running = document
+      .getAnimations()
+      .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
     await Promise.all(running.map((transition) => transition.finished.then(settled, settled)));
   });
   return (await new AxeBuilder({ page }).analyze()).violations;

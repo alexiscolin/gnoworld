@@ -6,7 +6,7 @@ import { getArbitrarySignBytes, makeArbitrarySignDoc, type SignedArbitraryData }
 import { Address, toAddress } from "@gnoworld/schemas";
 
 // secp256k1's group order: a signature whose s is above half of it is refused (low-S, BIP-62).
-const ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+export const ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
 export interface Wallet {
   address: Address;

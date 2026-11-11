@@ -1,5 +1,6 @@
 // The chosen place's preview at the palette's end: its portrait, kind, people now, description, rooms and actions.
 import { Button, Chip, Cluster, Kicker } from "@gnoworld/ui";
+import { PersonPreview, RoomPreview } from "./KindPreview.tsx";
 import { PlaceThumb } from "./PlaceResults.tsx";
 import styles from "./SearchDialog.module.css";
 import type { SearchItem, SearchKind } from "./types.ts";
@@ -13,6 +14,9 @@ const KINDS: Record<SearchKind, string> = {
   system: "System",
   realm: "Realm",
   command: "Command",
+  room: "Room",
+  person: "Person",
+  messages: "Messages",
 };
 
 const kicker = ({ kind, tag, here }: SearchItem) =>
@@ -33,6 +37,8 @@ export function PlacePreview({
   chat: (item: SearchItem) => void;
   copy: (item: SearchItem) => void;
 }) {
+  if (item.kind === "room") return <RoomPreview item={item} go={go} />;
+  if (item.kind === "person") return <PersonPreview item={item} go={go} />;
   return (
     <section className={["rule-start", styles["preview"]].join(" ")} aria-label="Preview">
       <PlaceThumb item={item} size="l" />

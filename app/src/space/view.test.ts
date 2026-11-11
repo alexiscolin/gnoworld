@@ -42,6 +42,7 @@ function pageAt(rate: number): Space {
     },
     stage: {
       effects: { busy: false },
+      ground: { turning: false },
       intro: { tick: () => undefined, aim: () => undefined },
       frame: {
         uTime: uniform(),

@@ -7,7 +7,7 @@
 # any tailnet stay out of reach; then public TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is
 # closed. jarvis's way out listens here too, on 4751, reached from jarvis's own network alone, which gets nothing
 # else in and nothing out but its replies (10j), and its reader's, on 4753, the same for the reader's network
-# (10u-g2). deploy/test.sh proves each line.
+# (10u-g2), and the link reader's, on 4754, the same for the link reader's network (slice 13). deploy/test.sh proves each line.
 set -eu
 
 web=$(getent hosts web | awk '{ print $1 }')
@@ -21,6 +21,8 @@ fi
 jarvis_out=$(ip -4 -o addr show to "$JARVIS_OUT_ADDRESS/32" | awk '{ print $2 }')
 # The reader's the same way, by its own address (READER_OUT_ADDRESS), a network of its own: 4753 from it alone.
 reader_out=$(ip -4 -o addr show to "$READER_OUT_ADDRESS/32" | awk '{ print $2 }')
+# The link reader's the same way, by its own address (LINKS_OUT_ADDRESS): 4754 from it alone.
+links_out=$(ip -4 -o addr show to "$LINKS_OUT_ADDRESS/32" | awk '{ print $2 }')
 outside=$(ip route show default | awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i + 1) }')
 if [ -z "$jarvis_out" ] || [ "$jarvis_out" = "$inside" ] || [ "$jarvis_out" = "$outside" ]; then
 	echo "guard: cannot find jarvis's network" >&2
@@ -28,6 +30,11 @@ if [ -z "$jarvis_out" ] || [ "$jarvis_out" = "$inside" ] || [ "$jarvis_out" = "$
 fi
 if [ -z "$reader_out" ] || [ "$reader_out" = "$inside" ] || [ "$reader_out" = "$outside" ] || [ "$reader_out" = "$jarvis_out" ]; then
 	echo "guard: cannot find the reader's network" >&2
+	exit 1
+fi
+
+if [ -z "$links_out" ] || [ "$links_out" = "$inside" ] || [ "$links_out" = "$outside" ] || [ "$links_out" = "$jarvis_out" ] || [ "$links_out" = "$reader_out" ]; then
+	echo "guard: cannot find the link reader's network" >&2
 	exit 1
 fi
 
@@ -50,11 +57,15 @@ dns=$(sed -n 's/^# ExtServers: \[\(.*\)\]$/\1/p' /etc/resolv.conf | tr ' ' '\n' 
 	echo "-A INPUT -i $reader_out -p tcp --dport 4753 -j ACCEPT"
 	echo "-A INPUT -i $reader_out -j REJECT"
 	echo '-A INPUT -p tcp --dport 4753 -j REJECT'
+	echo "-A INPUT -i $links_out -p tcp --dport 4754 -j ACCEPT"
+	echo "-A INPUT -i $links_out -j REJECT"
+	echo '-A INPUT -p tcp --dport 4754 -j REJECT'
 	echo '-A OUTPUT -o lo -j ACCEPT'
 	echo "-A OUTPUT -o $inside -d $web -p tcp --dport 8080 -j ACCEPT"
 	echo "-A OUTPUT -o $inside -p tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 	echo "-A OUTPUT -o $jarvis_out -p tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 	echo "-A OUTPUT -o $reader_out -p tcp --sport 4753 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
+	echo "-A OUTPUT -o $links_out -p tcp --sport 4754 -m conntrack --ctstate ESTABLISHED -j ACCEPT"
 	for server in $dns; do
 		echo "-A OUTPUT -d $server -p udp --dport 53 -j ACCEPT"
 		echo "-A OUTPUT -d $server -p tcp --dport 53 -j ACCEPT"

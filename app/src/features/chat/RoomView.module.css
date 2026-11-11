@@ -133,9 +133,6 @@
   /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
      author in the text's own colour and bolder: the prototype's quote (4d). */
   .replying {
-    padding-inline-start: var(--space-xs);
-    border-inline-start: var(--line-width) solid var(--color-line-strong);
-    color: var(--color-text-muted);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -236,18 +233,6 @@
     color: var(--color-mine);
   }
 
-  /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */
-  .text blockquote {
-    padding-inline-start: var(--space-xs);
-    border-inline-start: var(--line-width) solid var(--color-line-strong);
-    color: var(--color-text-muted);
-  }
-
-  /* Code kept as written scrolls on its own, wider than the line (F783). */
-  .text pre {
-    overflow: auto;
-  }
-
   /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
      whole in its title (UX review U2, U8). */
   .typing {
@@ -272,6 +257,35 @@
     gap: var(--space-2xs);
     /* layout: the rule runs the line's whole width, over the room kept for its bar, which the row holds none of */
     margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view (D13922). */
+  .lines > li.day {
+    /* layout: held at the top of the list's scrolling box while the lines of its day pass under */
+    position: sticky;
+    inset-block-start: 0;
+    /* raw: over the lines under it, which stand at auto */
+    z-index: 1;
+    /* layout: the word and its rule side by side, the rule taking what the word leaves */
+    display: flex;
+    /* layout: a step between the word and its rule */
+    column-gap: var(--space-2xs);
+    /* layout: a line's own room above and below, and none at its end for a bar */
+    padding-inline-end: 0;
+    /* layout: the same, none at its end for a bar */
+    margin-inline-end: 0;
+    /* the list's own fill, so the lines pass under the label, not through it */
+    background: var(--color-surface);
+    color: var(--color-text-muted);
+  }
+
+  .lines > li.day::after {
+    content: "";
+    /* layout: the rule on the word's line */
+    align-self: center;
+    /* layout: the rule takes the row's rest */
+    flex: 1;
+    border-block-start: var(--line-width) solid var(--color-line);
   }
 
   /* A poll's bars run the line's whole width, over the room kept for its bar, as the video's frame 73 draws them. */

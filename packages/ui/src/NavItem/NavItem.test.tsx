@@ -20,6 +20,15 @@ describe("NavItem", () => {
     expect(act).toHaveBeenCalledTimes(1);
   });
 
+  it("is greyed and inert while it is to come: named so, its press doing nothing", async () => {
+    render(<NavItem soon>Media</NavItem>);
+    const soon = screen.getByRole("button", { name: "Media, coming soon" });
+    expect(soon.getAttribute("aria-disabled")).toBe("true");
+    expect(soon.closest("[data-nav-item]")?.hasAttribute("data-soon")).toBe(true);
+    await userEvent.click(soon);
+    expect(screen.queryByRole("link")).toBeNull();
+  });
+
   it("says the item in view on its link, and fills the whole item, which a plain one does not", () => {
     const { container } = render(
       <>

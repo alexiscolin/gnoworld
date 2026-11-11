@@ -45,6 +45,7 @@ describe("loadConfig", () => {
       newAccountsPerHour: 5,
       guests: { on: true, perVisitor: 10, perHour: 600, living: 5000 },
       moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
+      cards: { enabled: false, readerUrl: undefined, thresholds: { sexual: 0.3 } },
     });
   });
 
@@ -534,7 +535,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090" }).jarvis).toEqual({
       on: false,
       url: "http://jarvis:8090",
-      timeoutMs: 1_500_000,
+      timeoutMs: 900_000,
       questionChars: 500,
       first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
       namesRpc: "https://rpc.gno.land",
@@ -608,7 +609,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       ...ENV,
       JARVIS_URL: "https://jarvis.internal:8443",
       JARVIS_DOOR_KEY_FILE: file("door-wide", "d".repeat(32)),
-      JARVIS_TIMEOUT_S: "3600",
+      JARVIS_TIMEOUT_S: "900",
       JARVIS_QUESTION_CHARS: "8000",
       JARVIS_QUOTA: "1000",
       JARVIS_QUOTA_UNNAMED: "1",
@@ -621,7 +622,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(door).toEqual({
       on: true,
       url: "https://jarvis.internal:8443",
-      timeoutMs: 3_600_000,
+      timeoutMs: 900_000,
       questionChars: 8000,
       first: { quota: 1000, quotaUnnamed: 1, unlimited: [ANNA, BEN] },
       namesRpc: "https://rpc.test5.gno.land",
@@ -636,7 +637,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     ["JARVIS_URL", "http://jarvis:8090/ask"],
     ["JARVIS_URL", "ftp://jarvis"],
     ["JARVIS_TIMEOUT_S", "0"],
-    ["JARVIS_TIMEOUT_S", "3601"],
+    ["JARVIS_TIMEOUT_S", "901"],
     ["JARVIS_QUESTION_CHARS", "8001"],
     ["JARVIS_QUOTA", "0"],
     ["JARVIS_QUOTA", "1001"],

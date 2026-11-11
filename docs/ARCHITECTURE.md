@@ -14,8 +14,11 @@ Browser: the static client (React Router 8, pre-rendered pages, one three.js sce
   ├─ PostHog, EU cloud .................... counts only, cookieless (ADR-0002 §6)
   ├─ indexer.gno.land (graphql-ws) ........ chain events, live
   ├─ Adena (extension, `window.adena`) .... the login signature; calls the user signs (desktop only)
-  ├─ server (TypeScript on Node) ......... login for Ergo, moderation and the activity API, signals, prices, the admin API
-  └─ jarvis (its own image) ............... Jarvis, gnomcp as a child process, translation; reached through the server alone
+  ├─ server (TypeScript on Node) ......... login for Ergo and linked accounts, moderation (the bot's and the owners'), search, link cards,
+  │                                        the activity API, signals, prices, the admin API
+  ├─ jarvis (its own image) ............... Jarvis, translation; reached through the server alone; reads chains through its reader
+  │    └─ jarvis_reader (its own image) ... gnomcp alone, no secret; jarvis's only way to a node
+  └─ link_reader (its own image) .......... a public page's head and picture for a link card; reached through the server alone
 ```
 
 The client is a static site. Anyone can host it, and it never holds a secret. The services
@@ -26,7 +29,7 @@ for Jarvis from phase 1 (ADR-0002 §5, §7).
 
 **One monorepo.** The client, the admin console, the server, the shared packages, the realms
 and the deployment live in one repository, with one lockfile and one gate:
-- each of `app/`, `admin/`, `server/`, `jarvis/`, `packages/core`, `packages/ui`, `packages/schemas`,
+- each of `app/`, `admin/`, `server/`, `jarvis/`, `link-reader/`, `packages/core`, `packages/ui`, `packages/schemas`,
   `packages/service` and `packages/chain` is a workspace: the applications at the root, the libraries
   they import under `packages/`;
 - a workspace imports another only through its `package.json` name (`@gnoworld/core`,
@@ -55,11 +58,14 @@ app/                         the web client
                              `@gnoworld/schemas` and apply `@gnoworld/core`
     store/                   the one Zustand store, one slice per feature, kept here: the store imports
                              no feature (`store/login.ts`); React reads it through `storeContext.tsx`
-    scene/                   three.js only: renderer, loop, flights, bodies, level of detail, labels
+    space/                   three.js only (it was `scene/` until the 2026-11-08 rebuild): renderer, loop, flights, the cosmos, the
+                             planets (`planet/`, `earth/`, `parts/`, `shaders/`), the rig, level of detail, labels
     sw/                      the service worker, and the page's side of it (ADR-0001 §12)
     features/                one folder per feature: chat, universe, world, realms, jarvis,
-                             passport, notifications, events, search, profile, settings; today
-                             update (the new version's notice) and errors (a page that failed)
+                             passport, notifications, events, search (the palette and the chat's search), previews (a realm's
+                             capture), names, share, profile, settings; update (the new version's notice) and errors (a page
+                             that failed). The chat holds the composer (on Lexical, loaded with it alone) and the cards under
+                             a line (link, market, Jarvis's)
   tests/e2e/                 Playwright: journeys, axe, budgets (bundle, Web Vitals, memory)
 packages/core/               pure rules, shared by app, admin and server: no DOM, no React, no network
 packages/ui/                 the design system: tokens, layers, compositions, components, Storybook
@@ -69,16 +75,24 @@ packages/service/            what the server and Jarvis share, on Node (10h): se
 packages/chain/              every read of a chain's node or the indexer, for app, server and Jarvis (10h): the capped
                              GET, the read through a schema, the node's reads with its universe check, the indexer's
 server/                      the server: TypeScript on Node (ADR-0002 §7); `roles.json`, the roles file (3g)
-  src/                       `main`, `app`, `config`, `limit`, `visitor` (slice 3's 3a), then one folder per role,
-                             from the merge that needs it: login/ ergo/ irc/ roles/ rooms/ activity/ moderation/
-                             stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), door/ (10, Jarvis's), admin/ (12)
+  src/                       `main`, `app`, `config`, `limit`, `visitor` (slice 3's 3a), `flights` (a read's bounded flights), then one
+                             folder per role, from the merge that needs it: login/ ergo/ irc/ roles/ rooms/ activity/ moderation/
+                             stream/ retention/ testing/ (slice 3), prices/ (5), signals/ (9), door/ (10, Jarvis's), admin/ (12);
+                             slice 13 adds login/ `links` (linked accounts, `linkRoutes`, `cliProof`, `release`), roles/ `owners`
+                             and `mayModerate` (the owner's right), moderation/ routes (`/api/moderation/hide`, `/mute`), search/
+                             (the index, `/api/search`), cards/ (the link cards' flow, store, routes, retention), jobs/ (the timed
+                             jobs made at start) and door/ `kept.ts` (Jarvis's kept answers)
+link-reader/                 the link reader (slice 13, its own workspace and image): it imports `core` and `schemas` alone, so no
+                             `server`, `jarvis`, `chain`, `service` or app; it holds the SSRF rules (`address.ts`, `url.ts`, `transport.ts`,
+                             `fetch.ts`), the page's head (`head.ts`), the picture's decode and resize (`picture.ts`) and the card (`card.ts`)
 jarvis/                      Jarvis (slice 10, its own workspace and image since 10h): it imports nothing of server/
   src/                       the loop, its locks, limits, checks and tools; testing/, its fakes
   skills/                    Jarvis's skills, one SKILL.md folder each, read by its loader only (ADR-0002 §5)
 evals/                       Jarvis's evals (10j): promptfoo apart from the workspace, its own lockfile; cases/ plain JSON,
                              chains/ the recorded realms, provider.ts through jarvis's real entry; never in an image
 deploy/                      compose.yaml (the demo stack, the reference wiring for ops), .env.example; jarvis/ its image
-                             and gnomcp's read-only profiles, egress/ the server's and jarvis's lists
+                             and gnomcp's read-only profiles, jarvis-reader/ gnomcp's container, link-reader/ the reader's image,
+                             egress/ one smokescreen list per way out (the server's, jarvis's, its reader's, the link reader's)
 admin/                       the admin console, on its own origin (ADR-0002 §6): reuses ui and lib
 gno/r/gnoworld/              realms: the slot realm (phase 0), then hubs and profiles; a store plus versioned rules (ADR-0001 §14)
 ```
@@ -99,24 +113,27 @@ features/chat/
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` and `ui`
 since slice 1, `app`'s folders since 2g (F378: `sw`, `features`, `routes`), `lib` and `store` since
 slice 4 (4a), `jarvis`, `service` and `chain` since 10h (`lint/server.config.ts`, `lint/chain.config.ts`,
-each wall proven by `scripts/probe.py`'s `walls` block), `scene` since slice 7 (7a).
+each wall proven by `scripts/probe.py`'s `walls` block), `link-reader` since slice 13 (`lint/server.config.ts`), `scene` since slice 7 (7a).
+The scene's folder is `space/` now, but `lint/app.config.ts` still names `app/src/scene`: until it names `space/`, its wall below is
+kept by review alone (found 2026-11-12; a harness change, so Alexis's).
 
 | Folder | May import | Never imports |
 |---|---|---|
 | `core` (`packages/core`) | `core` | Anything else, and no globals (`window`, `document`, `Date.now()`: time is a parameter) |
-| `lib` | `core`, Zod, the chain client libraries | React, `scene`, `features`, `ui` |
-| `store` | `core`, `lib` types | React, `scene`, `features` |
-| `scene` | `core`, `store` (read and subscribe), three, camera-controls, GSAP | React, `features`, `ui` |
-| `ui` | `ui` | `features`, `scene`, `store`, `lib` |
+| `lib` | `core`, Zod, the chain client libraries | React, `space`, `features`, `ui` |
+| `store` | `core`, `lib` types | React, `space`, `features` |
+| `space` | `core`, `store` (read and subscribe), three, GSAP | React, `features`, `ui` |
+| `ui` | `ui` | `features`, `space`, `store`, `lib` |
 | `features/x` | `ui`, `core`, `lib`, `store`, `sw` (the update notice), another feature's `index.ts` | Another feature's files |
 | `sw` | `sw` | Anything else: the worker runs alone, before the page |
-| `server` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its framework | React, `scene`, `ui`, `features`, `jarvis` |
-| `jarvis` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its dependencies | `server`, React, `scene`, `ui`, `features` |
+| `server` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its framework | React, `space`, `ui`, `features`, `jarvis`, `link-reader` |
+| `jarvis` | `core`, `schemas`, `service`, `chain`, Node's built-ins, its dependencies | `server`, `link-reader`, React, `space`, `ui`, `features` |
+| `link-reader` | `core`, `schemas`, Node's built-ins, its decoders and parser | `server`, `jarvis`, `chain`, `service`, the app: it holds nothing of the stack's |
 | `service` (`packages/service`) | `core`, `schemas`, Node's built-ins | `server`, `jarvis`, the app, `chain`, React |
 | `chain` (`packages/chain`) | `core`, `schemas`, the browser's `fetch` (which Node has too) | `server`, `jarvis`, the app, React, the store; a read's words anywhere else (D113) |
-| `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `scene` directly: the canvas is mounted by the universe feature |
+| `routes` | `features`, `ui`, `lib` (build-time loaders), `store` (to set the place) | `space` directly: the canvas is mounted by the universe feature |
 
-This is ADR-0001 §12's split, kept: a bug is either in the scene or in the interface, and
+This is ADR-0001 §12's split, kept: a bug is either in the space or in the interface, and
 the store is where they meet.
 
 ## TypeScript
@@ -212,6 +229,26 @@ Rules:
 5. The chat joins the world's main room.
 6. Back, `Esc` and the breadcrumb are history moves.
 
+**A link gets its card** (slice 13, `docs/plans/link-previews.md`; off unless `LINK_CARDS=1`).
+1. A line passes the bot's check and reaches `cards/flow.ts`, which finds its first https link.
+2. The server asks the link reader, `POST /card {url}` and nothing else: no cookie, no account, no room.
+3. The reader fetches the page through its own way out (`egress_links`), 256 KiB and 5 s at most, three redirects at most, public
+   hosts only; it reads the head, decodes and shrinks the picture, and answers a card or `422 {error}`.
+4. The server checks the card's text and picture in one call with the same moderation provider; a card that has not passed never
+   exists. It stores the page once (a day for a card or a refusal) and ties each line to it by key, never by its text.
+5. The stream tells the line its card; the app draws `LinkCard` (a chunk of its own) and loads its picture from `/api/cards/<key>/picture`
+   unless the reader saves data. A REDACT, an edit or the author's or a moderator's removal takes the card away.
+
+**A search** (`docs/plans/search.md`). The chat's search is the server's: `search/index.ts` keeps the lines moderation let through
+(2,048 a room, 90 days, SQLite full text) and drops a line with its REDACT. `GET /api/search` answers one world's rooms for the reader
+alone, asking the room's right again on every page; a members or hidden room is never in it. The palette (⌘K) finds places on the device.
+
+**An owner moderates** (`docs/plans/owners-moderation.md`). The owner of a world is the account (or one linked to it) that holds its
+namespace on the default chain (`roles/owners.ts`, read by the server and kept 60 s). `roles/mayModerate.ts` is the one place that gives
+the right; `POST /api/moderation/hide` and `/mute` and the pins ask it, then use the bot's own means. Accounts join one identity through
+`/api/links` (a code, then the other account's proof, from Adena or by a command-line signature rebuilt server-side, `login/cliProof.ts`);
+a key linked by phishing is released by its own file (`login/release.ts`).
+
 ## React
 
 - React 19 with the React Compiler: no hand-written `memo`, `useMemo` or `useCallback`
@@ -249,7 +286,7 @@ Rules:
   80, a cyclomatic `complexity` of 10 at most, a nesting depth of 3, three parameters at
   most (more go in one object). Past these, the code splits into parts that compose.
 
-## The scene
+## The scene (`app/src/space/`)
 
 - One `WebGLRenderer` (ADR-0002 §10). One render loop.
 - It renders on demand, by what happens (ADR-0002 §9, rendering):
@@ -267,11 +304,14 @@ Rules:
   target, listener.
 - The camera stays at the origin and the world comes to it (slice 7 §5): the eye is a position in doubles, and the GPU gets only what
   remains of it, so a far coordinate is as steady as home.
-- The scenery (`scene/space.ts`, `core/space`) is computed from a position and tied to no data (ADR-0002 §10): the mood is a smooth field,
+- The scenery (`core/space`, drawn by `space/`) is computed from a position and tied to no data (ADR-0002 §10): the mood is a smooth field,
   a cell's stars come from its hash, and both sit in tori of cells that follow the eye, so a step writes only what entered. The sky is
-  marched at half the buffer's size a side, shows through the image's one grade (`scene/renderer.ts`), and is added to the stage's black.
+  marched at half the buffer's size a side, shows through the image's one grade (`space/renderer.ts`), and is added to the stage's black.
 - What runs on a frame makes nothing: `ON_A_FRAME` in `lint/shared.config.ts` holds it by name, in the scene and in core's `frame` and
   `space`; a function a frame reaches joins that list as it is written.
+- The planets carry their depth (D13993): relief shadows from a height map near the terminator (the Earth and the Moon from real maps, a
+  light version on generated worlds), a sea mask, ambient occlusion, rings that turn faster inside than outside; every effect is off
+  under Low. The Earth shows the real hour (D13947): its sun stands over the place where it is noon now, from UTC (`space/earth/light.ts`).
 - Text is HTML anchored to the scene (ADR-0001 §7), never 3D geometry.
 - A page that shows space calls `useSpace` (`features/universe`). That door is all it holds of the scene: the universe comes after the
   text, in a React root of its own that outlives the route, so leaving covers the scene and the way back finds it. three is in the
@@ -280,7 +320,8 @@ Rules:
 - A page asks for the Earth with `useSpace("earth")` and keeps an empty `[data-globe]` box, laid out by its own stylesheet: the host
   measures it and the scene stands the globe in that circle, so a breakpoint moves the planet with what is around it. The box's
   `data-earth` says how far it came: `loading` keeps the box's room, `drawn` opens the plate's mask round it, for the opaque canvas lies under the plate.
-- `?debug` shows fps, draw calls and `renderer.info.memory`.
+- `?debug` shows fps, draw calls and `renderer.info.memory`. A development or test-GPU build sets `__gnoworldSpace` (the engine, with
+  `portraits`, the picture tool's entry: `features/universe/spaceHook.ts`); a production build holds no trace of it.
 
 ## Memory: the checklist
 
@@ -330,6 +371,23 @@ Each slice that adds a resource proves it is released:
   - every request but GET and HEAD comes from a listed `Origin` and in JSON; each visitor's
     calls are limited before any work; every failed login gets the same answer.
 
+- [ ] **The link reader** (`link-reader/`, `deploy/link-reader/`; slice 13; it fetches what strangers link):
+  - its container holds no secret, no volume, a read-only root, a user of its own, and two networks: one it shares with the server alone,
+    one to its way out; the stack's other services reach neither (`deploy/test-links.sh` proves each, with its mutants);
+  - it has no DNS of its own: `egress_links` resolves each name and refuses a private answer, the guard's rules refuse every private
+    range on each packet, and the reader refuses a non-global address itself (`address.ts`), so three layers hold, not one;
+  - https only, port 443, three redirects, a page 256 KiB and a picture 1 MiB, 5 s each, a picture at 2,000,000 px at most, one
+    picture decoded at a time; its answer is a schema-checked card, read by the server up to a cap before it is parsed;
+  - a card exists only after its text and picture passed moderation in one call, and the page is shown from the server's own copy,
+    never fetched by a visitor's browser (a visitor's address never reaches the page's host).
+- [ ] **Search never shows what its reader cannot read:** the right to the room is asked again on every page (`search/routes.ts`), a
+  members, hidden or archived room is empty, and a REDACT, an expiry or the room's cap removes the line (FTS5's `secure-delete`).
+- [ ] **Linked accounts and the owner's right** (`login/links.ts`, `roles/mayModerate.ts`; tier 1): a link code is a nonce of its own kind,
+  spent by one statement; the signed text names every account the link joins; the namespace comes from the server's tables and the
+  chain, never from a request; each moderation act is logged with the acting account and the owner.
+- [ ] **Kept answers** (`door/kept.ts`): only an `answered` is kept; a function's explanation reads code alone (no room lines, no live
+  tool), so it can be shared across rooms; a part of a key is validated before it exists.
+
 ## Search and pages
 
 - `react-router.config.ts` lists the places from `data/`. In phase 1, `r/gnoworld/hubs`
@@ -338,7 +396,8 @@ Each slice that adds a resource proves it is released:
 - Search is one palette (`features/search`, D355), a chunk of its own: ⌘K, `/`, the header's button, the rail's
   "See all" and `/list` (which goes to `/#search`) open it. `searchIndex.ts` indexes the site's places and the
   worlds' file's systems and realms once; `search.ts` answers a keystroke with the best 50 and the count. The
-  Places page and the drawer are gone.
+  Places page and the drawer are gone. What was said in a room is the server's search (`search/`, above), which the
+  palette hands a query to (`handOff.ts`, `chatItems.ts`, `filters.ts`).
 - Each route exports its `meta`: title, description, canonical, Open Graph, Twitter Card
   and JSON-LD.
 - A build step renders one Open Graph image per world from its planet. It writes

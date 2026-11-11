@@ -81,7 +81,16 @@ const hereOf = (here: number | undefined, messages: number | undefined) =>
 
 export function RoomSections({ sections, current, failed, badge, action }: RoomSectionsProps) {
   const full = useFull();
-  const shown = sections.filter(({ rooms }) => rooms.length > 0);
+  // A room with no address (a realm world's) is listed only as the one in view, which is where one is: no link.
+  const shown = sections
+    .map((section) => ({
+      ...section,
+      rooms: section.rooms.flatMap((each) => {
+        const to = roomHref(each.room, full);
+        return to === undefined && each.room !== current ? [] : [{ ...each, to }];
+      }),
+    }))
+    .filter(({ rooms }) => rooms.length > 0);
   if (failed !== undefined) return failed;
   if (shown.length === 0) return <p>No room here yet.</p>;
   return (
@@ -89,10 +98,10 @@ export function RoomSections({ sections, current, failed, badge, action }: RoomS
       {shown.map(({ name, rooms }, at) => (
         <Folding key={name ?? ""} name={name ?? "Rooms"} action={at === 0 ? action : undefined}>
           <ul className={[shared["plain"], shared["items"]].join(" ")}>
-            {rooms.map(({ room, here, messages }) => (
+            {rooms.map(({ room, here, messages, to }) => (
               <li key={room}>
                 <NavItem
-                  href={roomHref(room, full)}
+                  {...(to === undefined ? { onClick: () => undefined } : { href: to })}
                   current={room === current}
                   badge={badge?.(room)}
                   meta={hereOf(here, messages)}

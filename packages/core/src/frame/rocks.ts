@@ -3,7 +3,8 @@
 // the view's own seed, so the same view sees the same rocks, the nearer larger; never over a body or the
 // room of its label. The home's Earth view has none (Alexis, 2026-11-04, "Le retirer").
 import { PLACE } from "../lod/place.ts";
-import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
+import type { Point } from "../space/cell.ts";
+import { Draws } from "../station/draws.ts";
 import type { Arrival } from "./arrival.ts";
 import type { Lent } from "./lent.ts";
 import { STAR_HEART, type Look, type Seen } from "./restLook.ts";
@@ -58,11 +59,8 @@ function rocksOf(view: { readonly eye: Point }, judge: Seeing, scale: number): L
   const { looks, balls, focal, spots } = judge;
   const [first] = looks;
   if (first === undefined) return [];
-  let state = textHash(`rocks ${view.eye.x.toFixed(4)} ${view.eye.y.toFixed(4)} ${view.eye.z.toFixed(4)}`);
-  const next = () => {
-    state = nextState(state);
-    return unitOf(state);
-  };
+  const draws = new Draws(`rocks ${view.eye.x.toFixed(4)} ${view.eye.y.toFixed(4)} ${view.eye.z.toFixed(4)}`);
+  const next = (): number => draws.unit();
   const { camera, width, height } = first;
   const { eye, ahead, right, up } = camera;
   const [rocks, seen]: [Laid[], Seen[]] = [[], []];

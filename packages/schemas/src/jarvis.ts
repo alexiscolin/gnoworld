@@ -87,6 +87,11 @@ export const DOOR_CAPS = {
   unlimited: 1000,
 } as const;
 
+/** How long the door waits for jarvis, in seconds, and how long a page waits for the door. Jarvis's own worst (jarvis/src/config.ts) is
+ * turns × (attempts × call + retries × 8 s) + (turns − 1) × 30 s of tools = 4 × (3 × 60 + 2 × 8) + 3 × 30 = 874 s; the door waits 900 s,
+ * the page 10 s more (R9, 10u-a). */
+export const ASK_WAIT_S = { door: 900, page: 910 } as const;
+
 /** The room's lines a question carries to jarvis at most, and the bytes of their text (Alexis, 10g-1). */
 export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
 
@@ -112,6 +117,9 @@ const Answered = {
   markdown: text(DOOR_CAPS.answer),
   buttons: z.array(AnswerButton).check(z.maxLength(DOOR_CAPS.buttons)),
 };
+/** The explain prompt's version, in a kept explanation's key and sent back with it: bumped with the prompt (askLoops.test.ts pins it),
+ * so a new prompt never serves what the old one wrote; the door keeps only an answer of its own version. */
+export const EXPLAIN_VERSION = 1;
 const spentOrOffAnswer = [
   z.strictObject({ status: z.literal("spent") }),
   z.strictObject({ status: z.literal("off") }),
@@ -134,11 +142,11 @@ export type JarvisAnswer = z.infer<typeof JarvisAnswer>;
 /** What an answer cost, in millionths of a dollar. */
 const Cost = z.int().check(z.gte(0));
 
-/** An answer as jarvis gives the door, with its cost, which the door adds to the person's share and the page never reads (D13985):
+/** An answer as jarvis gives the door (an explanation says `keep`: its code reads all succeeded and found the function, D13920), with its cost, which the door adds to the person's share and the page never reads (D13985):
  * answered, declined, failed (it spent and gave nothing: its turns or tokens used, the model refusing or failing), spent (with what
  * its turns had cost when the day's budget ran out mid-way), or off. */
 export const JarvisPaidAnswer = z.discriminatedUnion("status", [
-  z.strictObject({ ...Answered, cost: Cost }),
+  z.strictObject({ ...Answered, cost: Cost, keep: z.optional(z.boolean()), version: z.optional(z.int()) }),
   z.strictObject({ status: z.literal("declined"), cost: Cost }),
   z.strictObject({ status: z.literal("failed"), cost: Cost }),
   z.strictObject({ status: z.literal("spent"), cost: z.optional(Cost) }),
@@ -167,7 +175,8 @@ export const JarvisAsk = z.union([
   z.strictObject({ ...Own, lines }),
   z.strictObject({ ...Here, lines }),
   z.strictObject({ ...CatchUp, lines }),
-  z.strictObject({ ...Explain, lines }),
+  // The chain the door found for the room, never the page's: the one jarvis reads the function's code on (D13920).
+  z.strictObject({ ...Explain, chain: z.optional(z.string().check(z.regex(/^[a-z0-9][a-z0-9_-]{0,63}$/))), lines }),
 ]);
 export type JarvisAsk = z.infer<typeof JarvisAsk>;
 
@@ -279,3 +288,7 @@ export const JarvisMadeDigest = z.discriminatedUnion("status", [
   ...spentOrOff,
 ]);
 export type JarvisMadeDigest = z.infer<typeof JarvisMadeDigest>;
+
+/** Whether Jarvis is on, which any page may ask with no session (10u-a): the door's switch and nothing more. */
+export const JarvisState = z.strictObject({ on: z.boolean() });
+export type JarvisState = z.infer<typeof JarvisState>;

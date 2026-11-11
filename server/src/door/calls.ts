@@ -2,11 +2,19 @@
 // and the effects of an answer on the account's quota and share. Asks with the same key at once share one call, never
 // stopped for a reader leaving; a quota full for the asker that made it sends the others back through. The effects run
 // before the call leaves the table, so a later ask finds the answer kept or none in flight.
-import type { Address, JarvisAnswer, JarvisAsk, JarvisPaidAnswer, JarvisQuestion } from "@gnoworld/schemas";
+import {
+  EXPLAIN_VERSION,
+  type Address,
+  type JarvisAnswer,
+  JarvisAsk,
+  JarvisPaidAnswer,
+  JarvisQuestion,
+} from "@gnoworld/schemas";
 import type { Day } from "./day.ts";
 import type { Jarvis, Failure } from "./jarvis.ts";
 import type { Counted } from "./quota.ts";
 import { makeRoomCap } from "./roomcap.ts";
+import type { Kept } from "./kept.ts";
 import type { Served } from "./served.ts";
 
 export type Called = { ok: true; answer: JarvisPaidAnswer } | { ok: false; error: Failure };
@@ -25,6 +33,9 @@ export interface Asked {
   heard: boolean;
   // The ask, without the room's lines, which are read when its call is made.
   ask: JarvisQuestion;
+  // The chain of a function ask's room, found by the door, and the key its answer is kept under, none when it is never kept.
+  chain?: string | undefined;
+  keptKey?: string | undefined;
 }
 
 interface Deps {
@@ -34,6 +45,7 @@ interface Deps {
   jarvis: Pick<Jarvis, "ask">;
   day: Pick<Day, "spend">;
   served: Pick<Served, "get" | "set">;
+  kept: Pick<Kept, "get" | "set">;
 }
 
 /** What the page reads of an answer: never its cost; a `failed` is no answer but a failure, so none. */
@@ -63,28 +75,43 @@ const nothing = (called: Called): boolean =>
     ? (called.answer.status === "spent" || called.answer.status === "off") && costOf(called) === 0
     : called.error === "refused";
 
-export function callsOf({ quota, named, recent, jarvis, day, served }: Deps) {
+// A function's explanation reads the code alone: it is kept only when jarvis says its code reads all succeeded, under the prompt's version the door knows.
+const isExplain = (ask: JarvisQuestion): boolean => "ask" in ask && ask.ask === "function";
+const keepable = (ask: JarvisQuestion, called: Called): boolean =>
+  !isExplain(ask) ||
+  (called.ok &&
+    called.answer.status === "answered" &&
+    called.answer.keep === true &&
+    called.answer.version === EXPLAIN_VERSION);
+
+export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Deps) {
   const cap = makeRoomCap();
   const flights = new Map<string, Promise<Outcome>>();
   // What an answer does to the account's quota, the room's slot, its share, and the answers kept. A call is never stopped
   // when its asker leaves: it ends, and its cost is the share of the one who asked first.
-  const settle = ({ who, room, started, key }: Asked, called: Called): void => {
+  const settle = ({ who, room, started, key, keptKey, ask }: Asked, called: Called): void => {
     if (nothing(called)) quota.giveBack(who, started);
     if (nothing(called) || (!called.ok && called.error === "down")) cap.give(room, started);
     const cost = costOf(called);
     day.spend(who, cost, started);
     const page = called.ok ? forPage(called.answer) : undefined;
-    if (page !== undefined) served.set(key, page, { room, started });
+    if (page === undefined || !keepable(ask, called)) return;
+    served.set(key, page, { room, started });
+    if (keptKey !== undefined) kept.set(keptKey, page, isExplain(ask) ? undefined : { room, started });
   };
   const call = async (asked: Asked): Promise<Outcome> => {
-    const { who, room, started, ask } = asked;
+    const { who, room, started, ask, chain } = asked;
     try {
-      const lines = recent(room, "ask" in ask ? "" : who);
+      // A function's explanation is given no line of the room: it reads the code alone, so every room may share it.
+      const lines = isExplain(ask) ? [] : recent(room, "ask" in ask ? "" : who);
       if (!quota.take(who, await named(who), started)) {
         cap.give(room, started);
         return { full: true };
       }
-      const called = await jarvis.ask({ ...ask, lines }, new AbortController().signal);
+      const called = await jarvis.ask(
+        { ...ask, lines, ...(chain === undefined || !isExplain(ask) ? {} : { chain }) },
+        new AbortController().signal,
+      );
       settle(asked, called);
       return { full: false, called };
     } finally {
@@ -109,8 +136,8 @@ export function callsOf({ quota, named, recent, jarvis, day, served }: Deps) {
   };
   return async (asked: Asked): Promise<Result> => {
     for (;;) {
-      const kept = served.get(asked.key);
-      if (kept !== undefined) return { kind: "served", answer: kept };
+      const held = served.get(asked.key) ?? (asked.keptKey === undefined ? undefined : kept.get(asked.keptKey));
+      if (held !== undefined) return { kind: "served", answer: held };
       const flight = flights.get(asked.key);
       if (flight === undefined) break;
       const result = await wait(flight);

@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Anchor } from "../link.tsx";
+import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import styles from "./NavItem.module.css";
 
 interface Shared {
@@ -17,7 +18,13 @@ interface Shared {
   /** A quiet fact at its end, before the badge: an icon and a figure (a room's people here), `said` for assistive technology. */
   meta?: { icon: IconName; value: string; said: string } | undefined;
 }
-export type NavItemProps = Shared & ({ href: string; onClick?: never } | { href?: never; onClick: () => void });
+/** `soon`: what a later slice brings, greyed and inert, "Coming soon" under the pointer and the focus (as `ComingSoon`). */
+export type NavItemProps = Shared &
+  (
+    | { href: string; onClick?: never; soon?: never }
+    | { href?: never; onClick: () => void; soon?: never }
+    | { href?: never; onClick?: never; soon: true }
+  );
 
 // Whether the badge says something is unseen, not a state such as online.
 const unseen = (badge: Shared["badge"]): boolean => badge !== undefined && badge.status !== true;
@@ -43,9 +50,45 @@ function End({ meta, badge }: Pick<Shared, "meta" | "badge">) {
   );
 }
 
+// The item's control: a link, a button that acts, or one to come, inert.
+function Main({
+  face,
+  label,
+  current,
+  href,
+  onClick,
+  soon,
+}: { face: ReactNode; label: string; current: boolean } & {
+  href: string | undefined;
+  onClick: (() => void) | undefined;
+  soon: true | undefined;
+}) {
+  const look = {
+    className: [styles["main"], "covers"].join(" "),
+    "aria-current": current ? ("true" as const) : undefined,
+  };
+  if (soon === true)
+    return (
+      <Tooltip label="Coming soon">
+        <button type="button" {...look} aria-disabled="true" aria-label={`${label}, coming soon`}>
+          {face}
+        </button>
+      </Tooltip>
+    );
+  return href === undefined ? (
+    <button type="button" {...look} onClick={onClick}>
+      {face}
+    </button>
+  ) : (
+    <Anchor href={href} {...look}>
+      {face}
+    </Anchor>
+  );
+}
+
 /** An item of a column of places, the video's rooms and direct messages: a link, or a button that acts, on a pill that fills
  * cream when it is the one in view. */
-export function NavItem({ children, current = false, lead, badge, meta, href, onClick }: NavItemProps) {
+export function NavItem({ children, current = false, lead, badge, meta, href, onClick, soon }: NavItemProps) {
   const face = (
     <>
       {lead === undefined ? null : <span className={styles["lead"]}>{lead}</span>}
@@ -59,25 +102,9 @@ export function NavItem({ children, current = false, lead, badge, meta, href, on
       data-nav-item=""
       data-current={current ? "" : undefined}
       data-unread={unseen(badge) ? "" : undefined}
+      data-soon={soon === true ? "" : undefined}
     >
-      {href === undefined ? (
-        <button
-          type="button"
-          className={[styles["main"], "covers"].join(" ")}
-          aria-current={current ? "true" : undefined}
-          onClick={onClick}
-        >
-          {face}
-        </button>
-      ) : (
-        <Anchor
-          href={href}
-          className={[styles["main"], "covers"].join(" ")}
-          aria-current={current ? "true" : undefined}
-        >
-          {face}
-        </Anchor>
-      )}
+      <Main face={face} label={children} current={current} href={href} onClick={onClick} soon={soon} />
       {meta === undefined && badge === undefined ? null : <End meta={meta} badge={badge} />}
     </div>
   );

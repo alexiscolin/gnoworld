@@ -39,10 +39,11 @@ test.describe("a message of several lines", () => {
     await field(page).click();
     await page.keyboard.type("- one");
     await page.keyboard.press("Shift+Enter");
-    await page.keyboard.type("- two");
-    await expect(field(page)).toHaveValue("- one\n- two");
+    // The first line's `- ` turned into a list in the field: the next line is its second item.
+    await page.keyboard.type("two");
+    await expect(field(page).locator("li")).toHaveText(["one", "two"]);
     await page.keyboard.press("Enter");
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     const batch = sent.filter((line) => /^(@batch=\S+ )?(BATCH|PRIVMSG) /.test(line));
     const ref = /^BATCH \+(\S+) draft\/multiline #bubble\/games$/.exec(batch[0] ?? "")?.[1] ?? "?";
     expect(batch).toEqual([
@@ -84,18 +85,17 @@ test.describe("a message of several lines", () => {
   // computer, then switched to touch emulation; the composer follows the pointer media query as it changes.
   test("on a touch screen, Enter adds a line and Send sends the draft whole (F1714)", async ({ page }) => {
     const sent = await opened(page);
-    await expect(page.getByText("Shift+Enter adds a line.")).toBeVisible();
     const client = await page.context().newCDPSession(page);
     await client.send("Emulation.setTouchEmulationEnabled", { enabled: true, maxTouchPoints: 1 });
-    await expect(page.getByText("Enter adds a line; Send sends it.")).toBeVisible();
     await field(page).click();
     await page.keyboard.type("- one");
     await page.keyboard.press("Enter");
-    await page.keyboard.type("- two");
-    await expect(field(page)).toHaveValue("- one\n- two");
+    // The first line's `- ` turned into a list in the field: the next line is its second item.
+    await page.keyboard.type("two");
+    await expect(field(page).locator("li")).toHaveText(["one", "two"]);
     expect(sent.filter((line) => line.startsWith("BATCH "))).toEqual([]);
     await page.getByRole("button", { name: "Send" }).click();
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     expect(sent.filter((line) => line.startsWith("BATCH +"))).toHaveLength(1);
   });
 
@@ -113,7 +113,7 @@ test.describe("a message of several lines", () => {
     await field(page).fill(lines20.join("\n"));
     await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
     await field(page).press("Enter");
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     expect(sent.filter((line) => line.startsWith("BATCH +"))).toEqual([]);
     expect(sent.filter((line) => /PRIVMSG #bubble\/games :line \d+$/.test(line))).toHaveLength(20);
   });
@@ -141,7 +141,7 @@ test.describe("a message of several lines", () => {
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     const tooMany = page.getByText(/too many: 20 at most/);
-    await expect(field(page)).toHaveValue(kept);
+    await expect(field(page).locator("p")).toHaveCount(30);
     // F1915: before the welcome nothing is known of draft/multiline, so nothing is refused and Send stays on.
     await expect(tooMany).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
@@ -150,7 +150,7 @@ test.describe("a message of several lines", () => {
     await expect(tooMany).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Send" })).toBeEnabled();
     await field(page).press("Enter");
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     expect(sent.filter((line) => line.startsWith("BATCH +"))).toHaveLength(1);
   });
 

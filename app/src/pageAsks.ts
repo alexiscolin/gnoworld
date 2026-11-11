@@ -2,8 +2,9 @@
 // the header's one account control (a second would watch the session and the wallet twice); who is here, by the chat's people (its info
 // panel). And what that control knows that the chat shows: whether the account has no name to be read by (D13982).
 import { useSyncExternalStore } from "react";
+import { Heard } from "./lib/heard.ts";
 
-type Ask = "log-in" | "pick-name" | "who-is-here";
+type Ask = "log-in" | "pick-name" | "who-is-here" | "jarvis" | "jarvis-catch-up";
 const eventOf = (ask: Ask) => `gnoworld:${ask}`;
 
 /** Asks the page's owner of `ask` to act. */
@@ -17,25 +18,19 @@ export function onAsked(ask: Ask, act: () => void, signal: AbortSignal): void {
 }
 
 let nameless = false;
-const hearers = new Set<() => void>();
-const hear = (change: () => void) => {
-  hearers.add(change);
-  return () => {
-    hearers.delete(change);
-  };
-};
+const heard = new Heard();
 
 /** Told by the account control: the account logged in has no name on the page's chain, so a name can be picked. */
 export function tellNameless(next: boolean): void {
   if (next === nameless) return;
   nameless = next;
-  for (const change of hearers) change();
+  heard.tell();
 }
 
 /** Whether the account logged in has no name on the page's chain, as the account control last told. */
 export const useNameless = (): boolean =>
   useSyncExternalStore(
-    hear,
+    heard.subscribe,
     () => nameless,
     () => false,
   );

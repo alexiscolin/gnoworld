@@ -2,6 +2,7 @@
 // JSON call of lib/api/http.ts. The answer must name the world asked, and list its rooms alone.
 import { MadeRoom, RoomList } from "@gnoworld/schemas";
 import { pageFetch } from "../query/policy.ts";
+import { rememberRealms } from "../roomRealms.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 
 // A room of this world: its main room, #<world>, or one of #<world>/<name>.
@@ -18,7 +19,9 @@ export function roomsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
       const { value } = result;
       const own =
         value.world === world && value.sections.every(({ rooms }) => rooms.every(({ room }) => ofWorld(room, world)));
-      return own ? result : { ok: false, reason: "malformed" };
+      if (!own) return { ok: false, reason: "malformed" };
+      rememberRealms(value.sections);
+      return result;
     },
     /** A room anyone signed in makes on the Earth (POST /api/rooms, D394): the server's refusal comes back as the reason. */
     make: (name: string): Promise<Result<MadeRoom>> =>

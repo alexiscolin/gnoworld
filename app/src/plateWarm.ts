@@ -4,6 +4,7 @@
 //  - the view's: once the page's space has drawn its first frame, and the browser is idle, the plate's code and the rollup files of the worlds in view;
 //  - the reader's intent: a pointer resting on a link to a realm (150 ms), its focus, a press or a touch, whatever the device: the realm's reads.
 // Never at first paint (the scene's chunk delayed the loader by seconds when preloaded then, preloads.ts), never under Save-Data.
+import { HOVER_MS } from "./intent.ts";
 import { savesData } from "./lib/saveData.ts";
 
 const warm = () => import("./warm.ts");
@@ -37,7 +38,6 @@ function whenIdle(cb: () => void): () => void {
 }
 
 // The links' intent, listened to once for the page's life: one at a time, the last, and none for a pointer that left before its delay.
-const HOVER_MS = 150;
 let listening = false;
 let pending: ReturnType<typeof setTimeout> | undefined;
 

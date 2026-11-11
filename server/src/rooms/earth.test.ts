@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { openDatabase } from "@gnoworld/service/db";
 import { VERDICT_TABLES } from "../moderation/check.ts";
 import { guestSaid, idleRooms, ROOM_SAID, roomCounts, sweepIdle } from "./earth.ts";
-import { EARTH_TABLES, makeRooms, REALM_TABLES, ROOM_STATE } from "./create.ts";
+import { EARTH_TABLES, makeRooms, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
 import { ensureRooms, ROOM_TABLES } from "./rooms.ts";
 
 const DAY = 24 * 60 * 60_000;
@@ -17,7 +17,15 @@ afterEach(() => {
 });
 
 const setup = () => {
-  const db = openDatabase(":memory:", [ROOM_TABLES, VERDICT_TABLES, ROOM_STATE, REALM_TABLES, EARTH_TABLES, ROOM_SAID]);
+  const db = openDatabase(":memory:", [
+    ROOM_TABLES,
+    VERDICT_TABLES,
+    ROOM_STATE,
+    REALM_TABLES,
+    REALM_PATH,
+    EARTH_TABLES,
+    ROOM_SAID,
+  ]);
   opened.push(db);
   ensureRooms(db, ["earth", "bubble"], T0 - 40 * DAY);
   const clock = { now: T0 - 30 * DAY };

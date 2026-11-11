@@ -1,0 +1,29 @@
+/* A list of words that complete a field: the floating surface's line and fill (surface.module.css), the lines of a menu. */
+@layer components {
+  .list {
+    /* layout: no space round the list, its place is its container's */
+    margin: 0;
+    padding: var(--space-2xs);
+    border-radius: var(--radius-box);
+    box-shadow: var(--shadow-popover);
+    list-style: none;
+  }
+
+  .option {
+    min-block-size: var(--control-s);
+    padding-inline: var(--space-s);
+    border-radius: var(--radius-item);
+    font: var(--font-chat);
+    cursor: pointer;
+  }
+
+  .option:hover,
+  .option[aria-selected="true"] {
+    background: var(--color-fill-hover);
+  }
+
+  .hint {
+    color: var(--color-text-muted);
+    font: var(--font-hint);
+  }
+}

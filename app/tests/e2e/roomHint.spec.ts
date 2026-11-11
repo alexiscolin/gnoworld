@@ -13,13 +13,13 @@ test.describe("the composer's word on @room", () => {
     await room(page, { me: await logIn(page, word("hint")) });
     const box = field(page);
     await box.fill("@ro");
-    await expect(page.getByText("Tab completes @room.")).toBeVisible();
+    await expect(page.getByRole("option", { name: /^@room/ })).toBeVisible();
     await box.press("Tab");
-    await expect(box).toHaveValue("@room ");
+    await expect(box).toHaveText("@room ");
     await expect(
       page.getByText("@room notifies no one in this room: it counts only in announcement and members rooms."),
     ).toBeVisible();
-    await roomsNav(page).getByRole("link", { name: "#news", exact: true }).click();
+    await roomsNav(page).getByRole("link", { name: "news", exact: true }).click();
     await page.getByRole("textbox", { name: "Message #news" }).fill("@room the release is out");
     await expect(page.getByText("@room notifies the members who keep notifications on for this room.")).toBeVisible();
   });

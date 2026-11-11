@@ -175,3 +175,74 @@ describe("the moderation client", () => {
     expect(events().join("")).not.toMatch(new RegExp(`${KEY}|a secret message`));
   });
 });
+
+// L3 (docs/plans/link-previews.md §7 "moderation/provider.ts"): the client's input is a string, as every caller gives it, or a card's text
+// with its picture as a data URL. A string goes out as it did; parts go out as OpenAI's multi-modal input (text and image_url), read
+// in the guide of 2026-11-11 (platform.openai.com/docs/guides/moderation). The answer is read as before.
+const IMAGE = "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQ";
+
+const partsClient = () => {
+  const bodies: unknown[] = [];
+  const lines: string[] = [];
+  const check = moderationClient({
+    key: "sk-a-test-key-that-must-never-show-0123456789",
+    log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+    send: (_url, init) => {
+      bodies.push(JSON.parse(typeof init.body === "string" ? init.body : ""));
+      return Promise.resolve(new Response(OMNI, { status: 200 }));
+    },
+  });
+  return { check, bodies, lines };
+};
+
+describe("moderationClient's widened input", () => {
+  it("sends a string as the model and the string, byte for byte as before: every caller is unchanged", async () => {
+    const { check, bodies } = partsClient();
+    await check("hello");
+    expect(bodies).toEqual([{ model: "omni-moderation-latest", input: "hello" }]);
+  });
+
+  it("sends a card's text and picture as one input of two parts", async () => {
+    const { check, bodies } = partsClient();
+    const answer = await check({ text: "A title. A description", image: IMAGE });
+    expect(bodies).toEqual([
+      {
+        model: "omni-moderation-latest",
+        input: [
+          { type: "text", text: "A title. A description" },
+          { type: "image_url", image_url: { url: IMAGE } },
+        ],
+      },
+    ]);
+    expect(answer).not.toBe("unchecked");
+  });
+
+  it("sends a card with no picture as its text part alone", async () => {
+    const { check, bodies } = partsClient();
+    await check({ text: "A title" });
+    expect(bodies).toEqual([{ model: "omni-moderation-latest", input: [{ type: "text", text: "A title" }] }]);
+  });
+
+  it("reads the answer for parts with the same schema: any other shape is unchecked and alerts", async () => {
+    const lines: string[] = [];
+    const check = moderationClient({
+      key: "sk-a-test-key-that-must-never-show-0123456789",
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      send: () => Promise.resolve(new Response(JSON.stringify({ results: [] }), { status: 200 })),
+    });
+    expect(await check({ text: "A title", image: IMAGE })).toBe("unchecked");
+    expect(lines.join("")).toContain("moderation_shape");
+  });
+
+  it("never logs the picture or the text", async () => {
+    const lines: string[] = [];
+    const check = moderationClient({
+      key: "sk-a-test-key-that-must-never-show-0123456789",
+      log: logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line)),
+      send: () => Promise.resolve(new Response("{}", { status: 500 })),
+    });
+    await check({ text: "a very private title", image: IMAGE });
+    expect(lines.join("")).not.toContain("private");
+    expect(lines.join("")).not.toContain("/9j/");
+  });
+});

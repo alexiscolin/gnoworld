@@ -2,9 +2,12 @@
 // word); and the quick actions the composer's + opens, the place's own: a direct message's, the Earth's, a world's with a realm or without.
 import type { ReactNode } from "react";
 import { realmView } from "../../places.ts";
+import { askFor } from "../../pageAsks.ts";
+import { useJarvisHere } from "../../jarvisHere.ts";
 import type { AppState } from "../../store/index.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import type { Shown } from "./shown.tsx";
+import { addMarketCard } from "./marketCommand.ts";
 import { QuickActions, type Pinned, type QuickActionsProps } from "./QuickActions.tsx";
 import styles from "./QuickActions.module.css";
 
@@ -42,13 +45,33 @@ export function Dock({ pinned, children }: DockProps) {
   );
 }
 
-/** The quick actions of the conversation in view, which its composer's + opens: a direct message's or the place's, Poll for an account. */
-export function quickActionsOf(place: ChatPlace, shown: Shown, session: AppState["login"]["session"]): ReactNode {
+// The quick actions' Jarvis and Catch up are alive while the page is told Jarvis can be asked from this room (jarvisTold.tsx).
+function Quick({ place, shown, account }: { place: ChatPlace; shown: Shown; account: string | undefined }) {
+  const here = useJarvisHere();
   return (
     <QuickActions
       pills={pillsOf(place, shown.kind === "dm")}
       realm={realmOf(place)}
-      poll={session.kind === "in" ? { room: shown.writer.room, nick: session.address, say: shown.say } : undefined}
+      poll={account === undefined ? undefined : { room: shown.writer.room, nick: account, say: shown.say }}
+      market={
+        shown.kind === "dm"
+          ? undefined
+          : () => {
+              addMarketCard(shown.writer.room, account);
+            }
+      }
+      jarvis={
+        here === undefined
+          ? undefined
+          : (what) => {
+              askFor(what === "catch-up" ? "jarvis-catch-up" : "jarvis");
+            }
+      }
     />
   );
+}
+
+/** The quick actions of the conversation in view, which its composer's + opens: a direct message's or the place's, Poll for an account. */
+export function quickActionsOf(place: ChatPlace, shown: Shown, session: AppState["login"]["session"]): ReactNode {
+  return <Quick place={place} shown={shown} account={session.kind === "in" ? session.address : undefined} />;
 }

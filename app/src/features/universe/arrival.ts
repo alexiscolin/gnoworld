@@ -124,15 +124,15 @@ const STAYING = `:not(${RISING.join(", ")})`;
 const docksOf = (root: ParentNode, ghost: boolean): Element[] =>
   ghost ? all(root, `[data-ghost]${DOCK}`) : all(root, `[data-exit]${DOCK}${STAYING}`);
 
-/** The arrival of the page under `root` (a leaving page's `ghost`, its copied parts): a timeline, played once; `part` plays only the box (the
- * plate, frame and dock, from the first paint) or only the words (once the blocks stand), both on a ghost. A page a flight brought keeps its dock
- * as it stood through the flight (`flown`): the chat shows from the flight's start, never popping in at its end. */
+/** The arrival of the page under `root` (a leaving page's `ghost`, its copied parts): a timeline, played once; `part` plays only the box
+ * (plate, frame, dock) or only the words, both on a ghost. A page a flight brought waits out of sight for it (globe.module.css) and comes
+ * in on this one clock as the flight ends. `kept`: the dock stood through the move (the full chat gave the page back) and is left as is. */
 function arrivalOf(
   root: ParentNode,
-  { ghost = false, flown = false, part }: { ghost?: boolean; flown?: boolean; part?: "box" | "words" } = {},
+  { ghost = false, kept = false, part }: { ghost?: boolean; kept?: boolean; part?: "box" | "words" } = {},
 ): gsap.core.Timeline {
   const plate = root.querySelector(ghost ? PLATE : `${PLATE}:not([data-ghost] *)`);
-  const parts: Parts = { root, plate, ghost, docks: flown ? [] : docksOf(root, ghost) };
+  const parts: Parts = { root, plate, ghost, docks: kept ? [] : docksOf(root, ghost) };
   const timeline = gsap.timeline();
   if (part === "words") document.documentElement.dataset["arrivedAt"] = String(performance.now());
   for (const { of, from, to, at } of STEPS.filter(
@@ -207,7 +207,7 @@ function waitFor(ready: () => boolean, go: () => void, within: number): void {
 
 /** Plays the page's arrival, the flight bringing it near its end or none bringing it. The box (the plate's fill, its frame and the dock) comes
  * at once; the words (title, lines, blocks, chat) play once the plate's blocks stand, on one clock. Nothing stands alone, no edge shows before its box. */
-export function enterPage(flown = false, stays = false): void {
+export function enterPage(kept = false, stays = false): void {
   // One arrival to a page: the flight's own calls (it nears, it lands) come after the page's and never play it again.
   if (arrived) return;
   arrived = true;
@@ -216,10 +216,10 @@ export function enterPage(flown = false, stays = false): void {
   const reduced = motionOf().matches;
   // A page of the kind that left (`stays`: a world after a world) finds the plate, its frame and the dock standing: they stay as they are, and
   // only the words change (their own step below), never the box played again from nothing.
-  const box = playsBox(reduced, stays) ? arrivalOf(document, { flown, part: "box" }) : undefined;
+  const box = playsBox(reduced, stays) ? arrivalOf(document, { kept, part: "box" }) : undefined;
   running = box;
   const words = (): void => {
-    if (!reduced) running = arrivalOf(document, { flown, part: "words" });
+    if (!reduced) running = arrivalOf(document, { kept, part: "words" });
   };
   const begin = (): void => {
     delete document.documentElement.dataset["arrive"];

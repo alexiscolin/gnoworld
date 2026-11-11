@@ -4,6 +4,7 @@
 import { jsonOf } from "@gnoworld/core";
 import type { ApiError } from "@gnoworld/schemas";
 import type { Context, MiddlewareHandler } from "hono";
+import { getCookie } from "hono/cookie";
 import { routePath } from "hono/route";
 import type { Log } from "@gnoworld/service/log";
 
@@ -37,8 +38,23 @@ export async function json(c: Context): Promise<unknown> {
   return jsonOf(await c.req.text());
 }
 
+/** The login's session token of a request: its one cookie. */
+export const tokenOf = (c: Context): string | undefined => getCookie(c, "__Host-session");
+
+/** What the session `session` knows of a request's cookie (an account, or none). */
+export const sessionOf = <T>(c: Context, session: (token: string | undefined) => T): T => session(tokenOf(c));
+
 /** A route's refusals: each cause's error word and status. */
 export type Refusals = Record<string, readonly [ApiError["error"], 400 | 401 | 403 | 404 | 409 | 415 | 429 | 503]>;
+
+/** The causes every route refuses alike: its Origin, its type, its session, its body and its rate. */
+export const baseRefusals = {
+  origin: ["forbidden", 403],
+  type: ["unsupported", 415],
+  session: ["unauthenticated", 401],
+  body: ["refused", 400],
+  limit: ["too_many", 429],
+} as const satisfies Refusals;
 
 /** The `refuse` of a route: logs `event` with the route, the status and the cause (and `extra`), answers the cause's error. */
 export const refuserOf =

@@ -82,3 +82,12 @@ type: "image/webp", quality })`, at 0.8 to 0.9.
 The nebulae's star removal is ffmpeg's: a pass is `erosion` and `dilation` filters alternating `coordinates=255` and `coordinates=90`,
 then `blend=all_mode=difference` against the original, a `lut` threshold, three `dilation`s and a `gblur` for the mask, and
 `maskedmerge` of the original with the opened picture, all in `gbrp`.
+
+## Height maps (13, read 2026-11-11)
+
+Made by `app/tests/tools/heightMaps.mjs` at the one size they are read at (no variants: `textureVariants.mjs` skips `-height`), loaded late and not under Low.
+
+| File | Source | Size | Changes |
+|---|---|---|---|
+| `moon-height.webp` | NASA SVS 4720 "CGI Moon Kit", `ldem_16_uint.tif` (LRO LOLA, 16 pixels a degree); terms: https://svs.gsfc.nasa.gov/help ("All of our content is in the public domain unless otherwise noted") | 1024 by 512 | -9.2 to +10.9 km over 0..255, mean of each block, WebP at 0.95, 114 KB |
+| `earth-height.webp` | NOAA NCEI ETOPO 2022, 60 arc-second ice surface; the NCEI record (doi:10.25921/Fd45-Gt74) states the data are not subject to US copyright and waived worldwide under CC0 1.0 | 4096 by 2048 | Sea 0..68, land 84..255 (5.5 km), the Caspian kept as sea, WebP at 0.95, 575 KB |

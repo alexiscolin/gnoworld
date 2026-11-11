@@ -109,7 +109,7 @@ function DockSlot({ chat }: { chat: ChatProps | undefined }) {
   }, [chat]);
   return (
     <div ref={slotRef} style={{ display: "contents" }}>
-      {fresh ? <DockCover /> : null}
+      {fresh ? <DockCover waiting={!ready} /> : null}
     </div>
   );
 }

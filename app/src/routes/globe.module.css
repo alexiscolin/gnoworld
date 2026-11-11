@@ -19,22 +19,12 @@
     display: block;
   }
 
-  /* A flight brings the page's body: the frame and the plate wait out of sight, out of reach of a pointer, a key or a reader; the dock, the
-     layout's last part, flies with it, fading in, its chat's shape standing till its lines load (Alexis, 2026-11-09: "un skeleton"). The page
-     leaves `flown` "flying" from the click that asks the flight (host.ts). Frames 19, 36 and 101 fly with the dock alone. */
-  .globe[data-flown="flying"] + * > :not(:last-child) {
+  /* A flight brings the page's body: the frame, the plate and the dock wait out of sight, out of reach of a pointer, a key or a reader, and
+     come in together on the arrival's one clock (arrival.ts) as the flight ends. The page leaves `flown` "flying" from the click that asks
+     the flight (host.ts). */
+  .globe[data-flown="flying"] + * > * {
     opacity: 0;
     visibility: hidden;
-  }
-
-  .globe[data-flown="flying"] + * > :last-child {
-    animation: dock-in calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard) both;
-  }
-
-  @keyframes dock-in {
-    from {
-      opacity: 0;
-    }
   }
 
   /* A window this wide loads the scene by itself: the room is kept from the first paint, or the plate jumps half a screen under the reader. */
@@ -86,12 +76,6 @@
       /* raw: the study's radius, 37 % of the width, or 59 % of the height past 16:10; its air and its glow past it (1.18 radii) a step clear
          of the words */
       --_radius: min(37vi, 59vb, (var(--_x) - var(--_start) - var(--space-s)) / 1.18);
-    }
-
-    /* raw: the dock's fill lets the planet under it show, dark enough that its muted words keep 4.5:1 over the brightest limb and city
-       lights under it (D458) */
-    .globe[data-framing]:is([data-earth="drawn"], [data-world="drawn"]) + * {
-      --dock-glass: 91%;
     }
 
     .globe {

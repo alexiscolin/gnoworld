@@ -21,6 +21,8 @@ export { Dialog, type DialogProps } from "./Dialog/Dialog.tsx";
 export { Disclosure, type DisclosureProps } from "./Disclosure/Disclosure.tsx";
 export { EmptyState, type EmptyStateProps } from "./EmptyState/EmptyState.tsx";
 export { Field, type FieldProps } from "./Field/Field.tsx";
+export { FieldWords } from "./Field/FieldWords.tsx";
+export { Listbox, type ListboxOption, type ListboxProps } from "./Listbox/Listbox.tsx";
 export { Figures, type Figure, type FiguresProps } from "./Figures/Figures.tsx";
 export { Flash, type FlashMessage, type FlashProps } from "./Flash/Flash.tsx";
 export { Icon, type IconName, type IconProps } from "./icons/Icon.tsx";

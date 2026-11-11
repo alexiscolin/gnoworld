@@ -14,7 +14,11 @@ export interface Reads {
 }
 
 // A name that could not be read is no answer: the query keeps the last name and says nothing of the failure.
-const nameOptions = (read: typeof readName, { rpc, chainId }: Chain, [account, again]: readonly [string, number]) =>
+export const nameOptions = (
+  read: typeof readName,
+  { rpc, chainId }: Chain,
+  [account, again]: readonly [string, number],
+) =>
   queryOptions<Named>({
     queryKey: keys.name(chainId, account, again),
     // The old name of the same account only: another account never shows this one's.

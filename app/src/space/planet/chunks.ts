@@ -53,10 +53,14 @@ export const LOOKUP = /* glsl */ `
 const float PI = 3.14159265359;
 const float TAU = 6.28318530718;
 struct Lookup { vec2 uv; vec2 dx; vec2 dy; };
+vec2 uvOf(vec3 direction) {
+  return vec2(atan(direction.z, direction.x) / TAU + 0.5, acos(clamp(direction.y, -1.0, 1.0)) / PI);
+}
 Lookup lookupOf(vec3 direction) {
-  float east = atan(direction.z, direction.x) / TAU + 0.5;
+  vec2 uv = uvOf(direction);
+  float east = uv.x;
   float across = fract(east + 0.5) - 0.5;
-  float down = acos(clamp(direction.y, -1.0, 1.0)) / PI;
+  float down = uv.y;
   vec2 eastX = vec2(dFdx(east), dFdx(down));
   vec2 eastY = vec2(dFdy(east), dFdy(down));
   vec2 acrossX = vec2(dFdx(across), dFdx(down));

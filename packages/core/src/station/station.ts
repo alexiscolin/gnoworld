@@ -59,7 +59,7 @@ function great(draws: Draws, inner: number, size: number): Part[] {
 
 /** The station `seed` builds at `size`, 0 a small satellite to 1 an artificial world. */
 export function stationOf(seed: string, size: number): Station {
-  const draws = new Draws(seed);
+  const draws = new Draws(`station ${seed}`);
   const grown = clamp01(size);
   const spine = spineOf(draws, grown);
   const parts = [...spine.parts, ...round(draws, spine, grown)];

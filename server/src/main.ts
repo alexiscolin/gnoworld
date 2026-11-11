@@ -7,29 +7,31 @@ import { openDatabase } from "@gnoworld/service/db";
 import { stop } from "@gnoworld/service/http";
 import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
+import { cardsBoot } from "./cards/wire.ts";
 import { guestSettings } from "./guest/wire.ts";
 import { adminRoutes } from "./door/admin.ts";
 import { jarvisClient } from "./door/jarvis.ts";
 import { doorMemory } from "./door/memory.ts";
 import { mountDoor } from "./door/mount.ts";
+import { stateRoutes } from "./door/state.ts";
 import { makeQuota } from "./door/quota.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
 import { makeLogin, makeSigned } from "./login/login.ts";
 import { migrations } from "./migrations.ts";
-import { pinsRoutes } from "./pins/routes.ts";
 import { loginFrom } from "./login/routes.ts";
 import { historyRoutes } from "./prices/history.ts";
 import { isTeam, loadRoles, spared } from "./roles/roles.ts";
-import { startPrices } from "./prices/prices.ts";
-import { checkFor, startPreviews } from "./previews/job.ts";
-import { defaultUniverse, hubRealms, hubWorlds } from "./prices/universes.ts";
-import { keptBy } from "./worlds/habitsFiles.ts";
+import { mountOwners } from "./roles/wire.ts";
+import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
+import { makeSearch } from "./search/index.ts";
+import { searchRoutes } from "./search/routes.ts";
+import { listRooms, worldOf } from "./rooms/rooms.ts";
 import { roomsBoot } from "./rooms/roomsBoot.ts";
-import { startWorlds } from "./worlds/job.ts";
 import { trendsRoutes } from "./worlds/trends.ts";
 import { dirname, join } from "node:path";
 import { bootSignals } from "./signals/boot.ts";
+import { bootJobs } from "./jobs/boot.ts";
 
 const FLAG = "--disallow-code-generation-from-strings";
 if (!process.execArgv.includes(FLAG)) throw new Error(`start the server with ${FLAG} (ADR-0002 §7)`);
@@ -40,46 +42,16 @@ const roles = loadRoles(config.roles);
 const log = logger(config.pepper, (line) => process.stdout.write(line));
 const db = openDatabase(config.database, migrations);
 // The verdicts kept 180 days and below their cap, now and every five minutes (3n), Ergo's folder measured (3n-b).
-const retention = startRetention(db, { log, ergoData: config.ergoData });
-// CoinGecko's prices every five minutes into the file MARKETS_FILE names (5l); without it, no timer. With UNIVERSES_FILE the
-// same read takes the default universe's block height from its RPC, so a visitor's browser asks no chain.
-const prices =
-  config.markets === undefined
-    ? undefined
-    : startPrices({
-        file: config.markets,
-        log,
-        ...(config.universes === undefined ? {} : { universe: defaultUniverse(config.universes) }),
-      });
-// The worlds job (7c, every half hour, WORLDS_FILE) and the previews job (8f, every six hours, PREVIEWS_FILE, each page read by the
-// moderation check) read the default universe alone: with no chain, or for previews no check, the server stops rather than run.
-if ((config.worlds !== undefined || config.previews !== undefined) && config.universes === undefined)
-  throw new Error("setting UNIVERSES_FILE: required");
-if (config.previews !== undefined && config.moderation.openaiKey === undefined)
-  throw new Error("setting OPENAI_API_KEY_FILE: required");
-// The trends read a hub's rooms and its realms as one world (7t3): the hubs beside the universes, read before the job, so a bad file stops
-// the server at boot; each world's chain windows kept beside the database, counts alone, none for a database in memory.
-const hubs = config.worlds === undefined || config.universes === undefined ? undefined : hubWorlds(config.universes);
-const worlds =
-  config.worlds === undefined || config.universes === undefined
-    ? undefined
-    : startWorlds({
-        file: config.worlds,
-        log,
-        universe: defaultUniverse(config.universes),
-        ...keptBy(config.database, db, config.worlds),
-      });
-const { openaiKey, thresholds } = config.moderation;
-const previews =
-  config.previews === undefined || config.universes === undefined || openaiKey === undefined
-    ? undefined
-    : startPreviews({
-        file: config.previews,
-        log,
-        universe: defaultUniverse(config.universes),
-        pages: hubRealms(config.universes),
-        check: checkFor({ openaiKey, thresholds }, { log }),
-      });
+// The search index (slice 13): the retention expires its lines, the chat feeds it.
+const search = makeSearch(db, { roles, now: Date.now });
+// The link cards (slice 13): the chat makes the flow, and the retention reads it once it exists; a card is checked by OpenAI or not shown.
+const cards = cardsBoot(config);
+// What Jarvis's door asks of the chat (D13985): the accounts heard speak, and the answers kept until a line is taken.
+const chainId = (): string | undefined =>
+  config.universes === undefined ? undefined : defaultUniverse(config.universes).chainId;
+const memory = doorMemory(db, config.origins, { now: Date.now, chainId });
+const retention = startRetention(db, { log, ergoData: config.ergoData, search, cards, kept: memory.ask.kept });
+const { prices, worlds, previews, hubs } = bootJobs({ config, db, log });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -87,8 +59,6 @@ app.route("/api/login", loginFrom(db, config, { log }));
 const { session, signedAt } = makeLogin(db, { chains: config.chains, now: Date.now });
 // The first signals (9h) and the chain in the rooms (9g), told on the one stream; the chain none without both data files.
 const { stream, signals, chain } = bootSignals({ app, db, roles, config, log, session });
-// What Jarvis's door asks of the chat (D13985): the accounts heard speak, and the answers kept until a line is taken.
-const memory = doorMemory(db, config.origins, Date.now);
 const chat = startChat(
   db,
   {
@@ -107,10 +77,13 @@ const chat = startChat(
     session,
     stream,
     signals,
+    search,
+    ...cards.options,
     door: memory.chat,
     ...(config.database === ":memory:" ? {} : { presence: join(dirname(config.database), "presence.json") }),
   },
 );
+cards.attach(chat.cards);
 app.route("/api/activity", chat.activity);
 // The guest chat (D430): a name and a cookie, then a line the bot says; both answer 404 under GUEST_CHAT=off.
 if (chat.guest !== undefined) app.route("/api/guest", chat.guest);
@@ -131,19 +104,24 @@ app.route(
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
-const roomsAhead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck });
+// Search (slice 13, B2): the lines of one world's rooms a reader may open, the right asked again on every page.
 app.route(
-  "/api/pins",
-  pinsRoutes({
-    pins: chat.pins,
-    mayPin: chat.mayPin,
-    readable: chat.mayRead,
+  "/api/search",
+  searchRoutes({
+    search,
+    roles,
+    archived: chat.rooms.archived,
+    rooms: (world) => listRooms(db).flatMap(({ name }) => (worldOf(name) === world ? [name] : [])),
     session,
     origins: config.origins,
+    proxy: config.trustedProxy,
     log,
     now: Date.now,
   }),
 );
+const roomsAhead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck });
+// The owner's right and the links (owners' moderation, part 4): the pins ask the right, /api/links lists and makes the links.
+mountOwners(app, { db, config, hubs, chat, spared: spared(roles), session, signedAt, log });
 // Jarvis's door (10g): a question from a room, held to its account's quota, to jarvis on the network only the two share;
 // none without JARVIS_URL. Its quotas, allowlist and jarvis's budgets change on the admin API alone.
 const door =
@@ -154,6 +132,8 @@ const door =
         quota: makeQuota(db, { first: config.jarvis.first, now: Date.now }),
         jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs, key: config.jarvis.key }),
       };
+// Whether it is on, told to any page; off with no door at all (10u-a).
+app.route("/api/jarvis", stateRoutes({ on: door?.settings.on ?? false }));
 if (door !== undefined)
   mountDoor(app, { door, chat, memory: memory.ask, session, signedAt, origins: config.origins, log });
 // The admin API on a listener of its own, never the public one (ADR-0002 §6), with the login for its own site, so the

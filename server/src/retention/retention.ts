@@ -9,9 +9,11 @@ import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
 import { makeGuests } from "../guest/guests.ts";
+import { guarded } from "../search/guard.ts";
+import { expireIndex } from "../search/retention.ts";
 
 // Ergo's `expire-time` (deploy/ergo/ircd.yaml.tmpl): a line older than that is gone from Ergo, and so is its pin.
-const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;
+export const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;
 
 interface Options {
   log: Log;
@@ -24,6 +26,12 @@ interface Options {
   batches?: number;
   // Ergo's data folder and its cap; none, no measure.
   ergoData?: { dir: string; maxBytes: number } | undefined;
+  // The search index: its lines past 90 days or its row cap, in what a tick's budget leaves after the verdicts.
+  search?: { expire: (limit: number) => number };
+  // The link cards (slice 13): their pages past 30 days or their caps, in what the search leaves of the budget.
+  cards?: { expire: (limit: number) => number };
+  // Jarvis's kept answers (D13920): those past their time or the table's caps, after the cards, in what the budget leaves.
+  kept?: { expire: (limit: number) => number };
 }
 
 export interface Retention {
@@ -55,6 +63,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     ),
   };
   const guests = makeGuests(db, { now });
+  const guard = guarded(log);
   const count = (): number => N.parse(sql.count.get()).n;
   // Whether an alert's condition holds now and did not at the last tick: one alert a crossing, armed again once
   // it no longer holds. Each alert is logged by its name written out, which scripts/check_docs.py reads.
@@ -79,6 +88,23 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     if (rises("unreadable", bytes === undefined)) log("alert", { error: "ergo_volume_unreadable" });
     if (bytes !== undefined && rises("ergo", near(bytes, cap))) log("alert", { error: "ergo_volume_near_cap" });
   };
+  // The link cards' pages and Jarvis's kept answers past their days or caps, in what the budget leaves.
+  const expireWith = (
+    name: string,
+    owner: { expire: (limit: number) => number } | undefined,
+    budget: number,
+  ): number => {
+    const asked = Math.min(batch, budget);
+    const taken = guard(name, () => owner?.expire(asked) ?? 0, 0);
+    return taken === asked ? 0 : budget - taken;
+  };
+  const expireOwned = (budget: number): number => {
+    const owned = [
+      ["cards_expire", options.cards],
+      ["kept_expire", options.kept],
+    ] as const;
+    return owned.reduce((left, [name, owner]) => (left > 0 ? expireWith(name, owner, left) : left), budget);
+  };
   return {
     tick() {
       let budget = batch * batches;
@@ -93,6 +119,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
         removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
       }
+      budget = expireIndex({ db, log, search: options.search, batch }, budget);
+      budget = expireOwned(budget);
       if (rises("verdicts", near(count(), maxVerdicts))) log("alert", { error: "verdicts_near_cap" });
       if (rises("database", near(N.parse(sql.used.get()).n, maxBytes))) log("alert", { error: "database_near_cap" });
       // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8).

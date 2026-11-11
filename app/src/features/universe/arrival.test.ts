@@ -47,6 +47,14 @@ test("leaving mid-words ends the chat seat's parts at their rest, not half drawn
   expect(style("#line")).toBe("||");
 });
 
+test("a page a flight brought has its dock held out of sight till the flight ends, then it comes in with the arrival, never before", async () => {
+  show(`<main>${PLATE}${SEAT}</main>`);
+  newPage("world:flown");
+  enterPage(false, false);
+  await wait(30);
+  expect(Number(document.querySelector<HTMLElement>("aside")?.style.opacity ?? "1")).toBeLessThan(0.5);
+});
+
 test("a new page starts the plate's rise count again: the cards of the next place rise in their stagger, not all at once", () => {
   show(`<main>${PLATE}</main>`);
   const body = document.querySelector<HTMLElement>("[data-content]");

@@ -3,15 +3,10 @@
 import type { RoomList } from "@gnoworld/schemas";
 import { Field, Stack } from "@gnoworld/ui";
 import { useState } from "react";
-import { useApp } from "../../storeContext.tsx";
 import { roomLabel } from "./names.ts";
-import { NewRoom } from "./NewRoom.tsx";
+import { NewRoom, useMayMakeRoom } from "./NewRoom.tsx";
 import { RoomSections, type RoomSectionsProps } from "./RoomSections.tsx";
 import styles from "./RoomsView.module.css";
-
-// The Earth's list always holds its main room, which no other world's does by that name.
-const onEarth = (sections: RoomList["sections"]): boolean =>
-  sections.some(({ rooms }) => rooms.some(({ room }) => room === "#earth"));
 
 /** The rooms whose name holds `query`, a section with none left out; all of them for an empty query. */
 function matching(sections: RoomList["sections"], query: string): RoomList["sections"] {
@@ -31,9 +26,8 @@ export { RoomsNav } from "./RoomSections.tsx";
 // Earth an account may also make one (D394).
 export function RoomsList(props: RoomSectionsProps) {
   const [query, setQuery] = useState("");
-  const signedIn = useApp(({ login }) => login.session.kind === "in");
   const found = matching(props.sections, query);
-  const make = signedIn && onEarth(props.sections);
+  const make = useMayMakeRoom(props.sections);
   return (
     <Stack space="m">
       <Field

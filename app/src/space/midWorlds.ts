@@ -22,6 +22,8 @@ export function midOf(seen: Seen, { at, seconds, out }: { at: Vec; seconds: numb
 export interface LabelHooks {
   readonly enter: (item: Named) => void;
   readonly name: (item: Named) => string;
+  /** A name is pointed at or focused: its world may be asked ahead. */
+  readonly warm?: ((item: Named) => void) | undefined;
   /** How many are here in a world now: none while unknown. */
   readonly fact?: ((id: string) => number | undefined) | undefined;
 }

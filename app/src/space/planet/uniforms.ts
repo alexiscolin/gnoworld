@@ -1,8 +1,9 @@
 // What a world's surface program reads from its look, apart from the sun and the clock: what both programs share, then the Earth's own.
 // A look is data, never shader text; every other world's own uniforms are generated.ts's.
 import type { MapName, PlanetLook, WorldSigns } from "@gnoworld/core";
-import { Color, Euler, Matrix3, Matrix4, SRGBColorSpace, Vector3, type IUniform, type Texture } from "three";
+import { Color, Euler, Matrix3, Matrix4, SRGBColorSpace, Vector3, Vector4, type IUniform, type Texture } from "three";
 import { lightCode } from "./signShaders.ts";
+import { MOONS_MOST } from "./surfaceParts.ts";
 
 type Rgb = readonly [number, number, number];
 type Uniforms = Record<string, IUniform>;
@@ -40,6 +41,8 @@ export interface HandMade extends PlanetLook {
   readonly clouds: number;
   /** A second, high, fainter layer of the same clouds: 0 for none. */
   readonly highClouds: number;
+  /** Its height map, once it came: where the sea ends in the map's 0 to 1, and its relief in radii, exaggerated. */
+  readonly height?: { readonly sea: number; readonly span: number };
 }
 
 // What a world lacks is marked by value: one program holds every world of its kind.
@@ -66,6 +69,12 @@ export function sharedUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     time: { value: 0 },
     cloudTime: { value: 0 },
     relief: { value: look.relief },
+    // 1 draws the relief's shadows and the real height's cavities near the terminator; a Low setting turns it to 0 (setDepth).
+    depth: { value: 1 },
+    // How far the planet has come in from its skeleton, 0 to 1 (Planet.setArrive).
+    arrive: { value: 1 },
+    // Up to four moons, each x, y, z and radius in world units; a radius of 0 is none (Planet.setMoons).
+    moonShadows: { value: Array.from({ length: MOONS_MOST }, () => new Vector4(0, 0, 0, 0)) },
     ringInner: { value: rings.inner },
     ringOuter: { value: rings.outer },
     ringOpacity: { value: rings.opacity },
@@ -87,6 +96,11 @@ export const noLights = (): Uniforms => ({
 /** The Earth's and its Moon's: their real map, the Earth's clouds and its cities. */
 export const handMadeUniforms = (look: HandMade, maps: MapSet): Uniforms => ({
   ...sharedUniforms(look, maps),
+  // The real height comes late (Planet.setHeight): until then a sampler holds the clouds, unread.
+  heightMap: { value: maps.clouds },
+  heightOn: { value: 0 },
+  heightSea: { value: look.height?.sea ?? 0 },
+  heightSpan: { value: look.height?.span ?? 0 },
   cloudCover: { value: look.clouds },
   highClouds: { value: look.highClouds },
   nightLights: { value: maps.night === undefined ? 0 : 1 },

@@ -7,6 +7,7 @@ import { placeOf, type Planet, type System, type Universe, type Vec } from "./la
 import type { Seen } from "./see.ts";
 import { Planets } from "./labelPlanets.ts";
 import { assign, Rest, retire, type Slot } from "./labelSlots.ts";
+import { afterDwell } from "../intent.ts";
 import { fillPill, midOf, tagOf, type LabelHooks } from "./midWorlds.ts";
 import styles from "./labels.module.css";
 
@@ -68,7 +69,7 @@ export class Labels {
   marked: Planet | undefined;
 
   /** In `layer`; `enter` is told what a label leads to, `name` names it. */
-  constructor(layer: HTMLElement, { enter, name, fact }: LabelHooks) {
+  constructor(layer: HTMLElement, { enter, name, fact, warm }: LabelHooks) {
     this.#named = name;
     this.#fact = fact;
     for (let at = 0; at < POOL; at += 1) {
@@ -81,6 +82,14 @@ export class Labels {
       button.addEventListener("click", () => {
         if (slot.item !== undefined) enter(slot.item);
       });
+      for (const type of ["pointerenter", "focus"])
+        button.addEventListener(type, () => {
+          const { item } = slot;
+          if (item !== undefined && warm !== undefined)
+            afterDwell(button, () => {
+              warm(item);
+            });
+        });
       layer.append(button);
       this.#slots.push(slot);
       this.#ofButton.set(button, slot);

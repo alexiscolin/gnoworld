@@ -12,7 +12,7 @@ import { VERDICT_TABLES } from "../moderation/check.ts";
 import { MUTE_TABLES } from "../moderation/mute.ts";
 import type { Answer } from "../moderation/provider.ts";
 import { PIN_TABLES } from "../pins/pins.ts";
-import { EARTH_TABLES, REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_SAID } from "../rooms/earth.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { answer } from "./answers.ts";
@@ -39,6 +39,7 @@ export const TABLES = [
   MUTE_TABLES,
   ROOM_STATE,
   REALM_TABLES,
+  REALM_PATH,
   EARTH_TABLES,
   ROOM_SAID,
   PIN_TABLES,

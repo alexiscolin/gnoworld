@@ -1,7 +1,9 @@
 // The loop's own pieces that hold no state (loop.ts): its system prompt, a question's first message, and where a model's
 // answer stops it.
+import { z } from "zod";
 import type Anthropic from "@anthropic-ai/sdk";
 import { millionths } from "./decline.ts";
+import type { Ran } from "./gnomcp.ts";
 import type { Question, Result } from "./loop.ts";
 import type { Untrusted } from "./untrusted.ts";
 
@@ -55,3 +57,38 @@ export const unanswered = (
   if (reason === "spent") return cost === 0 ? { kind: "spent" } : { kind: "spent", cost };
   return { kind: "failed", reason: reason === "timeout" ? "timeout" : "error", cost };
 };
+
+/** The reads of a question with a `finds`: whether one failed and whether one held the word (a function's name, D13920). */
+export interface Reads {
+  readonly finds: { readonly realm: string; readonly name: string } | undefined;
+  failed: boolean;
+  found: boolean;
+}
+
+const Path = z.object({ path: z.string() });
+
+// A line that declares `func name(` or `func (receiver) name(`, with no comment mark before it. A declaration inside a block
+// comment that spans lines is not told from code: it passes, and the model's answer is only kept after the code's own read.
+function declares(text: string, name: string): boolean {
+  const declaration = new RegExp(`\\bfunc (\\([^)]*\\) )?${name}\\(`);
+  return text.split("\n").some((line) => {
+    const found = declaration.exec(line);
+    return found !== null && !/\/\/|\/\*|^\s*\*/.test(line.slice(0, found.index));
+  });
+}
+
+/** A gno_read's end counted in `reads`, and the end itself; no other call, and no question without a `finds`, counts. */
+export function noteRead(reads: Reads, call: { name: string; args: unknown }, ran: Ran): Ran {
+  const { finds } = reads;
+  if (call.name !== "gno_read" || finds === undefined) return ran;
+  const good = ran.ok && !ran.isError;
+  reads.failed ||= !good;
+  // The asked realm's own declaration of that exact name, never a comment, another function or another realm's code.
+  const path = Path.safeParse(call.args);
+  reads.found ||= good && path.success && path.data.path === finds.realm && declares(ran.text, finds.name);
+  return ran;
+}
+
+/** `keep` for an answer of a question with a `finds`: every code read succeeded and one found it; nothing for another. */
+export const keepOf = (reads: Reads): { keep?: boolean } =>
+  reads.finds === undefined ? {} : { keep: reads.found && !reads.failed };

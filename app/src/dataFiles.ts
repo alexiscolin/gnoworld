@@ -19,7 +19,6 @@ import {
   OnAir,
   Quests,
   Universes,
-  XPosts,
 } from "@gnoworld/schemas";
 
 const SCHEMAS = {
@@ -34,7 +33,6 @@ const SCHEMAS = {
   earthRooms: EarthRooms,
   earthOrbit: EarthOrbit,
   news: News,
-  xPosts: XPosts,
   onAir: OnAir,
 };
 
@@ -43,7 +41,7 @@ export const MAX_FILE_BYTES = 1024 * 1024;
 
 export type Data = { [K in keyof typeof SCHEMAS]: output<(typeof SCHEMAS)[K]> };
 
-/** The thirteen files of a directory, checked; throws every fault found in the first file that has one. */
+/** The twelve files of a directory, checked; throws every fault found in the first file that has one. */
 export function loadData(dir: string): Data {
   const found: Record<string, unknown> = {};
   for (const [name, schema] of Object.entries(SCHEMAS)) {

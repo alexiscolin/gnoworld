@@ -2,7 +2,9 @@
 // room, or a direct message, 4e) and what writes in it.
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
+import { Chip } from "@gnoworld/ui";
 import { useId, type ReactNode, type RefObject } from "react";
+import { useLinks } from "../../useLinks.ts";
 import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
@@ -16,6 +18,7 @@ import { useRoomKeeping } from "./RoomKeeping.ts";
 import { RoomChips } from "./RoomChips.tsx";
 import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
 import { Dock, quickActionsOf } from "./Dock.tsx";
+import { JarvisTold } from "./jarvisTold.tsx";
 import { Saved } from "./Saved.tsx";
 import { Media } from "./Media.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
@@ -34,6 +37,10 @@ import { Writer } from "./Writer.tsx";
 
 const NO_LINES: readonly Line[] = [];
 const NO_MEMBERS: readonly string[] = [];
+
+// The room's own world, the id's first segment: a hub's other realms' rooms are other worlds, which the hint does not name.
+const ownsRoom = (worlds: readonly string[] | undefined, room: string | undefined) =>
+  room !== undefined && worlds?.includes(room.slice(1).split("/")[0] ?? "") === true;
 
 const addressOf = (session: AppState["login"]["session"]) => (session.kind === "in" ? session.address : undefined);
 
@@ -70,14 +77,12 @@ function Rail({
   signedIn,
   sections,
   current,
-  lines,
   dms,
   failed,
   noticing,
 }: Pick<LoadedProps, "sections" | "dms" | "failed" | "noticing"> & {
   signedIn: boolean;
   current: string | undefined;
-  lines: readonly Line[];
 }) {
   return (
     <RoomsView
@@ -87,7 +92,7 @@ function Rail({
       failed={failed}
       badges={noticing.badges}
       notices={noticing.list}
-      media={<Media room={current} lines={lines} />}
+      media={<Media room={current} />}
       saved={signedIn ? <Saved /> : undefined}
     />
   );
@@ -141,14 +146,14 @@ export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
   const { room, acts, me, people, shown, lines, members } = useConversation(props);
   const now = useNow();
+  // The owner of the place's world wears a mark beside the room's name (owners' moderation, part 5); the server's list says who owns what.
+  const owner = ownsRoom(useLinks(me)?.worlds, room);
   const ids = roomIds(sections);
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const composing = useComposing(shown, me);
   const threads = useThreads({ shown, state: props.state, session, rooms: ids, acts });
-  const rail = (
-    <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} lines={lines} noticing={noticing} />
-  );
+  const rail = <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} noticing={noticing} />;
   const writer =
     shown === undefined ? undefined : (
       <Writer
@@ -169,7 +174,16 @@ export function Loaded(props: LoadedProps) {
       title={shown?.title ?? place.name}
       chips={<RoomChips sections={sections} current={room} badges={noticing.badges} />}
       menu={{ label: "Rooms", content: menu }}
-      mark={shown?.mark}
+      mark={
+        owner ? (
+          <>
+            {shown?.mark}
+            <Chip tone="signal">Owner</Chip>
+          </>
+        ) : (
+          shown?.mark
+        )
+      }
       rail={rail}
       unread={unreadOf(noticing.badges)}
       talking={talkingOf(lines, now, chat === "connected")}
@@ -177,8 +191,10 @@ export function Loaded(props: LoadedProps) {
       here={{ lines, members }}
       people={people}
       threads={threads}
+      search={{ room, sections, members, me, link }}
       status={<NoticeStatus notices={noticing.list} />}
     >
+      <JarvisTold place={place} shown={shown} account={me} />
       <LoadedRoom
         problem={dms.problem}
         shown={shown}

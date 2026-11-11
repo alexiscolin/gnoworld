@@ -61,7 +61,7 @@ export function reader(options: Options, state: State) {
   // whole is handed on marked, to be hidden.
   const heard = (message: IrcMessage, readable: boolean): void => {
     const got = said(message, state.joined);
-    if (answered(state, message, got)) return;
+    if (answered(state, message, got ?? said(message, state.joined, true))) return;
     const batched = replayed(state, message);
     if (got !== undefined) onMessage(readable ? got : { ...got, unreadable: true }, batched);
   };

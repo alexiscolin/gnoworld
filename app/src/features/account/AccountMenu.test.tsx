@@ -35,7 +35,7 @@ describe("the account's menu", () => {
 
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
-    expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings"]);
+    expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
   });
 
   it("names its trigger the account and draws the lead it is given, the account's face and address", () => {
@@ -119,7 +119,7 @@ describe("the header's account", SLOW, () => {
       box.querySelector<HTMLButtonElement>("button[aria-label='Menu']")?.click();
     });
     await vi.waitFor(() => {
-      expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings"]);
+      expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);
     }, SOON);
   });
 

@@ -7,7 +7,7 @@ import { PagedList } from "@gnoworld/ui";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import { use, useEffect } from "react";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
-import { Act, CallCountsContext, FunctionRow, Unlisted } from "./FunctionRow.tsx";
+import { Act, CallCountsContext, FunctionRow, OpenOnGnoweb, PAGE_ROWS, Unlisted } from "./FunctionRow.tsx";
 import calm from "./quiet.module.css";
 import styles from "./RealmFunctions.module.css";
 import { useFunctions, type Functions, type Result } from "./useFunctions.ts";
@@ -26,9 +26,15 @@ export interface RealmFunctionsProps {
   expanded?: boolean;
 }
 
-function Outcome({ name, result }: { name: string; result: Result | undefined }) {
+function Outcome({ name, result, href }: { name: string; result: Result | undefined; href: string | undefined }) {
   if (result === undefined || result.state === "busy") return null;
-  if (result.state === "failed") return <p role="status">{result.next}</p>;
+  if (result.state === "failed")
+    return (
+      <>
+        <p role="status">{result.next}</p>
+        <OpenOnGnoweb href={href} />
+      </>
+    );
   const { height } = result;
   return (
     <>
@@ -55,12 +61,14 @@ function Items({
   read,
   more,
   expanded,
+  href,
 }: {
   names: string[];
   results: Functions["results"];
   read: Functions["read"];
   more: string | undefined;
   expanded: boolean;
+  href: string | undefined;
 }) {
   const counts = use(CallCountsContext);
   // The realm's own order, by calls once the rollup has counted them, by name.
@@ -77,10 +85,16 @@ function Items({
       textOf={(name) => name}
       sorts={sorts}
       expanded={expanded}
+      counted={names.length > PAGE_ROWS}
       {...(more === undefined ? {} : { explorer: { href: more, label: "More on gnoweb" } })}
       empty="No function matches your search."
       render={(name) => (
-        <FunctionRow name={name}>
+        <FunctionRow
+          name={name}
+          onToggle={(open) => {
+            if (open && results[name] === undefined) read(name);
+          }}
+        >
           <Act
             verb="Read"
             name={name}
@@ -89,7 +103,7 @@ function Items({
               read(name);
             }}
           />
-          <Outcome name={name} result={results[name]} />
+          <Outcome name={name} result={results[name]} href={href} />
         </FunctionRow>
       )}
     />
@@ -98,9 +112,9 @@ function Items({
 
 function Body({ functions, more, expanded }: { functions: Functions; more: string | undefined; expanded: boolean }) {
   const { listing, results, read } = functions;
-  if (listing.state !== "listed") return <Unlisted listing={listing} />;
+  if (listing.state !== "listed") return <Unlisted listing={listing} href={more} />;
   if (listing.names.length === 0) return <p className={calm["note"]}>There is no function to read here.</p>;
-  return <Items names={listing.names} results={results} read={read} more={more} expanded={expanded} />;
+  return <Items names={listing.names} results={results} read={read} more={more} expanded={expanded} href={more} />;
 }
 
 function Panel({ realm, chain, options, onCount, expanded = false }: RealmFunctionsProps) {

@@ -96,4 +96,30 @@
     padding-block-start: var(--space-xs);
     border-block-start: var(--line-width) solid var(--color-line);
   }
+
+  /* The text Adena signs and the command's block: set apart (.fill-box, .data-text), never wrapped, scrolled across where it is long. */
+  .block {
+    /* layout: a block's own vertical margin taken off */
+    margin-block: 0;
+    border: var(--line-width) solid var(--color-line);
+    /* layout: a long line scrolls inside the box, never widening the dialog */
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+
+  /* The command's block is read as typed: its lines are kept and scroll across. */
+  .block[data-scroll] {
+    white-space: pre;
+  }
+
+  /* The block's Copy in its top corner, over the text. */
+  .code {
+    position: relative;
+  }
+
+  .copy {
+    position: absolute;
+    inset-block-start: var(--space-2xs);
+    inset-inline-end: var(--space-2xs);
+  }
 }

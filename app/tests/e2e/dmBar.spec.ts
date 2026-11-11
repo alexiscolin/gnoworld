@@ -131,7 +131,7 @@ test.describe("a direct message's bar", () => {
     await barOf(page, 0).getByRole("button", { name: "More actions" }).click();
     await page.getByRole("menuitem", { name: "Edit" }).click();
     await expect(page.getByText("Editing a message")).toBeVisible();
-    await expect(field(page)).toHaveValue("my first words");
+    await expect(field(page)).toHaveText("my first words");
     await expect(field(page)).toBeFocused();
     await field(page).fill("my first words, fixed");
     await field(page).press("Enter");
@@ -139,7 +139,7 @@ test.describe("a direct message's bar", () => {
     await expect(lines(page).nth(0)).toContainText("my first words, fixed");
     await expect(lines(page).nth(0)).toContainText(/Edited/);
     await expect(page.getByText("Editing a message")).toHaveCount(0);
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     expect(dm.says()).toEqual([
       `PRIVMSG ${PARTNER} :my first words`,
       `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :my first words, fixed`,
@@ -155,17 +155,17 @@ test.describe("a direct message's bar", () => {
     await write(page, "keep me");
     await field(page).fill("a draft in progress");
     await startEdit(page, 0);
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
     await field(page).fill("keep me, typed in the edit");
     await field(page).press("Escape");
     await expect(page.getByText("Editing a message")).toHaveCount(0);
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     await expect(field(page)).toBeFocused();
     await startEdit(page, 0);
     await field(page).fill("keep me, typed again");
     await page.getByRole("button", { name: "Cancel the edit" }).click();
     await expect(page.getByText("Editing a message")).toHaveCount(0);
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     await expect(field(page)).toBeFocused();
     expect(dm.says()).toEqual([`PRIVMSG ${PARTNER} :keep me`]);
   });
@@ -178,7 +178,7 @@ test.describe("a direct message's bar", () => {
     await field(page).fill("keep me, fixed");
     await field(page).press("Enter");
     await expect(lines(page).nth(0)).toContainText("keep me, fixed");
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     expect(dm.says()).toEqual([
       `PRIVMSG ${PARTNER} :keep me`,
       `@+gnoworld/edit=echo1 PRIVMSG ${PARTNER} :keep me, fixed`,
@@ -196,7 +196,7 @@ test.describe("a direct message's bar", () => {
     await field(page).press("Enter");
     await expect(lines(page).nth(0)).toContainText("second words");
     await startEdit(page, 0);
-    await expect(field(page)).toHaveValue("second words");
+    await expect(field(page)).toHaveText("second words");
     await field(page).fill("third words");
     await field(page).press("Enter");
     await expect(lines(page).nth(0)).toContainText("third words");
@@ -264,7 +264,7 @@ test.describe("a direct message's bar", () => {
     await field(page).press("Enter");
     await expect(page.getByText(`Not sent: ${SHORT} is not online.`, { exact: true })).toBeVisible();
     await expect(page.getByText("Editing a message")).toBeVisible();
-    await expect(field(page)).toHaveValue("as written, fixed");
+    await expect(field(page)).toHaveText("as written, fixed");
     await expect(lines(page)).toHaveCount(1);
     await expect(lines(page).nth(0)).toContainText("as written");
     await expect(lines(page).nth(0)).not.toContainText("as written, fixed");
@@ -283,7 +283,7 @@ test.describe("a direct message's bar", () => {
     await field(page).fill("yes");
     await field(page).press("Enter");
     await expect(page.getByText(`Not sent: ${SHORT} is not online.`, { exact: true })).toBeVisible();
-    await expect(field(page)).toHaveValue("yes");
+    await expect(field(page)).toHaveText("yes");
     await expect(page.getByText(`Replying to ${SHORT}: are you coming?`)).toBeVisible();
     await expect(lines(page)).toHaveCount(1);
     await field(page).press("Enter");

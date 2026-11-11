@@ -14,6 +14,7 @@ import {
   makeLogin,
   makeSigned,
   NONCE_ACTION,
+  NONCE_LINK,
   NONCE_HOST,
   verifyProof,
   type Login,
@@ -35,7 +36,7 @@ afterEach(() => {
 });
 
 const setup = (options: { verify?: Verify; nonceCap?: number } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
   opened.push(db);
   const clock = { now: T0 };
   const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -57,7 +58,7 @@ describe("the nonces' table", () => {
       const file = join(folder, "gnoworld.sqlite");
       // As 3c and 3d made it: their migrations, in their order.
       openDatabase(file, [LOGIN_TABLES, TICKET_TABLES]).close();
-      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
       try {
         const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
         expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
@@ -807,7 +808,7 @@ describe("a signed action", () => {
   const HEAD = ["Change gnoworld's settings (admin, version 1)", "", "Jarvis: the daily quota is 20 questions"];
   const ACTION = '{"setting":"quota","questions":20}';
   const signedSetup = (options: { verify?: Verify } = {}) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const clock = { now: T0 };
     const signed = makeSigned(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -825,7 +826,7 @@ describe("a signed action", () => {
     try {
       const file = join(folder, "gnoworld.sqlite");
       openDatabase(file, [LOGIN_TABLES, NONCE_HOST]).close();
-      const db = openDatabase(file, [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+      const db = openDatabase(file, [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
       try {
         const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
         challenge(login);
@@ -944,7 +945,7 @@ describe("a signed action", () => {
   });
 
   it("issues an action's nonce for the chains the login takes alone, under the same cap", () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const signed = makeSigned(db, { chains: CHAINS, now: () => T0, nonceCap: 2 });
     const login = makeLogin(db, { chains: CHAINS, now: () => T0, nonceCap: 2 });
@@ -962,7 +963,7 @@ describe("a signed action", () => {
 describe("the admin console's login", () => {
   const CONSOLE = "admin.gnoworld.test";
   const consoleSetup = () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const clock = { now: T0 };
     const now = () => clock.now;

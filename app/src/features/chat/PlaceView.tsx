@@ -25,6 +25,19 @@ const FOLD_MS = 400;
 const worldOf = (place: ChatPlace): string =>
   place.earth === true ? EARTH : place.realm === undefined ? hubWorldOf(place) : worldIdOf(place.realm);
 
+/** The view's bar: the place's buttons and the control that closes the full chat. It stands alone over the search panel, which takes the rest
+ * of the info column, so opening the search moves no button. */
+export function PlaceBar({ buttons, close }: { buttons: ReactNode; close: ReactNode }) {
+  return (
+    <div className={styles["bar"]}>
+      <Cluster justify="between">
+        <Cluster space="xs">{buttons}</Cluster>
+        {close}
+      </Cluster>
+    </div>
+  );
+}
+
 export function PlaceView({ place, buttons, close }: { place: ChatPlace; buttons: ReactNode; close: ReactNode }) {
   const [shown, show] = usePlanetShown();
   const [drawn, setDrawn] = useState(shown);
@@ -35,12 +48,7 @@ export function PlaceView({ place, buttons, close }: { place: ChatPlace; buttons
   if (!useFull()) return null;
   return (
     <section aria-label="The place in space" className={styles["view"]} data-shown={shown ? "" : undefined}>
-      <div className={styles["bar"]}>
-        <Cluster justify="between">
-          <Cluster space="xs">{buttons}</Cluster>
-          {close}
-        </Cluster>
-      </div>
+      <PlaceBar buttons={buttons} close={close} />
       <div className={styles["handle"]} data-shown={shown ? "" : undefined}>
         <Cluster justify="center">
           <IconButton

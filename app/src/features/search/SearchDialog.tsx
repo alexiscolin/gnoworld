@@ -7,6 +7,7 @@ import { useEffect, type KeyboardEvent } from "react";
 import { placeOf, type UniverseView } from "../../places.ts";
 import { itemOf } from "./discover/realms.ts";
 import { useDiscover } from "./discover/useDiscover.ts";
+import { asksHandOff, handOff } from "./handOff.ts";
 import { onPaletteKey } from "./keys.ts";
 import { PaletteField } from "./PaletteField.tsx";
 import { DiscoverSheet, TypedSheet } from "./PaletteBody.tsx";
@@ -63,6 +64,12 @@ export default function SearchDialog({
       <div
         className={styles["palette"]}
         onKeyDown={(event) => {
+          const handing = handOff(palette.query);
+          if (handing !== undefined && asksHandOff(event)) {
+            event.preventDefault();
+            go(handing);
+            return;
+          }
           if (discovering) intoCards(event);
           onPaletteKey(event, { chosen, count: flat.length, active, choose, go, chat, copy, close });
         }}

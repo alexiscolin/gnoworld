@@ -1,4 +1,4 @@
-import { Address, StreamEvent } from "@gnoworld/schemas";
+import { Address, CardEvent, StreamEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
 import { logger } from "@gnoworld/service/log";
@@ -717,5 +717,127 @@ describe("the verdicts' stream, the max review", () => {
     expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
     expect((await rooms("#bubble", { peer: "203.0.113.8" })).response.status).toBe(200);
     expect((await open("rooms=%23bubble", { peer: "203.0.113.9" })).response.status).toBe(429);
+  });
+});
+
+// Link cards (slice 13, L3): their events go on the verdicts' stream, in its sequence of ids and its rings.
+const KEY = "a".repeat(64);
+// L3 (docs/plans/link-previews.md §3 step 4 and 5, §7 "stream/stream.ts"): a card's event goes on the verdicts' stream, in the verdicts' own
+// sequence of ids, so a client that comes back after a drop is told the cards it missed, and a card of a room it cannot read never.
+
+const cardsSetup = (
+  options: Parameters<typeof makeStream>[0] = {},
+  visible: (room: string) => boolean = () => true,
+) => {
+  const stream = makeStream(options);
+  streams.push(stream);
+  const app = makeApp(
+    logger("a-pepper-of-forty-characters-0123456789", () => true),
+    () => true,
+  );
+  app.route("/api/stream", stream.routes({ proxy: undefined, visible }));
+  const open = async (rooms: string, last?: string) => {
+    const response = await app.request(
+      `/api/stream?rooms=${encodeURIComponent(rooms)}`,
+      { headers: last === undefined ? {} : { "last-event-id": last } },
+      { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+    );
+    const reader = response.body?.getReader();
+    let text = "";
+    // The frames read so far, as event name, id and data, reading on until there are `count` of that event or the stream ends.
+    const frames = async (event: string, count: number) => {
+      const all = (): { id: string; event: string; data: unknown }[] =>
+        [...text.matchAll(/id: (\d+)\nevent: (\w+)\ndata: (.*)\n\n/g)].map(([, id = "", name = "", data = ""]) => ({
+          id,
+          event: name,
+          data: JSON.parse(data) as unknown,
+        }));
+      for (;;) {
+        const found = all().filter((frame) => frame.event === event);
+        const chunk: { done: boolean; value?: Uint8Array } | undefined =
+          found.length >= count ? undefined : await reader?.read();
+        if (chunk === undefined || chunk.done) return found;
+        text += new TextDecoder().decode(chunk.value);
+      }
+    };
+    return { frames, raw: () => text, cancel: () => reader?.cancel() };
+  };
+  return { stream, open };
+};
+
+describe("the stream's card events", () => {
+  it("sends a card event to the readers of its room, named `card`, with its key, and never another room's", async () => {
+    const { stream, open } = cardsSetup();
+    const client = await open("#bubble,#earth");
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    stream.card({ msgid: "m2", room: "#elsewhere", key: KEY });
+    stream.card({ msgid: "m3", room: "#earth", key: null });
+    const frames = await client.frames("card", 2);
+    expect(frames.map(({ data }) => CardEvent.parse(data))).toEqual([
+      { msgid: "m1", room: "#bubble", key: KEY },
+      { msgid: "m3", room: "#earth", key: null },
+    ]);
+  });
+
+  it("sends nothing of a room the reader may not read, a card event included", async () => {
+    const { stream, open } = cardsSetup({}, (room) => room !== "#bubble/crew");
+    const client = await open("#bubble/crew,#bubble");
+    stream.card({ msgid: "m1", room: "#bubble/crew", key: KEY });
+    stream.card({ msgid: "m2", room: "#bubble", key: KEY });
+    const frames = await client.frames("card", 1);
+    expect(frames.map(({ data }) => (data as { msgid: string }).msgid)).toEqual(["m2"]);
+    expect(client.raw()).not.toContain("m1");
+  });
+
+  it("shares the verdicts' ids, in order, so one Last-Event-ID covers verdicts and cards alike", async () => {
+    const { stream, open } = cardsSetup();
+    const client = await open("#bubble");
+    stream.publish({ msgid: "m1", room: "#bubble", state: "checked" });
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    stream.publish({ msgid: "m2", room: "#bubble", state: "hidden" });
+    const [card] = await client.frames("card", 1);
+    const verdicts = await client.frames("verdict", 2);
+    const ids = [verdicts[0]?.id, card?.id, verdicts[1]?.id].map(Number);
+    expect(ids[0]).toBeLessThan(ids[1] ?? 0);
+    expect(ids[1]).toBeLessThan(ids[2] ?? 0);
+  });
+
+  it("replays the cards a client missed after a reconnect, and only those after its Last-Event-ID", async () => {
+    const { stream, open } = cardsSetup();
+    const first = await open("#bubble");
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    const [seen] = await first.frames("card", 1);
+    await first.cancel();
+    stream.card({ msgid: "m2", room: "#bubble", key: "b".repeat(64) });
+    stream.card({ msgid: "m3", room: "#bubble", key: null });
+    const back = await open("#bubble", seen?.id);
+    const frames = await back.frames("card", 2);
+    expect(frames.map(({ data }) => (data as { msgid: string }).msgid)).toEqual(["m2", "m3"]);
+  });
+
+  it("replays a new client the room's last cards with its last verdicts, a removal included, so a late reader hides a card taken away", async () => {
+    const { stream, open } = cardsSetup();
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    stream.card({ msgid: "m1", room: "#bubble", key: null });
+    const client = await open("#bubble");
+    const frames = await client.frames("card", 2);
+    expect(frames.map(({ data }) => (data as { key: string | null }).key)).toEqual([KEY, null]);
+  });
+
+  it("keeps card events in the room's ring, which stays bounded: the oldest of more than the pending cap is gone", async () => {
+    const { stream, open } = cardsSetup({ pending: 4 });
+    for (let n = 0; n < 10; n += 1) stream.card({ msgid: `m${String(n)}`, room: "#bubble", key: KEY });
+    expect(stream.size().events).toBeLessThanOrEqual(4);
+    const client = await open("#bubble");
+    const frames = await client.frames("card", 4);
+    expect(frames.map(({ data }) => (data as { msgid: string }).msgid)).toEqual(["m6", "m7", "m8", "m9"]);
+  });
+
+  it("drops a client that leaves card events unread, as it does for verdicts", async () => {
+    const { stream, open } = cardsSetup({ pending: 2 });
+    const client = await open("#bubble");
+    for (let n = 0; n < 50; n += 1) stream.card({ msgid: `m${String(n)}`, room: "#bubble", key: KEY });
+    await client.cancel();
+    expect(stream.size().clients).toBeLessThanOrEqual(1);
   });
 });

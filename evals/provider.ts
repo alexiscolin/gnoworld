@@ -127,6 +127,11 @@ export default class JarvisProvider {
   private async run(one: Case, request: ReturnType<typeof requestOf>): Promise<Kept> {
     const jarvis = await this.jarvis(request.spent);
     const fakes = await this.startedFakes();
+    const explained = "ask" in one && "chain" in one.ask && "realm" in one.ask ? one.ask : undefined;
+    if ("recorded" in one && one.recorded !== undefined && explained?.chain !== undefined) {
+      const universe = universes().find((each) => each.chainId === explained.chain);
+      if (universe !== undefined) fakes.realms.set(`${universe.id} ${explained.realm}`, one.recorded);
+    }
     if ("chain" in one) {
       fakes.realms.set(`${one.digest.universe} ${one.digest.realm}`, one.chain);
       fakes.at.height = one.chain.height;

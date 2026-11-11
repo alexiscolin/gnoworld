@@ -48,7 +48,7 @@ for (const width of [390, 1280] as const) {
     );
     for (const name of ["pid", "option"]) {
       const box = card.getByRole("textbox", { name, exact: true });
-      await expect(box).toHaveValue("");
+      await expect(box).toHaveText("");
       await expect(box).toBeEditable();
     }
     // The card opens over the bar inside the dock: the bar stays on the screen, the card scrolls in its own box (design review, 9e-1).

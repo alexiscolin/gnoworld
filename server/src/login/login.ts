@@ -33,7 +33,16 @@ export const NONCE_ACTION = `
 ALTER TABLE nonces ADD COLUMN action TEXT;
 `;
 
-interface Expected {
+// A link's code (owners' moderation, part 2): its kind is the way it is proved, NULL for a login's and an admin change's,
+// the account that asked and the address to link. The two spends above take NULL alone, so no code stands for another.
+export const NONCE_LINK = `
+ALTER TABLE nonces ADD COLUMN kind TEXT CHECK (kind IN ('adena', 'cli'));
+ALTER TABLE nonces ADD COLUMN owner TEXT;
+ALTER TABLE nonces ADD COLUMN subject TEXT;
+CREATE INDEX nonces_by_owner ON nonces (owner) WHERE kind IS NOT NULL;
+`;
+
+export interface Expected {
   signer: Address;
   chainId: string;
   data: string;
@@ -43,6 +52,19 @@ export type Verify = (proof: Proof, expected: Expected) => Promise<boolean>;
 // The SDK's verifier says yes when told nothing to check (ADR-0002 §4): here all three are required.
 export const verifyProof: Verify = async (proof, { signer, chainId, data }) =>
   verifyArbitrarySignature(proof, { signer, chainId, data });
+
+// The verifier's answer, a refusal when it throws: the SDK's never does, but a proof must not depend on it.
+export async function verifies<P = Proof>(
+  verify: (proof: P, expected: Expected) => Promise<boolean>,
+  proof: P,
+  expected: Expected,
+): Promise<boolean> {
+  try {
+    return await verify(proof, expected);
+  } catch {
+    return false;
+  }
+}
 
 /** A text signed once: a nonce kept with the whole text the wallet signs, and with the action it stands for when it is
  * an admin's change, then the proof that spends it. */
@@ -97,16 +119,16 @@ export function makeSigned(
   const ttl = 5 * 60_000;
   const sql = {
     purgeNonces: db.prepare("DELETE FROM nonces WHERE expires_at <= ?"),
-    countNonces: db.prepare("SELECT count(*) AS n FROM nonces"),
+    countNonces: db.prepare("SELECT count(*) AS n FROM nonces WHERE kind IS NULL"),
     // ponytail: walks the table, n ≤ 2 × nonceCap (3.4 ms at 100,000, measured by the finding-verifier); the console's
     // calls are few, and the public path keeps the global count, so a flood costs it nothing more (Alexis, 10g-6).
-    countHost: db.prepare("SELECT count(*) AS n FROM nonces WHERE host = ?"),
+    countHost: db.prepare("SELECT count(*) AS n FROM nonces WHERE host = ? AND kind IS NULL"),
     addNonce: db.prepare("INSERT INTO nonces (nonce, chain, host, text, action, expires_at) VALUES (?, ?, ?, ?, ?, ?)"),
     spendLogin: db.prepare(
-      "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NULL RETURNING chain, text",
+      "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NULL AND kind IS NULL RETURNING chain, text",
     ),
     spendAction: db.prepare(
-      "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NOT NULL RETURNING chain, text, action",
+      "DELETE FROM nonces WHERE nonce = ? AND host = ? AND expires_at > ? AND action IS NOT NULL AND kind IS NULL RETURNING chain, text, action",
     ),
   };
   // Spent before the first await: a nonce buys one attempt, and the same proof twice at once one success.
@@ -118,12 +140,7 @@ export function makeSigned(
     const spent = spend.get(nonce, host, now());
     if (spent === undefined) return "nonce";
     const row = Row.parse(spent);
-    let valid = false;
-    try {
-      valid = await verify(proof, { signer: address, chainId: row.chain, data: row.text });
-    } catch {
-      // A verifier that fails refuses; the SDK's never throws, but the login must not depend on it.
-    }
+    const valid = await verifies(verify, proof, { signer: address, chainId: row.chain, data: row.text });
     return valid ? row : "proof";
   };
   return {

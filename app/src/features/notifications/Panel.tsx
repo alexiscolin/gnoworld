@@ -111,7 +111,7 @@ export function Panel({
   );
   const open = (item: Item) => {
     markRead([item.id]);
-    if (item.external === true) leaving.ask(item.href);
+    if (item.external === true && item.href !== undefined) leaving.ask(item.href);
     else onClose();
   };
   // In the top layer, over the dock and its full chat alike; it closes itself (useDismiss), so the browser's light dismiss is not asked.

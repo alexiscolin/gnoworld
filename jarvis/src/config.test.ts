@@ -891,7 +891,7 @@ describe("the networks", () => {
     expect(networksOf("jarvis_reader")).toEqual(["reader", "reader_out"]);
     expect(on("reader")).toEqual(["jarvis", "jarvis_reader"]);
     expect(on("reader_out")).toEqual(["guard", "jarvis_reader"]);
-    expect(networksOf("server")).toEqual(["admin", "inside", "jarvis"]);
+    expect(networksOf("server")).toEqual(["admin", "inside", "jarvis", "links"]);
     expect(on("jarvis")).toEqual(["jarvis", "server"]);
     expect(on("jarvis_out")).toEqual(["guard", "jarvis"]);
     expect(on("admin")).toEqual(["server"]);
@@ -960,7 +960,7 @@ describe("jarvis's way out", () => {
     expect(setting("jarvis", "HTTPS_PROXY")).toBe("${JARVIS_EGRESS_PROXY:-http://guard:4751}");
     expect(setting("jarvis", "NODE_USE_ENV_PROXY")).toBe('"1"');
     expect(read("deploy/egress/Dockerfile")).toMatch(
-      /^COPY deploy\/egress\/config\.yaml deploy\/egress\/acl\.yaml deploy\/egress\/jarvis-acl\.yaml deploy\/egress\/reader-acl\.yaml \/out\/etc\/$/m,
+      /^COPY deploy\/egress\/config\.yaml deploy\/egress\/acl\.yaml deploy\/egress\/jarvis-acl\.yaml deploy\/egress\/reader-acl\.yaml deploy\/egress\/links-acl\.yaml \/out\/etc\/$/m,
     );
     expect(read(".dockerignore").split("\n")).toContain("!deploy/egress/jarvis-acl.yaml");
   });

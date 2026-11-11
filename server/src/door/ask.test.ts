@@ -1,6 +1,13 @@
 import { createHmac } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { Address, toAddress, type JarvisAnswer, type JarvisAsk, type JarvisPaidAnswer } from "@gnoworld/schemas";
+import {
+  Address,
+  EXPLAIN_VERSION,
+  toAddress,
+  type JarvisAnswer,
+  type JarvisAsk,
+  type JarvisPaidAnswer,
+} from "@gnoworld/schemas";
 import { afterEach, describe, expect, it } from "vitest";
 import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
@@ -9,6 +16,7 @@ import { askRoutes } from "./ask.ts";
 import type { Jarvis } from "./jarvis.ts";
 import { DAY_TABLES, makeDay, SHARE } from "./day.ts";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
+import { KEPT_TABLES, makeKept } from "./kept.ts";
 import { makeServed } from "./served.ts";
 
 // 10g: POST /api/jarvis/ask, each check before any work, in the brief's order (D42, D43, D44, D93).
@@ -72,7 +80,7 @@ const setup = ({
   last = "m1",
   empty = false,
 }: Options = {}) => {
-  const db = openDatabase(":memory:", [QUOTA_TABLES, DAY_TABLES]);
+  const db = openDatabase(":memory:", [QUOTA_TABLES, DAY_TABLES, KEPT_TABLES]);
   opened.push(db);
   const clock = { now: T0 };
   const quota = makeQuota(db, { first: { quota: 20, quotaUnnamed: 5, unlimited: [] }, now: () => clock.now });
@@ -81,6 +89,7 @@ const setup = ({
   const tail: { last: string | undefined | null } = { last };
   const day = makeDay(db, { now: () => clock.now });
   const served = makeServed({ now: () => clock.now });
+  const kept = makeKept(db, { now: () => clock.now });
   const lines: string[] = [];
   const log = logger(PEPPER, (line) => lines.push(line));
   const work: string[] = [];
@@ -111,6 +120,9 @@ const setup = ({
       quota,
       day,
       served,
+      kept,
+      chainOf: () => "gnoland-1",
+      defaultChain: () => "gnoland-1",
       heard: () => heard,
       signedAt: () => (age === null ? undefined : clock.now - age),
       last: () => (tail.last === null ? undefined : tail.last),
@@ -154,7 +166,7 @@ const setup = ({
   // The log's lines, their time left out.
   const events = () => lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{"));
   const counted = () => db.prepare("SELECT account, day, count FROM jarvis_asked").all();
-  return { app, recall, ask, clock, tail, quota, day, served, work, sent, events, counted, logged: lines };
+  return { app, recall, ask, clock, tail, quota, day, served, kept, work, sent, events, counted, logged: lines };
 };
 const answerOf = async (response: Response) => [response.status, await response.json()];
 // A promise settled from outside, for a call in flight.
@@ -452,7 +464,11 @@ describe("Jarvis's guards before any model call", () => {
       const { ask, sent } = setup({ perMinute: 100 });
       for (const body of [HERE, CATCH_UP, EXPLAIN]) await passed(await ask({ body }));
       expect(sent.map(({ request }) => request)).toEqual(
-        [HERE, CATCH_UP, EXPLAIN].map((body) => ({ ...body, lines: LINES() })),
+        [HERE, CATCH_UP, EXPLAIN].map((body) => ({
+          ...body,
+          lines: body === EXPLAIN ? [] : LINES(),
+          ...(body === EXPLAIN ? { chain: "gnoland-1" } : {}),
+        })),
       );
     });
 
@@ -473,12 +489,18 @@ describe("Jarvis's guards before any model call", () => {
       expect(work.slice(-2)).toEqual(["read #bubble", "read #bubble"]);
       clock.now += 10 * MINUTE;
       await ask({ body: HERE });
+      expect(sent).toHaveLength(1);
+      clock.now += 50 * MINUTE;
+      await ask({ body: HERE });
       expect(sent).toHaveLength(2);
       expect([day.paused(ANNA), day.paused(BEN)]).toEqual([false, false]);
     });
 
-    it("are served by room for `here`, by room, realm and function for `function`, by room and last line for `catch-up`", async () => {
-      const { ask, sent } = setup({ perMinute: 100 });
+    it("are served by room for `here`, by chain, realm and function for `function` in every room, by room and last line for `catch-up`", async () => {
+      const { ask, sent } = setup({
+        perMinute: 100,
+        answer: () => Promise.resolve({ ok: true, answer: { ...PAID(), keep: true, version: EXPLAIN_VERSION } }),
+      });
       const other = { room: "#other" };
       const bodies = [
         HERE,
@@ -491,7 +513,8 @@ describe("Jarvis's guards before any model call", () => {
         { ...CATCH_UP, ...other },
       ];
       for (const body of [...bodies, ...bodies]) await ask({ body });
-      expect(sent).toHaveLength(bodies.length);
+      // The function of another room is the same explanation.
+      expect(sent).toHaveLength(bodies.length - 1);
     });
 
     it("serve a `catch-up` again only while the room's last line is the same", async () => {
@@ -1234,10 +1257,11 @@ describe("Jarvis's guards, step 4", () => {
 
   it("keeps no answer whose call began before its room's lines changed", async () => {
     const held = deferred<Asked>();
-    const { ask, sent, served } = setup({ perMinute: 100, answer: () => held.promise });
+    const { ask, sent, served, kept } = setup({ perMinute: 100, answer: () => held.promise });
     const first = ask({ body: HERE });
     await expect.poll(() => sent.length).toBe(1);
     served.drop("#bubble");
+    kept.drop("#bubble");
     held.resolve({ ok: true, answer: PAID() });
     await first;
     await ask({ body: HERE, token: BEN_TOKEN });

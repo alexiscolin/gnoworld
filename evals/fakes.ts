@@ -27,16 +27,26 @@ const reply = (response: ServerResponse, status: number, body: unknown = {}): vo
 const fromHex = (url: URL) => Buffer.from((url.searchParams.get("data") ?? "").replace(/^0x/, ""), "hex").toString();
 const REFUSED = () => queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } });
 
-// A universe's node, as the chain package reads it: its status naming its chain, a held realm's page and functions.
+// A realm's recorded source for a file query naming the realm's path, or a file under it.
+// ponytail: gno_read's query shape (vm/qfile, the realm's path, a file under it) is not read live yet; the first run with the key says.
+const sourceOf = (fakes: Held, data: string): string | undefined =>
+  [...fakes.realms].find(([name]) => data.startsWith(name.split(" ")[1] ?? "\0"))?.[1].source;
+
+// What a query of a universe's node holds: a realm's page (vm/qrender), its source (vm/qfile) or its functions (vm/qfuncs).
+function dataOf(fakes: Held, universe: string, { path, data }: { path: string; data: string }): string | undefined {
+  const realm = (name: string) => fakes.realms.get(`${universe} ${name}`);
+  if (path.includes("qrender")) return realm(data.replace(/:.*$/, ""))?.page;
+  if (path.includes("qfile")) return sourceOf(fakes, data);
+  const functions = path.includes("qfuncs") ? realm(data) : undefined;
+  return functions === undefined ? undefined : JSON.stringify(functions.functions);
+}
+
+// A universe's node, as the chain package reads it: its status naming its chain, a held realm's page, source and functions.
 function nodeAnswer(fakes: Held, chains: ReadonlyMap<string, string>, url: URL): unknown {
   const [, universe = "", route = ""] = /^\/node\/([a-z0-9-]+)\/(.*)$/.exec(url.pathname) ?? [];
   if (route === "status") return statusEnvelope(fakes.at.height, "2026-11-05T00:00:00Z", chains.get(universe));
-  const path = url.searchParams.get("path") ?? "";
-  const data = fromHex(url);
-  const page = path.includes("qrender") ? fakes.realms.get(`${universe} ${data.replace(/:.*$/, "")}`) : undefined;
-  if (page !== undefined) return queryEnvelope({ data: page.page });
-  const functions = path.includes("qfuncs") ? fakes.realms.get(`${universe} ${data}`) : undefined;
-  return functions === undefined ? REFUSED() : queryEnvelope({ data: JSON.stringify(functions.functions) });
+  const data = dataOf(fakes, universe, { path: url.searchParams.get("path") ?? "", data: fromHex(url) });
+  return data === undefined ? REFUSED() : queryEnvelope({ data });
 }
 
 // A batch of jarvis's spans: JSON by its type and its text, under the cap.

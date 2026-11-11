@@ -4,6 +4,7 @@
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
+import { lazyCards } from "../../lib/stream/lazyCards.ts";
 import { lazyChain } from "../../lib/stream/lazyChain.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
@@ -13,6 +14,9 @@ type Linked = (text: string) => boolean;
 // Outside the hook, which the React Compiler cannot lower an import() in.
 const loadLinked = () => import("./linked.ts");
 const loadFeed = () => import("../../lib/stream/chainFeed.ts");
+const loadCardFeed = () => import("../../lib/stream/cardFeed.ts");
+const loadCardsSlice = () => import("./cardsSlice.ts");
+const loadCardsApi = () => import("../../lib/api/cards.ts");
 type Store = ReturnType<typeof createAppStore>;
 
 /** The room shown, its lines once loaded, and who reads it: an account's address, or none for a guest. */
@@ -35,16 +39,34 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
     const api = pageVerdictsApi();
     // The world's calls on chain and the Earth's count come on the same stream, into the store in batches (9g).
     const feed = lazyChain(async () => (await loadFeed()).chainFeed(store.getState().chainActions));
+    // The cards' events (link-previews L4) wait for their feed's chunk in their order.
+    const card = lazyCards(async () => {
+      const [{ cardFeed }, { addCards }] = await Promise.all([loadCardFeed(), loadCardsSlice()]);
+      return cardFeed((events) => {
+        addCards(store).told(events);
+      });
+    });
     const asker = verdictAsker({
       verdicts: api.verdicts,
+      cards: async (room, ids) => (await loadCardsApi()).pageCardsApi().lines(room, ids),
+      carded: (events) => {
+        if (events.length > 0)
+          void loadCardsSlice().then(
+            ({ addCards }) => {
+              addCards(store).asked(events);
+            },
+            () => undefined,
+          );
+      },
       ...store.getState().verdictActions,
       signal: store.getState().signalActions.signaled,
       held: (room) => store.getState().verdicts[room],
-      follow: (room, on) => pageVerdicts([room], { ...on, chain: feed.chain, realms: feed.realms }),
+      follow: (room, on) => pageVerdicts([room], { ...on, chain: feed.chain, realms: feed.realms, card }),
       linked: (text) => linkedRef.current?.(text) ?? false,
     });
     askerRef.current = asker;
     return () => {
+      card.stop();
       asker.stop();
       feed.stop();
       // A stopped asker given a room follows it again: none is left for the lines' effect to find.

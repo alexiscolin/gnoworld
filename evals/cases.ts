@@ -34,18 +34,31 @@ const Recorded = z.strictObject({
   height: z.int().positive(),
   page: z.string().max(200 * 1024),
   functions: wire(FunctionList),
+  // The realm's source as gno_read reads it, for the asks that explain a function (D13920): one file, as its author wrote it.
+  source: z
+    .string()
+    .max(200 * 1024)
+    .optional(),
 });
 /** A realm as a recorded node holds it at one height: its page and its functions (vm/qrender, vm/qfuncs), written in
  * its case or named from chains/, the case's words after its page. */
 export const Chain = z.union([
   Recorded,
   z
-    .strictObject({ recorded: z.string().regex(/^[a-z0-9-]+$/), then: z.string().min(1).optional() })
-    .transform(({ recorded, then = "" }) => {
+    .strictObject({
+      recorded: z.string().regex(/^[a-z0-9-]+$/),
+      then: z.string().min(1).optional(),
+      source: z
+        .string()
+        .min(1)
+        .max(200 * 1024)
+        .optional(),
+    })
+    .transform(({ recorded, then = "", source }) => {
       const chain = Recorded.parse(
         JSON.parse(readFileSync(new URL(`chains/${recorded}.json`, import.meta.url), "utf8")),
       );
-      return { ...chain, page: chain.page + then };
+      return { ...chain, page: chain.page + then, ...(source === undefined ? {} : { source }) };
     }),
 ]);
 export type Chain = z.infer<typeof Chain>;
@@ -61,7 +74,8 @@ const common = {
   expect: Expect,
 };
 export const Case = z.union([
-  z.strictObject({ ...common, ask: wire(JarvisAsk) }),
+  // `recorded`: the realm an explained function belongs to, as the run's node holds it.
+  z.strictObject({ ...common, ask: wire(JarvisAsk), recorded: Chain.optional() }),
   z.strictObject({ ...common, translate: wire(JarvisTranslate) }),
   z.strictObject({ ...common, digest: wire(JarvisDigestRequest), chain: Chain }),
 ]);
