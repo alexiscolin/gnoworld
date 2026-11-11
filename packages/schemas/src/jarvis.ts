@@ -5,7 +5,7 @@
 // the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
 // since 10k, a line's translation and a realm's digest.
 import { Address } from "./address.ts";
-import { CALL_CAPS, CallArgs, Key, RealmPath } from "./data.ts";
+import { CALL_CAPS, CallArgs, funcName, Key, RealmPath } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
 import { PinId } from "./pins.ts";
 import { RoomId } from "./rooms.ts";
@@ -87,25 +87,64 @@ export const DOOR_CAPS = {
   unlimited: 1000,
 } as const;
 
-/** A question asked from a room: the server holds it to its own cap and adds the room's lines (D42). */
-export const JarvisQuestion = z.strictObject({ question: text(DOOR_CAPS.question), room: RoomId });
+/** The room's lines a question carries to jarvis at most, and the bytes of their text (Alexis, 10g-1). */
+export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
+
+// A person's own question, which the server holds to its own cap; and the fixed asks (D13985), whose words are Jarvis's own,
+// so a page sets none of them and one answer serves everyone who asks the same at the same place.
+const Own = { question: text(DOOR_CAPS.question), room: RoomId };
+const Here = { ask: z.literal("here"), room: RoomId };
+const CatchUp = { ask: z.literal("catch-up"), room: RoomId };
+const Explain = { ask: z.literal("function"), room: RoomId, realm: RealmPath, function: funcName(JARVIS_CAPS.name) };
+
+/** What a person asks Jarvis from a room: a question of their own, or a fixed ask: what can be done here, the room caught up,
+ * a realm's function explained. The server adds the room's lines (D42). */
+export const JarvisQuestion = z.union([
+  z.strictObject(Own),
+  z.strictObject(Here),
+  z.strictObject(CatchUp),
+  z.strictObject(Explain),
+]);
 export type JarvisQuestion = z.infer<typeof JarvisQuestion>;
 
-/** Jarvis's answer as the client reads it: a text and its buttons; or `spent`, the day's budget gone, or `off`, Jarvis
- * switched off, when the client shows its form without a model (plan §1; Alexis, off by default). */
-export const JarvisAnswer = z.discriminatedUnion("status", [
-  z.strictObject({
-    status: z.literal("answered"),
-    markdown: text(DOOR_CAPS.answer),
-    buttons: z.array(AnswerButton).check(z.maxLength(DOOR_CAPS.buttons)),
-  }),
+const Answered = {
+  status: z.literal("answered"),
+  markdown: text(DOOR_CAPS.answer),
+  buttons: z.array(AnswerButton).check(z.maxLength(DOOR_CAPS.buttons)),
+};
+const spentOrOffAnswer = [
   z.strictObject({ status: z.literal("spent") }),
   z.strictObject({ status: z.literal("off") }),
+] as const;
+
+/** Jarvis's answer as the client reads it: a text and its buttons; or, each answered by a fixed line or the page's form (D13985):
+ * `declined` (off its ground), `paused` (3 strikes today), `capped` (the person's share spent), `early` (an account too new or never
+ * heard), `busy` (the room's hour all asked), `spent` (the day's budget gone), `off` (switched off, by default). */
+export const JarvisAnswer = z.discriminatedUnion("status", [
+  z.strictObject(Answered),
+  z.strictObject({ status: z.literal("declined") }),
+  z.strictObject({ status: z.literal("paused") }),
+  z.strictObject({ status: z.literal("capped") }),
+  z.strictObject({ status: z.literal("early") }),
+  z.strictObject({ status: z.literal("busy") }),
+  ...spentOrOffAnswer,
 ]);
 export type JarvisAnswer = z.infer<typeof JarvisAnswer>;
 
-/** The room's lines a question carries to jarvis at most, and the bytes of their text (Alexis, 10g-1). */
-export const JARVIS_LINES = { lines: 30, bytes: 8192 } as const;
+/** What an answer cost, in millionths of a dollar. */
+const Cost = z.int().check(z.gte(0));
+
+/** An answer as jarvis gives the door, with its cost, which the door adds to the person's share and the page never reads (D13985):
+ * answered, declined, failed (it spent and gave nothing: its turns or tokens used, the model refusing or failing), spent (with what
+ * its turns had cost when the day's budget ran out mid-way), or off. */
+export const JarvisPaidAnswer = z.discriminatedUnion("status", [
+  z.strictObject({ ...Answered, cost: Cost }),
+  z.strictObject({ status: z.literal("declined"), cost: Cost }),
+  z.strictObject({ status: z.literal("failed"), cost: Cost }),
+  z.strictObject({ status: z.literal("spent"), cost: z.optional(Cost) }),
+  z.strictObject({ status: z.literal("off") }),
+]);
+export type JarvisPaidAnswer = z.infer<typeof JarvisPaidAnswer>;
 
 /** Where jarvis takes a question, and where its budgets are read and changed, on the network only it and the server
  * share (D42). */
@@ -113,17 +152,21 @@ export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets", translate: "/tra
 
 /** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each
  * by a number for who said it in this question alone, the asker 0, never an account (D91). */
-export const JarvisAsk = z.extend(JarvisQuestion, {
-  lines: z
-    .array(
-      z.strictObject({
-        speaker: z.int().check(z.gte(0), z.lte(JARVIS_LINES.lines)),
-        text: text(JARVIS_LINES.bytes),
-        time: z.optional(z.iso.datetime()),
-      }),
-    )
-    .check(z.maxLength(JARVIS_LINES.lines)),
-});
+const lines = z
+  .array(
+    z.strictObject({
+      speaker: z.int().check(z.gte(0), z.lte(JARVIS_LINES.lines)),
+      text: text(JARVIS_LINES.bytes),
+      time: z.optional(z.iso.datetime()),
+    }),
+  )
+  .check(z.maxLength(JARVIS_LINES.lines));
+export const JarvisAsk = z.union([
+  z.strictObject({ ...Own, lines }),
+  z.strictObject({ ...Here, lines }),
+  z.strictObject({ ...CatchUp, lines }),
+  z.strictObject({ ...Explain, lines }),
+]);
 export type JarvisAsk = z.infer<typeof JarvisAsk>;
 
 const count = (max: number) => z.int().check(z.gte(1), z.lte(max));

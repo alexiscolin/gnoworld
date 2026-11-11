@@ -5,9 +5,9 @@
 // 1 MiB and parsed with the client's own schema before anything passes it on; a failure is a value, never a hang.
 import {
   JARVIS_PATHS,
-  JarvisAnswer,
   JarvisBudgets,
   JarvisMadeDigest,
+  JarvisPaidAnswer,
   JarvisTranslation,
   type JarvisAsk,
   type JarvisBudget,
@@ -16,7 +16,7 @@ import {
 } from "@gnoworld/schemas";
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
 
-export type Failure = "down" | "slow" | "failed" | "shape" | "gone" | "refused";
+export type Failure = "down" | "lost" | "slow" | "failed" | "shape" | "gone" | "refused";
 
 // What a status jarvis answers with means, any other its failure: what its schemas refuse is the asker's request (400),
 // a jarvis starting or draining is not ready (503, D93), one past its own time slow (504) (F5314).
@@ -41,7 +41,7 @@ type Answered<A> = { ok: true; answer: A } | { ok: false; error: Failure };
 type Budgeted = { ok: true; budgets: JarvisBudgets } | { ok: false; error: Failure };
 
 export interface Jarvis {
-  ask: (request: JarvisAsk, signal: AbortSignal) => Promise<Answered<JarvisAnswer>>;
+  ask: (request: JarvisAsk, signal: AbortSignal) => Promise<Answered<JarvisPaidAnswer>>;
   translate: (request: JarvisTranslate, signal: AbortSignal) => Promise<Answered<JarvisTranslation>>;
   digest: (request: JarvisDigestRequest, signal: AbortSignal) => Promise<Answered<JarvisMadeDigest>>;
   budgets: () => Promise<Budgeted>;
@@ -52,11 +52,11 @@ const MAX_BYTES = 1024 * 1024;
 // A budget is read or changed by one SQLite statement: ten seconds is a jarvis that does not answer.
 const BUDGETS_MS = 10_000;
 
-// Why a call that threw failed: the request that asked gone, its own time out, or nothing that answered; a call answered
-// with no success failed, or was refused.
+// Why a call that threw failed: the request that asked gone, its own time out, or a connection lost or refused (`lost`,
+// told from a jarvis that answers 503, `down`); a call answered with no success failed, or was refused.
 function failureOf(error: unknown, signal: AbortSignal | undefined): Failure {
   if (signal?.aborted === true) return "gone";
-  return error instanceof Error && error.name === "TimeoutError" ? "slow" : "down";
+  return error instanceof Error && error.name === "TimeoutError" ? "slow" : "lost";
 }
 
 // The answer's value, or a failure: JSON of another shape, text that is no JSON or one too long.
@@ -104,7 +104,7 @@ export function jarvisClient({
     return called.ok ? { ok: true, answer: called.value } : called;
   };
   return {
-    ask: (body, signal) => posted(JarvisAnswer, JARVIS_PATHS.ask, { body, signal }),
+    ask: (body, signal) => posted(JarvisPaidAnswer, JARVIS_PATHS.ask, { body, signal }),
     translate: (body, signal) => posted(JarvisTranslation, JARVIS_PATHS.translate, { body, signal }),
     digest: (body, signal) => posted(JarvisMadeDigest, JARVIS_PATHS.digest, { body, signal }),
     budgets: async () => budgets(await call(JarvisBudgets, JARVIS_PATHS.budgets, { ms: BUDGETS_MS })),

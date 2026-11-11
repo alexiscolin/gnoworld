@@ -55,6 +55,8 @@ interface Attempts {
   readonly wait?: Wait | undefined;
   // The question's: once its asker left, nothing more is sent, waited for or retried (D177).
   readonly signal?: AbortSignal | undefined;
+  // The question's running total of what its attempts were charged, in nano-dollars, added to as each settles.
+  readonly paid?: { nano: number } | undefined;
 }
 type Called = { ok: true; answer: Anthropic.Message } | { ok: false; reason: "spent" | "failed" | "timeout" | "gone" };
 type Tried = Called | { ok: false; reason: "error"; error: AnthropicError };
@@ -121,8 +123,9 @@ function failedCost(error: unknown): 0 | undefined {
 }
 
 // What the budget charged, or nothing it could say for a hold already spent at its deadline.
-function settled({ budget, log }: Attempts, hold: { readonly id: number }, real: number | undefined) {
+function settled({ budget, log, paid }: Attempts, hold: { readonly id: number }, real: number | undefined) {
   const settlement = budget.settle(hold, real);
+  if (paid !== undefined && settlement.status !== "gone") paid.nano += settlement.charged;
   if (settlement.status !== "settled") log("jarvis_budget_settle", { reason: settlement.status });
   return settlement.status === "gone" ? undefined : settlement.charged;
 }

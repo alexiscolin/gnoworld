@@ -10,7 +10,7 @@ import {
   JarvisBudget,
   JarvisDigestRequest,
   JarvisTranslate,
-  type JarvisAnswer,
+  type JarvisPaidAnswer,
   type JarvisBudgets,
   type JarvisMadeDigest,
   type JarvisTranslation,
@@ -28,6 +28,8 @@ type Ask = (question: Question, signal: AbortSignal) => Promise<Result>;
 interface Parts {
   // The loop's ask, the translator's and the digests', or none while jarvis is off.
   readonly ask: Ask | undefined;
+  // The fast model's ask, for the fixed ask that catches a room up.
+  readonly catchUp?: Ask | undefined;
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
@@ -35,10 +37,10 @@ interface Parts {
   readonly log: Log;
 }
 
-const answered = (answer: JarvisAnswer): Reply => ({ status: 200, body: answer });
+const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answer });
 
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
-export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Routes {
+export function jarvisRoutes({ ask, catchUp, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
     const caps = budget.caps();
     return {
@@ -57,8 +59,9 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
         const asked = JarvisAsk.safeParse(body);
         if (!asked.success) return refused(JARVIS_PATHS.ask);
         if (ask === undefined) return answered({ status: "off" });
-        const { question, lines } = asked.data;
-        return replyOf(await ask({ text: question, room: lines.map(lineOf) }, signal), log);
+        const { question, run } = questionOf(asked.data);
+        const asking = run === "fast" && catchUp !== undefined ? catchUp : ask;
+        return replyOf(await asking(question, signal), log);
       },
     },
     [JARVIS_PATHS.translate]: {
@@ -94,22 +97,44 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
   };
 }
 
+// The fixed asks' words, Jarvis's own and constant (D13985): the page sets none of them. The place, and a function's
+// realm and name, go in as data blocks beside the room's lines.
+const HERE = "What can I do here, in this place? Say it briefly, with what the place's data tells.";
+const CATCH_UP = "Catch me up on this room: what was said, in a few short lines.";
+const EXPLAIN =
+  "Explain the function in the function block, of the realm it names: what it does and how to call it, briefly.";
+
+function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast" } {
+  const room = asked.lines.map(lineOf);
+  const place = { source: "place", text: asked.room };
+  if ("question" in asked) return { question: { text: asked.question, room, read: [place] }, run: "main" };
+  if (asked.ask === "catch-up") return { question: { text: CATCH_UP, room, read: [place] }, run: "fast" };
+  if (asked.ask === "here") return { question: { text: HERE, room, read: [place] }, run: "main" };
+  const named = { source: "function", text: `${asked.realm} ${asked.function}` };
+  return { question: { text: EXPLAIN, room, read: [place, named] }, run: "main" };
+}
+
 // A room's line as data: who said it (the asker, or the others by their number, D91), when, and its words, so its line
 // breaks and quotes pass for no other line (D176).
-const lineOf = ({ speaker, time, text }: JarvisAsk["lines"][number]): string =>
+const lineOf = ({ speaker, time, text }: { speaker: number; time?: string | undefined; text: string }): string =>
   JSON.stringify({ who: speaker === 0 ? "asker" : `#${String(speaker)}`, time, text });
 
 function replyOf(result: Result, log: Log): Reply {
   if (result.kind === "answer") {
     const markdown = cut(result.text, log);
-    // A text that draws nothing is no answer the wire can carry, nor one anybody could read.
+    // A text that draws nothing is no answer the wire can carry, but it was paid for.
     if (isBlank(markdown)) {
       log("jarvis_answer_empty");
-      return refusal("internal", 502);
+      return answered({ status: "failed", cost: result.cost });
     }
-    return answered({ status: "answered", markdown, buttons: result.cards.buttons.map(({ button }) => button) });
+    const buttons = result.cards.buttons.map(({ button }) => button);
+    return answered({ status: "answered", markdown, buttons, cost: result.cost });
   }
-  if (result.kind === "spent") return answered({ status: "spent" });
+  if (result.kind === "declined") return answered({ status: "declined", cost: result.cost });
+  if (result.kind === "spent")
+    return answered(result.cost === undefined ? { status: "spent" } : { status: "spent", cost: result.cost });
+  // Every other end that spent answers failed with its cost, which the door adds to the person's share (D13985).
+  if ("cost" in result) return answered({ status: "failed", cost: result.cost });
   return failureOf(result.kind);
 }
 

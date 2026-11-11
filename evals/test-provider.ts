@@ -68,6 +68,19 @@ await test("a case asks jarvis's real entry, gives its tools and cost, and is ke
   });
 });
 
+await test("a declined question is kept for the next run, with its status for the checks", async () => {
+  const steps = [message({ content: [toolUse("t1", "decline", {})], stop: "tool_use" })];
+  await withProvider(steps, async (provider, model) => {
+    const first = await provider.callApi("", VARS);
+    assert.equal(z.record(z.string(), z.unknown()).parse(first.metadata)["status"], "declined");
+    assert.ok(first.cost > 0);
+    const again = await provider.callApi("", VARS);
+    assert.equal(again.cached, true);
+    assert.equal(z.record(z.string(), z.unknown()).parse(again.metadata)["status"], "declined");
+    assert.equal(model.seen.length, 1);
+  });
+});
+
 await test("a failed answer is never kept: the next run asks again (10j's review, V4)", async () => {
   const steps = [
     { status: 400, error: "invalid_request_error" },

@@ -284,3 +284,56 @@ describe("a line of a room, by its id (10k, a translation's text)", () => {
     expect([recent.line("#first", "m1"), recent.line("#room9999", "m1")]).toEqual([undefined, "another room"]);
   });
 });
+
+describe("what the recent lines tell the door (D13985)", () => {
+  const spy = () => {
+    const heard: string[] = [];
+    const changed: string[] = [];
+    const recent = makeRecentLines({
+      isPublic: publicRooms,
+      heard: { said: (account) => heard.push(account) },
+      changed: (room) => changed.push(room),
+    });
+    return { recent, heard, changed };
+  };
+
+  it("hands on the account of a line that passed, in a public room or a members room", () => {
+    const { recent, heard } = spy();
+    recent.passed(said("m1", "hello"));
+    recent.passed(said("m2", "between us", { room: "#bubble/crew", account: BOB }));
+    expect(heard).toEqual([ALICE, BOB]);
+  });
+
+  it("hands on none for a line for the operators alone, an edit, or a line taken before it came", () => {
+    const { recent, heard } = spy();
+    recent.passed(said("m1", "to the operators", { few: true }));
+    recent.passed(said("m2", "an edit", { edits: "m0" }));
+    recent.taken("#bubble", "m3");
+    recent.passed(said("m3", "gone before"));
+    recent.edited(said("m5", "edited", { edits: "m4" }));
+    recent.passed(said("m4", "replaced before"));
+    expect(heard).toEqual([]);
+  });
+
+  it("keeps each room's last line id, a members room's too, moved by a line that passed alone", () => {
+    const { recent } = spy();
+    recent.passed(said("m1", "hello"));
+    recent.passed(said("m2", "between us", { room: "#bubble/crew" }));
+    recent.passed(said("m3", "few", { few: true }));
+    recent.passed(said("m4", "an edit", { edits: "m1" }));
+    expect([recent.last("#bubble"), recent.last("#bubble/crew"), recent.last("#earth")]).toEqual([
+      "m1",
+      "m2",
+      undefined,
+    ]);
+  });
+
+  it("tells the room of a line taken, and of a line its author replaced", () => {
+    const { recent, changed } = spy();
+    recent.passed(said("m1", "hello"));
+    recent.taken("#bubble", "m1");
+    recent.passed(said("m2", "one"));
+    recent.edited(said("m3", "two", { edits: "m2" }));
+    expect(changed).toEqual(["#bubble", "#bubble"]);
+  });
+});

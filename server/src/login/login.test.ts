@@ -590,6 +590,30 @@ describe("the token", () => {
     expect(login.session(made.token)).toBe(holds ? made.address : undefined);
   });
 
+  it("tells when a live token was signed, and nothing for an unknown, an ended or an expired one", async () => {
+    const { clock, login } = setup();
+    const made = await token(login);
+    clock.now += 5 * MINUTE;
+    expect(login.signedAt(made.token)).toBe(T0);
+    expect([login.signedAt(undefined), login.signedAt("a-token-nobody-holds")]).toEqual([undefined, undefined]);
+    clock.now = T0 + 90 * DAY;
+    expect(login.signedAt(made.token)).toBeUndefined();
+    const ended = await token(login);
+    login.logout(ended.token);
+    expect(login.signedAt(ended.token)).toBeUndefined();
+  });
+
+  it("keeps each token's own signing time when another login follows, and renews nothing by asking", async () => {
+    const { clock, login } = setup();
+    const first = await token(login);
+    clock.now += 20 * DAY;
+    expect(login.signedAt(first.token)).toBe(T0);
+    const later = await token(login);
+    expect([login.signedAt(first.token), login.signedAt(later.token)]).toEqual([T0, T0 + 20 * DAY]);
+    clock.now += 11 * DAY;
+    expect(login.signedAt(first.token)).toBeUndefined();
+  });
+
   it("renews on use for 30 days, and ends 90 days after its signature whatever the use", async () => {
     const { clock, login } = setup();
     const made = await token(login);

@@ -27,6 +27,8 @@ export interface Quota {
   // A question given back to the day of `at`, the time it was taken (now by default): a digest jarvis made nothing for
   // costs none (10k-1).
   giveBack: (account: Address, at?: number) => void;
+  // Whether the account is on the allowlist (the share and the first-ask check skip it).
+  unlimited: (account: Address) => boolean;
   values: () => QuotaValues;
   // A quota, or an account's own taken off or given back; full past the allowlist's cap.
   change: (change: Exclude<JarvisChange, { setting: "budget" }>) => "changed" | "full";
@@ -55,6 +57,7 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
     allow: db.prepare(`INSERT INTO jarvis_unlimited (address, added_at) SELECT :address, :at
       WHERE (SELECT count(*) FROM jarvis_unlimited) < :cap OR EXISTS (SELECT 1 FROM jarvis_unlimited WHERE address = :address)
       ON CONFLICT (address) DO UPDATE SET added_at = added_at RETURNING 1`),
+    isUnlimited: db.prepare("SELECT 1 FROM jarvis_unlimited WHERE address = ?"),
     limit: db.prepare("DELETE FROM jarvis_unlimited WHERE address = ?"),
     // The quota of the account's kind and the allowlist read, the count added to and refused, in one statement.
     take: db.prepare(`INSERT INTO jarvis_asked (account, day, count) VALUES (:account, :day, 1)
@@ -84,6 +87,7 @@ export function makeQuota(db: DatabaseSync, { first, now }: { first: QuotaValues
     giveBack(account, at = now()) {
       sql.giveBack.run(account, dayOf(at));
     },
+    unlimited: (account) => sql.isUnlimited.get(account) !== undefined,
     values() {
       const rows = Rows.parse(sql.settings.all());
       const { quota, quota_unnamed: quotaUnnamed } = Values.parse(

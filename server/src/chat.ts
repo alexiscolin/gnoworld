@@ -56,6 +56,8 @@ export interface Chat extends ReturnType<typeof guestFor> {
   // A public room's last lines moderation let through, for Jarvis's door (10g), and one by its id (10k).
   recent: RecentLines["recent"];
   line: RecentLines["line"];
+  // A room's last line's id, any room (D13985).
+  last: RecentLines["last"];
   stop: () => Promise<void>;
 }
 
@@ -93,6 +95,8 @@ export interface Options {
   redactRetryMs?: number;
   // The file who-is-here keeps its history in (7h); none keeps none.
   presence?: string;
+  // What the lines that pass tell Jarvis's door (D13985): the account of each, and the room of a line taken or edited.
+  door?: { heard: { said: (account: string) => void }; changed: (room: string) => void };
 }
 
 // A world's rooms at most, its main room aside (3l).
@@ -159,7 +163,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
   const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
-  const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room) });
+  const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room), ...options.door });
   const passed = passedLines({ roles: settings, recent, stream, signals: options.signals });
   const run = moderate({ db, check, send, stream, progress, strike, passed });
   const queue = makeQueue<Said>({ run, log, now });
@@ -211,6 +215,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     ...presentOf(present),
     recent: recent.recent,
     line: recent.line,
+    last: recent.last,
     stop: async () => {
       clearInterval(lifts);
       clearInterval(passes);

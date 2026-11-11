@@ -44,8 +44,8 @@ describe("loadJarvisConfig", () => {
     expect(rest).toEqual({
       caps: {
         questionChars: 2_000,
-        turns: 8,
-        outputTokens: 4_096,
+        turns: 4,
+        outputTokens: 1_000,
         callTimeoutMs: 60_000,
         retries: 2,
         toolResultBytes: 16 * 1024,
@@ -95,16 +95,16 @@ describe("loadJarvisConfig", () => {
     const high = {
       ...ENV,
       JARVIS_QUESTION_CHARS: "8000",
-      JARVIS_TURNS: "20",
-      JARVIS_OUTPUT_TOKENS: "16000",
+      JARVIS_TURNS: "4",
+      JARVIS_OUTPUT_TOKENS: "1000",
       JARVIS_CALL_TIMEOUT_S: "600",
       JARVIS_RETRIES: "2",
       JARVIS_TOOL_RESULT_KIB: "64",
     };
     expect(loadJarvisConfig(high).caps).toEqual({
       questionChars: 8_000,
-      turns: 20,
-      outputTokens: 16_000,
+      turns: 4,
+      outputTokens: 1_000,
       callTimeoutMs: 600_000,
       retries: 2,
       toolResultBytes: 64 * 1024,
@@ -258,9 +258,9 @@ describe("loadJarvisConfig", () => {
     ["JARVIS_QUESTION_CHARS", "0"],
     ["JARVIS_QUESTION_CHARS", "8001"],
     ["JARVIS_TURNS", "0"],
-    ["JARVIS_TURNS", "21"],
+    ["JARVIS_TURNS", "5"],
     ["JARVIS_OUTPUT_TOKENS", "0"],
-    ["JARVIS_OUTPUT_TOKENS", "16001"],
+    ["JARVIS_OUTPUT_TOKENS", "1001"],
     ["JARVIS_OUTPUT_TOKENS", "4k"],
     ["JARVIS_CALL_TIMEOUT_S", "0"],
     ["JARVIS_CALL_TIMEOUT_S", "601"],
@@ -328,7 +328,7 @@ describe("loadServed", () => {
       on: false,
       listen: { host: "127.0.0.1", port: 8081, names: ["127.0.0.1", "localhost"] },
       database: SERVED.JARVIS_DATABASE,
-      budgets: { ask: 45 * DOLLAR, translate: 5 * DOLLAR },
+      budgets: { ask: 3 * DOLLAR, translate: 1 * DOLLAR },
       drainMs: 20_000,
     });
   });

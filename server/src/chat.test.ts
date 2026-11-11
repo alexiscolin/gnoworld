@@ -68,6 +68,8 @@ const setup = (
     // The first signals' store, as main hands it to the chat (slice 9h).
     signals?: boolean;
   } = {},
+  // What the lines that pass tell Jarvis's door (D13985).
+  extra?: Pick<Parameters<typeof startChat>[2], "door">,
 ) => {
   const db = openDatabase(":memory:", [
     LOGIN_TABLES,
@@ -92,6 +94,7 @@ const setup = (
     ...(session === undefined ? {} : { session }),
     ...(redactRetryMs === undefined ? {} : { redactRetryMs }),
     ...(presence === undefined ? {} : { presence }),
+    ...extra,
     signals,
   };
   const chat = startChat(db, settings, options);
@@ -182,10 +185,11 @@ describe("the chat, as the server starts it", () => {
   const linked = async (
     settings: Omit<Parameters<typeof startChat>[1], "ergo">,
     more: Parameters<typeof setup>[1] = {},
+    extra?: Parameters<typeof setup>[2],
   ) => {
     const ergo = await fakeErgo();
     const ergoAt = { host: "127.0.0.1", port: ergo.port, password: PASSWORD };
-    const chat = setup({ ...settings, ergo: ergoAt }, { now: () => T0, ...more });
+    const chat = setup({ ...settings, ergo: ergoAt }, { now: () => T0, ...more }, extra);
     const peer = await ergo.peer(0);
     await welcome(peer);
     const Verdicts = z.array(z.object({ msgid: z.string(), action: z.string(), reason: z.string().nullable() }));
@@ -1816,6 +1820,69 @@ describe("the chat, as the server starts it", () => {
         { msgid: "m2", action: "pass", reason: "members_room" },
       ]);
       expect([chat.recent("#bubble/crew", "g1a"), chat.recent("#bubble/desk", "g1a")]).toEqual([[], []]);
+    });
+  });
+
+  describe("what the passed lines tell Jarvis's door (D13985)", () => {
+    const passing = { provider: () => Promise.resolve(OFF_ANSWER) };
+    const crew = new Map<string, World>([
+      [
+        "bubble",
+        {
+          rules: RULES,
+          rooms: new Map([["#bubble/crew", { type: "members", readers: "crew", hidden: false }]]),
+        },
+      ],
+    ]);
+    const door = () => {
+      const heard: string[] = [];
+      const changed: string[] = [];
+      return {
+        heard,
+        changed,
+        door: {
+          heard: { said: (account: string) => heard.push(account) },
+          changed: (room: string) => changed.push(room),
+        },
+      };
+    };
+
+    it("hands on the account of a line that passed, in a public room and in a members room, and of none it hides", async () => {
+      const spy = door();
+      const { peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing, { door: spy.door });
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      peer.say(message("account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      peer.say(message("account=g1c;msgid=m3", "c!u@h", ["#bubble/crew", "between us"]));
+      await expect.poll(verdicts).toHaveLength(3);
+      peer.say(":ergo.test BATCH +h chathistory #bubble");
+      peer.say(message("batch=h;account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      peer.say(":ergo.test BATCH -h");
+      peer.say(message("account=g1d;msgid=m4;+gnoworld/edit=m1", "d!u@h", ["#bubble", "hello again"]));
+      await expect.poll(verdicts).toHaveLength(4);
+      expect([...spy.heard].sort()).toEqual(["g1a", "g1c"]);
+    });
+
+    it("keeps a room's last line's id, a members room's too, moved by a line that passed alone", async () => {
+      const { chat, peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      peer.say(message("account=g1c;msgid=m3", "c!u@h", ["#bubble/crew", "between us"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      peer.say(message("account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      await expect.poll(verdicts).toHaveLength(3);
+      expect([chat.last("#bubble"), chat.last("#bubble/crew"), chat.last("#none")]).toEqual(["m1", "m3", undefined]);
+      expect(chat.recent("#bubble/crew", "g1x")).toEqual([]);
+    });
+
+    it("tells the door the room of a line taken or edited", async () => {
+      const spy = door();
+      const { peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing, { door: spy.door });
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "first"]));
+      peer.say(message("account=g1a;msgid=m2", "a!u@h", ["#bubble", "secnod"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      peer.say(":mod!u@h REDACT #bubble m1 :off topic");
+      await expect.poll(() => spy.changed).toEqual(["#bubble"]);
+      peer.say(message("account=g1a;msgid=m3;+gnoworld/edit=m2", "a!u@h", ["#bubble", "second"]));
+      await expect.poll(() => spy.changed).toEqual(["#bubble", "#bubble"]);
     });
   });
 

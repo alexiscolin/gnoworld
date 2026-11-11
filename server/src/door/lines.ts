@@ -17,6 +17,16 @@ export interface RecentLines {
   recent: (room: string, asker: string) => JarvisAsk["lines"];
   // A line's text by its id, while its room keeps it (10k, a translation's text): never one the page sent.
   line: (room: string, msgid: string) => string | undefined;
+  // The id of a room's last line moderation let through, public room or not (D13985, a served answer's key).
+  last: (room: string) => string | undefined;
+}
+
+interface Options {
+  isPublic: (room: string) => boolean;
+  // Told the account of each line moderation let through, in any room (D13985, the account's first ask).
+  heard?: { said: (account: string) => void } | undefined;
+  // Told the room of each line taken or replaced, whose served answers go (D13985).
+  changed?: ((room: string) => void) | undefined;
 }
 
 interface Kept {
@@ -31,15 +41,17 @@ const ROOMS = 10_000;
 // The lines taken or replaced before they came in, remembered: the oldest forgotten first.
 const GONE = 2000;
 
-export function makeRecentLines({ isPublic }: { isPublic: (room: string) => boolean }): RecentLines {
+export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLines {
   // The Map's first room is the one written longest ago: a room is set again at each line.
   const rooms = new Map<string, { lines: Kept[]; bytes: number }>();
   // The lines gone: a room's line taken (`room id`), or replaced by its author (`room id account`), each its own mark, so
   // no later mark of another kind or account stands for it (F5270, as pins.ts's `replaced`), and a line gone whether it
   // was kept yet or not, so it never comes in or back (F5109).
   const gone = new Map<string, true>();
+  const lasts = new Map<string, string>();
   const key = (...parts: string[]): string => parts.join(" ");
   const drop = (room: string, msgid: string, by: string | null): void => {
+    changed?.(room);
     const kept = rooms.get(room) ?? { lines: [], bytes: 0 };
     const line = kept.lines.find((each) => each.msgid === msgid);
     // Another account's edit of a line kept replaces nothing.
@@ -50,14 +62,19 @@ export function makeRecentLines({ isPublic }: { isPublic: (room: string) => bool
     kept.bytes -= line.bytes;
   };
   // A public room's line to the whole room, not taken nor replaced by its author before it came, within a room's bytes.
-  const admits = ({ room, msgid, account, text, few }: Said): boolean =>
-    few === undefined &&
-    isPublic(room) &&
-    !gone.has(key(room, msgid)) &&
-    !gone.has(key(room, msgid, account)) &&
-    Buffer.byteLength(text) <= JARVIS_LINES.bytes;
+  const live = ({ room, msgid, account, few }: Said): boolean =>
+    few === undefined && !gone.has(key(room, msgid)) && !gone.has(key(room, msgid, account));
+  const admits = (said: Said): boolean =>
+    live(said) && isPublic(said.room) && Buffer.byteLength(said.text) <= JARVIS_LINES.bytes;
+  // A line a person said to the room: not one for its operators, an edit, or one gone before it came.
+  const noted = (said: Said): void => {
+    if (!live(said) || said.edits !== undefined) return;
+    heard?.said(said.account);
+    remember(lasts, [said.room, said.msgid], ROOMS);
+  };
   return {
     passed(said) {
+      noted(said);
       const kept = rooms.get(said.room) ?? { lines: [], bytes: 0 };
       // A catch-up hands a line again: it is kept once.
       if (!admits(said) || kept.lines.some(({ msgid }) => msgid === said.msgid)) return;
@@ -75,6 +92,7 @@ export function makeRecentLines({ isPublic }: { isPublic: (room: string) => bool
     edited({ room, edits, account }) {
       if (edits !== undefined) drop(room, edits, account);
     },
+    last: (room) => lasts.get(room),
     line: (room, msgid) => rooms.get(room)?.lines.find((kept) => kept.msgid === msgid)?.text,
     recent(room, asker) {
       const speakers = new Map([[asker, 0]]);

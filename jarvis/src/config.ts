@@ -57,8 +57,8 @@ const servedShape = () => ({
     .pipe(z.array(z.string().regex(/^(?:[a-z0-9][a-z0-9.-]{0,252}|\[[0-9a-f:.]{2,45}\])$/))),
   // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
   JARVIS_DATABASE: databasePath.pipe(absolute),
-  JARVIS_BUDGET_USD: whole(500, 45),
-  JARVIS_TRANSLATION_BUDGET_USD: whole(500, 5),
+  JARVIS_BUDGET_USD: whole(500, 3),
+  JARVIS_TRANSLATION_BUDGET_USD: whole(500, 1),
   JARVIS_DRAIN_S: whole(600, 20),
 });
 const budgetsOf = (settings: { JARVIS_BUDGET_USD: number; JARVIS_TRANSLATION_BUDGET_USD: number }) => ({
@@ -92,8 +92,8 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       ...servedShape(),
       ANTHROPIC_API_KEY_FILE: z.string().min(1),
       JARVIS_QUESTION_CHARS: whole(8_000, 2_000),
-      JARVIS_TURNS: whole(20, 8),
-      JARVIS_OUTPUT_TOKENS: whole(16_000, 4_096),
+      JARVIS_TURNS: whole(4, 4),
+      JARVIS_OUTPUT_TOKENS: whole(1_000, 1_000),
       JARVIS_CALL_TIMEOUT_S: whole(600, 60),
       // Two at most, never more (ADR-0002 §5), or none.
       JARVIS_RETRIES: z.enum(["0", "1", "2"]).default("2").transform(Number),

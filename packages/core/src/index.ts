@@ -175,7 +175,7 @@ export {
 } from "./markdown/page.ts";
 export { COMMANDS, compose, relayOf, type Composed } from "./chat/compose.ts";
 export { POLL_KEYS, pollAsked, pollOf, pollText, revote, votesOn, type Poll, type Votes } from "./chat/poll.ts";
-export { fold } from "./chat/fold.ts";
+export { fold, mentionList, mentionsOf } from "./chat/fold.ts";
 export { threadsOf, type Threaded, type Threads } from "./chat/threads.ts";
 export { placeAt, placesOf, type Place, type PlaceKind, type PlaceSource } from "./places/places.ts";
 export { carryOver, frameRate, frameWait, isDue, type FrameRate, type LoopState } from "./frame/rate.ts";

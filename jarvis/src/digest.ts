@@ -177,7 +177,8 @@ function digestOf(parts: Parts, realm: RealmRead, signal: AbortSignal): Promise<
   const tools = realmCards(parts.cards.definitions, realm);
   const loop = makeLoop({
     ...parts.loop,
-    caps: { ...parts.loop.caps, toolResultBytes: BLOCK_BYTES },
+    // A digest of 50 blocks needs more than /ask's 4 turns and 1,000 tokens (D13985): its own caps, as before.
+    caps: { ...parts.loop.caps, turns: 8, outputTokens: 4_096, toolResultBytes: BLOCK_BYTES },
     skills: { index: [], digest: "" },
     system: SYSTEM,
     tools: { allowlist: allowlist(tools.definitions, parts.loop.log), run: (call, asked) => tools.run(call, asked) },

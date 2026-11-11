@@ -535,7 +535,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       on: false,
       url: "http://jarvis:8090",
       timeoutMs: 1_500_000,
-      questionChars: 2000,
+      questionChars: 500,
       first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
       namesRpc: "https://rpc.gno.land",
       namesChain: "gnoland-1",

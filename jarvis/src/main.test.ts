@@ -12,7 +12,7 @@ import {
   type AnswerButton,
   ApiError,
   JARVIS_PATHS,
-  JarvisAnswer,
+  JarvisPaidAnswer,
   type JarvisAsk,
   JarvisBudgets,
   JarvisMadeDigest,
@@ -248,7 +248,7 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
       const url = await listening(start(off));
       const response = await ask(url, QUESTION);
       expect(response.status).toBe(200);
-      expect(JarvisAnswer.parse(await response.json())).toEqual({ status: "off" });
+      expect(JarvisPaidAnswer.parse(await response.json())).toEqual({ status: "off" });
       expect(model.seen).toEqual([]);
       expect(gnomcp.starts()).toEqual([]);
       expect(gnoscope.requests).toEqual([]);
@@ -260,7 +260,7 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
     const url = await listening(start({ ...env, JARVIS: "off", JARVIS_BUDGET_USD: "3" }));
     expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toEqual({
       ask: 3,
-      translate: 5,
+      translate: 1,
     });
     expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({ ask: 3, translate: 2 });
   });
@@ -298,18 +298,37 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const url = await listening(jarvis);
     const response = await ask(url, QUESTION);
     expect(response.status).toBe(200);
-    expect(JarvisAnswer.parse(await response.json())).toEqual({
+    expect(JarvisPaidAnswer.parse(await response.json())).toEqual({
       status: "answered",
       markdown: "Onyx is at block 7.",
       buttons: [],
+      cost: expect.any(Number) as number,
     });
     const [first] = model.seen;
     expect(first?.key).toBe(KEY);
-    expect(namesOf(first?.body)).toEqual([...READS, "load_skill", "find_place", "give_button"]);
+    expect(namesOf(first?.body)).toEqual([...READS, "load_skill", "find_place", "give_button", "decline"]);
     expect(first?.body).toMatchObject({ model: "claude-sonnet-5-5", inference_geo: "global" });
     expect(gnomcp.starts()).toHaveLength(1);
     expect(gnoscope.requests).toEqual([]);
     expect(jarvis.out.stdout + jarvis.out.stderr).not.toContain(KEY);
+  });
+
+  it.each([
+    ["catch-up", { ask: "catch-up", room: "#bubble", lines: [] }, "claude-haiku-5-5"],
+    ["here", { ask: "here", room: "#bubble", lines: [] }, "claude-sonnet-5-5"],
+    [
+      "function",
+      { ask: "function", room: "#bubble", realm: "gno.land/r/gov/dao", function: "Vote", lines: [] },
+      "claude-sonnet-5-5",
+    ],
+    ["a person's own question", QUESTION, "claude-sonnet-5-5"],
+  ])("asks the model for %s on its own model, catch-up on the fast one", async (name, body, model) => {
+    const run = await setup([ended("Done.")]);
+    const url = await listening(start(run.env));
+    expect(JarvisPaidAnswer.parse(await (await ask(url, body)).json())).toMatchObject({ status: "answered" });
+    expect(run.model.seen[0]?.body).toMatchObject({ model });
+    const all = [...READS, "load_skill", "find_place", "give_button", "decline"];
+    expect(namesOf(run.model.seen[0]?.body)).toEqual(name === "catch-up" ? ["decline"] : all);
   });
 
   it("offers gnoscope's reads with its switch on, once it listed them at start", async () => {
@@ -322,6 +341,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
       "find_place",
       "give_button",
       ...GNOSCOPE_READS,
+      "decline",
     ]);
   });
 
@@ -333,8 +353,8 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const routes = { ...outbound, [GNOSCOPE]: closed.origin };
     const jarvis = start({ ...env, JARVIS_GNOSCOPE: "on", JARVIS_TEST_OUTBOUND: JSON.stringify(routes) });
     const url = await listening(jarvis);
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
-    expect(namesOf(model.seen[0]?.body)).toEqual([...READS, "load_skill", "find_place", "give_button"]);
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
+    expect(namesOf(model.seen[0]?.body)).toEqual([...READS, "load_skill", "find_place", "give_button", "decline"]);
     expect(lines(jarvis).some(({ event, reason }) => event === "jarvis_gnoscope_down" && reason === "start")).toBe(
       true,
     );
@@ -356,10 +376,11 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const { env, model, gnoscope } = await setup([calls, ended("Here it is.")]);
     const url = await listening(start({ ...env, JARVIS_GNOSCOPE: "on" }));
     const response = await ask(url, QUESTION);
-    expect(JarvisAnswer.parse(await response.json())).toEqual({
+    expect(JarvisPaidAnswer.parse(await response.json())).toEqual({
       status: "answered",
       markdown: "Here it is.",
       buttons: [fly],
+      cost: expect.any(Number) as number,
     });
     const of = resultsOf(model.seen[1]?.body);
     expect(of("toolu_1")).toContain('"chain_id":"onyx-1"');
@@ -390,8 +411,8 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     ]);
     const url = await listening(start(env));
     const vote = action("Vote").button;
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
     expect(resultsOf(model.seen[3]?.body)("toolu_3")).toContain("Refused, nothing kept");
     expect(node.received.filter(({ path }) => path === "/status")).toHaveLength(1);
     expect(node.received.filter(({ path }) => path.startsWith("/abci_query"))).toHaveLength(3);
@@ -401,11 +422,11 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const { env, dir, model } = await setup([ended("Back.")]);
     spentDay(join(dir, "jarvis.db"));
     const url = await listening(start({ ...env, JARVIS_BUDGET_USD: "1" }));
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toEqual({ status: "spent" });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toEqual({ status: "spent" });
     expect(model.seen).toEqual([]);
     expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toMatchObject({ ask: 1 });
     expect(JarvisBudgets.parse(await (await setBudget(url, "ask", 2)).json())).toMatchObject({ ask: 2 });
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
     expect(model.seen).toHaveLength(1);
   });
 
@@ -429,12 +450,12 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     expect(model.seen).toHaveLength(1);
   });
 
-  it("answers internal when the API refuses its key, and never prints the key", async () => {
+  it("answers failed, with its cost, when the API refuses its key, and never prints the key", async () => {
     const { env } = await setup([{ status: 401, error: "authentication_error" }]);
     const jarvis = start(env);
     const url = await listening(jarvis);
     const response = await ask(url, QUESTION);
-    expect([response.status, ApiError.parse(await response.json()).error]).toEqual([502, "internal"]);
+    expect([response.status, JarvisPaidAnswer.parse(await response.json())]).toMatchObject([200, { status: "failed" }]);
     await printed(jarvis, () => jarvis.out.stdout.includes('"event":"jarvis_model_error"'));
     expect(jarvis.out.stdout + jarvis.out.stderr).not.toContain(KEY);
   });
@@ -523,7 +544,7 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     );
     expect([503, "refused"]).toContain(late);
     answer.answer(ended("Just in time."));
-    expect(JarvisAnswer.parse(await (await inFlight).json())).toMatchObject({ status: "answered" });
+    expect(JarvisPaidAnswer.parse(await (await inFlight).json())).toMatchObject({ status: "answered" });
     expect(await exited(jarvis)).toBe(0);
     expect(lines(jarvis).filter(({ event }) => event === "stopping")).toHaveLength(1);
     const pids = gnomcp.starts().map(({ pid }) => pid);

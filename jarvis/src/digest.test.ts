@@ -109,8 +109,9 @@ const setup = ({ steps = [], chain = {}, cap = 45 * DOLLAR, keepBytes, chains = 
   const cards = cardTools({ chains, places, read: () => Promise.reject(new Error("no gnomcp")), fetch: node });
   const caps = {
     questionChars: 2_000,
+    // /ask's caps (D13985): a digest keeps its own, 8 turns and 4,096 tokens.
     turns: 4,
-    outputTokens: 4_096,
+    outputTokens: 1_000,
     callTimeoutMs: 60_000,
     retries: 2,
     toolResultBytes: 16 * 1024,
@@ -549,7 +550,7 @@ describe("a digest's reads and what it keeps (StrykerJS, the review's V4, V5)", 
 
 describe("a digest the model ends without (the security review's S1)", () => {
   it.each([
-    ["its turns used up", () => Array.from({ length: 4 }, () => give(digest("4,321")))],
+    ["its 8 turns used up", () => Array.from({ length: 8 }, () => give(digest("4,321")))],
     ["max_tokens", () => [message({ content: [text("cut")], stop: "max_tokens", model: "claude-haiku-5-5" })]],
     ["a refusal", () => [message({ content: [], stop: "refusal", model: "claude-haiku-5-5" })]],
     [
@@ -559,6 +560,30 @@ describe("a digest the model ends without (the security review's S1)", () => {
   ])("is a none kept for its 10 minutes after %s, so its next readers pay nothing", async (_, steps) => {
     const { ask, model } = setup({ steps: steps() });
     expect(await ask()).toEqual({ kind: "none" });
+    const asked = model.requests.length;
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests).toHaveLength(asked);
+  });
+});
+
+describe("a digest's loop, apart from /ask's (10u-g)", () => {
+  it("keeps its own caps whatever /ask's: 4,096 output tokens a request, and 8 turns before it gives up", async () => {
+    const { ask, model } = setup({ steps: Array.from({ length: 9 }, () => give(digest("4,321"))) });
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests).toHaveLength(8);
+    expect(model.requests.every((request) => request.max_tokens === 4_096)).toBe(true);
+  });
+
+  it("offers no `decline`: a realm page that tells the model to call it steers nothing", async () => {
+    const { ask, model } = setup({ steps: [said(toolUse("t1", "decline", {})), done()] });
+    expect(model.requests).toEqual([]);
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests[0]?.tools?.some((tool) => "name" in tool && tool.name === "decline")).toBe(false);
+  });
+
+  it("keeps the none of such a page for its 10 minutes: the next reader pays nothing", async () => {
+    const { ask, model } = setup({ steps: [said(toolUse("t1", "decline", {})), done()] });
+    await ask();
     const asked = model.requests.length;
     expect(await ask()).toEqual({ kind: "none" });
     expect(model.requests).toHaveLength(asked);

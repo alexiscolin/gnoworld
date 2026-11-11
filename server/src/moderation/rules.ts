@@ -3,7 +3,7 @@
 // accented spelling is the same word; a banned word matches whole, never inside a longer one.
 // Compatibility forms to their plain letters, accents and invisible format characters dropped, lower case: core's
 // fold, the one the page reads mentions with (F809).
-import { fold } from "@gnoworld/core";
+import { fold, mentionList } from "@gnoworld/core";
 import type { Rules } from "../roles/roles.ts";
 
 export type RuleReason =
@@ -54,7 +54,8 @@ export function ruleVerdict(text: string, rules: Rules, flags: Flags): RuleReaso
 function worldRule(text: string, rules: Rules, newAccount: boolean): RuleReason | undefined {
   const folded = fold(text);
   const links = folded.match(/\bhttps?:\/\/|(?<!\/\/)\bwww\./g)?.length ?? 0;
-  const mentions = folded.match(/(?<![\p{L}\p{N}_])@\w+|\bg1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}\b/gu)?.length ?? 0;
+  const mentions =
+    mentionList(folded).length + (folded.match(/\bg1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38}\b/gu)?.length ?? 0);
   if (banned(folded, rules.bannedWords)) return "banned_word";
   if (newAccount && links > rules.linksForNewAccount) return "new_account_links";
   if (links > rules.linksPerMessage) return "links";

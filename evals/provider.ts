@@ -8,7 +8,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { JARVIS_PATHS, JarvisAnswer, JarvisMadeDigest, JarvisTranslation } from "../packages/schemas/src/jarvis.ts";
+import { JARVIS_PATHS, JarvisMadeDigest, JarvisPaidAnswer, JarvisTranslation } from "../packages/schemas/src/jarvis.ts";
 import { Case, kindOf, type Kind } from "./cases.ts";
 import { startFakes, type Fakes } from "./fakes.ts";
 import { fingerprint } from "./fingerprint.ts";
@@ -18,7 +18,7 @@ import { outcomeOf } from "./spans.ts";
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const Universes = z.array(z.object({ id: z.string(), chainId: z.string(), rpc: z.url() }));
 const universes = () => Universes.parse(JSON.parse(readFileSync(join(ROOT, "app/data/universes.json"), "utf8")));
-const SCHEMAS = { ask: JarvisAnswer, translate: JarvisTranslation, digest: JarvisMadeDigest };
+const SCHEMAS = { ask: JarvisPaidAnswer, translate: JarvisTranslation, digest: JarvisMadeDigest };
 
 const Options = z.object({
   // jarvis's settings over the provider's, the models among them (promptfooconfig.yaml).
@@ -58,7 +58,7 @@ function keepable(one: Case, kind: Kind, kept: Kept): boolean {
   const sound = kept.answers.every((answer) => answer.status === 200 && schema.safeParse(answer.body).success);
   if (!sound) return false;
   const statuses = kept.answers.map((answer) => z.object({ status: z.string() }).parse(answer.body).status);
-  if (statuses.includes("off")) return false;
+  if (statuses.includes("off") || statuses.includes("failed")) return false;
   if (statuses.includes("spent")) return one.spent === true;
   return outcomeOf(kept.batches).made >= 1;
 }

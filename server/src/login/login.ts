@@ -68,6 +68,8 @@ export interface Login {
     host: string,
   ) => Promise<{ token: string; maxAge: number } | "nonce" | "proof" | "new_account">;
   session: (token: string | undefined) => Address | undefined;
+  // When a live session's token was signed, in ms; undefined for none, an ended one or an unknown (D13985, a session's age).
+  signedAt: (token: string | undefined) => number | undefined;
   logout: (token: string | undefined) => void;
 }
 
@@ -197,6 +199,12 @@ export function makeLogin(db: DatabaseSync, options: Options): Login {
       sql.addToken.run(sha256(token), address, at, at + sliding);
       sql.keepNewest.run(address, address, tokensPerAccount);
       return { token, maxAge: cap / 1000 };
+    },
+
+    signedAt(token) {
+      if (token === undefined) return undefined;
+      const row = sql.live.get(sha256(token), now());
+      return row === undefined ? undefined : Live.parse(row).signed_at;
     },
 
     session(token) {

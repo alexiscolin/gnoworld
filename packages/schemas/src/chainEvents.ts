@@ -3,6 +3,7 @@
 // args or memo ever travels: what a stranger wrote reaches a room as bounded names or not at all. The height is the block a
 // fact stands at, so a reader sees where a gap is; nothing is a time, a transaction having none.
 import { Address } from "./address.ts";
+import { funcName } from "./data.ts";
 import { Key } from "./slug.ts";
 import { z } from "./zod.ts";
 
@@ -24,7 +25,7 @@ export const ChainEvent = z.union([
     world: Key,
     realm: realm(),
     actor: Address,
-    func: z.string().check(z.maxLength(CHAIN_CAPS.func), z.regex(/^[A-Za-z_][A-Za-z0-9_]*$/)),
+    func: funcName(CHAIN_CAPS.func),
     height: height(),
   }),
   z.strictObject({

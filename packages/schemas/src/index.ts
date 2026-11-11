@@ -43,6 +43,7 @@ export {
   JarvisDigestRequest,
   JARVIS_LANGUAGES,
   JarvisMadeDigest,
+  JarvisPaidAnswer,
   JarvisQuestion,
   JarvisSettings,
   JarvisTranslate,

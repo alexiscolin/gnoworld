@@ -1,6 +1,7 @@
 // The server's migrations, in the order they ran on every database: a file is at `user_version` N once its
 // first N have run, so an entry is never edited, moved or inserted, only appended (db.ts). migrations.test.ts
 // holds each one's SHA-256 and fails on any of those.
+import { DAY_TABLES } from "./door/day.ts";
 import { QUOTA_TABLES } from "./door/quota.ts";
 import { GUEST_TABLES } from "./guest/guests.ts";
 import { LOGIN_TABLES, NONCE_ACTION, NONCE_HOST } from "./login/login.ts";
@@ -35,4 +36,5 @@ export const migrations: readonly string[] = [
   GUEST_TABLES,
   ROOM_SAID,
   ROLLUP_TABLES,
+  DAY_TABLES,
 ];

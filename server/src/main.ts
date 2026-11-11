@@ -9,12 +9,10 @@ import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
 import { guestSettings } from "./guest/wire.ts";
 import { adminRoutes } from "./door/admin.ts";
-import { askRoutes } from "./door/ask.ts";
-import { digestRoutes } from "./door/digest.ts";
 import { jarvisClient } from "./door/jarvis.ts";
-import { makeNames } from "./door/names.ts";
+import { doorMemory } from "./door/memory.ts";
+import { mountDoor } from "./door/mount.ts";
 import { makeQuota } from "./door/quota.ts";
-import { translateRoutes } from "./door/translate.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
 import { makeLogin, makeSigned } from "./login/login.ts";
 import { migrations } from "./migrations.ts";
@@ -86,9 +84,11 @@ let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
 // The login's sessions, read for the rooms' routes (3l) and the rooms a reader may see (3m).
-const { session } = makeLogin(db, { chains: config.chains, now: Date.now });
+const { session, signedAt } = makeLogin(db, { chains: config.chains, now: Date.now });
 // The first signals (9h) and the chain in the rooms (9g), told on the one stream; the chain none without both data files.
 const { stream, signals, chain } = bootSignals({ app, db, roles, config, log, session });
+// What Jarvis's door asks of the chat (D13985): the accounts heard speak, and the answers kept until a line is taken.
+const memory = doorMemory(db, config.origins, Date.now);
 const chat = startChat(
   db,
   {
@@ -107,6 +107,7 @@ const chat = startChat(
     session,
     stream,
     signals,
+    door: memory.chat,
     ...(config.database === ":memory:" ? {} : { presence: join(dirname(config.database), "presence.json") }),
   },
 );
@@ -153,26 +154,8 @@ const door =
         quota: makeQuota(db, { first: config.jarvis.first, now: Date.now }),
         jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs }),
       };
-// The door's routes: a question, and since 10k a line's translation and a realm's digest, each its own path and rate.
-if (door !== undefined) {
-  const front = { session, origins: config.origins, on: door.settings.on, log, now: Date.now };
-  // One memory of the accounts' mainnet names for the question's quota and the digest's (10k-1).
-  const named = makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now, log });
-  app.route(
-    "/api/jarvis",
-    askRoutes({
-      ...front,
-      mayRead: chat.mayRead,
-      recent: chat.recent,
-      named,
-      quota: door.quota,
-      jarvis: door.jarvis,
-      questionChars: door.settings.questionChars,
-    }),
-  );
-  app.route("/api/jarvis", translateRoutes({ ...front, mayRead: chat.mayRead, line: chat.line, jarvis: door.jarvis }));
-  app.route("/api/jarvis", digestRoutes({ ...front, jarvis: door.jarvis, quota: door.quota, named }));
-}
+if (door !== undefined)
+  mountDoor(app, { door, chat, memory: memory.ask, session, signedAt, origins: config.origins, log });
 // The admin API on a listener of its own, never the public one (ADR-0002 §6), with the login for its own site, so the
 // console's session cookie is its alone; none without ADMIN_PORT. The network that walls it off is deploy's.
 const adminApp = makeApp(log, () => !draining);

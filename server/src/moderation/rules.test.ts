@@ -120,6 +120,11 @@ describe("the rules' links and mentions", () => {
     expect(ruleVerdict("@a @a @a @a @a @a", RULES, OLD)).toBe("mentions");
   });
 
+  it("counts a mention whose name holds any letter, a lookalike's included, as the translation check reads one", () => {
+    expect(ruleVerdict("@аlice ".repeat(6), RULES, OLD)).toBe("mentions");
+    expect(ruleVerdict("@élo ".repeat(6), RULES, OLD)).toBe("mentions");
+  });
+
   it("counts no email address or short g1 word as a mention", () => {
     expect(ruleVerdict("a@b.test c@d.test e@f.test g@h.test i@j.test k@l.test g1ven", RULES, OLD)).toBeUndefined();
   });

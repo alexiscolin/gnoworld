@@ -126,6 +126,7 @@ describe("a translation that adds what its original lacks", () => {
     ["a link", "Le vote se termine au bloc 1 204, voir https://evil.test. Demandez à @alice."],
     ["a number", "Le vote se termine au bloc 1 205. Demandez à @alice."],
     ["a mention of the room", "Le vote se termine au bloc 1 204. @room, demandez à @alice."],
+    ["a mention by name", "Le vote se termine au bloc 1 204. Demandez à @alice et à @carol."],
     ["an account", `Le vote se termine au bloc 1 204. Envoyez à g1${"q".repeat(38)}.`],
   ])("is dropped for %s, the original shown and kept so, logged", async (_, translation) => {
     const { translator, model, events, signal } = setup({ steps: [said(translation)] });
@@ -135,6 +136,7 @@ describe("a translation that adds what its original lacks", () => {
     expect(model.requests).toHaveLength(1);
     expect(events()).toContainEqual({ event: "jarvis_translation_dropped" });
     expect(JSON.stringify(events())).not.toContain("evil.test");
+    expect(JSON.stringify(events())).not.toContain("carol");
   });
 
   it.each([

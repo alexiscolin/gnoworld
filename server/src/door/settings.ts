@@ -38,7 +38,7 @@ export function doorSettings() {
     JARVIS_URL: z.string().refine(isOrigin).optional(),
     // Longer than the loop's worst: 8 turns of 3 attempts of 60 s, and a minute for its tools (D94).
     JARVIS_TIMEOUT_S: whole(3600, 1500),
-    JARVIS_QUESTION_CHARS: whole(DOOR_CAPS.question, 2000),
+    JARVIS_QUESTION_CHARS: whole(DOOR_CAPS.question, 500),
     JARVIS_QUOTA: whole(DOOR_CAPS.quota, 20),
     JARVIS_QUOTA_UNNAMED: whole(DOOR_CAPS.quota, 5),
     JARVIS_UNLIMITED: list(Address)

@@ -77,6 +77,10 @@ export const RealmPath = z
   .string()
   .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
+/** A realm's function by its name, as gno writes one: a letter or an underscore, then letters, digits and underscores, `max` at most;
+ * never words (a chain event's, Jarvis's fixed ask about a function). */
+export const funcName = (max: number) => z.string().check(z.maxLength(max), z.regex(/^[A-Za-z_][A-Za-z0-9_]*$/));
+
 /** The most a call's arguments may hold, as a Jarvis proposal and a world's pinned action give them, in code points. */
 export const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
 

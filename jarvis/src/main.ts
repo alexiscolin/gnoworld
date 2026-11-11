@@ -14,7 +14,7 @@ import { loadJarvisConfig, loadServed } from "./config.ts";
 import { makeDigests } from "./digest.ts";
 import { startGnomcp } from "./gnomcp.ts";
 import { serve } from "./http.ts";
-import { makeLoop } from "./loop.ts";
+import { makeAskLoops } from "./askLoops.ts";
 import { jarvisMigrations } from "./migrations.ts";
 import { connectAnthropic } from "./model.ts";
 import { DOLLAR } from "./prices.ts";
@@ -51,7 +51,14 @@ const running = served.on
     })
   : undefined;
 let draining = false;
-const routes = { ask: running?.ask, translate: running?.translate, digest: running?.digest, budget, log };
+const routes = {
+  ask: running?.ask,
+  catchUp: running?.catchUp,
+  translate: running?.translate,
+  digest: running?.digest,
+  budget,
+  log,
+};
 const jarvis = await serve(jarvisRoutes(routes), {
   ...served.listen,
   log,
@@ -74,13 +81,14 @@ async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
     const profiles = { chains: config.profiles.read, indexed: config.profiles.indexed };
     const tools = toolbox({ profiles, gnomcp, skills, places: placesTool(places), cards, gnoscope, log });
     const { tracer } = tracing;
-    const loop = makeLoop({ send, budget, log, tracer, model: config.models.main, caps: config.caps, skills, tools });
+    const loop = makeAskLoops({ send, budget, log, tracer, models: config.models, caps: config.caps, skills, tools });
     // Translations and digests on the fast model (ADR-0002 §5, "Models").
     const fast = { send, budget, log, tracer, model: config.models.fast };
     const translator = makeTranslator({ ...fast, db, retries: config.caps.retries, now: Date.now });
     const digests = makeDigests({ db, places, cards, loop: { ...fast, caps: config.caps }, now: Date.now });
     return {
       ask: loop.ask,
+      catchUp: loop.catchUp,
       translate: translator.translate,
       digest: digests.digest,
       close: async (): Promise<void> => {

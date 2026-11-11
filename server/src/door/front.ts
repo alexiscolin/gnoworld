@@ -41,6 +41,7 @@ const failures = {
   shape: ["internal", 502],
   failed: ["internal", 502],
   down: ["not_ready", 503],
+  lost: ["not_ready", 503],
   slow: ["not_ready", 504],
   gone: ["not_ready", 503],
   refused: ["refused", 400],
