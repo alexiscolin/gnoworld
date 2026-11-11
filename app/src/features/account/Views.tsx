@@ -1,12 +1,11 @@
 // The device's own views over the current place (ADR-0002 §2): the passport, the settings and the saved messages, each a dialog; this
 // chunk comes when the first of them opens (DeviceViews.tsx), and the chat's door with the saved messages alone.
-import { lazy, Suspense, useState } from "react";
+import { Suspense, useState } from "react";
+// SavedDialog is a lazy component of its own: wrapped in a second lazy, React refuses it (a lazy must resolve to a function).
+import { SavedDialog } from "../chat/index.ts";
 import { PassportView } from "../passport/index.ts";
 import { SettingsView } from "../settings/index.ts";
 import { useDeviceView, type DeviceView } from "../../deviceViews.ts";
-
-// The chat's door comes with the saved messages' dialog, never with the first screen.
-const SavedDialog = lazy(async () => ({ default: (await import("../chat/index.ts")).SavedDialog }));
 
 export function Views({ universe }: { universe: string }) {
   const [open, go] = useDeviceView();
