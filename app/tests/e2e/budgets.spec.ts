@@ -8,13 +8,13 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page: 197,951 B (D386); 256,839 B with TanStack and the perf pass (D13973, D13977); 259,818 B with the card
-// opened alone's Room in the ui chunk (D13979, +2,979 B), provisional till vite.config.ts's ui group leaves it out.
-const FIRST_SCREEN_JS = 259_818;
+// The Earth's or a world's page: 197,951 B (D386); 256,839 B with TanStack and the perf pass (D13973, D13977); 257,751 B with the card
+// opened alone (D13979), its Room out of the ui chunk, and the latin fonts preloaded (D13978).
+const FIRST_SCREEN_JS = 257_751;
 // A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the rail on its first screen); 255,657 B
-// with the realm plate and the perf pass (D13964, D13977); 258,080 B with the card opened alone's Room (D13979, +2,423 B), provisional
-// as FIRST_SCREEN_JS.
-const PLAIN_FIRST_SCREEN_JS = 258_080;
+// with the realm plate and the perf pass (D13964, D13977); 256,017 B with the card opened alone, its Room out of the first screen
+// (D13979), and the latin fonts preloaded (D13978).
+const PLAIN_FIRST_SCREEN_JS = 256_017;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -157,14 +157,14 @@ const PROPOSALS_JS = 35_631;
 // A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
 // world that pins one alone: weighed with the proposals.
 const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
-// A plate's late chunks, each capped at its size and 256 B (8g, D386); slice 13's review and TanStack Query (D13973): EarthPlate 44,137 B,
-// HubPlate 43,249 B, the worlds file's reader and schema realms 694 B and worlds 870 B; followEarth, people, FromExplorer (Plate weighed once,
-// in the plate's chunk), hours, Bars and ChartedBy as measured on the plate's commit; no RealmPlate cap, no journey reaches it.
+// A plate's late chunks, each capped at its size and 256 B (8g, D386); EarthPlate 46,535 B and HubPlate 45,647 B with the card opened
+// alone's Room (D13979), the worlds file's reader and schema realms 694 B and worlds 870 B (D13973); the others as measured on the plate's
+// commit (Plate weighed once, in the plate's chunk); no RealmPlate cap, no journey reaches it.
 const PLATE_LATE =
   /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 44393,
-  HubPlate: 43505,
+  EarthPlate: 46791,
+  HubPlate: 45903,
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,

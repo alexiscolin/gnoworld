@@ -3,6 +3,7 @@
 import "./lib/jitless.ts";
 import "@gnoworld/ui/styles.css";
 import layers from "@gnoworld/ui/layers.css?url";
+import { LATIN_FONTS } from "@gnoworld/ui/fonts";
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
 import { PageError } from "./features/errors/index.ts";
@@ -25,6 +26,10 @@ export function Layout({ children }: { children: ReactNode }) {
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         {/* First of the sheets: the layers rank by first mention, so the order is never left to the chunks (F3260). */}
         <link rel="stylesheet" href={layers} />
+        {/* The two latin faces every page draws with, asked with the page rather than once the sheets are read (P409, D13978). */}
+        {LATIN_FONTS.map((href) => (
+          <link key={href} rel="preload" href={href} as="font" type="font/woff2" crossOrigin="anonymous" />
+        ))}
         <Meta />
         <Links />
       </head>
