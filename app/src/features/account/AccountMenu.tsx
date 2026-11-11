@@ -7,7 +7,7 @@ import { Button, IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { onAsked } from "../../pageAsks.ts";
 import { LoginControl, useLogin } from "../login/index.ts";
-import { useNaming } from "./naming.ts";
+import { useNaming, useNamelessTold } from "./naming.ts";
 
 const Face = lazy(async () => ({ default: (await import("./Face.tsx")).Face }));
 const Opened = lazy(async () => ({ default: (await import("./Opened.tsx")).Opened }));
@@ -69,6 +69,7 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
   const [again, setAgain] = useState(0);
   const address = login.session.kind === "in" ? login.session.address : undefined;
   const { naming, setNaming, setPickable, pickable } = useNaming(login.step !== "idle", address, universe);
+  useNamelessTold(address !== undefined && pickable, setNaming);
   const ask = () => {
     setAsked(true);
   };

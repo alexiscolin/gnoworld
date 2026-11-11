@@ -14,6 +14,7 @@ import { useEditing } from "./EditBar.tsx";
 import { formatted, type Edit, type Format } from "./format.ts";
 import { Message } from "./Message.tsx";
 import { MessageBox } from "./MessageBox.tsx";
+import { NameNudge } from "./NameNudge.tsx";
 import { roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
@@ -182,6 +183,7 @@ export function Composer(props: ComposerProps) {
         </MessageBox>
         {/* Under the box, the line as the room will read it (Alexis, 2026-11-10: lost in the one-box rebuild, put back). */}
         <Preview composed={composed} me={nick} members={new Set(members)} />
+        <NameNudge />
       </Stack>
     </form>
   );

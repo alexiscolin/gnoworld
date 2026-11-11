@@ -38,6 +38,9 @@ function reasonOf(reason: Refused["reason"]): string {
 
 const problemOf = (said: Refused): string => (said.cause === undefined ? reasonOf(said.reason) : CAUSES[said.cause]);
 
+// What an account has that a guest has not (D13982), said beside Connect Adena.
+const ADENA_GIVES = "With Adena, a gno.land name of your own, links, replies and reactions.";
+
 // No guest name to be had: the server answers 404 where guests do not speak at all (GUEST_CHAT=off, or no moderation to judge them).
 const OFF = "Guests cannot speak on this server. Connect Adena to speak.";
 
@@ -130,9 +133,7 @@ export function GuestWriter({ room }: { room: string }) {
           <span className={styles["note"]}>
             {guest.off
               ? "Guests cannot speak here."
-              : guest.name === undefined
-                ? "You speak as a guest."
-                : `You speak as ${guest.name}.`}
+              : `${guest.name === undefined ? "You speak as a guest." : `You speak as ${guest.name}.`} ${ADENA_GIVES}`}
           </span>
           <Button
             size="s"

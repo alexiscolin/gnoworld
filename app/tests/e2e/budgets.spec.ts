@@ -8,13 +8,13 @@ import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page: 197,951 B (D386); 256,839 B with TanStack and the perf pass (D13973, D13977); 257,751 B with the card
-// opened alone (D13979), its Room out of the ui chunk, and the latin fonts preloaded (D13978).
-const FIRST_SCREEN_JS = 257_751;
+// The Earth's or a world's page: 197,951 B (D386); 256,839 B with TanStack and the perf pass (D13973, D13977); 257,751 B with the
+// card opened alone (D13979) and the fonts (D13978); 258,074 B with the name asked after a Connect and in the chat (D13981, D13982).
+const FIRST_SCREEN_JS = 258_074;
 // A page with no plate (the home): 193,780 B (D386); 232,807 B on the ping-pong of 2026-11-09 (the rail on its first screen); 255,657 B
-// with the realm plate and the perf pass (D13964, D13977); 256,017 B with the card opened alone, its Room out of the first screen
-// (D13979), and the latin fonts preloaded (D13978).
-const PLAIN_FIRST_SCREEN_JS = 256_017;
+// with the realm plate and the perf pass (D13964, D13977); 256,017 B with the card opened alone (D13979) and the fonts (D13978);
+// 256,336 B with the name asked after a Connect and in the chat (D13981, D13982).
+const PLAIN_FIRST_SCREEN_JS = 256_336;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
