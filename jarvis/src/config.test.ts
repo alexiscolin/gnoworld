@@ -1159,9 +1159,10 @@ describe("deploy/test.sh", () => {
       expect(jarvis(), check).toContain(check);
   });
 
-  it("expects the server on its three networks, and runs its ad hoc proxy off jarvis's port (10j's review, V1)", () => {
+  it("expects the server on its four networks, and runs its ad hoc proxy off jarvis's port (10j's review, V1; D13942)", () => {
     expect(script()).toContain(
-      `expect "the server sits on the internal network, jarvis's and the admin API's" "$(networks_of "$server")" "\${project}_admin $inside \${project}_jarvis "`,
+      `expect "the server sits on the internal network, jarvis's, the link reader's and the admin API's" "$(networks_of "$server")" \\
+		"$(sorted "\${project}_admin" "$inside" "\${project}_jarvis" "\${project}_links")"`,
     );
     expect(script()).not.toContain(`"the server sits on the internal network only"`);
     expect(script()).not.toMatch(/--listen-port 4751/);

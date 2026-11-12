@@ -271,6 +271,8 @@ hardened() {
 }
 
 networks_of() { docker inspect --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$1" | tr ' ' '\n' | grep . | sort | tr '\n' ' '; }
+# The names $@ as networks_of prints them, sorted the same way: a wanted list never fails on its order alone.
+sorted() { printf '%s\n' "$@" | sort | tr '\n' ' '; }
 # The DNS servers guard.sh lets out, "<address>:53", as the kernel holds its rules. On a host whose
 # resolver is its router, the router's port 53 is one: allowed by design, not a way to the host.
 guard_dns() { docker exec "$guard" iptables-nft -S OUTPUT | sed -n 's#^-A OUTPUT -d \([0-9.]*\)/32 -p tcp -m tcp --dport 53 -j ACCEPT$#\1:53#p'; }
@@ -678,7 +680,8 @@ FAKE
 	reach "$inside" "the internal network" no
 
 	hardened "$guard" guard "user net-admin"
-	expect "the guard sits on the internal network, jarvis's way out's, the reader's and its own" "$(networks_of "$guard")" "$inside ${project}_jarvis_out ${project}_reader_out $outside "
+	expect "the guard sits on the internal network, jarvis's way out's, the reader's, the link reader's way out's and its own" "$(networks_of "$guard")" \
+		"$(sorted "$inside" "${project}_jarvis_out" "${project}_reader_out" "${project}_links_out" "$outside")"
 	expect "its own network lets out" "$(docker network inspect --format '{{.Internal}}' "$outside")" false
 	expect "it is alone there" "$(docker network inspect --format '{{len .Containers}}' "$outside")" 1
 	reach "container:$guard" "the guard's network, which Tailscale shares," yes "$(guard_dns)"
@@ -708,7 +711,8 @@ FAKE
 			-e '-A OUTPUT -d [0-9.]*/32 -p [a-z]* -m [a-z]* --dport 53 -j ACCEPT' \
 			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4750 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
 			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4751 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
-			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4753 -m conntrack --ctstate ESTABLISHED -j ACCEPT' || true)" ""
+			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4753 -m conntrack --ctstate ESTABLISHED -j ACCEPT' \
+			-e '-A OUTPUT -o [^ ]* -p tcp -m tcp --sport 4754 -m conntrack --ctstate ESTABLISHED -j ACCEPT' || true)" ""
 	expect "IPv6: the guard drops all but loopback" "$(printf '%s\n' "$v6" | tr '\n' '|')" "-P OUTPUT DROP|-A OUTPUT -o lo -j ACCEPT|"
 
 	# Requests as Tailscale sends them: through the PROXY protocol, with the visitor's address. Each
@@ -898,7 +902,8 @@ PY
 	expect "the server finds no jarvis in the demo" "$(docker exec "$server" /nodejs/bin/node -e \
 		"fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" refused
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "
-	expect "the server sits on the internal network, jarvis's and the admin API's" "$(networks_of "$server")" "${project}_admin $inside ${project}_jarvis "
+	expect "the server sits on the internal network, jarvis's, the link reader's and the admin API's" "$(networks_of "$server")" \
+		"$(sorted "${project}_admin" "$inside" "${project}_jarvis" "${project}_links")"
 	expect "the way out holds the guard's network, behind its rules" \
 		"$(docker inspect --format '{{.HostConfig.NetworkMode}}' "$egress")" "container:$(docker inspect --format '{{.Id}}' "$guard")"
 	expect "web holds the address Ergo and the server believe" \

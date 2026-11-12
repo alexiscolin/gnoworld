@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { CallRequest } from "./call.ts";
+import { stripHidden } from "./hidden.ts";
 
 const CALLER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const REQUEST = {
@@ -11,8 +12,8 @@ const REQUEST = {
   args: ["1", "two"],
 };
 
-// What the property tests strip from generated text: the characters the request refuses (hidden.ts's, but newline and tab).
-const CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}\u2028\u2029\u115f\u1160\u3164\uffa0]/gu;
+// What the property tests strip from generated text: the characters the request refuses, by the code's own rule.
+const visible = (text: string) => stripHidden(text, "\n\t");
 
 describe("CallRequest", () => {
   it("takes one call: a chain, a caller, a realm, an exported function and string arguments", () => {
@@ -102,7 +103,7 @@ describe("CallRequest", () => {
   it("parses what it was given, whatever the call's shape: a valid request parses back to itself", () => {
     fc.assert(
       fc.property(fc.array(fc.string({ unit: "grapheme" }), { maxLength: 8 }), (args) => {
-        const request = { ...REQUEST, args: args.map((arg) => arg.replace(CONTROL, "")) };
+        const request = { ...REQUEST, args: args.map(visible) };
         expect(CallRequest.parse(request)).toEqual(request);
       }),
     );
@@ -115,7 +116,7 @@ describe("CallRequest", () => {
         fc.constantFrom("\u0000", "\u001b", "\u007f", "\u0085", "\u200b", "\u200f", "\u202e", "\u2066", "\ufeff"),
         fc.string({ unit: "grapheme", maxLength: 6 }),
         (before, hidden, after) => {
-          const args = [`${before.replace(CONTROL, "")}${hidden}${after.replace(CONTROL, "")}`];
+          const args = [`${visible(before)}${hidden}${visible(after)}`];
           expect(CallRequest.safeParse({ ...REQUEST, args }).success).toBe(false);
         },
       ),
