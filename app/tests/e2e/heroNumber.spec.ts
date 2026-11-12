@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { COUNTED, expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
-import { countShifts, running, shifted, stats } from "./sceneStage.ts";
+import { countShifts, running, shifted, worldsDrawn } from "./sceneStage.ts";
 
 // The hero's number (7n, 7n2): the worlds the cosmos draws, read from the count the job writes beside the worlds' file, so a home whose scene
 // does not run keeps it (no WebGL; this browser's software GPU without `?test-gpu`) and a phone asks nothing of the cosmos before View in space.
@@ -47,7 +47,7 @@ for (const width of [390, 1280]) {
       await hydrated(page);
       await expect(page.locator(NUMBER)).toHaveText(COUNT);
       await expect(page.locator("h1")).toHaveText(`${COUNT} worlds in Onyx`);
-      expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldScene")), "no scene ran").toBe(false);
+      expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldSpace")), "no scene ran").toBe(false);
       await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
       expect(file.count()).toBe(1);
       // The page preloads the worlds' file for what is not a phone (routes/home.tsx's links), once, whether the scene runs or not.
@@ -102,6 +102,10 @@ test.describe("on a phone", () => {
   test.describe.configure({ timeout: 180_000 });
   // The home before View in space, its line as `line` says, and the scene's one read of the worlds' file once the button is pressed.
   const beforeTheButton = async (page: Page, missing: boolean, line: string) => {
+    // A first visit's welcome card covers the button: it is told away.
+    await page.addInitScript(() => {
+      localStorage.setItem("gnoworld:welcomed", "1");
+    });
     const file = await served(page, { missing });
     await page.goto("/?test-gpu");
     await hydrated(page);
@@ -111,7 +115,7 @@ test.describe("on a phone", () => {
     await page.waitForLoadState("load");
     expect(file.count()).toBe(1);
     expect(file.worlds(), "no worlds' file before View in space").toBe(0);
-    await view.click();
+    await view.click({ timeout: 20_000 });
     await running(page);
     await expect.poll(() => file.worlds(), { timeout: 90_000 }).toBe(1);
     await expect(page.locator(NUMBER)).toHaveText(COUNT);
@@ -136,7 +140,7 @@ test.describe("with the scene", () => {
   const SLOW = { timeout: 90_000 };
   const drawsTheFile = async (page: Page) => {
     await running(page);
-    await expect.poll(async () => (await stats(page)).cosmos?.worlds ?? 0, SLOW).toBeGreaterThan(1);
+    await expect.poll(() => worldsDrawn(page), SLOW).toBeGreaterThan(1);
   };
 
   test("the cosmos reads the worlds' file once, and the hero says the number it draws", async ({ page }) => {
@@ -146,7 +150,7 @@ test.describe("with the scene", () => {
     await hydrated(page);
     await drawsTheFile(page);
     await expect(page.locator(NUMBER)).toHaveText(COUNT);
-    expect(String((await stats(page)).cosmos?.worlds)).toBe(COUNT);
+    expect(String(await worldsDrawn(page))).toBe(COUNT);
     expect(file.worlds()).toBe(1);
     expect(file.count()).toBe(1);
   });
@@ -159,7 +163,8 @@ test.describe("with the scene", () => {
     await page.goto("/earth?test-gpu");
     await hydrated(page);
     await running(page);
-    expect(file.worlds()).toBe(0);
+    // The engine reads the worlds' file as it starts, on any page that shows space; the hero's count is asked by the home alone.
+    await expect.poll(() => file.worlds(), SLOW).toBe(1);
     expect(file.count()).toBe(0);
     await page.getByRole("link", { name: "gnoworld" }).click();
     await expect(page).toHaveURL(/\/$/);

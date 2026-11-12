@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { landed, running, stats } from "./sceneStage.ts";
+import { countFlights, flightOf, landed, running } from "./sceneStage.ts";
 
 // The first seconds (ADR-0003): a newcomer's "Start here" in the Earth's label is the one filled call; once a place was entered, the return
 // is the video's (frame 4): the Earth's heat, "Go explore" filled and "Join the chat" beside it. On the software GPU, with the recorded
@@ -70,10 +70,11 @@ test.describe("a reader who came back", () => {
     await arrive(page);
     await running(page);
     await landed(page);
+    await countFlights(page);
     await explore(page).click();
     // The click asks its chunk and the server, then the router flies: slow on a software GPU, whose frames hold the page's thread.
     await expect(page).toHaveURL(/\/w\/govdao/, SLOW);
-    await expect.poll(async () => (await stats(page)).flight?.flights ?? 0, SLOW).toBeGreaterThan(0);
+    await expect.poll(async () => (await flightOf(page)).flights, SLOW).toBeGreaterThan(0);
   });
 
   test("hears each view described, and sees nothing drawn under the tabs", async ({ page }) => {

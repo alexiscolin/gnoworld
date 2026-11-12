@@ -1,8 +1,69 @@
 import type { CDPSession } from "@playwright/test";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
+import type { Space } from "../../src/space/scene.ts";
 
-// What the scene's journeys share: the running scene, read in a test build, and its context lost and given back.
+// What the scene's journeys share: the running engine, read through `__gnoworldSpace` (features/universe/spaceHook.ts), a test build's hook
+// that hands out the engine itself, and its context lost and given back. A journey reads the engine's own state: the rig's flight, the
+// place it asked, the universe laid out, the frames the renderer drew; it never sleeps for a flight, it polls what the engine says.
+/** What the engine says of where the camera is and how it goes. */
+export interface Flight {
+  /** The rig's flight runs. */
+  flying: boolean;
+  /** How far along it, 0 to 1, eased; 1 with none. */
+  along: number;
+  /** The kind of place asked (`home`, `universe`, `system`, `world`), none before the first. */
+  kind: string | undefined;
+  /** The place's id (a system's, a world's), none for the home and the universe. */
+  id: string | undefined;
+  /** Whether the flight to the page's planet passed its 68 %. */
+  neared: boolean;
+  /** How many flights `countFlights` has seen start. */
+  flights: number;
+  eye: { x: number; y: number; z: number };
+}
+
+/** The engine's frames drawn so far, by its renderer. */
+export const framesOf = (page: Page) =>
+  page.evaluate(() => {
+    const space = Reflect.get(globalThis, "__gnoworldSpace") as Space | undefined;
+    return space?.renderer.info.render.frame ?? 0;
+  });
+
+/** Counts, from now, every flight the rig is asked: the engine keeps none, a journey waits on the count. */
+export const countFlights = (page: Page) =>
+  page.evaluate(() => {
+    const { rig } = Reflect.get(globalThis, "__gnoworldSpace") as Space;
+    Reflect.set(globalThis, "__flights", 0);
+    const fly = rig.fly.bind(rig);
+    rig.fly = (goal) => {
+      Reflect.set(globalThis, "__flights", Number(Reflect.get(globalThis, "__flights")) + 1);
+      fly(goal);
+    };
+  });
+
+/** Where the camera is and goes, now. */
+export const flightOf = (page: Page): Promise<Flight> =>
+  page.evaluate(() => {
+    const { rig, place, neared } = Reflect.get(globalThis, "__gnoworldSpace") as Space;
+    const { x, y, z } = rig.eye;
+    return {
+      flying: rig.flying,
+      along: rig.along,
+      kind: place?.kind,
+      id: place !== undefined && "id" in place ? place.id : undefined,
+      neared,
+      flights: Number(Reflect.get(globalThis, "__flights") ?? 0),
+      eye: { x, y, z },
+    };
+  });
+
+/** How many worlds the engine's universe lays out, the Earth among them: none before the worlds' file came. */
+export const worldsDrawn = (page: Page) =>
+  page.evaluate(() => (Reflect.get(globalThis, "__gnoworldSpace") as Space).universe?.planets.length ?? 0);
+
+// The old hook's reading, for the journeys not yet ported to `__gnoworldSpace` (f7a31433 deleted `__gnoworldScene`): their types, kept so they
+// still compile, and a `stats` that says so as it fails. A journey ported is off this list; the last one takes these away.
 interface Spot {
   x: number;
   y: number;
@@ -60,6 +121,14 @@ interface Stats {
   flight: FlightStats | undefined;
 }
 
+/** The old hook is gone: a journey still reading it fails here; read the engine (`flightOf`, `worldsDrawn`, `framesOf`) instead. */
+export const stats = (page: Page) =>
+  page.evaluate((): Stats => {
+    throw new Error(
+      "`__gnoworldScene.stats()` went in f7a31433: port this journey to `__gnoworldSpace` (sceneStage.ts)",
+    );
+  });
+
 /** The JS heap in use after a garbage collection, through CDP. */
 export async function heapOf(cdp: CDPSession): Promise<number> {
   await cdp.send("HeapProfiler.collectGarbage");
@@ -76,12 +145,6 @@ export async function gpuOf(page: Page): Promise<{ geometries: number; textures:
     return { geometries, textures };
   });
 }
-
-export const stats = (page: Page) =>
-  page.evaluate(() => {
-    const scene: unknown = Reflect.get(globalThis, "__gnoworldScene");
-    return (scene as { stats: () => Stats }).stats();
-  });
 
 // Every layout shift the page makes, from before its first paint, kept for `shifted`.
 export const countShifts = (page: Page) =>
@@ -125,14 +188,14 @@ export async function held(page: Page) {
 
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
-/** The home's dive over (7d7): its cosmos came and stands at rest, the dissolve's picture gone. Until then the camera looks at the Earth
- * from the whole cosmos, so the sky and the worlds are not the arrival's. */
+/** The home's dive over: the worlds' file came and the camera stands at the home, at rest. Until then it flies in from the whole cosmos, so
+ * the sky and the worlds are not the arrival's. */
 export const landed = (page: Page) =>
   expect
     .poll(
       async () => {
-        const dive = (await stats(page)).cosmos?.dive;
-        return dive?.along === 1 && dive.veil === 0;
+        const flight = await flightOf(page);
+        return flight.kind === "home" && !flight.flying && flight.neared && (await worldsDrawn(page)) > 0;
       },
       { timeout: 90_000 },
     )
@@ -169,3 +232,10 @@ export const hideThePage = (page: Page) =>
       )
         child.style.visibility = "hidden";
   });
+
+/** The router's own move, as a link on the page would make it: no load, the engine kept. */
+export const goInPage = (page: Page, path: string) =>
+  page.evaluate((to) => {
+    history.pushState(null, "", to);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, path);

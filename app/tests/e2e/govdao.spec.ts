@@ -4,7 +4,7 @@ import { violations } from "./axe.ts";
 import { CORS, HOME, RPC } from "./govdaoChain.ts";
 import { box, near } from "./geometry.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { opened, stats } from "./sceneStage.ts";
+import { opened } from "./sceneStage.ts";
 
 // GovDAO, a world with a realm (docs/decisions.md, 2026-10-31): its page reads the realm's proposals from the chain, in the format
 // RECORDED on onyx-1 (tests/chain/recorded: its first line is the recording's own comment). The page states no threshold, so the
@@ -150,18 +150,26 @@ test.describe("GovDAO with an open proposal", () => {
     await page.goto("/w/govdao?test-gpu");
     await hydrated(page);
     const plate = page.locator("[data-look='plate']");
+    // The page's text waits for the flight to near its planet, slow on the gate's software GPU.
     await expect(plate.getByRole("status").filter({ hasText: "Proposal 14" })).toHaveText(
       "Proposal 14 · YES 33% · NO 0%",
+      { timeout: 90_000 },
     );
     await expect(plate).not.toContainText(/YES \d+% of/);
     await opened(page);
-    const ring = async () =>
-      ((await stats(page)) as unknown as { world?: { ring?: { moon: number; against?: number; mark?: number } } }).world
-        ?.ring;
-    await expect.poll(async () => (await ring())?.against, { timeout: 90_000 }).toBe(0);
-    const shown = await ring();
-    expect(shown?.mark, "no threshold's mark").toBeUndefined();
-    expect(shown?.moon).toBeCloseTo(Math.PI * (1 - 33.33333333333333 / 100), 6);
+    // The ring is the page's own (features/world/StatusRing.tsx), drawn round the planet in its globe box: a track and the yes arc, a no arc
+    // only where the no share is above 0, a tick only where a threshold exists. The yes arc's dash is its share of the circle.
+    const ring = page.locator("[data-globe] svg");
+    await expect(ring.locator("circle")).toHaveCount(2, { timeout: 90_000 });
+    await expect(ring.locator("line"), "no threshold's mark").toHaveCount(0);
+    const [dash, round] = await ring
+      .locator("circle")
+      .nth(1)
+      .evaluate((yes) => {
+        const [lit = NaN] = (yes.getAttribute("stroke-dasharray") ?? "").split(" ").map(Number);
+        return [lit, 2 * Math.PI * Number(yes.getAttribute("r"))];
+      });
+    expect(dash / round).toBeCloseTo(33.33333333333333 / 100, 6);
     expect(await violations(page)).toEqual([]);
   });
 });
