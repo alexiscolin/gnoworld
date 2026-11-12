@@ -36,6 +36,8 @@ export function useUnread(on: boolean, api: UnreadApi = PAGE): Unread["worlds"] 
     const stop = forwardPlaces(store, async (placed) => (await places(placed)).ok, { everyMs: FORWARD_EVERY_MS });
     return () => {
       live = false;
+      // A log out or a close leaves nothing for the next account to see before its own answer.
+      setWorlds(NONE);
       clearInterval(timer);
       removeEventListener("focus", ask);
       stop();

@@ -12,6 +12,8 @@ import type { Language } from "./lib/language.ts";
 export const GATHER_MS = 100;
 /** A refusal for the rate is tried again after this. */
 export const RETRY_MS = 30_000;
+/** A line the server left for later, or still being made, is asked this many times at most. */
+const TRIES = 3;
 
 /** What the page holds of a line in a language: asked or being made, translated (folded away or not), already in that language, or failed. */
 export type Translation =
@@ -36,6 +38,7 @@ export interface Of {
 const keyOf = ({ room, id, language }: Of) => `${room}|${id}|${language}`;
 const heard = new Heard();
 const entries = new Map<string, Translation>();
+const tries = new Map<string, number>();
 let halted: "spent" | "off" | undefined;
 // Newest first.
 let queue: Want[] = [];
@@ -61,12 +64,42 @@ function wait(ms: number): void {
 const heldOf = (one: LineTranslations["translations"][number]): Translation =>
   one.status === "translated" ? { state: "done", text: one.text, from: one.from, hidden: false } : { state: "same" };
 
-// What a batch's answer says of a line: stored, still being made, or left out (failed; none while the asking is halted).
+// What a batch's answer says of a line: stored, or left out (failed; none while the asking is halted).
 function outcomeOf(id: string, answer: LineTranslations | undefined): Translation | undefined {
   const one = answer?.translations.find((each) => each.msgid === id);
   if (one !== undefined) return heldOf(one);
-  if (answer?.pending.includes(id) === true) return { state: "asking" };
   return halted === undefined ? { state: "failed" } : undefined;
+}
+
+// Lines the answer left for later or still being made, asked again after RETRY_MS unless the stream told them meanwhile.
+function again(wants: readonly Want[]): void {
+  setTimeout(() => {
+    const still = wants.filter(({ of }) => entries.get(keyOf(of))?.state === "asking");
+    if (halted !== undefined || still.length === 0) return;
+    queue.unshift(...still);
+    if (timer === undefined && !busy) wait(GATHER_MS);
+  }, RETRY_MS);
+}
+
+const leftOf = (id: string, answer: LineTranslations | undefined): boolean =>
+  answer !== undefined &&
+  !answer.translations.some(({ msgid }) => msgid === id) &&
+  [...answer.pending, ...(answer.later ?? [])].includes(id);
+
+// Puts a line's outcome in the store; whether it is to be asked again (left for later or still being made, a bounded number of times).
+function settleLine(each: Want, answer: LineTranslations | undefined): boolean {
+  const { of } = each;
+  const key = keyOf(of);
+  const left = leftOf(of.id, answer);
+  const asked = (tries.get(key) ?? 0) + 1;
+  if (left && asked < TRIES) {
+    tries.set(key, asked);
+    put(key, { state: "asking" });
+    return true;
+  }
+  tries.delete(key);
+  put(key, left ? { state: "failed" } : outcomeOf(of.id, answer));
+  return false;
 }
 
 function settle(batch: readonly Want[], result: Result<LineTranslations>): number {
@@ -80,7 +113,8 @@ function settle(batch: readonly Want[], result: Result<LineTranslations>): numbe
     halted = answer.halt;
     queue = [];
   }
-  for (const { of } of batch) put(keyOf(of), outcomeOf(of.id, answer));
+  const waiting = batch.filter((each) => settleLine(each, answer));
+  if (waiting.length > 0) again(waiting);
   return 0;
 }
 
@@ -129,12 +163,15 @@ export function wantTranslation(of: Of, ask: Ask = pageAsk): () => void {
 export function translationsTold(events: readonly TranslationEvent[]): void {
   for (const event of events) {
     const key = keyOf({ room: event.room, id: event.msgid, language: event.language });
-    put(
-      key,
-      event.status === "original"
-        ? { state: "same" }
-        : { state: "done", text: event.text, from: event.from, hidden: false },
-    );
+    tries.delete(key);
+    if (event.status === "gone") put(key, undefined);
+    else
+      put(
+        key,
+        event.status === "original"
+          ? { state: "same" }
+          : { state: "done", text: event.text, from: event.from, hidden: false },
+      );
   }
   heard.tell();
 }

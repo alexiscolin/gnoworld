@@ -151,7 +151,7 @@ export function ChatPanel({ world, place, room }: { world: string; place: ChatPl
   }
   if (!loaded) return LOADING;
   // A visitor has no direct message: the rooms that could not load are all the page says.
-  if (failed !== undefined) return failed;
+  if (failed !== undefined) return <div data-chat-failed="">{failed}</div>;
   return (
     <GuestLoaded
       sections={sections ?? []}

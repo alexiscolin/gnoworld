@@ -66,11 +66,11 @@ describe("the translations' store", () => {
       store.set({ room: "#bubble", msgid: "m2", language: language }, { status: "original" });
     }
     store.set({ room: "#other", msgid: "m1", language: "fr" }, { status: "original" });
-    expect(store.drop("#bubble", "m1")).toBe(true);
+    expect(store.drop("#bubble", "m1").toSorted()).toEqual(["de", "fr"]);
     expect(store.many("#bubble", ["m1", "m2"], "fr")).toEqual([{ msgid: "m2", status: "original" }]);
     expect(store.many("#bubble", ["m1"], "de")).toEqual([]);
     expect(store.many("#other", ["m1"], "fr")).toHaveLength(1);
-    expect(store.drop("#bubble", "m1")).toBe(false);
+    expect(store.drop("#bubble", "m1")).toEqual([]);
   });
 
   it("expires rows past 30 days, then the oldest past the row cap, at most `limit` a call, and says how many went", () => {

@@ -135,7 +135,7 @@ test.describe("the country tag", () => {
       await page.setViewportSize({ width, height });
       await asAccount(page);
       // A phone's full chat covers the site's header, and the account's pill with it: the chat is closed to reach Settings.
-      if (width < 600) await page.getByRole("button", { name: "Close the full chat" }).click();
+      if (width < 600) await page.getByRole("button", { name: "Close the chat" }).click();
       const dialog = await openSettings(page);
       await expect(countryList(dialog)).toHaveValue("JP");
       expect((await new AxeBuilder({ page }).include("#settings-privacy").analyze()).violations).toEqual([]);

@@ -157,10 +157,12 @@ test.describe("⌘K", () => {
   });
 
   test("typing in it sends no request", async ({ page }) => {
-    await ready(page);
+    await ready(page, "/w/bubble");
     // The arrival's code and the expedition's come a second after load (Later.tsx), past a networkidle some runs (8i): its
     // pill says both came, so neither lands in the count.
-    await expect(page.getByRole("status").getByText("Stamped · Earth")).toBeVisible();
+    await expect(page.getByRole("status").getByText("Stamped · Bubble")).toBeVisible();
+    // The dock's chat asks the world's rooms once it comes: it is drawn before the count starts.
+    await expect(page.locator("#chat").getByRole("textbox")).toBeVisible();
     await page.keyboard.press("Control+k");
     await expect(shelves(page)).toBeVisible();
     // The page's own settling (the worker, a poll) and the palette's first words (the label font, loaded when first drawn) are over
@@ -172,7 +174,8 @@ test.describe("⌘K", () => {
       if (!request.url().includes("/world-pictures/")) sent.push(request.url());
     });
     await field(page).pressSequentially("bubble", { delay: 20 });
-    await expect(choices(page, /Bubble/)).toBeVisible();
+    // On a world's page its rooms are listed beside it: the world is the first.
+    await expect(choices(page, /Bubble/).first()).toBeVisible();
     await field(page).fill("");
     await field(page).pressSequentially("zzz");
     await expect(page.getByText(/no place/i)).toBeVisible();

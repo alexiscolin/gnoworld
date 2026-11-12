@@ -53,6 +53,7 @@ export function translationRoutes({
       ids: ids.data,
       language: language.data,
       signedIn: who !== undefined,
+      account: who,
     });
     c.header("cache-control", "no-store");
     return c.json(answer satisfies LineTranslations);

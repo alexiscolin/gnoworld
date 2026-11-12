@@ -27,7 +27,7 @@ afterEach(() => {
   for (const db of opened.splice(0)) if (db.isOpen) db.close();
 });
 
-function setup() {
+function setup(perSecond = 1000) {
   const roles: Typed = {
     team: new Set(),
     worlds: new Map([["bubble", { rules: RULES, groups: new Map(), rooms: new Map() }]]),
@@ -36,7 +36,7 @@ function setup() {
   opened.push(db);
   const clock = { now: T0 };
   const search = makeSearch(db, { roles, now: () => clock.now });
-  const real = makeUnread(db, { roles, archived: () => false, now: () => clock.now });
+  const real = makeUnread(db, { roles, archived: () => false, exists: () => true, now: () => clock.now });
   const calls = { counts: 0 };
   const unread: UnreadStore = {
     ...real,
@@ -56,6 +56,7 @@ function setup() {
       origins: [ORIGIN],
       log,
       now: () => clock.now,
+      perSecond,
     }),
   );
   let serial = 0;
@@ -166,14 +167,25 @@ describe("the places a page forwards", () => {
     expect(await t.counts("alice")).toEqual({ bubble: 1 });
   });
 
-  it("refuses the 601st write of an account in a minute with 429, and not another account's", async () => {
+  it("an account's 31st POST in a minute is refused, and not another account's", async () => {
     const t = setup();
     const body = { places: [t.place("#bubble", T0)] };
-    for (let n = 0; n < 600; n += 1) expect((await t.post(body, "alice")).status).toBe(204);
+    for (let n = 0; n < 30; n += 1) expect((await t.post(body, "alice")).status).toBe(204);
     expect((await t.post(body, "alice")).status).toBe(429);
     expect((await t.post(body, "bob")).status).toBe(204);
     t.clock.now += MINUTE;
     expect((await t.post(body, "alice")).status).toBe(204);
+  });
+
+  it("refuses a POST past the second's limit shared by all accounts, then takes one the next second", async () => {
+    const t = setup(2);
+    const body = { places: [t.place("#bubble", T0)] };
+    expect((await t.post(body, "alice")).status).toBe(204);
+    expect((await t.post(body, "bob")).status).toBe(204);
+    expect((await t.post(body, "alice")).status).toBe(429);
+    expect((await t.post(body, "bob")).status).toBe(429);
+    t.clock.now += 1000;
+    expect((await t.post(body, "bob")).status).toBe(204);
   });
 });
 

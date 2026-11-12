@@ -5,10 +5,11 @@ import Earth, { loader as earthLoader } from "./routes/earth.tsx";
 import { clientLoader as cosmosLoader } from "./routes/cosmos.tsx";
 import Home, { ErrorBoundary as HomeError, loader as homeLoader } from "./routes/home.tsx";
 import World, { ErrorBoundary as WorldError, loader as worldLoader } from "./routes/world.tsx";
-import { siteOf } from "./places.ts";
+import { site, siteOf } from "./places.ts";
 import { PLANTED } from "./placesFixture.ts";
 import { Shell } from "./shell.tsx";
 import { ShellHeader } from "./shellHeader.tsx";
+import { levelsOf } from "./shellWays.tsx";
 
 // Slice 5r (O1, O4): the header as the video's frames 1, 20 and 37 show it: the logo, the views Universe, System and Earth, the
 // network named, "Testnet" on a testnet, search. Slice 8: the middle view says "Universe" (Alexis), Jarvis is coming soon, the chat and
@@ -203,6 +204,12 @@ describe("the header", () => {
     expect(html).not.toMatch(/undefined|NaN|\[object/);
     expect(html).toContain(`href="${world}"`);
   });
+});
+
+// A path that names no world (`/w/`) still names its World level: its link has text for a reader that cannot see it.
+test("/w/: the World level has a name", () => {
+  const world = levelsOf(site.universeAt("/w/"), "/w/").levels.find((level) => level.view === "world");
+  expect(world?.name).not.toBe("");
 });
 
 // O4: "Testnet" says what the data says of a universe, not what a name or a default says. The real data has one testnet and it is

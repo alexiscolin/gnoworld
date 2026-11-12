@@ -36,6 +36,8 @@ interface Options {
   said?: { expire: (limit: number) => number };
   // The stored translations: past 30 days or the table's cap, after the others.
   translations?: { expire: (limit: number) => number };
+  // The unread pill's reading places: past 90 days, after the translations.
+  unread?: { expire: (limit: number) => number };
 }
 
 export interface Retention {
@@ -108,6 +110,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       ["kept_expire", options.kept],
       ["said_expire", options.said],
       ["translations_expire", options.translations],
+      ["unread_expire", options.unread],
     ] as const;
     return owned.reduce((left, [name, owner]) => (left > 0 ? expireWith(name, owner, left) : left), budget);
   };

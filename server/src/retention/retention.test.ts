@@ -687,3 +687,23 @@ describe("Jarvis's public answers' retention", () => {
     db.close();
   });
 });
+
+describe("the unread places' retention", () => {
+  it("asks the unread places to expire, with the budget the earlier owners leave", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const asked: number[] = [];
+    makeRetention(db, {
+      log: logger(PEPPER, () => undefined),
+      now: () => T0,
+      batch: 7,
+      unread: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});

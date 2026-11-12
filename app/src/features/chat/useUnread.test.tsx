@@ -60,6 +60,18 @@ const idle = () =>
     window.dispatchEvent(new Event("focus"));
   });
 
+// The chat opened for an account that has a count, asked once, then closed.
+async function askedThenClosed(): Promise<ReturnType<typeof setup>> {
+  const t = setup(ok({ bubble: 3 }));
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(0);
+  });
+  act(() => {
+    t.draw(false);
+  });
+  return t;
+}
+
 describe("useUnread", () => {
   it("asks once on opening and holds the answer", async () => {
     const t = setup(ok({ bubble: 3 }));
@@ -113,15 +125,18 @@ describe("useUnread", () => {
   });
 
   it("stops asking and drops its number once the chat closes", async () => {
-    const t = setup(ok({ bubble: 3 }));
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(0);
-    });
-    act(() => {
-      t.draw(false);
-    });
+    const t = await askedThenClosed();
     await idle();
     expect(t.counts).toHaveBeenCalledTimes(1);
+    expect(t.last()).toEqual({});
+  });
+
+  it("shows no number of the last session on reopening, before the new answer", async () => {
+    const t = await askedThenClosed();
+    t.counts.mockImplementationOnce(() => new Promise<Result<Unread>>(() => undefined));
+    act(() => {
+      t.draw(true);
+    });
     expect(t.last()).toEqual({});
   });
 

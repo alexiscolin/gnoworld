@@ -35,6 +35,14 @@ export class Rings<T> extends Map<string, T[]> {
     if (kept.length > this.#pending) kept.shift();
     if (kept.length === 1 && this.size < 10_000) this.set(key, kept);
   }
+
+  /** Drops the entries `gone` names from a key's ring. */
+  purge(key: string, gone: (entry: T) => boolean): void {
+    const kept = this.get(key)?.filter((entry) => !gone(entry));
+    if (kept === undefined) return;
+    if (kept.length === 0) this.delete(key);
+    else this.set(key, kept);
+  }
 }
 
 export function translationSide<C extends Watcher>(
@@ -54,7 +62,10 @@ export function translationSide<C extends Watcher>(
   const ringOf = (room: string, language: Language): string => `${room} ${language}`;
   const keep = (event: TranslationEvent): void => {
     const id = next();
-    rings.push(ringOf(event.room, event.language), { id, event });
+    const ring = ringOf(event.room, event.language);
+    // A gone line is told to the readers now and kept from the ring: a replay never holds words that were edited or hidden.
+    if (event.status === "gone") rings.purge(ring, (entry) => entry.event.msgid === event.msgid);
+    else rings.push(ring, { id, event });
     const text = frame(id, event);
     for (const client of clients)
       if (client.language === event.language && client.rooms.has(event.room)) write(client, text);

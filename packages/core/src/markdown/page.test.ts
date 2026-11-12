@@ -1868,6 +1868,12 @@ describe("page: the edges StrykerJS found in the page reader", () => {
     expect(blocks.map((block) => block.type)).toStrictEqual(["columns", "columns"]);
   });
 
+  test("reads a plain columns block after five stacks, each one past the cap deep, were closed", () => {
+    const stack = `${"<gno-columns>\n".repeat(5)}x\n${"</gno-columns>\n".repeat(5)}`;
+    const blocks = blocksOf(`${stack.repeat(5)}<gno-columns>\ny\n</gno-columns>`);
+    expect(blocks.map((block) => block.type)).toStrictEqual(Array<string>(6).fill("columns"));
+  });
+
   test("makes no columns of a fifth opener whose only mate is the one closer there is", () => {
     // The first four openers never close, so the fifth stands at depth five: past the cap, it and its closer stay text.
     const source = `${"<gno-columns>\n".repeat(5)}x\n</gno-columns>`;

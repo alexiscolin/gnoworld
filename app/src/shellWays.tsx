@@ -4,6 +4,7 @@
 import { Icon, type IconName } from "@gnoworld/ui";
 import { useEffect, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
+import { useDrawnPath } from "./drawnPath.ts";
 import { isHome, systemOfPage, systemPath, trimmed } from "./cosmosAt.ts";
 import { asksFull, fullChatHref, holdsChat, leaveDock } from "./fullChat.ts";
 import { useViewKeys } from "./features/universe/viewKeys.ts";
@@ -35,7 +36,8 @@ const VERSION = /^v\d+$/;
 // A realm's name: its last part, its version left out.
 function realmName(path: string): string {
   const parts = (/\/r\/(.+)/.exec(path)?.[1] ?? "").split("/").filter((part) => !VERSION.test(part));
-  return parts.at(-1) ?? path;
+  const last = parts.at(-1);
+  return last === undefined || last === "" ? path : last;
 }
 
 // The world the page at `pathname` is: the Earth, a hub's world by its name, a realm by its last part.
@@ -130,7 +132,8 @@ const chatOf = (href: string, world: Spot) => fullChatHref(holdsChat(href.split(
 /** The chat full of the page in view, else of the world the World level leads to (D444): beside that level, after a divider, and in the
  * cream while it is open. A page with a chat under the dock's width is its chat already: none there. */
 export function ChatWay({ world }: { world: Spot }) {
-  const { pathname, search } = useLocation();
+  const pathname = useDrawnPath();
+  const { search } = useLocation();
   const full = asksFull(new URLSearchParams(search));
   return (
     <span className={styles["chatWay"]} data-chat-page={holdsChat(pathname) ? "" : undefined}>

@@ -87,9 +87,23 @@ export class TranslationStore {
     });
   }
 
-  /** Drops every language of a line; whether it had any. */
-  drop(room: string, msgid: string): boolean {
-    return this.#run("DELETE FROM line_translations WHERE room = ? AND msgid = ?", room, msgid) > 0;
+  /** Drops every language of a line; the languages it had. */
+  drop(room: string, msgid: string): Language[] {
+    const held = z
+      .array(z.object({ language: z.enum(JARVIS_LANGUAGES) }))
+      .parse(this.#db.prepare("SELECT language FROM line_translations WHERE room = ? AND msgid = ?").all(room, msgid));
+    this.#run("DELETE FROM line_translations WHERE room = ? AND msgid = ?", room, msgid);
+    return held.map(({ language }) => language);
+  }
+
+  /** The id of the line an edit was folded into by the search index, if it still holds it. */
+  lineOf(room: string, edit: string): string | undefined {
+    const row = this.#db
+      .prepare(
+        "SELECT lines.msgid AS msgid FROM line_edits JOIN lines ON lines.rowid = line_edits.line WHERE line_edits.edit = ? AND lines.room = ?",
+      )
+      .get(edit, room);
+    return row === undefined ? undefined : z.object({ msgid: z.string() }).parse(row).msgid;
   }
 
   count(): number {

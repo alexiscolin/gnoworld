@@ -10,10 +10,21 @@ import { gpuOf, heapOf } from "./sceneStage.ts";
 // heap, the DOM's nodes and listeners and the GPU's resources stay at their baseline.
 test.describe.configure({ timeout: 1_800_000 });
 test.use({ viewport: { width: 1728, height: 1080 } });
+// The JIT is off: its compiled code fills the V8 heap round after round (about 0.2 MB a round, 14 rounds: code +2.1 MB, every object, string, closure
+// and array flat within 1 %, heap snapshots of rounds 4 and 14) and would hide a real retention; with it off the heap is flat from round 2.
+// (--single-process as the config has it in Claude Code's sandbox; test.use replaces the config's args.)
+test.use({
+  launchOptions: {
+    args: [
+      ...(process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : []),
+      "--js-flags=--no-turbofan --no-maglev --no-sparkplug",
+    ],
+  },
+});
 
 const ROUNDS = 10;
-// Four rounds: the lazy chunks, the caches and the fonts a first visit loads are in by then (the heap still rose 0.7 MB in round 3, 0.4 after).
-const WARM = 4;
+// Two rounds: the lazy chunks, the caches and the fonts a first visit loads are in by then.
+const WARM = 2;
 // A tenth over the baseline for the heap, the nodes and the listeners: a collection that has not run, a list as long as the day's lines.
 const MARGIN = 1.1;
 const SLOW = { timeout: 30_000 };

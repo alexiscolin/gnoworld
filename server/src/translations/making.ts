@@ -17,6 +17,7 @@ const AT_ONCE = 4;
 const QUEUE = 200;
 const CALL_MS = 30_000;
 const DROPS = 5000;
+const ignored = (): undefined => undefined;
 
 function makeSlots() {
   const waiting: ((granted: boolean) => void)[] = [];
@@ -44,6 +45,14 @@ function makeSlots() {
   };
 }
 
+const translated = (key: Line & { language: Language }, answer: { text: string; from?: Language | undefined }) =>
+  ({
+    ...key,
+    status: "translated",
+    text: answer.text,
+    ...(answer.from === undefined ? {} : { from: answer.from }),
+  }) as const;
+
 export interface MakerOptions {
   store: TranslationStore;
   translate: Translate | undefined;
@@ -56,9 +65,9 @@ export function makeMaker({ store, translate, publish, log, now }: MakerOptions)
   const slots = makeSlots();
   const breaker = limiter({ max: 60, windowMs: 60_000, keys: 1 });
   const stopping = new AbortController();
-  // How many times a line was dropped: a making that began before a drop is not stored.
   const drops = new Map<string, number>();
   const inflight = new Map<string, Promise<Outcome>>();
+  const running = new Set<Promise<Outcome>>();
   const dropsOf = ({ room, msgid }: Line): number => drops.get(`${room} ${msgid}`) ?? 0;
 
   const settled = (line: Line, language: Language, answer: JarvisTranslation): Outcome => {
@@ -67,12 +76,7 @@ export function makeMaker({ store, translate, publish, log, now }: MakerOptions)
     if (answer.status === "original") {
       if (store.set(key, { status: "original" })) publish({ ...key, status: "original" });
     } else if (store.set(key, answer)) {
-      publish({
-        ...key,
-        status: "translated",
-        text: answer.text,
-        ...(answer.from === undefined ? {} : { from: answer.from }),
-      });
+      publish(translated(key, answer));
     }
     return "stored";
   };
@@ -106,18 +110,18 @@ export function makeMaker({ store, translate, publish, log, now }: MakerOptions)
     return settled(line, language, called.answer);
   };
 
-  // One making a line and language at a time, whoever asks.
   const make = (line: Line, text: string, language: Language): Promise<Outcome> => {
     const key = `${line.room} ${line.msgid} ${language}`;
     const found = inflight.get(key);
     if (found !== undefined) return found;
-    const started = run(line, text, language).finally(() => {
-      inflight.delete(key);
+    const started: Promise<Outcome> = run(line, text, language).finally(() => {
+      if (inflight.get(key) === started) inflight.delete(key);
+      running.delete(started);
     });
     inflight.set(key, started);
+    running.add(started);
     return started;
   };
-  const ignored = (): undefined => undefined;
 
   return {
     make,
@@ -125,13 +129,14 @@ export function makeMaker({ store, translate, publish, log, now }: MakerOptions)
     fire(line: Line, text: string, language: Language): void {
       make(line, text, language).then(ignored, ignored);
     },
-    /** A line taken or edited: its rows go, and a making begun before is not stored. */
+    /** A line taken or edited: its rows go and are told gone, its makings under way are let go (a new ask makes anew), and one begun before is not stored. */
     drop(line: Line): void {
       remember(drops, [`${line.room} ${line.msgid}`, dropsOf(line) + 1], DROPS);
-      store.drop(line.room, line.msgid);
+      for (const key of inflight.keys()) if (key.startsWith(`${line.room} ${line.msgid} `)) inflight.delete(key);
+      for (const language of store.drop(line.room, line.msgid)) publish({ ...line, language, status: "gone" });
     },
     async idle(): Promise<void> {
-      while (inflight.size > 0) await Promise.allSettled([...inflight.values()]);
+      while (running.size > 0) await Promise.allSettled([...running]);
     },
     stop(): void {
       stopping.abort();

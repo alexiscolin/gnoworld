@@ -104,10 +104,11 @@ export function linkFor({
     onJoin: reconciler.joined,
     ...kept.hooks,
     onRedact: (room, msgid) => {
+      // Before the index drops its row, which holds the edits' ids a translation is found by.
+      translations?.redacted(room, msgid);
       kept.hooks.onRedact(room, msgid);
       recent.taken(room, msgid);
       cards?.redacted(room, msgid);
-      translations?.redacted(room, msgid);
     },
     onChannels: unknownChannels(db, log),
     onMessage,

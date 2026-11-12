@@ -96,6 +96,8 @@ test.describe("threads", () => {
     await lines(page).nth(1).hover();
     await barOf(page, 1).getByRole("button", { name: "Reply" }).click();
     await expect(page.getByRole("form", { name: "Write in #games" })).toContainText("Replying to");
+    // The pointed line's bar stands over the line above it: the pointer goes to the root first, as a reader's does.
+    await lines(page).first().hover();
     await chipOf(lines(page).first()).click();
     await threadField(page).fill("to the root");
     await threadField(page).press("Enter");
@@ -248,8 +250,12 @@ test.describe("threads", () => {
   }) => {
     const { ergo } = await open(page);
     await chipOf(lines(page).first()).click();
+    // The panel is open, its field focused, when the line goes: a redaction while it opens is another case.
+    await expect(threadField(page)).toBeFocused();
     ergo().send(`:${MEMBER}!u@h REDACT ${ROOM} m1`);
     await expect(lines(page)).toHaveCount(3);
+    // The panel has taken the redaction in: its root is "an earlier message" now, and the field still holds the focus.
+    await expect(panel(page).getByRole("heading", { name: /an earlier message/ })).toBeVisible();
     await expect(threadField(page)).toBeFocused();
     // The room's own stop is its newest line, before the panel goes and after.
     await expect(lines(page).last()).toHaveAttribute("tabindex", "0");

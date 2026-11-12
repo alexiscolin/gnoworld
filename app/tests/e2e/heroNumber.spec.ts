@@ -57,6 +57,10 @@ for (const width of [390, 1280]) {
     // The hero as the frames draw it (2 to 8), with a count: from its kicker to its actions, the live line and the ticker left out.
     test("the hero as it looks with its number", async ({ page }) => {
       await page.emulateMedia({ reducedMotion: "reduce" });
+      // A first visit's welcome card is not the hero: it is told away.
+      await page.addInitScript(() => {
+        localStorage.setItem("gnoworld:welcomed", "1");
+      });
       await served(page);
       await page.goto("/");
       await hydrated(page);
@@ -64,8 +68,9 @@ for (const width of [390, 1280]) {
       const kicker = await box(page, "[data-clear] > p");
       const actions = await box(page, "[data-hero='actions']");
       const top = Math.floor(kicker.y) - 8;
+      // The hero's own column: the rail's panel, which rises at its own time at the right, is not in the picture.
       await expect(page).toHaveScreenshot(`hero-${String(width)}.png`, {
-        clip: { x: 0, y: top, width, height: Math.ceil(actions.y + actions.height) + 8 - top },
+        clip: { x: 0, y: top, width: Math.min(width, 800), height: Math.ceil(actions.y + actions.height) + 8 - top },
       });
     });
 

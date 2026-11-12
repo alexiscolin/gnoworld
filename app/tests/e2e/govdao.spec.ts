@@ -75,7 +75,9 @@ for (const width of [390, 1280, 1728] as const) {
       const newest = card.getByRole("link", { name: /Set validator gno-core-validator-1 to voting power 60/ }).first();
       await expect(newest).toBeVisible();
       await expect(newest).toContainText("#37");
-      await expect(card.getByRole("listitem").filter({ has: newest })).toContainText("Accepted");
+      await expect(card.getByRole("listitem").filter({ has: page.getByRole("link", { name: /#37/ }) })).toContainText(
+        "Accepted",
+      );
       // The recorded pages state no threshold: none is shown, never the video's; no open proposal, so no pill and no ring.
       await expect(plate).not.toContainText("66.66");
       await expect(plate).not.toContainText(/YES \d/);

@@ -47,10 +47,13 @@ for (const width of [390, 1280] as const) {
       await expect(box).toBeEditable();
     }
     // The card opens over the bar inside the dock: the bar stays on the screen, the card scrolls in its own box (design review, 9e-1).
+    // Under 1280 px the chat is a block of the page, which scrolls: the bar is there, not fixed to the screen.
     const row = await bar(page).boundingBox();
-    expect(row !== null && row.y + row.height <= (page.viewportSize()?.height ?? 0)).toBe(true);
-    await card.getByRole("button", { name: "Sign in Adena" }).scrollIntoViewIfNeeded();
-    await expect(card.getByRole("button", { name: "Sign in Adena" })).toBeInViewport();
+    if (width >= 1280) expect(row !== null && row.y + row.height <= (page.viewportSize()?.height ?? 0)).toBe(true);
+    else await expect(bar(page)).toBeVisible();
+    // A visitor's card offers Connect Adena where a connected account's offers Sign in Adena.
+    await card.getByRole("button", { name: "Connect Adena" }).scrollIntoViewIfNeeded();
+    await expect(card.getByRole("button", { name: "Connect Adena" })).toBeInViewport();
     // Its title is the action's name, as the video's card is named ("Boop the pot", f0110); the function keeps its row.
     await expect(card.getByRole("heading", { name: "Vote" })).toBeVisible();
     await sound(page);

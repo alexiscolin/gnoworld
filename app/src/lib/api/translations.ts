@@ -13,11 +13,12 @@ const sound = (room: string, ids: readonly string[], language: string): boolean 
   JARVIS_LANGUAGES.some((known) => known === language);
 
 // Whether an answer names what was asked alone.
-const named = ({ room, language, translations, pending }: LineTranslations, asked: Asked): boolean =>
+const named = ({ room, language, translations, pending, later = [] }: LineTranslations, asked: Asked): boolean =>
   room === asked.room &&
   language === asked.language &&
   translations.every(({ msgid }) => asked.ids.has(msgid)) &&
-  pending.every((msgid) => asked.ids.has(msgid));
+  pending.every((msgid) => asked.ids.has(msgid)) &&
+  later.every((msgid) => asked.ids.has(msgid));
 
 interface Asked {
   room: string;

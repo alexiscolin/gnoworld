@@ -6,6 +6,7 @@ import { Cluster, Logo } from "@gnoworld/ui";
 import { Fragment, useRef } from "react";
 import { Link, useLocation } from "react-router";
 import { useWoken } from "./features/home/clock.ts";
+import { useDrawnPath } from "./drawnPath.ts";
 import { asksFull } from "./fullChat.ts";
 import { AccountMenu } from "./features/account/index.ts";
 import { Network } from "./features/account/Network.tsx";
@@ -73,7 +74,8 @@ function LevelLink({
 }
 
 export function ShellHeader({ universe }: { universe: UniverseView }) {
-  const { pathname, search } = useLocation();
+  const pathname = useDrawnPath();
+  const { search } = useLocation();
   // In the full chat the cream is Chat's: no level is in view, each leaves the chat for its place in space.
   const full = asksFull(new URLSearchParams(search));
   const current = full ? undefined : site.viewAt(universe, pathname);

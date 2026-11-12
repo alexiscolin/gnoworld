@@ -5,8 +5,9 @@ import "@gnoworld/ui/styles.css";
 import layers from "@gnoworld/ui/layers.css?url";
 import { LATIN_FONTS } from "@gnoworld/ui/fonts";
 import type { ReactNode } from "react";
-import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
+import { Links, Meta, Outlet, Scripts, ScrollRestoration, useLocation } from "react-router";
 import { RouteError } from "./features/errors/index.ts";
+import { WRITTEN } from "./drawnPath.ts";
 import { markFullEarly } from "./fullChat.ts";
 import { Shell } from "./shell.tsx";
 
@@ -14,10 +15,11 @@ import { Shell } from "./shell.tsx";
 markFullEarly();
 
 export function Layout({ children }: { children: ReactNode }) {
+  const written = { [WRITTEN]: useLocation().pathname };
   return (
     // The root's marks set before React draws (fullChat.ts's data-chat): the page's own, never a mismatch to report. `data-first` holds the
     // header out of sight till the page's arrival takes it (arrival.ts).
-    <html lang="en" data-first="" suppressHydrationWarning>
+    <html lang="en" data-first="" {...written} suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />

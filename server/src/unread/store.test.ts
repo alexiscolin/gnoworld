@@ -35,8 +35,14 @@ function setup() {
   opened.push(db);
   const clock = { now: T0 };
   const archived = new Set<string>();
+  const missing = new Set<string>();
   const search: Search = makeSearch(db, { roles, now: () => clock.now });
-  const unread = makeUnread(db, { roles, archived: (room) => archived.has(room), now: () => clock.now });
+  const unread = makeUnread(db, {
+    roles,
+    archived: (room) => archived.has(room),
+    exists: (room) => !missing.has(room),
+    now: () => clock.now,
+  });
   let serial = 0;
   const line = (room: string, account: string, at: number): string => {
     serial += 1;
@@ -52,7 +58,7 @@ function setup() {
         : db.prepare("SELECT count(*) AS n FROM read_places WHERE account = ?")
       ).get(...(account === undefined ? [] : [account]))?.["n"],
     );
-  return { db, search, unread, clock, archived, roles, rooms, line, rows };
+  return { db, search, unread, clock, archived, missing, roles, rooms, line, rows };
 }
 
 describe("unread's store of places", () => {
@@ -107,6 +113,68 @@ describe("unread's store of places", () => {
     expect(t.unread.counts(ALICE)).toEqual({});
     t.unread.place(BOB, "#bubble", t.clock.now);
     expect(t.rows(ALICE)).toBe(0);
+  });
+});
+
+describe("unread's retention", () => {
+  it("expires the places past 90 days with no write, at most `limit` a call, and says how many went", () => {
+    const t = setup();
+    t.unread.place(ALICE, "#bubble", T0 - DAY);
+    t.unread.place(ALICE, "#bubble/club", T0 - DAY);
+    t.unread.place(BOB, "#bubble", T0 - DAY);
+    expect(t.unread.expire(10)).toBe(0);
+    t.clock.now = T0 + 90 * DAY + MINUTE;
+    expect(t.unread.expire(2)).toBe(2);
+    expect(t.rows()).toBe(1);
+    expect(t.unread.expire(2)).toBe(1);
+    expect(t.rows()).toBe(0);
+  });
+});
+
+describe("unread's store, what a call may write", () => {
+  it("a place in a room that does not exist is not kept", () => {
+    const t = setup();
+    t.missing.add("#ghost");
+    expect(t.unread.place(ALICE, "#ghost", T0 - MINUTE)).toBe(false);
+    expect(t.rows()).toBe(0);
+  });
+
+  it("a place in a room the account cannot read is not kept", () => {
+    const t = setup();
+    expect(t.unread.place(BOB, "#bubble/crew", T0 - MINUTE)).toBe(false);
+    expect(t.unread.place(ALICE, "#bubble/crew", T0 - MINUTE)).toBe(false);
+    t.archived.add("#bubble/club");
+    expect(t.unread.place(BOB, "#bubble/club", T0 - MINUTE)).toBe(false);
+    expect(t.rows()).toBe(0);
+    expect(t.unread.place(BOB, "#bubble", T0 - MINUTE)).toBe(true);
+    expect(t.rows()).toBe(1);
+  });
+
+  it("100 places are written in one transaction", () => {
+    const t = setup();
+    const sent: string[] = [];
+    const exec = t.db.exec.bind(t.db);
+    t.db.exec = (sql: string) => {
+      sent.push(sql);
+      exec(sql);
+    };
+    const places = Array.from({ length: 100 }, (_, n) => ({ room: `#room${String(n)}`, time: T0 - MINUTE }));
+    expect(t.unread.places(ALICE, places)).toBe(100);
+    expect(sent.filter((sql) => sql.startsWith("BEGIN"))).toHaveLength(1);
+    expect(sent.filter((sql) => sql.startsWith("COMMIT"))).toHaveLength(1);
+    expect(t.rows(ALICE)).toBe(100);
+  });
+
+  it("keeps the places that pass and drops the rest of a call, in one answer", () => {
+    const t = setup();
+    t.missing.add("#ghost");
+    const places = [
+      { room: "#bubble", time: T0 - MINUTE },
+      { room: "#ghost", time: T0 - MINUTE },
+      { room: "#garden", time: T0 + 10 * MINUTE },
+    ];
+    expect(t.unread.places(ALICE, places)).toBe(1);
+    expect(t.rows()).toBe(1);
   });
 });
 

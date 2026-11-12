@@ -2,8 +2,8 @@
 // document around it; apart, so a test can render it without the router's document components.
 import { Center } from "@gnoworld/ui";
 import { useEffect, type ReactNode } from "react";
-import { useLocation } from "react-router";
 import "./plugs.ts";
+import { useDrawnPath } from "./drawnPath.ts";
 import { DeviceViews } from "./features/account/index.ts";
 import { DockedChatHost, FullChatHost } from "./features/chat/index.ts";
 import { useSettingsApplied } from "./features/settings/applied.ts";
@@ -41,7 +41,7 @@ function Settled() {
 
 export function Shell({ children }: { children: ReactNode }) {
   useQueriesMounted();
-  const universe = site.universeAt(useLocation().pathname);
+  const universe = site.universeAt(useDrawnPath());
   // The header was held out of sight at the first paint (root.tsx): a page with a scene to wait for lets it in with the scene; any other (or a
   // page whose loader is slow, which mounts after this) lets it in once the page has had a moment to mount.
   useEffect(() => {

@@ -1,7 +1,7 @@
 // Whether the chat is full bleed over its page rather than docked beside the scene: it lives in the address (?chat=full),
 // so a reload and a shared link keep it. Where there is no dock (a narrow window) the chat is always full, the address
 // or not. Every link that changes the room carries the choice on.
-import { createContext, createElement, use, useEffect, type ReactNode } from "react";
+import { createContext, createElement, use, useEffect, useSyncExternalStore, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 import { asksFull, FULL } from "../../fullChat.ts";
 import { FullChatLinks } from "../../routerLink.tsx";
@@ -15,9 +15,19 @@ export function withFull(params: URLSearchParams, full: boolean): URLSearchParam
   return next;
 }
 
+const never = () => () => undefined;
+
 /** Whether the page draws its chat alone, full: the address asks it (?chat=full), and space and the plate stay out (Alexis,
- * 2026-11-07: "on ne sort jamais de là"). */
-export const useChatAlone = (): boolean => asksFull(useSearchParams()[0]);
+ * 2026-11-07: "on ne sort jamais de là"). The build wrote the page from an address with no search, so the first draw of a page
+ * hydrated from it says no, as the file does, and the address's word comes right after (React's error #418 otherwise). */
+export function useChatAlone(): boolean {
+  const asked = asksFull(useSearchParams()[0]);
+  return useSyncExternalStore(
+    never,
+    () => asked,
+    () => false,
+  );
+}
 
 const FullContext = createContext(false);
 /** What the chat holds knows its size, and its links keep the full chat (routerLink.tsx). */

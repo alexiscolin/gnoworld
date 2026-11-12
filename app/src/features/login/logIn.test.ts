@@ -422,6 +422,29 @@ describe("pageClock", () => {
     expect([waited(), rested()]).toEqual([false, false]);
   });
 
+  it("listens in capture and passive, and removes with the same options, so no handler up the tree hides a gesture or delays a scroll", () => {
+    const seen: { type: string; options: unknown }[] = [];
+    const recorded = {
+      hidden: false,
+      addEventListener: (type: string, _listener: () => void, options: AddEventListenerOptions) => {
+        seen.push({ type: `add ${type}`, options });
+      },
+      removeEventListener: (type: string, _listener: () => void, options: EventListenerOptions) => {
+        seen.push({ type: `remove ${type}`, options });
+      },
+    };
+    const clock = pageClock(recorded);
+    isDone(clock.rest());
+    clock.stop();
+    expect(seen).toHaveLength(8);
+    for (const entry of seen.filter((each) => each.type.startsWith("add"))) {
+      expect(entry.options).toEqual({ capture: true, passive: true });
+    }
+    for (const entry of seen.filter((each) => each.type.startsWith("remove"))) {
+      expect(entry.options).toMatchObject({ capture: true });
+    }
+  });
+
   describe("with knowSession, a server that never says: the asks it costs", () => {
     const asking = (hidden: boolean) => {
       const base = deps();

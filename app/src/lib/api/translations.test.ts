@@ -1,5 +1,6 @@
+import { TRANSLATIONS_WAIT_MS } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import type { Fetcher } from "./http.ts";
+import { TIMEOUT_MS, type Fetcher } from "./http.ts";
 import { translationsApi } from "./translations.ts";
 
 // The browser's client of the stored translations (server/src/translations/routes.ts): at most 30 lines an ask, every answer through its
@@ -51,12 +52,17 @@ describe("the translations' client", () => {
       { ...ANSWER, language: "de" },
       { ...ANSWER, translations: [{ msgid: "zz", status: "original" }] },
       { ...ANSWER, pending: ["zz"] },
+      { ...ANSWER, later: ["zz"] },
       { ...ANSWER, extra: 1 },
     ])
       expect(await server({ status: 200, json }).api.lines("#bubble", ["m1", "m2"], "fr")).toEqual({
         ok: false,
         reason: "malformed",
       });
+  });
+
+  it("keeps the server's wait under its own call limit, so a slow batch answers with the rest pending", () => {
+    expect(TRANSLATIONS_WAIT_MS).toBeLessThan(TIMEOUT_MS);
   });
 
   it("passes a refusal on", async () => {

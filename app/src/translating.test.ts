@@ -113,6 +113,52 @@ describe("asking the stored translations of the lines on screen", () => {
     expect(now(t, "a9")).toEqual({ state: "same" });
   });
 
+  it("clears a line's translation when the stream tells it gone (edited or hidden), and holds the new one that follows", async () => {
+    const t = await fresh();
+    t.translationsTold([{ room: "#bubble", msgid: "a1", language: "fr", status: "translated", text: "Salut" }]);
+    t.translationsTold([{ room: "#bubble", msgid: "a1", language: "fr", status: "gone" }]);
+    expect(now(t)).toBeUndefined();
+    t.translationsTold([{ room: "#bubble", msgid: "a1", language: "fr", status: "translated", text: "Encore" }]);
+    expect(now(t)).toMatchObject({ state: "done", text: "Encore" });
+  });
+
+  it("asks a line the server left for later again after RETRY_MS, asking meanwhile", async () => {
+    const t = await fresh();
+    const ask = vi
+      .fn<Ask>()
+      .mockResolvedValueOnce(ok({ translations: [HELLO], later: ["a2"] }))
+      .mockResolvedValue(ok({ translations: [{ msgid: "a2", status: "original" }] }));
+    want(t, "a1", ask);
+    want(t, "a2", ask);
+    await settle();
+    expect(now(t, "a2")).toEqual({ state: "asking" });
+    await vi.advanceTimersByTimeAsync(t.RETRY_MS + t.GATHER_MS);
+    expect(ask).toHaveBeenLastCalledWith("#bubble", ["a2"], "fr");
+    expect(now(t, "a2")).toEqual({ state: "same" });
+  });
+
+  it("asks a line left asking whose stream never told it again after RETRY_MS, a bounded number of times, then fails it", async () => {
+    const t = await fresh();
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok({ pending: ["a1"] })));
+    want(t, "a1", ask);
+    await settle();
+    await vi.advanceTimersByTimeAsync(t.RETRY_MS * 10);
+    expect(ask.mock.calls.length).toBeGreaterThan(1);
+    expect(ask.mock.calls.length).toBeLessThanOrEqual(3);
+    expect(now(t)).toEqual({ state: "failed" });
+  });
+
+  it("does not ask again a pending line the stream told meanwhile", async () => {
+    const t = await fresh();
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok({ pending: ["a1"] })));
+    want(t, "a1", ask);
+    await settle();
+    t.translationsTold([{ room: "#bubble", msgid: "a1", language: "fr", status: "original" }]);
+    await vi.advanceTimersByTimeAsync(t.RETRY_MS * 3);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(now(t)).toEqual({ state: "same" });
+  });
+
   it("asks nothing for a line the stream already told", async () => {
     const t = await fresh();
     t.translationsTold([{ room: "#bubble", msgid: "a1", language: "fr", status: "translated", text: "Salut" }]);

@@ -1,4 +1,5 @@
 import { accountPill } from "./account.ts";
+import { violations as settledViolations } from "./axe.ts";
 import { done, violations } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { DOWN, logIn, NAME, phoneOf } from "./namesChain.ts";
@@ -168,7 +169,8 @@ test.describe("the name dialog", () => {
     await accountPill(phone).tap();
     await pickItem(phone).tap();
     await expect(dialog(phone)).toBeVisible();
-    expect(await violations(phone)).toEqual([]);
+    // Not the animations' wait, which took 55 s on this page, past the test's own limit.
+    expect(await settledViolations(phone)).toEqual([]);
     expect(await phone.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await expect(dialog(phone)).toContainText("To sign, use a computer");
     await expect(dialog(phone).getByRole("button", { name: "Register · 0 GNOT" })).toBeHidden();

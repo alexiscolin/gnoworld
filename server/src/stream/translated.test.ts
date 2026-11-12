@@ -108,6 +108,19 @@ describe("the stream's translation events", () => {
     expect(ids(await back.frames("translation", 1))).toEqual(["m3"]);
   });
 
+  it("tells a translation gone to the readers of its language and purges the line from the ring, so a replay holds none of it", async () => {
+    const { stream, open } = setup();
+    const live = await open("rooms=%23bubble&language=fr");
+    stream.translation(event("m1", "fr"));
+    stream.translation(event("m2", "fr"));
+    stream.translation({ room: "#bubble", msgid: "m1", language: "fr", status: "gone" });
+    const told = await live.frames("translation", 3);
+    expect(told.map(({ data }) => (data as { status: string }).status)).toEqual(["original", "original", "gone"]);
+    const late = await open("rooms=%23bubble&language=fr");
+    expect(ids(await late.frames("translation", 1))).toEqual(["m2"]);
+    expect(late.raw()).not.toContain('"msgid":"m1"');
+  });
+
   it("keeps them in a ring that stays bounded, and counts them in what it holds", async () => {
     const { stream, open } = setup({ pending: 4 });
     for (let n = 0; n < 10; n += 1) stream.translation(event(`m${String(n)}`));

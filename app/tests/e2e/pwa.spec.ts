@@ -3,6 +3,7 @@ import ecosystems from "../../data/ecosystems.json" with { type: "json" };
 import hubs from "../../data/hubs.json" with { type: "json" };
 import universes from "../../data/universes.json" with { type: "json" };
 import { cacheContents, controlled, expect, hydrated, PAGES, test, type Answer, type Page } from "./fixtures.ts";
+import { goBySearch } from "./palette.ts";
 import { GUARDED, UPDATING } from "./sites.ts";
 
 // The PWA as ADR-0001 §12 asks, nuanced by the 2026-10-18 decision (F172, F175): a manifest Chromium reads, the
@@ -358,7 +359,8 @@ test("the app opens with no network: the home, a world, a reload on it, and a pa
   await hydrated(page);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Worlds in Onyx");
   // The router's own move to a world needs its route files and data, which are the cache's too.
-  await page.getByRole("link", { name: "Bubble", exact: true }).click();
+  // By the search: the worlds' rail stands with the scene alone, which a page opened with no network does not draw.
+  await goBySearch(page, "bubb", /Bubble/);
   await expect(page.getByRole("heading", { level: 1 })).toHaveText("Bubble");
   await expect(page.getByRole("alert")).toHaveCount(0);
   await page.reload();
@@ -631,7 +633,7 @@ test.describe("updates", () => {
         if (new URL(response.url()).pathname.includes("/assets/world-"))
           routeFiles.push({ status: response.status(), fromWorker: response.fromServiceWorker() });
       });
-      await other.getByRole("link", { name: "Bubble", exact: true }).click();
+      await goBySearch(other, "bubb", /Bubble/);
       await expect(other.getByRole("heading", { level: 1 })).toHaveText("Bubble");
       await expect(other.getByRole("alert")).toHaveCount(0);
       expect(routeFiles.length, "the world's route files were fetched").toBeGreaterThan(0);

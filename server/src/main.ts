@@ -28,7 +28,7 @@ import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { makeSearch } from "./search/index.ts";
 import { searchRoutes } from "./search/routes.ts";
-import { unreadBoot } from "./unread/boot.ts";
+import { unreadBoot, unreadExpiry } from "./unread/boot.ts";
 import { callRoutes } from "./calls/routes.ts";
 import { listRooms, worldOf } from "./rooms/rooms.ts";
 import { roomsBoot } from "./rooms/roomsBoot.ts";
@@ -68,6 +68,7 @@ const retention = startRetention(db, {
   kept: memory.ask.kept,
   translations,
   said: memory.said,
+  unread: unreadExpiry,
 });
 const { prices, worlds, previews, hubs, trending, network, balance } = bootJobs({ config, db, log });
 let draining = false;

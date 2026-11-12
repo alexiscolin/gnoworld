@@ -2,7 +2,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import type { JarvisTranslate, JarvisTranslation, TranslationEvent } from "@gnoworld/schemas";
+import {
+  TRANSLATIONS_WAIT_MS,
+  type JarvisTranslate,
+  type JarvisTranslation,
+  type TranslationEvent,
+} from "@gnoworld/schemas";
 import { openDatabase } from "@gnoworld/service/db";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Said } from "../irc/link.ts";
@@ -238,6 +243,55 @@ describe("a line taken, edited or hidden", () => {
     ]);
   });
 
+  it("loses the words a moderator hid: a REDACT of its author's edit drops the line's translations and tells it", async () => {
+    const t = setup();
+    t.index({ msgid: "m1", text: "Hello there" });
+    t.flow.heard(said());
+    await t.flow.idle();
+    t.flow.heard(said({ msgid: "m2", edits: "m1", text: "insult words" }));
+    await t.flow.idle();
+    expect(t.flow.stored("#bubble", ["m1"], "fr")).toMatchObject([{ text: "fr:insult words" }]);
+    t.events.length = 0;
+    t.flow.redacted("#bubble", "m2");
+    expect(t.flow.stored("#bubble", ["m1"], "fr")).toEqual([]);
+    expect(t.events).toEqual([{ room: "#bubble", msgid: "m1", language: "fr", status: "gone" }]);
+  });
+
+  it("finds the line of an edit the index folded, after a restart (the flow's own memory is empty)", async () => {
+    const t = setup();
+    t.index({ msgid: "m1", text: "Hello there" });
+    t.flow.heard(said());
+    await t.flow.idle();
+    t.db.prepare("INSERT INTO line_edits (edit, line) SELECT 'm2', rowid FROM lines WHERE msgid = 'm1'").run();
+    t.flow.redacted("#bubble", "m2");
+    expect(t.flow.stored("#bubble", ["m1"], "fr")).toEqual([]);
+  });
+
+  it("makes the edit's new text when it is heard while the old text is still being made", async () => {
+    const release: ((text: string) => void)[] = [];
+    const t = setup({
+      translate: ({ text }) =>
+        new Promise((resolve) => {
+          release.push((late) => {
+            resolve(made(`${late}:${text}`));
+          });
+        }),
+    });
+    t.index({ msgid: "m1", text: "Hello there" });
+    t.flow.heard(said());
+    await vi.waitFor(() => {
+      expect(release).toHaveLength(1);
+    });
+    t.flow.heard(said({ msgid: "m2", edits: "m1", text: "Hello again" }));
+    await vi.waitFor(() => {
+      expect(release).toHaveLength(2);
+    });
+    release[0]?.("old");
+    release[1]?.("new");
+    await t.flow.idle();
+    expect(t.flow.stored("#bubble", ["m1"], "fr")).toMatchObject([{ text: "new:Hello again" }]);
+  });
+
   it("is touched by no one else's edit: neither dropped nor made", async () => {
     const t = setup();
     t.index({ msgid: "m1" });
@@ -301,6 +355,34 @@ describe("a reader's ask", () => {
     expect(t.events).toHaveLength(1);
   });
 
+  it("answers before the page's 10 s call limit when a making is slow, the rest pending", async () => {
+    vi.useFakeTimers();
+    try {
+      const t = setup({ languages: [], translate: () => new Promise(() => undefined) });
+      t.index({ msgid: "old" });
+      const answered = vi.fn();
+      const asking = t.flow.asked({ room: "#bubble", ids: ["old"], language: "fr", signedIn: true });
+      asking.then(answered, () => undefined);
+      await vi.advanceTimersByTimeAsync(TRANSLATIONS_WAIT_MS);
+      expect(TRANSLATIONS_WAIT_MS).toBeLessThan(10_000);
+      expect(answered).toHaveBeenCalledWith(expect.objectContaining({ pending: ["old"] }));
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("names a line the breaker left unmade as later, not pending", async () => {
+    const t = setup();
+    for (let at = 0; at < 60; at += 1) {
+      t.index({ msgid: `m${String(at)}` });
+      t.flow.heard(said({ msgid: `m${String(at)}` }));
+    }
+    await t.flow.idle();
+    t.index({ msgid: "m60" });
+    const answer = await t.flow.asked({ room: "#bubble", ids: ["m60"], language: "fr", signedIn: true });
+    expect(answer).toMatchObject({ translations: [], pending: [], later: ["m60"] });
+  });
+
   it("says the halt when the budget is spent or Jarvis is off", async () => {
     const spent = setup({
       languages: [],
@@ -311,6 +393,28 @@ describe("a reader's ask", () => {
       halt: "spent",
       pending: [],
     });
+  });
+});
+
+describe("one account's asks", () => {
+  const ask = (t: ReturnType<typeof setup>, account: string, ids: string[]) =>
+    t.flow.asked({ room: "#bubble", ids, language: "fr", signedIn: true, account });
+
+  it("start at most 20 makings a minute, and not another account's", async () => {
+    const t = setup({ languages: [] });
+    const ids = Array.from({ length: 30 }, (_, n) => `old${String(n)}`);
+    for (const msgid of ids) t.index({ msgid });
+    const first = await ask(t, "g1alice", ids);
+    expect(t.calls).toHaveLength(20);
+    expect(first.later).toEqual(ids.slice(20));
+    await ask(t, "g1alice", ids);
+    expect(t.calls).toHaveLength(20);
+    await ask(t, "g1bob", ids.slice(20));
+    expect(t.calls).toHaveLength(30);
+    t.clock.now += MINUTE;
+    t.index({ msgid: "new" });
+    await ask(t, "g1alice", ["new"]);
+    expect(t.calls).toHaveLength(31);
   });
 });
 

@@ -73,8 +73,8 @@ const lines = (
   </div>
 );
 
-// The chat's own screen, once it is drawn under the skeleton.
-const DRAWN = "[data-full]:not([data-chat-skeleton])";
+// The chat's own screen once it is drawn under the skeleton, or the failure that stands in its place (a visitor's rooms that did not load).
+const DRAWN = "[data-full]:not([data-chat-skeleton]), [data-chat-failed]";
 
 /** The skeleton of the full chat, over the page; it fades out as the chat's screen is drawn under it, and `onGone` tells when it has. */
 export function FullLoading({ onGone }: { onGone: () => void }) {

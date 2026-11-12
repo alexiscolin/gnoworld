@@ -1,5 +1,6 @@
 import type { Locator } from "@playwright/test";
 import { violations } from "./axe.ts";
+import { goBySearch } from "./palette.ts";
 import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
@@ -37,14 +38,19 @@ async function tag(page: Page, selector: string): Promise<string> {
 
 // A link followed from a hydrated page, to the page and title it leads to: a mark set on the window
 // before the click is still there after it only if the page changed without a reload.
-async function followInPlace(link: Locator, from: string, to: { url: string; title: string }) {
-  const page = link.page();
-  await page.goto(from);
+// The follow is a link, or what a reader does where the page draws none (the worlds' rail stands with the scene alone).
+async function followInPlace(
+  page: Page,
+  follow: Locator | (() => Promise<void>),
+  to: { from: string; url: string; title: string },
+) {
+  await page.goto(to.from);
   await hydrated(page);
   await page.evaluate(() => {
     Object.assign(window, { stayed: true });
   });
-  await link.click();
+  if (typeof follow === "function") await follow();
+  else await follow.click();
   await expect(page).toHaveURL(to.url);
   await expect(page).toHaveTitle(to.title);
   expect(await page.evaluate(() => "stayed" in window)).toBe(true);
@@ -169,11 +175,9 @@ test.describe("once the client takes over", () => {
     await expect.poll(() => problems.some((problem) => problem.includes("#418"))).toBe(true);
   });
 
-  test("a link to a world changes the page and its tags without a reload", async ({ page }) => {
-    await followInPlace(page.getByRole("link", { name: "Bubble", exact: true }), "/", {
-      url: "/w/bubble",
-      title: "Bubble · gno.world",
-    });
+  test("a way to a world changes the page and its tags without a reload", async ({ page }) => {
+    const viaSearch = () => goBySearch(page, "bubb", /Bubble/);
+    await followInPlace(page, viaSearch, { from: "/", url: "/w/bubble", title: "Bubble · gno.world" });
     expect(await tag(page, 'link[rel="canonical"]')).toBe("https://gno.world/net/onyx/w/bubble");
     expect(await tag(page, 'meta[property="og:url"]')).toBe("https://gno.world/net/onyx/w/bubble");
     await expect(page.locator('meta[name="description"]')).toHaveCount(1);
@@ -182,7 +186,7 @@ test.describe("once the client takes over", () => {
   // The way home is the design system's link-button: the router's link fills it (F259).
   test("the way home from a page not found changes the page without a reload", async ({ page }) => {
     const home = page.getByRole("alert").getByRole("link", { name: "Galaxy" });
-    await followInPlace(home, "/nowhere", { url: "/", title: "gno.world" });
+    await followInPlace(page, home, { from: "/nowhere", url: "/", title: "gno.world" });
   });
 
   for (const { path, title, heading } of notFound) {

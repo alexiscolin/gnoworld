@@ -8,9 +8,11 @@ import { limiter } from "../limit.ts";
 import { remember } from "../remember.ts";
 import type { Unread } from "./store.ts";
 
-/** An account's calls a minute: its counts, and its places (one POST an account every 5 s in a page, with room to spare). */
+/** An account's calls a minute: its counts, and its places (a page posts one every 5 s, so 12 a minute; 30 leaves room for reloads). */
 const COUNTS_PER_MINUTE = 60;
-const PLACES_PER_MINUTE = 600;
+const PLACES_PER_MINUTE = 30;
+/** Place writes a second across every account: the index is one synchronous connection, so per-account limits do not bound its load (F13770). */
+const PLACES_PER_SECOND = 20;
 /** How long an account's count is kept before it is made again. */
 const KEPT_MS = 5_000;
 const KEPT_ACCOUNTS = 10_000;
@@ -21,11 +23,21 @@ export interface UnreadRoutesOptions {
   origins: readonly string[];
   log: Log;
   now: () => number;
+  /** Place writes a second across all accounts (default PLACES_PER_SECOND). */
+  perSecond?: number;
 }
 
-export function unreadRoutes({ unread, session, origins, log, now }: UnreadRoutesOptions): Hono<Guarded> {
+export function unreadRoutes({
+  unread,
+  session,
+  origins,
+  log,
+  now,
+  perSecond = PLACES_PER_SECOND,
+}: UnreadRoutesOptions): Hono<Guarded> {
   const perMinute = (max: number) => limiter({ max, windowMs: 60_000, keys: 100_000 });
   const [reads, writes] = [perMinute(COUNTS_PER_MINUTE), perMinute(PLACES_PER_MINUTE)];
+  const together = limiter({ max: perSecond, windowMs: 1000, keys: 1 });
   const refuse = refuserOf(log, "unread_refused", baseRefusals);
   const kept = new Map<string, { at: number; counts: Counts }>();
   const app = new Hono<Guarded>();
@@ -45,10 +57,13 @@ export function unreadRoutes({ unread, session, origins, log, now }: UnreadRoute
   app.post("/", async (c) => {
     const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
-    if (!writes.take(who, now())) return refuse(c, "limit");
+    if (!writes.take(who, now()) || !together.take("all", now())) return refuse(c, "limit");
     const body = UnreadPlaces.safeParse(await json(c));
     if (!body.success) return refuse(c, "body");
-    for (const { room, time } of body.data.places) unread.place(who, room, Date.parse(time));
+    unread.places(
+      who,
+      body.data.places.map(({ room, time }) => ({ room, time: Date.parse(time) })),
+    );
     kept.delete(who);
     return c.body(null, 204);
   });

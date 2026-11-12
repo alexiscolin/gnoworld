@@ -133,7 +133,7 @@ export function makeSaid(db: DatabaseSync, deps: SaidDeps): Answers {
     byBoth.take(both, at);
     return verdict;
   };
-  // The provider's word on the whole answer: a failure keeps it private, only a flag is the asker's strike.
+  // The provider's word on the whole answer: a failure keeps it private.
   const checked = async (text: string): Promise<"pass" | "moderation" | "unchecked"> => {
     const answer = await provider?.(text).catch(() => "unchecked" as const);
     if (answer === undefined || answer === "unchecked") return "unchecked";

@@ -131,6 +131,25 @@ describe("LoginView", () => {
   });
 });
 
+describe("LoginView: what a problem changes", () => {
+  it("shows the problem's whole sentence, not hidden, once the session is in, and hides the one that has a button", () => {
+    const shown = view({ session: { kind: "in", address: ADDRESS }, problem: { reason: "network" } });
+    expect(shown).toMatch(/<p role="status" class="(?![^"]*visually-hidden)[^"]*">/);
+    expect(view({ problem: { reason: "network" } })).toMatch(/<p role="status" class="[^"]*visually-hidden[^"]*">/);
+  });
+
+  it.each(["wallet", "signing", "verifying"] as const)(
+    "keeps the step's words, no alert and no description, while a login is at %s though a problem is kept",
+    (step) => {
+      const html = view({ step, problem: { reason: "locked" } });
+      expect(buttons(html)).not.toContain("Unlock Adena");
+      expect(html).not.toContain("aria-description");
+      expect(buttons(html)).toHaveLength(1);
+      expect(html).not.toContain("<svg");
+    },
+  );
+});
+
 describe("the first screen and the account's name", () => {
   it("reads the first screen's files, the login's view among them", () => {
     expect(Object.keys(FIRST_SCREEN)).toEqual(
