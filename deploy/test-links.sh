@@ -113,7 +113,13 @@ for address in $(host_addresses); do
 		case $(lvia "$scheme://$address/") in *407*) pass "the link way out refuses the host's $scheme://$address/" ;; *) fail "the link way out does not refuse the host's $scheme://$address/" ;; esac
 	done
 done
-expect "the link way out reaches no port but 80 and 443: https://example.com:8443/ gives nothing" "$(via https://example.com:8443/ guard:4754 "$links_out" | cut -c1-3)" "000"
+# A public port that answers (1.1.1.1:853, which a plain container reaches: test.sh's control) never opens a tunnel through the link way
+# out: the guard lets 80 and 443 out alone. How the refused tunnel ends (no answer, or smokescreen's 504 once its own wait is up) is the
+# timing's; a tunnel opened (200) is the fault.
+case $(via https://1.1.1.1:853/ guard:4754 "$links_out" | cut -c1-3) in
+200) fail "the link way out reaches a public port beside 80 and 443 (1.1.1.1:853)" ;;
+*) pass "the link way out reaches no port but 80 and 443 (1.1.1.1:853 opens no tunnel)" ;;
+esac
 expect "the server's own proxy holds its list: example.com via 4750 is 407, and via jarvis's and the gnomcp reader's ways out nothing" \
 	"$(via https://example.com/ guard:4750 "$inside" | cut -c1-3) $(via https://example.com/ guard:4751 "$links_out" | cut -c1-3) $(via https://example.com/ guard:4753 "$links_out" | cut -c1-3)" "407 000 000"
 expect "nothing but the link reader's network reaches the link way out" \
