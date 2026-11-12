@@ -9,7 +9,7 @@ const draw = (over: Partial<Parameters<typeof MessageBox>[0]> = {}) =>
   mount(
     <MessageBox
       onFormat={() => undefined}
-      linkTool={<button type="button" aria-label="Link" />}
+      linkTool={() => <button type="button" aria-label="Link" />}
       send="Send"
       goes
       {...over}
@@ -51,7 +51,7 @@ describe("the composer's box", () => {
   // The link has no format to apply in place: its tool is the caller's, a popover that asks for the address.
   it("draws the link tool the caller gives, between Code and Quote", () => {
     const bar = one(
-      draw({ linkTool: <button type="button">Link tool</button> }),
+      draw({ linkTool: () => <button type="button">Link tool</button> }),
       '[role="group"][aria-label="Format"]',
     );
     const names = all(bar, "button").map((each) => each.getAttribute("aria-label") ?? each.textContent);

@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { recentPaths } from "../../lib/recents.ts";
 import type { UniverseView } from "../../places.ts";
-import { groupResults, searchPlaces } from "./search.ts";
+import { groupResults } from "./groups.ts";
+import { searchPlaces } from "./search.ts";
 import { kinded, typedGroups } from "./tabs.ts";
 import type { SearchFilter, SearchSort, SearchTab } from "./types.ts";
 import { useSearchItems } from "./useSearchItems.ts";
@@ -24,16 +25,18 @@ export function usePalette(universe: UniverseView, open: boolean, start: string)
       setAt(0);
     }
   }
-  const { index, worlds, here } = useSearchItems(universe, open);
+  const { index, worlds, here, ranked, followedPlaces } = useSearchItems(universe, open);
   const found = searchPlaces(index, query, { filters, sort, namespace, tab });
   const listing = query.trim() === "";
-  const grouped = listing ? groupResults(found.results, recentPaths()) : undefined;
+  const grouped = listing ? groupResults(found.results, recentPaths(), sort) : undefined;
   const groups = grouped?.groups ?? typedGroups(found.results, kinded(query));
   const flat = groups.flatMap((group) => group.results);
   const active = Math.min(at, Math.max(0, flat.length - 1));
   return {
     worlds,
     here,
+    ranked,
+    followedPlaces,
     query,
     filters,
     sort,

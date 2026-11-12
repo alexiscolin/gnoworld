@@ -1,6 +1,6 @@
 # Textures
 
-Every file in `app/public/textures/` comes from a real map or image, read on 2026-11-02. `app/src/scene/planet/credits.ts` holds the
+Every file in `app/public/textures/` comes from a real map or image, read on 2026-11-02. `app/src/space/planet/credits.ts` holds the
 words shown wherever one is drawn (`docs/DESIGN-SYSTEM.md`, "Credits"); a test holds that every file has its row.
 
 ## Solar System Scope, CC BY 4.0

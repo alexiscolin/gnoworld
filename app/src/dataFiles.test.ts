@@ -434,11 +434,11 @@ describe("bubbles.json", () => {
     return "";
   };
 
-  it("is read as the rules, and the repository ships ADR-0001 section 7's starting values", () => {
+  it("is read as the rules, and the repository ships ADR-0001 section 7's starting values, a bubble shown twice as long", () => {
     const data = loadData(new URL("../data", import.meta.url).pathname);
     expect(data.bubbles).toEqual({
       maxOnScreen: 6,
-      showSeconds: 5,
+      showSeconds: 10,
       speakerDelaySeconds: 30,
       maxChars: 80,
       readLast: 500,

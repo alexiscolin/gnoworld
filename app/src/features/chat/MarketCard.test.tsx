@@ -115,8 +115,7 @@ describe("the market card without a file", () => {
     "shows a read that failed (%s) as one state, never what was received",
     (reason) => {
       const host = draw({ ok: false, reason });
-      expect(host.querySelector("[data-markets]")?.getAttribute("data-markets")).toBe("failed");
-      expect(host.textContent).toMatch(/could not be read\. Reload/i);
+      expect(host.querySelector("[role='status']")?.textContent).toBe("The prices could not be read.");
       expect(host.textContent).not.toMatch(/\$|NaN|undefined|unavailable|malformed|network/);
     },
   );

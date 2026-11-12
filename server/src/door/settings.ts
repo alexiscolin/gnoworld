@@ -42,8 +42,8 @@ export function doorSettings() {
     // At most what the page waits for less 10 s, and longer than the loop's worst, 874 s (ASK_WAIT_S in schemas).
     JARVIS_TIMEOUT_S: whole(ASK_WAIT_S.door, ASK_WAIT_S.door),
     JARVIS_QUESTION_CHARS: whole(DOOR_CAPS.question, 500),
-    JARVIS_QUOTA: whole(DOOR_CAPS.quota, 20),
-    JARVIS_QUOTA_UNNAMED: whole(DOOR_CAPS.quota, 5),
+    JARVIS_QUOTA: whole(DOOR_CAPS.quota, 30),
+    JARVIS_QUOTA_UNNAMED: whole(DOOR_CAPS.quota, 30),
     JARVIS_UNLIMITED: list(Address)
       .refine(unique)
       .refine((entries) => entries.length <= DOOR_CAPS.unlimited),

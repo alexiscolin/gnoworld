@@ -10,6 +10,7 @@ export function Opened({
   onLogOut,
   onPickName,
   onJarvis,
+  jarvisWhy,
 }: {
   address: string | undefined;
   lead: ReactNode;
@@ -18,12 +19,14 @@ export function Opened({
   onPickName?: () => void;
   /** Opens Jarvis's panel over the room in view (10u-a); none while Jarvis is off or no room is in view: the item stays greyed. */
   onJarvis?: () => void;
+  /** Why the item is greyed when Jarvis is on but cannot be asked here; none, it is coming soon (Jarvis is off). */
+  jarvisWhy?: string;
 }) {
   const [, open] = useDeviceView();
   const items: MenuItem[] = [
     // No pill in the header (D342, D343): Jarvis opens from here, greyed while it is off or no room is in view.
     onJarvis === undefined
-      ? { label: "Jarvis", icon: "spark", soon: true }
+      ? { label: "Jarvis", icon: "spark", soon: true, ...(jarvisWhy === undefined ? {} : { why: jarvisWhy }) }
       : { label: "Jarvis", icon: "spark", onSelect: onJarvis },
     {
       label: "Passport",

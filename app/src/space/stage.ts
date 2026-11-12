@@ -4,6 +4,7 @@
 import { Scene, type PerspectiveCamera, type WebGLRenderer } from "three";
 import { Disposer } from "./disposer.ts";
 import { DONE, Intro } from "./intro.ts";
+import { openOf, type Open } from "./open.ts";
 import type { Universe } from "./layout.ts";
 import { nebulaOf } from "./parts/nebula.ts";
 import { dustOf, starsOf, sunsOf, type Suns } from "./parts/lights.ts";
@@ -19,7 +20,7 @@ import { Effects } from "./rig/effects.ts";
 import { worldOf } from "./planet/generated.ts";
 
 /** What every material of the stage reads each frame. */
-export interface Frame {
+export interface Frame extends Open {
   readonly uTime: { value: number };
   readonly uPxK: { value: number };
   readonly uProj: { value: number };
@@ -28,6 +29,8 @@ export interface Frame {
   readonly uSolo: { value: number };
   /** How large on screen, in pixels, the others must stand to shrink away (0: all of them, a page's); the home's keeps far worlds (D499). */
   readonly uSoloPx: { value: number };
+  /** How far the far worlds the home kept have gone too, once it is left for a page (0 to 1). */
+  readonly uSoloAll: { value: number };
   /** How much larger the home system's worlds are drawn on the home's first screen (1 elsewhere), eased by the frame (D541). */
   readonly uBoost: { value: number };
   /** How far a lens dims what it does not light (0 to 1), eased by the frame (D425). */
@@ -54,10 +57,12 @@ export class Stage {
     uAlone: { value: -1 },
     uSolo: { value: 0 },
     uSoloPx: { value: 0 },
+    uSoloAll: { value: 0 },
     uBoost: { value: 1 },
     uLens: { value: 0 },
     uThrough: { value: 0 },
     uIntro: { value: DONE },
+    ...openOf(),
   };
   /** The galaxy's arrival, once per visit. */
   readonly intro = new Intro(this.frame.uIntro);
@@ -69,7 +74,7 @@ export class Stage {
   /** The moons round a planet a page frames close (D463). */
   readonly moons: Moons;
   /** The links between worlds, while the Map shows a system or a world (D433). */
-  readonly links = new Links(this.frame.uLens);
+  readonly links = new Links(this.frame);
   /** The Earth's ground, where the page's signs stand. */
   readonly ground: EarthGround;
   readonly maps: Maps;
@@ -80,12 +85,15 @@ export class Stage {
   suns: Suns | undefined;
   near: Near | undefined;
   readonly #made: { dispose(): void }[] = [];
+  #universe: Universe | undefined;
 
   readonly #bare: boolean;
+  readonly #still: () => boolean;
 
   /** For a site served at `base`; `still` under reduced motion; `bare`, no sky: no far stars, no dust, no galaxy's body. */
   constructor({ base, still, bare = false }: { base: string; still: () => boolean; bare?: boolean | undefined }) {
     this.#bare = bare;
+    this.#still = still;
     this.ground = new EarthGround((id) => worldOf(id).look, still);
     this.maps = this.owner.add(new Maps(base));
     this.moons = new Moons(this.maps, this.round.lines);
@@ -108,7 +116,14 @@ export class Stage {
     }
     const { uLens: lens, uProj: proj, uPxK: pxK } = this.frame;
     this.sky = bare ? undefined : this.owner.add(new Sky({ ...this.gains, lens, proj, pxK }));
-    this.scene.add(this.orbits.lines, this.links.lines, this.plate.mesh, this.round.lines, this.moons.group);
+    this.scene.add(
+      this.orbits.lines,
+      this.links.lines,
+      this.links.strip.mesh,
+      this.plate.mesh,
+      this.round.lines,
+      this.moons.group,
+    );
     this.owner.add(this.orbits);
     this.owner.add(this.round);
     this.owner.add(this.moons);
@@ -118,14 +133,16 @@ export class Stage {
 
   /** Stands `universe` on the stage, in place of the last. */
   stand(universe: Universe, { renderer, camera }: { renderer: WebGLRenderer; camera: PerspectiveCamera }): void {
-    this.#clear();
+    // The last stage goes once the new stands: the planets drawn as themselves go on into it whole (near.ts), never dropped and drawn again.
+    const [before, old, last] = [this.#universe, this.near, this.#made.splice(0)];
+    this.#universe = universe;
     this.sky?.stand(universe);
     const delays = this.intro.stand(universe);
     const planets = new Planets(universe, { ...this.frame }, delays);
-    const suns = sunsOf(universe, { ...this.frame, uGain: this.gains.sun }, delays);
+    const suns = sunsOf(universe, { ...this.frame, uGain: this.gains.sun }, { delays, still: this.#still });
     this.suns = suns;
     const dust = this.#bare ? undefined : dustOf(universe, { ...this.frame, uGain: this.gains.dust }, delays);
-    this.scene.add(planets.mesh, suns.mesh, ...(dust === undefined ? [] : [dust]));
+    this.scene.add(planets.mesh, suns.disc, suns.mesh, ...(dust === undefined ? [] : [dust]));
     this.planets = planets;
     this.moons.use({ renderer, camera, scene: this.scene });
     const device = {
@@ -137,11 +154,15 @@ export class Stage {
       plate: this.plate.mask,
       lens: this.frame.uLens,
     };
-    this.near = new Near(device);
+    this.near = new Near(
+      device,
+      old === undefined || before === undefined ? undefined : { near: old, before, now: universe },
+    );
+    for (const made of last) made.dispose();
     this.#made.push(planets, this.near, {
       dispose: () => {
-        this.scene.remove(planets.mesh, suns.mesh, ...(dust === undefined ? [] : [dust]));
-        for (const mesh of dust === undefined ? [suns.mesh] : [suns.mesh, dust]) {
+        this.scene.remove(planets.mesh, suns.disc, suns.mesh, ...(dust === undefined ? [] : [dust]));
+        for (const mesh of dust === undefined ? [suns.mesh, suns.disc] : [suns.mesh, suns.disc, dust]) {
           mesh.geometry.dispose();
           (mesh.material as { dispose(): void }).dispose();
         }
@@ -162,6 +183,7 @@ export class Stage {
     this.planets = undefined;
     this.suns = undefined;
     this.near = undefined;
+    this.#universe = undefined;
   }
 
   dispose(): void {

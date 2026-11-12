@@ -1,8 +1,8 @@
 // What this device keeps for whoever uses it, guest or account (slice 8; ADR-0002 §1, "Device"): the settings, the passport's stamps and
-// the worlds charted here, the streak, today's expedition, the quests, the worlds and people followed, the reminders and the notifications read. Nothing of it leaves the
+// the worlds charted here, the streak, today's expedition, the quests, the worlds and people followed and the notifications read. Nothing of it leaves the
 // device. Each field is one key, read through its schema: an entry that is none is dropped and kept aside (a newer page's, written back),
 // another shape forgets the key, and a device that refuses (blocked, full) is read as unreadable, which the store then never writes over.
-import { Address, Day, Time } from "@gnoworld/schemas";
+import { Address, Day, JARVIS_LANGUAGES, Time } from "@gnoworld/schemas";
 import type { DraftStorage } from "../drafts/drafts.ts";
 import { z } from "../jitless.ts";
 import {
@@ -31,14 +31,16 @@ const SETTINGS = {
   calm: z.boolean(),
   /** The 3D on a phone, where the list is the default. */
   phone3d: z.boolean(),
+  /** The language the room's lines are translated into. */
+  language: z.enum(JARVIS_LANGUAGES),
+  /** Whether the lines on screen are translated as they come. */
+  autoTranslate: z.boolean(),
 };
 
 /** The streak by UTC day: the last day counted, the days in a row to it, the longest run. */
 const Streak = z.strictObject({ day: Day, count: Count, best: Count });
 /** Today's expedition: its UTC day and the stops reached that day. */
 const ExpeditionDone = z.strictObject({ day: Day, reached: z.array(Key).check(z.maxLength(32)) });
-/** A reminder of an event: whether it fired, so it fires once. */
-const Reminder = z.strictObject({ fired: z.boolean() });
 
 /** The notifications read: every one up to `through`, and the ones marked read one by one after it, by id. */
 const NotificationsRead = z.strictObject({
@@ -117,7 +119,6 @@ const CODECS: { [K in DeviceField]: Codec<DeviceFields[K]> } = {
     },
     write: (value, strange) => ({ ...(isRecord(strange) ? strange : {}), ...value }),
   },
-  reminders: recordOf(Reminder, FOLLOWS_KEPT),
   notificationsRead: oneOf(NotificationsRead),
 };
 

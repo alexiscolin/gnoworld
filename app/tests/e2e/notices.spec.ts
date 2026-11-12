@@ -1,5 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { closeMenu, lineOf, menu, noticeStatus, roomsNav, word } from "./chat.ts";
+import { lineOf, noticeStatus, roomsNav, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, hiddenTab, HISTORY, live, OTHER, room, tab, T } from "./scriptedRoom.ts";
@@ -37,18 +37,18 @@ test.describe("notifications", () => {
     const { address, ergo } = await account(page);
     await expect(page).toHaveTitle(BASE);
     ergo().send(live("n1", T(31), { room: "#bubble", text: mentioned(address) }));
-    await expect(rowOf(page, "#bubble")).toContainText("1 unread");
-    await expect(rowOf(page, "#games")).not.toContainText("unread");
+    await expect(rowOf(page, "bubble")).toContainText("1 unread");
+    await expect(rowOf(page, "games")).not.toContainText("unread");
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     const nav = roomsNav(page);
     await expect(nav.getByRole("heading", { name: "Notifications" })).toBeVisible();
     await expect(nav.getByRole("link", { name: `${SHORT} mentioned you #bubble` })).toBeVisible();
-    await rowOf(page, "#bubble").getByRole("link", { name: "#bubble", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
+    await rowOf(page, "bubble").getByRole("link", { name: "bubble", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "#bubble" })).toBeVisible();
     await expect(lineOf(page, "look")).toBeVisible();
     await expect(page).toHaveTitle(BASE);
     await expect(nav.getByRole("heading", { name: "Notifications" })).toHaveCount(0);
-    await expect(rowOf(page, "#bubble")).not.toContainText("unread");
+    await expect(rowOf(page, "bubble")).not.toContainText("unread");
   });
 
   test("keeps a mention in the room in view unseen while the tab is hidden, and sees it as the tab shows", async ({
@@ -57,11 +57,11 @@ test.describe("notifications", () => {
     await hiddenTab(page, true);
     const { address, ergo } = await account(page);
     ergo().send(live("n1", T(31), { text: mentioned(address) }));
-    await expect(rowOf(page, "#games")).toContainText("1 unread");
+    await expect(rowOf(page, "games")).toContainText("1 unread");
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     await tab(page, "show");
     await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, "#games")).not.toContainText("unread");
+    await expect(rowOf(page, "games")).not.toContainText("unread");
   });
 
   // R12: a barrier line after the one under test is read first, so a notice added a frame late would have shown.
@@ -73,80 +73,17 @@ test.describe("notifications", () => {
     ergo().send(live("n2", T(32), { text: "a barrier" }));
     await expect(lineOf(page, "a barrier")).toBeVisible();
     await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, "#games")).not.toContainText("unread");
+    await expect(rowOf(page, "games")).not.toContainText("unread");
     await expect(noticeStatus(page)).toHaveText("");
   });
-
-  test("tells a screen reader nothing for a mention in a room set to Nothing, or in the room in view", async ({
-    page,
-  }) => {
-    const { address, ergo } = await account(page);
-    const modes = (await menu(page)).getByRole("group", { name: "Notifications for #games" });
-    await modes.getByRole("button", { name: "Nothing" }).click();
-    ergo().send(live("n1", T(31), { text: mentioned(address, "muted") }));
-    ergo().send(live("n2", T(32), { room: "#bubble", text: "a barrier" }));
-    await expect(page).toHaveTitle(BASE);
-    await expect(noticeStatus(page)).toHaveText("");
-  });
-
-  const pressed = async (page: Page, room: string, mode: string) =>
-    (await menu(page)).getByRole("group", { name: `Notifications for ${room}` }).getByRole("button", { name: mode });
-  // Opens a room and waits for it to be the one in view: a line sent before would arrive in the room in view.
-  async function open(page: Page, room: string) {
-    await closeMenu(page);
-    await rowOf(page, room).getByRole("link", { name: room, exact: true }).click();
-    await expect(page.getByRole("heading", { name: room, level: 2 })).toBeVisible();
-  }
 
   test("counts only the mentions by default: a plain line says nothing, a mention after it does", async ({ page }) => {
     const { address, ergo } = await account(page);
     ergo().send(live("p1", T(31), { room: "#bubble", text: "just talking" }));
     ergo().send(live("p2", T(32), { room: NEWS, text: mentioned(address) }));
     await expect(page).toHaveTitle(`(1) ${BASE}`);
-    await expect(rowOf(page, "#bubble")).not.toContainText("unread");
-    await expect(rowOf(page, "#news")).toContainText("1 unread");
-    await open(page, "#bubble");
-    await expect(await pressed(page, "#bubble", "Mentions")).toHaveAttribute("aria-pressed", "true");
-  });
-
-  test("counts every plain line of a room set to All messages, and again only the mentions once Mentions is pressed", async ({
-    page,
-  }) => {
-    const { ergo } = await account(page);
-    await open(page, "#bubble");
-    await (await pressed(page, "#bubble", "All messages")).click();
-    await expect(await pressed(page, "#bubble", "All messages")).toHaveAttribute("aria-pressed", "true");
-    await expect(await pressed(page, "#bubble", "Mentions")).toHaveAttribute("aria-pressed", "false");
-    await open(page, "#games");
-    ergo().send(live("p3", T(33), { room: "#bubble", text: "more talk" }));
-    await expect(rowOf(page, "#bubble")).toContainText("1 unread");
-    await expect(page).toHaveTitle(`(1) ${BASE}`);
-    await open(page, "#bubble");
-    await (await pressed(page, "#bubble", "Mentions")).click();
-    await open(page, "#games");
-    ergo().send(live("p4", T(34), { room: "#bubble", text: "still talking" }));
-    ergo().send(live("p5", T(35), { room: NEWS, text: "a barrier, in a room still on Mentions" }));
-    await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, "#bubble")).not.toContainText("unread");
-  });
-
-  test("counts nothing in a room set to Nothing, a mention included, and the others as before", async ({ page }) => {
-    const { address, ergo } = await account(page);
-    await (await pressed(page, "#games", "Nothing")).click();
-    await expect(await pressed(page, "#games", "Nothing")).toHaveAttribute("aria-pressed", "true");
-    await open(page, "#bubble");
-    ergo().send(live("p4", T(34), { room: "#bubble/games", text: mentioned(address, "muted") }));
-    ergo().send(live("p5", T(35), { room: NEWS, text: mentioned(address, "again") }));
-    await expect(rowOf(page, "#news")).toContainText("1 unread");
-    await expect(rowOf(page, "#games")).not.toContainText("unread");
-    await expect(page).toHaveTitle(`(1) ${BASE}`);
-  });
-
-  test("keeps a room's mode on the device, which a reload reads again", async ({ page }) => {
-    await account(page);
-    await (await menu(page)).getByRole("button", { name: "Nothing" }).click();
-    await page.reload();
-    await expect((await menu(page)).getByRole("button", { name: "Nothing" })).toHaveAttribute("aria-pressed", "true");
+    await expect(rowOf(page, "bubble")).not.toContainText("unread");
+    await expect(rowOf(page, "news")).toContainText("1 unread");
   });
 
   test("counts a direct message on its conversation's row and in the title, and opening it clears them", async ({
@@ -205,7 +142,7 @@ test.describe("notifications", () => {
     opened
       .ergo()
       .send(`@msgid=r1;time=${T(31)};account=${MEMBER};+reply=a1 :${MEMBER}!u@h PRIVMSG #bubble/games :agreed`);
-    await expect(rowOf(page, "#games")).toContainText("1 unread");
+    await expect(rowOf(page, "games")).toContainText("1 unread");
     await expect(roomsNav(page).getByRole("link", { name: `${SHORT} replied to you #games` })).toBeVisible();
     await tab(page, "show");
     await expect(page).toHaveTitle(BASE);
@@ -219,15 +156,15 @@ test.describe("notifications", () => {
     );
     ergo().send(live("n2", T(33), { room: "#bubble", text: "a barrier" }));
     await expect(page).toHaveTitle(`(1) ${BASE}`);
-    await expect(rowOf(page, "#bubble")).toContainText("1 unread");
+    await expect(rowOf(page, "bubble")).toContainText("1 unread");
   });
 
   test("counts a mention of the whole room in an announcement room, and not in an open one", async ({ page }) => {
     const { ergo } = await account(page);
     ergo().send(live("g1", T(31), { room: "#bubble", text: "@room hello all" }));
     ergo().send(live("g2", T(32), { room: NEWS, text: "@room the release is out" }));
-    await expect(rowOf(page, "#news")).toContainText("1 unread");
-    await expect(rowOf(page, "#bubble")).not.toContainText("unread");
+    await expect(rowOf(page, "news")).toContainText("1 unread");
+    await expect(rowOf(page, "bubble")).not.toContainText("unread");
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     await expect(roomsNav(page).getByRole("link", { name: `${SHORT} mentioned the room #news` })).toBeVisible();
   });
@@ -240,7 +177,7 @@ test.describe("notifications", () => {
     await expect(page).toHaveTitle(`(1) ${BASE}`);
     ergo().send(`:ergo MARKREAD #bubble timestamp=${T(31)}`);
     await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, "#bubble")).not.toContainText("unread");
+    await expect(rowOf(page, "bubble")).not.toContainText("unread");
   });
 
   test("takes a mention away when its line is deleted or hidden", async ({ page }) => {
@@ -259,8 +196,8 @@ test.describe("notifications", () => {
     await expect(page).toHaveTitle(`(2) ${BASE}`);
     await roomsNav(page).getByRole("button", { name: "Clear" }).click();
     await expect(page).toHaveTitle(BASE);
-    await expect(rowOf(page, "#bubble")).not.toContainText("unread");
-    await expect(rowOf(page, "#news")).not.toContainText("unread");
+    await expect(rowOf(page, "bubble")).not.toContainText("unread");
+    await expect(rowOf(page, "news")).not.toContainText("unread");
   });
 
   // No Notification API, no sound, no focus taken: what arrives is read, never forced (decisions row of 4f-n).
@@ -293,7 +230,7 @@ test.describe("notifications", () => {
       .getByRole("link", { name: `${SHORT} mentioned you #bubble` })
       .focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "#bubble" })).toBeVisible();
     await expect(roomsNav(page)).toBeFocused();
   });
 

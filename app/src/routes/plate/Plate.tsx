@@ -6,13 +6,14 @@
 import { lazy, Suspense } from "react";
 import type { RealmRollup } from "@gnoworld/schemas/indexer";
 import { Cell, Figures, Grid, Room, Stack } from "@gnoworld/ui";
-import { OutLinks } from "../../features/realms/OutLinks.tsx";
+import { OutLinks } from "../../OutLinks.tsx";
 import { Around } from "./Around.tsx";
 import { Callers } from "./Callers.tsx";
 import { Calls } from "./Calls.tsx";
 import { Can } from "./Can.tsx";
 import { Hero, Pills } from "./Hero.tsx";
 import { Hours } from "./Hours.tsx";
+import { TokenBlock } from "./TokenBlock.tsx";
 import type { PlateModel } from "./model.ts";
 import { Widgets } from "./Widgets.tsx";
 import styles from "./Plate.module.css";
@@ -43,6 +44,7 @@ function RealmCards({ realm, can }: { realm: NonNullable<PlateModel["realm"]>; c
     <>
       {rollup === undefined ? null : <Calls rollup={rollup} worlds={realm.worlds} beside={callers} />}
       {rollup === undefined || !callers ? null : <Callers rollup={rollup} worlds={realm.worlds} />}
+      {can?.some(({ label }) => label === "Token") === true ? <TokenBlock realm={realm.realm} /> : null}
       {can === undefined ? null : (
         <Cell span={12}>
           <Can can={can} />

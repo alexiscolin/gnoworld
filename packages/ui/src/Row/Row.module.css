@@ -44,6 +44,10 @@
     text-decoration: none;
   }
 
+  button.link {
+    cursor: pointer;
+  }
+
   .link[aria-current="true"] {
     font-weight: 500;
   }

@@ -1,4 +1,4 @@
-// The quick actions, behind the composer's + (Alexis, 2026-11-08: "un icône + en bas à gauche"): an image, then the conversation's own,
+// The quick actions, behind the composer's "/" (what they put in are commands and cards): an image, then the conversation's own,
 // the Earth's (Market chart, Poll, Jarvis), a world's with a realm (Proposal, Realm, Catch up, Jarvis, Market chart), a world's without (Play,
 // Catch up, Poll, Jarvis, Market chart), a direct message's (none: its cards need a room). What a later slice brings is greyed (ui's Menu).
 import { Menu, type MenuItem } from "@gnoworld/ui";
@@ -25,11 +25,18 @@ export interface QuickActionsProps {
   jarvis?: ((what: "intro" | "catch-up") => void) | undefined;
   /** Adds the market card to the room, the reader's alone; none where there is no room to hold it (a direct message). */
   market?: (() => void) | undefined;
+  /** Why Jarvis is greyed when it is on but cannot be asked here; none, it is coming soon (Jarvis is off). */
+  jarvisWhy?: string | undefined;
 }
 
-const soon = (label: string, icon: NonNullable<MenuItem["icon"]>): MenuItem => ({ label, icon, soon: true });
+const soon = (label: string, icon: NonNullable<MenuItem["icon"]>, why?: string): MenuItem => ({
+  label,
+  icon,
+  soon: true,
+  ...(why === undefined ? {} : { why }),
+});
 
-export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, market }: QuickActionsProps) {
+export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, market, jarvisWhy }: QuickActionsProps) {
   const navigate = useNavigate();
   const [polling, setPolling] = useState(false);
   const poll: MenuItem[] =
@@ -58,7 +65,7 @@ export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, mar
         ];
   const open = (label: string, icon: NonNullable<MenuItem["icon"]>, what: "intro" | "catch-up"): MenuItem =>
     openJarvis === undefined
-      ? soon(label, icon)
+      ? soon(label, icon, jarvisWhy)
       : {
           label,
           icon,
@@ -81,7 +88,7 @@ export function QuickActions({ pills, realm, poll: send, jarvis: openJarvis, mar
       <Menu
         trigger="Add"
         label="Add to the conversation"
-        icon="plus"
+        icon="slash"
         emphasis="plain"
         size="s"
         items={[soon("Image", "image"), ...items[pills]]}

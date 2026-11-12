@@ -2,8 +2,10 @@
 // what the worlds' file says of its realm, with no block of its own chain reads. Its proposals, the calls its team pins and the capture of
 // its page stand between the chart and the foot, as they did.
 import { hubWorldOf, stampKey } from "@gnoworld/core";
+import universes from "../../../data/universes.json" with { type: "json" };
+import { grouped } from "@gnoworld/ui";
 import { lazy, Suspense } from "react";
-import { OutLinks } from "../../features/realms/OutLinks.tsx";
+import { OutLinks } from "../../OutLinks.tsx";
 import { platePreview } from "../../features/previews/plate.ts";
 import { FirstCharted } from "../../features/world/Arrival.tsx";
 import { Proposed } from "../../features/world/PlateRealm.tsx";
@@ -13,7 +15,7 @@ import { realmView, site, universePrefix, type UniverseView } from "../../places
 import { useHere } from "../../useHere.ts";
 import { useWorldsFile } from "../../worldsFile.ts";
 import { aroundOf } from "./around.ts";
-import { chatFigures, grouped, hourWidgets, statusOf } from "./figures.ts";
+import { chatFigures, hourWidgets, statusOf } from "./figures.ts";
 import type { PlateModel } from "./model.ts";
 import { Plate } from "./Plate.tsx";
 
@@ -67,12 +69,16 @@ function useHubPlate({
 }): PlateModel {
   const realm = world.realms?.[0];
   const prefix = universePrefix(universe);
+  const chainId = universes.find(({ id }) => id === universe.id)?.chainId;
   const realmPath = realm === undefined ? undefined : realmView(realm, universe);
   const worlds = useWorldsFile(true);
   const here = useHere(true).get(world.slug) ?? 0;
   const hours = useHours(world.slug);
   return {
     lede: {
+      ...(realm === undefined || chainId === undefined
+        ? {}
+        : { explain: { kind: "world", chain: chainId, subject: realm } }),
       sentence: (
         <>
           {world.description}

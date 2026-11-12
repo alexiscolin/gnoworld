@@ -151,6 +151,11 @@
       border-end-end-radius: var(--radius-l);
     }
 
+    /* Beside a plate, the dock is as opaque as the plate and of its tint: one fill on both sides of the page, whatever the place. */
+    .dock:not([data-alone]) {
+      --color-surface: var(--color-plate);
+    }
+
     /* Alone over the scene, no plate beside it (frame 143): round at every corner, on the night's own fill. */
     .dock[data-alone] {
       border-radius: var(--radius-l);

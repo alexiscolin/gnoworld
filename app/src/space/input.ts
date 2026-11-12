@@ -6,6 +6,13 @@ import type { PerspectiveCamera } from "three";
 import type { Hit } from "./pick.ts";
 import type { Rig } from "./rig/rig.ts";
 
+/** What a drag turns instead of the camera (D13011): a generated world on its page. */
+export interface Turner {
+  /** The pointer moved by `dx`, `dy` pixels, `seconds` after its last move. */
+  readonly drag: (move: { dx: number; dy: number; seconds: number }) => void;
+  readonly release: (stood: boolean) => void;
+}
+
 export interface Hand {
   readonly canvas: HTMLCanvasElement;
   /** The names' layer over the canvas: a wheel over a name is space's too. */
@@ -17,7 +24,11 @@ export interface Hand {
   readonly under: (x: number, y: number, target?: EventTarget | null) => Hit | undefined;
   /** Whether a wheel in over `hit` dives there: in a system, a planet the camera is not at. */
   readonly deeper: (hit: Hit) => boolean;
+  /** What the mouse is over now, none when it leaves; no touch asks it. */
+  readonly over?: (hit: Hit | undefined) => void;
   readonly enter: (hit: Hit) => void;
+  /** What a drag that begins now turns; none, it moves the camera. */
+  readonly turner: () => Turner | undefined;
   readonly up: () => void;
 }
 
@@ -44,11 +55,23 @@ export function listen(hand: Hand, signal: AbortSignal): void {
 
 function watchDrag(hand: Hand, signal: AbortSignal): void {
   const { canvas, rig } = hand;
-  let press: { x: number; y: number; x0: number; y0: number; at: number; moved: boolean } | undefined;
+  let press:
+    | {
+        x: number;
+        y: number;
+        x0: number;
+        y0: number;
+        at: number;
+        moved: boolean;
+        id: number;
+        turner: Turner | undefined;
+      }
+    | undefined;
   canvas.addEventListener(
     "pointerdown",
     (event) => {
-      if (event.button !== 0) return;
+      // A second finger never takes a turn over from the first.
+      if (event.button !== 0 || press?.turner !== undefined) return;
       event.preventDefault();
       canvas.setPointerCapture(event.pointerId);
       press = {
@@ -58,31 +81,44 @@ function watchDrag(hand: Hand, signal: AbortSignal): void {
         y0: event.clientY,
         at: event.timeStamp,
         moved: false,
+        id: event.pointerId,
+        turner: hand.turner(),
       };
     },
     { signal },
   );
   canvas.addEventListener(
     "pointermove",
-    ({ clientX, clientY, timeStamp }) => {
-      if (press === undefined) return;
+    ({ clientX, clientY, timeStamp, pointerId }) => {
+      if (press === undefined || (press.turner !== undefined && pointerId !== press.id)) return;
       press.moved ||= Math.hypot(clientX - press.x0, clientY - press.y0) > DRAG_FROM;
       if (!press.moved || rig.flying) return;
-      rig.free.drag({
-        dx: clientX - press.x,
-        dy: clientY - press.y,
-        height: innerHeight,
-        seconds: (timeStamp - press.at) / 1000,
-      });
+      const move = { dx: clientX - press.x, dy: clientY - press.y, seconds: (timeStamp - press.at) / 1000 };
+      if (press.turner !== undefined) press.turner.drag(move);
+      else rig.free.drag({ ...move, height: innerHeight });
       [press.x, press.y, press.at] = [clientX, clientY, timeStamp];
     },
     { signal, passive: true },
   );
+  canvas.addEventListener(
+    "pointermove",
+    (event) => {
+      if (press === undefined && event.pointerType === "mouse") hand.over?.(hand.under(event.clientX, event.clientY));
+    },
+    { signal, passive: true },
+  );
+  canvas.addEventListener(
+    "pointerleave",
+    () => {
+      hand.over?.(undefined);
+    },
+    { signal },
+  );
   const letGo = (event: PointerEvent) => {
     const was = press;
+    if (was === undefined || (was.turner !== undefined && event.pointerId !== was.id)) return;
     press = undefined;
-    if (was === undefined) return;
-    if (was.moved) rig.free.release(event.timeStamp - was.at > STOOD_MS);
+    if (was.moved) (was.turner ?? rig.free).release(event.timeStamp - was.at > STOOD_MS);
     else if (event.type === "pointerup") {
       const hit = hand.under(event.clientX, event.clientY);
       if (hit !== undefined) hand.enter(hit);

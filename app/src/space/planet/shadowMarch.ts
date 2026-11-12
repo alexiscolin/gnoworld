@@ -26,7 +26,7 @@ float ${name}(vec3 direction, vec3 toSun, float ground, float span${extra}) {
     float s = 0.06 * float(i * i) / ${steps}.0 / ${steps}.0;
     vec3 p = normalize(direction + away / run * s);
     float rise = (${read} - ground) * span - s * tilt - 0.5 * s * s;
-    lit = min(lit, 1.0 - smoothstep(0.0, ${soft} * span, rise));
+    lit = min(lit, 1.0 - smoothstep(0.0, ${soft} * span * (1.0 + 3.0 * s), rise));
   }
   return lit;
 }

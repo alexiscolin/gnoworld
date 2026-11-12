@@ -4,7 +4,7 @@ import type { Composed } from "@gnoworld/core";
 import { useEffect, useState, type RefObject } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
 import { useMedia } from "./useMedia.ts";
-import type { MarketAsked } from "./marketCommand.ts";
+import type { CardAsked } from "./cardCommands.ts";
 import { editRefusal, roomHint, said, sendable } from "./said.ts";
 
 /** The lines Ergo refused so far, the last one's draft, and why it did not go. */
@@ -89,7 +89,12 @@ export function useHelp(
     groups?: boolean | undefined;
     editing?: boolean | undefined;
   },
-  { failed, draft, market }: { failed: boolean | string; draft: string; market?: MarketAsked | undefined },
+  {
+    failed,
+    draft,
+    card,
+    completing,
+  }: { failed: boolean | string; draft: string; card?: CardAsked | undefined; completing: boolean },
 ) {
   const coarse = useCoarsePointer();
   const context = { nick, draft, multiline };
@@ -98,12 +103,12 @@ export function useHelp(
     coarse,
     // Nothing said while there is nothing to say: no standing hint under the field (Alexis, 2026-11-08).
     shown:
-      market?.ok === false
-        ? { error: market.why }
+      card?.ok === false
+        ? { error: card.why }
         : hinted(
-            { ...said(composed, failed, context), ...refusal },
+            { ...(completing && composed.kind === "unknown" ? {} : said(composed, failed, context)), ...refusal },
             to === undefined ? roomHint(composed, groups ?? false) : undefined,
           ),
-    goes: market?.ok === true || (sendable(composed, multiline) && refusal.error === undefined),
+    goes: sendable(composed, multiline) && refusal.error === undefined,
   };
 }

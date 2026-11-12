@@ -1,6 +1,7 @@
 // The hero under the title (the proposal's .hero): the status and the rank at the kicker's row, the lede, the actions and the talk bar. The kicker
 // and the title are the route's, on the first screen; these come with the plate.
 import { Chip, Cluster, Panel, Stack } from "@gnoworld/ui";
+import { Explained } from "../../features/explain/Explained.tsx";
 import { Actions } from "../../features/world/Actions.tsx";
 import type { PlateModel } from "./model.ts";
 import { TalkBar } from "./TalkBar.tsx";
@@ -34,6 +35,12 @@ export function Pills({ lede }: { lede: PlateModel["lede"] }) {
 
 // The sentence under the title: its words, or while it is read the room of its two lines, so it never pushes what is under it when it comes.
 function Sentence({ lede }: Pick<PlateModel, "lede">) {
+  const sentence = <Written lede={lede} />;
+  if (lede.explain === undefined) return sentence;
+  return <Explained of={lede.explain} fallback={sentence} />;
+}
+
+function Written({ lede }: Pick<PlateModel, "lede">) {
   if (lede.sentence !== undefined)
     return (
       <div className={styles["sentence"]}>
@@ -54,7 +61,7 @@ function Sentence({ lede }: Pick<PlateModel, "lede">) {
 
 export function Hero({ lede, actions, talk }: Pick<PlateModel, "lede" | "actions" | "talk">) {
   return (
-    <Stack space="s">
+    <Stack space="m">
       <Sentence lede={lede} />
       <div className={styles["buttons"]}>
         <Stack space="m">

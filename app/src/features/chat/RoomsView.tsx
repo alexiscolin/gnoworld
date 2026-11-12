@@ -4,7 +4,7 @@
 import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
-import { Avatar, Button, Cluster, Icon, IconButton, NavItem, Row, Sidebar, Stack } from "@gnoworld/ui";
+import { Avatar, Button, Cluster, EmptyState, IconButton, NavItem, Row, Stack } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY } from "./Dms.tsx";
 import { useFull } from "./full.ts";
 import { dmHref, hrefProp, roomHref, roomLabel, shortAddress, whoIs } from "./names.ts";
@@ -75,7 +75,7 @@ function Notices({
   return (
     <Stack space="2xs" as="section">
       <Cluster space="xs" justify="between">
-        <h2 className={["label", styles["section"]].join(" ")}>Notifications</h2>
+        <h2 className="label">Notifications</h2>
         <Button
           size="s"
           emphasis="quiet"
@@ -135,16 +135,8 @@ function Dms({
       }
     >
       {partners.length === 0 ? (
-        // How to start one, a small card close under its label (U4; Alexis, 2026-11-07: "très vide et spacieux").
-        <div className={styles["empty"]}>
-          <Sidebar side="start" space="xs">
-            <Icon name="mail" />
-            <Stack space="3xs">
-              <span className={styles["lead"]}>No direct messages yet</span>
-              <span className={styles["note"]}>Pick someone in Who&apos;s here to start one.</span>
-            </Stack>
-          </Sidebar>
-        </div>
+        // How to start one: a line close under the section's name, not a boxed card.
+        <EmptyState look="inline" title="No direct messages yet" line="Pick someone in Who's here to start one." />
       ) : (
         <>
           <ul className={[shared["plain"], shared["items"]].join(" ")}>

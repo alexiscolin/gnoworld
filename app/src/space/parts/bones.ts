@@ -47,6 +47,25 @@ function sphere(): BufferGeometry {
   return new BufferGeometry().setAttribute("position", new Float32BufferAttribute(points, 3));
 }
 
+const AXIS = new Euler();
+const SPUN = new Quaternion();
+const Y = new Vector3(0, 1, 0);
+
+const lookOf = (planet: Planet) => (planet.id === EARTH ? EARTH_LOOK : worldOf(planet.id).look);
+
+/** The frame a planet's skeleton stands in, as the planet is turned (its lean toward the eye over its look, its spin led by `ahead`),
+ * into `out`: the arrival's scan stands in it too, so no grid ever changes its tilt in one frame as the one hands over to the other. */
+export function frameOf(
+  planet: Planet,
+  { seconds, leaned, ahead = 0 }: { seconds: number; leaned?: Quaternion | undefined; ahead?: number },
+  out: Quaternion,
+): Quaternion {
+  const { lean, tilt } = lookOf(planet);
+  out.setFromEuler(AXIS.set(lean, 0, tilt));
+  if (leaned !== undefined) out.premultiply(leaned);
+  return out.multiply(SPUN.setFromAxisAngle(Y, -(seconds + ahead) * SPIN));
+}
+
 interface Frame {
   readonly root: Group;
   /** The look's own lean and tilt. */
@@ -80,7 +99,7 @@ export class Bones {
     this.#used.add(index);
     let frame = this.#frames.get(index);
     if (frame === undefined) {
-      const { lean, tilt } = planet.id === EARTH ? EARTH_LOOK : worldOf(planet.id).look;
+      const { lean, tilt } = lookOf(planet);
       const lines = new LineSegments(
         this.#geometry,
         new ShaderMaterial({

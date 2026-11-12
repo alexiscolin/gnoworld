@@ -40,3 +40,27 @@ export function step(
 
 /** A share eased in and out. */
 export const eased = (share: number): number => smoothstep(0, 1, share);
+
+/** One frame of a planet that left, falling as it came in; hidden once it is gone. Its air goes with it (`arrive` scales both). */
+export function fall(
+  held: { leaving: boolean; arrive: number; drawn: { setArrive(share: number): void; group: { visible: boolean } } },
+  { delta }: { delta: number },
+): void {
+  held.arrive = Math.max(0, held.arrive - Math.min(delta, LONGEST_S) / FADE_S);
+  held.drawn.setArrive(eased(held.arrive));
+  if (held.arrive > 0) return;
+  held.leaving = false;
+  held.drawn.group.visible = false;
+}
+
+/** A planet whose `shown` just turned: one that goes fades out over its quad (`fall`), never pops; one that comes back mid-fade goes on
+ * from where it stands, one that is new stands at 0. */
+export function handOver(
+  held: { shown: boolean; leaving: boolean; fresh: boolean; arrive: number; drawn: { group: { visible: boolean } } },
+  still: boolean,
+): void {
+  const { shown, drawn } = held;
+  held.leaving = !shown && held.arrive > 0 && !still;
+  held.fresh = shown && held.arrive < 1 && !drawn.group.visible;
+  drawn.group.visible = shown || held.leaving;
+}

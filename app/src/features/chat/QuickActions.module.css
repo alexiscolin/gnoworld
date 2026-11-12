@@ -49,6 +49,9 @@
     padding-block: var(--space-s) calc(var(--space-s) + var(--space-3xs));
     padding-inline: var(--chat-inset);
     border-block-start: var(--line-width) solid var(--color-line);
+    /* layout: the composer's box, wider than the dock's inset: a step off the edge, its words (not its edge) on the lines' left (MessageBox.module.css) */
+    --box-bleed: calc(var(--chat-inset) - var(--space-2xs));
+    --box-in: calc(max(var(--chat-inset), var(--space-l)) - var(--space-2xs) - var(--line-width));
   }
 
   /* The card a pinned action opens over the row (D271): it scrolls in its own box, so the row and what writes stay on screen. */

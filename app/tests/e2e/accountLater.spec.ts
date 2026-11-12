@@ -1,3 +1,4 @@
+import { connectButton } from "./account.ts";
 import { word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -8,9 +9,7 @@ import { opened } from "./scripted.ts";
 const ACCOUNT_ONLY = [
   "Not encrypted: the server can read these.",
   "Direct message with",
-  "Only people I wrote to",
   "mentioned the room",
-  "Notifications for",
   // What an account keeps on its device: the room keeping's acts on a line.
   ".markUnread(",
   // The composer's side of a thread and of a reply: a visitor reads a thread, whose field is an account's.
@@ -19,8 +18,7 @@ const ACCOUNT_ONLY = [
   "@+typing=",
   "MARKREAD ",
   "+gnoworld/edit=",
-  // The country an account declares (7j): the choice and the tag it sends.
-  "Choose a country",
+  // The country an account declares (7j): the tag it sends.
   "+gnoworld/country=",
   // What reads a line's Markdown for a mention of the room: a notice's, or a line shown, never an empty room's first screen.
   "@room(?!",
@@ -55,7 +53,8 @@ test.describe("what only an account uses, loaded for an account alone", () => {
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(page.getByRole("navigation", { name: "Rooms" })).toBeVisible();
-    await expect(page.getByText("Log in to write in this room.")).toBeVisible();
+    // A visitor writes as a guest; the way to an account stays beside the composer.
+    await expect(connectButton(page)).toBeVisible();
     const loaded = await words();
     for (const mark of ACCOUNT_ONLY) expect(loaded.includes(mark), `a visitor's page loads ${mark}`).toBe(false);
   });

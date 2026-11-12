@@ -5,6 +5,7 @@ import { CARD_TABLES } from "./cards/store.ts";
 import { DAY_TABLES } from "./door/day.ts";
 import { KEPT_TABLES } from "./door/kept.ts";
 import { QUOTA_TABLES } from "./door/quota.ts";
+import { EXPLAIN_TABLES } from "./explain/store.ts";
 import { GUEST_TABLES } from "./guest/guests.ts";
 import { LINK_TABLES } from "./login/links.ts";
 import { RELEASE_SPENT } from "./login/release.ts";
@@ -19,8 +20,11 @@ import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./rooms/crea
 import { ROOM_SAID } from "./rooms/earth.ts";
 import { ROOM_TABLES } from "./rooms/rooms.ts";
 import { SEARCH_TABLES } from "./search/index.ts";
+import { PEOPLE_TABLES } from "./worlds/personTables.ts";
 import { ROLLUP_TABLES } from "./worlds/rollupStore.ts";
+import { NETWORK_TABLES } from "./worlds/networkStore.ts";
 import { SIGNAL_TABLES } from "./signals/signals.ts";
+import { TOKEN_TABLES } from "./worlds/tokenStore.ts";
 
 export const migrations: readonly string[] = [
   LOGIN_TABLES,
@@ -49,4 +53,8 @@ export const migrations: readonly string[] = [
   RELEASE_SPENT,
   CARD_TABLES,
   KEPT_TABLES,
+  PEOPLE_TABLES,
+  NETWORK_TABLES,
+  TOKEN_TABLES,
+  EXPLAIN_TABLES,
 ];

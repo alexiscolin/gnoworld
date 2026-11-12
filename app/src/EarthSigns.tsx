@@ -1,8 +1,7 @@
 // The signs over the globe, as HTML anchored to the ground (ADR-0001 §7; frames 43 to 55, 85): who says what from where, each country's hour,
 // the far side's counts, the side rooms. Bubbles repeat the chat, so screen readers skip them; a pin is a link, and a room with no place stays in
 // the chat's list. On another world (`world`, D565) the bubbles alone stand, each on its speaker's own spot (spot.ts).
-import { countryName, centreOf, cutText, regionAt, type Bubble, type Count, type Trend } from "@gnoworld/core/bubbles";
-import { Address, shortAddress } from "@gnoworld/schemas";
+import { countryName, centreOf, type Count, type Trend } from "@gnoworld/core/bubbles";
 import { Cluster, sightRef, Stack } from "@gnoworld/ui";
 import {
   useEffect,
@@ -10,56 +9,26 @@ import {
   useRef,
   useState,
   useSyncExternalStore,
-  type ComponentProps,
   type CSSProperties,
   type MouseEvent,
 } from "react";
 import rules from "../data/bubbles.json" with { type: "json" };
 import places from "../data/earthRooms.json" with { type: "json" };
+import { BubbleSign, loadWords, Mark } from "./BubbleSign.tsx";
 import { followed } from "./lib/followed.ts";
 import type { StoreApi } from "zustand/vanilla";
 import type { AppState } from "./store/index.ts";
-import { spotOf } from "./features/universe/spot.ts";
 import { marksOf, useUnderRing, worldFit } from "./features/universe/signMarks.ts";
 import { Signs, type Pin, type SignsDeps } from "./features/universe/signs.ts";
 import { ground as pageGround } from "./earthGround.ts";
 import type { Ground } from "./space/earth/ground.ts";
 import styles from "./EarthSigns.module.css";
 
-const NAME_GRAPHEMES = 32;
 const MOST_COUNTS = 3;
 
-const speaker = (account: string) =>
-  Address.safeParse(account).success ? shortAddress(account) : cutText(account, NAME_GRAPHEMES);
-const initial = (name: string) => Array.from(name)[0]?.toUpperCase() ?? "";
 const percent = (value: number) => `${value > 0 ? "+" : ""}${String(value)}% · 1 h`;
 const countLine = ({ country, count, far }: Count) =>
   `${countryName(country) ?? country} · ${String(count)}${far ? ", far side" : ""}`;
-
-function Mark({ at, ...rest }: { at: { lat: number; lon: number } | undefined } & ComponentProps<"li">) {
-  return at === undefined ? null : <li data-lat={at.lat} data-lon={at.lon} {...rest} />;
-}
-
-function BubbleSign({ bubble, world }: { bubble: Bubble; world: string | undefined }) {
-  const name = speaker(bubble.account);
-  const at = world === undefined ? centreOf(bubble.country) : spotOf(world, bubble.country);
-  const place =
-    world === undefined ? countryName(bubble.country) : at === undefined ? undefined : regionAt(world, at).name;
-  return (
-    <Mark at={at} className={styles["anchor"]} data-mark="bubble">
-      <div className={styles["bubble"]} data-bubble="">
-        <span className={styles["who"]}>{initial(name)}</span>
-        <div>
-          <div className={`truncate ${String(styles["head"])}`}>{`${name} · ${place ?? ""}`}</div>
-          <p dir="auto" className={styles["words"]}>
-            {bubble.text}
-          </p>
-        </div>
-      </div>
-      <i className={styles["ping"]} />
-    </Mark>
-  );
-}
 
 function TrendSign({ trend }: { trend: Trend }) {
   return (
@@ -68,6 +37,7 @@ function TrendSign({ trend }: { trend: Trend }) {
       className={styles["anchor"]}
       data-mark="spot"
       data-trend={trend.percent > 0 ? "up" : "down"}
+      aria-hidden="true"
     >
       <i key={trend.percent} ref={sightRef} className={styles["rings"]} />
       <b data-dot="" className={styles["dot"]} />
@@ -107,7 +77,7 @@ export function PageSigns({
   store: StoreApi<AppState>;
   open: (href: string) => void;
   ground?: Ground;
-  world?: { id: string; room: string };
+  world?: { id: string };
 }) {
   const [deps] = useState(() => ({
     store,
@@ -126,6 +96,20 @@ export function EarthSigns({ deps, open, inside }: { deps: SignsDeps; open: (hre
   const boxRef = useRef<HTMLDivElement>(null);
   const { ground, world } = deps;
   useEffect(() => signs.start(), [signs]);
+  // The bubbles' words come in a chunk of their own: asked as soon as the signs are up, so a bubble shows with its words, never without (D13014).
+  useEffect(() => {
+    let wanted = true;
+    // A load that fails is asked again by the bubble's own lazy; the effect's end only stops caring.
+    loadWords().then(
+      () => undefined,
+      (error: unknown) => {
+        if (wanted) reportError(error);
+      },
+    );
+    return () => {
+      wanted = false;
+    };
+  }, []);
   useLayoutEffect(() => {
     const elements = boxRef.current?.querySelectorAll<HTMLElement>("[data-mark]") ?? [];
     const reach = boxRef.current?.clientWidth ?? 0;
@@ -147,13 +131,13 @@ export function EarthSigns({ deps, open, inside }: { deps: SignsDeps; open: (hre
       data-inside={inside ? "" : undefined}
       style={inside ? INSIDE : undefined}
     >
-      <div aria-hidden="true">
+      <div>
         <Stack as="ul">
           {trends.map((trend) => (
             <TrendSign key={trend.country} trend={trend} />
           ))}
           {bubbles.map((bubble) => (
-            <BubbleSign key={bubble.id} bubble={bubble} world={world?.id} />
+            <BubbleSign key={bubble.id} bubble={bubble} world={world?.id} said={signs.said(bubble.id)} open={open} />
           ))}
         </Stack>
       </div>

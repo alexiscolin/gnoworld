@@ -1,7 +1,7 @@
 // The name dialog (9f, frames 9 to 15, "Pick a name and a face"): the kicker, the title, the line naming r/sys/namereg, the person's
 // nebula as the face (no planet, no upload: ADR-0002 section 1), the `nym-` field with its rule, "Register · 0 GNOT" and "Later".
 // It holds no state of the chain: its `phase` is the card's course, and a name shows as registered only in the phase `done`.
-import { Avatar, Button, Cluster, Dialog, Field, Stack } from "@gnoworld/ui";
+import { Avatar, Button, Cluster, Dialog, Field, grouped, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
 import { NOT_CHECKED, networkOf, publicForever } from "../calls/index.ts";
 import appear from "../../enter.module.css";
@@ -21,8 +21,6 @@ export interface NameDialogProps {
   onClose: () => void;
 }
 
-const COUNT = new Intl.NumberFormat("en-US");
-
 // What the network costs, in words: the registry's price is 0, the network fee is not.
 const feeWords = ({ name, real }: NameDialogProps["network"], fee: string) =>
   real
@@ -34,7 +32,7 @@ function State({ phase }: { phase: Phase }) {
     <p role="status" className={styles["state"]}>
       <span key={phase.kind} className={appear["enter"]}>
         {phase.kind === "working" || phase.kind === "failed" ? phase.text : null}
-        {phase.kind === "done" ? `${phase.name} is registered, in block ${COUNT.format(phase.height)}.` : null}
+        {phase.kind === "done" ? `${phase.name} is registered, in block ${grouped(phase.height)}.` : null}
       </span>
     </p>
   );

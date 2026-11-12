@@ -122,6 +122,14 @@ describe("Avatar", () => {
     expect(container.querySelector("polyline, radialGradient, [data-star]")).toBeNull();
   });
 
+  it("draws a guest's outline for what is not an address, never an empty disc, and none for an address", () => {
+    const guest = render(<Avatar address="prompt-otter" name="prompt-otter" />);
+    expect(guest.container.querySelector("[data-guest]")).not.toBeNull();
+    guest.unmount();
+    const { container } = render(<Avatar address={ONE} name="An account" />);
+    expect(container.querySelector("[data-guest]")).toBeNull();
+  });
+
   it("says the assistant is one, and draws its violet orb, no constellation", () => {
     const { container } = render(<Avatar address={ONE} name="Jarvis" kind="assistant" />);
     const avatar = screen.getByRole("img", { name: "Jarvis, assistant" });

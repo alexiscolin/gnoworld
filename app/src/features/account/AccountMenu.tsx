@@ -7,6 +7,7 @@ import { Button, IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { useJarvisHere } from "../../jarvisHere.ts";
 import { onAsked } from "../../pageAsks.ts";
+import type { FirstAsk } from "../jarvis/index.ts";
 import { LoginControl, useLogin } from "../login/index.ts";
 import { useJustLoggedIn } from "./justLoggedIn.ts";
 import { useNaming, useNamelessTold } from "./naming.ts";
@@ -60,12 +61,33 @@ function Trigger({ pill, onClick }: { pill: ReactNode; onClick: () => void }) {
 }
 
 // Jarvis's panel is brought once the chat in view can ask it (jarvisHere.ts): its code is a late chunk.
+const JARVIS_ASKS = ["jarvis", "jarvis-catch-up", "jarvis-ask"] as const satisfies readonly FirstAsk[];
+
 function JarvisDoor() {
-  return useJarvisHere() === undefined ? null : (
+  const here = useJarvisHere() !== undefined;
+  // An ask made while the listener's code is still on its way is kept, and handed to it.
+  const [early, setEarly] = useState<FirstAsk>();
+  useEffect(() => {
+    if (!here) return undefined;
+    const stop = new AbortController();
+    for (const ask of JARVIS_ASKS)
+      onAsked(
+        ask,
+        () => {
+          setEarly((was) => was ?? ask);
+        },
+        stop.signal,
+      );
+    return () => {
+      stop.abort();
+      setEarly(undefined);
+    };
+  }, [here]);
+  return here ? (
     <Suspense fallback={null}>
-      <JarvisListener />
+      <JarvisListener early={early} />
     </Suspense>
-  );
+  ) : null;
 }
 
 // What comes after the first screen, each in a chunk of its own: Jarvis's listener, and the notice of a login that is linked.

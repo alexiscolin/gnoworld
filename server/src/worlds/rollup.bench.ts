@@ -5,6 +5,7 @@ import { bench, describe } from "vitest";
 import { openDatabase } from "@gnoworld/service/db";
 import type { Row } from "./history.ts";
 import { fitted } from "./rollup.ts";
+import { PEOPLE_TABLES } from "./personTables.ts";
 import { ROLLUP_TABLES, rollupStore } from "./rollupStore.ts";
 
 const PATH = "gno.land/r/gnops/valopers";
@@ -40,7 +41,7 @@ let db: DatabaseSync | undefined;
 const options = {
   iterations: 3,
   setup: () => {
-    db = openDatabase(":memory:", [ROLLUP_TABLES]);
+    db = openDatabase(":memory:", [ROLLUP_TABLES, PEOPLE_TABLES]);
   },
   teardown: () => {
     db?.close();

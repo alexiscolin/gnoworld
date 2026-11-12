@@ -1,14 +1,14 @@
 // A world's page: pre-rendered for each known world, at its path and at its canonical address; any other path gets this
 // route's not-found. The world is found by the request's path as written: its case is part of the address (F376).
 import { lazy, Suspense, useState, type ReactNode } from "react";
-import { useLoaderData, useRouteError, type MetaArgs } from "react-router";
+import { useLoaderData, type MetaArgs } from "react-router";
 import { hubWorldOf } from "@gnoworld/core";
 import { Kicker, Panel } from "@gnoworld/ui";
 import stations from "../../data/earthOrbit.json" with { type: "json" };
 import { failedWorldMeta, ORIGIN, worldMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import { chatPlace, PlaceChat } from "../features/chat/index.ts";
-import { isMissing, PageError } from "../features/errors/index.ts";
+import { isMissing, RouteError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
@@ -62,7 +62,7 @@ export default function World() {
   // The plate is the page and the chat a block under it on a phone, as the Earth's and a realm's (the proposal's section 5).
   const chat = {
     world: world.slug,
-    place: chatPlace({ ...world, pinned: pinnedBar(world, universe), inPage: true }, universe),
+    place: chatPlace({ ...world, room: `#${world.slug}`, pinned: pinnedBar(world, universe), inPage: true }, universe),
     chain: { place: world, calls: calls ?? NO_CALLS },
   };
   return <PlaceChat chat={chat} page={(dock) => <WorldPage world={world} universe={universe} chat={dock} />} />;
@@ -101,25 +101,13 @@ function WorldPage({ world, universe, chat }: { world: SiteWorld; universe: Univ
         chat={chat}
         chatDue={chatDue}
       />
-      <WorldSigns world={hubWorldOf(world)} room={`#${world.slug}`} />
+      <WorldSigns world={hubWorldOf(world)} />
       <Arrival universe={universe.id} world={hubWorldOf(world)} name={world.name} path={world.path} />
     </>
   );
 }
 
 export function ErrorBoundary() {
-  const missing = isMissing(useRouteError());
-  // Inside the plate, as any page's content is: never loose at the screen's corner (D535).
-  return (
-    <PlaceFrame
-      label="World"
-      plate={
-        missing ? (
-          <PageError title="No world here" line="No world of gno.land goes by that name." />
-        ) : (
-          <PageError title="This world could not load" line="Try again in a moment." reload />
-        )
-      }
-    />
-  );
+  // Inside the plate, as any page's content is: never loose at the screen's corner.
+  return <PlaceFrame label="World" plate={<RouteError noun="world" size="place" />} />;
 }

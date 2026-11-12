@@ -33,6 +33,15 @@ describe("the account's menu", () => {
     expect(onLogOut).toHaveBeenCalledTimes(1);
   });
 
+  it("says why Jarvis is greyed when it is on but no room is in view, and coming soon when it is off", () => {
+    const off = mount(<Opened address={ADDRESS} lead={null} onLogOut={() => undefined} />);
+    expect(off.querySelector("[role='menuitem']")?.getAttribute("aria-label")).toBe("Jarvis, coming soon");
+    const on = mount(
+      <Opened address={ADDRESS} lead={null} onLogOut={() => undefined} jarvisWhy="Open a room to ask Jarvis" />,
+    );
+    expect(on.querySelector("[role='menuitem']")?.getAttribute("aria-label")).toBe("Jarvis, Open a room to ask Jarvis");
+  });
+
   it("offers no way out to a guest, whose menu is the device's", () => {
     const box = mount(<Opened address={undefined} lead={null} onLogOut={() => undefined} />);
     expect(items(box)).toEqual(["JarvisSoon", "Passport", "Settings", "Release a key"]);

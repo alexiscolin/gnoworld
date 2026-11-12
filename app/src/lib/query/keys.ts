@@ -21,7 +21,13 @@ export const keys = {
   hours: (world: string) => ["hours", world] as const,
   markets: () => ["markets"] as const,
   marketsHistory: () => ["markets", "history"] as const,
+  trending: () => ["trending"] as const,
+  network: () => ["network"] as const,
   card: (key: string) => ["card", key] as const,
+  person: (address: string) => ["person", address] as const,
+  call: (hash: string, index: number) => ["call", hash, index] as const,
+  token: (realm: string) => ["token", realm] as const,
+  explanation: (kind: string, chain: string, subject: string) => ["explanation", kind, chain, subject] as const,
   jarvisState: () => ["jarvis", "state"] as const,
 };
 

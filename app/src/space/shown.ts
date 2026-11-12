@@ -16,8 +16,10 @@ import {
   type Object3D,
 } from "three";
 
-// The clocks, and the dust's eye wrapped into its cell: it follows the camera, which the frame weighs by its pixels.
-const CLOCKS = new Set(["uTime", "time", "cloudTime", "uEye"]);
+// The clocks, the rings' clock, a planet's light direction (it turns with the orbit, a slow motion judged by its pixels, D13013: counted
+// here it made every frame "full" and the loop never calm), and the dust's eye wrapped into its cell: it follows the camera, which the
+// frame weighs by its pixels.
+const CLOCKS = new Set(["uTime", "time", "cloudTime", "ringTime", "sun", "uEye"]);
 
 function uniformsOf(material: ShaderMaterial, out: number[]): void {
   for (const [name, { value }] of Object.entries(material.uniforms)) {

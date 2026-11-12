@@ -23,6 +23,11 @@ describe("Jarvis's cards among the lines", () => {
     expect(new Set(keys).size).toBe(2);
   });
 
+  it("stand after the question that asked them, which the room hears a moment after the ask", () => {
+    const asked = [line("a", "2026-11-11T10:00:00.000Z"), line("question", "2026-11-11T10:05:00.300Z")];
+    expect(order(withJarvis(asked, [card("1", "2026-11-11T10:05:00.000Z")]))).toEqual(["a", "question", "card 1"]);
+  });
+
   it("leave the entries as they are, the same array, when there is none", () => {
     expect(withJarvis(lines, [])).toBe(lines);
   });

@@ -1,6 +1,6 @@
 // The places' list is the search palette (D355): /list keeps working, and goes to the home with the palette open. It has no place of its own.
 import { Navigate, data } from "react-router";
-import { PlaceError } from "../features/errors/index.ts";
+import { RouteError } from "../features/errors/index.ts";
 import { SEARCH_HASH } from "../features/search/index.ts";
 import { listMeta } from "../meta.ts";
 import { pageOf } from "../places.ts";
@@ -25,5 +25,5 @@ export default function List() {
 }
 
 export function ErrorBoundary() {
-  return <PlaceError what="page" />;
+  return <RouteError noun="page" />;
 }

@@ -9,7 +9,7 @@ import { Bar, SkeletonLines } from "./SkeletonBits.tsx";
 
 const shape = (
   <Stack space="m">
-    <Cluster as="header" space="xs">
+    <Cluster as="div" space="xs">
       <Skeleton shape="disc" />
       <Bar width="short" />
     </Cluster>

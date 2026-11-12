@@ -1,0 +1,44 @@
+/* The expedition: its stops on a dashed route, the line behind the planets, each stop's words centred under its planet. */
+@layer components {
+  .route {
+    position: relative;
+  }
+
+  .route::before {
+    content: "";
+    position: absolute;
+    inset-inline: 16%;
+    /* raw: the line runs through the large thumbs' middle (64 px thumbs) */
+    inset-block-start: 32px;
+    /* raw: a thin dashed line */
+    border-block-start: 2px dashed var(--color-line-strong);
+  }
+
+  /* Positioned after the line, so the planets paint over it. */
+  .stop {
+    position: relative;
+    text-align: center;
+  }
+
+  .name,
+  .line {
+    display: block;
+    padding-block-start: var(--space-2xs);
+  }
+
+  .name {
+    color: var(--color-text);
+    font: var(--font-ui);
+  }
+
+  .reached {
+    color: var(--color-mine);
+  }
+
+  .reward {
+    /* layout: the badge keeps its size beside the words */
+    flex: none;
+    /* raw: the badge beside the words, a little larger than a thumb */
+    inline-size: 44px;
+  }
+}

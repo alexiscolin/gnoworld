@@ -19,7 +19,7 @@
 
   .count {
     color: var(--color-text-muted);
-    font: var(--font-data);
+    font: var(--font-count);
   }
 
   .track {

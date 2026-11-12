@@ -9,7 +9,7 @@ import styles from "./RoomView.module.css";
 // stops on it (the chain's cards' mark).
 function DayDivider({ label }: { label: string }) {
   return (
-    <li role="separator" aria-label={label} data-chain="" className={styles["day"]}>
+    <li role="separator" aria-label={label} data-chain="" className={`held-top ${String(styles["day"])}`}>
       <span className="label" aria-hidden="true">
         {label}
       </span>

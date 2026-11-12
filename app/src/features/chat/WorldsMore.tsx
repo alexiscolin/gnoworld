@@ -13,7 +13,7 @@ import { realmPage } from "../../lib/realmPage.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { useWorldsFile } from "../../worldsFile.ts";
 import { useFollow } from "../follow/index.ts";
-import { ColumnPlanet } from "./ColumnPlanet.tsx";
+import { WorldPlanet } from "../../WorldPlanet.tsx";
 import styles from "./Worlds.module.css";
 
 // Read on the device after the page wakes: the server's page and the first draw hold none, so hydration matches.
@@ -33,7 +33,9 @@ function Place({ name, id, href, remove }: { name: string; id: string; href: str
           aria-current={href === pathname ? "page" : undefined}
           className={styles["world"]}
         >
-          <ColumnPlanet name={name} id={id} src={undefined} />
+          <span className={styles["planet"]}>
+            <WorldPlanet world={id} fallback="" name={name} decorative />
+          </span>
         </RouterLink>
       </Tooltip>
       <span className={styles["remove"]}>

@@ -57,7 +57,7 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
   return { ask, sent, heard, answers: () => answers, stop: asker.stop };
 }
 // The answers' turn: each request's promise settled, and what it does after.
-const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 const refusal = (reason: "refused" | "forbidden" | "malformed"): Promise<Result<LineVerdicts>> =>
   Promise.resolve({ ok: false, reason });
 
@@ -90,7 +90,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
   it("asks a line once while it stays in view, whatever comes after", async () => {
     const t = server();
     t.ask([line("a")]);
-    await settled();
+    await nextTask();
     t.ask([line("a"), line("b")]);
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a"], ["b"]]);
@@ -142,7 +142,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
       }),
     );
     t.ask([line("a"), line("b")]);
-    await settled();
+    await nextTask();
     expect(t.heard).toEqual([
       { msgid: "a", room: "#bubble", state: "hidden" },
       { msgid: "b", room: "#bubble", state: "checked" },
@@ -156,7 +156,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
   it.each(["refused", "forbidden", "malformed"] as const)("never asks again a line the server %s", async (reason) => {
     const t = server(() => refusal(reason));
     t.ask([line("a")]);
-    await settled();
+    await nextTask();
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a"], ["b"]]);
     expect(t.heard).toEqual([]);
@@ -526,7 +526,7 @@ describe("verdictAsker: the cards of the lines in view", () => {
       Promise.resolve({ ok: true, value: { room: "#bubble", cards: [{ msgid: "a", key: KEY }] } }),
     );
     t.asker.show("#bubble", [page("a"), page("b"), { ...line("n"), text: "no link" }]);
-    await settled();
+    await nextTask();
     expect(t.sent).toEqual([["a", "b"]]);
     expect(t.carded).toEqual([[{ room: "#bubble", msgid: "a", key: KEY }]]);
   });
@@ -534,7 +534,7 @@ describe("verdictAsker: the cards of the lines in view", () => {
   it("asks nothing of the cards for a line from the stream's opening on, which the stream tells", async () => {
     const t = withCards(() => Promise.resolve({ ok: true, value: { room: "#bubble", cards: [] } }));
     t.asker.show("#bubble", [page("a"), { ...page("b"), time: "2026-10-26T12:05:00.000Z" }]);
-    await settled();
+    await nextTask();
     expect(t.sent).toEqual([["a"]]);
   });
 

@@ -6,7 +6,7 @@ import layers from "@gnoworld/ui/layers.css?url";
 import { LATIN_FONTS } from "@gnoworld/ui/fonts";
 import type { ReactNode } from "react";
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from "react-router";
-import { PageError } from "./features/errors/index.ts";
+import { RouteError } from "./features/errors/index.ts";
 import { markFullEarly } from "./fullChat.ts";
 import { Shell } from "./shell.tsx";
 
@@ -47,5 +47,5 @@ export default function App() {
 }
 
 export function ErrorBoundary() {
-  return <PageError title="Something went wrong" line="Reload the page to try again." reload />;
+  return <RouteError />;
 }

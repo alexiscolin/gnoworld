@@ -7,7 +7,7 @@
 import { excerpt, foldEdits, threadsOf, type Line } from "@gnoworld/core";
 import { composing, IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { LineView } from "./LineView.tsx";
+import { BARE_ROW, LineView } from "./LineView.tsx";
 import shared from "./lists.module.css";
 import { mentionable } from "./names.ts";
 import { shortened } from "./shortened.ts";
@@ -79,23 +79,7 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
           <p className={styles["count"]}>{countOf(replies.length)}</p>
           <ol aria-label="In this thread" className={LINES}>
             {rows.map((line) => (
-              <LineView
-                key={line.id}
-                line={line}
-                me={me}
-                members={known}
-                stop={false}
-                actions={null}
-                fresh={false}
-                verdict={undefined}
-                players={false}
-                saved={false}
-                pinned={false}
-                chips={undefined}
-                react={undefined}
-                answers={undefined}
-                inThread
-              />
+              <LineView key={line.id} line={line} me={me} members={known} {...BARE_ROW} inThread />
             ))}
           </ol>
           {composer}

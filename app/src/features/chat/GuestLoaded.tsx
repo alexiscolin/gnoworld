@@ -1,6 +1,7 @@
 // A visitor's world, its rooms once listed (slice 4's 4b): the switcher, the room in view and its people; in an open room a guest's line
 // (D430), else the word to log in; no direct message, no notice, nothing kept. What an account adds is AccountChat's, loaded for one.
 import type { RoomList } from "@gnoworld/schemas";
+import { EmptyState } from "@gnoworld/ui";
 import type { ReactNode, RefObject } from "react";
 import { useAppStore } from "../../storeContext.tsx";
 import { chunked } from "./Failing.tsx";
@@ -30,7 +31,7 @@ import type { AppState } from "../../store/index.ts";
 // A chunk that cannot be fetched leaves the list's place with a word, never the page (F1763).
 const People = chunked(async () => ({ default: (await import("./People.tsx")).People }), {
   waiting: null,
-  failed: <p role="status">Who is here could not load.</p>,
+  failed: <EmptyState look="failed" line="Who is here could not load." />,
 });
 
 function PeopleHere(props: PeopleProps) {

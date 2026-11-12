@@ -24,7 +24,7 @@ for (const width of WIDTHS) {
         await page.goto(path);
         await hydrated(page);
         // A world's page holds its chat, which loads after the page: its plate alone is drawn (frame 26: the kicker, the title,
-        // the activity's words, the actions); the other pages say where they are in a trail.
+        // the activity's words, the actions); the other pages are taken whole.
         const world = path.startsWith("/w/");
         if (world) await calmed(page);
         const shown = world ? page.locator("[data-look='plate']") : page;
@@ -34,7 +34,7 @@ for (const width of WIDTHS) {
         if (world || path.endsWith("/earth"))
           await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
         await expect(
-          world ? page.locator("[data-look='plate']") : page.getByRole("navigation", { name: "You are here" }),
+          world ? page.locator("[data-look='plate']") : page.getByRole("heading", { level: 1, name: "Earth" }),
         ).toBeVisible();
         await expect(shown).toHaveScreenshot(`${name}-${String(width)}.png`, { mask: [page.getByRole("banner")] });
       });

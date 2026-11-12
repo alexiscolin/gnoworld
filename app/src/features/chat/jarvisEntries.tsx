@@ -1,11 +1,8 @@
 // Jarvis's cards among a room's lines (10u-a), the asker's alone and on this device (D1017): each stands where it was asked, before the
 // first entry that is newer. How a card is drawn is the panel's host's (features/jarvis), which comes when Jarvis is first asked.
-import { lazy, Suspense, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { useJarvisDrawing, type JarvisItem } from "../../jarvisHere.ts";
 import type { Entry } from "./chainEntries.ts";
-
-// The market card's chunk, asked when the first one is drawn.
-const MarketCard = lazy(() => import("./MarketCard.tsx"));
 
 /** A card of Jarvis, with the key its item is drawn under. */
 export interface JarvisEntry {
@@ -15,7 +12,13 @@ export interface JarvisEntry {
 
 const timeOf = (entry: Entry<{ time: string }>): string => ("line" in entry ? entry.line.time : entry.call.at);
 
-/** The entries and the cards in one order, oldest first: a card stands before the first entry newer than the time it was asked. */
+// A question to Jarvis goes to the room too, which hears it a moment after the ask: a card waits this long past its ask, so it stands
+// after its own question. ponytail: a fixed wait, the question's own msgid tied to the card if a slow room ever puts it after.
+const HEARD_MS = 5000;
+const heardAt = (at: string): string => new Date(Date.parse(at) + HEARD_MS).toISOString();
+
+/** The entries and the cards in one order, oldest first: a card stands before the first entry newer than its ask and the moment its
+ * question takes to be heard. */
 export function withJarvis<L extends { time: string }>(
   entries: readonly Entry<L>[],
   items: readonly JarvisItem[],
@@ -25,7 +28,8 @@ export function withJarvis<L extends { time: string }>(
   let next = 0;
   const cards = items.toSorted((a, b) => (a.at < b.at ? -1 : a.at > b.at ? 1 : 0));
   for (const entry of entries) {
-    for (; next < cards.length && (cards[next]?.at ?? "") < timeOf(entry); next += 1) placed.push(cardAt(cards, next));
+    for (; next < cards.length && heardAt(cards[next]?.at ?? "") < timeOf(entry); next += 1)
+      placed.push(cardAt(cards, next));
     placed.push(entry);
   }
   for (; next < cards.length; next += 1) placed.push(cardAt(cards, next));
@@ -41,14 +45,5 @@ function cardAt(cards: readonly JarvisItem[], at: number): JarvisEntry {
 /** One card as a list item, once the host has said how it is drawn. */
 export function JarvisSlot({ item }: { item: JarvisItem }): ReactNode {
   const draw = useJarvisDrawing();
-  if (item.market === true) {
-    return (
-      <li data-market="">
-        <Suspense fallback={null}>
-          <MarketCard only={item.symbols} />
-        </Suspense>
-      </li>
-    );
-  }
   return draw === undefined ? null : <li data-jarvis="">{draw(item)}</li>;
 }

@@ -75,7 +75,7 @@ const STATE = {
 const room = shownOf(dms(undefined), { id: "#bubble/games", state: STATE, acts }, PAGE);
 // The same room is in the store behind it, its lines answering one another as well.
 const dm = shownOf(dms(BOB), { id: "#bubble/games", state: STATE, acts }, PAGE);
-const chips = (html: string) => html.match(/\b\d+ repl(?:y|ies)\b/g) ?? [];
+const chips = (html: string) => [...html.matchAll(/>(\d+ repl(?:y|ies))</g)].map((found) => found[1] ?? "");
 
 beforeAll(async () => {
   // The lines view is a lazy chunk: asked once, so the drawings below hold its lines.

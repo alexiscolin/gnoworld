@@ -8,6 +8,8 @@ function stage() {
     uEye: { value: new Vector3(0.1, 0.2, 0.3) },
     uTime: { value: 5 },
     time: { value: 5 },
+    ringTime: { value: 5 },
+    sun: { value: new Vector3(1, 0, 0) },
     cloudTime: { value: 5 },
     uAt: { value: new Vector3(1, 2, 3) },
   };
@@ -53,6 +55,8 @@ describe("shownOf", () => {
     s.uniforms.uTime.value = 99;
     s.uniforms.time.value = 99;
     s.uniforms.cloudTime.value = 99;
+    s.uniforms.ringTime.value = 99;
+    s.uniforms.sun.value.set(0, 1, 0);
     expect(s.read()).toEqual(before);
   });
 

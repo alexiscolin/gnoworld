@@ -2,9 +2,8 @@
 // once opened, what it does: its Read or Call button and what that opens (a result, a call card). The list of read functions and the list of
 // write functions share it. The body is always drawn and held shut, so it grows (a grid row from 0 to its height) and a button in it is found by a test.
 import { realmType } from "@gnoworld/core";
-import { Button, Chip, Cluster, Disclosure, Skeleton, Stack } from "@gnoworld/ui";
+import { Button, Chip, Cluster, Disclosure, grouped, Skeleton, Stack } from "@gnoworld/ui";
 import { createContext, use, type ReactNode } from "react";
-import styles from "./RealmFunctions.module.css";
 
 /** How many times each function was called, from the realm's rollup (by name); a function not in it shows no count. */
 export const CallCountsContext = createContext<ReadonlyMap<string, number>>(new Map());
@@ -33,13 +32,13 @@ export function FunctionRow({ name, params = NO_PARAMS, open, onToggle, children
     <Disclosure
       lead={null}
       title={
-        <code className={styles["code"]} title={signature}>
+        <code className="plain-code" title={signature}>
           {signature}
         </code>
       }
       trail={
         calls === undefined || calls === 0 ? undefined : (
-          <Chip>{`${calls.toLocaleString("en-US")} ${calls === 1 ? "call" : "calls"}`}</Chip>
+          <Chip>{`${grouped(calls)} ${calls === 1 ? "call" : "calls"}`}</Chip>
         )
       }
       {...(open === undefined ? {} : { open })}

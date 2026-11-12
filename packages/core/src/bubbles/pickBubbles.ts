@@ -10,6 +10,10 @@ import type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts
 
 export type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
 
+/** A bubble keeps this many times `maxChars` graphemes of its line, marks included: the words it shows are read from them and cut
+ * to `maxChars` with their ellipsis late (app BubbleWords), the Markdown reader not being the first screen's (ADR-0001 §12). */
+const RAW = 4;
+
 interface Candidate {
   readonly message: BubbleMessage;
   readonly country: string;
@@ -66,7 +70,7 @@ function visible(run: Run, s: Bubble): boolean {
   return (
     line !== undefined &&
     allowed(run, line) &&
-    cutText(line.text, run.chars) === s.text &&
+    cutText(line.text, run.chars * RAW) === s.text &&
     (s.own || !far(run, s.country))
   );
 }
@@ -101,7 +105,7 @@ function count(run: Run, country: string): void {
 
 /** A candidate's text cut, or none when the cut leaves nothing to say: the only place a text is segmented. */
 function say(run: Run, c: Candidate): string | undefined {
-  const text = cutText(c.message.text, run.chars);
+  const text = cutText(c.message.text, run.chars * RAW);
   return isBlank(text) ? undefined : text;
 }
 
@@ -112,6 +116,7 @@ function put(run: Run, c: Candidate, text: string): void {
     account: message.account,
     country: c.country,
     text,
+    ...(message.room === undefined ? {} : { room: message.room }),
     since: run.now,
     until: run.now + run.show,
     own: c.rank === 0,

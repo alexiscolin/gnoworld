@@ -82,8 +82,9 @@ export type ListProps = Omit<LinesProps, "lines"> & {
   newest: ReadonlyMap<string, string>;
 };
 
-// What a line shows beyond its words: its chips, its poll's votes, and whether it is its author's first words.
+// What a line shows beyond its words: its chips, its poll's votes, and whether it is its author's first words; the room it is in.
 export const marksOf = (props: ListProps, id: string) => ({
+  room: props.room,
   chips: props.chips.get(id),
   votes: props.votes.get(id),
   newHere: props.firsts.has(id),

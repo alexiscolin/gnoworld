@@ -274,7 +274,7 @@ describe("pageClock", () => {
       allCapture: () => entries.every((entry) => entry.capture),
     };
   };
-  const settled = (promise: Promise<void>) => {
+  const isDone = (promise: Promise<void>) => {
     let done = false;
     promise.then(
       () => {
@@ -295,7 +295,7 @@ describe("pageClock", () => {
 
   it("waits its time while the tab is shown, and listens to nothing", async () => {
     const shown = page(false);
-    const done = settled(pageClock(shown).wait(1000));
+    const done = isDone(pageClock(shown).wait(1000));
     await vi.advanceTimersByTimeAsync(999);
     expect(done()).toBe(false);
     await vi.advanceTimersByTimeAsync(1);
@@ -305,7 +305,7 @@ describe("pageClock", () => {
 
   it("asks nothing while the tab is hidden: a wait ended hidden lasts until the tab is shown", async () => {
     const hidden = page(true);
-    const done = settled(pageClock(hidden).wait(1000));
+    const done = isDone(pageClock(hidden).wait(1000));
     await vi.advanceTimersByTimeAsync(60_000);
     hidden.fire("visibilitychange");
     hidden.fire("pointerdown");
@@ -320,7 +320,7 @@ describe("pageClock", () => {
 
   it("a wait whose tab was hidden in its middle lasts until the tab is shown", async () => {
     const tab = page(false);
-    const done = settled(pageClock(tab).wait(30_000));
+    const done = isDone(pageClock(tab).wait(30_000));
     await vi.advanceTimersByTimeAsync(5000);
     tab.hidden = true;
     tab.fire("visibilitychange");
@@ -338,7 +338,7 @@ describe("pageClock", () => {
 
   it("a tab hidden and shown again before the wait's end: the wait ends on time", async () => {
     const tab = page(false);
-    const done = settled(pageClock(tab).wait(30_000));
+    const done = isDone(pageClock(tab).wait(30_000));
     await vi.advanceTimersByTimeAsync(5000);
     tab.hidden = true;
     tab.fire("visibilitychange");
@@ -355,7 +355,7 @@ describe("pageClock", () => {
     "rests until the next gesture (%s), heard in capture",
     async (gesture) => {
       const shown = page(false);
-      const done = settled(pageClock(shown).rest());
+      const done = isDone(pageClock(shown).rest());
       expect(shown.listening()).toBeGreaterThan(0);
       expect(shown.allCapture()).toBe(true);
       await vi.advanceTimersByTimeAsync(600_000);
@@ -369,7 +369,7 @@ describe("pageClock", () => {
 
   it("rests until the tab comes back, never at its hiding", async () => {
     const tab = page(false);
-    const done = settled(pageClock(tab).rest());
+    const done = isDone(pageClock(tab).rest());
     tab.hidden = true;
     tab.fire("visibilitychange");
     await turn();
@@ -384,11 +384,11 @@ describe("pageClock", () => {
   it("stopped, what was pending never settles and nothing listens, a hidden wait's listener included", async () => {
     const tab = page(true);
     const clock = pageClock(tab);
-    const waited = settled(clock.wait(1000));
-    const rested = settled(clock.rest());
+    const waited = isDone(clock.wait(1000));
+    const rested = isDone(clock.rest());
     await vi.advanceTimersByTimeAsync(1000);
     expect(tab.listening()).toBeGreaterThan(0);
-    const later = settled(clock.wait(5000));
+    const later = isDone(clock.wait(5000));
     clock.stop();
     expect(tab.listening()).toBe(0);
     tab.hidden = false;
@@ -401,7 +401,7 @@ describe("pageClock", () => {
   it("stop clears every timer, several waits pending", async () => {
     const shown = page(false);
     const clock = pageClock(shown);
-    const waits = [settled(clock.wait(1000)), settled(clock.wait(30_000)), settled(clock.rest())];
+    const waits = [isDone(clock.wait(1000)), isDone(clock.wait(30_000)), isDone(clock.rest())];
     clock.stop();
     expect(vi.getTimerCount()).toBe(0);
     await vi.advanceTimersByTimeAsync(60_000);
@@ -412,8 +412,8 @@ describe("pageClock", () => {
     const shown = page(false);
     const clock = pageClock(shown);
     clock.stop();
-    const waited = settled(clock.wait(1000));
-    const rested = settled(clock.rest());
+    const waited = isDone(clock.wait(1000));
+    const rested = isDone(clock.rest());
     expect(vi.getTimerCount()).toBe(0);
     expect(shown.listening()).toBe(0);
     await vi.advanceTimersByTimeAsync(600_000);

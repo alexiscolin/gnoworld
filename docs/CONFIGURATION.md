@@ -26,7 +26,7 @@ A secret is only ever read from a file; `.env` holds the file's path, never its 
 | `ts_authkey` | Tailscale's single-use auth key, tag `tag:gnoworld-demo` | `tailscale` | Tailscale admin console, Settings, Keys | yes (spent at the first login) |
 | `ergo_oper_password` | The chat operator's password, 48 characters | `ergo`, `server` | `openssl rand -hex 24 > deploy/secrets/ergo_oper_password` | yes |
 | `log_pepper` | Hashing key of the logs' accounts and visitors | `server` | `openssl rand -hex 32 > deploy/secrets/log_pepper` | yes (32 bytes at least) |
-| `openai_api_key` | OpenAI moderation (and the previews' check) | `server` | one line, the key | yes as a file; the server reads it when `OPENAI_API_KEY_FILE` is set, which compose always does |
+| `openai_api_key` | OpenAI moderation (and the previews' and the link cards' check) | `server` | one line, the key | yes as a file; the server reads it when `OPENAI_API_KEY_FILE` is set, which compose always does |
 | `anthropic_api_key` | Anthropic key of a workspace with its own spend limit | `jarvis`, only when on | one line, the key | the file yes, any text when Jarvis is off |
 | `jarvis_door_key` | The shared key the server sends and Jarvis asks of every request | `server`, `jarvis` (and its health check) | `openssl rand -hex 32 > deploy/secrets/jarvis_door_key` | yes, whatever `JARVIS` says: a missing or short file stops the whole stack |
 
@@ -60,7 +60,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 
 ### `server` (`server/src/config.ts`, `cards/settings.ts`, `door/settings.ts`)
 
-The server's own defaults apply to what `compose.yaml` does not set. Compose forwards only the names in its `server` block (lines 109 to 156): a variable absent there (`CHAINS`, `NEW_ACCOUNTS_PER_HOUR`, `FIRST_TO_CHART_WORLDS`, `MODERATION_THRESHOLDS`, `NEW_ACCOUNT_HOURS`, `MUTE_*`, `JARVIS_QUOTA*`, `JARVIS_UNLIMITED`, `JARVIS_TIMEOUT_S`, `JARVIS_QUESTION_CHARS`, `JARVIS_NAMES_*`, `HUBS_FILE`, `ROLES_FILE`) cannot be set from `deploy/.env`; add it to that block first. The same holds for jarvis's block (lines 201 to 224).
+The server's own defaults apply to what `compose.yaml` does not set. Compose forwards only the names in its `server` block (lines 109 to 156): a variable absent there (`CHAINS`, `NEW_ACCOUNTS_PER_HOUR`, `FIRST_TO_CHART_WORLDS`, `MODERATION_THRESHOLDS`, `NEW_ACCOUNT_HOURS`, `MUTE_*`, `JARVIS_QUOTA*`, `JARVIS_UNLIMITED`, `JARVIS_TIMEOUT_S`, `JARVIS_QUESTION_CHARS`, `JARVIS_NAMES_*`, `EXPLAIN_SEED_FILE`, `EXPLAIN_PER_DAY`, `HUBS_FILE`, `ROLES_FILE`) cannot be set from `deploy/.env`; add it to that block first. The same holds for jarvis's block (lines 201 to 224).
 
 | Name | Default | Allowed | Effect, and when missing |
 |---|---|---|---|
@@ -99,6 +99,8 @@ The server's own defaults apply to what `compose.yaml` does not set. Compose for
 | `JARVIS_QUOTA`, `JARVIS_QUOTA_UNNAMED` | `20`, `5` | 1 to 1000 | First values of a day's questions per account (named, unnamed); the database keeps them after the first start |
 | `JARVIS_UNLIMITED` | none | comma list of addresses, 1000 at most, no duplicate | Accounts with no quota (first value) |
 | `JARVIS_NAMES_RPC`, `JARVIS_NAMES_CHAIN` | `https://rpc.gno.land`, `gnoland-1` | https origin; chain id | Where an account's name is read, and the chain id that node must name |
+| `EXPLAIN_SEED_FILE` | the seed shipped with the server, `server/src/explain/onyxSeed.json` | absolute path, 8 MiB at most | The realms' explanations written in advance, read at every start when `UNIVERSES_FILE` is set (OPERATIONS.md, "The realms' explanations"); a file that does not parse stops the server |
+| `EXPLAIN_PER_DAY` | `30` | 1 to 1000 | New explanations Jarvis may make in any 24 hours, one a minute at most |
 | `ADMIN_PORT` | none: no admin API | 0 to 65535 | Admin API's own listener (compose: `8082`); `ADMIN_HOST` or `ADMIN_ORIGINS` without it stops the server |
 | `ADMIN_HOST` | `127.0.0.1` (compose: the admin address) | host | Where it binds |
 | `ADMIN_ORIGINS` | none | origins | The console's sites; one on a host of `ORIGINS` is refused (cookies ignore scheme and port) |
@@ -169,7 +171,7 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 
 | Where | Limit | Value | Source |
 |---|---|---|---|
-| Moderation | a card's `sexual` score hides it from | 0.3, never above the lines' own threshold | `cards/settings.ts` line 6 |
+| Moderation | a card's `sexual` score hides it from | 0.3, never above the lines' own threshold | `cards/settings.ts` line 7 |
 | Moderation | mute | section 3 (`MUTE_*`) | `config.ts` |
 | Rules of a world | links, mentions per message; links for a new account | 3, 5, 2 (defaults) | `server/roles.json` |
 | Jarvis | question, answer, buttons, quota, dollars, unlimited accounts (ceilings) | 8000, 8000, 5, 1000, 500, 1000 | `packages/schemas/src/jarvis.ts` line 81 |
@@ -183,7 +185,7 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 | Link way out | tunnels | 32 (smokescreen's `max_concurrent_connect_tunnels`) | `deploy/egress/config.yaml` |
 | Search | lines kept per room, rows in all, edits per line | 2048, 400000, 50 | `server/src/search/index.ts` lines 15 to 18 |
 | Search | requests a minute per visitor, per account; a second in all | 20, 60, 10 | `server/src/search/routes.ts` lines 19 to 22 |
-| Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 29 to 32 |
+| Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 30 to 33 |
 | Guest | a line's length | 280 characters, 400 bytes | `server/src/guest/rules.ts` |
 | nginx | requests a visitor | 20 a second, burst 640 (Alexis, F3665) | `deploy/web/nginx.conf` lines 44 and 97 |
 | nginx | login | 1 a second, burst 20, besides the server's 10 a minute | lines 46 and 191 |
@@ -216,7 +218,7 @@ The app reads no `VITE_*` setting for production. What it reads:
 | `GNOWORLD_BUILD` | `app/react-router.config.ts` line 26 | The build folder (default `build`) |
 | `import.meta.env.BASE_URL`, `MODE`, `PROD` | `app/src/` | Vite's own: the base path of the files and of the data, the mode |
 | `VITE_GNOWORLD_TEST_GPU` | `app/src/features/universe/gpu.ts` line 24 | `1`: lets a test use the GPU path outside development |
-| `WORKSHOP_HOSTS`, `WORKSHOP_API_PORT`, `WORKSHOP_WS_PORT`, `WORKSHOP_DATA_DIR` | `app/vite.config.ts` lines 91 to 149 | The workshop's dev server |
+| `WORKSHOP_HOSTS`, `WORKSHOP_API_PORT`, `WORKSHOP_WS_PORT`, `WORKSHOP_DATA_DIR` | `app/vite.config.ts` lines 93 to 153 | The workshop's dev server |
 
 ## 8. Not configurable, and where it is fixed
 
@@ -229,7 +231,7 @@ The app reads no `VITE_*` setting for production. What it reads:
 | Jarvis's price table and its allowed models | `jarvis/src/prices.ts` |
 | The demo password's name `team`, the Funnel port 443 | `docs/OPERATIONS.md`; `deploy/tailscale/serve.json` |
 | The ports 8080, 8081, 8082, 8083, 8084, 4750 to 4754, 6667, 8097 | `deploy/compose.yaml`, `nginx.conf`, `deploy/guard/guard.sh`, `deploy/egress/` |
-| The retention of Jarvis's kept explanations (7 days) | server database; `docs/OPERATIONS.md` |
+| The retention of Jarvis's kept answers (a function's explanation 7 days, a "what can be done here" answer 1 hour), of the link cards' pages (30 days) and of the search index (90 days) | `server/src/door/kept.ts` lines 15 and 16; `server/src/cards/expire.ts` line 6; `server/src/search/index.ts` lines 10 and 154 |
 | Ergo's own configuration | rendered at its start from the variables above: `deploy/ergo/` |
 | Whether the container is read-only, capabilities, restart | `x-locked` in `compose.yaml` (lines 9 to 17) |
 

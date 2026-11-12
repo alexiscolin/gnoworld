@@ -4,7 +4,8 @@ import { act } from "react";
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import type { Result as HttpResult } from "../../lib/api/http.ts";
 import { mount, settled } from "../../../tests/mount.tsx";
-import { jarvisRoom, useJarvisOn } from "./jarvisTold.tsx";
+import { useJarvisOn } from "../../jarvisHere.ts";
+import { jarvisRoom } from "./jarvisTold.tsx";
 
 // 10u-a: whether Jarvis is on, for the page, and the room it reads.
 type Result = HttpResult<JarvisState>;

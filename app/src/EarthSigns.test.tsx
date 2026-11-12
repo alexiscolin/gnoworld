@@ -8,6 +8,8 @@ import rules from "../data/bubbles.json" with { type: "json" };
 import { all, mount, one } from "../tests/mount.tsx";
 import { createAppStore } from "./store/index.ts";
 import { EarthSigns } from "./EarthSigns.tsx";
+// The bubbles' words are a lazy chunk: loaded here first, so the fake clock's flush finds them, as the page's own preload does.
+import "./features/universe/BubbleWords.tsx";
 import type { SignsDeps } from "./features/universe/signs.ts";
 
 // The signs over the globe, as HTML anchored to the ground (ADR-0001 §7): text as text, read by no screen reader but for the pins, which are
@@ -27,11 +29,11 @@ const LIST: RoomList["sections"] = [
 const PLACES = [{ room: "#earth/lisbon", lat: 38.7, lon: -9.1 }];
 const HOUR = 3_600_000;
 
-function heard(id: string, over: { from?: string; country?: string; text?: string; at?: number } = {}) {
-  const { from = ANN, country = "JP", text = "hello", at = Date.now() } = over;
+function heard(id: string, over: { from?: string; country?: string; text?: string; at?: number; room?: string } = {}) {
+  const { from = ANN, country = "JP", text = "hello", at = Date.now(), room = "#earth" } = over;
   const time = new Date(at).toISOString();
   const parsed = parseLine(
-    `@msgid=${id};time=${time};account=${from};+gnoworld/country=${country} :${from}!u@h PRIVMSG #earth :${text}`,
+    `@msgid=${id};time=${time};account=${from};+gnoworld/country=${country} :${from}!u@h PRIVMSG ${room} :${text}`,
   );
   if (!parsed.ok) throw new Error("the test's line does not parse");
   return parsed.message;
@@ -111,6 +113,7 @@ describe("a bubble", () => {
     const { box, say, ground } = await shown();
     ground.facing.mockReturnValue({ lat: 39, lon: -8 });
     say("m1", { from: "ines", country: "PT", text: "Night Owls showed up on the map, anyone been?" });
+    await settled();
     const bubble = signOf(box, "Night Owls showed up on the map, anyone been?");
     expect(bubble.textContent).toContain("ines · Portugal");
     expect(words(bubble, "I")).toBeDefined();
@@ -148,6 +151,28 @@ describe("a bubble", () => {
     const { box, say } = await shown();
     say("m1");
     expect(words(box, "hello")?.closest("[aria-hidden='true']")).not.toBeNull();
+    expect(all(box, "[aria-hidden='true']").some((each) => each.contains(one(box, "a[aria-label^='Open']")))).toBe(
+      false,
+    );
+  });
+
+  it("names its room in a pill after the place, and opens it by the router on a press", async () => {
+    const { box, say, open } = await shown();
+    say("m1", { room: "#earth/lisbon" });
+    say("m2", { from: "ines", country: "KR", text: "general words" });
+    const side = signOf(box, "hello");
+    expect(one(side, "[data-room]").textContent).toBe("#lisbon");
+    expect(one(signOf(box, "general words"), "[data-room]").textContent).toBe("#general");
+    const link = one(side, "a");
+    expect(link.getAttribute("href")).toBe("/earth?room=lisbon");
+    expect(link.getAttribute("aria-label")).toBe("Open #lisbon");
+    expect(link.closest("[aria-hidden='true']")).toBeNull();
+    const event = new MouseEvent("click", { bubbles: true, cancelable: true });
+    act(() => {
+      link.dispatchEvent(event);
+    });
+    expect(open).toHaveBeenCalledWith("/earth?room=lisbon");
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it("stands on its country", async () => {
@@ -217,40 +242,50 @@ describe("a bubble", () => {
     return { bubbles: [...bubbles, third], marks: marks(ground).filter(({ lat }) => lat > 23 && lat < 37) };
   };
 
-  it("moves a bubble clear of those before it: words are never hidden, and it says how far it went", async () => {
+  // Every frame the loop places each mark in order: two passes, the second knowing where the later ones stood.
+  const frames = (
+    places: readonly { place: (x: number, y: number, front: boolean) => void }[],
+    at: readonly number[][],
+  ) => {
+    for (let pass = 0; pass < 2; pass += 1)
+      places.forEach(({ place }, i) => {
+        place(at[i]?.[0] ?? 0, at[i]?.[1] ?? 0, true);
+      });
+  };
+
+  it("keeps every bubble on its own country: none is lifted away, the newest covers the older ones that stand under it", async () => {
     const { bubbles, marks: places } = await threeBubbles();
-    for (const { place } of places) place(100, 400, true);
-    expect(bubbles[0]?.style.getPropertyValue("--_y")).toBe("-62px");
-    expect(bubbles[1]?.style.getPropertyValue("--_y")).toBe("-124px");
-    expect(bubbles[1]?.style.getPropertyValue("--_lift")).toBe("62px");
-    expect(bubbles[0]?.style.getPropertyValue("--_lift")).toBe("0px");
+    frames(
+      places,
+      places.map(() => [100, 400]),
+    );
+    for (const bubble of bubbles) {
+      expect(bubble.style.getPropertyValue("--_y")).toBe("-62px");
+      expect(bubble.style.getPropertyValue("--_lift")).toBe("");
+    }
+    expect(bubbles.map((bubble) => bubble.hasAttribute("data-away"))).toEqual([true, true, true]);
   });
 
-  it("clears every bubble before it, not the nearest alone: one that clears the second may land on the first", async () => {
+  it("shows a bubble again when the newer one that covered it moves off", async () => {
     const { bubbles, marks: places } = await threeBubbles();
-    const [first, second, third] = places;
-    first?.place(100, 162, true);
-    second?.place(100, 232, true);
-    third?.place(100, 232, true);
-    expect(bubbles[2]?.style.getPropertyValue("--_y")).toBe("-194px");
+    frames(
+      places,
+      places.map(() => [100, 400]),
+    );
+    frames(
+      places,
+      places.map((_, i) => (i === 0 ? [100, 400] : [600 + 300 * i, 400])),
+    );
+    expect(bubbles[0]?.hasAttribute("data-away")).toBe(false);
   });
 
-  it("gives a bubble its own place back when the other moved off", async () => {
-    const { bubbles, marks: places } = await threeBubbles();
-    const [first, second] = places;
-    first?.place(100, 400, true);
-    second?.place(100, 400, true);
-    first?.place(600, 400, true);
-    second?.place(100, 400, true);
-    expect(bubbles[1]?.style.getPropertyValue("--_y")).toBe("-62px");
-  });
-
-  it("stays over the globe's line when its place goes behind: it is the rules that end it", async () => {
+  it("is away while its country is behind the globe, and back when it comes round: never over a point that is not its country's", async () => {
     const { box, say, ground } = await shown();
     say("m1");
-    marks(ground)
-      .find(({ lat }) => lat === 36.1)
-      ?.place(100, 400, false);
+    const mark = marks(ground).find(({ lat }) => lat === 36.1);
+    mark?.place(100, 400, false);
+    expect(signOf(box, "hello").hasAttribute("data-away")).toBe(true);
+    mark?.place(100, 400, true);
     expect(signOf(box, "hello").hasAttribute("data-away")).toBe(false);
   });
 });

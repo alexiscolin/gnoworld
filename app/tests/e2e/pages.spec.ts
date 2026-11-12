@@ -185,7 +185,7 @@ test.describe("once the client takes over", () => {
 
   // The way home is the design system's link-button: the router's link fills it (F259).
   test("the way home from a page not found changes the page without a reload", async ({ page }) => {
-    const home = page.getByRole("alert").getByRole("link", { name: "Back to the universe" });
+    const home = page.getByRole("alert").getByRole("link", { name: "Galaxy" });
     await followInPlace(home, "/nowhere", { url: "/", title: "gno.world" });
   });
 
@@ -197,7 +197,7 @@ test.describe("once the client takes over", () => {
       await expect(page.getByRole("alert")).toContainText(heading);
       await expect(page).toHaveTitle(title);
       await expect(page.getByRole("link", { name: "gnoworld" })).toBeVisible();
-      const back = page.getByRole("alert").getByRole("link", { name: "Back to the universe" });
+      const back = page.getByRole("alert").getByRole("link", { name: "Galaxy" });
       await expect(back).toHaveAttribute("href", "/");
       expect(await tag(page, 'meta[name="robots"]')).toBe("noindex");
       await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);

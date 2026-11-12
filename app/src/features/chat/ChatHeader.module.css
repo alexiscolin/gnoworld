@@ -72,10 +72,10 @@
     --font-label: 500 9.5px/1 var(--family-mono);
   }
 
-  /* raw: the design system's one breakpoint for the chat, read from the chat's own width: a narrow chat's header (a dock's, a phone's) has
-     two rows whatever comes late, its title's font or its rooms' control (7e, 2026-11-02): the place and the controls, then the name,
-     as frame 38 sets them (Alexis, 2026-11-07), so nothing under it moves */
-  @container (inline-size <= 900px) {
+  /* The chat's breakpoint, from its own width (ChatScreen.tsx's `data-compact`: no container query, none holds one since 0c71e5b1). A
+     phone's header keeps two rows (frame 38: the place and the controls, then the name); a dock's one, what does not fit under "More"
+     (PlaceActs.tsx). */
+  [data-compact] {
     .place {
       /* layout: the first row, the controls at its end */
       display: grid;

@@ -1,6 +1,7 @@
 // What the sheet holds under the field: Discover while the field is empty (its cards a chunk of their own, asked when the palette opens),
 // and once words are typed, the ranked results with the chosen place's preview.
 import type { StoreRow } from "@gnoworld/core";
+import { EmptyState } from "@gnoworld/ui";
 import { lazy, Suspense, type ReactNode } from "react";
 import type { UniverseView } from "../../places.ts";
 import type { Discovery } from "./discover/useDiscover.ts";
@@ -20,11 +21,14 @@ type Palette = ReturnType<typeof usePalette>;
 
 function Empty({ query }: { query: string }) {
   return (
-    <p className="empty-note">
-      {parseQuery(query).mode === "address"
-        ? "No page holds an address yet."
-        : `No place answers “${query.trim()}”. Try > explore for a live place.`}
-    </p>
+    <EmptyState
+      look="inline"
+      line={
+        parseQuery(query).mode === "address"
+          ? "No page holds an address yet."
+          : `No place answers “${query.trim()}”. Try > explore for a live place.`
+      }
+    />
   );
 }
 
@@ -34,22 +38,33 @@ export function DiscoverSheet({
   universe,
   fly,
   chat,
+  go,
 }: {
   palette: Palette;
   discovery: Discovery;
   universe: UniverseView;
   fly: (row: StoreRow) => void;
   chat: (row: StoreRow) => void;
+  go: (item: SearchItem) => void;
 }): ReactNode {
   if (palette.worlds === undefined)
     return (
-      <p className="empty-note">
-        {universe.isDefault ? "Reading the realms…" : "Discover has no realms for this universe yet."}
-      </p>
+      <EmptyState
+        look="inline"
+        line={universe.isDefault ? "Reading the realms…" : "Discover has no realms for this universe yet."}
+      />
     );
   return (
     <Suspense fallback={null}>
-      <Discover discovery={discovery} universe={universe.id} fly={fly} chat={chat} />
+      <Discover
+        discovery={discovery}
+        universe={universe.id}
+        fly={fly}
+        chat={chat}
+        followed={palette.followedPlaces}
+        ranked={palette.ranked}
+        go={go}
+      />
     </Suspense>
   );
 }

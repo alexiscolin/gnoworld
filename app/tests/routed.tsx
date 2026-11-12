@@ -54,13 +54,17 @@ export function drawRoute(route: RouteObject, path: string) {
   return { box, leave };
 }
 
-/** The page follows one stream once it has run, and closes it when it is left. */
-export async function expectStreamClosedOnLeave(route: RouteObject, path: string): Promise<void> {
+/** The page follows one stream once it has run, and closes it when it is left. `timeout`: how long the stream may take to open, where the page
+ * holds its chat back for space's door (useSpace's 2.5 s at most). */
+export async function expectStreamClosedOnLeave(route: RouteObject, path: string, timeout = 1000): Promise<void> {
   const sources = fakeStream();
   const { leave } = drawRoute(route, path);
-  await vi.waitFor(() => {
-    expect(sources.opened).toHaveLength(1);
-  });
+  await vi.waitFor(
+    () => {
+      expect(sources.opened).toHaveLength(1);
+    },
+    { timeout },
+  );
   expect(sources.opened[0]?.closed).toBe(0);
   leave();
   expect(sources.opened[0]?.closed).toBe(1);

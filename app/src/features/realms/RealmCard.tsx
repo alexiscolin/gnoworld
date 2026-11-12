@@ -3,8 +3,9 @@
 // state and the link, never a part of it. Plain text only: what a realm says of itself is its own words. The design
 // system's compact Card, and gnoweb's address from lib/chain.
 import { cutGraphemes, words, type Page, type PageBlock } from "@gnoworld/core";
-import { Card } from "@gnoworld/ui";
+import { Card, grouped } from "@gnoworld/ui";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
+import { NEW_TAB } from "../../lib/newTab.ts";
 
 /** The graphemes of a heading and of a paragraph a card shows, at most: a page of one long word is a line, not a screen. */
 export const CARD_HEADING = 80;
@@ -46,11 +47,11 @@ export function RealmCard({ path, gnoweb, height, page }: RealmCardProps) {
           {href === undefined ? (
             path
           ) : (
-            <a href={href} target="_blank" rel="noopener noreferrer" dir="ltr">
+            <a href={href} {...NEW_TAB} dir="ltr">
               {path}
             </a>
           )}
-          {` · read at block ${new Intl.NumberFormat("en-US").format(height)}`}
+          {` · read at block ${grouped(height)}`}
         </small>
       </Card.Body>
     </Card>

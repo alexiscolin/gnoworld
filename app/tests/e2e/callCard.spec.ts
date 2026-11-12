@@ -17,6 +17,7 @@ import {
   type Wallet,
 } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { connectButton } from "./account.ts";
 
 // 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena built from the
 // recording, the hash followed to its block. Nothing shows as done before the chain's answer.
@@ -203,7 +204,7 @@ test.describe("a write function's call card", () => {
     await callAndSign(page);
     await expect.poll(() => done(page)).toBe(1);
     await changeAccount(page, "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
-    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
+    await expect(connectButton(page)).toBeVisible();
   });
 
   // A phone cannot log in (its pointer is coarse), but an account logged in writes there: the session of a computer's login is

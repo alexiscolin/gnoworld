@@ -52,6 +52,10 @@ const noCountry = (m: BubbleMessage): BubbleMessage => {
 const graphemes = (text: string): number => Array.from(new Intl.Segmenter().segment(text)).length;
 
 describe("the caps", () => {
+  it("keeps the room its message was said in on its bubble", () => {
+    expect(pick([msg(1, { room: "#earth/builders" })]).bubbles.map((b) => b.room)).toEqual(["#earth/builders"]);
+  });
+
   it("shows nothing for nothing", () => {
     expect(pick([])).toEqual({ bubbles: [], counts: [], shown: [] });
   });
@@ -351,8 +355,8 @@ describe("your own message", () => {
   });
 
   it("is cut at maxChars like any other", () => {
-    const out = pick([mine({ text: "x".repeat(RULES.maxChars + 20) })]);
-    expect(out.bubbles[0]?.text).toBe("x".repeat(RULES.maxChars));
+    const out = pick([mine({ text: "x".repeat(RULES.maxChars * 4 + 20) })]);
+    expect(out.bubbles[0]?.text).toBe("x".repeat(RULES.maxChars * 4));
   });
 
   it("draws nothing when it is one cluster over the limit: the cut leaves nothing to say", () => {
@@ -460,7 +464,7 @@ describe("what is never picked", () => {
 describe("the text", () => {
   it("is plain text cut like cutText, and links stay text", () => {
     const text = `<script>x</script> https://evil.test/${"a".repeat(200)}\u202e`;
-    expect(pick([msg(1, { text })]).bubbles[0]?.text).toBe(cutText(text, RULES.maxChars));
+    expect(pick([msg(1, { text })]).bubbles[0]?.text).toBe(cutText(text, RULES.maxChars * 4));
   });
 
   it("drops a message whose text is blank once it is cleaned: nothing to say", () => {
@@ -713,9 +717,9 @@ describe("it is a function", () => {
   });
 
   it("returns the rules' own cut: a rule of maxChars moves the cut, nothing else does", () => {
-    const text = "y".repeat(100);
+    const text = "y".repeat(200);
     const out = pickBubbles([msg(1, { text })], NOW, ME, { ...RULES, maxChars: 30 }, []);
-    expect(out.bubbles[0]?.text).toBe("y".repeat(30));
+    expect(out.bubbles[0]?.text).toBe("y".repeat(120));
   });
 
   it("reads maxOnScreen, showSeconds, speakerDelaySeconds and readLast from the rules it is given", () => {
@@ -967,7 +971,7 @@ describe("for any input (property)", () => {
     now - m.at <= rule.maxAgeSeconds * 1000 &&
     m.country !== undefined &&
     CODES.includes(m.country) &&
-    !isBlank(cutText(m.text, rule.maxChars)) &&
+    !isBlank(cutText(m.text, rule.maxChars * 4)) &&
     ![...who.muted, ...who.banned].some((a) => a.toLowerCase() === m.account.toLowerCase()) &&
     (m.account.toLowerCase() === who.account ||
       at === undefined ||
@@ -986,7 +990,7 @@ describe("for any input (property)", () => {
 
   /** What a bubble on screen must be: of a public, joined, visible line of an account the viewer did not mute or ban. */
   function checkBubble(b: Bubble, source: BubbleMessage | undefined, { who, rule }: Look): void {
-    expect(graphemes(b.text)).toBeLessThanOrEqual(rule.maxChars);
+    expect(graphemes(b.text)).toBeLessThanOrEqual(rule.maxChars * 4);
     if (source === undefined) return;
     expect(open(source)).toBe(true);
     const account = source.account.toLowerCase();

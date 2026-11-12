@@ -1,6 +1,33 @@
-/* A person's card (the video's frame 76): the name 18 px over its line of capitals. */
+/* A person's card: the amounts at the rows' end in tabular figures. */
 @layer components {
-  .name {
-    font: var(--font-card-name);
+  .amount {
+    font: var(--font-data);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* raw: under a phone's width the realm leaves the row, so a call keeps one line */
+  @media (width < 480px) {
+    .realm {
+      display: none;
+    }
+  }
+
+  /* The account's whole address, beside its buttons: it wraps anywhere rather than push them out. */
+  .address {
+    min-inline-size: 0;
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .failed {
+    color: var(--color-danger);
+  }
+
+  /* An account's window stands at one height from the top, not centred: what it reads late grows or shrinks it at its foot, its head and
+     tabs never move. */
+  dialog:has(.address) {
+    /* layout: a step under the page's header, the foot free */
+    margin-block: var(--space-2xl) auto;
   }
 }

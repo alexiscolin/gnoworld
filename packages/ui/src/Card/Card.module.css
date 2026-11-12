@@ -60,6 +60,17 @@
     white-space: nowrap;
   }
 
+  /* A long title is cut with an ellipsis in its own box, never run under the buttons at the end (Alexis, 2026-11-12). */
+  .card[data-look="hub"] .header > * > :first-child,
+  .card[data-look="hub"] .header > * > :first-child > * {
+    min-inline-size: 0;
+  }
+
+  .card[data-look="hub"] .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
   /* The header row: 28 px and 8 more below it; its title, a hint that gives way, and the buttons at the end. */
   .card[data-look="hub"] .header {
     block-size: var(--control-header);
@@ -87,7 +98,14 @@
     block-size: 100%;
   }
 
-  /* The buttons and the hint at the end of the row keep their size; the title and the meta line give way. */
+  /* A header's words break only between words: a list that breaks anywhere (the chat's lines, for long addresses) would squeeze the
+     kicker and its icon onto lines of their own. */
+  .header {
+    overflow-wrap: normal;
+  }
+
+  /* The buttons and the hint at the end of the row keep their size; the meta line gives way first, then the title, so a short title
+     is never cut beside a long path. */
   .end {
     /* layout: this row's own arrangement */
     flex: none;
@@ -96,14 +114,30 @@
 
   .meta {
     min-inline-size: 0;
-    /* layout: this row's own arrangement */
-    flex: 0 1 auto;
+    /* layout: this row's own arrangement; it shrinks far faster than the title (its weight against the title's 1) */
+    flex: 0 1000 auto;
     /* layout: right after the title, the buttons pushed to the end (Alexis, 2026-11-10: "plus coller les 2") */
     margin-inline-end: auto;
   }
 
   .card[data-look="hub"][data-flush] {
     --_pad: 0;
+  }
+
+  /* A card stretched taller than its parts (a row of cards as tall as the tallest) keeps its actions at its foot. */
+  .card > :only-child {
+    block-size: 100%;
+  }
+
+  .mark {
+    /* layout: the mark keeps its size beside the title */
+    flex: none;
+    inline-size: var(--control-l);
+  }
+
+  .actions {
+    /* layout: the actions at the card's foot */
+    margin-block-start: auto;
   }
 
   .title {

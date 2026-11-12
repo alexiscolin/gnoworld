@@ -121,7 +121,7 @@ export function searchRoutes({
     if (rooms_ === undefined) return "forbidden";
     const query: Query = {
       rooms: rooms_,
-      q,
+      q: q ?? "",
       limit: SEARCH_PAGE + 1,
       from,
       link: link === undefined ? undefined : true,

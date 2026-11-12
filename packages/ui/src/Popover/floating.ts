@@ -43,7 +43,7 @@ function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   box.style.removeProperty("visibility");
 }
 
-/** Keeps an open box placed by its anchor while the page scrolls or the window resizes; placed again whenever
+/** Keeps an open box placed by its anchor while the page scrolls, the window resizes or the box itself changes size; placed again whenever
  * `again` changes, a box shown late among them. */
 export function usePlaced(
   anchor: RefObject<Element | null>,
@@ -59,8 +59,12 @@ export function usePlaced(
     const stop = new AbortController();
     addEventListener("scroll", again, { capture: true, passive: true, signal: stop.signal });
     addEventListener("resize", again, { signal: stop.signal });
+    // A box whose content arrives after it opens (a card's blocks) grows, and is placed again for its new size.
+    const grows = typeof ResizeObserver === "function" ? new ResizeObserver(again) : undefined;
+    if (box.current !== null) grows?.observe(box.current);
     return () => {
       stop.abort();
+      grows?.disconnect();
     };
   }, [anchor, box, open, side, align, again]);
 }

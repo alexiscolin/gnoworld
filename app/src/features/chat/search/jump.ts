@@ -3,7 +3,7 @@
 import type { IrcMessage } from "@gnoworld/core";
 import { RoomId } from "@gnoworld/schemas";
 import { isCommandMsgid } from "../history.ts";
-import { shortDay } from "./days.ts";
+import { shortDay } from "../../../lib/days.ts";
 
 /** The items asked around the message: half before it, then on from there (Ergo's AROUND); under the window the store keeps. */
 export const AROUND_LINES = 100;
@@ -39,7 +39,7 @@ export class Jumps {
 }
 
 /** What the room says over its lines while it is read around a found message: the day, with the year when it is not this year's. */
-export function readingWords(time: string, now: Date, reader: { timeZone?: string; locale?: string } = {}): string {
+export function readingWords(time: string, now: Date, reader: { timeZone?: string } = {}): string {
   const at = new Date(time);
   if (Number.isNaN(at.getTime())) return "You are reading around a found message.";
   return `You are reading ${shortDay(at, now, reader)}, around a found message.`;

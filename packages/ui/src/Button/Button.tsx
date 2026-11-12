@@ -6,7 +6,8 @@ import styles from "./Button.module.css";
 
 interface Look {
   children: ReactNode;
-  emphasis?: "solid" | "outline" | "quiet";
+  /** `link`: no box, the words' own size, in the link's ink and underlined, for a button that reads as a link (it does something, not goes). */
+  emphasis?: "solid" | "outline" | "quiet" | "link";
   tone?: "neutral" | "danger";
   size?: ControlSize;
   icon?: IconName;
@@ -21,6 +22,8 @@ interface Pressed extends Look {
   description?: string;
   /** The key that does the same, for a screen reader (aria-keyshortcuts); never drawn on the button. */
   keys?: string;
+  /** Opens or folds something in place: whether it is open now, said as aria-expanded. */
+  expanded?: boolean;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 }
 
@@ -34,6 +37,7 @@ interface Linked extends Look {
   disabled?: never;
   busy?: never;
   keys?: never;
+  expanded?: never;
   onClick?: never;
 }
 
@@ -62,7 +66,7 @@ export function Button(props: ButtonProps) {
       </Anchor>
     );
   }
-  const { type = "button", disabled, busy, onClick, description, keys } = props;
+  const { type = "button", disabled, busy, onClick, description, keys, expanded } = props;
   return (
     <button
       type={type}
@@ -72,6 +76,7 @@ export function Button(props: ButtonProps) {
       aria-disabled={busy}
       aria-description={description}
       aria-keyshortcuts={keys}
+      aria-expanded={expanded}
       title={description}
       onClick={busy === true ? refuse : onClick}
     >

@@ -1,0 +1,13 @@
+/* The inline empty state: a line where a list holds nothing, a step round it, in the muted grey (a title over it in the text's ink). */
+@layer components {
+  .inline {
+    padding: var(--space-s) var(--space-xs);
+    color: var(--color-text-muted);
+    font: var(--font-reading);
+  }
+
+  .title {
+    color: var(--color-text);
+    font: var(--font-ui);
+  }
+}

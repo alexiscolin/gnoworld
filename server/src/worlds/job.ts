@@ -5,31 +5,21 @@
 // indexer leaves a world at rest (its last counts). Nothing a chain or an indexer wrote reaches a log: a fault is logged by its kind.
 import { worldsDrawn } from "@gnoworld/core";
 import type { WorldsCount } from "@gnoworld/schemas";
-import { Worlds, WORLDS_MAX_BYTES } from "@gnoworld/schemas/indexer";
-import { readFileSync } from "node:fs";
+import { Worlds, WORLDS_MAX_BYTES, type NetworkAnswer, type Trending } from "@gnoworld/schemas/indexer";
 import type { DatabaseSync } from "node:sqlite";
 import type { Log } from "@gnoworld/service/log";
 import { send as netSend, publicUrl } from "@gnoworld/service/net";
 import { repeat, waitsAfterOutcome, type Outcome } from "../repeat.ts";
 import { besideOf, replaceFiles } from "../replaceFile.ts";
-import { knownFacts, namesOf, sinceOf, worldsOf, type Gathered } from "./assemble.ts";
-import { compareLists, sorted } from "./compare.ts";
-import { isSystem, keptPaths } from "./group.ts";
-import { readHistories, type StampedHistory } from "./history.ts";
-import { readRealmPaths } from "./list.ts";
-import { readNames } from "./names.ts";
+import { worldsOf } from "./assemble.ts";
+import type { StampedHistory } from "./history.ts";
+import { runNetwork } from "./network.ts";
 import { rollUp } from "./rollup.ts";
-import { readPackages } from "./packages.ts";
+import { gather, type Universe } from "./readPass.ts";
 import { kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
 import { habitsAt, makeTrends, type ChainRead } from "./chainTrends.ts";
 import { setTimeout as sleep } from "node:timers/promises";
-
-interface Universe {
-  readonly id: string;
-  readonly rpc: string;
-  readonly indexer: string;
-}
 
 export interface RunOptions {
   file: string;
@@ -49,6 +39,10 @@ export interface RunOptions {
   trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
   /** Each realm's rollup (13a): its state's database and the folder of its files; none without it. */
   rollup?: { db: DatabaseSync; dir: string };
+  /** Told each pass the ranking of the last 7 days, once the rollup's files are written. */
+  trending?: (trending: Trending) => void;
+  /** The network's line of health: its tables' database, and told each pass its answer; none without it. */
+  network?: { db: DatabaseSync; told: (answer: NetworkAnswer) => void };
 }
 
 export const EVERY_MS = 30 * 60_000;
@@ -68,6 +62,8 @@ interface Settings {
   readonly isStopped: () => boolean;
   readonly trends?: RunOptions["trends"];
   readonly rollup?: RunOptions["rollup"];
+  readonly trending?: RunOptions["trending"];
+  readonly network?: RunOptions["network"];
 }
 
 function settingsOf(options: RunOptions): Settings {
@@ -82,69 +78,7 @@ function settingsOf(options: RunOptions): Settings {
   };
 }
 
-// The last file, or none when it is not there, is no good file, or is another universe's.
-function loadLast(file: string, universe: string): Worlds | undefined {
-  try {
-    const parsed = Worlds.safeParse(JSON.parse(readFileSync(file, "utf8")));
-    return parsed.success && parsed.data.universe === universe ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-// Every realm's history from the indexer, each stamped once the read has ended; none when it failed, each realm keeping its last counts.
-async function readCalls(
-  settings: Settings,
-  read: { pace: () => Promise<void>; paths: readonly string[]; sinceOf: (path: string) => number | undefined },
-): Promise<Map<string, StampedHistory> | "stopped"> {
-  const { send, universe, isStopped, log } = settings;
-  const page = settings.historyPage === undefined ? {} : { page: settings.historyPage };
-  const calls = await readHistories({ send, indexer: universe.indexer, pace: read.pace, ...page }, read.paths, {
-    sinceOf: read.sinceOf,
-    isStopped,
-  });
-  if (!calls.ok) {
-    if (calls.kind === "stopped") return "stopped";
-    log("worlds_indexer_failed", { error: calls.kind });
-    return new Map();
-  }
-  if (calls.skipped > 0) log("worlds_history_skipped", { error: "shape" });
-  const at = settings.now();
-  return new Map([...calls.histories].map(([path, history]) => [path, { ...history, at }]));
-}
-
-// The list, the packages, the names and the histories, in that order, or the kind of fault that ends the pass.
-async function gather(settings: Settings): Promise<Gathered | Kind> {
-  const { send, universe, isStopped } = settings;
-  const pace = pacer(settings.wait, settings.pauseMs, settings.now);
-  const list = await readRealmPaths({ send, rpc: universe.rpc, pace });
-  if (!list.ok) return list.kind;
-  if (list.partial === true) settings.log("worlds_shed", { error: "list" });
-  const last = loadLast(settings.file, universe.id);
-  const lastWorlds = new Map(last?.worlds.map((world) => [world.id, world] as const));
-  const lastRealms = new Map(
-    last?.worlds.flatMap((world) => world.realms.map((realm) => [realm.path, realm] as const)),
-  );
-  if (list.paths.length === 0 && lastRealms.size > 0) return "empty";
-  const known = sorted(new Set([...list.paths, ...lastRealms.keys()].filter((path) => !isSystem(path))));
-  const paths = sorted(new Set(keptPaths(known)));
-  if (paths.length < known.length) settings.log("worlds_shed", { error: "realms" });
-  if (isStopped()) return "stopped";
-  const knownBefore = knownFacts(lastRealms, lastWorlds);
-  const facts = await readPackages({ send, rpc: universe.rpc, known: knownBefore, pace }, paths);
-  const fresh = new Set([...facts.keys()].filter((path) => !knownBefore.has(path)));
-  const earlierNames = namesOf(lastRealms);
-  const unnamed = [...facts.values()].flatMap(({ deployer }) =>
-    deployer === null || earlierNames.has(deployer) ? [] : [deployer],
-  );
-  const names = await readNames({ send, rpc: universe.rpc, pace }, unnamed);
-  const histories = await readCalls(settings, { pace, paths, sinceOf: sinceOf(lastRealms) });
-  if (histories === "stopped") return "stopped";
-  const news = compareLists([...lastRealms.keys()], list.paths);
-  return { lastWorlds, lastRealms, paths, news, facts, fresh, earlierNames, names, histories };
-}
-
-// What follows a pass that wrote its files: the trends told, then each realm's rollup.
+// What follows a pass that wrote its files: the trends told, each realm's rollup, then the network's line.
 async function passed(
   settings: Settings,
   worlds: Worlds,
@@ -152,6 +86,7 @@ async function passed(
 ): Promise<void> {
   settings.trends?.passed(worlds, histories);
   await rollUp({ ...settings, pace: pacer(settings.wait, settings.pauseMs, settings.now) }, worlds);
+  await runNetwork(settings);
 }
 
 /** One pass. It never throws for a fault of the chain, the indexer or the disk: it says its kind and logs it. */

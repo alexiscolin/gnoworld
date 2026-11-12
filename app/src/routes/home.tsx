@@ -3,7 +3,7 @@ import { PHONE_QUERY } from "@gnoworld/core";
 import { Suspense, useLayoutEffect } from "react";
 import { type MetaArgs, useLoaderData, useLocation } from "react-router";
 import { cosmosAt, isHome } from "../cosmosAt.ts";
-import { isMissing, PlaceError } from "../features/errors/index.ts";
+import { isMissing, RouteError } from "../features/errors/index.ts";
 import { Hero, usePeople, Worlds, type People } from "../features/home/index.ts";
 import { PlaceLinks } from "../features/list/index.ts";
 import { useMedia } from "../features/chat/useMedia.ts";
@@ -26,9 +26,6 @@ import { pageOf, site, type UniverseView } from "../places.ts";
 import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";
 import { useFraming } from "./placeFrame.tsx";
-
-// What the loader's ring shows filled while space comes: its frame is drawn whole, at once, or not at all.
-const LOADING_SHARE = 0.6;
 
 // The worlds' file the cosmos reads, asked with the page so it comes while the page wakes (D334); not on a phone, where the 3D waits.
 export const links = () => [
@@ -55,14 +52,26 @@ export function meta({ loaderData, error }: MetaArgs<typeof loader>) {
   return isMissing(error) ? missingUniverseMeta() : failedPageMeta();
 }
 
+// The share of what the first screen awaits that is done: the worlds' count read (or ended with none), then the first frame.
+const loadedShare = (frame: boolean, worlds: number | null | undefined): number =>
+  frame ? 1 : worlds === undefined ? 0 : 0.5;
+
 // What stands over space on the default universe's home: the first load's loader till space has drawn its first frame (or 2.5 s on; a
 // return finds it drawn, and no loader), the rail of worlds, and its foot (SpaceFoot.tsx).
-function OverSpace({ universe, drawn }: { universe: UniverseView; drawn: boolean }) {
+function OverSpace({
+  universe,
+  drawn,
+  worlds,
+}: {
+  universe: UniverseView;
+  drawn: boolean;
+  worlds: number | null | undefined;
+}) {
   // The rail is a computer's (Rail.module.css): a phone mounts none, nor reads the worlds' file for it.
   const phone = useMedia(PHONE_QUERY);
   return (
     <>
-      <SpaceLoader waiting={!drawn} ready={drawn ? 1 : LOADING_SHARE} />
+      <SpaceLoader waiting={!drawn} ready={loadedShare(drawn, worlds)} />
       {phone ? null : (
         <Suspense fallback={null}>
           <LazyRail places={{ earth: universe.earth.path, worlds: universe.worlds }} universe={universe.id} />
@@ -103,7 +112,7 @@ export default function Home() {
   const drawnSpace = useSpace(universe.isDefault ? "cosmos" : undefined);
   // Back from a page's flight, the hero and the list rise in again instead of standing there cut in.
   useLayoutEffect(() => {
-    if (returning() && !sameKind()) riseChrome(RETURN_AFTER, { header: false });
+    if (returning() && !sameKind()) riseChrome(RETURN_AFTER);
   }, []);
   // A system the eye rests at names itself in the hero, in the number's place, its tags lighting its own worlds; the list of worlds gives
   // way, and comes back at rest.
@@ -118,7 +127,7 @@ export default function Home() {
   const first = universe.isDefault && cosmosAt(pathname) === undefined;
   return (
     <>
-      {universe.isDefault ? <OverSpace universe={universe} drawn={drawnSpace} /> : null}
+      {universe.isDefault ? <OverSpace universe={universe} drawn={drawnSpace} worlds={drawn} /> : null}
       {first ? <FirstScreen to={universe.earth.path} people={people} /> : null}
       <Hero
         universe={universe}
@@ -140,5 +149,5 @@ export default function Home() {
 // Every route catches its own errors (docs/ARCHITECTURE.md; F329); the app may be what failed, so the
 // way home loads the document again (F325).
 export function ErrorBoundary() {
-  return <PlaceError what="universe" />;
+  return <RouteError noun="universe" />;
 }

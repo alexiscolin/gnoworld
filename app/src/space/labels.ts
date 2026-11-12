@@ -7,8 +7,7 @@ import { placeOf, type Planet, type System, type Universe, type Vec } from "./la
 import type { Seen } from "./see.ts";
 import { Planets } from "./labelPlanets.ts";
 import { assign, Rest, retire, type Slot } from "./labelSlots.ts";
-import { afterDwell } from "../intent.ts";
-import { fillPill, midOf, tagOf, type LabelHooks } from "./midWorlds.ts";
+import { fillPill, midOf, tagOf, watchPill, type LabelHooks } from "./midWorlds.ts";
 import styles from "./labels.module.css";
 
 const POOL = 36;
@@ -24,7 +23,7 @@ const PLANETS_FROM_PX = 140;
 const ROOM = { x: 110, y: 24 };
 const NONE: readonly Item[] = [];
 
-const [ON, OTHER] = [styles["on"] ?? "", styles["other"] ?? ""];
+const [ON, OTHER, DIM] = [styles["on"] ?? "", styles["other"] ?? "", styles["dim"] ?? ""];
 type Item = Planet | System;
 const isPlanet = (item: Item): item is Planet => "system" in item;
 
@@ -65,6 +64,10 @@ export class Labels {
   plan = false;
   /** Whether the name of a world of the system at an index may show: the galaxy's arrival has lit it (intro.ts). */
   ready: (item: Item) => boolean = () => true;
+  /** The worlds a pointed planet lights in the Map: the other names dim; none, none does. */
+  lit: ReadonlySet<string> | undefined;
+  /** Told when a name is pointed at or focused, or left (none). */
+  hover: LabelHooks["hover"];
   /** The page's world, named first so that its name is never the one left out. */
   marked: Planet | undefined;
 
@@ -75,21 +78,19 @@ export class Labels {
     for (let at = 0; at < POOL; at += 1) {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = `nowrap row-center pill-ends ${styles["pill"] ?? ""}`;
+      button.className = `placed nowrap row-center pill-ends ${styles["pill"] ?? ""}`;
       button.tabIndex = -1;
       fillPill(button);
       const slot: Slot<Item, HTMLButtonElement> = { button, item: undefined, seen: 0, retired: false };
       button.addEventListener("click", () => {
         if (slot.item !== undefined) enter(slot.item);
       });
-      for (const type of ["pointerenter", "focus"])
-        button.addEventListener(type, () => {
-          const { item } = slot;
-          if (item !== undefined && warm !== undefined)
-            afterDwell(button, () => {
-              warm(item);
-            });
-        });
+      watchPill(button, () => slot.item, {
+        warm,
+        hover: (item) => {
+          this.hover?.(item);
+        },
+      });
       layer.append(button);
       this.#slots.push(slot);
       this.#ofButton.set(button, slot);
@@ -136,7 +137,7 @@ export class Labels {
   }
 
   #settings(): readonly unknown[] {
-    return [this.hidden, this.arrival, this.plan, this.system, this.marked, this.ready];
+    return [this.hidden, this.arrival, this.plan, this.system, this.marked, this.ready, this.lit];
   }
 
   /** A frame `seconds` on: the names of what `seen` shows. */
@@ -228,6 +229,7 @@ export class Labels {
       return;
     }
     button.classList.toggle(ON, live);
+    button.classList.toggle(DIM, this.lit !== undefined && !(isPlanet(item) && this.lit.has(item.id)));
     this.#rest.place(index, live ? this.#on : undefined);
     // Another system named from inside one: another pill's look, so it reads as elsewhere, not as one of these planets.
     button.classList.toggle(OTHER, !isPlanet(item) && this.system !== undefined && item !== this.system);

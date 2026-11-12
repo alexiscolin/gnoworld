@@ -1,8 +1,8 @@
 // A world's rooms by section, each a link to its address, the one shown marked (slice 4's 4b): the part of the rooms'
 // navigation a visitor has too. An account's direct messages and notices are RoomsView's.
 import type { RoomList as Rooms } from "@gnoworld/schemas";
-import { Cluster, Icon, NavItem, Stack, type NavItemProps } from "@gnoworld/ui";
-import { useId, useState, type ReactNode, type Ref } from "react";
+import { Disclosure, Icon, NavItem, Stack, type NavItemProps } from "@gnoworld/ui";
+import { type ReactNode, type Ref } from "react";
 import { useFull } from "./full.ts";
 import { roomHref, roomLabel } from "./names.ts";
 import shared from "./lists.module.css";
@@ -25,33 +25,12 @@ export function RoomsNav({
   );
 }
 
-/** A section of the column, as Discord's and Slack's: its name folds and unfolds it, a control may stand at its end (a "+"). */
+/** A section of the column, as Discord's and Slack's: its name folds and unfolds it (ui's Disclosure, the section look), a control may stand at its end (a "+"). */
 export function Folding({ name, action, children }: { name: string; action?: ReactNode; children: ReactNode }) {
-  const [open, setOpen] = useState(true);
-  const id = useId();
   return (
-    <Stack space="2xs" as="section">
-      <Cluster justify="between">
-        <h2 className={["label", styles["section"]].join(" ")}>
-          <button
-            type="button"
-            className={["with-icon", styles["fold"]].join(" ")}
-            aria-expanded={open}
-            aria-controls={id}
-            onClick={() => {
-              setOpen(!open);
-            }}
-          >
-            <Icon name="chevron" size="s" />
-            {name}
-          </button>
-        </h2>
-        {action}
-      </Cluster>
-      <div id={id} hidden={!open}>
-        {children}
-      </div>
-    </Stack>
+    <Disclosure look="section" title={name} open action={action}>
+      {children}
+    </Disclosure>
   );
 }
 
@@ -101,7 +80,7 @@ export function RoomSections({ sections, current, failed, badge, action }: RoomS
             {rooms.map(({ room, here, messages, to }) => (
               <li key={room}>
                 <NavItem
-                  {...(to === undefined ? { onClick: () => undefined } : { href: to })}
+                  {...(to === undefined ? {} : { href: to })}
                   current={room === current}
                   badge={badge?.(room)}
                   meta={hereOf(here, messages)}

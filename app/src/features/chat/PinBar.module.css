@@ -1,61 +1,45 @@
-/* The room's pins above its lines (4d): a line opening into a stack, the prototype's #pinBar in the design system's
-   tokens. */
+/* The room's pins above its lines: one line a pin, the first three, a "+N" for the rest; never past three lines. */
 @layer components {
   .bar {
+    /* layout: the pins and the "+N" side by side: the pins take the width, the count its own */
+    display: grid;
+    /* layout: the pins take the width, the count its own */
+    grid-template-columns: minmax(0, 1fr) auto;
+    /* layout: the pins and the count start on one line */
+    align-items: start;
+    /* layout: a step between them */
+    gap: var(--space-3xs);
     /* layout: the rule under the pins stops at the lines' inset, as the lines do */
     margin-inline: var(--chat-inset);
     /* layout: the pin stands off the header's rule */
     margin-block-start: var(--space-xs);
+    padding-block-end: var(--space-3xs);
     border-block-end: var(--line-width) solid var(--color-line);
-  }
-
-  .head {
-    /* layout: the pin, the newest pin's words and their count in one row, the words taking what is left */
-    display: flex;
-    /* layout: the three a step apart */
-    gap: var(--space-xs);
-    /* layout: the three on one line */
-    align-items: center;
-    inline-size: 100%;
-    padding-block: var(--space-2xs);
-    color: var(--color-text);
-    /* raw: the pin is 13 px on 1.45, a half point under the lines (the prototype's #pinBar, index.html:180) */
-    font: 400 13px/1.45 var(--family-sans);
-    cursor: pointer;
-  }
-
-  .newest {
-    /* layout: takes the room the count leaves, and gives it up, never wider than the bar */
-    flex: 1;
-    /* layout: a flex item shrinks below its words only with this */
-    min-inline-size: 0;
-    text-align: start;
-  }
-
-  .newest b,
-  .who {
-    font-weight: 500;
     color: var(--color-text-muted);
-  }
-
-  .count {
-    font: var(--font-meta);
-    color: var(--color-text-muted);
+    font: var(--font-ui);
   }
 
   .pins {
-    padding-block-end: var(--space-2xs);
+    /* layout: the list takes the width and holds three lines at most; the rest scrolls inside it */
+    /* layout: the first column may shrink under its line's cut */
+    min-inline-size: 0;
+    max-block-size: calc(3 * var(--control-xs));
+    overflow: hidden auto;
   }
 
   .pin {
-    position: relative;
-    /* room at the end for Unpin, as a line's own for its bar */
-    padding: var(--space-2xs) calc(var(--control-s) + var(--space-xs)) var(--space-2xs) var(--space-xs);
+    /* layout: the pin's icon, its line and its Unpin in one row of one height */
+    display: grid;
+    /* layout: the line takes what the icon and Unpin leave */
+    grid-template-columns: var(--icon-m) minmax(0, 1fr) auto;
+    /* layout: level, each at its column's start */
+    place-items: center start;
+    /* layout: a step between them */
+    column-gap: var(--space-2xs);
+    block-size: var(--control-xs);
   }
 
-  .unpin {
-    position: absolute;
-    inset-block-start: var(--space-3xs);
-    inset-inline-end: var(--space-3xs);
+  .who {
+    font-weight: 500;
   }
 }

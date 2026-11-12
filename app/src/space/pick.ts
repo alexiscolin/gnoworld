@@ -43,10 +43,13 @@ interface Aim {
   readonly seconds: number;
   /** The worlds a tag lights (D425): the others answer no aim; none, every world does. */
   readonly only?: ReadonlySet<string> | undefined;
+  /** The system whose planets are drawn: the others' answer no aim. */
+  readonly open: System | undefined;
 }
 
 // The planet of `system` nearest the aim on screen within its reach, and how far off it is.
 function planetAt(system: System, aim: Aim): { hit: Hit; off: number } | undefined {
+  if (system !== aim.open) return undefined;
   const [at, on] = [
     { x: 0, y: 0, z: 0 },
     { x: 0, y: 0, z: 0 },
@@ -79,14 +82,18 @@ const shines = (system: System, only: ReadonlySet<string> | undefined) =>
 export function pickAt(
   universe: Universe,
   { x, y }: { x: number; y: number },
-  { seen, seconds, only }: { seen: Seen; seconds: number; only?: ReadonlySet<string> | undefined },
+  {
+    seen,
+    seconds,
+    only,
+    open,
+  }: { seen: Seen; seconds: number; only?: ReadonlySet<string> | undefined; open: System | undefined },
 ): Hit | undefined {
-  const aim: Aim = { x, y, seen, seconds, only };
+  const aim: Aim = { x, y, seen, seconds, only, open };
   let best: { hit: Hit; off: number } | undefined;
   for (const system of universe.systems) {
     if (!shines(system, only)) continue;
     const across = seen.pixels(system.place, system.reach);
-    // A planet wins over its system's sun: its offset counts a thousand pixels less.
     const planet = across > APART_PX ? planetAt(system, aim) : undefined;
     const found = planet === undefined ? systemAt(system, aim, across) : { hit: planet.hit, off: planet.off - 1000 };
     if (found !== undefined && found.off < (best?.off ?? Infinity)) best = found;

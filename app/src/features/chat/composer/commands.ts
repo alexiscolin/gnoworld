@@ -23,6 +23,7 @@ import {
   type TextFormatType,
 } from "lexical";
 import { isAddress, type Format } from "./kinds.ts";
+import { setMarkdown } from "./markdownEditor.ts";
 
 const MARKS: Partial<Record<Format, TextFormatType>> = {
   bold: "bold",
@@ -104,6 +105,16 @@ export function caretInCode(editor: LexicalEditor): boolean {
 }
 
 /** Replaces the `length` characters before the caret (the word being typed) with `text`. */
+/** Puts `prefix` at the start of the draft `markdown` and the caret after it, the field focused. */
+export function startWith(editor: LexicalEditor, prefix: string, markdown: string): void {
+  setMarkdown(editor, `${prefix}${markdown}`);
+  editor.focus();
+  editor.update(() => {
+    const first = $getRoot().getFirstDescendant();
+    if ($isTextNode(first)) first.select(prefix.length, prefix.length);
+  });
+}
+
 export function replaceWordBeforeCaret(editor: LexicalEditor, length: number, text: string): void {
   editor.focus();
   editor.update(() => {

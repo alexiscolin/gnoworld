@@ -3,6 +3,7 @@
 // and callers per day, and what it can do, come with the server's rollup and the typed reads: none stands here till they do.
 import { stampKey, worldIdOf } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
+import { grouped } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
 import { useQuery } from "@tanstack/react-query";
@@ -20,9 +21,9 @@ import { useRealmFacts } from "../../features/realms/useRealmFacts.ts";
 import { Voted } from "../../features/world/PlateRealm.tsx";
 import type { Ring } from "../../features/world/statusRing.ts";
 import { aroundOf } from "./around.ts";
-import { ago } from "./days.ts";
+import { ago } from "../../lib/days.ts";
 import { capabilitiesOf } from "./capabilities.ts";
-import { grouped, statusOf } from "./figures.ts";
+import { calmOf, statusOf } from "./figures.ts";
 import type { PlateModel, Widget } from "./model.ts";
 import { ledeSentence, useSentenceBound } from "./sentenceBound.ts";
 import { Plate } from "./Plate.tsx";
@@ -127,7 +128,9 @@ function statusOfRealm({
   held,
   rollup,
   now,
+  read,
 }: {
+  read: boolean;
   here: number;
   held: Held | undefined;
   rollup: RealmRollup | undefined;
@@ -136,7 +139,7 @@ function statusOfRealm({
   if (here > 0) return statusOf(here, "");
   if (held?.calls === 0) return { label: "Never called", tone: "neutral" } as const;
   const at = Date.parse(rollup?.last[0]?.time ?? "");
-  if (Number.isNaN(at)) return statusOf(here, held === undefined ? "On chain" : "In use");
+  if (Number.isNaN(at)) return calmOf(here, held !== undefined, read);
   const { value, unit } = ago(at, now);
   const words = `last call ${String(value)} ${unit}`;
   return now - at < DAY_MS
@@ -193,7 +196,8 @@ export default function RealmPlate({
   const model: PlateModel = {
     lede: {
       ...ledeSentence(state),
-      status: statusOfRealm({ here, held, rollup, now }),
+      explain: { kind: "realm", chain: chain.chainId, subject: realm },
+      status: statusOfRealm({ here, held, rollup, now, read: state.state === "read" }),
       rank: rankOf(realm, worlds, chain.name),
     },
     // The one thing to do here follows the state (D530): a realm nobody called is for trying, one that lives is for reading.

@@ -7,9 +7,12 @@ import {
   DOOR_CAPS,
   EXPLAIN_VERSION,
   JARVIS_PATHS,
+  REALM_EXPLAIN_VERSION,
   JarvisAsk,
   JarvisBudget,
   JarvisDigestRequest,
+  JarvisExplainRequest,
+  type JarvisExplained,
   JarvisTranslate,
   type JarvisPaidAnswer,
   type JarvisBudgets,
@@ -20,6 +23,7 @@ import { isBlank } from "@gnoworld/core";
 import type { Log } from "@gnoworld/service/log";
 import type { Budget } from "./budget.ts";
 import type { Digested } from "./digest.ts";
+import type { Explained } from "./explainRealm.ts";
 import { refusal, type Reply, type Routes } from "./http.ts";
 import type { Question, Result } from "./loop.ts";
 import { DOLLAR } from "./prices.ts";
@@ -33,6 +37,8 @@ interface Parts {
   readonly catchUp?: Ask | undefined;
   // A function's explanation, on the loop that reads the code of one chain alone (D13920): none for a chain it has no profile for.
   readonly explain?: ((chain: string | undefined) => Ask | undefined) | undefined;
+  // A realm's explanation from its outline, on the fast model, or none while jarvis is off.
+  readonly explainRealm?: ((asked: JarvisExplainRequest, signal: AbortSignal) => Promise<Explained>) | undefined;
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
@@ -43,7 +49,7 @@ interface Parts {
 const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answer });
 
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
-export function jarvisRoutes({ ask, catchUp, explain, translate, digest, budget, log }: Parts): Routes {
+export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
     const caps = budget.caps();
     return {
@@ -72,6 +78,14 @@ export function jarvisRoutes({ ask, catchUp, explain, translate, digest, budget,
               : ask;
         if (asking === undefined) return refused(JARVIS_PATHS.ask);
         return replyOf(await asking(question, signal), log);
+      },
+    },
+    [JARVIS_PATHS.explain]: {
+      async POST(body, signal) {
+        const asked = JarvisExplainRequest.safeParse(body);
+        if (!asked.success) return refused(JARVIS_PATHS.explain);
+        if (explainRealm === undefined) return { status: 200, body: { status: "off" } satisfies JarvisExplained };
+        return explainedOf(await explainRealm(asked.data, signal));
       },
     },
     [JARVIS_PATHS.translate]: {
@@ -176,6 +190,27 @@ function cut(text: string, log: Log): string {
 function failureOf(kind: string): Reply {
   if (kind === "invalid") return refusal("refused", 400);
   return kind === "gone" ? refusal("not_ready", 503) : refusal("internal", 502);
+}
+
+// An explanation on the wire: the model's answer, its failure with what it cost, spent, or a reader gone.
+function explainedOf(result: Explained): Reply {
+  if (result.kind === "gone") return failureOf("gone");
+  if (result.kind === "spent") return { status: 200, body: { status: "spent" } satisfies JarvisExplained };
+  if (result.kind === "failed")
+    return { status: 200, body: { status: "failed", cost: result.cost } satisfies JarvisExplained };
+  const { sure, text, tags, model, cost } = result;
+  return {
+    status: 200,
+    body: {
+      status: "explained",
+      sure,
+      text,
+      tags,
+      model,
+      cost,
+      version: REALM_EXPLAIN_VERSION,
+    } satisfies JarvisExplained,
+  };
 }
 
 function translationOf(result: Translated): Reply {

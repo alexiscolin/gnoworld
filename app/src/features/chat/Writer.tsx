@@ -3,8 +3,10 @@
 import { Suspense, type ReactNode } from "react";
 import type { Line } from "@gnoworld/core";
 import type { AppState } from "../../store/index.ts";
-import { Composer } from "./composerChunk.ts";
+import { ErrorView, useWhere } from "../errors/index.ts";
+import { Composer, renewComposer } from "./composerChunk.ts";
 import type { ComposerProps } from "./Composer.tsx";
+import { Failing } from "./Failing.tsx";
 import { LogInToWrite } from "./LogInToWrite.tsx";
 import { roomLabel } from "./names.ts";
 import { answeredOf } from "./Replying.tsx";
@@ -58,10 +60,12 @@ export function Writer(props: WriterProps) {
   const { session, room, label, rooms, members, groups, onSay, slow, onTyping, refused, focus, describedBy } = props;
   const { replying, asked, onCancelReply, editing, onCancelEdit, gone, multiline } = props;
   if (session.kind !== "in") return <LogInToWrite />;
+  const { key, ...draft } = draftOf(props, session.address);
   return (
     <Suspense fallback={null}>
       <Composer
-        {...draftOf(props, session.address)}
+        key={key}
+        {...draft}
         room={room}
         label={label}
         nick={session.address}
@@ -84,5 +88,16 @@ export function Writer(props: WriterProps) {
         quick={props.quick}
       />
     </Suspense>
+  );
+}
+
+/** A room's writer: its composer failing as it comes (its chunk, its editor) takes its own place alone, never the page; a thread's is
+ * held by its panel (Threading.tsx). */
+export function RoomWriter(props: WriterProps) {
+  const where = useWhere();
+  return (
+    <Failing fallback={<ErrorView kind="crash" size="inline" where={where} />} renew={renewComposer}>
+      <Writer {...props} />
+    </Failing>
   );
 }

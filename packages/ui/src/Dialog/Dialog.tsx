@@ -22,6 +22,8 @@ export interface DialogProps {
   /** A drawer at the screen's start, its full height, over the page with no scrim, its title for assistive technology alone and Close at
    * its top end (the search, frames 98 to 100); a click beside it closes it. */
   side?: "start";
+  /** A mark before the heading, as wide as the heading's two lines (the passport's seal). */
+  lead?: ReactNode;
   children: ReactNode;
 }
 
@@ -29,14 +31,26 @@ export interface DialogProps {
 const FIELD =
   "input:not([type='submit'], [type='image'], [type='button'], [type='reset'], [type='hidden']), select, textarea, [contenteditable]:not([contenteditable='false'])";
 
-// A drawer: a press on the page beside it (the backdrop's, which the dialog receives) asks to close it.
-const closedBeside =
-  (onClose: () => void) =>
-  ({ target, currentTarget, clientX: x, clientY: y }: MouseEvent<HTMLDialogElement>) => {
-    if (target !== currentTarget) return;
-    const { left, right, top, bottom } = currentTarget.getBoundingClientRect();
-    if (x < left || x > right || y < top || y > bottom) onClose();
+// A press on the page beside the dialog (the backdrop's, which the dialog element receives), outside its box.
+const beside = ({ target, currentTarget, clientX: x, clientY: y }: MouseEvent<HTMLDialogElement>): boolean => {
+  if (target !== currentTarget) return false;
+  const { left, right, top, bottom } = currentTarget.getBoundingClientRect();
+  return x < left || x > right || y < top || y > bottom;
+};
+
+// A press that began beside the dialog and ends there asks to close it; one that began inside it (a selection dragged out) never does.
+function usePressBeside(onClose: () => void) {
+  const pressedRef = useRef(false);
+  return {
+    onPointerDown: (event: MouseEvent<HTMLDialogElement>) => {
+      pressedRef.current = beside(event);
+    },
+    onClick: (event: MouseEvent<HTMLDialogElement>) => {
+      if (pressedRef.current && beside(event)) onClose();
+      pressedRef.current = false;
+    },
   };
+}
 
 interface TitleRowProps extends Pick<DialogProps, "title" | "onClose"> {
   side: DialogProps["side"] | undefined;
@@ -69,8 +83,8 @@ function TitleRow({ headingRef, id, title, hideClose, onClose, side }: TitleRowP
 }
 
 /** The native modal dialog, over its scrim: its first field the browser can focus takes the focus, or
- * its title, never a button; Esc and Close ask the page to close it, and the browser gives the focus
- * back to the opener. */
+ * its title, never a button; Esc, Close and a press beside it ask the page to close it, and the browser gives
+ * the focus back to the opener. */
 // A field hidden by CSS or disabled refuses the focus: the next one is tried (F367); none takes it, the heading does.
 function focusFirst(shown: HTMLElement, heading: HTMLElement | null) {
   const focused = [...shown.querySelectorAll<HTMLElement>(FIELD)].some((field) => {
@@ -81,8 +95,13 @@ function focusFirst(shown: HTMLElement, heading: HTMLElement | null) {
 }
 
 // The kicker over the title row, in the one label style.
-function Heading({ kicker, kickerId, ...row }: TitleRowProps & { kicker: string | undefined; kickerId: string }) {
-  return (
+function Heading({
+  kicker,
+  kickerId,
+  lead,
+  ...row
+}: TitleRowProps & { kicker: string | undefined; kickerId: string; lead: ReactNode }) {
+  const words = (
     <Stack space="xs">
       {kicker === undefined || kicker === "" ? null : (
         <div id={kickerId} className={styles["kicker"]}>
@@ -91,6 +110,14 @@ function Heading({ kicker, kickerId, ...row }: TitleRowProps & { kicker: string 
       )}
       <TitleRow {...row} />
     </Stack>
+  );
+  return lead === undefined ? (
+    words
+  ) : (
+    <Sidebar side="start" space="s" align="center">
+      <div className={styles["lead"]}>{lead}</div>
+      {words}
+    </Sidebar>
   );
 }
 
@@ -103,6 +130,7 @@ export function Dialog({
   hideClose,
   description,
   side,
+  lead,
   children,
 }: DialogProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -117,6 +145,7 @@ export function Dialog({
   const [closes, setCloses] = useState(0);
   // Its own close() fires a close event too, which the browser queues: that one is not the browser's (F361).
   const ownCloseRef = useRef(false);
+  const pressBeside = usePressBeside(onClose);
   useEffect(() => {
     const shown = dialogRef.current;
     if (shown === null || shown.open === open) return;
@@ -143,7 +172,7 @@ export function Dialog({
         event.preventDefault();
         onClose();
       }}
-      onClick={side === undefined ? undefined : closedBeside(onClose)}
+      {...pressBeside}
       // Closed by the browser itself (a second Esc, a form's dialog method), not by the page; a dialog
       // inside it closing is that dialog's (F352).
       onClose={(event) => {
@@ -160,6 +189,7 @@ export function Dialog({
         <Heading
           kicker={kicker}
           kickerId={kickerId}
+          lead={lead}
           headingRef={headingRef}
           id={titleId}
           title={title}

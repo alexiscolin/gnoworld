@@ -4,9 +4,9 @@
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
 // bar wraps the selection in Markdown's marks.
-import type { Composed } from "@gnoworld/core";
+import { compose, type Composed } from "@gnoworld/core";
 import { composeDraft, DRAFT_COMMANDS } from "./polling.ts";
-import { addMarketCard, MARKET, marketAsked } from "./marketCommand.ts";
+import { cardAsked, CARD_COMMANDS } from "./cardCommands.ts";
 import { Stack } from "@gnoworld/ui";
 import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
 import { FIELD, useFocusAtStart, useHelp, useRefusal, type Refused } from "./composerHooks.ts";
@@ -15,6 +15,7 @@ import { ComposerField, THEME } from "./composer/ComposerField.tsx";
 import { createComposerEditor } from "./composer/markdownEditor.ts";
 import { suggestions } from "./composer/suggest.ts";
 import { useEditing } from "./EditBar.tsx";
+import { useJarvis } from "./JarvisButton.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 import { NameNudge } from "./NameNudge.tsx";
 import { actsOf } from "./composer/acts.ts";
@@ -93,6 +94,24 @@ function useDraft({ draft: kept = "", onDraft, onTyping }: Pick<ComposerProps, "
   return { draft, setDraft, change };
 }
 
+// What a card command composes: its line, or nothing when it was asked wrong (the field says why).
+const composedCard = (room: string, nick: string, card: NonNullable<ReturnType<typeof cardAsked>>): Composed =>
+  card.ok ? compose(room, card.text, nick) : { kind: "empty" };
+
+// What a word being typed may become: a direct message has no card commands, no @room and no Jarvis.
+const choicesOf = (
+  inRoom: boolean,
+  jarvis: { answers: boolean; examples: readonly string[] | undefined },
+  { rooms, people }: { rooms: readonly string[]; people: readonly string[] },
+) => ({
+  rooms,
+  people,
+  commands: inRoom ? [...DRAFT_COMMANDS, ...CARD_COMMANDS] : DRAFT_COMMANDS,
+  group: inRoom,
+  jarvis: jarvis.answers && inRoom,
+  examples: inRoom ? jarvis.examples : undefined,
+});
+
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, label: to, refused } = props;
   const { draft, setDraft, change } = useDraft(props);
@@ -101,19 +120,17 @@ export function Composer(props: ComposerProps) {
   const [editor] = useState(() => createComposerEditor(draft, THEME));
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
-  // `/market` sends nothing: it adds the card to the room for the reader (a direct message has no room for it, so it is an unknown command there).
-  const market = to === undefined ? marketAsked(draft) : undefined;
-  const composed: Composed = market === undefined ? composeDraft(room, draft, nick) : { kind: "empty" };
+  // A card command sends its card's line (a direct message has no room for it, so it is an unknown command there).
+  const card = to === undefined ? cardAsked(draft) : undefined;
+  const composed: Composed = card === undefined ? composeDraft(room, draft, nick) : composedCard(room, nick, card);
   const people = peopleOf(members, nick);
   const read = useMemberNames(people, props.names === undefined && /(^|\s)@\S*$/u.test(draft));
   const names = props.names ?? read;
-  const choices = {
-    rooms,
-    people,
-    commands: to === undefined ? [...DRAFT_COMMANDS, MARKET] : DRAFT_COMMANDS,
-    group: to === undefined,
-  };
-  const { coarse, shown, goes } = useHelp(composed, props, { failed, draft, market });
+  const jarvis = useJarvis(props.quick);
+  const choices = choicesOf(to === undefined, jarvis, { rooms, people });
+  const listed = suggestions(draft, { ...choices, names });
+  // A command still being typed, its suggestions on screen, is not yet an unknown one.
+  const { coarse, shown, goes } = useHelp(composed, props, { failed, draft, card, completing: listed.length > 0 });
   useFocusAtStart(formRef, props.focus);
   const box = () => formRef.current?.querySelector(FIELD) ?? undefined;
   // What the field does leaves no line not sent: the failure said for the last one goes as the draft changes.
@@ -121,18 +138,21 @@ export function Composer(props: ComposerProps) {
     setFailed(false);
     refusal.said();
   };
-  const { format, link, take } = actsOf(editor, draft, edited);
+  const { format, link, take, mention } = actsOf(editor, draft, edited);
   const answering = useAnswering(props, { formRef, box });
   const editing = useEditing(props, box, answering);
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!goes) return;
-    const slow = market === undefined ? props.slow?.(composed) : undefined;
-    const went =
-      market?.ok === true ? addMarketCard(room, nick, market.symbols) : slow === undefined && onSay(composed, draft);
+    const slow = props.slow?.(composed);
+    const went = slow === undefined && onSay(composed, draft);
     setFailed(slow ?? !went);
     refusal.said();
-    if (went) change("");
+    if (!went) return;
+    // A line to Jarvis goes to the room as any line, so the room sees the question, and is asked of Jarvis once it went: the answer is
+    // the asker's card.
+    jarvis.asked(draft);
+    change("");
   };
   return (
     <form
@@ -147,10 +167,10 @@ export function Composer(props: ComposerProps) {
         {/* The video's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
         <MessageBox
           onFormat={format}
-          linkTool={<LinkTool onApply={link} />}
+          linkTool={(size) => <LinkTool onApply={link} size={size} />}
           send={editing.send}
           goes={goes}
-          quick={props.quick}
+          quick={jarvis.quickWith(mention)}
         >
           <ComposerField
             editor={editor}
@@ -160,7 +180,7 @@ export function Composer(props: ComposerProps) {
             placeholder={`Message ${label}`}
             describedBy={editing.describedBy}
             names={names}
-            suggestions={suggestions(draft, { ...choices, names })}
+            suggestions={listed}
             onTake={take}
             onChange={(value) => {
               change(value);

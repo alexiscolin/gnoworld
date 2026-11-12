@@ -46,6 +46,8 @@ export function PlanetThumb({ src, name, kind = "world", size = "m", decorative 
         src={own ? src : FALLBACK}
         alt={decorative ? "" : name}
         referrerPolicy="no-referrer"
+        loading="lazy"
+        decoding="async"
         className={styles["picture"]}
       />
     </span>

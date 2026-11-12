@@ -258,7 +258,7 @@ test.describe("the loop", () => {
     // A screen of 25 Hz, the frames 40 ms apart however fast this machine is.
     await page.addInitScript(() => {
       globalThis.requestAnimationFrame = (run) =>
-        setTimeout(() => {
+        window.setTimeout(() => {
           run(performance.now());
         }, 40);
     });

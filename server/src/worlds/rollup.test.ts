@@ -6,12 +6,13 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSy
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import { fakeChain, INDEXER, pagedCalls, withBlocks, type CallRow } from "../testing/fakeWorldsChain.ts";
 import { HISTORY_MAX_PAGES, type Row } from "./history.ts";
 import { migrations } from "../migrations.ts";
 import { BLOCKS_PER_ASK, daysOf, parseBlockTimes, type Dated } from "./blockDays.ts";
 import { fitted, importersOf, readRollup, writeRollups } from "./rollup.ts";
+import { PEOPLE_TABLES } from "./personTables.ts";
 import { ROLLUP_TABLES, rollupStore } from "./rollupStore.ts";
 
 // A realm's rollup (slice 13a): the worlds job reads the chain's calls above the last height it kept, buckets them by UTC day from the
@@ -72,7 +73,7 @@ const dated = (days: Record<number, string>, times: Record<number, string> = {})
   times: new Map(Object.entries(times).map(([h, t]) => [Number(h), t])),
 });
 const store = (universe = "onyx") => {
-  const db = openDatabase(":memory:", [ROLLUP_TABLES]);
+  const db = openDatabase(":memory:", [ROLLUP_TABLES, PEOPLE_TABLES]);
   return { db, rollups: rollupStore(db, universe) };
 };
 const counted = (db: ReturnType<typeof openDatabase>, sql: string, ...args: (string | number)[]): number =>
@@ -349,7 +350,7 @@ describe("rollupStore, the rollup's state in sqlite", () => {
   });
 
   it("starts over for another universe, and drops the last one's rows: no count of one chain reaches another's files", () => {
-    const db = openDatabase(":memory:", [ROLLUP_TABLES]);
+    const db = openDatabase(":memory:", [ROLLUP_TABLES, PEOPLE_TABLES]);
     rollupStore(db, "onyx").add([row(5, [call(A)])], dated({ 5: "2026-09-28" }), 5);
     const other = rollupStore(db, "gnoland");
     expect(other.height()).toBeUndefined();
@@ -399,6 +400,16 @@ describe("rollupStore, the rollup's state in sqlite", () => {
     }
     // About 2 s on a quiet machine; the gate runs it at a load of 25 and more.
   }, 30_000);
+
+  it("prunes the days once for a pass of batches on one day, and again when a newer day comes", () => {
+    const { db, rollups } = store();
+    const spy = vi.spyOn(db, "prepare");
+    const prunes = () => spy.mock.calls.filter(([sql]) => sql.startsWith("DELETE FROM rollup_days WHERE day")).length;
+    for (const height of [10, 20, 30]) rollups.add([row(height, [call(A)])], dated({ [height]: "2026-11-10" }), height);
+    expect(prunes()).toBe(1);
+    rollups.add([row(40, [call(A)])], dated({ 40: "2026-11-11" }), 40);
+    expect(prunes()).toBe(2);
+  });
 
   it("sheds the last calls first, then the importers, the functions and the days, until the file fits; none when nothing fits", () => {
     const { rollups } = store();

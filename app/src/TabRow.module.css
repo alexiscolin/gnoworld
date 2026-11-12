@@ -1,0 +1,25 @@
+/* A dialog's row of figures and tabs: the tabs stay at the row's end, a card's empty line is the muted meta type, and the places of what is
+   not read yet keep the height of what comes. */
+@layer components {
+  .tabs {
+    /* layout: the tabs stay at the row's end, even when they wrap under the figures */
+    margin-inline-start: auto;
+  }
+
+  .note {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  .pending {
+    inline-size: var(--space-2xl);
+  }
+
+  .chart > span:first-child {
+    block-size: calc(var(--column-s) * 0.8);
+  }
+
+  .list > span:first-child {
+    block-size: calc(var(--column-s) * 1.8);
+  }
+}

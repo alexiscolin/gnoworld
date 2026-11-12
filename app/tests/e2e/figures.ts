@@ -21,7 +21,8 @@ export async function pinFigures(context: BrowserContext): Promise<void> {
   );
 }
 
-/** Closes the arrival's pill, which lives five seconds and says today's stop: a picture takes neither its time nor its day. */
+/** Closes the arrival's pill, which lives five seconds and says today's stop (a page opened straight on the full chat has none): a picture takes neither its time nor its day. */
 export async function calmed(page: Page): Promise<void> {
-  await page.locator("[data-banner]").getByRole("button", { name: "Close" }).click();
+  const close = page.locator("[data-banner]").getByRole("button", { name: "Close" });
+  if ((await close.count()) > 0) await close.click();
 }

@@ -3,11 +3,11 @@
 import type { ReactNode } from "react";
 import { realmView } from "../../places.ts";
 import { askFor } from "../../pageAsks.ts";
-import { useJarvisHere } from "../../jarvisHere.ts";
+import { useJarvisHere, useJarvisOn } from "../../jarvisHere.ts";
 import type { AppState } from "../../store/index.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import type { Shown } from "./shown.tsx";
-import { addMarketCard } from "./marketCommand.ts";
+import { marketLine } from "./cardCommands.ts";
 import { QuickActions, type Pinned, type QuickActionsProps } from "./QuickActions.tsx";
 import styles from "./QuickActions.module.css";
 
@@ -48,8 +48,10 @@ export function Dock({ pinned, children }: DockProps) {
 // The quick actions' Jarvis and Catch up are alive while the page is told Jarvis can be asked from this room (jarvisTold.tsx).
 function Quick({ place, shown, account }: { place: ChatPlace; shown: Shown; account: string | undefined }) {
   const here = useJarvisHere();
+  const on = useJarvisOn();
   return (
     <QuickActions
+      jarvisWhy={on ? (account === undefined ? "Log in to ask Jarvis" : "Open a room to ask Jarvis") : undefined}
       pills={pillsOf(place, shown.kind === "dm")}
       realm={realmOf(place)}
       poll={account === undefined ? undefined : { room: shown.writer.room, nick: account, say: shown.say }}
@@ -57,7 +59,7 @@ function Quick({ place, shown, account }: { place: ChatPlace; shown: Shown; acco
         shown.kind === "dm"
           ? undefined
           : () => {
-              addMarketCard(shown.writer.room, account);
+              shown.say(marketLine(shown.writer.room, account ?? ""), "");
             }
       }
       jarvis={

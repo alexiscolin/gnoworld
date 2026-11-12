@@ -1,13 +1,16 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { hubWorldOf } from "@gnoworld/core";
+import { ExportedName } from "@gnoworld/schemas/indexer";
 import { FIXTURE } from "../../placesFixture.ts";
 import { siteOf } from "../../places.ts";
 import { opensPalette } from "./chord.ts";
+import { sortPlaces } from "./ranks.ts";
 import { searchItemsOf, worldsItemsOf } from "./items.ts";
 import { matchOf, parseQuery } from "./match.ts";
-import { groupResults, SHOWN, searchPlaces } from "./search.ts";
-import { buildIndex } from "./searchIndex.ts";
+import { groupResults } from "./groups.ts";
+import { SHOWN, searchPlaces } from "./search.ts";
+import { buildIndex, FUNCTION_SCORE } from "./searchIndex.ts";
 import { COMMANDS, type SearchFilter, type SearchItem } from "./types.ts";
 
 // The palette's search, over the places the page holds already (no request, docs/plans/slice-5.md §1).
@@ -139,6 +142,13 @@ describe("the chips", () => {
     expect(found("stations", "unseen")).toEqual(["Gno Playground"]);
   });
 
+  it("keep the worlds the reader follows, listed with no words", () => {
+    const some = buildIndex(
+      ITEMS.map((item) => (item.name === "Bubble" ? { ...item, followed: true as const } : item)),
+    );
+    expect(names(searchPlaces(some, "", { filters: new Set<SearchFilter>(["following"]) }))).toEqual(["Bubble"]);
+  });
+
   it("leave the commands alone", () => {
     expect(run(">", { filters: new Set(["dao"]) }).results).toHaveLength(COMMANDS.length);
   });
@@ -169,6 +179,56 @@ describe("the order and the namespace", () => {
     expect(order("newest")).toEqual(["alpha", "gamma", "beta"]);
     expect(order("name")).toEqual(["alpha", "beta", "gamma"]);
     expect(names(searchPlaces(buildIndex(rich), "a", { sort: "here" }))).toEqual(["beta", "alpha", "gamma"]);
+  });
+
+  it("sorts by the indexer's ranks as Discover does, the places without one last", () => {
+    const rank = (name: string, [calls, callers, lastHeight]: number[]) => ({
+      name,
+      path: `/w/${name}`,
+      calls: calls ?? 0,
+      callers: callers ?? 0,
+      lastHeight: lastHeight ?? null,
+      rise: null,
+      firstHeight: null,
+    });
+    const ranked: SearchItem[] = [
+      ...rich.map((item, at) => ({
+        ...item,
+        rank: rank(
+          item.name,
+          [
+            [5, 1, 30],
+            [1, 9, 10],
+            [9, 2, 20],
+          ][at] ?? [],
+        ),
+      })),
+      { name: "delta", kind: "world", universe: "onyx", path: "/w/delta" },
+    ];
+    const by = (sort: "trend" | "callers" | "calls") => names(searchPlaces(buildIndex(ranked), "", { sort }));
+    expect(by("calls")).toEqual(["gamma", "alpha", "beta", "delta"]);
+    expect(by("callers")).toEqual(["beta", "gamma", "alpha", "delta"]);
+    expect(by("trend")).toEqual(["alpha", "gamma", "beta", "delta"]);
+  });
+
+  it("sorts the followed worlds as Discover's sorts do, the A to Z by name, those with no realm last", () => {
+    const rank = (calls: number, callers: number) => ({
+      name: "",
+      path: "",
+      calls,
+      callers,
+      lastHeight: null,
+      rise: null,
+      firstHeight: null,
+    });
+    const worlds: SearchItem[] = [
+      { name: "b", kind: "world", universe: "onyx", path: "/w/b", rank: rank(5, 1) },
+      { name: "a", kind: "world", universe: "onyx", path: "/w/a" },
+      { name: "c", kind: "world", universe: "onyx", path: "/w/c", rank: rank(1, 9) },
+    ];
+    expect(sortPlaces(worlds, "calls").map((w) => w.name)).toEqual(["b", "c", "a"]);
+    expect(sortPlaces(worlds, "callers").map((w) => w.name)).toEqual(["c", "b", "a"]);
+    expect(sortPlaces(worlds, "az").map((w) => w.name)).toEqual(["a", "b", "c"]);
   });
 
   it("keeps the places of one namespace, and lists the namespaces by their calls", () => {
@@ -397,5 +457,109 @@ describe("opensPalette", () => {
     expect(press("k", { ctrlKey: true, shiftKey: true })).toBe(false);
     expect(press("k", { metaKey: true, altKey: true })).toBe(false);
     expect(press("j", { ctrlKey: true })).toBe(false);
+  });
+});
+
+describe("a realm found by the functions it exports", () => {
+  const realm = (name: string, functions?: string[]): SearchItem => ({
+    name,
+    kind: "realm",
+    universe: "onyx",
+    path: `/r/${name}`,
+    ...(functions === undefined ? {} : { functions }),
+  });
+  const gov = realm("dao/gov", ["MustVoteOnProposal", "Vote", "Render", "VoteAll", "Votes"]);
+  const index = buildIndex([
+    gov,
+    realm("tok/coin", ["Mint", "Transfer"]),
+    realm("plain"),
+    realm("voting", ["Tally"]),
+    realm("vote"),
+  ]);
+  const found = (query: string) => searchPlaces(index, query).results;
+
+  it("finds a realm by a word of a function, and shows the functions that matched, three at most", () => {
+    const hit = found("vote").find((each) => each.item.name === "dao/gov");
+    expect(hit?.note).toBe("MustVoteOnProposal, Vote, VoteAll");
+  });
+
+  it("finds a function by its exact name in lower case, its words run together", () => {
+    const hit = found("mustvoteonproposal").find((each) => each.item.name === "dao/gov");
+    expect(hit?.note).toBe("MustVoteOnProposal");
+    expect(found("mustvote").some((each) => each.item.name === "dao/gov")).toBe(true);
+  });
+
+  it("finds Mint by mint", () => {
+    expect(found("mint").map((each) => each.item.name)).toEqual(["tok/coin"]);
+    expect(found("mint")[0]?.note).toBe("Mint");
+  });
+
+  it("ranks a name above a function, by a constant under the plain name scores and over the scattered letters", () => {
+    expect(
+      found("vote")
+        .map((each) => each.item.name)
+        .slice(0, 2),
+    ).toEqual(["vote", "dao/gov"]);
+    expect(
+      found("vot")
+        .map((each) => each.item.name)
+        .slice(0, 2),
+    ).toEqual(["vote", "voting"]);
+    expect(FUNCTION_SCORE).toBeLessThan(700);
+    expect(FUNCTION_SCORE).toBeGreaterThan(400);
+  });
+
+  it("ranks a function above the scattered letters of a long name", () => {
+    const some = buildIndex([realm("g1v0o0t0e0/x"), gov]);
+    expect(searchPlaces(some, "vote").results.map((each) => each.item.name)).toEqual(["dao/gov", "g1v0o0t0e0/x"]);
+  });
+
+  it("splits an identifier on its capitals and underscores", () => {
+    const some = buildIndex([realm("a/b", ["Must_Vote", "HTTPServer"])]);
+    expect(searchPlaces(some, "must vote").results[0]?.note).toBe("Must_Vote");
+    expect(searchPlaces(some, "server").results[0]?.note).toBe("HTTPServer");
+  });
+
+  it("matches a longer word a letter off or swapped, and a three-letter one not at all", () => {
+    const some = buildIndex([realm("a/b", ["Withdraw"])]);
+    expect(searchPlaces(some, "withdarw").results[0]?.note).toBe("Withdraw");
+    expect(searchPlaces(some, "witdhraw").results[0]?.note).toBe("Withdraw");
+    expect(searchPlaces(buildIndex([realm("a/b", ["Mint"])]), "mnt").results).toEqual([]);
+    expect(searchPlaces(buildIndex([realm("a/b", ["Mint"])]), "mxn").results).toEqual([]);
+  });
+
+  it("finds a realm with no functions by its name only", () => {
+    expect(found("plain").map((each) => each.item.name)).toEqual(["plain"]);
+    expect(found("plain")[0]?.note).toBeUndefined();
+  });
+
+  it("gives a name hit no note", () => {
+    expect(found("vote")[0]?.note).toBeUndefined();
+  });
+
+  it("builds each entry once: a search allocates no entry", () => {
+    const entries = index.realms;
+    const before = entries.map((entry) => entry.fns);
+    found("vote");
+    found("mint");
+    expect(index.realms).toBe(entries);
+    expect(index.realms.map((entry) => entry.fns)).toEqual(before);
+    expect(index.realms.every((entry, at) => entry.fns === before[at])).toBe(true);
+  });
+
+  it("carries the functions of the worlds' file onto the realm items, and a hostile name cannot reach it", () => {
+    const worlds = [
+      {
+        namespace: "dao",
+        realms: [
+          { path: "gno.land/r/dao/gov", calls: 1, functions: ["Vote"] },
+          { path: "gno.land/r/dao/x", calls: 1, functions: [] },
+        ],
+      },
+    ];
+    const items = worldsItemsOf(worlds, { universe: "onyx", systemPath: (n) => `/s/${n}`, now: 0 });
+    expect(items.find((each) => each.name === "dao/gov")?.functions).toEqual(["Vote"]);
+    expect(items.find((each) => each.name === "dao/x")?.functions).toBeUndefined();
+    expect(ExportedName.safeParse("<b>Vote</b>").success).toBe(false);
   });
 });

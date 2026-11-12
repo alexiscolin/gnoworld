@@ -10,6 +10,8 @@ import type { BubbleMessage } from "./types.ts";
 export interface EarthRoom {
   /** Its type as the list of rooms gives it; none while the list holds it not. */
   readonly type: string | undefined;
+  /** Its id, which each of its bubbles carries. */
+  readonly room?: string;
   readonly lines: readonly Line[];
   /** Whether the moderation hid a line, by msgid. */
   readonly hidden: (id: string) => boolean;
@@ -35,7 +37,7 @@ export function bubbleLines(
   { joined, since }: { joined: boolean; since: number },
 ): BubbleMessage[] {
   const read: BubbleMessage[] = [];
-  for (const { type, lines, hidden } of rooms) {
+  for (const { type, room, lines, hidden } of rooms) {
     const { shown, newest } = foldEdits(lines);
     const visibility = isPublicRoom(type) ? "public" : "private";
     for (const line of shown) {
@@ -43,7 +45,8 @@ export function bubbleLines(
       if (line.kind !== "message" || Number.isNaN(at)) continue;
       const mentioned = at < since ? [] : named(line.text);
       const marked = hidden(newest.get(line.id) ?? line.id) ? { hidden: true } : {};
-      read.push({ ...messageOf(line, at), visibility, joined, mentions: mentioned, ...marked });
+      const where = room === undefined ? {} : { room };
+      read.push({ ...messageOf(line, at), ...where, visibility, joined, mentions: mentioned, ...marked });
     }
   }
   return read;

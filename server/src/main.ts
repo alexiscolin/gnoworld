@@ -17,6 +17,7 @@ import { stateRoutes } from "./door/state.ts";
 import { makeQuota } from "./door/quota.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
 import { makeLogin, makeSigned } from "./login/login.ts";
+import { explainBoot } from "./explain/wire.ts";
 import { migrations } from "./migrations.ts";
 import { loginFrom } from "./login/routes.ts";
 import { historyRoutes } from "./prices/history.ts";
@@ -26,8 +27,14 @@ import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { makeSearch } from "./search/index.ts";
 import { searchRoutes } from "./search/routes.ts";
+import { callRoutes } from "./calls/routes.ts";
 import { listRooms, worldOf } from "./rooms/rooms.ts";
 import { roomsBoot } from "./rooms/roomsBoot.ts";
+import { networkRoutes } from "./worlds/network.ts";
+import { peopleRoutes, worldsFile } from "./worlds/person.ts";
+import { trendingRoutes } from "./worlds/trending.ts";
+import { tokenRoutes } from "./worlds/tokenRoutes.ts";
+import { tokenStore } from "./worlds/tokenStore.ts";
 import { trendsRoutes } from "./worlds/trends.ts";
 import { dirname, join } from "node:path";
 import { bootSignals } from "./signals/boot.ts";
@@ -51,7 +58,7 @@ const chainId = (): string | undefined =>
   config.universes === undefined ? undefined : defaultUniverse(config.universes).chainId;
 const memory = doorMemory(db, config.origins, { now: Date.now, chainId });
 const retention = startRetention(db, { log, ergoData: config.ergoData, search, cards, kept: memory.ask.kept });
-const { prices, worlds, previews, hubs } = bootJobs({ config, db, log });
+const { prices, worlds, previews, hubs, trending, network, balance } = bootJobs({ config, db, log });
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -101,6 +108,22 @@ app.route(
     now: Date.now,
   }),
 );
+// The chat's /trending card: the last 7 days' most called worlds, the last pass's, a 404 while it has none.
+app.route("/api/trending", trendingRoutes(trending));
+// A person's card: their calls and system from the rollup, their balance from the node; none without the worlds job's chain.
+if (balance !== undefined)
+  app.route(
+    "/api/people",
+    peopleRoutes({ db, worlds: worldsFile(config.worlds), balance, proxy: config.trustedProxy, log, now: Date.now }),
+  );
+// A token realm's holders and supply, replayed by the worlds job from grc20's events; a 404 for a realm with none, always one without the chain.
+const tokens = config.universes === undefined ? undefined : tokenStore(db, defaultUniverse(config.universes).id);
+app.route(
+  "/api/tokens",
+  tokenRoutes({ answer: (hash) => tokens?.answerOf(hash), proxy: config.trustedProxy, now: Date.now }),
+);
+// The home's one line of network health, the last pass's, a 404 while it has none.
+app.route("/api/network", networkRoutes(network));
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
@@ -119,6 +142,18 @@ app.route(
     now: Date.now,
   }),
 );
+// A call's detail, read from the default universe's indexer and kept by hash; none without the universes' file.
+if (config.universes !== undefined)
+  app.route(
+    "/api/calls",
+    callRoutes({
+      indexer: defaultUniverse(config.universes).indexer,
+      origins: config.origins,
+      proxy: config.trustedProxy,
+      log,
+      now: Date.now,
+    }),
+  );
 const roomsAhead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck });
 // The owner's right and the links (owners' moderation, part 4): the pins ask the right, /api/links lists and makes the links.
 mountOwners(app, { db, config, hubs, chat, spared: spared(roles), session, signedAt, log });
@@ -136,6 +171,7 @@ const door =
 app.route("/api/jarvis", stateRoutes({ on: door?.settings.on ?? false }));
 if (door !== undefined)
   mountDoor(app, { door, chat, memory: memory.ask, session, signedAt, origins: config.origins, log });
+explainBoot({ app, db, config, jarvis: door?.settings.on === true ? door.jarvis : undefined, log });
 // The admin API on a listener of its own, never the public one (ADR-0002 §6), with the login for its own site, so the
 // console's session cookie is its alone; none without ADMIN_PORT. The network that walls it off is deploy's.
 const adminApp = makeApp(log, () => !draining);

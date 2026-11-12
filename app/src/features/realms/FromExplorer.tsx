@@ -3,14 +3,12 @@
 // A fact the indexer or the file did not give is left out, never a zero.
 import { shortAddress } from "@gnoworld/schemas";
 import type { Worlds } from "@gnoworld/schemas/indexer";
-import { Card, Grid, Stack } from "@gnoworld/ui";
+import { Card, Grid, grouped, Stack } from "@gnoworld/ui";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
 import { realmAt, type RealmAt } from "../../realmAt.ts";
 import { ReadSource } from "./ReadSource.tsx";
 import { useRealmFacts } from "./useRealmFacts.ts";
-import { OutLinks } from "./OutLinks.tsx";
-
-const grouped = (n: number): string => n.toLocaleString("en-US");
+import { OutLinks } from "../../OutLinks.tsx";
 
 function Fact({ label, children }: { label: string; children: string }) {
   return (

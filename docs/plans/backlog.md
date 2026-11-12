@@ -142,6 +142,11 @@ comes with the slice that brings what it needs.
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the
 slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; once logged in, a phone writes (docs/decisions.md, 2026-10-28).
 
+**Where it stands:** slices 0 to 11 are built and in `main` (its tree holds `jarvis/`, `evals/`, `gno/r/seal` and `gno/r/satellite`), except 4b (images
+and files) and 4d (the Discord bridge), which have no code in `server/src` or `app/src`. Slice 12
+is not started: there is no `admin/` and no PostHog in the code (the server's admin API, `server/src/door/admin.ts`, holds Jarvis's
+settings only). What came after slice 9, on `pingpong` and not yet in `main`, is slice 13 below.
+
 | # | Slice | Delivers | Tests first (the main ones) | Human | Asks |
 |---|---|---|---|---|---|
 | 0 | Harness and gate | Done (`slice-0-harness.md`); the review agents and `/pre-merge` added on 2026-10-17 | — | — | — |
@@ -220,8 +225,8 @@ What the ping-pong decided or found and left for parts of their own (`.claude/tm
 ## Slice 13's days, 2026-11-10 to 11-12
 
 Built on `pingpong`, not yet in `main`: `main` takes it after the hardening slice (tests and journeys for every behaviour, the pictures, no
-regression, a security review of the whole, `deploy/test.sh` green). The demo is on the evening of 2026-11-12 (D13944): no new big part
-before it.
+regression, a security review of the whole, `deploy/test.sh` green). The demo is the evening of 2026-11-12, run from the Docker stack on
+Alexis's Mac behind Tailscale Funnel (D13944, D13030): no new big part waits for it beyond the rows below.
 
 | What | State | Plan |
 |---|---|---|
@@ -234,6 +239,14 @@ before it.
 | The markets chart card, compact (D13997) | Built | none |
 | The planets' depth (D13993), the Earth's real hour (D13947), regions of the other worlds from their seed (D13996) | Built | none |
 | The calendar's dialog removed; Events and Media greyed "coming soon" (D13995, D13921) | Done | none |
+| The shared cards `/market`, `/trending` and `/proposals`: a line every reader of the room sees drawn as its card (D13018) | Built | none |
+| The welcome card on a first visit and the Get started dialog for a browser with no Adena (D13017); the passport in three tabs, Challenges, Stamps, Charted (D13027) | Built; "Take the tour" waits for a video (D13019) | none |
+| One error system: every failure sorted into one kind, drawn by one view in three sizes (D13022) | Built | none |
+| The explorer's additions: the person card with balance and tokens, token worlds, a call's detail, search of realms by function name, the network line (D13023, D13028) | Built | [slice-13-explorer.md](slice-13-explorer.md) |
+| The chat's search by `from:` with no words, and the palette's "Following" chip (D13024, D13006); Ask Jarvis and `@jarvis` in the composer (D13025) | Built | [search.md](search.md) |
+| A realm's page whose realm is not on the chain becomes the shared not-found view (D13026) | Built | none |
+| The realms' and worlds' explanations by Jarvis, from their code alone, kept in the server's database, seeded for 322 of Onyx's realms (D13031, D13032) | Built | none |
+| The demo's script `deploy/demo.sh`, with backup, wipe and restore (D13030) | Built | [DEMO.md](../DEMO.md) |
 | Gnoworld online in one command | A plan only | [online.md](online.md) |
 
 **Waits after the demo** (D13944 and the rows above):
@@ -243,6 +256,7 @@ before it.
 | Private rooms | [private-rooms.md](private-rooms.md) |
 | The shared link's image (an Open Graph picture per link) | [share-image.md](share-image.md) |
 | Jarvis's queued ask | Not planned yet |
+| Search by meaning (Alexis, 2026-11-12, for the morning after the demo): an English phrase finds the worlds and realms whose descriptions answer it (the 830 seeded explanations, the worlds' names and descriptions), by words (the server's full-text index) and by meaning (each description's embedding made once, the phrase's at each search), results past a relevance floor ordered by relevance and activity together, the most active first among the relevant, never one off the subject; Jarvis's "why it matches" line later | Not planned yet: the next slice's first plan |
 | One timeline for every view's arrival (D13945): the scene, the header, the plate, the chat and the labels enter and leave on one clock | Not planned yet |
 | The 8K Earth map | Not planned yet |
 | CI and continuous improvement | After the demo (D13944) |

@@ -1,5 +1,5 @@
-// The header's bell (frames 86, 87; 8a's slot): the button and its count on the first screen, the rest later. The count and the
-// reminders come a moment after the page has loaded (Watch.tsx); the panel at the first press (Panel.tsx). Neither is in the first
+// The header's bell (frames 86, 87; 8a's slot): the button and its count on the first screen, the rest later. The count
+// comes a moment after the page has loaded (Watch.tsx); the panel at the first press (Panel.tsx). Neither is in the first
 // screen's budget, nor later.ts: on the home, the one page that has it nowhere else, it would cost a chunk of its own (472 B).
 import { IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState } from "react";

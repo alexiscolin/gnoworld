@@ -24,6 +24,7 @@ const handOf = (up: () => void): Hand => ({
   under: () => undefined,
   deeper: () => false,
   enter: () => undefined,
+  turner: () => undefined,
   up,
 });
 

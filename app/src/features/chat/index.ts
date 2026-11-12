@@ -30,3 +30,5 @@ export { chatPlace, EARTH_CHAT, EARTH_KICKER } from "./place.ts";
 // them in every world page's first screen.
 export const CountryChoice = lazy(async () => ({ default: (await import("./CountryChoice.tsx")).CountryChoice }));
 export const SavedDialog = lazy(async () => ({ default: (await import("./SavedDialog.tsx")).SavedDialog }));
+
+export { PersonLink } from "./PersonLinkLazy.tsx";

@@ -183,7 +183,7 @@ gate fails, run the failing lane alone before running the whole gate again.
 
 | A fast run's change | What runs beside the cheap checks (format, knip, jscpd, CSS, comments, check_docs) | Budget |
 |---|---|---|
-| `server/src`, `jarvis/src`, `packages/service/src` | tsc, ESLint, the related tests and `main.test.ts` (below) | 30 s |
+| `server/src`, `jarvis/src`, `link-reader/src`, `packages/service/src` | tsc, ESLint, the related tests and `main.test.ts` (below) | 30 s |
 | the TypeScript of `app/src`, `packages/ui/src` | tsc, ESLint, the related tests, the app's build (below) | 120 s |
 | a test of the app (`app/src/*.test.ts(x)`), anything of `app/tests/` (a journey, its helper, a recording) | tsc, ESLint, the related tests; no build | 30 s |
 | `packages/core/src`, `packages/chain/src`, `packages/schemas/src`, any other file of `app/src` and `packages/ui/src` (a fixture, a stylesheet), `app/data`, `app/lab`, `app/public` | tsc, ESLint, the related tests (and `main.test.ts` for core's and the schemas' code), the app's build | 120 s |
@@ -380,6 +380,7 @@ run is no row: `unsteady.log` keeps it.
 | `test-auditor` | the red pass: after a branch's failing tests, before code | Sonnet |
 | `reviewer` | each branch's `/pre-merge`: the green pass, correctness, security, cost, simplification | Opus |
 | `security-reviewer` | a branch touching a tier-1 file or the harness | Opus |
+| `design-reviewer` | a branch that changes how space looks (the scene, the planets, the cosmos), or when the reviewer asks; each screen against the approved video's frames | Opus |
 | `gno-auditor` | every realm, line by line | gnomcp's |
 | `/code-review ultra` | proposed to Alexis at a slice's last merge with tier-1 code | Claude Code's |
 | Alexis | every merge, blind first | — |
@@ -701,6 +702,8 @@ costs context in every session.
 | `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list; `merge.sh`, the merge that shows the harness first |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks` |
 | `scripts/check.sh` | the gate |
+| `scripts/ship.sh` | the end of a slice's branch: the check that fits the change, the review pass, the log row, the `Harness-changed:` lines, Alexis's merge and push commands |
+| `scripts/ergo.sh`, `scripts/workshop.sb`, `scripts/load.py` | the Ergo the server's tests start; the workshop's Seatbelt profile; the machine's load, for the gate's budget |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
 | `scripts/lint_scope.py`, `scripts/stryker_lines.py` | the files a commit's lint reads, from the type check's graph; the code a merge check's StrykerJS mutates |

@@ -24,7 +24,12 @@ async function chooseDm(page: Page) {
   await drawer(page).getByRole("link", { name: OTHER_SHORT, exact: true }).click();
   await expect(page.getByRole("heading", { name: `Direct message with ${OTHER_SHORT}` })).toBeVisible();
 }
-const control = (page: Page) => page.getByRole("button", { name: /^Rooms\b/ });
+// The header's own control: the rooms' column has a section button of the same name.
+const control = (page: Page) =>
+  page
+    .locator('[data-region="header"]')
+    .getByRole("button", { name: /^Rooms\b/ })
+    .first();
 const drawer = (page: Page) => page.getByRole("dialog", { name: "Rooms" });
 
 // The account, in #games with its own line m1 and another's m2, which has one reply (m3), #bubble ready to open.
@@ -49,7 +54,7 @@ async function account(page: Page, width: number) {
 }
 
 // A box's left and right edges are inside the gutter, and it takes the width the gutter leaves, give or take the
-// focus ring's margin a list keeps and a pixel.
+// focus ring's margin a list keeps, the lines' own 8 px inset beside the author's column, and a pixel.
 async function takesWidth(box: Locator, width: number) {
   await expect(box).toBeVisible();
   const { left, right } = await box.evaluate((element) => {
@@ -58,7 +63,7 @@ async function takesWidth(box: Locator, width: number) {
   });
   expect(left).toBeGreaterThanOrEqual(GUTTER - 1);
   expect(right).toBeLessThanOrEqual(width - GUTTER + 1);
-  expect(right - left).toBeGreaterThanOrEqual(width - 2 * GUTTER - 8);
+  expect(right - left).toBeGreaterThanOrEqual(width - 2 * GUTTER - 16);
 }
 
 test.describe("the rooms as a drawer, on a phone's screen", () => {
@@ -116,9 +121,9 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await account(page, 390);
     await control(page).click();
     await expect(drawer(page)).toBeVisible();
-    await expect(drawer(page).getByRole("link", { name: "#bubble", exact: true })).toBeVisible();
-    await drawer(page).getByRole("link", { name: "#bubble", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
+    await expect(drawer(page).getByRole("link", { name: "bubble", exact: true })).toBeVisible();
+    await drawer(page).getByRole("link", { name: "bubble", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "#bubble" })).toBeVisible();
     // The world's main room has no ?room= in its address.
     await expect(page).toHaveURL(/\/w\/bubble(\?chat=full)?$/);
     await expect(drawer(page)).toBeHidden();
@@ -128,7 +133,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
   test("chooses the room already in view: the drawer closes though the address does not change", async ({ page }) => {
     await account(page, 390);
     await control(page).click();
-    await drawer(page).getByRole("link", { name: "#games", exact: true }).click();
+    await drawer(page).getByRole("link", { name: "games", exact: true }).click();
     await expect(drawer(page)).toBeHidden();
     await expect(page).toHaveURL(/room=games/);
   });
@@ -196,7 +201,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     ergo().send(dmFrom(address));
     await expect(control(page)).toHaveAccessibleName("Rooms, 3 unread");
     await control(page).click();
-    const bubble = page.getByRole("link", { name: "#bubble", exact: true });
+    const bubble = page.getByRole("link", { name: "bubble", exact: true });
     await expect(drawer(page).getByRole("listitem").filter({ has: bubble })).toContainText("2 unread");
     await bubble.click();
     // The room's two are read; the conversation's one is not.
@@ -224,7 +229,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await drawer(page)
       .getByRole("link", { name: /mentioned you/ })
       .click();
-    await expect(page.getByRole("heading", { name: "#bubble", level: 2 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "#bubble" })).toBeVisible();
     await expect(drawer(page)).toBeHidden();
   });
 
@@ -254,7 +259,7 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
     await room(page);
     await expect(roomsNav(page)).toBeHidden();
     await control(page).click();
-    await expect(drawer(page).getByRole("link", { name: "#bubble", exact: true })).toBeVisible();
+    await expect(drawer(page).getByRole("link", { name: "bubble", exact: true })).toBeVisible();
     await expect(drawer(page).getByRole("heading", { name: "Direct messages" })).toHaveCount(0);
   });
 

@@ -27,6 +27,13 @@ describe("EmptyState", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
+  it("a failed load is a polite status, and an alert only where it says so", () => {
+    const { rerender } = render(<EmptyState look="failed" line="Could not load." />);
+    expect(screen.getByRole("status").textContent).toBe("Could not load.");
+    rerender(<EmptyState look="failed" urgent line="Could not load." />);
+    expect(screen.getByRole("alert").textContent).toBe("Could not load.");
+  });
+
   it("links where its action says", () => {
     render(
       <EmptyState

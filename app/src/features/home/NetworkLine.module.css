@@ -1,0 +1,19 @@
+/* The home's line of network health: the hero's small type, a count and its small line of the last days. */
+@layer components {
+  .line {
+    /* layout: the words a step from their line */
+    gap: var(--space-s);
+    /* layout: a paragraph with no margin of its own */
+    margin-block: 0;
+    color: var(--color-text-muted);
+    /* raw: 13 px mono, the hero's kicker size */
+    font: 400 13px/1.35 var(--family-mono);
+  }
+
+  .spark {
+    /* raw: the line's box, the markets row's 58 by 22 */
+    inline-size: 58px;
+    /* raw: the markets row's 22 px */
+    block-size: 22px;
+  }
+}

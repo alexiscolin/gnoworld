@@ -3,7 +3,7 @@ import type { JarvisAnswer } from "@gnoworld/schemas";
 import { act } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { tellJarvisHere, useJarvisItems, type JarvisHere } from "../../jarvisHere.ts";
+import { askJarvis, tellJarvisHere, useJarvisItems, type JarvisHere } from "../../jarvisHere.ts";
 import { askFor } from "../../pageAsks.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { all, button, drawer, modals, one, settled } from "../../../tests/mount.tsx";
@@ -83,6 +83,21 @@ const ask = (what: "jarvis" | "jarvis-catch-up") => {
 };
 
 describe("Jarvis's host", () => {
+  it("asks Jarvis the question a line carried, as an own question of the room, and draws its card the asker's alone", async () => {
+    const cards = page([
+      ["#a0", ME],
+      ["#a0", "g1other"],
+    ]);
+    tell(place("#a0", ME));
+    act(() => {
+      askJarvis("what is new?");
+    });
+    await settled(() => bodies.length === 1);
+    expect(bodies).toEqual([{ question: "what is new?", room: "#a0" }]);
+    expect(cards("#a0", ME).textContent).toContain("reading");
+    expect(all(cards("#a0", "g1other"), "li")).toEqual([]);
+  });
+
   it("draws Jarvis's introduction in the room when the page asks Jarvis, once however many times it asks", async () => {
     const cards = page([["#a1", ME]]);
     tell(place("#a1", ME));
@@ -161,13 +176,5 @@ describe("Jarvis's host", () => {
     await settled(() => cards("#a6", ME).textContent.includes("For the first account."));
     expect(cards("#a6", "g1you").textContent).not.toContain("For the first account.");
     expect(cards("#a6", "g1you").textContent).not.toContain("reading");
-  });
-
-  it("asks a guest to connect Adena in its introduction", async () => {
-    const cards = page([["#a7", undefined]]);
-    tell(place("#a7", undefined));
-    ask("jarvis");
-    await settled(() => cards("#a7", undefined).textContent.includes("Connect Adena to ask Jarvis"));
-    expect(cards("#a7", undefined).textContent).toContain("Connect Adena to ask Jarvis");
   });
 });

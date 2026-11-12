@@ -1,0 +1,11 @@
+/* The blog card's posts side by side (D13008): each its day, its title, then its link at its foot, so both links share one line. */
+@layer components {
+  .post {
+    /* layout: the post's parts one under the other */
+    display: grid;
+    /* layout: the day and the title at the top, the link at the post's foot, whatever the title's lines */
+    grid-template-rows: auto 1fr auto;
+    /* layout: the post's three parts a small step apart, as a Stack of xs */
+    gap: var(--space-xs);
+  }
+}

@@ -18,7 +18,7 @@ uniform Shape shape;
 uniform sampler2D minorMap;
 uniform vec3 offset, minorOffset, low, mid, high, minorLow, minorMid, minorHigh, seaShallow, seaDeep, glowColour;
 uniform vec3 sulfurLow, sulfurMid, sulfurHigh;
-uniform float minorRead, minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style, grooved;
+uniform float minorRead, life, minorShare, warpAmount, warpFrequency, recolour, banded, locked, glowLevel, style, grooved;
 `;
 
 export const GENERATED_FRAGMENT = /* glsl */ `
@@ -197,7 +197,7 @@ void main() {
     float burn = 0.4 + 1.3 * abs(field(direction * 2.4 + offset).y);
     vec3 glow = mix(glowColour * glowColour, vec3(1.0, 0.78, 0.42), heat * heat * 0.7) * heat * burn * 2.0;
     if (style > 0.5 && style < 1.5) glow = veinsOf(at + offset, pixel, burn);
-    colour += glow;
+        colour += glow * (1.0 + 0.15 * life * sin(cloudTime * 0.5 + 5.0 * burn));
   }
   if (air > 0.5) colour = nightAir(colour, albedo, light);
   gl_FragColor = vec4(colour, 1.0);

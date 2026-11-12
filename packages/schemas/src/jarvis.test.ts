@@ -525,7 +525,13 @@ describe("JarvisAsk", () => {
 describe("translation's contract (10k)", () => {
   it("names the translation's and the digest's paths beside the question's and the budgets'", () => {
     expect(JARVIS_KEY_HEADER).toBe("x-jarvis-key");
-    expect(JARVIS_PATHS).toEqual({ ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest" });
+    expect(JARVIS_PATHS).toEqual({
+      ask: "/ask",
+      budgets: "/budgets",
+      translate: "/translate",
+      digest: "/digest",
+      explain: "/explain",
+    });
   });
 
   it("lists the 16 languages decided (D190), and bounds a translation at 16,000 code points", () => {
@@ -598,6 +604,16 @@ describe("translation's contract (10k)", () => {
     ]);
     expect(answer({ status: "original", text: "x" })).toBe(false);
     expect(answer({ status: "failed" })).toBe(false);
+  });
+
+  it("may name the original's language, one of the list, and never needs to", () => {
+    const answer = (value: unknown) => JarvisTranslation.safeParse(value).success;
+    expect([
+      answer({ status: "translated", text: "Hi", from: "fr" }),
+      answer({ status: "translated", text: "Hi" }),
+    ]).toEqual([true, true]);
+    expect(answer({ status: "translated", text: "Hi", from: "xx" })).toBe(false);
+    expect(answer({ status: "original", from: "fr" })).toBe(false);
   });
 });
 

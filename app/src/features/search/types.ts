@@ -1,5 +1,5 @@
 // What the palette's search holds and answers: the items, the chips, the commands and the results.
-import type { PlaceKind } from "@gnoworld/core";
+import type { PlaceKind, Rank, SortId } from "@gnoworld/core";
 
 /** A kind of result: a place of the site, a station (a world of its own round the Earth), a namespace's system, a realm, a command, a
  * room the chat lists or follows, or a person it knows. */
@@ -27,6 +27,8 @@ export interface SearchItem {
   find?: string;
   /** Whether the reader may write to the person: their path is the direct message. */
   message?: true;
+  /** The names a realm exports, which a query matches by their words. */
+  functions?: readonly string[];
   /** The namespace of a system, or of a realm. */
   namespace?: string;
   /** The rooms of a place, which `#` finds. */
@@ -41,10 +43,17 @@ export interface SearchItem {
   calls?: number;
   seen?: number;
   active?: boolean;
+  /** Whether the reader follows the world. */
+  followed?: true;
+  /** What the indexer says of its realms together, for the sorts Discover has (core's): where the file is read. */
+  rank?: Rank;
+  /** How many realms of the worlds' file make up the rank. */
+  realmCount?: number;
 }
 
 /** A chip: kinds of place add to each other, the others narrow. */
-export type SearchFilter = "worlds" | "dao" | "stations" | "systems" | "here" | "active" | "new" | "unseen";
+export type SearchFilter =
+  "worlds" | "dao" | "stations" | "systems" | "here" | "active" | "new" | "unseen" | "following";
 export const FILTERS: readonly { id: SearchFilter; label: string }[] = [
   { id: "worlds", label: "Worlds" },
   { id: "dao", label: "DAO" },
@@ -54,6 +63,7 @@ export const FILTERS: readonly { id: SearchFilter; label: string }[] = [
   { id: "active", label: "Active in 24 h" },
   { id: "new", label: "New" },
   { id: "unseen", label: "Not visited" },
+  { id: "following", label: "Following" },
 ];
 
 /** What the palette's tabs split a search into. */
@@ -92,11 +102,17 @@ export const COMMANDS: readonly SearchItem[] = [
 ];
 
 /** How the results are ordered: by how well they answer, or by one of what the worlds' file and the server say. */
-export type SearchSort = "relevance" | "here" | "activity" | "newest" | "name";
+export type RankedSort = Extract<SortId, "trend" | "callers" | "calls">;
+export type SearchSort = "relevance" | "here" | "activity" | "newest" | "name" | RankedSort;
+/** The sorts the indexer's data gives, Discover's: offered where the worlds' file is read. */
+export const RANKED: readonly RankedSort[] = ["trend", "callers", "calls"];
 export const SORTS: readonly { value: SearchSort; label: string }[] = [
   { value: "relevance", label: "Best match" },
   { value: "here", label: "People here" },
   { value: "activity", label: "Most active" },
+  { value: "trend", label: "Recently active" },
+  { value: "callers", label: "Most callers" },
+  { value: "calls", label: "Most calls" },
   { value: "newest", label: "Newest" },
   { value: "name", label: "A to Z" },
 ];

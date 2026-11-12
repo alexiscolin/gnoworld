@@ -1,3 +1,4 @@
+import type { CDPSession } from "@playwright/test";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
 
@@ -57,6 +58,23 @@ interface Stats {
   seconds: number;
   cosmos: CosmosStats | undefined;
   flight: FlightStats | undefined;
+}
+
+/** The JS heap in use after a garbage collection, through CDP. */
+export async function heapOf(cdp: CDPSession): Promise<number> {
+  await cdp.send("HeapProfiler.collectGarbage");
+  return (await cdp.send("Runtime.getHeapUsage")).usedSize;
+}
+
+/** The GPU's resources the scene holds: its geometries and its textures. */
+export async function gpuOf(page: Page): Promise<{ geometries: number; textures: number }> {
+  return page.evaluate(() => {
+    const space: unknown = Reflect.get(globalThis, "__gnoworldSpace");
+    const { geometries, textures } = (
+      space as { renderer: { info: { memory: { geometries: number; textures: number } } } }
+    ).renderer.info.memory;
+    return { geometries, textures };
+  });
 }
 
 export const stats = (page: Page) =>

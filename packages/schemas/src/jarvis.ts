@@ -158,7 +158,8 @@ export type JarvisPaidAnswer = z.infer<typeof JarvisPaidAnswer>;
  * share (D42). */
 /** The header the door proves itself to jarvis with: a shared secret, read from a file on both sides (10u-g2). */
 export const JARVIS_KEY_HEADER = "x-jarvis-key";
-export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest" } as const;
+// prettier-ignore
+export const JARVIS_PATHS = { ask: "/ask", budgets: "/budgets", translate: "/translate", digest: "/digest", explain: "/explain" } as const;
 
 /** A question as jarvis takes it from the door: the question, its room, and the room's last lines, oldest first, each
  * by a number for who said it in this question alone, the asker 0, never an account (D91). */
@@ -245,9 +246,10 @@ export type JarvisTranslateRequest = z.infer<typeof JarvisTranslateRequest>;
 export const JarvisTranslate = z.strictObject({ text: text(JARVIS_LINES.bytes), language: Language });
 export type JarvisTranslate = z.infer<typeof JarvisTranslate>;
 
-/** A line's translation, or its original kept (a translation dropped, ADR-0002 §5 point 5), spent, or off. */
+/** A line's translation (with the line's own language when jarvis says it, never required), or its original kept (a
+ * translation dropped, ADR-0002 §5 point 5), spent, or off. */
 export const JarvisTranslation = z.discriminatedUnion("status", [
-  z.strictObject({ status: z.literal("translated"), text: text(TRANSLATION_CAPS.text) }),
+  z.strictObject({ status: z.literal("translated"), text: text(TRANSLATION_CAPS.text), from: z.optional(Language) }),
   z.strictObject({ status: z.literal("original") }),
   z.strictObject({ status: z.literal("spent") }),
   z.strictObject({ status: z.literal("off") }),

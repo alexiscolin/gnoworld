@@ -2,7 +2,7 @@
 // states of the canvas's States frame (before typing, nothing found, a conversation that is not searched). A result opens its room at the
 // message (the caller's `onOpen`). Public rooms of one world at a time: the server answers for what the reader may read.
 import type { SearchHit } from "@gnoworld/schemas";
-import { Button, composing, EmptyState, Field, Icon, IconButton, Sidebar, Skeleton, Stack } from "@gnoworld/ui";
+import { composing, EmptyState, Field, Icon, IconButton, ShowMore, Sidebar, Skeleton, Stack } from "@gnoworld/ui";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { pageRecent } from "../../../lib/keep/recent.ts";
 import { parseFind, toQuery, type Time, type Who } from "./filters.ts";
@@ -53,14 +53,12 @@ function Found({ search, open, onOpen }: { search: Search } & Pick<ChatSearchPro
     <Stack space="xs">
       <Results pages={search.data?.pages.map((page) => page.hits) ?? []} open={open} onOpen={onOpen} />
       {search.hasNextPage ? (
-        <Button
-          emphasis="quiet"
-          onClick={() => {
+        <ShowMore
+          busy={search.isFetchingNextPage}
+          onMore={() => {
             search.fetchNextPage().catch(reportError);
           }}
-        >
-          {search.isFetchingNextPage ? "Loading…" : "Show more"}
-        </Button>
+        />
       ) : null}
     </Stack>
   );
@@ -104,6 +102,9 @@ function Body({
 // The field, the way out and the filters, with how many were found.
 function Head({ props, filtered, page }: { props: ChatSearchProps; filtered: boolean; page: Counted | undefined }) {
   const { text, onText, time, onTime, world, who, searched, onClose } = props;
+  // With no words, the list is a sender's: said as "Your messages" when it is the reader's own.
+  const parsed = parseFind(text, who);
+  const yours = parsed.words.trim() === "" && parsed.from !== undefined && parsed.from === who.me;
   return (
     <div className={styles["head"]}>
       <Stack space="xs">
@@ -127,6 +128,7 @@ function Head({ props, filtered, page }: { props: ChatSearchProps; filtered: boo
         {filtered ? <Filters text={text} onText={onText} time={time} onTime={onTime} who={who} /> : null}
         {page === undefined ? null : (
           <p className="meta">
+            {yours ? "Your messages · " : ""}
             <b className={styles["count"]}>{countOf(page)}</b>
             {` in ${world.name}'s public rooms · last 90 days`}
             {page.partial ? ". Only the newest matches were searched; add words to narrow." : ""}

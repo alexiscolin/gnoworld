@@ -5,7 +5,7 @@
 // (4c); a guest reads, a room letting accounts alone speak.
 import type { Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
-import { Button, Stack } from "@gnoworld/ui";
+import { EmptyState } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { useSearchParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
@@ -30,12 +30,7 @@ const AccountChat = lazy(async () => ({ default: (await import("./AccountChat.ts
 
 // What says the rooms could not load, and asks again.
 function RoomsFailed({ onRetry }: { onRetry: () => void }) {
-  return (
-    <Stack space="s">
-      <p role="alert">The rooms could not load.</p>
-      <Button onClick={onRetry}>Try again</Button>
-    </Stack>
-  );
+  return <EmptyState look="failed" urgent line="The rooms could not load." onRetry={onRetry} />;
 }
 
 // The rooms as the server lists them for `query`, asked again as it changes; none before the first answer. A world listed before shows its rooms at

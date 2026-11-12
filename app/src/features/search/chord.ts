@@ -1,8 +1,7 @@
 // The chords that open the search palette, read by the header on every page (the search itself waits in the dialog's chunk).
 import { typedIn } from "@gnoworld/ui";
 
-/** The address hash that opens the palette over a page: /list goes to the home with it. */
-export const SEARCH_HASH = "#search";
+export { SEARCH_HASH } from "../../lib/searchHash.ts";
 
 /** ⌘K on a Mac, Ctrl+K elsewhere, with no other modifier: a bare k, or Shift or Alt with it, is for the page. A bare slash opens it too,
  * but never from a field. */

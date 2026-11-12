@@ -31,18 +31,27 @@
   .group {
     /* layout: the items as wide as the column, a hair apart so a lit pill never touches the next item */
     display: grid;
-    /* layout: the rooms column's step apart, so a lit pill stands clear of the next (Alexis, 2026-11-08: "trop collé") */
-    gap: var(--chat-item-gap);
+    /* layout: a hair apart so a lit pill stands clear of the next (Alexis, 2026-11-08: "trop collé"); the rows are a list row's high */
+    gap: var(--space-3xs);
   }
 
   .group + .group {
-    /* layout: the larger step between groups */
-    margin-block-start: var(--space-m);
+    /* layout: a rule and a larger step between sections */
+    margin-block-start: var(--space-s);
+    padding-block-start: var(--space-s);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  .shelf {
+    /* layout: a list row's height, not the rooms column's */
+    min-block-size: var(--row-h);
   }
 
   .groupName {
-    /* layout: the kicker on the items' left edge, a step above its first item */
+    /* layout: the section's title on the items' left edge, a step above its first item; the title style of the cards' rows */
+    margin: 0;
     padding: 0 var(--space-xs) var(--space-2xs);
+    font: var(--font-title-s);
   }
 
   .shelf {
@@ -89,7 +98,7 @@
     /* layout: a step off a long name */
     padding-inline-start: var(--space-xs);
     color: var(--color-text-faint);
-    font: var(--font-data);
+    font: var(--font-count);
   }
 
   .shelf[aria-selected="true"] .count {

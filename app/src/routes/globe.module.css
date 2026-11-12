@@ -102,15 +102,13 @@
     --_hair: 56px;
     --_mark: var(--icon-s);
 
-    position: absolute;
     /* raw: the point on the limb, in the planet's box: 50 % less 0.92 × 50 % × cos 45° */
     inset-block-start: 17.5%;
     /* raw: the same, across */
     inset-inline-start: 17.5%;
     padding: var(--space-2xs) var(--space-s);
     border: var(--line-width) solid var(--color-line-strong);
-    /* raw: a little darker than the names' glass (72 %), so its words keep their contrast over the lit limb */
-    background: color-mix(in oklab, var(--color-surface) 85%, transparent);
+    background: var(--color-pill-glass);
     color: var(--color-text);
     translate: var(--_hair) -50%;
   }

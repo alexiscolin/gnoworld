@@ -31,7 +31,6 @@ beforeAll(async () => {
 function context(over: Partial<JarvisCardContext> = {}): JarvisCardContext {
   return {
     room: ROOM,
-    account: "g1me",
     ask: vi.fn<(question: JarvisQuestion) => void>(),
     chain: CHAIN,
     options: { fetch: () => listing([]) },
@@ -133,22 +132,6 @@ describe("Jarvis's introduction", () => {
     expect(sent(ctx)).toEqual([]);
     expect(field(box).value).toBe("a".repeat(501));
   });
-
-  it("asks a guest to connect Adena: no field, no ask, the way in is the page's log in", () => {
-    const logIn = vi.fn();
-    window.addEventListener("gnoworld:log-in", logIn);
-    try {
-      const { box, ctx } = intro({ account: undefined });
-      expect(box.textContent).toContain("Connect Adena to ask Jarvis");
-      expect(all(box, "input, textarea")).toEqual([]);
-      expect(button(box, "What can I do here?")).toBeUndefined();
-      click(button(box, "Connect Adena"));
-      expect(logIn).toHaveBeenCalledTimes(1);
-      expect(sent(ctx)).toEqual([]);
-    } finally {
-      window.removeEventListener("gnoworld:log-in", logIn);
-    }
-  });
 });
 
 describe("an ask's card", () => {
@@ -208,6 +191,14 @@ describe("a guard's answer", () => {
     for (const other of Object.keys(SAYS).filter((each) => each !== status))
       expect(words).not.toMatch(SAYS[other as keyof typeof SAYS]);
     expect(all(box, "[data-jarvis-markdown], [role='progressbar'], [aria-busy='true']")).toEqual([]);
+    expect(button(box, "Search a place")).toBeUndefined();
+  });
+
+  it("the day's questions all asked (the door's 429 full) says the share is used, not to try again later", () => {
+    const { box } = asked({ ok: false, reason: "full" });
+    const words = all(box, "[data-jarvis-line]")[0]?.textContent ?? "";
+    expect(words).toMatch(SAYS.capped);
+    expect(words).not.toMatch(/could not answer/i);
     expect(button(box, "Search a place")).toBeUndefined();
   });
 });

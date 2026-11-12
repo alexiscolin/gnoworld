@@ -4,6 +4,9 @@
 import { daysSince, hubWorldOf, isFresh } from "@gnoworld/core";
 import { useState } from "react";
 import { useApp } from "../../storeContext.tsx";
+import { storeFor } from "../../lib/worldsStore.ts";
+import { worldsFollowedIn } from "../follow/index.ts";
+import { withRanks } from "./ranks.ts";
 import { systemPath } from "../../cosmosAt.ts";
 import type { AppState } from "../../store/index.ts";
 import { visitedIn } from "../../lib/visits.ts";
@@ -23,9 +26,10 @@ interface Ground {
   here: ReadonlyMap<string, number>;
   file: File;
   now: number;
+  followed: ReadonlySet<string>;
 }
 
-function enriched(item: SearchItem, { universe, here, file, now }: Ground) {
+function enriched(item: SearchItem, { universe, here, file, now, followed }: Ground) {
   const people = item.universe === universe && item.slug !== undefined ? here.get(item.slug) : undefined;
   const own = item.kind === "world" || item.kind === "station";
   const world = file?.find(({ id }) => id === item.world);
@@ -34,6 +38,7 @@ function enriched(item: SearchItem, { universe, here, file, now }: Ground) {
       ? {
           fresh: isFresh(daysSince(world?.seen, now), visitedIn(universe)(item.world)),
           visited: visitedIn(item.universe)(item.world),
+          ...(followed.has(item.world) ? { followed: true as const } : {}),
           ...activityOf(world, now),
         }
       : {};
@@ -54,12 +59,16 @@ export function useSearchItems(universe: UniverseView, open: boolean) {
   const chat = useApp((app) => (open ? app.chat : NO_CHAT));
   const dms = useApp((app) => (open ? app.dms : NO_DMS));
   const session = useApp((app) => app.login.session);
-  const places = placed.map((item) => enriched(item, { universe: universe.id, here, file: worlds, now }));
+  // The worlds followed are the device's (the lenses and the bell read them there); a string keeps the selector's value equal.
+  const follows = useApp((app) => worldsFollowedIn(app.device.follows, universe.id).join("\n"));
+  const followed = new Set(follows === "" ? [] : follows.split("\n"));
+  const places = placed.map((item) => enriched(item, { universe: universe.id, here, file: worlds, now, followed }));
+  const rows = worlds === undefined ? [] : storeFor(worlds).rows;
   const index: SearchIndex = buildIndex([
-    ...places,
-    ...worldsItemsOf(worlds ?? [], { universe: universe.id, systemPath, now }),
+    ...withRanks([...places, ...worldsItemsOf(worlds ?? [], { universe: universe.id, systemPath, now })], rows),
     ...roomItemsOf(chat.listed, chat.rooms, (world) => placed.find((item) => item.slug === world)?.name),
     ...peopleItemsOf(chat.rooms, Object.keys(dms), session.kind === "in" ? session.address : undefined),
   ]);
-  return { index, worlds, here };
+  const followedPlaces = index.places.map(({ item }) => item).filter((item) => item.followed === true);
+  return { index, worlds, here, ranked: rows.length > 0, followedPlaces };
 }

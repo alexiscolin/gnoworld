@@ -160,3 +160,22 @@ export const TxAnswer = z.object({
   error: z.optional(z.object({ data: z.optional(z.string()) })),
 });
 export type TxAnswer = z.infer<typeof TxAnswer>;
+// The ranking of the last 7 days behind it too: only the chat's /trending card reads it.
+export { Trending, TRENDING_DAYS, TRENDING_MAX_BYTES, TRENDING_MOST } from "./trending.ts";
+// The network's line of health too: the home's one line reads it.
+export { NetworkAnswer, NETWORK_COUNT_MAX, NETWORK_DAYS, NETWORK_MAX_BYTES } from "./network.ts";
+// A person's card data too: only the chat's person card reads it.
+export { PERSON_CAPS, PERSON_MAX_BYTES, PersonCardData, Ugnot } from "./person.ts";
+// A token world's holders and supply too: only a realm's plate reads them.
+export {
+  EventRow,
+  INT64_MAX,
+  NewTokenAttrs,
+  TOKEN_CAPS,
+  TOKEN_MAX_BYTES,
+  TOKEN_PACKAGE,
+  TokenAnswer,
+  TokenEventsPage,
+  tokenIdOf,
+  TransferAttrs,
+} from "./token.ts";

@@ -7,6 +7,9 @@ import { startPrices } from "../prices/prices.ts";
 import { defaultUniverse, hubRealms, hubWorlds } from "../prices/universes.ts";
 import { keptBy } from "../worlds/habitsFiles.ts";
 import { startWorlds } from "../worlds/job.ts";
+import type { NetworkAnswer, Trending } from "@gnoworld/schemas/indexer";
+import { send } from "@gnoworld/service/net";
+import { balanceReader } from "../worlds/balance.ts";
 
 interface Boot {
   config: Pick<Config, "markets" | "universes" | "worlds" | "previews" | "moderation" | "database">;
@@ -44,11 +47,28 @@ export function bootJobs({ config, db, log }: Boot) {
   // the server at boot; each world's chain windows kept beside the database, counts alone, none for a database in memory.
   const { worlds: file, previews: pagesFile } = config;
   const hubs = file === undefined ? undefined : withUniverse(universes, hubWorlds);
+  // The last ranking and the last line of health, kept in memory for GET /api/trending and /api/network: none before a pass has made one.
+  let trending: Trending | undefined;
+  let network: NetworkAnswer | undefined;
   const worlds =
     file === undefined
       ? undefined
       : withUniverse(universes, (all) =>
-          startWorlds({ file, log, universe: defaultUniverse(all), ...keptBy(config.database, db, file) }),
+          startWorlds({
+            file,
+            log,
+            universe: defaultUniverse(all),
+            ...keptBy(config.database, db, file),
+            trending: (made) => {
+              trending = made;
+            },
+            network: {
+              db,
+              told: (made) => {
+                network = made;
+              },
+            },
+          }),
         );
   const { openaiKey, thresholds } = moderation;
   const previews =
@@ -63,5 +83,9 @@ export function bootJobs({ config, db, log }: Boot) {
             check: checkFor({ openaiKey, thresholds }, { log }),
           }),
         );
-  return { prices, worlds, previews, hubs };
+  // A person's balance, read from the default universe's node.
+  const balance = withUniverse(universes, (all) =>
+    balanceReader({ send, rpc: defaultUniverse(all).rpc, now: Date.now }),
+  );
+  return { prices, worlds, previews, hubs, trending: () => trending, network: () => network, balance };
 }

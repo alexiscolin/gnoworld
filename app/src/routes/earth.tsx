@@ -4,26 +4,21 @@ import { EARTH as EARTH_ID } from "@gnoworld/core";
 import { Kicker, Panel, Stack } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { lazy, Suspense } from "react";
-import { type MetaArgs, useLoaderData, useNavigate } from "react-router";
+import { type MetaArgs, useLoaderData } from "react-router";
 import { chatPlace, EARTH_CHAT as EARTH, EARTH_KICKER, PlaceChat } from "../features/chat/index.ts";
-import { isMissing, PlaceError } from "../features/errors/index.ts";
+import { isMissing, RouteError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
+import { WorldSigns } from "../features/universe/WorldSigns.tsx";
 import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
-import { useAppStore } from "../storeContext.tsx";
 import styles from "./earth.module.css";
 import place from "./globe.module.css";
-import { DockChat, DOCKED, useFraming } from "./placeFrame.tsx";
+import { DockChat, DOCKED, PlaceFrame, useFraming } from "./placeFrame.tsx";
 
 // The plate's blocks (routes/plate), in a chunk once the first screen has drawn, asked once the door to space has come (chatDue), never on the first screen.
 const EarthPlate = lazy(() => import("./plate/EarthPlate.tsx"));
-
-// Who says what from where, on the globe (frames 43 to 55): their own chunk, once the page has come.
-// Asked as this module runs, not as the first render does: held behind the page's other chunks it fell past the first screen into the chat's count.
-const earth = import("../EarthSigns.tsx");
-const Signs = lazy(async () => ({ default: (await earth).PageSigns }));
 
 export function loader({ request }: { request: Request }) {
   return site.universe(pageOf(request), "earth");
@@ -79,28 +74,13 @@ function EarthPage({ universe, chat }: { universe: UniverseView; chat: ReactNode
         </DockChat>
       </Panel.Layout>
       <SpaceFoot />
-      <EarthSigns />
+      <WorldSigns />
       <Arrival universe={universe.id} world={EARTH_ID} name="Earth" path={universe.earth.path} />
     </>
   );
 }
 
-// The signs over the Earth, through the page's store and router.
-function EarthSigns() {
-  const store = useAppStore();
-  const navigate = useNavigate();
-  return (
-    <Suspense fallback={null}>
-      <Signs
-        store={store}
-        open={(href) => {
-          Promise.resolve(navigate(href)).catch(reportError);
-        }}
-      />
-    </Suspense>
-  );
-}
-
 export function ErrorBoundary() {
-  return <PlaceError what="universe" />;
+  // Inside the plate, as the Earth's page and every place's page are: never loose over the globe.
+  return <PlaceFrame label="Earth" plate={<RouteError noun="universe" size="place" />} />;
 }

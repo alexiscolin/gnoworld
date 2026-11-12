@@ -1,12 +1,18 @@
 // The format bar's link tool: a small popover with a field for the address, https only; Enter applies, Escape closes, and the
 // selection becomes a link in the field, no Markdown shown.
-import { Button, Field, Icon, Popover, Stack } from "@gnoworld/ui";
+import { Button, Field, Popover, Stack, type IconButtonProps } from "@gnoworld/ui";
 import { useState } from "react";
 import { isAddress } from "./kinds.ts";
 
 const START = "https://";
 
-export function LinkTool({ onApply }: { onApply: (address: string) => void }) {
+export function LinkTool({
+  onApply,
+  size,
+}: {
+  onApply: (address: string) => void;
+  size: NonNullable<IconButtonProps["size"]>;
+}) {
   const [address, setAddress] = useState(START);
   const [wrong, setWrong] = useState(false);
   const apply = (from: Element) => {
@@ -18,17 +24,7 @@ export function LinkTool({ onApply }: { onApply: (address: string) => void }) {
     from.closest<HTMLElement>("[popover]")?.hidePopover();
   };
   return (
-    <Popover
-      plain
-      lazy
-      label="Link"
-      trigger={
-        <>
-          <Icon name="link" />
-          <span className="visually-hidden">Link</span>
-        </>
-      }
-    >
+    <Popover lazy trigger={null} label="Link" icon={{ name: "link", size }}>
       {/* Enter here is the address's, never the message's: the popover sits in the composer's form. */}
       <div
         onKeyDown={(event) => {

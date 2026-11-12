@@ -7,4 +7,3 @@ type Story = StoryObj<typeof meta>;
 
 export const Mark: Story = {};
 export const WithWordmark: Story = { args: { wordmark: true } };
-export const Loading: Story = { args: { progress: 0.5 } };

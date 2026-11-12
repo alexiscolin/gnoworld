@@ -2,6 +2,7 @@
 // read of the page on a frame: a bubble's height and the edge it keeps are read as the list changes.
 import { useEffect, type RefObject } from "react";
 import type { GroundMark } from "../../space/earth/ground.ts";
+import { calmed } from "../../earthSignsCalm.ts";
 
 /** The sheet's own width, frame 47's. */
 const BUBBLE_WIDTH = 258;
@@ -41,6 +42,7 @@ interface Box {
   readonly height: number;
   x: number;
   y: number;
+  shown: boolean;
 }
 
 const covers = (other: Box, { left, width, height }: Box, top: number) =>
@@ -48,22 +50,10 @@ const covers = (other: Box, { left, width, height }: Box, top: number) =>
   top < other.top + other.height + BUBBLE_GAP &&
   top + height + BUBBLE_GAP > other.top;
 
-// Above every bubble before it: the frames let neighbours cover each other's words, which a reader then cannot read. Each pass only rises, so
-// it ends.
-function clearOf(boxes: readonly Box[], own: Box): number {
-  let top = own.top;
-  for (let rising = true; rising;) {
-    rising = false;
-    for (const other of boxes) {
-      if (other === own) break;
-      if (covers(other, own, top)) {
-        top = other.top - own.height - BUBBLE_GAP;
-        rising = true;
-      }
-    }
-  }
-  return top;
-}
+// Whether a bubble shown after `own` stands over it: the newest bubble keeps the country, an older one under it gives way (it is back when the
+// other moves off), never lifted from its own country.
+const covered = (boxes: readonly Box[], own: Box) =>
+  boxes.slice(boxes.indexOf(own) + 1).some((other) => other.shown && covers(other, own, own.top));
 
 // A focused pin stays until the focus leaves it: hidden, it would drop the reader's place in the page.
 const spotMark = (element: HTMLElement, lat: number, lon: number): GroundMark => ({
@@ -76,13 +66,21 @@ const spotMark = (element: HTMLElement, lat: number, lon: number): GroundMark =>
 });
 
 // Whether a point stands right of and under `from`, and left of `keep`.
-const stands = (at: { x: number; y: number }, from: { x: number; y: number }, keep = Infinity) =>
-  at.x >= from.x && at.y >= from.y && at.x < keep;
+const stands = (at: { x: number; y: number }, from: { x: number; y: number } | undefined, keep = Infinity) =>
+  from === undefined || (at.x >= from.x && at.y >= from.y && at.x < keep);
 
 // The element stands on the point; the bubble is offset from it by the sheet, which eases a move clear of another or a change of side.
 function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, keep, from, aim }: Fit): GroundMark {
   const [width, rise] = [BUBBLE_WIDTH * scale, BUBBLE_RISE * scale];
-  const own: Box = { left: 0, top: 0, width, height: element.offsetHeight * scale, x: Number.NaN, y: Number.NaN };
+  const own: Box = {
+    left: 0,
+    top: 0,
+    width,
+    height: element.offsetHeight * scale,
+    x: Number.NaN,
+    y: Number.NaN,
+    shown: false,
+  };
   const { style } = element;
   boxes.push(own);
   return {
@@ -91,22 +89,26 @@ function bubbleMark(element: HTMLElement, boxes: Box[], { reach, scale, floor, k
     keep,
     from,
     aim,
+    sent: element.dataset["said"] === undefined ? undefined : Number(element.dataset["said"]),
+    // The ping stands still till the arrival has calmed (D13001; EarthSigns.module.css).
+    calm: () => {
+      calmed(element);
+    },
     place: (x, y, front) => {
       const leftwards = x + BUBBLE_GAP + width > reach;
       own.left = Math.max(from?.x ?? EDGE, leftwards ? x - BUBBLE_GAP - width : x + BUBBLE_GAP);
-      own.top = y - rise;
-      own.top = Math.max(floor, clearOf(boxes, own));
+      own.top = Math.max(floor, y - rise);
       moved(element, x, y);
       const [offsetX, offsetY] = [Math.round(own.left - x), Math.round(own.top - y)];
       if (offsetX !== own.x) style.setProperty("--_x", `${String(offsetX)}px`);
-      if (offsetY !== own.y) {
-        style.setProperty("--_y", `${String(offsetY)}px`);
-        style.setProperty("--_lift", `${String(-offsetY - rise)}px`);
-      }
+      if (offsetY !== own.y) style.setProperty("--_y", `${String(offsetY)}px`);
       own.x = offsetX;
       own.y = offsetY;
-      // A world's bubble shows only while its point stands in the free area, the view's side: it comes in as the world turns it there.
-      const gone = from !== undefined && !(front && stands({ x, y }, from, keep));
+      // A bubble shows only over its own country: while the ground behind the globe's edge has it, the point it stands on is another's. A world's
+      // also only while that point stands in the free area, the view's side: it comes in as the world turns it there.
+      own.shown = front && stands({ x, y }, from, keep);
+      const gone = !own.shown || covered(boxes, own);
+      own.shown = !gone;
       away(element, gone);
       style.visibility = gone ? "hidden" : "visible";
     },

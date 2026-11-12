@@ -1,25 +1,23 @@
 // The site's door to space (D401): one canvas under every page that shows space, the engine loaded in its own chunk on the first,
 // the worlds' file read once; a page says its place and keeps its planet's circle; what the engine asks back (a world, a system,
 // the universe) becomes the router's navigation, and its flight's end the page's arrival.
-import { EARTH, PHONE_QUERY, sceneOffer, type SceneOffer } from "@gnoworld/core";
 import type { Space } from "../../space/scene.ts";
 import type { Place } from "../../space/place.ts";
 import { systemPath } from "../../cosmosAt.ts";
 import { Heard } from "../../lib/heard.ts";
 import { pagesOf } from "../../lib/hubWorld.ts";
-import { savesData } from "../../lib/saveData.ts";
 import { labelWords } from "./worldFact.ts";
 import { site } from "../../places.ts";
 import { motionOf } from "../../space/motion.ts";
 import { feedMoons, stopMoons } from "./moonRooms.ts";
 import { enterPage, landTags } from "./arrival.ts";
-import { markFlown, syncFlown } from "./flown.ts";
+import { markDrawn, markFlown, syncFlown } from "./flown.ts";
 
 export { syncFlown };
-import { layers } from "./firstLook.ts";
+import { holdsDive, layers, releaseDive } from "./firstLook.ts";
 import { attach } from "../../earthGround.ts";
 import { circleOf } from "./pageCircle.ts";
-import { gpuCanDraw } from "./gpu.ts";
+import { offerOf } from "./gpu.ts";
 import { lightSpace } from "../../lenses.ts";
 import { isMap, onMap } from "../../mapView.ts";
 import { views } from "./views.ts";
@@ -65,15 +63,14 @@ const events = {
   drawn: () => {
     drawn.done = true;
     for (const heard of drawn.heard) heard();
+    const dive = releaseDive();
+    const place = asked;
+    if (dive !== undefined && place !== undefined)
+      setTimeout(() => {
+        go(place);
+      }, dive);
   },
 };
-
-// Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU never; a phone (unless its settings ask for
-// space there) or a reader who saves data on "View in space"; any other at once.
-function offerOf(): SceneOffer {
-  const phone = matchMedia(PHONE_QUERY).matches && document.documentElement.dataset["phone3d"] !== "on";
-  return sceneOffer({ weak: !gpuCanDraw(), phone, savesData: savesData() });
-}
 
 function start(): void {
   if (starting) return;
@@ -153,11 +150,8 @@ function go(place: Place): void {
   if (space === undefined) return;
   space.covered = false;
   readWorlds();
-  // The page's box keeps its planet's room and opens the plate round it once it says the planet is drawn (globe.module.css); the home's
-  // first screen frames the Earth in its own (D459).
-  const box = globe();
-  if (box !== null && place.kind === "world") box.dataset[place.id === EARTH ? "earth" : "world"] = "drawn";
-  else if (box !== null && place.kind === "home") box.dataset["arrival"] = "drawn";
+  if (holdsDive(place)) return;
+  markDrawn(place);
   // A flight to a page's planet hides the page till it nears; a jump there tells it at once, as an unchanged place lets it be.
   const went = space.go(place);
   if (went && (place.kind === "world" || place.kind === "home")) markFlown(true);

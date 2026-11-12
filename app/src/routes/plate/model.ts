@@ -9,6 +9,7 @@ import type { Around } from "./around.ts";
 import type { Capability } from "./capabilities.ts";
 import type { Hours } from "../../features/world/useHours.ts";
 import type { Figure } from "@gnoworld/ui";
+import type { Explained } from "../../features/explain/useExplanation.ts";
 import type { Realm } from "../../features/realms/useRealm.ts";
 
 /** A small square of the plate's foot: one fact, one large value. */
@@ -41,6 +42,8 @@ export interface PlateModel {
     sentence?: ReactNode;
     /** The sentence is still being read: its line's room is kept, so it never pushes what is under it when it comes. */
     pending?: boolean;
+    /** Jarvis's two-sentence line from the code stands in the sentence's place once made; the sentence is the fallback. */
+    explain?: Explained | undefined;
     status?: { label: string; tone: "mine" | "warm" | "neutral" } | undefined;
     /** The rank's words, and what it ranks among (the pill's hint, the proposal's title). */
     rank?: { label: string; among: string } | undefined;

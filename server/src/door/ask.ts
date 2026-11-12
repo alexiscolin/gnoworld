@@ -27,6 +27,8 @@ interface Options extends Front, Counted<"take" | "giveBack" | "unlimited"> {
   last: (room: string) => string | undefined;
   // Whether the server heard the account speak in the chat, and when a session's token was signed (login.ts).
   heard: Heard["has"];
+  // Whether the chat hears an account not heard yet within a moment: an ask sent with the account's first line comes before it.
+  heardSoon?: (account: string) => Promise<boolean>;
   signedAt: (token: string | undefined) => number | undefined;
   // The hosts a link may name: the app's own and gno.land's, with their subdomains.
   hosts: readonly string[];
@@ -43,9 +45,19 @@ interface Options extends Front, Counted<"take" | "giveBack" | "unlimited"> {
 }
 
 const SESSION_MS = 10 * 60_000;
+// Who asks, when, and whether the chat heard them speak.
+interface Standing {
+  who: Address;
+  started: number;
+  heard: boolean;
+}
 const route = "/api/jarvis/ask";
 // An empty room's catch-up: nothing to sum up, so no model.
 const EMPTY: JarvisAnswer = { status: "answered", markdown: "Nothing was said here yet.", buttons: [] };
+
+// Whether the chat heard the account, waiting a moment for one not heard yet: its own line may come after its ask.
+const heardOf = async ({ heard, heardSoon }: Pick<Options, "heard" | "heardSoon">, who: Address): Promise<boolean> =>
+  heard(who) || ((await heardSoon?.(who)) ?? false);
 
 export function askRoutes(options: Options): Hono<Guarded> {
   const { mayRead, recent, last, quota, now, day, hosts, log, questionChars } = options;
@@ -59,13 +71,13 @@ export function askRoutes(options: Options): Hono<Guarded> {
     return c.json({ status });
   };
   // Paused, capped or early: an answer that ends the request, or none.
-  const standing = (c: Context, who: Address, started: number): Response | undefined => {
+  const standing = (c: Context, { who, started, heard }: Standing): Response | undefined => {
     if (day.paused(who, started)) return say(c, "paused", { account: who });
     if (quota.unlimited(who)) return undefined;
     if (day.capped(who, started)) return say(c, "capped", { account: who });
     const born = options.signedAt(getCookie(c, "__Host-session"));
     const aged = born !== undefined && started - born >= SESSION_MS;
-    return options.heard(who) && aged ? undefined : say(c, "early", { account: who });
+    return heard && aged ? undefined : say(c, "early", { account: who });
   };
   // The ask the body holds, once its size, its room and the list let it through; else the answer that ends the request.
   const taken = async (c: Context, who: Address, started: number): Promise<Response | JarvisQuestion> => {
@@ -87,15 +99,16 @@ export function askRoutes(options: Options): Hono<Guarded> {
   app.post("/ask", async (c) => {
     const who = admit(c);
     if (who instanceof Response) return who;
-    const started = now();
-    const stopped = standing(c, who, started);
+    const asker = { who, heard: await heardOf(options, who), started: now() };
+    const { started } = asker;
+    const stopped = standing(c, asker);
     if (stopped !== undefined) return stopped;
     const ask = await taken(c, who, started);
     if (ask instanceof Response) return ask;
     const more = { room: ask.room, account: who };
     if ("ask" in ask && ask.ask === "catch-up" && recent(ask.room, "").length === 0) return answered(c, EMPTY, more);
     // Read again: the body may have waited while another answer landed, and nothing is awaited from here to `launch`.
-    const again = standing(c, who, started);
+    const again = standing(c, asker);
     if (again !== undefined) return again;
     if (inFlight.has(who)) return say(c, "busy", more);
     return finish(c, await launch(who, ask, started), { started, ...more });

@@ -1,7 +1,9 @@
-import { groundDirection } from "@gnoworld/core";
+import { EARTH, groundDirection, subSolarPoint } from "@gnoworld/core";
 import { Euler, Quaternion, Vector3 } from "three";
 import { describe, expect, it } from "vitest";
-import { turned, worldSun } from "./light.ts";
+import type { Planet } from "../planet/planet.ts";
+import { SPIN } from "../planet/surfaceShader.ts";
+import { dayOf, turned, worldSun } from "./light.ts";
 
 const DEGREE = Math.PI / 180;
 const noon = (iso: string) => Date.parse(iso);
@@ -34,6 +36,46 @@ describe("worldSun", () => {
     ] as const) {
       const group = new Quaternion().setFromAxisAngle(new Vector3(1, 0, 0), tilt).multiply(base);
       expect(light(angle, group)).toBeCloseTo(first, 9);
+    }
+  });
+});
+
+describe("dayOf (D13002)", () => {
+  const at = noon("2026-11-12T09:30:00Z");
+  const star = new Vector3(-1, 0.1, 0.3).normalize();
+  const run = (page: number, time: number) => {
+    const sun = star.clone();
+    const drawn = { group: { quaternion: base }, setSun: () => undefined } as unknown as Planet;
+    const hour = dayOf(drawn, { id: EARTH, epochMs: at, time, page }, sun);
+    return { sun, hour };
+  };
+  const noonGround = new Vector3(...groundDirection(subSolarPoint(at)));
+
+  it("with the sun drawn, the ground where it is noon faces the star, whatever the spin", () => {
+    for (const time of [0, 90, 1000]) {
+      const { sun, hour } = run(0, time);
+      expect(sun.distanceTo(star)).toBeLessThan(1e-9);
+      expect(worldOf(noonGround.clone(), hour * SPIN, base).dot(star)).toBeGreaterThan(0.9);
+    }
+  });
+
+  it("on the page, the ground goes on from the turn it had and the sun is the real hour's, fixed to it (D13947)", () => {
+    const held = run(0, 90).hour;
+    const { sun, hour } = run(1, 95);
+    // the dive in turned nothing: the ground goes on from the turn it had, at the spin's pace
+    expect(hour - held).toBeCloseTo(5, 9);
+    expect(sun.distanceTo(worldSun({ epochMs: at, angle: hour * SPIN, group: base }, new Vector3()))).toBeLessThan(
+      1e-9,
+    );
+  });
+
+  it("the dive goes from one to the other with no jump: every frame of the share moves the turn and the light by a little", () => {
+    let last = run(0, 90);
+    for (let i = 1; i <= 120; i++) {
+      const next = run(i / 120, 90);
+      expect(Math.abs(next.hour - last.hour) * SPIN).toBeLessThan(0.05);
+      expect(next.sun.angleTo(last.sun)).toBeLessThan(0.05);
+      last = next;
     }
   });
 });

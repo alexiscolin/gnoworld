@@ -78,14 +78,14 @@ describe("the jump waiting for Ergo's answer", () => {
 describe("what the room says while it is read around a message", () => {
   const now = new Date("2026-11-11T12:00:00Z");
   it("names the day, with no year this year", () => {
-    expect(readingWords("2026-11-04T14:05:00Z", now, { timeZone: "UTC", locale: "en-US" })).toBe(
-      "You are reading Nov 4, around a found message.",
+    expect(readingWords("2026-11-04T14:05:00Z", now, { timeZone: "UTC" })).toBe(
+      "You are reading 4 Nov, around a found message.",
     );
   });
 
   it("names the year when it is not this year's", () => {
-    expect(readingWords("2025-03-02T14:05:00Z", now, { timeZone: "UTC", locale: "en-US" })).toBe(
-      "You are reading Mar 2, 2025, around a found message.",
+    expect(readingWords("2025-03-02T14:05:00Z", now, { timeZone: "UTC" })).toBe(
+      "You are reading 2 Mar 2025, around a found message.",
     );
   });
 

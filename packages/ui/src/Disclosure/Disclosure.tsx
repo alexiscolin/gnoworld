@@ -11,6 +11,10 @@ export interface DisclosureProps {
   trail?: ReactNode;
   /** 44 px, the default, or 36. */
   size?: "m" | "s";
+  /** `section`: a section of a column, its name in the label's capitals, the chevron before it, the body as wide as the column; `row` (default) a line of a list. */
+  look?: "row" | "section";
+  /** A control at the end of a section's name, a sibling of its button, never inside it (a "+"). */
+  action?: ReactNode;
   /** Open from the start, or opened from outside: it opens when this turns true. */
   open?: boolean;
   /** Told, with the state it now has, when the person opens or shuts the row (not when `open` opens it from outside). */
@@ -26,6 +30,8 @@ export function Disclosure({
   title,
   trail,
   size = "m",
+  look = "row",
+  action,
   open: asked = false,
   onToggle,
   children,
@@ -38,28 +44,38 @@ export function Disclosure({
     setWas(asked);
     if (asked) setOpen(true);
   }
-  return (
-    <div className={styles["disclosure"]}>
-      <button
-        type="button"
-        className={[styles["row"], lead === undefined ? "text-meta" : "icon-text-meta", "pointer"].join(" ")}
-        data-size={size}
-        aria-expanded={open}
-        aria-controls={bodyId}
-        onClick={() => {
-          setOpen(!open);
-          onToggle?.(!open);
-        }}
-      >
-        {lead === undefined ? null : <span>{lead}</span>}
-        <span className="truncate">{title}</span>
-        <span className={[styles["trail"], "row-center"].join(" ")}>
-          {trail}
-          <span className={styles["chevron"]}>
-            <Icon name="chevron" />
-          </span>
+  const button = (
+    <button
+      type="button"
+      className={[styles["row"], lead === undefined ? "text-meta" : "icon-text-meta", "pointer"].join(" ")}
+      data-size={size}
+      aria-expanded={open}
+      aria-controls={bodyId}
+      onClick={() => {
+        setOpen(!open);
+        onToggle?.(!open);
+      }}
+    >
+      {lead === undefined ? null : <span>{lead}</span>}
+      <span className="truncate">{title}</span>
+      <span className={[styles["trail"], "row-center"].join(" ")}>
+        {trail}
+        <span className={styles["chevron"]}>
+          <Icon name="chevron" />
         </span>
-      </button>
+      </span>
+    </button>
+  );
+  return (
+    <div className={styles["disclosure"]} data-look={look}>
+      {look === "section" ? (
+        <div className={styles["head"]}>
+          <h2 className="label">{button}</h2>
+          {action}
+        </div>
+      ) : (
+        button
+      )}
       <div id={bodyId} className={styles["body"]} data-open={open ? "" : undefined} inert={!open}>
         <div className={styles["inner"]}>{children}</div>
       </div>

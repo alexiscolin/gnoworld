@@ -8,6 +8,7 @@ import { useRef, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { UniverseView } from "../../places.ts";
 import { GoExplore } from "./GoExplore.tsx";
+import { Network } from "./Network.tsx";
 import styles from "./Hero.module.css";
 import { Lenses } from "../../Lenses.tsx";
 import { useSwapped } from "../../swapped.ts";
@@ -169,6 +170,8 @@ function Beside(props: HeroProps & { coming: boolean }) {
       <div className={styles["line"]} data-hero="line">
         <Line {...props} />
       </div>
+      {/* The default universe's health, late: the server's pass reads that universe alone. */}
+      {props.system === undefined && props.universe.isDefault ? <Network name={props.universe.name} /> : null}
       <Actions universe={props.universe} system={props.system} newcomer={props.newcomer} />
     </div>
   );

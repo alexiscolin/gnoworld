@@ -58,10 +58,9 @@
     block-size: 100%;
   }
 
-  /* "MARK ALL READ" in the label style, a button with no frame (frame 86). */
+  /* "MARK ALL READ" in the label style, in a link-look button (frame 86). */
   .markAll {
     color: var(--color-text);
-    cursor: pointer;
   }
 
   .title {

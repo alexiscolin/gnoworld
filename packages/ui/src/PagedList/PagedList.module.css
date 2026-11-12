@@ -30,10 +30,4 @@
     color: var(--color-text-muted);
     font: var(--font-meta);
   }
-
-  .empty {
-    padding-block: var(--space-s);
-    color: var(--color-text-muted);
-    font: var(--font-reading);
-  }
 }

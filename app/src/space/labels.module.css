@@ -1,15 +1,13 @@
 /* The universe's names (D401, the demo's pills): a pill per name, moved by transform; shown or not by `.on`. */
 @layer components {
   .pill {
-    position: absolute;
     inset-block-start: 0;
     inset-inline-start: 0;
     /* layout: the name and the people here a small step apart (the row's own, row-center, is set in labels.ts) */
     gap: var(--space-3xs);
     padding: var(--space-3xs) var(--space-2xs);
     border: var(--line-width) solid var(--color-line);
-    /* raw: the night at 72% over the scene, the demo's pill glass */
-    background: color-mix(in oklab, var(--color-surface) 72%, transparent);
+    background: var(--color-pill-glass);
     color: var(--color-text);
     font: var(--font-label);
     opacity: 0;
@@ -43,6 +41,11 @@
     will-change: transform;
     opacity: 1;
     pointer-events: auto;
+  }
+
+  /* A name the pointed planet does not light, in the Map. */
+  .pill.on.dim {
+    opacity: 0.3;
   }
 
   .pill:hover {

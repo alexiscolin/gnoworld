@@ -2,27 +2,27 @@
 // core's reader in a window of its own, a long one scrolling inside it. Every state names the way out: the link to the realm on gnoweb
 // (ADR-0002 §4, gnoweb is the source of truth) stands in its header whatever the page holds, with the height it was read at, the cap's
 // state or the failed read's state and its next step.
-import { Button, Card, Skeleton, Stack, useAlone } from "@gnoworld/ui";
+import { Button, Card, grouped, Skeleton, Stack, useAlone } from "@gnoworld/ui";
 import { hostOf, type Failure, type ReadOptions } from "@gnoworld/chain/read";
 import { useEffect, useRef, useState } from "react";
 import { bigLine } from "./RealmCard.tsx";
 import type { CallPlace } from "./InlineCard.tsx";
+import { utcMoment } from "../../lib/days.ts";
 import { Swap } from "./Swap.tsx";
 import { RealmBlocks } from "./RealmBlocks.tsx";
 import styles from "./RealmView.module.css";
-import { shortPath } from "./shortPath.ts";
+import { shortPath } from "../../lib/shortPath.ts";
 import { isHeight, type Height, type Realm } from "./useRealm.ts";
 
 // A block's time as a reader says it: the day and the minute, UTC (the node's own is nanoseconds of ISO).
-const when = (time: string): string =>
-  `${new Date(time).toLocaleString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: "UTC" })} UTC`;
+const when = (time: string): string => utcMoment(new Date(time), new Date());
 
 // Where the page was read: the block's height and time, or why neither is known.
 function Read({ height, rpc }: { height: Height | Failure; rpc: string }) {
   if (!isHeight(height)) return <p className={"meta"}>The block height could not be read. {height.next}</p>;
   return (
     <p className={"meta"}>
-      Read at <Swap>{`block ${new Intl.NumberFormat("en-US").format(height.height)}, ${when(height.time)}`}</Swap>, from{" "}
+      Read at <Swap>{`block ${grouped(height.height)}, ${when(height.time)}`}</Swap>, from{" "}
       <span dir="ltr">{hostOf(rpc)}</span>
     </p>
   );

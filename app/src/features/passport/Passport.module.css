@@ -1,7 +1,0 @@
-/* The passport: its gauge under the count, its lists of rows with no bullets. */
-@layer components {
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-}

@@ -1,10 +1,10 @@
 // Who calls it (the proposal's cal card, D566): the callers per day as a line, then the rollup's top callers by calls, each with its share as a bar,
 // named as the worlds' file names them; eight, and all twenty once the card is open.
 import type { CSSProperties } from "react";
-import { Avatar, Card, Cell, Grid, Sparkline, Stack, useAlone } from "@gnoworld/ui";
+import { Avatar, Card, Cell, Grid, grouped, Sparkline, Stack, useAlone } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
+import { PersonLink } from "../../features/chat/index.ts";
 import { dayValues } from "./days.ts";
-import { grouped } from "./figures.ts";
 import { callerName } from "./names.ts";
 import appear from "../../enter.module.css";
 import styles from "./Callers.module.css";
@@ -38,11 +38,15 @@ export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: World
               {shown.map(({ address, calls }, at) => (
                 <li key={address} className={styles["caller"]}>
                   <Grid template="icon-text-meta" space="xs">
-                    <Avatar address={address} name={callerName(worlds, address)} decorative />
+                    <PersonLink address={address}>
+                      <Avatar address={address} name={callerName(worlds, address)} decorative />
+                    </PersonLink>
                     <div className={styles["body"]}>
                       <Stack space="2xs">
                         <Grid template="text-meta" space="xs">
-                          <span className="truncate">{callerName(worlds, address)}</span>
+                          <PersonLink address={address}>
+                            <span className="truncate">{callerName(worlds, address)}</span>
+                          </PersonLink>
                           <span className={styles["count"]}>{grouped(calls)}</span>
                         </Grid>
                         <span className={styles["track"]}>

@@ -8,14 +8,14 @@ import {
   type ReactNode,
   type ToggleEvent,
 } from "react";
-import { buttonLook, iconLook, iconSize } from "../Button/control.ts";
+import { buttonLook, iconLook, iconSize, type IconControlSize } from "../Button/control.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Chip } from "../Chip/Chip.tsx";
 import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
-import soon from "../ComingSoon/ComingSoon.module.css";
+import { Trigger } from "./Trigger.tsx";
 import styles from "./Popover.module.css";
 
 // What a popover and a menu share: a trigger and the native popover it opens (light dismiss and Esc
@@ -56,23 +56,19 @@ function useAnchored(kind: "dialog" | "menu", size: "s" | "m" = "m", emphasis: "
   return { open, panelRef, trigger, panel };
 }
 
-// A trigger with none of a button's look: what opens the panel, and the plain class alone.
-const plainOf = ({ ref, popoverTarget, "aria-haspopup": haspopup }: ReturnType<typeof useAnchored>["trigger"]) => ({
-  ref,
-  popoverTarget,
-  "aria-haspopup": haspopup,
-  className: soon["plain"],
-});
-
 export interface PopoverProps {
-  /** The trigger's words, or what it shows. */
+  /** The trigger's words, or what it shows; none with an `icon`. */
   trigger: ReactNode;
   /** A trigger with no button's look: the words it holds as they are (a name in a line, which opens a person's card). */
   plain?: boolean;
+  /** An icon-only trigger as an IconButton's plain one (named by `label`), at this size, in place of the words. */
+  icon?: { name: IconName; size: IconControlSize };
   /** Its panel drawn only while open: a popover of each of many rows (a person's card on each line) costs nothing closed. */
   lazy?: boolean;
   /** Whether the trigger is a Tab stop: a list that is one stop (a room's lines) leaves its rows' controls out until in focus. */
   tabbable?: boolean;
+  /** The wider panel (440 px), for a card of lists: it still stays inside the screen and scrolls inside itself. */
+  wide?: boolean;
   /** What the panel is, for assistive technology. */
   label: string;
   children: ReactNode;
@@ -82,18 +78,18 @@ export interface PopoverProps {
 export function Popover({
   trigger: words,
   plain = false,
+  icon,
   lazy = false,
   tabbable = true,
+  wide = false,
   label,
   children,
 }: PopoverProps) {
   const { open, trigger, panel } = useAnchored("dialog");
   return (
     <>
-      <button type="button" {...(plain ? plainOf(trigger) : trigger)} {...(tabbable ? {} : { tabIndex: -1 })}>
-        {words}
-      </button>
-      <div {...panel} aria-label={label}>
+      <Trigger {...{ plain, icon, tabbable, label, attrs: trigger }}>{words}</Trigger>
+      <div {...panel} aria-label={label} data-wide={wide ? "" : undefined}>
         {lazy && !open ? null : children}
       </div>
     </>
@@ -113,7 +109,11 @@ export type MenuItem =
       /** An irreversible act: coral, with the alert icon, after a separator (docs/DESIGN-SYSTEM.md, "Severity"). */
       tone?: "danger";
     })
-  | (Entry & { soon: true });
+  | (Entry & {
+      soon: true;
+      /** Why it is greyed, where "coming soon" is not the reason: said in its name and in the place of the Soon chip. */
+      why?: string;
+    });
 
 export interface MenuProps {
   /** The trigger's words; with an icon, its name, which assistive technology reads and its tooltip shows. */
@@ -192,9 +192,9 @@ export function Menu({
               type="button"
               role="menuitem"
               tabIndex={-1}
-              className={["tint", styles["item"]].join(" ")}
+              className={["tint", "full-start", styles["item"]].join(" ")}
               {...("soon" in item
-                ? { "aria-disabled": true, "aria-label": `${item.label}, coming soon` }
+                ? { "aria-disabled": true, "aria-label": `${item.label}, ${item.why ?? "coming soon"}` }
                 : {
                     "data-tone": item.tone,
                     onClick: () => {
@@ -211,7 +211,7 @@ export function Menu({
               {item.label}
               {"soon" in item ? (
                 <span className={styles["soon"]}>
-                  <Chip>Soon</Chip>
+                  <Chip>{item.why ?? "Soon"}</Chip>
                 </span>
               ) : null}
             </button>

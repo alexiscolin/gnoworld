@@ -15,6 +15,7 @@ interface Screen {
 
 const SHIFT_IN_S = 1.7;
 const SHIFT_OUT_S = 0.8;
+const NO_SHIFT = { x: 0, y: 0 };
 const sineInOut = (t: number): number => -(Math.cos(Math.PI * t) - 1) / 2;
 const LONGEST_STEP_MS = 50;
 /** How near and how far the eye may stand from what it looks at, for the demo's universe. */
@@ -37,11 +38,12 @@ export class Rig {
   #flight: Flight | undefined;
   #placed = false;
   readonly #was = spot();
-  // The lens shift: in pixels, the share of it shown, and its glide.
-  readonly #shift = { x: 0, y: 0 };
+  // The lens shift, in pixels: where its glide began, where it goes, and the share of the way (0 to 1) it has gone. A new place to go to
+  // always glides from the shift shown now, never jumps (a page's circle that changes while the planet is already in one).
+  readonly #from = { x: 0, y: 0 };
+  readonly #to = { x: 0, y: 0 };
+  readonly #now = { x: 0, y: 0 };
   #share = 0;
-  #shareFrom = 0;
-  #shareTo = 0;
   #shareTime = 1;
   #shareSeconds = 1;
   // Where the flight the slide rides was when it was asked; -1, none.
@@ -83,26 +85,35 @@ export class Rig {
     }
     const moving = this.#flight !== undefined || this.free.moving;
     this.free.stop();
+    // A slide that rode the flight cut short goes on riding the new one, from the shift shown now: its share never jumps with the swap.
+    const riding = this.#rideFrom >= 0;
     this.#flight = new Flight(this.pose, goal, { moving });
+    if (riding) this.#slideTo(this.#to, this.#shareSeconds === SHIFT_IN_S, false);
   }
 
   /** The lens shift that puts the screen's middle on a page's circle, `shift` pixels, sliding in; none, sliding out. While a flight runs
    * the slide rides it, ending as it lands, never after; with none it slides over a moment, or at once where `still`. */
   lens(shift: { readonly x: number; readonly y: number } | undefined, still = false): void {
-    if (shift !== undefined) Object.assign(this.#shift, shift);
-    const to = shift === undefined ? 0 : 1;
-    if (to !== this.#shareTo) this.#slideTo(to, still);
+    const to = shift ?? NO_SHIFT;
+    if (to.x !== this.#to.x || to.y !== this.#to.y) this.#slideTo(to, shift !== undefined, still);
   }
 
-  // Starts the lens's slide to `to`: riding the flight that runs, at once where `still`, else over its moment.
-  #slideTo(to: number, still: boolean): void {
+  // The lens shift shown now.
+  get #shown(): { x: number; y: number } {
+    const [from, to, share] = [this.#from, this.#to, this.#share];
+    [this.#now.x, this.#now.y] = [from.x + (to.x - from.x) * share, from.y + (to.y - from.y) * share];
+    return this.#now;
+  }
+
+  // Starts the lens's slide to `to`, from the shift shown now: riding the flight that runs, at once where `still`, else over its moment.
+  #slideTo(to: { readonly x: number; readonly y: number }, into: boolean, still: boolean): void {
     const along = still ? undefined : this.#flight?.along;
-    this.#shareFrom = this.#share;
-    this.#shareTo = to;
+    Object.assign(this.#from, this.#shown);
+    Object.assign(this.#to, to);
     this.#rideFrom = along ?? -1;
     this.#shareTime = along === undefined && !still ? 0 : 1;
-    this.#shareSeconds = to === 1 ? SHIFT_IN_S : SHIFT_OUT_S;
-    if (still) this.#share = to;
+    this.#shareSeconds = into ? SHIFT_IN_S : SHIFT_OUT_S;
+    this.#share = still ? 1 : 0;
   }
 
   /** `delta` ms on, `still` under reduced motion. */
@@ -125,11 +136,11 @@ export class Rig {
     if (this.#rideFrom >= 0) {
       const flight = this.#flight;
       const t = flight === undefined ? 1 : (flight.along - this.#rideFrom) / Math.max(1 - this.#rideFrom, 1e-6);
-      this.#share = this.#shareFrom + (this.#shareTo - this.#shareFrom) * Math.min(1, Math.max(0, t));
+      this.#share = Math.min(1, Math.max(0, t));
       if (flight === undefined) this.#rideFrom = -1;
     } else if (this.#shareTime < 1) {
       this.#shareTime = Math.min(1, this.#shareTime + step / 1000 / this.#shareSeconds);
-      this.#share = this.#shareFrom + (this.#shareTo - this.#shareFrom) * sineInOut(this.#shareTime);
+      this.#share = sineInOut(this.#shareTime);
     }
   }
 
@@ -167,8 +178,8 @@ export class Rig {
     camera.lookAt(this.eye.x - way.x, this.eye.y - way.y, this.eye.z - way.z);
     const aspect = width > 0 && height > 0 ? width / height : 1;
     camera.fov = aspect >= 1 ? fov : (360 / Math.PI) * Math.atan(Math.tan((fov * Math.PI) / 360) / aspect);
-    if (this.#share > 0)
-      camera.setViewOffset(width, height, this.#shift.x * this.#share, this.#shift.y * this.#share, width, height);
+    const { x, y } = this.#shown;
+    if (x !== 0 || y !== 0) camera.setViewOffset(width, height, x, y, width, height);
     else camera.clearViewOffset();
     camera.updateProjectionMatrix();
     camera.updateMatrixWorld();

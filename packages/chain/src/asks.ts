@@ -26,6 +26,9 @@ export const pathsAsk = (prefix: string, limit: number): AbciAsk => ({
 /** A package's documentation. */
 export const docAsk = (path: string): AbciAsk => ({ path: "vm/qdoc", data: path });
 
+/** An account's coins and numbers: a read of the node's account store, no eval; `address` is a text the caller checked. */
+export const accountAsk = (address: string): AbciAsk => ({ path: `auth/accounts/${address}`, data: "" });
+
 /** A package's file. */
 export const fileAsk = (path: string): AbciAsk => ({ path: "vm/qfile", data: path });
 
@@ -78,4 +81,14 @@ export const blockTimes = (heights: readonly number[]): IndexerAsk => ({
     .map((_, i) => `b${String(i)}: getBlocks(where: { height: { eq: $h${String(i)} } }) { height time }`)
     .join(" ")} }`,
   variables: Object.fromEntries(heights.map((height, i) => [`h${String(i)}`, height])),
+});
+
+/** The chain's last block height. */
+export const tipAsk = (): IndexerAsk => ({ query: "{ latestBlockHeight }", variables: {} });
+
+/** The first `limit` transactions above a height, whatever their messages: each one's block and its first message's sender
+ * (the network's line); no body, no events. */
+export const txsAbove = (above: number, limit: number): IndexerAsk => ({
+  query: `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above } }, ${ORDER}, limit: $limit) { block_height messages { value { __typename ... on MsgCall { caller } ... on MsgRun { caller } ... on MsgAddPackage { creator } ... on BankMsgSend { from_address } } } } }`,
+  variables: { above, limit },
 });

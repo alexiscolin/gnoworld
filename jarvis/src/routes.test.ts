@@ -3,6 +3,8 @@ import {
   type AnswerButton,
   ApiError,
   EXPLAIN_VERSION,
+  JarvisExplained,
+  REALM_EXPLAIN_VERSION,
   JARVIS_LANGUAGES,
   JARVIS_PATHS,
   JarvisAsk,
@@ -20,6 +22,7 @@ import type { Question, Result } from "./loop.ts";
 import { jarvisRoutes } from "./routes.ts";
 import { budgetFor, capture } from "./testing/kit.ts";
 import type { Digested } from "./digest.ts";
+import type { Explained } from "./explainRealm.ts";
 import type { Translated } from "./translate.ts";
 import { FunctionList } from "@gnoworld/schemas/functions";
 import { z } from "zod";
@@ -1047,5 +1050,72 @@ describe("POST /ask: a function's explanation", () => {
     expect(explainer).not.toHaveBeenCalled();
     expect(ask.mock.calls[0]?.[0].room).toHaveLength(1);
     expect(ask.mock.calls[0]?.[0].read?.[0]).toEqual({ source: "place", text: ROOM });
+  });
+});
+
+// POST /explain: its body through its schema, off before any work, the explainer's result on the wire.
+const postExplain = async (
+  explainRealm: ((asked: { chain: string; realm: string }, signal: AbortSignal) => Promise<Explained>) | undefined,
+  body: unknown,
+) => {
+  const kit = budgetFor(1_000_000_000);
+  try {
+    const routes = jarvisRoutes({ ask: undefined, explainRealm, budget: kit.budget, log: capture().log });
+    return await routes[JARVIS_PATHS.explain]?.POST?.(body, new AbortController().signal);
+  } finally {
+    kit.close();
+  }
+};
+const EXPLAIN_ASKED = { chain: "onyx-1", realm: "gno.land/r/demo/defi/grc20factory" };
+
+describe("POST /explain", () => {
+  it("refuses a body its schema refuses, before any work", async () => {
+    const explain = vi.fn<() => Promise<Explained>>();
+    for (const body of [
+      {},
+      { ...EXPLAIN_ASKED, extra: 1 },
+      { chain: "ONYX", realm: EXPLAIN_ASKED.realm },
+      { chain: "onyx-1", realm: "gno.land/p/x/y" },
+    ]) {
+      expect((await postExplain(explain, body))?.status).toBe(400);
+    }
+    expect(explain).not.toHaveBeenCalled();
+  });
+
+  it("answers off while jarvis is off", async () => {
+    expect(await postExplain(undefined, EXPLAIN_ASKED)).toEqual({ status: 200, body: { status: "off" } });
+  });
+
+  it("puts the explanation on the wire with its prompt's version, a body the door's schema reads", async () => {
+    const result: Explained = {
+      kind: "explained",
+      sure: true,
+      text: "A token.",
+      tags: ["token"],
+      model: "claude-haiku-5-5",
+      cost: 120,
+    };
+    const reply = await postExplain(() => Promise.resolve(result), EXPLAIN_ASKED);
+    expect(reply?.body).toEqual({
+      status: "explained",
+      sure: true,
+      text: "A token.",
+      tags: ["token"],
+      model: "claude-haiku-5-5",
+      cost: 120,
+      version: REALM_EXPLAIN_VERSION,
+    });
+    expect(JarvisExplained.safeParse(reply?.body).success).toBe(true);
+  });
+
+  it("says failed with its cost, spent, and a reader gone as not ready", async () => {
+    expect((await postExplain(() => Promise.resolve({ kind: "failed", cost: 7 }), EXPLAIN_ASKED))?.body).toEqual({
+      status: "failed",
+      cost: 7,
+    });
+    expect((await postExplain(() => Promise.resolve({ kind: "spent" }), EXPLAIN_ASKED))?.body).toEqual({
+      status: "spent",
+    });
+    expect((await postExplain(() => Promise.resolve({ kind: "gone" }), EXPLAIN_ASKED))?.status).toBe(503);
   });
 });

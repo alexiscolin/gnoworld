@@ -67,6 +67,11 @@
     padding-block-start: var(--space-2xs);
   }
 
+  .lead {
+    /* raw: the seal beside the heading, about as tall as its kicker and title */
+    inline-size: 52px;
+  }
+
   .description {
     color: var(--color-text-muted);
     overflow-wrap: anywhere;

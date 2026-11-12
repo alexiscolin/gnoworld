@@ -1,10 +1,11 @@
 // The conversation in view on a world's page (slice 4's 4e), one RoomView and one Writer whatever it is: a room's or
 // a direct message's, what each is told.
-import { Chip, Icon } from "@gnoworld/ui";
+import { Chip, Cluster, Icon } from "@gnoworld/ui";
 import { NOT_ENCRYPTED, PAGE_ONLY, type Dms } from "./Dms.tsx";
 import type { DmActs } from "./dmActs.ts";
 import type { Say } from "./linkTypes.ts";
 import { shortAddress } from "./names.ts";
+import { PersonLink } from "./PersonLinkLazy.tsx";
 import type { RoomViewProps } from "./RoomView.tsx";
 import { roomShown, type Room, type Shown } from "./roomShown.ts";
 import styles from "./shown.module.css";
@@ -56,7 +57,12 @@ function dmShown(partner: string, dms: Dms, { sayTo, focus, noteId, seen, acts }
     key: `dm:${partner}`,
     title,
     note,
-    mark: <Chip tone="warm">Not encrypted</Chip>,
+    mark: (
+      <Cluster space="2xs">
+        <Chip tone="warm">Not encrypted</Chip>
+        <PersonLink address={partner} asIcon="s" />
+      </Cluster>
+    ),
     // Its lines have the bar (4d's DM bar): a reaction, a reply, an edit and a delete of one's own; no link, no player.
     view: {
       room: undefined,

@@ -27,17 +27,19 @@ const Words = z.pipe(
   z.string().check(z.minLength(SEARCH_Q_MIN), z.maxLength(SEARCH_Q_MAX), z.regex(/^[^\u0000-\u001f\u007f-\u009f]*$/)),
 );
 
-/** The request's parameters, each given once: the words, the world, and what narrows them. `before` is the last hit's `next`. */
-export const SearchQuery = z.object({
-  q: Words,
-  world: Key,
-  room: z.optional(RoomId),
-  from: z.optional(Address),
-  link: z.optional(z.literal("1")),
-  since: z.optional(z.iso.datetime({ offset: true })),
-  until: z.optional(z.iso.datetime({ offset: true })),
-  before: z.optional(z.string().check(z.regex(/^\d{1,15}$/))),
-});
+/** The request's parameters, each given once: the words, the world, and what narrows them. `before` is the last hit's `next`. Words may be left out only with a `from`: a world is never listed unfiltered. */
+export const SearchQuery = z
+  .object({
+    q: z.optional(Words),
+    world: Key,
+    room: z.optional(RoomId),
+    from: z.optional(Address),
+    link: z.optional(z.literal("1")),
+    since: z.optional(z.iso.datetime({ offset: true })),
+    until: z.optional(z.iso.datetime({ offset: true })),
+    before: z.optional(z.string().check(z.regex(/^\d{1,15}$/))),
+  })
+  .check(z.refine(({ q, from }) => q !== undefined || from !== undefined, "words or a sender"));
 export type SearchQuery = z.infer<typeof SearchQuery>;
 
 /** A hit: the line's snippet of 240 characters at most and the ranges of the words in it. */

@@ -37,73 +37,53 @@ const said = (html: string) =>
     .replaceAll(/\s+/g, " ")
     .trim();
 
-describe("the pin bar, closed", () => {
+describe("the pin bar", () => {
+  const rowsOf = (html: string) => [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((found) => said(found[1] ?? ""));
+
   it("draws nothing for a room with no pin", () => {
     expect(view({ pins: [] })).toBe("");
   });
 
-  it("is a region named Pinned messages, holding one button that says the newest pin's author and words, and is not open", () => {
+  it("is a region named Pinned messages, a line a pin with its author and its words, none with a button to open", () => {
     const html = view({ pins: [pin("m1"), pin("m2", { account: BOB })] });
     expect(html).toMatch(/^<section[^>]*aria-label="Pinned messages"/);
-    const buttons = [...html.matchAll(/<button([^>]*)>(.*?)<\/button>/gs)];
-    expect(buttons).toHaveLength(1);
-    expect(buttons[0]?.[1]).toContain('aria-expanded="false"');
-    expect(said(buttons[0]?.[2] ?? "")).toContain("g10gh7…3y5tv text m1");
-    expect(html).not.toContain("text m2");
+    expect(rowsOf(html)).toEqual(["g10gh7…3y5tv text m1", "g1jg8m…vsqf5 text m2"]);
+    expect(html).not.toContain("aria-expanded");
   });
 
-  it("says how many more there are past the first, none for one alone", () => {
-    expect(said(view({ pins: [pin("m1"), pin("m2"), pin("m3")] }))).toMatch(/\+2/);
-    expect(said(view())).not.toMatch(/\+\d/);
+  it("shows three at once and says how many more there are, which its button opens", () => {
+    const pins = [pin("m1"), pin("m2"), pin("m3"), pin("m4"), pin("m5")];
+    const shut = view({ pins });
+    expect(rowsOf(shut)).toHaveLength(3);
+    expect(said(shut)).toMatch(/\+2$/);
+    expect(shut).toContain('aria-expanded="false"');
+    const open = view({ pins, open: true });
+    expect(rowsOf(open)).toHaveLength(5);
+    expect(said(open)).toMatch(/Hide$/);
   });
 
-  it("gives its author's address whole in a title, the line being cut to one, and the pin's words whole in the bar's own", () => {
+  it("gives its author's address whole in a title, and the pin's words whole in the line's", () => {
     const text = "a long pinned line ".repeat(10);
     const html = view({ pins: [pin("m1", { text })] });
     expect(html).toContain(`title="${ALICE}"`);
-    expect(html).toContain(text.trim());
+    expect(html).toContain(`title="${text}"`);
   });
 
-  it("offers no Unpin while closed, to a moderator too", () => {
-    expect(view({ may: true })).not.toMatch(/Unpin/);
-  });
-});
-
-describe("the pin bar, open", () => {
-  it("lists every pin, the newest first as given, each with its author and its words, the button saying it is open", () => {
-    const html = view({ open: true, pins: [pin("m2", { account: BOB }), pin("m1")] });
-    expect(html).toContain('aria-expanded="true"');
-    const rows = [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((found) => said(found[1] ?? ""));
-    expect(rows).toHaveLength(2);
-    expect(rows[0]).toContain("g1jg8m…vsqf5 text m2");
-    expect(rows[1]).toContain("g10gh7…3y5tv text m1");
-  });
-
-  it("offers an Unpin of each pin, named for whose message it is, to a reader who may pin", () => {
-    const html = view({ open: true, may: true, pins: [pin("m2", { account: BOB }), pin("m1")] });
+  it("offers an Unpin of each pin, named for whose message it is, to a reader who may pin, and none to one who may not", () => {
+    const html = view({ may: true, pins: [pin("m2", { account: BOB }), pin("m1")] });
     // React writes an apostrophe in an attribute as &#x27;: the name a browser reads is with it as it is.
     const names = [...html.matchAll(/<button[^>]*aria-label="(Unpin[^"]*)"/g)].map((found) =>
       found[1]?.replaceAll("&#x27;", "'"),
     );
     expect(names).toEqual(["Unpin g1jg8m…vsqf5's message", "Unpin g10gh7…3y5tv's message"]);
+    expect(view({ may: false, pins: [pin("m1"), pin("m2")] })).not.toMatch(/Unpin/);
   });
 
-  it("offers none to a reader who may not", () => {
-    expect(view({ open: true, may: false, pins: [pin("m1"), pin("m2")] })).not.toMatch(/Unpin/);
-  });
-
-  // A pinned line is anyone's words: drawn as a line is, never as HTML.
-  it("draws a pin's words as Markdown, a hostile one as text", () => {
+  // A pinned line is anyone's words: drawn as text, never as HTML.
+  it("draws a pin's words as text, a hostile one too", () => {
     const html = view({
-      open: true,
-      pins: [
-        pin("m1", { text: "**bold** and [a link](https://gno.land/r/demo)" }),
-        pin("m2", { text: "[x](javascript:alert(1)) <img src=x onerror=alert(1)> <script>alert(1)</script>" }),
-      ],
+      pins: [pin("m1", { text: "<img src=x onerror=alert(1)> <script>alert(1)</script>" })],
     });
-    expect(html).toContain("<strong>bold</strong>");
-    expect(html).toMatch(/<a [^>]*href="https:\/\/gno\.land\/r\/demo"[^>]*rel="noopener noreferrer"/);
-    expect(html).not.toMatch(/href="javascript/i);
     expect(html).not.toContain("<img");
     expect(html).not.toContain("<script");
     expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
@@ -126,11 +106,13 @@ describe("the pin bar, used", () => {
     });
     host.replaceChildren();
   });
-  const draw = (onUnpin: (id: string) => Promise<Done>) => {
+  const draw = (onUnpin: (id: string) => Promise<Done>, count = 2) => {
     const bar = createRoot(host.appendChild(document.createElement("section")));
     bars.push(bar);
     act(() => {
-      bar.render(<PinBar pins={[pin("m1"), pin("m2")]} may onUnpin={onUnpin} />);
+      bar.render(
+        <PinBar pins={Array.from({ length: count }, (_, at) => pin(`m${String(at + 1)}`))} may onUnpin={onUnpin} />,
+      );
     });
   };
   const click = (find: string) => {
@@ -143,13 +125,13 @@ describe("the pin bar, used", () => {
   const status = () => host.querySelector('[role="status"]')?.textContent ?? "";
   const settle = () => act(() => Promise.resolve());
 
-  it("opens at a click on its button, and shuts at the next", () => {
-    draw(() => Promise.resolve({ ok: true }));
-    expect(host.querySelector("ul")).toBeNull();
+  it("opens the rest at a click on its count, and shuts it at the next", () => {
+    draw(() => Promise.resolve({ ok: true }), 5);
+    expect(host.querySelectorAll("li")).toHaveLength(3);
     click('button[aria-expanded="false"]');
-    expect(host.querySelectorAll("li")).toHaveLength(2);
+    expect(host.querySelectorAll("li")).toHaveLength(5);
     click('button[aria-expanded="true"]');
-    expect(host.querySelector("ul")).toBeNull();
+    expect(host.querySelectorAll("li")).toHaveLength(3);
   });
 
   it.each([
@@ -162,7 +144,6 @@ describe("the pin bar, used", () => {
     ["a server out of reach", () => Promise.reject(new Error("down")), "could not be reached"],
   ])("says why an Unpin failed, for %s", async (_, answer, said) => {
     draw(answer);
-    click('button[aria-expanded="false"]');
     click('button[aria-label^="Unpin"]');
     await settle();
     expect(status()).toContain("Could not unpin the message.");
@@ -175,7 +156,6 @@ describe("the pin bar, used", () => {
       asked.push(id);
       return Promise.resolve({ ok: true });
     });
-    click('button[aria-expanded="false"]');
     click('button[aria-label^="Unpin"]');
     await settle();
     expect(asked).toEqual(["m1"]);

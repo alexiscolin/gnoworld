@@ -1,13 +1,14 @@
 // Space's lenses (D425): what a tag at the hero's foot lights. Live, the worlds with people in them now; Active, called on chain in the last
 // 7 days; each kind, as the search reads a realm's code (D373, styleOf); Following, the reader's. One at a time, kept here and written in the
 // address (?lens=) with no navigation, so a pick moves nothing but the light.
-import { EARTH, STYLES, type StyleId } from "@gnoworld/core";
+import { EARTH, REALM_PREFIX, realmRoom, STYLES, type StyleId } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { useSyncExternalStore } from "react";
 import { createStore } from "zustand/vanilla";
 import { addressState } from "./addressState.ts";
 import { storeFor } from "./lib/worldsStore.ts";
 import { data, subscribe } from "./railFeed.ts";
+import { site } from "./places.ts";
 import { worldsFile } from "./features/universe/worldsFile.ts";
 
 export type LensId = "live" | "active" | "following" | Exclude<StyleId, "lab">;
@@ -72,11 +73,27 @@ function tell(): void {
   lit.setState({ sets: new Map([...held.file, ["live", held.live], ["following", held.following]]) }, true);
 }
 
-// Who is here now, as the rail's feed hears it each minute: the worlds with people in them, the Earth aside (it always has its chat).
+/** Who is here names a world by its room's world (a hub's slug, else the id as a slug with ten hex of it, core's realmRoom); the lenses by
+ * the worlds' file's id: each room's world to its file's id. */
+export const roomWorlds = (
+  ids: readonly string[],
+  hubs: Parameters<typeof realmRoom>[1],
+): ReadonlyMap<string, string> => new Map(ids.map((id) => [realmRoom(`${REALM_PREFIX}${id}`, hubs).world, id]));
+
+/** The worlds with people in them, by their file's id, the Earth aside (it always has its chat). */
+export const liveWorlds = (
+  present: Iterable<readonly [string, { here: number }]>,
+  rooms: ReadonlyMap<string, string>,
+): ReadonlySet<string> =>
+  new Set([...present].flatMap(([id, { here }]) => (here > 0 && id !== EARTH ? [rooms.get(id) ?? id] : [])));
+
+let rooms: ReadonlyMap<string, string> = new Map();
+
+// Who is here now, as the rail's feed hears it each minute.
 function hearLive(): void {
   const present = data()?.signals.present;
   if (present === undefined) return;
-  held = { ...held, live: new Set([...present].flatMap(([id, { here }]) => (here > 0 && id !== EARTH ? [id] : []))) };
+  held = { ...held, live: liveWorlds(present, rooms) };
   tell();
 }
 
@@ -88,6 +105,11 @@ export function startLenses(): void {
     (file) => {
       if (file === undefined) return;
       held = { ...held, file: fileLenses(file.worlds) };
+      rooms = roomWorlds(
+        file.worlds.map(({ id }) => id),
+        site.worlds,
+      );
+      hearLive();
       tell();
     },
     () => {
@@ -107,9 +129,20 @@ export function setFollowing(ids: readonly string[]): void {
 /** What lights now, for a component. */
 export const useLit = (): Lit | undefined => useSyncExternalStore(lit.subscribe, lit.getState, () => undefined);
 
-// The worlds `lens` lights now; none while the file is unread or no lens is picked.
+// Each lens's worlds with the Earth among them, made once a set: the same set for the same worlds, so space is lit anew only on a change.
+const earthed = new WeakMap<ReadonlySet<string>, ReadonlySet<string>>();
+
+/** `worlds` and the Earth: a filter never dims the home; a tag counts its own worlds alone. */
+export function withEarth(worlds: ReadonlySet<string> | undefined): ReadonlySet<string> | undefined {
+  if (worlds === undefined) return undefined;
+  const made = earthed.get(worlds) ?? new Set([EARTH, ...worlds]);
+  earthed.set(worlds, made);
+  return made;
+}
+
+// The worlds `lens` lights now, the Earth with them; none while the file is unread or no lens is picked.
 function litNow(lens: LensId | undefined): ReadonlySet<string> | undefined {
-  return lens === undefined ? undefined : lit.getState()?.sets.get(lens);
+  return lens === undefined ? undefined : withEarth(lit.getState()?.sets.get(lens));
 }
 
 /** Lights `space` by the lens picked, now and at each pick or change of what it lights; what it returns lets go. */

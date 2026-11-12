@@ -14,4 +14,20 @@
     color: var(--color-text-muted);
     font: var(--font-meta);
   }
+
+  /* A guest's field: the box places it and takes its look (MessageBox.module.css's textbox), so it draws no edge of its own. */
+  .field {
+    inline-size: 100%;
+    color: var(--color-text);
+  }
+
+  .field::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  /* Why a guest's line did not go, under the box, in the field's error ink. */
+  .problem {
+    color: var(--color-danger);
+    font: var(--font-meta);
+  }
 }

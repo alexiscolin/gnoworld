@@ -7,4 +7,10 @@
   .realm {
     font: var(--font-data);
   }
+
+  .details {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+    text-decoration: underline;
+  }
 }

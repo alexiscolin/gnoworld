@@ -113,6 +113,7 @@ A commit's gate runs the unit tests related to its change (HARNESS.md, "The rela
 `./scripts/check.sh --tests-all` runs every test of the commit's projects (node, ui, compiled); the slow ones (the real Ergo,
 the soak) and core's in Chromium run at the merge check and in `--full`. Design still being tried lives in the workshop
 (this file's "The workshop") and lands later, in one tested batch (REVIEW.md, "Keep it cheap").
+`pnpm run test:all` (`check.sh --everything`) runs every lane, test, picture, journey and check; `GNOWORLD_STRICT=1` gives a turn's end its gate.
 `--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
@@ -123,9 +124,7 @@ value. It replaces the config's `mutate` list (its log says `Found 2 of 935 file
 incremental file whole and takes no `--`. Two forms fail: `pnpm run mutate -- --mutate a.ts` hands
 StrykerJS a literal `--` (`too many arguments for 'run'`, pnpm's own help: every later token reaches
 the script verbatim), and `--mutate a.ts b.ts` reads `b.ts` as its config file. Without `--mutate`
-the whole config runs: 9,062 mutants in 142 files, and its initial test run alone takes 2 min 22 s
-(2026-10-27, load 5 to 19); one file (`packages/core/src/chat/compose.ts`, 57 mutants) takes 19 s
-with `--force`, 4 s from the incremental file. Keep `checkers: ["typescript"]` (HARNESS.md).
+the whole config runs (`pnpm run mutate`; `pnpm run mutate:all` runs `stryker.all.config.json`). Keep `checkers: ["typescript"]` (HARNESS.md).
 
 To regenerate the seal vectors after a change to `gno/tools/sealvec`, in `gno/`:
 `go run ./tools/sealvec > r/seal/vectors_test.gno`.
@@ -137,9 +136,8 @@ Anthropic key is Alexis's own for tests, then the company's.
 ## The workshop
 
 Design is tried here before it lands (`docs/decisions.md`, 2026-11-04): the app's screens on Vite's dev server, with hot reload,
-opened from the MacBook or a phone over Tailscale. The lab (the realism page and its tuning panel) left with the 2026-11-09 batch:
-`app/lab/` is gone, though `scripts/workshop.sh` and `app/lab.config.ts` still start a lab server that has no page to serve (to
-remove, a harness change). No
+opened from the MacBook or a phone over Tailscale. `app/lab/` is gone, though `scripts/workshop.sh` and `app/lab.config.ts` still start
+a lab server that has no page to serve (to remove, a harness change). No
 gate runs per tweak. An accepted batch then lands once, in a part of its own: test first, through the gate and one review, with
 pictures where it moves an approved one. A small isolated fix (about 20 product lines, no tier-1 or harness file) takes the
 fast lane instead: its test seen failing, the gate, the journeys that watch it, one `reviewer`.
@@ -156,7 +154,7 @@ backend a run killed hard left included, and that run's names stay on the tailne
 `tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
 **The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
-a turn of Claude's in it ends without the gate (as every turn does by default since the speed plan), so each retouch shows live in a couple of minutes; the gate, the tests and the
+a turn of Claude's in it ends without the gate (as every turn does by default), so each retouch shows live in a couple of minutes; the gate, the tests and the
 review come once the batch is accepted, and pre-commit still gates every commit. The hook knows the workshop by its own shell,
 running this checkout's `scripts/workshop.sh` from it, in its terminal's foreground group and outside every sandbox: a session's
 sandboxed command cannot start one that counts. The code the workshop runs is outside Claude's sandbox, under a profile of its
@@ -188,17 +186,36 @@ and CoinGecko straight from this machine (the egress proxy is the deployment's) 
 pass has written them (the worlds' pass reads every realm's history, minutes). The jobs' lines (`worlds_…`, `prices_…`, `height_…`) show in
 the workshop's terminal. A login with Adena is untried here.
 
-**A crowd** (Alexis, 2026-11-07): `cd app && node tests/e2e/crowd.mjs [--people 12] [--writers 5] [--base http://127.0.0.1:5198]` opens
+**A crowd:** `cd app && node tests/e2e/crowd.mjs [--people 12] [--writers 5] [--base http://127.0.0.1:5198]` opens
 simulated people on the running workshop, in headless Chromium, no scene, half on the Earth and the rest over the hubs' worlds; the
 writers log in with Adena's stand-in and a test wallet and say a line ending "(sim)" every 20-90 s. It refuses any base but
 127.0.0.1 or localhost (`node --test tests/e2e/crowd.test.mjs`), writes no file, and is in no gate. Ctrl-C leaves; the counts fall
 when the streams close. Inside Claude Code's sandbox Chromium runs one process per browser, so there each person is a browser.
+`--script app/tests/e2e/crowd-script.txt [--every 10] [--minutes 15]` makes the writers act that file's lines instead (`room|line`,
+or `room|reply|line`, `room|thread|line`, `room|react|👍`, `room|vote|<answer>`, `room|edit|line`, in the Earth, an Earth room
+`earth/<name>` (writer 0 makes it, its name checked by the moderation), a hub's world or a realm's page `/r/<path>`; `\n` breaks a line,
+`@{prev}` mentions the room's last speaker; writer n sits in the script's room n modulo their number), each by the next writer of its
+room able to (a reply, a thread, a reaction, a card or a mention needs a key), the `--bare` writers before the guests declaring no country, the last `--guests` writers as guests with no key (they need the moderation's key, `WORKSHOP_OPENAI_KEY_FILE`), one every
+`--every` to 1.5 times `--every` seconds, from the start again till `--minutes` are over (once without), then they
+stay silent till Ctrl-C; the "(sim)" mark stays, and each writer declares a country of its own. To empty the chat first, stop the workshop
+and remove `.claude/tmp/workshop-data/backend` (history, accounts, sessions; the worlds and prices stay); the workshop's server takes 50 new
+accounts an hour, so the crowd's wallets log in again.
+
+**Jarvis for a demo:** `WORKSHOP_JARVIS=standin pnpm workshop` has the backend start a local stand-in for jarvis
+(`server/src/testing/jarvisStandin.ts`: the same paths and schemas, prepared answers chosen by the question's words, no model, no key, no
+network) and give the server `JARVIS=on`, its address and a key file; without the variable Jarvis stays off. Never set in the journeys.
 
 The http link on the Tailscale IP is the fallback for a device without Tailscale's DNS. It is not a secure context, so Copy
 cannot reach the clipboard there; select the list instead.
 
 **Landing a batch:** the accepted retouches land in code as one part, test first, in a session that reads the diff of what the workshop
-showed (the lab's Copy list went with the lab).
+showed.
+
+## The demo
+
+The demo's stack runs from a checked copy of one commit with `sh deploy/demo.sh` (prepare, up, status, logs, backup, wipe, restore, test);
+its evening script is [DEMO.md](DEMO.md), the stack's runbook [OPERATIONS.md](OPERATIONS.md) and every setting
+[CONFIGURATION.md](CONFIGURATION.md). `deploy/test.sh` starts the stack and checks it.
 
 ## Probes and tools worth knowing
 
@@ -219,6 +236,9 @@ development or test-GPU build only; a production build holds no trace of it.
   (`app/src/lib/worldPictures.json`) that `worldPictures.test.ts` checks against `pictureInputs.ts`'s hash of the inputs. Run it when the
   planets' look (`app/src/space/`) changes; the new pictures replace the old files in `app/public/world-pictures/`, which a commit declares
   with `Updated-baseline:`.
+- **The map tools** (`app/tests/tools/heightMaps.mjs`, `textureVariants.mjs`), run by hand and in no gate: the first makes the Earth's and
+  the Moon's height maps once from their public data (the command is its header's); the second makes the variants of `app/public/textures`
+  (each map at its widths, named with a hash) and writes `app/src/space/planet/mapFiles.json`.
 - **The link reader's tests** run with the unit tests (`pnpm run test`: `link-reader/src/**/*.test.ts` is in the `node` project). Its
   transport tests (`transport.test.ts`) need the `openssl` command: `tlsFixtures.ts` makes a CA and a leaf per name, once per run, in a folder
   of the system's temporary directory (never in the repository), and a missing or failing `openssl` fails the test with its message, it

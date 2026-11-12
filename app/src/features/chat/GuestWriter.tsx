@@ -2,8 +2,8 @@
 // as anon/<name>. The name is the visit's, asked as the reader first comes to the box; a refusal says why, in the field's own words.
 // Connect Adena stays beside it: an account keeps its name and does what a guest cannot.
 import type { GuestCause } from "@gnoworld/schemas";
-import { Button, Cluster, Field, Stack } from "@gnoworld/ui";
-import { useRef, useState, type SubmitEvent } from "react";
+import { Button, Cluster, Stack } from "@gnoworld/ui";
+import { useId, useRef, useState, type SubmitEvent } from "react";
 import { pageGuestApi, type Refused } from "../../lib/api/guest.ts";
 import { askFor } from "../../pageAsks.ts";
 import { MessageBox } from "./MessageBox.tsx";
@@ -76,12 +76,43 @@ function useGuestName() {
   };
 }
 
+// The box's own field, as the account's composer draws it: no edge of its own inside the box's. A guest's line is one plain line: Enter
+// sends it. `problem`: the id of the line saying why the last one did not go.
+function GuestField(props: {
+  label: string;
+  draft: string;
+  problem: string | undefined;
+  onDraft: (draft: string) => void;
+}) {
+  const { label, draft, problem, onDraft } = props;
+  return (
+    <textarea
+      className={styles["field"]}
+      aria-label={`Message ${label}`}
+      placeholder={`Message ${label}`}
+      rows={2}
+      value={draft}
+      aria-invalid={problem !== undefined}
+      aria-describedby={problem}
+      onChange={(event) => {
+        onDraft(event.target.value);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" || event.shiftKey || event.nativeEvent.isComposing) return;
+        event.preventDefault();
+        event.currentTarget.form?.requestSubmit();
+      }}
+    />
+  );
+}
+
 export function GuestWriter({ room }: { room: string }) {
   const label = roomLabel(room);
   const guest = useGuestName();
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<string>();
+  const problemId = useId();
   const send = async (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
     const text = draft.trim();
@@ -115,20 +146,21 @@ export function GuestWriter({ room }: { room: string }) {
     >
       <Stack space="2xs">
         <MessageBox send="Send" goes={draft.trim() !== "" && !sending}>
-          <Field
-            kind="lines"
-            resizable={false}
-            label={`Message ${label}`}
-            placeholder={`Message ${label}`}
-            hideLabel
-            value={draft}
-            onChange={(value) => {
+          <GuestField
+            label={label}
+            draft={draft}
+            problem={problem === undefined ? undefined : problemId}
+            onDraft={(value) => {
               setDraft(value);
               setProblem(undefined);
             }}
-            {...(problem === undefined ? {} : { error: problem })}
           />
         </MessageBox>
+        {problem === undefined ? null : (
+          <p id={problemId} className={styles["problem"]} role="alert">
+            {problem}
+          </p>
+        )}
         <Cluster justify="between">
           <span className={styles["note"]}>
             {guest.off

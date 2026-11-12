@@ -44,6 +44,13 @@ describe("the quick actions", () => {
     ]);
   });
 
+  it("says why Jarvis is greyed when it is on but cannot be asked here, and Catch up stays coming soon", () => {
+    const box = draw(<QuickActions pills="hub" jarvisWhy="Open a room to ask Jarvis" />);
+    expect(all(box, '[aria-disabled="true"]').map((each) => each.getAttribute("aria-label"))).toContain(
+      "Jarvis, Open a room to ask Jarvis",
+    );
+  });
+
   it("gives an account Poll, in a world's row, the Earth's and nowhere else", () => {
     expect(items(draw(<QuickActions pills="hub" poll={POLL} />))).toEqual([
       "Image",

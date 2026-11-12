@@ -2,16 +2,28 @@
 // the same sky each visit, no chance drawn.
 import {
   BufferGeometry,
+  CustomBlending,
   Float32BufferAttribute,
   InstancedBufferAttribute,
   Mesh,
+  OneFactor,
+  OneMinusSrcAlphaFactor,
   Points,
   ShaderMaterial,
+  SrcAlphaFactor,
+  ZeroFactor,
   type IUniform,
 } from "three";
 import { hashOf } from "../hash.ts";
 import type { Universe } from "../layout.ts";
-import { DUST_VERTEX, POINT_FRAGMENT, STARS_VERTEX, SUNS_FRAGMENT, SUNS_VERTEX } from "../shaders/glows.ts";
+import {
+  DUST_VERTEX,
+  POINT_FRAGMENT,
+  STARS_VERTEX,
+  SUN_DISC_FRAGMENT,
+  SUNS_FRAGMENT,
+  SUNS_VERTEX,
+} from "../shaders/glows.ts";
 import { lightEach, quads } from "./planets.ts";
 import { ADDITIVE } from "../additive.ts";
 
@@ -31,13 +43,23 @@ export const additive = (uniforms: Uniforms, vertexShader: string, fragmentShade
 
 /** The suns and whether a lens lights each one's system. */
 export interface Suns {
+  /** The glow, added. */
   readonly mesh: Mesh;
+  /** The opaque disc, drawn just before the glow. */
+  readonly disc: Mesh;
   /** Lights the systems `lit` says by their index (none: every one). */
   light(lit: ((index: number) => boolean) | undefined): void;
 }
 
 /** The suns, one quad each. */
-export function sunsOf({ systems }: Universe, uniforms: Uniforms, delays: readonly number[]): Suns {
+export function sunsOf(
+  { systems }: Universe,
+  frame: Uniforms,
+  { delays, still }: { delays: readonly number[]; still: () => boolean },
+): Suns {
+  // The faces' life, 0 under reduced motion: set as the mesh is drawn, so a frame that is not drawn costs nothing.
+  const life = { value: 1 };
+  const uniforms = { ...frame, uLife: life };
   const geometry = quads(systems.length);
   const at = systems.flatMap(({ place }) => [place.x, place.y, place.z]);
   geometry.setAttribute("aPlace", new InstancedBufferAttribute(new Float32Array(at), 3));
@@ -52,10 +74,35 @@ export function sunsOf({ systems }: Universe, uniforms: Uniforms, delays: readon
   );
   const lit = new InstancedBufferAttribute(new Float32Array(systems.length).fill(1), 1);
   geometry.setAttribute("aLit", lit);
+  // The disc is made, so sorted, before the glow: an opaque face over what is behind (normal blending, the canvas's alpha left alone,
+  // as additive.ts), then the glow added round it.
+  const disc = new Mesh(
+    geometry,
+    new ShaderMaterial({
+      uniforms,
+      vertexShader: SUNS_VERTEX,
+      fragmentShader: SUN_DISC_FRAGMENT,
+      transparent: true,
+      // The disc is solid: it writes depth, so a planet behind it, or its glow drawn later, fails the test; a nearer one passes.
+      depthWrite: true,
+      blending: CustomBlending,
+      blendSrc: SrcAlphaFactor,
+      blendDst: OneMinusSrcAlphaFactor,
+      blendSrcAlpha: ZeroFactor,
+      blendDstAlpha: OneFactor,
+    }),
+  );
+  disc.frustumCulled = false;
+  // First of the added lights, after the stars (-10): what is drawn after it is tested against its depth.
+  disc.renderOrder = -5;
   const mesh = new Mesh(geometry, additive(uniforms, SUNS_VERTEX, SUNS_FRAGMENT));
   mesh.frustumCulled = false;
+  mesh.onBeforeRender = () => {
+    life.value = still() ? 0 : 1;
+  };
   return {
     mesh,
+    disc,
     light: (lights) => {
       lightEach(lit, lights);
     },

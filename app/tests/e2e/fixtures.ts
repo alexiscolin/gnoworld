@@ -213,6 +213,8 @@ export const reactMark = () => Object.keys(document).some((key) => key.startsWit
 
 export async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(reactMark);
+  // The home's loader covers the page (and takes its pointer) until the dive starts or 2.5 s pass.
+  await expect(page.getByRole("status", { name: "Loading space" })).toHaveCount(0, { timeout: 10_000 });
 }
 
 // The site's pages: each place of the data, at its path and at its canonical address (the same page, written twice, with

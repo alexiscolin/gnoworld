@@ -55,7 +55,7 @@ describe("a line's look", () => {
     expect(row.textContent).toContain("g10gh7…3y5tv");
   });
 
-  it("draws the same address as the same face, two addresses as two, and a guest as the night disc alone", () => {
+  it("draws the same address as the same face, two addresses as two, and a guest as a person's outline on the night disc", () => {
     const face = (over: Partial<LineViewProps>) => one(drawn(over).row, "[data-kind='person']");
     const alice = faceOf(face({}));
     expect(alice).not.toBe("");
@@ -63,8 +63,8 @@ describe("a line's look", () => {
     expect(faceOf(face({ line: line({ from: BOB, account: BOB }) }))).not.toBe(alice);
     const guest = drawn({ line: guestLine() }).row;
     expect(all(guest, "svg")).toHaveLength(1);
-    expect(all(guest, "svg circle")).toHaveLength(0);
-    expect(faceOf(one(guest, "[data-kind='person']"))).toBe("");
+    expect(all(guest, "[data-guest]")).toHaveLength(1);
+    expect(all(guest, "polyline, [data-star]")).toHaveLength(0);
   });
 
   it("holds the head in this order: the face, the name, then the time; the text is under it", () => {
@@ -182,4 +182,25 @@ describe("a line's country", () => {
       expect(wrong).toEqual([]);
     },
   );
+});
+
+// a card command's line is the card's words; a room's page draws the card in their place, a direct message's page and a line with
+// anything more keep the words.
+describe("a card line", () => {
+  const words = "📈 Most called worlds this week";
+
+  it("is drawn as its card in a room, in place of its words", () => {
+    const { row } = drawn({ players: true, line: line({ text: words }) });
+    expect(textOf(row).querySelector("[data-shared-card='trending']")).not.toBeNull();
+    expect(textOf(row).textContent).not.toContain("Most called");
+  });
+
+  it("keeps its words where no player is offered (a direct message, a reader who saves data), as an action or with a word more", () => {
+    for (const over of [
+      { players: false, line: line({ text: words }) },
+      { players: true, line: line({ text: words, kind: "action" }) },
+      { players: true, line: line({ text: `${words} now` }) },
+    ])
+      expect(textOf(drawn(over).row).querySelector("[data-shared-card]")).toBeNull();
+  });
 });

@@ -6,6 +6,7 @@ import { placeOf, type Planet, type System, type Universe, type Vec } from "../l
 import { LENS_DIM } from "../shaders/planets.ts";
 import { ORBIT_COLOUR, ORBIT_GAIN } from "./marks.ts";
 import { ADDITIVE } from "../additive.ts";
+import { Strip } from "./strip.ts";
 
 // ponytail: a place draws this many links at most; a kit of hundreds of copies importing each other shows its first ones. Raise it
 // with the buffer's size if a real system needs more.
@@ -14,29 +15,41 @@ const MOST = 2048;
 const BRIGHT = 4 * ORBIT_GAIN;
 const FAINT = ORBIT_GAIN;
 const EASE_S = 0.3;
-
 const NONE: readonly Link[] = [];
 
-interface Link {
+export interface Link {
   readonly from: Planet;
   readonly to: Planet;
 }
+
+/** The worlds a hovered `planet` lights: itself and the worlds at the other end of each of its `links`. */
+export const litBy = (planet: Planet, links: readonly Link[]): ReadonlySet<string> =>
+  new Set([planet.id, ...links.map(({ from, to }) => (from === planet ? to.id : from.id))]);
 
 const VERTEX = /* glsl */ `
 attribute float aTone; attribute float aLit; uniform float uLens; varying float vTone;
 void main() { vTone = aTone * ${LENS_DIM}; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); }`;
 const FRAGMENT =
   "uniform vec3 uColour; uniform float uGain; varying float vTone; void main() { gl_FragColor = vec4(uColour * uGain * vTone, 1.0); }";
-
-/** What a frame says of the Map's links: the time and the lens (D425), which the engine holds. */
+/** What a frame says of the Map's links: the time, the lens (D425), and the screen and the reader's motion settings. */
 interface Tick {
   readonly seconds: number;
   readonly lens: ReadonlySet<string> | undefined;
+  readonly renderer: { getPixelRatio(): number };
+  readonly options: { still(): boolean };
 }
+
+// Whether `link` is lit: a pointed planet's own link, or any when none is pointed, and the lens's, which lights both its worlds.
+const isLit = ({ from, to }: Link, lens: ReadonlySet<string> | undefined, held: Planet | undefined): boolean =>
+  (held === undefined || from === held || to === held) &&
+  (lens === undefined || (lens.has(from.id) && lens.has(to.id)));
 
 export class Links {
   readonly gain = { value: 0 };
   readonly lines: LineSegments;
+  /** The pointed planet's own links, wide and bright. */
+  readonly strip: Strip;
+  readonly #uLens: { value: number };
   readonly #material: ShaderMaterial;
   readonly #position = new BufferAttribute(new Float32Array(MOST * 6), 3).setUsage(DynamicDrawUsage);
   readonly #tone = new BufferAttribute(new Float32Array(MOST * 2), 1);
@@ -48,8 +61,14 @@ export class Links {
   #shown = NONE;
   #bright = false;
   #lens: ReadonlySet<string> | undefined;
+  // The planet pointed at, and the one the links' dimming is for: kept after the pointer leaves, till the dimming has eased out.
+  #pointed: Planet | undefined;
+  #held: Planet | undefined;
+  #litFor: Planet | undefined;
 
-  constructor(uLens: { value: number }) {
+  constructor({ uLens, uProj }: { uLens: { value: number }; uProj: { value: number } }) {
+    this.#uLens = uLens;
+    this.strip = new Strip(uProj);
     const geometry = new BufferGeometry();
     geometry.setAttribute("position", this.#position);
     geometry.setAttribute("aTone", this.#tone);
@@ -65,6 +84,12 @@ export class Links {
     });
     this.lines = new LineSegments(geometry, this.#material);
     this.lines.frustumCulled = false;
+  }
+
+  /** Points at `planet` (none: leaves it): its links show wide and bright, the others dim. Returns the worlds it lights: itself and those it is linked to. */
+  point(planet: Planet | undefined): ReadonlySet<string> | undefined {
+    this.#pointed = planet;
+    return planet === undefined ? undefined : litBy(planet, this.#byPlanet.get(planet) ?? NONE);
   }
 
   /** The links of `universe`, once per layout: `uses` is each world's id to the worlds it is built on. */
@@ -89,7 +114,8 @@ export class Links {
   }
 
   /** A frame on: the links of `at` (a world's, or a system's own), none for none. A change of place fades what shows out first. */
-  tick(at: Planet | System | undefined, { seconds, lens }: Tick, delta: number): void {
+  tick(at: Planet | System | undefined, { seconds, lens, renderer, options }: Tick, delta: number): void {
+    this.#hover(lens, { seconds, delta, still: options.still(), ratio: renderer.getPixelRatio() });
     const [links, bright] = this.#of(at);
     const same = links === this.#shown && bright === this.#bright;
     if (!same && this.gain.value < 1e-3) this.#set(links, bright, lens);
@@ -99,8 +125,19 @@ export class Links {
       this.gain.value = 0;
       return;
     }
-    if (lens !== this.#lens) this.#light(lens);
+    if (lens !== this.#lens || this.#held !== this.#litFor) this.#light(lens);
     this.#follow(seconds);
+  }
+
+  // The pointed planet's strip comes and goes, its other links dimming with the lens's own ease (uLens, move.ts).
+  #hover(
+    lens: ReadonlySet<string> | undefined,
+    frame: { seconds: number; delta: number; still: boolean; ratio: number },
+  ): void {
+    const pointed = this.#pointed;
+    if (pointed !== undefined) this.#held = pointed;
+    else if (lens !== undefined || this.#uLens.value < 1e-3) this.#held = undefined;
+    this.strip.tick(pointed === undefined ? undefined : (this.#byPlanet.get(pointed) ?? NONE), frame);
   }
 
   // The links to draw for `at`, and whether they are bright: a world's own, or a system's between its worlds.
@@ -120,13 +157,15 @@ export class Links {
     this.#light(lens);
   }
 
-  // A lens (D425) lights the links whose two worlds it lights; the shader eases the rest's dimming with the lens's own.
+  // A lens (D425) lights the links whose two worlds it lights, a hovered planet those it has; the shader eases the rest's dimming with the lens's own.
   #light(lens: ReadonlySet<string> | undefined): void {
     this.#lens = lens;
+    this.#litFor = this.#held;
+    const held = this.#held;
     const count = Math.min(this.#shown.length, MOST);
     for (let at = 0; at < count; at += 1) {
       const link = this.#shown[at];
-      const lit = lens === undefined || (link !== undefined && lens.has(link.from.id) && lens.has(link.to.id));
+      const lit = link !== undefined && isLit(link, lens, held);
       this.#lit.array[at * 2] = lit ? 1 : 0;
       this.#lit.array[at * 2 + 1] = lit ? 1 : 0;
     }
@@ -151,5 +190,6 @@ export class Links {
   dispose(): void {
     this.lines.geometry.dispose();
     this.#material.dispose();
+    this.strip.dispose();
   }
 }

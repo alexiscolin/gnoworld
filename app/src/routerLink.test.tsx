@@ -17,8 +17,11 @@ function read(html: string) {
 test("draws the anchor the design system asks for: every attribute it was given, its href its path", () => {
   const props = { href: "/w/bubble", className: "look", "data-emphasis": "solid", "aria-current": "true" as const };
   const plain = renderToStaticMarkup(<a {...props}>Fly to Bubble</a>);
+  // RouterLink reads the full chat's context (a hook), so it is drawn as an element, never called as a function.
   const routed = renderToStaticMarkup(
-    <MemoryRouter>{RouterLink({ ...props, children: "Fly to Bubble" })}</MemoryRouter>,
+    <MemoryRouter>
+      <RouterLink {...props}>Fly to Bubble</RouterLink>
+    </MemoryRouter>,
   );
   expect(read(routed)).toEqual(read(plain));
   expect(read(plain).attributes).toHaveLength(4);

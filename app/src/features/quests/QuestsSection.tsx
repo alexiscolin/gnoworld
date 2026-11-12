@@ -1,43 +1,61 @@
-// The passport's quests (slice 8; no frame: built from the design system, Alexis's answer 2): a card each, its steps in order, each a row
-// that leads to its world, done or not; the call that ends it waits for slice 9 and says so in place (answer 6, "needs a wallet, soon").
-import { Card, ComingSoon, Grid, Icon, Kicker, Progress, Row, Stack } from "@gnoworld/ui";
+// The passport's quests: a card each in a row, its badge, its steps in order with the app's icons and the next one lit, one button at its foot
+// that leads to the next step's world; the call that ends a quest is tried in the realm's own page.
+import { Badge, Button, Card, Cluster, Grid, Icon, Kicker, Stack, type BadgeProps, type IconName } from "@gnoworld/ui";
 import { useApp } from "../../storeContext.tsx";
+import styles from "./Quests.module.css";
 import { questsOf, type QuestView, type StepView } from "./progress.ts";
 
-function Step({ step }: { step: StepView }) {
-  if (step.kind === "call") return <ComingSoon name={step.title}>{`${step.title} · needs a wallet, soon`}</ComingSoon>;
+// What a quest's badge wears: the icon of its theme and a tone, by the quest's id; the data file names neither.
+const ICONS: Readonly<Record<string, IconName>> = { named: "at", player: "play", town: "chat" };
+const TONES: readonly BadgeProps["tone"][] = ["mine", "signal", "danger"];
+
+const STEP_ICONS: Readonly<Record<StepView["kind"], IconName>> = { visit: "arrow", talk: "chat", call: "key" };
+
+function Step({ step, next }: { step: StepView; next: boolean }) {
   return (
-    <Row
-      title={step.title}
-      {...(step.done ? { subtitle: "Done" } : {})}
-      lead={<Icon name={step.done ? "check" : step.kind === "talk" ? "chat" : "planet"} />}
-      {...(step.path === undefined ? {} : { href: step.path })}
-    />
+    <li className={styles["step"]} data-state={step.done ? "done" : next ? "next" : undefined}>
+      <Icon name={step.done ? "check" : STEP_ICONS[step.kind]} size="s" />
+      <span>{step.title}</span>
+    </li>
   );
 }
 
-function Quest({ quest }: { quest: QuestView }) {
+function Quest({ quest, tone }: { quest: QuestView; tone: BadgeProps["tone"] }) {
   const done = quest.steps.filter((step) => step.done).length;
+  const next = quest.steps.find((step) => !step.done);
+  const of = `${String(done)}/${String(quest.steps.length)}`;
   return (
     <Card compact>
-      <Card.Header title={quest.title} kicker={`Quest · ${quest.reward}`} level={4} />
-      <Card.Body>
-        <Stack space="xs">
-          <p>{quest.description}</p>
-          <Progress
-            label={`${quest.title}, steps done`}
-            value={done}
-            max={quest.steps.length}
-            kind="steps"
-            shown={`${String(done)}/${String(quest.steps.length)}`}
+      <Card.Header
+        title={quest.title}
+        level={4}
+        kicker={`Badge “${quest.reward}” · ${String(done)} of ${String(quest.steps.length)}`}
+        lead={
+          <Badge
+            name={quest.reward}
+            icon={ICONS[quest.id] ?? "star"}
+            tone={tone}
+            earned={next === undefined}
+            count={of}
           />
-          <div>
-            {quest.steps.map((step) => (
-              <Step key={step.id} step={step} />
-            ))}
-          </div>
+        }
+      />
+      <Card.Body>
+        <Stack as="ul" space="3xs">
+          {quest.steps.map((step) => (
+            <Step key={step.id} step={step} next={step === next} />
+          ))}
         </Stack>
       </Card.Body>
+      <Card.Actions>
+        {next === undefined ? (
+          <Button disabled>Done</Button>
+        ) : next.path === undefined ? (
+          <Button disabled>Go</Button>
+        ) : (
+          <Button href={next.path}>{next.kind === "call" ? "Try it" : "Go"}</Button>
+        )}
+      </Card.Actions>
     </Card>
   );
 }
@@ -49,10 +67,13 @@ export function QuestsSection({ universe }: { readonly universe: string }) {
   if (quests.length === 0) return null;
   return (
     <Stack as="section" space="s">
-      <Kicker>Quests · rewards stay on this device</Kicker>
+      <Cluster justify="between" space="xs">
+        <Kicker>Quests</Kicker>
+        <Kicker>The badge is kept on this device</Kicker>
+      </Cluster>
       <Grid min="m">
-        {quests.map((quest) => (
-          <Quest key={quest.id} quest={quest} />
+        {quests.map((quest, at) => (
+          <Quest key={quest.id} quest={quest} tone={TONES[at % TONES.length] ?? "mine"} />
         ))}
       </Grid>
     </Stack>

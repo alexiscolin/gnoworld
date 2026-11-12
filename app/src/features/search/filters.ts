@@ -11,6 +11,7 @@ const NARROWS: Readonly<Record<string, (item: SearchItem) => boolean>> = {
   here: (item) => (item.here ?? 0) > 0,
   active: (item) => item.active === true,
   new: (item) => item.fresh === true,
+  following: (item) => item.followed === true,
   unseen: (item) => (item.kind === "world" || item.kind === "station") && item.visited === false,
 };
 

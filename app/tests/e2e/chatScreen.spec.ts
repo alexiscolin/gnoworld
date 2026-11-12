@@ -1,6 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
-import { lines } from "./chat.ts";
-import { calmed } from "./figures.ts";
+import { lines, pressWhoIsHere } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { open, PIN } from "./chatScreenOpen.ts";
@@ -22,7 +21,9 @@ const sideways = (page: Page) =>
 const worlds = (page: Page) => page.getByRole("navigation", { name: "Worlds" });
 const info = (page: Page) => page.getByRole("complementary", { name: "Bubble" });
 const roomsNav = (page: Page) => page.getByRole("navigation", { name: /^Rooms/ });
-const roomsButton = (page: Page) => page.getByRole("button", { name: "Rooms" });
+// The header's own Rooms control, a phone's: the rooms column's section buttons are named Rooms too.
+const roomsButton = (page: Page) =>
+  page.locator('[data-chat-layout] [data-region="header"]').getByRole("button", { name: /^Rooms/ });
 
 test.describe("the chat as the video shows it", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
@@ -32,7 +33,7 @@ test.describe("the chat as the video shows it", () => {
   }) => {
     await logIn(page, "screen-look");
     await open(page, { width: 1280, as: ACCOUNT });
-    const heading = page.getByRole("heading", { level: 2, name: "#games" });
+    const heading = page.getByRole("heading", { name: "#games" });
     const [w, r, talk, i, h] = await Promise.all([
       box(worlds(page)),
       box(roomsNav(page)),
@@ -43,12 +44,15 @@ test.describe("the chat as the video shows it", () => {
     expect(w.x + w.width).toBeLessThanOrEqual(r.x + 1);
     expect(r.x + r.width).toBeLessThanOrEqual(talk.x + 1);
     expect(talk.x + talk.width).toBeLessThanOrEqual(i.x + 1);
-    expect(h.y + h.height).toBeLessThanOrEqual(w.y + 1);
+    // The heading stands in the conversation's column, under the site's header, between the rooms and the info panel.
+    expect(h.x).toBeGreaterThanOrEqual(r.x + r.width - 1);
+    expect(h.x + h.width).toBeLessThanOrEqual(i.x + 1);
+    expect(h.y + h.height).toBeLessThanOrEqual(talk.y + 1);
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toHaveAttribute("aria-current", "page");
-    // The full chat has its dock to shrink to, and Close leaves the chat for the universe's home.
-    await expect(page.getByRole("button", { name: "Shrink the chat" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Expand the chat" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Close the chat" })).toBeVisible();
+    // The full chat of a computer's window closes to its dock, from the info panel's bar; it has no close to the home.
+    await expect(info(page).getByRole("button", { name: "Close the full chat" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Open the full chat" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Close the chat" })).toHaveCount(0);
   });
 
   test("names each world in the column of worlds and draws each with its own planet", async ({ page }) => {
@@ -81,9 +85,9 @@ test.describe("the chat as the video shows it", () => {
 
   test("closes to the universe's home, at the header's right edge, a control that works", async ({ page }) => {
     await logIn(page, "screen-close");
-    await open(page, { width: 1280, as: ACCOUNT });
-    // 5j took the breadcrumb off a world's page (its kicker names the universe, worldPage.spec.ts), so the test no longer reads the
-    // home from it: /w/bubble is the default universe's, whose home is the site's root.
+    // Only a window with no dock has a close to the home (a computer's has its dock to close to): a phone's. /w/bubble is the
+    // default universe's, whose home is the site's root.
+    await open(page, { width: 390, as: ACCOUNT });
     const close = page.getByRole("button", { name: "Close the chat" });
     const [bar, shut] = await Promise.all([box(page.locator('[data-region="header"]')), box(close)]);
     expect(bar.x + bar.width - (shut.x + shut.width)).toBeLessThanOrEqual(24);
@@ -129,17 +133,16 @@ test.describe("the chat as the video shows it", () => {
     expect(labels.indexOf("Pinned messages")).toBeLessThan(labels.indexOf("Messages"));
   });
 
-  test("keeps the quick actions, over the composer's one box, an account's", async ({ page }) => {
+  test("keeps the composer's one box with its Add menu inside, an account's, no row of quick actions", async ({
+    page,
+  }) => {
     await logIn(page, "screen-composer");
     await open(page, { width: 1280, as: ACCOUNT });
-    const bar = page.getByRole("toolbar", { name: "Quick actions" });
-    await expect(bar.getByRole("button")).toHaveText(["Who's here", "Play", "Events", "Catch up", "Poll"]);
+    await expect(page.getByRole("toolbar", { name: "Quick actions" })).toHaveCount(0);
     const message = page.getByRole("group", { name: "Message box" });
     await expect(message.getByRole("textbox")).toBeVisible();
     await expect(message.getByRole("button", { name: "Send" })).toBeVisible();
-    const [b, m] = await Promise.all([bar.boundingBox(), message.boundingBox()]);
-    if (b === null || m === null) throw new Error("not drawn");
-    expect(b.y + b.height).toBeLessThanOrEqual(m.y + 1);
+    await expect(message.getByRole("button", { name: "Add" })).toBeVisible();
     const style = await message.evaluate((element) => {
       const { borderTopLeftRadius, borderTopWidth } = getComputedStyle(element);
       return { borderTopLeftRadius, borderTopWidth };
@@ -151,7 +154,7 @@ test.describe("the chat as the video shows it", () => {
     page,
   }) => {
     await open(page, { width: 1280, as: GUEST });
-    await page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button", { name: "Who's here" }).click();
+    await info(page).getByRole("button", { name: "Who's here" }).click();
     await expect(info(page)).toBeFocused();
     await expect(info(page).getByRole("region", { name: "Who's here" })).toContainText("here");
   });
@@ -198,7 +201,6 @@ test.describe("the chat as the video shows it", () => {
     page,
   }) => {
     await open(page, { width: 390, as: GUEST });
-    await calmed(page);
     await expect(worlds(page)).toBeHidden();
     await expect(info(page)).toBeHidden();
     await expect(roomsButton(page)).toBeVisible();
@@ -214,7 +216,7 @@ test.describe("the chat as the video shows it", () => {
     await logIn(page, "screen-phone");
     await open(page, { width: 390, as: ACCOUNT });
     const message = await box(page.getByRole("group", { name: "Message box" }));
-    const bar = await box(page.getByRole("toolbar", { name: "Quick actions" }));
+    const bar = await box(page.locator('[data-chat-layout] [data-region="header"]'));
     for (const each of [message, bar]) {
       expect(each.x).toBeGreaterThanOrEqual(0);
       expect(each.x + each.width).toBeLessThanOrEqual(390);
@@ -222,7 +224,7 @@ test.describe("the chat as the video shows it", () => {
     expect(await sideways(page)).toBe(0);
     expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
     // The info panel has no room on a phone: Who's here opens the people, each with its Message button.
-    await page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button", { name: "Who's here" }).click();
+    await pressWhoIsHere(page);
     const dialog = page.getByRole("dialog", { name: "Who's here" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("button", { name: /^Message/ }).first()).toBeVisible();

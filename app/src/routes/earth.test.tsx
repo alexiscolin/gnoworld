@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
 import { isRouteErrorResponse, type MetaArgs, type RouteObject } from "react-router";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { describe, expect, test, vi } from "vitest";
+import { expectFollowAndShare } from "../../tests/plateButtons.ts";
 import { fakeStream } from "../../tests/fakeStream.ts";
+import { noMedia, noObservers } from "../../tests/mount.tsx";
 import { expectClientAsBuild, render, routeError } from "../../tests/render.tsx";
-import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
+import { drawRoute } from "../../tests/routed.tsx";
 import Earth, { clientLoader, ErrorBoundary, loader, meta } from "./earth.tsx";
 
 const route = (path: string): RouteObject => ({ path, Component: Earth, loader, ErrorBoundary });
@@ -68,11 +70,12 @@ describe("the Earth's page", () => {
     expect(canonical(tags)?.href).toBe(`https://gno.world${expected}`);
   });
 
-  test("has frame 40's crumb: the universe, a link to its cosmos, then the home, the general chat", async () => {
+  // D428 and the plate's rebuild (D567): the plate has no crumb to the universe any more; its kicker names the place and its kind.
+  test("has no crumb: the plate's kicker says Home, the general chat, and no link leads to the universe's cosmos", async () => {
     const html = await render(route("/net/:network/earth"), "/net/gnoland/earth");
-    expect(html).toMatch(/<nav [^>]*aria-label="[^"]+"/);
-    expect(html).toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
-    expect(html).toMatch(/aria-current="page"[^>]*>Home · the general chat</);
+    expect(html).not.toMatch(/<nav [^>]*aria-label="[^"]+"/);
+    expect(html).not.toMatch(/<a [^>]*href="\/net\/gnoland\/"[^>]*>Universe<\/a>/);
+    expect(html).toContain("Home · the general chat");
   });
 });
 
@@ -81,88 +84,86 @@ test("the browser's loader gives each pre-rendered earth what the build's does",
   expectClientAsBuild("earth", clientLoader, loader);
 });
 
-// Slice 5r (frames 37 to 42): the Earth's page is a plate, with no 3D.
+// The Earth's page is a plate with no 3D whose blocks come in a chunk once the page has loaded: the build writes its frame and kicker, the
+// rest is drawn after. jsdom lacks the browser's media query, observers and scene, which the page asks for: these stand in, for the whole
+// file, as the route's own unmount still asks the scene for its media query.
+const drawn = (path = "/net/:network/earth", at = "/net/onyx/earth") => {
+  const sources = fakeStream();
+  // The figure counts up only where motion is welcome: none here.
+  noMedia();
+  noObservers();
+  const page = drawRoute({ path, Component: Earth, loader: clientLoader }, at);
+  return { sources, ...page };
+};
+const plateOf = async (box: HTMLElement) => {
+  await vi.waitFor(() => {
+    expect(box.textContent).toContain("Countries are opt-in");
+  });
+  return box.querySelector("section[data-look='plate']");
+};
+
 describe("the Earth's plate", () => {
   test("is a plate named Earth, holding the one heading and the line of frame 40", async () => {
-    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
-    const plate = /<section [^>]*data-look="plate"[^>]*>/.exec(html)?.[0] ?? "";
-    expect(plate).toContain('aria-label="Earth"');
-    expect(html.match(/<h1\b/g)).toHaveLength(1);
-    expect(html).toContain("Where people speak from. Countries are opt-in.");
+    const { box } = drawn();
+    const plate = await plateOf(box);
+    expect(plate?.getAttribute("aria-label")).toBe("Earth");
+    expect(box.querySelectorAll("h1")).toHaveLength(1);
+    expect(plate?.textContent).toContain("Where people speak from. Countries are opt-in.");
   });
 
-  test("says hi in #general, and holds the latest on X and the three links out, each to its own tab", async () => {
-    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
-    expect(html).toMatch(/>Say hi in #general</);
-    expect(html).toMatch(/Latest on X/);
-    expect(html).toMatch(/<a [^>]*href="https:\/\/x\.com\/_gnoland"[^>]*target="_blank"/);
+  test("says hi in #general, and holds the three links out, each to its own tab", async () => {
+    const { box } = drawn();
+    const plate = await plateOf(box);
+    expect(plate?.querySelector("a[href='#chat']")?.textContent).toBe("Say hi in #general");
+    // The latest on X is the blog's card now (D13931), drawn only once a read of the chain has found posts: LatestOnX.test.tsx's.
     for (const [label, href] of [
       ["View on gnoweb", "https://onyx.testnets.gno.land"],
       ["Explorer", "https://gnoscan.io/?chainId=onyx-1"],
       ["Docs", "https://docs.gno.land/"],
-    ] as const)
-      expect(html).toMatch(
-        new RegExp(
-          `href="${href.replaceAll(".", "\\.").replaceAll("?", "\\?")}" target="_blank" rel="noopener noreferrer"><div[^>]*>${label}<`,
-        ),
-      );
-  });
-
-  test("shows the realms deployed in 24 h as coming soon, greyed and said so (slice 9)", async () => {
-    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
-    expect(html).toMatch(/aria-label="Realms deployed in 24 h, coming soon"/);
-    expect(html).toMatch(/aria-disabled="true"/);
+    ] as const) {
+      const link = plate?.querySelector(`a[href="${href}"]`);
+      expect(link?.textContent, label).toBe(label);
+      expect(link?.getAttribute("target"), label).toBe("_blank");
+      expect(link?.getAttribute("rel"), label).toBe("noopener noreferrer");
+    }
   });
 
   test("shows its vertical atlas caption to the eye only, and no figure the data does not hold", async () => {
-    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
-    expect(html).toContain("gnoworld");
-    expect(html).toMatch(/aria-hidden="true"[^>]*><p [^>]*>gnoworld/);
-    expect(html).not.toMatch(/<(canvas|video|picture|figure)\b/i);
+    const { box } = drawn();
+    const plate = await plateOf(box);
+    const caption = plate?.querySelector("[data-caption]");
+    expect(caption?.getAttribute("aria-hidden")).toBe("true");
+    expect(caption?.textContent).toBe("gnoworld · hub atlas");
+    expect(box.querySelector("canvas, video, picture, figure")).toBeNull();
     // Frame 26's planet thumbs are the only pictures, each decorative (its name sits beside it).
-    for (const image of html.match(/<img\b[^>]*>/g) ?? []) expect(image).toContain('alt=""');
+    for (const image of box.querySelectorAll("img")) expect(image.getAttribute("alt")).toBe("");
   });
 
-  test("offers Follow and Share in the page the build writes, as frame 86 draws them", async () => {
-    const html = await render({ path: "/earth", Component: Earth, loader }, "/earth");
-    expect(html).toMatch(/>Follow</);
-    expect(html).toMatch(/>Share</);
+  test("offers Follow and Share, as frame 86 draws them", async () => {
+    const { box } = drawn();
+    const plate = await plateOf(box);
+    // In words, both (D13915 reverses D536's icons: what they did was unclear).
+    expectFollowAndShare(plate);
   });
 });
 
-// Slice 9g (F5784, frame 38): the page follows the Earth's room once it has run, and draws the count the stream tells, for its own universe.
+// Slice 9g (F5784, frame 38): the page follows the Earth's room once it has run. It asks no count of the room (presence=0, D384): the plate
+// no longer draws the realms deployed in 24 h (D567's plate has no such square; the store still takes the stream's count).
 describe("the Earth's page and the chain's stream", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-  const drawn = () => {
-    const sources = fakeStream();
-    // The figure counts up only where motion is welcome: jsdom has no media query, so none.
-    vi.stubGlobal("matchMedia", () => ({ matches: false }));
-    const page = drawRoute({ path: "/net/:network/earth", Component: Earth, loader: clientLoader }, "/net/onyx/earth");
-    return { sources, ...page };
-  };
-
-  test("follows #earth, draws the count of its universe from a realms frame, and ignores another universe's", async () => {
-    const { sources, box } = drawn();
+  test("follows #earth, for its events alone", async () => {
+    const { sources } = drawn();
     await vi.waitFor(() => {
-      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth"]);
+      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth&presence=0"]);
     });
-    // Until the stream tells a count, the slot is main's coming soon: no figure, never a made-up zero.
-    expect(box.textContent).not.toContain("block");
-    sources.opened[0]?.emit("realms", { universe: "gnoland", count: 99, height: 5 });
-    expect(box.textContent).not.toContain("block");
-    sources.opened[0]?.emit("realms", { universe: "onyx", count: 17, height: 908297 });
-    await vi.waitFor(() => {
-      expect(box.textContent).toContain("17");
-    });
-    expect(box.textContent).toContain("deployed in 24 h · block 908297");
   });
 
   test("closes the stream when the page is left", async () => {
-    await expectStreamClosedOnLeave(
-      { path: "/net/:network/earth", Component: Earth, loader: clientLoader },
-      "/net/onyx/earth",
-    );
+    const { sources, leave } = drawn();
+    await vi.waitFor(() => {
+      expect(sources.opened).toHaveLength(1);
+    });
+    expect(sources.opened[0]?.closed).toBe(0);
+    leave();
+    expect(sources.opened[0]?.closed).toBe(1);
   });
 });

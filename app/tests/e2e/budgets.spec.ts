@@ -3,15 +3,17 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { closureOf as filesOf, DYNAMIC_IMPORT, HASHED, lateWeights, STATIC_IMPORT } from "./chunks.ts";
 import type { Request } from "@playwright/test";
-import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
+import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, reactMark, test, type Page } from "./fixtures.ts";
 import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
 // ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
-// The Earth's or a world's page, exact: 265,038 B on 2026-11-12, a world's (D13948, provisional till the hardening; its history D386 on).
-const FIRST_SCREEN_JS = 265_038;
-// A page with no plate (the home), exact: 262,551 B on 2026-11-12 (D13948, provisional till the hardening; its history D386 on).
-const PLAIN_FIRST_SCREEN_JS = 262_551;
+// The Earth's or a world's page, exact: 265,038 B on 2026-11-12; 277,086 B measured on 2026-11-13, a world's, 256 B ahead (D13948,
+// provisional till the hardening; its history D386 on).
+const FIRST_SCREEN_JS = 277_342;
+// A page with no plate (the home), exact: 262,551 B on 2026-11-12; 274,613 B measured on 2026-11-13, 256 B ahead (D13948, provisional till
+// the hardening; its history D386 on).
+const PLAIN_FIRST_SCREEN_JS = 274_869;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -143,8 +145,8 @@ const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
 // What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09; 45,824 B
 // with the realm plate's moved bytes (slice 13); 46,464 B on 2026-11-11, 46,208 B measured with the chat's move on Web Animations
-// (D13980), 256 B ahead; 50,032 B on 2026-11-12 (49,776 B measured, 256 B ahead; D13948).
-const LATE_CHAT_JS = 50_032;
+// (D13980), 256 B ahead; 50,032 B on 2026-11-12 (49,776 B measured, 256 B ahead; D13948); 52,960 B on 2026-11-13 (52,704 B measured).
+const LATE_CHAT_JS = 52_960;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
@@ -158,10 +160,10 @@ const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
 // alone's Room (D13979), the worlds file's reader and schema realms 694 B and worlds 870 B (D13973); the others as measured on the plate's
 // commit (Plate weighed once, in the plate's chunk); no RealmPlate cap, no journey reaches it.
 const PLATE_LATE =
-  /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds)-[\w-]+\.js$/;
+  /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
 const PLATE_LATE_JS: Record<string, number> = {
-  EarthPlate: 51022, // 2026-11-12: 50,766 B measured, 256 B ahead (D13948)
-  HubPlate: 46963, // 2026-11-12: 46,707 B measured, 256 B ahead (D13948)
+  EarthPlate: 59626, // 2026-11-13: 59,370 B measured, 256 B ahead (D13948)
+  HubPlate: 55740, // 2026-11-13: 55,484 B measured, 256 B ahead (D13948)
   followEarth: 1728,
   people: 405,
   FromExplorer: 5853,
@@ -170,6 +172,9 @@ const PLATE_LATE_JS: Record<string, number> = {
   ChartedBy: 608,
   realms: 8307, // D13948: two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,051 B of realm code; hardening splits them
   worlds: 1126,
+  // A bubble's words with the plain text they are cut from, asked once a bubble shows: 535 B on 2026-11-13, 256 B ahead.
+  BubbleWords: 791,
+  plain: 682,
 };
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads.
@@ -346,7 +351,8 @@ async function settled(page: Page, seen: Seen): Promise<void> {
 async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
   await page.addInitScript(holdTimers);
   await page.goto(path);
-  await hydrated(page);
+  // Hydrated, not past the home's loader: it leaves on a timer this run holds till the first screen is weighed.
+  await page.waitForFunction(reactMark);
   await settled(page, seen);
   const asked = [...seen.scripts];
   await page.evaluate(() => {

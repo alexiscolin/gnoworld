@@ -6,8 +6,9 @@ import { sharpener } from "./sharp.ts";
 import { loop, type Beat } from "./loop.ts";
 import { motionOf } from "./motion.ts";
 import { advance, paint, present } from "./move.ts";
+import { touchOf } from "./hands.ts";
 import { onResize } from "./onResize.ts";
-import { choose, momentOf, napOf, pace, resize, stateOf } from "./view.ts";
+import { choose, livelyOf, momentOf, napOf, pace, resize, stateOf } from "./view.ts";
 
 /** Runs `space`'s loop till `signal` aborts; `space.keep.wake` wakes it where it sleeps. */
 export function draw(space: Space, signal: AbortSignal): void {
@@ -31,7 +32,10 @@ export function draw(space: Space, signal: AbortSignal): void {
       advance(space, delta, { real, slept });
       choose(space, state, now);
       paint(space, delta);
+      touchOf(space);
       space.stage.frame.uThrough.value = space.stage.effects.through ? 1 : 0;
+      // Something that moves by itself is drawn each frame (at 15 fps, loop.ts), though nothing crossed half a pixel (D13013).
+      space.keep.redraw.live = livelyOf(state);
       state.need = space.keep.redraw.check(momentOf(space, state));
       if (state.need !== "none") present(space);
       if (!drawn && space.universe !== undefined) {
@@ -46,6 +50,7 @@ export function draw(space: Space, signal: AbortSignal): void {
       if (nap !== undefined) state.ticked = -1;
       return nap;
     },
+    lively: () => space.keep.redraw.live,
     free: () => {
       if (space.disposed || space.renderer.getContext().isContextLost()) return;
       space.renderer.setSize(1, 1, false);

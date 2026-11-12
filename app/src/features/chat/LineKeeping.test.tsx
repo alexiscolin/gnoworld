@@ -145,7 +145,7 @@ describe("a line's keeping, bound to the room's", () => {
     const flashes: { title: string; line?: string }[] = [];
     return { flashes, say: (message: { title: string; line?: string }) => void flashes.push(message) };
   };
-  const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it("gives a guest, and a room with no keeping, none", () => {
     expect(lineKeeping(room(), undefined, none)(LINE)).toBeUndefined();
@@ -198,7 +198,7 @@ describe("a line's keeping, bound to the room's", () => {
     expect(kept?.pinned).toBe(true);
     kept?.onPin();
     kept?.onUnpin();
-    await settled();
+    await nextTask();
     expect(asked).toEqual(["pin AB12", "unpin AB12"]);
     expect(flashes).toEqual([{ title: "Could not unpin the message.", line: "It is not pinned any more." }]);
   });
@@ -207,7 +207,7 @@ describe("a line's keeping, bound to the room's", () => {
     const { flashes, say } = said();
     const pin = { pin: () => Promise.reject(new Error("broken")), unpin: () => Promise.reject(new Error("broken")) };
     lineKeeping(room({ pin }), BOB, say)(LINE)?.pin?.onPin();
-    await settled();
+    await nextTask();
     expect(flashes).toEqual([
       { title: "Could not pin the message.", line: "The chat server could not be reached. Try again in a moment." },
     ]);

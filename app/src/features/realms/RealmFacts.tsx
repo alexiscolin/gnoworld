@@ -2,12 +2,11 @@
 // one drawn only when the indexer gave it (never a zero in its place), with the source and the time of the read. Everything the
 // indexer returns is text, in left-to-right, in an element of its own.
 import type { RealmFactsValue } from "@gnoworld/schemas/indexer";
+import { grouped } from "@gnoworld/ui";
 import type { ChainRead } from "@gnoworld/chain/read";
 import { ReadFailed, ReadSource } from "./ReadSource.tsx";
 
 export type { RealmFactsValue };
-
-const grouped = (n: number): string => n.toLocaleString("en-US");
 
 function Fact({ label, children, ltr = false }: { label: string; children: string; ltr?: boolean }) {
   return (

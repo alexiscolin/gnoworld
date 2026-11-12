@@ -12,7 +12,7 @@ const unstyled: {
   [
     Name in Exclude<
       keyof Exported,
-      "iconNode" | "sightRef" | "stillCopy" | "useAlone" | "holdsEscape" | "typedIn" | "composing"
+      "iconNode" | "sightRef" | "stillCopy" | "useAlone" | "grouped" | "holdsEscape" | "typedIn" | "composing"
     >
   ]: Unstyled<ComponentProps<Exported[Name]>>;
 } = {
@@ -23,8 +23,11 @@ const unstyled: {
   Figures: true,
   Network: true,
   PagedList: true,
+  ShowMore: true,
   Cell: true,
   Avatar: true,
+  Badge: true,
+  Stamp: true,
   Breadcrumb: true,
   Card: true,
   Center: true,
@@ -78,11 +81,12 @@ const parts: [
 
 // What @gnoworld/ui gives the app and the admin console: a component left out of the entry
 // would pass its own tests and still be out of their reach.
-it("exports every component of the design system, iconNode, stillCopy, sightRef and useAlone, nothing else", () => {
+it("exports every component of the design system, iconNode, stillCopy, sightRef, grouped and useAlone, nothing else", () => {
   expect(Object.keys(ui).sort()).toEqual(
     [
       "ActivityChart",
       "Avatar",
+      "Badge",
       "Breadcrumb",
       "Button",
       "Card",
@@ -120,15 +124,18 @@ it("exports every component of the design system, iconNode, stillCopy, sightRef 
       "Room",
       "Row",
       "Select",
+      "ShowMore",
       "Sidebar",
       "Skeleton",
       "Sparkline",
       "Stack",
+      "Stamp",
       "Stat",
       "Switch",
       "Switcher",
       "Tabs",
       "Tooltip",
+      "grouped",
       "iconNode",
       "sightRef",
       "stillCopy",

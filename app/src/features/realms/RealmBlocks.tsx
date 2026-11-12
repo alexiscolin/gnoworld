@@ -5,6 +5,7 @@
 // A link on gnoweb's origin opens there in a new tab; any other is a button that asks first (ExternalLink).
 import type { Inline, PageBlock } from "@gnoworld/core";
 import { Icon } from "@gnoworld/ui";
+import { NEW_TAB } from "../../lib/newTab.ts";
 import { createElement, Fragment, lazy, Suspense, useId, type ReactNode } from "react";
 import type { Drawing } from "../chat/index.ts";
 import { Budget, weigh, type Ink } from "./drawBudget.ts";
@@ -210,9 +211,7 @@ export function RealmBlocks({
         "p",
         { key: "cut", className: "meta", "data-cut": "" },
         "The rest of this page is not shown here.",
-        more === undefined
-          ? undefined
-          : createElement("a", { href: more, target: "_blank", rel: "noopener noreferrer" }, " Read it on gnoweb"),
+        more === undefined ? undefined : createElement("a", { href: more, ...NEW_TAB }, " Read it on gnoweb"),
       )
     : undefined;
   return createElement("article", { className: styles["page"] }, ...drawn, below, notice, warning.dialog);

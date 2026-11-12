@@ -10,6 +10,7 @@ import {
   jarvisItems,
   settleJarvisItem,
   setJarvisDrawing,
+  takeJarvisQuestions,
   useJarvisHere,
   type JarvisHere,
 } from "../../jarvisHere.ts";
@@ -44,7 +45,32 @@ function introduce(here: JarvisHere): void {
   addJarvisItem({ room: here.room, account: here.account });
 }
 
-export function JarvisHost({ first }: { first: "jarvis" | "jarvis-catch-up" }) {
+// Each ask of the page's that this host answers, once the chat's drawing is loaded (`wake`).
+function listen(here: JarvisHere, wake: (act: () => void) => () => void, signal: AbortSignal): void {
+  onAsked(
+    "jarvis",
+    wake(() => {
+      introduce(here);
+    }),
+    signal,
+  );
+  onAsked(
+    "jarvis-catch-up",
+    wake(() => {
+      ask(here, { ask: "catch-up", room: here.room });
+    }),
+    signal,
+  );
+  onAsked(
+    "jarvis-ask",
+    wake(() => {
+      for (const question of takeJarvisQuestions()) ask(here, { question, room: here.room });
+    }),
+    signal,
+  );
+}
+
+export function JarvisHost({ first }: { first: "jarvis" | "jarvis-catch-up" | "jarvis-ask" }) {
   const here = useJarvisHere();
   const firedRef = useRef(false);
   const [drawn, setDrawn] = useState<Drawing>();
@@ -62,20 +88,7 @@ export function JarvisHost({ first }: { first: "jarvis" | "jarvis-catch-up" }) {
         })
         .catch(reportError);
     };
-    onAsked(
-      "jarvis",
-      wake(() => {
-        introduce(here);
-      }),
-      stop.signal,
-    );
-    onAsked(
-      "jarvis-catch-up",
-      wake(() => {
-        ask(here, { ask: "catch-up", room: here.room });
-      }),
-      stop.signal,
-    );
+    listen(here, wake, stop.signal);
     // The ask that brought the host, said again now that the host listens.
     if (!firedRef.current) {
       firedRef.current = true;
@@ -94,7 +107,6 @@ export function JarvisHost({ first }: { first: "jarvis" | "jarvis-catch-up" }) {
     const { realm, universe } = here;
     const ctx: JarvisCardContext = {
       room: here.room,
-      account: here.account,
       ask: (question) => {
         ask(here, question);
       },

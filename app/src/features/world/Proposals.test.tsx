@@ -70,7 +70,7 @@ describe("a world's proposals", () => {
     await flush();
     expect(el.querySelector("h2")?.textContent).toBe("Proposals");
     expect(el.querySelector("[role='status']")).toBeNull();
-    expect([...el.querySelectorAll("[data-link] .truncate")].map((h) => h.textContent)).toEqual([
+    expect([...el.querySelectorAll("a[target='_blank'] .truncate")].map((h) => h.textContent)).toEqual([
       "Set validator gno-core-validator-1 to voting power 60",
       "Set validator gno-core-validator-1 to voting power 500",
       "Set node halt height",

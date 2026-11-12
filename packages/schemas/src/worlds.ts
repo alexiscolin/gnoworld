@@ -43,6 +43,10 @@ const Realm = z.strictObject({
 /** What a world's realms say it is, read once by the job (F4109): core's `NATURES`, which only leans a look and is never shown. */
 export const WORLD_NATURES = ["nft", "token", "exchange", "dao", "game"] as const;
 
+/** The closed list of tags Jarvis may give a realm when it explains it (the natures and a few the outlines show beyond doubt): one source for
+ * the explanation's prompt, its check, its table and the search's kind filter. Never free words. */
+export const REALM_TAGS = [...WORLD_NATURES, "registry", "board", "social", "tool", "identity", "payments"] as const;
+
 // A key it does not know is dropped, never kept nor refused: a reader older than the job that wrote the file, an open tab or a server
 // rolled back, still reads every world, and nothing it cannot check reaches the app.
 const World = z.object({

@@ -46,7 +46,17 @@ describe("loadConfig", () => {
       guests: { on: true, perVisitor: 10, perHour: 600, living: 5000 },
       moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
       cards: { enabled: false, readerUrl: undefined, thresholds: { sexual: 0.3 } },
+      explain: { seed: undefined, perDay: 30 },
     });
+  });
+
+  it("reads the explanations' seed file and daily cap, the cap from 1 to 1000", () => {
+    expect(loadConfig({ ...ENV, EXPLAIN_SEED_FILE: "/data/seed.json", EXPLAIN_PER_DAY: "5" }).explain).toEqual({
+      seed: "/data/seed.json",
+      perDay: 5,
+    });
+    for (const bad of ["0", "1001", "x"]) expect(() => loadConfig({ ...ENV, EXPLAIN_PER_DAY: bad })).toThrow();
+    expect(() => loadConfig({ ...ENV, EXPLAIN_SEED_FILE: "seed.json" })).toThrow();
   });
 
   it("reads the login's lists, each item as it is sent", () => {
@@ -537,7 +547,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       url: "http://jarvis:8090",
       timeoutMs: 900_000,
       questionChars: 500,
-      first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
+      first: { quota: 30, quotaUnnamed: 30, unlimited: [] },
       namesRpc: "https://rpc.gno.land",
       namesChain: "gnoland-1",
     });

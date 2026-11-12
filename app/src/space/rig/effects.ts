@@ -1,5 +1,5 @@
 // The demo's effects on the scene (D401), drawn by one owner: speed (blur and dust) and the arrival's scan.
-import type { PerspectiveCamera, Scene, WebGLRenderer } from "three";
+import type { PerspectiveCamera, Quaternion, Scene, WebGLRenderer } from "three";
 import type { Disposer } from "../disposer.ts";
 import type { Rig } from "./rig.ts";
 import type { Vec } from "../layout.ts";
@@ -16,10 +16,10 @@ export class Effects {
     this.#speed = new Speed(stage, owner);
   }
 
-  /** A frame of `rig`'s, `delta` ms on; `at`, the page's planet, where the scan stands. */
-  tick(rig: Rig, delta: number, at: Vec): void {
+  /** A frame of `rig`'s, `delta` ms on; `planet`, the page's: `at`, where the scan stands, in its `frame` (its axis and turn). */
+  tick(rig: Rig, delta: number, planet: { at: Vec; frame?: Quaternion | undefined }): void {
     this.#speed.tick(rig, delta);
-    this.scan.tick(rig, delta, at);
+    this.scan.tick(rig, delta, planet);
   }
 
   /** Lets go of the blur's target in GPU memory; the next fast flight makes it again. */

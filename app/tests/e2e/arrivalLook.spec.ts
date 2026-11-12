@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { adena } from "./adena.ts";
-import { accountPill } from "./account.ts";
+import { accountPill, connectButton } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // How the arrival banners look (slice 9h, frames 90 to 97), on a phone and a computer. No journey reaches first words (the
@@ -27,7 +27,7 @@ async function arriveWith(page: Page, kinds: readonly ("chart" | "words")[]): Pr
   await page.route("**/api/signals/chart", (route) => route.fulfill({ json: { world: "bubble", first: true } }));
   await page.goto("/w/bubble");
   await hydrated(page);
-  await page.getByRole("button", { name: "Connect Adena" }).click();
+  await connectButton(page).click();
   await expect(accountPill(page)).toBeVisible();
 }
 

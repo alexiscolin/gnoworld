@@ -1,19 +1,10 @@
-/* The rooms' sections: each named as a label is, and the small grey note under the direct messages. */
+/* The rooms' sections (ui's Disclosure names each), and the small grey note under the direct messages. */
 @layer components {
   .note {
+    /* layout: a step under the list it speaks of */
+    margin-block-start: var(--space-xs);
     color: var(--color-text-muted);
     font: var(--font-meta);
-  }
-
-  /* No direct message yet: a small card, its icon and two short lines. */
-  .empty {
-    padding: var(--space-xs) var(--space-s);
-    border: var(--line-width) dashed var(--color-line);
-    border-radius: var(--radius-m);
-  }
-
-  .lead {
-    font: var(--font-ui);
   }
 
   /* The column's list fills its height (the fill-column utility), so the reader's shortcuts stand at its foot (Alexis, 2026-11-07). */
@@ -27,21 +18,6 @@
     margin-block-start: auto;
     padding-block-start: var(--space-s);
     border-block-start: var(--line-width) solid var(--color-line);
-  }
-
-  /* The section's name folds it, in the label's own type (the reset's button): its chevron turned aside while folded. */
-  .fold > svg {
-    transition: rotate calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
-  }
-
-  .fold[aria-expanded="false"] > svg {
-    rotate: -90deg;
-  }
-
-  .section {
-    /* layout: the first pill stands off the kicker */
-    /* raw: 11 px more, so the pill's ink is 25 px from the kicker's (frame 66) */
-    margin-block-end: 11px;
   }
 }
 

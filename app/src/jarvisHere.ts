@@ -1,11 +1,16 @@
 // What the page's parts share of Jarvis (10u-a), between parts that import nothing of each other (as pageAsks.ts): the chat in view tells
 // the room Jarvis could read now, once Jarvis is on; Jarvis's cards, the asker's alone (D1017), are kept here for the chat to draw among
 // its lines, and the panel's host (features/jarvis) registers how they are drawn. Memory only: a reload takes them.
-import type { JarvisAnswer, JarvisQuestion } from "@gnoworld/schemas";
+import type { JarvisAnswer, JarvisQuestion, JarvisState } from "@gnoworld/schemas";
+import { useQuery } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { useSyncExternalStore } from "react";
 import type { Result } from "./lib/api/http.ts";
+import type { Language } from "./lib/language.ts";
 import { Heard } from "./lib/heard.ts";
+import { queryClient } from "./lib/query/client.ts";
+import { jarvisStateOptions } from "./lib/query/jarvisState.ts";
+import { askFor } from "./pageAsks.ts";
 
 /** Where Jarvis was asked from: the room it reads, and what the cards need of its place. */
 export interface JarvisHere {
@@ -15,6 +20,9 @@ export interface JarvisHere {
   universe: { id: string; isDefault: boolean; gnoweb?: string | undefined };
   /** The account logged in; none for a guest. */
   account?: string | undefined;
+  /** The language the reader's lines are translated into, and whether they are, as they come on screen (the device's settings). */
+  language?: Language | undefined;
+  auto?: boolean | undefined;
 }
 
 /** A card of Jarvis in a room's list: its introduction, or an ask and what came back (none yet while it is asked). */
@@ -27,10 +35,6 @@ export interface JarvisItem {
   at: string;
   ask?: JarvisQuestion;
   result?: Result<JarvisAnswer>;
-  /** The market card (not Jarvis's): it stands in the same list, the reader's alone, and is drawn by the chat (features/chat/MarketCard.tsx). */
-  market?: true;
-  /** The market card's tokens when it shows some alone (`/market gnot`); none is all of them. */
-  symbols?: readonly string[];
 }
 
 let here: JarvisHere | undefined;
@@ -53,6 +57,22 @@ export const useJarvisHere = (): JarvisHere | undefined =>
     () => here,
     () => undefined,
   );
+
+/** Whether Jarvis is on: off until the server says on, and off for any failure, which the next ask reads again. */
+export function useJarvisOn(read?: () => Promise<Result<JarvisState>>): boolean {
+  return useQuery(jarvisStateOptions(read), queryClient).data === true;
+}
+
+const questions: string[] = [];
+
+/** Asks Jarvis a question of the asker's own words, in the room the chat told; the host, once it has come, takes it. */
+export function askJarvis(question: string): void {
+  questions.push(question);
+  askFor("jarvis-ask");
+}
+
+/** The questions asked and not yet taken, the oldest first; taking them empties the list. */
+export const takeJarvisQuestions = (): string[] => questions.splice(0);
 
 let made = 0;
 

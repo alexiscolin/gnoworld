@@ -62,12 +62,10 @@ describe("Worlds, the pictures of the real planets", () => {
     expect(picture?.getAttribute("src")).not.toBe(pictureOf("govdao"));
   });
 
-  it("loads each lazily at its own size, saying nothing: the link names it", () => {
+  it("loads each lazily, saying nothing: the link names it (its size is the disc's, from CSS)", () => {
     const [picture] = all(mount(<Worlds universe={UNIVERSE} worlds={[EARTH]} current="earth" />), "img");
     expect(picture?.getAttribute("loading")).toBe("lazy");
     expect(picture?.getAttribute("decoding")).toBe("async");
-    expect(picture?.getAttribute("width")).toBe("44");
-    expect(picture?.getAttribute("height")).toBe("44");
     expect(picture?.getAttribute("alt")).toBe("");
   });
 

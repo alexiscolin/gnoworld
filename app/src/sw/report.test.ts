@@ -33,7 +33,7 @@ function worker({ pages = 2, listing = true } = {}) {
     heard,
   };
 }
-const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // F468: the page's journeys listen for these messages; a worker's violation is invisible to them otherwise.
 test("a policy violation inside the worker is told to every open page, with the directive it broke and what it blocked", async () => {
@@ -42,7 +42,7 @@ test("a policy violation inside the worker is told to every open page, with the 
   expect(heard.map(({ type }) => type)).toEqual(["securitypolicyviolation"]);
   violate("connect-src", "https://evil.test/x");
   violate("script-src-elem", "inline");
-  await settled();
+  await nextTask();
   const told = [
     { type: VIOLATION, directive: "connect-src", blockedURI: "https://evil.test/x" },
     { type: VIOLATION, directive: "script-src-elem", blockedURI: "inline" },
@@ -62,7 +62,7 @@ test("the message type is the one the journeys' page side listens for: csp-viola
 test("nothing is told until a violation happens", async () => {
   const { scope, sent, asked } = worker();
   reportViolations(scope, vi.fn());
-  await settled();
+  await nextTask();
   expect(asked).toEqual([]);
   expect(sent).toEqual([[], []]);
 });
@@ -72,7 +72,7 @@ test("with no page open nothing is sent and nothing fails", async () => {
   const fail = vi.fn();
   reportViolations(scope, fail);
   violate("connect-src");
-  await settled();
+  await nextTask();
   expect(fail).not.toHaveBeenCalled();
 });
 
@@ -81,7 +81,7 @@ test("pages the worker cannot list are not silent: the failure is reported, not 
   const fail = vi.fn();
   reportViolations(scope, fail);
   violate("connect-src");
-  await settled();
+  await nextTask();
   expect(fail).toHaveBeenCalledOnce();
   expect(fail.mock.calls[0]?.[0]).toEqual(new Error("no clients"));
 });

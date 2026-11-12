@@ -103,16 +103,13 @@ describe("the composer's Markdown, to the editor and back", () => {
 
   // The room's reader, not the text, is what must not change: the tree of the draft and of what the editor gives back.
   it("leaves the room's reading of a draft as it was, on drafts of marks and blocks mixed", () => {
-    const bad: string[] = [];
+    // A failed property prints its shrunk counterexample and its seed, which `fc.assert` takes back to replay it.
     fc.assert(
       fc.property(prose.filter(kept), (md) => {
-        const back = through(md);
-        if (JSON.stringify(markdown(back)) !== JSON.stringify(markdown(md)))
-          bad.push(`${JSON.stringify(md)} -> ${JSON.stringify(back)}`);
+        expect(markdown(through(md))).toEqual(markdown(md));
       }),
       { numRuns: 5000 },
     );
-    expect(bad).toEqual([]);
   });
 });
 

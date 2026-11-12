@@ -211,7 +211,7 @@ test.describe("the composer", () => {
     await inGames(page);
     await field(page).fill("/");
     const list = page.getByRole("listbox", { name: "Suggestions" });
-    await expect(list.getByRole("option")).toHaveText([/\/me/, /\/poll/]);
+    await expect(list.getByRole("option")).toHaveText([/\/me/, /\/poll/, /\/market/, /\/trending/, /\/proposals/]);
     await field(page).press("Tab");
     await expect(field(page)).toHaveText("/me");
     await expect(field(page)).toBeFocused();
@@ -239,7 +239,7 @@ test.describe("the composer", () => {
     await inGames(page);
     await page.keyboard.press("Alt+ArrowDown");
     await page.keyboard.press("Alt+ArrowDown");
-    await expect(page.getByRole("heading", { level: 2, name: "#news", exact: true })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "#news", exact: true })).toBeVisible();
     await expect(page).toHaveURL(/\/w\/bubble\?room=news&chat=full$/);
   });
 
@@ -247,7 +247,7 @@ test.describe("the composer", () => {
     page,
   }) => {
     await inGames(page);
-    const heading = (name: string) => page.getByRole("heading", { level: 2, name, exact: true });
+    const heading = (name: string) => page.getByRole("heading", { name, exact: true });
     await field(page).press("ArrowDown");
     for (const keys of [
       "ArrowDown",

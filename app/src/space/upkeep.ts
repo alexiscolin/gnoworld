@@ -14,6 +14,8 @@ export class Upkeep {
   /** The most pixels per page pixel the frames keep up with: none till they fail to. */
   ratioCap = Infinity;
   plated: Plated | undefined;
+  /** Whether the flight that runs, if one does, is the framing's own, which no page waits on. */
+  unheard = false;
   /** Asks the loop for a frame where it sleeps; a no-op while it is awake. Set once the loop runs, and never touches back. */
   wake: () => void = () => undefined;
 

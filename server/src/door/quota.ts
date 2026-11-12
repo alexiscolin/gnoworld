@@ -1,5 +1,5 @@
-// The door's quota (D43, D47, D95): questions per account and UTC day, 20 by default and 5 for an account with no mainnet
-// name, an allowlist of accounts counted but never refused (the day's budget still stops them), all kept in the server's
+// The door's quota (D43, D47, D95): questions per account and UTC day, 30 by default, an account with no mainnet name
+// too, an allowlist of accounts counted but never refused (the day's budget still stops them), all kept in the server's
 // database. The environment gives their first value at the first start alone; an admin changes them at once, read again at
 // each question. One statement counts a question and refuses it together, so questions at once never pass the quota.
 import type { DatabaseSync } from "node:sqlite";

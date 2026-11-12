@@ -3,17 +3,14 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, expect, it, vi } from "vitest";
 import type { PlateModel } from "./model.ts";
+import { standInPopovers } from "../../../tests/popover.ts";
 import { Plate } from "./Plate.tsx";
 
 // The hero asks the router and the stores: it is not what this reads.
 vi.mock("./Hero.tsx", () => ({ Hero: () => null, Pills: () => null }));
 
 // jsdom has no popover API: the tooltip of a card's button asks for one.
-Object.assign(HTMLElement.prototype, {
-  showPopover: () => undefined,
-  hidePopover: () => undefined,
-  togglePopover: () => undefined,
-});
+standInPopovers();
 Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
 
 const modelAt = (path: string): PlateModel => ({

@@ -1,16 +1,17 @@
-import AxeBuilder from "@axe-core/playwright";
+import type { Locator } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { violations } from "./axe.ts";
 import { open } from "./chatScreenOpen.ts";
 import { logIn } from "./irc.ts";
 import { box, near } from "./geometry.ts";
 
-// Slice 5j: a world's page as frames 20 to 35 and 90 to 97 show it, at the video's size (1728 by 1080, scale 1; a box to
-// 2 px of the frame's, as pageGeometry.spec.ts holds it). Bubble has no figure, no history and no linked world, so the
-// page draws what its data holds: the kicker, the title, its line, the activity's words, the actions.
+// A world's page at the video's size (1728 by 1080, scale 1; a box to 2 px of the proposal's, as pageGeometry.spec.ts holds it). Bubble
+// has no figure, no history and no linked world, so the page draws what its data holds: the kicker, the title, its line, the actions, the
+// figures band.
 
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
-// Bubble has no history here: the plate's hours (8g) come from the server's rooms, where the other journeys of the run have said lines, so
+// Bubble has no history here: the plate's hours come from the server's rooms, where the other journeys of the run have said lines, so
 // each test below answers them as a server with none does, and reads no rate it did not plant.
 test.beforeEach(async ({ page }) => {
   await page.route("**/api/presence/hours*", (route) =>
@@ -21,66 +22,40 @@ test.beforeEach(async ({ page }) => {
 test.describe("a world's page at the video's size", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
-  // 8g: the kicker is frame 104's crumb, "UNIVERSE › GAMES › DAPP", the universe a link to its cosmos.
-  test("the crumb stands at the text column's left, 137 px down, over the title (frames 26, 104)", async ({ page }) => {
+  // The kicker is the plate's first row: the planet's disc, then the genre and the kind; the header's levels say where the place is.
+  test("the kicker stands at the text column's left, over the title, and carries no crumb", async ({ page }) => {
     await page.goto("/w/bubble");
     await hydrated(page);
-    const label = "[data-look='plate'] nav[aria-label='You are here']";
-    const kicker = await box(page, label);
+    const row = await box(page, "[data-look='plate'] [data-planet]");
     const title = await box(page, "[data-look='plate'] h1");
-    near(kicker.x, 100, "the kicker's left");
-    near(kicker.y + kicker.height / 2, 137, "the kicker's middle");
-    expect(kicker.y + kicker.height).toBeLessThanOrEqual(title.y + 0.5);
-    await expect(page.locator(`${label} li`)).toHaveText(["Universe", "Games", "dApp"]);
+    near(row.x, title.x, "the kicker's left, the title's");
+    expect(row.y + row.height).toBeLessThanOrEqual(title.y + 0.5);
+    await expect(page.locator("[data-look='plate'] [data-planet]")).toContainText("Games · dApp");
+    await expect(page.locator("[data-look='plate'] nav")).toHaveCount(0);
   });
 
-  // F2871: the kicker's row (24 px, flex) is the paragraph right before the title, not any first paragraph of a block of the plate: the
-  // activity's own title, which a history draws, stays a plain label. The probe stands where Activity's title would.
-  test("sets the kicker's row on the paragraph before the title and on no other first paragraph", async ({ page }) => {
-    await page.goto("/w/bubble");
-    await hydrated(page);
-    const rows = await page.evaluate(() => {
-      const kicker = document.querySelector("[data-look='plate'] h1")?.previousElementSibling;
-      const block = document.createElement("div");
-      const probe = document.createElement("p");
-      probe.className = "label";
-      probe.textContent = "Activity · last 24 h";
-      block.append(probe);
-      document.querySelector("[data-look='plate'] h1 + p")?.after(block);
-      const row = (node: Element | null | undefined) => (node ? getComputedStyle(node) : undefined);
-      return [row(kicker)?.display, row(kicker)?.minHeight, row(probe)?.display, row(probe)?.minHeight];
-    });
-    expect(rows).toEqual(["flex", "24px", "block", "0px"]);
-  });
-
-  // F2869: each block at its place. Frame 26's description line stands at y 316 (its centre); Bubble's has two lines, the first at
-  // the frame's place. The frame's facts, chart (479) and actions (574) have the data Bubble lacks (no source for who is here, no
-  // history), so below the description the page is pinned at what it lays: the flat chart of no history, then the actions under it.
-  test("the title, the line, the activity's words and the actions stand at their y (frames 26, 90)", async ({
+  test("the title, the line, the actions and the figures stand in their order, from the column's left", async ({
     page,
   }) => {
     // The demo's rooms hold people: nobody is counted here, as the test's premise says.
     await page.routeWebSocket(/\/ws$/, () => undefined);
     await page.goto("/w/bubble");
     await hydrated(page);
+    const plate = page.locator("[data-look='plate']");
+    await expect(plate.getByRole("region", { name: "Figures" })).toBeVisible();
     const title = await box(page, "[data-look='plate'] h1");
-    const line = await box(page, "[data-look='plate'] h1 + p");
-    // The activity's words by what they say: from 1,280 px nobody counted holds no place over them (Alexis, 2026-11-03, "retire le vide").
-    const activity = await box(page, "[data-look='plate'] .label:has-text('Activity · last 24 h')");
+    const line = await box(page, "[data-look='plate'] p:has-text('Bubble, a world')");
     const main = await box(page, "[data-look='plate'] a[href='#chat']");
-    near(title.y, 172, "the title's top");
-    near(line.y + 12.4, 316, "the line's first line's middle");
-    near(line.x, 100, "the line's left");
-    near(activity.y, 371, "the activity title's top");
-    // Frame 26: the actions' top 30 px under the chart's last words' ink (544 to 574); a label's box ends 2 px under its ink.
-    // 8g: the activity holds the chart's room while it has no history, so the actions stand under that room as frame 26's under its chart.
-    const room = await box(page, "[data-look='plate'] div:has(> div > .label:has-text('Activity · last 24 h'))");
-    near(room.y, activity.y, "the room's top, the title's");
-    near(main.y - (room.y + room.height), 574 - 544 - 2, "the actions under the activity's room");
-    expect(main.y, "the actions come after the activity's title").toBeGreaterThan(activity.y + activity.height);
+    const band = await box(page, "[data-look='plate'] section[aria-label='Figures']");
+    near(line.x, title.x, "the line's left");
+    near(main.x, title.x, "the actions' left");
+    near(band.x, title.x, "the figures' left");
+    expect(line.y, "the line under the title").toBeGreaterThanOrEqual(title.y + title.height);
+    expect(main.y, "the actions under the line").toBeGreaterThanOrEqual(line.y + line.height);
+    expect(band.y, "the figures under the actions").toBeGreaterThanOrEqual(main.y + main.height);
   });
 
-  test("the actions are 56 px tall from the column's left, Follow 10 px after the main one, Share 10 px after Follow (frames 26, 92)", async ({
+  test("the actions are 44 px tall from the column's left, Follow 10 px after the main one, Share 10 px after Follow", async ({
     page,
   }) => {
     await page.routeWebSocket(/\/ws$/, () => undefined);
@@ -96,28 +71,36 @@ test.describe("a world's page at the video's size", () => {
     const first = (await main.boundingBox()) ?? none;
     const second = (await follow.boundingBox()) ?? none;
     const third = (await share.boundingBox()) ?? none;
-    near(first.x, 100, "the main action's left");
-    near(first.height, 56, "the main action's height");
-    near(second.height, 56, "Follow's height");
-    near(third.height, 56, "Share's height");
+    near(first.x, 101, "the main action's left");
+    near(first.height, 44, "the main action's height");
+    near(second.height, 44, "Follow's height");
+    near(third.height, 44, "Share's height");
     near(second.x - (first.x + first.width), 10, "the gap between the main action and Follow");
     near(third.x - (second.x + second.width), 10, "the gap between Follow and Share");
     near(second.y, first.y, "Follow's top");
     near(third.y, first.y, "Share's top");
   });
 
-  test("the activity block draws its chart flat and names it as no activity yet for Bubble", async ({ page }) => {
+  test("the hours card draws its chart flat for a world nobody spoke in, a dot an hour", async ({ page }) => {
+    const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000 - 23 * 3_600_000;
+    await page.route("**/api/presence/hours*", (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({ from: hour, hours: [], now: null }),
+      }),
+    );
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect(page.getByRole("group", { name: /no activity recorded yet/i })).toBeVisible();
-    await expect(page.locator("[data-look='plate'] [data-hour]")).toHaveCount(24);
+    await expect(page.getByRole("group", { name: "Chat messages per hour" })).toBeVisible();
+    await expect(page.getByText(/No message in the last 24 hours/)).toBeVisible();
     await expect(page.getByText("messages now")).toHaveCount(0);
     await expect(page.getByText(/connected worlds/i)).toHaveCount(0);
   });
 });
 
 // F2864, with the dock: the chat stands beside the plate from 1280 px, so "Say hi in the chat" needs no scroll; it puts the reader's
-// cursor in the chat's composer. Under 1280 px the chat is the page and the plate is not seen.
+// cursor in the chat's composer. Under 1280 px the chat is a block under the plate.
 test.describe("Say hi in the chat", () => {
   for (const width of [1280, 1728] as const) {
     test(`at ${String(width)} px puts the cursor in the dock's composer`, async ({ page }) => {
@@ -129,108 +112,76 @@ test.describe("Say hi in the chat", () => {
   }
 });
 
-// F2868: who is here comes from the chat, once it has connected; the page draws no rate (nothing gives one).
+// Who is here comes from the server's count, once it has answered, in the figures band's first cell; the page draws no rate (nothing gives one).
 test.describe("who is here right now", () => {
   test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
 
-  // The plate of Bubble once its chat has connected and the fact is drawn.
+  // The plate of Bubble once the server has counted people: the band's "Here now" cell says so.
   const connected = async (page: Page) => {
+    await page.route("**/api/presence", (route) =>
+      route.fulfill({ json: { worlds: [{ world: "bubble", here: 7, perHour: 0, rise: 0 }] } }),
+    );
     await page.goto("/w/bubble");
     await hydrated(page);
     const plate = page.locator("[data-look='plate']");
-    await expect(plate.getByText("right now", { exact: true })).toBeVisible();
+    await expect(plate.getByRole("region", { name: "Figures" }).locator(".visually-hidden").first()).toHaveText("7");
     return plate;
   };
+  const hereCell = (plate: Locator) =>
+    plate.getByRole("region", { name: "Figures" }).locator("div:has(> div > span:text-is('Here now'))").first();
 
-  // Frame 26 draws "38 here" under its one line, its digits from 372 to 405 px, the line's middle at 316: the page's figure, 44 px at line
-  // height 1, stands its box 8 px over its digits, so 364 - (316 + half a line) under the line's last line, whatever its count of lines
-  // (7w's design review: Bubble's two lines had put it there by chance). The fact comes there, the words under it, from 1,280 px.
   for (const width of [1280, 1728] as const)
-    test(`stands where frame 26 draws it once someone is counted, the activity's words under it, at ${String(width)} px`, async ({
-      page,
-    }) => {
+    test(`draws the figures as one row of cells under the actions, at ${String(width)} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 1080 });
-      await connected(page);
-      const line = page.locator("[data-look='plate'] h1 + p");
-      const half = Number.parseFloat(await line.evaluate((node) => getComputedStyle(node).lineHeight)) / 2;
-      const words = await box(page, "[data-look='plate'] h1 + p");
-      const figure = await box(page, "[data-look='plate'] [data-value]");
-      const activity = await box(page, "[data-look='plate'] .label:has-text('Activity · last 24 h')");
-      near(figure.y - (words.y + words.height), 364 - (316 + half), "the figure under the line");
-      expect(activity.y, "the activity's words under the fact").toBeGreaterThan(figure.y + figure.height);
-    });
-
-  // Frame 26 draws a hairline over each fact (1 px at 355, from the column's left: 100 to 325 and 358 to 583), its digits 17 px under it:
-  // the figure's box 9 px under the hairline.
-  for (const width of [1280, 1728] as const)
-    test(`draws a hairline over each fact, as frame 26, at ${String(width)} px`, async ({ page }) => {
-      await page.setViewportSize({ width, height: 1080 });
-      await connected(page);
-      const fact = page.locator("[data-look='plate'] h1 + p + div > * > *").first();
-      const drawn = await fact.evaluate((node) => {
-        const style = getComputedStyle(node);
-        return [style.borderTopWidth, style.borderTopStyle];
-      });
-      expect(drawn, "a hairline over the fact").toEqual(["1px", "solid"]);
-      const rule = (await fact.boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
-      const words = await box(page, "[data-look='plate'] h1 + p");
-      const figure = await box(page, "[data-look='plate'] [data-value]");
-      near(rule.x, words.x, "the hairline from the column's left");
-      near(figure.y - rule.y, 364 - 355, "the figure under the hairline");
-      // One fact a column, as frame 26's two: a hairline 226 px wide of the column's 484, 33 px from the next; a lone fact keeps its own.
-      near(rule.width, (words.width - 32) / 2, "the hairline's width, a column's");
+      const plate = await connected(page);
+      const cells = plate.locator("section[aria-label='Figures'] > div > div");
+      const first = (await cells.first().boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+      const last = (await cells.last().boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+      near(last.y, first.y, "the cells share a row");
+      near(last.width, first.width, "the cells are alike");
+      const actions = await box(page, "[data-look='plate'] a[href='#chat']");
+      expect(first.y, "the figures under the actions").toBeGreaterThan(actions.y + actions.height);
     });
 
   test("appears in the plate once the chat has connected, as a count of people, and writes no rate", async ({
     page,
   }) => {
     const plate = await connected(page);
-    const people = Number(await plate.locator("[data-value]").first().getAttribute("data-value"));
+    const people = Number(
+      (await hereCell(plate).locator(".visually-hidden").first().textContent())?.replace(/\D/g, ""),
+    );
     expect(people).toBeGreaterThan(0);
     await expect(plate.getByText("messages now")).toHaveCount(0);
   });
 
-  // The instrument figures (Alexis, 2026-10-31; the board "Instrument"): the figure in Geist Mono 500, tabular and tracked -0.04em, its
-  // caption the label in mono capitals.
-  test("sets the figure in Geist Mono 500, tabular, and its caption in mono capitals", async ({ page }) => {
+  // The instrument figures: the figure in the figure font, tabular and tracked -0.04em.
+  test("sets the figure tabular and tracked, in Geist Mono", async ({ page }) => {
     const plate = await connected(page);
-    const figure = await plate
-      .locator("[data-value]")
+    const figure = await hereCell(plate)
+      .locator("span[aria-hidden='true']")
       .first()
       .evaluate((node) => {
-        const style = getComputedStyle(node);
-        return [style.fontFamily, style.fontWeight, style.fontVariantNumeric, style.fontSize, style.letterSpacing];
+        const style = getComputedStyle(node.parentElement ?? node);
+        return [style.fontFamily, style.fontVariantNumeric, style.fontSize, style.letterSpacing];
       });
     expect(figure[0]).toContain("Geist Mono");
-    expect(figure.slice(1)).toEqual(["500", "tabular-nums", "44px", "-1.76px"]);
-    const caption = await plate.getByText("right now", { exact: true }).evaluate((node) => {
-      const style = getComputedStyle(node);
-      return [style.fontFamily, style.textTransform];
-    });
-    expect(caption[0]).toContain("Geist Mono");
-    expect(caption[1]).toBe("uppercase");
+    expect(figure[1]).toBe("tabular-nums");
+    expect(figure[3]).toBe(`${String(Number.parseFloat(figure[2] ?? "0") * -0.04)}px`);
   });
 });
 
-// Who is here, while nobody is counted (Alexis, 2026-11-03, "retire le vide"): where the plate is a block in the page, under 1,280 px, its
-// place is held, so nothing under it moves as the count comes (7e); from 1,280 px, where the plate stands beside its dock, it holds none.
-// The chat's socket answers nothing, so nobody is ever counted.
+// While nobody is counted, the band still draws its first cell with its zero (a count that was read is a value), at every width:
+// the chat's socket answers nothing, so nobody is ever counted.
 test.describe("who is here while nobody is counted", () => {
-  const FACT = 59;
-  for (const [width, held] of [
-    [390, FACT],
-    [1279, FACT],
-    [1280, 0],
-    [1728, 0],
-  ] as const)
-    test(`at ${String(width)} px holds ${held === 0 ? "no place" : "the fact's place"}`, async ({ page }) => {
+  for (const width of [390, 1279, 1280, 1728] as const)
+    test(`at ${String(width)} px the band's "Here now" reads zero`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.routeWebSocket(/\/ws$/, () => undefined);
       await page.goto("/w/bubble");
       await hydrated(page);
-      const here = page.locator("[data-look='plate'] h1 + p + div");
-      await expect(here).toBeAttached();
-      expect(await here.evaluate((node) => node.getBoundingClientRect().height)).toBeCloseTo(held, 0);
+      const band = page.locator("[data-look='plate'] section[aria-label='Figures']");
+      await expect(band.getByText("Here now")).toBeVisible();
+      await expect(band.locator(".visually-hidden").first()).toHaveText("0");
     });
 });
 
@@ -264,18 +215,19 @@ test.describe("Share where the browser cannot copy", () => {
   });
 });
 
-// From 1280 px the chat is a dock at the plate's right, inside one outline; under it the chat is the page, drawn over the plate.
+// From 1280 px the chat is a dock at the plate's right, inside one outline; under it the chat is a block under the plate.
 // The plate comes first in the reading and tab order at every width (F2865).
 test.describe("the page's order", () => {
   for (const width of [390, 1279] as const) {
-    test(`at ${String(width)} px the chat takes the whole page`, async ({ page }) => {
+    test(`at ${String(width)} px the chat is a block under the plate, between the page's gutters`, async ({ page }) => {
       await page.setViewportSize({ width, height: 844 });
       await page.goto("/w/bubble");
       await hydrated(page);
       const chat = await box(page, "[data-chat-layout]");
-      near(chat.x, 0, "the chat's left");
-      near(chat.y, 0, "the chat's top");
-      near(chat.width, width, "the chat's width");
+      near(chat.x, 16, "the chat's left, the page's gutter");
+      const plate = await box(page, "[data-look='plate']");
+      expect(chat.y, "the chat under the plate").toBeGreaterThanOrEqual(plate.y + plate.height - 0.5);
+      near(chat.width, width - 32, "the chat's width, the gutters apart");
     });
   }
 
@@ -340,9 +292,8 @@ for (const width of [390, 1280] as const) {
     await page.setViewportSize({ width, height: 844 });
     await page.goto("/w/bubble");
     await hydrated(page);
-    await expect(page.getByRole("group", { name: /no activity recorded yet/i })).toBeVisible();
-    const { violations } = await new AxeBuilder({ page }).analyze();
-    expect(violations).toHaveLength(0);
+    await expect(page.locator("[data-look='plate'] section[aria-label='Figures']")).toBeVisible();
+    expect(await violations(page)).toHaveLength(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 }

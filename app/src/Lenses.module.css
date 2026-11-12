@@ -80,7 +80,7 @@
     max-inline-size: 0;
     overflow: hidden;
     opacity: 0;
-    font: var(--font-label);
+    font: var(--font-count);
     transition:
       max-inline-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard),
       opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);

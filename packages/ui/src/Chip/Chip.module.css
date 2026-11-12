@@ -3,6 +3,9 @@
 @layer components {
   .chip {
     --_fill: var(--color-fill);
+
+    /* A pill is one line: a row too narrow for it hides it, never breaks its words. */
+    white-space: nowrap;
   }
 
   /* A mark's one line of text fills its height with its own leading. */
@@ -24,6 +27,16 @@
       color var(--motion-base) var(--ease-standard);
   }
 
+  /* The dock's room shortcuts: the video's pill, 27 px high. */
+  .chip[data-size="chip"] {
+    --_h: var(--control-chip);
+    --_pad: var(--space-xs);
+    --_font: var(--font-chip);
+
+    padding-block: 0;
+    text-decoration: none;
+  }
+
   /* A control at the smallest size: its words at the interface's size over the mark's, the pointer's. */
   button.chip[data-size="xs"] {
     --_font: var(--font-ui);
@@ -32,7 +45,7 @@
   }
 
   /* The pointer lightens a neutral chip at rest, never a selected one's cream or a tone's tint. */
-  button.chip[data-tone="neutral"]:not([aria-pressed="true"]):hover {
+  .chip:is(button, a)[data-tone="neutral"]:not([aria-pressed="true"], [aria-current="true"]):hover {
     --_fill: var(--color-fill-hover);
   }
 
@@ -60,8 +73,8 @@
     --_ink: var(--color-danger);
   }
 
-  /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
-  .chip[aria-pressed="true"] {
+  /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"); a link in view says so by aria-current. */
+  .chip:is([aria-pressed="true"], [aria-current="true"]) {
     --_fill: var(--color-primary);
     --_ink: var(--color-ink);
   }
@@ -101,6 +114,6 @@
   }
 
   .count {
-    font: var(--font-data);
+    font: var(--font-count);
   }
 }

@@ -4,7 +4,7 @@ import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain
 import { indexer } from "../chain/indexerRoute.ts";
 import recording from "../../recording/adena-recording.json" with { type: "json" };
 import type { Browser, BrowserType, LaunchOptions } from "@playwright/test";
-import { accountPill } from "./account.ts";
+import { accountPill, connectButton } from "./account.ts";
 import { calls, openCall, writeTab } from "./callRows.ts";
 import { expect, hydrated, type Page } from "./fixtures.ts";
 
@@ -193,7 +193,7 @@ export async function openRealm(page: Page, logIn: () => Promise<void>): Promise
 export async function connect(page: Page): Promise<void> {
   await page.goto("/");
   await hydrated(page);
-  await page.getByRole("button", { name: "Connect Adena" }).click();
+  await connectButton(page).click();
   await expect(accountPill(page)).toBeVisible();
 }
 

@@ -52,9 +52,13 @@
     color: var(--color-ink);
   }
 
-  .pin,
-  .count {
+  .pin {
     font: var(--font-meta);
+    color: var(--color-text);
+  }
+
+  .count {
+    font: var(--font-count);
     color: var(--color-text);
   }
 
@@ -88,12 +92,10 @@
   }
 
   .anchor[data-mark="bubble"] {
-    /* raw: the bubble's place from its point, and how far it moved clear of another: the script writes them */
+    /* raw: the bubble's place from its point: the script writes it */
     --_x: 6px;
     /* raw: the same, 62 px over the point */
     --_y: -62px;
-    /* raw: the same */
-    --_lift: 0px;
 
     visibility: hidden;
   }
@@ -105,8 +107,8 @@
     grid-template-columns: var(--control-xs) minmax(0, 1fr);
     /* layout: a step between the two */
     column-gap: var(--space-xs);
-    /* layout: the face at the words' middle */
-    align-items: center;
+    /* layout: the face at the top, beside the head */
+    align-items: start;
     /* raw: frame 47's bubble, 258 px wide */
     inline-size: 258px;
     border-radius: var(--radius-box);
@@ -130,6 +132,32 @@
       opacity: 1;
       transform: none;
     }
+  }
+
+  /* The link's content, hidden from a screen reader: the grid is the bubble's own. */
+  .inside {
+    display: contents;
+  }
+
+  .bubble:any-link {
+    color: inherit;
+    text-decoration: none;
+    pointer-events: auto;
+  }
+
+  .bubble:any-link:hover {
+    border-color: var(--color-primary);
+  }
+
+  /* The room's name after the place, a small pill. */
+  .room {
+    display: inline-block;
+    border-radius: var(--radius-pill);
+    padding-inline: var(--space-2xs);
+    background: var(--color-fill);
+    color: var(--color-text);
+    text-transform: none;
+    letter-spacing: normal;
   }
 
   .who {
@@ -157,6 +185,22 @@
     letter-spacing: 0.12em;
   }
 
+  .headRow {
+    /* layout: the name and place on the left, wrapping under themselves; the room's pill whole at the top right */
+    display: grid;
+    /* layout: the same */
+    grid-template-columns: minmax(0, 1fr) auto;
+    /* layout: the pill's words on the name's first line */
+    align-items: baseline;
+    /* layout: a small step before the pill */
+    column-gap: var(--space-3xs);
+    overflow-wrap: anywhere;
+  }
+
+  .headRow > .room {
+    white-space: nowrap;
+  }
+
   .head:not(:empty) {
     color: var(--color-text-muted);
     text-transform: uppercase;
@@ -169,19 +213,6 @@
     inset: 0 auto auto 0;
   }
 
-  /* A bubble that moved clear of another stays tied to its place by a line. */
-  .ping::before {
-    content: "";
-    position: absolute;
-    /* raw: from the point upwards */
-    inset-block-end: 0;
-    inline-size: var(--line-width);
-    block-size: var(--_lift);
-    background: var(--color-line-strong);
-    /* the bubble's own ease */
-    transition: block-size calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
-  }
-
   .ping::after {
     content: "";
     position: absolute;
@@ -190,6 +221,12 @@
     border: var(--line-width) solid var(--color-mine);
     /* one ring, as a person speaks */
     animation: ring calc(var(--motion-ambient) * 0.4 * var(--motion-scale)) var(--ease-standard) both;
+  }
+
+  /* No ring before the planet's arrival has calmed (ground.ts tells the bubble). */
+  .anchor:not([data-calm]) .ping::after {
+    animation: none;
+    visibility: hidden;
   }
 
   .rings,
@@ -301,7 +338,7 @@
     /* raw: the frames' 10 px beside the words */
     padding: var(--space-3xs) 10px;
     /* raw: a little lighter than a bubble, for it holds no words to read at length */
-    background: color-mix(in oklab, var(--color-space) 65%, transparent);
+    background: var(--color-pill-glass);
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -310,8 +347,7 @@
       animation: none;
     }
 
-    .bubble,
-    .ping::before {
+    .bubble {
       transition: none;
     }
 

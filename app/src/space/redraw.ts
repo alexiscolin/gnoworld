@@ -34,6 +34,8 @@ const changed = (now: readonly number[], then: readonly number[]): boolean =>
 export class Redraw {
   #drawn: Moment | undefined;
   #told = false;
+  /** Set by the loop while it paces a view with something moving (rest.ts): a frame that would be "none" is drawn all the same. */
+  live = false;
 
   /** Something outside the numbers changed (a place, a lens, a plate, the worlds): the next frame is drawn. */
   touch(): void {
@@ -43,8 +45,9 @@ export class Redraw {
   /** What the frame `now` needs; what is drawn becomes what the next is measured against. */
   check(now: Moment): Need {
     const then = this.#drawn;
-    const need =
+    let need: Need =
       then === undefined || this.#told || now.moving || changed(now.shown, then.shown) ? "full" : slow(now, then);
+    if (need === "none" && this.live) need = "ambient";
     if (need !== "none") {
       this.#drawn = { ...now, eye: [...now.eye], shown: [...now.shown] };
       this.#told = false;

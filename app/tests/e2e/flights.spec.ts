@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { landed, running, stats, type FlightStats } from "./sceneStage.ts";
+import { gpuOf, heapOf, landed, running, stats, type FlightStats } from "./sceneStage.ts";
 
 // Flights (7g; ADR-0001 §7; ADR-0002 §1, "Flight panel"; frames 18, 19, 36, 88, 89, 101, 128, 129, 142): the jump to a star the reader aims
 // at, Escape landing at once, the way back, a page's flight, a crossfade under reduced motion, and what twenty flights leave behind (row 7's
@@ -336,14 +336,8 @@ test("leaves the GPU's resources at their baseline and the heap within a tenth a
   test.setTimeout(600_000);
   await home(page, SMALL);
   const cdp = await page.context().newCDPSession(page);
-  const heap = async () => {
-    await cdp.send("HeapProfiler.collectGarbage");
-    return (await cdp.send("Runtime.getHeapUsage")).usedSize;
-  };
-  const gpu = async () => {
-    const { geometries, textures } = await stats(page);
-    return { geometries, textures };
-  };
+  const heap = () => heapOf(cdp);
+  const gpu = () => gpuOf(page);
   // Once the looks a flight asks for are done: two reads half a second apart agree.
   const steady = () =>
     expect

@@ -72,7 +72,7 @@ export class Planets {
     this.#lit = new InstancedBufferAttribute(new Float32Array(planets.length).fill(1), 1);
     geometry.setAttribute("aLit", this.#lit);
     each(geometry, "aDelay", { values: planets.map((p) => delays[p.system.index] ?? 0), size: 1 });
-    each(geometry, "aReach", { values: planets.map((p) => p.system.reach), size: 1 });
+    each(geometry, "aSystem", { values: planets.map((p) => p.system.index), size: 1 });
     const material = new ShaderMaterial({
       uniforms: {
         ...uniforms,

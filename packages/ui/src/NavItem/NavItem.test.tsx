@@ -29,6 +29,11 @@ describe("NavItem", () => {
     expect(screen.queryByRole("link")).toBeNull();
   });
 
+  it("with no address and no act is the item in view, marked, pressing it does nothing", () => {
+    render(<NavItem current>Here</NavItem>);
+    expect(screen.getByRole("button", { name: "Here" }).getAttribute("aria-current")).toBe("true");
+  });
+
   it("says the item in view on its link, and fills the whole item, which a plain one does not", () => {
     const { container } = render(
       <>

@@ -15,6 +15,7 @@ import { makeDigests } from "./digest.ts";
 import { startGnomcp } from "./gnomcp.ts";
 import { serve } from "./http.ts";
 import { makeAskLoops } from "./askLoops.ts";
+import { makeRealmExplainer } from "./explainRealm.ts";
 import { jarvisMigrations } from "./migrations.ts";
 import { connectAnthropic } from "./model.ts";
 import { DOLLAR } from "./prices.ts";
@@ -55,6 +56,7 @@ const routes = {
   ask: running?.ask,
   catchUp: running?.catchUp,
   explain: running?.explain,
+  explainRealm: running?.explainRealm,
   translate: running?.translate,
   digest: running?.digest,
   budget,
@@ -108,10 +110,18 @@ async function startModel(log: Log, budget: Budget, db: DatabaseSync) {
     const fast = { send, budget, log, tracer, model: config.models.fast };
     const translator = makeTranslator({ ...fast, db, retries: config.caps.retries, now: Date.now });
     const digests = makeDigests({ db, places, cards, loop: { ...fast, caps: config.caps }, now: Date.now });
+    // A realm's label on the fast model too, from gno_read's outline on the profile of its chain.
+    const labels = makeRealmExplainer({
+      ...fast,
+      retries: config.caps.retries,
+      read: (profile, path, signal) => gnomcp.call("gno_read", { profile, path }, signal),
+      profileOf: explain.profileOf,
+    });
     return {
       ask: loop.ask,
       catchUp: loop.catchUp,
       explain: loop.explain,
+      explainRealm: labels.explain,
       translate: translator.translate,
       digest: digests.digest,
       close: async (): Promise<void> => {

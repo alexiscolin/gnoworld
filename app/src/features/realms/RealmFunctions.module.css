@@ -1,11 +1,5 @@
 /* A realm's functions (the proposal's .fn): a result in its own box, a quiet box for what a row says in place of a button. */
 @layer components {
-  .code {
-    padding: 0;
-    background: none;
-    font: var(--font-mono-ui);
-  }
-
   /* A result, in its own box: its text kept as written, scrolling on its own when long (taller once the card is expanded). */
   .result {
     /* raw: the proposal's value, no token names it */

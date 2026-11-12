@@ -1,4 +1,5 @@
 // What the linked accounts say when a call does not go through: what happened and what to do, in the person's words, never a code.
+import { shortDay } from "../../lib/days.ts";
 import type { Result } from "../../lib/api/http.ts";
 
 type Why = Exclude<Result<never>, { ok: true }>["reason"];
@@ -25,9 +26,8 @@ const SAID: Record<Why, string> = {
 /** The sentence for a call the server refused or could not answer. */
 export const linkProblem = (reason: Why): string => SAID[reason];
 
-/** The day a link was made, as the list shows it: "11 Nov". */
-export const linkedOn = (at: number): string =>
-  new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" }).format(new Date(at));
+/** The day a link was made, as the list shows it: "11 Nov" ("11 Nov 2025" before this year), the reader's own day. */
+export const linkedOn = (at: number): string => shortDay(new Date(at), new Date());
 
 /** A verify the server refused, in the words of its cause: a proof that is not the account's, by way. */
 export const notSigned = (way: "adena" | "cli", address: string): string =>

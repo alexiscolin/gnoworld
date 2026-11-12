@@ -1,5 +1,6 @@
 // The fields this device keeps for whoever uses it (slice 8), their shapes and their defaults: what the store holds from the first screen.
 // Reading and writing them, with their schemas, is device.ts's, which the page asks for once it runs.
+import type { Language } from "../language.ts";
 
 export interface Settings {
   /** Auto, High or Low (ADR-0002 §9, rendering). */
@@ -8,10 +9,20 @@ export interface Settings {
   calm: boolean;
   /** The 3D on a phone, where the list is the default. */
   phone3d: boolean;
+  /** The language the room's lines are translated into; the site's own by default. */
+  language: Language;
+  /** Whether the lines on screen are translated as they come, through Jarvis. */
+  autoTranslate: boolean;
 }
-export const DEFAULT_SETTINGS: Settings = { quality: "auto", calm: false, phone3d: false };
+export const DEFAULT_SETTINGS: Settings = {
+  quality: "auto",
+  calm: false,
+  phone3d: false,
+  language: "en",
+  autoTranslate: true,
+};
 
-/** The worlds followed, the people followed, the reminders and the notifications marked read kept at most, each: the device's reader
+/** The worlds followed, the people followed and the notifications marked read kept at most, each: the device's reader
  * drops what is past it, and a feature that adds one keeps to it. */
 export const FOLLOWS_KEPT = 500;
 
@@ -30,8 +41,6 @@ export interface DeviceFields {
   quests: Record<string, string[]>;
   /** What is followed, the last followed first: worlds as "universe:world", people by their account's address, never a nick. */
   follows: { worlds: readonly string[]; people: readonly string[] };
-  /** The reminders asked, by the event's id. */
-  reminders: Record<string, { fired: boolean }>;
   /** The notifications read: every one up to `through` (a time), and the ones marked read one by one after it, by id. */
   notificationsRead: { through: string | null; ids: string[] };
 }
@@ -45,7 +54,6 @@ export const DEVICE_EMPTY: DeviceFields = {
   expedition: null,
   quests: {},
   follows: { worlds: [], people: [] },
-  reminders: {},
   notificationsRead: { through: null, ids: [] },
 };
 

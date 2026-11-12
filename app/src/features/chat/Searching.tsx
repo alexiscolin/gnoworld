@@ -2,19 +2,20 @@
 // a room read around a found message. Only this file is on the first screen; the panel, the field's logic and the band are one late chunk,
 // asked when the search is first opened (a room never searched loads none of it).
 import type { RoomList, SearchHit } from "@gnoworld/schemas";
-import { IconButton } from "@gnoworld/ui";
+import { EmptyState } from "@gnoworld/ui";
 import { useEffect, useEffectEvent, useRef, useState, type RefObject } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { chunked } from "./Failing.tsx";
 import type { ChatLink } from "./linkTypes.ts";
 import { roomHref, roomWorld } from "./names.ts";
+import type { Act } from "./PlaceActs.tsx";
 import type { Time } from "./search/filters.ts";
 import { opensChatSearch } from "./searchKeys.ts";
 
 const Panel = chunked(async () => ({ default: (await import("./search/ChatSearch.tsx")).ChatSearch }), {
   waiting: null,
-  failed: <p role="status">The search could not load.</p>,
+  failed: <EmptyState look="failed" line="The search could not load." />,
 });
 const Banner = chunked(async () => ({ default: (await import("./search/JumpBanner.tsx")).default }), {
   waiting: null,
@@ -120,7 +121,7 @@ export function useSearching(
     }, reportError);
   };
   return {
-    button: <IconButton icon="search-messages" label="Search messages" size={full ? "m" : "s"} onClick={open} />,
+    act: { label: "Search messages", icon: "search-messages", onSelect: open } satisfies Act,
     panel:
       text === undefined ? undefined : (
         <Panel
@@ -136,14 +137,17 @@ export function useSearching(
           onOpen={found}
           onClose={() => {
             setText(undefined);
-            // Back where the search was asked from, else on its button.
+            // Back where the search was asked from, else on its button, or on More where the header holds it in its menu (PlaceActs.tsx).
             requestAnimationFrame(() => {
               const back =
                 openerRef.current?.isConnected === true && openerRef.current !== document.body
                   ? openerRef.current
                   : null;
               (
-                back ?? document.querySelector<HTMLElement>("[data-chat-screen] button[aria-label='Search messages']")
+                back ??
+                document.querySelector<HTMLElement>(
+                  "[data-chat-screen] :is(button[aria-label='Search messages'], button[aria-label='More'])",
+                )
               )?.focus();
             });
           }}

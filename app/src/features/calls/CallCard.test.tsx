@@ -16,7 +16,7 @@ import { ensureCalls } from "./slice.ts";
 
 // 9d: the card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
 // REALM / FUNCTION / ARGUMENTS / NETWORK / FEE block, the warnings, then "Sign in Adena" and "Cancel" and, once signed, the
-// wait and the result. Every state is words, and the result says done only from the chain's answer.
+// wait and the result (a hash short as an address is: six, "…", five, D13015). Every state is words, and the result says done only from the chain's answer.
 const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
 const REALM = "gno.land/r/demo/profile";
 const PARAMS = [
@@ -198,7 +198,7 @@ describe("CallCard, the states after the click", () => {
   it("says it is landing in a block, with the hash, once it is sent: nothing yet says done", () => {
     const box = withState({ kind: "landing", hash: HASH });
     expect(said(box)).toMatch(/landing in a block/i);
-    expect(said(box)).toContain("tx 785c…d058");
+    expect(said(box)).toContain("tx 785c18…3d058");
     expect(said(box)).not.toMatch(/signed ·|done/i);
     expectWaiting(box);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
@@ -206,7 +206,7 @@ describe("CallCard, the states after the click", () => {
 
   it("is done, 'Signed · tx …', with the block's height and the returned value, only from the chain's answer", () => {
     const box = withState({ kind: "done", hash: HASH, height: 55414, value: "(42 int)" });
-    expect(said(box)).toMatch(/Signed · tx 785c…d058/);
+    expect(said(box)).toMatch(/Signed · tx 785c18…3d058/);
     expect(said(box)).toContain("55,414");
     expect(said(box)).toContain("(42 int)");
     expect(buttons(box)).toEqual(["Close"]);
@@ -240,7 +240,7 @@ describe("CallCard, the states after the click", () => {
   it("says a failure after the hash with the hash and the chain's log, and only 'Close'", () => {
     const box = withState({ kind: "failed", reason: "chain", log: "panic: name taken", hash: HASH });
     expect(said(box)).toContain("panic: name taken");
-    expect(said(box)).toContain("tx 785c…d058");
+    expect(said(box)).toContain("tx 785c18…3d058");
     expect(said(box)).not.toMatch(/Signed · tx/);
     expect(buttons(box)).toEqual(["Close"]);
   });

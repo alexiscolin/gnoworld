@@ -1,13 +1,14 @@
 // The rollup's state (slice 13a) in the server's database, for one universe: per realm its calls, callers, days, functions and last calls,
 // and the height every call is counted up to, so a pass reads only what is new and a restart resumes. Every list is bounded: 100 calls a
 // realm, the chain's newest 400 days; the callers and functions grow with the transactions alone, each of which paid its fee.
-import { ExportedName, ROLLUP_CAPS, type RealmRollup } from "@gnoworld/schemas/indexer";
+import { ExportedName, PERSON_CAPS, ROLLUP_CAPS, type RealmRollup } from "@gnoworld/schemas/indexer";
 import { transaction } from "@gnoworld/service/db";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Dated } from "./blockDays.ts";
 import type { Row } from "./history.ts";
 import { Failure } from "./remote.ts";
+import { anchorIn, heightIn } from "./stateRows.ts";
 
 export const ROLLUP_TABLES = `
 CREATE TABLE rollup_state (universe TEXT PRIMARY KEY, height INTEGER NOT NULL, anchor INTEGER, anchor_time TEXT) STRICT;
@@ -21,6 +22,7 @@ CREATE INDEX rollup_calls_by_realm ON rollup_calls (realm, id);
 CREATE INDEX rollup_calls_untimed ON rollup_calls (height) WHERE time IS NULL;
 `;
 const TABLES = [
+  "rollup_caller_days",
   "rollup_state",
   "rollup_realms",
   "rollup_callers",
@@ -51,9 +53,7 @@ export interface RollupStore {
 }
 
 const Height = z.object({ height: z.number() });
-const Anchor = z.object({ anchor: z.nullable(z.number()), anchor_time: z.nullable(z.string()) });
 const Counted = z.object({ n: z.number() });
-const Newest = z.object({ day: z.nullable(z.string()) });
 const Days = z.array(z.object({ day: z.string(), calls: z.number(), callers: z.number() }));
 const Top = z.array(z.object({ address: z.string(), calls: z.number() }));
 const Last = z.array(
@@ -78,6 +78,7 @@ function writers(db: DatabaseSync) {
     upsert("rollup_days", 2),
     upsert("rollup_functions", 2),
   ];
+  const callerDay = upsert("rollup_caller_days", 2);
   const dayCaller = db.prepare("INSERT OR IGNORE INTO rollup_day_callers VALUES (?, ?, ?)");
   const call = db.prepare(
     "INSERT INTO rollup_calls (realm, height, func, caller, success, time) VALUES (?, ?, ?, ?, ?, ?)",
@@ -89,6 +90,7 @@ function writers(db: DatabaseSync) {
     if (by !== undefined) {
       caller.run(path, by);
       dayCaller.run(path, at.day, by);
+      callerDay.run(by, at.day);
     }
     // A failed call may name any function: a successful one names one the realm has.
     if (name !== null && row.success) func.run(path, name);
@@ -119,13 +121,13 @@ function anchorOf(rows: readonly Row[], dated: Dated): { height: number; time: s
   return undefined;
 }
 
-// The days kept: the newest 400 of the chain's, counted from the newest day any realm holds.
-function keepDays(db: DatabaseSync): void {
-  const { day: newest } = Newest.parse(db.prepare("SELECT max(day) AS day FROM rollup_days").get());
-  if (newest === null) return;
+// The days kept: the newest 400 of the chain's, counted from `newest`, the newest day read (rows come in height order, so no stored day is later).
+function keepDays(db: DatabaseSync, newest: string): void {
   const cutoff = new Date(Date.parse(newest) - (ROLLUP_CAPS.days - 1) * DAY_MS).toISOString().slice(0, 10);
   for (const table of ["rollup_days", "rollup_day_callers"])
     db.prepare(`DELETE FROM ${table} WHERE day < ?`).run(cutoff);
+  const person = new Date(Date.parse(newest) - (PERSON_CAPS.days - 1) * DAY_MS).toISOString().slice(0, 10);
+  db.prepare("DELETE FROM rollup_caller_days WHERE day < ?").run(person);
 }
 
 // A realm's whole file from the state.
@@ -165,16 +167,16 @@ function fileOf(
 
 /** The rollup's state in `db`, for `universe` alone: rows of another are dropped at once. */
 export function rollupStore(db: DatabaseSync, universe: string): RollupStore {
+  // The newest day the days were pruned for: the cutoff moves only when a newer day arrives.
+  let pruned = "";
   const reset = (): void => {
+    pruned = "";
     transaction(db, () => {
       for (const table of TABLES) db.exec(`DELETE FROM ${table}`);
     });
   };
   if (db.prepare("SELECT 1 FROM rollup_state WHERE universe <> ?").get(universe) !== undefined) reset();
-  const height = (): number | undefined => {
-    const row = db.prepare("SELECT height FROM rollup_state WHERE universe = ?").get(universe);
-    return row === undefined ? undefined : Height.parse(row).height;
-  };
+  const height = (): number | undefined => heightIn(db, "rollup_state", universe);
   const write = writers(db);
   const add = (rows: readonly Row[], dated: Dated, through: number): void => {
     const kept = height() ?? -1;
@@ -183,18 +185,15 @@ export function rollupStore(db: DatabaseSync, universe: string): RollupStore {
       for (const row of fresh) write.row(row, dated);
       for (const path of new Set(fresh.flatMap(({ calls }) => calls.map((call) => call.path))))
         write.keepCalls.run(path, path);
-      keepDays(db);
+      const newest = [...dated.days.values()].sort().at(-1) ?? "";
+      if (newest > pruned) keepDays(db, (pruned = newest));
       const anchor = anchorOf(fresh, dated);
       if (through > kept) write.state.run(universe, through, anchor?.height ?? null, anchor?.time ?? null);
     });
   };
   return {
     height,
-    anchor: () => {
-      const row = db.prepare("SELECT anchor, anchor_time FROM rollup_state WHERE universe = ?").get(universe);
-      const { anchor, anchor_time: time } = Anchor.parse(row ?? { anchor: null, anchor_time: null });
-      return anchor === null || time === null ? undefined : { height: anchor, time };
-    },
+    anchor: () => anchorIn(db, "rollup_state", universe),
     add,
     untimed: (most) =>
       Heights.parse(

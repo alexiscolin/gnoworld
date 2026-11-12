@@ -30,8 +30,7 @@
   }
 
   /* The picture, and ui's disc (48 px, inline) that stands in for it, fill the planet's 44 px box: the column never moves as one gives way */
-  .picture,
-  .planet > span {
+  .planet span {
     inline-size: 100%;
     block-size: 100%;
     vertical-align: top;

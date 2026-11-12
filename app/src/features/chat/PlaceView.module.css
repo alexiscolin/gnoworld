@@ -43,15 +43,9 @@
     overflow: clip;
   }
 
-  /* The Earth's signs over the canvas, gone in the Map, where the Earth is a speck. */
+  /* The Earth's signs over the canvas. */
   .signs {
     position: absolute;
     inset: 0;
-    transition: var(--transition-fade);
-  }
-
-  .signs[data-map] {
-    opacity: 0;
-    pointer-events: none;
   }
 }

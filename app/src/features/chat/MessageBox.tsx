@@ -1,4 +1,4 @@
-// The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the quick actions' +, the
+// The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the quick actions' /, the
 // field's words, when it has some to say, and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
 import { Cluster, Icon, IconButton, type IconName } from "@gnoworld/ui";
 import { Fragment, type ReactNode } from "react";
@@ -27,8 +27,10 @@ const BAR: readonly (readonly { format: Format | "link"; icon: IconName; label: 
   ],
 ];
 
+type LinkTool = (size: "xs" | "s") => ReactNode;
+
 // The format bar: each format of BAR, named, applied to the box's selection.
-function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void; linkTool: ReactNode }) {
+function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void; linkTool: LinkTool | undefined }) {
   // Larger in the full chat, the screen its own (Alexis, 2026-11-07).
   const tools = useFull() ? "s" : "xs";
   return (
@@ -39,7 +41,7 @@ function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void;
             {at === 0 ? null : <span role="separator" aria-orientation="vertical" className={styles["rule"]} />}
             {group.map((tool) => {
               const { format } = tool;
-              if (format === "link") return <Fragment key="link">{linkTool}</Fragment>;
+              if (format === "link") return <Fragment key="link">{linkTool?.(tools)}</Fragment>;
               return (
                 <IconButton
                   key={format}
@@ -73,10 +75,10 @@ export function MessageBox({
   /** The format bar's tools; none, no bar: a guest's line is one plain line (D430). */
   onFormat?: ((format: Format) => void) | undefined;
   /** The bar's link tool, which is the composer's (a popover that asks for the address): it brings its own code. */
-  linkTool?: ReactNode;
+  linkTool?: LinkTool | undefined;
   send: string;
   goes: boolean;
-  /** The room's quick actions, behind a + at the foot's start; none in a thread's box. */
+  /** The room's quick actions, behind a / at the foot's start; none in a thread's box. */
   quick?: ReactNode;
   children: ReactNode;
 }) {

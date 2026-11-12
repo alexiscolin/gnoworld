@@ -8,6 +8,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Plain: Story = {};
 export const WithUnit: Story = { args: { value: 21480, unit: "calls", caption: "Today" } };
+export const Small: Story = { args: { value: 1, unit: "/9", caption: "Challenge steps", size: "s" } };
 export const Deltas: Story = {
   render: () => (
     <Cluster space="xl">

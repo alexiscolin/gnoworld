@@ -1,6 +1,7 @@
 // The attributions in full (docs/DESIGN-SYSTEM.md, Credits), one dialog for every place that shows the textures: the universe's corner word
 // and the full chat's column. CC BY 4.0 §3(a)(2) allows a link to it.
 import { Dialog, Stack } from "@gnoworld/ui";
+import { NEW_TAB } from "../../lib/newTab.ts";
 import { CREDITS } from "../../space/planet/credits.ts";
 
 export function CreditsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -12,11 +13,11 @@ export function CreditsDialog({ open, onClose }: { open: boolean; onClose: () =>
             <Stack space="3xs">
               <p>{line}</p>
               <p>
-                <a href={source} target="_blank" rel="noopener noreferrer">
+                <a href={source} {...NEW_TAB}>
                   {new URL(source).host}
                 </a>{" "}
                 ·{" "}
-                <a href={licenceUrl} target="_blank" rel="noopener noreferrer">
+                <a href={licenceUrl} {...NEW_TAB}>
                   {licence}
                 </a>{" "}
                 · read on {read}
@@ -29,7 +30,7 @@ export function CreditsDialog({ open, onClose }: { open: boolean; onClose: () =>
           <Stack space="3xs">
             <p>The prices of the home</p>
             <p>
-              <a href="https://www.coingecko.com" target="_blank" rel="noopener noreferrer">
+              <a href="https://www.coingecko.com" {...NEW_TAB}>
                 CoinGecko
               </a>
             </p>

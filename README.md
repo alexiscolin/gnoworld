@@ -15,10 +15,10 @@ The applications sit at the root; the libraries they import sit under `packages/
 | Folder | Inside | What it holds |
 |---|---|---|
 | `app/` | | The web app: React Router, pre-rendered, installable as a PWA |
-| | `src/` | Its code: one module per page (`routes/`), the 3D universe (`space/`: the cosmos, the worlds' planets and their depth, the Earth and its real hour), the state (`store/`), the service worker (`sw/`), and one folder per feature (`features/`: the universe and its rail, a world's page, the chat and its Lexical composer, search, Jarvis's cards, login and account with its linked accounts, follows, notifications, quests and the passport, previews, credits…) |
-| | `tests/` | Playwright: the pages' journeys (`e2e/`) and the design system's stories in a browser, with their approved pictures (`stories/`) |
+| | `src/` | Its code: one module per page (`routes/`), the 3D universe (`space/`: the cosmos, the worlds' planets and their depth, the Earth and its real hour), the state (`store/`), the service worker (`sw/`), and one folder per feature (`features/`: the universe and its rail, a world's page, the chat and its Lexical composer, search, Jarvis's cards, login and account with its linked accounts, the welcome card and its Get started dialog, follows, notifications, quests and the passport, previews, the shared error views, credits…) |
+| | `tests/` | Playwright: the pages' journeys (`e2e/`), the design system's stories in a browser with their approved pictures (`stories/`), and the measuring tools (`tools/`) |
 | | `data/`, `public/` | The universes, hubs and their rooms as data files; the files served as they are (the manifest, the icons, the planets' pictures) |
-| `server/` | `src/` | The server, TypeScript on Node: login and linked accounts (`login/`), the chat's rooms on Ergo (IRC) and their moderation (`moderation/`, owners' rights in `roles/`), the search index (`search/`), the link cards (`cards/`), pins, prices, the worlds' activity and previews, the timed jobs (`jobs/`), and Jarvis's door (`door/`), its quotas, its kept answers and its translations |
+| `server/` | `src/` | The server, TypeScript on Node: login and linked accounts (`login/`), the chat's rooms on Ergo (IRC) and their moderation (`moderation/`, owners' rights in `roles/`), the search index (`search/`), the link cards (`cards/`), pins, prices, the guests (`guest/`), a call's detail (`calls/`), the worlds' activity and previews, the worlds job's rollup with its token worlds, people and network line (`worlds/`), the timed jobs (`jobs/`), and Jarvis's door (`door/`), its quotas, its kept answers and its translations, with the realms' explanations (`explain/`) |
 | `link-reader/` | | The link reader, as its own service: it fetches a public page's head and picture for a chat line's card, walled in, off unless the link cards are on |
 | `jarvis/` | | Jarvis, the assistant, as its own service: its skills, its reads of gno.land through gnomcp, its budget; it reaches only the hosts its way out lists |
 | `evals/` | | Jarvis's evaluations: the cases its answers are held to |
@@ -32,11 +32,12 @@ The applications sit at the root; the libraries they import sit under `packages/
 | `deploy/` | `web/`, `server/`, `jarvis/`, `jarvis-reader/`, `link-reader/`, `ergo/` | The demo's images: the app served by nginx, the server, Jarvis and its gnomcp reader, the link reader and the chat's IRC server |
 | | `guard/`, `egress/`, `tailscale/` | The demo's network: a guard that lets out only what it must, the ways out (one list per service: the server's, Jarvis's, its reader's, the link reader's), and Tailscale, which publishes the demo |
 | | `k6/`, `probe/`, `test.sh` | The load test, the health probe the images without a shell use, and `test.sh`, which starts the stack and checks it (with its mutants), with `test-jarvis.sh` and `test-links.sh` for the two services that sit behind a profile |
+| | `demo.sh` | The demo's one script: it runs the stack from a checked copy of one commit, with its backup, wipe and restore ([docs/DEMO.md](docs/DEMO.md)) |
 | `lint/` | | The lint rules, one file per area |
 | `scripts/` | | The gate (`check.sh`), the workshop, and the harness that keeps the code honest: its checks, its probe, its mutation testers |
 | `.githooks/` | | The git hooks, installed from `main`, and `merge.sh`, the one way into `main` |
 | `.github/` | `workflows/` | The CI: the full gate on every push |
-| `.claude/` | `rules/`, `agents/`, `commands/` | Claude Code's rules per area, its review agents, and `/slice-plan` and `/pre-merge` |
+| `.claude/` | `rules/`, `agents/`, `commands/`, `workflows/` | Claude Code's rules per area, its review agents, `/slice-plan`, `/pre-merge` and `/dream`, and the branch workflow |
 | `docs/` | `plans/`, `design/`, `review/`, `prototype/` | How it is built, looks and is reviewed: the slices' plans, the approved designs, the findings ledger, the approved prototype |
 | `adr/` | | The design: ADR-0001, and ADR-0002, the prototype's scope |
 
@@ -52,7 +53,16 @@ later. Folders still to come: `gno/p/` once two realms share code, and the admin
 - **Search:** the chat's own search over the public rooms' lines, kept by the server, beside the palette that finds where to go ([plan](docs/plans/search.md)).
 - **Link previews:** a card under a line that links a page, read by the link reader and checked before it shows ([plan](docs/plans/link-previews.md)).
 - **Jarvis's kept answers:** a function's explanation is kept 7 days and a room's "here" an hour, in the server's database; Jarvis's answers are cards in the chat column.
-- **The composer on Lexical:** the field shows its formatting in place, with `/`, `@` and `#` suggestions.
+- **Ask Jarvis and the realms' explanations:** a button beside the composer (or `@jarvis` at a line's start) asks Jarvis, whose answer is the
+  asker's card; every realm and world carries a two-sentence explanation from its code, kept in the server's database and seeded for 322 of Onyx's realms.
+- **The composer on Lexical:** the field shows its formatting in place, with `/`, `@` and `#` suggestions, and the card commands `/market`,
+  `/trending` and `/proposals`, which post a line every reader of the room sees drawn as its card.
+- **The explorer's additions:** the person card with balance and tokens, a call's detail, the token worlds (holders, supply, transfers),
+  the network line, and a realm's page that says plainly when the realm is not on the chain.
+- **Search by `from:` and by function name,** with a "Following" chip in the palette.
+- **A welcome card and a Get started dialog** for a first visit and for a browser with no Adena; the passport in three tabs (Challenges,
+  Stamps, Charted); one error system, one view in three sizes for every failure.
+- **The demo's script:** `deploy/demo.sh` runs the stack from a checked commit, with backup, wipe and restore ([docs/DEMO.md](docs/DEMO.md)).
 - **The planets' depth and the Earth's real hour:** relief shadows, height maps, a sea mask and rings; the Earth's day and night are the real ones.
 - **Waiting after the demo:** private rooms ([plan](docs/plans/private-rooms.md)), the shared link's image ([plan](docs/plans/share-image.md)), Jarvis's queued ask,
   one timeline for every view's arrival, the 8K Earth map and CI. Putting the demo online in one command: [plan](docs/plans/online.md).
@@ -88,10 +98,11 @@ of those, that is the protection working, not a bug.
 | Command | What it does |
 |---|---|
 | `pnpm dev` | The site, on your machine, with hot reload (the PWA's worker is off in development); no Docker, no secret |
-| `pnpm workshop` | The app's screens and the lab's pages with hot reload, the chat running with them (a local Ergo and the server), put on your tailnet to look from a laptop or a phone; run it in your own terminal ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "The workshop") |
+| `pnpm workshop` | The app's screens with hot reload, the chat running with them (a local Ergo and the server), put on your tailnet to look from a laptop or a phone; run it in your own terminal ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "The workshop") |
 | `docker compose -f deploy/compose.yaml --profile demo up -d --build` | The demo, published through Tailscale: its secrets first ([docs/OPERATIONS.md](docs/OPERATIONS.md)) |
-| `./scripts/check.sh` | The fast gate: formatting, types, lint, tests, dead code, copies, CSS and comment rules, the realms, the hooks. It runs before every commit (a Claude Code turn runs no gate by default) |
-| `./scripts/check.sh --full` | Everything above, plus the harness's own probe, coverage (85% everywhere, 100% in `core`), the coverage of the lines you changed, mutation testing and a scan of the whole history for secrets. It runs before every push; `main` also needs a review pass (docs/REVIEW.md) |
+| `./scripts/check.sh` | The fast gate, sized to the change: formatting, types, lint, the app's build and the docs check; a change to a tier-1 file (docs/REVIEW.md) also runs the related unit tests, dead code, copies, CSS and comment rules, the realms and the hooks. It runs before every commit (a Claude Code turn runs no gate by default) |
+| `./scripts/check.sh --full` | The gate for a push to `main`: the whole tree, the tier-1 and smoke journeys, coverage (85% everywhere, higher floors for `core` and the tier-1 files), mutation testing of the changed tier-1 lines and a scan of the whole history for secrets; the harness's own probe and mutants only when the harness changed. `main` also needs a review pass (docs/REVIEW.md) |
+| `pnpm run test:all` | `check.sh --everything`: every lane, test, picture, journey and check |
 | `pnpm run test` | The unit tests |
 | `pnpm run coverage` | The tests with coverage, under `coverage/` |
 | `pnpm run mutate` | Mutation testing, with its report in `reports/mutation/index.html` |

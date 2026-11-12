@@ -68,6 +68,8 @@ export function sharedUniforms(look: PlanetLook, maps: MapSet): Uniforms {
     faraway: { value: 0 },
     time: { value: 0 },
     cloudTime: { value: 0 },
+    // 1 lets a world's slow extras move (a lava world's glow breathes), 0 holds them still: reduced motion (Planet.setTime).
+    life: { value: 1 },
     relief: { value: look.relief },
     // 1 draws the relief's shadows and the real height's cavities near the terminator; a Low setting turns it to 0 (setDepth).
     depth: { value: 1 },

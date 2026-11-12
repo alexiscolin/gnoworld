@@ -9,12 +9,13 @@ import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
 import { useQuery } from "@tanstack/react-query";
 import { peopleOptions } from "../../features/home/peopleQuery.ts";
 import { queryClient } from "../../lib/query/client.ts";
-import { universePrefix, type UniverseView } from "../../places.ts";
-import { aroundEarth } from "./around.ts";
+import type { UniverseView } from "../../places.ts";
+import { useApp } from "../../storeContext.tsx";
+import { own } from "../../store/record.ts";
 import { useHere } from "../../useHere.ts";
 import rooms from "../../../data/earthRooms.json" with { type: "json" };
 import universes from "../../../data/universes.json" with { type: "json" };
-import { chatFigures, hourWidgets, roomsWidget, statusOf } from "./figures.ts";
+import { chatFigures, countriesWidget, hourWidgets, roomsWidget, statusOf } from "./figures.ts";
 import type { PlateModel } from "./model.ts";
 import { Plate } from "./Plate.tsx";
 
@@ -35,6 +36,7 @@ function useEarthPlate(universe: UniverseView): PlateModel {
   const hours = useHours(EARTH.slug);
   // No read of the people (another universe's, or none came): no Countries figure; a read of none is a zero, and shows.
   const countries = useQuery({ ...peopleOptions, enabled: universe.isDefault }, queryClient).data?.countries;
+  const lines = useApp((state) => own(state.chat.rooms, "#earth")?.lines);
   return {
     // The title is the route's; the line comes after the status, as a realm's does (the proposal's phone).
     lede: { sentence: EARTH.description, status: statusOf(here, "Quiet") },
@@ -49,8 +51,7 @@ function useEarthPlate(universe: UniverseView): PlateModel {
     hours,
     extras: <LatestOnX />,
     links: earthLinks(universe.id),
-    around: aroundEarth({ hubs: universe.worlds, prefix: universePrefix(universe) }),
-    widgets: [...hourWidgets(hours), ...roomsWidget(rooms)],
+    widgets: [...hourWidgets(hours), ...roomsWidget(rooms), ...countriesWidget(lines ?? [], hours?.from)],
   };
 }
 

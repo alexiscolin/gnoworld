@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
-import { lines, menu, word } from "./chat.ts";
+import { lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
@@ -9,8 +9,6 @@ import { MEMBER, scriptedErgo } from "./scripted.ts";
 // socket answered by a scripted Ergo (scripted.ts), the conversation's lines sent by the test, the same each run.
 // The nick Ergo gives the page's account, whatever the test wallet is; the header, which names the wallet, is masked.
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-// Another account, never written to.
-const STRANGER = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
 const SCREENS = [
   ["computer", 1280],
   ["phone", 390],
@@ -97,21 +95,4 @@ test.describe("a direct message, as it looks", () => {
       expect(await axe(page)).toEqual([]);
     });
   }
-
-  test("a stranger's, not kept while the account hears those it wrote to alone, with no violation", async ({
-    page,
-  }) => {
-    const ergo = await conversation(page, 1280, STRANGER);
-    const only = (await menu(page)).getByRole("button", { name: "Only people I wrote to" });
-    await only.click();
-    await expect(only).toHaveAttribute("aria-pressed", "true");
-    // Its colours ease to the pressed ones (Chip.module.css): axe read one mid-way under a gate's load (2.84:1).
-    await only.evaluate((chip) => Promise.all(chip.getAnimations().map((animation) => animation.finished)));
-    await page.keyboard.press("Escape");
-    ergo.send(dm("s1", { from: STRANGER, to: ACCOUNT, minute: 0, text: "Buy my token." }));
-    await expect(page.getByText(/^Not kept: messages from accounts you never wrote to/)).toBeVisible();
-    await expect(lines(page)).toHaveCount(0);
-    expect(await axe(page)).toEqual([]);
-    await expect(page).toHaveScreenshot("dm-not-kept-computer.png", { mask: [page.getByRole("banner")] });
-  });
 });

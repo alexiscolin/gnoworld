@@ -3,11 +3,13 @@ export { familyOf, nameOf, realmName } from "./families.ts";
 export { STYLES, styleOf, type StyleId, type Styled } from "./styles.ts";
 export { DAY_BLOCKS, storeOf, WEEK_BLOCKS, type Store, type StoreRealm, type StoreRow } from "./rows.ts";
 export {
+  compareRanks,
   defaultFilters,
   shelfRows,
   sortRows,
   type FilterId,
   type Ground,
+  type Rank,
   type View,
   type ShelfId,
   type SortId,

@@ -1,23 +1,18 @@
 // The call card's status line (CallCard.tsx): the wait for the signature, the landing in a block, the result or the failure.
-import { Stack } from "@gnoworld/ui";
+import { shortAddress } from "@gnoworld/schemas";
+import { grouped, Stack } from "@gnoworld/ui";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
 import appear from "../../enter.module.css";
 import styles from "./CallCard.module.css";
 import { sayFailure, shown } from "./say.ts";
-
-const COUNT = new Intl.NumberFormat("en-US");
 
 // The mark before a wait's words, a ring turning, and before the result's, a dot: drawn by the stylesheet.
 const Mark = ({ kind }: { kind: "ring" | "dot" }) => (
   <span className={styles["mark"]} data-mark={kind} aria-hidden="true" />
 );
 
-// A transaction's hash, short as the frame draws it (its first and last four), whole in its title.
-const Tx = ({ hash }: { hash: string }) => (
-  <span title={hash}>
-    tx {hash.slice(0, 4)}…{hash.slice(-4)}
-  </span>
-);
+// A transaction's hash, short as an address is (its first six and last five), whole in its title.
+const Tx = ({ hash }: { hash: string }) => <span title={hash}>tx {shortAddress(hash)}</span>;
 
 // The result of the call as the card says it: the state's words in the one status region, and what the chain gave.
 export function CallStatus({ card }: { card: Card_ }) {
@@ -47,7 +42,7 @@ export function CallStatus({ card }: { card: Card_ }) {
         <p role="status" className={[styles["line"], appear["enter"]].join(" ")}>
           <Mark kind="dot" />
           <span>
-            Signed · <Tx hash={state.hash} />, in block {COUNT.format(state.height)}.
+            Signed · <Tx hash={state.hash} />, in block {grouped(state.height)}.
           </span>
         </p>
         {state.value === "" ? null : (

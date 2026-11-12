@@ -11,10 +11,6 @@
     font-weight: 500;
   }
 
-  .address {
-    font: var(--font-data);
-  }
-
   /* Two lines kept for the chosen quality's words, the longest's, so a choice never moves the rows under it. */
   .line {
     min-block-size: 2lh;

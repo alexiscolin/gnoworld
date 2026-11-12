@@ -28,7 +28,7 @@
   }
 
   .count {
-    font: var(--font-card-title);
+    font: var(--font-count);
   }
 
   /* The results scroll inside the panel, the filters and the note staying where they are. */

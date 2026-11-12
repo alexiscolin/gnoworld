@@ -2,47 +2,18 @@
 // HTML told where it stands on each frame. The sums are the surface shader's (planet/surfaceShader.ts): the ground's direction turned back
 // about the pole by the planet's own turn, then its lean and tilt (planet.ts), its size and its place. Nothing is made on a frame.
 import { EARTH as EARTH_ID, groundDirection } from "@gnoworld/core";
-import type { LatLon } from "@gnoworld/core/bubbles";
+import type { Axis, Eye, GroundMark, LatLon } from "./groundTypes.ts";
 import { Euler, Quaternion, Vector3 } from "three";
 import { placeOf, type Planet, type Vec } from "../layout.ts";
 import { SPIN } from "../planet/surfaceShader.ts";
 import { AIM_STEP, bestPair } from "./aim.ts";
-import { turned } from "./light.ts";
+import { Calm } from "./calm.ts";
+import { Grab } from "./grab.ts";
+import { kept, turned } from "./light.ts";
 import { EARTH } from "./look.ts";
 import { Spring } from "./spring.ts";
 
-export type { LatLon };
-
-export interface GroundMark extends LatLon {
-  /** Where it stands in the page's pixels, and whether the eye sees it clear of the limb. */
-  readonly place: (x: number, y: number, front: boolean) => void;
-  /** A bubble's: the page's x it must stand left of to be read (the dock's edge); the newest turns the Earth to it (D488). */
-  readonly keep?: number | undefined;
-  /** Where its country should stand when it is brought into view: the free area's point Alexis's frames keep it at (signMarks.ts). */
-  readonly aim?: { readonly x: number; readonly y: number } | undefined;
-  /** A world's bubble: the page's point it must stand right of and under (the plate's edge, the header's), or the newest turns the world (D565). */
-  readonly from?: { readonly x: number; readonly y: number } | undefined;
-}
-
-/** How a planet's axis stands: its lean and tilt, as its group is turned (planet.ts). */
-export interface Axis {
-  readonly lean: number;
-  readonly tilt: number;
-}
-
-/** What the page has of the Earth under it. */
-export interface Ground {
-  /** The marks to keep placed, in place of the last. */
-  setMarks(marks: readonly GroundMark[]): void;
-  /** The ground that faces the eye; none while no Earth stands. */
-  facing(): LatLon | undefined;
-}
-
-/** The eye that sees the Earth: where it stands, and where a point stands on screen (false off it). */
-export interface Eye {
-  readonly eye: Vec;
-  project(at: Vec, out: Vec): boolean;
-}
+export type { Axis, Eye, Ground, GroundMark, LatLon } from "./groundTypes.ts";
 
 const DEGREE = Math.PI / 180;
 // A sign this close to the limb would slide off the edge: the cosine of the eye's angle over the ground.
@@ -54,6 +25,8 @@ const MARGIN = 60;
 // raw: a turn's speed is capped, in radians a second, for the spin and for the lean (spring.ts)
 const MOST_SPIN = 1.5;
 const MOST_TILT = 1;
+// The arrival has calmed this many seconds after its animation has ended: no aim, no ping before (D13001).
+const CALM_S = 4;
 
 // The window's foot, as the page stands in a window; none where there is no window (the unit tests).
 const bottom = () => (typeof innerHeight === "number" ? innerHeight : Infinity);
@@ -71,6 +44,9 @@ export class EarthGround {
   readonly #centre = new Vector3();
   readonly #on: Vec = { x: 0, y: 0, z: 0 };
   readonly #spin = new Spring();
+  /** The turn the reader's hand gave the planet (D13011), on top of its spin and lean; each world's kept as the lead is. */
+  readonly grab = new Grab();
+  readonly #grabbed = new Map<string, Quaternion>();
   readonly #lean = new Spring();
   // The axis the planet leans about (the eye's right when the lean began), and the lean as a turn of the world.
   readonly #axis = new Vector3(1, 0, 0);
@@ -86,14 +62,22 @@ export class EarthGround {
   readonly #left = new Map<string, number>();
   readonly #axisOf: (id: string) => Axis;
   readonly #still: () => boolean;
+  // The planet's arrival's calm (D13001): no aim and no ping before it is over.
+  readonly #calm: Calm;
   #base = new Quaternion().setFromEuler(new Euler(EARTH.lean, 0, EARTH.tilt));
   #back = this.#base.clone().invert();
   readonly #undo = new Quaternion();
 
-  /** `axisOf` gives another world's axis; `still`, under reduced motion, has the turn made at once, not eased. */
-  constructor(axisOf: (id: string) => Axis, still: () => boolean) {
+  /** `axisOf` gives another world's axis; `still`, under reduced motion, has the turn made at once, not eased. `calm`, the seconds an arrival
+   * waits before the first aim and the first ping; `now`, the clock a message's time is held against. */
+  constructor(
+    axisOf: (id: string) => Axis,
+    still: () => boolean,
+    { calm = CALM_S, now = Date.now }: { calm?: number; now?: () => number } = {},
+  ) {
     this.#axisOf = axisOf;
     this.#still = still;
+    this.#calm = new Calm(calm, now);
   }
 
   /** The ground turned past the Earth's own spin, in radians (D488): its shader, its signs and its facing all take it. */
@@ -116,7 +100,7 @@ export class EarthGround {
 
   /** Whether the planet is still turning to show a bubble: the loop stays awake while it does. */
   get turning(): boolean {
-    return this.#spin.moving || this.#lean.moving;
+    return this.#spin.moving || this.#lean.moving || this.grab.moving;
   }
 
   /** The lead in seconds of the planet's spin, as its surface's clock takes it. */
@@ -142,7 +126,7 @@ export class EarthGround {
 
   // The lean `angle` about `#axis`, kept as a turn of the world.
   #leanBy(angle: number): void {
-    this.#leaned.setFromAxisAngle(this.#axis, angle);
+    this.#leaned.setFromAxisAngle(this.#axis, angle).premultiply(this.grab.at);
   }
 
   // The world's direction from the planet's middle of the ground `ground`, into `out`, the world turned by `angle`.
@@ -171,11 +155,15 @@ export class EarthGround {
   #stand(planet: Planet): void {
     if (planet.id === this.#id) return;
     this.#left.set(this.#id, this.lead);
+    this.#grabbed.set(this.#id, this.grab.at.clone());
     this.#id = planet.id;
     this.#spin.jump(this.#left.get(planet.id) ?? 0);
+    this.grab.at.copy(this.#grabbed.get(planet.id) ?? new Quaternion());
+    this.grab.stop();
     this.#lean.jump(0);
     this.#leanBy(0);
     this.#aimed = undefined;
+    this.#calm.away();
     const { lean, tilt } = planet.id === EARTH_ID ? EARTH : this.#axisOf(planet.id);
     this.#base.setFromEuler(new Euler(lean, 0, tilt));
     this.#back.copy(this.#base).invert();
@@ -185,6 +173,7 @@ export class EarthGround {
    * the surface the shader draws with it agree on the same frame. */
   place(earth: Planet, { seconds, step }: { seconds: number; step: number }, seen: Eye): void {
     this.#stand(earth);
+    this.#calm.rested(step);
     placeOf(earth, seconds, this.#centre);
     this.#radius = earth.radius;
     // The newest bubble is the last: whether it stands where none can read it, past the limb, under the dock, the plate or the header.
@@ -192,11 +181,12 @@ export class EarthGround {
     const held = this.#newest;
     this.#hidden =
       held !== undefined &&
-      !(this.#stands(held.ground, seconds * SPIN + this.lead, seen) && this.#readable(held.mark, true));
+      !(this.#stands(held.ground, seconds * SPIN + this.lead + kept(), seen) && this.#readable(held.mark, true));
     this.#turn(seen, seconds, step);
     for (const { mark, ground } of this.#held) {
-      const front = this.#stands(ground, seconds * SPIN + this.lead, seen);
+      const front = this.#stands(ground, seconds * SPIN + this.lead + kept(), seen);
       mark.place(this.#on.x, this.#on.y, front);
+      if (this.#calm.tell(mark)) mark.calm?.();
     }
   }
 
@@ -204,6 +194,7 @@ export class EarthGround {
    * back to rest by `step` seconds, so no flight leaves with a lean (D13916). */
   rest(earth: Planet, step: number): void {
     this.#stand(earth);
+    this.#calm.away();
     this.#lean.to = 0;
     this.#advance(step, false);
   }
@@ -214,9 +205,11 @@ export class EarthGround {
     const held = this.#newest;
     // An aim goes on, following the planet's own spin, until its country has been well seen; then it stays, whatever the spin does to the
     // country after (D13946), and with no bubble left nothing eases back.
-    if (held !== undefined) {
+    // No aim before the arrival has calmed, nor for a message said before it (D13001).
+    if (held !== undefined && this.#calm.over && !this.#calm.before(held.mark.sent)) {
       if (held.mark !== this.#aimed?.mark) this.#aimed = { mark: held.mark, spin: NaN, seen: false };
-      this.#aimed.seen ||= !this.#hidden;
+      // The hand turning the planet takes the aim over: the country it shows is the reader's to choose.
+      this.#aimed.seen ||= !this.#hidden || this.grab.moving;
       if (!this.#aimed.seen) this.#aim(held, seen, seconds);
     }
     this.#advance(step, true);
@@ -237,7 +230,7 @@ export class EarthGround {
   // The pair of spin and lean that shows the newest bubble's country in the free area, by the shortest turn (aim.ts): once per bubble, and again
   // when the planet's own spin has moved it a few degrees.
   #aim(held: { mark: GroundMark; ground: Vector3 }, seen: Eye, seconds: number): void {
-    const turn = seconds * SPIN;
+    const turn = seconds * SPIN + kept();
     if (this.#aimed?.mark === held.mark && Math.abs(this.#aimed.spin - turn) < AIM_STEP) return;
     this.#aimed = { mark: held.mark, spin: turn, seen: false };
     if (!this.#lean.moving && this.#lean.at === 0) this.#axisFor(seen.eye);
@@ -267,7 +260,7 @@ export class EarthGround {
         .normalize()
         .applyQuaternion(this.#undo.copy(this.#leaned).invert())
         .applyQuaternion(this.#back),
-      seconds * SPIN + this.lead,
+      seconds * SPIN + this.lead + kept(),
     );
     return { lat: Math.asin(local.y) / DEGREE, lon: Math.atan2(-local.z, local.x) / DEGREE };
   }

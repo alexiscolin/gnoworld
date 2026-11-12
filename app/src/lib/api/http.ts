@@ -73,3 +73,11 @@ export function jsonCall(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
     }
   };
 }
+
+/** A client's GETs: `get(schema, pathOf)` is a reader that calls the path `pathOf(arg)` and reads the answer through `schema`. */
+export function getter(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
+  const call = jsonCall(fetcher, timeoutMs);
+  return <A, T>(schema: z.ZodMiniType<T>, pathOf: (arg: A) => string) =>
+    (arg: A): Promise<Result<T>> =>
+      call({ path: pathOf(arg), schema });
+}

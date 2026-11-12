@@ -3,7 +3,17 @@ import { Button } from "../Button/Button.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
 import { Field } from "../Field/Field.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
+import { EmptyState } from "../EmptyState/EmptyState.tsx";
 import styles from "./PagedList.module.css";
+
+/** The button under a list that shows more of it: "Show N more" ("Show more" with no count), outlined, with its chevron, never bare words. */
+export function ShowMore({ count, onMore, busy = false }: { count?: number; onMore: () => void; busy?: boolean }) {
+  return (
+    <Button size="s" icon="chevron" busy={busy} onClick={onMore}>
+      {count === undefined ? "Show more" : `Show ${String(count)} more`}
+    </Button>
+  );
+}
 
 /** The most rows it ever shows: past it, "more" leaves for the explorer. */
 const LIST_MAX = 100;
@@ -121,9 +131,7 @@ function Foot({
         {note === undefined ? "" : ` \u00b7 ${note}`}
       </span>
       {more > 0 ? (
-        <Button size="s" onClick={onMore}>
-          Show {Math.min(page, more)} more
-        </Button>
+        <ShowMore count={Math.min(page, more)} onMore={onMore} />
       ) : all.matching > LIST_MAX && explorer !== undefined ? (
         <Button size="s" href={explorer.href} icon="arrow-up-right">
           {explorer.label}
@@ -165,7 +173,7 @@ export function PagedList<T>(props: PagedListProps<T>) {
         />
       )}
       {rows.length === 0 ? (
-        <p className={styles["empty"]}>{empty}</p>
+        <EmptyState look="inline" line={empty} />
       ) : (
         <ul className={styles["rows"]}>
           {drawn.map((item) => (

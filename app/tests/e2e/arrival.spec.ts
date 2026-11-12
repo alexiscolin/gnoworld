@@ -1,6 +1,6 @@
 import AxeBuilder from "@axe-core/playwright";
 import { adena } from "./adena.ts";
-import { accountPill } from "./account.ts";
+import { accountPill, connectButton } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // Slice 9h (frames 90 to 97): the arrival banners against the real server. A world is charted once a run, so this file owns
@@ -36,7 +36,7 @@ async function arriveAs(page: Page, as: string, path = "/w/govdao"): Promise<unk
   await page.goto(path);
   await hydrated(page);
   const call = answered(page, "POST", "/api/signals/chart");
-  await page.getByRole("button", { name: "Connect Adena" }).click();
+  await connectButton(page).click();
   const answer: unknown = await (await call).json();
   await expect(accountPill(page)).toBeVisible();
   return answer;

@@ -1,10 +1,11 @@
 // What a realm is doing as figures (D530, the proposal's band): its calls with the last thirty days beside them, its callers, its last call and
 // who imports it. A figure no source gave is a word in its place ("Never"), never a made zero; with no rollup the worlds' file's counts stand,
 // with no line and no time.
-import type { Figure } from "@gnoworld/ui";
+import { grouped, type Figure } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
-import { ago, dayLabel, dayValues } from "./days.ts";
-import { grouped, noun } from "./figures.ts";
+import { dayLabel, dayValues } from "./days.ts";
+import { ago } from "../../lib/days.ts";
+import { noun } from "./figures.ts";
 
 type Held = Worlds["worlds"][number]["realms"][number];
 

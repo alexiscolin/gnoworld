@@ -1,0 +1,62 @@
+-- gnomod.toml --
+// 122 bytes (not Gno source — content omitted; fetch with full=true)
+-- grc20factory.gno --
+// 5843 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: gno.land/p/moul/md/v0, gno.land/p/nt/avl/pager/v0, gno.land/p/nt/avl/rotree/v0, gno.land/p/nt/avl/v0, gno.land/p/nt/grc20/v0, gno.land/p/nt/mux/v0, gno.land/p/nt/ownable/v0, gno.land/p/nt/seqid/v0, gno.land/p/nt/ufmt/v0, gno.land/r/nt/grc20reg/v0
+
+func New(cur realm, name, symbol string, decimals int, initialMint, faucet int64)
+
+func NewWithAdmin(cur realm, name, symbol string, decimals int, initialMint, faucet int64, admin address)
+
+func Bank(symbol string) *grc20.Token
+
+func TotalSupply(symbol string) int64
+
+func HasAddr(symbol string, owner address) bool
+
+func BalanceOf(symbol string, owner address) int64
+
+func Allowance(symbol string, owner, spender address) int64
+
+func Transfer(cur realm, symbol string, to address, amount int64)
+
+func Approve(cur realm, symbol string, spender address, amount int64)
+
+func TransferFrom(cur realm, symbol string, from, to address, amount int64)
+
+// faucet.
+func Faucet(cur realm, symbol string)
+
+func Mint(cur realm, symbol string, to address, amount int64)
+
+func Burn(cur realm, symbol string, from address, amount int64)
+
+// instance admin functionality
+func DropInstanceOwnership(cur realm, symbol string)
+
+func TransferInstanceOwnership(cur realm, symbol string, newOwner address)
+
+func ListTokens(pageNumber, pageSize int) []*grc20.Token
+
+func Render(path string) string
+
+// unexported:
+//	var instances avl.Tree
+//	var nextTokenID seqid.ID
+//	var pager = …
+//	type instance struct {
+//		token	*grc20.Token
+//		ledger	*grc20.PrivateLedger
+//		admin	*ownable.Ownable
+//		faucet	int64	// per-request amount. disabled if 0.
+//	}
+//	func renderHome(res *mux.ResponseWriter, req *mux.Request)
+//	func renderToken(res *mux.ResponseWriter, req *mux.Request)
+//	func renderBalance(res *mux.ResponseWriter, req *mux.Request)
+//	func mustGetInstance(symbol string) *instance
+//	func checkErr(err error)
+-- grc20factory_test.gno --
+// 2441 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: testing, gno.land/p/nt/testutils/v0, gno.land/p/nt/uassert/v0, gno.land/p/nt/ufmt/v0
+
+func TestReadOnlyPublicMethods(cur realm, t *testing.T)

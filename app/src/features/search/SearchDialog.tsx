@@ -5,7 +5,7 @@ import type { StoreRow } from "@gnoworld/core";
 import { Dialog } from "@gnoworld/ui";
 import { useEffect, type KeyboardEvent } from "react";
 import { placeOf, type UniverseView } from "../../places.ts";
-import { itemOf } from "./discover/realms.ts";
+import { itemOf, realmChat } from "./discover/realms.ts";
 import { useDiscover } from "./discover/useDiscover.ts";
 import { asksHandOff, handOff } from "./handOff.ts";
 import { onPaletteKey } from "./keys.ts";
@@ -40,10 +40,15 @@ export default function SearchDialog({
   start?: string;
 }) {
   const palette = usePalette(universe, open, start);
-  const discovering = palette.query.trim() === "";
+  // A chip or a namespace on, with no words, lists the places it keeps, not Discover.
+  const discovering = palette.query.trim() === "" && palette.filters.size === 0 && palette.namespace === undefined;
   const { flat, active, choose } = palette;
   const chosen = discovering ? undefined : palette.chosen;
-  const discovery = useDiscover(discovering ? (palette.worlds ?? NO_WORLDS) : NO_WORLDS, palette.here, universe.id);
+  const discovery = useDiscover(discovering ? (palette.worlds ?? NO_WORLDS) : NO_WORLDS, {
+    here: palette.here,
+    universe: universe.id,
+    following: palette.followedPlaces.length,
+  });
   useEffect(() => {
     document.getElementById(`${LIST_ID}-${String(active)}`)?.scrollIntoView({ block: "nearest" });
   }, [active]);
@@ -55,9 +60,10 @@ export default function SearchDialog({
   const fly = (row: StoreRow) => {
     go(itemOf(row, universe.id));
   };
-  // A realm's chat is its world's, where the universe has a page for it, and the Earth's where it has none.
+  // A realm's chat is its own room, full (Alexis, 2026-11-12); a realm with no page of its own talks in its world's, else the Earth's.
   const talk = (row: StoreRow) => {
-    chat(itemOf(row, universe.id), placeOf(universe, row.world)?.href ?? universe.earth.path);
+    const item = itemOf(row, universe.id);
+    go(item, realmChat(item, placeOf(universe, row.world)?.href ?? universe.earth.path));
   };
   return (
     <Dialog title="Search" open={open} onClose={close} wide="sheet">
@@ -76,7 +82,7 @@ export default function SearchDialog({
       >
         <PaletteField palette={palette} />
         {discovering ? (
-          <DiscoverSheet palette={palette} discovery={discovery} universe={universe} fly={fly} chat={talk} />
+          <DiscoverSheet palette={palette} discovery={discovery} universe={universe} fly={fly} chat={talk} go={go} />
         ) : (
           <TypedSheet palette={palette} copied={copied} go={go} chat={chat} copy={copy} />
         )}

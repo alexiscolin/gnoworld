@@ -1,18 +1,26 @@
 // Each realm's rollup (slice 13a), a pass of it after the worlds' file: the chain's calls above the height kept, read a page at a time
 // (history.ts's walk), dated by their blocks' times (blockDays.ts), kept in the database (rollupStore.ts); then one file per realm of the
 // worlds' file, named by its path's hash, shed to its gzip cap. A fault is logged by its kind and never undoes the worlds' pass.
-import { blockTimes } from "@gnoworld/chain/asks";
 import { rollupName } from "@gnoworld/core";
-import { RealmPath, RealmRollup, ROLLUP_CAPS, ROLLUP_MAX_GZIP, type Worlds } from "@gnoworld/schemas/indexer";
+import {
+  RealmPath,
+  RealmRollup,
+  ROLLUP_CAPS,
+  ROLLUP_MAX_GZIP,
+  type Trending,
+  type Worlds,
+} from "@gnoworld/schemas/indexer";
 import type { Log } from "@gnoworld/service/log";
 import { mkdirSync, readdirSync, unlinkSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
-import { Blocks, daysOf, timesOf } from "./blockDays.ts";
-import { readingOf, request, walkCalls, type Reader, type Reading, type Row } from "./history.ts";
+import { anchorHolds, daysOf, timesOf } from "./blockDays.ts";
+import { readingOf, walkCalls, type Reader, type Row } from "./history.ts";
 import { Failure, kindOf, type Kind, type Send } from "./remote.ts";
 import { rollupStore, type RollupStore } from "./rollupStore.ts";
+import { runTokens } from "./tokens.ts";
+import { rowsSince, sinceOf, trendingOf } from "./trending.ts";
 import { replaceFile } from "../replaceFile.ts";
 
 /** The most heights of last calls a pass asks the exact time of, past those the days' bisection asked. */
@@ -30,14 +38,6 @@ export function importersOf(worlds: Worlds): Map<string, RealmRollup["importers"
       .sort((a, b) => b.calls - a.calls || (a.path < b.path ? -1 : 1))
       .slice(0, ROLLUP_CAPS.importers);
   return new Map([...all].map(([path, by]) => [path, { total: by.size, top: ranked(by) }]));
-}
-
-// Whether the block the state was dated by still has its time: a chain restarted under the same name has none, or another.
-async function anchorHolds(reading: Reading, anchor: { height: number; time: string }): Promise<boolean> {
-  const answer = Blocks.safeParse(await request(reading, blockTimes([anchor.height])));
-  if (!answer.success) throw new Failure("shape");
-  const block = answer.data.data["b0"]?.[0];
-  return block?.height === anchor.height && new Date(block.time).toISOString() === anchor.time;
 }
 
 /**
@@ -116,6 +116,9 @@ export interface RollupPass {
   readonly pace: () => Promise<void>;
   readonly historyPage?: number | undefined;
   readonly isStopped: () => boolean;
+  readonly now: () => number;
+  /** Told the ranking of the last 7 days (trending.ts) once the files are written; none: nobody asks. */
+  readonly trending?: ((trending: Trending) => void) | undefined;
 }
 
 /** A pass of the rollup over the worlds' file just written; a stop writes no file. */
@@ -138,6 +141,8 @@ export async function rollUp(pass: RollupPass, worlds: Worlds): Promise<void> {
   const read = await readRollup(reader, store, { known, isStopped });
   if (!read.ok) failed(read.kind);
   if (!isStopped() && (await writeRollups(rollup.dir, worlds, store)) === false) failed("write");
+  if (!isStopped()) pass.trending?.(trendingOf(worlds, rowsSince(rollup.db, sinceOf(pass.now())), pass.now()));
+  await runTokens(pass);
 }
 
 const gzipped = (file: RealmRollup): number => gzipSync(JSON.stringify(file), { level: 6 }).length;

@@ -24,6 +24,8 @@ export type NavItemProps = Shared &
     | { href: string; onClick?: never; soon?: never }
     | { href?: never; onClick: () => void; soon?: never }
     | { href?: never; onClick?: never; soon: true }
+    /** The one in view that has no address: marked current, with nothing to do. */
+    | { href?: never; onClick?: never; soon?: never }
   );
 
 // Whether the badge says something is unseen, not a state such as online.

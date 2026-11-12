@@ -22,6 +22,7 @@ export {
 export { Expedition, Quests } from "./discovery.ts";
 export { BlogPost, OnAir } from "./feeds.ts";
 export { CallRequest } from "./call.ts";
+export { CALL_CAPS, CallDetail, CallHash, CallIndex, callAddress, indexerHash } from "./callDetail.ts";
 export { CARD_CAPS, CardEvent, CardRemove, LineCards, LinkCard, ReaderCard } from "./cards.ts";
 // The one rule for hidden (Cc, Cf) characters, which the link reader applies to a page's text.
 export { hasHidden, stripHidden } from "./hidden.ts";
@@ -60,6 +61,7 @@ export {
   ProposedAction,
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
+export { JARVIS_EXAMPLES, jarvisExamples } from "./jarvisExamples.ts";
 export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
@@ -97,3 +99,18 @@ export const ApiError = z.object({
   ]),
 });
 export type ApiError = z.infer<typeof ApiError>;
+export {
+  EXPLAIN_CAPS,
+  EXPLAIN_KINDS,
+  Explanation,
+  ExplainKind,
+  ExplainSeed,
+  ExplainSeedRow,
+  JarvisExplained,
+  JarvisExplainRequest,
+  REALM_EXPLAIN_VERSION,
+  REALM_TAGS,
+  RealmExplanation,
+  tagsOf,
+  type RealmTag,
+} from "./explain.ts";

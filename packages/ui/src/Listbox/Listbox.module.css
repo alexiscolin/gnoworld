@@ -10,7 +10,8 @@
   }
 
   .option {
-    min-block-size: var(--control-s);
+    /* a control's height, the line of words centred in it by the padding above and below it */
+    padding-block: calc((var(--control-s) - 1lh) / 2);
     padding-inline: var(--space-s);
     border-radius: var(--radius-item);
     font: var(--font-chat);

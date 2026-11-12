@@ -75,7 +75,7 @@
      keeps inside its rounded ends: the views' two icons and the search. Over the plain icon control's square corners. */
   .round-controls button {
     /* raw: a view link's 34 px inside the 44 px pill (shellHeader.module.css) */
-    --_h: 34px;
+    --_h: var(--round-h);
 
     /* layout: no room to share with the pill's 40 px controls: the icons are its links' height */
     margin-block: 0;
@@ -97,6 +97,23 @@
     border-inline-start: var(--line-width) solid var(--color-line);
   }
 
+  /* Held at the top of a chat's scrolling box, over the lines that pass under it, in the chat's own fill: the day's label, the dock's
+     rooms. A scrolling box with padding above sets `--_held-top` to the padding negated, so it holds at the box's edge, not
+     under the padding, where the lines show. */
+  :root {
+    /* raw: no padding above, as a box with none */
+    --_held-top: 0px;
+  }
+
+  .held-top {
+    /* layout: held at the top of its scrolling box while the lines pass under */
+    position: sticky;
+    inset-block-start: var(--_held-top);
+    /* raw: over the lines under it, which stand at auto */
+    z-index: 1;
+    background: var(--color-surface);
+  }
+
   /* A column's item: the pill of the rooms' column (38 px high, a step each side of its words), shared by its items and Discover's shelves. */
   .column-item {
     min-block-size: var(--chat-item);
@@ -107,12 +124,6 @@
   /* The pointer's light on a box that has a fill at rest: the fill brightens, nothing moves (the Select, the chips, Discover's cards). */
   .fill-hover:hover {
     background: var(--color-fill-hover);
-  }
-
-  /* A line of words where a list holds nothing: a step round it, in the muted grey. */
-  .empty-note {
-    padding: var(--space-s) var(--space-xs);
-    color: var(--color-text-muted);
   }
 
   /* Tags and a signal on one line that never wraps, the last one cut by an ellipsis where the place is narrow: a card's last line. */
@@ -206,26 +217,6 @@
     align-items: center;
   }
 
-  /* A row of a list a click opens (Around it, the Proposals card): its parts a step apart, a line high, the pointer lighting it. */
-  .list-row {
-    /* layout: the lead, the words and the trailing part a step apart */
-    gap: var(--space-s);
-    inline-size: 100%;
-    min-block-size: var(--row-h);
-    color: inherit;
-    font: var(--font-meta);
-    text-align: start;
-  }
-
-  .list-row[data-link] {
-    cursor: pointer;
-    transition: background-color var(--motion-fast) var(--ease-standard);
-  }
-
-  .list-row[data-link]:hover {
-    background: var(--color-fill);
-  }
-
   /* A definition's value, the margin the browser gives it taken off: a fact of a card. */
   .fact-value {
     margin: 0;
@@ -250,6 +241,12 @@
   .grid-center {
     display: grid;
     place-items: center;
+  }
+
+  /* A block that fills its line with its words at the start: a menu's act, a row's link (a button would centre them). */
+  .full-start {
+    inline-size: 100%;
+    text-align: start;
   }
 
   /* A word and its mark side by side on one inline grid, sharing a middle: a name and its chevron. */
@@ -277,6 +274,11 @@
     border-radius: inherit;
     background: var(--color-mine-line);
     opacity: 0;
+  }
+
+  /* A box placed by its own insets in its positioned parent: a name over the scene, a tag beside a planet. */
+  .placed {
+    position: absolute;
   }
 
   /* A pill's ends. */
@@ -345,5 +347,19 @@
     overflow: clip;
     visibility: hidden;
     pointer-events: none;
+  }
+
+  /* A button that is no control to the eye: its words as they are (a name in a line that opens a person's window, a step greyed). */
+  .bare {
+    padding: 0;
+    /* raw: 2 px each side lifts the box past 24 px (WCAG 2.5.8) and the matching negative margin gives the room back */
+    padding-block: 2px;
+    /* layout: the room the padding took, given back, so a line keeps its measures */
+    margin-block: -2px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
   }
 }

@@ -33,7 +33,7 @@ import { useNow } from "./useNow.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { Noticing } from "./useNotices.ts";
 import { useThreads } from "./Threading.tsx";
-import { Writer } from "./Writer.tsx";
+import { RoomWriter } from "./Writer.tsx";
 
 const NO_LINES: readonly Line[] = [];
 const NO_MEMBERS: readonly string[] = [];
@@ -118,7 +118,7 @@ function useConversation(props: LoadedProps) {
     { sayTo, focus: opened.focus, noteId, seen: noticing.seen, acts: bar },
   );
   const lines = state?.lines ?? NO_LINES;
-  return { room, acts, me, people, shown, lines, members: state?.members ?? NO_MEMBERS };
+  return { room, acts, me, people, shown, lines, noteId, members: state?.members ?? NO_MEMBERS };
 }
 
 /** The conversation in view: a direct message's problem, said in the room's place, then the room with its composer. */
@@ -142,9 +142,18 @@ function LoadedRoom({
   );
 }
 
+// What the composer's description points at: the header shows a direct message's mark, a screen reader hears its note.
+function DmNote({ shown, id }: { shown: Shown | undefined; id: string }) {
+  return shown?.kind === "dm" ? (
+    <p id={id} className="visually-hidden">
+      {shown.note}
+    </p>
+  ) : null;
+}
+
 export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
-  const { room, acts, me, people, shown, lines, members } = useConversation(props);
+  const { room, acts, me, people, shown, lines, members, noteId } = useConversation(props);
   const now = useNow();
   // The owner of the place's world wears a mark beside the room's name (owners' moderation, part 5); the server's list says who owns what.
   const owner = ownsRoom(useLinks(me)?.worlds, room);
@@ -156,7 +165,7 @@ export function Loaded(props: LoadedProps) {
   const rail = <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} noticing={noticing} />;
   const writer =
     shown === undefined ? undefined : (
-      <Writer
+      <RoomWriter
         session={session}
         rooms={ids}
         groups={groupsAt(sections, room)}
@@ -167,7 +176,9 @@ export function Loaded(props: LoadedProps) {
       />
     );
   // The room's name opens the place's rooms under a search (D487); the room's settings wait for their own place.
-  const menu = <RoomsList sections={sections} current={room} badge={(id) => badged(noticing.badges?.[id])} />;
+  const menu = (
+    <RoomsList sections={sections} current={room} failed={failed} badge={(id) => badged(noticing.badges?.[id])} />
+  );
   return (
     <ChatScreen
       place={place}
@@ -208,7 +219,12 @@ export function Loaded(props: LoadedProps) {
           ...composing.view,
           ...threads.view,
         }}
-        composer={<Dock pinned={place.pinned}>{writer}</Dock>}
+        composer={
+          <>
+            <DmNote shown={shown} id={noteId} />
+            <Dock pinned={place.pinned}>{writer}</Dock>
+          </>
+        }
       />
     </ChatScreen>
   );

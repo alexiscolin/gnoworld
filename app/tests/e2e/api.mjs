@@ -13,6 +13,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { freePort, startErgo } from "../../../server/src/testing/ergo.ts";
+import { startStandin } from "../../../server/src/testing/jarvisStandin.ts";
 import { rawClient } from "../../../server/src/testing/rawClient.ts";
 import { wallet } from "../../../server/src/testing/signer.ts";
 
@@ -30,14 +31,27 @@ const BUBBLE = {
 };
 
 // The shipped roles file, with the journeys' rooms and Bubble's moderators (test wallets moderator0 to moderator8, 4d's pins) for the
-// journeys alone; written where the server reads it; its worlds. The workshop takes the shipped file as it is, as the playground will (D398).
-function writeRoles(path, journeys) {
+// journeys alone; written where the server reads it; its worlds. The workshop takes the shipped file, its team the addresses `team`
+// names (WORKSHOP_TEAM), none by default.
+function writeRoles(path, journeys, team = []) {
   const roles = JSON.parse(readFileSync(ROLES, "utf8"));
+  // The team moderates every world, the Earth's included, by itself: the roles file refuses it listed again as a world's moderator.
+  if (team.length > 0) roles.team = team;
   const moderators = Array.from({ length: 9 }, (_, n) => walletOf({ url: `/?as=moderator${String(n)}` }).address);
   if (journeys)
     roles.worlds = roles.worlds.map((world) => (world.slug === "bubble" ? { ...world, ...BUBBLE, moderators } : world));
   writeFileSync(path, JSON.stringify(roles));
   return roles.worlds;
+}
+// The workshop's team, as WORKSHOP_TEAM lists it (addresses, a comma between); one that is no address stops the start.
+function teamOf(listed = "") {
+  const team = listed
+    .split(",")
+    .map((each) => each.trim())
+    .filter((each) => each !== "");
+  const wrong = team.find((each) => !/^g1[02-9ac-hj-np-z]{38}$/.test(each));
+  if (wrong !== undefined) throw new Error(`api.mjs: WORKSHOP_TEAM holds "${wrong}", which is no g1 address`);
+  return team;
 }
 const LISTENING = /"event":"listening".*"port":(\d+)/;
 const LINKED = /"event":"irc_ready"/;
@@ -55,7 +69,11 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
   writeFileSync(join(dir, "oper"), operPassword);
   // The ticket logins reach the server's auth handler through a port (authPort.mjs), on which Ergo's script dials.
   const authPort = await freePort();
-  const worlds = writeRoles(join(dir, "roles.json"), jobs === undefined);
+  const worlds = writeRoles(
+    join(dir, "roles.json"),
+    jobs === undefined,
+    jobs === undefined ? [] : teamOf(process.env.WORKSHOP_TEAM),
+  );
   // The workshop keeps its chat from one run to the next, as the playground does (Alexis, 2026-11-08: "le chat est vide?"): the
   // server's database and Ergo's folder (its rooms, accounts and history) live in the workshop's data folder; the journeys' stay temporary.
   const kept = jobs === undefined ? undefined : join(jobs.dir, "backend");
@@ -73,6 +91,11 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
       cause: error,
     });
   });
+  // The workshop alone, and only when asked: Jarvis answered by the stand-in (server/src/testing/jarvisStandin.ts), never in the journeys.
+  const doorKey = randomBytes(24).toString("hex");
+  const standin =
+    jobs !== undefined && process.env.WORKSHOP_JARVIS === "standin" ? await startStandin(doorKey) : undefined;
+  writeFileSync(join(dir, "jarvis-key"), doorKey);
   const child = spawn(process.execPath, ["--disallow-code-generation-from-strings", "--import", AUTH_PORT, ENTRY], {
     env: {
       PATH: process.env.PATH ?? "",
@@ -96,7 +119,12 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
             UNIVERSES_FILE: jobs.universes,
             WORLDS_FILE: join(jobs.dir, "worlds.json"),
             MARKETS_FILE: join(jobs.dir, "markets.json"),
+            // The crowd logs in up to a dozen test wallets from this one machine, all new after the chat is reset: the default five an hour would refuse most.
+            NEW_ACCOUNTS_PER_HOUR: "50",
           }),
+      ...(standin === undefined
+        ? {}
+        : { JARVIS: "on", JARVIS_URL: standin.url, JARVIS_DOOR_KEY_FILE: join(dir, "jarvis-key") }),
       // A guest speaks only with moderation (D430, closed without it): the workshop alone may be given the key's file, by its absolute path (D564).
       ...(jobs !== undefined && process.env.WORKSHOP_OPENAI_KEY_FILE
         ? { OPENAI_API_KEY_FILE: process.env.WORKSHOP_OPENAI_KEY_FILE }
@@ -120,6 +148,7 @@ export async function startBackend(origins, { apiPort = 0, ergoPorts, jobs } = {
       await exited;
       clearTimeout(patience);
       await ergo.stop();
+      await standin?.stop();
       rmSync(dir, { recursive: true, force: true });
     })());
   // startErgo's own exit handler kills Ergo and removes its folder.

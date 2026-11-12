@@ -50,7 +50,7 @@ const line = (id: string, text: string): Line => ({
   text,
   kind: "message",
 });
-const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
+const pausedBriefly = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 const CHART: Signal = {
   kind: "chart",
@@ -108,7 +108,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     };
     await act(async () => {
       redraw({});
-      await settled();
+      await pausedBriefly();
     });
     return sources;
   };
@@ -118,7 +118,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     await draw(undefined);
     await act(async () => {
       redraw({ lines: [] });
-      await settled();
+      await pausedBriefly();
     });
     expect(chunk.loads).toBe(0);
   });
@@ -128,12 +128,12 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const sources = await draw([line("a", link)]);
     await act(async () => {
       redraw({ room: "#other", lines: [line("x", link)] });
-      await settled();
+      await pausedBriefly();
     });
     expect(chunk.loads).toBe(1);
     chunk.open();
     await act(async () => {
-      await settled();
+      await pausedBriefly();
     });
     expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble", "/api/stream?rooms=%23other"]);
   });

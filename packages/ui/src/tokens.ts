@@ -37,6 +37,7 @@ export function groups() {
         "--dock-",
         "--page-",
         "--globe-",
+        "--round-",
       ],
     },
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },

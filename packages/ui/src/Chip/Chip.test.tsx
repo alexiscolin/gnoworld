@@ -6,6 +6,16 @@ import { Chip } from "./Chip.tsx";
 import * as stories from "./Chip.stories.tsx";
 
 describe("Chip", () => {
+  it("with an href, is a link naming its count, the one in view marked by aria-current", () => {
+    render(
+      <Chip href="/chat/a" selected count={3} label="A, 3 unseen">
+        A
+      </Chip>,
+    );
+    const link = screen.getByRole("link", { name: "A, 3 unseen" });
+    expect(link.getAttribute("aria-current")).toBe("true");
+  });
+
   it("with a handler, is a button named by its words, its count among them", () => {
     render(
       <Chip count={3} onClick={vi.fn()}>
@@ -14,6 +24,17 @@ describe("Chip", () => {
     );
     const chip = screen.getByRole("button", { name: "Dev help 3" });
     expect(chip.getAttribute("type")).toBe("button");
+  });
+
+  it("says it opens a dialog only when told", () => {
+    const { rerender } = render(<Chip onClick={vi.fn()}>More</Chip>);
+    expect(screen.getByRole("button").hasAttribute("aria-haspopup")).toBe(false);
+    rerender(
+      <Chip popup="dialog" onClick={vi.fn()}>
+        More
+      </Chip>,
+    );
+    expect(screen.getByRole("button").getAttribute("aria-haspopup")).toBe("dialog");
   });
 
   it("says whether it is selected only when it toggles, and calls its handler", async () => {

@@ -49,11 +49,13 @@ export function Controls({ discovery }: { discovery: Discovery }) {
         </div>
         <FilterRow
           chips={
-            <ToggleChips
-              items={FILTERS.filter((each) => each.first !== true || store.hasFirst)}
-              selected={filters}
-              onToggle={toggle}
-            />
+            shelf === "following" ? null : (
+              <ToggleChips
+                items={FILTERS.filter((each) => each.first !== true || store.hasFirst)}
+                selected={filters}
+                onToggle={toggle}
+              />
+            )
           }
           sort={
             <Select

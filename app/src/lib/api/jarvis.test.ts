@@ -251,3 +251,30 @@ describe("a question to Jarvis, through the door", () => {
     }
   });
 });
+
+describe("a line's translation, from the door", () => {
+  const request = { room: ROOM, msgid: "AB12", language: "fr" } as const;
+
+  it("posts the room, the line's id and the language to /api/jarvis/translate, and reads the answer through its schema", async () => {
+    const { sent, api } = server(200, { status: "translated", text: "Bonjour", from: "en" });
+    expect(await api().translate(request)).toEqual({
+      ok: true,
+      value: { status: "translated", text: "Bonjour", from: "en" },
+    });
+    expect(sent[0]?.url).toBe("/api/jarvis/translate");
+    expect(sent[0]?.init).toMatchObject({ method: "POST", credentials: "same-origin", redirect: "error" });
+    expect(bodyOf(sent[0]?.init)).toEqual(request);
+  });
+
+  it("refuses a request off the schema before sending, and takes an answer off it as malformed", async () => {
+    const { sent, api } = server(200, { status: "translated", text: "x", from: "xx" });
+    expect(await api().translate({ ...request, language: "xx" as "fr" })).toEqual({ ok: false, reason: "malformed" });
+    expect(sent).toHaveLength(0);
+    expect(await api().translate(request)).toEqual({ ok: false, reason: "malformed" });
+  });
+
+  it("says too_many for a 429, so the queue tries later", async () => {
+    const { api } = server(429);
+    expect(await api().translate(request)).toMatchObject({ ok: false, reason: "too_many" });
+  });
+});

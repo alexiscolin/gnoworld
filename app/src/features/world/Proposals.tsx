@@ -8,7 +8,7 @@ import { realmAt } from "../../realmAt.ts";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { useQuery } from "@tanstack/react-query";
 import { isUnread, queryClient } from "../../lib/query/client.ts";
-import { proposalsOptions } from "./proposalsQuery.ts";
+import { proposalsOptions } from "../../lib/query/proposalsQuery.ts";
 import type { ChainRead, ReadOptions } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { ReadFailed } from "../realms/index.ts";

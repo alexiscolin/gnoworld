@@ -25,3 +25,12 @@ export function writeFlag(key: string, value: string, storage: () => Pick<FlagSt
     // Full or blocked: what reads it does without.
   }
 }
+
+/** Whether this device says plainly that it keeps nothing under `key`: a device that refuses to be read says nothing, which is not none. */
+export function flagAbsent(key: string, storage: () => Pick<FlagStorage, "getItem"> = local): boolean {
+  try {
+    return storage().getItem(key) === null;
+  } catch {
+    return false;
+  }
+}

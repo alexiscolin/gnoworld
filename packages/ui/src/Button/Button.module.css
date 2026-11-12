@@ -67,8 +67,24 @@
     --_line: var(--_edge);
   }
 
+  /* A button that reads as a link: the words' own size and line, the link's ink, underlined; no box, no veil. */
+  .button[data-emphasis="link"] {
+    --_h: auto;
+    --_pad: 0;
+    --_hover: transparent;
+    --_ink: var(--color-link);
+
+    display: inline;
+    min-block-size: 0;
+    padding: 0;
+    border-radius: var(--radius-s);
+    font: inherit;
+    text-align: start;
+    text-decoration: underline;
+  }
+
   /* A transparent edge still shows under forced colours. */
-  .button:is([data-emphasis="quiet"], [data-emphasis="plain"]) {
+  .button:is([data-emphasis="quiet"], [data-emphasis="plain"], [data-emphasis="link"]) {
     --_line: transparent;
   }
 

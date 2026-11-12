@@ -29,11 +29,11 @@ scope and the decisions it changes are in [ADR-0002](../../adr/0002-validated-pr
 
 | In the prototype | In the product |
 |---|---|
-| One 4,000-line script with globals | Feature modules with one owner each (`docs/ARCHITECTURE.md`) |
+| One 4,300-line script with globals | Feature modules with one owner each (`docs/ARCHITECTURE.md`) |
 | Sample data hard-coded in the script | Data from the chain, Ergo and the indexer, validated with Zod at the boundary |
 | 20 font sizes, 11 control heights, 82 `!important` | Design tokens and a short scale (`docs/DESIGN-SYSTEM.md`) |
 | Timers that fake activity, and fake replies | Real events only; empty states when there are none |
-| State in `localStorage` | IndexedDB for what the device keeps, the chain for what is public |
+| State in `localStorage`, unchecked | What the device keeps in `localStorage` too, each field read through its schema (`app/src/lib/keep/`); the chain for what is public |
 | Fixes stacked on fixes, dead code from earlier versions | Each slice reviewed, with no dead code |
 | No tests | Test first, with one gate (`scripts/check.sh`) |
 | A modal for signatures | Inline transaction cards (ADR-0001 §7). The modal stood in for the card |

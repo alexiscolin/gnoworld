@@ -42,8 +42,8 @@ export function headingOf(html: string): string | undefined {
   return /<h1\b[^>]*>(.*?)<\/h1>/s.exec(html)?.[1]?.replace(/<[^>]*>/g, "");
 }
 
-/** The way home a page that failed offers: the primary link to the universe. */
-export const BACK_HOME = /<a [^>]*href="\/"[^>]*>Back to the universe<\/a>/;
+/** The way to the Galaxy a page that failed offers. */
+export const BACK_HOME = /<a [^>]*href="\/"[^>]*>Galaxy<\/a>/;
 
 /** What the page's alert holds: the markup inside its first role="alert" div, nested divs included. */
 export function alertOf(html: string): string {

@@ -1,0 +1,67 @@
+/* The badge: a medal in its tone, the muted grey while it is not earned. */
+@layer components {
+  .badge {
+    --_ink: var(--color-text-muted);
+
+    display: block;
+    inline-size: 100%;
+    block-size: auto;
+    color: var(--_ink);
+  }
+
+  .badge[data-earned] {
+    --_ink: var(--_tone);
+  }
+
+  .badge[data-tone="primary"] {
+    --_tone: var(--color-primary);
+  }
+
+  .badge[data-tone="mine"] {
+    --_tone: var(--color-mine);
+  }
+
+  .badge[data-tone="warm"] {
+    --_tone: var(--color-warm);
+  }
+
+  .badge[data-tone="signal"] {
+    --_tone: var(--color-signal);
+  }
+
+  .badge[data-tone="danger"] {
+    --_tone: var(--color-danger);
+  }
+
+  .badge[data-earned] .medal {
+    fill: currentcolor;
+    fill-opacity: 0.16;
+  }
+
+  .band {
+    fill: currentcolor;
+    fill-opacity: 0.18;
+  }
+
+  .badge[data-earned] .band {
+    fill-opacity: 1;
+  }
+
+  .name,
+  .count {
+    font-family: var(--family-mono);
+  }
+
+  .count {
+    fill: currentcolor;
+  }
+
+  .name {
+    fill: var(--color-text);
+    font-weight: 600;
+  }
+
+  .badge[data-earned] .name {
+    fill: var(--color-ink);
+  }
+}

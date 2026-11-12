@@ -16,7 +16,7 @@ import { Chat, type ChatProps } from "./Chat.tsx";
 import { FullLoading } from "./FullLoading.tsx";
 import { DockCover } from "./DockCover.tsx";
 import { asksFull, useChatAlone } from "./full.ts";
-import { keyOf, leaveFull, leaveRoom, scrollsOf, restoreScrolls } from "./stillScreen.ts";
+import { keyOf, leaveDocked, leaveFull, leaveRoom, scrollsOf, restoreScrolls } from "./stillScreen.ts";
 
 let held: ChatProps | undefined;
 const heard = new Heard();
@@ -107,6 +107,14 @@ function DockSlot({ chat }: { chat: ChatProps | undefined }) {
   useEffect(() => {
     if (chat !== undefined) hold(chat);
   }, [chat]);
+  // Heals itself: a render that finds the chat let go or its seat out of this box (module state reset by a hot reload, a seat left in the
+  // body) holds it and takes the seat again.
+  useLayoutEffect(() => {
+    const box = slotRef.current;
+    if (box === null || !takes) return;
+    if (held === undefined && chat !== undefined) hold(chat);
+    putSeat(box);
+  });
   return (
     <div ref={slotRef} style={{ display: "contents" }}>
       {fresh ? <DockCover waiting={!ready} /> : null}
@@ -152,6 +160,9 @@ export function DockedChatHost() {
   // The seat still in the window's own place while the address no longer asks it full: this draw gives the chat back to its page, and its screen is
   // copied first, as it stands (a render only reads; a second run finds the same).
   if (!alone && seat?.parentElement?.tagName === "BODY") leaveFull();
+  // The dock's screen too, as it stands, for the full chat to grow out of: the dock keeps its look while the full chat fades in over it. No
+  // seat yet, no dock to copy: a page opened full, and the server's draw, which has no document.
+  if (alone && seat !== undefined && seat.parentElement?.tagName !== "BODY") leaveDocked();
   // Before the layout effects of the screen the move reads its box in.
   useInsertionEffect(() => {
     if (alone) putSeat(document.body);

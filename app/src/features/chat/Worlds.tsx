@@ -1,21 +1,20 @@
 // The full-screen chat's column of worlds (the video's left edge, frame 80): the picture of each world's real planet at 44 px, the world in
 // view ringed, no text under it; its name shows on hover (the tooltip) and names the link. A world with no picture keeps ui's disc.
 import { hubWorldOf } from "@gnoworld/core";
-import { Cluster, Tooltip } from "@gnoworld/ui";
+import { Cluster, EmptyState, Tooltip } from "@gnoworld/ui";
 import { useState } from "react";
 import { chunked } from "./Failing.tsx";
 import { RouterLink } from "../../routerLink.tsx";
 import { useApp } from "../../storeContext.tsx";
 import { listAhead } from "./roomsListed.ts";
-import { pictureOf } from "../../lib/worldPictures.ts";
-import { ColumnPlanet as Planet } from "./ColumnPlanet.tsx";
+import { WorldPlanet } from "../../WorldPlanet.tsx";
 import { WorldsMore } from "./WorldsMore.tsx";
 import styles from "./Worlds.module.css";
 
 // The credits' dialog is the universe's own, its code asked at the first press: the column carries only the button.
 const CreditsDialog = chunked(async () => ({ default: (await import("../credits/index.ts")).CreditsDialog }), {
   waiting: null,
-  failed: <p role="status">The credits could not load.</p>,
+  failed: <EmptyState look="failed" line="The credits could not load." />,
 });
 
 export interface WorldsProps {
@@ -59,7 +58,9 @@ export function Worlds({ worlds, current, followed = NONE, universe }: WorldsPro
                 aria-current={world.slug === current ? "page" : undefined}
                 className={styles["world"]}
               >
-                <Planet name={world.name} id={hubWorldOf(world)} src={pictureOf(hubWorldOf(world))} />
+                <span className={styles["planet"]}>
+                  <WorldPlanet world={hubWorldOf(world)} fallback="" name={world.name} decorative />
+                </span>
               </RouterLink>
             </Tooltip>
           </li>

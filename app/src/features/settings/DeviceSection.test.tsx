@@ -38,7 +38,6 @@ const OTHERS: Record<string, unknown> = {
   "gnoworld:device:expedition": { day: "2026-11-05", reached: ["onyx:a"] },
   "gnoworld:device:quests": { named: ["read"] },
   "gnoworld:device:follows": { worlds: ["onyx:a"], people: [] },
-  "gnoworld:device:reminders": { e1: { fired: false } },
   [`gnoworld:draft:${ALICE}:#bubble`]: "hello",
   [`gnoworld:draft:${BOB}:#bubble`]: "bob's",
 };
@@ -143,7 +142,12 @@ describe("this device's settings", () => {
 
   it("offer no clear of saved messages or drafts to a guest", async () => {
     const box = await section();
-    expect(all(box, "button").map((each) => each.textContent)).toEqual(["Export the passport", "Clear the passport"]);
+    // The passport's file is exported or read back through a button of its own (the ping-pong's batch, f7a31433), then cleared.
+    expect(all(box, "button").map((each) => each.textContent)).toEqual([
+      "Export the passport",
+      "Import a passport",
+      "Clear the passport",
+    ]);
   });
 
   it("replace the passport whole from a file, never merged entry by entry", async () => {

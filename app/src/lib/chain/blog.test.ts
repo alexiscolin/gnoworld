@@ -1,12 +1,14 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { latestPost } from "./blog.ts";
+import { latestPosts } from "./blog.ts";
 
-// gno.land's blog page (D13931): the page recorded through gnomcp from gnoland-1, the posts' titles, slugs and days, and the newest one picked.
+// gno.land's blog page (D13931): the page recorded through gnomcp from gnoland-1, the posts' titles, slugs and days, and the newest picked.
 const RECORDED = readFileSync(new URL("../../../tests/chain/recorded/gnoland-1-blog-home.md", import.meta.url), "utf8");
 const entry = (title: string, slug: string, day: string) => `### [${title}](/r/gnoland/blog:p/${slug})\n${day}\n`;
+// The newest post of a page: the first of its newest.
+const latestPost = (page: string) => latestPosts(page, 1)[0];
 
-describe("latestPost", () => {
+describe("latestPosts", () => {
   it("reads the newest post of the recorded page: title, slug and day", () => {
     expect(latestPost(RECORDED)).toEqual({
       title: "Gno.land Mainnet Upgraded to v1.7.0",
@@ -38,6 +40,13 @@ describe("latestPost", () => {
       entry("x".repeat(121), "a", "30 Oct 2026"),
     ])
       expect(latestPost(bad), bad).toBeUndefined();
+  });
+
+  it("gives the newest two, the newest first, whatever the order of the page, and fewer when fewer pass", () => {
+    const page =
+      entry("Old", "old", "05 May 2025") + entry("New", "new", "9 Jun 2026") + entry("Mid", "mid", "01 Jan 2026");
+    expect(latestPosts(page, 2).map((post) => post.slug)).toEqual(["new", "mid"]);
+    expect(latestPosts(entry("Only", "only", "01 Jan 2026"), 2).map((post) => post.slug)).toEqual(["only"]);
   });
 
   it("skips a refused post and shows the next good one, never a half-read one", () => {

@@ -46,7 +46,8 @@ describe("the chat's header", () => {
           <ChatHeader title={title} onClose={none} world="Bubble" />
         </FullProvider>,
       );
-    expect(one(wide("#general"), "h2").textContent).toBe("#general");
+    // The full chat covers the page, so the room's name is its main heading.
+    expect(one(wide("#general"), "h1").textContent).toBe("#general");
     expect(wide("#general").textContent).toContain("Bubble/#general");
     expect(wide("#bubble").textContent).not.toContain("Bubble/");
   });

@@ -38,9 +38,11 @@ export function Listbox({ label, id, options, active, onPick }: ListboxProps) {
             onPick(option.id);
           }}
         >
-          <Cluster justify="between" align="baseline">
-            <span>{option.label}</span>
-            {option.hint === undefined ? null : <span className={styles["hint"]}>{option.hint}</span>}
+          <Cluster justify="between" align="baseline" wrap="no">
+            <span className="truncate">{option.label}</span>
+            {option.hint === undefined ? null : (
+              <span className={["truncate", styles["hint"]].join(" ")}>{option.hint}</span>
+            )}
           </Cluster>
         </li>
       ))}

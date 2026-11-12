@@ -11,7 +11,8 @@ import { AskModerate } from "./AskModerate.tsx";
 import { Reacting, Shortcuts, type Need } from "./BarButtons.tsx";
 import { openAuthorCard } from "./LineHead.tsx";
 import { keptItems, moderationItems, PinButton, type LineKeeping } from "./LineKeeping.tsx";
-import { menuItems } from "./menuItems.ts";
+import { menuItems, type MenuItems } from "./menuItems.ts";
+import { useTranslationItem } from "./translationItem.ts";
 import { roomLabel, shortAddress } from "./names.ts";
 
 // A bar that would rise past the top of the list that scrolls comes down inside its line, as it shows (U10).
@@ -69,7 +70,7 @@ const placeOf = (room: string, dm: string | undefined) =>
 // The More menu's items for a line: what its conversation, its reader and a delete under way allow.
 function itemsOf(
   props: Pick<LineActionsProps, "line" | "dm" | "me" | "onCopy" | "onThread" | "onEdit" | "keeping">,
-  { own, deleting }: { own: boolean; deleting: boolean },
+  { own, deleting, translation }: { own: boolean; deleting: boolean; translation: MenuItems["onTranslation"] },
   asks: { delete: () => void; moderate: (act: "hide" | "mute") => void },
 ) {
   const { line, dm, me, onCopy, onThread, onEdit, keeping } = props;
@@ -79,6 +80,7 @@ function itemsOf(
       link: dm === undefined,
       onThread,
       onCard: openAuthorCard,
+      onTranslation: translation,
       kept: [...keptItems(line, own, keeping), ...moderationItems({ line, own, keeping }, asks.moderate)],
       onEdit: asksEdit(onEdit, line, me) && !deleting ? onEdit : undefined,
       onDelete: own && !deleting ? asks.delete : undefined,
@@ -157,7 +159,11 @@ export function LineActions({
   };
   const items = itemsOf(
     { line, dm, me, onCopy, onThread, onEdit, keeping },
-    { own, deleting },
+    {
+      own,
+      deleting,
+      translation: useTranslationItem(room, line.id),
+    },
     {
       delete: () => {
         setAsking(true);

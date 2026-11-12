@@ -167,6 +167,13 @@ describe("Stat", () => {
     expect(screen.getByText("Hot")).toBeTruthy();
   });
 
+  it("sticks a unit that starts with a slash to its figure, and spaces any other", () => {
+    const { container } = render(<Stat value={1} unit="/9" caption="Steps" />);
+    expect(container.querySelector("[data-of]")?.textContent).toBe("/9");
+    render(<Stat value={2} unit="calls" caption="Today" />);
+    expect(screen.getAllByText(/calls/)[0]?.textContent).toBe(" calls");
+  });
+
   it("shows a unit and a caption made of markup, or very long, as text", () => {
     staysText((text) => <Stat value={1} unit={text} caption={text} />);
   });

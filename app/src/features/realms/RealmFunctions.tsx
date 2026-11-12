@@ -3,7 +3,7 @@
 // so, with the block height it was read at, and no wallet is ever asked. One request a view for the list, two a click (the
 // call, shown first, and the height, which follows it); nothing polls. The names are lib/chain's (one exported identifier or none); a long list is drawn a
 // hundred at a time and searched whole. Every state keeps the link to the realm on gnoweb, where the rest is done.
-import { PagedList } from "@gnoworld/ui";
+import { grouped, PagedList } from "@gnoworld/ui";
 import type { ReadOptions } from "@gnoworld/chain/read";
 import { use, useEffect } from "react";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
@@ -47,7 +47,7 @@ function Outcome({ name, result, href }: { name: string; result: Result | undefi
         {height === undefined
           ? null
           : isHeight(height)
-            ? `, at block ${new Intl.NumberFormat("en-US").format(height.height)}`
+            ? `, at block ${grouped(height.height)}`
             : `. The block height could not be read. ${height.next}`}
       </p>
     </>

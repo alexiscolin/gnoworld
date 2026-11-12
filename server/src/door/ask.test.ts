@@ -61,7 +61,8 @@ interface Options {
   perMinute?: number;
   named?: boolean;
   answer?: () => Promise<Asked>;
-  heard?: boolean;
+  // Whether the chat heard the account; "soon": not yet, but within the moment the door waits for its line.
+  heard?: boolean | "soon";
   // How long ago the session was signed, in ms.
   age?: number | null;
   last?: string | undefined | null;
@@ -123,7 +124,8 @@ const setup = ({
       kept,
       chainOf: () => "gnoland-1",
       defaultChain: () => "gnoland-1",
-      heard: () => heard,
+      heard: () => heard === true,
+      heardSoon: () => Promise.resolve(heard === "soon"),
       signedAt: () => (age === null ? undefined : clock.now - age),
       last: () => (tail.last === null ? undefined : tail.last),
       hosts: ["gno.land", "gnoworld.test"],
@@ -731,6 +733,13 @@ describe("Jarvis's guards before any model call", () => {
       expect(young.sent).toHaveLength(0);
       const ripe = setup({ age: 10 * MINUTE });
       await passed(await ripe.ask());
+    });
+
+    it("waits a moment for the account's own line: an ask sent with its first line passes once the chat hears that line", async () => {
+      await passed(await setup({ heard: "soon" }).ask());
+      const never = setup({ heard: false });
+      expect(await answerOf(await never.ask())).toEqual([200, { status: "early" }]);
+      expect(never.sent).toHaveLength(0);
     });
 
     it("counts no question and no strike, even for a question the list would decline", async () => {

@@ -25,13 +25,14 @@ const BARE = { functions: [], imports: [], deployerName: null, callers: 0, lastH
 const universe = site.universeAt("/");
 
 function Page() {
-  const { pathname, hash } = useLocation();
+  const { pathname, hash, search } = useLocation();
   const navigate = useNavigate();
   return (
     <>
       <SearchButton className="" emphasis="outline" />
       <SearchPalette universe={universe} />
       <output data-at="">{pathname + hash}</output>
+      <output data-search="">{search}</output>
       <button
         type="button"
         onClick={() => {
@@ -47,6 +48,7 @@ function Page() {
 const drawerOf = (box: HTMLElement) => box.querySelector<HTMLDialogElement>("dialog");
 const isOpen = (box: HTMLElement) => drawerOf(box)?.open ?? false;
 const at = (box: HTMLElement) => one(box, "[data-at]").textContent;
+const searchOf = (box: HTMLElement) => one(box, "[data-search]").textContent;
 const field = (box: HTMLElement) => one(box, "input[type='search']");
 const rows = (box: HTMLElement) => all(box, "[role='option']");
 const labels = (box: HTMLElement) => rows(box).map((each) => each.querySelector("[class*='name']")?.textContent);
@@ -348,6 +350,29 @@ describe("a long list", () => {
   });
 });
 
+describe("Discover's Following shelf", () => {
+  it("counts the worlds followed, listed by the palette's rows, one world each, even with no realm in the file", async () => {
+    seen.file.mockReturnValue([
+      { id: "other", namespace: "oth", realms: [{ path: "gno.land/r/oth/thing", calls: 9, ...BARE }], seen: null },
+    ]);
+    const { box, store } = await mountInStore(<Page />);
+    act(() => {
+      store.getState().deviceActions.change("follows", (held) => ({ ...held, worlds: [`${universe.id}:bubble`] }));
+    });
+    await openIt(box);
+    const shelf = () => box.querySelector<HTMLElement>("[data-shelf='following']");
+    await settled(() => shelf() !== null);
+    expect(shelf()?.textContent).toBe("Following1");
+    click(shelf() ?? undefined);
+    const worlds = () => all(box, "[aria-label='Places'] [role='option']").map((each) => each.textContent);
+    await settled(() => worlds().length > 0);
+    expect(worlds()).toHaveLength(1);
+    expect(worlds()[0]).toContain("Bubble");
+    expect(box.textContent).toContain("1 world");
+    expect(box.textContent).toContain("No realm in the file yet");
+  });
+});
+
 describe("the namespace chips", () => {
   const file = [
     { id: "big/a", namespace: "big", realms: [{ path: "gno.land/r/big/a", calls: 5, ...BARE }], seen: null },
@@ -473,5 +498,128 @@ describe("the palette asked from the page", () => {
     ask("gnoswap");
     await settled(() => (field(box) as HTMLInputElement).value === "@gnoswap");
     expect(await reopened(box)).toHaveProperty("value", "");
+  });
+});
+
+// Where the buttons that open a chat lead (useGo.chat, SearchDialog's talk): a realm with a page of its own opens its own room, full; a
+// world, the Earth and the universe their pages; a room and a person their addresses; from the full chat the place's chat page, full.
+describe("the chat and fly buttons", () => {
+  const rowOf = (world: string, path: string) => ({ ...BARE, path, functions: ["Render"], calls: 5, world });
+  const fileOf = (id: string, path: string) => [{ id, namespace: id, realms: [rowOf(id, path)], seen: null }];
+  const ROOM = { lines: [], members: ["kai"], topic: undefined, refused: undefined, typing: {}, read: undefined };
+
+  // Each test mounts its own store and router, so follows, location and dialog start clean; the full chat's mark is the page's own, put back
+  // here. A wait that fails does so inside the test's 5 s, never as a loop left running into the next test.
+  afterEach(() => {
+    delete document.documentElement.dataset["chat"];
+  });
+  // Discover's detail of the one realm the file holds, open: the shelf of the unvisited, its card.
+  async function detailOf(file: ReturnType<typeof fileOf>) {
+    seen.file.mockReturnValue(file);
+    const mounted = await mountInStore(<Page />);
+    await openIt(mounted.box);
+    await settled(() => mounted.box.querySelector("[data-shelf='unseen']") !== null);
+    click(one(mounted.box, "[data-shelf='unseen']"));
+    await settled(() => mounted.box.querySelector("[data-card]") !== null);
+    click(one(mounted.box, "[data-card]"));
+    const detail = one(mounted.box, "section[aria-label='Realm detail']");
+    return { ...mounted, detail };
+  }
+
+  describe("in Discover's detail of a realm", () => {
+    it("Chat opens a realm with a page of its own in its own room, full: never the Earth's", async () => {
+      const { box, detail } = await detailOf(fileOf("bub", "gno.land/r/bub/pop"));
+      click(button(detail, "Chat"));
+      await settled(() => at(box) === "/r/bub/pop");
+      expect(searchOf(box)).toBe("?chat=full");
+      expect(isOpen(box)).toBe(false);
+    });
+
+    it("Fly there goes to the realm's page", async () => {
+      const { box, detail } = await detailOf(fileOf("bub", "gno.land/r/bub/pop"));
+      click(button(detail, "Fly there"));
+      await settled(() => at(box) === "/r/bub/pop");
+      expect(searchOf(box)).toBe("");
+    });
+
+    it("Follow follows the realm's world, and a second press stops", async () => {
+      const { store, detail } = await detailOf(fileOf("bub", "gno.land/r/bub/pop"));
+      const followed = () => store.getState().device.follows.worlds;
+      click(button(detail, "Follow"));
+      expect(followed()).toContain(`${universe.id}:bub`);
+      click(button(detail, "Following"));
+      expect(followed()).not.toContain(`${universe.id}:bub`);
+    });
+
+    it("Chat of a realm with no page of its own opens its world's chat where the world has a page, else the Earth's", async () => {
+      const own = await detailOf(fileOf("bubble", "other.chain/r/x"));
+      click(button(own.detail, "Chat"));
+      await settled(() => at(own.box) === "/w/bubble");
+      expect(searchOf(own.box)).toBe("");
+    });
+
+    it("Chat of a realm with no page and a world with none opens the Earth's", async () => {
+      const { box, detail } = await detailOf(fileOf("nowhere", "other.chain/r/x"));
+      click(button(detail, "Chat"));
+      await settled(() => at(box) === universe.earth.path);
+      expect(searchOf(box)).toBe("");
+    });
+  });
+
+  // Where Shift+Enter, and the preview's Chat where it has one, lead from `words`.
+  async function chatFrom(words: string, how: "keys" | "button") {
+    seen.file.mockReturnValue(fileOf("bub", "gno.land/r/bub/pop"));
+    const { box, store } = await mountInStore(<Page />);
+    act(() => {
+      store.setState({
+        chat: {
+          me: undefined,
+          rooms: { "#bubble/games": ROOM },
+          listed: [{ name: null, rooms: [{ room: "#bubble/games", type: "open" }] }],
+        },
+      });
+    });
+    await openIt(box);
+    type(field(box), words);
+    await settled(() => rows(box).length > 0);
+    if (how === "keys") press(field(box), "Enter", { shiftKey: true });
+    else click(button(box, "Chat"));
+    await settled(() => !isOpen(box));
+    return `${at(box)}${searchOf(box)}`;
+  }
+
+  describe("in the typed palette", () => {
+    const places = [
+      ["a realm", "pop", "/r/bub/pop?chat=full"],
+      ["a world", "bubble", "/w/bubble"],
+      ["the Earth", `Earth of ${universe.name}`, universe.earth.path],
+    ] as const;
+    for (const [what, words, to] of places) {
+      it(`Shift+Enter and the preview's Chat open ${what} at its own place`, async () => {
+        expect(await chatFrom(words, "keys")).toBe(to);
+        expect(await chatFrom(words, "button")).toBe(to);
+      });
+    }
+
+    it("Shift+Enter on a room and on a person goes to their own address", async () => {
+      expect(await chatFrom("#games", "keys")).toBe("/w/bubble?room=games");
+      expect(await chatFrom("kai", "keys")).toBe("/w/bubble?room=games");
+    });
+  });
+
+  describe("from inside the full chat", () => {
+    const full = [
+      ["a realm", "pop", "/r/bub/pop?chat=full"],
+      ["a world", "bubble", "/w/bubble?chat=full"],
+      ["the Earth", `Earth of ${universe.name}`, `${universe.earth.path}?chat=full`],
+      ["a room", "#games", "/w/bubble?room=games&chat=full"],
+      ["a person", "kai", "/w/bubble?room=games&chat=full"],
+    ] as const;
+    for (const [what, words, to] of full) {
+      it(`Shift+Enter on ${what} stays in the full chat, on its own place`, async () => {
+        document.documentElement.dataset["chat"] = "full";
+        expect(await chatFrom(words, "keys")).toBe(to);
+      });
+    }
   });
 });

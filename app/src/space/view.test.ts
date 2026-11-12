@@ -3,7 +3,8 @@ import type { Space } from "./scene.ts";
 import { Round } from "./parts/marks.ts";
 import { blankPose } from "./rig/pose.ts";
 import { advance, paint } from "./move.ts";
-import { napOf, stateOf, tick } from "./view.ts";
+import { openOf } from "./open.ts";
+import { choose, napOf, stateOf, tick } from "./view.ts";
 
 // view.ts reads the pointer's media query as it loads.
 vi.hoisted(() => {
@@ -16,14 +17,14 @@ vi.mock("./motion.ts", () => ({ coveredByChat: () => false }));
 
 const uniform = () => ({ value: 0 });
 
-// A Space whose clock runs at `rate`, on a world's page (a planet framed close), with just what advance and the nap read.
-function pageAt(rate: number): Space {
+// A Space on a world's page (a planet framed close), with just what advance and the nap read; `moon`, a moon shown round it.
+function pageAt({ moon = false } = {}): Space {
   const stub = {
     seconds: 5,
     place: undefined,
     universe: undefined,
     kept: undefined,
-    arrival: true,
+    arrival: false,
     circle: { close: true },
     lens: undefined,
     neared: false,
@@ -37,12 +38,13 @@ function pageAt(rate: number): Space {
       page: false,
       eye: { x: 0, y: 0, z: 0 },
       pose: blankPose(),
-      free: { rate, moving: false, turning: false, inward: false },
+      free: { moving: false, turning: false, inward: false },
       advance: () => undefined,
     },
     stage: {
       effects: { busy: false },
       ground: { turning: false },
+      moons: { group: { visible: moon } },
       intro: { tick: () => undefined, aim: () => undefined },
       frame: {
         uTime: uniform(),
@@ -51,6 +53,7 @@ function pageAt(rate: number): Space {
         uSolo: uniform(),
         uAlone: uniform(),
         uLens: uniform(),
+        ...openOf(),
       },
       gains: { sun: uniform(), dust: uniform(), stars: uniform() },
       plate: { shown: uniform(), sync: () => undefined },
@@ -60,47 +63,42 @@ function pageAt(rate: number): Space {
   return stub as unknown as Space;
 }
 
-describe("a stopped scene clock (rate 0, after a minute of rest)", () => {
-  it("ticks no scene time, and a running one ticks its share", () => {
-    for (const [rate, seconds] of [
-      [0, 5],
-      [1, 5.5],
-      [0.5, 5.25],
-    ] as const) {
-      const space = pageAt(rate);
-      tick(space, 500);
-      expect(space.seconds).toBeCloseTo(seconds, 9);
-    }
+describe("the scene clock (D13013: it never stops at rest)", () => {
+  it("ticks the scene's time by the frame's step, after any rest", () => {
+    const space = pageAt();
+    tick(space, 500);
+    expect(space.seconds).toBeCloseTo(5.5, 9);
   });
 
-  it("is left standing by a frame's advance", () => {
-    const [stopped, running] = [pageAt(0), pageAt(1)];
-    advance(stopped, 16);
-    advance(running, 16);
-    expect(stopped.seconds).toBe(5);
-    expect(stopped.stage.frame.uTime.value).toBe(5);
-    expect(running.seconds).toBeCloseTo(5.016, 9);
+  it("still runs after 2 minutes at rest: a frame's advance and the slept seconds both tick it", () => {
+    const space = pageAt();
+    for (let t = 0; t < 120_000; t += 16) advance(space, 16, { real: 16 });
+    expect(space.seconds).toBeCloseTo(5 + 120, 0);
+    advance(space, 16, { slept: 2 });
+    expect(space.seconds).toBeCloseTo(5 + 120 + 2.016, 0);
   });
 
-  it("takes none of the seconds the loop slept, where a running clock takes them", () => {
-    const [stopped, running] = [pageAt(0), pageAt(1)];
-    advance(stopped, 16, { slept: 2 });
-    advance(running, 16, { slept: 2 });
-    expect(stopped.seconds).toBe(5);
-    expect(running.seconds).toBeCloseTo(7.016, 9);
+  it("never lets the loop sleep a lively view: a close planet turning is paced at 15 fps (D13013), where it once slept after a minute", () => {
+    const state = { ...stateOf(pageAt()), pxPerSecond: 50 };
+    expect(napOf(pageAt(), state, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
   });
 
-  it("lets the loop sleep on a page's close planet, which a running clock never does", () => {
-    const state = { ...stateOf(pageAt(1)), pxPerSecond: 50 };
-    expect(napOf(pageAt(1), state, { need: "none", calm: 9000 })).toBeUndefined();
-    expect(napOf(pageAt(0), state, { need: "none", calm: 9000 })).toBeGreaterThan(0);
+  it("sleeps as long as the slow motions allow while they are under a pixel a second", () => {
+    const state = { ...stateOf(pageAt()), pxPerSecond: 0.8 };
+    expect(napOf(pageAt(), state, { need: "none", calm: 9000 })).toBe(625);
   });
 
-  it("sleeps as long as the slow motions allow at the clock's rate: at half the rate, twice as long", () => {
-    const still = (rate: number): Space => Object.assign(pageAt(rate), { arrival: false, circle: undefined });
-    const state = { ...stateOf(pageAt(1)), pxPerSecond: 2 };
-    expect(napOf(still(1), state, { need: "none", calm: 9000 })).toBe(250);
-    expect(napOf(still(0.5), state, { need: "none", calm: 9000 })).toBe(500);
+  it("paces at 15 frames a second a planet that turns a pixel a second or a sun with its face (D13013)", () => {
+    const turning = { ...stateOf(pageAt()), pxPerSecond: 2 };
+    expect(napOf(pageAt(), turning, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
+    expect(napOf(pageAt(), { ...stateOf(pageAt()), face: true }, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
+  });
+});
+
+describe("a moon round the planet framed close", () => {
+  it("keeps every frame drawn: paced at 15 frames a second, it jerked across the planet", () => {
+    const state = { ...stateOf(pageAt()), pxPerSecond: 2 };
+    expect(napOf(pageAt({ moon: true }), state, { need: "none", calm: 9000 })).toBeUndefined();
   });
 });
 
@@ -115,7 +113,7 @@ describe("an ease runs on the frame's own time", () => {
 
 describe("a frame's paint", () => {
   it("hands the ring and the moons the frame's own delta in seconds, whatever the scene clock does", () => {
-    const space = pageAt(0);
+    const space = pageAt();
     const follow = vi.fn<(...args: unknown[]) => void>();
     const planet = { id: "p" };
     Object.assign(space, { kept: planet });
@@ -135,5 +133,28 @@ describe("a frame's paint", () => {
       const clock = rest.find((arg) => typeof arg === "object" && arg !== null && "delta" in arg);
       expect(clock).toMatchObject({ delta: 0.016 });
     }
+  });
+});
+
+describe("choosing the near planets", () => {
+  it("waits 100 ms, but not when a system opens or closes: its planets hand over to their quads at once", () => {
+    const space = pageAt();
+    const near = vi.fn();
+    const system = { index: 2 };
+    Object.assign(space, {
+      universe: { planets: [], systems: [] },
+      place: { kind: "system", id: "a" },
+      camera: { position: {} },
+    });
+    Object.assign(space, { system });
+    Object.assign(space.stage, { near: { choose: near } });
+    const state = stateOf(space);
+    choose(space, state, 1000);
+    choose(space, state, 1050);
+    expect(near).toHaveBeenCalledTimes(1);
+    Object.assign(space, { system: undefined });
+    choose(space, state, 1060);
+    expect(near).toHaveBeenCalledTimes(2);
+    expect(near.mock.calls[1]?.[2]).toMatchObject({ open: -1 });
   });
 });

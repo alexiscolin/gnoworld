@@ -68,11 +68,14 @@ export function Nothing({
   const parsed = parseFind(text, who);
   const drops = (["in", "from", "has"] as const).filter((key) => text.toLowerCase().includes(`${key}:`));
   const said = parsed.words.trim();
+  const sender = parsed.from === who.me ? "you" : parsed.from === undefined ? "" : shortAddress(parsed.from);
   return (
     <Stack space="xs">
-      <h3
-        className={styles["count"]}
-      >{`No message says “${said}”${parsed.from === undefined ? "" : ` from ${shortAddress(parsed.from)}`}`}</h3>
+      <h3 className={styles["count"]}>
+        {said === ""
+          ? `No message from ${sender} here`
+          : `No message says “${said}”${sender === "" ? "" : ` from ${sender}`}`}
+      </h3>
       <p>Rooms keep 90 days. Try other words, or fewer filters.</p>
       <Cluster space="2xs">
         {drops.map((key) => (

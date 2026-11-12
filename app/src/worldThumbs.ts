@@ -66,8 +66,8 @@ function want(world: string): void {
   }, WAIT_MS);
 }
 
-/** The world's drawn planet once it came, else undefined; `ref` goes on the element whose showing asks for it. */
-export function useWorldThumb(world: string | undefined) {
+// The world's drawn planet once it came, else undefined; `ref` goes on the element whose showing asks for it.
+function useWorldThumb(world: string | undefined) {
   const ref = useRef<HTMLElement>(null);
   useEffect(() => {
     const target = ref.current?.firstElementChild ?? ref.current;
@@ -89,7 +89,7 @@ export function useWorldThumb(world: string | undefined) {
   return { ref, src };
 }
 
-/** The world's picture: the one the scene took, else its planet once drawn, else undefined; `ref` as `useWorldThumb`'s. */
+/** The world's picture: the one the scene took, else its planet once drawn, else undefined; `ref` goes on the element whose showing asks for it. */
 export function useWorldPicture(world: string | undefined) {
   const { ref, src } = useWorldThumb(world);
   return { ref, src: (world === undefined ? undefined : pictureOf(world)) ?? src };

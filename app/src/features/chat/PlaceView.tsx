@@ -1,13 +1,12 @@
 // The full chat's small view of space at the top of its info panel: a bar with the place's buttons (who is here, the events) and the control
-// that folds the view, then the place's planet as space shows it, or from above where the page's Map is on, with the Earth's signs over the
+// that folds the view, then the place's planet as space shows it, always the planet itself (never the Map's system from above), with the Earth's signs over the
 // Earth. Folded, nothing of the view runs: its engine and its context are gone, and the bar stays.
 import { EARTH, hubWorldOf, worldIdOf } from "@gnoworld/core";
-import { Cluster, IconButton } from "@gnoworld/ui";
-import { lazy, Suspense, useState, type ReactNode } from "react";
+import { Button, Cluster } from "@gnoworld/ui";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router";
 import { useAppStore } from "../../storeContext.tsx";
 import { groundOn } from "../../earthGround.ts";
-import { useMapView } from "../../mapView.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 import { useFull } from "./full.ts";
 import { usePlanetShown } from "./planetShown.ts";
@@ -42,7 +41,14 @@ export function PlaceView({ place, buttons, close }: { place: ChatPlace; buttons
   const [shown, show] = usePlanetShown();
   const [drawn, setDrawn] = useState(shown);
   const [ground] = useState(groundOn);
-  const map = useMapView();
+  // The fold's timer, cleared when the view goes or the control is pressed again.
+  const foldRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(
+    () => () => {
+      clearTimeout(foldRef.current);
+    },
+    [],
+  );
   const store = useAppStore();
   const navigate = useNavigate();
   if (!useFull()) return null;
@@ -51,18 +57,21 @@ export function PlaceView({ place, buttons, close }: { place: ChatPlace; buttons
       <PlaceBar buttons={buttons} close={close} />
       <div className={styles["handle"]} data-shown={shown ? "" : undefined}>
         <Cluster justify="center">
-          <IconButton
+          <Button
             icon="chevron"
-            emphasis="plain"
+            emphasis="quiet"
             size="s"
-            label={shown ? "Hide the planet" : "Show the planet"}
+            expanded={shown}
             onClick={() => {
               show(!shown);
-              setTimeout(() => {
+              clearTimeout(foldRef.current);
+              foldRef.current = setTimeout(() => {
                 setDrawn(!shown);
               }, FOLD_MS);
             }}
-          />
+          >
+            {shown ? "Hide the planet" : "Show the planet"}
+          </Button>
         </Cluster>
       </div>
       <div className={styles["fold"]}>
@@ -70,15 +79,16 @@ export function PlaceView({ place, buttons, close }: { place: ChatPlace; buttons
           <div className={styles["box"]}>
             {drawn ? (
               <Suspense fallback={null}>
-                <MiniSpace world={worldOf(place)} map={map} ground={ground} />
-                {place.earth === true ? (
-                  <div className={styles["signs"]} data-map={map ? "" : undefined}>
+                <MiniSpace world={worldOf(place)} ground={ground} />
+                {place.earth === true || place.room !== undefined ? (
+                  <div className={styles["signs"]}>
                     <Signs
                       store={store}
                       ground={ground.ground}
                       open={(href) => {
                         Promise.resolve(navigate(href)).catch(reportError);
                       }}
+                      {...(place.earth === true || place.room === undefined ? {} : { world: { id: worldOf(place) } })}
                     />
                   </div>
                 ) : null}

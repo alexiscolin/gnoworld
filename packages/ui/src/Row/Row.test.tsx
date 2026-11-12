@@ -1,10 +1,19 @@
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
 import { Row } from "./Row.tsx";
 import * as stories from "./Row.stories.tsx";
 
 describe("Row", () => {
+  it("with a handler is a button, with an external href a link in a tab of its own", () => {
+    const { rerender } = render(<Row title="Bubble" onClick={vi.fn()} />);
+    expect(screen.getByRole("button", { name: "Bubble" }).getAttribute("type")).toBe("button");
+    rerender(<Row title="Bubble" href="https://x.test" external truncate />);
+    const link = screen.getByRole("link", { name: "Bubble" });
+    expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    expect(screen.getByText("Bubble").classList.contains("truncate")).toBe(true);
+  });
+
   it("shows its title, subtitle and activity in order, its lead and trail around them", () => {
     render(
       <Row

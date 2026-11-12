@@ -27,6 +27,8 @@ export function doorMemory(
     // What the ask route is given.
     ask: {
       heard: heard.has,
+      // An ask sent with the account's own line waits for it 3 s at most.
+      heardSoon: (account: string) => heard.soon(account, 3000),
       served,
       kept,
       chainOf: chains.of,

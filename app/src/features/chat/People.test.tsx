@@ -26,9 +26,10 @@ describe("who is here, as the info panel shows it", () => {
     expect(faceOf(one(nth(all(people(), "li"), 0), "[data-kind='person']"))).toBe(faceOf(nth(faces, 0)));
   });
 
-  it("shows a guest by the night disc, never a face an address would draw", () => {
+  it("shows a guest by a person's outline on the night disc, never a face an address would draw", () => {
     const row = one(people({ members: ["guest-ab12cd"] }), "li");
-    expect(all(row, "svg circle")).toHaveLength(0);
+    expect(all(row, "[data-guest]")).toHaveLength(1);
+    expect(all(row, "polyline, [data-star]")).toHaveLength(0);
     expect(all(row, "svg")).toHaveLength(1);
   });
 

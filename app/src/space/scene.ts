@@ -4,7 +4,7 @@
 import { PerspectiveCamera, Vector3, type WebGLRenderer } from "three";
 import { usesOf, type CosmosWorld } from "./cosmosWorld.ts";
 import { draw } from "./frame.ts";
-import { arrivalOf, firstArrival, holdCircle, scans, slideFor } from "./framing.ts";
+import { arrivalOf, firstArrival, holdCircle, scans, slideFor, waitedOn } from "./framing.ts";
 import { homeGoal, middleOf, planetGoal, screenOf, systemGoal, universeGoal, type Circle } from "./goals.ts";
 import { enterHit, wireHands } from "./hands.ts";
 import { labelOf, Labels } from "./labels.ts";
@@ -122,8 +122,8 @@ export class Space {
     this.touch();
     this.#asked = place;
     const universe = this.universe;
-    if (universe === undefined || this.#there(place)) return this.rig.flying;
-    [this.place, this.neared] = [place, false];
+    if (universe === undefined || this.#there(place)) return waitedOn(this);
+    [this.place, this.neared, this.keep.unheard] = [place, false, false];
     this.stage.near?.warm.place({ planet: this.planet, system: this.system, universe, eye: this.rig.eye });
     this.stage.effects.scan.play(undefined);
     const goal = this.#goalOf(place, universe);

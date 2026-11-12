@@ -1,0 +1,6 @@
+/* A proposal's row (the proposal's .rc): the number in the world's light. */
+@layer components {
+  .number {
+    color: var(--world-light);
+  }
+}

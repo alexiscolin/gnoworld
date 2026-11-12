@@ -58,7 +58,8 @@ Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks 
 
 Code written by an agent gets the same reading as anyone's, plus this. `/pre-merge`
 (`.claude/commands/pre-merge.md`) runs it, with the agents of `.claude/agents/`; from slice 5 a
-branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`):
+branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); `sh scripts/ship.sh` runs its gate, pass and log row in one
+command at a slice's end (`docs/HARNESS.md`, "The speed plan"):
 
 1. **No tokens first.** The merge's gate, then the mutation tester on the changed code: a
    surviving mutant is a missing test, found without a model.

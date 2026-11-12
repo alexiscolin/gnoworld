@@ -53,7 +53,7 @@ float groundAt(vec3 d, Lookup at) {
   return max(textureGrad(heightMap, uvOf(d), at.dx, at.dy).r - heightSea, 0.0) / (1.0 - heightSea);
 }
 ${LOW_SUN}
-${shadowMarch("shadowed", { steps: "6", soft: "0.2", extra: ", Lookup at", read: "groundAt(p, at)" })}
+${shadowMarch("shadowed", { steps: "6", soft: "0.2", extra: ", Lookup at", read: "groundAt(p, Lookup(at.uv, at.dx + vec2(1.0 * s / TAU, 0.0), at.dy + vec2(0.0, 1.0 * s / PI)))" })}
 vec3 bumped(vec3 axis, float height, float angle, Lookup at, float ground, out float hollow) {
   hollow = 0.0;
   vec3 normal = normalize(vNormal);

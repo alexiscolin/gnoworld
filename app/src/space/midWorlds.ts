@@ -5,6 +5,7 @@ import type { Seen } from "./see.ts";
 import { iconNode } from "@gnoworld/ui";
 import { scaleOf } from "./boosts.ts";
 import { latch } from "./vista.ts";
+import { afterDwell } from "../intent.ts";
 import styles from "./labels.module.css";
 
 const MID_PX = 12;
@@ -24,6 +25,8 @@ export interface LabelHooks {
   readonly name: (item: Named) => string;
   /** A name is pointed at or focused: its world may be asked ahead. */
   readonly warm?: ((item: Named) => void) | undefined;
+  /** A name is pointed at or focused, or left (none). */
+  readonly hover?: ((item: Named | undefined) => void) | undefined;
   /** How many are here in a world now: none while unknown. */
   readonly fact?: ((id: string) => number | undefined) | undefined;
 }
@@ -34,6 +37,28 @@ export function fillPill(button: HTMLElement): void {
   count.className = `nowrap with-icon ${styles["count"] ?? ""}`;
   count.append(iconNode("people", "s"), document.createTextNode(""));
   button.append(document.createElement("b"), count);
+}
+
+/** Tells `hooks` which item a name `button` is on while it is pointed at or focused (`warm`, after a dwell; `hover`, at once), and when it is left. */
+export function watchPill(
+  button: HTMLElement,
+  item: () => Named | undefined,
+  { warm, hover }: Pick<LabelHooks, "warm" | "hover">,
+): void {
+  for (const type of ["pointerenter", "focus"])
+    button.addEventListener(type, () => {
+      const here = item();
+      if (here === undefined) return;
+      hover?.(here);
+      if (warm !== undefined)
+        afterDwell(button, () => {
+          warm(here);
+        });
+    });
+  for (const type of ["pointerleave", "blur"])
+    button.addEventListener(type, () => {
+      hover?.(undefined);
+    });
 }
 
 // The number here shown, or hidden while unknown or none.

@@ -1,6 +1,6 @@
 // Try it (the proposal's card): a quiet box that says where to start, the Read and Write tabs with their counts, each a paged list of rows that
 // open in place.
-import { Button, Card, Cluster, Stack, Tabs, useAlone } from "@gnoworld/ui";
+import { Button, Card, Cluster, grouped, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import { use, useRef, useState } from "react";
 import { callsIn } from "../calls/index.ts";
 import { useApp } from "../../storeContext.tsx";
@@ -20,8 +20,7 @@ function StartHere({ start, onStart }: { start: { name: string; calls: number };
       <Stack space="2xs">
         <b>Start here</b>
         <span>
-          Most people start with {start.name} ({start.calls.toLocaleString("en-US")}{" "}
-          {start.calls === 1 ? "call" : "calls"}).
+          Most people start with {start.name} ({grouped(start.calls)} {start.calls === 1 ? "call" : "calls"}).
         </span>
         <Cluster space="2xs">
           <Button emphasis="solid" size="s" icon="play" onClick={onStart}>

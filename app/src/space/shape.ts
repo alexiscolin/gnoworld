@@ -3,14 +3,19 @@
 // changes its size. Leaving the home they shrink with the frame's easing, never at once.
 import type { Space } from "./scene.ts";
 import { boosts } from "./boosts.ts";
-import { placeOf, type Planet } from "./layout.ts";
+import { placeOf, type Planet, type Vec } from "./layout.ts";
 import { latch, type Featured } from "./vista.ts";
+
+// What the boosts read of the scene: where it goes, its circle and clock, and the camera.
+type Seen = Pick<Space, "place" | "circle" | "seconds"> & {
+  readonly rig: { readonly flying: boolean; readonly eye: Vec; readonly pose: { fov: number; way: Vec; up: Vec } };
+};
 
 // Each slot's world and the boost it landed with, in pairs as `boosts` (-1: none).
 const held = new Float32Array(boosts.value.length).fill(-1);
 
 // Where `planet` stands on screen in the pose's view, and how deep.
-function screenOf(space: Space, planet: Planet): { x: number; y: number; z: number } | undefined {
+function screenOf(space: Seen, planet: Planet): { x: number; y: number; z: number } | undefined {
   const { rig, circle, seconds } = space;
   if (circle === undefined) return undefined;
   const { pose, eye } = rig;
@@ -35,7 +40,7 @@ function screenOf(space: Space, planet: Planet): { x: number; y: number; z: numb
 }
 
 // The boost that draws the layer's world `size` of the screen's height across its radius, from where the camera is now.
-function boostOf(space: Space, { planet, share: size }: Featured): number {
+function boostOf(space: Seen, { planet, share: size }: Featured): number {
   const { circle, rig } = space;
   const spot = screenOf(space, planet);
   if (circle === undefined || spot === undefined || spot.z <= 0) return 1;
@@ -43,13 +48,15 @@ function boostOf(space: Space, { planet, share: size }: Featured): number {
   return Math.min(12, Math.max(0.3, (px * spot.z) / (f * planet.radius)));
 }
 
-export function shapeBoosts(space: Space): void {
+export function shapeBoosts(space: Seen): void {
   boosts.value.fill(-1);
+  const home = space.place?.kind === "home";
   // Off the home the set goes once its worlds have shrunk back.
-  if (space.place?.kind !== "home" && boosts.gate < 0.01) latch.featured = [];
+  if (!home && boosts.gate < 0.01) latch.featured = [];
   for (const [slot, featured] of latch.featured.entries()) {
     const { index } = featured.planet;
-    if (space.rig.flying || held[slot * 2] !== index)
+    // Measured from the camera on the flight that lands on the home alone: one that leaves it keeps the landed boost, which the frame eases.
+    if ((space.rig.flying && home) || held[slot * 2] !== index)
       [held[slot * 2], held[slot * 2 + 1]] = [index, boostOf(space, featured)];
     boosts.value[slot * 2] = index;
     boosts.value[slot * 2 + 1] = held[slot * 2 + 1] ?? 1;

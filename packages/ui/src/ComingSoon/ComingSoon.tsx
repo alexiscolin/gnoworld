@@ -31,7 +31,7 @@ export function ComingSoon({ name, icon, words, size = "m", children }: ComingSo
   // An icon alone wears an IconButton's own look, so it stands at the same size beside them (the chat's header).
   const look =
     children !== undefined
-      ? { className: styles["plain"] }
+      ? { className: "bare" }
       : words === undefined
         ? iconLook("outline", size)
         : buttonLook("outline", "neutral", size);

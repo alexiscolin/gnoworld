@@ -3,13 +3,17 @@
 import type { Space } from "./scene.ts";
 import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
 import { ORBIT_GAIN } from "./parts/marks.ts";
+import { frameOf } from "./parts/bones.ts";
+import { Quaternion } from "three";
 import { HOME_SYSTEM } from "../cosmosAt.ts";
-import { aloneOf, homeFrame } from "./framing.ts";
+import { aloneOf, homeFrame, nearAlone } from "./framing.ts";
 import { followHome } from "./follow.ts";
 import { handOf } from "./hand.ts";
+import { hoverLit, settleHover } from "./hover.ts";
 import { eyeOf } from "./rig/pose.ts";
 import { coveredByChat } from "./motion.ts";
 import { tick } from "./view.ts";
+import { open, openedOf } from "./open.ts";
 
 // On a page the universe dims as the demo's behind a plate: the suns to 0.45, the dust to 0.15, the stars to half.
 const PAGE = { sun: 0.45, dust: 0.15, stars: 0.5 } as const;
@@ -20,13 +24,14 @@ const LENS_S = 0.18;
 const ORBITS_S = 0.3;
 // Where the page's planet stands this frame, for the scan.
 const PLANET_AT: Vec = { x: 0, y: 0, z: 0 };
+const SCAN_FRAME = new Quaternion();
 // The level follows the zoom: out of a system past 11 of its reaches, the universe; the eye among a system's orbits, that system.
 const LEAVE = 11;
 const ENTER = 1.2;
 // raw: how many orbits a system draws at their full strength
 const CLEAR_ORBITS = 12;
 
-// `slept` seconds more went by while the loop slept: the clock the orbits ride takes them, at its rate; the steps (`delta`) never do.
+// `slept` seconds more went by while the loop slept: the clock the orbits ride takes them whole (it never eases, D13013); the steps (`delta`) never do.
 export function advance(
   space: Space,
   delta: number,
@@ -91,8 +96,14 @@ function dim(space: Space, paged: boolean, delta: number): void {
   ease(frame.uSolo, alone === undefined ? 0 : 1, share);
   if (alone !== undefined) frame.uAlone.value = alone.index;
   homeFrame(space, alone, share);
-  // A lens's light comes and goes over a moment, never at once (D425); at once under reduced motion.
-  ease(frame.uLens, space.lens === undefined ? 0 : 1, space.options.still() ? 1 : 1 - Math.exp(-delta / 1000 / LENS_S));
+  lighten(space, delta);
+}
+
+// A lens's, or a pointed planet's, light comes and goes over a moment, never at once (D425); at once under reduced motion.
+function lighten(space: Space, delta: number): void {
+  settleHover(space);
+  const on = space.lens !== undefined || hoverLit(space) !== undefined;
+  ease(space.stage.frame.uLens, on ? 1 : 0, space.options.still() ? 1 : 1 - Math.exp(-delta / 1000 / LENS_S));
 }
 
 // The level follows the camera at rest: zoomed far out of a system, the universe; zoomed close to a system from far out, it.
@@ -123,13 +134,21 @@ function enter(space: Space, systems: readonly System[]): void {
 
 export function paint(space: Space, delta: number): void {
   const { stage, rig } = space;
+  // The page planet's ground first, so the planet is drawn with the spin and lean its signs stand by on this frame, not the last's.
+  signs(space, delta / 1000);
   stage.near?.tick(space.seconds, {
-    alone: stage.frame.uSolo.value > 0.5 ? stage.frame.uAlone.value : -1,
+    alone: nearAlone(stage.frame),
     close: closeUp(space),
     delta: delta / 1000,
     still: space.options.still(),
+    // How far the sun has gone dim for a page (its gain, eased): 0 where it is drawn, 1 on a page where it is not (D13002).
+    page: Math.min(1, Math.max(0, (1 - stage.gains.sun.value) / (1 - PAGE.sun))),
   });
   space.labels.system = space.system;
+  open(stage.frame, openedOf(space, stage.frame.uOpenNow.value), {
+    seconds: space.seconds,
+    still: space.options.still(),
+  });
   space.labels.plan = space.plan;
   space.labels.marked = space.planet;
   // No name while a flight runs: they come as it lands, never popping in and out on the way (Alexis, 2026-11-09).
@@ -141,8 +160,17 @@ export function paint(space: Space, delta: number): void {
   round(space, delta);
   stage.links.tick(space.plan ? (space.planet ?? space.system) : undefined, space, delta);
   const planet = space.planet;
-  stage.effects.tick(rig, delta, planet === undefined ? rig.pose.look : placeOf(planet, space.seconds, PLANET_AT));
-  signs(space, delta / 1000);
+  stage.effects.tick(rig, delta, {
+    at: planet === undefined ? rig.pose.look : placeOf(planet, space.seconds, PLANET_AT),
+    frame:
+      planet === undefined
+        ? undefined
+        : frameOf(
+            planet,
+            { seconds: space.seconds, leaned: stage.ground.leaned, ahead: stage.ground.ahead },
+            SCAN_FRAME,
+          ),
+  });
 }
 
 // The frame, blurred while fast, then the galaxy's body over it, never through the blur's pass, which grades the frame anew.
@@ -181,8 +209,13 @@ function signs(space: Space, step: number): void {
   const { ground, near } = space.stage;
   // Neither the spin nor the lean starts while a flight brings the planet or takes the eye from it, nor before the planet has come; the lean
   // eases back to rest then.
-  if (space.neared && !space.rig.flying) ground.place(planet, { seconds: space.seconds, step }, space.see);
-  else ground.rest(planet, step);
+  if (space.neared && !space.rig.flying) {
+    ground.grab.advance(step, space.camera.quaternion, space.options.still());
+    ground.place(planet, { seconds: space.seconds, step }, space.see);
+  } else {
+    ground.grab.stop();
+    ground.rest(planet, step);
+  }
   near?.lead(planet.id, ground.ahead, ground.leaned);
 }
 

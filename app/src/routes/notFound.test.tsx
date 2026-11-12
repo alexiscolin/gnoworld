@@ -8,7 +8,7 @@ describe("a path no route matches", () => {
     const html = await render({ path: "*", loader: clientLoader, ErrorBoundary }, "/nowhere");
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>No page here</h1>");
-    expect(html).toContain("<p>Nothing on gno.world goes by this address.</p>");
+    expect(html).toContain("You are lost in space: no page of gno.world goes by that address.");
     expect(alertOf(html)).toMatch(BACK_HOME);
   });
 

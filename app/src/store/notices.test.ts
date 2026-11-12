@@ -333,14 +333,45 @@ describe("the store's notices slice", () => {
   });
 
   describe("what a room counts, and the total", () => {
-    it("counts a room in mentions mode by its unseen notices", () => {
+    it("counts a room in mentions mode by its unseen notices while its reading place is unknown, then by its lines past it", () => {
       const t = setup();
+      t.said(GAMES, ["a", 5]);
+      t.said(GAMES, ["b", 7]);
       t.notices.add(notice({ id: "a", time: T(5) }));
       t.notices.add(notice({ id: "b", time: T(7) }));
       t.notices.add(notice({ id: "c", where: MAIN }));
       expect(badgeOf(t.state(), GAMES)).toBe(2);
       t.notices.seen(GAMES, T(5));
       expect(badgeOf(t.state(), GAMES)).toBe(1);
+    });
+
+    it("counts a room in the default mentions mode by its unseen lines too, as all mode does, and nothing in none", () => {
+      const t = setup();
+      t.marked(GAMES, 0);
+      t.said(GAMES, ["m1", 1]);
+      t.said(GAMES, ["m2", 2], { text: "hi", from: BOB });
+      t.said(GAMES, ["m3", 3], { text: "mine", from: ME });
+      t.noticed(GAMES, "bot", 4);
+      expect(modeOf(t.state(), GAMES)).toBe("mentions");
+      expect(badgeOf(t.state(), GAMES)).toBe(2);
+      t.notices.setMode(GAMES, "none");
+      expect(badgeOf(t.state(), GAMES)).toBe(0);
+    });
+
+    it("counts a room never read (its reading place unknown) by the lines that came since the page opened, none from before", () => {
+      const t = setup();
+      const live = (id: string, after: number) => {
+        const time = new Date(Date.now() + after).toISOString();
+        t.store
+          .getState()
+          .chatActions.heard(read(`@msgid=${id};time=${time};account=${BOB} :${BOB}!u@h PRIVMSG ${GAMES} :hi`));
+      };
+      t.said(GAMES, ["old", 1]);
+      live("new1", 1000);
+      live("new2", 2000);
+      expect(badgeOf(t.state(), GAMES)).toBe(2);
+      t.notices.setMode(GAMES, "all");
+      expect(badgeOf(t.state(), GAMES)).toBe(2);
     });
 
     it("counts a room in all mode by its unseen lines: the others' only, no notice among them, no line of the account's", () => {
@@ -536,6 +567,7 @@ describe("the store's notices slice", () => {
       expect(totalUnseen(t.state())).toBe(0);
       expect(unseenNotices(t.state())).toEqual([]);
       t.said(MAIN, ["m3", 7]);
+      t.said(GAMES, ["b", 8]);
       t.notices.add(notice({ id: "b", where: GAMES, time: T(8) }));
       expect(totalUnseen(t.state())).toBe(2);
     });

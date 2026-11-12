@@ -2,6 +2,7 @@
 // imported first, so its layers' order comes before any component's sheet (F363). Its JavaScript is free
 // of side effects but for its CSS (F370): a bundler may skip this file, so the app imports the sheet too.
 import "./styles.css";
+export { grouped } from "./format.ts";
 export { ActivityChart, type ActivityChartProps } from "./ActivityChart/ActivityChart.tsx";
 export { DayChart, type DayChartProps } from "./ActivityChart/DayChart.tsx";
 export { Avatar, type AvatarProps } from "./Avatar/Avatar.tsx";
@@ -35,7 +36,7 @@ export { Panel, type PanelProps } from "./Panel/Panel.tsx";
 export { PlanetThumb, type PlanetThumbProps } from "./PlanetThumb/PlanetThumb.tsx";
 export { Menu, Popover, type MenuItem, type MenuProps, type PopoverProps } from "./Popover/Popover.tsx";
 export { Network, type NetworkNode, type NetworkProps } from "./Network/Network.tsx";
-export { PagedList, type PagedListProps, type PagedSort } from "./PagedList/PagedList.tsx";
+export { PagedList, ShowMore, type PagedListProps, type PagedSort } from "./PagedList/PagedList.tsx";
 export { NavItem, type NavItemProps } from "./NavItem/NavItem.tsx";
 export { Progress, type ProgressProps } from "./Progress/Progress.tsx";
 export { Row, type RowProps } from "./Row/Row.tsx";
@@ -44,6 +45,8 @@ export { sightRef } from "./offscreen.ts";
 export { Skeleton, type SkeletonProps } from "./Skeleton/Skeleton.tsx";
 export { Planet, type PlanetProps } from "./Planet/Planet.tsx";
 export { Sparkline, type SparklineProps } from "./Sparkline/Sparkline.tsx";
+export { Badge, type BadgeProps } from "./Badge/Badge.tsx";
+export { Stamp, type StampProps } from "./Stamp/Stamp.tsx";
 export { Stat, type StatProps } from "./Stat/Stat.tsx";
 export { Switch, type SwitchProps } from "./Switch/Switch.tsx";
 export { Tabs, type Tab, type TabsProps } from "./Tabs/Tabs.tsx";

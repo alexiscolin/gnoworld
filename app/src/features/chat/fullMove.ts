@@ -6,7 +6,7 @@ import { useLayoutEffect, type RefObject } from "react";
 import { FULL_MOVE, takeBack, takeDock } from "../../fullChat.ts";
 import { motionOf } from "../../space/motion.ts";
 import { fadeFrames, growFrames, insetsOf, parseInset, shrinkFrames, type Insets } from "./moveClip.ts";
-import { restoreScrolls, stillFull, takeClosing } from "./stillScreen.ts";
+import { restoreScrolls, stillFull, takeClosing, takeDocked } from "./stillScreen.ts";
 
 // Space's flights' own curve, a cubic in and out (space/rig/flight.ts's inOut), a little longer than before: the chat eases off and lands
 // as a flight does (Alexis, 2026-11-09: "plus smooth à la fin et au début … en cohérence avec … les planètes").
@@ -24,12 +24,30 @@ const grows = new WeakMap<HTMLElement, Animation[]>();
 const LINEAR = "linear";
 const ease = gsap.parseEase;
 
+// The dock's screen, as it stood, stays where it was while the full chat fades in over it, then goes: the dock never empties at once.
+function dockStays({ copy, scrolls }: { copy: HTMLElement; scrolls: readonly (readonly [number, number])[] }): void {
+  document.body.append(copy);
+  restoreScrolls(copy, scrolls);
+  try {
+    copy
+      .animate(fadeFrames(ease("power1.in"), 1, 0), { duration: FADE_S * 1000, easing: LINEAR, fill: "forwards" })
+      .finished.then(() => {
+        copy.remove();
+      }, reportError);
+  } catch (error) {
+    copy.remove();
+    reportError(error);
+  }
+}
+
 // The full chat's `screen`, just laid out: grows out of the dock's box, fading in over the dock's ghost (rise.ts), which fades out under it.
 // Web Animations: the browser runs the clip and the opacity on its compositor, so busy script never drops a frame of the grow (D13980).
 function growFull(screen: HTMLElement): void {
   const from = takeDock();
+  const dock = takeDocked();
   if (from === undefined || motionOf().matches) return;
   const box = screen.getBoundingClientRect();
+  if (dock !== undefined) dockStays(dock);
   try {
     const moves = [
       screen.animate(growFrames(box, from, { round: ROUND, curve: ease(EASE), grow: GROW_S, tail: TAIL_S }), {

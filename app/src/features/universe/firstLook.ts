@@ -2,6 +2,7 @@
 // page's planet stands as itself (`data-sharp`, frame.ts), and the arrival (arrival.ts) takes the page's box in that same frame. The home has
 // its loader, which covers all that and opens the cosmos itself.
 import { gsap } from "gsap";
+import type { Place } from "../../space/place.ts";
 import { motionOf } from "../../space/motion.ts";
 import { SHARP, SHARP_MS } from "../../space/sharp.ts";
 import { EMPHASIZED } from "./arrivalBase.ts";
@@ -11,6 +12,28 @@ const SHARP_SLACK_MS = 500;
 
 /** Whether the loader still stands: what mounts under it rises with it. */
 export const loading = (): boolean => document.querySelector("[role='status'][aria-label='Loading space']") !== null;
+
+// The bar's last stretch of fill, in ms, before the loader fades (SpaceLoader.module.css: the fade's delay, the fill's transition).
+const FILL_MS = 200;
+
+let [released, pending] = [false, false];
+
+/** Whether the loader covers the home's dive, which is then kept: it starts with the loader's leaving (`releaseDive`), never under it. */
+export function holdsDive(place: Place): boolean {
+  if (place.kind !== "home" || released || !loading()) return false;
+  pending = true;
+  return true;
+}
+
+/** The first frame is drawn: the loader's bar finishes its fill, then it fades. Gives how many ms until a dive kept under it starts (as the
+ * fade does), none if no dive was kept. */
+export function releaseDive(): number | undefined {
+  released = true;
+  const kept = pending;
+  pending = false;
+  if (!kept) return undefined;
+  return motionOf().matches ? 0 : FILL_MS;
+}
 
 /** Whether the scene, held out of sight while its planet is not itself yet (frame.ts), is still to come: the shell does not show before it. */
 export const holdsShell = (): boolean => document.querySelector("canvas[data-first]:not([data-sharp])") !== null;

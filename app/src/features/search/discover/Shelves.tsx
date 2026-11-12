@@ -1,8 +1,8 @@
 // The left column: the shelves as a listbox, each with how many realms it holds under the filters; the arrows move among them.
-import { STYLES, type ShelfId } from "@gnoworld/core";
+import { STYLES } from "@gnoworld/core";
 import type { KeyboardEvent } from "react";
 import styles from "./Discover.module.css";
-import { SHELF_IDS, type Discovery } from "./useDiscover.ts";
+import { SHELF_IDS, type Discovery, type Shelf } from "./useDiscover.ts";
 
 const NAMES: Readonly<Record<string, string>> = {
   today: "Today",
@@ -12,18 +12,19 @@ const NAMES: Readonly<Record<string, string>> = {
   gems: "Hidden gems",
   unseen: "Never visited",
   visited: "Visited",
+  following: "Following",
   ...Object.fromEntries(STYLES.map(({ id, label }) => [id, label])),
 };
-export const nameOfShelf = (id: ShelfId): string => NAMES[id] ?? id;
+export const nameOfShelf = (id: Shelf): string => NAMES[id] ?? id;
 
-const GROUPS: readonly (readonly [string, readonly ShelfId[]])[] = [
-  ["Discover", ["today", "trending", "new", "live", "gems", "unseen"]],
+const GROUPS: readonly (readonly [string, readonly Shelf[]])[] = [
+  ["Discover", ["today", "trending", "new", "live", "gems", "unseen", "following"]],
   ["Styles", STYLES.map(({ id }) => id)],
   ["Your travels", ["visited"]],
 ];
 
 // Up and down choose the shelf before or after, Home and End the first and the last; the focus and the shelf go together.
-function move(event: KeyboardEvent<HTMLElement>, shelf: ShelfId, show: (id: ShelfId) => void) {
+function move(event: KeyboardEvent<HTMLElement>, shelf: Shelf, show: (id: Shelf) => void) {
   const at = SHELF_IDS.indexOf(shelf);
   const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: SHELF_IDS.length - 1 }[event.key];
   if (to === undefined || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -48,7 +49,7 @@ export function Shelves({ discovery }: { discovery: Discovery }) {
     >
       {GROUPS.map(([group, ids]) => (
         <div key={group} role="group" aria-label={group} className={styles["group"]}>
-          <div className={["label", styles["groupName"]].join(" ")}>{group}</div>
+          <div className={styles["groupName"]}>{group}</div>
           {ids.map((id) => (
             <button
               key={id}

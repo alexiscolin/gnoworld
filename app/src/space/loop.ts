@@ -2,6 +2,7 @@
 // (frame.ts); this holds the rules: the pace, the cap on a frame's step, the nap after a still view, the sleep while unseen, the buffer
 // freed after it, and every listener and timer, which go when `signal` aborts.
 import { gapFor } from "./pace.ts";
+import { LIVELY_MS } from "./rest.ts";
 import type { Need } from "./redraw.ts";
 import { pulse } from "./pulse.ts";
 import { wakeOn } from "./wakes.ts";
@@ -23,6 +24,8 @@ export interface Beat {
   work(step: { now: number; delta: number; slept: number; real: number }): Need;
   /** How long the loop may sleep after a frame that left `need`, `calm` ms after the last change; none, it stays awake. */
   nap(need: Need, calm: number): number | undefined;
+  /** Whether the loop is pacing a view with something moving (D13013): an input then brings the full pace back. */
+  lively(): boolean;
   /** Lets go of what only a running scene holds (the drawing buffer, the blur's target). */
   free(): void;
   /** The canvas's box changed. */
@@ -82,7 +85,9 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     clearTimeout(sleeper);
     sleeper = undefined;
     beat.watch(now);
-    if (now - last < gapFor(need, beat.focused()) - 3) return true;
+    const gap = gapFor(need, beat.focused());
+    // A view with something moving by itself is drawn at 15 fps, whether it naps between frames or not (D13013).
+    if (now - last < (need === "ambient" && beat.lively() ? Math.max(gap, LIVELY_MS) : gap) - 3) return true;
     need = frame(now);
     const nap = beat.nap(need, now - changed);
     if (nap === undefined) return true;
@@ -99,7 +104,9 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     frames,
   ));
   const input = () => {
-    keep.wake();
+    // A lively nap is no sleep: an input draws, and the changed time it sets keeps the full pace till the view is still again.
+    if (beat.lively()) keep.touch();
+    else keep.wake();
   };
   const change = () => {
     keep.touch();

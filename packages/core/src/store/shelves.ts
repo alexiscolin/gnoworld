@@ -58,8 +58,11 @@ export function shelfRows(store: Store, shelf: ShelfId, { filters, ground }: Vie
   return store.rows.filter((row) => keep.every((id) => FILTER_TESTS[id](row, ground)) && onShelf(row));
 }
 
-const byPath = (a: StoreRow, b: StoreRow) => Number(a.path > b.path) - Number(a.path < b.path);
-const SORTERS: Readonly<Record<SortId, (a: StoreRow, b: StoreRow) => number>> = {
+/** What the sorts read of a realm; a world's or a namespace's is its realms' together (the search ranks them by it). */
+export type Rank = Pick<StoreRow, "name" | "path" | "rise" | "lastHeight" | "firstHeight" | "callers" | "calls">;
+
+const byPath = (a: Rank, b: Rank) => Number(a.path > b.path) - Number(a.path < b.path);
+const SORTERS: Readonly<Record<SortId, (a: Rank, b: Rank) => number>> = {
   trend: (a, b) =>
     (b.rise ?? 0) - (a.rise ?? 0) ||
     (b.lastHeight ?? -1) - (a.lastHeight ?? -1) ||
@@ -70,6 +73,9 @@ const SORTERS: Readonly<Record<SortId, (a: StoreRow, b: StoreRow) => number>> = 
   newest: (a, b) => (b.firstHeight ?? -1) - (a.firstHeight ?? -1),
   az: (a, b) => a.name.localeCompare(b.name),
 };
+
+/** The order a sort asks of two ranks; 0 for a tie, which the caller breaks. */
+export const compareRanks = (sort: SortId) => SORTERS[sort];
 
 /** The rows in an order, the same one each time (a tie goes by path); the input is left as it was. */
 export function sortRows(rows: readonly StoreRow[], sort: SortId): StoreRow[] {

@@ -2,7 +2,7 @@
 // change and the day's small chart, the high and the low in the row's title (Alexis, 2026-11-11: a card a third as high, and `/market`). Restored from the home's old prices row (D425). A chunk of its own, asked when the
 // card is first drawn. Loading, missing and failed are states in words, never a gap and never a number.
 import type { MarketToken } from "@gnoworld/schemas";
-import { Card, Cluster, Sparkline, Stack } from "@gnoworld/ui";
+import { Card, EmptyState, Sparkline, Stack } from "@gnoworld/ui";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { MarketsRead } from "../../lib/api/markets.ts";
@@ -26,7 +26,7 @@ function Change({ percent }: { percent: number | null }) {
           <span className="visually-hidden">{direction === "up" ? "rose " : "fell "}</span>
         </>
       )}
-      {Math.abs(tenths).toFixed(1)}% · 24 h
+      {Math.abs(tenths).toFixed(1)}%<span className={styles["window"]}> · 24 h</span>
     </span>
   );
 }
@@ -37,7 +37,7 @@ function Token({ token, line }: { token: MarketToken; line: readonly number[] | 
   const drawn = line !== undefined && line.length >= 2;
   return (
     <section data-token={token.symbol} aria-label={token.symbol} title={drawn ? rangeOf(line) : undefined}>
-      <Cluster space="xs" align="center">
+      <div className={styles["row"]}>
         <span className={styles["symbol"]}>
           <small className="label">{token.symbol}</small>
         </span>
@@ -46,17 +46,13 @@ function Token({ token, line }: { token: MarketToken; line: readonly number[] | 
           <small className={styles["unit"]}> USD</small>
         </span>
         <Change percent={token.change24h} />
-        {drawn ? (
-          <span className={styles["spark"]}>
-            <Sparkline values={line} tone={tone} />
-          </span>
-        ) : null}
-      </Cluster>
+        <span className={styles["spark"]}>{drawn ? <Sparkline values={line} tone={tone} /> : null}</span>
+      </div>
     </section>
   );
 }
 
-function State({ state, words }: { state: "loading" | "missing" | "failed" | "empty"; words: string }) {
+function State({ state, words }: { state: "loading" | "missing" | "empty"; words: string }) {
   return (
     <p className="meta" data-markets={state} role="status">
       {words}
@@ -72,12 +68,15 @@ export function MarketCardView({
   lines,
   now,
   only = NO_TOKENS,
+  onRetry,
 }: {
   read: MarketsRead | undefined;
   lines: ReadonlyMap<string, readonly number[]> | undefined;
   now: Date;
   /** The tokens to show when some alone (`/market gnot`); none is all of them. */
   only?: readonly string[] | undefined;
+  /** Asks the prices again. */
+  onRetry?: () => void;
 }) {
   const body = (() => {
     if (read === undefined) return <State state="loading" words="Reading the prices" />;
@@ -85,7 +84,11 @@ export function MarketCardView({
       return read.reason === "missing" ? (
         <State state="missing" words="Prices are not available yet. Check back in a few minutes." />
       ) : (
-        <State state="failed" words="The prices could not be read. Reload the page to try again." />
+        <EmptyState
+          look="failed"
+          line="The prices could not be read."
+          {...(onRetry === undefined ? {} : { onRetry })}
+        />
       );
     }
     const tokens = read.markets.tokens.filter((token) => only.length === 0 || only.includes(token.symbol));
@@ -95,7 +98,7 @@ export function MarketCardView({
   const hint = read?.ok === true ? `CoinGecko · ${stampOf(read.markets.updated, now)}` : "CoinGecko";
   return (
     <Card compact>
-      <Card.Header icon="chart" kicker="Prices" title="Market chart" hint={hint} />
+      <Card.Header icon="chart" kicker="Prices · 24 h" title="Market chart" hint={hint} />
       <div data-market-card="" className={styles["body"]}>
         <Stack space="xs">{body}</Stack>
       </div>
@@ -114,5 +117,8 @@ export default function MarketCard({ only }: { only?: readonly string[] | undefi
   const read = useMarkets();
   const lines = useMarketHistory();
   const [now] = useState(() => new Date());
-  return <MarketCardView read={read} lines={lines} now={now} only={only} />;
+  const retry = () => {
+    queryClient.refetchQueries(marketsOptions).catch(reportError);
+  };
+  return <MarketCardView read={read} lines={lines} now={now} only={only} onRetry={retry} />;
 }

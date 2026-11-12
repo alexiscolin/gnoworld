@@ -132,7 +132,8 @@ describe("a world's proposals, with its pinned actions", () => {
       </StoreProvider>,
     );
     const vote = await calling(el, "Vote");
-    const heading = el.querySelector("#proposals-title");
+    // The card's header names it (Card.Header's title, a level-2 heading), no longer an id of the page's own.
+    const heading = [...el.querySelectorAll("h2")].find((each) => each.textContent === "Proposals") ?? null;
     expect(heading).not.toBeNull();
     expect(heading !== null && follows(vote, heading)).toBe(true);
     expect(read.mock.calls.map(([url]) => new URL(url).host)).toContain("rpc.onyx.testnets.gno.land");

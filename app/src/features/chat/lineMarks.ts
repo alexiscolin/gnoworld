@@ -1,6 +1,7 @@
 // What a room's lines show beyond their words (8d): a poll's votes (core's poll.ts) and an account's first words, the video's
 // "new here" (frame 56). Apart from Lines.tsx, which draws them.
 import { POLL_KEYS, pollOf, votesOn, type Reaction, type Shown, type ShownLine } from "@gnoworld/core";
+import { dayKey, dayName } from "../../lib/days.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import type { Entry } from "./chainEntries.ts";
 import { votesString } from "./PollView.tsx";
@@ -102,47 +103,22 @@ export function groupedOf(
 
 const NO_DAYS: ReadonlyMap<string, string> = new Map();
 
-/** Where a day is read: the reader's own zone and language unless a test says another. */
-interface Reader {
-  timeZone?: string | undefined;
-  locale?: string | undefined;
-}
-
-/** The label above the lines of each day, on the first line of it (the first of the list included, once the list holds two days): "Today", "Yesterday", else
- * the weekday and date, the year when it is not this year's. A day is the reader's own, as the clock changes make it (a day of
- * 23 or 25 hours is one day): the key is the zone's calendar date, never 24 hours of milliseconds. */
+/** The label above the lines of each day, on the first line of it (the first of the list included, once the list holds two days): `dayName`'s
+ * words (D13015), in the reader's own zone unless a test says another: a day is the zone's calendar date, never 24 hours of milliseconds. */
 export function dayLabelsOf(
   entries: readonly (Entry<ShownLine> | { jarvis: unknown })[],
   now: Date,
-  { timeZone, locale }: Reader = {},
+  { timeZone }: { timeZone?: string | undefined } = {},
 ): ReadonlyMap<string, string> {
-  const key = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" });
-  const words = (year: boolean) =>
-    new Intl.DateTimeFormat(locale, {
-      timeZone,
-      weekday: "long",
-      day: "numeric",
-      month: "long",
-      ...(year ? { year: "numeric" } : {}),
-    });
-  const today = key.format(now);
-  const yesterday = key.format(new Date(Date.parse(`${today}T12:00:00Z`) - 24 * 3_600_000));
   const labels = new Map<string, string>();
   let before: string | undefined;
   for (const entry of entries) {
     if (!("line" in entry)) continue;
     const at = new Date(entry.line.time);
-    const day = key.format(at);
+    const day = dayKey(at, timeZone);
     if (day === before) continue;
     before = day;
-    labels.set(
-      entry.line.id,
-      day === today
-        ? "Today"
-        : day === yesterday
-          ? "Yesterday"
-          : words(day.slice(0, 4) !== today.slice(0, 4)).format(at),
-    );
+    labels.set(entry.line.id, dayName(at, now, { timeZone }));
   }
   // A room that shows one day alone has no change of day to tell (its lines' times keep their full date in their title).
   return labels.size < 2 ? NO_DAYS : labels;

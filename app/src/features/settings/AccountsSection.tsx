@@ -4,6 +4,7 @@
 import { shortAddress, type Address } from "@gnoworld/schemas";
 import { Avatar, Button, Chip, Cluster, Row, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useState } from "react";
+import { PersonLink } from "../chat/index.ts";
 import { useDeviceView } from "../../deviceViews.ts";
 import { pageLinksApi } from "../../lib/api/links.ts";
 import { readLinks } from "../../lib/links/held.ts";
@@ -48,7 +49,11 @@ function Members({
             subtitle={
               address === account ? "Logged in now" : `Linked ${linkedAt === undefined ? "" : linkedOn(linkedAt)}`
             }
-            lead={<Avatar address={address} name={shortAddress(address)} decorative />}
+            lead={
+              <PersonLink address={address}>
+                <Avatar address={address} name={shortAddress(address)} decorative />
+              </PersonLink>
+            }
             trail={
               <>
                 <Chip>{WAYS[kind]}</Chip>

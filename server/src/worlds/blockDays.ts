@@ -14,7 +14,7 @@ export interface Dated {
   readonly times: ReadonlyMap<number, string>;
 }
 
-export const Blocks = z.object({
+const Blocks = z.object({
   data: z.record(
     z.string(),
     z.nullable(z.array(z.object({ height: z.number(), time: z.iso.datetime({ offset: true }) }))),
@@ -87,4 +87,12 @@ export async function daysOf(
     probes = spans.filter((_, i) => i % 2 === 0).map(([, hi]) => sorted[hi] ?? -1);
   }
   return known;
+}
+
+/** Whether the block the state was dated by still has its time: a chain restarted under the same name has none, or another. */
+export async function anchorHolds(reading: Reading, anchor: { height: number; time: string }): Promise<boolean> {
+  const answer = Blocks.safeParse(await request(reading, blockTimes([anchor.height])));
+  if (!answer.success) throw new Failure("shape");
+  const block = answer.data.data["b0"]?.[0];
+  return block?.height === anchor.height && new Date(block.time).toISOString() === anchor.time;
 }

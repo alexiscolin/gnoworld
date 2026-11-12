@@ -4,13 +4,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, markup, one } from "../../../tests/mount.tsx";
+import { all, markup, noMedia, one } from "../../../tests/mount.tsx";
 import { Composer, typingOf } from "./Composer.tsx";
 import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./said.ts";
 import { tooFast } from "./pace.ts";
 import { refusalAfter } from "./composerHooks.ts";
 import { acting, FIELD, inPage } from "../../../tests/composer.tsx";
-import { jarvisItems } from "../../jarvisHere.ts";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -293,6 +292,11 @@ describe("the composer, a draft of several lines", () => {
     const markup = from("/nick bob");
     expect(markup).toContain("/nick is not a command. /me sends an action.");
     expect(markup).not.toContain("Shift+Enter adds a line.");
+  });
+
+  it("does not call a command being typed unknown while its suggestions are open", () => {
+    expect(from("/")).not.toContain("is not a command");
+    expect(from("/ma")).not.toContain("is not a command");
   });
 
   it("names the line too long, from 1, and a message too many lines by how many", () => {
@@ -631,9 +635,8 @@ describe("Composer: submitting an edit", () => {
   HTMLElement.prototype.togglePopover = () => false;
   const host = document.createElement("div");
   const root = createRoot(host);
-  // jsdom has no matchMedia: a computer's pointer, which is not coarse (the composer reads it as it mounts).
   beforeEach(() => {
-    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    noMedia();
   });
   afterEach(() => {
     act(() => {
@@ -696,8 +699,8 @@ describe("the composer's box", () => {
   });
 });
 
-// `/market` (Alexis, 2026-11-11): it sends nothing, and adds the market card to the room for the reader, as the quick action does.
-describe("the composer's /market", () => {
+// The card commands: each sends its card's line as any message, so every reader's page draws the card and a guest's goes the same way.
+describe("the composer's card commands", () => {
   const sent = async (draft: string, label?: string) => {
     const onSay = vi.fn(() => true);
     const page = inPage(
@@ -709,26 +712,26 @@ describe("the composer's /market", () => {
     return { onSay, page };
   };
 
-  it("adds the card, its token alone when one is named, sends nothing, and empties the field", async () => {
-    const before = jarvisItems().length;
-    const { onSay, page } = await sent("/market GNOT");
-    expect(onSay).not.toHaveBeenCalled();
+  it.each([
+    ["/market GNOT", "💹 Market prices GNOT"],
+    ["/trending", "📈 Most called worlds this week"],
+    ["/proposals", "🏛️ GovDAO proposals"],
+  ])("sends %s as the line any client reads, and empties the field", async (draft, text) => {
+    const { onSay, page } = await sent(draft);
+    expect(onSay).toHaveBeenCalledTimes(1);
+    expect(onSay.mock.calls[0]).toMatchObject([{ kind: "line", text }, draft]);
     expect(page.held()).toBe("");
-    expect(jarvisItems().slice(before)).toMatchObject([{ room: ROOM, account: NICK, market: true, symbols: ["GNOT"] }]);
   });
 
-  it("refuses an unknown token in words, adding nothing", async () => {
-    const before = jarvisItems().length;
+  it("refuses an unknown token in words, sending nothing", async () => {
     const { onSay, page } = await sent("/market eth");
     expect(onSay).not.toHaveBeenCalled();
-    expect(jarvisItems()).toHaveLength(before);
     expect(page.host.textContent).toContain("/market takes one token");
   });
 
   it("is an unknown command in a direct message, which has no room for the card", async () => {
-    const before = jarvisItems().length;
-    const { page } = await sent("/market", "g10gh7…3y5tv");
-    expect(jarvisItems()).toHaveLength(before);
-    expect(page.host.textContent).toContain("/market is not a command");
+    const { onSay, page } = await sent("/trending", "g10gh7…3y5tv");
+    expect(onSay).not.toHaveBeenCalled();
+    expect(page.host.textContent).toContain("/trending is not a command");
   });
 });

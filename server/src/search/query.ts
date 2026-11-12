@@ -7,6 +7,7 @@ import { worldOf } from "../rooms/rooms.ts";
 
 export interface Query {
   rooms: readonly string[];
+  /** Empty with a `from`: that account's lines, newest first, with no words. */
   q: string;
   from?: string | undefined;
   link?: boolean | undefined;
@@ -53,9 +54,12 @@ const Row = z.object({
 });
 const Count = z.object({ n: z.number() });
 
+// With no words, the sender's newest lines come from `lines_by_account` (account, at); the rooms and filters are asked of them as of a match.
+const NEWEST_OF = `SELECT rowid FROM lines WHERE account = ? AND world = ? ORDER BY at DESC, rowid DESC LIMIT ${String(MATCHES_MOST + 1)}`;
+
 // The world's lines come first (a column of the full-text table): one pass gives the newest matches, the rooms and filters are asked of them.
 // ponytail: only the newest MATCHES_MOST matches are searched, so a filter nothing passes costs 5,000 rows; an old line of a common word is
-// missed with a narrow filter (`partial` says so). Upgrade: a statement driven by `lines_by_account` for `from`, a partial index on `link`.
+// missed with a narrow filter (`partial` says so). Upgrade: a partial index on `link`.
 const NEWEST = `SELECT rowid FROM lines_fts WHERE lines_fts MATCH ? ORDER BY rowid DESC LIMIT ${String(MATCHES_MOST + 1)}`;
 const FROM = `FROM json_each(?) j CROSS JOIN lines l ON l.rowid = j.value
   WHERE l.room IN (SELECT value FROM json_each(?))
@@ -64,6 +68,7 @@ const Rowids = z.array(z.object({ rowid: z.number() }));
 
 export function makeQuery(db: DatabaseSync) {
   const newest = db.prepare(NEWEST);
+  const newestOf = db.prepare(NEWEST_OF);
   const rows = db.prepare(
     `SELECT l.rowid AS rowid, l.room, l.msgid, l.account, l.at, l.link, l.text ${FROM} AND (? IS NULL OR l.rowid < ?) ORDER BY l.rowid DESC LIMIT ?`,
   );
@@ -74,9 +79,12 @@ export function makeQuery(db: DatabaseSync) {
     const words = wordsOf(q);
     // A slug's characters only, so the quoted term holds nothing else; the rooms asked are one world's (the route's), the first names it.
     const world = worldOf(rooms[0] ?? "").replaceAll(/[^a-z0-9-]/g, "");
-    if (words.length === 0 || world === "") return { rows: [], total: 0, capped: false, partial: false };
+    const byWords = words.length > 0;
+    // A `q` typed with no word in it ("!!") matches nothing; only an empty one lists a sender's lines.
+    if ((!byWords && (from === undefined || q.trim() !== "")) || world === "")
+      return { rows: [], total: 0, capped: false, partial: false };
     const match = `world : "${world}" AND text : (${words.map((word) => (prefixed(word) ? `"${word}"*` : `"${word}"`)).join(" AND ")})`;
-    const matches = Rowids.parse(newest.all(match)).map((row) => row.rowid);
+    const matches = Rowids.parse(byWords ? newest.all(match) : newestOf.all(from ?? "", world)).map((row) => row.rowid);
     const filters = [
       JSON.stringify(matches.slice(0, MATCHES_MOST)),
       JSON.stringify(rooms),

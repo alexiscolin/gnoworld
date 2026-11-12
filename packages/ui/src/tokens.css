@@ -52,9 +52,13 @@
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
     --color-surface: var(--p-night);
+    /* The plate's fill, and the dock's beside it: the world's tint over the night (a page that sets its own --world mixes its own). */
+    --color-plate: color-mix(in oklab, var(--world) 16%, var(--p-night));
     --color-scrim: color-mix(in oklab, var(--p-space) 70%, transparent);
     /* The glass of a bubble over the scene: near-black, with no blur, which is not yet baseline. */
     --color-bubble: color-mix(in oklab, var(--p-space) 94%, transparent);
+    /* The translucent pills over the scene and the globe (a space label, a country tag, the far side's count): one wash. */
+    --color-pill-glass: color-mix(in oklab, var(--color-surface) 72%, transparent);
 
     --family-sans: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
     --family-mono: "Geist Mono Variable", ui-monospace, Menlo, Consolas, monospace;
@@ -64,6 +68,8 @@
     --font-label: 500 0.6875rem/1 var(--family-mono);
     --font-meta: 400 0.75rem/1.4 var(--family-sans);
     --font-data: 400 0.75rem/1.4 var(--family-mono);
+    /* A count beside its words (a chip's, a pin bar's, a section's): one face for every count. */
+    --font-count: var(--font-data);
     --font-ui: 500 0.8125rem/1 var(--family-sans);
     --font-reading: 400 0.8125rem/1.5 var(--family-sans);
     --font-chat: 400 0.84375rem/1.45 var(--family-sans);
@@ -109,8 +115,11 @@
 
     --control-xs: 24px;
     --control-s: 32px;
+    --control-chip: 27px;
     --control-m: 44px;
     --control-l: 56px;
+    /* A round icon control in a bar: a view link's height inside the pill; a bar may set it wider. */
+    --round-h: 34px;
     /* A card's header row. */
     --control-header: 28px;
     --icon-s: 12px;
@@ -130,6 +139,7 @@
     --dialog-w: 490px;
     --dialog-wide: 760px;
     --popover-w: 300px;
+    --popover-wide: 440px;
     /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
     --plate-w: 808px;
     /* The plate's inner step, the step between its zones, its side column and the day chart's height (docs/plans/slice-realm-plate.md); a narrow plate sets the first two smaller. */
@@ -179,6 +189,9 @@
     --chat-panel-inset: 20px;
     /* The inset of what the chat draws, set by the screen it is in: the video's 32 px; 24 in its dock, a phone's gutter. */
     --chat-inset: var(--space-l);
+    /* How far the composer's box goes out past its column's inset, and the inset of its words from its edge; the dock sets both (app's QuickActions.module.css). */
+    --box-bleed: 0px;
+    --box-in: var(--space-s);
     /* The room a flash that stays holds at the top of the screen; the flash sets it while it shows. */
     --flash-room: 0px;
     /* The top centre's slot (DESIGN-SYSTEM.md, Layout): the bottom of the header in view, the shell's or a full chat's, which sets
@@ -214,7 +227,6 @@
     --motion-wait: 300ms;
     /* A page opened from its URL: its scene coming in from black, with the arrival's box. */
     --motion-arrive: 1200ms;
-    --motion-iris: 800ms;
     --motion-ambient: 3s;
     /* The plate's entrance (the proposal's score): the delay a card waits to rise (--d), whether its parts' animations run (--play), a part's place in its row
        (--n, --j), where the chart's peak label comes in (--pk) and when a line and its area draw (--spark-line, --spark-area). A card or a chart sets them. */

@@ -19,6 +19,7 @@ import {
   Stats,
   TabRows,
 } from "./Interface.tsx";
+import { Marks } from "./Marks.tsx";
 import { NavItems } from "./NavItems.tsx";
 import { Compositions, Frames, Kickers, Layout } from "./Frames.tsx";
 import { PlateRegions } from "./Plate.tsx";
@@ -167,6 +168,7 @@ export function Overview() {
       </Region>
       <Region name="Stats">
         <Stats />
+        <Marks />
         <Soon />
       </Region>
       <PlateRegions />

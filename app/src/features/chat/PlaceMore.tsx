@@ -2,6 +2,7 @@
 // draws none), and the place on gnoweb and the explorer.
 import type { Line } from "@gnoworld/core";
 import { Cluster, Icon } from "@gnoworld/ui";
+import { NEW_TAB } from "../../lib/newTab.ts";
 import { countriesHere } from "./Country.tsx";
 import { Figure } from "./Figure.tsx";
 import styles from "./PlaceInfo.module.css";
@@ -25,7 +26,7 @@ export function Links({ gnoweb }: { gnoweb: string | undefined }) {
     <Cluster as="ul" space="xs">
       {links.map(({ label, href }) => (
         <li key={label}>
-          <a href={href} target="_blank" rel="noopener noreferrer" className="label">
+          <a href={href} {...NEW_TAB} className="label">
             <span className={styles["link"]}>
               {label}
               <Icon name="arrow-up-right" />

@@ -1,0 +1,129 @@
+{
+  "earth": {
+    "language": "fr",
+    "country": "FR",
+    "lines": {
+      "gm gno.land, first coffee and first block of the day": "gm gno.land, premier café et premier bloc de la journée",
+      "welcome to everyone who just landed here": "bienvenue à tous ceux qui viennent d'arriver",
+      "first time here, is every planet a project?": "première fois ici, chaque planète est-elle un projet ?",
+      "yes, every world is a set of realms deployed on gno.land": "oui, chaque monde est un ensemble de realms déployés sur gno.land",
+      "the planet view is wild, click a world and it flies you there": "la vue des planètes est dingue, clique sur un monde et il t'y emmène en vol",
+      "and the Map shows the whole system from above": "et la Carte montre tout le système vu d'en haut",
+      "@{prev} oh nice, I had not found the Map yet": "@{prev} ah super, je n'avais pas encore trouvé la Carte",
+      "things to try today:\n- open a world\n- call a function\n- say hi in its room": "à essayer aujourd'hui :\n- ouvrir un monde\n- appeler une fonction\n- dire bonjour dans son salon",
+      "**reminder**: this is a testnet, the tokens have no value": "**rappel** : c'est un testnet, les jetons n'ont aucune valeur",
+      "good to repeat it for the newcomers": "bon à répéter pour les nouveaux",
+      "if you are lost, ask @jarvis what a realm is": "si tu es perdu, demande à @jarvis ce qu'est un realm",
+      "see you all in teh other rooms": "à tous dans les otres salons",
+      "see you all in the other rooms": "à tous dans les autres salons",
+      "/me waves from Lisbon": "/me fait signe depuis Lisbonne"
+    }
+  },
+  "govdao": {
+    "language": "de",
+    "country": "DE",
+    "lines": {
+      "gm, anyone reading the new GovDAO proposal?": "gm, liest jemand den neuen GovDAO-Vorschlag?",
+      "reading it now, I like to know what it changes before the vote": "ich lese ihn gerade, ich will vor der Abstimmung wissen, was er ändert",
+      "how does voting work here, for someone new?": "wie funktioniert das Abstimmen hier für jemanden, der neu ist?",
+      "only members' votes count, everyone else can read and follow along": "nur die Stimmen der Mitglieder zählen, alle anderen können lesen und mitverfolgen",
+      "a member votes from the call card, signed in their own wallet": "ein Mitglied stimmt über die Aufrufkarte ab, signiert in der eigenen Wallet",
+      "@{prev} clear, thank you": "@{prev} klar, danke",
+      "what I check before a vote:\n- what the proposal changes\n- who proposed it\n- the discussion here": "was ich vor einer Abstimmung prüfe:\n- was der Vorschlag ändert\n- wer ihn eingebracht hat\n- die Diskussion hier",
+      "> read before you vote\nthe best advice in this room": "> erst lesen, dann abstimmen\nder beste Rat in diesem Raum",
+      "the realm is `gno.land/r/gov/dao` if you want to read its code": "das Realm ist `gno.land/r/gov/dao`, falls du seinen Code lesen willst",
+      "bookmarked, thanks": "als Lesezeichen gespeichert, danke",
+      "**tip**: open the realm's functions to see what a vote calls": "**Tipp**: öffne die Funktionen des Realms, um zu sehen, was eine Abstimmung aufruft",
+      "thanks all, good discusion today": "danke euch allen, gute Dikussion heute",
+      "thanks all, good discussion today": "danke euch allen, gute Diskussion heute",
+      "ask @jarvis how to vote on GovDAO if you have never done it": "frag @jarvis, wie man bei GovDAO abstimmt, wenn du es noch nie gemacht hast"
+    }
+  },
+  "gnoswap": {
+    "language": "it",
+    "country": "IT",
+    "lines": {
+      "gm traders, anyone swapping on gnoswap today?": "gm trader, qualcuno fa swap su gnoswap oggi?",
+      "just a small swap to test, it went through smoothly": "solo un piccolo swap di prova, è andato a buon fine senza problemi",
+      "remember these are testnet tokens, no real value": "ricordate che sono token di testnet, senza valore reale",
+      "how do you add liquidity to a pool?": "come si aggiunge liquidità a un pool?",
+      "pick the pair, set the range, then sign in your wallet": "scegli la coppia, imposta l'intervallo, poi firma nel tuo wallet",
+      "start small, a narrow range moves out of the price fast": "parti in piccolo, un intervallo stretto esce subito dal prezzo",
+      "@{prev} good point, I will start small": "@{prev} buon punto, partirò in piccolo",
+      "anyone watching the GNOT price today?": "qualcuno sta guardando il prezzo di GNOT oggi?",
+      "the market card above has the day's line": "la scheda mercato qui sopra mostra la linea del giorno",
+      "my checklist before a swap:\n- check the pair\n- check the slippage\n- sign only what I read": "la mia checklist prima di uno swap:\n- controllare la coppia\n- controllare lo slippage\n- firmare solo ciò che ho letto",
+      "my first try, I swapped the pair the wrong way round": "il mio primo tentativo, ho scambiato la coppia al contrario",
+      "**careful** with the slippage on thin pools": "**attenzione** allo slippage sui pool sottili",
+      "the gnoswap realms are all readable on gno.land, nice to learn form": "i realm di gnoswap si leggono tutti su gno.land, bello per imparae",
+      "the gnoswap realms are all readable on gno.land, nice to learn from": "i realm di gnoswap si leggono tutti su gno.land, bello per imparare",
+      "/me checks the pool again": "/me controlla di nuovo il pool"
+    }
+  },
+  "/r/nym-alexiscolin000/gnogolf/golf/v2": {
+    "language": "es",
+    "country": "ES",
+    "lines": {
+      "gnogolf v2 is live, who is playing today?": "gnogolf v2 ya está disponible, ¿quién juega hoy?",
+      "me! first round done, the wind got me on the last hole": "¡yo! primera ronda hecha, el viento me ganó en el último hoyo",
+      "how do you see the best scores?": "¿cómo se ven las mejores puntuaciones?",
+      "the realm keeps a leaderboard per course and per hole": "el realm guarda una clasificación por campo y por hoyo",
+      "you can simulate a round before playing it for real": "puedes simular una ronda antes de jugarla de verdad",
+      "nice, I will compare the simulation with my real round": "genial, compararé la simulación con mi ronda real",
+      "tell us which one scores better": "cuéntanos cuál puntúa mejor",
+      "@{prev} will do": "@{prev} lo haré",
+      "**new personal best** today, finally": "**nuevo récord personal** hoy, por fin",
+      "congrats! which course?": "¡felicidades! ¿qué campo?",
+      "tips for windy days:\n- aim lower\n- play it safe near the green": "consejos para días de viento:\n- apunta más bajo\n- juega seguro cerca del green",
+      "> my ghost from yesterday beat me again\nsame here, every single time": "> mi fantasma de ayer me volvió a ganar\nme pasa igual, cada vez",
+      "is it a new period already?": "¿ya es un periodo nuevo?",
+      "yes, check the standings": "sí, mira la clasificación",
+      "see you on teh course!": "¡nos vemos en el cmpo!",
+      "see you on the course!": "¡nos vemos en el campo!",
+      "/me tees off": "/me hace el primer golpe"
+    }
+  },
+  "earth/builders": {
+    "language": "ja",
+    "country": "JP",
+    "lines": {
+      "this room is for people building realms, share what you are working on": "このルームはレルムを作っている人のためのものです。取り組んでいることを共有してください",
+      "I am writing my first realm, any tips?": "初めてのレルムを書いています。何かコツはありますか？",
+      "run the tests locally before you deploy": "デプロイする前にローカルでテストを実行してください",
+      "and keep the state small, every byte is stored on chain": "それと状態は小さく保ってください。すべてのバイトがチェーンに保存されます",
+      "@{prev} thanks, that helps a lot": "@{prev} ありがとう、とても助かります",
+      "my steps to ship a realm:\n- write it\n- test it with `gno test`\n- deploy it to the testnet": "レルムを公開する手順：\n- 書く\n- `gno test` でテストする\n- テストネットにデプロイする",
+      "is there a way to call a realm from an assistant?": "アシスタントからレルムを呼び出す方法はありますか？",
+      "gnomcp does it, and it writes only with a session you approve": "gnomcp でできます。書き込みは承認したセッションでのみ行われます",
+      "**today**: deployed a small counter realm, it renders!": "**今日**：小さなカウンターのレルムをデプロイしました、表示されます！",
+      "my counter starts at 1 because I forgot about zero": "ゼロを忘れていたので、カウンターは1から始まります",
+      "> keep the state small\nthe best advice I got this week": "> 状態は小さく保つ\n今週もらった一番のアドバイスです",
+      "agreed, it changed how I design": "同感です、設計の仕方が変わりました",
+      "who wants to review each other's realms this week?": "今週、お互いのレルムをレビューしたい人はいますか？",
+      "me, send me the path": "私が見ます、パスを送ってください",
+      "I wil post the path here once it is deployed": "デプロイしたらここにパスを投稿しまう",
+      "I will post the path here once it is deployed": "デプロイしたらここにパスを投稿します"
+    }
+  },
+  "earth/lisbon-meetup": {
+    "language": "pt",
+    "country": "PT",
+    "lines": {
+      "who is coming to the gno meetup in Lisbon?": "quem vem ao meetup de gno em Lisboa?",
+      "me! first time at a gno meetup": "eu! primeira vez num meetup de gno",
+      "what to bring:\n- your laptop\n- a realm idea\n- questions": "o que trazer:\n- o teu portátil\n- uma ideia de realm\n- perguntas",
+      "is there a talk planned?": "há alguma palestra prevista?",
+      "a short demo of gnoworld, then open discussion": "uma breve demonstração do gnoworld, depois discussão aberta",
+      "and someone wants to show their golf realm": "e alguém quer mostrar o seu realm de golfe",
+      "@{prev} great, I will bring questions": "@{prev} ótimo, vou trazer perguntas",
+      "**see you there**, the details will be posted here": "**até lá**, os detalhes serão publicados aqui",
+      "last time we talked so long they turned the lights off": "da última vez falámos tanto tempo que apagaram as luzes",
+      "> bring a realm idea\nI have three, is that too many?": "> traz uma ideia de realm\ntenho três, é demais?",
+      "never too many": "nunca é demais",
+      "I will post the adress the day before": "vou publicar o enderço na véspera",
+      "I will post the address the day before": "vou publicar o endereço na véspera",
+      "see you in Lisbon!": "até Lisboa!",
+      "/me books a train to Lisbon": "/me reserva um comboio para Lisboa"
+    }
+  }
+}

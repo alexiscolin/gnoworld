@@ -108,10 +108,16 @@ describe("what the server is asked", () => {
     expect(toQuery("quorum", { ...base, time })).toEqual({ q: "quorum", world: "bubble", since });
   });
 
-  it("asks nothing for words too short, filters alone, or a filter that found nothing", () => {
+  it("asks with a sender alone and no words, from:@me included", () => {
+    expect(toQuery("from:@me", base)).toEqual({ world: "bubble", from: ALICE });
+    expect(toQuery("in:#games from:@me", base)).toEqual({ world: "bubble", room: "#bubble/games", from: ALICE });
+  });
+
+  it("asks nothing for words too short, other filters alone, or a filter that found nothing", () => {
     expect(toQuery("q", base)).toBeUndefined();
     expect(toQuery("  ", base)).toBeUndefined();
     expect(toQuery("has:link", base)).toBeUndefined();
+    expect(toQuery("q from:@me", base)).toBeUndefined();
     expect(toQuery("quorum from:@nobody", base)).toBeUndefined();
   });
 });

@@ -1,7 +1,7 @@
 // The chat search's results by day, in the order the server gave them (newest arrival first: a day may come back).
 import type { SearchHit } from "@gnoworld/schemas";
 import { useState, type ReactNode } from "react";
-import { dayName } from "./days.ts";
+import { dayName } from "../../../lib/days.ts";
 import { Hit } from "./Hit.tsx";
 import type { ChatSearchProps } from "./ChatSearch.tsx";
 import shared from "../lists.module.css";

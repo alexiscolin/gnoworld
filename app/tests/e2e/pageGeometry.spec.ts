@@ -2,6 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { connectButton } from "./account.ts";
 import { calmed, pinFigures } from "./figures.ts";
 import { box, brightness, near, style } from "./geometry.ts";
 
@@ -42,7 +43,7 @@ test.describe("at the video's size", () => {
       near(earth.y + earth.height / 2, 56, "the views' row's middle");
       near(logo.y + logo.height / 2, 56, "the logo's middle");
       // The header's right edge keeps the same 32 px, once the login has said whether a session is open.
-      await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
+      await expect(connectButton(page)).toBeVisible();
       const right = await page.evaluate(() => {
         const items = [...document.querySelectorAll("header a, header button")].map(
           (el) => el.getBoundingClientRect().right,

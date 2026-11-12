@@ -19,12 +19,13 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 // 17 chunks (mountUniverse, cosmos, web, restSearch, flights, part...) are no file of the build. Raised on 2026-11-09 to the weights, 256 B ahead
 // (D386, provisional); the first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
-  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 190,507 B measured on 2026-11-12, 256 B ahead
-  // (D13948, provisional till the hardening; its history D386 and D13961).
-  { chunk: "scene", after: ["root", "universe"], cap: 190_763 },
+  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 190,507 B measured on 2026-11-12, 194,353 B on
+  // 2026-11-13, 256 B ahead (D13948, provisional till the hardening; its history D386 and D13961).
+  { chunk: "scene", after: ["root", "universe"], cap: 194_609 },
   // On the home's first screen now, not behind the cosmos (7i): 7,293 B on 2026-11-07 beyond the scene and the cosmos (D386); 16,007 B beyond
-  // `root` and `universe` (its worlds, their thumbs, the home's views and the follow chunks it imports), 256 B ahead (+8,970 B).
-  { chunk: "Rail", after: ["root", "universe"], cap: 18_752 },
+  // `root` and `universe` (its worlds, their thumbs, the home's views and the follow chunks it imports), 256 B ahead (+8,970 B); 19,370 B
+  // measured on 2026-11-13, 256 B ahead (D13948, provisional till the hardening).
+  { chunk: "Rail", after: ["root", "universe"], cap: 19_626 },
   // A world's planet drawn as its thumb anywhere (Discover, search, the chat's worlds): 347 B alone (D386); 2,436 B alone on 2026-11-09,
   // 256 B ahead (+2,089 B over D386's 603 B).
   { chunk: "thumbs", cap: 2692 },

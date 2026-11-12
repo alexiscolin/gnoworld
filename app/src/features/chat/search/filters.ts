@@ -92,12 +92,14 @@ export function setFilter(text: string, key: Key, value: string | undefined): st
 /** The text without any filter of `key`. */
 export const dropFilter = (text: string, key: Key): string => setFilter(text, key, undefined);
 
-/** What the server is asked for the text, or none when there is nothing to ask: words too short, or a filter that found nothing. */
+/** What the server is asked for the text, or none when there is nothing to ask: words too short, a filter that found nothing, or no words and no sender. */
 export function toQuery(text: string, ask: { world: string; who: Who; now: Date; time: Time }): SearchAsk | undefined {
   const parsed = parseFind(text, ask.who);
-  if (parsed.bad.length > 0 || parsed.words.trim().length < SEARCH_Q_MIN) return undefined;
+  const wordless = parsed.words.trim() === "";
+  if (parsed.bad.length > 0 || (wordless ? parsed.from === undefined : parsed.words.trim().length < SEARCH_Q_MIN))
+    return undefined;
   return {
-    q: parsed.words,
+    ...(wordless ? {} : { q: parsed.words }),
     world: ask.world,
     ...(parsed.room === undefined ? {} : { room: parsed.room }),
     ...(parsed.from === undefined ? {} : { from: parsed.from }),

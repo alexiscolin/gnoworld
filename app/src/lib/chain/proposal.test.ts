@@ -65,6 +65,10 @@ describe("an open proposal's yes and no, from its page", () => {
     });
   });
 
+  it("reads a share the realm prints in exponent form", () => {
+    expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: 1e-05%"))).toMatchObject({ no: 0.00001 });
+  });
+
   it("gives none for a share past 100 or not a number, and none for a home page", () => {
     expect(votesOf(ACTIVE_14.replace("YES PERCENT: 33.33333333333333%", "YES PERCENT: 133%"))).toBeUndefined();
     expect(votesOf(ACTIVE_14.replace("NO PERCENT: 0%", "NO PERCENT: none%"))).toBeUndefined();
@@ -195,7 +199,7 @@ describe("readProposals", () => {
     vi.fn<ChainFetch>(() => Promise.resolve(new Response(JSON.stringify(body), init)));
   const options = (fetcher: ChainFetch): ReadOptions => ({ fetch: fetcher, now: () => NOW });
 
-  it("asks the realm's home page once and gives the proposals it lists, newest first as written, with its source", async () => {
+  it("asks the realm's home page and gives the proposals it lists, newest first as written, with its source", async () => {
     const fetcher = answering(queryEnvelope({ data: HOME_ONYX }));
     const result = await readProposals(RPC, REALM, options(fetcher));
     expect(result.ok && result.value.map(({ id }) => id)).toEqual([37, 36, 35, 34, 33]);
@@ -203,7 +207,7 @@ describe("readProposals", () => {
       true,
     );
     expect(result.source.at).toBe(NOW.toISOString());
-    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(fetcher.mock.calls.length).toBeGreaterThanOrEqual(1);
     const hex = /data=0x([0-9a-f]+)/.exec(fetcher.mock.calls[0]?.[0] ?? "")?.[1] ?? "";
     expect(new TextDecoder().decode(Uint8Array.from(hex.match(/../g) ?? [], (byte) => Number.parseInt(byte, 16)))).toBe(
       `${REALM}:`,
@@ -221,6 +225,24 @@ describe("readProposals", () => {
     expect(listed.find(({ id }) => id === 14)).toMatchObject({ yes: 33.33333333333333, no: 0 });
     expect(listed.filter(({ yes }) => yes !== undefined).map(({ id }) => id)).toEqual([14]);
     expect(fetcher.mock.calls.map(([url]) => askedOf(url))).toEqual([`${REALM}:`, `${REALM}:14`]);
+  });
+
+  it("reads the next pages while none is open, so an open proposal older than the first page's five is found", async () => {
+    const fetcher = vi.fn<ChainFetch>((url) => {
+      const asked = askedOf(url);
+      const data = asked.endsWith(":14") ? ACTIVE_14 : asked.endsWith("?page=2") ? HOME_GNOLAND : HOME_ONYX;
+      return Promise.resolve(new Response(JSON.stringify(queryEnvelope({ data }))));
+    });
+    const result = await readProposals(RPC, REALM, options(fetcher));
+    const listed = result.ok ? result.value : [];
+    expect(listed.find(({ id }) => id === 14)).toMatchObject({ state: "ACTIVE", yes: 33.33333333333333 });
+    expect(fetcher.mock.calls.map(([url]) => askedOf(url))).toEqual([`${REALM}:`, `${REALM}:?page=2`, `${REALM}:14`]);
+  });
+
+  it("stops at a bound of pages when none is ever open", async () => {
+    const fetcher = answering(queryEnvelope({ data: HOME_ONYX }));
+    await readProposals(RPC, REALM, options(fetcher));
+    expect(fetcher.mock.calls.length).toBeLessThanOrEqual(4);
   });
 
   it("keeps the proposals, with no votes, when the open one's page cannot be read", async () => {

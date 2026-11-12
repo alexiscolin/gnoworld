@@ -14,6 +14,16 @@ beforeAll(() => {
   Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
   // jsdom has no popover API, which an icon button's tooltip asks for as it mounts: the page's own journeys see it.
   Object.assign(HTMLElement.prototype, { togglePopover: () => true });
+  // ... no ResizeObserver, which the chat's header watches its width with: it is read once, never told of a resize.
+  if (!("ResizeObserver" in globalThis)) {
+    Object.assign(globalThis, {
+      ResizeObserver: class {
+        observe = () => undefined;
+        unobserve = () => undefined;
+        disconnect = () => undefined;
+      },
+    });
+  }
   // ... and no showModal: a dialog it opens is open, and closed by close(), as ui's tests do (packages/ui/src/testSetup.ts).
   Object.assign(HTMLDialogElement.prototype, {
     showModal(this: HTMLDialogElement) {
@@ -117,11 +127,13 @@ export function markup(element: ReactElement): HTMLElement {
   return host;
 }
 
-/** Until `holds`, the effects, promises and lazy chunks it waits on flushed inside act, or a failure after 10 s. */
+/** Until `holds`, the effects, promises and lazy chunks it waits on flushed inside act, or a failure after 4 s: just under vitest's 5 s
+ * test timeout (no `testTimeout` is set), so a wait that fails throws its own message before the test is cut, and never keeps polling
+ * `act` into the next tests. */
 export async function settled(holds: () => boolean): Promise<void> {
-  const end = Date.now() + 10_000;
+  const end = Date.now() + 4_000;
   while (!holds()) {
-    if (Date.now() > end) throw new Error("waited 10 s");
+    if (Date.now() > end) throw new Error("waited 4 s");
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 10));
     });
@@ -153,4 +165,15 @@ export function noMedia(): void {
     "matchMedia",
     vi.fn(() => ({ matches: false, addEventListener: () => undefined, removeEventListener: () => undefined })),
   );
+}
+
+/** jsdom has no ResizeObserver nor IntersectionObserver, which the page's space and its signs ask for: these watch nothing, until the test unstubs its globals. */
+export function noObservers(): void {
+  class Watching {
+    observe = (): void => undefined;
+    unobserve = (): void => undefined;
+    disconnect = (): void => undefined;
+  }
+  vi.stubGlobal("ResizeObserver", Watching);
+  vi.stubGlobal("IntersectionObserver", Watching);
 }

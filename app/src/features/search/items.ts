@@ -75,7 +75,7 @@ const DAY = 86_400_000;
 interface FileWorld {
   namespace: string;
   seen?: string | null | undefined;
-  realms: readonly { path?: string | null; calls?: number | null }[];
+  realms: readonly { path?: string | null; calls?: number | null; functions?: readonly string[] }[];
 }
 
 // When a world was last seen, in ms, or none; and whether that was in the last day.
@@ -122,7 +122,7 @@ function systemOf(before: SearchItem | undefined, world: FileWorld, ground: Grou
 // A world's realms with a page, each with its calls and its world's last sight.
 function realmsOf(world: FileWorld, ground: Ground): [string, SearchItem][] {
   const own = activityOf(world, ground.now);
-  return world.realms.flatMap(({ path, calls }) => {
+  return world.realms.flatMap(({ path, calls, functions }) => {
     const page = realmPage(path ?? undefined);
     if (page === undefined || path === undefined || path === null) return [];
     const item: SearchItem = {
@@ -135,6 +135,7 @@ function realmsOf(world: FileWorld, ground: Ground): [string, SearchItem][] {
       calls: calls ?? 0,
       active: own.active === true,
       ...(own.seen === undefined ? {} : { seen: own.seen }),
+      ...(functions === undefined || functions.length === 0 ? {} : { functions }),
     };
     return [[page, item]];
   });

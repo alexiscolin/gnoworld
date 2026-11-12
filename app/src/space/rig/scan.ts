@@ -70,8 +70,8 @@ export class Scan {
     return this.#time >= 0;
   }
 
-  /** A frame `delta` ms on: the shell stands on the planet, `at`, upright to the rig's up. */
-  tick(rig: Rig, delta: number, at: Vec): void {
+  /** A frame `delta` ms on: the shell stands on the planet, `at`, in the planet's `frame`. */
+  tick(rig: Rig, delta: number, { at, frame }: { at: Vec; frame?: Quaternion | undefined }): void {
     const shell = this.#shell;
     shell.visible = this.#time >= 0;
     if (!shell.visible) return;
@@ -89,7 +89,10 @@ export class Scan {
     this.#undraw.value = sineInOut(share(t, UNDRAW));
     const { up, way } = rig.pose;
     shell.position.set(at.x, at.y, at.z);
-    shell.quaternion.setFromUnitVectors(Y, this.#up.set(up.x, up.y, up.z));
+    // In the planet's own frame, as its skeleton stands, so the one grid hands over to the other with no change of tilt; upright to the
+    // rig's up where no planet's frame is known.
+    if (frame === undefined) shell.quaternion.setFromUnitVectors(Y, this.#up.set(up.x, up.y, up.z));
+    else shell.quaternion.copy(frame);
     shell.scale.setScalar(this.#radius);
     // The eye's longitude on the shell: the parallels draw back to the meridian that faces it.
     const eye = this.#eye.set(way.x, way.y, way.z).applyQuaternion(this.#turn.copy(shell.quaternion).invert());

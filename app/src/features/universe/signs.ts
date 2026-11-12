@@ -39,9 +39,9 @@ export interface SignsDeps {
   readonly rules: Rules;
   /** Where the side rooms stand (app/data/earthRooms.json). */
   readonly places: readonly { readonly room: string; readonly lat: number; readonly lon: number }[];
-  /** On a world with no countries (D565): its one room's lines are its bubbles, each standing on its speaker's own spot (spot.ts), and
-   * none of the Earth's counts, trends, pins or turn to your country. */
-  readonly world?: { readonly id: string; readonly room: string };
+  /** On a world with no countries (D565): the lines of the rooms the page follows, its own, are its bubbles, each standing on its speaker's
+   * own spot (spot.ts), and none of the Earth's counts, trends, pins or turn to your country. */
+  readonly world?: { readonly id: string };
 }
 
 const NOTHING: Snapshot = { bubbles: [], counts: [], trends: [], pins: [] };
@@ -69,6 +69,8 @@ export class Signs {
   readonly #state = createStore<Snapshot>(() => NOTHING);
   #said = JSON.stringify(NOTHING);
   #shown: readonly Bubble[] = [];
+  // When each message of the last pick was said, by id: a bubble's turn of the planet depends on it (D13001).
+  #at = new Map<string, number>();
 
   constructor(deps: SignsDeps) {
     this.#deps = deps;
@@ -77,6 +79,9 @@ export class Signs {
   readonly subscribe = this.#state.subscribe;
 
   readonly snapshot = this.#state.getState;
+
+  /** When the message `id` was said, in milliseconds; none for a bubble the last pick no longer holds. */
+  readonly said = (id: string): number | undefined => this.#at.get(id);
 
   /** Starts it; what this returns stops it. */
   start(): () => void {
@@ -103,14 +108,12 @@ export class Signs {
   #rooms(): EarthRoom[] {
     const { chat, verdicts } = this.#deps.store.getState();
     const types = this.#types();
-    const { world } = this.#deps;
-    return Object.entries(chat.rooms)
-      .filter(([room]) => world === undefined || room === world.room)
-      .map(([room, { lines }]) => ({
-        type: types.get(room),
-        lines,
-        hidden: (id) => own(own(verdicts, room) ?? {}, id) === "hidden",
-      }));
+    return Object.entries(chat.rooms).map(([room, { lines }]) => ({
+      room,
+      type: types.get(room),
+      lines,
+      hidden: (id) => own(own(verdicts, room) ?? {}, id) === "hidden",
+    }));
   }
 
   #pins(): Pin[] {
@@ -135,6 +138,7 @@ export class Signs {
     const facing = world === undefined ? ground.facing() : undefined;
     const viewer = { account: me ?? "", muted: [], banned: [], ...(facing === undefined ? {} : { facing }) };
     const messages = read.flatMap((each) => each.messages);
+    this.#at = new Map(messages.map(({ id, at }) => [id, at]));
     const placed =
       world === undefined
         ? messages

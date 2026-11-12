@@ -291,6 +291,21 @@ describe("what leaves at once (F3366)", () => {
   });
 });
 
+describe("a world's bubbles", () => {
+  it("come from every room the page follows, whatever the room's name: a world of realms has no room of its own name", async () => {
+    const { store, signs, stop } = await started({ world: { id: "nym/gnogolf" } });
+    left.push(stop);
+    say(store, "m1", { room: "#earth/help" });
+    say(store, "m2", { room: "#earth/lisbon", from: ME });
+    expect(
+      signs
+        .snapshot()
+        .bubbles.map(({ room }) => room)
+        .sort(),
+    ).toEqual(["#earth/help", "#earth/lisbon"]);
+  });
+});
+
 describe("your own line", () => {
   it("shows its bubble, and flies nothing: the ground turns the planet to it alone (D13998)", async () => {
     const { store, signs, ground, stop } = await started();

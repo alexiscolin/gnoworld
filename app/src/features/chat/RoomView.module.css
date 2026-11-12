@@ -45,7 +45,10 @@
     min-block-size: 0;
     overflow: auto;
     /* raw: 20 px above the first line and below the last (the prototype's #chatList padding) */
-    padding-block: 20px;
+    --_pad: 20px;
+    padding-block: var(--_pad);
+    /* held labels stand at the box's edge, not under its padding (utilities.css) */
+    --_held-top: calc(-1 * var(--_pad));
     --_room: max(var(--chat-inset), var(--space-l));
     padding-inline: calc(var(--_room) - var(--focus-width) - var(--focus-offset))
       calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
@@ -74,6 +77,33 @@
     .lines > li {
       --_gutter: calc(0 * var(--control-s));
     }
+  }
+
+  /* A line's foot: its reactions at the start, its thread's chip at the end, on one row; no row when it holds neither. */
+  .foot {
+    /* layout: the two on one row, the chips wrapping where they are many */
+    display: flex;
+    /* layout: the same */
+    flex-wrap: wrap;
+    /* layout: the same */
+    align-items: center;
+    /* layout: a small step between the chips */
+    gap: var(--space-3xs);
+  }
+
+  .foot:empty {
+    display: none;
+  }
+
+  .thread {
+    /* layout: at the line's end */
+    margin-inline-start: auto;
+  }
+
+  /* The foot reaches the row's end, through the room the line keeps for its bar: the thread's chip under the time, not mid-row. */
+  .lines > li > .foot {
+    /* layout: the same */
+    margin-inline-end: calc(-1 * var(--_gutter));
   }
 
   /* The line pointed at: a faint fill and nothing else, so no line under it moves. */
@@ -261,11 +291,9 @@
 
   /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view (D13922). */
   .lines > li.day {
-    /* layout: held at the top of the list's scrolling box while the lines of its day pass under */
-    position: sticky;
-    inset-block-start: 0;
-    /* raw: over the lines under it, which stand at auto */
-    z-index: 1;
+    /* held at the top over its day's lines by `held-top` (utilities.css) */
+    /* layout: no step above, which a held label would leave open to the lines under it */
+    margin-block-start: 0;
     /* layout: the word and its rule side by side, the rule taking what the word leaves */
     display: flex;
     /* layout: a step between the word and its rule */
@@ -274,8 +302,6 @@
     padding-inline-end: 0;
     /* layout: the same, none at its end for a bar */
     margin-inline-end: 0;
-    /* the list's own fill, so the lines pass under the label, not through it */
-    background: var(--color-surface);
     color: var(--color-text-muted);
   }
 
@@ -289,9 +315,24 @@
   }
 
   /* A poll's bars run the line's whole width, over the room kept for its bar, as the video's frame 73 draws them. */
+  /* A line's translation, under its words: the text's own size and ink, a rule at its start and a step in, no box. */
+  .translation {
+    /* layout: a step under the original, the rule drawn at the start of the translation alone */
+    margin-block-start: var(--space-3xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    /* layout: the words a step in from the rule */
+    padding-inline-start: var(--space-s);
+  }
+
+  .translated {
+    display: block;
+  }
+
   .wide {
     /* layout: over the room kept for the line's bar */
     margin-inline-end: calc(-1 * var(--_gutter));
+    /* layout: a card or a poll stands a step under its author's name, not against it */
+    margin-block-start: var(--space-2xs);
   }
 
   .divider::after {

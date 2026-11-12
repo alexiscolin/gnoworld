@@ -21,6 +21,17 @@ describe("Redraw", () => {
     expect(redraw.check(moment({ seconds: 5 }))).toBe("none");
   });
 
+  it("draws each frame of a lively view although nothing crossed half a pixel, a full one still reads as full (D13013)", () => {
+    const redraw = new Redraw();
+    redraw.check(moment());
+    redraw.live = true;
+    expect(redraw.check(moment({ seconds: 0.07 }))).toBe("ambient");
+    expect(redraw.check(moment({ seconds: 0.14 }))).toBe("ambient");
+    expect(redraw.check(moment({ moving: true }))).toBe("full");
+    redraw.live = false;
+    expect(redraw.check(moment({ seconds: 0.2 }))).toBe("none");
+  });
+
   it("draws every frame while the hand, a flight, an effect or a close planet moves", () => {
     const redraw = new Redraw();
     redraw.check(moment());

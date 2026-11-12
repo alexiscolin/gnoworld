@@ -89,3 +89,22 @@ export function takeClosing(): Closing | undefined {
   closing = undefined;
   return was;
 }
+
+let docked: Closing | undefined;
+
+/** Before the dock's chat goes full: its screen in sight copied as it stands, the commit moving the chat out of its dock after. */
+export function leaveDocked(): void {
+  const screen = document.querySelector("#chat [data-chat-screen]:not([data-full]):not([data-ghost] *)");
+  const copy = screen instanceof HTMLElement ? unmarked(screen) : undefined;
+  if (!(screen instanceof HTMLElement) || copy === undefined) return;
+  const box = screen.getBoundingClientRect();
+  copy.style.cssText += `;position:fixed;margin:0;z-index:3;pointer-events:none;left:${String(box.left)}px;top:${String(box.top)}px;width:${String(box.width)}px;height:${String(box.height)}px`;
+  docked = { copy, box, scrolls: scrollsOf(screen) };
+}
+
+/** What `leaveDocked` copied, taken once. */
+export function takeDocked(): Closing | undefined {
+  const was = docked;
+  docked = undefined;
+  return was;
+}

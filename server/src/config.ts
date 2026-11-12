@@ -63,6 +63,8 @@ export interface Config {
   jarvis: DoorConfig | undefined;
   // The admin API's own listener (ADR-0002 §6): none without its port.
   admin: AdminConfig | undefined;
+  // The realms' two-sentence explanations: a seed file read at the start, none by default, and the new ones Jarvis may make a day.
+  explain: { seed: string | undefined; perDay: number };
   // Link cards (slice 13, D13906): a kill switch, off by default, with the link reader's address; the thresholds a card is held to.
   cards: CardsConfig;
 }
@@ -131,6 +133,8 @@ const settingsSchema = () =>
       // The preview job's file (8f), written like MARKETS_FILE: the default universe's hubs' pages, each checked before it is written.
       PREVIEWS_FILE: absolute.optional(),
       UNIVERSES_FILE: absolute.optional(),
+      EXPLAIN_SEED_FILE: absolute.optional(),
+      EXPLAIN_PER_DAY: whole(1000, 30),
       HUBS_FILE: absolute.optional(),
       OPENAI_API_KEY_FILE: z.string().min(1).optional(),
       // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
@@ -201,6 +205,7 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       newAccountHours: NEW_ACCOUNT_HOURS,
       mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },
     },
+    explain: { seed: settings.EXPLAIN_SEED_FILE, perDay: settings.EXPLAIN_PER_DAY },
     jarvis: doorOf(env, settings),
     admin: adminOf(env, settings),
     cards: cardsConfigOf(settings, MODERATION_THRESHOLDS),

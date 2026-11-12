@@ -3,7 +3,7 @@
 // whose loader no page uses (ssr: false). The page reads its own path; the browser's loader answers the 404.
 import { Breadcrumb } from "@gnoworld/ui";
 import { useLocation, type MetaArgs } from "react-router";
-import { isMissing, PageError, PlaceError } from "../features/errors/index.ts";
+import { ErrorView, isMissing, RouteError, useWhere } from "../features/errors/index.ts";
 import { ecosystemMeta, failedPageMeta } from "../meta.ts";
 import { site } from "../places.ts";
 
@@ -18,8 +18,8 @@ export function meta({ location, error }: MetaArgs) {
 
 function Ecosystem() {
   const ecosystem = site.ecosystemAt(useLocation().pathname);
-  if (ecosystem === undefined)
-    return <PageError title="No ecosystem here" line="No ecosystem of gno.world goes by that name." />;
+  const where = useWhere();
+  if (ecosystem === undefined) return <ErrorView kind="not-found" noun="ecosystem" where={where} />;
   const universe = site.home(ecosystem);
   return (
     <>
@@ -46,5 +46,5 @@ export function HydrateFallback() {
 }
 
 export function ErrorBoundary() {
-  return <PlaceError what="ecosystem" />;
+  return <RouteError noun="ecosystem" />;
 }

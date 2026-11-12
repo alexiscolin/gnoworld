@@ -1,14 +1,16 @@
 // The palette's search: one pass over the index of the places the page already holds, so typing sends no request. A query is a name, or
 // opens with a mark: `#` a room, `@` a namespace, `/r/` a realm's path, `>` a command (D355). The best 50 come back, with how many answered.
+import { compareRanks } from "@gnoworld/core";
 import { realmPage } from "../../lib/realmPage.ts";
 import { matchLower, parseQuery, wordsOf, type Parsed } from "./match.ts";
-import type { Entry, SearchIndex } from "./searchIndex.ts";
+import { byFunctions, type Entry, type SearchIndex } from "./searchIndex.ts";
 import {
   COMMANDS,
+  RANKED,
+  type RankedSort,
   type Found,
   type SearchFilter,
   type SearchItem,
-  type SearchKind,
   type SearchOptions,
   type SearchResult,
   type SearchSort,
@@ -19,7 +21,6 @@ import { NONE, tabbed } from "./tabs.ts";
 /** The most results a list draws: past it, the words are to be refined. */
 export const SHOWN = 50;
 const FUZZY_CAP = 500;
-
 interface Scored {
   score: number;
   result: SearchResult;
@@ -45,22 +46,36 @@ const resultOf = (
   ...(entry.room === undefined ? {} : { room: true as const }),
 });
 
+// How an entry answers `text`: by its name, or failing that by its functions (the plain ones, or a few letters off when `fuzzy`).
+function scoredOf(
+  entry: Entry,
+  text: string,
+  { fuzzy, note }: { fuzzy: boolean; note: Ask["note"] },
+): Scored | undefined {
+  const m = matchLower(entry, text, fuzzy);
+  if (m !== undefined)
+    return { score: m.score, result: fuzzy ? { item: entry.item, hits: [] } : resultOf(entry, m.hits, note) };
+  const found = byFunctions(entry, text, fuzzy);
+  if (found === undefined) return undefined;
+  return { score: found.score, result: { ...resultOf(entry, [], note), note: found.note } };
+}
+
 // The entries that pass the ask and answer `text`: the plain matches, and only when few, those a few letters off.
 function rank(entries: readonly Entry[], text: string, { keep, note }: Pick<Ask, "keep" | "note">): Scored[] {
   const found: Scored[] = [];
   const missed: Entry[] = [];
   for (const entry of entries) {
     if (!keep(entry.item)) continue;
-    const m = matchLower(entry, text, false);
-    if (m === undefined) missed.push(entry);
-    else found.push({ score: m.score, result: resultOf(entry, m.hits, note) });
+    const scored = scoredOf(entry, text, { fuzzy: false, note });
+    if (scored === undefined) missed.push(entry);
+    else found.push(scored);
   }
   if (found.length < SHOWN / 5 && text.length >= 4) {
     // ponytail: past this many names a few letters off the pass stops: the best 50 come from the first ones, and the count says "more".
     for (const entry of missed) {
       if (found.length >= FUZZY_CAP) break;
-      const m = matchLower(entry, text, true);
-      if (m !== undefined) found.push({ score: m.score, result: { item: entry.item, hits: [] } });
+      const scored = scoredOf(entry, text, { fuzzy: true, note });
+      if (scored !== undefined) found.push(scored);
     }
   }
   return found;
@@ -72,9 +87,18 @@ const KEYS: Readonly<Record<string, (item: SearchItem) => number>> = {
   newest: (item) => item.seen ?? 0,
 };
 
+const rankedBy = (sort: SearchSort): RankedSort | undefined => RANKED.find((each) => each === sort);
+
 // The order a sort asks, or none: the first thing that tells two results apart.
 const bySort = (sort: SearchSort, a: SearchItem, b: SearchItem): number => {
   if (sort === "name") return a.name.localeCompare(b.name);
+  const ranked = rankedBy(sort);
+  if (ranked !== undefined) {
+    // What the file says nothing of goes after what it does.
+    if (a.rank === undefined || b.rank === undefined)
+      return Number(b.rank !== undefined) - Number(a.rank !== undefined);
+    return compareRanks(ranked)(a.rank, b.rank);
+  }
   const key = KEYS[sort];
   return key === undefined ? 0 : key(b) - key(a);
 };
@@ -179,44 +203,4 @@ export function searchPlaces(index: SearchIndex, query: string, options?: Partia
   if (text === "" && mode !== "room" && mode !== "namespace") return listing(index, ask);
   const { parts, mains } = partsOf(index, { mode, text }, ask);
   return tabbed(parts, tab, mains);
-}
-
-const ORDER: readonly { kind: SearchKind; label: string }[] = [
-  { kind: "world", label: "Worlds" },
-  { kind: "station", label: "Stations" },
-  { kind: "ecosystem", label: "Ecosystems" },
-  { kind: "earth", label: "Home" },
-  { kind: "cosmos", label: "Universes" },
-  { kind: "system", label: "Systems" },
-  { kind: "realm", label: "Realms" },
-  { kind: "command", label: "Commands" },
-];
-
-/** The results of an empty field in groups: the recent places first, then every kind in turn, the busiest first; each place once, a
- * group's first few, and how many more there were. */
-export function groupResults(
-  found: readonly SearchResult[],
-  recent: readonly string[],
-): { groups: { id: string; label: string; results: SearchResult[] }[]; more: number } {
-  const byPath = new Map(found.map((each) => [each.item.path, each]));
-  const latest = recent.flatMap((path) => byPath.get(path) ?? []);
-  const taken = new Set(latest.map(({ item }) => item.path));
-  const rest = found.filter(({ item }) => !taken.has(item.path));
-  const busiest = (a: SearchResult, b: SearchResult) =>
-    (b.item.here ?? 0) - (a.item.here ?? 0) || (b.item.calls ?? 0) - (a.item.calls ?? 0);
-  const groups = [
-    { id: "recent", label: "Recent", results: latest },
-    ...ORDER.map(({ kind, label }) => ({
-      id: kind,
-      label,
-      results: rest.filter(({ item }) => item.kind === kind).sort(busiest),
-    })),
-  ].filter((group) => group.results.length > 0);
-  const shown = groups.map((group) => ({ ...group, results: group.results.slice(0, SHOWN) }));
-  return {
-    groups: shown,
-    more:
-      groups.reduce((sum, group) => sum + group.results.length, 0) -
-      shown.reduce((sum, group) => sum + group.results.length, 0),
-  };
 }

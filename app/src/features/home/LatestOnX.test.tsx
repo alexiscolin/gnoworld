@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
 import { LatestOnX } from "./LatestOnX.tsx";
 
@@ -11,13 +11,32 @@ vi.mock("../../lib/chain/rpc.ts", () => ({ readPage: read }));
 const page = "### [Gno.land Mainnet Upgraded to v1.7.0](/r/gnoland/blog:p/mainnet-upgrade)\n30 Oct 2026\n";
 const source = { url: "https://rpc.gno.land:443", at: "2026-11-11T10:00:00.000Z" };
 
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe("the latest post of the blog", () => {
-  it("shows the title, the day and a link to the post on the mainnet's gnoweb, read from the mainnet", async () => {
+  // D13015: a day is "30 Oct" in the current year, "30 Oct 2026" in another; the clock is the test's, so the year is.
+  it.each([
+    ["2026-11-11T10:00:00Z", "30 Oct"],
+    ["2027-01-05T10:00:00Z", "30 Oct 2026"],
+  ])("words its day as the app does at %s: %s", async (now, day) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(now));
     read.mockResolvedValue({ ok: true, value: page, source });
     const box = mount(<LatestOnX />);
     await settled(() => box.textContent !== "");
+    expect(box.querySelector("time")?.textContent).toBe(day);
+  });
+
+  it("shows the title, the day and a link to the post on the mainnet's gnoweb, read from the mainnet", async () => {
+    read.mockResolvedValue({ ok: true, value: page, source });
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-11T10:00:00Z"));
+    const box = mount(<LatestOnX />);
+    await settled(() => box.textContent !== "");
     expect(box.textContent).toContain("Gno.land Mainnet Upgraded to v1.7.0");
-    expect(box.querySelector("time")?.textContent).toBe("30 Oct 2026");
+    expect(box.querySelector("time")?.textContent).toBe("30 Oct");
     expect(box.querySelector("time")?.getAttribute("datetime")).toBe("2026-10-30");
     expect(box.querySelector("a")?.getAttribute("href")).toBe("https://gno.land/r/gnoland/blog:p/mainnet-upgrade");
     expect(read).toHaveBeenCalledWith(

@@ -1,6 +1,7 @@
 // What Discover reads of the worlds' file: the visits, and where a realm goes.
 import { stampKey, type StoreRow } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
+import { fullChatHref, holdsChat } from "../../../fullChat.ts";
 import { realmPage } from "../../../lib/realmPage.ts";
 import { visitedIn } from "../../../lib/visits.ts";
 import type { SearchItem } from "../types.ts";
@@ -21,3 +22,7 @@ export const itemOf = (row: StoreRow, universe: string): SearchItem => ({
 
 /** The key by which this device follows the realm's world. */
 export const followKey = (row: StoreRow, universe: string): string => stampKey(universe, row.world);
+
+/** Where a realm's Chat goes: its own room, opened full, where it has a page of its own; else `elsewhere` (its world's, or the Earth's). */
+export const realmChat = (item: SearchItem, elsewhere: string): string =>
+  holdsChat(item.path) ? fullChatHref(item.path) : elsewhere;

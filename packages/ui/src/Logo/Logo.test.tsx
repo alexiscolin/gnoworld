@@ -54,25 +54,4 @@ describe("Logo", () => {
     expect(container.querySelector("b")?.textContent).toBe("gno");
     expect(container.textContent).toBe("gnoworld");
   });
-
-  // Alexis, 2026-11-07: the loader's mark, its moons turning and a mint arc filling the ring with what is ready.
-  it("while loading, turns its two moons and fills a mint arc of what is ready over the dotted ring", () => {
-    const { container } = render(<Logo progress={0.25} />);
-    expect(container.querySelectorAll("g[class]")).toHaveLength(2);
-    const arc = container.querySelector("circle[stroke='var(--color-mine)']");
-    expect(Number(arc?.getAttribute("stroke-dashoffset"))).toBeCloseTo(85 * 0.75, 6);
-    expect(
-      Number(
-        render(<Logo progress={7} />)
-          .container.querySelector("circle[stroke-dashoffset]")
-          ?.getAttribute("stroke-dashoffset"),
-      ),
-    ).toBe(0);
-  });
-
-  it("draws the plain mark, no arc and no turning moon, with no progress", () => {
-    const { container } = render(<Logo />);
-    expect(container.querySelector("circle[stroke='var(--color-mine)']")).toBeNull();
-    expect(container.querySelectorAll("g[class]")).toHaveLength(0);
-  });
 });

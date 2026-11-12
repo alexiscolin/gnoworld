@@ -51,9 +51,38 @@ describe("parseTokens", () => {
     ]);
   });
 
-  it("puts every token of the file in a group the page draws", () => {
+  // The plate's and the composer's own layout variables, and the animation's per-element ones, are set in :root as defaults for a stylesheet's
+  // `var()` (slice 13): not design tokens, so no group draws them; a new name in none still fails here, until it is a token with its group or is named here.
+  const LAYOUT_VARIABLES = [
+    "--chart-h",
+    "--chart-h-l",
+    "--chart-open",
+    "--talk-h",
+    "--web-h",
+    "--web-h-l",
+    "--web-h-s",
+    "--fn-row-h",
+    "--row-h",
+    "--box-bleed",
+    "--box-in",
+    "--d",
+    "--play",
+    "--n",
+    "--j",
+    "--pk",
+    "--spark-line",
+    "--spark-area",
+  ];
+  const drawn = () => tokens().filter((token) => !LAYOUT_VARIABLES.includes(token.name));
+
+  it("puts every token of the file in a group the page draws, but the layout variables named here", () => {
     expect(tokens().length).toBeGreaterThan(0);
-    for (const token of tokens()) expect(groups().map((g) => g.name)).toContain(token.group);
+    for (const token of drawn()) expect(groups().map((g) => g.name)).toContain(token.group);
+    expect(
+      tokens()
+        .filter((token) => token.group === "Other")
+        .map((token) => token.name),
+    ).toEqual(LAYOUT_VARIABLES);
   });
 
   it("keeps the page's groups in their order", () => {
@@ -83,6 +112,7 @@ describe("parseTokens", () => {
     ["--measure", "Size"],
     ["--dialog-w", "Size"],
     ["--popover-w", "Size"],
+    ["--popover-wide", "Size"],
     ["--plate-w", "Size"],
     ["--chat-dock", "Size"],
     ["--thumb-m", "Size"],
@@ -124,9 +154,11 @@ describe("the tokens", () => {
   });
 
   it("make every colour role of primitives only, never of a raw value", () => {
-    for (const token of tokens().filter((t) => t.name.startsWith("--color-"))) {
+    // A link takes the colour of the text round it (`--color-link`, 977255f1): no colour of its own, so none to be raw.
+    for (const token of tokens().filter((t) => t.name.startsWith("--color-") && t.value !== "currentcolor")) {
       expect(token.value).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|oklab)a?\(/i);
-      expect(token.value).toMatch(/var\(--p-[\w-]+\)/);
+      // A role may be a wash of another role (the pill glass is the surface's): that one is of primitives in its turn.
+      expect(token.value).toMatch(/var\(--(?:p|color)-[\w-]+\)/);
     }
   });
 
@@ -183,6 +215,7 @@ describe("the tokens", () => {
     ["--dialog-w", "490px"],
     ["--dialog-wide", "760px"],
     ["--popover-w", "300px"],
+    ["--popover-wide", "440px"],
     ["--thumb-s", "32px"],
     ["--thumb-m", "52px"],
     ["--plate-w", "808px"],

@@ -1,3 +1,5 @@
+import { utcDay } from "./lib/days.ts";
+
 // When a read was made, in the words the home uses for the prices and the block. A clock time, not an age: the page ticks no
 // timer, so an age would be false after a minute in an open tab (F3066).
 const AHEAD_MS = 10 * 60_000;
@@ -10,10 +12,5 @@ export function stampOf(time: string, now: Date): string {
   const today = now.toISOString().slice(0, 10);
   const label = `${clock.slice(0, 5)} UTC`;
   if (day === today) return label;
-  const [, month = "", date = ""] = day.split("-");
-  const name = new Date(Date.UTC(2000, Number(month) - 1, 1)).toLocaleString("en-US", {
-    month: "short",
-    timeZone: "UTC",
-  });
-  return `${String(Number(date))} ${name} ${label}`;
+  return `${utcDay(new Date(at), now)} ${label}`;
 }

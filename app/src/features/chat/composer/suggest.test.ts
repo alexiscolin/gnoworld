@@ -65,3 +65,27 @@ describe("the composer's suggestions", () => {
     expect(values("#", { rooms })).toHaveLength(5);
   });
 });
+
+describe("the examples after @jarvis ", () => {
+  const choices = { commands: [], rooms: [], people: [], jarvis: true, examples: ["what is a realm?", "who is here?"] };
+  const picks = (draft: string, over = {}) => suggestions(draft, { ...choices, ...over }).map((item) => item.value);
+
+  it("offer each example as the draft it becomes, narrowed by the words typed, once the mention and its space are there", () => {
+    expect(picks("@jarvis ")).toEqual(["@jarvis what is a realm?", "@jarvis who is here?"]);
+    expect(picks("@jarvis wh")).toEqual(["@jarvis what is a realm?", "@jarvis who is here?"]);
+    expect(picks("@jarvis WHO")).toEqual(["@jarvis who is here?"]);
+    expect(suggestions("@jarvis ", choices)[0]).toEqual({
+      value: "@jarvis what is a realm?",
+      label: "what is a realm?",
+    });
+  });
+
+  it("offer none for another start, for words that match none, for a whole example, or where Jarvis cannot answer", () => {
+    expect(picks("@jarvis")).toEqual([]);
+    expect(picks("hi @jarvis ")).toEqual([]);
+    expect(picks("@jarvis zzz")).toEqual([]);
+    expect(picks("@jarvis who is here?")).toEqual([]);
+    expect(picks("@jarvis ", { examples: [] })).toEqual([]);
+    expect(picks("@jarvis ", { examples: undefined })).toEqual([]);
+  });
+});

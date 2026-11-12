@@ -2,11 +2,10 @@
 // first call (a day with none a dot), the range (all or 14 days), then its last calls as a paged list of three that Expand opens to a hundred: who,
 // which function, when. Every text is the rollup's, checked by its schema; nothing here is made up.
 import { useState } from "react";
-import { Card, Cell, Cluster, DayChart, PagedList, Stack, Tabs, useAlone } from "@gnoworld/ui";
+import { Card, Cell, Cluster, DayChart, grouped, PagedList, Stack, Tabs, useAlone } from "@gnoworld/ui";
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { CallRow } from "./CallRow.tsx";
 import { dayLabel, dayValues } from "./days.ts";
-import { grouped } from "./figures.ts";
 import { callerName } from "./names.ts";
 import styles from "./Chart.module.css";
 

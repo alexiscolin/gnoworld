@@ -2,31 +2,28 @@
 // generated planets they are (the Earth as the hand-made one), at the same place and size, lit by their sun; their quad is hidden
 // meanwhile. A planet stands only once its maps came, went to the GPU one a frame, and its shaders compiled, so it never waits on screen
 // and never stalls the frame it comes in.
-import { Euler, Quaternion, SphereGeometry, Vector3, type Vector4 } from "three";
+import { Euler, Quaternion, Vector3, type Vector4 } from "three";
 import { EARTH } from "@gnoworld/core";
 import { scaleOf } from "../boosts.ts";
 import { placeOf, type Planet, type Universe, type Vec } from "../layout.ts";
 import type { Planet as Drawn } from "../planet/planet.ts";
-import { ready, step } from "./arrival.ts";
+import { fall, handOver, ready, step } from "./arrival.ts";
 import { dayOf } from "../earth/light.ts";
 import { drawnOf } from "./draw.ts";
+import { adopt, SPHERE } from "./adopt.ts";
 import { holdOf, type Held } from "./held.ts";
 import { Bones } from "./bones.ts";
 import { upgradeStep } from "./upgrade.ts";
 import { warmFrame } from "./warmup.ts";
 import { Warm } from "./warm.ts";
-import { keepLargest } from "./wanted.ts";
+import { sight } from "./wanted.ts";
 import type { NearDevice } from "./nearDevice.ts";
 
-// A planet this many pixels across, or more, is drawn as itself; at most this many at once; kept made this many more.
-const FROM_PX = 6;
-// A planet this many pixels across has its maps asked ahead (warm.ts): it is seen as itself soon.
-const WARM_PX = 2;
+// At most this many planets are kept made, more than the ones drawn.
 const KEPT = 24;
 
 export class Near {
   readonly #device: NearDevice;
-  readonly #sphere = new SphereGeometry(1, 128, 96);
   readonly #bones = new Bones();
   /** The maps asked ahead of their being seen as themselves (warm.ts). */
   readonly warm: Warm;
@@ -36,7 +33,9 @@ export class Near {
   // The planets drawn as themselves, largest first, and how many pixels across each is.
   readonly #wanted: Planet[] = [];
   readonly #sizes: number[] = [];
-  readonly #wantedIndex = new Set<number>();
+  // The open system's planets too small yet, made ahead: each shows whole the frame it is wanted.
+  readonly #ahead: Planet[] = [];
+  #wantedIndex = new Set<number>();
   // The planets whose quad is hidden for their skeleton: each gets it back once it is wanted no more and stands not as itself.
   readonly #hidden = new Set<number>();
   // The planets drawn as themselves once: none goes back to its skeleton in this page's life, whatever made it anew meanwhile (a planet
@@ -46,6 +45,8 @@ export class Near {
   // The frame's time, the page's planet and the one it frames close (-1 none), for the callbacks a frame runs.
   #seconds = 0;
   #alone = -1;
+  // How far the page has come over the sun (0 where the sun is drawn, 1 on a page): the Earth's sun is the star's till then (D13002).
+  #page = 0;
   #lit: ReadonlySet<string> | undefined;
   #close = -1;
   #shadowed = -1;
@@ -63,53 +64,56 @@ export class Near {
   // goes, so the world keeps the angle it has on screen and turns on at its own pace, never unwound or reset.
   // Each world's lean toward the eye too (D13916), laid over its look's own lean and tilt.
   readonly #led = new Map<string, { ahead: number; leaned: Quaternion }>();
+  // What a Near keeps for its planets, lent to the next (adopt.ts).
+  readonly #kept = { held: this.#held, hidden: this.#hidden, once: this.#drawnOnce, led: this.#led };
   readonly #look = new Quaternion();
   readonly #euler = new Euler();
 
-  constructor(device: NearDevice) {
+  /** `from`: the Near of the universe `before`, whose planets this one adopts into `now` (matched by id), as they stand. */
+  constructor(device: NearDevice, from?: { near: Near; before: Universe; now: Universe }) {
     this.#device = device;
     this.warm = new Warm(device.maps);
     device.stage.add(this.#bones.group);
+    if (from !== undefined) adopt(from.near.#kept, this.#kept, { ...from, planets: device.planets });
   }
 
   /** Turns the ground of the world `id` on `seconds` past its own spin; its clouds keep time. */
   lead(id: string, seconds: number, leaned: Quaternion): void {
-    this.#led.set(id, { ahead: seconds, leaned });
+    const led = this.#led.get(id) ?? { ahead: seconds, leaned: new Quaternion() };
+    this.#led.set(id, { ahead: seconds, leaned: led.leaned.copy(leaned) });
   }
 
-  /** Chooses which planets are drawn as themselves, seen from `eye` with `pxK` world units a pixel at distance 1: called a few
-   * times a second, not every frame. */
-  choose(universe: Universe, eye: Vec, { pxK, seconds }: { pxK: number; seconds: number }): void {
-    this.#wanted.length = 0;
-    this.#sizes.length = 0;
-    for (const system of universe.systems) {
-      const off = Math.hypot(system.place.x - eye.x, system.place.y - eye.y, system.place.z - eye.z);
-      if (off > system.reach * 40) continue;
-      for (const planet of system.planets) {
-        placeOf(planet, seconds, this.#at);
-        const px = (2 * planet.radius) / (Math.hypot(this.#at.x - eye.x, this.#at.y - eye.y, this.#at.z - eye.z) * pxK);
-        if (px >= FROM_PX) keepLargest({ wanted: this.#wanted, sizes: this.#sizes }, planet, px);
-        else if (px >= WARM_PX) this.warm.planet(planet);
-      }
-    }
-    this.#wantedIndex.clear();
-    for (const planet of this.#wanted) {
-      this.#wantedIndex.add(planet.index);
-      this.#make(planet);
-    }
+  /** Chooses which planets are drawn as themselves, from `eye`, `pxK` world units a pixel at distance 1, a few times a second; with
+   * `open`, only that system's (-1: none; the others' are asked ahead, never drawn). */
+  choose(universe: Universe, eye: Vec, { pxK, seconds, open }: { pxK: number; seconds: number; open?: number }): void {
+    const lists = { wanted: this.#wanted, sizes: this.#sizes, ahead: this.#ahead, warm: this.warm };
+    sight(universe, { eye, pxK, seconds, open }, lists);
+    this.#wantedIndex = new Set(this.#wanted.map(({ index }) => index));
+    for (const planet of [...this.#wanted, ...this.#ahead]) this.#make(planet);
     this.#forget();
   }
 
   /** A frame `seconds` on: the planets drawn as themselves stand where their quads would; with `alone` (a page's planet's index),
    * that one alone; `close`, the planet a page frames close, its air's lit limb pushed (D458). */
-  tick(seconds: number, view: { alone: number; close: Planet | undefined; delta: number; still: boolean }): void {
+  tick(
+    seconds: number,
+    view: {
+      alone: number;
+      close: Planet | undefined;
+      delta: number;
+      still: boolean;
+      page?: number;
+    },
+  ): void {
     this.#fade = view;
+    this.#page = view.page ?? this.#page;
     this.#seconds = seconds;
     this.#alone = view.alone;
     this.#close = view.close?.index ?? -1;
-    this.#sent = this.#wanted.some(this.#uploadOne);
+    this.#sent = this.#wanted.some(this.#uploadOne) || this.#ahead.some(this.#uploadOne);
     for (const held of this.#held.values()) warmFrame(held, this.#device.camera);
     this.#held.forEach(this.#showOne);
+    this.#held.forEach(this.#leaveOne);
     this.#bones.begin();
     this.arriving = false;
     this.#wanted.forEach(this.#placeOne);
@@ -142,14 +146,20 @@ export class Near {
 
   // Planet `index` shown as itself or as its quad: made once, called on frames.
   readonly #showOne = (held: Held, index: number): void => {
-    // Made whole, wanted, and the page's own when a page shows one.
     const [compiled, uploads, wanted] = [held.compiled, held.uploads.length, this.#wantedIndex.has(index)];
     const shown = ready({ compiled, uploads, wanted, alone: this.#alone, index });
     if (shown === held.shown) return;
     held.shown = shown;
-    held.fresh = shown && held.arrive < 1;
-    held.drawn.group.visible = shown;
-    this.#device.planets.show(index, !shown);
+    handOver(held, this.#fade.still);
+    held.over = shown && !this.#hidden.has(index);
+    this.#device.planets.show(index, !shown || held.over);
+  };
+
+  // A planet that leaves stays placed as it fades, its air and close framing with it, else it keeps its last size beside its quad.
+  readonly #leaveOne = (held: Held): void => {
+    if (!held.leaving) return;
+    this.#place(held.planet, held.drawn, this.#seconds);
+    fall(held, this.#fade);
   };
 
   // A wanted planet stands where its quad would, as itself once ready, coming in from its skeleton; until then its skeleton stands
@@ -162,7 +172,7 @@ export class Near {
       if (planet.id === EARTH && !this.#sent) upgradeStep(held, this.#device.maps, this.#device.renderer);
       const share = step(held, this.#fade);
       held.drawn.setArrive(share);
-      if (share < 1) this.#skeleton(planet, 1 - share);
+      this.#coming(planet, held, share);
     } else if (this.#alone < 0 || this.#alone === planet.index) {
       if (this.#drawnOnce.has(planet.index)) return;
       this.#device.planets.show(planet.index, false);
@@ -170,6 +180,13 @@ export class Near {
       this.#skeleton(planet, 1);
     }
   };
+
+  // A planet coming in stands in its skeleton, or, if it comes over its quad, over that, which goes once it is whole.
+  #coming(planet: Planet, held: Held, share: number): void {
+    this.arriving ||= held.over && share < 1;
+    if (held.over && share >= 1) this.#device.planets.show(planet.index, (held.over = false));
+    else if (!held.over && share < 1) this.#skeleton(planet, 1 - share);
+  }
 
   #skeleton(planet: Planet, opacity: number): void {
     this.arriving ||= opacity < 1;
@@ -194,12 +211,15 @@ export class Near {
     drawn.setSun(this.#sun.set(place.x - this.#at.x, place.y - this.#at.y, place.z - this.#at.z).normalize());
     const led = this.#led.get(planet.id);
     const time = seconds + (led?.ahead ?? 0);
-    drawn.setTime(time, seconds);
     const { lean, tilt } = drawn.look;
     const leaned = led?.leaned;
     if (leaned !== undefined)
       drawn.group.quaternion.copy(leaned).multiply(this.#look.setFromEuler(this.#euler.set(lean, 0, tilt)));
-    dayOf(drawn, { id: planet.id, epochMs: Date.now(), time }, this.#sun);
+    drawn.setTime(
+      dayOf(drawn, { id: planet.id, epochMs: Date.now(), time, page: this.#page }, this.#sun),
+      seconds,
+      this.#fade.still,
+    );
     // A world a lens leaves unlit stays itself, darkened as the lens comes, never a flat quad (D502); the last lens's while it goes.
     if (this.only !== undefined) this.#lit = this.only;
     drawn.setFar(this.#lit?.has(planet.id) === false ? this.#device.lens.value : 0);
@@ -211,9 +231,9 @@ export class Near {
     if (this.#held.has(planet.index)) return;
     // With a page's planet shown, the other worlds' maps wait for the page's own (Maps).
     const page = this.#alone < 0 || this.#alone === planet.index;
-    const made = drawnOf(planet, this.#device.maps, { sphere: this.#sphere, page });
+    const made = drawnOf(planet, this.#device.maps, { sphere: SPHERE, page });
     if (made === undefined) return;
-    this.#held.set(planet.index, holdOf(made, this.#device));
+    this.#held.set(planet.index, holdOf(made, planet, this.#device));
   }
 
   // Past the kept number, the planets not wanted go, least recently made first.
@@ -225,17 +245,16 @@ export class Near {
     }
   }
 
-  #drop(index: number, held: Held): void {
+  readonly #drop = (index: number, held: Held): void => {
     this.#device.stage.remove(held.drawn.group);
     held.drawn.dispose();
     this.#device.planets.show(index, true);
     this.#held.delete(index);
-  }
+  };
 
   dispose(): void {
     for (const [index, held] of this.#held) this.#drop(index, held);
     this.#device.stage.remove(this.#bones.group);
     this.#bones.dispose();
-    this.#sphere.dispose();
   }
 }

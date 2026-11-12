@@ -1,7 +1,8 @@
 /// <reference types="vite/client" />
 // Whether this GPU may have space, read on a canvas of its own whose context goes back at once (ADR-0002 §8). The gate's browsers have a
 // software GPU: a test build or the dev server lets `?test-gpu` pass it; a production build holds no trace of it, the build replacing both.
-import { isWeakGpu } from "@gnoworld/core";
+import { isWeakGpu, PHONE_QUERY, sceneOffer, type SceneOffer } from "@gnoworld/core";
+import { savesData } from "../../lib/saveData.ts";
 
 declare global {
   interface ImportMetaEnv {
@@ -30,4 +31,11 @@ export function gpuCanDraw(): boolean {
   const name = gpuName(context);
   context.getExtension("WEBGL_lose_context")?.loseContext();
   return !isWeakGpu(name);
+}
+
+// Whether this device takes space at once, on a press, or never (ADR-0002 §8): a weak GPU never; a phone (unless its settings ask for
+// space there) or a reader who saves data on "View in space"; any other at once.
+export function offerOf(): SceneOffer {
+  const phone = matchMedia(PHONE_QUERY).matches && document.documentElement.dataset["phone3d"] !== "on";
+  return sceneOffer({ weak: !gpuCanDraw(), phone, savesData: savesData() });
 }

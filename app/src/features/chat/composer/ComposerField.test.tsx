@@ -232,8 +232,10 @@ describe("what the field suggests as one types", () => {
       "/meSend an action: /me waves",
       "/pollAsk a poll: /poll Question? | answer | answer",
       "/marketShow the prices here: /market gnot, atone or btc",
+      "/trendingShow the most called worlds this week",
+      "/proposalsShow GovDAO's proposals, open ones first",
     ]);
-    await type(page, "p");
+    await type(page, "po");
     expect(options(page)).toEqual(["/pollAsk a poll: /poll Question? | answer | answer"]);
   });
 

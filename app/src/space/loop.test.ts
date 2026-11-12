@@ -24,7 +24,7 @@ function make(over: Partial<Beat> = {}) {
     resized: 0,
     naps: [] as number[],
   };
-  const state = { need: "full" as Need, nap: undefined as number | undefined, unseen: false };
+  const state = { need: "full" as Need, nap: undefined as number | undefined, unseen: false, lively: false };
   const beat: Beat = {
     gone: () => false,
     unseen: () => state.unseen,
@@ -35,6 +35,7 @@ function make(over: Partial<Beat> = {}) {
       return state.need;
     },
     nap: () => state.nap,
+    lively: () => state.lively,
     free: () => {
       log.freed += 1;
     },
@@ -128,6 +129,29 @@ describe("loop", () => {
       expect(l.touched).not.toHaveBeenCalled();
     },
   );
+
+  it("paces a lively view by naps, and an input then draws at once (D13013)", () => {
+    const l = make();
+    l.state.nap = 1000 / 15;
+    l.state.lively = true;
+    l.frame(1000);
+    expect(l.queue).toHaveLength(0);
+    vi.advanceTimersByTime(67);
+    expect(l.queue).toHaveLength(1);
+    l.page.dispatchEvent(new Event("pointermove"));
+    expect(l.touched).toHaveBeenCalledTimes(1);
+  });
+
+  it("works a frame of a lively ambient view every 67 ms, not every 17 (D13013)", () => {
+    const l = make();
+    l.state.need = "ambient";
+    l.state.lively = true;
+    l.frame(1000);
+    l.frame(1017);
+    expect(l.log.steps).toHaveLength(1);
+    l.frame(1070);
+    expect(l.log.steps).toHaveLength(2);
+  });
 
   it("asks a draw as the page shows again, a context comes back or its marks change", () => {
     const l = make();

@@ -299,10 +299,16 @@ describe("the request: world, q and the cursor", () => {
     expect([response.status, await response.json()]).toEqual([400, { error: "refused" }]);
   });
 
-  it("refuses no q and a q given twice", async () => {
+  it("refuses no q and no from, and a q given twice", async () => {
     const t = filled();
-    for (const query of ["world=bubble", "q=quorum&q=zebra&world=bubble"])
+    for (const query of ["world=bubble", "q=quorum&q=zebra&world=bubble", "q=&world=bubble"])
       expect((await t.ask(query)).status).toBe(400);
+  });
+
+  it("answers a from with no q: that account's lines in the rooms the reader may read, and refuses a one-letter q with it", async () => {
+    const t = filled();
+    expect(await t.ids(`world=bubble&from=${ALICE}`)).toEqual(["#bubble", "#bubble/games", "#bubble/news"]);
+    expect((await t.ask(`q=a&world=bubble&from=${ALICE}`)).status).toBe(400);
   });
 
   it("answers a q of 2 characters and one of 100 characters", async () => {

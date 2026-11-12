@@ -13,6 +13,14 @@ export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText
 /** A line's buttons but its author's name, which opens the person's card (5a1e8335): the chips, the bar, the players. */
 export const buttonsOf = (line: Locator) => line.locator("button:not([data-author] > button)");
 export const whoIsHere = (page: Page) => page.getByRole("region", { name: "Who's here" });
+/** Presses the header's Who's here: its own button, or where the header's width leaves it under "More" (a phone's), that menu's item. */
+export async function pressWhoIsHere(page: Page): Promise<void> {
+  const header = page.locator('[data-chat-layout] [data-region="header"]');
+  const first = header.getByRole("button", { name: /^(Who's here|More)/ }).first();
+  const name = (await first.getAttribute("aria-label")) ?? "";
+  await first.click();
+  if (name.startsWith("More")) await page.getByRole("menuitem", { name: "Who's here" }).click();
+}
 /** The polite status that tells a screen reader a notice came: apart from the rooms' list, which a phone hides. */
 export const noticeStatus = (page: Page) => page.locator('p[role="status"].visually-hidden');
 export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
@@ -24,20 +32,4 @@ export async function inGames(page: Page): Promise<string> {
   await hydrated(page);
   await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
   return address;
-}
-
-/** The menu behind the room's name (the chevron), opened if it is not, a modal dialog: the room's note, an account's
- * notification modes and its choice of whom it hears direct messages from. Close it before the page is used again. */
-export async function menu(page: Page): Promise<ReturnType<Page["locator"]>> {
-  const panel = page.getByRole("dialog", { name: /^(Room|Conversation)$/ });
-  if (!(await panel.isVisible())) await page.locator('[data-region="header"] button[aria-haspopup="dialog"]').click();
-  await expect(panel).toBeVisible();
-  return panel;
-}
-
-/** Shuts the menu if it is open (Escape), so the page behind it can be used. */
-export async function closeMenu(page: Page): Promise<void> {
-  const panel = page.getByRole("dialog", { name: /^(Room|Conversation)$/ });
-  if (await panel.isVisible()) await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
 }

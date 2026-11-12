@@ -86,6 +86,8 @@ export interface CardHeaderProps {
   actions?: ReactNode;
   /** A line that follows the title and gives way first, a long path cut in the middle of the row. */
   meta?: string;
+  /** A mark before the title and its kicker, a control tall: a medal. */
+  lead?: ReactNode;
 }
 
 const HEADINGS = { 2: "h2", 3: "h3", 4: "h4" } as const;
@@ -125,31 +127,45 @@ function End({
   );
 }
 
-function Header({ title, icon, kicker, state, level = 3, size, expand, hint, actions, meta }: CardHeaderProps) {
+// The header's words, after the mark a card wears before them.
+function Mark({ lead, children }: { lead: ReactNode; children: ReactNode }) {
+  if (lead === undefined) return children;
+  return (
+    <Cluster space="xs" wrap="no">
+      <div className={styles["mark"]}>{lead}</div>
+      {children}
+    </Cluster>
+  );
+}
+
+function Header({ title, icon, kicker, state, level = 3, size, expand, hint, actions, meta, lead }: CardHeaderProps) {
   const Heading = HEADINGS[level];
   const titleId = use(TitleContext);
   return (
     <div className={styles["header"]}>
-      <Cluster justify="between" space="xs" wrap="no">
-        <Stack space="3xs">
-          {kicker === undefined ? null : (
-            <Cluster space="2xs">
-              {icon === undefined ? null : <Icon name={icon} />}
-              <Kicker>{kicker}</Kicker>
-            </Cluster>
-          )}
-          {/* With no kicker, the type's icon leads the title on its row, muted: a card known at a glance (Alexis, 2026-11-10). */}
-          <Cluster space="2xs" wrap="no">
-            {icon === undefined || kicker !== undefined ? null : (
-              <span className={styles["lead"]}>
-                <Icon name={icon} />
-              </span>
+      {/* A kicker makes the left stack two lines tall: what stands at the end lines up with the title's, the lower one. */}
+      <Cluster justify="between" align={kicker === undefined ? "center" : "end"} space="xs" wrap="no">
+        <Mark lead={lead}>
+          <Stack space="3xs">
+            {kicker === undefined ? null : (
+              <Cluster space="2xs" wrap="no">
+                {icon === undefined ? null : <Icon name={icon} />}
+                <Kicker>{kicker}</Kicker>
+              </Cluster>
             )}
-            <Heading id={titleId} className={styles["title"]} data-size={size}>
-              {title}
-            </Heading>
-          </Cluster>
-        </Stack>
+            {/* With no kicker, the type's icon leads the title on its row, muted: a card known at a glance (Alexis, 2026-11-10). */}
+            <Cluster space="2xs" wrap="no">
+              {icon === undefined || kicker !== undefined ? null : (
+                <span className={styles["lead"]}>
+                  <Icon name={icon} />
+                </span>
+              )}
+              <Heading id={titleId} className={styles["title"]} data-size={size}>
+                {title}
+              </Heading>
+            </Cluster>
+          </Stack>
+        </Mark>
         {meta === undefined ? null : <span className={[styles["meta"], "meta", "truncate"].join(" ")}>{meta}</span>}
         {state === undefined ? null : <Chip>{state}</Chip>}
         <End title={title} hint={hint} actions={actions} expand={expand} />
@@ -164,9 +180,11 @@ function Body({ children }: { children: ReactNode }) {
 
 function Actions({ children }: { children: ReactNode }) {
   return (
-    <Cluster as="footer" space="2xs">
-      {children}
-    </Cluster>
+    <div className={styles["actions"]}>
+      <Cluster as="footer" space="2xs">
+        {children}
+      </Cluster>
+    </div>
   );
 }
 

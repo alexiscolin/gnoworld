@@ -90,6 +90,8 @@ export function ChatLayout({
       <div
         className={styles["frame"]}
         data-chat-layout=""
+        role="region"
+        aria-label="Chat"
         data-info-first={infoFirst === true ? "" : undefined}
         data-compact={compact ? "" : undefined}
       >

@@ -18,7 +18,7 @@ import { keptRail, RailOrder, type RailEntry } from "../../railWorlds.ts";
 import { useSwapped } from "../../swapped.ts";
 import { sameKind } from "./useSpace.ts";
 import { inSystem, useResting } from "./views.ts";
-import { useLens, useLit } from "../../lenses.ts";
+import { useLens, useLit, withEarth } from "../../lenses.ts";
 import { loading, RETURN_AFTER, riseIn } from "./rise.ts";
 import styles from "./Rail.module.css";
 import { FOOTPRINT } from "./railFootprint.ts";
@@ -128,7 +128,7 @@ function useRail(places: WorldPlaces, followed: readonly string[], universe: str
   const lens = useLens();
   const lit = useLit();
   const system = useResting();
-  const only = lens === undefined ? undefined : lit?.sets.get(lens);
+  const only = lens === undefined ? undefined : withEarth(lit?.sets.get(lens));
   const kept = keepOf(only, system);
   const shown = kept === undefined || known === undefined ? entries : keptRail(known, places, kept);
   return { entries: standing ? shown : NO_ENTRIES, railRef, cut, keep: `${lens ?? ""} ${system ?? ""}` };
@@ -150,7 +150,7 @@ export function Rail({ places, universe }: { places: WorldPlaces; universe: stri
   const present = entries.length > 0;
   useEffect(() => {
     const rail = railRef.current;
-    if (present && rail !== null && !loading() && !sameKind()) riseIn(rail.querySelectorAll("li"), RETURN_AFTER, true);
+    if (present && rail !== null && !loading() && !sameKind()) riseIn(rail.querySelectorAll("li"), RETURN_AFTER);
   }, [present, railRef]);
   if (entries.length === 0) return null;
   const moved = (event: KeyboardEvent<HTMLUListElement>) => {

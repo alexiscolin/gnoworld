@@ -1,9 +1,10 @@
 # Operations
 
 The runbook (ADR-0002 §7). It holds the demo: the client behind a password, published through
-Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login, the rooms, the bot)
-and, in the demo, a way out to OpenAI alone (slice 3, 3e); `jarvis`, off by default and under a profile of its own, comes with slice 10 (10j, 10j-4), and
-Grafana later (`docs/decisions.md:151`). Everything is in `deploy/`; nothing outside it is touched,
+Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login, the rooms, the bot, the search, the chain's jobs)
+and, in the demo, a way out to the hosts of `deploy/egress/acl.yaml` alone (slice 3, 3e); `jarvis` (with its `jarvis_reader`) and the
+link reader (`link_reader`), each off by default and under a profile of its own (10j-4; slice 13), and Grafana later (`docs/decisions.md:151`).
+Running the demo from one Mac, step by step, is [DEMO.md](DEMO.md). Everything is in `deploy/`; nothing outside it is touched,
 and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
 later, Docker Desktop, or OrbStack. Every setting, secret and switch is listed in [CONFIGURATION.md](CONFIGURATION.md).
 
@@ -41,8 +42,8 @@ and `link_reader` as 65530, users of their own.
 - `web` holds a fixed address on `inside` (`WEB_ADDRESS`, in `INSIDE_SUBNET`), the only one Ergo
   (`proxy-allowed-from`) and `server` (`TRUSTED_PROXY`) believe about a visitor's address; it sends
   the PROXY protocol's address on, overwriting the client's, and never the demo's password.
-- `egress` (smokescreen) lets the server reach `api.openai.com`, `api.coingecko.com` and the default universe's RPC host (`deploy/egress/acl.yaml`, one
-  file the test reads too; the RPC's host is `app/data/universes.json`'s default, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
+- `egress` (smokescreen) lets the server reach `api.openai.com`, `api.coingecko.com` and each universe's RPC and indexer host (`deploy/egress/acl.yaml`, one
+  file the test reads too; the hosts are `app/data/universes.json`'s, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
   `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (D120).
@@ -80,8 +81,7 @@ and `link_reader` as 65530, users of their own.
   `POST /card`) and `links_out` (its way out). It has no DNS: it goes out through `egress_links`, a smokescreen on 4754 in `guard`'s network
   that takes 4754 from `links_out` alone, lets any public https host out (`deploy/egress/links-acl.yaml`, `action: open`) and refuses
   every private answer; `guard`'s rules refuse every private range on each packet too, and the reader refuses a non-global address itself
-  (`link-reader/src/address.ts`). The server stays off the reader's network but for its API, which listens on its address of `inside`
-  alone. The reader serves 2 pages at once (`LINKS_MAX`), decodes one picture at a time, and its 256 MB is measured (210 MiB at the
+  (`link-reader/src/address.ts`). The server joins `links` to ask it, but its API listens on its address of `inside` alone, so the reader reaches no port of it. The reader serves 2 pages at once (`LINKS_MAX`), decodes one picture at a time, and its 256 MB is measured (210 MiB at the
   2,000,000-pixel cap, `link-reader/src/memory.test.ts`). It is in a profile of its own, out of the demo's cap, as Jarvis: its 0.3 core
   and 304 MB (reader and way out) come on top. "Switching the link cards on", below.
 - The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
@@ -146,6 +146,7 @@ tailnet; keep it so.
 | Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh`, from the commit you reviewed (below) |
 | Test that each check catches its fault | `sh deploy/test.sh --mutants`, from the commit you reviewed (below) |
 | Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
+| Run the demo from a checked copy of one commit: prepare, up, status, logs, restart, down, backup, wipe, restore, tester add and remove, test, keys forget | `sh deploy/demo.sh <subcommand>`, in your own Terminal ([DEMO.md](DEMO.md)) |
 | Its logs, jarvis's with them if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis --profile links logs -f` |
 | Stop, jarvis with it if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down` |
 | Stop, with the link reader too when the cards are on | `docker compose -f deploy/compose.yaml --profile links --profile demo --profile jarvis down` |
@@ -176,10 +177,11 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_NOSYSTEM=1 PYTHONNOUSERSITE=1 # no
 	[ "$(/usr/bin/git -C "$repo" cat-file commit "$sha" | /usr/bin/git hash-object -t commit --stdin)" = "$sha" ] &&
 	(cd "$d" && /usr/bin/git init -q && /usr/bin/git add -A -f && [ "$(/usr/bin/git write-tree)" = "$(/usr/bin/git -C "$repo" rev-parse "$sha^{tree}")" ]) &&
 	echo "test.sh runs from $sha, checked, in $d" && (cd "$d" && /bin/sh deploy/test.sh)
-status=$?; [ -z "${d:-}" ] || /bin/rm -rf "$d"; exit "$status" )
+rc=$?; [ -z "${d:-}" ] || /bin/rm -rf "$d"; exit "$rc" )
 ```
 
-It runs in a subshell of its own, so nothing it sets stays in the Terminal; it calls the system's
+It runs in a subshell of its own, so nothing it sets stays in the Terminal (its exit code in `rc`: zsh keeps `status`
+read-only, and the copy was then never removed); it calls the system's
 programs by path, and the copy holds a repository of its own, for test.sh's checks of what git
 ignores, and is removed at the end. A run that prints no "test.sh runs from" line means the copy is
 not that commit: run nothing more, and tell the chief. It takes about 15 s before test.sh. The copy
@@ -497,6 +499,17 @@ Slice 3, the server's retention (3n):
   capture, no preview: a world's plate and a chat line linking that realm's home on the default universe's gnoweb show the capture, and
   a line only once its own check passed; the browser asks the site's file alone, never the address a line holds. To take a page's
   capture down at once, remove its realm from `hubs.json` and redeploy: the next pass drops it, and so does a restart.
+- **What the worlds pass also keeps** (slice 13; each part after the worlds' file, a fault logged by its kind and never undoing the file): each
+  realm's rollup, its calls, callers, days, functions and last calls counted from the indexer above the height kept (`server/src/worlds/rollup.ts`), in
+  the database and as one file a realm in `/markets/rollups/`, served at `/rollups/<32 hex>.json` (a minute's cache); the most called worlds of
+  the last 7 UTC days (`GET /api/trending`, from memory, a 404 while the first pass has not run); the network's line, the transactions and
+  the accounts that sent them of each of the last 14 UTC days, read from the indexer (at most 20 pages and 4 MB a pass) and kept in the
+  database's tables `network_state`, `network_days` and `network_day_accounts` (`GET /api/network`, a 404 until the first pass); and the token
+  worlds, each token's supply, holders and transfers a day replayed from grc20's events (`GET /api/tokens/<hash>`, a 404 for a realm with none).
+  Beside these, `GET /api/people/<address>` reads one account's balance from the default universe's node (kept 60 s, ten reads a second across
+  every visitor, `unavailable` past that or with the node down, never 0), and `GET /api/calls/<hash>[/<index>]` reads one call's detail from
+  its indexer and keeps it by hash: a visitor's browser never asks a chain. All of them go out through the same way out as the worlds job, so no
+  host is added; without `UNIVERSES_FILE` the call and people routes are not mounted and the token route answers 404 for every realm.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
   project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
@@ -624,6 +637,35 @@ sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%,\"gno.land
 
 The kept rows are capped at 5,000 and 16 MiB, the oldest going first at the retention's tick. The next ask of that function calls the model again and keeps its answer. A room's kept "What can I do here?" rows
 (`key LIKE '[\"here\",%'`) last an hour and go by themselves.
+
+### The realms' explanations
+
+Under a realm's title (and a world's, which shows its main realm's), the app shows two plain sentences on what the realm is and what one can
+do with it, marked "✦ Jarvis · from its code". They live in the server's database, in the table `explanations`, never evicted, and come
+from two places:
+
+1. **The seed shipped with the server**, `server/src/explain/onyxSeed.json`: onyx's realms explained in advance, from their code alone, under
+   the same rules as Jarvis. The server reads it at every start (the image copies `server/src`, so a new commit's seed arrives with
+   `prepare` and `up`). Reading it twice changes nothing, and it never replaces a line Jarvis made. Each line passes the same check as
+   Jarvis's own (two sentences, 240 characters, no link, address, amount, or call to send, sign, approve, connect or share); a line that
+   fails, or one marked not sure, goes in as `refused`, and nothing is asked for that realm again. `EXPLAIN_SEED_FILE` replaces this file.
+2. **Jarvis, at a realm's first visit by anyone**, when Jarvis is on and the realm has no row: it reads the realm's code and writes the two
+   sentences, through the same check. One at a time, one a minute at most, `EXPLAIN_PER_DAY` new ones in any 24 hours at most (30), on Jarvis's
+   budget. A failure tries again later; a refusal is final for that prompt version. Only the realms of the default universe's worlds file
+   are explained.
+
+What a visitor sees: the line once it is made, even with Jarvis off; a grey placeholder while it is being made; the realm's own first line
+when there is none. Compose does not forward `EXPLAIN_SEED_FILE` or `EXPLAIN_PER_DAY` (CONFIGURATION.md), so under Docker the shipped seed
+and 30 a day hold until they are added to the `server` block.
+
+To drop one line (a wrong one), on the host, against the `server` volume's file as above:
+
+```sh
+sqlite3 "$DB" "DELETE FROM explanations WHERE chain = 'onyx-1' AND subject = 'gno.land/r/demo/defi/grc20factory';"
+```
+
+With Jarvis on, the realm's next visit makes a new one. A seeded line comes back at the next start unless Jarvis has made its own first:
+remove it from the seed file too (a new commit).
 
 ## Switching the link cards on
 

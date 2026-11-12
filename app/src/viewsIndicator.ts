@@ -26,8 +26,9 @@ const write = (nav: HTMLElement, { x, width }: Place) => {
   nav.dataset["filled"] = "";
 };
 
-// Where the fill stands as the pill's own properties say, none before its first place.
-const standing = (nav: HTMLElement): Place | undefined => {
+// Where the fill stands as the pill's own properties say, none before its first place or while no level is in view.
+export const standing = (nav: HTMLElement): Place | undefined => {
+  if (nav.dataset["empty"] !== undefined) return undefined;
   const [x, width] = ["--_fill-x", "--_fill-w"].map((name) => Number.parseFloat(nav.style.getPropertyValue(name)));
   return x === undefined || width === undefined || Number.isNaN(x + width) ? undefined : { x, width };
 };
@@ -44,7 +45,13 @@ function follow(nav: HTMLElement): () => void {
   const step = (now: number) => {
     frame = 0;
     const link = current(nav);
-    if (link === null) return;
+    // No level in view: the fill fades where it stands, and the next level's comes back in its place rather than gliding from here.
+    if (link === null) {
+      nav.dataset["empty"] = "";
+      [linked, shown, gap] = [null, undefined, { x: 0, width: 0 }];
+      return;
+    }
+    delete nav.dataset["empty"];
     const goal = placeOf(nav, link);
     const still = stillOf(nav);
     // A new link to stand under (the mark moves to it a render after the page): the gap from where the fill is now.

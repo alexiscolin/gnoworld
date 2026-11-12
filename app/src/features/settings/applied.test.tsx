@@ -86,6 +86,8 @@ describe("the settings on the page's root", () => {
       quality: "high",
       calm: false,
       phone3d: false,
+      language: "en",
+      autoTranslate: true,
     });
   });
 });

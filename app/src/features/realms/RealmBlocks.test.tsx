@@ -440,7 +440,9 @@ describe("RealmBlocks: a link that leaves gnoweb is behind a warning (R-F4, S-F2
   test("draws a link off gnoweb's origin as a button, never as an anchor that goes there", () => {
     const html = draw(SOURCE);
     expect(html).not.toMatch(/<a\s[^>]*href="https:\/\/evil\.example/);
-    expect(html).toMatch(/<button[^>]*type="button"[^>]*>https:\/\/gno\.land\/r\/demo<\/button>/);
+    expect(html).toMatch(
+      /<button[^>]*type="button"[^>]*>(?:<span[^>]*>)?https:\/\/gno\.land\/r\/demo(?:<\/span>)?<\/button>/,
+    );
   });
 
   test("keeps a link on gnoweb's own origin, one written as a path included, an anchor", () => {

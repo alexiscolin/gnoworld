@@ -8,6 +8,10 @@
     letter-spacing: -0.04em;
   }
 
+  .figure[data-size="s"] {
+    font: var(--font-figure-s);
+  }
+
   .unit {
     /* raw: the frame sets its unit about 5 px after the figure, the space counted (frame 26) */
     /* layout: the unit stands a little off its figure */
@@ -16,6 +20,12 @@
     letter-spacing: normal;
     color: var(--color-text-muted);
     font: var(--font-body);
+  }
+
+  /* A unit that continues the figure ("1/9") touches it. */
+  .unit[data-of] {
+    /* layout: no step off the figure */
+    margin-inline-start: 0;
   }
 
   /* The caption's icon stands on its line, the kicker's dot's step before its words. */

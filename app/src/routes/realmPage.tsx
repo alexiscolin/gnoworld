@@ -2,14 +2,15 @@
 // planet, which the cosmos draws for the realm's world and the flight flew to (D362). The plate holds the realm's crumbs, short name,
 // lede, actions, talk bar, figures, page, functions, around it and facts (routes/plate); the dock is the world's chat, given the realm's place.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
-import { useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
 import { isAddress, realmName, realmRoom, worldIdOf } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
 import { pageRoomsApi } from "../lib/api/rooms.ts";
-import { Button, Kicker, Panel, Stack } from "@gnoworld/ui";
+import { Kicker, Panel } from "@gnoworld/ui";
+import { ErrorView, useWhere } from "../features/errors/index.ts";
 import { chatPlace, PlaceChat, roomIds, roomsChanged } from "../features/chat/index.ts";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
-import { site } from "../places.ts";
+import { placeOf, site } from "../places.ts";
 import { WorldSigns } from "../features/universe/WorldSigns.tsx";
 import type { Ring } from "../features/world/index.ts";
 import type { RealmAt } from "../realmAt.ts";
@@ -41,10 +42,11 @@ export async function roomListed(
   return false;
 }
 
-function useRoomMade(realm: string, world: string, room: string) {
+function useRoomMade({ realm, world, room }: { realm: string; world: string; room: string }, known: boolean) {
   const [done, setDone] = useState<{ room: string; made: Made }>();
   const [again, setAgain] = useState(0);
   useEffect(() => {
+    if (!known) return;
     let live = true;
     roomListed({ realm, world, room }, () => live)
       .then((listed) => {
@@ -59,7 +61,7 @@ function useRoomMade(realm: string, world: string, room: string) {
     return () => {
       live = false;
     };
-  }, [realm, world, room, again]);
+  }, [realm, world, room, again, known]);
   const made: Made = done?.room === room ? done.made : "making";
   return {
     made,
@@ -72,15 +74,22 @@ function useRoomMade(realm: string, world: string, room: string) {
 
 // The realm's chat: its room, made on the first open (useRoomMade), in its world (D389 to D392). The same element docks beside the
 // page or stands alone, full (full.ts).
-function useRealmChat({ realm, chain }: RealmAt) {
+function useRealmChat({ realm, chain }: RealmAt, known: boolean) {
   const universe = site.universeAt(useLocation().pathname);
   const { namespace: owner, name } = realmName(realm);
   // A namespace that is an address reads short.
   const namespace = isAddress(owner) ? shortAddress(owner) : owner;
   const where = realmRoom(realm, universe.worlds);
-  const { made, retry } = useRoomMade(realm, where.world, where.room);
+  const { made, retry } = useRoomMade({ realm, world: where.world, room: where.room }, known);
   const place = chatPlace(
-    { slug: where.world, name, description: `A realm of @${namespace} on ${chain.name}.`, inPage: true, realm },
+    {
+      slug: where.world,
+      name,
+      description: `A realm of @${namespace} on ${chain.name}.`,
+      inPage: true,
+      realm,
+      room: where.room,
+    },
     universe,
     `@${namespace} · ${name}`,
   );
@@ -88,8 +97,17 @@ function useRealmChat({ realm, chain }: RealmAt) {
   return { namespace, name, talk: where.world, room: where.room, chat, failed: made === "failed", retry };
 }
 
-export function RealmPage(found: RealmAt) {
-  const { namespace, name, talk, room, chat, failed, retry } = useRealmChat(found);
+// The owner's namespace as the kicker shows it: a link to its system's page when the universe lists one.
+function OwnerLink({ realm, namespace }: { realm: string; namespace: string }) {
+  const owner = realmName(realm).namespace;
+  const href = placeOf(site.universeAt(useLocation().pathname), owner)?.href;
+  return href === undefined ? <>@{namespace}</> : <Link to={href}>@{namespace}</Link>;
+}
+
+/** A realm's page; `known` is whether its realm is proved to exist: no room is asked and no planet drawn before. */
+export function RealmPage({ found, known }: { found: RealmAt; known: boolean }) {
+  const { namespace, name, talk, room, chat, failed, retry } = useRealmChat(found, known);
+  const at = useWhere();
   return (
     <PlaceChat
       chat={chat}
@@ -100,22 +118,12 @@ export function RealmPage(found: RealmAt) {
           name={name}
           talk={talk}
           room={room}
-          chat={failed ? <RoomFailed retry={retry} /> : dock}
+          chat={failed ? <ErrorView kind="unavailable" size="inline" where={at} onRetry={retry} /> : dock}
           failed={failed}
+          known={known}
         />
       )}
     />
-  );
-}
-
-function RoomFailed({ retry }: { retry: () => void }) {
-  return (
-    <div role="alert">
-      <Stack space="s">
-        <p>The chat of this realm could not be opened.</p>
-        <Button onClick={retry}>Try again</Button>
-      </Stack>
-    </div>
   );
 }
 
@@ -127,6 +135,7 @@ function RealmPlace({
   room,
   chat,
   failed,
+  known,
 }: {
   found: RealmAt;
   namespace: string;
@@ -138,11 +147,12 @@ function RealmPlace({
   chat: ReactNode;
   /** The realm's room could not be made: the dock says so at once, not waiting for the door to space. */
   failed: boolean;
+  known: boolean;
 }) {
   useEntered();
   // The open proposal's ring round the planet, when the realm takes votes (Voted, StatusRing.tsx).
   const [ring, setRing] = useState<Ring>();
-  const chatDue = useSpace({ world: worldIdOf(found.realm), name });
+  const chatDue = useSpace(known ? { world: worldIdOf(found.realm), name } : undefined);
   // The plate's chunk is asked once the page has loaded, never waiting for the door to space or the chat (the shapes stand till it comes).
   const loaded = useLoaded();
   return (
@@ -152,7 +162,9 @@ function RealmPlace({
         label={name}
         plate={
           <>
-            <Kicker planet>Realm · @{namespace}</Kicker>
+            <Kicker planet>
+              Realm · <OwnerLink realm={found.realm} namespace={namespace} />
+            </Kicker>
             <Panel.Title id="realm-title">{name}</Panel.Title>
             {/* The rest of the plate comes in a chunk once the first screen has drawn (D566): its blocks are the realm's own reads. */}
             <Suspense fallback={null}>
@@ -163,7 +175,7 @@ function RealmPlace({
         chat={chat}
         chatDue={chatDue || failed}
       />
-      <WorldSigns world={worldIdOf(found.realm)} room={room} />
+      <WorldSigns world={worldIdOf(found.realm)} />
     </>
   );
 }

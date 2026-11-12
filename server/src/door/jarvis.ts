@@ -7,12 +7,14 @@ import {
   JARVIS_KEY_HEADER,
   JARVIS_PATHS,
   JarvisBudgets,
+  JarvisExplained,
   JarvisMadeDigest,
   JarvisPaidAnswer,
   JarvisTranslation,
   type JarvisAsk,
   type JarvisBudget,
   type JarvisDigestRequest,
+  type JarvisExplainRequest,
   type JarvisTranslate,
 } from "@gnoworld/schemas";
 import { readJson, send as netSend, type Send } from "@gnoworld/service/net";
@@ -46,6 +48,7 @@ export interface Jarvis {
   ask: (request: JarvisAsk, signal: AbortSignal) => Promise<Answered<JarvisPaidAnswer>>;
   translate: (request: JarvisTranslate, signal: AbortSignal) => Promise<Answered<JarvisTranslation>>;
   digest: (request: JarvisDigestRequest, signal: AbortSignal) => Promise<Answered<JarvisMadeDigest>>;
+  explain: (request: JarvisExplainRequest, signal: AbortSignal) => Promise<Answered<JarvisExplained>>;
   budgets: () => Promise<Budgeted>;
   setBudget: (change: JarvisBudget) => Promise<Budgeted>;
 }
@@ -113,6 +116,7 @@ export function jarvisClient({
     ask: (body, signal) => posted(JarvisPaidAnswer, JARVIS_PATHS.ask, { body, signal }),
     translate: (body, signal) => posted(JarvisTranslation, JARVIS_PATHS.translate, { body, signal }),
     digest: (body, signal) => posted(JarvisMadeDigest, JARVIS_PATHS.digest, { body, signal }),
+    explain: (body, signal) => posted(JarvisExplained, JARVIS_PATHS.explain, { body, signal }),
     budgets: async () => budgets(await call(JarvisBudgets, JARVIS_PATHS.budgets, { ms: BUDGETS_MS })),
     setBudget: async (change) =>
       budgets(await call(JarvisBudgets, JARVIS_PATHS.budgets, { body: change, ms: BUDGETS_MS })),

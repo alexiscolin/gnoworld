@@ -1,10 +1,5 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, test, vi } from "vitest";
-import events from "../../data/events.json" with { type: "json" };
-import orbit from "../../data/earthOrbit.json" with { type: "json" };
-import news from "../../data/news.json" with { type: "json" };
-import { fakeStream } from "../../tests/fakeStream.ts";
-import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
 import { type MetaArgs } from "react-router";
 import { BACK_HOME, routeError, alertOf, expectClientAsBuild, headingOf, render } from "../../tests/render.tsx";
 import { failedPageMeta, homeMeta, missingUniverseMeta } from "../meta.ts";
@@ -23,36 +18,20 @@ vi.mock("../features/universe/index.ts", () => ({
   useResting,
   useNewcomer,
   useCosmosAddress: () => undefined,
+  // The resting system's worlds (the home's hero names them): none, as no system is laid out in a page the test renders.
+  useRestingWorlds: () => undefined,
 }));
 afterEach(() => {
   useResting.mockReturnValue(undefined);
 });
-// Every event of the data waits for its date (7t no longer shows those): one dated beside them, so the ticker's tests still see an event.
-const { DATED } = vi.hoisted(() => ({
-  DATED: { id: "dated-call", title: "A dated call", start: "2026-11-15T10:00:00Z", link: "https://gno.land/dated" },
+// The rail is a lazy chunk the server render never waits for: its stand-in keeps the places the page hands it.
+const { railProps } = vi.hoisted(() => ({ railProps: [] as { places?: unknown }[] }));
+vi.mock("../features/universe/railLazy.ts", () => ({
+  LazyRail: (props: { places?: unknown }) => {
+    railProps.push(props);
+    return null;
+  },
 }));
-vi.mock("../../data/events.json", async (original) => {
-  const { default: rows } = await original<{ default: unknown[] }>();
-  return { default: [...rows, DATED] };
-});
-
-// What is on air (8i), as the data may hold it: a world by its hub, a hub the page does not list, another universe's line.
-const { LIVE } = vi.hoisted(() => ({
-  LIVE: [
-    { id: "air-world", universe: "onyx", title: "Live in Bubble", hub: "bubble" },
-    {
-      id: "air-site",
-      universe: "onyx",
-      title: "Live elsewhere",
-      link: "https://example.org/live",
-      until: "2999-01-01T00:00:00Z",
-    },
-    { id: "air-nowhere", universe: "onyx", title: "Live in a lost world", hub: "nowhere" },
-    { id: "air-other", universe: "gnoland", title: "Live in another universe", link: "https://example.org/other" },
-  ],
-}));
-vi.mock("../../data/onAir.json", () => ({ default: LIVE }));
-
 test("home links to each world by its name, at the world's path", async () => {
   const html = await render({ path: "/", Component: Home, loader }, "/");
   // F3267, 8i: the kicker says gno.land · live now as frame 6, and the one heading is the hero's line, its figure's room kept while the number comes (7n).
@@ -111,24 +90,22 @@ test("asks for the worlds on the default universe's home alone: universes are ne
   expect(useSpace.mock.lastCall?.[0]).toBe("cosmos");
   useSpace.mockClear();
   await render({ path: "/net/:universe", Component: Home, loader }, "/net/gnoland/");
-  expect(useSpace).toHaveBeenLastCalledWith(undefined, undefined);
+  expect(useSpace).toHaveBeenLastCalledWith(undefined);
 });
 
 // 7i: the rail beside the cosmos links each world to its page, the Earth's and the hubs' as the page lists them, through the page's router.
-test("hands the cosmos the places its rail links to and the page's router", async () => {
-  useSpace.mockClear();
+// The rail is its own lazy chunk now and takes the places as its props (the cosmos is handed none: D431's hero and rail).
+test("hands the rail the places it links to", async () => {
+  railProps.length = 0;
   await render({ path: "/", Component: Home, loader }, "/");
-  const page = useSpace.mock.lastCall?.[1] as { places: unknown; open: unknown } | undefined;
-  expect(page?.places).toEqual({
+  expect(railProps.at(-1)?.places).toEqual({
     earth: "/earth",
     worlds: [
       expect.objectContaining({ slug: "bubble", path: "/w/bubble" }),
       expect.objectContaining({ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }),
-      // The stations round the Earth are worlds of the page too (8l).
-      ...orbit.map(({ slug }): unknown => expect.objectContaining({ slug, path: `/w/${slug}` })),
+      // The stations round the Earth are no place while STATIONS_SHOWN is off (places.ts, ping-pong of 2026-11-07..09): their pages stay routable.
     ],
   });
-  expect(page?.open).toBeTypeOf("function");
 });
 
 // 7i: where the rail stands it stands for the page's list of worlds, which steps aside (Hero.module.css).
@@ -208,17 +185,17 @@ test("the browser's loader gives each pre-rendered home what the build's does", 
   expectClientAsBuild("cosmos", clientLoader, loader);
 });
 
-// Slice 5r (frames 1 to 8): the hero's big number, its line and two big actions; with no data, what is true.
-// 7v (Alexis, 2026-11-03): at a system's view the screen is the system's, its crumb at the top left where the list of worlds stands (the
-// design review: the crumb was drawn over it): both give way, and come back at rest.
-test("gives the screen to a system the eye rests at: no hero and no list of worlds then, both back at rest", async () => {
+// The hero's big number, its line and two actions, and with no data what is true. At a system's view the screen is the system's: the hero
+// stays and names it with no actions, the list of worlds and the crumb give way, and both come back at rest.
+test("gives the screen to a system the eye rests at: its hero with no actions and no list of worlds, both back at rest", async () => {
   useResting.mockReturnValue("gnoswap");
   const there = await render({ path: "/", Component: Home, loader }, "/");
-  expect(there).not.toContain("data-hero=");
+  expect(there).toContain("gno.land · system");
+  expect(there).not.toContain('data-hero="actions"');
   expect(there).not.toContain('<a href="/w/bubble"');
   useResting.mockReturnValue(undefined);
   const home = await render({ path: "/", Component: Home, loader }, "/");
-  expect(home).toContain("data-hero=");
+  expect(home).toContain('data-hero="actions"');
   expect(home).toContain('<a href="/w/bubble"');
 });
 
@@ -240,169 +217,30 @@ describe("home's hero", () => {
   test("offers two big actions, Go explore and Join the chat, both addressed to the universe's Earth, in that order", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     // The actions' own container: what follows its mark: its first two links.
-    const hero = (html.split('data-hero="actions"')[1] ?? "").split("data-hero=")[0] ?? "";
-    expect([...hero.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)/g)].map((match) => [match[1], match[2]])).toEqual([
+    // Join the chat opens the Earth's room grown to the full screen (fullChatHref, "?chat=full"), as the header's Chat does.
+    const hero = html.split('data-hero="actions"')[1] ?? "";
+    expect(
+      [...hero.matchAll(/<a [^>]*href="([^"]+)"[^>]*>([^<]+)/g)].map((match) => [match[1], match[2]]).slice(0, 2),
+    ).toEqual([
       ["/earth", "Go explore"],
-      ["/earth", "Join the chat"],
+      ["/earth?chat=full", "Join the chat"],
     ]);
   });
 
   test("keeps the actions inside the universe: under /net/gnoland the Earth is gno.land's", async () => {
     const html = await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
-    const hero = (html.split('data-hero="actions"')[1] ?? "").split("data-hero=")[0] ?? "";
+    const hero = html.split('data-hero="actions"')[1] ?? "";
     expect([...hero.matchAll(/<a [^>]*href="([^"]+)"/g)].map((match) => match[1]).slice(0, 2)).toEqual([
       "/net/gnoland/earth",
-      "/net/gnoland/earth",
+      "/net/gnoland/earth?chat=full",
     ]);
   });
 });
 
-// Slice 5m (frames 1 to 8): the live line under the actions, and the ticker from the data's news and events. The page the build
-// writes holds states, never a price or a block height: those are read in the browser.
-const escaped = (text: string) =>
-  text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#x27;");
-const sample = (file: "news.json" | "events.json"): { title: string; link: string }[] =>
-  file === "news.json" ? news : events;
-
+// Slice 5m (frames 1 to 8): the hero's line. The ticker, the markets row and the on-air lines are gone (D431, D425), with the home's stream.
 describe("home's live line", () => {
-  test("follows the actions inside the hero, as a loading state with no price and no height written into the page", async () => {
-    const html = await render({ path: "/", Component: Home, loader }, "/");
-    const after = html.split('data-hero="actions"')[1] ?? "";
-    expect(after).toContain('data-hero="markets"');
-    const line = after.split('data-hero="markets"')[1] ?? "";
-    expect(line).toContain('data-markets="loading"');
-    expect(html).not.toMatch(/data-token=|data-height=/);
-    expect(html).not.toMatch(/\$\d/);
-  });
-
   test("still claims nobody online, with the live line in", async () => {
     const html = await render({ path: "/", Component: Home, loader }, "/");
     expect(html).not.toMatch(/online|here now|talking/i);
-  });
-});
-
-describe("home's on-air lines", () => {
-  const home = () => render({ path: "/", Component: Home, loader }, "/");
-
-  test("leads a hub's line to its world's page through the router, and a link's line to its own site", async () => {
-    const html = await home();
-    expect(html).toMatch(/href="\/w\/bubble"[^>]*>Live in Bubble</);
-    expect(html).toMatch(/href="https:\/\/example\.org\/live"[^>]*>Live elsewhere</);
-  });
-
-  test("leaves out a hub the page does not list and another universe's line", async () => {
-    const html = await home();
-    for (const title of ["Live in a lost world", "Live in another universe"]) {
-      expect(html, title).not.toContain(title);
-    }
-  });
-
-  test("shows another universe's line under that universe, and not this one's", async () => {
-    const html = await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
-    expect(html).toContain("Live in another universe");
-    expect(html).not.toContain("Live elsewhere");
-  });
-});
-
-describe("home's ticker", () => {
-  // 7t: an event waiting for its date is no longer shown; the dated news are, and the chain's trends join them once the page runs.
-  test("holds each dated news of the data as a link to its address, and no event that waits for its date", async () => {
-    const html = await render({ path: "/", Component: Home, loader }, "/");
-    expect(html).toContain("data-ticker");
-    for (const { title, link } of sample("news.json")) {
-      expect(html, title).toContain(escaped(title));
-      expect(html, link).toContain(`href="${link}"`);
-    }
-    const waiting = sample("events.json").filter(({ title }) => title !== DATED.title);
-    expect(waiting.length).toBeGreaterThan(0);
-    for (const { title } of waiting) expect(html, title).not.toContain(escaped(title));
-  });
-
-  test("writes no trend into the page: the chain's are read once it runs", async () => {
-    const html = await render({ path: "/", Component: Home, loader }, "/");
-    expect(html).not.toMatch(/data-kind="(trending|rising|new)"/);
-  });
-
-  test("is drawn under /net/gnoland too: the lists are the site's, not a universe's", async () => {
-    const html = await render({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
-    expect(html).toContain("data-ticker");
-  });
-
-  test("is written the same whatever the time of the build: no event is dropped from the markup by the clock", async () => {
-    const written = async (time: string) => {
-      vi.useFakeTimers({ toFake: ["Date"] });
-      vi.setSystemTime(new Date(time));
-      return render({ path: "/", Component: Home, loader }, "/");
-    };
-    const before = await written("2026-10-31T12:00:00Z");
-    const after = await written("2100-01-01T00:00:00Z");
-    expect(after).toBe(before);
-    expect(after).toContain(escaped(DATED.title));
-    for (const { title } of sample("news.json")) expect(after, title).toContain(escaped(title));
-  });
-});
-
-afterEach(() => {
-  vi.useRealTimers();
-});
-
-// Slice 9g (F5784, frame 6): the page follows the Earth's room once it has run, and the strip draws the deploys the stream tells.
-describe("home and the chain's stream", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-  const deploy = (universe: string, name: string, height: number) => ({
-    id: `h${String(height)}:0`,
-    kind: "deploy",
-    universe,
-    realm: `gno.land/r/${ALICE}/${name}`,
-    actor: ALICE,
-    height,
-  });
-
-  test("follows #earth, draws a deploy of its universe in the strip as a signal, and none of another's", async () => {
-    const sources = fakeStream();
-    const { box } = drawRoute({ path: "/", Component: Home, loader }, "/");
-    await vi.waitFor(() => {
-      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth"]);
-    });
-    sources.opened[0]?.emit("chain", deploy("gnoland", "theirs", 11));
-    sources.opened[0]?.emit("chain", deploy("onyx", "mine", 10));
-    await vi.waitFor(() => {
-      expect(box.textContent).toContain("r/g10gh7…y5tv/mine deployed · block 10");
-    });
-    expect(box.textContent).not.toContain("theirs");
-    expect(box.textContent).toContain("Signal");
-  });
-
-  test("links a deploy under its universe's own path: none for the default one, /net/<id> for another", async () => {
-    const sources = fakeStream();
-    const onyx = drawRoute({ path: "/", Component: Home, loader }, "/");
-    await vi.waitFor(() => {
-      expect(sources.opened).toHaveLength(1);
-    });
-    sources.opened[0]?.emit("chain", deploy("onyx", "mine", 10));
-    await vi.waitFor(() => {
-      expect(onyx.box.querySelector("[data-ticker] a")?.getAttribute("href")).toBe(`/r/${ALICE}/mine`);
-    });
-    onyx.leave();
-    const gnoland = drawRoute({ path: "/net/:network", Component: Home, loader }, "/net/gnoland");
-    await vi.waitFor(() => {
-      expect(sources.opened).toHaveLength(2);
-    });
-    sources.opened[1]?.emit("chain", deploy("gnoland", "theirs", 11));
-    await vi.waitFor(() => {
-      expect(gnoland.box.querySelector("[data-ticker] a")?.getAttribute("href")).toBe(`/net/gnoland/r/${ALICE}/theirs`);
-    });
-  });
-
-  test("closes the stream when the page is left", async () => {
-    await expectStreamClosedOnLeave({ path: "/", Component: Home, loader }, "/");
   });
 });

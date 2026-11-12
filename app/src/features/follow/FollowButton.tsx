@@ -13,7 +13,7 @@ export function FollowButton({
 }: {
   kind: FollowKind;
   id: string;
-  size?: "m" | "l";
+  size?: "s" | "m" | "l";
   /** A plate's second action: an icon button, outlined, filled while followed, its words in its tooltip. */
   quiet?: boolean;
 }) {

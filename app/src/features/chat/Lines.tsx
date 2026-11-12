@@ -27,6 +27,7 @@ import { useLineFocus } from "./lineFocus.ts";
 import { Beside } from "./DayDivider.tsx";
 import { LineView } from "./LineView.tsx";
 import { Told } from "./Told.tsx";
+import { TranslationHalt } from "./TranslationHalt.tsx";
 import { mentionable } from "./names.ts";
 import { chipsOn, firstWordsOf, groupedOf, votesOf, withDays } from "./lineMarks.ts";
 import { useListRead } from "./reading.ts";
@@ -62,22 +63,25 @@ export function Lines(props: LinesProps) {
     new Date(now),
   );
   return (
-    <List
-      entries={entries}
-      grouped={groupedOf(entries)}
-      votes={votes}
-      firsts={firstWordsOf(lines, { room: props.room, paged: props.paged === true })}
-      {...props}
-      known={mentionable(props.members, lines)}
-      byId={byId}
-      chips={chips}
-      onThread={onThread}
-      lines={lines}
-      shown={shown}
-      lineOf={lineOf}
-      newest={newest}
-      repliesOf={repliesOf}
-    />
+    <>
+      <TranslationHalt />
+      <List
+        entries={entries}
+        grouped={groupedOf(entries)}
+        votes={votes}
+        firsts={firstWordsOf(lines, { room: props.room, paged: props.paged === true })}
+        {...props}
+        known={mentionable(props.members, lines)}
+        byId={byId}
+        chips={chips}
+        onThread={onThread}
+        lines={lines}
+        shown={shown}
+        lineOf={lineOf}
+        newest={newest}
+        repliesOf={repliesOf}
+      />
+    </>
   );
 }
 

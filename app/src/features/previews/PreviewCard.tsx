@@ -7,7 +7,8 @@ import { Button, Cluster, Dialog, Sidebar, Stack } from "@gnoworld/ui";
 import { useState, type KeyboardEvent } from "react";
 import type { PageDrawing } from "../../slots.tsx";
 import type { Drawing } from "../chat/index.ts";
-import { shortPath } from "./previews.ts";
+import { moment } from "../../lib/days.ts";
+import { cardPath } from "../../lib/shortPath.ts";
 import styles from "./Preview.module.css";
 
 export interface PreviewCardProps {
@@ -24,8 +25,6 @@ export interface PreviewCardProps {
   tabbable?: boolean;
 }
 
-const CLOCK = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
-
 // A key pressed in the open capture is its own: under a line, the room's list would take its arrows (lineFocus.ts).
 const kept = (event: KeyboardEvent) => {
   event.stopPropagation();
@@ -35,7 +34,7 @@ export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable
   const [open, setOpen] = useState(false);
   const read = page(capture.text, { origin: gnoweb });
   const blocks = read.kind === "page" ? read.blocks : [];
-  const when = CLOCK.format(Date.parse(capture.captured));
+  const when = moment(new Date(capture.captured));
   // Under a line the page alone, as frame 104 draws it: the card's words are its button's name, for assistive technology alone.
   const said = look === "line" ? "visually-hidden" : undefined;
   const thumb = (
@@ -56,7 +55,7 @@ export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable
       }}
     >
       <span className={said}>Preview</span>
-      <span className={said ?? "label truncate"}>{`${shortPath(capture.path)} · captured`}</span>
+      <span className={said ?? "label truncate"}>{`${cardPath(capture.path)} · captured`}</span>
       <span className={said ?? "label"}>Open large</span>
     </button>
   );

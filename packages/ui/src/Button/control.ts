@@ -18,7 +18,11 @@ export function pill(...own: (string | undefined)[]) {
 }
 
 /** A button's look, as the attributes its module reads: what a popover's trigger wears too. */
-export function buttonLook(emphasis: "solid" | "outline" | "quiet", tone: "neutral" | "danger", size: ControlSize) {
+export function buttonLook(
+  emphasis: "solid" | "outline" | "quiet" | "link",
+  tone: "neutral" | "danger",
+  size: ControlSize,
+) {
   return { className: pill(styles["button"]), "data-emphasis": emphasis, "data-tone": tone, "data-size": size };
 }
 

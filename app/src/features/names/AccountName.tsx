@@ -2,7 +2,7 @@
 // name on THIS universe's chain, once that read has answered, the pill is the way to pick one. A name is shown only when a read of a
 // chain gives it. The dialog and what signs load on the first press (RegisterFlow.tsx); this file's chunk loads after the first screen.
 import type { readCallFees } from "@gnoworld/chain/fees";
-import { Avatar } from "@gnoworld/ui";
+import { Avatar, grouped } from "@gnoworld/ui";
 import { useState } from "react";
 import { MAINNET_CHAIN, readName, shownName, type Chain } from "../../lib/chain/names.ts";
 import type { Parts } from "../calls/index.ts";
@@ -24,7 +24,6 @@ export interface AccountNameProps {
 
 // Outside the component: the compiler does not take an import() inside one.
 const load = () => import("./RegisterFlow.tsx");
-const COUNT = new Intl.NumberFormat("en-US");
 const report = (error: unknown): void => {
   reportError(error);
 };
@@ -38,7 +37,7 @@ export function AccountName({ account, universe, chains, read = readName, deps, 
   const shown = shownName(account, mine);
   const here = mine[universe.chainId === MAINNET_CHAIN ? "mainnet" : "onyx"];
   const where = shown.from === MAINNET_CHAIN ? "gno.land" : "Onyx";
-  const title = shown.height === undefined ? account : `${where} · block ${COUNT.format(shown.height)}`;
+  const title = shown.height === undefined ? account : `${where} · block ${grouped(shown.height)}`;
   const face = (
     <span className={styles["row"]}>
       <Avatar address={account} name={shown.text} size="m" decorative />

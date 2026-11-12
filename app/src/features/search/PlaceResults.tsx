@@ -109,7 +109,7 @@ export function PlaceResults({
   /** How many more answered than the list draws. */
   more: number;
   onChoose: (item: SearchItem) => void;
-  onHover: (at: number) => void;
+  onHover?: (at: number) => void;
 }) {
   // A group's first row is the number of the rows before it.
   const firsts = groups.map((_, n) => groups.slice(0, n).reduce((sum, each) => sum + each.results.length, 0));
@@ -134,7 +134,7 @@ export function PlaceResults({
                   onChoose(result.item);
                 }}
                 onHover={() => {
-                  onHover(own);
+                  onHover?.(own);
                 }}
               />
             );

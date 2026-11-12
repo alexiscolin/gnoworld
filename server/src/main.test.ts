@@ -1212,7 +1212,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
       return [answer.status, await answer.json()];
     };
     const [leads, strangers] = [await signIn(lead), await signIn(stranger)];
-    const settled = { quota: 20, quotaUnnamed: 5, unlimited: [], budgets: null };
+    const settled = { quota: 30, quotaUnnamed: 30, unlimited: [], budgets: null };
     expect(await read(leads)).toEqual([200, settled]);
     expect(await read(strangers)).toEqual([403, { error: "forbidden" }]);
     const change = { chainId: "onyx-1", change: { setting: "quota", questions: 30 } };
@@ -1252,7 +1252,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
       const answer = await reading;
       expect([answer.status, await answer.json()]).toEqual([
         200,
-        { quota: 20, quotaUnnamed: 5, unlimited: [], budgets: { ask: 45, translate: 5 } },
+        { quota: 30, quotaUnnamed: 30, unlimited: [], budgets: { ask: 45, translate: 5 } },
       ]);
       expect(await exit).toBe(0);
     } finally {

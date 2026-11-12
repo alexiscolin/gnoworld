@@ -1,12 +1,15 @@
 // The chat's header (the video's frames 26 and 66, top): the room's name and the place's buttons; the site header's Chat and the chat's own
 // arrows open a docked chat full, its arrows or a level close it (D441, D445), and a chat with no dock (a phone's screen) has a close.
 import { Cluster, Dialog, Icon, IconButton, Sidebar } from "@gnoworld/ui";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode, type Ref } from "react";
 import { useLocation } from "react-router";
+import { onAsked } from "../../pageAsks.ts";
 import { useControlSize, useFull } from "./full.ts";
 // The site's header's divider, the same rule in the chat's band.
 import site from "../../shellHeader.module.css";
 import { FullButton } from "./FullButton.tsx";
+import { ActsRoomContext } from "./PlaceActs.tsx";
+import { useActsRoom } from "./useActsRoom.ts";
 import styles from "./ChatHeader.module.css";
 
 export interface ChatHeaderProps {
@@ -21,7 +24,7 @@ export interface ChatHeaderProps {
   mark?: ReactNode;
   /** The control to the rooms, before the name, on a phone's screen (5b's drawer). */
   rooms?: ReactNode;
-  /** The place's own buttons, after its name (PlaceButtons.tsx). */
+  /** The place's own buttons, after its name. */
   buttons?: ReactNode;
   /** The place's own name, before the room's in the wide full chat ("Bubble / #general"). */
   world?: string | undefined;
@@ -55,11 +58,36 @@ function Name({ title, menu, short = false }: Pick<ChatHeaderProps, "title" | "m
   const { key } = useLocation();
   const [openAt, setOpenAt] = useState<string>();
   const open = openAt === key;
+  // The dock's "+N" chip asks for the same rooms.
+  const has = menu !== undefined;
+  useEffect(() => {
+    if (!has) return;
+    const stop = new AbortController();
+    onAsked(
+      "rooms",
+      () => {
+        setOpenAt(key);
+      },
+      stop.signal,
+    );
+    return () => {
+      stop.abort();
+    };
+  }, [has, key]);
   const look = short ? CUT : styles["title"];
-  if (menu === undefined) return <h2 className={look}>{title}</h2>;
+  // The full chat covers the page: the room's name is then its one main heading; docked, the page's own heading leads.
+  const Heading = useFull() ? "h1" : "h2";
+  // The whole name under the pointer where it is cut; the same words as its text, so a screen reader hears them once.
+  const whole = typeof title === "string" ? title : undefined;
+  if (menu === undefined)
+    return (
+      <Heading className={look} title={whole}>
+        {title}
+      </Heading>
+    );
   return (
     <>
-      <h2 className={look}>
+      <Heading className={look}>
         <button
           type="button"
           className={`inline-columns ${String(styles["trigger"])}`}
@@ -68,10 +96,12 @@ function Name({ title, menu, short = false }: Pick<ChatHeaderProps, "title" | "m
             setOpenAt(key);
           }}
         >
-          <span className="truncate">{title}</span>
+          <span className="truncate" title={whole}>
+            {title}
+          </span>
           <Icon name="chevron" />
         </button>
-      </h2>
+      </Heading>
       <Dialog
         title={menu.label}
         open={open}
@@ -92,11 +122,12 @@ function Controls({
   onClose,
   lead,
   wide,
-}: Pick<ChatHeaderProps, "docked" | "onClose"> & { lead: ReactNode; wide: boolean }) {
+  controls,
+}: Pick<ChatHeaderProps, "docked" | "onClose"> & { lead: ReactNode; wide: boolean; controls: Ref<HTMLDivElement> }) {
   const control = useControlSize();
   const full = useFull();
   return (
-    <div className={wide ? [styles["controls"], styles["over"]].join(" ") : styles["controls"]}>
+    <div ref={controls} className={wide ? [styles["controls"], styles["over"]].join(" ") : styles["controls"]}>
       <Cluster space="2xs" justify="end">
         {lead}
         {/* A rule between the place's buttons and the close after them; a docked chat has none. */}
@@ -113,26 +144,46 @@ export function ChatHeader({ title, onClose, docked, rooms, menu, mark, world, b
   // The wide full chat's band, under the site's header: the worlds' and rooms' columns' room, then the place and the room (Where);
   // docked, the rooms' control, then the room's name: no place's name, which the dock's row always cut (Alexis, 2026-11-07).
   const wide = useFull() && rooms === undefined;
+  const { controlsRef, fit } = useActsRoom({
+    docked,
+    buttons: buttons !== undefined,
+    rooms: rooms !== undefined,
+    wide,
+    title,
+    mark,
+  });
   return (
-    <Cluster as="header" space="m">
-      <div className={styles["place"]}>{wide ? null : rooms}</div>
-      {wide ? (
-        // Over the conversation's column: the place and the room at its start, its buttons at its end, over the lines' times.
-        <div className={styles["middle"]}>
-          <Sidebar side="end" align="center">
-            <Where world={world} title={title} menu={menu} />
-            {buttons === undefined ? null : (
-              <Cluster space="2xs" justify="end">
-                {buttons}
-              </Cluster>
-            )}
-          </Sidebar>
-        </div>
-      ) : (
-        <Name title={title} menu={menu} />
-      )}
-      {mark === undefined ? null : <span className={styles["mark"]}>{mark}</span>}
-      <Controls docked={docked} onClose={onClose} lead={wide ? undefined : buttons} wide={wide} />
-    </Cluster>
+    <ActsRoomContext value={fit}>
+      <Cluster as="div" space="m">
+        <div className={styles["place"]}>{wide ? null : rooms}</div>
+        {wide ? (
+          // Over the conversation's column: the place and the room at its start, its buttons at its end, over the lines' times.
+          <div className={styles["middle"]}>
+            <Sidebar side="end" align="center">
+              <Where world={world} title={title} menu={menu} />
+              {buttons === undefined ? null : (
+                <Cluster space="2xs" justify="end">
+                  {buttons}
+                </Cluster>
+              )}
+            </Sidebar>
+          </div>
+        ) : (
+          <Name title={title} menu={menu} />
+        )}
+        {mark === undefined ? null : (
+          <span className={styles["mark"]} data-mark="">
+            {mark}
+          </span>
+        )}
+        <Controls
+          docked={docked}
+          onClose={onClose}
+          lead={wide ? undefined : buttons}
+          wide={wide}
+          controls={controlsRef}
+        />
+      </Cluster>
+    </ActsRoomContext>
   );
 }

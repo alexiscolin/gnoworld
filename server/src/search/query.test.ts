@@ -164,6 +164,13 @@ describe("the work is bounded by the asked world's lines (F13756, plan T3)", () 
       .parse(db.prepare(`EXPLAIN QUERY PLAN ${sql}`).all(...(args as string[])))
       .map(({ detail }) => detail);
 
+  it("answers nothing for a query with no word, even with a sender", () => {
+    const { search, ask } = setup();
+    search.add(said("a1", { account: ALICE, text: "first words" }));
+    expect(ask({ q: "", from: ALICE }).rows).toHaveLength(1);
+    expect(ask({ q: "!!", from: ALICE })).toMatchObject({ rows: [], total: 0 });
+  });
+
   it("starts the match from the asked world, and asks `lines` for the matches' rowids alone, never a scan of it", () => {
     const { search, db } = setup();
     search.add(said("m1"));
@@ -281,6 +288,53 @@ describe("what the index sends to SQLite (B1 security, for B2: 2, 4 and 6)", () 
     const counting = sent.filter((sql) => /count\s*\(/i.test(sql));
     expect(counting.length).toBeGreaterThan(0);
     for (const sql of counting) expect(sql).toMatch(/limit/i);
+  });
+});
+
+describe("a search by the sender alone, with no words", () => {
+  it("lists the sender's lines in the rooms asked, newest first, paged, with the same filters, never another account's", () => {
+    const { search, ask } = setup();
+    search.add(said("a1", { account: ALICE, text: "first words" }));
+    search.add(said("b1", { account: BOB, text: "bob here" }));
+    search.add(said("a2", { account: ALICE, text: "second https://a.b" }));
+    search.add(said("a3", { account: ALICE, room: "#bubble/news", text: "third" }));
+    search.add(said("a4", { account: ALICE, room: "#bubble/other", text: "elsewhere" }));
+    const rooms = ["#bubble", "#bubble/news"];
+    const ids = (over: Partial<Query> = {}) => ask({ q: "", from: ALICE, rooms, ...over }).rows.map((row) => row.msgid);
+    expect(ids()).toEqual(["a3", "a2", "a1"]);
+    expect(ids({ link: true })).toEqual(["a2"]);
+    expect(ids({ rooms: ["#bubble"] })).toEqual(["a2", "a1"]);
+    expect(ids({ before: { rowid: 4 } })).toEqual(["a2", "a1"]);
+    expect(ask({ q: "", from: ALICE, rooms })).toMatchObject({ total: 3, capped: false, partial: false });
+  });
+
+  it("asks nothing with no words and no sender: a world is never scanned unfiltered", () => {
+    const { search, ask, sent } = setup();
+    search.add(said("a1"));
+    sent.length = 0;
+    expect(ask({ q: "" })).toEqual({ rows: [], total: 0, capped: false, partial: false });
+    expect(sent).toEqual([]);
+  });
+
+  it("reads the newest 5,000 of the sender's lines through the account's index, and says partial when it cut", () => {
+    const { search, ask, db, sent } = setup();
+    const rooms = ["#bubble", "#bubble/a", "#bubble/b"];
+    for (let i = 0; i < 5001; i++) search.add(said(`m${String(i)}`, { room: rooms[i % 3] ?? "" }));
+    sent.length = 0;
+    expect(ask({ q: "", from: ALICE, rooms })).toMatchObject({ partial: true });
+    const byAccount = sent.find((sql) => sql.includes("account = ?") && sql.includes("LIMIT 5001"));
+    const detail = z
+      .array(z.object({ detail: z.string() }))
+      .parse(db.prepare(`EXPLAIN QUERY PLAN ${byAccount ?? "SELECT 1"}`).all(ALICE, "bubble"))
+      .map((row) => row.detail);
+    expect(detail.some((line) => line.includes("lines_by_account"))).toBe(true);
+    expect(detail.filter((line) => /SCAN lines\b|TEMP B-TREE/i.test(line))).toEqual([]);
+  });
+
+  it("gives a line's start as the snippet, with no marks", () => {
+    const { search, ask } = setup();
+    search.add(said("a1", { text: "just some words" }));
+    expect(ask({ q: "", from: ALICE }).rows.map((row) => row.text)).toEqual(["just some words"]);
   });
 });
 

@@ -1,7 +1,7 @@
 // A result of the chat's search: its author, its room and its time, then its words with the ones searched marked. The words are the
 // message's, drawn as text and never as markup; the marks are the server's offsets (marks.ts).
 import type { SearchHit } from "@gnoworld/schemas";
-import { CLOCK, FULL } from "../LineHead.tsx";
+import { clock, moment } from "../../../lib/days.ts";
 import { roomLabel, isAccount } from "../names.ts";
 import { Person } from "../Person.tsx";
 import { pieces } from "./marks.ts";
@@ -28,8 +28,8 @@ export function Hit({ hit, current, onOpen }: { hit: SearchHit; current: boolean
               </b>{" "}
               {roomLabel(hit.room)}
             </span>
-            <time className="meta" dateTime={at.toISOString()} title={FULL.format(at)}>
-              {CLOCK.format(at)}
+            <time className="meta" dateTime={at.toISOString()} title={moment(at)}>
+              {clock(at)}
             </time>
           </span>
           <span className={styles["snippet"]}>

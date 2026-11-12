@@ -5,9 +5,10 @@ import type { Space } from "./scene.ts";
 import { placeOf, type Vec } from "./layout.ts";
 import { lowered, raised, type Verdict } from "./pace.ts";
 import { lowQuality } from "./quality.ts";
-import { napFor } from "./rest.ts";
+import { LIVELY_PX, napFor } from "./rest.ts";
 import type { Moment, Need } from "./redraw.ts";
 import { shownOf } from "./shown.ts";
+import { fading, openedOf } from "./open.ts";
 
 // A slow planet's spin, in radians a second, at most (shaders/planets.ts): the pixels it moves a second are its radius's.
 const SPIN_MOST = 0.08;
@@ -19,10 +20,12 @@ const AT: Vec = { x: 0, y: 0, z: 0 };
 export interface State {
   need: Need;
   pxPerSecond: number;
+  /** Whether a sun is drawn large enough for its face to show, and boil. */
+  face: boolean;
   sized: boolean;
   /** When the near planets were last chosen, and what they are chosen by, written each time: a frame makes nothing. */
   chose: number;
-  readonly choosing: { pxK: number; seconds: number };
+  readonly choosing: { pxK: number; seconds: number; open: number };
   freed: boolean;
   ticked: number;
   place: Space["place"];
@@ -34,11 +37,12 @@ export interface State {
 export const stateOf = (space: Space): State => ({
   need: "full",
   pxPerSecond: 0,
+  face: false,
   sized: true,
   freed: false,
   ticked: -1,
   chose: 0,
-  choosing: { pxK: 0, seconds: 0 },
+  choosing: { pxK: 0, seconds: 0, open: -1 },
   place: space.place,
   universe: space.universe,
   numbers: { eye: [0, 0, 0, 0, 0, 0, 1], shown: [] },
@@ -118,15 +122,18 @@ export function momentOf(space: Space, { numbers: { eye, shown }, pxPerSecond }:
   };
 }
 
-// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in from its skeleton, an arrival or a planet framed close; the last two only while the
-// scene's clock runs (rig/free.ts's rate: stopped after a minute's rest, the page's planet stands still).
-const moves = ({ rig, stage, arrival, circle }: Space): boolean =>
+// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in from its skeleton, an arrival or a moon. A planet
+// framed close turns slowly: it is lively (below), drawn at 15 frames a second once the view is still; its moons cross it far faster, and
+// stepped at 15 they jerked across it.
+const moves = ({ rig, stage, arrival, seconds }: Space): boolean =>
   rig.flying ||
+  stage.moons.group.visible ||
   stage.near?.arriving === true ||
   rig.free.moving ||
   stage.effects.busy ||
+  fading(stage.frame, seconds) ||
   stage.ground.turning ||
-  ((arrival || circle?.close === true) && rig.free.rate > 0);
+  arrival;
 
 // The pixels a second the fastest slow motion moves: a planet's orbit and its spin, those of the page's planet, the system's or all.
 function pixelsPerSecond(space: Space): number {
@@ -143,31 +150,50 @@ function pixelsPerSecond(space: Space): number {
   return fastest;
 }
 
-/** How long the loop may sleep after this frame; none, it stays awake. The slow motions move at the scene clock's rate (rig/free.ts): a
- * stopped clock moves nothing, one easing down moves that much less a real second. */
+// A sun's face shows from its disc's radius of this many pixels (shaders/glows.ts: vNear starts at 2, full at 14).
+const FACE_PX = 4;
+
+// Whether a sun is drawn with its face: its radius in pixels is its core over what a pixel spans at its distance.
+function facesShow(space: Space): boolean {
+  const eyeAt = space.camera.position;
+  return (
+    space.universe?.systems.some(({ place, core }) => {
+      const away = Math.hypot(place.x - eyeAt.x, place.y - eyeAt.y, place.z - eyeAt.z) * space.see.pxK;
+      return core >= FACE_PX * away;
+    }) ?? false
+  );
+}
+
+/** Whether something on screen moves by itself (D13013): a slow motion of a pixel a second or more, or a sun's face. The scene's clock
+ * never stops (only a hidden tab and reduced motion, where the loop or the faces stand still, do). */
+export const livelyOf = (state: State): boolean => state.pxPerSecond >= LIVELY_PX || state.face;
+
+/** How long the loop may sleep after this frame; none, it stays awake. */
 export const napOf = (space: Space, state: State, { need, calm }: { need: Need; calm: number }): number | undefined =>
   napFor({
     need,
     moving: moves(space) || space.rig.free.turning,
     settled: space.labels.settled(),
     calm,
-    pxPerSecond: state.pxPerSecond * space.rig.free.rate,
+    pxPerSecond: state.pxPerSecond,
+    lively: livelyOf(state),
   });
 
-/** Runs the scene's clock `ms` on, at the rate the rest has left it (rig/free.ts). The place of a thing goes by it; an ease goes by the frame's own delta. */
-export const tick = (
-  space: { seconds: number; readonly rig: { readonly free: { readonly rate: number } } },
-  ms: number,
-): void => {
-  space.seconds += (ms / 1000) * space.rig.free.rate;
+/** Runs the scene's clock `ms` on. The place of a thing goes by it; an ease goes by the frame's own delta. */
+export const tick = (space: { seconds: number }, ms: number): void => {
+  space.seconds += ms / 1000;
 };
 
 /** A few times a second: the slow motions' speed, and which near planets are drawn as themselves. */
 export function choose(space: Space, state: State, now: number): void {
-  if (now - state.chose <= CHOOSE_MS || space.universe === undefined) return;
+  const open = openedOf(space, space.stage.frame.uOpenNow.value);
+  // A system opening or closing is chosen at once: the planets drawn as themselves hand over to their quads, which fade, with no wait.
+  if ((now - state.chose <= CHOOSE_MS && open === state.choosing.open) || space.universe === undefined) return;
   state.chose = now;
   state.choosing.pxK = space.see.pxK;
   state.choosing.seconds = space.seconds;
+  state.choosing.open = open;
   state.pxPerSecond = pixelsPerSecond(space);
+  state.face = facesShow(space);
   space.stage.near?.choose(space.universe, space.camera.position, state.choosing);
 }

@@ -1,7 +1,7 @@
 // A link off gnoweb is behind a warning (plan §3, ADR-0002 §4; leaving.tsx): such a link is a button that opens it.
+import { Button } from "@gnoworld/ui";
 import type { ReactNode } from "react";
 import { useLeaving } from "../../leaving.tsx";
-import styles from "./RealmBlocks.module.css";
 
 /** Whether an address of a page is on gnoweb's own origin: the same scheme, host and port, never one that only starts alike. */
 function isOwn(href: string, origin: string | undefined): boolean {
@@ -20,17 +20,15 @@ export function useExternalLinks(origin: string | undefined, also?: string) {
   return {
     link: (href: string, label: ReactNode[]): ReactNode =>
       isOwn(href, origin) || (also !== undefined && isOwn(href, also)) ? undefined : (
-        <button
-          type="button"
-          className={styles["external"]}
-          title={href}
-          dir="ltr"
+        <Button
+          emphasis="link"
+          description={href}
           onClick={() => {
             ask(href);
           }}
         >
-          {label}
-        </button>
+          <span dir="ltr">{label}</span>
+        </Button>
       ),
     dialog,
   };

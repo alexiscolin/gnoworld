@@ -63,13 +63,16 @@ async function view(fetcher: ChainFetch, realm = "gno.land/r/gnoland/wugnot", ch
 
 describe("a realm's view", () => {
   test("shows the realm's page, the block height it was read at and the link to gnoweb", async () => {
+    // A day is "30 Oct" in the current year (D13015): the clock is the test's.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T12:00:00Z"));
     const box = await view(chain(WUGNOT?.body ?? null));
     expect(box.textContent).toContain("wrapped GNOT ($wugnot)");
     expect(box.textContent).toContain("Total supply");
     // The line is the last of the page itself; the read functions' panel, with its own text, follows it (5i).
     expect(
       all(box, "p").some((p) =>
-        /^Read at block 786,661, Oct 30, 23:43 UTC, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
+        /^Read at block 786,661, 30 Oct, 23:43 UTC, from rpc\.onyx\.testnets\.gno\.land$/.test(p.textContent),
       ),
     ).toBe(true);
     // The page card's own link is the one inside it; the functions' failed states carry theirs (D13905).
@@ -78,6 +81,7 @@ describe("a realm's view", () => {
         a.getAttribute("href") === "https://onyx.testnets.gno.land/r/gnoland/wugnot" && a.closest("#page") !== null,
     );
     expect(links).toHaveLength(1);
+    vi.useRealTimers();
   });
 
   test("asks the chain once for the page and once for the height, and nothing again", async () => {

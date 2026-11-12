@@ -15,6 +15,23 @@
     background: var(--color-surface);
     box-shadow: var(--shadow-popover);
     white-space: nowrap;
+    /* layout: one row of controls of one height, every icon and emoji centred the same way */
+    display: inline-flex;
+    /* layout: centred on one line */
+    align-items: center;
+  }
+
+  .bar button {
+    /* layout: an emoji is centred in its square as an icon is */
+    align-items: center;
+    /* layout: the same, across */
+    justify-content: center;
+  }
+
+  /* An emoji reaction draws at the icons' size, on a line of its own height, so it shares their baseline. */
+  .bar button > span[aria-hidden="true"] {
+    font-size: var(--icon-m);
+    line-height: 1;
   }
 
   /* Its line at the top of the list that scrolls: inside the line, never past the list's edge (U10). */

@@ -44,7 +44,7 @@ describe("the day each line opens", () => {
       ...dayLabelsOf(
         ["2020-01-01T10:00:00Z", ...times].map((time, i) => lineAt(`l${String(i)}`, time)),
         at,
-        { timeZone: zone, locale: "en-GB" },
+        { timeZone: zone },
       ),
     ]
       .map(([, label]) => label)
@@ -54,19 +54,19 @@ describe("the day each line opens", () => {
     const entries = ["2026-11-09T09:00:00Z", "2026-11-09T21:00:00Z", "2026-11-10T09:00:00Z"].map((t, i) =>
       lineAt(`l${String(i)}`, t),
     );
-    expect([...dayLabelsOf(entries, now, { timeZone: "UTC", locale: "en-GB" }).keys()]).toEqual(["l0", "l2"]);
+    expect([...dayLabelsOf(entries, now, { timeZone: "UTC" }).keys()]).toEqual(["l0", "l2"]);
     expect(
       dayLabelsOf([lineAt("a", "2026-11-09T09:00:00Z"), lineAt("b", "2026-11-09T21:00:00Z")], now, { timeZone: "UTC" })
         .size,
     ).toBe(0);
-    expect([...dayLabelsOf([], now, { timeZone: "UTC", locale: "en-GB" }).keys()]).toEqual([]);
+    expect([...dayLabelsOf([], now, { timeZone: "UTC" }).keys()]).toEqual([]);
   });
 
-  it("says Today, Yesterday, then the weekday and date, the year only when it is not this year", () => {
-    expect(labels(["2026-11-11T01:00:00Z", "2026-11-12T01:00:00Z"])).toEqual(["Today", "Thursday 12 November"]);
+  it("says Today, Yesterday, the weekday for the last week, then the date, the year only when it is not this year (D13015)", () => {
+    expect(labels(["2026-11-11T01:00:00Z", "2026-11-12T01:00:00Z"])).toEqual(["Today", "12 Nov"]);
     expect(labels(["2026-11-10T23:59:00Z"])).toEqual(["Yesterday"]);
-    expect(labels(["2026-11-09T10:00:00Z"])).toEqual(["Monday 9 November"]);
-    expect(labels(["2025-12-31T10:00:00Z"])).toEqual(["Wednesday, 31 December 2025"]);
+    expect(labels(["2026-11-09T10:00:00Z"])).toEqual(["Monday"]);
+    expect(labels(["2025-12-31T10:00:00Z"])).toEqual(["31 Dec 2025"]);
   });
 
   it("cuts at midnight in the reader's zone, not UTC", () => {
@@ -76,7 +76,6 @@ describe("the day each line opens", () => {
     expect([
       ...dayLabelsOf([lineAt("a", "2026-11-10T22:59:00Z"), lineAt("b", "2026-11-10T23:01:00Z")], now, {
         timeZone: "Europe/Paris",
-        locale: "en-GB",
       }).keys(),
     ]).toEqual(["a", "b"]);
   });
@@ -87,13 +86,13 @@ describe("the day each line opens", () => {
       ...dayLabelsOf(
         times.map((t, i) => lineAt(`l${String(i)}`, t)),
         new Date("2026-10-26T10:00:00Z"),
-        { timeZone: "Europe/Paris", locale: "en-GB" },
+        { timeZone: "Europe/Paris" },
       ).entries(),
     ];
     expect(
       keys(["2026-10-24T21:30:00Z", "2026-10-24T22:30:00Z", "2026-10-25T22:30:00Z", "2026-10-25T23:30:00Z"]),
     ).toEqual([
-      ["l0", "Saturday 24 October"],
+      ["l0", "Saturday"],
       ["l1", "Yesterday"],
       ["l3", "Today"],
     ]);

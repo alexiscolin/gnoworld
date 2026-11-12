@@ -1,12 +1,12 @@
 // The chat's screen on a world's page, whoever reads it (a visitor's or an account's): docked at the right of the page
 // (frames 20 to 35) or, expanded, full bleed over it (frames 56 to 77): the header over the column of worlds, the rooms, the
 // conversation and the info panel (ui's ChatLayout places them by the box's width; this fills them). The rooms and the room in view are the caller's.
-import { ChatLayout, Stack } from "@gnoworld/ui";
+import { ChatLayout, EmptyState, Stack } from "@gnoworld/ui";
 import type { Line } from "@gnoworld/core";
 import { useEffect, useRef, useState, type ReactElement, type ReactNode, type SyntheticEvent } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ChatHeader, type ChatHeaderProps } from "./ChatHeader.tsx";
-import { PlaceButtons } from "./PlaceButtons.tsx";
+import { PlaceActs, placeActs } from "./PlaceActs.tsx";
 import { PlaceBar } from "./PlaceView.tsx";
 import { usePeople } from "./usePeople.tsx";
 import { useColumns } from "./columns.ts";
@@ -16,7 +16,7 @@ import { useFullMove } from "./fullMove.ts";
 import { keyOf } from "./stillScreen.ts";
 import { useSwapMove } from "./swapMove.ts";
 import { FullButton } from "./FullButton.tsx";
-import { warmPictures } from "./ColumnPlanet.tsx";
+import { warmPictures } from "../../WorldPlanet.tsx";
 import { Info } from "./Info.tsx";
 import { useSearching, type SearchInput } from "./Searching.tsx";
 import type { Pinned } from "./QuickActions.tsx";
@@ -33,7 +33,7 @@ import styles from "./ChatScreen.module.css";
 // narrow: a wide one never carries it (the first screen's budget, ADR-0001 §12). A chunk that cannot be fetched leaves the
 const RoomsDrawer = chunked(async () => ({ default: (await import("./RoomsDrawer.tsx")).RoomsDrawer }), {
   waiting: null,
-  failed: <p role="status">The rooms could not load.</p>,
+  failed: <EmptyState look="failed" urgent line="The rooms could not load." />,
 });
 
 /** The place a chat is in: what the page knows of its world and of the worlds beside it. */
@@ -58,6 +58,8 @@ export interface ChatPlace {
   realms?: readonly string[] | undefined;
   /** The realm this place is the page of: the panel links it on gnoweb, and its pills stay a hub's. */
   realm?: string | undefined;
+  /** The page's room, whose newest words the full chat's planet shows as bubbles, as the page's planet does (D565); none on the Earth. */
+  room?: string | undefined;
   universe: Pick<UniverseView, "id" | "isDefault" | "gnoweb">;
   /** The calls the world's team pins (D271): their pills in the quick actions, and the cards they open over them. */
   pinned?: Pinned | undefined;
@@ -181,12 +183,7 @@ export function ChatScreen(props: ChatScreenProps) {
   const searching = useSearching(search, { world: place, full, compact, closeThread: threads.close });
   const thread = threadAside(threads);
   // The place's buttons stand in the planet's bar where the info panel shows, else in the header.
-  const buttons = (
-    <>
-      {searching.button}
-      <PlaceButtons onWhoIsHere={here.ask} />
-    </>
-  );
+  const buttons = <PlaceActs acts={placeActs(searching.act, here.ask)} />;
   const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
   const aside = asideOf({ thread, panel: searching.panel, bar });
   return (

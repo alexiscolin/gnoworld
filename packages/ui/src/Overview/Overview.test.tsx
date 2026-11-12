@@ -7,10 +7,13 @@ import { Overview } from "./Overview.tsx";
 import * as stories from "./Overview.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Storybook shows everything": each component the entry gives, by the region that shows it and the mark it
-// leaves there; tsc fails this object the day a component joins the entry with nothing named here. stillCopy, sightRef, Room, useAlone, holdsEscape, typedIn and composing are helpers
+// leaves there; tsc fails this object the day a component joins the entry with nothing named here. stillCopy, sightRef, Room, useAlone, holdsEscape, typedIn, composing and grouped are helpers
 // with nothing to draw.
 const SHOWN: Record<
-  Exclude<keyof typeof ui, "stillCopy" | "sightRef" | "Room" | "useAlone" | "holdsEscape" | "typedIn" | "composing">,
+  Exclude<
+    keyof typeof ui,
+    "stillCopy" | "sightRef" | "Room" | "useAlone" | "holdsEscape" | "typedIn" | "composing" | "grouped"
+  >,
   readonly [region: string, mark: string]
 > = {
   Breadcrumb: ["Links", "nav[aria-label] [aria-current='page']"],
@@ -52,13 +55,17 @@ const SHOWN: Record<
   ActivityChart: ["Activity", "svg [data-hour]"],
   DayChart: ["Day chart", "svg [data-hour]"],
   PagedList: ["Paged list", "ul > li"],
+  ShowMore: ["Paged list", 'button[data-emphasis="outline"]'],
   Disclosure: ["Paged list", "button[aria-expanded][aria-controls]"],
   Network: ["Network", "svg[role='group'] circle"],
-  Figures: ["Figures", "[data-value]"],
+  // The band's cells (977255f1 rebuilt it: a figure is a cell of its grid, its value a span, no longer a Stat's `data-value`).
+  Figures: ["Figures", "section[data-look='hub'] [data-span='3']"],
   Sparkline: ["Activity", "svg[data-tone]"],
   Planet: ["Planets", "span.disc[aria-hidden='true']"],
   PlanetThumb: ["Planets", "[data-kind]"],
   Avatar: ["Avatars", "[data-kind] svg"],
+  Stamp: ["Stats", "svg[role='img'][color]"],
+  Badge: ["Stats", "svg[role='img'][data-tone]"],
   LinkProvider: ["Links", "a[data-page-link]"],
   ChatLayout: ["Chat layout", "[data-chat-layout] [data-region='conversation']"],
 };
@@ -66,7 +73,8 @@ const SHOWN: Record<
 describe("Overview", () => {
   it.each(Object.entries(SHOWN))("shows %s in its region", (_, [name, mark]) => {
     render(<Overview />);
-    expect(screen.getByRole("region", { name }).querySelector(mark)).not.toBeNull();
+    // The first in the page's order: the Figures band is a region of that very name inside the Overview's Figures region.
+    expect(screen.getAllByRole("region", { name })[0]?.querySelector(mark)).not.toBeNull();
   });
 
   it("has a region for Text", () => {

@@ -1,19 +1,14 @@
-/* The loader (SpaceLoader.tsx; Alexis's proposal 1, the logo in orbit): opaque over the whole page, the mark and what gnoworld is in its
-   middle. It leaves in one moment (Alexis, 2026-11-07): the mark opens outward and thins, then the loader fades while the canvas opens
-   as an iris under it; opacity and transform only. */
+/* The loader (SpaceLoader.tsx): the black of space, the logo where the header's stands and one thin bar, centred, filling left to right. It
+   leaves by one fade once the bar is full; opacity and transform only. */
 @layer components {
   .loader {
     position: fixed;
     inset: 0;
     /* raw: over the header's and the views' bar's layers, and every control of the page */
     z-index: 100;
-    /* layout: the column of the mark and its words in the middle of the window */
-    display: grid;
-    /* layout: the column centred on both axes */
-    place-content: center;
     background: var(--color-space);
-    /* One clock with the iris, the dive's fade and the rise (Universe.module.css, rise.ts): the loader fades over the iris's time, on its curve. */
-    transition: opacity var(--motion-iris) var(--ease-emphasized);
+    /* raw: the one fade out, 400 ms, after the bar's last 200 ms of fill */
+    transition: opacity 400ms var(--ease-standard) 200ms;
     outline: none;
   }
 
@@ -22,75 +17,76 @@
     pointer-events: none;
   }
 
-  /* The mark, large: the logo's own size is the header's. */
-  .mark {
-    /* layout: the mark in the middle of the column */
-    align-self: center;
+  /* The header's logo: its row is 44 px high under the page's edge, the logo centred in it (shellHeader.module.css). */
+  .brand {
+    position: absolute;
+    inset-block-start: var(--space-s);
+    inset-inline-start: var(--space-s);
+    block-size: var(--control-m);
+    /* layout: the logo in the middle of its row, as the header centres it */
+    display: flex;
     /* layout: and across it */
-    justify-self: center;
-    /* raw: the mark opens outward in 0.8 s and thins out in 0.5 s */
-    transition:
-      transform 800ms var(--ease-standard),
-      opacity 500ms var(--ease-standard);
+    align-items: center;
+    color: var(--color-text);
   }
 
-  .mark svg {
+  @media (min-width: 900px) {
+    .brand {
+      /* raw: the header's 34 px from the top on a computer */
+      inset-block-start: 34px;
+      inset-inline-start: var(--page-edge);
+    }
+  }
+
+  .bar {
+    position: absolute;
+    /* raw: the bar's middle on the screen's middle */
+    inset: 50% auto auto 50%;
+    /* raw: 240 px long, a fifth of a laptop's screen, never past the phone's width less its edges */
+    inline-size: min(240px, calc(100vi - 2 * var(--space-l)));
+    /* raw: 2 px thin */
+    block-size: 2px;
+    border-radius: var(--radius-pill);
+    /* The bar's whole length in grey, under the white fill: where the loading stands is read against it. */
+    background: var(--color-line-strong);
+    transform: translate(-50%, -50%);
+  }
+
+  .fill {
     display: block;
-    /* raw: the proposal's mark, 72 px to 120 px */
-    inline-size: clamp(72px, 14vi, 120px);
-    block-size: auto;
-    color: var(--color-text);
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--color-text);
+    transform: scaleX(0);
+    transform-origin: left;
+    /* raw: a step of the fill, and the last one, 200 ms */
+    transition: transform 200ms linear;
   }
 
-  .loader[data-leaving] .mark {
-    /* raw: the mark opens outward as it thins and goes */
-    transform: scale(2.4);
-    opacity: 0;
+  .fill[data-step="1"] {
+    transform: scaleX(0.25);
   }
 
-  .title,
-  .line {
-    /* layout: the column spaces its lines */
-    margin-block: 0;
-    /* layout: each line centred in the window */
-    margin-inline: auto;
-    text-align: center;
-    /* raw: the words go first, in 0.3 s */
-    transition: opacity 300ms var(--ease-standard);
+  .fill[data-step="2"] {
+    transform: scaleX(0.5);
   }
 
-  .loader[data-leaving] :is(.title, .line) {
-    opacity: 0;
+  .fill[data-step="3"] {
+    transform: scaleX(0.75);
   }
 
-  .title {
-    color: var(--color-text);
-    /* raw: the opening's promise, smaller: 20 px, semibold */
-    font: 600 1.25rem/1.1 var(--family-sans);
+  .fill[data-step="4"] {
+    transform: scaleX(1);
   }
 
-  .line {
-    /* raw: the opening's line, the hero line's grey */
-    color: #c8d0de;
-    /* raw: two short lines at most on a laptop's screen */
-    max-inline-size: 48ch;
-    font: var(--font-meta);
-  }
-
-  /* Under reduced motion: a plain short crossfade. */
+  /* Under reduced motion: the bar is shown full at once, and the leaving is a short fade. */
   @media (prefers-reduced-motion: reduce) {
     .loader {
-      /* raw: a plain 200 ms crossfade */
+      /* raw: a plain 200 ms fade */
       transition: opacity 200ms linear;
     }
 
-    .loader[data-leaving] .mark {
-      transform: none;
-    }
-
-    .mark,
-    .title,
-    .line {
+    .fill {
       transition: none;
     }
   }

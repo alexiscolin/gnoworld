@@ -54,6 +54,15 @@
     fill: var(--color-surface);
   }
 
+  /* A guest's face: a person's outline in the muted ink, on the night disc. */
+  .guest {
+    fill: none;
+    stroke: var(--color-text-muted);
+    /* raw: 2.5 units of 48, an icon's stroke at the face's sizes */
+    stroke-width: 2.5;
+    stroke-linecap: round;
+  }
+
   .line {
     fill: none;
     stroke: var(--color-text);

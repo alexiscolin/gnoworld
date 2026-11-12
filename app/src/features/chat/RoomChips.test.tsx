@@ -26,27 +26,46 @@ const SECTIONS: RoomList["sections"] = [
 const mount = (element: React.ReactElement) => draw(<MemoryRouter>{element}</MemoryRouter>);
 
 describe("RoomChips", () => {
-  it("is a navigation of one link to each room, in the sections' order, the room in view marked", () => {
+  it("is a navigation of one link to each room, the room in view first then the list's order, it marked", () => {
     const nav = one(
       mount(<RoomChips sections={SECTIONS} current="#bubble/games" />),
       'nav[aria-label="Room shortcuts"]',
     );
     const links = all(nav, "a");
-    expect(links.map((link) => link.textContent)).toEqual(["#bubble", "#games", "#lounge"]);
+    expect(links.map((link) => link.textContent)).toEqual(["#games", "#bubble", "#lounge"]);
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
-      "/w/bubble",
       "/w/bubble?room=games",
+      "/w/bubble",
       "/w/bubble?room=lounge",
     ]);
-    expect(links.map((link) => link.getAttribute("aria-current"))).toEqual([null, "true", null]);
+    expect(links.map((link) => link.getAttribute("aria-current"))).toEqual(["true", null, null]);
   });
 
   it("says what a room holds unseen, in words for assistive technology and as a count", () => {
     const box = mount(<RoomChips sections={SECTIONS} current="#bubble" badges={{ "#bubble/games": 3 }} />);
     const games = all(box, "li").find((item) => item.textContent.includes("#games"));
     expect(games?.textContent).toContain("3");
-    expect(games?.querySelector(".visually-hidden")?.textContent).toBe("3 unread");
-    expect(all(box, ".visually-hidden")).toHaveLength(1);
+    expect(games?.querySelector("a")?.getAttribute("aria-label")).toBe("#games, 3 unread");
+  });
+
+  it("ends a crowded row with a +N chip that says it opens a dialog", () => {
+    vi.stubGlobal(
+      "ResizeObserver",
+      class {
+        observe = vi.fn();
+        disconnect = vi.fn();
+      },
+    );
+    const width = vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(100);
+    const wide = vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(60);
+    try {
+      const more = one(mount(<RoomChips sections={SECTIONS} current="#bubble" />), "[data-more] button");
+      expect(more.getAttribute("aria-haspopup")).toBe("dialog");
+    } finally {
+      width.mockRestore();
+      wide.mockRestore();
+      vi.unstubAllGlobals();
+    }
   });
 
   it("draws nothing for no room", () => {

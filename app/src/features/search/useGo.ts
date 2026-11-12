@@ -8,6 +8,7 @@ import { site, universePath, type UniverseView } from "../../places.ts";
 import { useExplore } from "../home/index.ts";
 import { showMap } from "../../mapView.ts";
 import type { SearchItem } from "./types.ts";
+import { realmChat } from "./discover/realms.ts";
 
 export function useGo(universe: UniverseView, close: () => void) {
   const navigate = useNavigate();
@@ -48,7 +49,7 @@ export function useGo(universe: UniverseView, close: () => void) {
     if (item.command === "plan") showMap(true);
     Promise.resolve(navigate(to)).catch(reportError);
   };
-  // A world's chat is docked on its page, the Earth's on its own: any other place says its chat on its universe's Earth.
+  // A world's chat is docked on its page, the Earth's on its own, a realm's in its own room, full; any other place says its chat on its Earth.
   // Opened from the full chat, it stays there: the place's own chat page, its room changing, no space (D393).
   const chat = (item: SearchItem, to?: string) => {
     if (item.kind === "room" || item.kind === "person") {
@@ -61,7 +62,7 @@ export function useGo(universe: UniverseView, close: () => void) {
     }
     const own = item.kind === "world" || item.kind === "station" || item.kind === "earth";
     const home = site.universes.find(({ id }) => id === item.universe) ?? universe;
-    go(item, to ?? (own ? item.path : home.earth.path));
+    go(item, to ?? (own ? item.path : realmChat(item, home.earth.path)));
   };
   const copy = (item: SearchItem) => {
     navigator.clipboard

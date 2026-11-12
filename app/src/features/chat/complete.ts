@@ -8,6 +8,10 @@ export interface Choices {
   people: readonly string[];
   /** Whether `@room` is offered, first of the accounts: a room's composer, not a direct message's (4f-n). */
   group?: boolean;
+  /** Whether `@jarvis` is offered, first of the accounts: where Jarvis can answer the account. */
+  jarvis?: boolean;
+  /** The questions offered once the draft is `@jarvis `, where Jarvis can answer. */
+  examples?: readonly string[] | undefined;
 }
 
 /** How many suggestions are listed, at most. */

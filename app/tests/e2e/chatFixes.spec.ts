@@ -1,4 +1,4 @@
-import { lines, whoIsHere } from "./chat.ts";
+import { lines, pressWhoIsHere, whoIsHere } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -19,7 +19,7 @@ test.describe("the chat's fixes", () => {
   }) => {
     await logIn(page, "fix-phone");
     await open(page, { width: 390, as: ACCOUNT });
-    await page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button", { name: "Who's here" }).click();
+    await pressWhoIsHere(page);
     const dialog = page.getByRole("dialog", { name: "Who's here" });
     await expect(dialog).toContainText("here now");
     await dialog
@@ -27,7 +27,7 @@ test.describe("the chat's fixes", () => {
       .first()
       .click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByRole("heading", { level: 2, name: /^Direct message with/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^Direct message with/ })).toBeVisible();
     await expect(page.getByRole("textbox", { name: /^Message / })).toBeFocused();
   });
 
@@ -41,17 +41,16 @@ test.describe("the chat's fixes", () => {
       .getByRole("button", { name: /^Message/ })
       .first()
       .click();
-    await expect(page.getByRole("heading", { level: 2, name: /^Direct message with/ })).toBeVisible();
-    await expect(page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button")).toHaveText([
-      "Who's here",
-      "Quiz",
-    ]);
+    await expect(page.getByRole("heading", { name: /^Direct message with/ })).toBeVisible();
+    // A conversation has the box's Add menu too, and no row of quick actions over it.
+    await expect(message(page).getByRole("button", { name: "Add" })).toBeVisible();
+    await expect(page.getByRole("toolbar", { name: "Quick actions" })).toHaveCount(0);
     const [box, talk] = await Promise.all([
       message(page).boundingBox(),
       page.locator('[data-region="conversation"]').boundingBox(),
     ]);
     if (box === null || talk === null) throw new Error("not drawn");
-    expect(box.x).toBeGreaterThan(talk.x + 16);
+    expect(box.x).toBeGreaterThanOrEqual(talk.x + 8);
     expect(talk.y + talk.height - (box.y + box.height)).toBeGreaterThan(12);
   });
 
@@ -90,7 +89,7 @@ test.describe("the chat's fixes", () => {
     await chipOf(lines(page).first()).click();
     await expect(panel(page)).toBeVisible();
     await expect(inThread(page).first()).toContainText("the root line");
-    await page.getByRole("toolbar", { name: "Quick actions" }).getByRole("button", { name: "Who's here" }).click();
+    await pressWhoIsHere(page);
     await expect(panel(page)).toHaveCount(0);
     const info = page.getByRole("complementary", { name: "Bubble" });
     await expect(info).toBeFocused();

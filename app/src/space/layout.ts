@@ -60,6 +60,12 @@ const ROOM = 0.9;
 const SPACING = 150;
 const FIRST_ORBIT = 7;
 const SUN_SIZE = 0.6;
+// Every body, its suns, planets and so their moons, a little larger (D13003, on trial): its orbits widen with it.
+const GROW = 1.25;
+// And the room between them a little wider (D13003): the gaps between orbits, not the bodies, which GROW holds.
+const SPREAD = 1.15;
+// A sun at least this many times its largest planet's radius (D13004).
+const SUN_OVER = 2;
 // The home system: the Earth with gno.land's own namespaces, the realms the site was born round (Alexis: "les planètes du système
 // qu'on connaissait").
 
@@ -92,10 +98,16 @@ function sunOf(id: string, home: boolean): readonly [number, number, number] {
   return warm < 0.9 ? [1, 0.95, 0.9] : [0.72, 0.82, 1];
 }
 
-function systemOf(index: number, id: string, { place, use, home, worlds }: Sun): System {
-  // A sun smaller than the demo's, so its planets keep the room round it (Alexis, 2026-11-08); a namespace of many worlds a larger one,
-  // a step each time its worlds double, never past its first orbit's room (D454).
-  const core = (home ? 3.4 : Math.min(2 + 0.7 * Math.log2(1 + worlds), 6)) * SUN_SIZE;
+// A sun smaller than the demo's, so its planets keep the room round it (Alexis, 2026-11-08); a namespace of many worlds a larger one,
+// a step each time its worlds double (D454); never smaller than its largest planet (D13004), its first orbit past it.
+const coreOf = (home: boolean, { worlds, asked = [] }: Kept): number =>
+  Math.max(
+    (home ? 3.4 : Math.min(2 + 0.7 * Math.log2(1 + worlds.length), 6)) * SUN_SIZE * GROW,
+    SUN_OVER * Math.max(0, ...[...worlds, ...asked].map(radiusOf)),
+  );
+
+function systemOf(index: number, id: string, { place, use, home, kept }: Sun): System {
+  const core = coreOf(home, kept);
   return { index, id, home, place, ...planeOf(id, home), sun: sunOf(id, home), core, use, planets: [], reach: 0 };
 }
 
@@ -109,8 +121,8 @@ interface Sun {
   readonly place: Vec;
   readonly use: number;
   readonly home: boolean;
-  /** How many worlds its namespace holds: its sun's size. */
-  readonly worlds: number;
+  /** Its planets: the file's worlds, then the asked ones (its sun's size). */
+  readonly kept: Kept;
 }
 interface Kept {
   readonly worlds: Held;
@@ -120,21 +132,28 @@ interface Kept {
 // The orbits round a system `id` of the file's `worlds` and the `asked` ones past them, each one's and the reach past the last, which its
 // place keeps clear of the others'.
 function orbitsOf(id: string, home: boolean, { worlds, asked = [] }: Kept): { orbits: number[]; reach: number } {
-  let orbit = FIRST_ORBIT + hashOf(id, 10) * 3 + (home ? 5 : 0);
-  // A namespace of many worlds packs its orbits closer: past two dozen, its reach stays a large system's, not a galaxy's.
+  const [first] = [...worlds, ...asked];
+  // The first planet's inner edge: its orbit as before, but never inside three of its sun's radii, out of its glare (D13005).
+  let edge = Math.max(
+    (FIRST_ORBIT + hashOf(id, 10) * 3 + (home ? 5 : 0)) * SPREAD - (first === undefined ? 0 : radiusOf(first)),
+    3 * coreOf(home, { worlds, asked }),
+  );
+  // A namespace of many worlds packs its gaps closer: past two dozen, its reach stays a large system's, not a galaxy's.
   const packed = Math.max(Math.min(1, 24 / Math.max(worlds.length, 1)), 0.25);
+  // Each planet past the last one's outer edge, both radii counted, so none touch; the gaps uneven, some close, some wide (D13005).
   const orbits = [...worlds, ...asked].map((world) => {
-    const at = orbit;
-    orbit += (3 + hashOf(world.id, 15) * 2.2 + radiusOf(world)) * packed;
+    const radius = radiusOf(world);
+    const at = edge + radius;
+    edge = at + radius + (1.5 + hashOf(world.id, 15) * 6) * SPREAD * packed;
     return at;
   });
-  return { orbits, reach: orbit + 6 };
+  return { orbits, reach: edge + 6 };
 }
 
 // A planet's radius by its use (P1), on a log scale: an unused world small, the busiest the largest, each a fifth larger or smaller by its
 // id so no two stand alike (D508); the Earth as it always was.
 const radiusOf = (world: Held[number]) =>
-  world.id === EARTH ? SIZE.earth : sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16));
+  GROW * (world.id === EARTH ? SIZE.earth : sizeOf(world.use) * (0.8 + 0.4 * hashOf(world.id, 16)));
 
 // The planets of `system`: the file's `worlds`, then the `asked` ones the file lacks, on orbits past them.
 function addPlanets(system: System, kept: Kept, planets: Planet[]): void {
@@ -190,12 +209,13 @@ export function layoutOf(worlds: readonly CosmosWorld[], asked: readonly CosmosW
     room,
   );
   const planets: Planet[] = [];
-  const home = systemOf(0, homeId, { place: HEART, use: 0, home: true, worlds: homeWorlds.length });
+  const home = systemOf(0, homeId, { place: HEART, use: 0, home: true, kept: homeKept });
   addPlanets(home, homeKept, planets);
   const systems = [home];
-  for (const [at, { id, list, use }] of [...others, ...fresh].entries()) {
-    const system = systemOf(systems.length, id, { place: places[at] ?? HEART, use, home: false, worlds: list.length });
-    addPlanets(system, kept[at] ?? { worlds: [] }, planets);
+  for (const [at, { id, use }] of [...others, ...fresh].entries()) {
+    const held = kept[at] ?? { worlds: [] };
+    const system = systemOf(systems.length, id, { place: places[at] ?? HEART, use, home: false, kept: held });
+    addPlanets(system, held, planets);
     systems.push(system);
   }
   const [earth] = home.planets;

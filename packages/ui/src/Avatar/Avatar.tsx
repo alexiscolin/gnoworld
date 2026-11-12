@@ -31,11 +31,17 @@ function said({ name, kind = "person", here, speaking, decorative }: AvatarProps
 const xy = ([x, y]: readonly [number, number]) => `${x.toFixed(2)},${y.toFixed(2)}`;
 
 // The address's clouds in its hues, its constellation over them, the bright star with its halo; for what
-// is not an address, nothing: the night disc alone.
+// is not an address (a guest's nick), a person's outline on the night disc, so the face is never an empty hole.
 function Nebula({ address }: { address: string }) {
   const id = useId();
   const parts = partsFrom(address);
-  if (parts === null) return null;
+  if (parts === null)
+    return (
+      <g className={styles["guest"]} data-guest="">
+        <circle cx="24" cy="19" r="7" />
+        <path d="M11 39a13 11 0 0 1 26 0" />
+      </g>
+    );
   const { hues, clouds, stars, order, bright } = parts;
   return (
     <>
