@@ -6,7 +6,7 @@ import { isAddress } from "@gnoworld/core";
 import { placeOf, type Planet, type System, type Universe, type Vec } from "./layout.ts";
 import type { Seen } from "./see.ts";
 import { Planets } from "./labelPlanets.ts";
-import { assign, Rest, retire, type Slot } from "./labelSlots.ts";
+import { assign, expose, Rest, retire, type Slot } from "./labelSlots.ts";
 import { fillPill, midOf, tagOf, watchPill, type LabelHooks } from "./midWorlds.ts";
 import styles from "./labels.module.css";
 
@@ -80,6 +80,7 @@ export class Labels {
       button.type = "button";
       button.className = `placed nowrap row-center pill-ends ${styles["pill"] ?? ""}`;
       button.tabIndex = -1;
+      expose(button, false);
       fillPill(button);
       const slot: Slot<Item, HTMLButtonElement> = { button, item: undefined, seen: 0, retired: false };
       button.addEventListener("click", () => {
@@ -225,10 +226,12 @@ export class Labels {
     const at = this.#where(item);
     if (item === undefined || at === undefined || this.#seen?.project(at, this.#on) !== true) {
       button.classList.toggle(ON, false);
+      expose(button, false);
       this.#rest.place(index, undefined);
       return;
     }
     button.classList.toggle(ON, live);
+    expose(button, live);
     button.classList.toggle(DIM, this.lit !== undefined && !(isPlanet(item) && this.lit.has(item.id)));
     this.#rest.place(index, live ? this.#on : undefined);
     // Another system named from inside one: another pill's look, so it reads as elsewhere, not as one of these planets.

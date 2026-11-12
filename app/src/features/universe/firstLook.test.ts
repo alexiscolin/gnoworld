@@ -45,3 +45,8 @@ it("starts a kept dive at once under reduced motion, and keeps none where no loa
   expect(again.holdsDive({ kind: "home" })).toBe(true);
   expect(again.releaseDive()).toBe(0);
 });
+
+it("puts the scene's canvas out of the accessibility tree: a picture outside every landmark, its names being the buttons and the page's words", async () => {
+  const { layers } = await import("./firstLook.ts");
+  expect(layers("scene").canvas.getAttribute("aria-hidden")).toBe("true");
+});

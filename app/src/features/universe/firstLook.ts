@@ -59,6 +59,8 @@ export function revealShell(page: boolean): void {
  * once its page's planet is itself (frame.ts's `sharp` event), and the labels' box. */
 export function layers(className: string): { canvas: HTMLCanvasElement; labels: HTMLElement } {
   const canvas = Object.assign(document.createElement("canvas"), { className });
+  // A picture of the world the page names: the names over it are its buttons, the page's own words say the rest.
+  canvas.setAttribute("aria-hidden", "true");
   const labels = document.createElement("div");
   labels.style.cssText = "position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:0";
   document.body.prepend(canvas, labels);

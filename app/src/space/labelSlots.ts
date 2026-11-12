@@ -90,3 +90,10 @@ export class Rest {
     return settings.every((value, at) => value === this.#saw[at]) && performance.now() - this.#busyAt > FADE_MS + 50;
   }
 }
+
+// A name no one sees is no button to a screen reader: an idle pool slot has no words, a fading one is leaving. Written only on a change.
+export function expose(button: HTMLButtonElement, shown: boolean): void {
+  if ((button.getAttribute("aria-hidden") === "true") !== shown) return;
+  if (shown) button.removeAttribute("aria-hidden");
+  else button.setAttribute("aria-hidden", "true");
+}

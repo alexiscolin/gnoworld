@@ -23,13 +23,6 @@ export interface Flight {
   eye: { x: number; y: number; z: number };
 }
 
-/** The engine's frames drawn so far, by its renderer. */
-export const framesOf = (page: Page) =>
-  page.evaluate(() => {
-    const space = Reflect.get(globalThis, "__gnoworldSpace") as Space | undefined;
-    return space?.renderer.info.render.frame ?? 0;
-  });
-
 /** Counts, from now, every flight the rig is asked: the engine keeps none, a journey waits on the count. */
 export const countFlights = (page: Page) =>
   page.evaluate(() => {
@@ -93,7 +86,7 @@ interface CosmosStats {
   stations?: { close: number; belt: number; parts: number; draws: number; scenery: number; orbits: boolean };
 }
 /** The flights (7g): how many started, one under way or not, how far along, its veil and streaks, where it goes, and the eye's way so far. */
-export interface FlightStats {
+interface FlightStats {
   flights: number;
   flying: boolean;
   along: number;
@@ -121,7 +114,7 @@ interface Stats {
   flight: FlightStats | undefined;
 }
 
-/** The old hook is gone: a journey still reading it fails here; read the engine (`flightOf`, `worldsDrawn`, `framesOf`) instead. */
+/** The old hook is gone: a journey still reading it fails here; read the engine (`flightOf`, `worldsDrawn`) instead. */
 export const stats = (page: Page) =>
   page.evaluate((): Stats => {
     throw new Error(

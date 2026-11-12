@@ -105,3 +105,27 @@ describe("the names of a still scene", () => {
     expect(labels.settled()).toBe(true);
   });
 });
+
+describe("the names as the page's buttons", () => {
+  const open = (): HTMLButtonElement[] => [...layer.querySelectorAll("button")].filter((b) => b.ariaHidden !== "true");
+
+  it("leave no button without a name in the accessibility tree: the pool's idle ones are hidden from it", () => {
+    expect(open()).toEqual([]);
+    labels.tick(seen, 0);
+    for (const button of open()) expect(button.textContent.trim()).not.toBe("");
+    expect(open().length).toBeGreaterThan(0);
+    expect(open().length).toBeLessThan(layer.querySelectorAll("button").length);
+  });
+
+  it("show a name again when it is lit, and hide it once it fades out", () => {
+    labels.tick(seen, 0);
+    vi.advanceTimersByTime(1000);
+    labels.tick(seen, 0);
+    expect(open().length).toBeGreaterThan(0);
+    labels.hidden = true;
+    labels.tick(seen, 0);
+    vi.advanceTimersByTime(2000);
+    labels.tick(seen, 0);
+    expect(open()).toEqual([]);
+  });
+});
