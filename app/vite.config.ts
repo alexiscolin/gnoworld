@@ -154,4 +154,19 @@ export default defineConfig({
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
   server: { ...workshopServer(), proxy: workshopBackend() },
+  // The dev server bundles the composer's editor at its start, not when a page first asks for it: found later, it is bundled again
+  // while the page runs, and a page holding the two bundles sees two Lexical cores ("not a constructor that subclasses LexicalNode").
+  optimizeDeps: {
+    include: [
+      "lexical",
+      "@lexical/code-core",
+      "@lexical/history",
+      "@lexical/link",
+      "@lexical/list",
+      "@lexical/markdown",
+      "@lexical/rich-text",
+      "@lexical/selection",
+      "@lexical/utils",
+    ],
+  },
 });

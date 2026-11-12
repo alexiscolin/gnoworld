@@ -9804,7 +9804,7 @@ until_ 'grep -q "and so do the worlds job and the prices. timer" "$w/one.out"' |
 # parameters, each its real path: the home folder, what of it they read (the checkout, the one node_modules lead to, Node, the tools'
 # cache, GNOWORLD_TOOLS here), and what they write (lot 2's S1, F4962).
 for each in react-router vite node sh; do
-	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router" "$w/log.seatbelt" ||
+	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router OPENAI_KEY=/nonexistent" "$w/log.seatbelt" ||
 		fail "workshop.sh did not start $each under its profile with its folders: $(cat "$w/log.seatbelt" 2>/dev/null)"
 done
 order

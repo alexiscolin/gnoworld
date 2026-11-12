@@ -3,7 +3,8 @@ import type { StorybookConfig } from "@storybook/react-vite";
 
 const config: StorybookConfig = {
   framework: "@storybook/react-vite",
-  stories: ["../src/**/*.stories.tsx"],
+  // The app's failure views are drawn here too, apart from the scene that may be what failed.
+  stories: ["../src/**/*.stories.tsx", "../../../app/src/features/errors/*.stories.tsx"],
   // Storybook reports nothing home: the sandbox and the CI reach only the registries.
   core: { disableTelemetry: true },
 };

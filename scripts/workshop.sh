@@ -43,7 +43,8 @@ tools=${GNOWORLD_TOOLS:-$HOME/.cache/gnoworld-tools} && mkdir -p "$tools" && too
 boxed() {
 	exec /usr/bin/sandbox-exec -f "$seatbelt" -D HOME="$home" -D ROOT="$root" -D MAIN="$main" -D NODE="$node_dir" -D TOOLS="$tools" \
 		-D TMP="$scratch" -D CHECKOUT_TMP="$root/.claude/tmp" -D VITE_CACHE="$root/app/node_modules/.vite" \
-		-D VITE_TEMP="$root/app/node_modules/.vite-temp" -D ROUTER_TYPES="$root/app/.react-router" "$@"
+		-D VITE_TEMP="$root/app/node_modules/.vite-temp" -D ROUTER_TYPES="$root/app/.react-router" \
+		-D OPENAI_KEY="${WORKSHOP_OPENAI_KEY_FILE:-/nonexistent}" "$@"
 }
 app_port=${WORKSHOP_APP_PORT:-5198} lab_port=${WORKSHOP_LAB_PORT:-5199}
 api_port=${WORKSHOP_API_PORT:-5195} irc_port=${WORKSHOP_IRC_PORT:-5196} ws_port=${WORKSHOP_WS_PORT:-5197} # the server's, Ergo's, Ergo's WebSocket
