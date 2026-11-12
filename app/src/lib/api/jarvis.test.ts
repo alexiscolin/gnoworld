@@ -252,29 +252,30 @@ describe("a question to Jarvis, through the door", () => {
   });
 });
 
-describe("a line's translation, from the door", () => {
-  const request = { room: ROOM, msgid: "AB12", language: "fr" } as const;
-
-  it("posts the room, the line's id and the language to /api/jarvis/translate, and reads the answer through its schema", async () => {
-    const { sent, api } = server(200, { status: "translated", text: "Bonjour", from: "en" });
-    expect(await api().translate(request)).toEqual({
+describe("a kept public answer, read by its line", () => {
+  it("asks GET /api/jarvis/said with the room and the id encoded, never a body", async () => {
+    const { sent, api } = server(200, { answer: ANSWERED, asker: "g1jg8m…vsqf5" });
+    expect(await api().said("#bubble/crew", "m 1&x")).toEqual({
       ok: true,
-      value: { status: "translated", text: "Bonjour", from: "en" },
+      value: { answer: ANSWERED, asker: "g1jg8m…vsqf5" },
     });
-    expect(sent[0]?.url).toBe("/api/jarvis/translate");
-    expect(sent[0]?.init).toMatchObject({ method: "POST", credentials: "same-origin", redirect: "error" });
-    expect(bodyOf(sent[0]?.init)).toEqual(request);
+    expect(sent[0]?.url).toBe("/api/jarvis/said?room=%23bubble%2Fcrew&id=m%201%26x");
+    expect(sent[0]?.init).toMatchObject({ method: "GET", credentials: "same-origin", redirect: "error" });
+    expect(sent[0]?.init.body).toBeUndefined();
   });
 
-  it("refuses a request off the schema before sending, and takes an answer off it as malformed", async () => {
-    const { sent, api } = server(200, { status: "translated", text: "x", from: "xx" });
-    expect(await api().translate({ ...request, language: "xx" as "fr" })).toEqual({ ok: false, reason: "malformed" });
-    expect(sent).toHaveLength(0);
-    expect(await api().translate(request)).toEqual({ ok: false, reason: "malformed" });
-  });
-
-  it("says too_many for a 429, so the queue tries later", async () => {
-    const { api } = server(429);
-    expect(await api().translate(request)).toMatchObject({ ok: false, reason: "too_many" });
+  it("reads the answer through the schema: a body off it is malformed, a 404 a refusal, a 500 unavailable", async () => {
+    for (const body of [
+      { answer: { status: "answered", markdown: 3 }, asker: "g1jg8m…vsqf5" },
+      { answer: ANSWERED },
+      { answer: ANSWERED, asker: "g1jg8m…vsqf5", more: 1 },
+      ANSWERED,
+    ])
+      expect(await server(200, body).api().said(ROOM, "m1")).toEqual({ ok: false, reason: "malformed" });
+    expect(await server(404, { error: "not_found" }).api().said(ROOM, "m1")).toMatchObject({
+      ok: false,
+      reason: "not_found",
+    });
+    expect(await server(500).api().said(ROOM, "m1")).toMatchObject({ ok: false, reason: "unavailable" });
   });
 });

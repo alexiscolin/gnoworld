@@ -1,125 +1,134 @@
 // @vitest-environment jsdom
-import type { JarvisTranslateRequest, JarvisTranslation } from "@gnoworld/schemas";
+import type { LineTranslations, TranslationEvent } from "@gnoworld/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "./lib/api/http.ts";
+import type { Language } from "./lib/language.ts";
 
-// A room's lines translated as they come on screen: asked once a line and a language, newest first, one after another up to ASKS_A_MINUTE
-// in any minute, kept on the device.
-type Ask = (request: JarvisTranslateRequest) => Promise<Result<JarvisTranslation>>;
-const ok = (value: JarvisTranslation): Result<JarvisTranslation> => ({ ok: true, value });
-const HELLO = { status: "translated", text: "Bonjour", from: "en" } as const;
+// A room's lines translated as they come on screen: the stored translations asked of the server in batches of at most 30, never one by
+// one, and the stream's events put in the same store.
+type Ask = (room: string, ids: readonly string[], language: Language) => Promise<Result<LineTranslations>>;
+const ok = (over: Partial<LineTranslations> = {}): Result<LineTranslations> => ({
+  ok: true,
+  value: { room: "#bubble", language: "fr", translations: [], pending: [], ...over },
+});
+const HELLO = { msgid: "a1", status: "translated", text: "Bonjour", from: "en" } as const;
 
-// A fresh module each test: its memory is the page's.
 async function fresh() {
   vi.resetModules();
   return import("./translating.ts");
 }
 type T = Awaited<ReturnType<typeof fresh>>;
-const now = (t: T, id = "a1") => t.translationNow({ room: "#bubble", id, language: "fr" });
-// The gathering of lines that came together (GATHER_MS), after which the first ask goes.
+const want = (t: T, id: string, ask: Ask) => t.wantTranslation({ room: "#bubble", id, language: "fr" }, ask);
+const wantDe = (t: T, id: string, ask: Ask) => t.wantTranslation({ room: "#bubble", id, language: "de" }, ask);
+const now = (t: T, id = "a1", language: "fr" | "de" = "fr") => t.translationNow({ room: "#bubble", id, language });
 const settle = () => vi.advanceTimersByTimeAsync(100);
-// A step of time well past an ask's own, to let the queue run.
-const STEP = 2500;
 
 beforeEach(() => {
-  localStorage.clear();
   vi.useFakeTimers();
 });
 afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("asking a line's translation", () => {
-  it("asks with the room, the line and the language, and holds the translation with its original's language", async () => {
+describe("asking the stored translations of the lines on screen", () => {
+  it("asks the lines that came together in one request, the newest first, after a short gathering", async () => {
     const t = await fresh();
-    const ask = vi.fn<Ask>(() => Promise.resolve(ok(HELLO)));
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok()));
+    for (const id of ["a1", "a2", "a3"]) want(t, id, ask);
+    expect(ask).not.toHaveBeenCalled();
     await settle();
-    expect(ask).toHaveBeenCalledWith({ room: "#bubble", msgid: "a1", language: "fr" });
-    expect(now(t)).toEqual({ state: "done", text: "Bonjour", from: "en", hidden: false });
-  });
-
-  it("asks once a line and a language, and not at all for one it holds", async () => {
-    const t = await fresh();
-    const ask = vi.fn<Ask>(() => Promise.resolve(ok(HELLO)));
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(STEP * 3);
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(STEP * 3);
     expect(ask).toHaveBeenCalledTimes(1);
+    expect(ask).toHaveBeenCalledWith("#bubble", ["a3", "a2", "a1"], "fr");
   });
 
-  it("asks the newest line that came on screen first, then the others at once, one after another, never waiting between them", async () => {
+  it("holds a stored translation as done with its original's language, and an original as same", async () => {
     const t = await fresh();
-    const ask = vi.fn<Ask>(() => Promise.resolve(ok(HELLO)));
-    for (const id of ["a1", "a2", "a3"]) t.wantTranslation({ room: "#bubble", id, language: "fr" }, ask);
+    const ask = () => Promise.resolve(ok({ translations: [HELLO, { msgid: "a2", status: "original" as const }] }));
+    want(t, "a1", ask);
+    want(t, "a2", ask);
     await settle();
-    await vi.advanceTimersByTimeAsync(100);
-    expect(ask.mock.calls.map(([sent]) => sent.msgid)).toEqual(["a3", "a2", "a1"]);
+    expect(now(t)).toEqual({ state: "done", text: "Bonjour", from: "en", hidden: false });
+    expect(now(t, "a2")).toEqual({ state: "same" });
   });
 
-  it("keeps under the door's rate: ASKS_A_MINUTE asks in any minute, the next once the first of them is a minute old", async () => {
+  it("asks 31 lines in two requests of 30 and 1, one after the other, never one by one", async () => {
     const t = await fresh();
-    const times: number[] = [];
-    const ask = vi.fn<Ask>(() => {
-      times.push(Date.now());
-      return Promise.resolve(ok(HELLO));
-    });
-    for (let at = 0; at < 30; at += 1)
-      t.wantTranslation({ room: "#bubble", id: `l${String(at)}`, language: "fr" }, ask);
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok()));
+    for (let at = 0; at < 31; at += 1) want(t, `l${String(at)}`, ask);
     await settle();
-    await vi.advanceTimersByTimeAsync(100);
-    expect(ask).toHaveBeenCalledTimes(t.ASKS_A_MINUTE);
-    expect(t.ASKS_A_MINUTE).toBeLessThan(30);
-    // The first ask went at 100 ms: none more till it is a minute old, then the rest as the first ones get a minute old.
-    await vi.advanceTimersByTimeAsync(60_000 - 250);
-    expect(ask).toHaveBeenCalledTimes(t.ASKS_A_MINUTE);
-    await vi.advanceTimersByTimeAsync(1000);
-    expect(ask).toHaveBeenCalledTimes(30);
-    for (let at = t.ASKS_A_MINUTE; at < 30; at += 1)
-      expect((times[at] ?? 0) - (times[at - t.ASKS_A_MINUTE] ?? 0)).toBeGreaterThanOrEqual(60_000);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(ask.mock.calls.map(([, ids]) => ids.length)).toEqual([30, 1]);
   });
 
-  it("drops a line that left the screen before its turn", async () => {
+  it("asks a room's two languages apart, and asks nothing again for a line it holds, is asking or has failed", async () => {
     const t = await fresh();
-    const ask = vi.fn<Ask>(() => Promise.resolve(ok(HELLO)));
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    t.wantTranslation({ room: "#bubble", id: "a2", language: "fr" }, ask);
-    const leave = t.wantTranslation({ room: "#bubble", id: "a3", language: "fr" }, ask);
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok({ pending: ["a1"] })));
+    want(t, "a1", ask);
+    wantDe(t, "a1", ask);
+    want(t, "a1", ask);
+    await settle();
+    await vi.advanceTimersByTimeAsync(10);
+    expect(ask.mock.calls.map(([, ids, language]) => [ids.join(), language]).toSorted()).toEqual([
+      ["a1", "de"],
+      ["a1", "fr"],
+    ]);
+    want(t, "a1", ask);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ask).toHaveBeenCalledTimes(2);
+  });
+
+  it("drops a line that left the screen before the request went", async () => {
+    const t = await fresh();
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok()));
+    want(t, "a1", ask);
+    const leave = want(t, "a2", ask);
     leave();
-    t.wantTranslation({ room: "#bubble", id: "a4", language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(STEP * 5);
-    expect(ask.mock.calls.map(([sent]) => sent.msgid)).toEqual(["a4", "a2", "a1"]);
-  });
-
-  it("keeps a translation and an original on the device: a reload shows them and asks nothing", async () => {
-    const first = await fresh();
-    const ask = vi.fn<Ask>(({ msgid }) => Promise.resolve(ok(msgid === "a1" ? HELLO : { status: "original" })));
-    first.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    first.wantTranslation({ room: "#bubble", id: "a2", language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(STEP * 3);
-    const reloaded = await fresh();
-    const again = vi.fn<Ask>();
-    reloaded.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, again);
-    reloaded.wantTranslation({ room: "#bubble", id: "a2", language: "fr" }, again);
-    await vi.advanceTimersByTimeAsync(STEP * 3);
-    expect(again).not.toHaveBeenCalled();
-    expect(now(reloaded)).toMatchObject({ state: "done", text: "Bonjour", hidden: false });
-    expect(now(reloaded, "a2")).toEqual({ state: "same" });
-  });
-
-  it("holds a line that came back original as drawn nowhere", async () => {
-    const t = await fresh();
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, () => Promise.resolve(ok({ status: "original" })));
     await settle();
-    expect(now(t)).toEqual({ state: "same" });
+    expect(ask).toHaveBeenCalledWith("#bubble", ["a1"], "fr");
   });
 
-  it("retries a refusal for the rate later, the line kept in the queue", async () => {
+  it("shows a line the server is still making as asking, and a line it left out as failed", async () => {
     const t = await fresh();
-    const ask = vi.fn<Ask>().mockResolvedValueOnce({ ok: false, reason: "too_many" }).mockResolvedValue(ok(HELLO));
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok({ pending: ["a1"] })));
+    want(t, "a1", ask);
+    want(t, "a2", ask);
+    await settle();
+    expect(now(t)).toEqual({ state: "asking" });
+    expect(now(t, "a2")).toEqual({ state: "failed" });
+  });
+
+  it("takes the translation of a line it was told is asking from the stream's event", async () => {
+    const t = await fresh();
+    want(t, "a1", () => Promise.resolve(ok({ pending: ["a1"] })));
+    await settle();
+    const event: TranslationEvent = {
+      room: "#bubble",
+      msgid: "a1",
+      language: "fr",
+      status: "translated",
+      text: "Salut",
+    };
+    t.translationsTold([event, { room: "#bubble", msgid: "a9", language: "fr", status: "original" }]);
+    expect(now(t)).toMatchObject({ state: "done", text: "Salut" });
+    expect(now(t, "a9")).toEqual({ state: "same" });
+  });
+
+  it("asks nothing for a line the stream already told", async () => {
+    const t = await fresh();
+    t.translationsTold([{ room: "#bubble", msgid: "a1", language: "fr", status: "translated", text: "Salut" }]);
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok()));
+    want(t, "a1", ask);
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(ask).not.toHaveBeenCalled();
+  });
+
+  it("asks again after a refusal for the rate, later, the lines kept", async () => {
+    const t = await fresh();
+    const ask = vi
+      .fn<Ask>()
+      .mockResolvedValueOnce({ ok: false, reason: "too_many" })
+      .mockResolvedValue(ok({ translations: [HELLO] }));
+    want(t, "a1", ask);
     await settle();
     expect(ask).toHaveBeenCalledTimes(1);
     await vi.advanceTimersByTimeAsync(t.RETRY_MS - 1);
@@ -129,37 +138,32 @@ describe("asking a line's translation", () => {
     expect(now(t)?.state).toBe("done");
   });
 
-  it("leaves a line whose ask failed as it is, never asked again by this page", async () => {
+  it("leaves lines whose request failed as failed, never asked again by this page", async () => {
     const t = await fresh();
     const ask = vi.fn<Ask>(() => Promise.resolve({ ok: false, reason: "unavailable" }));
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(STEP * 2);
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(STEP * 2);
+    want(t, "a1", ask);
+    await settle();
+    want(t, "a1", ask);
+    await vi.advanceTimersByTimeAsync(5000);
     expect(ask).toHaveBeenCalledTimes(1);
     expect(now(t)).toEqual({ state: "failed" });
   });
 
-  it.each(["spent", "off"] as const)(
-    "stops the queue on %s, once, with the reason held for the room",
-    async (status) => {
-      const t = await fresh();
-      const ask = vi.fn<Ask>(() => Promise.resolve(ok({ status })));
-      for (const id of ["a1", "a2", "a3"]) t.wantTranslation({ room: "#bubble", id, language: "fr" }, ask);
-      t.wantTranslation({ room: "#bubble", id: "a4", language: "fr" }, ask);
-      await vi.advanceTimersByTimeAsync(STEP * 6);
-      expect(ask).toHaveBeenCalledTimes(1);
-      expect(t.translationHalt()).toBe(status);
-      t.wantTranslation({ room: "#bubble", id: "a5", language: "fr" }, ask);
-      await vi.advanceTimersByTimeAsync(STEP * 6);
-      expect(ask).toHaveBeenCalledTimes(1);
-      expect(now(t, "a4")).toBeUndefined();
-    },
-  );
+  it.each(["spent", "off"] as const)("stops asking on %s, the reason held for the room", async (halt) => {
+    const t = await fresh();
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok({ halt })));
+    want(t, "a1", ask);
+    await settle();
+    expect(t.translationHalt()).toBe(halt);
+    want(t, "a2", ask);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(now(t, "a2")).toBeUndefined();
+  });
 
   it("folds a translation away and brings it back, the original never touched", async () => {
     const t = await fresh();
-    t.wantTranslation({ room: "#bubble", id: "a1", language: "fr" }, () => Promise.resolve(ok(HELLO)));
+    want(t, "a1", () => Promise.resolve(ok({ translations: [HELLO] })));
     await settle();
     t.foldTranslation({ room: "#bubble", id: "a1", language: "fr" }, true);
     expect(now(t)).toMatchObject({ state: "done", hidden: true });
@@ -167,12 +171,14 @@ describe("asking a line's translation", () => {
     expect(now(t)).toMatchObject({ hidden: false });
   });
 
-  it("asks a number of lines on screen once each: 50 lines make 50 asks, within three minutes", async () => {
-    const t = await fresh();
-    const ask = vi.fn<Ask>(() => Promise.resolve(ok(HELLO)));
-    for (let at = 0; at < 50; at += 1)
-      t.wantTranslation({ room: "#bubble", id: `l${String(at)}`, language: "fr" }, ask);
-    await vi.advanceTimersByTimeAsync(3 * 60_000);
-    expect(ask).toHaveBeenCalledTimes(50);
+  it("keeps nothing on the device: a reload asks the server again", async () => {
+    const first = await fresh();
+    want(first, "a1", () => Promise.resolve(ok({ translations: [HELLO] })));
+    await settle();
+    const reloaded = await fresh();
+    const ask = vi.fn<Ask>(() => Promise.resolve(ok({ translations: [HELLO] })));
+    want(reloaded, "a1", ask);
+    await settle();
+    expect(ask).toHaveBeenCalledTimes(1);
   });
 });

@@ -275,6 +275,15 @@ describe("a source's facts", () => {
     expect([...facts.words]).toEqual(expect.arrayContaining(["top", "nested", "done", "task"]));
   });
 
+  it("finds a link and a word in a table's head and in its cells", () => {
+    const source = ["| name | [head](/r/demo/head) |", "| --- | --- |", "| cell | https://gno.land/r/demo/cell |"].join(
+      "\n",
+    );
+    const facts = sourceFactsOf(source, ORIGIN);
+    expect([...facts.links].sort()).toEqual(["https://gno.land/r/demo/cell", "https://gno.land/r/demo/head"]);
+    expect([...facts.words]).toEqual(expect.arrayContaining(["name", "head", "cell"]));
+  });
+
   it("finds a link and a word in each of a page's columns, and nothing in a rule", () => {
     const source = [
       "<gno-columns>",

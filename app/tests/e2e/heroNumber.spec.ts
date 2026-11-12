@@ -39,7 +39,7 @@ for (const width of [390, 1280]) {
   test.describe(`at ${String(width)} px`, () => {
     test.use({ viewport: { width, height: 844 } });
 
-    test("the home without the scene keeps its number, from the worlds' count, and asks nothing of the worlds' file", async ({
+    test("the home without the scene keeps its number, from the worlds' count, and a phone asks nothing of the worlds' file", async ({
       page,
     }) => {
       const file = await served(page);
@@ -50,7 +50,8 @@ for (const width of [390, 1280]) {
       expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldScene")), "no scene ran").toBe(false);
       await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
       expect(file.count()).toBe(1);
-      expect(file.worlds()).toBe(0);
+      // The page preloads the worlds' file for what is not a phone (routes/home.tsx's links), once, whether the scene runs or not.
+      expect(file.worlds()).toBe(width === 390 ? 0 : 1);
     });
 
     // The hero as the frames draw it (2 to 8), with a count: from its kicker to its actions, the live line and the ticker left out.

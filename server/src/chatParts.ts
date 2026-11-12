@@ -5,20 +5,27 @@ import type { Log } from "@gnoworld/service/log";
 import type { Rooms } from "./rooms/create.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Mutes } from "./moderation/mute.ts";
-import { listRooms, worldRooms } from "./rooms/rooms.ts";
+import { ensureNamed, ensureRooms, listRooms, worldRooms } from "./rooms/rooms.ts";
 import { listed, mayRead, staffOf } from "./rooms/types.ts";
 import { verdictRoutes } from "./stream/verdicts.ts";
 import { visitorOf } from "./visitor.ts";
 import type { Options, Settings } from "./chat.ts";
 import type { Config } from "./config.ts";
 import type { CardFlow } from "./cards/flow.ts";
+import type { TranslationFlow } from "./translations/flow.ts";
 import type { makeQueue } from "./moderation/queue.ts";
 import type { Stream } from "./stream/stream.ts";
 import type { Present } from "./worlds/present.ts";
 import { ircLink, type Link, type Said } from "./irc/link.ts";
 import type { makeProgress } from "./moderation/catchup.ts";
 import type { pinsFor } from "./pins/wire.ts";
-import type { reconcilerFor } from "./rooms/wire.ts";
+import { typedRooms, type reconcilerFor } from "./rooms/wire.ts";
+
+/** Each world's main room and its roles file's typed rooms, made in the database. */
+export function seedRooms(db: DatabaseSync, settings: Settings, now: number): void {
+  ensureRooms(db, [...settings.worlds.keys()], now);
+  ensureNamed(db, typedRooms(settings.worlds), now);
+}
 
 // A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
 const unknownChannels =
@@ -59,6 +66,7 @@ interface LinkParts {
   mutes: { reapply: () => void };
   kept: ReturnType<typeof pinsFor>;
   cards: { redacted: (room: string, msgid: string) => void } | undefined;
+  translations: { redacted: (room: string, msgid: string) => void } | undefined;
   recent: { taken: (room: string, msgid: string) => void };
   log: Log;
   onMessage: (said: Said, replayed: boolean) => void;
@@ -75,6 +83,7 @@ export function linkFor({
   mutes,
   kept,
   cards,
+  translations,
   recent,
   log,
   onMessage,
@@ -98,6 +107,7 @@ export function linkFor({
       kept.hooks.onRedact(room, msgid);
       recent.taken(room, msgid);
       cards?.redacted(room, msgid);
+      translations?.redacted(room, msgid);
     },
     onChannels: unknownChannels(db, log),
     onMessage,
@@ -124,6 +134,7 @@ export const stopper =
     present,
     queue,
     cards,
+    translations,
     link,
     stream,
   }: {
@@ -132,6 +143,7 @@ export const stopper =
     present: Present | undefined;
     queue: Pick<ReturnType<typeof makeQueue>, "stop" | "idle">;
     cards: CardFlow | undefined;
+    translations: Pick<TranslationFlow, "stop" | "idle"> | undefined;
     link: () => Link | undefined;
     stream: Stream;
   }) =>
@@ -141,8 +153,10 @@ export const stopper =
     present?.stop();
     queue.stop();
     cards?.stop();
+    translations?.stop();
     await link()?.stop();
     await queue.idle();
     await cards?.idle();
+    await translations?.idle();
     stream.close();
   };

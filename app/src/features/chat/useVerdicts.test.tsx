@@ -8,6 +8,8 @@ import { fakeStream } from "../../../tests/fakeStream.ts";
 import { BATCH_MS } from "../../lib/stream/chainFeed.ts";
 import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
+import { tellJarvisHere } from "../../jarvisHere.ts";
+import { translationNow } from "../../translating.ts";
 import { cardsIn } from "./cardsIn.ts";
 import { useVerdicts, type Shown } from "./useVerdicts.ts";
 
@@ -172,6 +174,24 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     expect(asked).toEqual([]);
   });
 
+  it("asks the stream for a signed-in reader's language, and holds the translations it tells", async () => {
+    tellJarvisHere({ room: "#bubble", universe: { id: "u", isDefault: true }, account: "g1x", language: "de" });
+    const sources = await draw([]);
+    tellJarvisHere(undefined);
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble&language=de"]);
+    sources.opened[0]?.emit("translation", {
+      room: "#bubble",
+      msgid: "t-from-stream",
+      language: "de",
+      status: "translated",
+      text: "Hallo",
+    });
+    expect(translationNow({ room: "#bubble", id: "t-from-stream", language: "de" })).toMatchObject({
+      state: "done",
+      text: "Hallo",
+    });
+  });
+
   it("asks the server of the line that holds a link, once the code came, and of none other", async () => {
     const sources = await draw([line("a", "https://youtu.be/dQw4w9WgXcQ"), line("b", "only words")]);
     sources.opened[0]?.emit("since", SINCE);
@@ -187,7 +207,16 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const sources = await draw([]);
     sources.opened[0]?.emit("signal", CHART);
     expect(store.getState().signals.map(({ world, kind }) => `${world} ${kind}`)).toEqual(["bubble chart"]);
-    expect(sources.opened[0]?.heard()).toEqual(["card", "chain", "error", "realms", "signal", "since", "verdict"]);
+    expect(sources.opened[0]?.heard()).toEqual([
+      "card",
+      "chain",
+      "error",
+      "realms",
+      "signal",
+      "since",
+      "translation",
+      "verdict",
+    ]);
   });
 
   it("hands a verdict of the stream to the store", async () => {

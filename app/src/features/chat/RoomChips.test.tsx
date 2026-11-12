@@ -3,6 +3,7 @@ import type { RoomList } from "@gnoworld/schemas";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { all, mount as draw, one } from "../../../tests/mount.tsx";
+import { rememberRealms } from "../../lib/roomRealms.ts";
 import { RoomChips } from "./RoomChips.tsx";
 
 // The reader's session, which the store holds: signed in or out as each test says.
@@ -39,6 +40,18 @@ describe("RoomChips", () => {
       "/w/bubble?room=lounge",
     ]);
     expect(links.map((link) => link.getAttribute("aria-current"))).toEqual(["true", null, null]);
+  });
+
+  it("names two realms alike apart, the later version by its version", () => {
+    const rooms = [
+      { room: "#nym-x-golf-0123456789/golf-aaaaaaaaaa", realm: "gno.land/r/nym/golf" },
+      { room: "#nym-x-golf-0123456789/golf-bbbbbbbbbb", realm: "gno.land/r/nym/golf/v2" },
+      { room: "#nym-x-golf-0123456789/other-cccccccccc", realm: "gno.land/r/nym/other" },
+    ].map((each) => ({ ...each, type: "open" as const }));
+    const sections: RoomList["sections"] = [{ name: null, rooms }];
+    rememberRealms(sections);
+    const links = all(mount(<RoomChips sections={sections} current={rooms[0]?.room} />), "a");
+    expect(links.map((link) => link.textContent)).toEqual(["#golf", "#golf v2", "#other"]);
   });
 
   it("says what a room holds unseen, in words for assistive technology and as a count", () => {

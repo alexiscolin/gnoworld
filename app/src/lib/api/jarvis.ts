@@ -1,8 +1,13 @@
 // The browser's client of the door's Jarvis routes (server/src/door/state.ts and ask.ts, under /api/jarvis), through the one JSON
 // call of lib/api/http.ts. Every answer is read through its schema: one off it, a 401, a 500 or a timeout is a failure the panel
 // shows as `off`, never a retry.
-import { ASK_WAIT_S, JarvisAnswer, JarvisQuestion, JarvisTranslateRequest, JarvisTranslation } from "@gnoworld/schemas";
+import { ASK_WAIT_S, JarvisAnswer, JarvisQuestion } from "@gnoworld/schemas";
+import { z } from "../jitless.ts";
 import { jsonCall, type Fetcher, type Result } from "./http.ts";
+
+/** What the door keeps for a line Jarvis said: the answer, and its asker by short address. */
+export const KeptAnswer = z.strictObject({ answer: JarvisAnswer, asker: z.string() });
+export type KeptAnswer = z.infer<typeof KeptAnswer>;
 
 /** The most code points a person's own question holds (D13986); the server's cap is higher and its own. */
 export const QUESTION_CHARS = 500;
@@ -17,18 +22,19 @@ const tooLong = (question: JarvisQuestion): boolean =>
 
 export function jarvisApi(fetcher: Fetcher, timeoutMs?: number) {
   const ask = jsonCall(fetcher, timeoutMs ?? ASK_MS);
-  const translation = jsonCall(fetcher, timeoutMs);
+  const read = jsonCall(fetcher, timeoutMs);
   return {
     /** A question or a fixed ask; one off the schema or too long is refused here, before anything is sent. */
     ask: (question: JarvisQuestion): Promise<Result<JarvisAnswer>> =>
       !JarvisQuestion.safeParse(question).success || tooLong(question)
         ? Promise.resolve({ ok: false, reason: "malformed" })
         : ask({ path: "/api/jarvis/ask", body: question, schema: JarvisAnswer }),
-    /** A room's line in a language (the door's /api/jarvis/translate): the line by its id, never its text. */
-    translate: (request: JarvisTranslateRequest): Promise<Result<JarvisTranslation>> =>
-      !JarvisTranslateRequest.safeParse(request).success
-        ? Promise.resolve({ ok: false, reason: "malformed" })
-        : translation({ path: "/api/jarvis/translate", body: request, schema: JarvisTranslation }),
+    /** The answer kept for a line Jarvis said in a room (the door's /api/jarvis/said), with its asker, by the line's id. */
+    said: (room: string, msgid: string): Promise<Result<KeptAnswer>> =>
+      read({
+        path: `/api/jarvis/said?room=${encodeURIComponent(room)}&id=${encodeURIComponent(msgid)}`,
+        schema: KeptAnswer,
+      }),
   };
 }
 

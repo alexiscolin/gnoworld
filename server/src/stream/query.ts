@@ -1,5 +1,6 @@
 // What a stream's request says (stream.ts): a room's name, the rooms asked, the last id a client had, and whether it is counted
 // in a world's "here" (D374); each read through its schema, a word given twice refused as one missing.
+import { JARVIS_LANGUAGES } from "@gnoworld/schemas";
 import { z } from "zod";
 
 // A room's name as the stream and GET /api/verdicts take it: # and one word with no comma, 64 characters at most.
@@ -24,8 +25,12 @@ const LastId = () =>
     .transform(Number)
     .optional();
 
-// What a stream asks, none for a refusal: its rooms, the last id it had, and whether it goes uncounted in "here": presence=0 once
-// (D374); any other word is refused, never read as either.
+// The language asked: none when none is given, a failure for one off the list or given twice.
+const languageOf = (values: readonly string[] | undefined) =>
+  values === undefined ? undefined : z.enum(JARVIS_LANGUAGES).safeParse(once(values));
+
+// What a stream asks, none for a refusal: its rooms, the last id it had, whether it goes uncounted in "here": presence=0 once
+// (D374), and the language it reads the translations in, once and on the list; any other word is refused, never read as either.
 export function askedOf(req: {
   queries: (key: string) => string[] | undefined;
   header: (key: string) => string | undefined;
@@ -34,6 +39,7 @@ export function askedOf(req: {
   const last = LastId().safeParse(req.header("last-event-id"));
   const presence = req.queries("presence");
   const hidden = presence === undefined ? false : once(presence) === "0" ? true : undefined;
-  if (!rooms.success || !last.success || hidden === undefined) return undefined;
-  return { rooms: rooms.data, last: last.data ?? 0, hidden };
+  const language = languageOf(req.queries("language"));
+  if (!rooms.success || !last.success || hidden === undefined || language?.success === false) return undefined;
+  return { rooms: rooms.data, last: last.data ?? 0, hidden, language: language?.data };
 }

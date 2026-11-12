@@ -6,6 +6,7 @@ import { chainsOf } from "./chain.ts";
 import { makeDay } from "./day.ts";
 import { makeHeard } from "./heard.ts";
 import { makeKept } from "./kept.ts";
+import type { Answers } from "./said.ts";
 import { makeServed } from "./served.ts";
 
 export function doorMemory(
@@ -15,7 +16,17 @@ export function doorMemory(
 ) {
   const chains = chainsOf(db, chainId ?? (() => undefined));
   const [heard, served, kept] = [makeHeard(100_000), makeServed({ now }), makeKept(db, { now })];
+  const day = makeDay(db, { now });
+  // Jarvis's public answers are made with the chat, which starts after this: the retention expires them through this.
+  const late: { answers?: Answers | undefined } = {};
+  const hosts = [...origins.flatMap((origin) => URL.parse(origin)?.hostname ?? []), "gno.land"];
   return {
+    said: {
+      attach: (answers: Answers | undefined): void => {
+        late.answers = answers;
+      },
+      expire: (limit: number): number => late.answers?.expire(limit) ?? 0,
+    },
     // What the chat tells the door.
     chat: {
       heard,
@@ -23,6 +34,7 @@ export function doorMemory(
         served.drop(room);
         kept.drop(room);
       },
+      said: { hosts },
     },
     // What the ask route is given.
     ask: {
@@ -33,8 +45,8 @@ export function doorMemory(
       kept,
       chainOf: chains.of,
       defaultChain: chains.fallback,
-      day: makeDay(db, { now }),
-      hosts: [...origins.flatMap((origin) => URL.parse(origin)?.hostname ?? []), "gno.land"],
+      day,
+      hosts,
     },
   };
 }

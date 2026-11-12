@@ -10,6 +10,7 @@ import { OutLinks } from "../../OutLinks.tsx";
 import { Around } from "./Around.tsx";
 import { Callers } from "./Callers.tsx";
 import { Calls } from "./Calls.tsx";
+import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { Can } from "./Can.tsx";
 import { Hero, Pills } from "./Hero.tsx";
 import { Hours } from "./Hours.tsx";
@@ -47,7 +48,7 @@ function RealmCards({ realm, can }: { realm: NonNullable<PlateModel["realm"]>; c
       {can?.some(({ label }) => label === "Token") === true ? <TokenBlock realm={realm.realm} /> : null}
       {can === undefined ? null : (
         <Cell span={12}>
-          <Can can={can} />
+          <Can can={can} link={gnowebLink(realm.chain.gnoweb, realm.realm)} />
         </Cell>
       )}
       <Cell span={12}>

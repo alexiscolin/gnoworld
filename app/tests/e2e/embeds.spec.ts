@@ -132,7 +132,8 @@ test.describe("a link's player", () => {
     });
     const { away } = await room(page, () => "");
     await expect(play(page)).toBeEnabled();
-    expect(asked).toEqual([`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v1`]);
+    // The imgur line has no player, but its https link may wear a card (linked.ts), which waits on a verdict as a player does.
+    expect(asked).toEqual([`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v1%2Cv2`]);
     expect(away).toEqual([]);
   });
 

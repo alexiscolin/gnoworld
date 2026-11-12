@@ -80,14 +80,12 @@ test.describe("a station's code that does not come", () => {
   });
 });
 
-test("crumbs the page as a station, links its project's site out in a tab of its own, and stamps the passport", async ({
+test("kicks the page as a station, links its project's site out in a tab of its own, and stamps the passport", async ({
   page,
 }) => {
   await visit(page, "/w/adena");
-  await expect(page.locator("[data-look='plate'] nav[aria-label='You are here'] li")).toHaveText([
-    "Universe",
-    "Station",
-  ]);
+  await expect(page.locator("[data-look='plate'] [data-planet]")).toHaveText("Station");
+  await expect(page.locator("[data-look='plate'] nav")).toHaveCount(0);
   const site = page.getByRole("link", { name: /website/i });
   await expect(site).toHaveAttribute("href", /^https:\/\//);
   await expect(site).toHaveAttribute("target", "_blank");

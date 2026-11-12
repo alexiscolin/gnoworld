@@ -21,10 +21,11 @@ export const WANDER = {
   none: { speed: 0, after: 0 },
 } as const;
 const IDLE_RISE = 3;
-// With no input for a minute the view's own turn eases to a stop over 3 s; the next input turns it again. The scene's clock (planets' spin,
-// clouds, orbits) never stops: it runs at its own pace, drawn at 15 frames a second at rest (D13013, rest.ts).
+// With no input for a minute the view's own turn and the scene's clock (planets' spin, clouds, orbits) ease to a stop over 3 s; the next
+// input starts them again, the clock easing back up over RATE_RISE seconds.
 const QUIET_AFTER = 60;
 const QUIET_FALL = 3;
+const RATE_RISE = 3;
 // How near the view's up the way may turn, and how far under: the cosmos is seen from above it.
 const TOP = 0.985;
 const UNDER = -0.6;
@@ -41,6 +42,7 @@ export class Free {
   #pitch = 0;
   #zoom = 0;
   #idle = 0;
+  #rate = 1;
   #pull = 0;
   #held = false;
   #still = false;
@@ -112,6 +114,16 @@ export class Free {
     return this.wander.speed > 0 && !this.#still && this.#idle > this.wander.after && this.#hush() > 0;
   }
 
+  /** The share of real time the scene's clock runs at: 1, eased to 0 after a minute with no input, back up at the next. */
+  get rate(): number {
+    return this.#rate;
+  }
+
+  /** Any input at all (a pointer move, a key, a touch): the minute of rest starts over. */
+  rouse(): void {
+    this.#idle = 0;
+  }
+
   /** `delta` ms on, `still` under reduced motion, on `pose`, within `reach`. */
   advance(
     delta: number,
@@ -122,6 +134,7 @@ export class Free {
     const dt = Math.min(delta, 50) / 1000;
     // The rest is counted in real time: a slow machine's capped steps would stretch the minute.
     this.#idle += real / 1000;
+    this.#rate = Math.min(this.#hush(), this.#rate + dt / RATE_RISE);
     if (this.#held) this.#turnBy(this.#pending.yaw, this.#pending.pitch, pose);
     else {
       const decay = Math.exp(-dt / TURN_TAU);

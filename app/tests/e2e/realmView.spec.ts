@@ -200,7 +200,7 @@ test.describe("a realm's view", () => {
 
       // The World view is the one lit on a world's page and on a realm's; hydration patches no attribute (react-dom 19.3.1), so the
       // light must follow the path once the page wakes. The galaxy is lit on its own page.
-      test(`lights the World view on a realm's page or a world's, and Galaxy on the galaxy, on a ${name}'s screen`, async ({
+      test(`lights the World view on a realm's page or a world's, and Galaxy on the galaxy's, and none on the home, on a ${name}'s screen`, async ({
         page,
       }) => {
         await page.setViewportSize({ width, height });
@@ -213,9 +213,13 @@ test.describe("a realm's view", () => {
           await expect(views.locator("[aria-current]")).toHaveCount(1);
           await expect(views.locator("[aria-current='page']")).toContainText("World");
         }
-        await page.goto("/");
+        await page.goto("/universe");
         await hydrated(page);
         await expect(views.locator("[aria-current='page']")).toHaveText("Galaxy");
+        // The home is the Earth's first screen: no level is lit there.
+        await page.goto("/");
+        await hydrated(page);
+        await expect(views.locator("[aria-current]")).toHaveCount(0);
       });
     }
   });

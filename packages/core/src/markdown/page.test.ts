@@ -1832,3 +1832,123 @@ describe("originOf: the origin a page's links resolve against", () => {
       expect(originOf(origin)).toBeUndefined();
   });
 });
+
+// Slice 13's mutation pass: each case kills a StrykerJS survivor the tests above let live.
+describe("page: the edges StrykerJS found in the page reader", () => {
+  const countColumns = (blocks: readonly PageBlock[]): number =>
+    [...blocksIn(blocks)].filter((block) => block.type === "columns").length;
+
+  test.each([
+    ["a two-byte letter at U+0080", "\u0080", 2],
+    ["the last two-byte letter", "߿", 2],
+    ["the first three-byte sign", "ࠀ", 3],
+    ["a sign below the surrogates followed by a low half alone", "€\udc00", 6],
+    ["a low half followed by a low half", "\udc00\udc00", 6],
+    ["a high half followed by a sign past the low halves", "\ud800", 6],
+    ["the first high half with the first low half", "𐀀", 4],
+    ["the last high half with the last low half", "􏿿", 4],
+  ])("counts %s as its UTF-8 bytes", (_name, unit, size) => {
+    const count = Math.floor(PAGE_MAX_BYTES / size);
+    expect(page(unit.repeat(count + 1))).toStrictEqual({
+      kind: "too-big",
+      bytes: (count + 1) * size,
+      cap: PAGE_MAX_BYTES,
+    });
+    expect(page(unit.repeat(count)).kind).toBe("page");
+  });
+
+  test("reads every one of six columns in a row: a closed pair gives its depth back", () => {
+    const source = Array.from({ length: 6 }, () => "<gno-columns>\nx\n</gno-columns>").join("\n");
+    expect(blocksOf(source).map((block) => block.type)).toStrictEqual(Array<string>(6).fill("columns"));
+  });
+
+  test("reads the columns after a deeper stack was closed, the dead openers not counted", () => {
+    const deep = "<gno-columns>\n".repeat(8) + "x\n" + "</gno-columns>\n".repeat(8);
+    const blocks = blocksOf(`${deep}<gno-columns>\ny\n</gno-columns>`);
+    expect(blocks.map((block) => block.type)).toStrictEqual(["columns", "columns"]);
+  });
+
+  test("makes no columns of a fifth opener whose only mate is the one closer there is", () => {
+    // The first four openers never close, so the fifth stands at depth five: past the cap, it and its closer stay text.
+    const source = `${"<gno-columns>\n".repeat(5)}x\n</gno-columns>`;
+    expect(countColumns(blocksOf(source))).toBe(0);
+    expect(shown(blocksOf(source)).split("<gno-columns>").length - 1).toBe(5);
+  });
+
+  test("makes a form's line holding a tag it does not know a line, trimmed", () => {
+    const [form] = blocksOf('<gno-form>\n   <gno-other bogus="1" />   \n</gno-form>');
+    expect(form).toMatchObject({ type: "form", fields: [{ tag: "other", value: '<gno-other bogus="1" />' }] });
+  });
+
+  test("counts a flag whose value has blanks round `true`, as gnoweb trims it (ext_forms.go:301)", () => {
+    reads('<gno-form>\n<gno-input name="a" required=" true " />\n</gno-form>', {
+      type: "form",
+      exec: "",
+      path: "",
+      fields: [field("input", "a", { inputType: "text", flags: "required" })],
+    });
+  });
+
+  test("opens fenced code whose language has blanks round it", () => {
+    reads("``` go \ncode\n```", { type: "codeBlock", text: "code" });
+    reads("```  go\ncode\n```", { type: "codeBlock", text: "code" });
+  });
+
+  test("makes one title of lines indented or not, each trimmed", () => {
+    reads("Title\n   second   \n=====", heading(1, text("Title second")));
+  });
+
+  test("reads a table whose line holds a gno tag after other text", () => {
+    const [table] = blocksOf("| a <gno-x> | b |\n|---|---|\n| 1 | 2 |");
+    expect(table?.type).toBe("table");
+  });
+
+  test("opens an alert whatever blanks lead or trail its head, and trims its title", () => {
+    reads(">  [!NOTE]\n> body", {
+      type: "quote",
+      severity: "notice",
+      children: [paragraph(strong(text("Note"))), paragraph(text("body"))],
+    });
+    reads("> [!NOTE] Title  \n> body", {
+      type: "quote",
+      severity: "notice",
+      children: [paragraph(strong(text("Title"))), paragraph(text("body"))],
+    });
+  });
+
+  test("trims a heading's text", () => {
+    reads("#  Title", heading(1, text("Title")));
+  });
+
+  test("ends a list item's lines at a blank line holding blanks", () => {
+    const blocks = blocksOf("- [ ] a\n    \n  b");
+    expect(blocks.map((block) => block.type)).toStrictEqual(["outline", "paragraph"]);
+  });
+
+  test("keeps an item with nothing in it out of a list that has tasks", () => {
+    const blocks = blocksOf("- [ ] a\n-    \n- b");
+    expect(blocks.map((block) => block.type)).toStrictEqual(["outline", "paragraph", "list"]);
+  });
+
+  test("reads a table whose rows are indented, and ends it at an indented block's start", () => {
+    const [table, ...rest] = blocksOf("  | a | b |\n  |---|---|\n  | 1 | 2 |\n  > q");
+    expect(table).toMatchObject({ type: "table", cut: false, rows: [[[text("1")], [text("2")]]] });
+    expect(rest.map((block) => block.type)).toStrictEqual(["quote"]);
+  });
+
+  test("ends a table at a line of blanks", () => {
+    const [table, ...rest] = blocksOf("|a|\n|-|\n|1|\n   \nx");
+    expect(table).toMatchObject({ type: "table", rows: [[[text("1")]]] });
+    expect(rest).toStrictEqual([paragraph(text("x"))]);
+  });
+
+  test("reads a table of one column whose rows have no closing pipe", () => {
+    const [table] = blocksOf("|a\n|-\n|1");
+    expect(table).toMatchObject({ type: "table", head: [[text("a")]], rows: [[[text("1")]]] });
+  });
+
+  test("leaves an indented item holding a pipe a list, not a table", () => {
+    const blocks = blocksOf("  - a | b\n  --|--");
+    expect(blocks.map((block) => block.type)).not.toContain("table");
+  });
+});

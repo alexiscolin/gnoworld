@@ -22,6 +22,7 @@ function make(over: Partial<Beat> = {}) {
     steps: [] as { delta: number; slept: number; real: number }[],
     freed: 0,
     resized: 0,
+    roused: 0,
     naps: [] as number[],
   };
   const state = { need: "full" as Need, nap: undefined as number | undefined, unseen: false, lively: false };
@@ -36,6 +37,9 @@ function make(over: Partial<Beat> = {}) {
     },
     nap: () => state.nap,
     lively: () => state.lively,
+    rouse: () => {
+      log.roused += 1;
+    },
     free: () => {
       log.freed += 1;
     },
@@ -127,6 +131,17 @@ describe("loop", () => {
       l.page.dispatchEvent(new Event(type));
       expect(l.queue).toHaveLength(1);
       expect(l.touched).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["pointermove", "keydown", "wheel", "pointerdown", "touchstart"])(
+    "tells the beat a %s came, before it asks the frame: the rest's minute starts over",
+    (type) => {
+      const l = make();
+      l.state.nap = 2000;
+      l.frame(1000);
+      l.page.dispatchEvent(new Event(type));
+      expect(l.log.roused).toBe(1);
     },
   );
 

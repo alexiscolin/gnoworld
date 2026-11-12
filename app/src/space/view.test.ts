@@ -4,7 +4,7 @@ import { Round } from "./parts/marks.ts";
 import { blankPose } from "./rig/pose.ts";
 import { advance, paint } from "./move.ts";
 import { openOf } from "./open.ts";
-import { choose, napOf, stateOf, tick } from "./view.ts";
+import { choose, livelyOf, napOf, stateOf, tick } from "./view.ts";
 
 // view.ts reads the pointer's media query as it loads.
 vi.hoisted(() => {
@@ -18,13 +18,13 @@ vi.mock("./motion.ts", () => ({ coveredByChat: () => false }));
 const uniform = () => ({ value: 0 });
 
 // A Space on a world's page (a planet framed close), with just what advance and the nap read; `moon`, a moon shown round it.
-function pageAt({ moon = false } = {}): Space {
+function pageAt({ moon = false, arrival = false, rate = 1 } = {}): Space {
   const stub = {
     seconds: 5,
     place: undefined,
     universe: undefined,
     kept: undefined,
-    arrival: false,
+    arrival,
     circle: { close: true },
     lens: undefined,
     neared: false,
@@ -38,7 +38,7 @@ function pageAt({ moon = false } = {}): Space {
       page: false,
       eye: { x: 0, y: 0, z: 0 },
       pose: blankPose(),
-      free: { moving: false, turning: false, inward: false },
+      free: { moving: false, turning: false, inward: false, rate },
       advance: () => undefined,
     },
     stage: {
@@ -63,24 +63,45 @@ function pageAt({ moon = false } = {}): Space {
   return stub as unknown as Space;
 }
 
-describe("the scene clock (D13013: it never stops at rest)", () => {
-  it("ticks the scene's time by the frame's step, after any rest", () => {
-    const space = pageAt();
-    tick(space, 500);
-    expect(space.seconds).toBeCloseTo(5.5, 9);
+describe("the scene clock (rate: the share of real time it runs at, 0 after a minute with no input)", () => {
+  it("ticks the scene's time by the frame's step times the rate", () => {
+    for (const [rate, seconds] of [
+      [1, 5.5],
+      [0.5, 5.25],
+      [0, 5],
+    ] as const) {
+      const space = pageAt({ rate });
+      tick(space, 500);
+      expect(space.seconds).toBeCloseTo(seconds, 9);
+    }
   });
 
-  it("still runs after 2 minutes at rest: a frame's advance and the slept seconds both tick it", () => {
-    const space = pageAt();
-    for (let t = 0; t < 120_000; t += 16) advance(space, 16, { real: 16 });
-    expect(space.seconds).toBeCloseTo(5 + 120, 0);
-    advance(space, 16, { slept: 2 });
-    expect(space.seconds).toBeCloseTo(5 + 120 + 2.016, 0);
+  it("stands still through a frame's advance and the seconds the loop slept at rate 0, and runs at rate 1", () => {
+    const [stopped, running] = [pageAt({ rate: 0 }), pageAt()];
+    advance(stopped, 16, { slept: 2 });
+    advance(running, 16, { slept: 2 });
+    expect(stopped.seconds).toBe(5);
+    expect(stopped.stage.frame.uTime.value).toBe(5);
+    expect(running.seconds).toBeCloseTo(7.016, 9);
   });
 
-  it("never lets the loop sleep a lively view: a close planet turning is paced at 15 fps (D13013), where it once slept after a minute", () => {
+  it("never lets the loop sleep a lively view while the clock runs: a close planet turning is paced at 15 fps", () => {
     const state = { ...stateOf(pageAt()), pxPerSecond: 50 };
     expect(napOf(pageAt(), state, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
+  });
+
+  it("sleeps a planet or a sun's face once the clock stopped: nothing moves, so no frame is paced", () => {
+    const stopped = pageAt({ rate: 0 });
+    const turning = { ...stateOf(stopped), pxPerSecond: 50 };
+    expect(livelyOf(stopped, turning)).toBe(false);
+    expect(napOf(stopped, turning, { need: "none", calm: 9000 })).toBe(2000);
+    expect(napOf(stopped, { ...stateOf(stopped), face: true }, { need: "none", calm: 9000 })).toBe(2000);
+  });
+
+  it("is lively again as the clock eases back up", () => {
+    const easing = pageAt({ rate: 0.01 });
+    const state = { ...stateOf(easing), pxPerSecond: 50 };
+    expect(livelyOf(easing, state)).toBe(true);
   });
 
   it("sleeps as long as the slow motions allow while they are under a pixel a second", () => {
@@ -88,7 +109,7 @@ describe("the scene clock (D13013: it never stops at rest)", () => {
     expect(napOf(pageAt(), state, { need: "none", calm: 9000 })).toBe(625);
   });
 
-  it("paces at 15 frames a second a planet that turns a pixel a second or a sun with its face (D13013)", () => {
+  it("paces at 15 frames a second a planet that turns a pixel a second or a sun with its face", () => {
     const turning = { ...stateOf(pageAt()), pxPerSecond: 2 };
     expect(napOf(pageAt(), turning, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
     expect(napOf(pageAt(), { ...stateOf(pageAt()), face: true }, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
@@ -96,9 +117,22 @@ describe("the scene clock (D13013: it never stops at rest)", () => {
 });
 
 describe("a moon round the planet framed close", () => {
-  it("keeps every frame drawn: paced at 15 frames a second, it jerked across the planet", () => {
+  it("keeps every frame drawn while the clock runs: paced at 15 frames a second, it jerked across the planet", () => {
     const state = { ...stateOf(pageAt()), pxPerSecond: 2 };
     expect(napOf(pageAt({ moon: true }), state, { need: "none", calm: 9000 })).toBeUndefined();
+    expect(napOf(pageAt({ moon: true, rate: 0.2 }), state, { need: "none", calm: 9000 })).toBeUndefined();
+  });
+
+  it("stops with its planet: no frame at all once the clock stopped, not a step at 15 a second", () => {
+    const state = { ...stateOf(pageAt()), pxPerSecond: 2 };
+    expect(napOf(pageAt({ moon: true, rate: 0 }), state, { need: "none", calm: 9000 })).toBe(2000);
+  });
+});
+
+describe("a view at rest", () => {
+  it("is paced at 15 frames a second on the home's first screen once landed: an arrival that stays true held every frame", () => {
+    const state = { ...stateOf(pageAt()), pxPerSecond: 2 };
+    expect(napOf(pageAt({ arrival: true }), state, { need: "none", calm: 9000 })).toBeCloseTo(66.7, 1);
   });
 });
 

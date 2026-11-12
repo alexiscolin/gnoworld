@@ -19,8 +19,8 @@ const setup = () => {
 const READY = { text: "A token factory.", tags: ["token" as const], model: "claude-haiku-5-5", now: T0 };
 
 describe("the explanations' table", () => {
-  it("is the last migration, on the server's file", () => {
-    expect(migrations.at(-1)).toBe(EXPLAIN_TABLES);
+  it("is one of the server's migrations, on the server's file", () => {
+    expect(migrations).toContain(EXPLAIN_TABLES);
   });
 
   it("reads each of its lookups by its key, never a scan (EXPLAIN QUERY PLAN)", () => {

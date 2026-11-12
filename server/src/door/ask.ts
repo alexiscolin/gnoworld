@@ -3,12 +3,13 @@
 // (guard.ts), the session, the switch, the rate, strikes (paused), the share (capped), the first ask (early), the body and
 // size, the room's reading, the list (a strike), one question in flight (busy), then calls.ts: served answers, the room's
 // cap (busy), the quota, jarvis. The share and `early` skip the allowlist, its strikes do not.
+import { plainWords } from "@gnoworld/core";
 import { z } from "zod";
 import { JarvisQuestion, type Address, type JarvisAnswer, type JarvisAsk } from "@gnoworld/schemas";
 import type { Context, Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { json, type Guarded } from "../guard.ts";
-import { callsOf, forRelay, type Asked, type Result } from "./calls.ts";
+import { callsOf, forRelay, type Asked, type Called, type Result } from "./calls.ts";
 import type { Day } from "./day.ts";
 import { frontOf, type Front } from "./front.ts";
 import type { Heard } from "./heard.ts";
@@ -17,6 +18,7 @@ import type { Counted } from "./quota.ts";
 import { refusedWithoutModel } from "./refuse.ts";
 import { keysOf, type Kept } from "./kept.ts";
 import type { Served } from "./served.ts";
+import type { Answers } from "./said.ts";
 
 interface Options extends Front, Counted<"take" | "giveBack" | "unlimited"> {
   // Whether an account may read a room (rooms/types.ts's mayRead, through the chat).
@@ -40,6 +42,8 @@ interface Options extends Front, Counted<"take" | "giveBack" | "unlimited"> {
   // The default universe's chain (chain.ts): a room with no chain of its own is read on it, and its answer is never kept.
   defaultChain: () => string | undefined;
   jarvis: Pick<Jarvis, "ask">;
+  // Where an answered personal question is offered to be made public.
+  said?: Pick<Answers, "offer">;
   questionChars: number;
   perMinute?: number;
 }
@@ -58,6 +62,50 @@ const EMPTY: JarvisAnswer = { status: "answered", markdown: "Nothing was said he
 // Whether the chat heard the account, waiting a moment for one not heard yet: its own line may come after its ask.
 const heardOf = async ({ heard, heardSoon }: Pick<Options, "heard" | "heardSoon">, who: Address): Promise<boolean> =>
   heard(who) || ((await heardSoon?.(who)) ?? false);
+
+// What a finished ask is told: when, where, by whom, and what was asked.
+interface Told {
+  started: number;
+  ask: JarvisQuestion;
+  more: { room: string; account: string };
+}
+
+// How long before its ask the asker's own line may have been heard: the line comes with the ask, or a moment before.
+const HEARD_MS = 60_000;
+
+// Whether the room's lines hold one the asker said, heard no earlier than that, with the question's words in it.
+function saidInRoom(lines: JarvisAsk["lines"], question: string, started: number): boolean {
+  const words = plainWords(question);
+  return (
+    words !== "" &&
+    lines.some(
+      ({ speaker, text, time }) =>
+        speaker === 0 &&
+        time !== undefined &&
+        Date.parse(time) >= started - HEARD_MS &&
+        plainWords(text).includes(words),
+    )
+  );
+}
+
+// A personal question's own answer, offered to the room once the room heard the question: never waited for, and never a fault of the
+// asker's own answer. A question the room never heard, one an account only sent to the route, stays the asker's private card.
+function offerAnswer(
+  { said, log, recent }: Pick<Options, "said" | "log" | "recent">,
+  called: Called,
+  asked: Told,
+): void {
+  const { ask, started, more } = asked;
+  const page = forRelay(called);
+  if (said === undefined || !("question" in ask) || !page.ok || page.answer.status !== "answered") return;
+  const { room, account: who } = more;
+  const offered = { room, who, started, question: ask.question, answer: page.answer };
+  void Promise.resolve()
+    .then(() => (saidInRoom(recent(room, who), ask.question, started) ? said.offer(offered) : "private"))
+    .catch(() => {
+      log("jarvis_said", { room, account: who, reason: "failed" });
+    });
+}
 
 export function askRoutes(options: Options): Hono<Guarded> {
   const { mayRead, recent, last, quota, now, day, hosts, log, questionChars } = options;
@@ -111,7 +159,7 @@ export function askRoutes(options: Options): Hono<Guarded> {
     const again = standing(c, asker);
     if (again !== undefined) return again;
     if (inFlight.has(who)) return say(c, "busy", more);
-    return finish(c, await launch(who, ask, started), { started, ...more });
+    return finish(c, await launch(who, ask, started), { started, ask, more });
   });
   const launch = async (who: Address, ask: JarvisQuestion, started: number): Promise<Result> => {
     const tail = last(ask.room);
@@ -128,17 +176,17 @@ export function askRoutes(options: Options): Hono<Guarded> {
     inFlight.add(who);
     return await calls(asked).finally(() => inFlight.delete(who));
   };
-  const finish = (c: Context, result: Result, asked: { started: number; room: string; account: string }) => {
-    const { started, ...more } = asked;
+  const finish = (c: Context, result: Result, asked: Told) => {
     switch (result.kind) {
       case "served":
-        return answered(c, result.answer, more);
+        return answered(c, result.answer, asked.more);
       case "busy":
-        return say(c, "busy", more);
+        return say(c, "busy", asked.more);
       case "full":
-        return refuse(c, "quota", more);
+        return refuse(c, "quota", asked.more);
       case "called":
-        return relay(c, forRelay(result.called), { started, ...more });
+        offerAnswer(options, result.called, asked);
+        return relay(c, forRelay(result.called), { started: asked.started, ...asked.more });
     }
   };
   return app;

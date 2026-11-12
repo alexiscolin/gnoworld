@@ -4,6 +4,7 @@
 import { CARD_TABLES } from "./cards/store.ts";
 import { DAY_TABLES } from "./door/day.ts";
 import { KEPT_TABLES } from "./door/kept.ts";
+import { SAID_TABLES } from "./door/said.ts";
 import { QUOTA_TABLES } from "./door/quota.ts";
 import { EXPLAIN_TABLES } from "./explain/store.ts";
 import { GUEST_TABLES } from "./guest/guests.ts";
@@ -24,7 +25,9 @@ import { PEOPLE_TABLES } from "./worlds/personTables.ts";
 import { ROLLUP_TABLES } from "./worlds/rollupStore.ts";
 import { NETWORK_TABLES } from "./worlds/networkStore.ts";
 import { SIGNAL_TABLES } from "./signals/signals.ts";
+import { UNREAD_TABLES } from "./unread/store.ts";
 import { TOKEN_TABLES } from "./worlds/tokenStore.ts";
+import { TRANSLATION_TABLES } from "./translations/store.ts";
 
 export const migrations: readonly string[] = [
   LOGIN_TABLES,
@@ -57,4 +60,7 @@ export const migrations: readonly string[] = [
   NETWORK_TABLES,
   TOKEN_TABLES,
   EXPLAIN_TABLES,
+  UNREAD_TABLES,
+  SAID_TABLES,
+  TRANSLATION_TABLES,
 ];

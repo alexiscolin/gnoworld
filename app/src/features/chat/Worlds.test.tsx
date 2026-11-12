@@ -132,3 +132,36 @@ describe("Worlds, the credits", () => {
     expect(one(box, "dialog").textContent).toContain("Solar System Scope");
   });
 });
+
+// Each world's pill of unseen lines: another world's count beside its planet, never the world in view's, which its rooms already show.
+describe("Worlds, the unread pills", () => {
+  const pills = (box: HTMLElement) =>
+    all(box, '[data-unread-pill] [aria-hidden="true"]').map((each) => each.textContent);
+
+  it("shows another world's count in a pill and hides the zero ones", () => {
+    const box = mount(
+      <Worlds universe={UNIVERSE} worlds={[BUBBLE, GOVDAO]} current="bubble" unread={{ govdao: 7, bubble: 0 }} />,
+    );
+    expect(pills(box)).toEqual(["7"]);
+    expect(one(box, "li:nth-child(2)").querySelector("[data-unread-pill]")).not.toBeNull();
+  });
+
+  it("shows nothing on the world in view, whatever the count", () => {
+    const box = mount(
+      <Worlds universe={UNIVERSE} worlds={[BUBBLE, GOVDAO]} current="bubble" unread={{ bubble: 40 }} />,
+    );
+    expect(pills(box)).toEqual([]);
+  });
+
+  it("says 99+ past 99, and tells a screen reader the count beside the world's name", () => {
+    const box = mount(
+      <Worlds universe={UNIVERSE} worlds={[BUBBLE, GOVDAO]} current="bubble" unread={{ govdao: 100 }} />,
+    );
+    expect(pills(box)).toEqual(["99+"]);
+    expect(one(box, "[data-unread-pill] .visually-hidden").textContent).toBe("99+ unread");
+  });
+
+  it("shows no pill when no count is given: a guest's column", () => {
+    expect(pills(mount(<Worlds universe={UNIVERSE} worlds={[BUBBLE, GOVDAO]} current="bubble" />))).toEqual([]);
+  });
+});

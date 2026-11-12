@@ -147,9 +147,6 @@ function statusOfRealm({
     : ({ label: `Quiet · ${words}`, tone: "warm" } as const);
 }
 
-// The room as the chat keys it: the part after its world.
-const chatRoom = (room: string) => room.split("/").at(-1) ?? room;
-
 // Read its page leads, Try a function beside it (the proposal's two buttons); a realm nobody called leads with trying.
 const PAGE_LEAD = { label: "Read its page", href: "#page", icon: "news" } as const;
 const TRY_LEAD = { label: "Try a function", href: "#functions", icon: "play" } as const;
@@ -206,7 +203,7 @@ export default function RealmPlate({
       follow: stampKey(universe.id, worldIdOf(realm)),
       ...leadOf(held),
     },
-    talk: { name, room: chatRoom(room) },
+    talk: { name, room },
     figures: { figures: realmFigures({ held, rollup, importers: worlds && importersOf(realm, worlds), now }) },
     extras: <Voted path={pathname} functions={held?.functions ?? []} onRing={onRing} />,
     realm: { realm, chain, state, worlds, rollup },

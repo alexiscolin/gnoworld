@@ -1,8 +1,8 @@
 // The recent lines of each public room (Alexis, 10g-1): the last 30 lines moderation let through, 8 KiB of text a room,
 // 10,000 rooms, in memory alone, so a question to Jarvis carries what was said where it was asked. A line taken from its
-// room, or replaced by its author's edit, leaves at once; one taken before moderation let it through never comes in. A
-// line is read back by its id for its translation (10k), the server's own text, never the page's.
+// room, or replaced by its author's edit, leaves at once; one taken before moderation let it through never comes in.
 import type { Said } from "../irc/link.ts";
+import { JARVIS_NICK } from "@gnoworld/core";
 import { remember } from "../remember.ts";
 import { JARVIS_LINES, type JarvisAsk } from "@gnoworld/schemas";
 
@@ -15,8 +15,6 @@ export interface RecentLines {
   edited: (said: Said) => void;
   // A room's lines, oldest first, each by a number for who said it, the asker 0.
   recent: (room: string, asker: string) => JarvisAsk["lines"];
-  // A line's text by its id, while its room keeps it (10k, a translation's text): never one the page sent.
-  line: (room: string, msgid: string) => string | undefined;
   // The id of a room's last line moderation let through, public room or not (D13985, a served answer's key).
   last: (room: string) => string | undefined;
 }
@@ -27,6 +25,8 @@ interface Options {
   heard?: { said: (account: string) => void } | undefined;
   // Told the room of each line taken or replaced, whose served answers go (D13985).
   changed?: ((room: string) => void) | undefined;
+  // Told the room and id of each line taken or replaced, whose kept public answer goes.
+  answers?: { drop: (room: string, msgid: string, line?: { account: string; text: string }) => void } | undefined;
 }
 
 interface Kept {
@@ -37,11 +37,22 @@ interface Kept {
   bytes: number;
 }
 
+// The answer Jarvis said for a line goes with it. Jarvis's own line is never kept here: its answer goes when it is taken, or edited
+// by its nick; another account's edit of a line not kept counts for nothing.
+function dropAnswer(
+  answers: Options["answers"],
+  { room, msgid, by }: { room: string; msgid: string; by: string | null },
+  line: Kept | undefined,
+): void {
+  if (by !== null && line === undefined && by !== JARVIS_NICK) return;
+  answers?.drop(room, msgid, line === undefined ? undefined : { account: line.account, text: line.text });
+}
+
 const ROOMS = 10_000;
 // The lines taken or replaced before they came in, remembered: the oldest forgotten first.
 export const GONE = 2000;
 
-export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLines {
+export function makeRecentLines({ isPublic, heard, changed, answers }: Options): RecentLines {
   // The Map's first room is the one written longest ago: a room is set again at each line.
   const rooms = new Map<string, { lines: Kept[]; bytes: number }>();
   // The lines gone: a room's line taken (`room id`), or replaced by its author (`room id account`), each its own mark, so
@@ -57,6 +68,7 @@ export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLi
     if (line !== undefined && by !== null && line.account !== by) return;
     changed?.(room);
     remember(gone, [by === null ? key(room, msgid) : key(room, msgid, by), true], GONE);
+    dropAnswer(answers, { room, msgid, by }, line);
     if (line === undefined) return;
     kept.lines.splice(kept.lines.indexOf(line), 1);
     kept.bytes -= line.bytes;
@@ -74,6 +86,7 @@ export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLi
   };
   return {
     passed(said) {
+      if (said.account === JARVIS_NICK) return;
       noted(said);
       const kept = rooms.get(said.room) ?? { lines: [], bytes: 0 };
       // A catch-up hands a line again: it is kept once.
@@ -93,7 +106,6 @@ export function makeRecentLines({ isPublic, heard, changed }: Options): RecentLi
       if (edits !== undefined) drop(room, edits, account);
     },
     last: (room) => lasts.get(room),
-    line: (room, msgid) => rooms.get(room)?.lines.find((kept) => kept.msgid === msgid)?.text,
     recent(room, asker) {
       const speakers = new Map([[asker, 0]]);
       return (rooms.get(room)?.lines ?? []).map(({ account, text, time }) => {

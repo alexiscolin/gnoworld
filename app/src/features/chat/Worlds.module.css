@@ -54,6 +54,30 @@
     vertical-align: top;
   }
 
+  /* a world's line in the column: the anchor its pill stands on */
+  .entry {
+    position: relative;
+  }
+
+  /* A world's unseen lines, in the coral of new things, at its planet's top right; it takes no pointer */
+  .pill {
+    position: absolute;
+    inset-block-start: calc(-1 * var(--space-3xs));
+    inset-inline-end: calc(-1 * var(--space-3xs));
+    /* layout: the figure centred in the pill */
+    display: grid;
+    /* layout: the figure centred in the pill */
+    place-items: center;
+    block-size: var(--size-counter);
+    min-inline-size: var(--size-counter);
+    padding: 0 var(--space-3xs);
+    border-radius: var(--radius-l);
+    background: var(--color-new);
+    color: var(--color-ink);
+    font: var(--font-data);
+    pointer-events: none;
+  }
+
   .remove {
     position: absolute;
     /* layout: the planet's corner, past its ring, which stands 3 px off */

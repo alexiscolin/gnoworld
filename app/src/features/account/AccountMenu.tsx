@@ -61,7 +61,7 @@ function Trigger({ pill, onClick }: { pill: ReactNode; onClick: () => void }) {
 }
 
 // Jarvis's panel is brought once the chat in view can ask it (jarvisHere.ts): its code is a late chunk.
-const JARVIS_ASKS = ["jarvis", "jarvis-catch-up", "jarvis-ask"] as const satisfies readonly FirstAsk[];
+const JARVIS_ASKS = ["jarvis", "jarvis-catch-up", "jarvis-ask", "jarvis-said"] as const satisfies readonly FirstAsk[];
 
 function JarvisDoor() {
   const here = useJarvisHere() !== undefined;

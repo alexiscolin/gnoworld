@@ -1119,3 +1119,28 @@ describe("POST /explain", () => {
     expect((await postExplain(() => Promise.resolve({ kind: "gone" }), EXPLAIN_ASKED))?.status).toBe(503);
   });
 });
+
+// POST /ask on routes whose catch-up and explainer loops are not given: the main loop alone is there.
+describe("POST /ask without a catch-up or an explainer loop", () => {
+  const postAsk = async (body: unknown, ask: Ask) => {
+    const kit = budgetFor(1_000_000_000);
+    try {
+      const routes = jarvisRoutes({ ask, budget: kit.budget, log: capture().log });
+      return await routes[JARVIS_PATHS.ask]?.POST?.(body, new AbortController().signal);
+    } finally {
+      kit.close();
+    }
+  };
+
+  it("asks the main loop a catch-up the fast loop is not there for", async () => {
+    const ask = asking({ kind: "spent" });
+    expect((await postAsk(catchUp, ask))?.body).toEqual({ status: "spent" });
+    expect(ask).toHaveBeenCalledOnce();
+  });
+
+  it("refuses a function's explanation, never giving it to the main loop", async () => {
+    const ask = asking({ kind: "spent" });
+    expect((await postAsk(explain, ask))?.status).toBe(400);
+    expect(ask).not.toHaveBeenCalled();
+  });
+});

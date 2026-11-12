@@ -103,3 +103,60 @@ describe("Free's slow turn", () => {
     expect(stepOf(free, pose)).toBeLessThan(1e-6);
   });
 });
+
+describe("Free's clock rate", () => {
+  const rested = (): [Free, Pose] => [new Free(), poseAt([0, 0, 0], 100)];
+  const rateAfter = (free: Free, pose: Pose): number => {
+    free.advance(16, false, { pose, reach: REACH });
+    return free.rate;
+  };
+
+  it("runs at 1 for the minute, eases to 0 over 3 s without a jump, and stays there", () => {
+    const [free, pose] = rested();
+    idleFor(free, pose, 59);
+    expect(rateAfter(free, pose)).toBe(1);
+    let [last, jump] = [1, 0];
+    for (let t = 0; t < 4.5; t += 0.016) {
+      const rate = rateAfter(free, pose);
+      jump = Math.max(jump, Math.abs(rate - last));
+      last = rate;
+    }
+    expect(last).toBe(0);
+    expect(jump).toBeLessThan(0.02);
+  });
+
+  it("starts again at a drag, a wheel or a rouse (a pointer move, a key), easing in over 3 s from where it stopped", () => {
+    for (const hand of [
+      (f: Free) => {
+        f.wheel(0);
+      },
+      (f: Free) => {
+        f.drag({ dx: 1, dy: 0, height: 800, seconds: 0.016 });
+      },
+      (f: Free) => {
+        f.rouse();
+      },
+    ]) {
+      const [free, pose] = rested();
+      idleFor(free, pose, 70);
+      expect(rateAfter(free, pose)).toBe(0);
+      hand(free);
+      const first = rateAfter(free, pose);
+      expect(first).toBeGreaterThan(0);
+      expect(first).toBeLessThan(0.02);
+      idleFor(free, pose, 1.5);
+      expect(rateAfter(free, pose)).toBeGreaterThan(0.3);
+      idleFor(free, pose, 2);
+      expect(rateAfter(free, pose)).toBe(1);
+    }
+  });
+
+  it("is kept at 1 by a rouse every few seconds, however long", () => {
+    const [free, pose] = rested();
+    for (let t = 0; t < 130; t += 5) {
+      free.rouse();
+      idleFor(free, pose, 5);
+    }
+    expect(rateAfter(free, pose)).toBe(1);
+  });
+});

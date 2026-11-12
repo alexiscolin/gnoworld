@@ -7,7 +7,6 @@
 import { Address } from "./address.ts";
 import { CALL_CAPS, CallArgs, funcName, Key, RealmPath } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
-import { PinId } from "./pins.ts";
 import { RoomId } from "./rooms.ts";
 import { z } from "./zod.ts";
 
@@ -237,10 +236,6 @@ const Language = z.enum(JARVIS_LANGUAGES);
 
 /** The most a translation holds, in code points: twice a line's bound, as a translation runs longer than its original. */
 export const TRANSLATION_CAPS = { text: 16_000 } as const;
-
-/** A room's line to translate, as a page asks the door: the line by its id, never its text, which is the server's. */
-export const JarvisTranslateRequest = z.strictObject({ room: RoomId, msgid: PinId, language: Language });
-export type JarvisTranslateRequest = z.infer<typeof JarvisTranslateRequest>;
 
 /** A line's text and the language to translate it into, as the door sends jarvis. */
 export const JarvisTranslate = z.strictObject({ text: text(JARVIS_LINES.bytes), language: Language });

@@ -240,3 +240,28 @@ describe("the relay's line fits IRC and carries what the server builds (D430)", 
       expect(allowed("RELAYMSG", ["#earth", `${GUEST_PREFIX}${word}-${word}-aa22`, "hi"])).toBe(true);
   });
 });
+
+describe("Jarvis's one nick (the relay form)", () => {
+  const relay = (nick: string): boolean => allowed("RELAYMSG", ["#bubble", nick, "It closes today."]);
+
+  it("relayForm accepts jarvis/bot and no other nick with a slash", () => {
+    expect(relay("jarvis/bot")).toBe(true);
+    for (const nick of ["jarvis/bot2", "jarvis/bo", "Jarvis/bot", "jarvis/Bot", "admin/bot", "a/b", "jarvis/", "/bot"])
+      expect(relay(nick)).toBe(false);
+  });
+
+  it("a guest cannot relay as jarvis/bot", () => {
+    expect(relay("jarvis/bot")).toBe(true);
+    for (const nick of [
+      `${GUEST_PREFIX}jarvis/bot`,
+      " jarvis/bot",
+      "jarvis/bot ",
+      "jarvis/bot\n",
+      "jarvis/bot:x",
+      `${GUEST_PREFIX}jarvis-bot-aaaa/bot`,
+    ])
+      expect(relay(nick)).toBe(false);
+    expect(allowed("RELAYMSG", ["#bubble", "jarvis/bot", "two\nlines"])).toBe(false);
+    expect(allowed("RELAYMSG", ["#bubble", "jarvis/bot", "x".repeat(600)])).toBe(false);
+  });
+});

@@ -453,6 +453,12 @@ describe("gnomcp over TCP", () => {
     expect(config.gnomcp).toEqual({ address: { host: "jarvis-reader", port: 7070 } });
   });
 
+  it("takes the highest port, 65535", () => {
+    expect(loadJarvisConfig({ ...BASE, JARVIS_GNOMCP_ADDRESS: "jarvis-reader:65535" }).gnomcp).toEqual({
+      address: { host: "jarvis-reader", port: 65_535 },
+    });
+  });
+
   it("keeps the spawn when no address is set", () => {
     expect(loadJarvisConfig(ENV).gnomcp).toEqual({
       command: "/usr/local/bin/gnomcp",

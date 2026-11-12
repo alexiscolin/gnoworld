@@ -1,11 +1,12 @@
 // @vitest-environment jsdom
 import type { Line } from "@gnoworld/core";
-import type { JarvisTranslateRequest, JarvisTranslation } from "@gnoworld/schemas";
+import type { JarvisTranslation, LineTranslations } from "@gnoworld/schemas";
 import { act } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, click, mount, one } from "../../../tests/mount.tsx";
 import { tellJarvisHere, type JarvisHere } from "../../jarvisHere.ts";
 import type { Result } from "../../lib/api/http.ts";
+import type { Language } from "../../lib/language.ts";
 import { wantTranslation } from "../../translating.ts";
 import { LineActions } from "./LineActions.tsx";
 import { BARE_ROW, LineView, type LineViewProps } from "./LineView.tsx";
@@ -36,7 +37,7 @@ const tell = (next: JarvisHere | undefined) => {
     tellJarvisHere(next);
   });
 };
-type Ask = (request: JarvisTranslateRequest) => Promise<Result<JarvisTranslation>>;
+type Ask = (room: string, ids: readonly string[], language: Language) => Promise<Result<LineTranslations>>;
 const ok = (value: JarvisTranslation): Result<JarvisTranslation> => ({ ok: true, value });
 const view = (over: Partial<LineViewProps> = {}) =>
   mount(
@@ -47,8 +48,22 @@ const view = (over: Partial<LineViewProps> = {}) =>
 let n = 0;
 // A line id no other test has asked for: the page's memory of translations outlives a test.
 const fresh = (): Line => ({ ...LINE, id: `T${String((n += 1))}` });
+// What the server answers for one line whose translation went as `answer`.
+const stored = (line: Line, answer: Result<JarvisTranslation>): Result<LineTranslations> => {
+  if (!answer.ok) return answer;
+  const base = { room: ROOM, language: "fr" as const, pending: [] };
+  const { value } = answer;
+  if (value.status === "translated")
+    return {
+      ok: true,
+      value: { ...base, translations: [{ msgid: line.id, status: "translated", text: value.text, from: value.from }] },
+    };
+  if (value.status === "original")
+    return { ok: true, value: { ...base, translations: [{ msgid: line.id, status: "original" }] } };
+  return { ok: true, value: { ...base, translations: [], halt: value.status } };
+};
 const translate = async (line: Line, answer: Result<JarvisTranslation>) => {
-  const ask = vi.fn<Ask>(() => Promise.resolve(answer));
+  const ask = vi.fn<Ask>(() => Promise.resolve(stored(line, answer)));
   wantTranslation({ room: ROOM, id: line.id, language: "fr" }, ask);
   await act(() => vi.advanceTimersByTimeAsync(200));
   return ask;
@@ -98,7 +113,7 @@ describe("a translated line", () => {
     tell(here());
     const boxes = [same, asking, failed].map((line) => view({ line: line }));
     await translate(same, ok({ status: "original" }));
-    let answer: (result: Result<JarvisTranslation>) => void = () => undefined;
+    let answer: (result: Result<LineTranslations>) => void = () => undefined;
     wantTranslation({ room: ROOM, id: asking.id, language: "fr" }, () => new Promise((resolve) => (answer = resolve)));
     await act(() => vi.advanceTimersByTimeAsync(3000));
     for (const box of boxes) expect(all(box, "[data-translation]")).toHaveLength(0);

@@ -38,8 +38,7 @@ export function useJarvis(quick: ReactNode) {
   };
 }
 
-// Its spark and its name, "Jarvis", read as "Ask Jarvis". Where Jarvis cannot answer the button stays, greyed, and says why in its name; a
-// press does nothing.
+// Its spark and its name, "Jarvis", read as "Ask Jarvis". Where Jarvis cannot answer the button stays, disabled and greyed, and says why in its name.
 function JarvisButton({ onMention, off }: { onMention: (mention: string) => void; off: string | undefined }) {
   return (
     <span className={styles["jarvis"]} data-off={off === undefined ? undefined : ""}>
@@ -47,8 +46,9 @@ function JarvisButton({ onMention, off }: { onMention: (mention: string) => void
         icon="spark"
         size="s"
         emphasis="quiet"
+        disabled={off !== undefined}
         onClick={() => {
-          if (off === undefined) onMention(JARVIS_MENTION);
+          onMention(JARVIS_MENTION);
         }}
       >
         <span className="visually-hidden">Ask </span>Jarvis

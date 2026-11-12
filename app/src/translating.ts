@@ -1,31 +1,27 @@
-// A room's lines translated into the reader's language as they come on screen: each line is asked once a language, newest first, one after
-// another with no wait, up to ASKS_A_MINUTE in any minute (the door lets 30 a minute and 200 a day), the answer kept on the device. The lines'
-// views read it by line; the room reads why the asking stopped. Memory first, the device's keeping loaded on the first use.
-import type { JarvisTranslateRequest, JarvisTranslation } from "@gnoworld/schemas";
+// A room's lines translated into the reader's language as they come on screen: the translations the server stored are asked in batches of at
+// most TRANSLATIONS_ASKED lines, newest first, one batch after another, never one by one; the stream's events fill the same store. The lines'
+// views read it by line; the room reads why the asking stopped.
+import { TRANSLATIONS_ASKED, type LineTranslations, type TranslationEvent } from "@gnoworld/schemas";
 import { useSyncExternalStore } from "react";
-import { pageJarvisApi } from "./lib/api/jarvis.ts";
+import { pageTranslationsApi } from "./lib/api/translations.ts";
 import type { Result } from "./lib/api/http.ts";
 import { Heard } from "./lib/heard.ts";
-import { pageTranslations } from "./lib/keep/translations.ts";
 import type { Language } from "./lib/language.ts";
 
-/** The asks in any minute: under the door's 30, which counts a minute from an account's first ask. */
-export const ASKS_A_MINUTE = 24;
-const MINUTE_MS = 60_000;
 /** The lines that come on screen together are gathered this long before the first ask, so the newest of them goes first. */
 export const GATHER_MS = 100;
 /** A refusal for the rate is tried again after this. */
 export const RETRY_MS = 30_000;
 
-/** What the page holds of a line in a language: asked and under way, translated (folded away or not), already in that language, or failed. */
+/** What the page holds of a line in a language: asked or being made, translated (folded away or not), already in that language, or failed. */
 export type Translation =
   | { state: "asking" }
   | { state: "done"; text: string; from?: Language | undefined; hidden: boolean }
   | { state: "same" }
   | { state: "failed" };
 
-type Ask = (request: JarvisTranslateRequest) => Promise<Result<JarvisTranslation>>;
-interface Job {
+type Ask = (room: string, ids: readonly string[], language: Language) => Promise<Result<LineTranslations>>;
+interface Want {
   of: Of;
   ask: Ask;
 }
@@ -39,43 +35,20 @@ export interface Of {
 
 const keyOf = ({ room, id, language }: Of) => `${room}|${id}|${language}`;
 const heard = new Heard();
-const device = pageTranslations();
-let entries: Map<string, Translation> | undefined;
+const entries = new Map<string, Translation>();
 let halted: "spent" | "off" | undefined;
 // Newest first.
-let queue: Job[] = [];
+let queue: Want[] = [];
 let busy = false;
 let timer: ReturnType<typeof setTimeout> | undefined;
-let api: ReturnType<typeof pageJarvisApi> | undefined;
-// When the asks of the last minute went, the oldest first.
-let asked: number[] = [];
-
-// How long the next ask waits: none while the last minute holds fewer than ASKS_A_MINUTE, else till the oldest of them is a minute old.
-function room(): number {
-  const now = Date.now();
-  asked = asked.filter((at) => now - at < MINUTE_MS);
-  const oldest = asked[0];
-  return asked.length < ASKS_A_MINUTE || oldest === undefined ? 0 : oldest + MINUTE_MS - now;
-}
-
-// The device's keeping, read once.
-function held(): Map<string, Translation> {
-  entries ??= new Map(
-    Object.entries(device.get()).map(([key, kept]): [string, Translation] => [
-      key,
-      "original" in kept ? { state: "same" } : { state: "done", text: kept.text, from: kept.from, hidden: false },
-    ]),
-  );
-  return entries;
-}
+let api: ReturnType<typeof pageTranslationsApi> | undefined;
 
 function put(key: string, value: Translation | undefined): void {
-  if (value === undefined) held().delete(key);
-  else held().set(key, value);
-  heard.tell();
+  if (value === undefined) entries.delete(key);
+  else entries.set(key, value);
 }
 
-const pageAsk: Ask = (request) => (api ??= pageJarvisApi()).translate(request);
+const pageAsk: Ask = (room, ids, language) => (api ??= pageTranslationsApi()).lines(room, ids, language);
 
 function wait(ms: number): void {
   timer = setTimeout(() => {
@@ -84,45 +57,54 @@ function wait(ms: number): void {
   }, ms);
 }
 
-function settle(key: string, job: Job, result: Result<JarvisTranslation>): number {
-  if (!result.ok) {
-    if (result.reason === "too_many") {
-      queue.unshift(job);
-      put(key, undefined);
-      return RETRY_MS;
-    }
-    put(key, { state: "failed" });
-  } else if (result.value.status === "translated") {
-    const { text, from } = result.value;
-    put(key, { state: "done", text, from, hidden: false });
-    device.add(key, from === undefined ? { text } : { text, from });
-  } else if (result.value.status === "original") {
-    put(key, { state: "same" });
-    device.add(key, { original: true });
-  } else {
-    halted = result.value.status;
-    queue = [];
-    put(key, undefined);
+// What a stored answer makes of a line: translated, or already in the reader's language.
+const heldOf = (one: LineTranslations["translations"][number]): Translation =>
+  one.status === "translated" ? { state: "done", text: one.text, from: one.from, hidden: false } : { state: "same" };
+
+// What a batch's answer says of a line: stored, still being made, or left out (failed; none while the asking is halted).
+function outcomeOf(id: string, answer: LineTranslations | undefined): Translation | undefined {
+  const one = answer?.translations.find((each) => each.msgid === id);
+  if (one !== undefined) return heldOf(one);
+  if (answer?.pending.includes(id) === true) return { state: "asking" };
+  return halted === undefined ? { state: "failed" } : undefined;
+}
+
+function settle(batch: readonly Want[], result: Result<LineTranslations>): number {
+  if (!result.ok && result.reason === "too_many") {
+    queue.unshift(...batch);
+    for (const { of } of batch) put(keyOf(of), undefined);
+    return RETRY_MS;
   }
-  return room();
+  const answer = result.ok ? result.value : undefined;
+  if (answer?.halt !== undefined) {
+    halted = answer.halt;
+    queue = [];
+  }
+  for (const { of } of batch) put(keyOf(of), outcomeOf(of.id, answer));
+  return 0;
 }
 
 function pump(): void {
-  const job = queue.shift();
-  if (busy || timer !== undefined || halted !== undefined || job === undefined) {
-    if (job !== undefined) queue.unshift(job);
-    return;
-  }
+  const first = queue[0];
+  if (busy || timer !== undefined || halted !== undefined || first === undefined) return;
+  const { room, language } = first.of;
+  const same = (want: Want) => want.of.room === room && want.of.language === language;
+  const batch = queue.filter(same).slice(0, TRANSLATIONS_ASKED);
+  queue = queue.filter((want) => !batch.includes(want));
   busy = true;
-  asked.push(Date.now());
-  const key = keyOf(job.of);
-  put(key, { state: "asking" });
-  job
-    .ask({ room: job.of.room, msgid: job.of.id, language: job.of.language })
-    .then((result) => settle(key, job, result))
+  for (const { of } of batch) put(keyOf(of), { state: "asking" });
+  heard.tell();
+  first
+    .ask(
+      room,
+      batch.map(({ of }) => of.id),
+      language,
+    )
+    .then((result) => settle(batch, result))
     .then((after) => {
       busy = false;
-      wait(after);
+      heard.tell();
+      if (queue.length > 0) wait(after);
     })
     .catch((error: unknown) => {
       reportError(error);
@@ -132,20 +114,33 @@ function pump(): void {
 /** Asks for a line that came on screen, unless it is held, asked or queued; the newest comes first. Gives what drops it from the queue as it leaves. */
 export function wantTranslation(of: Of, ask: Ask = pageAsk): () => void {
   const key = keyOf(of);
-  const job = { of, ask };
-  const queued = (other: Job) => keyOf(other.of) === key;
-  if (halted === undefined && !held().has(key) && !queue.some(queued)) {
-    queue.unshift(job);
+  const want = { of, ask };
+  if (halted === undefined && !entries.has(key) && !queue.some((other) => keyOf(other.of) === key)) {
+    queue.unshift(want);
     // After the lines that came with it, so the newest of them goes first.
     if (timer === undefined && !busy) wait(GATHER_MS);
   }
   return () => {
-    queue = queue.filter((other) => other !== job);
+    queue = queue.filter((other) => other !== want);
   };
 }
 
+/** What the stream told: each line's translation or original, held as if asked. */
+export function translationsTold(events: readonly TranslationEvent[]): void {
+  for (const event of events) {
+    const key = keyOf({ room: event.room, id: event.msgid, language: event.language });
+    put(
+      key,
+      event.status === "original"
+        ? { state: "same" }
+        : { state: "done", text: event.text, from: event.from, hidden: false },
+    );
+  }
+  heard.tell();
+}
+
 /** What the page holds of a line in a language, none while it has not asked. */
-export const translationNow = (of: Of): Translation | undefined => held().get(keyOf(of));
+export const translationNow = (of: Of): Translation | undefined => entries.get(keyOf(of));
 
 /** A line's translation as it changes. */
 export const useTranslation = (room: string | undefined, id: string, language: Language): Translation | undefined =>
@@ -158,8 +153,9 @@ export const useTranslation = (room: string | undefined, id: string, language: L
 /** Folds a line's translation away, or brings it back: the line's own words are never touched. */
 export function foldTranslation(of: Of, hidden: boolean): void {
   const key = keyOf(of);
-  const now = held().get(key);
+  const now = entries.get(key);
   if (now?.state === "done") put(key, { ...now, hidden });
+  heard.tell();
 }
 
 /** Why the asking stopped: the day's budget is spent, or Jarvis is off; none while it goes on. */

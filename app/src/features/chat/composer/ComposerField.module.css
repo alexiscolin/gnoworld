@@ -46,7 +46,7 @@
   }
 
   .placeholder {
-    color: var(--color-text-faint);
+    color: var(--color-text-muted);
     font: var(--font-chat);
     pointer-events: none;
   }

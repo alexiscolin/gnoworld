@@ -7,8 +7,8 @@ import { logIn } from "./irc.ts";
 /** A word of its own for each test, so none reads another's lines, or its own retry's. */
 export const word = (what: string): string => `${what}-${crypto.randomUUID().slice(0, 8)}`;
 const messages = (page: Page) => page.getByRole("list", { name: "Messages" });
-/** A room's lines: the Messages list's own items, never those of a line that is a list (F814). */
-export const lines = (page: Page) => messages(page).locator(":scope > li");
+/** A room's lines: the Messages list's own items, never those of a line that is a list (F814), nor the day dividers between days. */
+export const lines = (page: Page) => messages(page).locator(":scope > li:not([role='separator'])");
 export const lineOf = (page: Page, text: string) => lines(page).filter({ hasText: text });
 /** A line's buttons but its author's name, which opens the person's card (5a1e8335): the chips, the bar, the players. */
 export const buttonsOf = (line: Locator) => line.locator("button:not([data-author] > button)");
@@ -24,6 +24,8 @@ export async function pressWhoIsHere(page: Page): Promise<void> {
 /** The polite status that tells a screen reader a notice came: apart from the rooms' list, which a phone hides. */
 export const noticeStatus = (page: Page) => page.locator('p[role="status"].visually-hidden');
 export const roomsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
+/** The last stop before the messages' list: the separator that resizes the rooms' column, after the rooms. */
+export const beforeTheList = (page: Page) => page.getByRole("separator", { name: "Resize the rooms column" });
 
 /** A test's own account, logged in, in #games, Ergo having said it is here. */
 export async function inGames(page: Page): Promise<string> {

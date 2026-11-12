@@ -30,6 +30,20 @@ export const roomLabel = (room: string): string => {
   return `#${isAccount(label) ? shortAddress(label) : label}`;
 };
 
+/** The labels of rooms shown side by side: each room's own, a realm's version after it (#golf v2) where two would read the same. */
+export function distinctLabels(rooms: readonly { room: string; realm?: string | undefined }[]): Map<string, string> {
+  const own = rooms.map(({ room }) => roomLabel(room));
+  const seen = new Map<string, number>();
+  for (const label of own) seen.set(label, (seen.get(label) ?? 0) + 1);
+  return new Map(
+    rooms.map(({ room, realm }, at) => {
+      const label = own[at] ?? "";
+      const version = /\/(v[0-9]+)$/.exec(realm ?? "")?.[1];
+      return [room, (seen.get(label) ?? 0) > 1 && version !== undefined ? `${label} ${version}` : label] as const;
+    }),
+  );
+}
+
 /** A sender as a list names it: an account by its short address, a guest by its nick. */
 export const whoIs = (by: string): string => (isAccount(by) ? shortAddress(by) : by);
 

@@ -298,7 +298,8 @@ test.describe("threads", () => {
     await expect(threadField(page)).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(root).toBeFocused();
-    expect(await tabsTo(page, chipOf(root), 10)).toBeLessThanOrEqual(10);
+    // The bar's reactions come first: the chip stands after them, a count the bar may change.
+    expect(await tabsTo(page, chipOf(root), 14)).toBeLessThanOrEqual(14);
     await page.keyboard.press("Enter");
     await expect(panel(page)).toBeVisible();
   });

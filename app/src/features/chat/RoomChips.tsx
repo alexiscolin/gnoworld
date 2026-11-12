@@ -8,7 +8,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { askFor } from "../../pageAsks.ts";
 import { useFull } from "./full.ts";
 import { NewRoom, useMayMakeRoom } from "./NewRoom.tsx";
-import { roomHref, roomLabel } from "./names.ts";
+import { distinctLabels, roomHref } from "./names.ts";
 import { chipsFit, pickRooms } from "./roomChipsPick.ts";
 import { badged } from "./unread.ts";
 import styles from "./RoomChips.module.css";
@@ -62,6 +62,7 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
   );
   const listed = sections.flatMap((section) => section.rooms).filter(({ room }) => links.has(room));
   const rooms = pickRooms(listed, current, badges);
+  const labels = distinctLabels(listed);
   // One room is the header's name already: the row shows a choice, or nothing (Alexis, 2026-11-07: "pas besoin de doublon").
   const drawn = listed.length >= 2 || make;
   const { rowRef, fit } = useFitting(drawn, rooms.map((room) => `${room}${String(badges?.[room])}`).join());
@@ -81,9 +82,9 @@ export function RoomChips({ sections, current, badges }: RoomChipsProps) {
                 size="chip"
                 selected={room === current}
                 {...(unseen?.count === undefined ? {} : { count: unseen.count })}
-                {...(unseen === undefined ? {} : { label: `${roomLabel(room)}, ${unseen.said}` })}
+                {...(unseen === undefined ? {} : { label: `${labels.get(room) ?? room}, ${unseen.said}` })}
               >
-                {roomLabel(room)}
+                {labels.get(room) ?? room}
               </Chip>
             </li>
           );

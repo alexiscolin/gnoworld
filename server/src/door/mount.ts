@@ -1,4 +1,4 @@
-// The door's routes in the app (10g, 10k, 10u-g): a question, a line's translation and a realm's digest, each its own path
+// The door's routes in the app (10g, 10k, 10u-g): a question, a kept answer and a realm's digest, each its own path
 // and rate, under /api/jarvis; one memory of the accounts' mainnet names serves the question's quota and the digest's.
 import type { Hono } from "hono";
 import type { Log } from "@gnoworld/service/log";
@@ -11,7 +11,7 @@ import { makeNames } from "./names.ts";
 import type { doorMemory } from "./memory.ts";
 import type { Quota } from "./quota.ts";
 import type { DoorConfig } from "./settings.ts";
-import { translateRoutes } from "./translate.ts";
+import { saidRoutes } from "./said.ts";
 
 interface Door {
   settings: DoorConfig;
@@ -21,7 +21,7 @@ interface Door {
 
 interface Parts {
   door: Door;
-  chat: Pick<Chat, "mayRead" | "recent" | "last" | "line">;
+  chat: Pick<Chat, "mayRead" | "recent" | "last" | "said">;
   memory: ReturnType<typeof doorMemory>["ask"];
   session: (token: string | undefined) => Address | undefined;
   signedAt: (token: string | undefined) => number | undefined;
@@ -32,10 +32,21 @@ interface Parts {
 export function mountDoor(app: Hono, { door, chat, memory, session, signedAt, origins, log }: Parts): void {
   const front = { session, origins, on: door.settings.on, log, now: Date.now };
   const named = makeNames({ rpc: door.settings.namesRpc, chainId: door.settings.namesChain, now: Date.now, log });
-  const { mayRead, recent, last, line } = chat;
+  const { mayRead, recent, last, said } = chat;
   const { quota, jarvis } = door;
-  const asked = { ...front, ...memory, mayRead, recent, last, signedAt, named, quota, jarvis };
+  const asked = {
+    ...front,
+    ...memory,
+    mayRead,
+    recent,
+    last,
+    signedAt,
+    named,
+    quota,
+    jarvis,
+    ...(said === undefined ? {} : { said }),
+  };
   app.route("/api/jarvis", askRoutes({ ...asked, questionChars: door.settings.questionChars }));
-  app.route("/api/jarvis", translateRoutes({ ...front, mayRead, line, jarvis }));
+  if (said !== undefined) app.route("/api/jarvis", saidRoutes({ ...front, mayRead, said }));
   app.route("/api/jarvis", digestRoutes({ ...front, jarvis, quota, named }));
 }

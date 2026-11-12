@@ -15,6 +15,8 @@ export type DrawMarkdown = (text: string, link: (href: string, label: ReactNode[
 
 export interface AnswerCardProps {
   answer: Answered;
+  /** Who asked, by short address, when the room is shown another person's answer. */
+  asker?: string;
   chain: CallPlace["chain"];
   options?: ReadOptions | undefined;
   /** The chain's gnoweb and the app's own origin: links there are anchors. */
@@ -44,12 +46,17 @@ function Action({
   );
 }
 
-export function AnswerCard({ answer, chain, options, gnoweb, own, draw, onFly }: AnswerCardProps) {
+export function AnswerCard({ answer, asker, chain, options, gnoweb, own, draw, onFly }: AnswerCardProps) {
   const external = useExternalLinks(gnoweb, own);
   return (
     <>
       <Card tone="signal" compact>
-        <Card.Header icon="spark" kicker="AI concierge" title="Jarvis" hint="AI · may be wrong" />
+        <Card.Header
+          icon="spark"
+          kicker="AI concierge"
+          title="Jarvis"
+          hint={asker === undefined ? "AI · may be wrong" : `asked by ${asker} · AI · may be wrong`}
+        />
         <div data-jarvis-markdown="">{draw(answer.markdown, external.link)}</div>
         <Stack space="xs">
           {answer.buttons

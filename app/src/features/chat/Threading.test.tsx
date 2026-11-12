@@ -166,7 +166,7 @@ describe("useThreads: the open panel's focus and keys", () => {
   };
   // The panel and its lazy code come, then the composer's.
   const loaded = async (guest = false) => {
-    const ready = () => thread()?.querySelector("h3") !== null && (guest || field() !== null);
+    const ready = () => thread()?.querySelector("h2") !== null && (guest || field() !== null);
     for (let waits = 0; waits < 500 && !ready(); waits++)
       await act(async () => {
         await new Promise((done) => setTimeout(done, 10));
@@ -215,7 +215,7 @@ describe("useThreads: the open panel's focus and keys", () => {
     act(() => {
       opens("root");
     });
-    expect(thread()?.querySelector("h3")).toBeNull();
+    expect(thread()?.querySelector("h2")).toBeNull();
     // A tooltip shown on Close takes the first Escape, as it does in the panel's own: the second closes.
     const standing = thread();
     if (standing === null) throw new Error("no stand-in");

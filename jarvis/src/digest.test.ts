@@ -167,6 +167,22 @@ describe("a realm's digest, read on its universe's node", () => {
     expect(first).toContain(`source=\\"page\\"`);
     expect(first).toContain(`source=\\"functions\\"`);
     expect(first).toContain("efefefef");
+    expect(first).toContain("Results");
+  });
+
+  it("answers invalid for a universe the cards list but the places do not hold, reading nothing", async () => {
+    const { parts, node, model, signal } = setup();
+    const digests = makeDigests({ ...parts, cards: { ...parts.cards, chains: ["onyx", "ghost"] } });
+    expect(await digests.digest({ universe: "ghost", realm: REALM }, signal())).toEqual({ kind: "invalid" });
+    expect(node).not.toHaveBeenCalled();
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("answers failed, not invalid, for a realm whose question the loop refuses as too long", async () => {
+    const long = `gno.land/r/demo/${"a".repeat(2_100)}`;
+    const { ask, model } = setup({ chain: { realms: [long] } });
+    expect(await ask(long)).toEqual({ kind: "failed" });
+    expect(model.requests).toHaveLength(0);
   });
 
   it("offers the model give_digest and propose_action, and nothing else", async () => {

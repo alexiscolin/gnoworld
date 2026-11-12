@@ -23,7 +23,6 @@ import {
   JarvisSettings,
   JarvisState,
   JarvisTranslate,
-  JarvisTranslateRequest,
   JarvisTranslation,
   ProposedAction,
   TRANSLATION_CAPS,
@@ -568,17 +567,6 @@ describe("translation's contract (10k)", () => {
       false,
       false,
     ]);
-  });
-
-  it("asks the server for a room's line by its id, never its text (the text is the server's own record)", () => {
-    const request = (over: Record<string, unknown>) =>
-      JarvisTranslateRequest.safeParse({ room: "#bubble", msgid: "m1", language: "fr", ...over }).success;
-    expect(request({})).toBe(true);
-    expect(request({ text: "forged" })).toBe(false);
-    expect(request({ msgid: "" })).toBe(false);
-    expect(request({ msgid: "a b" })).toBe(false);
-    expect(request({ room: "bubble" })).toBe(false);
-    expect(request({ language: "klingon" })).toBe(false);
   });
 
   it("sends jarvis a line's text within a line's bound in code points, never empty, and nothing else", () => {

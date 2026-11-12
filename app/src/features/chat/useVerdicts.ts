@@ -6,6 +6,9 @@ import { useEffect, useRef } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
 import { lazyCards } from "../../lib/stream/lazyCards.ts";
 import { lazyChain } from "../../lib/stream/lazyChain.ts";
+import { translationFeed } from "../../lib/stream/translationFeed.ts";
+import { translationLanguage } from "../../jarvisHere.ts";
+import { translationsTold } from "../../translating.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";
@@ -46,6 +49,7 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
         addCards(store).told(events);
       });
     });
+    const translation = translationFeed(translationsTold);
     const asker = verdictAsker({
       verdicts: api.verdicts,
       cards: async (room, ids) => (await loadCardsApi()).pageCardsApi().lines(room, ids),
@@ -61,7 +65,15 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
       ...store.getState().verdictActions,
       signal: store.getState().signalActions.signaled,
       held: (room) => store.getState().verdicts[room],
-      follow: (room, on) => pageVerdicts([room], { ...on, chain: feed.chain, realms: feed.realms, card }),
+      follow: (room, on) =>
+        pageVerdicts([room], {
+          ...on,
+          chain: feed.chain,
+          realms: feed.realms,
+          card,
+          translation,
+          language: translationLanguage(),
+        }),
       linked: (text) => linkedRef.current?.(text) ?? false,
     });
     askerRef.current = asker;

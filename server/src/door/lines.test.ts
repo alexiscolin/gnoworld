@@ -107,7 +107,6 @@ describe("the recent lines of a room", () => {
     ])
       if (line !== undefined) recent.passed(line);
     expect(texts(recent.recent("#bubble", ASKER))).toEqual(["to everyone"]);
-    expect([recent.line("#bubble", "m1"), recent.line("#bubble", "m2")]).toEqual([undefined, undefined]);
   });
 
   it("never keeps a line of a members room, nor of a members-write room", () => {
@@ -234,57 +233,6 @@ describe("the recent lines of a room", () => {
   });
 });
 
-describe("a line of a room, by its id (10k, a translation's text)", () => {
-  it("is the text the server keeps for a public room's line moderation let through, by its room and id", () => {
-    const recent = setup();
-    recent.passed(said("m1", "hello"));
-    recent.passed(said("m2", "the poll closes today", { account: BOB }));
-    expect([recent.line("#bubble", "m1"), recent.line("#bubble", "m2")]).toEqual(["hello", "the poll closes today"]);
-    expect([recent.line("#bubble", "m3"), recent.line("#earth", "m1")]).toEqual([undefined, undefined]);
-  });
-
-  it("is none for a members room's line", () => {
-    const recent = setup();
-    recent.passed(said("c1", "crew only", { room: "#bubble/crew" }));
-    expect(recent.line("#bubble/crew", "c1")).toBeUndefined();
-  });
-
-  it("is none for a line taken once it was kept, and for one taken before it came", () => {
-    const recent = setup();
-    recent.passed(said("m1", "hidden later"));
-    recent.taken("#bubble", "m1");
-    recent.taken("#bubble", "m2");
-    recent.passed(said("m2", "hidden before it came"));
-    expect([recent.line("#bubble", "m1"), recent.line("#bubble", "m2")]).toEqual([undefined, undefined]);
-  });
-
-  it("is the edit's own line once it passed, never the line its author replaced", () => {
-    const recent = setup();
-    recent.passed(said("m2", "before the edit"));
-    const edit = said("m3", "after the edit", { edits: "m2" });
-    recent.edited(edit);
-    recent.passed(edit);
-    expect([recent.line("#bubble", "m2"), recent.line("#bubble", "m3")]).toEqual([undefined, "after the edit"]);
-  });
-
-  it("is none once 30 later lines pushed it out of its room", () => {
-    const recent = setup();
-    for (let at = 0; at < 31; at += 1) recent.passed(said(`n${String(at)}`, `line ${String(at)}`));
-    expect([recent.line("#bubble", "n0"), recent.line("#bubble", "n1"), recent.line("#bubble", "n30")]).toEqual([
-      undefined,
-      "line 1",
-      "line 30",
-    ]);
-  });
-
-  it("is none once 10,000 rooms written since pushed its room out", () => {
-    const recent = setup();
-    recent.passed(said("m1", "first room's line", { room: "#first" }));
-    for (let at = 0; at < 10_000; at += 1) recent.passed(said("m1", "another room", { room: `#room${String(at)}` }));
-    expect([recent.line("#first", "m1"), recent.line("#room9999", "m1")]).toEqual([undefined, "another room"]);
-  });
-});
-
 describe("what the recent lines tell the door (D13985)", () => {
   const spy = () => {
     const heard: string[] = [];
@@ -349,5 +297,97 @@ describe("what the recent lines tell the door (D13985)", () => {
     recent.edited(said("m3", "two", { edits: "m2" }));
     recent.taken("#bubble", "m9");
     expect(changed).toEqual(["#bubble", "#bubble"]);
+  });
+});
+
+describe("Jarvis's own relayed lines", () => {
+  it("a line of jarvis/bot is not a line Jarvis reads", () => {
+    const recent = setup();
+    recent.passed(said("m1", "hello"));
+    recent.passed(said("m2", "It closes today.", { account: "jarvis/bot" }));
+    expect(texts(recent.recent("#bubble", ASKER))).toEqual(["hello"]);
+  });
+
+  it("taken drops the kept answer of the line, and an edit by its author does too", () => {
+    const dropped: [string, string][] = [];
+    const recent = makeRecentLines({
+      isPublic: publicRooms,
+      answers: { drop: (room, msgid) => dropped.push([room, msgid]) },
+    });
+    recent.passed(said("m1", "one"));
+    recent.passed(said("m2", "two"));
+    recent.taken("#bubble", "m1");
+    expect(dropped).toEqual([["#bubble", "m1"]]);
+    recent.edited(said("m3", "two again", { edits: "m2" }));
+    expect(dropped).toEqual([
+      ["#bubble", "m1"],
+      ["#bubble", "m2"],
+    ]);
+  });
+
+  it("an edit by another account drops no kept answer", () => {
+    const dropped: [string, string][] = [];
+    const recent = makeRecentLines({
+      isPublic: publicRooms,
+      answers: { drop: (room, msgid) => dropped.push([room, msgid]) },
+    });
+    recent.passed(said("m1", "one"));
+    recent.edited(said("m2", "forged", { account: BOB, edits: "m1" }));
+    expect(dropped).toEqual([]);
+    recent.taken("#bubble", "m1");
+    expect(dropped).toEqual([["#bubble", "m1"]]);
+  });
+});
+
+describe("Jarvis's answers said in a room", () => {
+  const BOT = "jarvis/bot";
+  const watched = () => {
+    const dropped: unknown[][] = [];
+    const heard: string[] = [];
+    const recent = makeRecentLines({
+      isPublic: publicRooms,
+      heard: { said: (account) => heard.push(account) },
+      answers: { drop: (...args) => dropped.push(args) },
+    });
+    return { recent, dropped, heard };
+  };
+
+  it("a line of jarvis/bot is neither the room's last line nor a speaker heard", () => {
+    const { recent, heard } = watched();
+    recent.passed(said("m1", "hello"));
+    recent.passed(said("m2", "It closes today.", { account: BOT }));
+    expect(recent.last("#bubble")).toBe("m1");
+    expect(heard).toEqual([ALICE]);
+  });
+
+  it("a REDACT of the bot's line drops its kept answer though the line was never kept, even before it came", () => {
+    const { recent, dropped } = watched();
+    recent.passed(said("m2", "It closes today.", { account: BOT }));
+    recent.taken("#bubble", "m2");
+    recent.taken("#bubble", "m3");
+    expect(dropped).toEqual([
+      ["#bubble", "m2", undefined],
+      ["#bubble", "m3", undefined],
+    ]);
+  });
+
+  it("an edit of a line by the bot drops its answer, and one by another account of a line unknown drops none", () => {
+    const { recent, dropped } = watched();
+    recent.edited(said("m5", "forged", { account: BOB, edits: "m4" }));
+    expect(dropped).toEqual([]);
+    recent.edited(said("m6", "changed", { account: BOT, edits: "m4" }));
+    expect(dropped).toEqual([["#bubble", "m4", undefined]]);
+  });
+
+  it("a line taken or edited by its author hands on who said it and what, so the answer to its question goes too", () => {
+    const { recent, dropped } = watched();
+    recent.passed(said("q1", "@jarvis what is up", { account: ASKER }));
+    recent.passed(said("q2", "@jarvis other", { account: ASKER }));
+    recent.taken("#bubble", "q1");
+    recent.edited(said("q3", "@jarvis other?", { account: ASKER, edits: "q2" }));
+    expect(dropped).toEqual([
+      ["#bubble", "q1", { account: ASKER, text: "@jarvis what is up" }],
+      ["#bubble", "q2", { account: ASKER, text: "@jarvis other" }],
+    ]);
   });
 });

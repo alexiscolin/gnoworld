@@ -70,7 +70,7 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
     <aside ref={boxRef} aria-label="Thread" className={styles["panel"]} onKeyDown={escape}>
       <header className={styles["head"]}>
         <Sidebar side="end" space="2xs">
-          <h3 className={styles["title"]}>{title === "" ? "Thread" : `Thread: ${title}`}</h3>
+          <h2 className={styles["title"]}>{title === "" ? "Thread" : `Thread: ${title}`}</h2>
           <IconButton icon="close" label="Close the thread" size="s" emphasis="plain" onClick={onClose} />
         </Sidebar>
       </header>

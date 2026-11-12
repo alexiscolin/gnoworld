@@ -20,7 +20,8 @@ test.beforeEach(async ({ page }) => {
 });
 
 test.describe("a world's page at the video's size", () => {
-  test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1 });
+  // Reduced motion: the plate's parts stand where they settle, not where their entrance has them as the box is read.
+  test.use({ viewport: { width: 1728, height: 1080 }, deviceScaleFactor: 1, reducedMotion: "reduce" });
 
   // The kicker is the plate's first row: the planet's disc, then the genre and the kind; the header's levels say where the place is.
   test("the kicker stands at the text column's left, over the title, and carries no crumb", async ({ page }) => {
@@ -171,12 +172,16 @@ test.describe("who is here right now", () => {
 });
 
 // While nobody is counted, the band still draws its first cell with its zero (a count that was read is a value), at every width:
-// the chat's socket answers nothing, so nobody is ever counted.
+// the chat's socket answers nothing and the server counts nobody.
 test.describe("who is here while nobody is counted", () => {
   for (const width of [390, 1279, 1280, 1728] as const)
     test(`at ${String(width)} px the band's "Here now" reads zero`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       await page.routeWebSocket(/\/ws$/, () => undefined);
+      // The server's count is the shared stack's, which the run's other journeys fill: a server that counted nobody here says zero.
+      await page.route("**/api/presence", (route) =>
+        route.fulfill({ json: { worlds: [{ world: "bubble", here: 0, perHour: 0, rise: 0 }] } }),
+      );
       await page.goto("/w/bubble");
       await hydrated(page);
       const band = page.locator("[data-look='plate'] section[aria-label='Figures']");

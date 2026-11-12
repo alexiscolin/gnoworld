@@ -1,7 +1,7 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { PRESENCE_ANSWER_MAX, Presence, PresencePeople } from "@gnoworld/schemas/indexer";
+import { PRESENCE_ANSWER_MAX, Presence, PresenceHours, PresencePeople } from "@gnoworld/schemas/indexer";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makePresence } from "./presence.ts";
 import { PRESENT_MS, countriesTo, startPresent } from "./present.ts";
@@ -271,6 +271,31 @@ describe("the chat's signals for the trends", () => {
     const read = makePresence({ file: messagesOf(file), now: () => T0 + PRESENT_MS });
     expect(read.history("earth")).toEqual([{ at: T0, people: 120 }]);
     expect(read.history("bubble")).toEqual([]);
+  });
+
+  const hoursAt = async (present: ReturnType<typeof setup>["present"]) =>
+    PresenceHours.parse(await (await present.routes.request("/hours?world=earth")).json()).hours;
+
+  it("serves a plate's hours as the lines counted in each hour, never the busiest pace times 60", async () => {
+    // One line in the last five minutes is a pace of 0.2 a minute: read as an hour's count it is 12, and it is 1 line.
+    const { present } = setup({ rates: { "#earth": 0.2 } });
+    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+    present.seen("#earth", ["gnoworld", "ada"]);
+    vi.advanceTimersByTime(MINUTE);
+    expect((await hoursAt(present)).at(-1)).toBe(1);
+  });
+
+  it("adds the lines of each sample of an hour, and keeps them across a restart", async () => {
+    const { present, file } = setup({ rates: { "#earth": 0.4, "#earth/kyoto": 0.2 } });
+    for (let sample = 0; sample < 3; sample += 1) {
+      vi.advanceTimersByTime(PRESENT_MS - MINUTE);
+      present.seen("#earth", ["gnoworld", "ada"]);
+      vi.advanceTimersByTime(MINUTE);
+    }
+    expect((await hoursAt(present)).at(-1)).toBe(9);
+    present.stop();
+    const again = setup({ file });
+    expect((await hoursAt(again.present)).at(-1)).toBe(9);
   });
 
   it("counts no room a guest cannot see, in the signals as in the messages' history", () => {

@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { Locator } from "@playwright/test";
+import { violations } from "./axe.ts";
 import { expect, hydrated, reactMark, test, type Page } from "./fixtures.ts";
 
 // The pages slice 1 pre-renders (ADR-0002 §2), with the address each names as its own.
@@ -48,10 +48,6 @@ async function followInPlace(link: Locator, from: string, to: { url: string; tit
   await expect(page).toHaveURL(to.url);
   await expect(page).toHaveTitle(to.title);
   expect(await page.evaluate(() => "stayed" in window)).toBe(true);
-}
-
-async function violations(page: Page): Promise<unknown[]> {
-  return (await new AxeBuilder({ page }).analyze()).violations;
 }
 
 // Every error the page reports, and every request but the page's own that failed or answered 400 or more.

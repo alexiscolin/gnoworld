@@ -30,3 +30,21 @@ export function peopleOf(
   const named = new Set([...people].flatMap((nick) => countryOf(nick) ?? []));
   return { online: people.size + guests, countries: named.size };
 }
+
+// The lines a pace says in the five minutes it is read over (activity.ts): its hour over twelve, added to the hour of each sample, the
+// plate's hours (8g); the sample at the stop adds none, its five minutes overlapping the last one's.
+export const linesOf = (perHour: number): number => Math.round(perHour / 12);
+
+// Each world with its people and its messages an hour, the worlds none of whose rooms was read left out.
+export const sampled = (
+  held: readonly [string, string[]][],
+  at: number,
+  read: {
+    here: (names: readonly string[], at: number) => number | undefined;
+    perHour: (names: readonly string[], at: number) => number;
+  },
+): [string, number, number][] =>
+  held.flatMap(([world, names]) => {
+    const people = read.here(names, at);
+    return people === undefined ? [] : [[world, people, Math.round(read.perHour(names, at))]];
+  });

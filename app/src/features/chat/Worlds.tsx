@@ -8,6 +8,7 @@ import { RouterLink } from "../../routerLink.tsx";
 import { useApp } from "../../storeContext.tsx";
 import { listAhead } from "./roomsListed.ts";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
+import { UnreadPill } from "./UnreadPill.tsx";
 import { WorldsMore } from "./WorldsMore.tsx";
 import styles from "./Worlds.module.css";
 
@@ -25,6 +26,8 @@ export interface WorldsProps {
   followed?: readonly string[];
   /** The universe the column is of: its id (the follows' key) and whether its paths carry no /net prefix. */
   universe: { id: string; isDefault: boolean };
+  /** Each world's lines not yet seen, by its slug: a pill beside its planet, the world in view's left to its rooms. */
+  unread?: Readonly<Record<string, number>> | undefined;
 }
 
 const NONE: readonly string[] = [];
@@ -38,7 +41,7 @@ export function inRailOrder(worlds: WorldsProps["worlds"], followed: readonly st
   return worlds.toSorted((a, b) => place(a) - place(b));
 }
 
-export function Worlds({ worlds, current, followed = NONE, universe }: WorldsProps) {
+export function Worlds({ worlds, current, followed = NONE, universe, unread }: WorldsProps) {
   const session = useApp(({ login }) => login.session);
   const [asked, setAsked] = useState(false);
   const [open, setOpen] = useState(false);
@@ -47,7 +50,7 @@ export function Worlds({ worlds, current, followed = NONE, universe }: WorldsPro
       {/* One planet to a line: the column is no wider than one, so a Cluster wraps each onto its own. */}
       <Cluster as="ul" space="2xs" justify="center">
         {inRailOrder(worlds, followed).map((world) => (
-          <li key={world.slug}>
+          <li key={world.slug} className={styles["entry"]}>
             <Tooltip label={world.name}>
               <RouterLink
                 href={world.href}
@@ -63,6 +66,7 @@ export function Worlds({ worlds, current, followed = NONE, universe }: WorldsPro
                 </span>
               </RouterLink>
             </Tooltip>
+            {world.slug === current ? null : <UnreadPill count={unread?.[world.slug] ?? 0} />}
           </li>
         ))}
       </Cluster>

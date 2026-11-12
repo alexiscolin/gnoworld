@@ -13,6 +13,7 @@ import {
   VERDICTS_ASKED,
 } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
+import { BUSY_REST_MS } from "../../lib/stream/verdicts.ts";
 import { own } from "../../store/record.ts";
 
 export interface Asking {
@@ -62,7 +63,7 @@ export function unjudged(
 
 /** The rest after a failure that may pass; after "too many", the route's minute (server/src/stream/verdicts.ts). */
 export const REST_MS = 10_000;
-export const BUSY_REST_MS = 60_000;
+export { BUSY_REST_MS };
 // The failures that may pass: the others (refused, forbidden, malformed) the server would give again.
 const PASSING: ReadonlySet<string> = new Set(["network", "unavailable", "internal", "not_ready", "too_many"]);
 

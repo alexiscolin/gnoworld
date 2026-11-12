@@ -50,6 +50,10 @@ export function tellJarvisHere(next: JarvisHere | undefined): void {
   changed();
 }
 
+/** The language a signed-in reader's stream asks the stored translations in: none for a guest or with the switch off. */
+export const translationLanguage = (): Language | undefined =>
+  here?.account !== undefined && here.auto !== false ? (here.language ?? "en") : undefined;
+
 /** Where Jarvis can be asked from now, as the chat last told. */
 export const useJarvisHere = (): JarvisHere | undefined =>
   useSyncExternalStore(
@@ -109,6 +113,22 @@ export function setJarvisDrawing(next: ((item: JarvisItem) => ReactNode) | undef
   drawing = next;
   changed();
 }
+
+let saying: ((room: string, msgid: string, fallback: ReactNode) => ReactNode) | undefined;
+
+/** Registered by the panel's host: how a line Jarvis said is drawn, the plain line standing where it cannot be. */
+export function setJarvisSaidDrawing(next: typeof saying): void {
+  saying = next;
+  changed();
+}
+
+/** How a line Jarvis said is drawn, once the host's code has come; none before. */
+export const useJarvisSaidDrawing = (): typeof saying =>
+  useSyncExternalStore(
+    heard.subscribe,
+    () => saying,
+    () => undefined,
+  );
 
 /** How a card is drawn, once the host's code has come; none before. */
 export const useJarvisDrawing = (): ((item: JarvisItem) => ReactNode) | undefined =>

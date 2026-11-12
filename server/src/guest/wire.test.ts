@@ -230,13 +230,13 @@ describe("the guest chat as the chat starts it (D430)", () => {
     expect(db.prepare("SELECT count(*) AS n FROM room_said").get()).toEqual({ n: 0 });
   });
 
-  it("lets a guest's relayed line be translated: the recent lines hold it under the id Ergo gave it, after the provider passed it (L8)", async () => {
+  it("lets Jarvis read a guest's relayed line: the recent lines hold it, after the provider passed it (L8)", async () => {
     const { post, peer, chat, arrive } = await setup();
     const cookie = await arrive();
     const said = post("/say", { room: "#earth", text: "hello there" }, cookie);
     await answerRelay(peer, "m77");
     expect((await said).status).toBe(200);
-    expect(chat.line("#earth", "m77")).toBe("hello there");
+    expect(chat.recent("#earth", "g1asker").map(({ text }) => text)).toEqual(["hello there"]);
   });
 
   it("shares one provider breaker with the account check: five guest failures leave the provider alone for an account's line too (L5)", async () => {

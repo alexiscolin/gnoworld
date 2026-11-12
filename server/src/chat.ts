@@ -7,14 +7,16 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Presence } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
-import { makeRecentLines, type RecentLines } from "./door/lines.ts";
+import type { RecentLines } from "./door/lines.ts";
+import type { Answers } from "./door/said.ts";
 import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
 import type { Said } from "./irc/link.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Log } from "@gnoworld/service/log";
 import type { CardFlow } from "./cards/flow.ts";
-import { cardsFlow, thenCards, type ChatCards } from "./cards/wire.ts";
+import type { ChatCards } from "./cards/wire.ts";
+import type { Translate, TranslationFlow } from "./translations/flow.ts";
 import { makeProgress } from "./moderation/catchup.ts";
 import { checkerFor, nameCheckerFor, providerOf, strikesFor } from "./moderation/checker.ts";
 import type { Answer } from "./moderation/provider.ts";
@@ -22,18 +24,17 @@ import { makeQueue } from "./moderation/queue.ts";
 import { moderate } from "./moderation/way.ts";
 import type { Pins } from "./pins/pins.ts";
 import { pinsFor } from "./pins/wire.ts";
-import { ensureNamed, ensureRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
-import { mayRead, publicRoom, type World } from "./rooms/types.ts";
-import { linkFor, listedTo, ownerActs, stopper, verdictsFor } from "./chatParts.ts";
+import { mayRead, type World } from "./rooms/types.ts";
+import { linkFor, listedTo, ownerActs, seedRooms, stopper, verdictsFor } from "./chatParts.ts";
 import { hearing, presentFor, presentOf } from "./chatHearing.ts";
 import { guestFor, type GuestSettings } from "./guest/wire.ts";
 import type { Search } from "./search/index.ts";
-import { indexing } from "./search/wire.ts";
-import { passedLines, type Signals } from "./signals/signals.ts";
+import { linesAfter } from "./chatLines.ts";
+import type { Signals } from "./signals/signals.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
-import { keeping, reconcilerFor, sweeping, typedRooms } from "./rooms/wire.ts";
+import { keeping, reconcilerFor, sweeping } from "./rooms/wire.ts";
 import type { ChatWorld } from "./worlds/present.ts";
 
 export interface Chat extends ReturnType<typeof guestFor> {
@@ -51,6 +52,8 @@ export interface Chat extends ReturnType<typeof guestFor> {
   pins: Pins;
   // The link cards (slice 13): none unless they are on; what the routes serve and the retention expires.
   cards: CardFlow | undefined;
+  // The stored translations (slice 13): none while Jarvis is off; what the routes serve and the retention expires.
+  translations: TranslationFlow | undefined;
   // Whether an account may pin in a room: its world's moderators and the team.
   mayPin: (room: string, who: string) => boolean;
   // An owner's moderation (D13936): a line hidden by the link's REDACT, a mute that ends none, a world's rooms.
@@ -66,9 +69,10 @@ export interface Chat extends ReturnType<typeof guestFor> {
   presenceChat?: () => readonly ChatWorld[];
   // A public room's last lines moderation let through, for Jarvis's door (10g), and one by its id (10k).
   recent: RecentLines["recent"];
-  line: RecentLines["line"];
   // A room's last line's id, any room (D13985).
   last: RecentLines["last"];
+  // Jarvis's answers said to a room and kept by their line's id: none without the door's part in the options.
+  said: Answers | undefined;
   stop: () => Promise<void>;
 }
 
@@ -106,12 +110,19 @@ export interface Options {
   search?: Search | undefined;
   // Link cards (slice 13, L3): the link reader's call and the card's thresholds; none, no card.
   cards?: ChatCards | undefined;
+  // jarvis's translate call, as the door's client makes it; none while Jarvis is off, and no line is translated.
+  translate?: Translate | undefined;
   // How long after a refused hide (the line not yet in Ergo's history) it is asked again (F2462).
   redactRetryMs?: number;
   // The file who-is-here keeps its history in (7h); none keeps none.
   presence?: string;
   // What the lines that pass tell Jarvis's door (D13985): the account of each, and the room of a line taken or edited.
-  door?: { heard: { said: (account: string) => void }; changed: (room: string) => void };
+  // `said`: what Jarvis's public answers need of the door, the hosts a link may name.
+  door?: {
+    heard: { said: (account: string) => void };
+    changed: (room: string) => void;
+    said?: { hosts: readonly string[] };
+  };
 }
 
 // A world's rooms at most, its main room aside (3l).
@@ -123,8 +134,7 @@ const streamFor = (stream: ReturnType<typeof makeStream>, settings: Settings, { 
 
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
   const { log, pepper, now = Date.now } = options;
-  ensureRooms(db, [...settings.worlds.keys()], now());
-  ensureNamed(db, typedRooms(settings.worlds), now());
+  seedRooms(db, settings, now());
   // One provider behind one breaker for the lines, the rooms' names and the guests' lines.
   const ask = providerOf(settings, { ...options, now });
   const check = checkerFor(db, settings, { ...options, ask });
@@ -132,13 +142,9 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
   const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
-  const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room), ...options.door });
-  // Every line the bot passed, the guests' relayed ones too, goes to the recent lines and to the index (F13700).
-  const index = indexing(options.search, log, { recent, link: () => link });
-  const passed = passedLines({ roles: settings, recent: index.recent, stream, signals: options.signals });
-  // The link cards, once a line has passed: their flow checks the card behind the chat's one breaker.
-  const cards = cardsFlow({ db, roles: settings, pepper, log, now, stream, ask, cards: options.cards });
-  const run = moderate({ db, check, send, stream, progress, strike, passed: thenCards(passed, cards) });
+  const lines = { ...options, now, stream, ask, link: () => link };
+  const { recent, answers, index, cards, translations, afterPassed } = linesAfter(db, settings, lines);
+  const run = moderate({ db, check, send, stream, progress, strike, passed: afterPassed });
   const queue = makeQueue<Said>({ run, log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
@@ -157,7 +163,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const stopSweeping = sweeping(db, rooms, { now, ms: options.sweepMs ?? 60 * 60_000, roles: settings });
   const kept = pinsFor(db, settings, { link: () => link, now, log, maker: keeper.maker });
   const onMessage = hearing({ kept, cards, recent, activity, present, visible, progress, queue, now });
-  const parts = {
+  const linked = {
     db,
     ergo: settings.ergo,
     redactRetryMs: options.redactRetryMs,
@@ -168,7 +174,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     log,
     onMessage,
   };
-  const link = linkFor({ ...parts, cards, kept: index.kept(kept), recent: index.recent });
+  const link = linkFor({ ...linked, cards, translations, kept: index.kept(kept), recent: index.recent });
   return {
     ...guestFor(db, settings, {
       ...options,
@@ -189,11 +195,21 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     nameCheck: nameCheckerFor(settings, { ...options, ask }),
     ...kept.api,
     cards,
+    translations,
     ...presentOf(present),
     recent: recent.recent,
-    line: recent.line,
     last: recent.last,
+    said: answers,
     ...ownerActs(db, send, mutes),
-    stop: stopper({ timers: [lifts, passes], sweep: stopSweeping, present, queue, cards, link: () => link, stream }),
+    stop: stopper({
+      timers: [lifts, passes],
+      sweep: stopSweeping,
+      present,
+      queue,
+      cards,
+      translations,
+      link: () => link,
+      stream,
+    }),
   };
 }

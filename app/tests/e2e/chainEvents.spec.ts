@@ -1,8 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
-// Slice 9g (frames 20 to 35 and 90 to 97): a line in the GovDAO room, the ticker's deploy, the Earth's 24 h count, each with its block
-// and none before its event. The page is handed the stream's frames a server would send and waits on the stream's own response.
+// Slice 9g (frames 20 to 35 and 90 to 97): a line in the GovDAO room with its block and none before its event. The page is handed the stream's frames a server would send and waits on the stream's own response.
 // Guests only: no journey but arrival.spec.ts may open /w/govdao logged in (D210).
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const SINCE = `event: since\ndata: ${JSON.stringify({ time: "2026-11-05T12:00:00.000Z" })}\n\n`;
@@ -16,14 +15,6 @@ const CALL = {
   func: "MustVoteOnProposal",
   actor: ALICE,
   height: 900030,
-};
-const DEPLOY = {
-  id: "h887427:0",
-  kind: "deploy",
-  universe: "onyx",
-  realm: `gno.land/r/${ALICE}/counter`,
-  actor: ALICE,
-  height: 887427,
 };
 
 const SIZES = [
@@ -72,34 +63,3 @@ test("a call to another world's realm is not a line of this room", async ({ page
   await hydrated(page);
   await expect(page.locator("[data-chain]")).toHaveCount(1);
 });
-
-// Red pass: the Earth and the ticker are walked at both sizes, with no sideways scroll, the ticker's strip among them.
-for (const [size, width, height] of SIZES) {
-  test(`the Earth says its realms of the last 24 h with the block, on a ${size}, with no axe violation`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height });
-    await streamOf(page, `${frame("realms", { universe: "onyx", count: 17, height: 908297 })}${SINCE}`);
-    await page.goto("/earth");
-    await hydrated(page);
-    await expect(page.getByText(/deployed/).first()).toBeVisible();
-    await expect(page.getByText("block 908297")).toBeVisible();
-    expect(await violations(page)).toEqual([]);
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
-  });
-
-  test(`the ticker shows a deploy of the chain with its block, linked to the realm's page, on a ${size}`, async ({
-    page,
-  }) => {
-    await page.setViewportSize({ width, height });
-    await streamOf(page, `${frame("chain", DEPLOY)}${SINCE}`);
-    await page.goto("/");
-    await hydrated(page);
-    const ticker = page.locator("[data-ticker]");
-    await expect(ticker.locator("[data-kind='chain']").first()).toBeVisible();
-    await expect(ticker.getByText("block 887427").first()).toBeAttached();
-    await expect(ticker.locator(`a[href='/r/${ALICE}/counter']`).first()).toBeAttached();
-    expect(await violations(page)).toEqual([]);
-    expect(await sideways(page)).toBeLessThanOrEqual(0);
-  });
-}

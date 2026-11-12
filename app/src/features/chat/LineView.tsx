@@ -1,19 +1,18 @@
 // A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
 // (4c), its link's player (4g), its link's page preview (8f), its link's card (L4) and its bar. One that mentions the reader says so (4d), one of the reader's own says
 // "you" (4e).
-import { cardOf, markdown, mentions, pollOf, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
+import { markdown, mentions, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { ReactNode } from "react";
 import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
+import { LineBody } from "./LineBody.tsx";
 import { Head } from "./LineHead.tsx";
 import { LineText } from "./LineText.tsx";
 import { LineTranslation } from "./LineTranslation.tsx";
 import { LineCard, type LineCardProps } from "./LineCard.tsx";
 import { LinePreview } from "./LinePreview.tsx";
 import { Reactions } from "./Reactions.tsx";
-import { PollView } from "./PollView.tsx";
-import { SharedCard } from "./SharedCard.tsx";
 import { Quote } from "./Replying.tsx";
 import { ThreadChip } from "./ThreadChip.tsx";
 import styles from "./RoomView.module.css";
@@ -48,31 +47,6 @@ function NewDivider() {
         </span>
       </span>{" "}
     </>
-  );
-}
-
-// The card a message's words are (core's cardLine.ts): where a player is offered alone, which a direct message and a reader who saves data are
-// not given, the card fetching its own data.
-const cardIn = ({ kind, text }: Line, players: boolean): ReturnType<typeof cardOf> =>
-  kind === "message" && players ? cardOf(text) : undefined;
-
-// A line's words, or a poll's bars or a card in their place (core's poll.ts, cardLine.ts), over the room kept for its bar.
-function Body({
-  line,
-  votes,
-  react,
-  players,
-  children,
-}: Pick<LineViewProps, "line" | "votes" | "react" | "players"> & { children: ReactNode }) {
-  const poll = votes === undefined ? undefined : pollOf(line.text);
-  const card = cardIn(line, players);
-  let drawn = children;
-  if (card !== undefined) drawn = <SharedCard card={card} />;
-  else if (poll !== undefined) drawn = <PollView to={line.id} poll={poll} votes={votes ?? ""} react={react} />;
-  return (
-    <div data-line-text="" className={votes === undefined && card === undefined ? undefined : styles["wide"]}>
-      {drawn}
-    </div>
   );
 }
 
@@ -220,9 +194,9 @@ export function LineView(props: LineViewProps) {
       {fresh ? <NewDivider /> : null}
       <Head {...{ line, mine, me, mentioned, saved, pinned, newHere, grouped: row.grouped }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
-      <Body line={line} votes={votes} react={react} players={players}>
+      <LineBody line={line} votes={votes} react={react} players={players} room={room}>
         <LineText blocks={blocks} me={me} known={known} stop={row.links} />
-      </Body>
+      </LineBody>
       <LineTranslation line={line} room={room} mine={mine} me={me} known={known} stop={row.links} />
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       <LinePreview blocks={blocks} verdict={verdict} tabbable={row.links} />

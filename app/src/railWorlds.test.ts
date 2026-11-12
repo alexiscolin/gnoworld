@@ -3,7 +3,7 @@ import { REALM_PREFIX } from "@gnoworld/core";
 import recorded from "../tests/recordedWorlds.json" with { type: "json" };
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CosmosWorld } from "./space/cosmosWorld.ts";
-import { type Known, RailOrder, type RailPlaces } from "./railWorlds.ts";
+import { keptRail, type Known, RailOrder, type RailPlaces } from "./railWorlds.ts";
 import type { WorldSignals } from "./features/universe/signals.ts";
 
 const RAIL_MINUTE = 60_000;
@@ -285,5 +285,16 @@ describe("the rail's order, held", () => {
     order.read({ worlds, signals: after });
     order.dispose();
     expect(vi.getTimerCount()).toBe(0);
+  });
+});
+
+// A tag's rail keeps every world the tag lights that has a page: a hub's and a namespace's, whoever else is here.
+describe("a tag's rail", () => {
+  it("shows each lit world, a hub's and a namespace's, the others left out", () => {
+    const worlds = [worldOf("gov/dao"), worldOf("nym-alexiscolin000/gnogolf"), worldOf("other/world")];
+    const signals = signalsOf({ "gov/dao": here(2), "other/world": here(9) });
+    const lit = new Set(["gov/dao", "nym-alexiscolin000/gnogolf"]);
+    const shown = keptRail({ worlds, signals }, PLACES, (id) => lit.has(id)).map(({ id }) => id);
+    expect(shown.toSorted()).toEqual(["gov/dao", "nym-alexiscolin000/gnogolf"]);
   });
 });

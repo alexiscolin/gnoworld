@@ -26,6 +26,8 @@ export interface Beat {
   nap(need: Need, calm: number): number | undefined;
   /** Whether the loop is pacing a view with something moving (D13013): an input then brings the full pace back. */
   lively(): boolean;
+  /** An input came (a pointer move, a key, the wheel, a touch): the view's minute of rest starts over. */
+  rouse(): void;
   /** Lets go of what only a running scene holds (the drawing buffer, the blur's target). */
   free(): void;
   /** The canvas's box changed. */
@@ -104,6 +106,7 @@ export function loop(beat: Beat, keep: Keep, on: Sources): void {
     frames,
   ));
   const input = () => {
+    beat.rouse();
     // A lively nap is no sleep: an input draws, and the changed time it sets keeps the full pace till the view is still again.
     if (beat.lively()) keep.touch();
     else keep.wake();

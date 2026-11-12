@@ -646,3 +646,44 @@ describe("the retention's runs (3n)", () => {
     );
   });
 });
+
+describe("the translations' retention", () => {
+  it("asks the translations to expire, with the budget the earlier owners leave", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const asked: number[] = [];
+    const log = logger(PEPPER, () => undefined);
+    makeRetention(db, {
+      log,
+      now: () => T0,
+      batch: 7,
+      translations: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});
+
+describe("Jarvis's public answers' retention", () => {
+  it("asks the answers to expire, with the budget the earlier owners leave", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const asked: number[] = [];
+    makeRetention(db, {
+      log: logger(PEPPER, () => undefined),
+      now: () => T0,
+      batch: 7,
+      said: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});

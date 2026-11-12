@@ -1,6 +1,6 @@
 // The lines the server's IRC link writes and reads (slice 3's plan, 3h, 3j, 3k): each through formatLine;
 // the commands the bot may send, each in its only forms; a room's message as the link hands it on.
-import { formatLine, GUEST_PREFIX, isCountryCode, toIrcCommand, type IrcMessage } from "@gnoworld/core";
+import { formatLine, GUEST_PREFIX, isCountryCode, JARVIS_NICK, toIrcCommand, type IrcMessage } from "@gnoworld/core";
 
 /** A room's message, as Ergo marked it: the account it set, the message's id and its time, and the id
  * of the line it corrects when it is an edit. */
@@ -42,8 +42,8 @@ function roomMode([room = "", mode = "", arg, ...more]: readonly string[]): bool
 }
 
 // A guest's line by RELAYMSG (D430): a room, a nick only the server builds (anon/ and two words and four base32 characters, 32
-// at most), a text of one line with no control character (a CTCP's \x01 would be relayed as it is), the whole line within the
-// 510 bytes of IRC. The room and the text are never the guest's to shape beyond that.
+// at most) or Jarvis's one, a text of one line with no control character, the whole line within the 510 bytes of IRC. The room
+// and the text are never the guest's to shape beyond that.
 const guestNick = (nick: string): boolean =>
   new RegExp(`^${GUEST_PREFIX}[a-z]{2,10}-[a-z]{2,10}-[a-z2-7]{4}$`).test(nick) && nick.length <= 32;
 const oneLine = (text: string): boolean => text.trim() !== "" && text.isWellFormed() && !/[\0-\x1f\x7f]/.test(text);
@@ -51,7 +51,7 @@ const oneLine = (text: string): boolean => text.trim() !== "" && text.isWellForm
 function relayForm([room = "", nick = "", text = "", ...more]: readonly string[]): boolean {
   return (
     ROOM.test(room) &&
-    guestNick(nick) &&
+    (nick === JARVIS_NICK || guestNick(nick)) &&
     oneLine(text) &&
     more.length === 0 &&
     Buffer.byteLength(`RELAYMSG ${room} ${nick} :${text}`) <= 510

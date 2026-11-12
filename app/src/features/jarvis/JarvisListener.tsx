@@ -6,7 +6,7 @@ import { onAsked } from "../../pageAsks.ts";
 
 const JarvisHost = lazy(async () => ({ default: (await import("./JarvisHost.tsx")).JarvisHost }));
 
-export type FirstAsk = "jarvis" | "jarvis-catch-up" | "jarvis-ask";
+export type FirstAsk = "jarvis" | "jarvis-catch-up" | "jarvis-ask" | "jarvis-said";
 
 /** `early`: the ask the page made before this code came, which it takes as its first. */
 export function JarvisListener({ early }: { early?: FirstAsk | undefined }) {
@@ -34,6 +34,13 @@ export function JarvisListener({ early }: { early?: FirstAsk | undefined }) {
       "jarvis-ask",
       () => {
         setFirst("jarvis-ask");
+      },
+      stop.signal,
+    );
+    onAsked(
+      "jarvis-said",
+      () => {
+        setFirst("jarvis-said");
       },
       stop.signal,
     );

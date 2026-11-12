@@ -1,3 +1,4 @@
+import { shortAddress } from "@gnoworld/schemas";
 import { adena, changeAccount } from "./adena.ts";
 import {
   callAndSign,
@@ -58,7 +59,8 @@ test.describe("a write function's call card", () => {
     await expect(card(page)).not.toContainText("Signed · tx");
     expect(await done(page)).toBe(1);
     chain.release();
-    await expect(card(page)).toContainText(`Signed · tx ${HASH.slice(0, 4)}…${HASH.slice(-4)}`);
+    // The hash is short as an address is: its first six and last five.
+    await expect(card(page)).toContainText(`Signed · tx ${shortAddress(HASH)}`);
     await expect(card(page)).toContainText("55,414");
     await expect(card(page)).toContainText("(42 int)");
     const sent = await page.evaluate(() => JSON.stringify((Reflect.get(window, "__done") as unknown[])[0]));

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Grab, state } from "../../../tests/grabStore.tsx";
 import { fakeStream } from "../../../tests/fakeStream.ts";
 import { BATCH_MS } from "../../lib/stream/chainFeed.ts";
+import { BUSY_REST_MS } from "../../lib/stream/verdicts.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { useEarthChain } from "./useEarthChain.ts";
 
@@ -86,5 +87,41 @@ describe("useEarthChain", () => {
     leave();
     await new Promise((resolve) => setTimeout(resolve, 300));
     expect(sources.opened).toEqual([]);
+  });
+
+  // The server answered 429 (too many streams): the browser gave the stream up, and the ticker followed nothing for good.
+  // Each test: the page drawn, its first stream refused, the timers faked; the rest runs `after` it.
+  async function refused(after: (sources: ReturnType<typeof fakeStream>, leave: () => void) => void) {
+    const sources = fakeStream();
+    const leave = draw();
+    await vi.waitFor(() => {
+      expect(sources.opened).toHaveLength(1);
+    });
+    const [first] = sources.opened;
+    if (first) first.readyState = 2;
+    vi.useFakeTimers();
+    try {
+      first?.emit("error", {});
+      after(sources, leave);
+    } finally {
+      vi.useRealTimers();
+    }
+  }
+
+  it("follows the room again after the route's minute when the server refused its stream, not at once", async () => {
+    await refused((sources) => {
+      vi.advanceTimersByTime(BUSY_REST_MS - 1);
+      expect(sources.opened).toHaveLength(1);
+      vi.advanceTimersByTime(1);
+      expect(sources.opened.map(({ url }) => url)).toEqual(Array(2).fill("/api/stream?rooms=%23earth&presence=0"));
+    });
+  });
+
+  it("asks nothing again once the page left while the stream rested", async () => {
+    await refused((sources, leave) => {
+      leave();
+      vi.advanceTimersByTime(BUSY_REST_MS * 2);
+      expect(sources.opened).toHaveLength(1);
+    });
   });
 });

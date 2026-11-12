@@ -26,10 +26,14 @@ const words = (question: string): boolean =>
 // ponytail: a text's length in UTF-16 units, near its code points for a pasted document.
 const pasted = (question: string): boolean => /\btranslat/i.test(question) && question.length > PASTED;
 
+/** Whether a host is on the list or a subdomain of a host on it. */
+export const onList = (host: string, hosts: readonly string[]): boolean =>
+  hosts.some((listed) => host === listed || host.endsWith(`.${listed}`));
+
 const offTheList = (question: string, hosts: readonly string[]): boolean =>
   [...question.matchAll(LINK)].some((match) => {
     const host = hostOf(match[0]);
-    return host === undefined || !hosts.some((listed) => host === listed || host.endsWith(`.${listed}`));
+    return host === undefined || !onList(host, hosts);
   });
 
 const otherCode = (question: string): boolean => CODE.test(question) && OTHER.test(question) && !GNO.test(question);

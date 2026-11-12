@@ -14,6 +14,7 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loadConfig } from "./config.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
+import { SAID_TABLES } from "./door/said.ts";
 import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
@@ -84,6 +85,7 @@ const setup = (
     ROOM_SAID,
     PIN_TABLES,
     SIGNAL_TABLES,
+    SAID_TABLES,
   ]);
   const signals = withSignals ? makeSignals(db, { now: now ?? Date.now }) : undefined;
   const options = {
@@ -1823,6 +1825,28 @@ describe("the chat, as the server starts it", () => {
       await expect.poll(() => chat.recent("#bubble", ASKER).map(({ text }) => text)).toEqual(["kept", "after"]);
       peer.say(":mod!u@h REDACT #bubble m1 :off topic");
       await expect.poll(() => chat.recent("#bubble", ASKER).map(({ text }) => text)).toEqual(["after"]);
+    });
+
+    it("keeps Jarvis's public answers only with the door's part, and drops one when its line is hidden", async () => {
+      const without = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
+      expect(without.chat.said).toBeUndefined();
+      const door = {
+        heard: { said: () => undefined },
+        changed: () => undefined,
+        said: { hosts: ["gno.land"] },
+      };
+      const { chat, peer, db } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing, { door });
+      const full = JSON.stringify({ status: "answered", markdown: "It closes today.", buttons: [] });
+      db.prepare(
+        "INSERT INTO jarvis_said (room, msgid, answer, asker, question, at, bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ).run("#bubble", "b1", full, "g1a", "what", T0, full.length);
+      expect(chat.said?.get("#bubble", "b1")).toEqual({
+        status: "answered",
+        markdown: "It closes today.",
+        buttons: [],
+      });
+      peer.say(":mod!u@h REDACT #bubble b1 :off topic");
+      await expect.poll(() => chat.said?.get("#bubble", "b1")).toBeUndefined();
     });
 
     it("drops a line its author deletes, and one its author edits, at once", async () => {

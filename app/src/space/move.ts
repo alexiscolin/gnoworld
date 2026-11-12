@@ -31,7 +31,7 @@ const ENTER = 1.2;
 // raw: how many orbits a system draws at their full strength
 const CLEAR_ORBITS = 12;
 
-// `slept` seconds more went by while the loop slept: the clock the orbits ride takes them whole (it never eases, D13013); the steps (`delta`) never do.
+// `slept` seconds more went by while the loop slept: the clock the orbits ride takes them at its rate; the steps (`delta`) never do.
 export function advance(
   space: Space,
   delta: number,

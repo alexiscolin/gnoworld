@@ -56,7 +56,6 @@ export {
   JarvisSettings,
   JarvisState,
   JarvisTranslate,
-  JarvisTranslateRequest,
   JarvisTranslation,
   ProposedAction,
   TRANSLATION_CAPS,
@@ -74,9 +73,11 @@ export {
   SearchPage,
   SearchQuery,
 } from "./search.ts";
+export { Unread, UnreadPlaces, UNREAD_COUNT_MOST, UNREAD_PLACES_MOST } from "./unread.ts";
 export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
 export { Key, Slug } from "./slug.ts";
 export { Guest, GuestCause, GuestRefusal, GuestSaid, GuestSayRequest } from "./guest.ts";
+export { LineTranslations, TRANSLATIONS_ASKED, TranslationEvent } from "./translations.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 // The worlds' count (7n2), which the home's hero reads, in the barrel and so in the store's chunk: its head is the worlds' file's too (behind

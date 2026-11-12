@@ -59,6 +59,8 @@ describe("the composer's Jarvis button", () => {
     const greyed = (host: HTMLElement) => named(host, (text) => text.startsWith("Ask Jarvis: "));
     expect(button(composer().host)).toBeUndefined();
     expect(greyed(composer().host)).toBeDefined();
+    // Disabled, so that its dimmed ink is exempt from the contrast rule: the reason stays in its name.
+    expect(greyed(composer().host)?.hasAttribute("disabled")).toBe(true);
     tell({ ...here, account: undefined });
     expect(button(composer().host)).toBeUndefined();
     expect(greyed(composer().host)).toBeDefined();

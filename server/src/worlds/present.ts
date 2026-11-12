@@ -11,7 +11,7 @@ import type { Said } from "../irc/lines.ts";
 import type { Log } from "@gnoworld/service/log";
 import { besideOf } from "../replaceFile.ts";
 import { hoursOf, hoursRoute } from "./hours.ts";
-import { hourOf, isPerson, peopleOf, shownOf } from "./people.ts";
+import { hourOf, isPerson, linesOf, peopleOf, sampled, shownOf } from "./people.ts";
 import { makeCountries } from "./countries.ts";
 import { makePresence, type Signal } from "./presence.ts";
 
@@ -168,6 +168,7 @@ export function startPresent(options: Options): Present {
   const presence = makePresence({ file, now });
   // Each world's messages an hour, kept as its people are, in a file beside theirs (7t3).
   const messages = makePresence({ file: besideOf(file, "messages"), now });
+  const lines = makePresence({ file: besideOf(file, "lines"), now, adds: true });
   const read = new Map<string, Read>();
   const countries = makeCountries();
   let stopped = false;
@@ -177,18 +178,15 @@ export function startPresent(options: Options): Present {
   const hereIn = (names: readonly string[], at: number): number | undefined => nicksOf(read, names, at)?.size;
   // A world's messages an hour now: its open rooms' pace; the plate adds the guests' (D374).
   const perHourIn = (names: readonly string[], at: number): number => hourOf(rates, names, at);
-  // ponytail: each history writes its whole file at once, about 44 ms for a store of 500 worlds full of 14 days (5.7 MB, 7t3's review):
-  // two every five minutes here, beside the chain's two a pass.
-  const record = (): void => {
+  // ponytail: each history writes its whole file at once, about 44 ms for 500 worlds of 14 days (5.7 MB): three every five minutes.
+  const record = (adding = true): void => {
     const at = now();
-    const counted = worlds().flatMap(([world, names]): [string, number, number][] => {
-      const here = hereIn(names, at);
-      return here === undefined ? [] : [[world, here, Math.round(perHourIn(names, at))]];
-    });
+    const counted = sampled(worlds(), at, { here: hereIn, perHour: perHourIn });
+    if (adding) lines.record(new Map(counted.map(([world, , perHour]) => [world, linesOf(perHour)])));
     presence.record(new Map(counted.map(([world, here]) => [world, here])));
     messages.record(new Map(counted.map(([world, , perHour]) => [world, perHour])));
     changed = true;
-    if (![presence.save(), messages.save()].every(Boolean)) log("alert", { error: "presence_write" });
+    if (![presence.save(), messages.save(), lines.save()].every(Boolean)) log("alert", { error: "presence_write" });
   };
   // Each world's nicks and pace read once: the plate and the trend share them.
   const build = (at: number, held: readonly [string, string[]][]): Pick<Answer, "value" | "chat"> => {
@@ -220,7 +218,7 @@ export function startPresent(options: Options): Present {
   const routes = new Hono();
   hoursRoute(routes, (world) => {
     const pace = current().value.worlds.find((each) => each.world === world)?.perHour;
-    return hoursOf(messages.history(world), pace === undefined ? null : Math.round(pace), now());
+    return hoursOf(lines.history(world), pace === undefined ? null : Math.round(pace), now());
   });
   for (const [path, pick] of SERVED)
     routes.get(path, (c) => {
@@ -245,7 +243,7 @@ export function startPresent(options: Options): Present {
       if (stopped) return;
       stopped = true;
       clearInterval(timer);
-      record();
+      record(false);
     },
   };
 }

@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import type { ShownLine } from "@gnoworld/core";
 import { countryName } from "@gnoworld/core/bubbles";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { setJarvisSaidDrawing } from "../../jarvisHere.ts";
 import { all, faceOf, follows, mount, one } from "../../../tests/mount.tsx";
 import { LineView, type LineViewProps } from "./LineView.tsx";
 
@@ -202,5 +203,54 @@ describe("a card line", () => {
       { players: true, line: line({ text: `${words} now` }) },
     ])
       expect(textOf(drawn(over).row).querySelector("[data-shared-card]")).toBeNull();
+  });
+});
+
+// The line Jarvis says: told by its relay nick alone, drawn by the host's drawing once there is one, the plain line otherwise.
+describe("a line Jarvis said", () => {
+  afterEach(() => {
+    setJarvisSaidDrawing(undefined);
+  });
+  const botLine = (over: Partial<ShownLine> = {}): ShownLine => ({
+    ...bare,
+    from: "jarvis/bot",
+    text: "It closes today.",
+    ...over,
+  });
+  const withDrawing = () => {
+    const draw = vi.fn((room: string, msgid: string, fallback: unknown) => (
+      <p data-said={`${room} ${msgid}`}>{fallback as string}</p>
+    ));
+    setJarvisSaidDrawing(draw);
+    return draw;
+  };
+
+  it("is drawn by the host's drawing, by its room and msgid, with its plain words as the fallback, under the name Jarvis", () => {
+    const draw = withDrawing();
+    const { row } = drawn({ line: botLine({ id: "m7" }), room: "#bubble" });
+    expect(one(row, "[data-said]").getAttribute("data-said")).toBe("#bubble m7");
+    expect(draw).toHaveBeenCalledWith("#bubble", "m7", expect.anything());
+    expect(textOf(row).textContent).toBe("It closes today.");
+    expect(one(row, "[data-line-head]").textContent).toContain("Jarvis (AI)");
+  });
+
+  it("stays a plain line with no drawing yet", () => {
+    const row = drawn({ line: botLine(), room: "#bubble" }).row;
+    expect(all(row, "[data-said]")).toHaveLength(0);
+    expect(textOf(row).textContent).toBe("It closes today.");
+  });
+
+  it("stays a plain line in a thread's row with no room, and for each look-alike nick", () => {
+    const draw = withDrawing();
+    const plain = [
+      drawn({ line: botLine() }).row,
+      ...["anon/jarvis/bot", "jarvis/bot2", "Jarvis/bot", "jarvis", "x/bot"].map(
+        (from) => drawn({ line: botLine({ from }), room: "#bubble" }).row,
+      ),
+      drawn({ line: botLine({ account: ALICE }), room: "#bubble" }).row,
+    ];
+    for (const row of plain) expect(all(row, "[data-said]")).toHaveLength(0);
+    expect(draw).not.toHaveBeenCalled();
+    expect(plain.at(1)?.textContent).not.toContain("Jarvis (AI)");
   });
 });

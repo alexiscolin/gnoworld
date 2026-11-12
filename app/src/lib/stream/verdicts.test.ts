@@ -274,3 +274,29 @@ describe("pageVerdicts: the page's own stream", () => {
     expect(String(report.mock.calls[0]?.[0])).toBe("Error: verdicts: verdict_unknown");
   });
 });
+
+describe("pageVerdicts: the reader's language and the translations' events", () => {
+  it("asks the stream for the language, after the rooms, and for none when the page has none", () => {
+    const sources = fakeStream();
+    const base = { verdict: () => undefined, since: () => undefined, dead: () => undefined };
+    pageVerdicts(["#a"], { ...base, language: "fr" });
+    pageVerdicts(["#a"], { ...base, uncounted: true, language: "de" });
+    pageVerdicts(["#a"], base);
+    expect(sources.opened.map(({ url }) => url)).toEqual([
+      "/api/stream?rooms=%23a&language=fr",
+      "/api/stream?rooms=%23a&presence=0&language=de",
+      "/api/stream?rooms=%23a",
+    ]);
+  });
+
+  it("listens to `translation` events only when the page has a handler, handing them on unread", () => {
+    const sources = fakeStream();
+    const base = { verdict: () => undefined, since: () => undefined, dead: () => undefined };
+    pageVerdicts(["#a"], base);
+    expect(sources.opened[0]?.heard()).not.toContain("translation");
+    const told: unknown[] = [];
+    pageVerdicts(["#b"], { ...base, translation: (data) => told.push(data) });
+    sources.opened[1]?.emit("translation", { room: "#b", msgid: "m1" });
+    expect(told).toEqual(['{"room":"#b","msgid":"m1"}']);
+  });
+});

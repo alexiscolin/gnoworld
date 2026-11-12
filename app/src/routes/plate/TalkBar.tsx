@@ -3,6 +3,7 @@
 // know: with no words, the invitation alone.
 import type { CSSProperties } from "react";
 import { Button, Cluster, Stack } from "@gnoworld/ui";
+import { roomLabel } from "../../features/chat/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import { hueOf } from "./names.ts";
 import styles from "./TalkBar.module.css";
@@ -13,6 +14,7 @@ const clip = (text: string) => (text.length > CLIP ? `${text.slice(0, CLIP - 1)}
 const FACES = 3;
 
 export function TalkBar({ name, room }: { name: string; room: string }) {
+  const label = roomLabel(room);
   const lines = useApp(({ chat }) => chat.rooms[room]?.lines);
   const spoken = lines?.filter((line) => line.kind === "message") ?? [];
   const latest = spoken.at(-1);
@@ -36,10 +38,10 @@ export function TalkBar({ name, room }: { name: string; room: string }) {
             </span>
           )}
           <Stack space="3xs">
-            <b className={styles["title"]}>{`Ask about ${name} in #${name}`}</b>
+            <b className={styles["title"]}>{`Ask about ${name} in ${label}`}</b>
             <span className={["truncate", styles["words"]].join(" ")}>
               {latest === undefined
-                ? `Nobody has spoken in #${name} yet. Your question can be the first.`
+                ? `Nobody has spoken in ${label} yet. Your question can be the first.`
                 : `${latest.from}: ${clip(latest.text)}`}
             </span>
           </Stack>

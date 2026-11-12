@@ -10,6 +10,7 @@ import type {
   Signal,
   StreamEvent,
   StreamSince,
+  TranslationEvent,
 } from "@gnoworld/schemas";
 import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
@@ -22,6 +23,9 @@ import { askedOf } from "./query.ts";
 export { once, RoomName } from "./query.ts";
 import { watchingIn, watchingOf } from "./watching.ts";
 import { follows, signalRing } from "./signals.ts";
+import { Rings, translationSide } from "./translated.ts";
+
+type Language = TranslationEvent["language"];
 
 /** A line's state on the stream from the bot's action on it: an unchecked or pending line has none. */
 export function stateOf(action: string): StreamEvent["state"] | undefined {
@@ -33,6 +37,10 @@ export interface Stream {
   publish: (event: StreamEvent) => void;
   // A link card's event (slice 13, L3), in the verdicts' sequence and ring.
   card: (event: CardEvent) => void;
+  // A line's translation, to the streams of its room that asked its language, in the verdicts' sequence of ids, in a ring of its own a room and language.
+  translation: (event: TranslationEvent) => void;
+  // The languages signed-in streams read a world in, open now or closed in the last 15 minutes, the latest first.
+  languages: (world: string) => readonly Language[];
   // A first signal (slice 9h) to the readers of any room of its world they may read, in the verdicts' sequence of ids.
   signal: (signal: Signal) => void;
   // The chain's events (slice 9g): a call to the readers of its world, a deploy to the Earth's, live only.
@@ -68,6 +76,8 @@ interface Options {
   // they have a budget of their own and cannot fill the chat's (F5775).
   earthTotal?: number;
   heartbeatMs?: number;
+  // How long a language stays in use after its last stream (15 minutes).
+  languageMs?: number;
   // Events a client may leave unread before it is dropped, and each room's last events kept.
   pending?: number;
   now?: () => number;
@@ -82,6 +92,8 @@ interface Client {
   counted: ReadonlySet<string>;
   /** The session's account in lower case, none for a guest. */
   account: string | undefined;
+  /** The language it asked the translations in, none when it asked none. */
+  language: Language | undefined;
   /** Its visitor's key, the slots' (an IPv4 address, an IPv6 /64): a guest's streams count once. */
   visitor: string;
   stream: SSEStreamingApi;
@@ -90,17 +102,19 @@ interface Client {
 
 // Hono's write never rejects (hono 4.13.13, utils/stream.js): a gone client ends by its abort, a slow one
 // by the writes it leaves pending, beats included.
-function writeTo(client: Client, text: string, pending: number): void {
-  if (client.unread >= pending) {
-    client.stream.abort();
-    return;
-  }
-  client.unread += 1;
-  const sent = (): void => {
-    client.unread -= 1;
+const writer =
+  (pending: number) =>
+  (client: Client, text: string): void => {
+    if (client.unread >= pending) {
+      client.stream.abort();
+      return;
+    }
+    client.unread += 1;
+    const sent = (): void => {
+      client.unread -= 1;
+    };
+    client.stream.write(text).then(sent, sent);
   };
-  client.stream.write(text).then(sent, sent);
-}
 
 // The time a connection began following (F890), taken in the same turn as it joins the clients, no event between: a
 // line said from then on has its verdict on this stream. Said after its replay, so the page asks the server only of lines the replay did not answer;
@@ -130,13 +144,14 @@ function replay(verdicts: readonly Framed[], firsts: readonly Framed[], pending:
 
 const clientOf = (
   rooms: { seen: Set<string>; counted: readonly string[] },
-  reader: { account: string | undefined; visitor: string },
+  reader: { account: string | undefined; visitor: string; language: Language | undefined },
   stream: SSEStreamingApi,
 ): Client => ({
   rooms: rooms.seen,
   worlds: new Set([...rooms.seen].map(worldOf)),
   counted: new Set(rooms.counted.map(worldOf)),
   account: reader.account?.toLowerCase(),
+  language: reader.language,
   visitor: reader.visitor,
   stream,
   unread: 0,
@@ -144,12 +159,12 @@ const clientOf = (
 
 // What it holds, for the tests of its bounds.
 function sizeOf(
-  rings: ReadonlyMap<string, readonly unknown[]>,
+  rings: readonly ReadonlyMap<string, readonly unknown[]>[],
   clients: ReadonlySet<Client>,
   places: { visitors: () => number },
 ) {
-  const events = [...rings.values()].reduce((sum, kept) => sum + kept.length, 0);
-  return { events, rooms: rings.size, clients: clients.size, visitors: places.visitors() };
+  const events = rings.flatMap((each) => [...each.values()]).reduce((sum, kept) => sum + kept.length, 0);
+  return { events, rooms: rings[0]?.size ?? 0, clients: clients.size, visitors: places.visitors() };
 }
 
 export function makeStream(options: Options = {}): Stream {
@@ -157,13 +172,11 @@ export function makeStream(options: Options = {}): Stream {
   // From the clock, so the ids a server gave before a restart stay below the next one's.
   let sequence = Date.now();
   // Each room's last events, oldest first; a room past the cap of rooms is not kept.
-  const rings = new Map<string, { id: number; event: StreamEvent | CardEvent }[]>();
+  const rings = new Rings<{ id: number; event: StreamEvent | CardEvent }>(pending);
   const ring = signalRing();
   const clients = new Set<Client>();
   const places = admission(options);
-  const write = (client: Client, text: string): void => {
-    writeTo(client, text, pending);
-  };
+  const write = writer(pending);
 
   // An event with the next id, to the readers of any room of the world.
   const tell = (world: string, framed: (id: number) => string): void => {
@@ -173,21 +186,19 @@ export function makeStream(options: Options = {}): Stream {
   const side = chainSide(tell, (rooms) => follows(rooms, EARTH));
 
   const keep = (event: StreamEvent | CardEvent): void => {
-    sequence += 1;
-    const kept = rings.get(event.room) ?? [];
-    kept.push({ id: sequence, event });
-    if (kept.length > pending) kept.shift();
-    if (kept.length === 1 && rings.size < 10_000) rings.set(event.room, kept);
+    rings.push(event.room, { id: (sequence += 1), event });
     // One frame for every client that follows the room.
     // ponytail: every client is asked whether it follows; 1,000 at most, about 7 us an event. Index
     // the clients by room if the total grows.
     const text = frame(sequence, event);
     for (const client of clients) if (client.rooms.has(event.room)) write(client, text);
   };
+  const translations = translationSide({ next: () => (sequence += 1), clients, write, pending }, options);
 
   return {
     publish: keep,
     card: keep,
+    ...translations.api,
     signal: (signal) => {
       tell(signal.world, (id) => ring.keep(id, signal));
     },
@@ -214,8 +225,9 @@ export function makeStream(options: Options = {}): Stream {
           const ended = new Promise<void>((resolve) => {
             stream.onAbort(resolve);
           });
-          const client = clientOf({ seen, counted }, { account: reader, visitor: who }, stream);
+          const client = clientOf({ seen, counted }, { account: reader, visitor: who, ...asked }, stream);
           clients.add(client);
+          translations.touch(client);
           // The newest it missed, or the rooms' last events for a new client, as many as it may leave unread:
           // a client further behind loses the rest. An id past the last is none of ours (a clock set back).
           const after = asked.last > sequence ? 0 : asked.last;
@@ -223,6 +235,7 @@ export function makeStream(options: Options = {}): Stream {
             .flatMap((room) => rings.get(room) ?? [])
             .filter(({ id }) => id > after)
             .map(({ id, event }) => ({ id, text: frame(id, event) }));
+          verdicts.push(...translations.missed(client, after));
           for (const text of replay(
             verdicts,
             [...ring.missed(client.rooms, after), ...side.missed(client.rooms, after)],
@@ -237,6 +250,7 @@ export function makeStream(options: Options = {}): Stream {
           await ended;
           clearInterval(beat);
           clients.delete(client);
+          translations.touch(client);
           place.release(who);
         });
       });
@@ -246,6 +260,6 @@ export function makeStream(options: Options = {}): Stream {
     },
     watching: () => watchingOf(clients),
     watchingIn: () => watchingIn(clients),
-    size: () => sizeOf(rings, clients, places),
+    size: () => sizeOf([rings, translations.rings], clients, places),
   };
 }

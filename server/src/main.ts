@@ -8,25 +8,27 @@ import { stop } from "@gnoworld/service/http";
 import { logger } from "@gnoworld/service/log";
 import { startChat } from "./chat.ts";
 import { cardsBoot } from "./cards/wire.ts";
+import { translationsBoot } from "./translations/wire.ts";
 import { guestSettings } from "./guest/wire.ts";
-import { adminRoutes } from "./door/admin.ts";
+import { adminBoot } from "./adminBoot.ts";
 import { jarvisClient } from "./door/jarvis.ts";
 import { doorMemory } from "./door/memory.ts";
 import { mountDoor } from "./door/mount.ts";
 import { stateRoutes } from "./door/state.ts";
 import { makeQuota } from "./door/quota.ts";
 import { authServer, listenAt } from "./ergo/auth.ts";
-import { makeLogin, makeSigned } from "./login/login.ts";
+import { makeLogin } from "./login/login.ts";
 import { explainBoot } from "./explain/wire.ts";
 import { migrations } from "./migrations.ts";
 import { loginFrom } from "./login/routes.ts";
 import { historyRoutes } from "./prices/history.ts";
-import { isTeam, loadRoles, spared } from "./roles/roles.ts";
+import { loadRoles, spared } from "./roles/roles.ts";
 import { mountOwners } from "./roles/wire.ts";
 import { defaultUniverse } from "./prices/universes.ts";
 import { startRetention } from "./retention/retention.ts";
 import { makeSearch } from "./search/index.ts";
 import { searchRoutes } from "./search/routes.ts";
+import { unreadBoot } from "./unread/boot.ts";
 import { callRoutes } from "./calls/routes.ts";
 import { listRooms, worldOf } from "./rooms/rooms.ts";
 import { roomsBoot } from "./rooms/roomsBoot.ts";
@@ -56,8 +58,17 @@ const cards = cardsBoot(config);
 // What Jarvis's door asks of the chat (D13985): the accounts heard speak, and the answers kept until a line is taken.
 const chainId = (): string | undefined =>
   config.universes === undefined ? undefined : defaultUniverse(config.universes).chainId;
+const translations = translationsBoot();
 const memory = doorMemory(db, config.origins, { now: Date.now, chainId });
-const retention = startRetention(db, { log, ergoData: config.ergoData, search, cards, kept: memory.ask.kept });
+const retention = startRetention(db, {
+  log,
+  ergoData: config.ergoData,
+  search,
+  cards,
+  kept: memory.ask.kept,
+  translations,
+  said: memory.said,
+});
 const { prices, worlds, previews, hubs, trending, network, balance } = bootJobs({ config, db, log });
 let draining = false;
 const app = makeApp(log, () => !draining);
@@ -66,6 +77,16 @@ app.route("/api/login", loginFrom(db, config, { log }));
 const { session, signedAt } = makeLogin(db, { chains: config.chains, now: Date.now });
 // The first signals (9h) and the chain in the rooms (9g), told on the one stream; the chain none without both data files.
 const { stream, signals, chain } = bootSignals({ app, db, roles, config, log, session });
+// Jarvis's door (10g): a question from a room, held to its account's quota, to jarvis on the network only the two share;
+// none without JARVIS_URL. Its quotas, allowlist and jarvis's budgets change on the admin API alone.
+const door =
+  config.jarvis === undefined
+    ? undefined
+    : {
+        settings: config.jarvis,
+        quota: makeQuota(db, { first: config.jarvis.first, now: Date.now }),
+        jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs, key: config.jarvis.key }),
+      };
 const chat = startChat(
   db,
   {
@@ -86,11 +107,13 @@ const chat = startChat(
     signals,
     search,
     ...cards.options,
+    translate: door?.settings.on === true ? door.jarvis.translate : undefined,
     door: memory.chat,
     ...(config.database === ":memory:" ? {} : { presence: join(dirname(config.database), "presence.json") }),
   },
 );
 cards.attach(chat.cards);
+memory.said.attach(chat.said);
 app.route("/api/activity", chat.activity);
 // The guest chat (D430): a name and a cookie, then a line the bot says; both answer 404 under GUEST_CHAT=off.
 if (chat.guest !== undefined) app.route("/api/guest", chat.guest);
@@ -127,6 +150,7 @@ app.route("/api/network", networkRoutes(network));
 app.route("/api/rooms", chat.roomList);
 app.route("/api/stream", chat.stream);
 app.route("/api/verdicts", chat.verdicts);
+translations.attach(chat, app, { session, config, log });
 // Search (slice 13, B2): the lines of one world's rooms a reader may open, the right asked again on every page.
 app.route(
   "/api/search",
@@ -142,6 +166,8 @@ app.route(
     now: Date.now,
   }),
 );
+// Each world's unread count (slice 13): the places a page forwards, counted against the search index's lines.
+unreadBoot(app, { db, roles, archived: chat.rooms.archived, session, origins: config.origins, log, now: Date.now });
 // A call's detail, read from the default universe's indexer and kept by hash; none without the universes' file.
 if (config.universes !== undefined)
   app.route(
@@ -157,16 +183,6 @@ if (config.universes !== undefined)
 const roomsAhead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck });
 // The owner's right and the links (owners' moderation, part 4): the pins ask the right, /api/links lists and makes the links.
 mountOwners(app, { db, config, hubs, chat, spared: spared(roles), session, signedAt, log });
-// Jarvis's door (10g): a question from a room, held to its account's quota, to jarvis on the network only the two share;
-// none without JARVIS_URL. Its quotas, allowlist and jarvis's budgets change on the admin API alone.
-const door =
-  config.jarvis === undefined
-    ? undefined
-    : {
-        settings: config.jarvis,
-        quota: makeQuota(db, { first: config.jarvis.first, now: Date.now }),
-        jarvis: jarvisClient({ url: config.jarvis.url, timeoutMs: config.jarvis.timeoutMs, key: config.jarvis.key }),
-      };
 // Whether it is on, told to any page; off with no door at all (10u-a).
 app.route("/api/jarvis", stateRoutes({ on: door?.settings.on ?? false }));
 if (door !== undefined)
@@ -174,25 +190,7 @@ if (door !== undefined)
 explainBoot({ app, db, config, jarvis: door?.settings.on === true ? door.jarvis : undefined, log });
 // The admin API on a listener of its own, never the public one (ADR-0002 §6), with the login for its own site, so the
 // console's session cookie is its alone; none without ADMIN_PORT. The network that walls it off is deploy's.
-const adminApp = makeApp(log, () => !draining);
-if (config.admin !== undefined) {
-  adminApp.route("/api/login", loginFrom(db, { ...config, origins: config.admin.origins }, { log, console: true }));
-  if (door !== undefined)
-    adminApp.route(
-      "/api/admin/jarvis",
-      adminRoutes({
-        isTeam: (who) => isTeam(roles, who),
-        // The console's session, an hour from its signature, whatever login made it (ADR-0002 §6).
-        session: makeLogin(db, { chains: config.chains, now: Date.now, console: true }).session,
-        origins: config.admin.origins,
-        signed: makeSigned(db, { chains: config.chains, now: Date.now, console: true }),
-        quota: door.quota,
-        jarvis: door.jarvis,
-        log,
-        now: Date.now,
-      }),
-    );
-}
+const adminApp = adminBoot({ db, config, roles, door, log, ready: () => !draining });
 // Ergo's logins go through the socket; without it, Ergo lets nobody in (fails closed).
 const auth = authServer(db, { log, ...(config.ergo === undefined ? {} : { bot: config.ergo.password }) });
 if (config.authSocket !== undefined) await listenAt(auth, config.authSocket);

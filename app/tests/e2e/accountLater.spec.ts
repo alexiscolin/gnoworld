@@ -20,8 +20,6 @@ const ACCOUNT_ONLY = [
   "+gnoworld/edit=",
   // The country an account declares (7j): the tag it sends.
   "+gnoworld/country=",
-  // What reads a line's Markdown for a mention of the room: a notice's, or a line shown, never an empty room's first screen.
-  "@room(?!",
 ];
 
 // The words of every script the page loads, the lines' view and the composer included, once the page is quiet.

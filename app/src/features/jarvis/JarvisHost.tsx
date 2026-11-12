@@ -10,6 +10,7 @@ import {
   jarvisItems,
   settleJarvisItem,
   setJarvisDrawing,
+  setJarvisSaidDrawing,
   takeJarvisQuestions,
   useJarvisHere,
   type JarvisHere,
@@ -20,9 +21,14 @@ import { realmView } from "../../places.ts";
 import { SEARCH_HASH } from "../search/index.ts";
 import type { JarvisQuestion } from "@gnoworld/schemas";
 import { JarvisCard, type JarvisCardContext } from "./JarvisCard.tsx";
+import type { FirstAsk } from "./JarvisListener.tsx";
+import { JarvisSaid } from "./JarvisSaid.tsx";
 import { drawerOf } from "./drawer.ts";
+import { memoSaid } from "./memoSaid.ts";
 
 const api = pageJarvisApi();
+const noop = (): void => undefined;
+const readSaid = memoSaid(api.said);
 
 const mine = (here: JarvisHere) => (item: { room: string; account: string | undefined }) =>
   item.room === here.room && item.account === here.account;
@@ -68,9 +74,11 @@ function listen(here: JarvisHere, wake: (act: () => void) => () => void, signal:
     }),
     signal,
   );
+  // A line Jarvis said asks for its card's drawing alone: no card is made.
+  onAsked("jarvis-said", wake(noop), signal);
 }
 
-export function JarvisHost({ first }: { first: "jarvis" | "jarvis-catch-up" | "jarvis-ask" }) {
+export function JarvisHost({ first }: { first: FirstAsk }) {
   const here = useJarvisHere();
   const firedRef = useRef(false);
   const [drawn, setDrawn] = useState<Drawing>();
@@ -128,8 +136,20 @@ export function JarvisHost({ first }: { first: "jarvis" | "jarvis-catch-up" | "j
       },
     };
     setJarvisDrawing((item) => <JarvisCard key={item.id} item={item} ctx={ctx} />);
+    const card = {
+      chain: ctx.chain,
+      options: ctx.options,
+      gnoweb: ctx.gnoweb,
+      own: ctx.own,
+      draw: ctx.draw,
+      onFly: ctx.onFly,
+    };
+    setJarvisSaidDrawing((room, msgid, fallback) => (
+      <JarvisSaid key={msgid} {...{ room, msgid, card, fallback }} read={readSaid} />
+    ));
     return () => {
       setJarvisDrawing(undefined);
+      setJarvisSaidDrawing(undefined);
     };
   }, [here, drawn, navigate, pathname]);
   return null;

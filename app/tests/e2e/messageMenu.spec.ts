@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Locator, WebSocketRoute } from "@playwright/test";
-import { inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
+import { violations } from "./axe.ts";
+import { beforeTheList, inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { tabsTo } from "./talk.ts";
@@ -107,7 +108,7 @@ test.describe("a line's actions", () => {
 
   test("reach the newest line by Tab, the others by the arrows, round the ends, Home and End", async ({ page }) => {
     await room(page);
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     await expect(lines(page).nth(2)).toBeFocused();
     await expect(focusedLines(page)).toHaveCount(1);
@@ -136,7 +137,7 @@ test.describe("a line's actions", () => {
         ["k3", T(2), "and https://gno.land/r/other too"],
       ],
     });
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     await expect(lines(page).nth(2)).toBeFocused();
     await page.keyboard.press("Tab");
@@ -186,7 +187,7 @@ test.describe("a line's actions", () => {
     await expect(lines(page)).toHaveCount(2);
     await expect(stops(page)).toHaveCount(1);
     await expect(lineOf(page, "the third line")).toHaveAttribute("tabindex", "0");
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     await expect(lineOf(page, "the third line")).toBeFocused();
   });
@@ -390,7 +391,7 @@ test.describe("a line's actions", () => {
     await page.keyboard.press("ArrowUp");
     await expect(lines(page).nth(30)).toBeFocused();
     expect(await barInside(page, 30)).toBe(true);
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await expect(focusedLines(page)).toHaveCount(0);
     await toTop(page, 30);
     await page.keyboard.press("Tab");
@@ -439,7 +440,7 @@ test.describe("a line's actions", () => {
     await tabToMore(page, 1);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menu")).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await violations(page)).toEqual([]);
   });
 
   // The red pass (M3): the tab stop never leaves the list while it holds a line.
@@ -495,7 +496,7 @@ test.describe("a line's actions", () => {
     page,
   }) => {
     await room(page);
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     for (const [at, key] of [
       [2, undefined],

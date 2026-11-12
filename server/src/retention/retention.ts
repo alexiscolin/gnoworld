@@ -32,6 +32,10 @@ interface Options {
   cards?: { expire: (limit: number) => number };
   // Jarvis's kept answers (D13920): those past their time or the table's caps, after the cards, in what the budget leaves.
   kept?: { expire: (limit: number) => number };
+  // Jarvis's public answers: past the cards' days or the table's caps, after the kept answers.
+  said?: { expire: (limit: number) => number };
+  // The stored translations: past 30 days or the table's cap, after the others.
+  translations?: { expire: (limit: number) => number };
 }
 
 export interface Retention {
@@ -102,6 +106,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     const owned = [
       ["cards_expire", options.cards],
       ["kept_expire", options.kept],
+      ["said_expire", options.said],
+      ["translations_expire", options.translations],
     ] as const;
     return owned.reduce((left, [name, owner]) => (left > 0 ? expireWith(name, owner, left) : left), budget);
   };

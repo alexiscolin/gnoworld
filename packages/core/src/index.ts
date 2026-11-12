@@ -1,6 +1,7 @@
 export { escapeTagValue, formatLine, LINE_BYTES, parseLine, toIrcCommand, unescapeTagValue } from "./irc/irc.ts";
 export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc.ts";
 export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
+export { JARVIS_NICK, plainWords } from "./chat/jarvisNick.ts";
 export { GUEST_ADJECTIVES, GUEST_ANIMALS, GUEST_NAME_BYTES, GUEST_PREFIX, guestName } from "./chat/guestName.ts";
 export { foldMultiline, MULTILINE, MULTILINE_BYTES, MULTILINE_LINES } from "./irc/multiline.ts";
 export {

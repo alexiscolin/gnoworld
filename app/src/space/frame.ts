@@ -35,7 +35,7 @@ export function draw(space: Space, signal: AbortSignal): void {
       touchOf(space);
       space.stage.frame.uThrough.value = space.stage.effects.through ? 1 : 0;
       // Something that moves by itself is drawn each frame (at 15 fps, loop.ts), though nothing crossed half a pixel (D13013).
-      space.keep.redraw.live = livelyOf(state);
+      space.keep.redraw.live = livelyOf(space, state);
       state.need = space.keep.redraw.check(momentOf(space, state));
       if (state.need !== "none") present(space);
       if (!drawn && space.universe !== undefined) {
@@ -51,6 +51,9 @@ export function draw(space: Space, signal: AbortSignal): void {
       return nap;
     },
     lively: () => space.keep.redraw.live,
+    rouse: () => {
+      space.rig.free.rouse();
+    },
     free: () => {
       if (space.disposed || space.renderer.getContext().isContextLost()) return;
       space.renderer.setSize(1, 1, false);

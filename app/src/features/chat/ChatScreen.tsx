@@ -26,6 +26,7 @@ import { useApp } from "../../storeContext.tsx";
 import type { ChatWorld } from "./place.ts";
 import { useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
+import { useUnread } from "./useUnread.ts";
 import { Worlds } from "./Worlds.tsx";
 import styles from "./ChatScreen.module.css";
 
@@ -179,6 +180,7 @@ export function ChatScreen(props: ChatScreenProps) {
   const follows = useApp((state) => state.device.follows);
   const followed = worldsFollowedIn(follows, place.universe.id);
   const columns = useColumns();
+  const unreadWorlds = useUnread(full);
   const here = usePeople({ screenRef, people, compact, present, closeThread: threads.close });
   const searching = useSearching(search, { world: place, full, compact, closeThread: threads.close });
   const thread = threadAside(threads);
@@ -213,7 +215,15 @@ export function ChatScreen(props: ChatScreenProps) {
               }}
             />
           }
-          worlds={<Worlds worlds={place.worlds} current={place.slug} followed={followed} universe={place.universe} />}
+          worlds={
+            <Worlds
+              worlds={place.worlds}
+              current={place.slug}
+              followed={followed}
+              universe={place.universe}
+              unread={unreadWorlds}
+            />
+          }
           rooms={compact ? undefined : <div className={styles["rail"]}>{rail}</div>}
           info={
             aside ??

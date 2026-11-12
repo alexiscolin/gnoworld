@@ -122,18 +122,17 @@ export function momentOf(space: Space, { numbers: { eye, shown }, pxPerSecond }:
   };
 }
 
-// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in from its skeleton, an arrival or a moon. A planet
-// framed close turns slowly: it is lively (below), drawn at 15 frames a second once the view is still; its moons cross it far faster, and
-// stepped at 15 they jerked across it.
-const moves = ({ rig, stage, arrival, seconds }: Space): boolean =>
+// Whether each frame differs by itself: a flight, the hand, an effect, a planet coming in from its skeleton or a moon. A planet framed close
+// turns slowly: it is lively (below), drawn at 15 frames a second once the view is still; its moons cross it far faster, and stepped at 15
+// they jerked across it, so a moon keeps every frame while the clock runs, and none once it stopped.
+const moves = ({ rig, stage, seconds }: Space): boolean =>
   rig.flying ||
-  stage.moons.group.visible ||
+  (stage.moons.group.visible && rig.free.rate > 0) ||
   stage.near?.arriving === true ||
   rig.free.moving ||
   stage.effects.busy ||
   fading(stage.frame, seconds) ||
-  stage.ground.turning ||
-  arrival;
+  stage.ground.turning;
 
 // The pixels a second the fastest slow motion moves: a planet's orbit and its spin, those of the page's planet, the system's or all.
 function pixelsPerSecond(space: Space): number {
@@ -164,9 +163,9 @@ function facesShow(space: Space): boolean {
   );
 }
 
-/** Whether something on screen moves by itself (D13013): a slow motion of a pixel a second or more, or a sun's face. The scene's clock
- * never stops (only a hidden tab and reduced motion, where the loop or the faces stand still, do). */
-export const livelyOf = (state: State): boolean => state.pxPerSecond >= LIVELY_PX || state.face;
+/** Whether something on screen moves by itself: a slow motion of a pixel a second or more, or a sun's face, while the clock runs. */
+export const livelyOf = ({ rig }: Space, state: State): boolean =>
+  rig.free.rate > 0 && (state.pxPerSecond >= LIVELY_PX || state.face);
 
 /** How long the loop may sleep after this frame; none, it stays awake. */
 export const napOf = (space: Space, state: State, { need, calm }: { need: Need; calm: number }): number | undefined =>
@@ -175,13 +174,16 @@ export const napOf = (space: Space, state: State, { need, calm }: { need: Need; 
     moving: moves(space) || space.rig.free.turning,
     settled: space.labels.settled(),
     calm,
-    pxPerSecond: state.pxPerSecond,
-    lively: livelyOf(state),
+    pxPerSecond: state.pxPerSecond * space.rig.free.rate,
+    lively: livelyOf(space, state),
   });
 
-/** Runs the scene's clock `ms` on. The place of a thing goes by it; an ease goes by the frame's own delta. */
-export const tick = (space: { seconds: number }, ms: number): void => {
-  space.seconds += ms / 1000;
+/** Runs the scene's clock `ms` on, at the rate the rest has left it (rig/free.ts). The place of a thing goes by it; an ease by the frame's own delta. */
+export const tick = (
+  space: { seconds: number; readonly rig: { readonly free: { readonly rate: number } } },
+  ms: number,
+): void => {
+  space.seconds += (ms / 1000) * space.rig.free.rate;
 };
 
 /** A few times a second: the slow motions' speed, and which near planets are drawn as themselves. */

@@ -18,6 +18,7 @@ import { DAY_TABLES, makeDay, SHARE } from "./day.ts";
 import { makeQuota, QUOTA_TABLES } from "./quota.ts";
 import { KEPT_TABLES, makeKept } from "./kept.ts";
 import { makeServed } from "./served.ts";
+import type { Offered } from "./said.ts";
 
 // 10g: POST /api/jarvis/ask, each check before any work, in the brief's order (D42, D43, D44, D93).
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
@@ -36,7 +37,10 @@ for (let at = 0; at < 40; at += 1) TOKENS.set(crowd(at), Address.parse(toAddress
 const ANNA_TOKEN = "anna-token-of-forty-three-characters-000000";
 const BEN_TOKEN = "ben-token-of-forty-three-characters-0000000";
 const QUESTION = "What did they decide about the poll?";
-const LINES = () => [{ speaker: 1, text: "the poll closes today", time: "2026-11-04T11:59:00.000Z" }];
+const LINES = () => [
+  { speaker: 1, text: "the poll closes today", time: "2026-11-04T11:59:00.000Z" },
+  { speaker: 0, text: `@jarvis ${QUESTION}`, time: "2026-11-04T11:59:30.000Z" },
+];
 type Asked = Awaited<ReturnType<Jarvis["ask"]>>;
 const ANSWER = (): JarvisAnswer => ({ status: "answered", markdown: "It closes today.", buttons: [] });
 // What jarvis gives the door: the answer and its cost, which the page never reads (D13985).
@@ -68,6 +72,10 @@ interface Options {
   last?: string | undefined | null;
   // The room has no line said.
   empty?: boolean;
+  // The room's lines instead of the default ones.
+  lines?: JarvisAsk["lines"];
+  // What the room's offer answers, by default "public".
+  offer?: (offered: Offered) => Promise<"public" | "private">;
 }
 
 const setup = ({
@@ -80,6 +88,8 @@ const setup = ({
   age = 60 * MINUTE,
   last = "m1",
   empty = false,
+  lines: said,
+  offer,
 }: Options = {}) => {
   const db = openDatabase(":memory:", [QUOTA_TABLES, DAY_TABLES, KEPT_TABLES]);
   opened.push(db);
@@ -95,6 +105,7 @@ const setup = ({
   const log = logger(PEPPER, (line) => lines.push(line));
   const work: string[] = [];
   const sent: { request: JarvisAsk; signal: AbortSignal }[] = [];
+  const offers: Offered[] = [];
   const app = makeApp(log, () => true);
   app.route(
     "/api/jarvis",
@@ -111,7 +122,7 @@ const setup = ({
           throw new Error("the lines could not be read");
         }
         work.push(`lines ${room} ${asker}`);
-        return empty ? [] : LINES();
+        return empty ? [] : (said ?? LINES());
       },
       named: async () => {
         work.push("named");
@@ -129,6 +140,12 @@ const setup = ({
       signedAt: () => (age === null ? undefined : clock.now - age),
       last: () => (tail.last === null ? undefined : tail.last),
       hosts: ["gno.land", "gnoworld.test"],
+      said: {
+        offer: (offered) => {
+          offers.push(offered);
+          return offer === undefined ? Promise.resolve("public") : offer(offered);
+        },
+      },
       jarvis: {
         ask: (request, signal) => {
           work.push("jarvis");
@@ -168,7 +185,23 @@ const setup = ({
   // The log's lines, their time left out.
   const events = () => lines.map((line) => line.replace(/^\{"time":"[^"]+",/, "{"));
   const counted = () => db.prepare("SELECT account, day, count FROM jarvis_asked").all();
-  return { app, recall, ask, clock, tail, quota, day, served, kept, work, sent, events, counted, logged: lines };
+  return {
+    app,
+    recall,
+    ask,
+    clock,
+    tail,
+    quota,
+    day,
+    served,
+    kept,
+    work,
+    sent,
+    offers,
+    events,
+    counted,
+    logged: lines,
+  };
 };
 const answerOf = async (response: Response) => [response.status, await response.json()];
 // A promise settled from outside, for a call in flight.
@@ -201,7 +234,8 @@ describe("a question to Jarvis", () => {
   it("is passed to jarvis with the room and its lines, and jarvis's answer passed on as it is", async () => {
     const { ask, work, sent } = setup();
     expect(await answerOf(await ask())).toEqual([200, ANSWER()]);
-    expect(work).toEqual(["read #bubble", `lines #bubble ${ANNA}`, "named", "jarvis"]);
+    // The last read is the offer's, which looks for the question in the room.
+    expect(work).toEqual(["read #bubble", `lines #bubble ${ANNA}`, "named", "jarvis", `lines #bubble ${ANNA}`]);
     expect(sent.map(({ request }) => request)).toEqual([{ question: QUESTION, room: "#bubble", lines: LINES() }]);
   });
 
@@ -453,6 +487,137 @@ describe("a question to Jarvis", () => {
 });
 
 // 10u-g, D13985 and D13986: every misuse that can be told without a model is stopped before any model call.
+describe("a question's answer offered to the room", () => {
+  it("a fixed ask is never relayed, nor is a declined question", async () => {
+    const { ask, offers } = setup();
+    await passed(await ask());
+    expect(offers).toEqual([{ room: "#bubble", who: ANNA, started: T0, question: QUESTION, answer: ANSWER() }]);
+    for (const body of [HERE, CATCH_UP, EXPLAIN, POEM]) await ask({ body });
+    expect(offers).toHaveLength(1);
+  });
+
+  it("is offered once an answer is given to a question, not before, and never for another status", async () => {
+    const gate = deferred<Asked>();
+    const { ask, offers } = setup({ answer: () => gate.promise });
+    const pending = ask();
+    await idle();
+    expect(offers).toEqual([]);
+    gate.resolve({ ok: true, answer: PAID() });
+    await pending;
+    expect(offers).toHaveLength(1);
+    const spent = setup({ answer: () => Promise.resolve({ ok: true, answer: { status: "spent", cost: 0 } }) });
+    await spent.ask();
+    const failed = setup({ answer: () => Promise.resolve({ ok: false, error: "down" }) });
+    await failed.ask();
+    expect([spent.offers, failed.offers]).toEqual([[], []]);
+  });
+});
+
+describe("an ask whose question was never said in the room", () => {
+  const at = (time: string | undefined, text = QUESTION, speaker = 0) => ({
+    speaker,
+    text,
+    ...(time === undefined ? {} : { time }),
+  });
+  const HEARD = "2026-11-04T11:59:30.000Z";
+
+  it.each([
+    ["no line by the asker", [at(HEARD, QUESTION, 1)]],
+    ["no line at all", []],
+    ["a line by the asker with other words", [at(HEARD, "what is a realm?")]],
+    ["a line by the asker heard over a minute before the ask", [at("2026-11-04T11:58:59.999Z")]],
+    ["a line by the asker with no time", [at(undefined)]],
+  ] as [string, JarvisAsk["lines"]][])("stays private with %s", async (_name, lines) => {
+    const { ask, offers } = setup({ lines });
+    await passed(await ask());
+    expect(offers).toEqual([]);
+  });
+
+  it.each([
+    ["with the mention in front", `@jarvis ${QUESTION}`],
+    ["with emphasis and spaces", `**What did they**  decide  about the poll?`],
+    ["among other words", `hey, ${QUESTION} thanks`],
+  ])("is offered when the asker's own line holds the question, %s", async (_name, text) => {
+    const { ask, offers } = setup({ lines: [at(HEARD, text)] });
+    await passed(await ask());
+    expect(offers).toHaveLength(1);
+  });
+
+  it("is offered for a line heard a minute before the ask, or after it", async () => {
+    for (const time of ["2026-11-04T11:59:00.000Z", "2026-11-04T12:00:05.000Z"]) {
+      const { ask, offers } = setup({ lines: [at(time)] });
+      await passed(await ask());
+      expect(offers).toHaveLength(1);
+    }
+  });
+});
+
+describe("the offer to make an answer public", () => {
+  it("is the page's answer alone, never its cost", async () => {
+    const { ask, offers } = setup();
+    await ask();
+    expect(offers[0]?.answer).toStrictEqual(ANSWER());
+  });
+
+  it("leaves the asker its answer when the offer rejects or throws", async () => {
+    const rejected = setup({ offer: () => Promise.reject(new Error("down")) });
+    await passed(await rejected.ask());
+    const thrown = setup({
+      offer: () => {
+        throw new Error("sync");
+      },
+    });
+    await passed(await thrown.ask());
+  });
+
+  it("is not waited for: an offer that never settles frees the asker, who may ask again", async () => {
+    const lines = [{ speaker: 0, text: `${QUESTION} ${QUESTION} 1`, time: "2026-11-04T11:59:30.000Z" }];
+    const { ask, offers } = setup({ offer: () => new Promise(() => undefined), perMinute: 100, lines });
+    await passed(await ask());
+    await passed(await ask(many(1)));
+    expect(offers).toHaveLength(2);
+  });
+
+  it("is made once for a question asked twice: the second is served, not offered again", async () => {
+    const { ask, offers } = setup();
+    await passed(await ask());
+    await passed(await ask());
+    expect(offers).toHaveLength(1);
+  });
+
+  it("is made for no ask that is refused or ends without a call", async () => {
+    const cases: [Options, Parameters<ReturnType<typeof setup>["ask"]>[0]][] = [
+      [{}, { body: { question: QUESTION, room: "#bubble/crew" } }],
+      [{}, { token: null }],
+      [{}, { origin: "https://evil.test" }],
+      [{ on: false }, {}],
+      [{ heard: false }, {}],
+      [{}, { body: POEM }],
+      [{ age: 0 }, {}],
+    ];
+    for (const [options, input] of cases) {
+      const { ask, offers } = setup(options);
+      await ask(input);
+      expect(offers).toEqual([]);
+    }
+    const struck = setup({ perMinute: 100 });
+    for (let at = 0; at < 3; at += 1) await struck.ask({ body: POEM });
+    await struck.ask();
+    expect(struck.offers).toEqual([]);
+  });
+
+  it("is made for no ask refused as busy", async () => {
+    const gate = deferred<Asked>();
+    const { ask, offers } = setup({ answer: () => gate.promise, perMinute: 100 });
+    const first = ask();
+    await idle();
+    await ask(many(1));
+    gate.resolve({ ok: true, answer: PAID() });
+    await first;
+    expect(offers).toHaveLength(1);
+  });
+});
+
 describe("Jarvis's guards before any model call", () => {
   it("hands the page the answer alone, never its cost, whatever jarvis gave", async () => {
     const { ask } = setup();
@@ -1112,7 +1277,11 @@ describe("Jarvis's guards, second round", () => {
       const { ask, work } = setup({ perMinute: 100 });
       await ask({ body: HERE });
       await ask(distinct(1));
-      expect(work.filter((line) => line.startsWith("lines"))).toEqual(["lines #bubble ", `lines #bubble ${ANNA}`]);
+      expect(work.filter((line) => line.startsWith("lines"))).toEqual([
+        "lines #bubble ",
+        `lines #bubble ${ANNA}`,
+        `lines #bubble ${ANNA}`,
+      ]);
     });
 
     it("goes when a line of its room is taken or edited, the room's answers dropped", async () => {

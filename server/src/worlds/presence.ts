@@ -74,8 +74,9 @@ function quietsOf(worlds: ReadonlyMap<string, ReadonlyMap<number, number>>) {
   };
 }
 
-export function makePresence(options: { file: string; now: () => number }): Presence {
-  const { file, now } = options;
+/** `adds`: a sample is a count to add to its hour (lines said), not a level whose busiest is kept (people, a pace). */
+export function makePresence(options: { file: string; now: () => number; adds?: boolean }): Presence {
+  const { file, now, adds = false } = options;
   const worlds = new Map<string, Map<number, number>>();
 
   try {
@@ -119,7 +120,9 @@ export function makePresence(options: { file: string; now: () => number }): Pres
       // The sample's held worlds first, so none looks quiet to a newcomer listed before it; then the newcomers, a world nobody was in left out.
       for (const [id, count] of counted) {
         const slots = worlds.get(id);
-        if (slots !== undefined) slots.set(at, Math.max(slots.get(at) ?? 0, count));
+        if (slots === undefined) continue;
+        const held = slots.get(at) ?? 0;
+        slots.set(at, adds ? Math.min(PEOPLE_MAX, held + count) : Math.max(held, count));
       }
       const quiets = quietsOf(worlds);
       for (const [id, count] of counted) {
