@@ -18,7 +18,7 @@ export async function clientLoader({ request }: { request: Request }) {
   return universe;
 }
 
-export { default, links, meta } from "./home.tsx";
+export { default, meta } from "./home.tsx";
 
 export function ErrorBoundary() {
   return <RouteError noun={cosmosAt(useLocation().pathname)?.view === "system" ? "system" : "universe"} />;

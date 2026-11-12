@@ -27,17 +27,6 @@ import place from "./globe.module.css";
 import { AimTag } from "./aimTag.tsx";
 import { useFraming } from "./placeFrame.tsx";
 
-// The worlds' file the cosmos reads, asked with the page so it comes while the page wakes (D334); not on a phone, where the 3D waits.
-export const links = () => [
-  {
-    rel: "preload",
-    href: `${import.meta.env.BASE_URL}worlds.json`,
-    as: "fetch",
-    crossOrigin: "anonymous",
-    media: `not ${PHONE_QUERY}`,
-  },
-];
-
 // The data ships with the client, so the browser fetches nothing: an unknown universe is a 404 here, and the path's
 // case is checked (F376).
 export function loader({ request }: { request: Request }) {

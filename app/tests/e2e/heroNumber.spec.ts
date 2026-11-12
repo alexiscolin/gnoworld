@@ -50,7 +50,7 @@ for (const width of [390, 1280]) {
       expect(await page.evaluate(() => Reflect.has(globalThis, "__gnoworldSpace")), "no scene ran").toBe(false);
       await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
       expect(file.count()).toBe(1);
-      // The page preloads the worlds' file for what is not a phone (routes/home.tsx's links), once, whether the scene runs or not.
+      // The page preloads the worlds' file for what is not a phone (preloads.ts, in the HTML), once, whether the scene runs or not.
       expect(file.worlds()).toBe(width === 390 ? 0 : 1);
     });
 

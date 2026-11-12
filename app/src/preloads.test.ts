@@ -28,19 +28,17 @@ describe("the home's preloads", () => {
     for (const tag of tags) expect(tag).toContain('media="not (max-width: 899px)"');
   });
 
-  it("go beside the worlds file's preload, on the pages that have it alone", () => {
-    const page = `<head>${WORLDS}<title>x</title></head>`;
-    const done = withPreloads(page);
-    expect(done.startsWith(`<head>${WORLDS}<link rel="preload" href="/textures/earth-day.2048.`)).toBe(true);
-    expect(done.endsWith("<title>x</title></head>")).toBe(true);
-    const other = "<head><title>y</title></head>";
-    expect(withPreloads(other)).toBe(other);
+  it("go at the head's end, as a page's own, and a page with none is as it was", () => {
+    const page = "<head><title>x</title></head>";
+    const own = pagePreloads("routes/home", {});
+    expect(withPreloads(page, own)).toBe(`<head><title>x</title>${own}</head>`);
+    expect(withPreloads(page)).toBe(page);
   });
 
-  it("put a page's own beside the head's end, where the home's worlds link is not", () => {
-    const earth = pagePreloads("routes/earth", undefined);
-    const page = "<head><title>x</title></head>";
-    expect(withPreloads(page, earth)).toBe(`<head><title>x</title>${earth}</head>`);
+  it("name the worlds file with the maps, on the home, a universe's, the cosmos and a system, and in the HTML alone: a route's links would ask again on a client navigation", async () => {
+    for (const id of ["routes/home", "universe", "cosmos-universe", "cosmos-system"])
+      expect(pagePreloads(id, {})).toBe(WORLDS + preloadTags());
+    expect(Reflect.has(await import("./routes/home.tsx"), "links")).toBe(false);
   });
 });
 
@@ -67,7 +65,7 @@ describe("the Earth's and a world's page preloads", () => {
   it("leave a phone alone, and every other page, and a world with no readable data", () => {
     for (const tag of pagePreloads("routes/earth", undefined).match(/<link [^>]*>/g) ?? [])
       expect(tag).toContain('media="not (max-width: 899px)"');
-    for (const id of ["routes/home", "universe", "routes/list", "routes/realm"]) expect(pagePreloads(id, {})).toBe("");
+    for (const id of ["routes/list", "routes/realm"]) expect(pagePreloads(id, {})).toBe("");
     expect(pagePreloads("routes/world", { nope: 1 })).toBe("");
     expect(pagePreloads("routes/world", null)).toBe("");
   });
