@@ -4,7 +4,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import type { Locator } from "@playwright/test";
 import type { Page } from "../e2e/fixtures.ts";
-import { contrast, expect, open, RING, test } from "./storybook.ts";
+import { contrast, expect, open, RING, settle, test } from "./storybook.ts";
 
 // The focused control by its name: an icon button has no words of its own.
 const focused = (page: Page) =>
@@ -13,7 +13,10 @@ const focused = (page: Page) =>
     return now?.getAttribute("aria-label") ?? now?.textContent.trim() ?? "";
   });
 
+// Where a box is once its enter has played: a dialog, a popover and a tooltip grow and settle (D13969), and a box read mid-way
+// is a fraction of a pixel off.
 const box = async (locator: Locator) => {
+  await settle(locator.page());
   const found = await locator.boundingBox();
   if (found === null) throw new Error("not drawn");
   return found;
@@ -449,6 +452,12 @@ test.describe("an icon button's tooltip", () => {
     await page.getByRole("button").click();
     await page.waitForTimeout(300);
     await expect(tip(page)).toHaveAttribute("data-shown", "false");
+    // A press dismisses the words, and they come back only with the pointer's next visit (Tooltip.test.tsx).
+    await page.clock.runFor(1_000);
+    await expect(tip(page)).toHaveAttribute("data-shown", "false");
+    const button = await box(page.getByRole("button"));
+    await page.mouse.move(button.x + button.width + 100, button.y + button.height / 2);
+    await page.mouse.move(button.x + button.width / 2, button.y + button.height / 2);
     await page.clock.runFor(500);
     await expect(tip(page)).toHaveAttribute("data-shown", "true");
     const t = await box(tip(page));

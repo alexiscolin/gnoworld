@@ -110,7 +110,8 @@ function Lane({ nodes, side, cy, width, span, selected, onSelect }: LaneProps) {
                   },
                 })}
           >
-            <title>{node.detail ?? node.label}</title>
+            {/* The hover's full path; a button is named by its aria-label, and a title inside it would read twice as its text. */}
+            {onSelect === undefined ? <title>{node.detail ?? node.label}</title> : null}
             <rect x={x} y={y - NODE_H / 2} width={width} height={NODE_H} rx={pure ? 5 : NODE_H / 2} />
             <text x={x + 10} y={y + 3.5}>
               {cut(node.label, width, node.count)}

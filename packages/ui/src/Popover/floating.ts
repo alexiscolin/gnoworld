@@ -23,7 +23,10 @@ interface Placing {
  * until placed is seen from then on. */
 function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   const at = anchor.getBoundingClientRect();
-  const { width, height } = box.getBoundingClientRect();
+  // Its own size: the enter draws it scaled (surface.module.css), and a box placed by that smaller size stays that much too near.
+  const scale = Number.parseFloat(getComputedStyle(box).scale) || 1;
+  const drawn = box.getBoundingClientRect();
+  const [width, height] = [drawn.width / scale, drawn.height / scale];
   const { clientWidth, clientHeight } = document.documentElement;
   const step = Number.parseFloat(getComputedStyle(box).getPropertyValue("--space-2xs")) || 0;
   const spots = { below: at.bottom + step, above: at.top - step - height };

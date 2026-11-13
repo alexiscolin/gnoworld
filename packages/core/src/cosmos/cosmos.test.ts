@@ -12,6 +12,7 @@ import {
   type SystemPlace,
   type SystemRef,
 } from "./cosmos.ts";
+import { CLEAR_BODIES, planetCount } from "./crowd.ts";
 
 // core/cosmos (slice 7, 7c and 7d1; ADR-0002 §3 and §10; F3520): systems take cells in rings by their rank in the set, a thick disc with
 // clusters above and below it, their height from a smooth field of position. Nothing piles up, an arrival moves others little and only
@@ -682,5 +683,15 @@ describe("its cost: n log n at most, measured", () => {
     const places = placeSystems(ids(30_000).map((id) => ({ id, ecosystem: "one" })));
     expect(places.size).toBe(30_000);
     expect(closest(places.values())).toBeGreaterThanOrEqual(CELL);
+  });
+});
+
+describe("planetCount: how many worlds a system draws as planets", () => {
+  it("draws every world while a lattice of its worlds and their half again fits 32 slots", () => {
+    expect([0, 1, 2, 21].map(planetCount)).toEqual([0, 1, 2, 21]);
+  });
+
+  it("draws only the three most used worlds as planets once the lattice would pass 32 slots, and a crowd the same", () => {
+    expect([22, 100, 10_000].map(planetCount)).toEqual([CLEAR_BODIES, CLEAR_BODIES, CLEAR_BODIES]);
   });
 });

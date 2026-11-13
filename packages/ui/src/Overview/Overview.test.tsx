@@ -73,8 +73,13 @@ const SHOWN: Record<
 describe("Overview", () => {
   it.each(Object.entries(SHOWN))("shows %s in its region", (_, [name, mark]) => {
     render(<Overview />);
-    // The first in the page's order: the Figures band is a region of that very name inside the Overview's Figures region.
-    expect(screen.getAllByRole("region", { name })[0]?.querySelector(mark)).not.toBeNull();
+    expect(screen.getByRole("region", { name }).querySelector(mark)).not.toBeNull();
+  });
+
+  it("names no two regions alike, as axe's landmark-unique asks", () => {
+    render(<Overview />);
+    const names = screen.getAllByRole("region").map((r) => r.getAttribute("aria-label"));
+    expect(names.filter((n, i) => names.indexOf(n) !== i)).toEqual([]);
   });
 
   it("has a region for Text", () => {

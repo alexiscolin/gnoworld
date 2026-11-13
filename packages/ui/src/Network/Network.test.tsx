@@ -18,3 +18,28 @@ describe("the halo's pulse", () => {
     expect(view.container.querySelector("circle")).not.toBe(halo);
   });
 });
+
+// A dot that is a button names itself by its aria-label; a <title> with the same words inside it would be read twice as its text
+// (axe's label-content-name-mismatch, seen on network--picked).
+describe("a dot that answers a pick", () => {
+  const graph = (onSelect?: () => void) => (
+    <Network
+      label="Linked"
+      centre={{ id: "c", label: "c" }}
+      left={{ word: "imports", nodes: [{ id: "a", label: "a", detail: "gno.land/r/a" }] }}
+      right={{ word: "imported by", nodes: [] }}
+      {...(onSelect === undefined ? {} : { onSelect })}
+    />
+  );
+
+  it("is a button named by its label alone, with no title repeating it", () => {
+    const view = render(graph(() => undefined));
+    const dot = view.getByRole("button", { name: "gno.land/r/a" });
+    expect(dot.querySelector("title")).toBeNull();
+  });
+
+  it("keeps its title, the hover's full path, when nothing answers a pick", () => {
+    const view = render(graph());
+    expect(view.container.querySelector("title")?.textContent).toBe("gno.land/r/a");
+  });
+});

@@ -197,17 +197,22 @@ describe("Tooltip", () => {
     vi.restoreAllMocks();
   });
 
-  // The green pass (G3): words shown after a refusal are placed then, by their size once they have one.
-  it("places its words by their size once shown, after a refused show (F832)", () => {
+  // A 1000 by 800 screen, the tooltip drawn, its control's box 40 px square at 200, 300: the words' place is read from it.
+  const drawnAt40 = () => {
     Object.defineProperty(document.documentElement, "clientWidth", { value: 1000, configurable: true });
     Object.defineProperty(document.documentElement, "clientHeight", { value: 800, configurable: true });
     draw();
-    const words = tip();
     const anchor = button().parentElement;
     if (anchor === null) throw new Error("no anchor");
     vi.spyOn(anchor, "getBoundingClientRect").mockReturnValue(
       DOMRect.fromRect({ x: 200, y: 300, width: 40, height: 40 }),
     );
+    return tip();
+  };
+
+  // The green pass (G3): words shown after a refusal are placed then, by their size once they have one.
+  it("places its words by their size once shown, after a refused show (F832)", () => {
+    const words = drawnAt40();
     // A box out of the top layer has no size, as a browser draws it.
     vi.spyOn(words, "getBoundingClientRect").mockImplementation(() =>
       DOMRect.fromRect(words.style.display === "block" ? { width: 80, height: 20 } : {}),
@@ -218,6 +223,25 @@ describe("Tooltip", () => {
       vi.advanceTimersToNextFrame();
     });
     expect(words.style.display).toBe("block");
+    expect([words.style.left, words.style.top]).toEqual(["180px", "280px"]);
+    vi.restoreAllMocks();
+  });
+
+  // The words grow in from a scale of 0.98 (surface.module.css): measured as they are drawn at that moment they read 2% too small, and a box
+  // set that much too near its trigger stays so (the story's 8 px step read 7.5).
+  it("is placed by its own size, not the size its enter's scale draws it at", () => {
+    const words = drawnAt40();
+    words.style.scale = "0.98";
+    vi.spyOn(words, "getBoundingClientRect").mockImplementation(() =>
+      DOMRect.fromRect({
+        width: 80 * Number.parseFloat(words.style.scale),
+        height: 20 * Number.parseFloat(words.style.scale),
+      }),
+    );
+    keyboardFocus();
+    act(() => {
+      vi.advanceTimersToNextFrame();
+    });
     expect([words.style.left, words.style.top]).toEqual(["180px", "280px"]);
     vi.restoreAllMocks();
   });

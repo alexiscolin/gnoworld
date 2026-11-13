@@ -2,13 +2,14 @@
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "../e2e/fixtures.ts";
-import { BUTTONS, contrast, CONTROLS, expect, open, pixel, RING, stories, test } from "./storybook.ts";
+import { BUTTONS, contrast, CONTROLS, expect, open, pixel, RING, settle, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   for (const id of await stories(page)) {
     await open(page, id);
+    await settle(page);
     const found = (await new AxeBuilder({ page }).include("#storybook-root").analyze()).violations;
     expect
       .soft(
@@ -167,8 +168,8 @@ test("a bare button wears none of the browser's face: no fill, no edge, no paddi
   expect(face).toEqual(["rgba(0, 0, 0, 0)", "none", "none", "0px"]);
 });
 
-// The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS
-// rules"): each state is turned off in place, transitions stilled, and the control must look different.
+// The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS rules"): each state is turned off in place,
+// transitions stilled, and the control must look different, in itself, a part of it (a chevron, a dot's rect) or the item mirroring it.
 test("in every story, a pressed, selected, expanded or current control looks unlike its resting self", async ({
   page,
 }) => {
@@ -190,16 +191,24 @@ test("in every story, a pressed, selected, expanded or current control looks unl
           s.boxShadow,
           s.fontWeight,
           s.outlineStyle,
+          s.fill,
+          s.stroke,
+          s.transform,
+          s.rotate,
         ].join();
       };
+      const parts = (e: Element) => [e, ...e.querySelectorAll("*")].map(looks).join("|");
       const on = names.map((name) => `#storybook-root [${name}]:not([${name}="false"])`).join(", ");
       const result = [...document.querySelectorAll(on)].map((element) => {
         const name = names.find((n) => element.hasAttribute(n)) ?? "";
         const value = element.getAttribute(name) ?? "";
-        const shown = looks(element);
+        const mirror = name === "aria-current" ? element.closest("[data-current]") : null;
+        const shown = parts(element);
         element.setAttribute(name, "false");
-        const resting = looks(element);
+        mirror?.removeAttribute("data-current");
+        const resting = parts(element);
         element.setAttribute(name, value);
+        mirror?.setAttribute("data-current", "");
         return shown === resting ? `${name} on ${element.outerHTML.slice(0, 60)}` : "";
       });
       still.remove();
@@ -309,8 +318,10 @@ for (const touch of [false, true]) {
     });
 
     // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a popover's trigger at
-    // the default one, and a field's box at the default one with its two edges, 46 px (frame 10, F5967).
-    test("chips, tabs and triggers are as tall as their size's control, a field 2 px taller", async ({ page }) => {
+    // the default one, and a field's box at the default one, its edges inside it, 44 px (Alexis, 2026-11-08, Field.module.css; was 46).
+    test("chips, tabs and triggers are as tall as their size's control, a field the default one's too", async ({
+      page,
+    }) => {
       const heights = async (id: string, selector: string) => {
         await open(page, id);
         return [
@@ -324,7 +335,7 @@ for (const touch of [false, true]) {
       expect(await heights("chip--marks", "[data-tone]"), "marks").toEqual([24]);
       expect(await heights("chip--control", "button"), "a chip that acts").toEqual([32]);
       expect(await heights("tabs--segmented", "[role='tab']"), "tabs").toEqual([32]);
-      expect(await heights("field--text", "input"), "a field").toEqual([46]);
+      expect(await heights("field--text", "input"), "a field").toEqual([44]);
       expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([44]);
     });
 
@@ -511,6 +522,11 @@ test("the flash's region sits in the flow, taking no room; its flash is in the t
 // Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through (F262).
 test("a flash's panel is the surface's night, opaque", async ({ page }) => {
   await open(page, "flash--timed");
+  // Its fade in (D13969) is played first: an opacity read half way is the fade's, not the panel's.
+  await settle(page);
+  await page
+    .getByRole("status")
+    .evaluate((region) => Promise.all(region.getAnimations({ subtree: true }).map((a) => a.finished)));
   const [panel, night, through] = await page.getByRole("status").evaluate((region) => {
     const probe = document.body.appendChild(document.createElement("div"));
     probe.style.background = "var(--color-surface)";

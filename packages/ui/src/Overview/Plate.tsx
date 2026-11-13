@@ -8,7 +8,7 @@ import { Figures } from "../Figures/Figures.tsx";
 import { Network, type NetworkNode } from "../Network/Network.tsx";
 import { Disclosure } from "../Disclosure/Disclosure.tsx";
 import { PagedList } from "../PagedList/PagedList.tsx";
-import { Region } from "./Region.tsx";
+import { Region, Stage } from "./Region.tsx";
 import { Tabs } from "../Tabs/Tabs.tsx";
 import { DAY, FIGURES } from "./samples.ts";
 
@@ -79,7 +79,11 @@ function Networks() {
 }
 
 function Band() {
-  return <Figures label="Figures" figures={FIGURES} />;
+  return (
+    <Stage>
+      <Figures label="Figures band" figures={FIGURES} />
+    </Stage>
+  );
 }
 
 function HubCards() {

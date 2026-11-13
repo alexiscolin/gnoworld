@@ -10,7 +10,7 @@
     gap: var(--space-xs);
     /* raw: the card's width and 8 px more each side's half, so the hover fill reaches past the words */
     inline-size: calc(100% + var(--space-s));
-    block-size: var(--fn-row-h);
+    min-block-size: var(--fn-row-h);
     /* layout: this row's own arrangement */
     margin-inline: calc(var(--space-2xs) * -1);
     padding-inline: var(--space-2xs);
@@ -23,7 +23,7 @@
   }
 
   .row[data-size="s"] {
-    block-size: var(--row-h);
+    min-block-size: var(--row-h);
   }
 
   .row:hover {

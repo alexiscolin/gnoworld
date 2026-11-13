@@ -5,6 +5,7 @@ import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 import {
   MAX_INLINE_DEPTH,
   MAX_QUOTE_DEPTH,
+  inWord,
   markdown,
   mentions,
   mentionsRoom,
@@ -1334,5 +1335,19 @@ describe("markdown: whatever comes", () => {
     };
     expect(linear(pile)).toBe(true);
     expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
+  });
+});
+
+describe("inWord: the characters a mark's run never opens or closes inside", () => {
+  test("holds letters and digits of any script in a word, and no space, punctuation, symbol or line edge", () => {
+    expect(["a", "7", "é", "字"].map((char) => inWord(char))).toEqual([true, true, true, true]);
+    expect([" ", "\n", ".", "-", "$", undefined].map((char) => inWord(char))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

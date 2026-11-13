@@ -3,9 +3,6 @@
 @layer components {
   .chip {
     --_fill: var(--color-fill);
-
-    /* A pill is one line: a row too narrow for it hides it, never breaks its words. */
-    white-space: nowrap;
   }
 
   /* A mark's one line of text fills its height with its own leading. */
@@ -27,14 +24,19 @@
       color var(--motion-base) var(--ease-standard);
   }
 
-  /* The dock's room shortcuts: the video's pill, 27 px high. */
+  /* The dock's room shortcuts: the video's pill, 27 px high, one line: a row too narrow for it hides it (the dock fits as many as it can,
+     D13016), never breaks its words; and never wider than that row, so a name with no space in it is cut at the pill's edge and pushes
+     nothing sideways. Any other chip wraps its words, as a button does, and grows with them. */
   .chip[data-size="chip"] {
     --_h: var(--control-chip);
     --_pad: var(--space-xs);
     --_font: var(--font-chip);
 
+    max-inline-size: 100%;
+    overflow: hidden;
     padding-block: 0;
     text-decoration: none;
+    white-space: nowrap;
   }
 
   /* A control at the smallest size: its words at the interface's size over the mark's, the pointer's. */

@@ -505,6 +505,18 @@ describe("uniqueness and the cap", () => {
     consistent(s.db);
   });
 
+  it("answers members, and rolls the whole link back, when the insert takes no seat although the text matched", async () => {
+    const s = setup();
+    const [a, b] = [wallet(), wallet()];
+    const made = s.started(a, b);
+    // The seat is taken between the text's check and the insert, as only a second writer could: the insert is skipped.
+    s.db.exec(
+      `CREATE TRIGGER skip_seat BEFORE INSERT ON links WHEN NEW.address = '${b.address}' BEGIN SELECT RAISE(IGNORE); END`,
+    );
+    expect(await s.finish(made, { by: a, who: b })).toBe("members");
+    expect([count(s.db, "identities"), count(s.db, "links")]).toEqual([1, 1]);
+  });
+
   it("leaves no identity and no row when the proof is refused", async () => {
     const s = setup();
     const [a, b] = [wallet(), wallet()];

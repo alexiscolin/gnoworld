@@ -107,6 +107,28 @@ export async function open(page: Page, id: string) {
   await page.evaluate(() => document.fonts.ready);
 }
 
+/** The longest an arrival or a fade is awaited: the latest figure's end (2.95 s, Figures' ring) rounded up. */
+const SETTLE_MS = 5_000;
+
+/** The page once what plays on it has played: the arrivals, fades and settles of D13969. What is not running is not awaited (a beat paused out
+ * of view), nor what ends later (a live dot's beat runs a minute, a skeleton's breath never ends). What reads a colour, an opacity or a box
+ * reads it here, never half way. */
+export async function settle(page: Page) {
+  await page.evaluate(
+    (limit) =>
+      // allSettled: an animation a page cancels as it goes (a flash leaving) has nothing left to wait for.
+      Promise.allSettled(
+        document
+          .getAnimations()
+          .filter(
+            (a) => a.playState === "running" && Number(a.effect?.getComputedTiming().endTime ?? Infinity) <= limit,
+          )
+          .map((a) => a.finished),
+      ),
+    SETTLE_MS,
+  );
+}
+
 /** A length token on the open page, in pixels, as the story's text resolves it (65ch, not 65). */
 export function token(page: Page, name: string): Promise<number> {
   return page.evaluate((property) => {
