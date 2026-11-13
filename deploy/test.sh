@@ -365,7 +365,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
 	mutant "a first load cut short" "a visitor's first load" nginx sed 's#zone=files burst=1024#zone=files burst=60#'
-mutant "the hashed files back in the visitors' zone" "a visitor's first load" nginx sed 's#zone=files burst=1024#zone=visitors burst=640#'
+	mutant "the hashed files back in the visitors' zone" "a burst of 1,024 on a hashed file is served whole" nginx sed 's#zone=files burst=1024#zone=visitors burst=640#'
 	mutant "the burst back at 320" "a burst of 640 requests is served whole" nginx sed 's#burst=640#burst=320#'
 	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
@@ -882,6 +882,9 @@ PY
 	# The room itself (F3665): a build's first load sits under 320, so only this tells a burst of 640 from the one before it. A real file: a
 	# made-up path is the app's 404, which would count nothing.
 	at_least "a burst of 640 requests is served whole" "$(codes 200 198.51.100.13 -u "$auth" 'http://web:8080/sw.js?[1-640]')" 640
+	# The hashed files' own room (D13127, F13131): the first load above asks their JS and CSS twice, about 620 requests, which the visitors'
+	# zone, 640 at once and 20 a second, serves too; a real one adds the textures and the worlds' pictures. Only a burst past 640 tells them apart.
+	at_least "a burst of 1,024 on a hashed file is served whole" "$(codes 200 198.51.100.14 -u "$auth" "http://web:8080$first?[1-1024]")" 1024
 	# One container, two visitors, the second right after the first's burst: the limit is each one's.
 	expect "a visitor is served right after another's burst" "$(docker run --rm --network "$inside" --entrypoint sh "$CURL" -c '
 		curl -s -o /dev/null --haproxy-protocol --haproxy-clientip 198.51.100.11 -u "$1" "http://web:8080/[1-1600]"
