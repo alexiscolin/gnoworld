@@ -14,7 +14,8 @@ The design: the final page (claude.ai/artifact/AkkvNY33kRnmB4fhNDR38V, v24) and 
 - scripts/ about half its 19,391 lines; guard.py at its vital bans; check.sh cut; CLAUDE.md about 3 KB; no relic.
 - Registers frozen; docs/decisions/, docs/findings/open/ and docs/log/ in use; the dream due weekly, run alone.
 - The cleanup: knip clean per package (not gno/, not Jarvis: D13153), a README per main folder, comments; screen unchanged.
-- The five tasks (T1 to T5) faster than the "before" table, with the same protections; the docs and docs/harness.png
+- The five tasks (T1 to T5), measured once on the new process, faster than the "before" table's medians, with the same
+  protections (not replayed before: D13156, `docs/plans/harness-overhaul-before.md`); the docs and docs/harness.png
   describe what exists, never a step before it exists.
 
 ## 2. Out of scope
@@ -57,17 +58,17 @@ run #31): one noted retry, never for a security test, each repaired. Next: deplo
 0. Now: Alexis applies `.claude/tmp/slice-13/f13138-user-settings.patch` to ~/.claude/settings.json; proven by an Edit
    refused on a worktree's scripts/workshop.sh.
 1. Measure (~2 days), branch `harness-overhaul` (worktree ~/Server/gnoworld-wt/harness-overhaul). First commit: this plan,
-   D13137-D13153, F13138, F13134 fixed, decisions.md's line 1. The "before" table (`before-table.md`, drafted the night
-   of 11-13 with the core's share by day and the Actions history: 32 runs, none green, the full gate failing red on
-   Linux); T1-T5 replayed once, or dropped for one measure at phase 3's exit (Alexis's call); the dream (D13150).
-   Exit: Alexis signs the table.
+   D13137-D13154, F13138, F13134 fixed, decisions.md's line 1. The "before" table (`docs/plans/harness-overhaul-before.md`,
+   drafted the night of 11-13 with the core's share by day and the Actions history: 32 runs, none green, the full gate
+   failing red on Linux), signed with two rows as context (D13155); T1-T5 not replayed, measured once at phase 3's exit
+   (D13156); the dream (D13150). Exit: Alexis signs the table (done, 2026-11-13).
 2. GitHub judges main (4-6 days): the agent's account (Alexis creates and invites it); the push helper; gate.yml split into
    jobs (`pull_request`, push on main, workflow_dispatch), `gate-ok`, zizmor, green on Linux, no pictures; nightly.yml; the
    admin bypass and break-glass tested on a scratch repository; the ruleset on only after several green PRs. Exit: tests 1-15.
 3. Delete and lock (3-4 days): the deletion map's order (mind check_docs.py importing speeds.py, guard.py parsing
    records.sh); check.sh cut; guard.py to its vital bans; CLAUDE.md and the rules (overnight/docs/rules-diff.md);
    the registers frozen; hooks on main's copy, key stores unreadable, the workshop's env an allowlist; dream_due.sh weekly.
-   The security reviewer rechecks the core's list first. Exit: tests 16-23; T1-T5 faster.
+   The security reviewer rechecks the core's list first. Exit: tests 16-23; T1-T5 measured, faster than the table's medians.
 4. The pose and the cleanup (~3 days): /pose; knip per package; READMEs (overnight/readmes/); comments; the stale
    worktrees (15) and branches (133); the docs and docs/harness.png (overnight/harness-proposed.png). Exit: a day of
    ping-pong landed as several PRs, each in 30 min at most.
