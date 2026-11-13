@@ -72,7 +72,7 @@ SECTIONS = {
     "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "prove_fix,worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,speeds_light,gate_speeds,gate_light", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate_scope,gate_triggers,gate_lanes,gate_times,gate_full,gate_full_order,gate_full_fail,gate_full_merge,gate_journeys,gate_checks,gate_stryker,merge_lock,gate_limits,gate_full_coverage,gate_speeds,gate_merge_continues,merge_waits,gate_budgets,gate_lint_scope,gate_tsc_cache,gate_light,gate_step_log,gate_stryker_lines,gate_timing", "scripts/lint_scope.py": "lint_scope", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate", "scripts/prove_fix.py": "prove_fix",
-    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "wiring",
+    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,batch_size,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/batch_size.py": "batch_size", "scripts/load.py": "gate_times", "scripts/unsteady.py": {"hooks": "gate_lanes", "probe": "unsteady_real"}, "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci",
 }
 
 
@@ -1703,21 +1703,76 @@ def mutants():
     yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
     yield from each("scripts/audit.py", "locked.setdefault(name, set()).add(version)", "pass", "hooks", "audit asks about every package")
     yield from each("scripts/audit.py", '''sys.exit(f"audit: no readable answer from npm's advisory database: {e}")''', "answer = {}", "hooks", "audit fails without an answer")
+    # GitHub judges main (the harness overhaul, phase 2): each promise of the two workflows and the two scripts, switched off.
     ci = ".github/workflows/gate.yml"
-    yield from each(ci, "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7", "hooks", "CI pins its actions")
-    yield from each(ci, "  contents: read\n", "  contents: write\n", "hooks", "CI only reads")
-    yield from each(ci, "run: sh scripts/check.sh --full", "run: sh scripts/check.sh", "hooks", "CI runs the full gate")
-    yield from each(ci, "| sha256sum -c", "| cat", "hooks", "CI checks gitleaks' checksum")
-    yield from each(ci, " --frozen-lockfile", "", "hooks", "CI keeps the lockfile frozen")
-    yield from each(ci, "run: sh scripts/check.sh --full", "run: sh scripts/check.sh --full || true", "hooks", "CI fails on a red gate")
-    yield from each(ci, "path: ${{ env.GNO_TOOLCHAIN }}", "path: ~/.cache/gnoworld-tools", "hooks", "the CI keeps no cache of verdicts")
-    yield from each(ci, "      - name: The full gate\n", "      - name: The full gate\n        continue-on-error: true\n", "hooks", "CI lets no step fail")
-    yield from each(ci, "      - name: gitleaks", "      - if: false\n        name: gitleaks", "hooks", "CI skips no step")
-    yield from each(ci, "\n  push:\n", "\n  pull_request_target:\n  push:\n", "hooks", "CI runs on a push only")
-    yield from each(ci, "persist-credentials: false", "persist-credentials: true", "hooks", "CI drops its token")
-    yield from each(ci, "fetch-depth: 0", "fetch-depth: 1", "hooks", "CI fetches main")
-    yield from each(ci, "install --with-deps --only-shell chromium", "--version", "hooks", "CI installs the journeys' browser")
-    yield from each(ci, "GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378", "GNO_COMMIT: master", "hooks", "CI pins gno")
+    for find, replace, label in (
+        ("actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1", "actions/checkout@v7", "the CI pins its actions"),
+        ("permissions:\n  contents: read\n", "permissions:\n  contents: write\n", "the CI only reads"),
+        ("persist-credentials: false", "persist-credentials: true", "the CI keeps no token on disk"),
+        ("\n  pull_request:\n", "\n  pull_request_target:\n", "the CI never runs a fork's privileged event"),
+        ("  push:\n    branches: [main]\n", "  push:\n    branches: [main]\n    paths: [app/**]\n", "no filter leaves the required check pending"),
+        ("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", "cancel-in-progress: true", "a run of main is never cancelled"),
+        ("(github.event_name == 'push' && github.run_id) || github.ref }}", "github.ref }}", "each push to main is a group of its own"),
+        ("| sha512sum -c", "| cat", "the CI checks pnpm's hash"),
+        ("| sha256sum -c", "| cat", "the CI checks gitleaks' checksum"),
+        (" --frozen-lockfile", "", "the CI keeps the lockfile frozen"),
+        ("exe.linux-x64-12.14.0.tgz", "exe.linux-x64-12.13.0.tgz", "the CI's pnpm is package.json's"),
+        ("GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378", "GNO_COMMIT: master", "the CI pins gno"),
+        ("    if: always()\n", "", "gate-ok runs whatever failed"),
+        ("      - deploy-stack\n      - harness-selftest\n", "      - harness-selftest\n", "gate-ok waits for every job"),
+        ('"$RUNNER_TEMP/base/scripts/ci_changes.sh"', "scripts/ci_changes.sh", "the detector comes from the base"),
+        ('python3 -I "$RUNNER_TEMP/base/scripts/ci_gate_ok.py"', "python3 -I scripts/ci_gate_ok.py", "the verdict comes from the base"),
+        ('"$RUNNER_TEMP/base/scripts/check_regressions.py"', "scripts/check_regressions.py", "the regressions are judged from the base"),
+        ('--config "$RUNNER_TEMP/base/scripts/$config"', '--config "scripts/$config"', "the change is scanned by the base's rules"),
+        ("    timeout-minutes: 12\n", "    timeout-minutes: 60\n", "every job holds its budget"),
+        ("    runs-on: ubuntu-24.04\n    timeout-minutes: 40\n", "    runs-on: ubuntu-latest\n    timeout-minutes: 40\n", "every job names its machine"),
+        ("      - name: Prettier\n", "      - name: Prettier\n        continue-on-error: true\n", "no step may fail"),
+        ('ci_gate_ok.py" "$EVENT"', 'ci_gate_ok.py" "${{ github.event_name }}"', "no expression inside a script"),
+        ("    if: needs.changes.outputs.ts == 'true'\n", "    if: false\n", "no condition skips a check"),
+        ("zizmor --offline --no-progress .github/workflows\n", "zizmor --offline --no-progress .github/workflows/gate.yml\n", "zizmor reads every workflow"),
+        (" --require-hashes", "", "zizmor is installed by its hash"),
+    ):
+        yield from each(ci, find, replace, "hooks", label)
+    night = ".github/workflows/nightly.yml"
+    for find, replace, label in (
+        ("\n  schedule:\n", "\n  pull_request_target:\n  schedule:\n", "the night runs on no fork's event"),
+        ("persist-credentials: false", "persist-credentials: true", "the night keeps no token on disk"),
+        ("GH_TOKEN: ${{ github.token }}", "GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}", "the night reads no secret"),
+        ("      - name: Open or update the issue", "      - run: sh scripts/report.sh\n      - name: Open or update the issue", "the writing job runs no code of the repository"),
+        ("python3 -I scripts/harness_mutate.py\n", "python3 -I scripts/harness_mutate.py --changed HEAD~1\n", "the night mutates the whole harness"),
+        ("permissions:\n  contents: read\n", "permissions:\n  contents: read\n  issues: write\n", "only the report writes"),
+    ):
+        yield from each(night, find, replace, "hooks", label)
+    for find, replace, label in (
+        ("*) all=true ;;", "*) all=false ;;", "an unknown event runs every job"),
+        ('git diff --no-renames --raw "$base" HEAD | grep -Eq \'^:[0-7]+ 120000 |^:120000 \' && return 0', ":", "a link the change touches is tier 1"),
+        ('--tier1 "$root" 2>/dev/null', "--tier1 . 2>/dev/null", "the tier is the base's table's (test 10)"),
+        ("2>/dev/null || :)\" != other ]", "2>/dev/null || echo other)\" != other ]", "a speeds.py that fails counts as tier 1"),
+        ("--no-renames --name-only", "--name-only", "a rename keeps where it came from"),
+        ("diff -z --no-renames --name-only \"$base\" HEAD | tr", "diff --no-renames --name-only \"$base\" HEAD | tr", "a name git quotes is read whole"),
+        ('git cat-file -e "$base^{commit}" ||', ": ||", "a base git does not have fails the detector"),
+        ('|| ! (. "$root/.githooks/records.sh"', '|| (. "$root/.githooks/records.sh"', "the harness flag says a harness change"),
+        ("has \'^deploy/\'", "has \'^deploy/x/\'", "a deploy/ change calls for deploy-stack"),
+        ("has \'^gno/\'", "has \'^gnox/\'", "a gno/ change calls for gno-go"),
+        ("!= other ]", '!= "other " ]', "a change of no tier-1 path is no tier-1 change"),
+        ("|^(package\\.json|pnpm-lock\\.yaml|pnpm-workspace", "|^(package\\.json|pnpm-workspace", "a lockfile change is TypeScript's"),
+        ("has \'^server/src/|^scripts/check_migrations", "has \'^nope/|^scripts/check_migrations", "a server change calls for the migrations' check"),
+        ("has \'^packages/ui/\'", "has \'^nope/\'", "a design-system change calls for the stories"),
+        ("\thas \'^(app/src|app/tests|server/src|packages/[^/]+/src)/.*\\.md$\' && return 0\n", "", "a page under the sources is code"),
+    ):
+        yield from each("scripts/ci_changes.sh", find, replace, "hooks", label)
+    for find, replace, label in (
+        ('OWN = {"deploy/": "deploy-stack", "gno/": "gno-go"}', 'OWN = {"gno/": "gno-go"}', "gate-ok reads deploy/ itself (test 9)"),
+        ('OWN = {"deploy/": "deploy-stack", "gno/": "gno-go"}', 'OWN = {"deploy/": "deploy-stack"}', "gate-ok reads gno/ itself"),
+        ('        if result == "skipped" and not wanted:\n', '        if result == "skipped":\n', "a skipped job the change calls for fails the gate"),
+        ('manual = event not in ("pull_request", "push")', "manual = False", "a manual run calls for every job"),
+        ("    if changed is None:\n", "    if False:\n", "a change git cannot list fails the gate"),
+        ('if changes.get("result") != "success" or not out.get("base"):', "if False:", "no detector fails the gate"),
+        ('if needs[name].get("result") not in ("success", "skipped"):', "if False:", "a failed job of no known name fails the gate"),
+        ('        if result == "success":\n', '        if result != "failure":\n', "a cancelled or neutral job fails the gate"),
+        ('"diff", "-z", "--no-renames"', '"diff", "--no-renames"', "gate-ok reads a name git quotes whole"),
+    ):
+        yield from each("scripts/ci_gate_ok.py", find, replace, "hooks", label)
     # The app's step and its package guard (F080), which the step-dropping pattern below misses.
     yield from each("scripts/check.sh", "installed=$(packages)\n", "", "hooks", "check.sh snapshots the package files before the build")
     yield from each("scripts/check.sh", " app/package.json pnpm-lock.yaml | cksum", " | cksum", "hooks", "check.sh's package guard reads every package file")

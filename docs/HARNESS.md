@@ -155,7 +155,10 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    pass for exactly that tree, and each harness file changed since the remote's `main` declared on
    a line `Harness-changed: <path> - why`. Claude can do neither: the sandbox refuses the merge's
    writes to the harness, and the push asks.
-10. **The CI** runs the full gate again on GitHub's machines, for every branch pushed.
+10. **The CI** on GitHub judges every pull request to main, every push to main and a run by hand: one job reads what the
+    change calls for with the base commit's own detector, the checks run side by side, and `gate-ok`, the one check main
+    will require, reads every result with the base commit's verdict; `nightly.yml` runs the long checks at night
+    (`docs/plans/harness-overhaul.md`, phase 2).
 
 ## The gate
 
@@ -708,7 +711,10 @@ costs context in every session.
 | `scripts/unsteady.py` | the fast gate's second run of a failed file, and its log |
 | `scripts/lint_scope.py`, `scripts/stryker_lines.py` | the files a commit's lint reads, from the type check's graph; the code a merge check's StrykerJS mutates |
 | `scripts/worktree.sh`, `scripts/borrow_node_modules.sh` | a branch's worktree with its packages, made and removed in one root alone; a copy borrowing the installed packages, a workspace's `.bin` its own |
-| `.github/workflows/gate.yml` | the full gate on GitHub's machines |
+| `.github/workflows/gate.yml` | the gate on GitHub: a pull request to main, a push to main or a run by hand, `gate-ok` its verdict |
+| `.github/workflows/nightly.yml` | the night on GitHub: every journey, StrykerJS and the harness whole, the history's secrets; a red night opens one issue |
+| `.github/CODEOWNERS` | the core, whose change needs an owner's approval once main's ruleset asks for it |
+| `scripts/ci_changes.sh`, `scripts/ci_gate_ok.py` | what a change calls for, and gate-ok's verdict, each run from the base commit |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
 | `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
 | `scripts/speeds.py` | the merge check's two speeds: `interface` (docs/REVIEW.md's tier-3 paths alone: no StrykerJS) or `full`, which any other path, or any doubt, runs; `--full` is always whole ; with `--light`, whether a change of the interface alone, tier-3 folders of main's table and the tree's and no tier-1 path of either, may take the radical mode's light gate |
