@@ -5,7 +5,7 @@ import { box } from "./geometry.ts";
 import { logIn } from "./irc.ts";
 import { EARTH, INES, NIGHT, onEarth, raw, ROOMS, SLOW } from "./earthStage.ts";
 import { scriptedErgo } from "./scripted.ts";
-import { countShifts, running, shifted, stats } from "./sceneStage.ts";
+import { countShifts, running, shifted } from "./sceneStage.ts";
 import type { WebSocketRoute } from "@playwright/test";
 
 // The Earth's life (frames 43 to 55, 85): what people say, where they say it from, over the globe, on a scripted Ergo so every run shows the
@@ -38,9 +38,6 @@ async function parisSaid(page: Page) {
   return socket;
 }
 
-const earthOf = async (page: Page) =>
-  (await stats(page)) as unknown as { earth: { x: number; y: number; radius: number } };
-
 test.describe("a computer, as the frames", () => {
   test.use({ viewport: COMPUTER });
 
@@ -62,20 +59,6 @@ test.describe("a computer, as the frames", () => {
     await signsReady(page);
     socket().send(raw({ id: "m1", text: "from a side room", country: "JP", from: "p2", room: "#earth/lisbon" }));
     await expect(bubble(page, "from a side room")).toBeAttached();
-  });
-
-  test("shows a person's line over their country, with their name and country, as frame 47", async ({ page }) => {
-    await parisSaid(page);
-    const shown = bubble(page, "gm from Paris!");
-    await expect(shown).toBeVisible();
-    await expect(shown).toContainText(/FRANCE/i);
-    const found = await shown.boundingBox();
-    if (found === null) throw new Error("no bubble");
-    near(found.width, 258, 6);
-    near(found.height, 56, 8);
-    const { earth } = await earthOf(page);
-    expect(found.x).toBeGreaterThan(earth.x - earth.radius);
-    expect(found.x + found.width).toBeLessThan(earth.x + earth.radius * 1.2);
   });
 
   test("brings your own line's country into view by the ground alone: Paris well seen, the camera where it was", async ({
@@ -354,15 +337,6 @@ test.describe("a window under the dock's breakpoint", () => {
       scrollTo(0, 0);
     });
     await expect(page.locator("[data-signs]")).toBeVisible();
-  });
-
-  test("keeps the chat in the page, under the globe: the Earth is what the page shows", async ({ page }) => {
-    await onEarth(page, { me: ME });
-    await signsReady(page);
-    const { earth } = await earthOf(page);
-    expect(await onTop(page, earth.x, earth.y)).toBe(true);
-    const chat = await box(page, "[data-chat-layout]");
-    expect(chat.y).toBeGreaterThanOrEqual(earth.y + earth.radius);
   });
 });
 

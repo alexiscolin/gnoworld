@@ -27,7 +27,7 @@
     --_pad: var(--space-s);
   }
 
-  /* The hub card: the fill and the line of a places' list's card (PlacesList), the plate's own padding; 6 % and the strong line under the pointer
+  /* The hub card: a plate's card, on the faint card fill with its line and the plate's own padding; 6 % and the strong line under the pointer
      unless it is fixed; dashed, no fill. */
   .card[data-look="hub"] {
     --_fill: var(--color-card);

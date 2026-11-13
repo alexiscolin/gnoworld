@@ -29,7 +29,9 @@ describe("Redraw", () => {
     expect(redraw.check(moment({ seconds: 0.14 }))).toBe("ambient");
     expect(redraw.check(moment({ moving: true }))).toBe("full");
     redraw.live = false;
-    expect(redraw.check(moment({ seconds: 0.2 }))).toBe("none");
+    // The moving frame read no numbers: the one after it is drawn, and reads them (C5, slice 13).
+    expect(redraw.check(moment({ seconds: 0.2 }))).toBe("full");
+    expect(redraw.check(moment({ seconds: 0.21 }))).toBe("none");
   });
 
   it("draws every frame while the hand, a flight, an effect or a close planet moves", () => {
@@ -37,6 +39,36 @@ describe("Redraw", () => {
     redraw.check(moment());
     expect(redraw.check(moment({ moving: true }))).toBe("full");
     expect(redraw.check(moment({ moving: true }))).toBe("full");
+  });
+
+  it("does not read the numbers a frame is drawn from while a frame is moving anyway", () => {
+    const redraw = new Redraw();
+    let read = 0;
+    const counted = (over: Partial<Moment> = {}): Moment => {
+      const base = moment(over);
+      return {
+        ...base,
+        get shown() {
+          read += 1;
+          return base.shown;
+        },
+      };
+    };
+    redraw.check(counted());
+    read = 0;
+    redraw.check(counted({ moving: true }));
+    redraw.check(counted({ moving: true }));
+    expect(read).toBe(0);
+    redraw.check(counted());
+    expect(read).toBe(1);
+  });
+
+  it("draws once more when a movement stops, to learn the numbers it ended on, then nothing", () => {
+    const redraw = new Redraw();
+    redraw.check(moment());
+    redraw.check(moment({ moving: true }));
+    expect(redraw.check(moment())).toBe("full");
+    expect(redraw.check(moment())).toBe("none");
   });
 
   it("draws when an eased value moves past its tolerance, and keeps the last drawn to measure by", () => {

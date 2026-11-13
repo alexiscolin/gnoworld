@@ -13,7 +13,7 @@ export function Pills({ lede }: { lede: PlateModel["lede"] }) {
   if (status === undefined && rank === undefined) return null;
   return (
     <div className={styles["pills"]}>
-      <Cluster space="2xs" wrap="no">
+      <Cluster space="2xs" wrap="no" className={styles["pillRow"]}>
         {rank === undefined ? null : (
           <span className={styles["pill"]} title={rank.among}>
             <Chip tone="signal" strong>
@@ -63,10 +63,10 @@ export function Hero({ lede, actions, talk }: Pick<PlateModel, "lede" | "actions
   return (
     <Stack space="m">
       <Sentence lede={lede} />
-      <div className={styles["buttons"]}>
+      <div>
         <Stack space="m">
           <div className={styles["acts"]}>
-            <Actions {...actions} />
+            <Actions {...actions} className={styles["row"]} />
           </div>
           {talk === undefined ? null : <TalkBar {...talk} />}
         </Stack>

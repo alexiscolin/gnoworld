@@ -55,72 +55,26 @@ export const flightOf = (page: Page): Promise<Flight> =>
 export const worldsDrawn = (page: Page) =>
   page.evaluate(() => (Reflect.get(globalThis, "__gnoworldSpace") as Space).universe?.planets.length ?? 0);
 
-// The old hook's reading, for the journeys not yet ported to `__gnoworldSpace` (f7a31433 deleted `__gnoworldScene`): their types, kept so they
-// still compile, and a `stats` that says so as it fails. A journey ported is off this list; the last one takes these away.
-interface Spot {
-  x: number;
-  y: number;
-  radius: number;
-}
-interface CosmosStats {
-  shown: boolean;
-  bodies: number;
-  stars: number;
-  dots: number;
-  glows: number;
-  rocks: number;
-  maps: number;
-  looks: number;
-  dotPixels: number;
-  earth: boolean;
-  screen: { sun: Spot; earth: Spot | undefined; bodies: (Spot & { id: string; away: number })[] };
-  nebulae: number;
-  worlds: number;
-  eye: { x: number; y: number; z: number };
-  web?: { points: number; particles: number; clumps: number; chosen?: string; share: number };
-  sky: { share: number; eye: { x: number; y: number; z: number } };
-  /** The home's dive (7d7): how far along it is, 1 at rest, and how much of the dissolve's picture still shows. */
-  dive: { along: number; veil: number };
-  /** The Earth's view (7x2), once its chunk came: its stations as bodies and as the belt's lights, their parts and draws, the scenery's
-   * planets, and whether the orbits show. */
-  stations?: { close: number; belt: number; parts: number; draws: number; scenery: number; orbits: boolean };
-}
-/** The flights (7g): how many started, one under way or not, how far along, its veil and streaks, where it goes, and the eye's way so far. */
-interface FlightStats {
-  flights: number;
-  flying: boolean;
-  along: number;
-  veil: number;
-  streaks: number;
-  kind: string;
-  target: string;
-  seconds: number;
-  /** How long, on its own clock, the last flight waited in transit for its page's body. */
-  waited: number;
-  travel: { x: number; y: number; z: number };
-}
-interface Stats {
-  frames: number;
-  tier: "high" | "low";
-  ratio: number;
-  probing: boolean;
-  calls: number;
-  points: number;
-  geometries: number;
-  textures: number;
-  eye: { x: number; y: number; z: number };
-  seconds: number;
-  cosmos: CosmosStats | undefined;
-  flight: FlightStats | undefined;
-}
+/** Each name of the engine's own layer (`options.labels`), shown or not: its words, its opacity, whether it takes the pointer, its right edge. */
+export const labelsOf = (page: Page) =>
+  page.evaluate(() =>
+    [...(Reflect.get(globalThis, "__gnoworldSpace") as Space).options.labels.children].map((label) => {
+      const style = getComputedStyle(label);
+      return {
+        text: label.textContent,
+        opacity: Number(style.opacity),
+        pointer: style.pointerEvents,
+        right: label.getBoundingClientRect().right,
+      };
+    }),
+  );
 
-/** The old hook is gone: a journey still reading it fails here; read the engine (`flightOf`, `worldsDrawn`) instead. */
-export const stats = (page: Page) =>
-  page.evaluate((): Stats => {
-    throw new Error(
-      "`__gnoworldScene.stats()` went in f7a31433: port this journey to `__gnoworldSpace` (sceneStage.ts)",
-    );
-  });
+/** The names standing over the canvas, each as visible as its opacity says. */
+export const shownLabels = async (page: Page) => (await labelsOf(page)).filter(({ opacity }) => opacity > 0.05);
+
+/** How many frames the engine's renderer has drawn: none is counted while its context is lost. */
+export const framesOf = (page: Page) =>
+  page.evaluate(() => (Reflect.get(globalThis, "__gnoworldSpace") as Space).renderer.info.render.frame);
 
 /** The JS heap in use after a garbage collection, through CDP. */
 export async function heapOf(cdp: CDPSession): Promise<number> {
@@ -167,18 +121,6 @@ export async function keepsItsRoom(page: Page, path: string, come: (page: Page) 
   expect(await shifted(page)).toBeLessThan(0.1);
 }
 
-// The page's time held, to move only as a journey runs it: a frame at a time, each 16 ms after the last however slow the software GPU,
-// so the Auto probe keeps the tier it found. Held a little ahead of now, read again if the page went past it. The clock is installed first.
-export async function held(page: Page) {
-  for (let tried = 0; ; tried += 1)
-    try {
-      await page.clock.pauseAt(await page.evaluate(() => Date.now() + 250));
-      return;
-    } catch (error) {
-      if (tried > 4) throw error;
-    }
-}
-
 export const running = (page: Page) => expect(page.locator("canvas[data-scene='on']")).toBeAttached();
 
 /** The home's dive over: the worlds' file came and the camera stands at the home, at rest. Until then it flies in from the whole cosmos, so
@@ -212,18 +154,6 @@ export const loseContext = (page: Page) =>
 export const restoreContext = (page: Page) =>
   page.evaluate(() => {
     (Reflect.get(globalThis, "__lose") as WEBGL_lose_context).restoreContext();
-  });
-
-/** Hides the page's text over the canvas, so a journey reads what the scene drew. */
-export const hideThePage = (page: Page) =>
-  page.evaluate(() => {
-    for (const child of document.body.children)
-      if (
-        child instanceof HTMLElement &&
-        !(child instanceof HTMLCanvasElement) &&
-        child.querySelector("canvas") === null
-      )
-        child.style.visibility = "hidden";
   });
 
 /** The router's own move, as a link on the page would make it: no load, the engine kept. */

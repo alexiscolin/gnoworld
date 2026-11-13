@@ -4,23 +4,11 @@
 // nears its end, or at once on a page opened directly. Leaving plays the same back, 2.6 times as fast, on the page's ghost. Nothing moves
 // under reduced motion.
 import { gsap } from "gsap";
-import { all, MOVED, OUT4, WORDS } from "./arrivalBase.ts";
+import { all, CHAT, DOCK, ITEMS, MOVED, OUT4, WORDS } from "./arrivalBase.ts";
 import { holdsShell, revealShell } from "./firstLook.ts";
 import { motionOf } from "../../space/motion.ts";
 
 const PLATE = "[data-look='plate']";
-// What the first screen holds besides the title and the kicker, which have steps of their own: the lede and the banners. The plate's blocks (its
-// root is [data-blocks]) come after it, with the entrance their own sheets play (the proposal's score).
-const ITEMS = "[data-content] > div > div > div > :not([data-title], [data-planet], [data-blocks])";
-// The dock is what leaves with the page and holds no plate; on a leaving page's ghost, its copy.
-const DOCK = ":not(:has([data-look='plate']))";
-// The chat's parts as the demo's: its header, the lines in view (it stands at its end: the last ten) and what follows them. A chat that stood
-// through the move from the page before (`data-stood`, fullHost.tsx) keeps its own: it changes in place, never rising again.
-const LINES = "ol[aria-label='Messages']";
-const SEATED = "[data-chat-seat]:not([data-stood])";
-const CHAT = ["header", `${LINES} > li:nth-last-child(-n + 10)`, `${LINES} ~ *`]
-  .map((part) => `${SEATED} ${part}`)
-  .join(", ");
 const BACK = 2.6;
 
 type Vars = gsap.TweenVars;
@@ -45,8 +33,15 @@ interface Step {
 const STEPS: readonly Step[] = [
   {
     of: ({ plate }) => (plate === null ? [] : [plate]),
-    from: { "--plate-in": 0, autoAlpha: 0 },
-    to: { "--plate-in": 1, autoAlpha: 1, duration: 0.5, ease: "power2.out" },
+    from: { autoAlpha: 0 },
+    to: { autoAlpha: 1, duration: 0.5, ease: "power2.out" },
+    at: 0,
+    box: true,
+  },
+  {
+    of: ({ plate }) => all(plate, "[data-fill]"),
+    from: { opacity: 0 },
+    to: { opacity: 1, duration: 0.5, ease: "power2.out" },
     at: 0,
     box: true,
   },

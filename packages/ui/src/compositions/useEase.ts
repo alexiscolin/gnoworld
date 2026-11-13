@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { motionWelcome } from "../motion.ts";
 
 // A track change is no CSS transition (grid-column is not animatable): a card that spans 4 then 12 columns would send the cells around it to their new
 // places in one frame. This eases them (FLIP): where each child stood before the change and where it stands after, it slides the one to the other.
@@ -39,7 +40,7 @@ export function useEase(root: HTMLElement | null, on: boolean) {
       if (slid.length > 0) {
         const tokens = getComputedStyle(root);
         const duration = parseFloat(tokens.getPropertyValue("--motion-slow"));
-        const still = !(duration > 0) || tokens.getPropertyValue("--motion-scale").trim() === "0";
+        const still = !(duration > 0) || !motionWelcome();
         if (!still) {
           const easing = tokens.getPropertyValue("--ease-standard").trim();
           for (const { child, dx, dy } of slid) {

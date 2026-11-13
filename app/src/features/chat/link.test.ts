@@ -265,20 +265,27 @@ describe("the chat's link: who connects", () => {
     expect(t.store.getState().dms).toEqual({});
   });
 
-  // 4e's complexity review: the account's direct-message choices, read from its device by the store at its start.
+  // 4e's complexity review: the account's device, handed to the store at its start; a refused line's draft goes back to it.
   it("hands the store the device of each account's session, and none of a guest's", () => {
     const asked: string[] = [];
+    const drafts: [string, string][] = [];
     const t = setup(undefined, (account) => {
       asked.push(account);
       return {
-        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [OTHER], setKnown: () => true },
-        drafts: { get: () => "", set: () => true },
+        drafts: {
+          get: () => "",
+          set: (room, draft) => {
+            drafts.push([room, draft]);
+            return true;
+          },
+        },
       };
     });
     t.signedIn(ADDRESS);
-    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: true, known: new Set([OTHER]) });
+    t.store.getState().dmActions.refused(OTHER, "hi");
     t.signedOut();
-    expect(t.store.getState().dmChoices).toEqual({ onlyKnown: false, known: new Set() });
+    t.store.getState().dmActions.refused(OTHER, "again");
+    expect(drafts).toEqual([[OTHER, "hi"]]);
     expect(asked).toEqual([ADDRESS]);
   });
 
@@ -1091,7 +1098,9 @@ describe("the chat's link: what it says", () => {
   it("sends nothing of a message a line of which Ergo's connection would refuse, a lone surrogate", () => {
     const t = memberIn(["#bubble/games"]);
     const lines = ["PRIVMSG #bubble/games :a", "PRIVMSG #bubble/games :\ud800"];
-    expect(t.link.say("#bubble/games", { kind: "lines", lines, text: "a\n\ud800", left: 0 })).toBe(false);
+    expect(
+      t.link.say("#bubble/games", { kind: "lines", lines, text: "a\n\ud800", left: 0, tightest: { line: 2, left: 0 } }),
+    ).toBe(false);
     expect(batches(t.fake.sent)).toEqual([]);
   });
 
@@ -1643,7 +1652,6 @@ describe("the chat's link: direct messages", () => {
   const withDrafts = () => {
     const kept = new Map<string, string>();
     const t = setup(undefined, () => ({
-      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
       drafts: {
         get: (room) => kept.get(room) ?? "",
         set: (room, draft) => {
@@ -2307,7 +2315,6 @@ describe("the chat's link: notices", () => {
 
   it("reads the modes of the account's device when its session starts", () => {
     const t = member(() => ({
-      prefs: { onlyKnown: () => false, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
       drafts: { get: () => "", set: () => true },
       notices: { modes: () => ({ "#bubble": "none" }), setModes: () => true },
     }));
@@ -2326,16 +2333,6 @@ describe("the chat's link: notices", () => {
       dm(t.fake, ["d1", OTHER, ADDRESS]);
       dm(t.fake, ["d2", ADDRESS, OTHER], "hello");
       expect(t.notices()).toEqual([{ id: "d1", kind: "dm", where: OTHER, time: T(5), by: OTHER }]);
-    });
-
-    it("makes none of a message the store discards while the account hears those it wrote to alone", () => {
-      const t = member(() => ({
-        prefs: { onlyKnown: () => true, setOnlyKnown: () => true, known: () => [], setKnown: () => true },
-        drafts: { get: () => "", set: () => true },
-      }));
-      dm(t.fake, ["d1", OTHER, ADDRESS]);
-      expect(t.store.getState().dms).toEqual({});
-      expect(t.notices()).toEqual([]);
     });
 
     it("makes none of a direct message to a guest, nor of a room's line naming an address, for a guest", () => {
@@ -2446,10 +2443,7 @@ describe("the chat's link: notices, the edges", () => {
   const NEWS = "#bubble/news";
   const BOB = Address.parse("g1f6dcp6he2vq9gymrm4yrnyx66n0578vf7fsksl");
   const T = (minute: number) => `2026-10-25T10:${String(minute).padStart(2, "0")}:00.000Z`;
-  const prefs = (known: string[] = [], onlyKnown = false) => ({
-    prefs: { onlyKnown: () => onlyKnown, setOnlyKnown: () => true, known: () => known, setKnown: () => true },
-    drafts: { get: () => "", set: () => true },
-  });
+  const drafts = () => ({ drafts: { get: () => "", set: () => true } });
   const member = (device?: LinkDeps["device"], account: string = ADDRESS) => {
     const t = setup(undefined, device);
     t.link.follow([GAMES, "#bubble", NEWS], [NEWS]);
@@ -2473,7 +2467,7 @@ describe("the chat's link: notices, the edges", () => {
       const asked: string[] = [];
       const device = (account: string) => {
         asked.push(account);
-        return { ...prefs(), notices: { modes: () => ({ [NEWS]: "none" as const }), setModes: () => true } };
+        return { ...drafts(), notices: { modes: () => ({ [NEWS]: "none" as const }), setModes: () => true } };
       };
       const t = member(device);
       const old = t.fake;
@@ -2498,7 +2492,7 @@ describe("the chat's link: notices, the edges", () => {
 
     // G1 (F1500): the account held no mode, so the guard in `begin` that skips a reset for an empty session saw its notices.
     it("forgets an account's notices and marks at sign-out though it held no mode, for the next account of the device", () => {
-      const t = member(() => ({ ...prefs(), notices: { modes: () => ({}), setModes: () => true } }));
+      const t = member(() => ({ ...drafts(), notices: { modes: () => ({}), setModes: () => true } }));
       say(t.fake, [GAMES, "m1", `@${ADDRESS}`], { minute: 3 });
       say(t.fake, ["#bubble", "m2", `@${ADDRESS}`]);
       t.link.read(GAMES, "m1");
@@ -2725,17 +2719,6 @@ describe("the chat's link: notices, the edges", () => {
       const account = from === "gnoworld" ? "" : `;account=${from}`;
       fake.line(`@msgid=${id};time=${T(5)}${account} :${from}!u@h ${over.command ?? "PRIVMSG"} ${to} :hi`);
     };
-
-    // R7: the rule is "never a message the account discards", not "never a message".
-    it("makes a notice of a message from one the account wrote to, none of a stranger's, and one once it wrote to it", () => {
-      const t = member(() => prefs([OTHER], true));
-      dm(t.fake, ["d1", OTHER, ADDRESS]);
-      dm(t.fake, ["d2", BOB, ADDRESS]);
-      expect(ids(t)).toEqual(["d1"]);
-      dm(t.fake, ["d3", ADDRESS, BOB]);
-      dm(t.fake, ["d4", BOB, ADDRESS]);
-      expect(ids(t)).toEqual(["d1", "d4"]);
-    });
 
     it("makes none of an account's NOTICE to the nick, nor of the bot's, which carries no account", () => {
       const t = member();

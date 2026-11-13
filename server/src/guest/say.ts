@@ -34,7 +34,7 @@ export interface SayDeps {
   thresholds: Thresholds;
   /** The bot's RELAYMSG: the id Ergo gave the line, a refusal, or no word in time. */
   relay: (room: string, nick: string, text: string) => Promise<Relayed>;
-  /** A relayed line, counted in the plate's messages an hour and never in a trend. */
+  /** A relayed line, counted in the plate's messages an hour and never in the history. */
   counted: (room: string, name: string, at: number) => void;
   /** A relayed line as the room heard it, kept among the recent lines, so it can be translated. */
   passed: (said: Said) => void;

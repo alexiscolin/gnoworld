@@ -8,8 +8,9 @@ import type { Result } from "../lib/api/login.ts";
 import type { ErgoState } from "../lib/ergo/ergo.ts";
 
 type Problem<T> = T extends { ok: false } ? Omit<T, "ok"> : never;
-/** Why a login stopped: Adena's answer, or the server's. */
-export type LoginProblem = Problem<ConnectResult> | Problem<SignResult> | Problem<Result<unknown>>;
+/** Why a login stopped: Adena's answer, the server's, or the page's wallet code that a new version renamed. */
+export type LoginProblem =
+  Problem<ConnectResult> | Problem<SignResult> | Problem<Result<unknown>> | { reason: "new-version" };
 /** A login's steps: Adena asked, the text signed, the proof checked by the server. */
 type LoginStep = "idle" | "wallet" | "signing" | "verifying";
 type Session = { kind: "unknown" } | { kind: "out" } | { kind: "in"; address: Address };

@@ -94,7 +94,7 @@ levels. Nothing in the repository holds a key or names an account.
   the seed lacks shows its own first line, or, with Jarvis on, gets a line at its first visit, on the Anthropic key, 30 new in any 24 hours at most
   (OPERATIONS.md, "The realms' explanations").
 - The Mac must stay on, awake, plugged in and online (`caffeinate`, above). If it sleeps, the address is dead.
-- The demo password and the 640-request burst limit are the only walls: do not post the address in public.
+- The demo password and the burst limits (640 requests, 1,024 more for the hashed files) are the only walls: do not post the address in public.
 - A backup stops the server and Ergo while it copies, so the database and its journal are a consistent pair; it is not
   tested by a restore until you try `restore` once (above). `wipe` always backs up first, even when the stack is stopped, and removes nothing if the copy fails.
 - The copy is a checked commit: a fix means a new commit, `prepare` and `up`, not an edit in `~/gnoworld-demo`.

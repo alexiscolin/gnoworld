@@ -8,8 +8,8 @@ function callsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
   return {
     /** Message `index` of the transaction `hash` (a route's spelling of it, CallHash). */
-    read: (hash: string, index: number): Promise<Result<CallDetail>> =>
-      call({ path: `/api/calls/${hash}/${String(index)}`, schema: CallDetail }),
+    read: (hash: string, index: number, signal?: AbortSignal): Promise<Result<CallDetail>> =>
+      call({ path: `/api/calls/${hash}/${String(index)}`, schema: CallDetail, signal }),
   };
 }
 

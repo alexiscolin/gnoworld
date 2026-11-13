@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { focusManager, onlineManager, QueryObserver } from "@tanstack/react-query";
-import { FRESH_MS, makeQueryClient, Unread } from "./client.ts";
+import { FRESH_MS, makeQueryClient, quietUnread, Unread } from "./client.ts";
 import { keys, invalidateRealm } from "./keys.ts";
 
 // The app's reads through one query client (slice 13, D13973): a held answer, one fresh read past fifteen seconds and none before, a failed read
@@ -72,6 +72,27 @@ describe("the client's defaults", () => {
     await client.cancelQueries({ queryKey: key });
     await cut;
     expect(client.getQueryData(key)).toBeUndefined();
+  });
+
+  it("keeps quiet for a read asked ahead that was cancelled when its last viewer left, and lets a bug rise", async () => {
+    const client = makeQueryClient();
+    const key = keys.hours("moon");
+    const ahead = client
+      .query({
+        queryKey: key,
+        queryFn: ({ signal }) =>
+          new Promise<number>((_, reject) => {
+            signal.addEventListener("abort", () => {
+              reject(new Error("cut"));
+            });
+          }),
+      })
+      .catch(quietUnread);
+    await client.cancelQueries({ queryKey: key });
+    await expect(ahead).resolves.toBeUndefined();
+    expect(() => {
+      quietUnread(new Error("bug"));
+    }).toThrow("bug");
   });
 
   it("retries a read that did not answer, twice, and never one whose answer was the wrong shape", () => {

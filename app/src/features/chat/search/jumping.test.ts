@@ -67,4 +67,16 @@ describe("a room opened at a found message", () => {
     jumping.latest("#bubble");
     expect(sent).toHaveLength(before);
   });
+
+  it("forgets a jump asked for a room the view left, and keeps one for the room it moved to", () => {
+    const { store, jumping } = setup();
+    const window = [said("old1", "found", "2026-11-04T14:05:00.000Z")];
+    jumping.around("#bubble", "old1");
+    jumping.away("#other");
+    expect(jumping.page("#bubble", window)).toBe(false);
+    expect(store.getState().chat.rooms["#bubble"]?.jump).toBeUndefined();
+    jumping.around("#bubble", "old1");
+    jumping.away("#bubble");
+    expect(jumping.page("#bubble", window)).toBe(true);
+  });
 });

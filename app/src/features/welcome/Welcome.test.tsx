@@ -60,6 +60,25 @@ describe("welcome card", () => {
     vi.unstubAllGlobals();
   });
 
+  it("asks the page's login on Connect Adena, not Get started's dialog", async () => {
+    vi.stubGlobal("adena", { AddEstablish: () => undefined });
+    const login = vi.fn();
+    const started = vi.fn();
+    addEventListener("gnoworld:log-in", login);
+    addEventListener("gnoworld:get-started", started);
+    try {
+      const box = page();
+      await settled(() => box.querySelector("[data-open]") !== null);
+      click(button(box, "Connect Adena"));
+      expect(login).toHaveBeenCalledTimes(1);
+      expect(started).not.toHaveBeenCalled();
+    } finally {
+      removeEventListener("gnoworld:log-in", login);
+      removeEventListener("gnoworld:get-started", started);
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("closes with the close button, for good", async () => {
     const box = page();
     await settled(() => box.querySelector("[data-open]") !== null);

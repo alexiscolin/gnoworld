@@ -7,7 +7,7 @@ import { DEFAULT_MODE, type Notice, type NoticeMode } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
 import type { ChatSlice } from "./chat.ts";
-import { heardFrom, type DmSlice } from "./dms.ts";
+import type { DmSlice } from "./dms.ts";
 import type { LoginSlice } from "./login.ts";
 
 /** The notices kept at most for each place (a room, a conversation), the newest: a flood in one drops its own oldest. */
@@ -58,13 +58,12 @@ export const modeOf = (state: State, room: string): NoticeMode => own(state.noti
 // Where the reader has seen a room up to: the page's mark, or Ergo's reading place, the later; a conversation, the mark.
 const markOf = (state: State, where: string) => later(own(state.noticeSeen, where), roomOf(state, where)?.read);
 
-// Whether a notice counts: a conversation's after its mark, while the store keeps that conversation and the account
-// hears from its partner (else it has no row to open or to mark seen); a room's while the page follows it, its mode is not
-// none and the reader has not seen its time.
+// Whether a notice counts: a conversation's after its mark, while the store keeps that conversation (else it has no row to
+// open or to mark seen); a room's while the page follows it, its mode is not none and the reader has not seen its time.
 function unseen(state: State, notice: Notice): boolean {
   const { kind, where, time } = notice;
   if (kind === "dm") {
-    if (!Object.hasOwn(state.dms, where) || !heardFrom(state.dmChoices, where)) return false;
+    if (!Object.hasOwn(state.dms, where)) return false;
   } else if (roomOf(state, where) === undefined || modeOf(state, where) === "none") return false;
   return time > (markOf(state, where) ?? "");
 }

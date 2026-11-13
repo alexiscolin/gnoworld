@@ -5,8 +5,9 @@
 // the door's bodies too: a question, what the door sends jarvis, the answer, an admin's change and the values it changes;
 // since 10k, a line's translation and a realm's digest.
 import { Address } from "./address.ts";
-import { CALL_CAPS, CallArgs, funcName, Key, RealmPath } from "./data.ts";
+import { PROPOSAL_ARGS_CAPS, CallArgs, funcName, Key } from "./data.ts";
 import { ChallengeRequest } from "./login.ts";
+import { ChainId, RealmPath } from "./realmPath.ts";
 import { RoomId } from "./rooms.ts";
 import { z } from "./zod.ts";
 
@@ -16,15 +17,15 @@ export const JARVIS_CAPS = {
   facts: 12,
   points: 100,
   links: 10,
-  args: CALL_CAPS.args,
-  label: CALL_CAPS.label,
+  args: PROPOSAL_ARGS_CAPS.args,
+  label: PROPOSAL_ARGS_CAPS.label,
   value: 200,
   href: 2048,
   announcement: 280,
   text: 1000,
-  arg: CALL_CAPS.arg,
+  arg: PROPOSAL_ARGS_CAPS.arg,
   why: 200,
-  name: CALL_CAPS.name,
+  name: PROPOSAL_ARGS_CAPS.name,
   realm: 128,
   place: 200,
 } as const;
@@ -176,7 +177,7 @@ export const JarvisAsk = z.union([
   z.strictObject({ ...Here, lines }),
   z.strictObject({ ...CatchUp, lines }),
   // The chain the door found for the room, never the page's: the one jarvis reads the function's code on (D13920).
-  z.strictObject({ ...Explain, chain: z.optional(z.string().check(z.regex(/^[a-z0-9][a-z0-9_-]{0,63}$/))), lines }),
+  z.strictObject({ ...Explain, chain: z.optional(ChainId), lines }),
 ]);
 export type JarvisAsk = z.infer<typeof JarvisAsk>;
 

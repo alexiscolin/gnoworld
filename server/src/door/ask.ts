@@ -1,8 +1,8 @@
 // POST /api/jarvis/ask, the door (D42, D43, D44, D93, D13985): a question or a fixed ask to Jarvis from a room. Each check
 // before any model call, cheapest first, each refusal a typed answer and a log line with no question: a listed site in JSON
 // (guard.ts), the session, the switch, the rate, strikes (paused), the share (capped), the first ask (early), the body and
-// size, the room's reading, the list (a strike), one question in flight (busy), then calls.ts: served answers, the room's
-// cap (busy), the quota, jarvis. The share and `early` skip the allowlist, its strikes do not.
+// size, the room's reading, the list (a strike), one question in flight (busy), then calls.ts: served answers, the quota,
+// jarvis. The share and `early` skip the allowlist, its strikes do not.
 import { plainWords } from "@gnoworld/core";
 import { z } from "zod";
 import { JarvisQuestion, type Address, type JarvisAnswer, type JarvisAsk } from "@gnoworld/schemas";
@@ -170,7 +170,6 @@ export function askRoutes(options: Options): Hono<Guarded> {
       who,
       room: ask.room,
       started,
-      heard: tail !== undefined,
       ask,
     };
     inFlight.add(who);
@@ -180,8 +179,6 @@ export function askRoutes(options: Options): Hono<Guarded> {
     switch (result.kind) {
       case "served":
         return answered(c, result.answer, asked.more);
-      case "busy":
-        return say(c, "busy", asked.more);
       case "full":
         return refuse(c, "quota", asked.more);
       case "called":

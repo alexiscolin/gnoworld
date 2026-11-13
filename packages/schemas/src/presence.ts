@@ -31,7 +31,7 @@ export const Presence = z.strictObject({
 export type Presence = z.infer<typeof Presence>;
 
 /** The most countries a count may name: every pair of capitals a client's country tag can hold (core's `isCountryCode`). */
-export const COUNTRIES_MOST = 26 * 26;
+const COUNTRIES_MOST = 26 * 26;
 
 /** The most bytes the people's answer weighs: two counts. */
 export const PRESENCE_PEOPLE_MAX_BYTES = 256;

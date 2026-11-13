@@ -5,6 +5,7 @@ import { Icon } from "@gnoworld/ui";
 import { useEffect, useRef, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router";
 import { followed } from "../../lib/followed.ts";
+import { reportedOr } from "../../lib/reported.ts";
 import { raisePill } from "../../topPill.tsx";
 import type { ExplorePlaces } from "./explore.ts";
 import { useLens, useLit } from "../../lenses.ts";
@@ -33,8 +34,7 @@ export function useExplore(places: ExplorePlaces): () => void {
     const passportAt = (path: string) => {
       Promise.resolve(navigate({ pathname: path, hash: "passport" }, { preventScrollReset: true })).catch(reportError);
     };
-    busiest({ ...places, passportAt, raise: raisePill })
-      .catch(() => places.earth)
+    reportedOr(busiest({ ...places, passportAt, raise: raisePill }), places.earth)
       .then((href) => {
         askingRef.current = undefined;
         if (!asked.signal.aborted) return navigate(href);

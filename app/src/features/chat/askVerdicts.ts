@@ -13,6 +13,7 @@ import {
   VERDICTS_ASKED,
 } from "@gnoworld/schemas";
 import type { Result } from "../../lib/api/http.ts";
+import type { Language } from "../../lib/language.ts";
 import { BUSY_REST_MS } from "../../lib/stream/verdicts.ts";
 import { own } from "../../store/record.ts";
 
@@ -30,8 +31,8 @@ export interface Asking {
   /** The verdicts the page holds of a room's lines. */
   held: (room: string) => Readonly<Record<string, unknown>> | undefined;
   /** Follows a room's stream (lib/stream/verdicts.ts), handing on its verdicts, its word of when it began following
-   * (in ms), and its end for good; stops when called. */
-  follow: (room: string, on: Told) => () => void;
+   * (in ms), and its end for good, the stored translations asked in a language when given; stops when called. */
+  follow: (room: string, on: Told, language: Language | undefined) => () => void;
   /** Whether a line's text holds a link a player or a card is shown for (linked.ts). */
   linked: (text: string) => boolean;
   /** A first signal the same stream gave (slice 9h): the page follows one stream, not one for each thing it hears. */
@@ -75,10 +76,16 @@ interface Told {
   dead: () => void;
 }
 
+/** Whose stream: a reader, an account's or a guest's (none), for the rooms the server lets it read; and the language its stream
+ * asks the stored translations in, none for no translation. */
+export interface Who {
+  reader?: string | undefined;
+  language?: Language | undefined;
+}
+
 interface Following {
   room: string;
-  /** Whose stream: an account's, or a guest's (none), for the rooms the server lets it read. */
-  reader: string | undefined;
+  who: Who;
   /** The room's lines last shown, none before they load. */
   lines: readonly Line[] | undefined;
   /** When its stream began following, by the stream's own word (F890); none before it; after its end, all time. */
@@ -182,8 +189,8 @@ export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked
     clearTimeout(following?.again);
     following = undefined;
   };
-  const start = (room: string, reader: string | undefined, lines?: readonly Line[]): void => {
-    const mine: Following = { room, reader, lines, since: undefined, stop: () => undefined, again: undefined };
+  const start = (room: string, who: Who, lines?: readonly Line[]): void => {
+    const mine: Following = { room, who, lines, since: undefined, stop: () => undefined, again: undefined };
     // The stream's word after its replay, on the server's clock, which Ergo's server-time shares (F890): never the
     // page's, which may run ahead or behind. A reconnection's later word moves it, the replay having given the rest;
     // after a gap, what was asked before is asked again, a line the server had no verdict of yet among it (F891).
@@ -202,22 +209,27 @@ export function verdictAsker({ verdicts, judged, judgedAll, held, follow, linked
       mine.again = setTimeout(() => {
         if (following !== mine) return;
         mine.stop();
-        start(room, reader, mine.lines);
+        start(room, who, mine.lines);
       }, BUSY_REST_MS);
     };
     // A new stream (a room, a reader, one followed again) asks of what it shows afresh (F891).
     server.forget(room);
     following = mine;
-    mine.stop = follow(room, { verdict: judged, signal, since, dead });
+    mine.stop = follow(room, { verdict: judged, signal, since, dead }, who.language);
   };
   return {
     /** Follows the room's stream for its reader, the stream before stopped; then asks of its lines in view, once
-     * loaded and once the stream has said when it began. A new reader (a login) follows again: the server lets each
-     * read its own rooms. */
-    show: (room: string | undefined, lines: readonly Line[] | undefined, reader?: string): void => {
-      if (following === undefined ? room !== undefined : following.room !== room || following.reader !== reader) {
+     * loaded and once the stream has said when it began. A new reader (a login) or language follows again: the server
+     * lets each read its own rooms. */
+    show: (room: string | undefined, lines: readonly Line[] | undefined, who: Who = {}): void => {
+      const { reader, language } = who;
+      if (
+        following === undefined
+          ? room !== undefined
+          : following.room !== room || following.who.reader !== reader || following.who.language !== language
+      ) {
         unfollow();
-        if (room !== undefined) start(room, reader);
+        if (room !== undefined) start(room, who);
       }
       if (following === undefined) return;
       following.lines = lines;

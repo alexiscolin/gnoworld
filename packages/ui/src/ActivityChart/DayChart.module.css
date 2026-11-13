@@ -62,31 +62,32 @@
     fill: var(--color-line-strong);
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .gl,
-    .tk {
-      /* raw: the proposal's score */
-      animation: appear 0.5s ease calc(var(--d, 0s) + 0.05s) backwards;
-      animation-play-state: var(--play, running);
-    }
+  /* The motion scale is 0 under reduced motion, the system's or the app's setting: the chart stands whole at once. */
+  .gl,
+  .tk {
+    /* raw: the proposal's score */
+    animation: appear calc(0.5s * var(--motion-scale)) ease calc((var(--d, 0s) + 0.05s) * var(--motion-scale)) backwards;
+    animation-play-state: var(--play, running);
+  }
 
-    .bar {
-      /* raw: the proposal's score */
-      animation: grow 0.6s var(--ease-out-3) calc(var(--d, 0s) + 0.13s + var(--j, 0) * 0.012s) backwards;
-      animation-play-state: var(--play, running);
-    }
+  .bar {
+    /* raw: the proposal's score */
+    animation: grow calc(0.6s * var(--motion-scale)) var(--ease-out-3)
+      calc((var(--d, 0s) + 0.13s + var(--j, 0) * 0.012s) * var(--motion-scale)) backwards;
+    animation-play-state: var(--play, running);
+  }
 
-    .zero {
-      /* raw: the proposal's score */
-      animation: appear 0.5s ease calc(var(--d, 0s) + 0.25s) backwards;
-      animation-play-state: var(--play, running);
-    }
+  .zero {
+    /* raw: the proposal's score */
+    animation: appear calc(0.5s * var(--motion-scale)) ease calc((var(--d, 0s) + 0.25s) * var(--motion-scale)) backwards;
+    animation-play-state: var(--play, running);
+  }
 
-    .peak {
-      /* raw: the proposal's score */
-      animation: appear 0.5s ease calc(var(--d, 0s) + var(--pk, 0.9s)) backwards;
-      animation-play-state: var(--play, running);
-    }
+  .peak {
+    /* raw: the proposal's score */
+    animation: appear calc(0.5s * var(--motion-scale)) ease calc((var(--d, 0s) + var(--pk, 0.9s)) * var(--motion-scale))
+      backwards;
+    animation-play-state: var(--play, running);
   }
 
   /* A fresh read that changes a bar moves it from where it stands (its geometry is the drawing's attributes, which the browser animates as CSS);

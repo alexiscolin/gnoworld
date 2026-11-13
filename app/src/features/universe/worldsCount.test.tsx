@@ -49,7 +49,7 @@ const readsAnswered = () =>
 async function visit() {
   vi.resetModules();
   const count = await import("./worldsCount.ts");
-  const { worldsFile } = await import("./worldsFile.ts");
+  const { worldsFile } = await import("../../worldsFile.ts");
   const seen: (number | null | undefined)[] = [];
   const drawn: (number | undefined)[] = [];
   function Home({ wanted }: { wanted: boolean }) {

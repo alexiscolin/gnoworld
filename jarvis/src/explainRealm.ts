@@ -102,11 +102,16 @@ async function label(parts: Parts, outline: string, signal: AbortSignal): Promis
   if (!called.ok) {
     trace.end(called.reason, 0);
     if (called.reason === "spent") return { kind: "spent" };
-    return called.reason === "gone" ? { kind: "gone" } : { kind: "failed", cost };
+    if (called.reason === "gone") return { kind: "gone" };
+    parts.log("jarvis_explain_failed", { reason: "model" });
+    return { kind: "failed", cost };
   }
   const answer = parsed(answerOf(called.answer));
   trace.end(answer === undefined ? "failed" : "explained", 1);
-  if (answer === undefined) return { kind: "failed", cost };
+  if (answer === undefined) {
+    parts.log("jarvis_explain_failed", { reason: "answer" });
+    return { kind: "failed", cost };
+  }
   const { sure } = answer;
   const [text, tags] = sure ? [answer.text, tagsOf(answer.tags)] : ["", []];
   return { kind: "explained", sure, text, tags, model: called.answer.model, cost };
@@ -115,11 +120,15 @@ async function label(parts: Parts, outline: string, signal: AbortSignal): Promis
 /** The explainer of realms, on jarvis's gnomcp and its fast model. */
 export function makeRealmExplainer(parts: Parts) {
   const explain = async (asked: JarvisExplainRequest, signal: AbortSignal): Promise<Explained> => {
+    const failed = (reason: "profile" | "read"): Explained => {
+      parts.log("jarvis_explain_failed", { reason });
+      return { kind: "failed", cost: 0 };
+    };
     const profile = parts.profileOf(asked.chain);
-    if (profile === undefined) return { kind: "failed", cost: 0 };
+    if (profile === undefined) return failed("profile");
     const ran = await parts.read(profile, asked.realm, signal);
     if (signal.aborted) return { kind: "gone" };
-    if (!ran.ok || ran.isError) return { kind: "failed", cost: 0 };
+    if (!ran.ok || ran.isError) return failed("read");
     const outline = trimOutline(ran.text);
     // No source to read: nothing to say, and nothing to pay for.
     if (outline === "") return { kind: "explained", sure: false, text: "", tags: [], model: parts.model, cost: 0 };

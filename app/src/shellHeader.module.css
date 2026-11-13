@@ -90,16 +90,15 @@
     display: grid;
     /* layout: the label in the middle of its link */
     place-items: center;
-    /* raw: a link is 34 px tall inside the 44 px pill */
-    block-size: 34px;
+    /* a link is 34 px tall inside the 44 px pill */
+    block-size: var(--round-h);
     border-radius: var(--radius-pill);
     color: var(--color-text-muted);
     /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
-    font: 500 11.5px/1 var(--family-sans);
+    font: 500 0.71875rem/1 var(--family-sans);
     /* raw: the prototype's and the frames' own value */
     letter-spacing: 0.1em;
     text-decoration: none;
-    text-transform: uppercase;
     /* a way to look is a button: none of a button's own edge (no-edge) or fill; its fill and ink ease as it is pointed at, or pressed
        in place (tint; the views' own fill slides apart, .fill) */
     background: transparent;
@@ -220,7 +219,7 @@
 
   /* A wide computer says each level's word: the mark, which stands for it on a phone, would say it twice; its column goes with it, so the
      words stand in the middle of their pill. */
-  @media (min-width: 1340px) {
+  @media (width >= 1340px) {
     .mark {
       display: none;
     }
@@ -266,13 +265,13 @@
      fill as from the next words. Between two fills it stands in the middle, as far from each. */
   .view:is([aria-current="page"], :hover, :focus-visible)
     + .chevron:not(:has(+ .view:is([aria-current="page"], :hover, :focus-visible))) {
-    translate: var(--_lean) 0;
+    translate: calc(var(--_lean) * var(--dir)) 0;
   }
 
   .chevron:has(+ .view:is([aria-current="page"], :hover, :focus-visible)):not(
       .view:is([aria-current="page"], :hover, :focus-visible) + .chevron
     ) {
-    translate: calc(-1 * var(--_lean)) 0;
+    translate: calc(-1 * var(--_lean) * var(--dir)) 0;
   }
 
   /* The chat's divider and its link are the pill's own items. */
@@ -324,9 +323,9 @@
     color: var(--color-text);
   }
 
-  /* Under the dock's width a page with a chat is its chat (ChatScreen.tsx's DOCKABLE): Chat would change nothing there, and the ways,
+  /* Under the dock's width a page with a chat is its chat (useMedia.ts's DOCKED): Chat would change nothing there, and the ways,
      away on a world's page, keep no room. */
-  @media (max-width: 1279px) {
+  @media (width < 1280px) {
     .ways[data-away],
     .chatWay[data-chat-page] {
       display: none;
@@ -344,8 +343,7 @@
     /* raw: the prototype's and the frames' own value */
     block-size: 16px;
     /* layout: the arrangement the prototype and the frames draw */
-    /* raw: the prototype's and the frames' own value */
-    margin-inline: 4px;
+    margin-inline: var(--space-3xs);
     background: var(--color-line-strong);
   }
 
@@ -362,13 +360,13 @@
     border-width: 5px;
   }
 
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .phoneSearch {
       display: none;
     }
   }
 
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .wideSearch {
       display: none;
     }
@@ -376,7 +374,7 @@
 
   /* Where the bar cannot hold every word beside the logo and the account (a phone's, and a computer's under 1340 px), each level is its mark and
      its name, the ways their icons. */
-  @media (max-width: 1339px) {
+  @media (width < 1340px) {
     .level,
     .word {
       display: none;
@@ -396,7 +394,7 @@
 
   /* The ways where the bar cannot hold them (F4691): a pill of their own at the scene's top right, under the header; a phone's bar at the
      foot keeps its one row, a computer's levels the room. */
-  @media (max-width: 1139px) {
+  @media (width < 1140px) {
     .ways {
       position: fixed;
       /* raw: under the header, 96 px high (a phone's: 16 px, a 40 px row, 4 px, a 20 px line, 16 px), a step below it */
@@ -405,7 +403,7 @@
     }
   }
 
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .chevron {
       /* raw: a phone's levels a step closer, so the lean is less */
       --_lean: 6px;
@@ -452,7 +450,7 @@
     padding-block-end: calc(var(--_bar) + 2 * var(--space-s));
   }
 
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .header {
       /* layout: logo, views, the end: the views in the exact middle while the end fits its half; past it, the end keeps its controls whole
          and the views give way to the left */
@@ -530,7 +528,7 @@
     /* layout: over the whole window */
     position: fixed;
     inset: 0;
-    /* raw: the full chat's own layer (ChatScreen.module.css), above the page's header */
+    /* raw: the full chat's own layer (ChatScreen.module.css): under the page's header from 900 px (4), over a phone's */
     z-index: 3;
     background: var(--color-surface);
     /* raw: the cover's last word, 4 s, past a chat's slowest first draw on a phone's network */

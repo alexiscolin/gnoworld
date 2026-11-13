@@ -16,6 +16,7 @@ import {
   NONCE_ACTION,
   NONCE_LINK,
   NONCE_HOST,
+  verifies,
   verifyProof,
   type Login,
   type Verify,
@@ -783,6 +784,18 @@ describe("verifyProof", () => {
     expect(await verifyProof(proof, { ...expected, signer: OTHER })).toBe(false);
     expect(await verifyProof(proof, { ...expected, chainId: "gnoland-1" })).toBe(false);
     expect(await verifyProof(proof, { ...expected, data: "a text " })).toBe(false);
+  });
+});
+
+describe("verifies", () => {
+  it("answers false, a boolean, when the verifier throws or rejects", async () => {
+    const me = wallet();
+    const expected = { signer: me.address, chainId: "onyx-1", data: "a text" };
+    const throws: Verify = () => {
+      throw new Error("verifier broke");
+    };
+    expect(await verifies(throws, me.sign("onyx-1", "a text"), expected)).toBe(false);
+    expect(await verifies(() => Promise.reject(new Error("down")), me.sign("onyx-1", "a text"), expected)).toBe(false);
   });
 });
 

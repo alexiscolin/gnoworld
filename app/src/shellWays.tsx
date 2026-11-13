@@ -1,6 +1,7 @@
 // The header's two pills (D424, D444): where one is, the three levels of space, System and World each named by the place it leads to (the
 // page's own, else the last this tab saw, the Earth's home the first time), and the chat full (?chat=full) of that world beside it; and
 // how one looks at it: space or the Map (space from above).
+import { realmName } from "@gnoworld/core";
 import { Icon, type IconName } from "@gnoworld/ui";
 import { useEffect, type MouseEvent, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
@@ -30,16 +31,6 @@ export interface Level {
 
 // What this tab saw last, written once a page shows; the server, which renders for every reader, keeps none.
 const seen: { system?: Spot; world?: Spot } = {};
-// A realm's version is no part of its name: gnoswap/access/v1 is "access".
-const VERSION = /^v\d+$/;
-
-// A realm's name: its last part, its version left out.
-function realmName(path: string): string {
-  const parts = (/\/r\/(.+)/.exec(path)?.[1] ?? "").split("/").filter((part) => !VERSION.test(part));
-  const last = parts.at(-1);
-  return last === undefined || last === "" ? path : last;
-}
-
 // The world the page at `pathname` is: the Earth, a hub's world by its name, a realm by its last part.
 function worldAt(universe: UniverseView, pathname: string): Spot | undefined {
   if (!holdsChat(pathname)) return undefined;
@@ -47,7 +38,8 @@ function worldAt(universe: UniverseView, pathname: string): Spot | undefined {
   if (path === universe.earth.path || path === universe.earth.canonical) return { path, name: "Earth" };
   const slug = /\/w\/([^/]+)/.exec(path)?.[1];
   if (slug !== undefined) return { path, name: placeOf(universe, slug)?.name ?? slug };
-  return { path, name: realmName(path) };
+  // A realm by core's name for it, its last part with its version left out (gnoswap/access/v1 is "access"); any other path by itself.
+  return { path, name: /\/r\/./.test(path) ? realmName(path).name : path };
 }
 
 // The system the page at `pathname` stands in, a system's or a world's; none far out.
@@ -105,7 +97,7 @@ function Way(props: {
   return to === undefined ? (
     <button
       type="button"
-      className={`no-edge tint ${String(styles["view"])}`}
+      className={`no-edge tint caps ${String(styles["view"])}`}
       aria-label={name}
       aria-pressed={on}
       disabled={off}
@@ -116,7 +108,7 @@ function Way(props: {
   ) : (
     <Link
       to={to}
-      className={`no-edge tint ${String(styles["view"])}`}
+      className={`no-edge tint caps ${String(styles["view"])}`}
       aria-current={on ? "page" : undefined}
       aria-label={name}
       onClick={pick}

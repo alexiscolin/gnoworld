@@ -1,4 +1,5 @@
 // What a person's card draws of the server's answer, as plain values.
+import { ADDRESS_BODY } from "@gnoworld/core";
 import { PERSON_CAPS, type PersonCardData } from "@gnoworld/schemas/indexer";
 import { shortAddress } from "@gnoworld/schemas";
 import { amountText } from "../../lib/chainText.ts";
@@ -15,7 +16,7 @@ export const wholeGnot = (ugnot: string): number => Number(BigInt(ugnot) / UGNOT
 export function realmIn(realm: string, address: string): string {
   const own = `gno.land/r/${address}/`;
   const path = realm.startsWith(own) ? realm.slice(own.length) : realm.replace(/^gno\.land\//, "");
-  return path.replace(/g1[a-z0-9]{38}/g, (found) => shortAddress(found));
+  return path.replace(new RegExp(ADDRESS_BODY, "g"), (found) => shortAddress(found));
 }
 
 /** A text of at most `max` characters, cut in its middle with an ellipsis: both ends of a path stay. */

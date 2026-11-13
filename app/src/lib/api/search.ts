@@ -32,17 +32,7 @@ export function searchApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
           typeof value === "string" ? [[key, value]] : [],
         ),
       );
-      const call = jsonCall(
-        (url, init) =>
-          fetcher(
-            url,
-            signal === undefined || init?.signal == null
-              ? init
-              : { ...init, signal: AbortSignal.any([init.signal, signal]) },
-          ),
-        timeoutMs,
-      );
-      return call({ path: `/api/search?${params.toString()}`, schema: Answer });
+      return jsonCall(fetcher, timeoutMs)({ path: `/api/search?${params.toString()}`, schema: Answer, signal });
     },
   };
 }

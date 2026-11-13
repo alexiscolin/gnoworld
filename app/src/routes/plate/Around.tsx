@@ -13,7 +13,7 @@ function Entry({ node, onOpen }: { node: AroundNode; onOpen: (node: AroundNode) 
       truncate
       lead={<Planet name={node.id} />}
       title={rowPath(node.detail ?? node.label)}
-      trail={<time className={styles["note"]}>{node.note}</time>}
+      trail={<time className={["data-text", styles["note"]].join(" ")}>{node.note}</time>}
       {...(node.path === undefined
         ? {}
         : {

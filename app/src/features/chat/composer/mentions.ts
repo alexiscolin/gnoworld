@@ -2,9 +2,10 @@
 // name, or the short address, and written back as the address. A chip is a text node of its own, whole (token mode), that carries
 // its address and draws with `data-mention`, the design system's look (base.css); the editor turns each address typed, pasted or read
 // from a draft into one.
+import { mentionSpans } from "@gnoworld/core";
 import type { TextMatchTransformer } from "@lexical/markdown";
 import { Address, shortAddress } from "@gnoworld/schemas";
-import { TextNode, type EditorConfig, type LexicalEditor, type LexicalNode } from "lexical";
+import { $isTextNode, TextNode, type EditorConfig, type LexicalEditor, type LexicalNode } from "lexical";
 
 /** A text node that is an account's mention: its words are the chip's label, its address what is sent. */
 export class MentionNode extends TextNode {
@@ -44,9 +45,6 @@ export class MentionNode extends TextNode {
 export const $isMentionNode = (node: LexicalNode | null | undefined): node is MentionNode =>
   node instanceof MentionNode;
 
-// `@` after what is no letter, digit or `_`, g1 and 38 of bech32's characters, a word whole (core's MENTION).
-const ADDRESS = /(?<![\p{L}\p{N}_])@(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})(?![\p{L}\p{N}_])/gu;
-
 // What each editor's chips say of its members: names by address.
 const named = new WeakMap<LexicalEditor, ReadonlyMap<string, string>>();
 
@@ -67,6 +65,14 @@ const labelOf = (account: string, editor: LexicalEditor): string =>
 const chip = (account: string, editor: LexicalEditor): MentionNode =>
   new MentionNode(labelOf(account, editor)).setAddress(account);
 
+// The end of what the room reads just before `node`, its last character whole: a chip's address, a plain text's own end; nothing at
+// the line's start or after a mark, whose closing sign is no letter.
+function priorOf(node: TextNode): string {
+  const prior = node.getPreviousSibling();
+  if ($isMentionNode(prior)) return addressOf(prior).slice(-2);
+  return $isTextNode(prior) && prior.getFormat() === 0 ? prior.getTextContent().slice(-2) : "";
+}
+
 /** The node transform: the plain text holding an address becomes text, a chip, text; a chip says its own address's member. */
 export function mentionize(editor: LexicalEditor) {
   return (node: TextNode): void => {
@@ -78,14 +84,17 @@ export function mentionize(editor: LexicalEditor) {
     }
     if ($isMentionNode(node) || node.hasFormat("code") || !node.isSimpleText()) return;
     const text = node.getTextContent();
-    const found = [...text.matchAll(ADDRESS)];
+    const prior = priorOf(node);
+    const found = mentionSpans(prior + text)
+      .map((span) => ({ ...span, at: span.at - prior.length, end: span.end - prior.length }))
+      .filter(({ at }) => at >= 0);
     if (found.length === 0) return;
-    const cuts = found
-      .flatMap((each) => [each.index, each.index + each[0].length])
-      .filter((at) => at > 0 && at < text.length);
-    const accounts = new Map(found.map((each) => [each[0], each[1] ?? ""]));
+    const cuts = found.flatMap(({ at, end }) => [at, end]).filter((at) => at > 0 && at < text.length);
+    const accounts = new Map(found.map(({ at, account }) => [at, account]));
+    let at = 0;
     for (const part of cuts.length === 0 ? [node] : node.splitText(...cuts)) {
-      const account = accounts.get(part.getTextContent());
+      const account = accounts.get(at);
+      at += part.getTextContentSize();
       if (account !== undefined) part.replace(chip(account, editor));
     }
   };

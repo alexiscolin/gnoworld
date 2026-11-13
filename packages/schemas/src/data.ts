@@ -2,6 +2,7 @@
 // malformed file stops the build. A list may be empty, but the universes'. Nothing here is trusted: a link is https and
 // no more, a name in a path is a slug, every string and every list has a cap (DATA_CAPS), a duplicate is refused.
 import { hasHidden } from "./hidden.ts";
+import { ChainId, RealmPath } from "./realmPath.ts";
 import { Key, SLUG_CAP } from "./slug.ts";
 import { z } from "./zod.ts";
 
@@ -72,23 +73,19 @@ const bySlug = <T extends z.ZodMiniType>(row: T) => unique(list(row), "slug", (r
 const inUniverse = <T extends z.ZodMiniType>(row: T) =>
   unique(list(row), "slug", (r: { slug: string; universe: string }) => `${r.universe}/${r.slug}`);
 
-/** A realm of a world, by its path on its universe's chain: the shape of gno's own (`gno.land/r/gov/dao`), at most 128 characters; the
- * cosmos's Plan links a world to its realm's view only by such a path (7v). */
-export const RealmPath = z
-  .string()
-  .check(z.maxLength(128), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
+export { RealmPath } from "./realmPath.ts";
 
 /** A realm's function by its name, as gno writes one: a letter or an underscore, then letters, digits and underscores, `max` at most;
  * never words (a chain event's, Jarvis's fixed ask about a function). */
 export const funcName = (max: number) => z.string().check(z.maxLength(max), z.regex(/^[A-Za-z_][A-Za-z0-9_]*$/));
 
 /** The most a call's arguments may hold, as a Jarvis proposal and a world's pinned action give them, in code points. */
-export const CALL_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
+export const PROPOSAL_ARGS_CAPS = { args: 16, name: 128, arg: 1000, label: 80 } as const;
 
 /** A call's arguments by the parameter's name, as text: what a call carries, and what a model is shown of them. */
 export const CallArgs = z
-  .record(text(CALL_CAPS.name), z.string().check(z.maxLength(CALL_CAPS.arg)))
-  .check(z.refine((args) => Object.keys(args).length <= CALL_CAPS.args, "too many arguments"));
+  .record(text(PROPOSAL_ARGS_CAPS.name), z.string().check(z.maxLength(PROPOSAL_ARGS_CAPS.arg)))
+  .check(z.refine((args) => Object.keys(args).length <= PROPOSAL_ARGS_CAPS.args, "too many arguments"));
 
 // A team's arguments from a data file: Zod drops a key `__proto__` (an own key from JSON.parse) without a word, so its argument
 // would vanish unseen; refused first. Not Jarvis's: a pipe shows a model no shape (jarvis/src/allowlist.ts's input schema).
@@ -120,7 +117,7 @@ export const holdsHidden = (label: string): boolean => hasHidden(label);
 
 // A label drawn on a button that leads to a signature: words a reader sees as they are (no control, format or separator character,
 // not blank), never read as the bar's own Who's here.
-const Label = text(CALL_CAPS.label).check(
+const Label = text(PROPOSAL_ARGS_CAPS.label).check(
   z.refine((label) => !holdsHidden(label), "a label holds no control or format character"),
   z.refine((label) => labelKey(label) !== "", "a label draws more than blank"),
   z.refine((label) => labelKey(label) !== "who's here", "a label is not the bar's Who's here"),
@@ -130,7 +127,7 @@ const Label = text(CALL_CAPS.label).check(
 const PinnedAction = z.strictObject({
   label: Label,
   realm: RealmPath,
-  function: text(CALL_CAPS.name),
+  function: text(PROPOSAL_ARGS_CAPS.name),
   args: DataArgs,
 });
 
@@ -235,7 +232,7 @@ export const News = byId(
 const Universe = z.strictObject({
   id: Key,
   name: text(DATA_CAPS.name),
-  chainId: text(DATA_CAPS.key),
+  chainId: ChainId.check(z.maxLength(DATA_CAPS.key)),
   rpc: Link,
   /** The chain's gnoweb, the source of truth a realm's card and view link to (ADR-0002 §4): its origin. */
   gnoweb: Origin,

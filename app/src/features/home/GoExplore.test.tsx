@@ -95,13 +95,16 @@ describe("Go explore's click", () => {
 
   // F4507: what goes wrong between the click and the answer.
   it("goes to the Earth its address names when the answer fails", async () => {
-    where.exploreTo.mockRejectedValue(new Error("the chunk did not come"));
+    const failure = new Error("the chunk did not come");
+    where.exploreTo.mockRejectedValue(failure);
     const { router, explore } = heroIn();
     await act(async () => {
       explore.click();
       await vi.dynamicImportSettled();
     });
     expect(router.state.location.pathname).toBe("/earth");
+    expect(reported).toHaveBeenCalledExactlyOnceWith(failure);
+    reported.mockClear();
   });
 
   it("asks once for a second click while the first one's answer comes", async () => {

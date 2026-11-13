@@ -1,7 +1,7 @@
 import { hubWorldOf } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
 import { mapNamesOf, worldOf } from "./space/planet/generated.ts";
-import { pagePreloads, preloadTags, withPreloads } from "./preloads.ts";
+import { documentPreloads, pagePreloads, preloadTags, withPreloads } from "./preloads.ts";
 
 const WORLDS =
   '<link rel="preload" href="/worlds.json" as="fetch" crossorigin="anonymous" media="not (max-width: 899px)"/>';
@@ -36,9 +36,24 @@ describe("the home's preloads", () => {
   });
 
   it("name the worlds file with the maps, on the home, a universe's, the cosmos and a system, and in the HTML alone: a route's links would ask again on a client navigation", async () => {
-    for (const id of ["routes/home", "universe", "cosmos-universe", "cosmos-system"])
+    for (const id of ["routes/home", "cosmos-universe", "cosmos-system"])
       expect(pagePreloads(id, {})).toBe(WORLDS + preloadTags());
+    expect(pagePreloads("universe", { isDefault: true })).toBe(WORLDS + preloadTags());
     expect(Reflect.has(await import("./routes/home.tsx"), "links")).toBe(false);
+  });
+
+  it("name nothing on another universe's home, which draws no space", () => {
+    expect(pagePreloads("universe", { isDefault: false })).toBe("");
+    expect(pagePreloads("universe", {})).toBe("");
+  });
+
+  it("name nothing in the fallback page the host serves every page not written ahead: it is built from the home's route", () => {
+    const page = (isSpaMode: boolean) => ({
+      isSpaMode,
+      staticHandlerContext: { matches: [{ route: { id: "root" } }, { route: { id: "routes/home" } }], loaderData: {} },
+    });
+    expect(documentPreloads(page(true))).toBe("");
+    expect(documentPreloads(page(false))).toBe(WORLDS + preloadTags());
   });
 });
 

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { describe, expect, it, vi } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
+import { Unread } from "../../lib/query/client.ts";
 import type { People } from "./Hero.tsx";
 import { usePeople } from "./peopleCount.ts";
 
@@ -28,7 +29,7 @@ describe("usePeople", () => {
   it("says none when the server did not say, and asks nothing when not wanted", async () => {
     seen.length = 0;
     read.mockReset();
-    read.mockResolvedValue(undefined);
+    read.mockRejectedValue(new Unread(undefined));
     mount(<Hero />);
     await settled(() => seen.at(-1) === undefined);
     read.mockClear();

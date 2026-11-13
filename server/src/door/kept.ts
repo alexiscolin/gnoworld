@@ -2,7 +2,7 @@
 // across rooms, keyed by chain, realm and function (it read the code alone: no room lines, no live tool); a room's "here" 1 hour,
 // its own, gone when a line of the room is taken. Only an `answered` is kept. A part of a key is validated before it exists.
 import type { DatabaseSync } from "node:sqlite";
-import { EXPLAIN_VERSION, JarvisAnswer, type JarvisQuestion } from "@gnoworld/schemas";
+import { ChainId, EXPLAIN_VERSION, JarvisAnswer, RealmPath, type JarvisQuestion } from "@gnoworld/schemas";
 import { remember } from "../remember.ts";
 import { servedKey } from "./served.ts";
 
@@ -34,8 +34,8 @@ export interface Kept {
 /** The key of an explanation: chain, realm path and function alone. None for a part that is no chain id, realm path or name. */
 export function explainKey(chain: string, realm: string, name: string): string | undefined {
   const good =
-    /^[a-z0-9][a-z0-9_-]{0,63}$/.test(chain) &&
-    /^gno\.land\/r\/[a-z0-9_\-/.]+$/.test(realm) &&
+    ChainId.safeParse(chain).success &&
+    RealmPath.safeParse(realm).success &&
     realm.length <= 128 &&
     /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(name);
   return good ? JSON.stringify(["explain", EXPLAIN_VERSION, chain, realm, name]) : undefined;

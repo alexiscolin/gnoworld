@@ -1,5 +1,5 @@
 // The home's first screen's aiming tag (D459, D540): a name pill of the world labels' family, a step larger, on a fine leader to a ring on the
-// Earth's lit limb: "Earth" and one live fact the hero already reads, left out while unknown. It links to the Earth.
+// Earth's lit limb: "Earth" and one live fact the hero already reads, left out while unknown. It links to the Earth, named by its words.
 import { Cluster, grouped, Icon } from "@gnoworld/ui";
 import { Link } from "react-router";
 import type { PresencePeople } from "@gnoworld/schemas/indexer";
@@ -13,13 +13,7 @@ export function AimTag({ to, people }: { to: string; people: PresencePeople | un
   };
   const here = people?.online;
   return (
-    <Link
-      ref={wait}
-      to={to}
-      className={`placed nowrap pill-ends no-underline hit ${String(place["tag"])}`}
-      data-tag=""
-      aria-label="Earth, open its page"
-    >
+    <Link ref={wait} to={to} className={`placed nowrap pill-ends no-underline hit ${String(place["tag"])}`} data-tag="">
       <Cluster space="xs">
         <b className={place["name"]}>Earth</b>
         {here === undefined || here === 0 ? null : (

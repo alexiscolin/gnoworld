@@ -8,7 +8,7 @@ import { keys } from "../../lib/query/keys.ts";
 export const personOptions = (address: string) =>
   queryOptions({
     queryKey: keys.person(address),
-    queryFn: () => readApi(() => pagePeopleApi().read(address)),
+    queryFn: ({ signal }) => readApi((s) => pagePeopleApi().read(address, s), signal),
     staleTime: 60_000,
     retry: false,
   });

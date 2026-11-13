@@ -34,6 +34,8 @@ export interface Deps {
   /** A name's addresses; undefined when the way out resolves (the reader has no DNS of its own behind its proxy). */
   lookup: ((host: string) => Promise<string[]>) | undefined;
   transport: Transport;
+  /** Ends a fetch early, as a timeout. */
+  signal?: AbortSignal | undefined;
 }
 
 export const LIMITS = {
@@ -138,19 +140,24 @@ async function run(raw: string, job: Job): Promise<Fetched> {
 
 /** The bytes of the page's head (to `</head>` or `<body`, at most the cap) or of the picture (refused past its cap). */
 export async function fetchLimited(raw: string, kind: Which, deps: Deps): Promise<Fetched> {
+  const stop = deps.signal;
   const controller = new AbortController();
-  const timer = setTimeout(() => {
+  const abort = () => {
     controller.abort();
-  }, LIMITS[kind].ms);
+  };
+  const timer = setTimeout(abort, LIMITS[kind].ms);
   const late = new Promise<never>((_resolve, reject) => {
     controller.signal.addEventListener("abort", () => {
       reject(new Refused("timeout"));
     });
   });
+  stop?.addEventListener("abort", abort);
+  if (stop?.aborted === true) abort();
   try {
     return await Promise.race([run(raw, { kind, deps, signal: controller.signal }), late]);
   } finally {
     clearTimeout(timer);
+    stop?.removeEventListener("abort", abort);
     controller.abort();
   }
 }

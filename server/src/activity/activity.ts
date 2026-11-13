@@ -1,13 +1,13 @@
 // How busy each room is (slice 3's plan, 3h): messages a minute over the last five minutes, counted in
 // memory, which calls no service (ADR-0002, the heat). An account counts 10 times a minute at most, so a
 // spammer fakes no storm; the rooms and accounts it holds are capped. A guest's relayed line (D430) is counted apart: the plate
-// shows it (D374), the trends and the history never do (D353).
+// shows it (D374), the history never does (D353).
 import { limiter } from "../limit.ts";
 
 export interface Activity {
   count: (room: string, account: string, now: number) => void;
   rates: (rooms: readonly string[], now: number) => Map<string, number>;
-  // A guest's relayed line: in `guestRates` alone, never in `rates`, which the trends and the history read.
+  // A guest's relayed line: in `guestRates` alone, never in `rates`, which the history reads.
   countGuest: (room: string, name: string, now: number) => void;
   guestRates: (rooms: readonly string[], now: number) => Map<string, number>;
   // What it holds: accounts, rooms, and the minutes counted across rooms; the guest names held.

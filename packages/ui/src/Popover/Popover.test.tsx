@@ -378,3 +378,13 @@ describe("Menu", () => {
     }
   });
 });
+
+// The composer's link tool: its trigger a tool of the format bar, as the bar's other tools.
+it("draws an icon trigger as a bar's tool when its icon says so", () => {
+  render(
+    <Popover trigger={null} label="Link" icon={{ name: "link", size: "xs", tool: true }}>
+      <p>Address</p>
+    </Popover>,
+  );
+  expect(screen.getByRole("button", { name: "Link" }).hasAttribute("data-tool")).toBe(true);
+});

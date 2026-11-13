@@ -31,6 +31,20 @@ describe("open", () => {
     expect(uniforms.uOpenAt.value).toBe(10);
   });
 
+  it("ends a fade under way at once when reduced motion stops the clock in it, never left at its share", () => {
+    const uniforms = openOf();
+    open(uniforms, 3, { seconds: 10, still: false });
+    open(uniforms, 3, { seconds: 10.1, still: true });
+    expect(uniforms.uOpenWas.value).toBe(-1);
+    expect(fading(uniforms, 10.1)).toBe(false);
+  });
+
+  it("tells whether it opened another system", () => {
+    const uniforms = openOf();
+    expect(open(uniforms, 3, { seconds: 10, still: false })).toBe(true);
+    expect(open(uniforms, 3, { seconds: 11, still: false })).toBe(false);
+  });
+
   it("changes at once under reduced motion", () => {
     const uniforms = openOf();
     open(uniforms, 3, { seconds: 10, still: true });

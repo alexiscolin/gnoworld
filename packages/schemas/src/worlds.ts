@@ -1,6 +1,7 @@
 // The file the server's worlds job writes and every client reads (slice 7, 7c): the chain's realms grouped into worlds, each realm
 // with what was read of its package and its history. All of it came from a chain or an indexer, so every text is capped and
 // checked, every count is a whole number, and a null is a fact not read, never a zero.
+import { isAddress } from "@gnoworld/core";
 import { ChainCount, RealmPath, WorldId } from "./realmPath.ts";
 import { Moment, Slug, WORLDS_CAPS } from "./worldsHead.ts";
 import { z } from "./zod.ts";
@@ -22,7 +23,7 @@ export const ImportPath = z.string().check(
 );
 
 /** A gno address as the chain writes it: `g1` and 38 characters of bech32's alphabet, the checksum not checked. */
-export const DeployerAddress = z.string().check(z.regex(/^g1[023456789acdefghjklmnpqrstuvwxyz]{38}$/));
+export const DeployerAddress = z.string().check(z.refine(isAddress, { message: "an address" }));
 
 /** The name registered for an address: letters, digits, `_`, `.` and `-`, 1 to 128 characters. */
 export const DeployerName = z

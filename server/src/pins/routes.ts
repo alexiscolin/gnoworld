@@ -7,16 +7,13 @@ import { type Context, Hono } from "hono";
 import { baseRefusals, guard, json, refuserOf, sessionOf, type Refusals, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
-import { asOf, type Right } from "../roles/mayModerate.ts";
+import { asOf, mayWithin, type Right } from "../roles/mayModerate.ts";
 import { once } from "../stream/stream.ts";
 import { visitorOf } from "../visitor.ts";
 import type { Pins } from "./pins.ts";
 
 // An account's pin and unpin requests a minute (docs/decisions.md, 2026-10-27).
 const PINS_PER_MINUTE = 30;
-// How long a list waits for the right (an owner's is a chain read) before it says the reader may not pin.
-const READ_MS = 5_000;
-
 interface Options {
   pins: Pins;
   // What lets an account pin and unpin in a room, if anything: its world's moderators and the team, or its realm's owner (mayModerate). The
@@ -44,26 +41,6 @@ const refusals = {
   not_found: ["not_found", 404],
   unavailable: ["not_ready", 503],
 } as const satisfies Refusals;
-
-// A read that cannot tell the right, or does not within 5 s, says no: the list still shows.
-export const mayWithin = (read: Promise<Right | false>): Promise<boolean> =>
-  new Promise((resolve) => {
-    const timer = setTimeout(() => {
-      resolve(false);
-    }, READ_MS);
-    read
-      .then(
-        (right) => {
-          resolve(right !== false);
-        },
-        () => {
-          resolve(false);
-        },
-      )
-      .finally(() => {
-        clearTimeout(timer);
-      });
-  });
 
 export function pinsRoutes({
   pins,

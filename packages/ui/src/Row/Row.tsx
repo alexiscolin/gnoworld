@@ -43,8 +43,8 @@ function Words({
   return (
     <Stack space="3xs">
       <span className={[styles["title"], truncate === true ? "truncate" : ""].join(" ")}>{title}</span>
-      {subtitle === undefined ? null : <span className={label ? "label" : styles["subtitle"]}>{subtitle}</span>}
-      {activity === undefined ? null : <span className={styles["activity"]}>{activity}</span>}
+      {subtitle === undefined ? null : <span className={label ? "label" : "meta"}>{subtitle}</span>}
+      {activity === undefined ? null : <span className="data-text">{activity}</span>}
     </Stack>
   );
 }

@@ -97,7 +97,7 @@ describe("loadJarvisConfig", () => {
       JARVIS_QUESTION_CHARS: "8000",
       JARVIS_TURNS: "4",
       JARVIS_OUTPUT_TOKENS: "1000",
-      JARVIS_CALL_TIMEOUT_S: "600",
+      JARVIS_CALL_TIMEOUT_S: "61",
       JARVIS_RETRIES: "2",
       JARVIS_TOOL_RESULT_KIB: "64",
     };
@@ -105,11 +105,36 @@ describe("loadJarvisConfig", () => {
       questionChars: 8_000,
       turns: 4,
       outputTokens: 1_000,
-      callTimeoutMs: 600_000,
+      callTimeoutMs: 61_000,
       retries: 2,
       toolResultBytes: 64 * 1024,
     });
     expect(loadJarvisConfig({ ...ENV, JARVIS_RETRIES: "1" }).caps.retries).toBe(1);
+    const longestCall = { ...ENV, JARVIS_CALL_TIMEOUT_S: "600", JARVIS_TURNS: "1", JARVIS_RETRIES: "0" };
+    expect(loadJarvisConfig(longestCall).caps.callTimeoutMs).toBe(600_000);
+  });
+
+  it("refuses caps whose longest question passes the request's deadline, the door's wait less 10 s", () => {
+    // 4 turns × (3 attempts × 61 s + 2 waits × 8 s) + 3 × 30 s of tools = 886 s, within 890; at 62 s, 898.
+    expect(loadJarvisConfig({ ...ENV, JARVIS_CALL_TIMEOUT_S: "61" }).caps.callTimeoutMs).toBe(61_000);
+    expect(() => loadJarvisConfig({ ...ENV, JARVIS_CALL_TIMEOUT_S: "62" })).toThrow(
+      /^setting JARVIS_CALL_TIMEOUT_S: custom$/,
+    );
+    expect(() => loadJarvisConfig({ ...ENV, JARVIS_CALL_TIMEOUT_S: "600" })).toThrow(
+      /^setting JARVIS_CALL_TIMEOUT_S: custom$/,
+    );
+    expect(() =>
+      loadJarvisConfig({ ...ENV, JARVIS_CALL_TIMEOUT_S: "600", JARVIS_TURNS: "2", JARVIS_RETRIES: "0" }),
+    ).toThrow(/^setting JARVIS_CALL_TIMEOUT_S: custom$/);
+  });
+
+  it("takes caps whose longest question ends at the deadline itself", () => {
+    // 2 turns × 430 s + 1 × 30 s of tools = 890 s, the deadline; at 431 s, 892.
+    const edge = { ...ENV, JARVIS_TURNS: "2", JARVIS_RETRIES: "0" };
+    expect(loadJarvisConfig({ ...edge, JARVIS_CALL_TIMEOUT_S: "430" }).caps.callTimeoutMs).toBe(430_000);
+    expect(() => loadJarvisConfig({ ...edge, JARVIS_CALL_TIMEOUT_S: "431" })).toThrow(
+      /^setting JARVIS_CALL_TIMEOUT_S: custom$/,
+    );
   });
 
   it("reads the models by task, any of the three priced", () => {

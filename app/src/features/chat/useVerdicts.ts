@@ -2,13 +2,13 @@
 // asker (askVerdicts.ts) follows and asks. A reader who saves data is shown no player, so follows and asks nothing
 // (F879).
 import type { Line } from "@gnoworld/core";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { pageVerdictsApi } from "../../lib/api/verdicts.ts";
 import { lazyCards } from "../../lib/stream/lazyCards.ts";
 import { lazyChain } from "../../lib/stream/lazyChain.ts";
 import { translationFeed } from "../../lib/stream/translationFeed.ts";
-import { translationLanguage } from "../../jarvisHere.ts";
-import { translationsTold } from "../../translating.ts";
+import type { Language } from "../../lib/language.ts";
+import { translationLines, translationsTold } from "../../translating.ts";
 import { pageVerdicts } from "../../lib/stream/verdicts.ts";
 import type { createAppStore } from "../../store/index.ts";
 import { verdictAsker } from "./askVerdicts.ts";
@@ -21,6 +21,14 @@ const loadCardFeed = () => import("../../lib/stream/cardFeed.ts");
 const loadCardsSlice = () => import("./cardsSlice.ts");
 const loadCardsApi = () => import("../../lib/api/cards.ts");
 type Store = ReturnType<typeof createAppStore>;
+
+// The language a signed-in reader's stream asks the stored translations in, from the device's settings: none for a guest or with the
+// switch off. Known at the first render, so a room's stream opens once.
+const languageOf = (store: Store, reader: string | undefined): Language | undefined => {
+  const { language, autoTranslate } = store.getState().device.settings;
+  return reader !== undefined && autoTranslate ? language : undefined;
+};
+const noLanguage = () => undefined;
 
 /** The room shown, its lines once loaded, and who reads it: an account's address, or none for a guest. */
 export interface Shown {
@@ -37,8 +45,10 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
   const askerRef = useRef<ReturnType<typeof verdictAsker>>(undefined);
   // What finds a player's link in a line, asked with the room's first lines: the first screen holds no Markdown's code.
   const linkedRef = useRef<Linked>(undefined);
+  const language = useSyncExternalStore(store.subscribe, () => languageOf(store, reader), noLanguage);
   useEffect(() => {
     if (saving) return;
+    const forget = translationLines((room) => store.getState().chat.rooms[room]?.lines);
     const api = pageVerdictsApi();
     // The world's calls on chain and the Earth's count come on the same stream, into the store in batches (9g).
     const feed = lazyChain(async () => (await loadFeed()).chainFeed(store.getState().chainActions));
@@ -65,19 +75,19 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
       ...store.getState().verdictActions,
       signal: store.getState().signalActions.signaled,
       held: (room) => store.getState().verdicts[room],
-      follow: (room, on) =>
+      follow: (room, on, language) =>
         pageVerdicts([room], {
           ...on,
           chain: feed.chain,
-          realms: feed.realms,
           card,
           translation,
-          language: translationLanguage(),
+          language,
         }),
       linked: (text) => linkedRef.current?.(text) ?? false,
     });
     askerRef.current = asker;
     return () => {
+      forget();
       card.stop();
       asker.stop();
       feed.stop();
@@ -88,19 +98,19 @@ export function useVerdicts(store: Store, { room, lines, reader, saving }: Shown
   useEffect(() => {
     // Lines given the asker before it can read them would be counted looked at and never asked of: it follows the room alone.
     const ready = linkedRef.current !== undefined || lines === undefined || lines.length === 0;
-    askerRef.current?.show(room, ready ? lines : undefined, reader);
+    askerRef.current?.show(room, ready ? lines : undefined, { reader, language });
     if (ready) return;
     let live = true;
     // A chunk that could not be fetched is asked for again as the lines change.
     void loadLinked().then(
       ({ linked }) => {
         linkedRef.current = linked;
-        if (live) askerRef.current?.show(room, lines, reader);
+        if (live) askerRef.current?.show(room, lines, { reader, language });
       },
       () => undefined,
     );
     return () => {
       live = false;
     };
-  }, [room, lines, reader]);
+  }, [room, lines, reader, language]);
 }

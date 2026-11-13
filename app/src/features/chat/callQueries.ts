@@ -11,7 +11,7 @@ export const TIMELESS_MS = 5_000;
 export const callOptions = (hash: string, index: number) =>
   queryOptions({
     queryKey: keys.call(hash, index),
-    queryFn: () => readApi(() => pageCallsApi().read(hash, index)),
+    queryFn: ({ signal }) => readApi((s) => pageCallsApi().read(hash, index, s), signal),
     staleTime: ({ state }) => (state.data?.time === null ? TIMELESS_MS : Number.POSITIVE_INFINITY),
     retry: false,
   });

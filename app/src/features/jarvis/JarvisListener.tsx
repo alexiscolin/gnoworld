@@ -3,10 +3,9 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 import { useJarvisHere } from "../../jarvisHere.ts";
 import { onAsked } from "../../pageAsks.ts";
+import { JARVIS_ASKS, type FirstAsk } from "./asks.ts";
 
 const JarvisHost = lazy(async () => ({ default: (await import("./JarvisHost.tsx")).JarvisHost }));
-
-export type FirstAsk = "jarvis" | "jarvis-catch-up" | "jarvis-ask" | "jarvis-said";
 
 /** `early`: the ask the page made before this code came, which it takes as its first. */
 export function JarvisListener({ early }: { early?: FirstAsk | undefined }) {
@@ -16,34 +15,14 @@ export function JarvisListener({ early }: { early?: FirstAsk | undefined }) {
   useEffect(() => {
     if (!listening) return undefined;
     const stop = new AbortController();
-    onAsked(
-      "jarvis",
-      () => {
-        setFirst("jarvis");
-      },
-      stop.signal,
-    );
-    onAsked(
-      "jarvis-catch-up",
-      () => {
-        setFirst("jarvis-catch-up");
-      },
-      stop.signal,
-    );
-    onAsked(
-      "jarvis-ask",
-      () => {
-        setFirst("jarvis-ask");
-      },
-      stop.signal,
-    );
-    onAsked(
-      "jarvis-said",
-      () => {
-        setFirst("jarvis-said");
-      },
-      stop.signal,
-    );
+    for (const ask of JARVIS_ASKS)
+      onAsked(
+        ask,
+        () => {
+          setFirst(ask);
+        },
+        stop.signal,
+      );
     return () => {
       stop.abort();
     };

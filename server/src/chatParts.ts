@@ -38,8 +38,8 @@ const unknownChannels =
 // Whom a room is listed to: an archived room is a hidden one.
 export const listedTo =
   (settings: Settings, keeper: Rooms) =>
-  (room: string, who: string | undefined): boolean =>
-    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
+  (room: string, who: string | undefined, archived: boolean = keeper.archived(room)): boolean =>
+    archived ? staffOf(settings, room, who) : listed(settings, room, who);
 
 // The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
 export function verdictsFor(

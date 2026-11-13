@@ -26,6 +26,7 @@ import { capabilitiesOf } from "./capabilities.ts";
 import { calmOf, statusOf } from "./figures.ts";
 import type { PlateModel, Widget } from "./model.ts";
 import { ledeSentence, useSentenceBound } from "./sentenceBound.ts";
+import { deployerLabel, heldOf, importersOf, realmsOf } from "../../features/realms/worldsIndex.ts";
 import { Plate } from "./Plate.tsx";
 
 type Held = Worlds["worlds"][number]["realms"][number];
@@ -36,7 +37,7 @@ const LISTED = 100;
 // The rank in the worlds' file by calls, for a realm in its first ten that has been called: the file's own order, no source of its own.
 const RANKED = 10;
 function rankOf(realm: string, worlds: Worlds["worlds"] | undefined, chain: string): PlateModel["lede"]["rank"] {
-  const calls = worlds?.flatMap((world) => world.realms).filter((each) => (each.calls ?? 0) > 0);
+  const calls = worlds && realmsOf(worlds).filter((each) => (each.calls ?? 0) > 0);
   if (calls === undefined) return undefined;
   const at = calls.sort((a, b) => (b.calls ?? 0) - (a.calls ?? 0)).findIndex((each) => each.path === realm);
   const on = chain.toLowerCase();
@@ -47,10 +48,6 @@ function rankOf(realm: string, worlds: Worlds["worlds"] | undefined, chain: stri
       }
     : undefined;
 }
-
-// The realms of the file that import this one: a fact of the file, counted once a view.
-const importersOf = (realm: string, worlds: Worlds["worlds"]): number =>
-  worlds.flatMap((world) => world.realms).filter((each) => each.imports.includes(realm)).length;
 
 // The indexer holds no time for a block (F2950): a deploy is its block, and how many blocks ago when the tip is known.
 function deployedWidget(first: number | undefined, tip: number | undefined): Widget | undefined {
@@ -63,12 +60,11 @@ function deployedWidget(first: number | undefined, tip: number | undefined): Wid
 
 function authorWidget(held: Held | undefined): Widget | undefined {
   if (held?.deployer == null) return undefined;
-  const short = shortAddress(held.deployer);
   return {
     label: "Author",
-    value: held.deployerName ?? short,
+    value: deployerLabel(held.deployerName, held.deployer),
     face: held.deployer,
-    detail: held.deployerName === null ? "who deployed it" : short,
+    detail: held.deployerName === null ? "who deployed it" : shortAddress(held.deployer),
   };
 }
 
@@ -159,7 +155,7 @@ function useRealmReads({ realm, chain }: RealmAt, talk: string) {
   const facts = useRealmFacts(chain.indexer, realm);
   return {
     worlds,
-    held: worlds?.flatMap((world) => world.realms).find((each) => each.path === realm),
+    held: worlds && heldOf(worlds, realm),
     here: useHere(true).get(talk) ?? 0,
     first: facts?.ok === true ? facts.value.firstBlock : undefined,
     state: useRealm({ rpc: chain.rpc, realm, origin: chain.gnoweb }),
@@ -204,7 +200,7 @@ export default function RealmPlate({
       ...leadOf(held),
     },
     talk: { name, room },
-    figures: { figures: realmFigures({ held, rollup, importers: worlds && importersOf(realm, worlds), now }) },
+    figures: { figures: realmFigures({ held, rollup, importers: worlds && importersOf(worlds, realm), now }) },
     extras: <Voted path={pathname} functions={held?.functions ?? []} onRing={onRing} />,
     realm: { realm, chain, state, worlds, rollup },
     can: held === undefined ? undefined : capabilitiesOf(held.imports),
@@ -216,7 +212,7 @@ export default function RealmPlate({
       realm,
       importers: rollup?.importers,
     }),
-    widgets: widgetsOf({ held, first, importers: worlds && importersOf(realm, worlds), rollup, now }),
+    widgets: widgetsOf({ held, first, importers: worlds && importersOf(worlds, realm), rollup, now }),
     links: [
       { label: "Explorer", href: explorerLink(chain.chainId, realm) },
       { label: "Docs", href: DOCS },

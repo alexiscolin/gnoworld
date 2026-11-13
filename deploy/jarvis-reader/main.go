@@ -26,6 +26,7 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
@@ -136,10 +137,10 @@ func bridge(conn net.Conn, cfg config) {
 	_ = cmd.Wait()
 }
 
-// filterAudit copies gnomcp's audit to w as jarvis's own does (jarvis/src/gnomcpLog.ts): a JSON line keeps its tool, its
-// result and its duration alone, never its arguments or an error's words; any other line is cut to 512 bytes, its hidden
-// characters shown as [U+XXXX]. A line past 64 KiB is logged as its first 512 bytes, shown and never parsed as JSON; the
-// rest of it is read and dropped, so it holds nothing back and none of it, nor a later line, is taken for it.
+// filterAudit copies gnomcp's audit to w as jarvis's own does (jarvis/src/gnomcpLog.ts, logLine): a line that opens
+// with { or [ logs its tool, its result and its duration alone when it is an audit row, else a fixed marker; any other
+// line is cut at its first {, then to 512 bytes, its hidden characters shown as [U+XXXX]. A line past 64 KiB is never
+// parsed: a fixed marker if it opens like a row, else its head cut the same way; the rest of it is read and dropped.
 func filterAudit(r io.Reader, w io.Writer) {
 	reader := bufio.NewReaderSize(r, 64*1024)
 	for {
@@ -150,13 +151,12 @@ func filterAudit(r io.Reader, w io.Writer) {
 			for errors.Is(err, bufio.ErrBufferFull) {
 				_, err = reader.ReadSlice('\n')
 			}
-			// A head that opens like an audit row holds the person's words: a fixed marker stands for it, never a part of it.
-			if strings.HasPrefix(strings.TrimLeft(head, " \t"), "{") {
+			if opensRow(head) {
 				fmt.Fprintln(w, `{"audit":"over-long line dropped"}`)
 			} else {
-				fmt.Fprintln(w, shown(head, 512))
+				fmt.Fprintln(w, otherLine(head))
 			}
-		} else if text := strings.TrimRight(string(line), "\r\n"); text != "" {
+		} else if text := strings.TrimRight(string(line), "\r\n"); strings.TrimFunc(text, jsSpace) != "" {
 			fmt.Fprintln(w, auditLine(text))
 		}
 		if err != nil {
@@ -165,22 +165,58 @@ func filterAudit(r io.Reader, w io.Writer) {
 	}
 }
 
-func auditLine(text string) string {
-	var row struct {
-		Tool     string  `json:"tool"`
-		Result   string  `json:"result"`
-		Duration float64 `json:"duration_ms"`
+// jsSpace is JavaScript's \s, which jarvis's filter reads a line's opening and a blank line by.
+func jsSpace(r rune) bool {
+	switch r {
+	case '\t', '\n', '\v', '\f', '\r', ' ', 0xa0, 0x1680, 0x2028, 0x2029, 0x202f, 0x205f, 0x3000, 0xfeff:
+		return true
 	}
-	var raw map[string]json.RawMessage
-	if json.Unmarshal([]byte(text), &raw) == nil && raw != nil {
-		_ = json.Unmarshal(raw["tool"], &row.Tool)
-		_ = json.Unmarshal(raw["result"], &row.Result)
-		_ = json.Unmarshal(raw["duration_ms"], &row.Duration)
-		out, _ := json.Marshal(map[string]any{"tool": shown(row.Tool, 64), "result": shown(row.Result, 64), "duration_ms": row.Duration})
-		return string(out)
+	return r >= 0x2000 && r <= 0x200a
+}
+
+func opensRow(text string) bool {
+	opened := strings.TrimLeftFunc(text, jsSpace)
+	return strings.HasPrefix(opened, "{") || strings.HasPrefix(opened, "[")
+}
+
+// otherLine is a line of gnomcp's own words up to its first {: an audit row written into an unended line is no word of gnomcp's.
+func otherLine(text string) string {
+	if end := strings.IndexByte(text, '{'); end >= 0 {
+		text = text[:end]
 	}
 	return shown(text, 512)
 }
+
+func auditLine(text string) string {
+	if !opensRow(text) {
+		return otherLine(text)
+	}
+	var tool, result string
+	var duration float64
+	var raw map[string]json.RawMessage
+	if json.Unmarshal([]byte(text), &raw) != nil || raw == nil ||
+		!field(raw, "tool", &tool) || !field(raw, "result", &result) || !field(raw, "duration_ms", &duration) {
+		return `{"audit":"malformed"}`
+	}
+	out, _ := json.Marshal(map[string]any{"tool": name(tool), "result": name(result), "duration_ms": duration})
+	return string(out)
+}
+
+// field reads a row's key, written exactly so, present, not null and of its type, as jarvis's schema does.
+func field(raw map[string]json.RawMessage, key string, to any) bool {
+	value, found := raw[key]
+	return found && string(value) != "null" && json.Unmarshal(value, to) == nil
+}
+
+// name is a tool's or a result's word as jarvis shows it (tracing.ts, shown): itself when it is a name, else a fixed word.
+func name(text string) string {
+	if namePattern.MatchString(text) {
+		return text
+	}
+	return "<malformed>"
+}
+
+var namePattern = regexp.MustCompile(`^[a-z][a-z0-9_]{0,63}$`)
 
 // shown cuts text to max bytes and writes each hidden or non-printing character as [U+XXXX].
 func shown(text string, max int) string {

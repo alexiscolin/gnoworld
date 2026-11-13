@@ -4,6 +4,7 @@
 import { REALM_EXPLAIN_VERSION, tagsOf, type Explanation, type RealmTag } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import type { Jarvis } from "../door/jarvis.ts";
+import { limiter } from "../limit.ts";
 import { checkLine } from "./check.ts";
 import type { Explanations, Key, Row } from "./store.ts";
 
@@ -15,6 +16,8 @@ const RETRY_FIRST_MS = 10 * 60_000;
 const RETRY_LAST_MS = 6 * HOUR;
 // A subject whose making failed this many times is refused for this prompt version: a realm that always fails never spends the cap again.
 const TRIES = 3;
+/** The new makings one visitor starts a day, so one cannot spend the day's cap for every other. */
+const VISITOR_DAY = 5;
 
 interface Parts {
   store: Explanations;
@@ -57,6 +60,7 @@ function heldOf(row: Row | undefined, at: number): Explanation | undefined {
 
 export function makeExplainer({ store, jarvis, known, now, log, perDay, gapMs }: Parts) {
   const running = new Set<Promise<void>>();
+  const visitors = limiter({ max: VISITOR_DAY, windowMs: DAY, keys: 100_000 });
   const state = { last: -Infinity };
   const retryAfter = (tries: number): number => Math.min(RETRY_LAST_MS, RETRY_FIRST_MS * 2 ** Math.max(0, tries - 1));
   const settle = (key: Key, end: Ended): void => {
@@ -78,13 +82,20 @@ export function makeExplainer({ store, jarvis, known, now, log, perDay, gapMs }:
       const called = await call.explain({ chain: key.chain, realm: key.subject }, AbortSignal.timeout(CALL_MS));
       settle(key, endOf(called));
     } catch {
-      settle(key, { kind: "failed", reason: "threw" });
+      // A making is never awaited by a request: a rejection here would be unhandled and stop the server.
+      try {
+        settle(key, { kind: "failed", reason: "threw" });
+      } catch {
+        log("explain_failed", { reason: "store" });
+      }
     }
   };
-  const start = (key: Key, call: Pick<Jarvis, "explain">): boolean => {
+  const start = (key: Key, call: Pick<Jarvis, "explain">, visitor: string): boolean => {
     const at = now();
-    if (at - state.last < gapMs || store.startedSince(at - DAY + 1) >= perDay) return false;
+    if (at - state.last < gapMs || store.startedSince(at - DAY + 1) >= perDay || visitors.full(visitor, at))
+      return false;
     if (!store.claim(key, { now: at, until: at + CALL_MS + 60_000 })) return false;
+    visitors.take(visitor, at);
     state.last = at;
     const making = run(key, call).finally(() => running.delete(making));
     running.add(making);
@@ -93,13 +104,18 @@ export function makeExplainer({ store, jarvis, known, now, log, perDay, gapMs }:
   };
   return {
     /** What a page reads for a subject: its line, a making that is under way, or none. Starts a making on a miss when it may. */
-    answer(asked: Key): Explanation {
+    answer(asked: Key, visitor = ""): Explanation {
       // A world's line is its main realm's, so it is the realm's row: one making for both.
       const key: Key = { ...asked, kind: "realm" };
       const held = heldOf(store.get(key), now());
       if (held !== undefined) return held;
-      if (jarvis === undefined || !known(key) || !start(key, jarvis)) return { status: "none" };
+      if (jarvis === undefined || !known(key) || !start(key, jarvis, visitor)) return { status: "none" };
       return { status: "making" };
+    },
+    /** The subject's line when it is made, else none; never starts anything. */
+    ready(asked: Key): Explanation | undefined {
+      const held = heldOf(store.get({ ...asked, kind: "realm" }), now());
+      return held?.status === "ready" ? held : undefined;
     },
     /** Every making started has ended. */
     idle: async (): Promise<void> => {

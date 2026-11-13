@@ -225,6 +225,20 @@ describe("a realm's digest, read on its universe's node", () => {
     expect(model.requests).toHaveLength(0);
   });
 
+  it("logs a read that failed by its step and its kind, never the realm: a node of another chain, a realm it does not hold", async () => {
+    const unread = (events: () => Record<string, unknown>[]) =>
+      events().filter((event) => event["event"] === "jarvis_digest_unread");
+    const other = setup({ chain: { network: "gnoland-1" } });
+    await other.ask();
+    expect(unread(other.events)).toEqual([{ event: "jarvis_digest_unread", reason: "height:other-chain" }]);
+    const missing = setup();
+    await missing.ask("gno.land/r/demo/none");
+    expect(unread(missing.events)).toEqual([{ event: "jarvis_digest_unread", reason: "page:no-realm" }]);
+    const read = setup({ steps: [give(digest()), done()] });
+    await read.ask();
+    expect(unread(read.events)).toEqual([]);
+  });
+
   it("answers invalid for a universe none of jarvis's chains names, reading nothing", async () => {
     const { ask, node } = setup();
     expect(await ask(REALM, "mars")).toEqual({ kind: "invalid" });

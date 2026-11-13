@@ -4,8 +4,6 @@
     padding: var(--space-xs) var(--chat-panel-inset);
     border-block-end: var(--line-width) solid var(--color-line);
     background: var(--color-card);
-    font: var(--font-meta);
-    color: var(--color-text-muted);
   }
 
   .banner a,

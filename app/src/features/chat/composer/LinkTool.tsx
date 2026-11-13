@@ -24,7 +24,7 @@ export function LinkTool({
     from.closest<HTMLElement>("[popover]")?.hidePopover();
   };
   return (
-    <Popover lazy trigger={null} label="Link" icon={{ name: "link", size }}>
+    <Popover lazy trigger={null} label="Link" icon={{ name: "link", size, tool: true }}>
       {/* Enter here is the address's, never the message's: the popover sits in the composer's form. */}
       <div
         onKeyDown={(event) => {
@@ -43,8 +43,10 @@ export function LinkTool({
             }}
             {...(wrong ? { error: "An address that starts with https://" } : {})}
           />
+          {/* Inside the format bar, a tool of it as the bar's own. */}
           <Button
             size="s"
+            tool
             onClick={(event) => {
               apply(event.currentTarget);
             }}

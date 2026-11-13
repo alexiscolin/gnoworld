@@ -1,6 +1,6 @@
 // The items the palette searches: the places of the site, then the systems and realms the worlds' file adds.
 import type { siteOf } from "../../places.ts";
-import { realmPage } from "../../lib/realmPage.ts";
+import { realmPageHref } from "../../lib/realmPage.ts";
 import type { SearchItem } from "./types.ts";
 
 // A world's kind as its tag says it; a hub is the plain kind and says none, a station has its own group.
@@ -123,7 +123,7 @@ function systemOf(before: SearchItem | undefined, world: FileWorld, ground: Grou
 function realmsOf(world: FileWorld, ground: Ground): [string, SearchItem][] {
   const own = activityOf(world, ground.now);
   return world.realms.flatMap(({ path, calls, functions }) => {
-    const page = realmPage(path ?? undefined);
+    const page = realmPageHref(path ?? undefined);
     if (page === undefined || path === undefined || path === null) return [];
     const item: SearchItem = {
       name: path.replace(/^gno\.land\/r\//, ""),

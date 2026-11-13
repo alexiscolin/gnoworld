@@ -22,10 +22,12 @@ export {
 export { Expedition, Quests } from "./discovery.ts";
 export { BlogPost, OnAir } from "./feeds.ts";
 export { CallRequest } from "./call.ts";
-export { CALL_CAPS, CallDetail, CallHash, CallIndex, callAddress, indexerHash } from "./callDetail.ts";
+export { AnyChainId, ChainId, isRealmPath } from "./realmPath.ts";
+export { jsonOfBytes, strictUtf8 } from "./utf8.ts";
+export { CALL_DETAIL_CAPS, CallDetail, CallHash, CallIndex, callAddress, indexerHash } from "./callDetail.ts";
 export { CARD_CAPS, CardEvent, CardRemove, LineCards, LinkCard, ReaderCard } from "./cards.ts";
 // The one rule for hidden (Cc, Cf) characters, which the link reader applies to a page's text.
-export { hasHidden, stripHidden } from "./hidden.ts";
+export { stripHidden } from "./hidden.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";
 // The chain events' schemas are values at "@gnoworld/schemas/chainEvents" (a page loads them on its first event, in a chunk of its own); here, the types.
@@ -37,7 +39,6 @@ export {
   DigestBlock,
   DOOR_CAPS,
   EXPLAIN_VERSION,
-  JARVIS_CAPS,
   JARVIS_LINES,
   JARVIS_KEY_HEADER,
   JARVIS_PATHS,
@@ -61,7 +62,7 @@ export {
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
 export { JARVIS_EXAMPLES, jarvisExamples } from "./jarvisExamples.ts";
-export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
+export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
 export {
@@ -75,7 +76,7 @@ export {
 } from "./search.ts";
 export { Unread, UnreadPlaces, UNREAD_COUNT_MOST, UNREAD_PLACES_MOST } from "./unread.ts";
 export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
-export { Key, Slug } from "./slug.ts";
+export { Key } from "./slug.ts";
 export { Guest, GuestCause, GuestRefusal, GuestSaid, GuestSayRequest } from "./guest.ts";
 export { LineTranslations, TRANSLATIONS_ASKED, TRANSLATIONS_WAIT_MS, TranslationEvent } from "./translations.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
@@ -102,11 +103,9 @@ export const ApiError = z.object({
 export type ApiError = z.infer<typeof ApiError>;
 export {
   EXPLAIN_CAPS,
-  EXPLAIN_KINDS,
   Explanation,
   ExplainKind,
   ExplainSeed,
-  ExplainSeedRow,
   JarvisExplained,
   JarvisExplainRequest,
   REALM_EXPLAIN_VERSION,

@@ -102,7 +102,7 @@ test("on a phone the search takes the screen, and a result gives it back at the 
 test("the palette's last row hands the words to the chat's search, which opens on them", async ({ page }) => {
   await inGames(page);
   await page.keyboard.press("Control+k");
-  await page.getByRole("searchbox", { name: "Search places" }).fill("quorum");
+  await page.getByRole("combobox", { name: "Search places" }).fill("quorum");
   await page.getByRole("button", { name: /Search messages for “quorum” in the chat/ }).click();
   await expect(field(page)).toHaveValue("quorum");
   await expect(page).not.toHaveURL(/find=/);

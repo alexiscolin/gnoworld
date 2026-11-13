@@ -1,5 +1,4 @@
 import { pageLoginApi } from "../../lib/api/login.ts";
-import { pageDmPrefs } from "../../lib/dms/page.ts";
 import { pageDrafts } from "../../lib/drafts/page.ts";
 import { pageKeep } from "../../lib/keep/page.ts";
 import { pageNoticePrefs } from "../../lib/notices/page.ts";
@@ -8,8 +7,8 @@ import { pageErgo } from "../../lib/ergo/page.ts";
 import type { useAppStore } from "../../storeContext.tsx";
 import { chatLink, type ChatLink } from "./link.ts";
 
-// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device (its direct
-// messages' choices and drafts, its saved lines and places).
+// The page's link to Ergo: the page's socket, the login's tickets, a guest's drawn nick, an account's device (its drafts and
+// notices' modes, its saved lines and places).
 const pageLink = (store: ReturnType<typeof useAppStore>) =>
   chatLink({
     store,
@@ -17,7 +16,6 @@ const pageLink = (store: ReturnType<typeof useAppStore>) =>
     ticket: pageLoginApi().ticket,
     guest: drawGuestNick,
     device: (account) => ({
-      prefs: pageDmPrefs(account),
       drafts: pageDrafts(account),
       notices: pageNoticePrefs(account),
     }),

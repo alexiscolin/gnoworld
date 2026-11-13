@@ -22,6 +22,9 @@ const STAMPS_KEPT = 10_000;
 const Key = z.string().check(z.minLength(1), z.maxLength(256), z.regex(/^[^\s\0-\x1f\x7f]+$/));
 const Count = z.int().check(z.minimum(0), z.maximum(100_000));
 
+/** A field no page keeps any more (the reminders), its key removed on the device's first read. */
+const RETIRED = "gnoworld:device:reminders";
+
 const Quality = z.enum(["auto", "high", "low"]);
 /** The settings (ADR-0002 §1, Menu and settings): each has its default when the device holds none. Fields of later slices are added. */
 const SETTINGS = {
@@ -131,10 +134,15 @@ function device(storage: () => DraftStorage): Device {
   // What each key held that this page could not read, from its last read: written back with the field.
   const strange: Partial<Record<DeviceField, unknown>> = {};
   const codec = <K extends DeviceField>(field: K) => CODECS[field] as Codec<DeviceFields[K]>;
+  let swept = false;
   return {
     keys,
     read: (field) => {
       try {
+        if (!swept) {
+          swept = true;
+          storage().removeItem(RETIRED);
+        }
         const held = storage().getItem(keys[field]);
         if (held === null) return DEVICE_EMPTY[field];
         let raw: unknown;

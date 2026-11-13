@@ -13,28 +13,17 @@
   }
 
   /* The words give way (cut with an ellipsis) before the bar's button does: a long line never runs out of the bar. */
-  .talk > * > :first-child {
+  .who {
     /* layout: the faces and words take what the button leaves */
     flex: 1 1 0;
     min-inline-size: 0;
   }
 
-  .talk > * > :first-child > :last-child {
+  .said {
     min-inline-size: 0;
   }
 
   .talk:hover {
-    background: var(--color-fill-hover);
-  }
-
-  .talk a::after {
-    /* The link's own box covers the bar: a click anywhere on it is the button's. */
-    content: "";
-    position: absolute;
-    inset: 0;
-  }
-
-  .talk:hover a {
     background: var(--color-fill-hover);
   }
 
@@ -74,17 +63,18 @@
   @media (prefers-reduced-motion: no-preference) {
     .talk {
       /* raw: the proposal's score, 0.6 s at 0.6 s */
-      animation: slide 0.6s var(--ease-out-3) 0.6s both;
+      animation: slide calc(0.6s * var(--motion-scale)) var(--ease-out-3) calc(0.6s * var(--motion-scale)) both;
     }
 
     .face {
       /* raw: the proposal's score, each face 0.4 s from 0.8 s, 0.08 s apart, overshooting */
-      animation: pop 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) calc(0.8s + var(--n) * 0.08s) both;
+      animation: pop calc(0.4s * var(--motion-scale)) cubic-bezier(0.3, 1.6, 0.5, 1)
+        calc((0.8s + var(--n) * 0.08s) * var(--motion-scale)) both;
     }
 
     .words {
       /* raw: the proposal's score, 0.5 s at 1.1 s */
-      animation: appear 0.5s ease 1.1s both;
+      animation: appear calc(0.5s * var(--motion-scale)) ease calc(1.1s * var(--motion-scale)) both;
     }
   }
 
@@ -92,7 +82,7 @@
     from {
       opacity: 0;
       /* raw: the proposal's score */
-      transform: translateX(-24px);
+      transform: translateX(calc(-24px * var(--dir)));
     }
   }
 

@@ -9,7 +9,7 @@ import { addressState } from "./addressState.ts";
 import { storeFor } from "./lib/worldsStore.ts";
 import { data, subscribe } from "./railFeed.ts";
 import { site } from "./places.ts";
-import { worldsFile } from "./features/universe/worldsFile.ts";
+import { worldsFile } from "./worldsFile.ts";
 
 export type LensId = "live" | "active" | "following" | Exclude<StyleId, "lab">;
 
@@ -67,6 +67,7 @@ let held: {
   following: NONE,
 };
 let started = false;
+let hearing = false;
 
 function tell(): void {
   if (held.file === undefined) return;
@@ -97,13 +98,17 @@ function hearLive(): void {
   tell();
 }
 
-/** Reads the worlds' file once and hears who is here, for every reader of the light. */
+/** Reads the worlds' file once it comes whole (a read that failed is asked again at the next start) and hears who is here, for every
+ * reader of the light. */
 export function startLenses(): void {
   if (started) return;
   started = true;
   worldsFile().then(
     (file) => {
-      if (file === undefined) return;
+      if (file === undefined) {
+        started = false;
+        return;
+      }
       held = { ...held, file: fileLenses(file.worlds) };
       rooms = roomWorlds(
         file.worlds.map(({ id }) => id),
@@ -116,7 +121,8 @@ export function startLenses(): void {
       started = false;
     },
   );
-  subscribe(hearLive);
+  if (!hearing) subscribe(hearLive);
+  hearing = true;
   hearLive();
 }
 

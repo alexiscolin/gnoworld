@@ -2,7 +2,7 @@
 // Ergo answers a labeled line with that label (labeled-response, irc/commands.go:41, v2.19.1): its echo when it
 // delivered it, a numeric when it refused it (401 its partner not connected, irc/handlers.go:2533; 477; 417), or a
 // labeled-response batch of several lines (irc/responsebuffer.go:264-281). Another tab's line carries no label of ours.
-import type { IrcMessage } from "@gnoworld/core";
+import { trimOldest, type IrcMessage } from "@gnoworld/core";
 import type { RefusedTags } from "../../store/dms.ts";
 import type { createAppStore } from "../../store/index.ts";
 
@@ -46,8 +46,7 @@ export function outbox(store: ReturnType<typeof createAppStore>): Outbox {
       const label = String(count);
       if (!send(label)) return false;
       waiting.set(label, { partner, draft, act, tags });
-      const [oldest] = waiting.keys();
-      if (waiting.size > WAITING && oldest !== undefined) waiting.delete(oldest);
+      trimOldest(waiting, WAITING);
       return true;
     },
     answered: (tags, messages) => {

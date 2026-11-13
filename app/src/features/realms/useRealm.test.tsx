@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mount, settled } from "../../../tests/mount.tsx";
 import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
-import { realmPage, useRealm, type Realm } from "./useRealm.ts";
+import { realmPageQuery, useRealm, type Realm } from "./useRealm.ts";
 
 // A realm's page as a query (slice 13): the held page in the first frame of a view seen again, the failure of a first read as a state of its own, the
 // last good page left when a fresh read fails, and a read of another chain never shown for this one.
@@ -21,7 +21,7 @@ describe("useRealm", () => {
     mount(<Reader />);
     expect(seen.at(0)).toEqual({ state: "loading" });
     await settled(() => seen.at(-1)?.state === "failed");
-    expect(queryClient.getQueryData(realmPage(SOURCE).queryKey)).toBeUndefined();
+    expect(queryClient.getQueryData(realmPageQuery(SOURCE).queryKey)).toBeUndefined();
   });
 
   it("draws the kept page in its first frame, and leaves it when the fresh read fails", async () => {

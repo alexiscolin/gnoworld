@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Batch } from "./batch.ts";
-import { bytes, parseLine, type IrcMessage } from "./irc.ts";
+import { utf8Bytes as bytes } from "../text/utf8.ts";
+import { parseLine, type IrcMessage } from "./irc.ts";
 import { foldMultiline, MULTILINE_BYTES, MULTILINE_LINES } from "./multiline.ts";
 
 // Ergo's draft/multiline as it relays a message of several lines to a client that asked for it (irc/client.go,

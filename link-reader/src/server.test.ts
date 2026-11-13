@@ -1,3 +1,4 @@
+import { connect } from "node:net";
 import type { AddressInfo } from "node:net";
 import { ReaderCard } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -24,7 +25,8 @@ async function start(over: Partial<ServerDeps> = {}) {
     path = "/card",
     headers: Record<string, string> = { "content-type": "application/json" },
   ) => ask(path, { method: "POST", headers, body });
-  return { ask, post, read, log };
+  const port = (server.address() as AddressInfo).port;
+  return { ask, post, read, log, port };
 }
 
 describe("POST /card", () => {
@@ -35,7 +37,7 @@ describe("POST /card", () => {
     expect(response.headers.get("content-type")).toMatch(/^application\/json/);
     expect(response.headers.get("cache-control")).toBe("no-store");
     expect(ReaderCard.parse(await response.json())).toEqual(CARD);
-    expect(read).toHaveBeenCalledWith("https://example.com/a");
+    expect(read).toHaveBeenCalledWith("https://example.com/a", expect.any(AbortSignal));
   });
 
   it.each([
@@ -175,6 +177,59 @@ describe("a body that is too long or too slow", () => {
     expect(server.requestTimeout).toBeGreaterThan(0);
     expect(server.requestTimeout).toBeGreaterThanOrEqual(server.headersTimeout);
     server.close();
+  });
+});
+
+describe("a client that leaves", () => {
+  it("aborts the read's signal once its client leaves, and logs it gone, never as the read's own failure", async () => {
+    let seen: AbortSignal | undefined;
+    const read = vi.fn<ServerDeps["read"]>(
+      (_url, signal) =>
+        new Promise((_resolve, reject) => {
+          seen = signal;
+          signal.addEventListener("abort", () => {
+            reject(new Refused("timeout"));
+          });
+        }),
+    );
+    const { ask, log } = await start({ read });
+    const leave = new AbortController();
+    const asked = ask("/card", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ url: "https://example.com/" }),
+      signal: leave.signal,
+    }).then(
+      () => "answered",
+      () => "left",
+    );
+    await vi.waitFor(() => {
+      expect(read).toHaveBeenCalledTimes(1);
+    });
+    expect(seen?.aborted).toBe(false);
+    leave.abort();
+    expect(await asked).toBe("left");
+    await vi.waitFor(() => {
+      expect(log).toHaveBeenCalledWith({ kind: "gone" });
+    });
+    expect(seen?.aborted).toBe(true);
+    expect(log).not.toHaveBeenCalledWith({ kind: "timeout" });
+  });
+
+  it("logs a client that leaves in the middle of its body as gone, never as a crash", async () => {
+    const { port, log, read } = await start();
+    const socket = connect(port, "127.0.0.1");
+    await new Promise((resolve) => socket.once("connect", resolve));
+    socket.write(
+      'POST /card HTTP/1.1\r\nHost: x\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"url"',
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    socket.destroy();
+    await vi.waitFor(() => {
+      expect(log).toHaveBeenCalledWith({ kind: "gone" });
+    });
+    expect(log).not.toHaveBeenCalledWith({ kind: "crash" });
+    expect(read).not.toHaveBeenCalled();
   });
 });
 

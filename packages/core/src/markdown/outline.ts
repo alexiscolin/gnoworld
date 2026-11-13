@@ -121,7 +121,8 @@ class Lists {
         sub.push(read.list);
         next = read.next;
       } else if (under === undefined && sub.length === 0 && continues(line, item)) {
-        children.push({ type: "break" }, ...this.#inline(line.trim()));
+        children.push({ type: "break" });
+        pushEach(children, this.#inline(line.trim()));
         this.rich = true;
         next += 1;
       } else break;
@@ -129,6 +130,11 @@ class Lists {
     this.rich ||= task !== "none" || sub.length > 0;
     return { item: { children, task, sub }, next };
   }
+}
+
+// One push a node: a line of 60,000 code spans spread into one call passes the engine's count of arguments.
+function pushEach<T>(into: T[], nodes: readonly T[]): void {
+  for (const node of nodes) into.push(node);
 }
 
 /** The list that starts at `at`, if a line is an item there. */

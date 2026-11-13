@@ -640,14 +640,25 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     const socket = connect(Number(url.port), "127.0.0.1");
     socket.on("error", () => undefined);
     await once(socket, "connect");
+    // Node answers 100 Continue as it hands the request to jarvis's handler: the stop then always finds it in its body.
+    const handed = new Promise<void>((resolve) => {
+      let heard = "";
+      socket.on("data", (chunk: Buffer) => {
+        heard += chunk.toString("latin1");
+        if (heard.startsWith("HTTP/1.1 100 ")) resolve();
+      });
+    });
     socket.write(
-      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n${JARVIS_KEY_HEADER}: ${DOOR_KEY}\r\nContent-Length: 100\r\n\r\n{"question`,
+      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n${JARVIS_KEY_HEADER}: ${DOOR_KEY}\r\nContent-Length: 100\r\nExpect: 100-continue\r\n\r\n`,
     );
+    await handed;
+    socket.write(`{"question`);
     // events.once rejects on the reset a cut connection may give first.
     const closed = new Promise((resolve) => socket.on("close", resolve));
     jarvis.child.kill("SIGTERM");
     expect(await exited(jarvis)).toBe(0);
     await closed;
+    expect(lines(jarvis).some((line) => line.event === "jarvis_refused")).toBe(false);
   });
 
   it("stops at once when off, with nothing in flight", async () => {

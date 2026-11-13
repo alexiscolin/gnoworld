@@ -163,8 +163,8 @@ export function ActivityChart({ label, values, sparkline = false, unit = "hour",
       <Plot points={points} sparkline={sparkline} unit={unit} label={label} />
       {figures ? (
         <Cluster space="s">
-          <p className={styles["figure"]}>Peak {grouped(peak)}</p>
-          <p className={styles["figure"]}>Now {grouped(counts.at(-1) ?? 0)}</p>
+          <p className="data-text">Peak {grouped(peak)}</p>
+          <p className="data-text">Now {grouped(counts.at(-1) ?? 0)}</p>
         </Cluster>
       ) : null}
       {/* A table is never narrower than its words: the box around it clips it. */}

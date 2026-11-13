@@ -1,12 +1,10 @@
 // The words of the chain a page draws (slice 9g), the second wall after the stream's schemas: text and nothing else, an address by its two ends.
 
+import { cutText } from "@gnoworld/core/bubbles";
 import { shortAddress } from "@gnoworld/schemas";
 
-// Format characters (bidi overrides among them) and controls out.
-const stripped = (text: string): string => text.replace(/[\p{Cf}\p{Cc}]/gu, "");
-
-// Stripped, `max` characters at most, never a lone half of a surrogate pair.
-export const cut = (text: string, max: number): string => stripped(text).slice(0, max).toWellFormed();
+// Format characters (bidi overrides among them) and controls out, `max` characters at most as a reader counts them, never half an emoji.
+export const cut = (text: string, max: number): string => cutText(text, max);
 
 // Stripped, 64 characters at most.
 export const plain = (text: string): string => cut(text, 64);

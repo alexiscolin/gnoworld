@@ -1,6 +1,11 @@
+// @vitest-environment jsdom
+import { act } from "react";
 import { describe, expect, it } from "vitest";
+import { mount } from "../../../tests/mount.tsx";
 import type { JarvisItem } from "../../jarvisHere.ts";
-import { withJarvis } from "./jarvisEntries.tsx";
+import { queryClient } from "../../lib/query/client.ts";
+import { keys } from "../../lib/query/keys.ts";
+import { useSaidAnswers, withJarvis } from "./jarvisEntries.tsx";
 
 // 10u-a: Jarvis's cards stand among a room's lines where and when they were asked.
 const line = (id: string, time: string) => ({ line: { id, time } });
@@ -168,6 +173,26 @@ describe("with the question as the room hears it", () => {
     expect(run(late, [asked("1", "2026-11-11T10:05:00.000Z", "what is up")])).toEqual(["a", "card 1", "q"]);
   });
 
+  it("takes the asker's line a few seconds before the card's time, the page's clock ahead of the room's, and hides the answer Jarvis's line gives", () => {
+    const entries = [said("q", "2026-11-11T10:05:00.000Z", "@jarvis what is up"), bot("b", "2026-11-11T10:05:20.000Z")];
+    expect(run(entries, [done(asked("1", "2026-11-11T10:05:02.000Z", "what is up"))])).toEqual(["q", "b"]);
+    expect(run(entries, [asked("1", "2026-11-11T10:05:02.000Z", "what is up")])).toEqual(["q", "card 1", "b"]);
+  });
+
+  it("keeps a card another asker's Jarvis line follows in the window, once that line's kept answer is read and is not the card's", () => {
+    const entries = [said("q", "2026-11-11T10:05:02.000Z", "@jarvis what is up"), bot("b", "2026-11-11T10:05:20.000Z")];
+    const card = done(asked("1", "2026-11-11T10:05:00.000Z", "what is up"));
+    const kept = (markdown: string) => () => ({
+      answer: { status: "answered" as const, markdown, buttons: [] },
+      asker: "g1you…",
+    });
+    const placed = (said?: Parameters<typeof withJarvis>[2]) =>
+      order(withJarvis(entries as never, [card], said) as never);
+    expect(placed(kept("another answer"))).toEqual(["q", "card 1", "b"]);
+    expect(placed(kept("x"))).toEqual(["q", "b"]);
+    expect(placed(() => undefined)).toEqual(["q", "b"]);
+  });
+
   it("hides an answered card once Jarvis's own line follows its question, and no other card", () => {
     const entries = [said("q", "2026-11-11T10:05:02.000Z", "@jarvis what is up"), bot("b", "2026-11-11T10:05:20.000Z")];
     expect(run(entries, [done(asked("1", "2026-11-11T10:05:00.000Z", "what is up"))])).toEqual(["q", "b"]);
@@ -176,5 +201,23 @@ describe("with the question as the room hears it", () => {
     expect(run(before, [done(asked("1", "2026-11-11T10:05:00.000Z", "what is up"))])).toEqual(["b", "q", "card 1"]);
     const far = [said("q", "2026-11-11T10:05:02.000Z", "@jarvis what is up"), bot("b", "2026-11-11T11:05:20.000Z")];
     expect(run(far, [done(asked("1", "2026-11-11T10:05:00.000Z", "what is up"))])).toEqual(["q", "card 1", "b"]);
+  });
+});
+
+describe("the kept answers of Jarvis's lines", () => {
+  it("reads a line's kept answer once the page has it, and none before", () => {
+    const seen: unknown[] = [];
+    function Probe() {
+      seen.push(useSaidAnswers("#bubble")("m1")?.answer);
+      return null;
+    }
+    mount(<Probe />);
+    const answer = { status: "answered" as const, markdown: "It closes today.", buttons: [] };
+    act(() => {
+      queryClient.setQueryData(keys.jarvisSaid("#bubble", "m1"), { answer, asker: "g1me…" });
+    });
+    expect(seen.at(0)).toBeUndefined();
+    expect(seen.at(-1)).toEqual(answer);
+    queryClient.clear();
   });
 });

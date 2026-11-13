@@ -25,9 +25,12 @@ export ANTHROPIC_API_KEY_FILE GNOMCP
 node --test "$here"/test-*.ts
 mkdir -p "$here/results"
 cd "$here"
+# The code and cases this result judges, kept beside it: the gate that switches Jarvis on refuses a result of other code.
+stamp=$(date -u +%Y-%m-%dT%H%M%SZ)
+node "$here/fingerprint.ts" >"results/$stamp.fingerprint"
 # promptfoo's command is package.json's `eval`, the one place it is written (as check.sh runs its tools). The grader
 # reads its key from the environment, for this command alone; promptfoo sends nothing of its own out.
 PATH="$here/node_modules/.bin:$PATH"
 ANTHROPIC_API_KEY=$(cat "$ANTHROPIC_API_KEY_FILE") PROMPTFOO_DISABLE_TELEMETRY=1 PROMPTFOO_DISABLE_SHARING=1 \
 	PROMPTFOO_DISABLE_UPDATE=1 PROMPTFOO_DISABLE_REMOTE_GENERATION=1 \
-	exec sh -c "$(node -p "require('./package.json').scripts.eval") \"\$@\"" sh -o "results/$(date -u +%Y-%m-%dT%H%M%SZ).json" "$@"
+	exec sh -c "$(node -p "require('./package.json').scripts.eval") \"\$@\"" sh -o "results/$stamp.json" "$@"

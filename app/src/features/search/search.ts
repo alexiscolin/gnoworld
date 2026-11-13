@@ -1,7 +1,7 @@
 // The palette's search: one pass over the index of the places the page already holds, so typing sends no request. A query is a name, or
 // opens with a mark: `#` a room, `@` a namespace, `/r/` a realm's path, `>` a command (D355). The best 50 come back, with how many answered.
 import { compareRanks } from "@gnoworld/core";
-import { realmPage } from "../../lib/realmPage.ts";
+import { realmPageHref } from "../../lib/realmPage.ts";
 import { matchLower, parseQuery, wordsOf, type Parsed } from "./match.ts";
 import { byFunctions, type Entry, type SearchIndex } from "./searchIndex.ts";
 import {
@@ -138,7 +138,7 @@ function inNamespaces(index: SearchIndex, text: string, { keep, sort }: Ask): Fo
 // A realm by its path; one typed whole is offered, listed or not, when no listed realm answers.
 function inRealms(index: SearchIndex, text: string, ask: Ask): Found {
   const found = best(rank(index.realms, text, ask), ask.sort);
-  const page = found.total > 0 ? undefined : realmPage(`gno.land/r/${text}`);
+  const page = found.total > 0 ? undefined : realmPageHref(`gno.land/r/${text}`);
   if (page === undefined) return found;
   const item: SearchItem = { name: text, kind: "realm", universe: "", path: page, description: "A realm, by its path" };
   return { results: [{ item, hits: [] }], total: 1 };

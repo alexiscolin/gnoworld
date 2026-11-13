@@ -79,7 +79,7 @@ test.describe("the pages added in 5d", () => {
     await expect(page).toHaveURL(/\/#search$/);
     await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
     // Its empty field is Discover (D373): the places are found by their name.
-    await page.getByRole("searchbox", { name: "Search places" }).fill("bubb");
+    await page.getByRole("combobox", { name: "Search places" }).fill("bubb");
     await page.getByRole("option", { name: /Bubble/ }).click();
     await expect(page).toHaveURL("/w/bubble");
   });

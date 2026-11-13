@@ -2,13 +2,12 @@
 // people can read, which the header's account control opens (pageAsks.ts).
 import { Button, Cluster } from "@gnoworld/ui";
 import { askFor, useNameless } from "../../pageAsks.ts";
-import styles from "./LogInToWrite.module.css";
 
 export function NameNudge() {
   if (!useNameless()) return null;
   return (
     <Cluster justify="between">
-      <span className={styles["note"]}>People here read your address. Pick a gno.land name they can read.</span>
+      <span className="meta">People here read your address. Pick a gno.land name they can read.</span>
       <Button
         size="s"
         icon="at"

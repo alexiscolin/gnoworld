@@ -24,6 +24,18 @@ export const WithTooltip: Story = {
   },
 };
 
+// A bar's tools (the composer's format bar): the bar's faint ink; a narrow bar goes without the last two (their box under 18 rem).
+export const Tools: Story = {
+  render: () => (
+    <Cluster space="3xs">
+      <IconButton icon="bold" label="Bold" size="xs" emphasis="plain" tool />
+      <IconButton icon="italic" label="Italic" size="xs" emphasis="plain" tool />
+      <IconButton icon="list-bulleted" label="Bulleted list" size="xs" emphasis="plain" tool drops />
+      <IconButton icon="list-numbered" label="Numbered list" size="xs" emphasis="plain" tool drops />
+    </Cluster>
+  ),
+};
+
 export const Sizes: Story = {
   render: () => (
     <Cluster>

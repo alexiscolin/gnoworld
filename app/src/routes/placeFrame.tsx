@@ -4,16 +4,13 @@
 import type { ReactNode } from "react";
 import { Panel, Stack } from "@gnoworld/ui";
 import { chatHeld, LOADING } from "../features/chat/index.ts";
-import { useMedia } from "../features/chat/useMedia.ts";
+import { DOCKED, useMedia } from "../features/chat/useMedia.ts";
 import { SpaceFoot } from "../features/universe/SpaceFoot.tsx";
 import { StatusRing } from "../features/world/StatusRing.tsx";
 import type { Ring } from "../features/world/statusRing.ts";
 import { useApp } from "../storeContext.tsx";
 import place from "./globe.module.css";
 import styles from "./world.module.css";
-
-/** Where a page frames its planet close, larger than the window (D458): the dock's width for a place's page. */
-export const DOCKED = "(min-width: 1280px)";
 
 /** Whether the window `query` names frames the planet close (D458): never where the settings ask for low quality, whose frame keeps
  * today's pixels. */

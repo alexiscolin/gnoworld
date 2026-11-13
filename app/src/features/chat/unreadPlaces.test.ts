@@ -1,6 +1,6 @@
 import { parseLine, type IrcMessage } from "@gnoworld/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Address } from "@gnoworld/schemas";
+import { Address, RoomId } from "@gnoworld/schemas";
 import { createAppStore } from "../../store/index.ts";
 import { forwardPlaces } from "./unreadPlaces.ts";
 
@@ -134,5 +134,16 @@ describe("the places forwarded to the server", () => {
     await vi.advanceTimersByTimeAsync(EVERY);
     expect(t.send).toHaveBeenCalledTimes(2);
     expect(t.send.mock.calls[1]?.[0].map(({ room }) => room).toSorted()).toEqual(["#bubble", "#garden"]);
+  });
+
+  it("reads the rooms again only when they change: a change of another slice of the store parses no room", async () => {
+    const t = setup();
+    t.heard("#bubble", stamp(-60_000));
+    await vi.advanceTimersByTimeAsync(EVERY);
+    expect(t.send).toHaveBeenCalledOnce();
+    const parsed = vi.spyOn(RoomId, "safeParse");
+    for (let n = 0; n < 10; n += 1) t.store.getState().loginActions.chat(n % 2 === 0 ? "connecting" : "off");
+    expect(parsed).not.toHaveBeenCalled();
+    parsed.mockRestore();
   });
 });

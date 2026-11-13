@@ -1,16 +1,25 @@
 import type { MouseEvent, ReactNode } from "react";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Anchor } from "../link.tsx";
-import { buttonLook, iconSize, type ControlSize } from "./control.ts";
+import { buttonLook, iconSize, toolMark, type ControlSize } from "./control.ts";
 import styles from "./Button.module.css";
 
 interface Look {
   children: ReactNode;
   /** `link`: no box, the words' own size, in the link's ink and underlined, for a button that reads as a link (it does something, not goes). */
   emphasis?: "solid" | "outline" | "quiet" | "link";
-  tone?: "neutral" | "danger";
+  /** `signal`: the violet of what a machine says, Jarvis's (the composer's Ask Jarvis). */
+  tone?: "neutral" | "danger" | "signal";
   size?: ControlSize;
   icon?: IconName;
+  /** `close`: its start a step tighter, so its icon stands close to the control before it, as one group with it. */
+  lead?: "close";
+  /** `wide`: its words 20 px in, the plate's buttons with words (a large button keeps its own). */
+  pad?: "wide";
+  /** Its press covers its nearest positioned box, whose hover it answers as its own: a bar whose one link is the whole bar. */
+  stretch?: boolean;
+  /** A tool of a bar inside a box (the composer's format bar): the bar's faint ink, 24 px where the box is under 24 rem. */
+  tool?: boolean;
 }
 
 interface Pressed extends Look {
@@ -51,8 +60,14 @@ function refuse(event: MouseEvent<HTMLButtonElement>) {
 
 /** The one button (docs/DESIGN-SYSTEM.md): solid and neutral is the primary, one per region. */
 export function Button(props: ButtonProps) {
-  const { children, emphasis = "outline", tone = "neutral", size = "m", icon } = props;
-  const look = buttonLook(emphasis, tone, size);
+  const { children, emphasis = "outline", tone = "neutral", size = "m", icon, lead, pad, stretch, tool } = props;
+  const look = {
+    ...buttonLook(emphasis, tone, size),
+    ...toolMark(tool),
+    "data-lead": lead,
+    "data-pad": pad,
+    "data-stretch": stretch === true ? "" : undefined,
+  };
   const face = (
     <>
       {icon === undefined ? null : <Icon name={icon} size={iconSize(size)} />}

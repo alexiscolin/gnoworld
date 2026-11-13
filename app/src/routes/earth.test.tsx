@@ -2,7 +2,6 @@
 import { isRouteErrorResponse, type MetaArgs, type RouteObject } from "react-router";
 import { describe, expect, test, vi } from "vitest";
 import { expectFollowAndShare } from "../../tests/plateButtons.ts";
-import { fakeStream } from "../../tests/fakeStream.ts";
 import { noMedia, noObservers } from "../../tests/mount.tsx";
 import { expectClientAsBuild, render, routeError } from "../../tests/render.tsx";
 import { drawRoute } from "../../tests/routed.tsx";
@@ -88,12 +87,10 @@ test("the browser's loader gives each pre-rendered earth what the build's does",
 // rest is drawn after. jsdom lacks the browser's media query, observers and scene, which the page asks for: these stand in, for the whole
 // file, as the route's own unmount still asks the scene for its media query.
 const drawn = (path = "/net/:network/earth", at = "/net/onyx/earth") => {
-  const sources = fakeStream();
   // The figure counts up only where motion is welcome: none here.
   noMedia();
   noObservers();
-  const page = drawRoute({ path, Component: Earth, loader: clientLoader }, at);
-  return { sources, ...page };
+  return drawRoute({ path, Component: Earth, loader: clientLoader }, at);
 };
 const plateOf = async (box: HTMLElement) => {
   await vi.waitFor(() => {
@@ -144,26 +141,5 @@ describe("the Earth's plate", () => {
     const plate = await plateOf(box);
     // In words, both (D13915 reverses D536's icons: what they did was unclear).
     expectFollowAndShare(plate);
-  });
-});
-
-// Slice 9g (F5784, frame 38): the page follows the Earth's room once it has run. It asks no count of the room (presence=0, D384): the plate
-// no longer draws the realms deployed in 24 h (D567's plate has no such square; the store still takes the stream's count).
-describe("the Earth's page and the chain's stream", () => {
-  test("follows #earth, for its events alone", async () => {
-    const { sources } = drawn();
-    await vi.waitFor(() => {
-      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23earth&presence=0"]);
-    });
-  });
-
-  test("closes the stream when the page is left", async () => {
-    const { sources, leave } = drawn();
-    await vi.waitFor(() => {
-      expect(sources.opened).toHaveLength(1);
-    });
-    expect(sources.opened[0]?.closed).toBe(0);
-    leave();
-    expect(sources.opened[0]?.closed).toBe(1);
   });
 });

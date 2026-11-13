@@ -492,6 +492,68 @@ describe("Gnomcp.call: one read", BOOTS, () => {
   });
 });
 
+describe("startGnomcp: a start that hangs", BOOTS, () => {
+  // A child that crashes once, then a start whose initialize gnomcp never answers, its own time 40 s.
+  const hanging = async () => {
+    const made = await start({ crash: { tool: "gno_render", starts: 1 } }, { startTimeoutMs: 40_000 });
+    await made.gnomcp.call("gno_render", { profile: "onyx", realm: "gno.land/r/x" });
+    made.fake.change({ crash: { tool: "gno_render", starts: 1 }, slow: ["initialize"] });
+    return made;
+  };
+
+  it("closes at once while a start is under way, never waiting for its time, and leaves no folder or process", async () => {
+    const { gnomcp, fake, events } = await hanging();
+    const restarting = gnomcp.call("gno_status", { profile: "onyx" });
+    await until(() => fake.starts().length === 2);
+    const started = performance.now();
+    await gnomcp.close();
+    expect(performance.now() - started).toBeLessThan(20_000);
+    expect(await restarting).toEqual({ ok: false, reason: "down" });
+    expect(events().filter((event) => event["event"] === "jarvis_gnomcp_down")).toEqual([]);
+    const pids = fake.starts().map((seen) => seen.pid);
+    await until(() => !pids.some(running));
+    expect(fake.starts().map((seen) => existsSync(seen.cwd))).toEqual(pids.map(() => false));
+  });
+
+  it("ends a call waiting for a start once its signal fires, as a timeout", async () => {
+    const { gnomcp, fake } = await hanging();
+    const left = new AbortController();
+    const asked = gnomcp.call("gno_status", { profile: "onyx" }, left.signal);
+    await until(() => fake.starts().length === 2);
+    const started = performance.now();
+    left.abort();
+    expect(await asked).toEqual({ ok: false, reason: "timeout" });
+    expect(performance.now() - started).toBeLessThan(5_000);
+  });
+});
+
+describe("startGnomcp: a call that fails, in jarvis's log", BOOTS, () => {
+  it.each([
+    { name: "a JSON-RPC error", scenario: { failing: ["gno_status"] }, extra: {}, reason: "error" },
+    {
+      name: "a result it cannot read",
+      scenario: { answers: { gno_status: { content: [] } } },
+      extra: {},
+      reason: "malformed",
+    },
+    { name: "its time passed", scenario: { slow: ["gno_status"] }, extra: { callTimeoutMs: 2_000 }, reason: "timeout" },
+  ])("logs $name by its tool and its reason, never its arguments", async ({ scenario, extra, reason }) => {
+    const { gnomcp, events, raw } = await start(scenario, extra);
+    expect(await gnomcp.call("gno_status", { profile: "onyx" })).toEqual({ ok: false, reason });
+    expect(events()).toContainEqual({ event: "jarvis_gnomcp_failed", tool: "gno_status", reason });
+    expect(raw()).not.toContain('"profile"');
+  });
+
+  it("logs nothing for a call its asker ended, and nothing for one that answered", async () => {
+    const { gnomcp, events } = await start();
+    const left = new AbortController();
+    left.abort();
+    await gnomcp.call("gno_status", { profile: "onyx" }, left.signal);
+    await gnomcp.call("gno_status", { profile: "onyx" });
+    expect(events().filter((event) => event["event"] === "jarvis_gnomcp_failed")).toEqual([]);
+  });
+});
+
 describe("startGnomcp: gnomcp's stderr in jarvis's log", BOOTS, () => {
   it("logs each audit line by its tool, its result and its time, never its arguments", async () => {
     const { gnomcp, events, raw } = await start();

@@ -16,8 +16,7 @@ import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
 import { Switch } from "../Switch/Switch.tsx";
-import { Tabs } from "../Tabs/Tabs.tsx";
-import { Comboboxes } from "./Comboboxes.tsx";
+import { FieldParts } from "./FieldParts.tsx";
 import { ADDRESS, disc, short } from "./samples.ts";
 
 export function Chips() {
@@ -38,34 +37,6 @@ export function Chips() {
       <Chip tone="warm">Live</Chip>
       <Chip tone="signal">Assistant</Chip>
     </Cluster>
-  );
-}
-
-export function TabRows() {
-  const [view, setView] = useState<string | null>("cosmos");
-  return (
-    <Stack>
-      <Tabs
-        label="Views"
-        tabs={[
-          { id: "earth", label: "Earth" },
-          { id: "cosmos", label: "Cosmos" },
-          { id: "list", label: "List", count: 12 },
-        ]}
-        selected={view}
-        onSelect={setView}
-      />
-      <Tabs
-        label="Library"
-        iconOnly
-        tabs={[
-          { id: "worlds", label: "Worlds", icon: "planet" },
-          { id: "people", label: "People", icon: "people" },
-        ]}
-        selected="worlds"
-        onSelect={() => undefined}
-      />
-    </Stack>
   );
 }
 
@@ -150,7 +121,7 @@ export function Fields() {
   return (
     <Stack>
       <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />
-      <Comboboxes />
+      <FieldParts />
       <Switch label="Reduce animations" description="Nothing flies or flares." checked={calm} onChange={setCalm} />
     </Stack>
   );

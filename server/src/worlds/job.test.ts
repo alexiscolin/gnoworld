@@ -17,8 +17,7 @@ import {
   type Routes,
 } from "../testing/fakeWorldsChain.ts";
 import { failingFirst, proxyRefused, refused, timerWaits, unresolved } from "@gnoworld/service/testing/wayOut";
-import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds, type RunOptions } from "./job.ts";
-import { makePresence } from "./presence.ts";
+import { EVERY_MS, PAUSE_MS, runWorlds, startWorlds } from "./job.ts";
 import { migrations } from "../migrations.ts";
 
 // The worlds job (slice 7, 7c), one pass of it: the list, the worlds, the packages read once, the history through the indexer, the
@@ -101,7 +100,6 @@ async function run(
     historyPage?: number;
     /** Told each wait, as it begins: a test's clock may move by it. */
     onWait?: (ms: number) => void;
-    trends?: RunOptions["trends"];
   } = {},
 ): Promise<Run> {
   const file = extra.file ?? fresh();
@@ -121,7 +119,6 @@ async function run(
     },
     ...(extra.maxBytes === undefined ? {} : { maxBytes: extra.maxBytes }),
     ...(extra.historyPage === undefined ? {} : { historyPage: extra.historyPage }),
-    ...(extra.trends === undefined ? {} : { trends: extra.trends }),
   });
   return { file, logged, chain, outcome, waits };
 }
@@ -934,128 +931,6 @@ describe("the worlds' count, beside their file", () => {
   });
 });
 
-// The ticker's trends (7t) compare a pass with the one before it: the job tells them each file it wrote and the calls it read, realm by
-// realm, and nothing of a pass that wrote nothing, so a silent indexer or a failed write is never a world's gain.
-describe("the trends it tells", () => {
-  const keeper = () => {
-    const told: { worlds: Worlds; read: Map<string, number> }[] = [];
-    const trends: RunOptions["trends"] = {
-      passed: (worlds, read) =>
-        void told.push({ worlds, read: new Map([...read].map(([path, { calls }]) => [path, calls])) }),
-    };
-    return { told, trends };
-  };
-
-  it("tells the file it wrote, and the calls of every realm this pass read, a realm with none as none", async () => {
-    const { told, trends } = keeper();
-    const { file } = await run(chainRoutes([POOL, POOL1, ROUTER], { indexer: callsOf({ [POOL]: 3, [ROUTER]: 3 }) }), {
-      trends,
-    });
-    expect(told).toHaveLength(1);
-    expect(told[0]?.worlds).toEqual(written(file));
-    expect(told[0]?.read).toEqual(
-      new Map([
-        [POOL, 3],
-        [POOL1, 0],
-        [ROUTER, 3],
-      ]),
-    );
-  });
-
-  // 7t3: the window between two passes is counted from the height the last file wrote for each realm it read.
-  it("tells each realm's transactions above the last file's height and who sent them, and writes the file without them", async () => {
-    const file = fresh();
-    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
-    const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
-    await run(chainRoutes([POOL, ROUTER]), { file, trends });
-    expect(written(file).worlds.flatMap(({ realms }) => realms.map(({ lastHeight }) => lastHeight))).toEqual([
-      101, 101,
-    ]);
-    const busier = chainRoutes([POOL, ROUTER], { indexer: callsOf({ [POOL]: 5, [ROUTER]: 2 }) });
-    const { outcome } = await run(busier, { file, now: NOW + 5, trends });
-    expect(outcome).toEqual({ wrote: true });
-    expect(told[0]?.get(POOL)?.recent, "a first file has no height to count from").toBeUndefined();
-    expect(told[1]?.get(POOL)?.recent).toEqual({ transactions: [`102:${A}`, `103:${B}`, `104:${A}`], callers: [A, B] });
-    expect(told[1]?.get(ROUTER)?.recent).toEqual({ transactions: [], callers: [] });
-    expect(told[1]?.get(POOL)?.at, "each read stamped as it comes, by the job's clock").toBe(NOW + 5);
-    expect(readFileSync(file, "utf8")).not.toContain("recent");
-    expect(written(file).worlds.find(({ id }) => id === "gnoswap/pool")?.realms[0]).toMatchObject({
-      calls: 5,
-      lastHeight: 104,
-    });
-  });
-
-  // The third round of 7t3's review (F4865) wanted each realm's read stamped as it came, when the reads took minutes; one read of the chain
-  // reads every realm at once (7k3), so the stamp is the clock once that read has ended, never the pass's start nor the first answer.
-  it("stamps every realm's read by the job's clock once the indexer's last page has come, never at the pass's start nor its first page", async () => {
-    const clock = { at: NOW };
-    const answered: number[] = [];
-    const routes = chainRoutes([POOL, ROUTER], {
-      indexer: (request) => {
-        clock.at += 1000;
-        answered.push(clock.at);
-        return eachCalled([POOL, ROUTER], 2)(request);
-      },
-    });
-    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
-    const { chain } = await run(routes, {
-      clock: () => clock.at,
-      historyPage: 2,
-      trends: { passed: (_worlds, read) => void told.push(read) },
-    });
-    expect(pagesAsked(chain)).toEqual([
-      { limit: 2 },
-      { height: 100 },
-      { above: 100, limit: 2 },
-      { height: 101 },
-      { above: 101, limit: 2 },
-    ]);
-    expect(answered).toHaveLength(5);
-    const last = answered.at(-1);
-    expect([told[0]?.get(POOL)?.at, told[0]?.get(ROUTER)?.at]).toEqual([last, last]);
-  });
-
-  it("counts every call of a realm the last file read with none yet, and gives no window to one it never read", async () => {
-    const file = fresh();
-    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
-    const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
-    await run(chainRoutes([POOL], { indexer: callsOf({}) }), { file, trends });
-    expect(written(file).worlds[0]?.realms[0]).toMatchObject({ calls: 0, lastHeight: null });
-    await run(chainRoutes([POOL, ROUTER]), { file, now: NOW + 5, trends });
-    expect(told[1]?.get(POOL)?.recent).toEqual({ transactions: [`100:${A}`, `101:${B}`], callers: [A, B] });
-    expect(told[1]?.get(ROUTER)?.recent).toBeUndefined();
-  });
-
-  it("gives no window to a realm whose counts the last file could not read", async () => {
-    const file = fresh();
-    const told: Parameters<NonNullable<RunOptions["trends"]>["passed"]>[1][] = [];
-    const trends: RunOptions["trends"] = { passed: (_worlds, read) => void told.push(read) };
-    await run(chainRoutes([POOL], { indexer: () => new TypeError("down") }), { file, trends });
-    expect(written(file).worlds[0]?.realms[0]).toMatchObject({ calls: null, lastHeight: null });
-    await run(chainRoutes([POOL]), { file, now: NOW + 5, trends });
-    expect(told[1]?.get(POOL)).toEqual({ calls: 2, callers: 2, lastHeight: 101, at: NOW + 5 });
-  });
-
-  it("tells no read of a pass whose indexer is silent, though it writes the file with the last counts", async () => {
-    const file = fresh();
-    await run(chainRoutes([POOL]), { file });
-    const { told, trends } = keeper();
-    await run(chainRoutes([POOL], { indexer: () => new TypeError("fetch failed") }), { file, now: NOW + 5, trends });
-    expect(told.map(({ read }) => read.size)).toEqual([0]);
-    expect(written(file).worlds[0]?.realms[0]?.calls).toBe(2);
-  });
-
-  it("tells nothing of a pass that wrote nothing: the list down, or the file refused", async () => {
-    const { told, trends } = keeper();
-    await run(chainRoutes([POOL], { paths: () => new TypeError("fetch failed") }), { trends });
-    const file = fresh();
-    mkdirSync(`${file}.tmp`);
-    const { outcome } = await run(chainRoutes([POOL]), { file, trends });
-    expect(outcome).toEqual({ wrote: false, kind: "write" });
-    expect(told).toEqual([]);
-  });
-});
-
 describe("startWorlds", () => {
   const base = { log: () => undefined, send: () => new Promise<Response>(() => undefined) };
   const universe = { id: "onyx", rpc: RPC, indexer: INDEXER };
@@ -1151,69 +1026,6 @@ describe("startWorlds", () => {
     await until(() => existsSync(file));
     job.stop();
     expect(chain.asked.filter(({ kind }) => kind === "vm/qpaths")).toHaveLength(1);
-  });
-
-  it("keeps the chain's window of its passes for the ticker's route, each pass against the one before (7t)", async () => {
-    let reads = 0;
-    const counting = chainRoutes([POOL], {
-      indexer: (request) => {
-        if (request.variables["above"] === undefined && request.variables["height"] === undefined) reads += 1;
-        return callsOf({ [POOL]: 6 * reads })(request);
-      },
-    });
-    const chain = fakeChain(counting);
-    const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20 });
-    expect(job.trends()).toEqual({ worlds: [], newest: [] });
-    await until(() => job.trends().worlds.length > 0);
-    job.stop();
-    expect(job.trends().worlds[0]).toMatchObject({
-      world: "gnoswap/pool",
-      transactions: { count: 6 },
-      addresses: { count: 2 },
-    });
-  });
-
-  it("keeps each world's window in the habit files it is given, the busiest of each hour, for the next 14 days (7t3)", async () => {
-    let reads = 0;
-    const counting = chainRoutes([POOL], {
-      indexer: (request) => {
-        if (request.variables["above"] === undefined && request.variables["height"] === undefined) reads += 1;
-        return callsOf({ [POOL]: 6 * reads })(request);
-      },
-    });
-    const chain = fakeChain(counting);
-    const folder = join(fresh(), "..");
-    const habits = {
-      transactions: join(folder, "trends-transactions.json"),
-      addresses: join(folder, "trends-addresses.json"),
-    };
-    // A clock a minute on at each read, so a window spans minutes and its pace an hour stays within what a habit holds.
-    const clock = { at: NOW };
-    const now = () => (clock.at += 60_000);
-    const job = startWorlds({ ...base, ...quick, send: chain.send, file: fresh(), universe, everyMs: 20, habits, now });
-    await until(() => job.trends().worlds.length > 0);
-    job.stop();
-    const [window] = job.trends().worlds;
-    const kept = (habit: string) => makePresence({ file: habit, now }).history("gnoswap/pool").at(-1)?.people;
-    expect(window?.transactions.count).toBe(6);
-    expect(kept(habits.transactions)).toBe(window?.transactions.now);
-    expect(kept(habits.addresses)).toBe(window?.addresses.now);
-    expect(window?.transactions.now).toBeGreaterThan(6);
-  });
-
-  it("writes its habits as it stops, where it was told, though no pass wrote a window (7t3)", () => {
-    const folder = join(fresh(), "..");
-    const habits = {
-      transactions: join(folder, "trends-transactions.json"),
-      addresses: join(folder, "trends-addresses.json"),
-    };
-    const job = startWorlds({ ...base, file: fresh(), universe, habits });
-    job.stop();
-    expect(
-      readdirSync(folder)
-        .filter((name) => name.startsWith("trends-"))
-        .sort(),
-    ).toEqual(["trends-addresses.json", "trends-transactions.json"]);
   });
 
   it("runs another pass after the period, once the first has ended", async () => {

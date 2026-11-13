@@ -11,8 +11,13 @@ import { previewIn } from "./pageLinks.ts";
 const LinkCard = lazy(() => import("./LinkCard.tsx"));
 
 export interface LineCardProps {
-  /** The room's name, the id a removal names and the key the server told, the reader's right to pin there, and whether the reader saves data (cardOf); none: no card. */
-  card: { room: string; msgid: string; key: string | undefined; may: boolean; saving: boolean } | undefined;
+  /** The room's name, the id a removal names and the key the server told, the reader's right to pin there, and whether the reader saves data
+   * (cardMarks); no msgid: no card. */
+  room: string | undefined;
+  msgid: string | undefined;
+  cardKey: string | undefined;
+  may: boolean | undefined;
+  saving: boolean | undefined;
   /** The line's words, and what they say: a player or a realm's capture gives the card way. */
   text: string;
   blocks: readonly Block[];
@@ -23,19 +28,24 @@ export interface LineCardProps {
   tabbable: boolean;
 }
 
-export const LineCard = ({ card, ...line }: LineCardProps) =>
-  card === undefined ? null : <Carded card={card} {...line} />;
+export const LineCard = (props: LineCardProps) =>
+  props.msgid === undefined || props.room === undefined ? null : (
+    <Carded {...props} room={props.room} msgid={props.msgid} />
+  );
 
 function Carded({
-  card: asked,
+  room,
+  msgid,
+  cardKey: key,
+  may = false,
+  saving = false,
   text,
   blocks,
   player,
   verdict,
   mine,
   tabbable,
-}: LineCardProps & { card: NonNullable<LineCardProps["card"]> }) {
-  const { room, msgid, key, may, saving } = asked;
+}: LineCardProps & { room: string; msgid: string }) {
   // Read only for a line that has a card: the first screen's lines are never read twice for it.
   const capture = key !== undefined && previewIn(blocks, site.universeAt("/").gnoweb ?? "") !== undefined;
   const card = lineCard({ key, verdict, room, player, capture, mine, may });

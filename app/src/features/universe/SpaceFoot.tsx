@@ -5,7 +5,6 @@ import { useEffect, useSyncExternalStore } from "react";
 import { useApp } from "../../storeContext.tsx";
 import { Credits } from "./Credits.tsx";
 import { offer, press } from "./space.ts";
-import appear from "../../enter.module.css";
 import styles from "./Universe.module.css";
 
 const SORRY = "Space is not available here. Every place is in the list.";
@@ -22,11 +21,11 @@ export function SpaceFoot() {
     <>
       {state === "taken" ? <Credits /> : null}
       {state === "ask" ? (
-        <div className={[styles["offer"], appear["enter"]].join(" ")}>
+        <div className={[styles["offer"], "enter"].join(" ")}>
           <Button onClick={press}>View in space</Button>
         </div>
       ) : null}
-      <p role="status" className={styles["status"]}>
+      <p role="status" className={["meta", styles["status"]].join(" ")}>
         {state === "failed" ? SORRY : null}
       </p>
     </>

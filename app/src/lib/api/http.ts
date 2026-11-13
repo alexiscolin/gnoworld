@@ -4,11 +4,12 @@
 import { jsonOf } from "@gnoworld/core";
 import { ApiError } from "@gnoworld/schemas";
 import type * as z from "zod/mini";
+import type { GatedFetch } from "../query/policy.ts";
 
 /** The time a call has, its body read included: the server's own request timeout (server/src/app.ts). */
 export const TIMEOUT_MS = 10_000;
 
-export type Fetcher = (url: string, init?: RequestInit) => Promise<Response>;
+export type Fetcher = GatedFetch;
 type Reason = ApiError["error"] | "unavailable" | "malformed" | "network";
 /** A refusal's `body` is the server's answer as it came, for a client that reads more than its code (the guest chat's cause). */
 export type Result<T> = { ok: true; value: T } | { ok: false; reason: Reason; body?: unknown };
@@ -18,6 +19,8 @@ export interface Call<T> {
   path: string;
   body?: unknown;
   schema: z.ZodMiniType<T>;
+  /** Ends the call early, as the time limit does. */
+  signal?: AbortSignal | undefined;
 }
 
 // The answer read whole, or why not: a body that breaks off is the network's, a body that is no JSON malformed.
@@ -56,20 +59,39 @@ async function answerOf<T>(response: Response, { schema }: Call<T>): Promise<Res
   return parsed.success ? { ok: true, value: parsed.data } : { ok: false, reason: "malformed" };
 }
 
-/** A client's one way to call the server: one call, its answer read before its time runs out, the timer cleared
- * whatever happens. */
+/** A client's one way to call the server: one call, its answer read before its time runs out, the timer and the listener
+ * on the caller's signal cleared whatever happens. The time stops while the page's per-host queue holds the call. */
 export function jsonCall(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   return async <T>(call: Call<T>): Promise<Result<T>> => {
+    const { signal: outer } = call;
+    if (outer?.aborted === true) return { ok: false, reason: "network" };
     const controller = new AbortController();
-    const timer = setTimeout(() => {
-      controller.abort(new DOMException("the server took too long", "TimeoutError"));
-    }, timeoutMs);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const time = (running: boolean) => {
+      clearTimeout(timer);
+      if (!running) return;
+      timer = setTimeout(() => {
+        controller.abort(new DOMException("the server took too long", "TimeoutError"));
+      }, timeoutMs);
+    };
+    const leave = () => {
+      controller.abort(outer?.reason);
+    };
+    time(true);
+    outer?.addEventListener("abort", leave, { once: true });
     try {
-      return await answerOf(await fetcher(call.path, requestOf(call.body, controller.signal)), call);
+      const init = {
+        ...requestOf(call.body, controller.signal),
+        onWait: (waiting: boolean) => {
+          time(!waiting);
+        },
+      };
+      return await answerOf(await fetcher(call.path, init), call);
     } catch {
       return { ok: false, reason: "network" };
     } finally {
       clearTimeout(timer);
+      outer?.removeEventListener("abort", leave);
     }
   };
 }
@@ -78,6 +100,6 @@ export function jsonCall(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
 export function getter(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
   return <A, T>(schema: z.ZodMiniType<T>, pathOf: (arg: A) => string) =>
-    (arg: A): Promise<Result<T>> =>
-      call({ path: pathOf(arg), schema });
+    (arg: A, signal?: AbortSignal): Promise<Result<T>> =>
+      call({ path: pathOf(arg), schema, signal });
 }

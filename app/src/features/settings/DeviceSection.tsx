@@ -41,7 +41,6 @@ function Clear({ name, line, act, onClear }: { name: string; line: string; act: 
 // An account's saved messages and drafts, cleared one kind at a time.
 function AccountClears({ account, onSaid }: { account: Address; onSaid: (said: string) => void }) {
   const store = useAppStore();
-  const saved = useApp(({ keep }) => keep.saved);
   return (
     <>
       <Clear
@@ -49,8 +48,7 @@ function AccountClears({ account, onSaid }: { account: Address; onSaid: (said: s
         line="Those this account kept on this device."
         act="Clear saved messages"
         onClear={() => {
-          const { unsave } = store.getState().keepActions;
-          for (const line of saved) unsave(line.room, line.id);
+          store.getState().keepActions.clearSaved();
           onSaid("Saved messages cleared.");
         }}
       />
@@ -115,8 +113,15 @@ export function DeviceSection({ account }: { account: Address | undefined }) {
   const stamps = useApp(({ device }) => device.stamps);
   const charted = useApp(({ device }) => device.charted);
   const [said, setSaid] = useState("");
-  const { change } = store.getState().deviceActions;
-  const replace = (next: Passport) => change("stamps", () => next.stamps) && change("charted", () => next.charted);
+  // The passport replaced whole or not at all: a field the device refused puts the other back as it was.
+  const replace = (next: Passport) => {
+    const { change } = store.getState().deviceActions;
+    const before = store.getState().device;
+    if (change("stamps", () => next.stamps) && change("charted", () => next.charted)) return true;
+    change("stamps", () => before.stamps);
+    change("charted", () => before.charted);
+    return false;
+  };
   const read = (file: File) => {
     file
       .text()

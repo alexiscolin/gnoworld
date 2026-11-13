@@ -25,7 +25,7 @@ describe("CallRequest", () => {
     const edge = {
       chainId: "a".repeat(50),
       caller: CALLER,
-      realm: `gno.land/r/${"a".repeat(245)}`,
+      realm: `gno.land/r/${"a".repeat(128)}/${"a".repeat(116)}`,
       func: `A${"a".repeat(127)}`,
       args: Array.from({ length: 32 }, () => "a".repeat(8192)),
     };
@@ -67,7 +67,7 @@ describe("CallRequest", () => {
     ["a realm in capitals", { realm: "gno.land/r/Demo/Counter" }],
     ["a realm with a newline", { realm: "gno.land/r/demo/counter\n" }],
     ["a realm with a query", { realm: "gno.land/r/demo/counter?x=1" }],
-    ["a realm of 257 characters", { realm: `gno.land/r/${"a".repeat(246)}` }],
+    ["a realm of 257 characters", { realm: `gno.land/r/${"a".repeat(128)}/${"a".repeat(117)}` }],
     ["a function with a space", { func: "Inc rement" }],
     ["a function that starts with a digit", { func: "1A" }],
     ["a function with brackets", { func: "A()" }],

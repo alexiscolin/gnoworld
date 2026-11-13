@@ -32,12 +32,6 @@ describe("readCard", () => {
     expect(vi.getTimerCount()).toBe(0);
   });
 
-  it("gives down for a reader that takes longer than 10 s", async () => {
-    const asked = readCard(() => new Promise(() => undefined), "https://example.com/");
-    await vi.advanceTimersByTimeAsync(10_000);
-    expect(await asked).toBe("down");
-  });
-
   it("gives a card with no picture as it is", async () => {
     expect(await readCard(() => Promise.resolve(card(null)), "https://example.com/")).toEqual(card(null));
   });

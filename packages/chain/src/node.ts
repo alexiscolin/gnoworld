@@ -4,7 +4,7 @@
 // and no value. The expression of a vm/qeval is its caller's to build, with its tier-1 checks (app/src/lib/chain/evalCall.ts).
 import { jsonOf } from "@gnoworld/core";
 import { abciQueryOf } from "./abci.ts";
-import { QueryAnswer, StatusAnswer } from "@gnoworld/schemas";
+import { QueryAnswer, StatusAnswer, strictUtf8 } from "@gnoworld/schemas";
 import { FunctionList } from "@gnoworld/schemas/functions";
 import {
   failedRead,
@@ -15,7 +15,7 @@ import {
   type FailureKind,
   type ReadOptions,
 } from "./read.ts";
-import { withinTime } from "./transport.ts";
+import { withinTime, type ChainFetch } from "./transport.ts";
 
 type Query = "vm/qrender" | "vm/qeval" | "vm/qfuncs";
 
@@ -31,12 +31,11 @@ export interface NodeOptions extends ReadOptions {
 /** How long a node seen on its chain is taken to stay on it. */
 const SEEN_MS = 60_000;
 
-// The text of a base64 body, or null when it is no base64 or no UTF-8.
+/** The text of a base64 body, padded as a node writes it, or null when it is no such base64 or no UTF-8. */
 export function textOf(base64: string): string | null {
+  if (base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) return null;
   try {
-    const binary = atob(base64);
-    const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0));
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+    return strictUtf8(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0)));
   } catch {
     return null;
   }
@@ -105,12 +104,26 @@ export function guarded<T>(
   const [at, node] = [Date.parse(source.at), `${chainId} ${withoutSlash(rpc)}`];
   if ((seen?.get(node) ?? at) > at) return run(read);
   const ends = { timeout: failedRead<T>("timeout", source), left: failedRead<T>("down", source) };
-  return withinTime(read, ends, async (signal) => {
-    const status = await statusOf(rpc, { ...read, chainId, signal });
+  return withinTime(read, ends, async (signal, onWait) => {
+    const fetch = toldOfWaits(read.fetch, onWait);
+    const status = await statusOf(rpc, { ...read, fetch, chainId, signal });
     if (!status.ok) return status;
     seen?.set(node, at + SEEN_MS);
-    return run({ ...read, signal });
+    return run({ ...read, fetch, signal });
   });
+}
+
+// `fetcher`, telling `onWait` too when a gate holds one of its requests, so the guard's own limit stops with each request's.
+function toldOfWaits(fetcher: ChainFetch | undefined, onWait: (waiting: boolean) => void): ChainFetch {
+  const asked: ChainFetch = fetcher ?? ((url, init) => fetch(url, init));
+  return (url, init) =>
+    asked(url, {
+      ...init,
+      onWait: (waiting) => {
+        init?.onWait?.(waiting);
+        onWait(waiting);
+      },
+    });
 }
 
 /** The latest block's height and its own time (a page's age), its node checked on the same status when a chain is named.

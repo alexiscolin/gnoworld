@@ -375,6 +375,9 @@ importers:
       '@gnoworld/schemas':
         specifier: workspace:*
         version: link:../packages/schemas
+      '@gnoworld/service':
+        specifier: workspace:*
+        version: link:../packages/service
       '@jsquash/jpeg':
         specifier: 1.6.0
         version: 1.6.0
@@ -411,6 +414,9 @@ importers:
 
   packages/schemas:
     dependencies:
+      '@gnoworld/core':
+        specifier: workspace:*
+        version: link:../core
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -420,6 +426,9 @@ importers:
       '@gnoworld/core':
         specifier: workspace:*
         version: link:../core
+      '@gnoworld/schemas':
+        specifier: workspace:*
+        version: link:../schemas
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -490,13 +499,13 @@ importers:
         version: link:../packages/service
       '@hono/node-server':
         specifier: 2.1.6
-        version: 2.1.6(hono@4.13.13)
+        version: 2.1.6(hono@4.13.16)
       '@hono/zod-validator':
         specifier: 0.9.1
-        version: 0.9.1(hono@4.13.13)(zod@4.6.7)
+        version: 0.9.1(hono@4.13.16)(zod@4.6.7)
       hono:
-        specifier: 4.13.13
-        version: 4.13.13
+        specifier: 4.13.16
+        version: 4.13.16
       zod:
         specifier: 4.6.7
         version: 4.6.7
@@ -3648,8 +3657,8 @@ packages:
   hmac-drbg@1.0.1:
     resolution: {integrity: sha512-Tti3gMqLdZfhOQY1Mzf/AanLiqh1WTiJgEj26ZuYQ9fbkLomzGchCws4FyrSd4VkpBfiNhaE1On+lOz894jvXg==}
 
-  hono@4.13.13:
-    resolution: {integrity: sha512-CQ46U0ZkAGmbT/4UxdzzGJpacP2IeKgY4a5/tOI9AABbpOMfK739wfDXmv1usCk+3RkKj1hQy4/fjhiwa2xlrA==}
+  hono@4.13.16:
+    resolution: {integrity: sha512-AOLOEhvrV+iH92xXCnFr/5+3KjPKcI3xP63XJtX5spAnkznPdHijlIsUTpi7/9EhWqrTCekw5c5zh1K+YsVw7A==}
     engines: {node: '>=16.9.0'}
 
   hookified@1.15.1:
@@ -5861,13 +5870,13 @@ snapshots:
       - encoding
       - utf-8-validate
 
-  '@hono/node-server@2.1.6(hono@4.13.13)':
+  '@hono/node-server@2.1.6(hono@4.13.16)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.16
 
-  '@hono/zod-validator@0.9.1(hono@4.13.13)(zod@4.6.7)':
+  '@hono/zod-validator@0.9.1(hono@4.13.16)(zod@4.6.7)':
     dependencies:
-      hono: 4.13.13
+      hono: 4.13.16
       zod: 4.6.7
 
   '@humanfs/core@0.19.2':
@@ -8309,7 +8318,7 @@ snapshots:
       minimalistic-assert: 1.0.1
       minimalistic-crypto-utils: 1.0.1
 
-  hono@4.13.13: {}
+  hono@4.13.16: {}
 
   hookified@1.15.1: {}
 

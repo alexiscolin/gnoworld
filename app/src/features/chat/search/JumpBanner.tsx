@@ -47,7 +47,7 @@ export default function JumpBanner({
   const ready = time !== undefined;
   useEffect(() => (ready ? markFound(id) : undefined), [id, ready]);
   return (
-    <p role="status" className={styles["banner"]}>
+    <p role="status" className={["meta", styles["banner"]].join(" ")}>
       <Sidebar side="end" align="center" space="xs">
         <span>{readingWords(time ?? "", now)}</span>
         <Button

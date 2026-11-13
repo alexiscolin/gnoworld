@@ -8,6 +8,7 @@ import {
   absolute,
   databasePath,
   host,
+  hostPort,
   keyFile,
   parseSettings,
   port,
@@ -15,7 +16,10 @@ import {
   Secret,
   whole,
 } from "@gnoworld/service/settings";
+import { DEADLINE_MS } from "./http.ts";
+import { WAIT_MAX_MS } from "./model.ts";
 import { DOLLAR, MODELS, type Model } from "./prices.ts";
+import { TOOL_MS } from "./toolRun.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
 
 export interface JarvisConfig {
@@ -131,15 +135,7 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       JARVIS_GNOMCP_COMMAND: absolute.optional(),
       JARVIS_GNOMCP_CONFIG: absolute.optional(),
       // host:port, the port written plainly; replaces the command when set.
-      JARVIS_GNOMCP_ADDRESS: z
-        .string()
-        .regex(/^[a-z0-9][a-z0-9.-]{0,252}:[1-9]\d{0,4}$/i)
-        .transform((text) => ({
-          host: text.slice(0, text.lastIndexOf(":")),
-          port: Number(text.slice(text.lastIndexOf(":") + 1)),
-        }))
-        .refine(({ port }) => port <= 65535)
-        .optional(),
+      JARVIS_GNOMCP_ADDRESS: hostPort().optional(),
       JARVIS_PROFILES: z
         .string()
         .transform((list) => list.split(","))
@@ -151,6 +147,7 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
         .pipe(profiles),
     })
     .superRefine(({ JARVIS_PROFILES, JARVIS_INDEXER_PROFILES, JARVIS_GNOMCP_ADDRESS, ...spawned }, ctx) => {
+      if (longestAskMs(spawned) > DEADLINE_MS) ctx.addIssue({ code: "custom", path: ["JARVIS_CALL_TIMEOUT_S"] });
       if (JARVIS_GNOMCP_ADDRESS === undefined) {
         for (const name of ["JARVIS_GNOMCP_COMMAND", "JARVIS_GNOMCP_CONFIG"] as const)
           if (spawned[name] === undefined) ctx.addIssue({ code: "custom", path: [name], message: "required" });
@@ -183,6 +180,13 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
     gnomcp: gnomcpOf(settings),
     profiles: { read: settings.JARVIS_PROFILES, indexed: settings.JARVIS_INDEXER_PROFILES },
   };
+}
+
+// A question's longest run: each turn's attempts at their time with the waits between them, and the tools between turns.
+// A digest's 8 turns are not counted: the request's deadline cuts them.
+function longestAskMs(caps: { JARVIS_TURNS: number; JARVIS_RETRIES: number; JARVIS_CALL_TIMEOUT_S: number }): number {
+  const turn = (caps.JARVIS_RETRIES + 1) * caps.JARVIS_CALL_TIMEOUT_S * 1000 + caps.JARVIS_RETRIES * WAIT_MAX_MS;
+  return caps.JARVIS_TURNS * turn + (caps.JARVIS_TURNS - 1) * TOOL_MS;
 }
 
 // The address when one is set, else the spawn's command and configuration, which the schema made both present.

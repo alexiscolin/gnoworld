@@ -13,7 +13,7 @@ export interface ClusterProps extends Composed {
 export function Cluster({ justify = "start", align = "center", wrap = "yes", ...rest }: ClusterProps) {
   return place({
     ...rest,
-    className: styles["cluster"],
+    composition: styles["cluster"],
     own: { "data-justify": justify, "data-align": align, "data-wrap": wrap },
   });
 }

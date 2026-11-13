@@ -976,6 +976,23 @@ try:
             ]
             lint_cases(cases, src, f"walls {package}")
             shutil.rmtree(src)
+        # The link reader apart: core, schemas and the service package, by name and by a path, as its own; the server, Jarvis,
+        # the app and the chain package never, whatever the form.
+        reader = [
+            *apart("server", "../../../server/src/config.ts", ["@gnoworld/server"]),
+            *apart("jarvis", "../../../jarvis/src/loop.ts", ["@gnoworld/jarvis"]),
+            *apart("app", "../../../app/src/root.tsx", ["@gnoworld/app"]),
+            *apart("chain", "../../../packages/chain/src/read.ts", ["@gnoworld/chain/read"]),
+            ("core.ts", uses(name="parseLine", path="@gnoworld/core"), None),
+            ("schemas.ts", uses(name="ApiError", path="@gnoworld/schemas"), None),
+            ("service.ts", uses(name="logger", path="@gnoworld/service/log"), None),
+            ("core_path.ts", uses(name="parseLine", path="../../../packages/core/src/index.ts"), None),
+            ("schemas_path.ts", uses(name="ApiError", path="../../../packages/schemas/src/index.ts"), None),
+            ("service_path.ts", uses(name="logger", path="../../../packages/service/src/log.ts"), None),
+            ("sibling.ts", uses(name="used", path="./core.ts"), None),
+        ]
+        lint_cases(reader, "link-reader/src/__probe__", "walls link reader")
+        shutil.rmtree("link-reader/src/__probe__")
 
     if part("chain_reads"):
         # Every read of a chain's node or the indexer goes through packages/chain (Alexis, decision-onchain.md; D113): outside
@@ -1315,6 +1332,7 @@ finally:
     shutil.rmtree("packages/schemas/src/__probe__", ignore_errors=True)
     shutil.rmtree("app/tests/__probe__", ignore_errors=True)
     shutil.rmtree("server/src/__probe__", ignore_errors=True)
+    shutil.rmtree("link-reader/src/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
 if ONLY - ran:

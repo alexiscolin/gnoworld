@@ -1,6 +1,6 @@
-export { escapeTagValue, formatLine, LINE_BYTES, parseLine, toIrcCommand, unescapeTagValue } from "./irc/irc.ts";
+export { formatLine, LINE_BYTES, parseLine, toIrcCommand } from "./irc/irc.ts";
 export type { IrcCommand, IrcMessage, IrcParsed, IrcParseError } from "./irc/irc.ts";
-export { BATCH_LINES, BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
+export { BatchReader, OPEN_BATCHES, type Batch, type Batched } from "./irc/batch.ts";
 export { JARVIS_NICK, plainWords } from "./chat/jarvisNick.ts";
 export { GUEST_ADJECTIVES, GUEST_ANIMALS, GUEST_NAME_BYTES, GUEST_PREFIX, guestName } from "./chat/guestName.ts";
 export { foldMultiline, MULTILINE, MULTILINE_BYTES, MULTILINE_LINES } from "./irc/multiline.ts";
@@ -31,7 +31,7 @@ export {
   type StarSystem,
   type WorldHeld,
 } from "./cosmos/system.ts";
-export { planetCount, worldsDrawn } from "./cosmos/count.ts";
+export { worldsDrawn } from "./cosmos/count.ts";
 export { rollupName } from "./rollupName.ts";
 export type { Planned, Rock } from "./lod/drawn.ts";
 export {
@@ -66,24 +66,21 @@ export {
 export { coveredShare, evenRow, offLine } from "./frame/composition.ts";
 export { DIVE, diveAt } from "./frame/dive.ts";
 export { arrivalOf, type Arrival } from "./frame/arrival.ts";
-export { PART_KINDS, type Finish, type Part, type PartKind } from "./station/parts.ts";
+export type { Finish, Part, PartKind } from "./station/parts.ts";
 export { stationOf, STATIONS_SHOWN, type Station } from "./station/station.ts";
 export { earthCamera, earthEye, earthTopEye, offEarthViews, sceneryOf, type Scenery } from "./station/scenery.ts";
 export { onOrbit, stationsRound, type Placed as PlacedStation } from "./station/round.ts";
-export { alikeStations, lookOf as stationLookOf } from "./station/variety.ts";
 export { planOf, plannedOf } from "./frame/plan.ts";
 export { LENT, type Lent } from "./frame/lent.ts";
 export { rocksAt } from "./frame/rocks.ts";
-export { HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
+export { haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./frame/halo.ts";
 export * from "./frame/flight.ts";
 export { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "./frame/zoomPath.ts";
-export { drawnOf, easedOf, postcardOf, type Postcard } from "./frame/postcard.ts";
+export { drawnOf, easedOf, type Postcard } from "./frame/postcard.ts";
 export { FIELD_OF_VIEW, HERO_ZONE, REST_DISTANCE, REST_SCREENS, STAR_HEART, type RestView } from "./frame/rest.ts";
-export { BANDS } from "./frame/bands.ts";
 export {
   anchorOf,
   ANCHORS,
-  asciiBytes,
   MAPS,
   natureOf,
   planetLook,
@@ -118,7 +115,6 @@ export {
   daysSince,
   isFresh,
   LIGHT_KINDS,
-  STAGES,
   worldSigns,
   type LightKind,
   type Stage,
@@ -129,7 +125,7 @@ export { between, seedShare } from "./planet/shares.ts";
 export { groundDirection, subSolarPoint, within, type GroundPoint } from "./earth/sun.ts";
 export { cappedBytes, type ByteReader } from "./chain/capped.ts";
 export { isPublicOrigin } from "./chain/origin.ts";
-export { evalNameOf, evalOwner, isAddress, isName, ownerOfAnswer } from "./chain/evalName.ts";
+export { ADDRESS_BODY, evalNameOf, evalOwner, isAddress, isName, ownerOfAnswer } from "./chain/evalName.ts";
 export { dmOf } from "./chat/dm.ts";
 export { cardLinkOf, normalisedUrl } from "./chat/cardLink.ts";
 export { dmNotice, roomNotice, type Notice, type NoticeKind, type NoticeLine, type RoomAt } from "./chat/notice.ts";
@@ -157,6 +153,7 @@ export {
   type Shown,
 } from "./chat/reactions.ts";
 export { inlines, inWord, markdown, mentions, mentionsRoom, type Block, type Inline } from "./markdown/markdown.ts";
+export { mentionSpans } from "./markdown/mentions.ts";
 export { firstGraphemes } from "./markdown/graphemes.ts";
 export { cutGraphemes, excerpt, words } from "./markdown/plain.ts";
 export { isBlank } from "./markdown/nodes.ts";
@@ -191,3 +188,8 @@ export * from "./discovery/index.ts";
 export * from "./store/index.ts";
 export { jsonOf, placeIn } from "./json/json.ts";
 export * from "./args/args.ts";
+export { hasHidden, stripHidden } from "./text/hidden.ts";
+export { utf8Bytes } from "./text/utf8.ts";
+export { asciiBytes, hexOf } from "./text/bytes.ts";
+export { damp } from "./smooth.ts";
+export { trimOldest } from "./trim.ts";

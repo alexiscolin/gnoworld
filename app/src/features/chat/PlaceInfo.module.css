@@ -11,16 +11,15 @@
 
   .name {
     /* raw: the video's panel title, 32 px; its stems are 1.3 px against 1.8 px at 400 (frame 66), so 300, not the prototype's 400 */
-    font: 300 32px/1.1 var(--family-sans);
+    font: 300 2rem/1.1 var(--family-sans);
     /* raw: the prototype's -0.03em */
     letter-spacing: -0.03em;
   }
 
   .about {
+    color: var(--color-text-soft);
     /* raw: 13.5 px on 1.5 in the panel's own grey (the prototype's #chatSide p) */
-    color: #c8d0de;
-    /* raw: 13.5 px on 1.5 in the panel's own grey (the prototype's #chatSide p) */
-    font: 400 13.5px/1.5 var(--family-sans);
+    font: 400 0.84375rem/1.5 var(--family-sans);
   }
 
   /* The figures between two rules, as the video's panel sets them. */

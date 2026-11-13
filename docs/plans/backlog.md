@@ -112,7 +112,6 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Item | Delivers | Why |
 |---|---|---|
 | More worlds than `_headers` holds (F2461) | The build's stop at 100 rules, about 20 worlds, replaced before the data reaches it: a host's rules that scale, and no stop for nginx, which has no such cap | Alexis, 2026-10-30: kept for now, one world today; the data's growth decides when |
-| A Combobox group's id (F2410) | `ui`'s `Combobox` says or checks that a group's id holds no space and no repeat, since it is joined into `aria-labelledby`; with its next change | An id with a space leaves the group unnamed for a screen reader; the palette's kinds have none today |
 | The composer's lost key (F2411) | The cause of the Home and End lost after a Tab's focus found, and `composer.spec.ts`'s `caretAt` stops pressing them again | The test retries, so a composer that loses the first key would still pass; F2402 left the cause unexplained |
 
 ## The design system, after slice 2

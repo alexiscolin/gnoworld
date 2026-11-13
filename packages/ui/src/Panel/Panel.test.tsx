@@ -36,6 +36,17 @@ describe("Panel", () => {
     expect(panel().dataset["look"]).toBe("floating");
   });
 
+  it("gives the plate alone a fill element the arrival fades, never a custom property the plate's words inherit", () => {
+    const { container, rerender } = render(
+      <Panel label="World" look="plate">
+        x
+      </Panel>,
+    );
+    expect(container.querySelector("[data-fill]")?.getAttribute("aria-hidden")).toBe("true");
+    rerender(<Panel label="World">x</Panel>);
+    expect(container.querySelector("[data-fill]")).toBeNull();
+  });
+
   it("draws no box for a part it does not have: a body alone is its one child", () => {
     render(
       <Panel label="Dock">

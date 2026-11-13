@@ -57,18 +57,18 @@
     stroke-dasharray: 1;
   }
 
-  @media (prefers-reduced-motion: no-preference) {
-    .spark[data-arrives] .line {
-      /* raw: the proposal's score */
-      animation: draw 0.8s var(--ease-out-3) var(--spark-line, 0.9s) both;
-      animation-play-state: var(--play, running);
-    }
+  /* The motion scale is 0 under reduced motion, the system's or the app's setting: the drawing stands whole at once. */
+  .spark[data-arrives] .line {
+    /* raw: the proposal's score */
+    animation: draw calc(0.8s * var(--motion-scale)) var(--ease-out-3)
+      calc(var(--spark-line, 0.9s) * var(--motion-scale)) both;
+    animation-play-state: var(--play, running);
+  }
 
-    .spark[data-arrives] .area {
-      /* raw: the proposal's score */
-      animation: appear 0.6s ease var(--spark-area, 1.2s) both;
-      animation-play-state: var(--play, running);
-    }
+  .spark[data-arrives] .area {
+    /* raw: the proposal's score */
+    animation: appear calc(0.6s * var(--motion-scale)) ease calc(var(--spark-area, 1.2s) * var(--motion-scale)) both;
+    animation-play-state: var(--play, running);
   }
 
   @keyframes draw {

@@ -11,6 +11,7 @@ export const keys = {
   worldsCount: (base: string) => ["worlds", base, "count"] as const,
   proposals: (rpc: string, realm: string) => ["realm", rpc, realm, "proposals"] as const,
   name: (chainId: string, account: string, again: number) => ["name", chainId, account, again] as const,
+  height: (chainId: string) => ["height", chainId] as const,
   previews: (base: string) => ["previews", base] as const,
   search: (ask: unknown) => ["search", ask] as const,
   rooms: (query: string) => ["rooms", query] as const,
@@ -29,6 +30,7 @@ export const keys = {
   token: (realm: string) => ["token", realm] as const,
   explanation: (kind: string, chain: string, subject: string) => ["explanation", kind, chain, subject] as const,
   jarvisState: () => ["jarvis", "state"] as const,
+  jarvisSaid: (room: string, msgid: string) => ["jarvis", "said", room, msgid] as const,
 };
 
 /** A call of `realm` was accepted: its page, its facts and its proposals are read again at the next look (a mounted view reads them at once). */

@@ -82,7 +82,7 @@ export function PreviewCard({ capture, look, gnoweb, via, Blocks, live, tabbable
           }}
         >
           <Stack space="s">
-            <p className={styles["when"]}>
+            <p className="meta">
               Captured <time dateTime={capture.captured}>{when}</time>: the first part of the page as the chain rendered
               it.
             </p>

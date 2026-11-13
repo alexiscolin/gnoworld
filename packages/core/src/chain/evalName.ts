@@ -4,10 +4,13 @@
 /** bech32's alphabet, lower case: no b, i, o or 1. */
 const BECH32 = "023456789acdefghjklmnpqrstuvwxyz";
 
+/** A gno address's pattern, for a larger one: `g1` and 38 characters of bech32's alphabet, the checksum unread. */
+export const ADDRESS_BODY = `g1[${BECH32}]{38}`;
+
 /** A gno address: `g1` and 38 characters of bech32's alphabet, 40 in all. The checksum is not checked: the pattern alone decides
  * what may enter an expression. */
 export function isAddress(address: string): boolean {
-  return new RegExp(`^g1[${BECH32}]{38}$`).test(address);
+  return new RegExp(`^${ADDRESS_BODY}$`).test(address);
 }
 
 /** Whether `text` holds an address or its look, a short or a split one too: `g1` and 8 or more of bech32's letters in a row, whatever

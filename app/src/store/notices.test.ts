@@ -257,17 +257,6 @@ describe("the store's notices slice", () => {
       expect(unseenNotices(t.state())).toEqual([]);
     });
 
-    it("counts none of a stranger's once the account hears from those it wrote to alone", () => {
-      const t = setup();
-      t.kept(ALICE, BOB);
-      t.notices.add(notice({ id: "a", kind: "dm", where: ALICE }));
-      t.notices.add(notice({ id: "b", kind: "dm", where: BOB }));
-      t.store.getState().dmActions.setOnlyKnown(true);
-      expect(totalUnseen(t.state())).toBe(0);
-      t.store.getState().dmActions.setOnlyKnown(false);
-      expect(totalUnseen(t.state())).toBe(2);
-    });
-
     // R2 (redpass2-4fn): the conversations are bounded, the notices of those that went were not.
     it("keeps the notices of the conversations the store keeps alone, as many as it keeps of them", () => {
       const t = setup();

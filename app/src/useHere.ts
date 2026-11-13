@@ -11,7 +11,7 @@ const mapOf = ({ worlds }: Presence): ReadonlyMap<string, number> =>
   new Map(worlds.map(({ world, here }) => [world, here]));
 
 /** Who is here in the world `slug` now, from the page's one reading (a component holds it with `useHere`): none until it answers. */
-export const hereOf = (slug: string): number | undefined =>
+export const presentIn = (slug: string): number | undefined =>
   queryClient.getQueryData(presenceOptions.queryKey)?.worlds.find(({ world }) => world === slug)?.here;
 
 export function useHere(open: boolean): ReadonlyMap<string, number> {

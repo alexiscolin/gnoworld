@@ -5,9 +5,12 @@ import { fastLink } from "./lib/saveData.ts";
 /** How long a pointer rests on a link before it is meant. */
 export const HOVER_MS = 150;
 
-/** Calls `run` after HOVER_MS if `element` is still pointed at or focused, and the link is a fast one. */
-export function afterDwell(element: Element, run: () => void): void {
-  setTimeout(() => {
+/** Calls `run` after HOVER_MS if `element` is still pointed at or focused, and the link is a fast one; gives what calls it off. */
+export function afterDwell(element: Element, run: () => void): () => void {
+  const timer = setTimeout(() => {
     if (fastLink() && element.matches(":hover, :focus-visible")) run();
   }, HOVER_MS);
+  return () => {
+    clearTimeout(timer);
+  };
 }

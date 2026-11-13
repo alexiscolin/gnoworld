@@ -6,7 +6,7 @@ import { type groundOn } from "./earthGround.ts";
 import { motionOf } from "./space/motion.ts";
 import { nameOf } from "./placeName.ts";
 import { gpuCanDraw } from "./features/universe/gpu.ts";
-import { worldsFile } from "./features/universe/worldsFile.ts";
+import { worldsFile } from "./worldsFile.ts";
 import styles from "./MiniSpace.module.css";
 
 // raw: the planet's circle in the box, a share of its shorter side
@@ -52,7 +52,7 @@ export default function MiniSpace({ world, ground }: { world: string; ground: Re
             near: nothing,
             landed: nothing,
             drawn: () => {
-              canvas.classList.add(styles["drawn"] ?? "");
+              canvas.dataset["drawn"] = "";
             },
           },
         });

@@ -10,10 +10,4 @@
   .box b {
     font-weight: 700;
   }
-
-  /* A line under a list: what it is for, in the meta type. */
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
 }

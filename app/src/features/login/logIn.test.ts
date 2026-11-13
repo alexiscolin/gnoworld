@@ -445,6 +445,35 @@ describe("pageClock", () => {
     }
   });
 
+  // Loaded afresh inside the test: the options are a constant of the module, which a planted change reaches only when it loads after.
+  it("hears in capture and passive whenever its module loads", async () => {
+    vi.resetModules();
+    const { pageClock: loaded } = await import("./logIn.ts");
+    const options: unknown[] = [];
+    const clock = loaded({
+      hidden: false,
+      addEventListener: (_type: string, _listener: () => void, given: AddEventListenerOptions) => {
+        options.push(given);
+      },
+      removeEventListener: () => undefined,
+    });
+    isDone(clock.rest());
+    clock.stop();
+    expect(options).toEqual(Array.from({ length: 4 }, () => ({ capture: true, passive: true })));
+  });
+
+  it("clears at stop the timers still pending alone, each once: not one that fired, nothing at a second stop", async () => {
+    const clock = pageClock(page(false));
+    isDone(clock.wait(1000));
+    await vi.advanceTimersByTimeAsync(1000);
+    isDone(clock.wait(5000));
+    const cleared = vi.spyOn(globalThis, "clearTimeout");
+    clock.stop();
+    clock.stop();
+    expect(cleared).toHaveBeenCalledTimes(1);
+    cleared.mockRestore();
+  });
+
   describe("with knowSession, a server that never says: the asks it costs", () => {
     const asking = (hidden: boolean) => {
       const base = deps();

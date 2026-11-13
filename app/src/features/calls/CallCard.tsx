@@ -114,7 +114,7 @@ function Actions({ card, onSign, onCancel, onRetry, login }: Omit<CallCardProps,
     const stuck = problemsOf(card).some((problem) => problem !== undefined);
     return (
       <Card.Actions>
-        <span className={styles["computer"]}>
+        <span className="fine-only">
           <Button emphasis="solid" disabled={stuck} onClick={onSign}>
             Sign in Adena
           </Button>
@@ -185,13 +185,13 @@ export function CallCard({
         </dl>
         {preview
           ? warningsOf(card).map((warning) => (
-              <p key={warning} className={styles["note"]}>
+              <p key={warning} className="meta">
                 {warning}
               </p>
             ))
           : null}
         <CallStatus card={card} />
-        {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
+        {preview ? <p className="meta coarse-only">To sign, use a computer.</p> : null}
       </Card.Body>
       <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} login={login} />
     </Card>

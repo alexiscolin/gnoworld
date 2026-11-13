@@ -34,18 +34,15 @@
     block-size: 100%;
     border-radius: var(--radius-pill);
     background: var(--color-primary);
-    transform-origin: 0 50%;
-  }
-
-  .more {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
+    /* the track's start, the left in left-to-right */
+    transform-origin: calc(50% - 50% * var(--dir)) 50%;
   }
 
   @media (prefers-reduced-motion: no-preference) {
     .track i {
       /* raw: the proposal's score, 0.9 s from 0.3 s after its card */
-      animation: along 0.9s var(--ease-out-3) calc(var(--d) + 0.3s) backwards;
+      animation: along calc(0.9s * var(--motion-scale)) var(--ease-out-3) calc((var(--d) + 0.3s) * var(--motion-scale))
+        backwards;
       animation-play-state: var(--play);
     }
   }

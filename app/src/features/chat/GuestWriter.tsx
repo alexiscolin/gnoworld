@@ -162,7 +162,7 @@ export function GuestWriter({ room }: { room: string }) {
           </p>
         )}
         <Cluster justify="between">
-          <span className={styles["note"]}>
+          <span className="meta">
             {guest.off
               ? "Guests cannot speak here."
               : `${guest.name === undefined ? "You speak as a guest." : `You speak as ${guest.name}.`} ${ADENA_GIVES}`}

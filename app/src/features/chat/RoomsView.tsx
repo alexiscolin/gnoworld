@@ -1,6 +1,6 @@
 // A world's rooms by section (slice 4's 4b): the sections the server lists, in its order, a section with no
 // room left out; each room a link to its address on the site, the one shown marked. An account's direct messages
-// follow (4e), each conversation a link to its page, with the choice to hear from those it wrote to alone.
+// follow (4e), each conversation a link to its page.
 import type { Notice } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { useRef, type ReactNode } from "react";
@@ -49,11 +49,6 @@ export interface DmsProps {
   partners: readonly string[];
   /** The conversation in view. */
   current: string | undefined;
-  /** Whether it hears from those it wrote to alone. */
-  onlyKnown: boolean;
-  onOnlyKnown: (only: boolean) => void;
-  /** Whether the device failed to keep that choice and those written to (CR5). */
-  notKept?: boolean | undefined;
   /** Everyone in a room the page follows, space-separated: a partner among them gets the video's green dot (frame 56). */
   present?: string | undefined;
 }
@@ -115,9 +110,8 @@ function Dms({
   partners,
   current,
   badges,
-  notKept,
   present,
-}: Pick<DmsProps, "world" | "partners" | "current" | "notKept" | "present"> & { badges: RoomsViewProps["badges"] }) {
+}: Pick<DmsProps, "world" | "partners" | "current" | "present"> & { badges: RoomsViewProps["badges"] }) {
   const full = useFull();
   const here = new Set(present?.split(" "));
   return (
@@ -154,13 +148,11 @@ function Dms({
             ))}
           </ul>
           {/* What every direct message says of itself, in the video's small grey note under the list. */}
-          <p className={styles["note"]}>
+          <p className={["meta", styles["note"]].join(" ")}>
             {NOT_ENCRYPTED} {PAGE_ONLY}
           </p>
         </>
       )}
-      {/* Said in view, not behind the menu: a device that kept none of the choices is a risk the reader must not miss (CR5). */}
-      {notKept === true ? <p className={styles["note"]}>Not kept on this device</p> : null}
     </Folding>
   );
 }

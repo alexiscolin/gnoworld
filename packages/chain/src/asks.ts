@@ -86,6 +86,10 @@ export const blockTimes = (heights: readonly number[]): IndexerAsk => ({
 /** The chain's last block height. */
 export const tipAsk = (): IndexerAsk => ({ query: "{ latestBlockHeight }", variables: {} });
 
+/** The address that asks `ask` of the indexer at `indexer` (its GraphQL endpoint) by GET, its variables as JSON. */
+export const indexerUrl = (indexer: string, { query, variables }: IndexerAsk): string =>
+  `${indexer}?query=${encodeURIComponent(query)}&variables=${encodeURIComponent(JSON.stringify(variables))}`;
+
 /** The first `limit` transactions above a height, whatever their messages: each one's block and its first message's sender
  * (the network's line); no body, no events. */
 export const txsAbove = (above: number, limit: number): IndexerAsk => ({

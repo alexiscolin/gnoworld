@@ -21,7 +21,7 @@ export interface Explained {
 const explanationOptions = ({ kind, chain, subject }: Explained) =>
   queryOptions({
     queryKey: keys.explanation(kind, chain, subject),
-    queryFn: () => readApi(() => pageExplanationsApi().read(kind, chain, subject)),
+    queryFn: ({ signal }) => readApi((s) => pageExplanationsApi().read({ kind, chain, subject }, s), signal),
     staleTime: 60_000,
     retry: false,
     placeholderData: keepPreviousData,

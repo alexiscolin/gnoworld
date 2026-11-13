@@ -160,6 +160,56 @@ describe("readTokens", () => {
     expect(store.height()).toBe(3);
   });
 
+  it("resets the store it is given when the chain restarted, so the route sharing it reads the new table", async () => {
+    const db = new DatabaseSync(":memory:");
+    db.exec(TOKEN_TABLES);
+    const shared = tokenStore(db, "onyx");
+    const pass = (send: Send) =>
+      readTokens({
+        db,
+        store: shared,
+        log: () => undefined,
+        reader: { send, indexer: "https://i.example/q" },
+        universe: "onyx",
+        isStopped: () => false,
+        now: () => Date.parse("2026-11-12T12:00:00Z"),
+      });
+    const first = page({ block_height: 1, events: [born, mint("100")] }).data.getTransactions;
+    await pass(chain(first));
+    expect(shared.answerOf(rollupName(REALM))?.tokens[0]?.supply).toBe("100");
+    // The same height on a chain that restarted: its block 1 has another time, and other rows.
+    const second = page({ block_height: 1, events: [born, mint("7")] }).data.getTransactions;
+    const restarted: Send = async (...args) =>
+      new Response((await (await chain(second)(...args)).text()).replaceAll("01:00:00Z", "02:00:00Z"));
+    await pass(restarted);
+    expect(shared.answerOf(rollupName(REALM))?.tokens[0]?.supply).toBe("7");
+  });
+
+  it(`stops at ${String(TOKEN_PAGES)} pages a pass, keeps what it replayed, says it was capped, and goes on from there next time`, async () => {
+    const db = new DatabaseSync(":memory:");
+    db.exec(TOKEN_TABLES);
+    const rows = page(
+      { block_height: 1, events: [born, mint("1")] },
+      ...Array.from({ length: 60 }, (_, at) => ({ block_height: at + 2, events: [mint("1")] })),
+    ).data.getTransactions;
+    const log: string[] = [];
+    const pass = () =>
+      readTokens({
+        db,
+        log: (name) => void log.push(name),
+        reader: { send: chain(rows), indexer: "https://i.example/q", page: 2 },
+        universe: "onyx",
+        isStopped: () => false,
+        now: () => Date.parse("2026-11-12T12:00:00Z"),
+      });
+    expect(await pass()).toEqual({ ok: true });
+    expect(log).toEqual(["token_read_capped"]);
+    const first = tokenStore(db, "onyx").height();
+    expect(first).toBe(TOKEN_PAGES);
+    await pass();
+    expect(tokenStore(db, "onyx").height()).toBe(2 * TOKEN_PAGES);
+  });
+
   it("counts a token made under realm.Sub as an event skipped, and never replays it", () => {
     const sub = { token: `${REALM}#sub.COIN.0000000`, name: "n", symbol: "COIN", decimals: "2" };
     const { txs, skipped } = txsOf(page({ block_height: 1, events: [event("NewToken", sub)] }), 0);

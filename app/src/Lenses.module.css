@@ -40,7 +40,7 @@
     background: transparent;
     color: var(--color-text-muted);
     /* raw: 16 px, larger than the interface's 13 (Alexis, 2026-11-09: "plus gros") */
-    font: 500 16px/1 var(--family-sans);
+    font: 500 1rem/1 var(--family-sans);
     white-space: nowrap;
     transition: var(--transition-tint);
   }

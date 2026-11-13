@@ -2,15 +2,10 @@
 // poll's catch-up, a page at a time) and the realms deployed in the last 24 h (the Earth's count at start). The answer is outside
 // data: every call has its timeout and no redirect (service/net), an answer is read up to a size, goes through Zod, and a row that
 // fails is dropped and said. Every loop has its cap; a count that would stand on a capped history is no count (it fails).
-import {
-  blocksQuery,
-  catchUpQuery,
-  deploysQuery,
-  placeQuery,
-  tipQuery,
-  type Place,
-} from "@gnoworld/chain/transactions";
+import { tipAsk } from "@gnoworld/chain/asks";
+import { blocksQuery, catchUpQuery, deploysQuery, placeQuery, type Place } from "@gnoworld/chain/transactions";
 import { jsonOf } from "@gnoworld/core";
+import { TipAnswer } from "@gnoworld/schemas/indexer";
 import { readCapped, send as netSend, type Send } from "@gnoworld/service/net";
 import { z } from "zod";
 import type { Deploy } from "./count.ts";
@@ -147,9 +142,7 @@ export function indexerReaders({ url, watch, log, send = netSend }: IndexerOptio
   return {
     /** The newest block the indexer holds. */
     async tip(signal?: AbortSignal): Promise<number> {
-      const height = z
-        .object({ latestBlockHeight: z.number().int().nonnegative() })
-        .safeParse(await ask(tipQuery, signal));
+      const height = TipAnswer.shape.data.safeParse(await ask(tipAsk().query, signal));
       if (!height.success) throw new Error("the indexer gave no height");
       return height.data.latestBlockHeight;
     },

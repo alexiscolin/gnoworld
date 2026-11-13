@@ -5,9 +5,9 @@ import { CallDetail, CallHash, CallIndex, indexerHash } from "@gnoworld/schemas"
 import type { Log } from "@gnoworld/service/log";
 import { send as netSend, type Send } from "@gnoworld/service/net";
 import { Hono } from "hono";
+import { keptFlights } from "../flights.ts";
 import { guard, refuserOf, type Guarded, type Refusals } from "../guard.ts";
 import { limiter } from "../limit.ts";
-import { remember } from "../remember.ts";
 import { visitorOf } from "../visitor.ts";
 import { kindOf } from "../worlds/remote.ts";
 import { readCall, type Found } from "./read.ts";
@@ -38,11 +38,6 @@ const refusals = {
   unavailable: ["not_ready", 503],
 } as const satisfies Refusals;
 
-interface Kept {
-  found: Found;
-  until: number;
-}
-
 export function callRoutes({
   indexer,
   origins,
@@ -54,40 +49,31 @@ export function callRoutes({
   perSecond = PER_SECOND,
 }: Options): Hono<Guarded> {
   const byVisitor = limiter({ max: PER_MINUTE, windowMs: 60_000, keys });
-  const together = limiter({ max: perSecond, windowMs: 1000, keys: 1 });
-  const kept = new Map<string, Kept>();
-  const asking = new Map<string, Promise<Found>>();
   const refuse = refuserOf(log, "call_refused", refusals);
   const app = new Hono<Guarded>();
   app.use(guard(origins, refuse));
-  // The call kept under `key`, else the read already running for it, else a read now (only that spends the site-wide limit), kept; a
-  // fault throws.
-  const found = (key: string, hash: string, index: number): Promise<Found | "limit"> => {
-    const held = kept.get(key);
-    if (held !== undefined && held.until > now()) return Promise.resolve(held.found);
-    const running = asking.get(key);
-    if (running !== undefined) return running;
-    if (!together.take("all", now())) return Promise.resolve("limit");
-    const ask = readCall({ send, indexer }, indexerHash(hash), index)
-      .then((read) => {
-        // A hash not indexed yet, or a call with no block time (that read failed), is asked again soon.
-        const soon = read.kind === "absent" || (read.kind === "call" && read.detail.time === null);
-        remember(kept, [key, { found: read, until: soon ? now() + ABSENT_MS : Number.POSITIVE_INFINITY }], KEPT);
-        return read;
-      })
-      .finally(() => asking.delete(key));
-    asking.set(key, ask);
-    return ask;
-  };
+  // The call kept under its key, else the read already running for it, else a read now; a fault throws. A hash not indexed yet, or a call
+  // with no block time (that read failed), is asked again soon.
+  const found = keptFlights<Found>({
+    now,
+    perSecond,
+    most: KEPT,
+    until: (read) =>
+      read.kind === "absent" || (read.kind === "call" && read.detail.time === null)
+        ? now() + ABSENT_MS
+        : Number.POSITIVE_INFINITY,
+  });
   app.get("/:hash/:index?", async (c) => {
     // Counted before anything is read: a refused request is load too.
     if (!byVisitor.take(visitorOf(c, proxy), now())) return refuse(c, "limit");
     const hash = CallHash.safeParse(c.req.param("hash"));
     const index = CallIndex.safeParse(c.req.param("index") ?? "0");
     if (!hash.success || !index.success) return refuse(c, "refused");
+    const at = Number(index.data);
+    const asked = found(`${hash.data}:${String(at)}`, () => readCall({ send, indexer }, indexerHash(hash.data), at));
+    if (asked === "limit") return refuse(c, "limit");
     try {
-      const read = await found(`${hash.data}:${String(Number(index.data))}`, hash.data, Number(index.data));
-      if (read === "limit") return refuse(c, "limit");
+      const read = await asked;
       if (read.kind !== "call") return refuse(c, "missing");
       c.header("cache-control", "private, max-age=60");
       return c.json(read.detail satisfies CallDetail);

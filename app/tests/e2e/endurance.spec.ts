@@ -33,7 +33,7 @@ const REALM = "gnoland/blog";
 const expand = (page: Page) => page.getByRole("button", { name: "Open the full chat" });
 const shrink = (page: Page) => page.getByRole("button", { name: "Close the full chat" });
 const control = (page: Page) => page.getByRole("button", { name: "Search", exact: true });
-const field = (page: Page) => page.getByRole("searchbox", { name: "Search places" });
+const field = (page: Page) => page.getByRole("combobox", { name: "Search places" });
 
 interface Counters {
   heap: number;

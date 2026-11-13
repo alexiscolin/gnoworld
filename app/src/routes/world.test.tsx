@@ -130,11 +130,8 @@ describe("a world's page", () => {
   test("a world with no capture shows no preview: no picture on its page, no og:image in its tags", async () => {
     const html = await render(route(), "/w/bubble");
     expect(html).not.toMatch(/<(figure|picture|img|video|canvas|iframe|object|embed)\b|data-preview/i);
-    // The main action's icon (frame 26) comes with the plate's chunk, not the first paint: any drawing there is a decorative glyph of the
-    // design system, no other.
-    const drawings = html.match(/<svg\b[^>]*>/gi) ?? [];
-    for (const drawing of drawings)
-      expect(drawing).toMatch(/aria-hidden="true"[^>]*data-icon=|data-icon=[^>]*aria-hidden="true"/);
+    // The main action's icon (frame 26) comes with the plate's chunk: the first paint draws nothing at all.
+    expect(html).not.toMatch(/<svg\b/i);
     const tags = JSON.stringify(meta(metaArgs(bubbleOf())));
     expect(tags).not.toMatch(/og:image|twitter:image|"image"/i);
   });

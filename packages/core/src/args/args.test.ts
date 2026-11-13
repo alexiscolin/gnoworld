@@ -681,6 +681,18 @@ describe("textProblem: what a CallRequest refuses of any text", () => {
     expect(textProblem(text)).toBe("malformed");
   });
 
+  it.each([
+    ["the line separator", "\u2028"],
+    ["the paragraph separator", "\u2029"],
+    ["the Hangul choseong filler", "\u115f"],
+    ["the Hangul jungseong filler", "\u1160"],
+    ["the Hangul filler", "\u3164"],
+    ["the half-width Hangul filler", "\uffa0"],
+  ])("calls a text holding %s malformed, which draws as nothing and a CallRequest refuses", (_, char) => {
+    expect(textProblem(`a${char}b`)).toBe("malformed");
+    expect(HIDDEN.test(char)).toBe(true);
+  });
+
   it("calls a text of more than 8,192 UTF-8 bytes long, and takes one of exactly 8,192", () => {
     expect(textProblem("a".repeat(8192))).toBeUndefined();
     expect(textProblem("a".repeat(8193))).toBe("long");

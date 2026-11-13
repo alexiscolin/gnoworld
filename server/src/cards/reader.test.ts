@@ -1,4 +1,6 @@
-import type { send as netSend } from "@gnoworld/service/net";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
+import { send as netSend } from "@gnoworld/service/net";
 import { describe, expect, it, vi } from "vitest";
 import { readerClient } from "./reader.ts";
 
@@ -41,5 +43,25 @@ describe("readerClient", () => {
     const send = vi.fn<typeof netSend>(() => Promise.reject(new Error("ECONNREFUSED")));
     await expect(readerClient({ url: URL_, send })("https://example.com/a")).rejects.toThrow();
     expect(send.mock.calls.every(([url]) => url.startsWith(`${URL_}/`))).toBe(true);
+  });
+
+  it("gives up at its own deadline on a reader that sends its headers, then stalls mid-body", async () => {
+    const stalled = createServer((_request, response) => {
+      response.writeHead(200, { "content-type": "application/json" });
+      response.write('{"title":');
+    });
+    await new Promise<void>((resolve) => stalled.listen(0, "127.0.0.1", resolve));
+    const { port } = stalled.address() as AddressInfo;
+    try {
+      const begun = Date.now();
+      const send: typeof netSend = (url, init) => netSend(url, init, 200);
+      await expect(
+        readerClient({ url: `http://127.0.0.1:${String(port)}`, send })("https://example.com/a"),
+      ).rejects.toThrow();
+      expect(Date.now() - begun).toBeLessThan(2000);
+    } finally {
+      stalled.closeAllConnections();
+      stalled.close();
+    }
   });
 });

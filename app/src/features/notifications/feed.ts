@@ -136,9 +136,17 @@ export function feedOf(sources: Sources, naming: Naming, now: number): Item[] {
   return [...followedItems(sources, naming), ...timed];
 }
 
+// The ids marked read as a Set, made once for each state of the device's field: a panel asks of every item at each render.
+const marked = new WeakMap<DeviceFields["notificationsRead"], ReadonlySet<string>>();
+const markedOf = (read: DeviceFields["notificationsRead"]): ReadonlySet<string> => {
+  const held = marked.get(read) ?? new Set(read.ids);
+  marked.set(read, held);
+  return held;
+};
+
 /** Whether `item` is still to read: not marked, and after the last "Mark all read". A world of the moment counts until marked. */
 export function isUnread(item: Item, read: DeviceFields["notificationsRead"]): boolean {
-  if (read.ids.includes(item.id)) return false;
+  if (markedOf(read).has(item.id)) return false;
   return read.through === null || Number.isNaN(item.at) || item.at > Date.parse(read.through);
 }
 

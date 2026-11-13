@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { whenArrived } from "../arrived.ts";
+import { onceSeen } from "../offscreen.ts";
 
 // The plate's cards rise as they are seen (the proposal's score): those in view as the plate comes, 0.9 s on and 0.05 s apart; the rest as they
 // scroll in, at once. The plate's scroll body is the observer's root, and holds the count of the cards that came with it. Without motion nothing waits
@@ -37,19 +38,13 @@ export function useRise(on: boolean) {
     const root = node.closest<HTMLElement>("[data-content]");
     // A card seen while the arrival's box still waits for the scene waits too: one clock (arrived.ts).
     let unwait = (): void => undefined;
-    const watch = new IntersectionObserver(
-      (entries) => {
-        if (!entries.some((entry) => entry.isIntersecting)) return;
-        watch.disconnect();
-        unwait = whenArrived(() => {
-          setState({ delay: delayOf(root) });
-        });
-      },
-      { root, threshold: 0.1 },
-    );
-    watch.observe(node);
+    const unseen = onceSeen(node, { root, threshold: 0.1 }, () => {
+      unwait = whenArrived(() => {
+        setState({ delay: delayOf(root) });
+      });
+    });
     return () => {
-      watch.disconnect();
+      unseen();
       unwait();
     };
   }, [on]);

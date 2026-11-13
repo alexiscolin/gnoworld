@@ -38,7 +38,7 @@
     }
   }
 
-  @media (max-width: 40rem) {
+  @media (width <= 40rem) {
     .welcome {
       inset-inline: 0;
       inset-block-end: 0;

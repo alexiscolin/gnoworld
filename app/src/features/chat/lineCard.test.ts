@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cardOf, lineCard, type LineCardFacts } from "./lineCard.ts";
+import { cardMarks, cardOf, lineCard, type LineCardFacts } from "./lineCard.ts";
 
 const KEY = "a".repeat(64);
 const FACTS: LineCardFacts = {
@@ -57,5 +57,28 @@ describe("what a line's card needs of its list", () => {
     };
     expect(cardOf({ ...base, keeping: moderator, saving: true }, "m2")).toMatchObject({ may: true, saving: true });
     expect(cardOf({ ...base, keeping: undefined }, "m2")).toMatchObject({ key: undefined, may: false });
+  });
+});
+
+describe("what a line is given of its card", () => {
+  const base = {
+    room: "#bubble",
+    newest: new Map<string, string>(),
+    keeping: { cards: { m2: KEY }, moderate: undefined },
+  };
+
+  it("is bare values, never one object a render makes anew for each line", () => {
+    const marks = cardMarks(base, "m2");
+    expect(marks).toEqual({ cardMsgid: "m2", cardKey: KEY, may: false, saving: false });
+    expect(Object.values(marks).every((value) => typeof value !== "object")).toBe(true);
+  });
+
+  it("names no line's card in a direct message", () => {
+    expect(cardMarks({ ...base, room: undefined }, "m2")).toEqual({
+      cardMsgid: undefined,
+      cardKey: undefined,
+      may: false,
+      saving: false,
+    });
   });
 });

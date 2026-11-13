@@ -3,6 +3,7 @@
 // every result, good or not, names where it was read and when: the page never shows a number without its source.
 // One request a call: no retry, no timer left behind, so nothing polls. Unlike lib/api/http.ts it caps the answer's size.
 import type * as z from "zod/mini";
+import { jsonOfBytes } from "@gnoworld/schemas";
 import { fetchBytes, type ChainFetch, type FailureKind } from "./transport.ts";
 
 export type { ChainFetch, FailureKind };
@@ -93,12 +94,8 @@ export async function readChain<T>(
   if (!isHttps(url)) return failed("refused");
   const fetched = await fetchBytes(url, { ...transport, credentials: "omit", cache: "no-store" });
   if ("kind" in fetched) return failed(fetched.kind, fetched.status);
-  let value: unknown;
-  try {
-    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fetched.bytes));
-  } catch {
-    return failed("not-json");
-  }
+  const value = jsonOfBytes(fetched.bytes);
+  if (value === undefined) return failed("not-json");
   const parsed = schema.safeParse(value);
   return parsed.success ? { ok: true, value: parsed.data, source } : failed("wrong-shape");
 }

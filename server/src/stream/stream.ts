@@ -40,7 +40,7 @@ export interface Stream {
   // A line's translation, to the streams of its room that asked its language, in the verdicts' sequence of ids, in a ring of its own a room and language.
   translation: (event: TranslationEvent) => void;
   // The languages signed-in streams read a world in, open now or closed in the last 15 minutes, the latest first.
-  languages: (world: string) => readonly Language[];
+  languages: (world: string, except?: string) => readonly Language[];
   // A first signal (slice 9h) to the readers of any room of its world they may read, in the verdicts' sequence of ids.
   signal: (signal: Signal) => void;
   // The chain's events (slice 9g): a call to the readers of its world, a deploy to the Earth's, live only.
@@ -135,11 +135,14 @@ interface Framed {
 }
 
 // What a stream replays, in id order, `pending` at most: the world's firsts whole (two a world, which the page reads nowhere
-// else), then the newest verdicts in the room left.
-function replay(verdicts: readonly Framed[], firsts: readonly Framed[], pending: number): string[] {
-  const room = Math.max(0, pending - firsts.length);
-  const newest = verdicts.toSorted((a, b) => a.id - b.id).slice(Math.max(0, verdicts.length - room));
-  return [...newest, ...firsts].toSorted((a, b) => a.id - b.id).map(({ text }) => text);
+// else), the newest verdicts in the room left, then the newest translations in what the verdicts leave.
+function replay(framed: Record<"verdicts" | "translations" | "firsts", readonly Framed[]>, pending: number): string[] {
+  const newest = (frames: readonly Framed[], room: number): Framed[] =>
+    frames.toSorted((a, b) => a.id - b.id).slice(Math.max(0, frames.length - room));
+  const room = Math.max(0, pending - framed.firsts.length);
+  const verdicts = newest(framed.verdicts, room);
+  const told = [...verdicts, ...newest(framed.translations, room - verdicts.length), ...framed.firsts];
+  return told.toSorted((a, b) => a.id - b.id).map(({ text }) => text);
 }
 
 const clientOf = (
@@ -235,12 +238,8 @@ export function makeStream(options: Options = {}): Stream {
             .flatMap((room) => rings.get(room) ?? [])
             .filter(({ id }) => id > after)
             .map(({ id, event }) => ({ id, text: frame(id, event) }));
-          verdicts.push(...translations.missed(client, after));
-          for (const text of replay(
-            verdicts,
-            [...ring.missed(client.rooms, after), ...side.missed(client.rooms, after)],
-            pending,
-          ))
+          const firsts = [...ring.missed(client.rooms, after), ...side.missed(client.rooms, after)];
+          for (const text of replay({ verdicts, translations: translations.missed(client, after), firsts }, pending))
             write(client, text);
           tellSince(stream, now());
           // A comment line, which keeps a proxy from closing a quiet stream.

@@ -1,4 +1,3 @@
-// Events and calendar (ADR-0002 §1; slice 8): the data's events as an agenda. The calendar's dialog is a
-// chunk of its own, asked when it opens: the bell's count, which reads the rest, stays light.
+// Events (ADR-0002 §1): the data's events, whether one is live, and the place each is in, for the bell.
 export { isLive, type CalendarEvent } from "./agenda.ts";
 export { placeOf, universeAt } from "./places.ts";

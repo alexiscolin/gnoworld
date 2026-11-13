@@ -5,8 +5,7 @@ import { Avatar, Card, Cell, Grid, grouped, Sparkline, Stack, useAlone } from "@
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { PersonLink } from "../../features/chat/index.ts";
 import { dayValues } from "./days.ts";
-import { callerName } from "./names.ts";
-import appear from "../../enter.module.css";
+import { callerName } from "../../features/realms/worldsIndex.ts";
 import styles from "./Callers.module.css";
 
 const OPENS_WITH = 8;
@@ -66,9 +65,7 @@ export function Callers({ rollup, worlds }: { rollup: RealmRollup; worlds: World
               ))}
             </Stack>
             {callers > shown.length ? (
-              <p
-                className={[styles["more"], appear["enter"]].join(" ")}
-              >{`+ ${grouped(callers - shown.length)} more addresses`}</p>
+              <p className="meta enter">{`+ ${grouped(callers - shown.length)} more addresses`}</p>
             ) : null}
           </Stack>
         </Card.Body>

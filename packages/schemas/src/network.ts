@@ -10,7 +10,7 @@ import { z } from "./zod.ts";
 export const NETWORK_DAYS = 14;
 export const NETWORK_MAX_BYTES = 4096;
 /** The most a day's count may say: a chain a thousand times onyx's busiest day. */
-export const NETWORK_COUNT_MAX = 1e9;
+const NETWORK_COUNT_MAX = 1e9;
 
 const Counted = ChainCount.check(z.lte(NETWORK_COUNT_MAX));
 

@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
-import { knownRealms, worldsListing } from "./known.ts";
+import { worldsListing } from "./known.ts";
 
 const dir = mkdtempSync(join(tmpdir(), "gnoworld-known-"));
 afterAll(() => {
@@ -37,19 +37,19 @@ const written = (text: string, at = 1_000): string => {
 
 describe("the realms the worlds job knows", () => {
   it("says a realm the file lists is known, and one it does not list is not", () => {
-    const known = knownRealms(written(doc("gno.land/r/leon")));
+    const known = worldsListing(written(doc("gno.land/r/leon"))).known;
     expect([known("gno.land/r/leon"), known("gno.land/r/other")]).toEqual([true, false]);
   });
 
   it("knows none while the file is not there, is no JSON or is not the worlds' file", () => {
-    expect(knownRealms(join(dir, "none.json"))("gno.land/r/leon")).toBe(false);
-    expect(knownRealms(written("{"))("gno.land/r/leon")).toBe(false);
-    expect(knownRealms(written(JSON.stringify({ version: 2 })))("gno.land/r/leon")).toBe(false);
+    expect(worldsListing(join(dir, "none.json")).known("gno.land/r/leon")).toBe(false);
+    expect(worldsListing(written("{")).known("gno.land/r/leon")).toBe(false);
+    expect(worldsListing(written(JSON.stringify({ version: 2 }))).known("gno.land/r/leon")).toBe(false);
   });
 
   it("reads the file again when the job has written it anew, and only then", () => {
     const file = written(doc("gno.land/r/leon"));
-    const known = knownRealms(file);
+    const known = worldsListing(file).known;
     expect(known("gno.land/r/leon")).toBe(true);
     writeFileSync(file, doc("gno.land/r/other"));
     utimesSync(file, 1_000, 1_000);
@@ -60,7 +60,7 @@ describe("the realms the worlds job knows", () => {
 
   it("knows none once a file it had read is broken or gone, and no name of Object's", () => {
     const file = written(doc("gno.land/r/leon"));
-    const known = knownRealms(file);
+    const known = worldsListing(file).known;
     expect([known("gno.land/r/leon"), known("__proto__"), known("constructor")]).toEqual([true, false, false]);
     writeFileSync(file, "{");
     utimesSync(file, 3_000, 3_000);
@@ -71,7 +71,7 @@ describe("the realms the worlds job knows", () => {
 
   it("reads a file the schema refuses once, not for each ask: the same file is not read again until it changes", () => {
     const file = written("{");
-    const known = knownRealms(file);
+    const known = worldsListing(file).known;
     expect(known("gno.land/r/leon")).toBe(false);
     writeFileSync(file, doc("gno.land/r/leon"));
     utimesSync(file, 1_000, 1_000);
@@ -111,6 +111,19 @@ describe("the worlds listing every reader shares (D413)", () => {
     expect(listing.known("gno.land/r/leon")).toBe(false);
     expect(listing.stamp()).toBe(2_000 * 1_000);
     expect(reads).toBe(2);
+  });
+
+  it("gives the parsed file to every reader from the same one read, none for a file that is broken", () => {
+    const file = written(doc("gno.land/r/leon"));
+    let reads = 0;
+    const listing = worldsListing(file, (name) => {
+      reads += 1;
+      return readFileSync(name, "utf8");
+    });
+    expect(listing.known("gno.land/r/leon")).toBe(true);
+    expect(listing.worlds()?.worlds[0]?.realms[0]?.path).toBe("gno.land/r/leon");
+    expect(reads).toBe(1);
+    expect(worldsListing(written("{")).worlds()).toBeUndefined();
   });
 
   it("gives the paths of the world with the most calls first, the file's order for the others", () => {

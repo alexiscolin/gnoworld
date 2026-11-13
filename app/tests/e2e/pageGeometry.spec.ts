@@ -132,12 +132,12 @@ test.describe("at the video's size", () => {
     page,
   }) => {
     await plateAt(page, "/w/bubble");
-    const fill = await page.locator("[data-look='plate']").evaluate((el) => {
+    const fill = await page.locator("[data-look='plate'] [data-fill]").evaluate((el) => {
       const canvas = document.createElement("canvas");
       canvas.width = canvas.height = 1;
       const context = canvas.getContext("2d");
       if (context === null) throw new Error("no canvas context");
-      context.fillStyle = getComputedStyle(el, "::before").backgroundColor;
+      context.fillStyle = getComputedStyle(el).backgroundColor;
       context.fillRect(0, 0, 1, 1);
       return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
     });

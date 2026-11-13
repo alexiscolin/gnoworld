@@ -99,21 +99,27 @@ export function momentOf(space: Space, { numbers: { eye, shown }, pxPerSecond }:
   const { position: at, quaternion: turn } = camera;
   [eye[0], eye[1], eye[2], eye[3], eye[4], eye[5], eye[6]] = [at.x, at.y, at.z, turn.x, turn.y, turn.z, turn.w];
   const lens = camera.projectionMatrix.elements;
-  shown.length = 0;
-  shown.push(
-    camera.fov,
-    lens[0],
-    lens[5],
-    lens[8],
-    lens[9],
-    renderer.getPixelRatio(),
-    see.screen.width,
-    see.screen.height,
-  );
-  shown.push(space.options.still() ? 1 : 0, space.universe === undefined ? 0 : 1);
+  const read = (): number[] => {
+    shown.length = 0;
+    shown.push(
+      camera.fov,
+      lens[0],
+      lens[5],
+      lens[8],
+      lens[9],
+      renderer.getPixelRatio(),
+      see.screen.width,
+      see.screen.height,
+    );
+    shown.push(space.options.still() ? 1 : 0, space.universe === undefined ? 0 : 1);
+    return shownOf(stage.scene, shown);
+  };
   return {
     eye,
-    shown: shownOf(stage.scene, shown),
+    // Read when the redraw asks (redraw.ts): a moving frame never does.
+    get shown() {
+      return read();
+    },
     pxK: see.pxK,
     distance: space.rig.pose.distance,
     seconds: space.seconds,

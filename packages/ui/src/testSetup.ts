@@ -73,7 +73,14 @@ document.addEventListener("click", (event) => {
 });
 
 // jsdom has no matchMedia: every query answers no, so motion that waits for "no-preference" stays still.
-Object.assign(window, { matchMedia: (media: string) => ({ matches: false, media }) });
+Object.assign(window, {
+  matchMedia: (media: string) => ({
+    matches: false,
+    media,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }),
+});
 
 // jsdom has no ResizeObserver: a box that is watched is read once, and never told of a resize (the journeys' own).
 if (!("ResizeObserver" in globalThis)) {

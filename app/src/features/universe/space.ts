@@ -22,7 +22,7 @@ import { lightSpace } from "../../lenses.ts";
 import { isMap, onMap } from "../../mapView.ts";
 import { views } from "./views.ts";
 import { exposeSpace } from "./spaceHook.ts";
-import { worldsFile } from "./worldsFile.ts";
+import { worldsFile } from "../../worldsFile.ts";
 import styles from "./Universe.module.css";
 
 const loadEngine = () => import("../../space/scene.ts");

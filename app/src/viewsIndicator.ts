@@ -2,6 +2,7 @@
 // changes. The links move while it goes (in the full chat their names fold and the pill's left edge runs, D503), so the fill is the link's
 // own place as it stands each frame plus a gap that dies away without a turn: it never goes past its link and back, as a target read once
 // did when the names then folded. Places are the pill's own (a link's box less the pill's), so a move of the header as a whole is not one.
+import { motionWelcome } from "@gnoworld/ui";
 import { useLayoutEffect, type RefObject } from "react";
 import { useLocation } from "react-router";
 
@@ -34,7 +35,6 @@ export const standing = (nav: HTMLElement): Place | undefined => {
 };
 
 const current = (nav: HTMLElement) => nav.querySelector<HTMLElement>("a[aria-current='page']");
-const stillOf = (nav: HTMLElement) => getComputedStyle(nav).getPropertyValue("--motion-scale").trim() === "0";
 
 // Keeps the fill under the current link of `nav`: each frame while it has a gap to close, and again whenever a link changes size or the mark
 // moves; the way to stop.
@@ -53,7 +53,7 @@ function follow(nav: HTMLElement): () => void {
     }
     delete nav.dataset["empty"];
     const goal = placeOf(nav, link);
-    const still = stillOf(nav);
+    const still = !motionWelcome();
     // A new link to stand under (the mark moves to it a render after the page): the gap from where the fill is now.
     if (link !== linked) {
       gap = shown === undefined || still ? gap : { x: shown.x - goal.x, width: shown.width - goal.width };

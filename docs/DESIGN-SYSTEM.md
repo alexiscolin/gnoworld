@@ -46,7 +46,7 @@ These are the lead's and Alexis's rules from the prototype reviews.
 
 | Tier | File | Holds | Read by |
 |---|---|---|---|
-| Primitives | `packages/ui/src/tokens.css`, named `--p-*` | The nine base colours, the only raw colours | Semantic tokens only: `check_css.py` refuses one read anywhere else |
+| Primitives | `packages/ui/src/tokens.css`, named `--p-*` | The fourteen base colours, the only raw colours | Semantic tokens only: `check_css.py` refuses one read anywhere else |
 | Semantic | `packages/ui/src/tokens.css` | The roles below, colours made only of primitives; the steps of space, size, type and time, which name a role already, hold their value | Components and compositions |
 | Private | Inside a component's module, named `--_*` | What a variant or a context sets (`--_h`, `--_tone`) | That module only |
 
@@ -60,7 +60,8 @@ These are the lead's and Alexis's rules from the prototype reviews.
 
 ### Colour
 
-The theme is dark only (`color-scheme: dark`). Nine base colours:
+The theme is dark only (`color-scheme: dark`). Ten base colours, then four that the frames draw where no mix of the
+ten gives the value exactly (D13129), each with one role:
 
 | Primitive | Value | Role |
 |---|---|---|
@@ -74,6 +75,10 @@ The theme is dark only (`color-scheme: dark`). Nine base colours:
 | violet | `#B79CFF` | What a machine says: uncharted signals, and the assistant (Jarvis's orb and the card of its answers) |
 | coral | `#FF8A7A` | Errors, danger, a falling trend; what is new (`--color-new`) |
 | dusk | `#6885D9` | `--world` until a world has its own colour: its plate's tint, 16 % over the night. Nothing else |
+| slate | `#2C313C` | `--color-outline`: the one outline round the plate, the scene and the dock |
+| sky | `#5EAAFD` | `--world-earth`: the Earth's own colour, the frames' blue over its plate (f0039) |
+| white | `#FFFFFF` | `--color-lit`: the light on a planet's lit side, the `Planet` stand-in's highlight |
+| mist | `#C8D0DE` | `--color-text-soft`: the soft grey of a line read under a figure or a title (the hero's line, the info panel's words) |
 
 Semantic roles, all computed from them:
 
@@ -91,7 +96,12 @@ Semantic roles, all computed from them:
 | `--color-scrim` | space at 70% | Behind a dialog |
 | `--color-<accent>-soft`, `--color-<accent>-line` | the accent at 12% and 50% | Tinted fills and borders of mint, amber, violet, coral |
 | `--color-new`, `--color-new-line` | coral; coral at 60% | What is new in a list: the "New" divider's word and its rule, the 60% holding 3:1 against the page (WCAG 1.4.11). Its own token, so what is new can change hue without touching danger |
-| `--world`, `--world-light` | a world's own colour, set from its data, a cool blue until it has one; that colour at 62% over the text | The plate's tint, 16% over the night; the world's words and lines on the plate; the dock keeps the plain surface |
+| `--world` | a world's own colour, set from its data, the dusk until it has one | The source of the three below; the Earth's page sets the sky |
+| `--world-light`, `--color-plate`, `--world-deep` | the world at 62% over the text; at 16% over the night; at 30% over space | The world's words and lines on the plate; the plate's fill, and the dock's beside a plate (alone over the scene the dock keeps the night); a `Network` dot's fill and a `Planet`'s far side |
+
+**A world's tokens are computed where they are declared.** `--world-light`, `--color-plate` and `--world-deep` are declared on
+`:root, [data-world]`, so a box tinted by a world of its own carries `data-world` and gets the three again from its own `--world`:
+the plate's `Panel` and a named `Planet` do. A box that sets `--world` without it keeps the values the root computed.
 
 **Three meanings, three colours, never colour alone:**
 - selected (navigation, a choice): the cream fill; on a thing that is not text (a planet, an
@@ -156,13 +166,15 @@ the brightest planet behind the header's pills.
 | `--font-title-room` | 22 px, leading 1 | Geist 300 | A room's name in the chat's header |
 | `--font-title-m` | 26 px, -0.03em | Geist 300 | Panel and dialog titles, room names, big facts (frame 10's dialog title, F5969) |
 | `--font-title-l` | 36 px, -0.03em | Geist 300 | Dialogs that tell a story (passport) |
-| `--font-count`, `--font-hint`, `--font-tick`, `--font-mono-ui`, `--font-chip`, `--font-card-name`, `--font-card-title` | `--font-data`; 10.5 px; 11 px mono; 13 px mono 500; 12 px 500; 18 px; 17 px 500 | | A count beside its words; the smallest hint; the chart's axis labels; a function's signature; a chip's words in the plate's pills; a card's name; a card's title |
+| `--font-count`, `--font-hint`, `--font-tick`, `--font-mono-ui`, `--font-chip`, `--font-card-title` | `--font-data`; 10.5 px; 11 px mono; 13 px mono 500; 12 px 500; 17 px 500 | | A count beside its words; the smallest hint; the chart's axis labels; a function's signature; a chip's words in the plate's pills; a card's title |
 | `--font-figure` | 44 px, -0.04em, leading 1 | Geist Mono 500, tabular | The instrument figures of `Stat` (Alexis, 2026-10-31): the board "Instrument" of the counter-proposal; its caption is the label |
 
 - Each role is a composite token (`font: var(--font-body)`). The label's tracking and caps are a
-  utility that components compose once; no component sets caps or tracking itself, units and
-  domains inside a label keep their case, and the utility resets both under `:lang()` for scripts
-  that caps break (Arabic, Hebrew, Persian…).
+  utility (`label`) that components compose once. No component sets caps itself: words in capitals
+  that a block tracks at its own step (the header's views, a bubble's head, "Online now") take the
+  `caps` utility, the capitals alone. Units and domains inside a label keep their case, and both
+  utilities reset the case and the tracking under `:lang()` for scripts that caps break (Arabic,
+  Hebrew, Persian…).
 - 11 px is the floor; nothing is smaller.
 - Two families, Geist and Geist Mono, self-hosted with `font-display: swap` and preloaded for the
   first screen; beyond the scripts Geist covers, a system fallback per script. The first paint is
@@ -183,6 +195,7 @@ the brightest planet behind the header's pills.
 | `--size-counter` / `--size-dot` / `--size-dot-l` / `--size-bar` | 18 px (an unread count) / 6 and 8 px (a dot) / 44 px (a bar of controls) |
 | `--avatar-s` / `-m` / `-l` | 20 / 24 / 48 px |
 | `--thumb-s` / `-m` / `-l` | 32 / 52 / 64 px: a row's lead / a card / the rail |
+| `--dir` | 1; -1 under `[dir="rtl"]`, 1 again under a `[dir="ltr"]` inside it: the inline axis's sign (CSS rules, "Direction"; the token page's "Direction" group) |
 | Layout | header clearance 96, dock 420 (`--chat-dock`; `--chat-dock-s` 380 under 1400; 360 and 320 before 2026-11-08, D419), plate 808 with its fade (`--plate-w`), dialog 490 and wide 760, popover 300 px and wide 440; `--measure` 65ch; `--switch-at` 38rem, under which a Switcher stacks its children, about 65ch of body text in one unit for every child |
 
 - Controls are a minimum height with padding, never a fixed height, so text zoomed to 200% grows
@@ -319,11 +332,15 @@ component with its CSS Module, documented by its props.
 **How they compose:**
 - **Named parts.** Card.Header, Card.Body and Card.Actions; Row's lead, title, subtitle,
   activity and trail; Field's label, box (the frame round a prefix and its input), help, error and prefix.
-- **Closed variants.** `size`, `emphasis` (solid, outline, quiet), `tone` (neutral, danger; and
-  for static marks mine, warm, signal) and `density` are TypeScript unions, and each value only
-  sets private properties. A primary button is `emphasis="solid" tone="neutral"` (cream); a
-  destructive one is `tone="danger"`.
+- **Closed variants.** `size`, `emphasis` (solid, outline, quiet), `tone` (neutral, danger; signal
+  on a button too, Jarvis's violet; and for static marks mine, warm, signal) and `density` are
+  TypeScript unions, and each value only sets private properties. A primary button is
+  `emphasis="solid" tone="neutral"` (cream); a destructive one is `tone="danger"`.
 - **No outside styling.** No component accepts `className` or `style`: TypeScript refuses them.
+  The compositions alone (`Stack`, `Cluster`, `Grid`, `Sidebar`, `Switcher`, `Center`) take a
+  block's own class beside theirs, an `id`, ARIA (`aria-*`) and `as`, the element they draw (`li`
+  and `button` among them; a button composition submits nothing), so a block that must name,
+  label or style its box keeps their layout (D13128). None takes `style`.
 - **Context cascades.** `data-tone` and `data-density` on a container, and the surface level (a
   card on a panel is one step lighter), reach everything inside.
 
@@ -337,12 +354,11 @@ component with its CSS Module, documented by its props.
 
 | Component | Variants and states | Notes |
 |---|---|---|
-| `Button` | emphasis solid, outline, quiet, link; tone neutral, danger; sizes s, m, l; with an icon; disabled; busy; a `description`, the shortcut it shows (`keys`), `expanded`; or a link (`href`, `reload`) | The solid neutral (cream) is the primary: one per region. A danger button names its act |
-| `IconButton` | sizes xs, s, m, l (the header, m: 44); outline, plain; pressed; expanded; a count, in a mine or new tone | Always a `label` (its `aria-label`), and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
+| `Button` | emphasis solid, outline, quiet, link; tone neutral, danger, signal (Jarvis's violet: the composer's Ask Jarvis); sizes s, m, l; with an icon; disabled; busy; a `description`, the shortcut it shows (`keys`), `expanded`; or a link (`href`, `reload`). `lead="close"`: its start a step tighter, its icon close to the control before it, as one group; `pad="wide"`: its words 20 px in (the plate's buttons with words; a large button keeps its own); `stretch`: its press covers its nearest positioned box, whose hover it answers as its own (the talk bar, whose one link is the whole bar); `tool`: a tool of a bar inside a box (the composer's format bar), in the bar's faint ink, 24 px where the box is under 24 rem | The solid neutral (cream) is the primary: one per region. A danger button names its act |
+| `IconButton` | sizes xs, s, m, l (the header, m: 44); outline, plain; pressed; expanded; a count, in a mine or new tone; `tool`, as Button's; `drops`: one a narrow bar goes without first, its `Tooltip`'s anchor hidden where the box is under 18 rem (the format bar's lists) | Always a `label` (its `aria-label`), and a `Tooltip` with the same text (2c). A count shows past 99 as 99+, and the button adds it to its name as shown ("Unread notifications, over 99"): WCAG's label in name |
 | `Chip` | interactive (default, selected, with a count); static, at `--control-xs`, with a tone (a card's state, a badge) | Room chips, quick actions, filters, reactions, genre lenses (ADR-0002 §3); "Testnet" and "Sponsored" are uses of the static chip |
 | `Tabs` | segmented, with counts, icon-only; none selected | ARIA `tablist`. The views (Earth, Cosmos, List), notifications, the library filter, a world's rooms in the dock |
-| `Popover` | anchored; plain or lazy trigger; `wide` (`--popover-wide`, 440 px, for a card of lists) | The native `popover` attribute; outside click and `Esc` close it |
-| `Combobox` | mentions, commands, search | A list moved with the arrow keys in a `Popover`, ARIA `combobox`: `@`, `/` and ⌘K |
+| `Popover` | anchored; plain or lazy trigger; an icon trigger, IconButton's plain look, a bar's tool when its `icon` says `tool`; `wide` (`--popover-wide`, 440 px, for a card of lists) | The native `popover` attribute; outside click and `Esc` close it |
 | `Listbox` | rows of a label and a muted hint; the picked row marked | The words that complete a field, on the floating surface (`Popover`'s): the field keeps the focus and the keys (`aria-controls`, `aria-activedescendant`), a press on a row picks it without taking the focus. The composer's `/`, `@` and `#` suggestions |
 | `Tooltip` | | On every icon-only control |
 | `Dialog` | standard, wide, sheet; from the start side (the ⌘K palette, the lightbox, the passport) | The native `<dialog>`. An optional `kicker` line above the title (the one label style, read with the description) and `hideClose` where the page draws another way out (Esc still closes). Focus moves to the first field or the title, never to a primary button. Device-only routes (`/passport`, `/saved`) open as dialogs over the current place. A signing block may sit inside one (registering a name, setting up a session); a dialog is never the transaction itself (ADR-0002 §4) |
@@ -375,12 +391,12 @@ component with its CSS Module, documented by its props.
 | `Sparkline` | tone up (mint), down (coral), flat (muted); from the range or from zero; fills its box; arrives | A small line of how a value moved, its area shaded, for the eye alone: the words beside it say the change (a price's 24 h). Fewer than two values draw nothing |
 | `DayChart` | up to 400 days of calls; a log or a linear scale | Bars with an axis at its steps, the peak written over its bar, a dot for a day with none, the tooltip and the keyboard of `ActivityChart`, and every value in a table for assistive technology |
 | `Planet` | a name | A planet's stand-in beside a name, the world's colour lit from the upper left, until the scene gives a picture |
-| `ChatLayout` | the frame's regions | The full-screen chat's frame: a header, the worlds, the rooms, the conversation and the info panel, each holding its own scroll; the app fills the slots |
+| `ChatLayout` | the frame's regions; `band`: the header a band over the columns, out of their flow, under the page's own header, which the columns start below, only its controls taking a click (the app's wide full chat) | The full-screen chat's frame: a header, the worlds, the rooms, the conversation and the info panel, each holding its own scroll; the app fills the slots |
 | `Room`, `useAlone` | | The element that holds the plate's cards, which one is open and its Escape; a card opens in place by itself without one |
 | `LinkProvider` | `pages`, the paths the app routes | Hands every link of the design system the page's own link, for the site's own paths; a link that must `reload` the document stays a plain anchor |
 
 Not built, each when its slice needs it: `Table` and `Checkbox` (the admin console). A message is an assembly of the chat feature
-(`app/src/features/chat/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and `Combobox`. A presence dot is an `Avatar`
+(`app/src/features/chat/Message.tsx`), the ⌘K palette one of the search feature, on `Dialog` and a search `Field`. A presence dot is an `Avatar`
 slot, a divider a base `hr`. The flight panel is the flight feature's assembly.
 
 **Rich cards in the chat.** Every interactive structure of a room is one `Card`:
@@ -477,10 +493,13 @@ a person or Jarvis wrote is drawn as text with its source.
 | Chat dock | Right | 420 px, 380 px under 1400 px (D419), on the surface colour; messages anchored at the bottom; full screen on demand: a column of worlds, a room sidebar (rooms, Media, Saved, DMs), the conversation, and an info panel (Here now, pins) |
 | Credits | A fixed corner, wherever textures show, on phones too | One 11 px "Credits" link in the muted grey, opening the full attributions (CC BY 4.0 §3(a)(2) allows a link) |
 
-Search is a ⌘K palette (a wide `Dialog` with a `Combobox`), not a drawer.
+Search is a ⌘K palette (a wide `Dialog` with a search `Field`), not a drawer.
 
-Breakpoints:
-- 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
+Breakpoints, written in range syntax in a stylesheet: the phone's `(width < 900px)` and the computer's
+`(width >= 900px)`, each other pair the same way (1280, 1340, 1400), so every width, 900 px itself and a
+fraction such as 899.5 included, falls on one side alone. The scripts' queries (`PHONE_QUERY`,
+`(max-width: 899px)`) agree with them at whole widths.
+- Under 900 px: phone layout, chat first (ADR-0002 §8, row 10). The chat is full screen; places
   are a list with planet thumbnails; "View in space" loads the 3D on request, and then the
   plate goes below the planet. The Earth alone keeps its chat a block of the page under the
   globe, up to the dock's 1280 px: a full chat would cover the globe, "View in space" and the
@@ -508,11 +527,16 @@ Components use container queries, so they fit wherever they are placed.
     `::selection` waits for Baseline.
   - **Compositions** are the layout primitives, `Stack`, `Cluster`, `Grid`, `Sidebar`,
     `Switcher`, `Center`: intrinsic layouts that place things without styling them, each taking
-    a space step (Center's is its gutter). All layout is one of them, never new CSS.
+    a space step (Center's is its gutter). All layout is one of them, never new CSS. A block
+    that must style a composition's box passes its own class (Components, "No outside styling").
   - **Blocks** are the components, one CSS Module each, so class names never leak: no prefix,
     as the module renames each class with a hash; the utilities keep their plain names.
-  - **Utilities** are a handful of single-purpose classes, driven by tokens: visually-hidden,
-    the flow space, truncate, list-reset, scroll-body, the label style.
+  - **Utilities** are single-purpose classes, driven by tokens, listed in
+    `packages/ui/src/utilities.css`: visually-hidden, truncate, the label style and `caps`,
+    `meta` (a secondary line) and `data-text` (figures or a path, broken anywhere), the rows
+    `icon-text-meta` and `text-meta` (which `Grid`'s templates of those names add), among
+    others. Their layer comes after the blocks', so a utility beats a block's rule on the same
+    element.
   - **Exceptions** are states read from attributes, `[aria-pressed="true"]`,
     `[aria-expanded]`, `[data-state="busy"]`, never modifier classes: the state the
     accessibility tree sees is the state the CSS draws, and tests select it by role.
@@ -528,9 +552,17 @@ Components use container queries, so they fit wherever they are placed.
 - **Logical properties** (`margin-inline`, `inset-block`), so the layout can follow the
   writing direction.
 - **Direction** is read from `[dir="rtl"]`, not `:dir()`: the build's minifier turns `:dir()` into a
-  list of languages, which a page set right to left by `dir` alone does not match.
+  list of languages, which a page set right to left by `dir` alone does not match. A physical value
+  that no logical property covers (a slide from the start, a gradient's angle for a fade at the end,
+  an inset shadow's bar at a line's start, a transform's origin) multiplies by `--dir`:
+  `translateX(calc(-24px * var(--dir)))`, the same value left to right.
 - **Focus:** one ring everywhere, `:focus-visible` with a 2 px mint outline and an offset;
   fields included. Nothing hides focus.
+- **Forced colours** repaint every fill in a few system colours. In `base.css`, what only its fill
+  marks as pressed, selected or current (`aria-pressed="true"`, `aria-selected="true"`, an
+  `aria-current` that is not `false`) gets a 2 px `Highlight` outline inside its edge, unless it is
+  focused, which keeps the focus ring. A block whose own `outline: none` would beat base sets its
+  forced-colours outline in its module: `ChatLayout`'s separator, the composer's box.
 - **Motion:** `transition` names its properties, never `all`. Prefer animating
   `transform` and `opacity`.
 - **Stacking:** no `backdrop-filter`: a bubble is near-opaque (`--color-bubble`) until the blur is widely Baseline.
@@ -548,7 +580,8 @@ Components use container queries, so they fit wherever they are placed.
     `grid`, `gap`, the `flex-*`, `grid-*`, `justify-*` and `align-*` properties, and any
     outer `margin`, in a block's module. A block that truly needs one (an icon beside a
     label) says why in a `/* layout: … */` comment, and the gate prints the count of those
-    exceptions so review sees it grow;
+    exceptions so review sees it grow (494 on 2026-11-13, converted later, screen by screen:
+    D13128);
   - **no copied rules:** the same set of three or more declarations in two modules fails
     `check_css.py`; it becomes a composition, a utility or a `composes`;
   - a class a component names (`styles.x`, `styles["x"]`) that its module lacks fails

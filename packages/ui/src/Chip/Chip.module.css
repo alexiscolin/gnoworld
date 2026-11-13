@@ -3,6 +3,12 @@
 @layer components {
   .chip {
     --_fill: var(--color-fill);
+
+    /* A pill is one line: a row too narrow for it hides it, never breaks its words; and never wider than that row, so a name with no space
+       in it is cut at the pill's edge and pushes nothing sideways. */
+    max-inline-size: 100%;
+    overflow: hidden;
+    white-space: nowrap;
   }
 
   /* A mark's one line of text fills its height with its own leading. */
@@ -24,19 +30,14 @@
       color var(--motion-base) var(--ease-standard);
   }
 
-  /* The dock's room shortcuts: the video's pill, 27 px high, one line: a row too narrow for it hides it (the dock fits as many as it can,
-     D13016), never breaks its words; and never wider than that row, so a name with no space in it is cut at the pill's edge and pushes
-     nothing sideways. Any other chip wraps its words, as a button does, and grows with them. */
+  /* The dock's room shortcuts: the video's pill, 27 px high. */
   .chip[data-size="chip"] {
     --_h: var(--control-chip);
     --_pad: var(--space-xs);
     --_font: var(--font-chip);
 
-    max-inline-size: 100%;
-    overflow: hidden;
     padding-block: 0;
     text-decoration: none;
-    white-space: nowrap;
   }
 
   /* A control at the smallest size: its words at the interface's size over the mark's, the pointer's. */
@@ -92,12 +93,11 @@
 
   /* The live dot's beat: a ring in mint that grows and leaves (the home's hero has the same), from 0.85 s on, for a minute (25 beats), then it rests with the
      ring gone; a new word in the chip beats it again (Chip.tsx keys the dot). */
-  @media (prefers-reduced-motion: no-preference) {
-    .chip[data-tone="mine"] .dot::after {
-      /* raw: the proposal's score; paused out of view (offscreen.ts) */
-      animation: beat 2.4s ease-out 0.85s 25 forwards;
-      animation-play-state: var(--play, running);
-    }
+  /* The motion scale is 0 under reduced motion, the system's or the app's setting: the ring is gone at once. */
+  .chip[data-tone="mine"] .dot::after {
+    /* raw: the proposal's score; paused out of view (offscreen.ts) */
+    animation: beat calc(2.4s * var(--motion-scale)) ease-out calc(0.85s * var(--motion-scale)) 25 forwards;
+    animation-play-state: var(--play, running);
   }
 
   /* On the compositor: the ring grows 8 px past the 6 px dot (22/6 across) and fades. */

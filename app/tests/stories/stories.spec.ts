@@ -60,29 +60,28 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "200%";
     });
-    // Each word's box against its control's: a control grows with its text, so no word sticks out.
-    // What is hidden from assistive technology is decoration, as a count's badge on a corner.
-    const spilled = await page.evaluate(
-      (buttons) =>
-        [...document.querySelectorAll(buttons)].filter((button) => {
-          const outer = button.getBoundingClientRect();
-          const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-            if (node.parentElement?.closest("[aria-hidden='true']") || node.textContent?.trim() === "") continue;
-            const words = document.createRange();
-            words.selectNodeContents(node);
-            const inner = words.getBoundingClientRect();
-            const out =
-              inner.top < outer.top ||
-              inner.bottom > outer.bottom ||
-              inner.left < outer.left ||
-              inner.right > outer.right;
-            if (out) return true;
-          }
-          return false;
-        }).length,
-      BUTTONS,
-    );
+    // Each word's box against its control's: a control grows with its text, so no word sticks out; one that keeps a single line and
+    // clips it, as a chip does, cuts its words at its sides, never above or below. What is hidden from assistive technology is
+    // decoration, as a count's badge on a corner.
+    const spilled = await page.evaluate((buttons) => {
+      const sticksOut = (inner: DOMRect, outer: DOMRect, cuts: boolean) =>
+        inner.top < outer.top ||
+        inner.bottom > outer.bottom ||
+        (!cuts && (inner.left < outer.left || inner.right > outer.right));
+      return [...document.querySelectorAll(buttons)].filter((button) => {
+        const outer = button.getBoundingClientRect();
+        const style = getComputedStyle(button);
+        const cuts = ["hidden", "clip"].includes(style.overflowX) && style.whiteSpace === "nowrap";
+        const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (node.parentElement?.closest("[aria-hidden='true']") || node.textContent?.trim() === "") continue;
+          const words = document.createRange();
+          words.selectNodeContents(node);
+          if (sticksOut(words.getBoundingClientRect(), outer, cuts)) return true;
+        }
+        return false;
+      }).length;
+    }, BUTTONS);
     expect.soft(spilled, `${id}: controls whose text spills at 200%`).toBe(0);
   }
 });
@@ -380,19 +379,22 @@ test("a field's edge is the strong line at rest and under the pointer, the dange
   expect(await edge(), "invalid").toBe(await token("--color-danger-line"));
 });
 
+// Stopped as every duration is, by --motion-scale: a turn of 0 s plays nothing, under the system's setting or the site's own.
 test("a busy button's spinner turns, and stops under reduced motion", async ({ page }) => {
-  const spin = async () => {
+  const spin = async (motion = "") => {
     await open(page, "button--busy");
-    return page.evaluate(() =>
-      [...document.querySelectorAll("#storybook-root [aria-busy] [aria-hidden='true']")].map((e) => {
+    return page.evaluate((motion) => {
+      if (motion !== "") document.documentElement.dataset["motion"] = motion;
+      return [...document.querySelectorAll("#storybook-root [aria-busy] [aria-hidden='true']")].map((e) => {
         const style = getComputedStyle(e);
         return [style.animationName === "none" ? "none" : "spins", style.animationDuration];
-      }),
-    );
+      });
+    }, motion);
   };
   expect(await spin()).toEqual([["spins", "0.8s"]]);
+  expect(await spin("reduce"), "the site's setting").toEqual([["spins", "0s"]]);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect((await spin()).map(([name]) => name)).toEqual(["none"]);
+  expect(await spin(), "the system's setting").toEqual([["spins", "0s"]]);
 });
 
 // The design's motion: "Hovered items follow the pointer at once and ease back on leave". Each

@@ -4,7 +4,7 @@ import { createStore } from "zustand/vanilla";
 import type { CosmosWorld } from "./space/cosmosWorld.ts";
 import type { Known } from "./railWorlds.ts";
 import type { WorldSignals } from "./features/universe/signals.ts";
-import { worldsFile } from "./features/universe/worldsFile.ts";
+import { worldsFile } from "./worldsFile.ts";
 
 const PRESENCE_MS = 60_000;
 const loadSignals = () => import("./features/universe/signals.ts");

@@ -7,10 +7,14 @@ import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
 function explanationsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
   return {
-    read: (kind: ExplainKind, chain: string, subject: string): Promise<Result<Explanation>> =>
+    read: (
+      { kind, chain, subject }: { kind: ExplainKind; chain: string; subject: string },
+      signal?: AbortSignal,
+    ): Promise<Result<Explanation>> =>
       call({
         path: `/api/explanations/${kind}/${encodeURIComponent(chain)}/${encodeURIComponent(subject)}`,
         schema: Explanation,
+        signal,
       }),
   };
 }

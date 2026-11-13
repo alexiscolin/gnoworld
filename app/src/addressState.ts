@@ -13,6 +13,24 @@ export interface AddressState<T extends string> {
   readonly useValue: () => T | undefined;
 }
 
+// Every value kept so, by its key, for a navigation that left them out of the address.
+const kept = new Map<string, () => string | undefined>();
+
+// Writes `value` into the address's `key`, or takes the key out; the address is left as it is when it already says so.
+function write(key: string, value: string | undefined): void {
+  if (typeof history === "undefined") return;
+  const url = new URL(location.href);
+  if ((url.searchParams.get(key) ?? undefined) === value) return;
+  if (value === undefined) url.searchParams.delete(key);
+  else url.searchParams.set(key, value);
+  history.replaceState(history.state, "", url);
+}
+
+/** Writes every value kept back into the address, after a navigation of the router, which never hears them, left them out. */
+export function restateAddress(): void {
+  for (const [key, value] of kept) if (value() !== undefined) write(key, value());
+}
+
 /** The address's `key`, as `read` takes its word. */
 export function addressState<T extends string>(
   key: string,
@@ -25,14 +43,11 @@ export function addressState<T extends string>(
     store.subscribe(() => {
       heard();
     });
+  kept.set(key, store.getState);
   return {
     set: (value) => {
       store.setState(value, true);
-      if (typeof history === "undefined") return;
-      const url = new URL(location.href);
-      if (value === undefined) url.searchParams.delete(key);
-      else url.searchParams.set(key, value);
-      history.replaceState(history.state, "", url);
+      write(key, value);
     },
     get: store.getState,
     subscribe,

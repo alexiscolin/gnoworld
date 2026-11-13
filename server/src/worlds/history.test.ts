@@ -29,17 +29,13 @@ const burst = (height: number, caller: string, calls: number): CallRow => ({
 const answer = (rows: readonly unknown[] | null) => JSON.stringify({ data: { getTransactions: rows } });
 
 type Given = Parameters<typeof fakeChain>[0]["indexer"];
-const reading = (
-  given: Given,
-  options: { paths?: string[]; page?: number; since?: Record<string, number>; isStopped?: () => boolean } = {},
-) => {
+const reading = (given: Given, options: { paths?: string[]; page?: number; isStopped?: () => boolean } = {}) => {
   const chain = fakeChain({ indexer: given });
-  const since = options.since ?? {};
   const read = () =>
     readHistories(
       { send: chain.send, indexer: INDEXER, ...(options.page === undefined ? {} : { page: options.page }) },
       options.paths ?? [PATH, OTHER],
-      { sinceOf: (path) => since[path], ...(options.isStopped === undefined ? {} : { isStopped: options.isStopped }) },
+      options.isStopped === undefined ? {} : { isStopped: options.isStopped },
     );
   return { chain, read };
 };
@@ -137,110 +133,6 @@ describe("readHistories", () => {
       expect(await reading(pagedCalls([call(1, CALLER_A)]), { paths: [PATH] }).read()).toMatchObject({
         ok: true,
         skipped: 0,
-      });
-    });
-  });
-
-  // 7t3's window: what a realm drew between the job's last two passes, counted from the height the last file wrote for it. A transaction is
-  // one however many calls it bundles, so one address's burst counts once; its senders are given, for a world's realms count each once.
-  describe("above the height the last file wrote for each realm", () => {
-    it("counts the transactions with a call to the realm, a transaction of five calls once, and the different addresses that sent them", async () => {
-      const rows = [
-        call(100, CALLER_A),
-        burst(101, CALLER_A, 5),
-        call(102, CALLER_B),
-        { block_height: 103, messages: [{ value: { __typename: "MsgAddPackage", creator: CALLER_C } }] },
-        call(104, CALLER_B),
-        call(105, CALLER_C, OTHER),
-      ];
-      expect(await histories(rows, { paths: [PATH], since: { [PATH]: 100 } })).toEqual({
-        [PATH]: {
-          calls: 8,
-          callers: 2,
-          lastHeight: 104,
-          recent: {
-            transactions: [`101:${CALLER_A}`, `102:${CALLER_B}`, `104:${CALLER_B}`],
-            callers: [CALLER_A, CALLER_B],
-          },
-        },
-      });
-    });
-
-    it("counts each realm's window from its own height", async () => {
-      const rows = [call(100, CALLER_A), call(101, CALLER_B, OTHER), call(102, CALLER_C), call(103, CALLER_C, OTHER)];
-      expect(await histories(rows, { since: { [PATH]: 101, [OTHER]: 0 } })).toMatchObject({
-        [PATH]: { recent: { transactions: [`102:${CALLER_C}`], callers: [CALLER_C] } },
-        [OTHER]: { recent: { transactions: [`101:${CALLER_B}`, `103:${CALLER_C}`], callers: [CALLER_B, CALLER_C] } },
-      });
-    });
-
-    it("keeps a window whole across the pages it spans", async () => {
-      const rows = [call(1, CALLER_A), call(2, CALLER_B), call(3, CALLER_A), call(3, CALLER_B), call(4, CALLER_A)];
-      expect(await histories(rows, { paths: [PATH], page: 3, since: { [PATH]: 2 } })).toEqual({
-        [PATH]: {
-          calls: 5,
-          callers: 2,
-          lastHeight: 4,
-          recent: { transactions: [`3:${CALLER_A}`, `3:${CALLER_B}`, `4:${CALLER_A}`], callers: [CALLER_A, CALLER_B] },
-        },
-      });
-    });
-
-    it("counts nothing at the height itself, the last pass's, and every call above a height of none", async () => {
-      const rows = [call(100, CALLER_A), call(101, CALLER_B)];
-      expect(await histories(rows, { paths: [PATH], since: { [PATH]: 101 } })).toMatchObject({
-        [PATH]: { recent: { transactions: [], callers: [] } },
-      });
-      expect(await histories(rows, { paths: [PATH], since: { [PATH]: 0 } })).toMatchObject({
-        [PATH]: { recent: { transactions: [`100:${CALLER_A}`, `101:${CALLER_B}`], callers: [CALLER_A, CALLER_B] } },
-      });
-    });
-
-    it("gives the transactions and the addresses sorted, whatever order the calls came in", async () => {
-      const rows = [call(101, CALLER_B), call(102, CALLER_A), call(103, CALLER_B)];
-      expect(await histories(rows, { paths: [PATH], since: { [PATH]: 100 } })).toMatchObject({
-        [PATH]: {
-          recent: {
-            transactions: [`101:${CALLER_B}`, `102:${CALLER_A}`, `103:${CALLER_B}`],
-            callers: [CALLER_A, CALLER_B],
-          },
-        },
-      });
-    });
-
-    it.each([
-      ["names no caller", msg(PATH).value],
-      ["gives its caller as null", { __typename: "MsgCall", pkg_path: PATH, caller: null }],
-    ])("counts a call that %s as its transaction, with no address", async (_name, value) => {
-      const rows = [{ block_height: 101, messages: [{ value }] }, call(102, CALLER_A)];
-      expect(await histories(rows, { paths: [PATH], since: { [PATH]: 100 } })).toMatchObject({
-        [PATH]: { calls: 2, callers: 1, recent: { transactions: ["101:", `102:${CALLER_A}`], callers: [CALLER_A] } },
-      });
-    });
-
-    // The security review of 7t3: one transaction calling K realms of a world counted K times, past the floor. Its mark is its height and its
-    // senders, so the world counts it once, whichever realms it called.
-    it("marks a transaction by its height and its senders, whatever calls it bundles, so a world's realms count it once", async () => {
-      const both = { block_height: 101, messages: [msg(PATH, CALLER_B), msg(PATH, CALLER_A), msg(PATH, CALLER_B)] };
-      expect(await histories([both], { paths: [PATH], since: { [PATH]: 100 } })).toMatchObject({
-        [PATH]: { recent: { transactions: [`101:${CALLER_A},${CALLER_B}`], callers: [CALLER_A, CALLER_B] } },
-      });
-    });
-
-    // The second round of 7t3's review: one transaction signed by two, each calling a realm of one world, gave each realm the mark of its
-    // own caller: two marks, two transactions. A mark carries the senders of all the transaction's calls, so each realm gives the same.
-    it("marks a transaction by the senders of all its calls, so a realm called by one of its signers gives the mark another realm does", async () => {
-      const both = { block_height: 101, messages: [msg(PATH, CALLER_A), msg(OTHER, CALLER_B)] };
-      const mark = `101:${CALLER_A},${CALLER_B}`;
-      expect(await histories([both], { since: { [PATH]: 100, [OTHER]: 100 } })).toEqual({
-        [PATH]: { calls: 1, callers: 1, lastHeight: 101, recent: { transactions: [mark], callers: [CALLER_A] } },
-        [OTHER]: { calls: 1, callers: 1, lastHeight: 101, recent: { transactions: [mark], callers: [CALLER_B] } },
-      });
-    });
-
-    it("gives no window to a realm the last file never read", async () => {
-      expect(await histories([call(101, CALLER_A)], { paths: [PATH] })).toEqual({
-        [PATH]: { calls: 1, callers: 1, lastHeight: 101 },
       });
     });
   });
@@ -467,7 +359,7 @@ describe("readHistories", () => {
       let paced = 0;
       const chain = fakeChain({ indexer: pagedCalls([call(1, CALLER_A), call(2, CALLER_A), call(3, CALLER_A)]) });
       const pace = () => Promise.resolve(void (paced += 1));
-      await readHistories({ send: chain.send, indexer: INDEXER, pace, page: 2 }, [PATH], { sinceOf: () => undefined });
+      await readHistories({ send: chain.send, indexer: INDEXER, pace, page: 2 }, [PATH]);
       expect(chain.asked).toHaveLength(5);
       expect(paced).toBe(5);
       for (const { ms, init } of chain.asked) {

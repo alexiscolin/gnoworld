@@ -3,9 +3,9 @@
 import { hubWorldOf } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { HOME_NAMESPACES, isHome } from "./cosmosAt.ts";
-import { realmPage } from "./features/realms/useRealm.ts";
+import { realmPageQuery } from "./features/realms/useRealm.ts";
 import { realmFacts } from "./features/realms/useRealmFacts.ts";
-import { worldsFile } from "./features/universe/worldsFile.ts";
+import { worldsFile } from "./worldsFile.ts";
 import { realmFunctions } from "./lib/chain/rpc.ts";
 import { rollupOptions } from "./lib/chain/rollupQuery.ts";
 import { queryClient, quietUnread } from "./lib/query/client.ts";
@@ -48,8 +48,9 @@ function inView(worlds: readonly World[], place: { kind: string; id: string }): 
 
 /** The idle batch: the plate's code, then the rollup of each world in view, two at a time, till `signal` aborts (the view changed) or the tab hides. */
 export async function warmBatch(place: { kind: string; id: string }, signal: AbortSignal): Promise<void> {
+  if (!fastLink()) return;
   warmChunks();
-  if (!fastLink() || (place.kind !== "system" && place.kind !== "universe")) return;
+  if (place.kind !== "system" && place.kind !== "universe") return;
   const file = await worldsFile();
   const queue = inView(file?.worlds ?? [], place).flatMap((world) => world.realms[0]?.path ?? []);
   const work = async () => {
@@ -81,8 +82,8 @@ export function warmRealm(pathname: string, pressed: boolean): void {
   const { realm, chain } = found;
   warmChunks();
   // The page's own read says a failure when it asks; an ask ahead that failed says nothing (TanStack's prefetching guide: `.catch(noop)`).
-  const ahead = (read: Promise<unknown>) => void read.catch(quietUnread);
-  ahead(queryClient.query(realmPage({ rpc: chain.rpc, realm, origin: chain.gnoweb })));
+  const ahead = (read: Promise<unknown>) => void read.catch(quietUnread).catch(reportError);
+  ahead(queryClient.query(realmPageQuery({ rpc: chain.rpc, realm, origin: chain.gnoweb })));
   ahead(queryClient.query(realmFunctions(chain.rpc, realm)));
   ahead(queryClient.query(realmFacts(chain.indexer, realm)));
   ahead(queryClient.query(rollupOptions(import.meta.env.BASE_URL, realm)));

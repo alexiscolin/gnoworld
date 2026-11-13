@@ -29,16 +29,22 @@ export function chatHides(): boolean {
   return performance.now() - coveredSince > CHAT_GROWS_MS;
 }
 
+// The query is made once per browser (a test that stubs matchMedia makes it anew): motionOf is asked each frame.
+let asked: { ask: typeof matchMedia; list: MediaQueryList } | undefined;
+const systemOf = (): MediaQueryList => {
+  if (asked?.ask !== matchMedia) asked = { ask: matchMedia, list: matchMedia(MOTION) };
+  return asked.list;
+};
+
 export function motionOf(): Motion {
-  const system = matchMedia(MOTION);
   // Read at each use: a scene's parts are made where no page is, in their tests.
   const root = (): HTMLElement | undefined => ("document" in globalThis ? document.documentElement : undefined);
   return {
     get matches() {
-      return system.matches || root()?.dataset["motion"] === "reduce";
+      return systemOf().matches || root()?.dataset["motion"] === "reduce";
     },
     watch: (changed, signal) => {
-      system.addEventListener("change", changed, { signal });
+      systemOf().addEventListener("change", changed, { signal });
       const page = root();
       if (page === undefined) return;
       const marks = new MutationObserver(changed);

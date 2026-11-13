@@ -120,6 +120,43 @@ describe("this device's settings", () => {
     expect(bobs.saved()).toEqual([saved(BOB, "m3")]);
   });
 
+  it("clear an account's saved messages in one write of the device, however many there are", async () => {
+    const mine = keep(() => localStorage, ALICE);
+    mine.setSaved(
+      Array.from({ length: 3 }, (_, n) => ({
+        room: "#bubble",
+        id: `m${String(n)}`,
+        time: "2026-11-05T10:00:00.000Z",
+        from: ALICE,
+        account: ALICE,
+        text: `kept ${String(n)}`,
+      })),
+    );
+    const box = await section(ALICE);
+    act(() => {
+      store?.getState().keepActions.begin(mine);
+    });
+    const writes = [vi.spyOn(Storage.prototype, "setItem"), vi.spyOn(Storage.prototype, "removeItem")];
+    press(box, "Clear saved messages");
+    const touched = writes.flatMap((spy) => spy.mock.calls.map(([key]) => key));
+    expect(touched.filter((key) => key === `gnoworld:saved:${ALICE}`)).toHaveLength(1);
+    expect(mine.saved()).toEqual([]);
+  });
+
+  it("keep the passport as it was when the device refuses its worlds charted", async () => {
+    const box = await section();
+    const write = localStorage.setItem.bind(localStorage);
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation((key: string, value: string) => {
+      if (key === "gnoworld:device:charted") throw new DOMException("full", "QuotaExceededError");
+      write(key, value);
+    });
+    await imported(box, passportFile({ stamps: { "onyx:z": "2026-10-01" }, charted: { "onyx:z": "2026-10-01" } }));
+    expect(said(box)).toBe("This device did not keep it.");
+    expect(held("gnoworld:device:stamps")).toEqual({ "onyx:a": "2026-11-01", "onyx:b": "2026-11-02" });
+    expect(held("gnoworld:device:charted")).toEqual({ "onyx:a": "2026-11-01" });
+    expect(box.textContent).toContain("Your passport holds 2 stamps");
+  });
+
   it("leave the saved messages intact when the passport is cleared", async () => {
     const mine = keep(() => localStorage, ALICE);
     const line = {

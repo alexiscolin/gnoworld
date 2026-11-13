@@ -6,6 +6,12 @@ import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import badge from "../Button/Button.module.css";
 import styles from "./Tabs.module.css";
 
+export const tabId = (base: string, tab: string) => `${base}-tab-${tab}`;
+export const panelId = (base: string, tab: string) => `${base}-panel-${tab}`;
+
+const tied = (base: string | undefined, tab: string) =>
+  base === undefined ? {} : { id: tabId(base, tab), "aria-controls": panelId(base, tab) };
+
 export interface Tab {
   id: string;
   label: string;
@@ -27,6 +33,8 @@ export interface TabsProps {
   fill?: boolean;
   /** Counts as plain figures after the words in the data type, not in a badge. */
   plainCount?: boolean;
+  /** The id base of the tabs and their panels (a TabPanel with the same base), so each panel is named by its tab. */
+  id?: string;
 }
 
 /** A tablist with one tab reached by the keyboard, the selected one; the arrows move and select, round
@@ -40,6 +48,7 @@ export function Tabs({
   size = "m",
   fill = false,
   plainCount = false,
+  id,
 }: TabsProps) {
   const reached = Math.max(
     0,
@@ -69,6 +78,7 @@ export function Tabs({
             key={tab.id}
             type="button"
             role="tab"
+            {...tied(id, tab.id)}
             className={pill(styles["tab"])}
             aria-selected={tab.id === selected}
             aria-label={iconOnly ? name : undefined}

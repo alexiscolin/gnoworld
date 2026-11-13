@@ -583,18 +583,36 @@ describe("the rail's magnification", () => {
     expect(magnification(nth(worlds(box), 3))).toBeCloseTo(MAGNIFIED, 2);
   });
 
+  // The rail laid out, then hovered or reached by keyboard: no world grows.
+  const growsNothing = (by: "pointer" | "keyboard") => {
+    const { box } = rail();
+    lay(box);
+    if (by === "pointer") point(box, 160 + 49);
+    else reach(box, 2);
+    expect(worlds(box).map(magnification)).toEqual([1, 1, 1, 1, 1]);
+  };
+
   it.each([
     ["under reduced motion, for the pointer", { reduced: true }, "pointer"],
     ["under reduced motion, for the keyboard", { reduced: true }, "keyboard"],
     ["on a touch screen", { touch: true }, "pointer"],
   ] as const)("grows nothing %s", (_, quiet, by) => {
     media(quiet);
-    const { box } = rail();
-    lay(box);
-    if (by === "pointer") point(box, 160 + 49);
-    else reach(box, 2);
-    expect(worlds(box).map(magnification)).toEqual([1, 1, 1, 1, 1]);
+    growsNothing(by);
   });
+
+  it.each(["pointer", "keyboard"] as const)(
+    "grows nothing under the app's Reduce animations setting, for the %s",
+    (by) => {
+      media();
+      document.documentElement.dataset["motion"] = "reduce";
+      try {
+        growsNothing(by);
+      } finally {
+        delete document.documentElement.dataset["motion"];
+      }
+    },
+  );
 
   it("asks no frame once every planet stands at its size", () => {
     const { box } = rail();

@@ -13,9 +13,12 @@ afterEach(async () => {
 });
 
 // A table of routes whose handlers the test gives, served on a port of its own; its address and its log.
-const served = async (routes: Routes, ready = () => true, key?: Secret) => {
+const served = async (
+  routes: Routes,
+  { ready = () => true, key, deadlineMs }: { ready?: () => boolean; key?: Secret; deadlineMs?: number } = {},
+) => {
   const { log, events, raw } = capture();
-  const jarvis = await serve(routes, { host: "127.0.0.1", port: 0, names: ["127.0.0.1"], log, ready, key });
+  const jarvis = await serve(routes, { host: "127.0.0.1", port: 0, names: ["127.0.0.1"], log, ready, key, deadlineMs });
   const address = jarvis.server.address();
   if (address === null || typeof address === "string") throw new Error("no port");
   const url = `http://127.0.0.1:${String(address.port)}`;
@@ -437,6 +440,34 @@ describe("jarvis's HTTP face: a request that ends", () => {
     expect(events()).toEqual([]);
   });
 
+  it("aborts its handler's signal once the request's deadline passes, and writes what the handler then answers", async () => {
+    let seen: AbortSignal | undefined;
+    const slow: Handler = async (_body, signal) => {
+      seen = signal;
+      const aborted = once(signal, "abort").then(() => true);
+      const late = new Promise<false>((resolve) => setTimeout(resolve, 2000, false));
+      return { status: 503, body: { error: "not_ready", aborted: await Promise.race([aborted, late]) } };
+    };
+    const { url, jarvis } = await served({ "/slow": { POST: slow } }, { deadlineMs: 50 });
+    const response = await post(`${url}/slow`, "{}");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toEqual({ error: "not_ready", aborted: true });
+    expect(seen?.aborted).toBe(true);
+    await jarvis.idle();
+  });
+
+  it("clears its deadline once it answered: a handler's signal stays unaborted past it", async () => {
+    let seen: AbortSignal | undefined;
+    const handler: Handler = (body, signal) => {
+      seen = signal;
+      return echo(body, signal);
+    };
+    const { url } = await served({ "/echo": { POST: handler } }, { deadlineMs: 20 });
+    expect((await post(`${url}/echo`, "{}")).status).toBe(200);
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    expect(seen?.aborted).toBe(false);
+  });
+
   it("keeps its handler's signal unaborted once it answered", async () => {
     let seen: AbortSignal | undefined;
     const { url } = await served({
@@ -454,7 +485,7 @@ describe("jarvis's HTTP face: a request that ends", () => {
   it("answers not_ready once it is no longer ready, closing the connection, its handler never called", async () => {
     const handler = vi.fn(echo);
     let ready = true;
-    const { url } = await served({ "/echo": { POST: handler } }, () => ready);
+    const { url } = await served({ "/echo": { POST: handler } }, { ready: () => ready });
     ready = false;
     const response = await post(`${url}/echo`, "{}");
     expect(await refusal(response)).toEqual({ status: 503, body: { error: "not_ready" } });
@@ -529,7 +560,7 @@ describe("the door's key", () => {
   const KEY = `door-key-${"k".repeat(40)}`;
   const HEADER = JARVIS_KEY_HEADER;
   const table = (handler: Handler = echo): Routes => ({ "/echo": { GET: handler, POST: handler } });
-  const keyed = (ready = () => true) => served(table(), ready, new Secret(KEY));
+  const keyed = (ready = () => true) => served(table(), { ready, key: new Secret(KEY) });
 
   it("serves a request that carries the key, on a GET and a POST", async () => {
     const { url } = await keyed();
@@ -552,7 +583,7 @@ describe("the door's key", () => {
     ["the key in another case", KEY.toUpperCase()],
   ])("answers 401 to %s, and runs no handler", async (_case, key) => {
     const handler = vi.fn(echo);
-    const { url, events } = await served(table(handler), () => true, new Secret(KEY));
+    const { url, events } = await served(table(handler), { key: new Secret(KEY) });
     const response = await fetch(`${url}/echo`, { headers: key === undefined ? {} : { [HEADER]: key } });
     expect(await refusal(response)).toEqual({ status: 401, body: { error: "unauthenticated" } });
     expect(handler).not.toHaveBeenCalled();
@@ -580,7 +611,7 @@ describe("the door's key", () => {
 
   it("answers before reading the body: a body never ended, past its bound, is refused at once, its connection closed", async () => {
     const handler = vi.fn(echo);
-    const { url } = await served(table(handler), () => true, new Secret(KEY));
+    const { url } = await served(table(handler), { key: new Secret(KEY) });
     // A body declared small and never finished would be waited for; one declared past the bound would be a 413.
     const { sent, status, connection } = unended(
       url,

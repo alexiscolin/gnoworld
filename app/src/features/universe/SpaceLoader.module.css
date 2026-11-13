@@ -7,8 +7,8 @@
     /* raw: over the header's and the views' bar's layers, and every control of the page */
     z-index: 100;
     background: var(--color-space);
-    /* raw: the one fade out, 400 ms, after the bar's last 200 ms of fill */
-    transition: opacity 400ms var(--ease-standard) 200ms;
+    /* raw: the one fade out, 400 ms, after the bar's last 200 ms of fill; under reduced motion a short fade at once */
+    transition: opacity calc(200ms + 200ms * var(--motion-scale)) var(--ease-standard) calc(200ms * var(--motion-scale));
     outline: none;
   }
 
@@ -30,7 +30,7 @@
     color: var(--color-text);
   }
 
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .brand {
       /* raw: the header's 34 px from the top on a computer */
       inset-block-start: 34px;
@@ -60,7 +60,7 @@
     transform: scaleX(0);
     transform-origin: left;
     /* raw: a step of the fill, and the last one, 200 ms */
-    transition: transform 200ms linear;
+    transition: transform calc(200ms * var(--motion-scale)) linear;
   }
 
   .fill[data-step="1"] {
@@ -77,17 +77,5 @@
 
   .fill[data-step="4"] {
     transform: scaleX(1);
-  }
-
-  /* Under reduced motion: the bar is shown full at once, and the leaving is a short fade. */
-  @media (prefers-reduced-motion: reduce) {
-    .loader {
-      /* raw: a plain 200 ms fade */
-      transition: opacity 200ms linear;
-    }
-
-    .fill {
-      transition: none;
-    }
   }
 }

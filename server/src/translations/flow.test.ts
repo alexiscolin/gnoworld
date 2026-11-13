@@ -54,7 +54,9 @@ afterEach(() => {
 });
 
 function setup(
-  more: Omit<Partial<TranslationFlowOptions>, "languages"> & { languages?: readonly Language[] } = {},
+  more: Omit<Partial<TranslationFlowOptions>, "languages"> & {
+    languages?: readonly Language[] | TranslationFlowOptions["languages"];
+  } = {},
   db: DatabaseSync = openDatabase(":memory:", migrations),
 ) {
   const clock = { now: T0 };
@@ -69,7 +71,7 @@ function setup(
     db,
     roles: ROLES,
     translate,
-    languages: () => languages,
+    languages: typeof languages === "function" ? languages : () => languages,
     publish: (event) => events.push(event),
     log: () => undefined,
     now: () => clock.now,
@@ -315,7 +317,7 @@ describe("a reader's ask", () => {
   });
 
   it("makes a missing line from the server's own text, once for every reader, a guest's ask making nothing", async () => {
-    const t = setup({ languages: [] });
+    const t = setup({ languages: ["fr"] });
     t.index({ msgid: "old", text: "Old words" });
     const guest = await t.flow.asked({ room: "#bubble", ids: ["old"], language: "fr", signedIn: false });
     expect(guest.translations).toEqual([]);
@@ -337,7 +339,7 @@ describe("a reader's ask", () => {
   it("names a line still being made as pending when the wait is over, and stores it when it ends", async () => {
     const release: (() => void)[] = [];
     const t = setup({
-      languages: [],
+      languages: ["fr"],
       waitMs: 5,
       translate: () =>
         new Promise((resolve) => {
@@ -358,7 +360,7 @@ describe("a reader's ask", () => {
   it("answers before the page's 10 s call limit when a making is slow, the rest pending", async () => {
     vi.useFakeTimers();
     try {
-      const t = setup({ languages: [], translate: () => new Promise(() => undefined) });
+      const t = setup({ languages: ["fr"], translate: () => new Promise(() => undefined) });
       t.index({ msgid: "old" });
       const answered = vi.fn();
       const asking = t.flow.asked({ room: "#bubble", ids: ["old"], language: "fr", signedIn: true });
@@ -385,7 +387,7 @@ describe("a reader's ask", () => {
 
   it("says the halt when the budget is spent or Jarvis is off", async () => {
     const spent = setup({
-      languages: [],
+      languages: ["fr"],
       translate: () => Promise.resolve({ ok: true, answer: { status: "spent" } }),
     });
     spent.index({ msgid: "old" });
@@ -400,8 +402,33 @@ describe("one account's asks", () => {
   const ask = (t: ReturnType<typeof setup>, account: string, ids: string[]) =>
     t.flow.asked({ room: "#bubble", ids, language: "fr", signedIn: true, account });
 
+  it("start none in a language no signed-in reader of the world reads", async () => {
+    const t = setup({ languages: ["fr"] });
+    t.index({ msgid: "old" });
+    const answer = await t.flow.asked({
+      room: "#bubble",
+      ids: ["old"],
+      language: "de",
+      signedIn: true,
+      account: "g1alice",
+    });
+    expect(answer).toEqual({ room: "#bubble", language: "de", translations: [], pending: [] });
+    expect(t.calls).toEqual([]);
+  });
+
+  it("the asker's own stream as the only reader of X starts no making", async () => {
+    const t = setup({ languages: (_world, except) => (except === "g1alice" ? [] : ["de"]) });
+    t.index({ msgid: "old" });
+    const asked = (account: string) =>
+      t.flow.asked({ room: "#bubble", ids: ["old"], language: "de", signedIn: true, account });
+    expect((await asked("g1alice")).translations).toEqual([]);
+    expect(t.calls).toEqual([]);
+    expect((await asked("g1bob")).translations).toHaveLength(1);
+    expect(t.calls).toHaveLength(1);
+  });
+
   it("start at most 20 makings a minute, and not another account's", async () => {
-    const t = setup({ languages: [] });
+    const t = setup({ languages: ["fr"] });
     const ids = Array.from({ length: 30 }, (_, n) => `old${String(n)}`);
     for (const msgid of ids) t.index({ msgid });
     const first = await ask(t, "g1alice", ids);

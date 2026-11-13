@@ -42,11 +42,6 @@
     border-block-start: var(--line-width) solid var(--color-line);
   }
 
-  .shelf {
-    /* layout: a list row's height, not the rooms column's */
-    min-block-size: var(--row-h);
-  }
-
   .groupName {
     /* layout: the section's title on the items' left edge, a step above its first item; the title style of the cards' rows */
     margin: 0;
@@ -55,6 +50,8 @@
   }
 
   .shelf {
+    /* a list row's height, not the rooms column's */
+    min-block-size: var(--row-h);
     /* layout: the style's dot, the name, the count */
     display: flex;
     /* layout: the dot and the words share a line */
@@ -81,6 +78,7 @@
   .name {
     /* layout: the name takes the room, the count at the end */
     flex: 1;
+    font: var(--font-ui);
   }
 
   .dot {
@@ -183,16 +181,11 @@
   .why {
     /* layout: See all goes to the end */
     flex: 1;
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 
   .all {
     color: var(--color-text-muted);
     font: var(--font-meta);
-  }
-
-  .all {
     transition: color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
   }
 
@@ -216,7 +209,7 @@
     /* A row cut by the column's edge fades out there, so the cut reads as more to scroll, and each card stops at the row's start. */
     scroll-snap-type: x mandatory;
     /* raw: the fade over the last 48 px, about a quarter card */
-    mask-image: linear-gradient(to right, #000 calc(100% - 48px), transparent);
+    mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - 48px), transparent);
   }
 
   .strip > * {
@@ -249,15 +242,6 @@
 
   .card[data-unseen] {
     border-style: dashed;
-  }
-
-  .name {
-    font: var(--font-ui);
-  }
-
-  .sub {
-    color: var(--color-text-muted);
-    font: var(--font-data);
   }
 
   .meta {
@@ -332,11 +316,6 @@
     border-block: var(--line-width) solid var(--color-line);
   }
 
-  .stats dt {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
   .stats div {
     /* layout: the figure over its name */
     display: flex;
@@ -350,7 +329,7 @@
   }
 
   /* A phone has the shelves out of the way, and the detail over the cards. */
-  @media (max-width: 900px) {
+  @media (width < 900px) {
     .styleChips {
       display: block;
     }

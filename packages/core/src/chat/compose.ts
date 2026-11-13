@@ -4,8 +4,9 @@
 // a break a space, so a draft forges no CTCP of its own. A draft of several lines is one message of lines
 // (draft/multiline, docs/decisions.md row 255), each a PRIVMSG within that budget, the message within Ergo's caps;
 // an action stays one line, its breaks spaces.
-import { bytes, LINE_BYTES } from "../irc/irc.ts";
+import { LINE_BYTES } from "../irc/irc.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
+import { utf8Bytes } from "../text/utf8.ts";
 
 // Ergo's cloak of a host: 64 bits in base32, then the network's name (deploy/ergo/ircd.yaml.tmpl, ip-cloaking).
 const CLOAK = "x".repeat(13) + ".gnoworld";
@@ -16,18 +17,18 @@ const CLOAK = "x".repeat(13) + ".gnoworld";
  * composer counts them; server/src/testing/ergo.test.ts holds Ergo to this count.
  */
 export function relayOf(nick: string): number {
-  return bytes(`:${nick}!~u@${CLOAK} `);
+  return utf8Bytes(`:${nick}!~u@${CLOAK} `);
 }
 
 /** The commands a draft may lead with: `/me` sends an action. */
 export const COMMANDS: readonly string[] = ["/me"];
 
-/** A draft, composed: the line to send, the bytes it leaves and its text as the room reads it (an action's words,
- * the action said apart), or a message's lines, the bytes it leaves and its text; or why there is none: a line long
- * by `over` bytes (the line of several named, from 1), a message past a cap, or text holding half of an emoji. */
+/** A draft, composed: the line to send, the bytes it leaves and its text as the room reads it (an action's words apart), or a
+ * message's lines, the bytes left, its text and its tightest line (fewest bytes left of an IRC line, named from 1); or why none:
+ * a line long by `over` bytes (named from 1 among several), a message past a cap, or text holding half of an emoji. */
 export type Composed =
   | { kind: "line"; line: string; left: number; text: string; action: boolean }
-  | { kind: "lines"; lines: string[]; left: number; text: string }
+  | { kind: "lines"; lines: string[]; left: number; text: string; tightest: { line: number; left: number } }
   | { kind: "empty" }
   | { kind: "unknown"; command: string }
   | { kind: "long"; over: number; line?: number }
@@ -55,7 +56,7 @@ function said(room: string, nick: string, { text, action }: { text: string; acti
   if (text === "") return { kind: "empty" };
   if (text.includes("\n")) return several(room, nick, text);
   const line = `PRIVMSG ${room} :${action ? `\u0001ACTION ${text}\u0001` : text}`;
-  const left = LINE_BYTES - relayOf(nick) - bytes(line);
+  const left = LINE_BYTES - relayOf(nick) - utf8Bytes(line);
   return left < 0 ? { kind: "long", over: -left } : { kind: "line", line, left, text, action };
 }
 
@@ -70,12 +71,15 @@ function several(room: string, nick: string, draft: string): Composed {
     .split("\n")
     .map((line) => line.trimEnd())
     .join("\n");
-  const left = MULTILINE_BYTES - bytes(text);
+  const left = MULTILINE_BYTES - utf8Bytes(text);
   if (left < 0) return { kind: "tooBig", unit: "bytes", over: -left };
   const budget = LINE_BYTES - relayOf(nick);
   const lines = text.split("\n").map((line) => `PRIVMSG ${room} :${line}`);
+  const tightest = { line: 0, left: Infinity };
   for (const [at, line] of lines.entries()) {
-    if (bytes(line) > budget) return { kind: "long", over: bytes(line) - budget, line: at + 1 };
+    const lineLeft = budget - utf8Bytes(line);
+    if (lineLeft < 0) return { kind: "long", over: -lineLeft, line: at + 1 };
+    if (lineLeft < tightest.left) Object.assign(tightest, { line: at + 1, left: lineLeft });
   }
-  return { kind: "lines", lines, left, text };
+  return { kind: "lines", lines, left, text, tightest };
 }

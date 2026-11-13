@@ -22,7 +22,7 @@ async function docked(page: Page, label: string) {
 // The search palette's way: "/" opens it, a place's name found, its row clicked.
 async function viaSearch(page: Page, name: string) {
   await page.locator("body").press("/");
-  await page.getByRole("searchbox", { name: "Search places" }).fill(name.slice(0, 4));
+  await page.getByRole("combobox", { name: "Search places" }).fill(name.slice(0, 4));
   await page.getByRole("option", { name: new RegExp(name) }).click({ timeout: 15_000 });
 }
 

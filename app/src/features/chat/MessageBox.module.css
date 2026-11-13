@@ -27,6 +27,13 @@
     border-color: var(--color-mine);
   }
 
+  /* Forced colours repaint every edge alike: the focus takes a ring instead. */
+  @media (forced-colors: active) {
+    .box:focus-within {
+      outline: var(--focus-width) solid Highlight;
+    }
+  }
+
   /* The format bar: small, in a row of its own under a rule. */
   .format {
     /* layout: across the box's three columns, on its first row */
@@ -36,17 +43,6 @@
     padding-block: var(--space-3xs);
     border-block-end: var(--line-width) solid var(--color-line);
     color: var(--color-text-muted);
-  }
-
-  /* The icons at the video's 62% of the muted grey, a size up from its 13 px (Alexis, 2026-11-08: "grossis un peu"). */
-  .format button {
-    /* raw: the video's 62% of the muted grey (the prototype's #fmtBar button) */
-    --_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);
-  }
-
-  .format svg {
-    inline-size: var(--icon-m);
-    block-size: var(--icon-m);
   }
 
   /* A rule between the groups of tools, as high as their icons (prototype #fmtBar .sep). */
@@ -140,20 +136,12 @@
   }
 }
 
-/* A narrow box (a thread's column): the format bar keeps one row, its tools at the smallest size, then without its lists. */
+/* A narrow box (a thread's column): the format bar keeps one row, its tools at the smallest size (ui's `tool`), then without its lists
+   (their `drops`) and the rule before them. */
 @layer components {
-  /* raw: 24 rem, the width at which the nine tools of 32 px no longer fit one row */
-  @container (inline-size < 24rem) {
-    /* :enabled only outweighs the button's own size rule, which it must override */
-    .format button:enabled {
-      --_h: var(--control-xs);
-    }
-  }
-
-  /* raw: 18 rem, the width at which the nine tools of 24 px no longer fit one row; the lists (the cluster's last two tools and the rule before them) go */
+  /* raw: 18 rem, the width at which the nine tools of 24 px no longer fit one row */
   @container (inline-size < 18rem) {
-    .format > div > :nth-last-child(-n + 2),
-    .format [role="separator"]:nth-last-child(3) {
+    .rule[data-drops] {
       display: none;
     }
   }

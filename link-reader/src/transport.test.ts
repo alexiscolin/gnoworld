@@ -76,7 +76,7 @@ async function wayOut(connect: string | undefined, behind?: Server) {
     });
   });
   const port = await listen(server);
-  return { seen, address: `127.0.0.1:${String(port)}` };
+  return { seen, address: { host: "127.0.0.1", port } };
 }
 const request = (url: string, extra: Partial<Request> = {}): Request => ({
   url: new URL(url),
@@ -135,7 +135,7 @@ describe("through the link way out", () => {
   it("fails as a network error when the proxy hangs up, and when nothing listens", async () => {
     const way = await wayOut(undefined);
     expect(await kind(proxyTransport(way.address)(request("https://example.com/")))).toBe("network");
-    expect(await kind(proxyTransport("127.0.0.1:1")(request("https://example.com/")))).toBe("network");
+    expect(await kind(proxyTransport({ host: "127.0.0.1", port: 1 })(request("https://example.com/")))).toBe("network");
   });
 
   it("never connects anywhere but the proxy, whatever address it is given", async () => {
@@ -226,7 +226,7 @@ describe("through the link way out", () => {
     const port = await listen(silent);
     expect(
       await kind(
-        proxyTransport(`127.0.0.1:${String(port)}`)(
+        proxyTransport({ host: "127.0.0.1", port })(
           request("https://example.com/", { signal: AbortSignal.timeout(300) }),
         ),
       ),
@@ -273,7 +273,7 @@ describe("straight to an address (no proxy: development)", () => {
     ["example.com"],
   ])("refuses %s before any socket, as the dialer's Control would", async (address) => {
     const local = await wayOut("");
-    const port = Number(local.address.split(":")[1]);
+    const { port } = local.address;
     expect(await kind(directTransport({ port })(request("https://example.com/", { address })))).toBe("private");
     expect(local.seen.tunnels).toHaveLength(0);
   });

@@ -1,5 +1,6 @@
 // The network line's tables and what is asked of them: a page's transactions kept, the answer read back. Counts and addresses stay here.
 import { NETWORK_DAYS, NetworkAnswer } from "@gnoworld/schemas/indexer";
+import { transaction } from "@gnoworld/service/db";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { Failure } from "./remote.ts";
@@ -33,8 +34,7 @@ export function keep(db: DatabaseSync, universe: string, { days, txs, through }:
     "INSERT INTO network_days (day, txs) VALUES (?, 1) ON CONFLICT (day) DO UPDATE SET txs = txs + 1",
   );
   const accounts = db.prepare("INSERT OR IGNORE INTO network_day_accounts (day, address) VALUES (?, ?)");
-  db.exec("BEGIN");
-  try {
+  transaction(db, () => {
     for (const { height, sender } of txs) {
       const day = days.get(height);
       if (day === undefined) throw new Failure("shape");
@@ -42,11 +42,7 @@ export function keep(db: DatabaseSync, universe: string, { days, txs, through }:
       if (sender !== undefined) accounts.run(day, sender);
     }
     db.prepare("INSERT OR REPLACE INTO network_state (universe, height) VALUES (?, ?)").run(universe, through);
-    db.exec("COMMIT");
-  } catch (error) {
-    db.exec("ROLLBACK");
-    throw error;
-  }
+  });
 }
 
 const Counts = z.array(z.object({ day: z.string(), n: z.number() }));

@@ -15,6 +15,9 @@ export interface ChatLayoutProps {
   info?: ReactNode;
   /** The panel takes the conversation's place where the screen is narrow, as a thread's does. */
   infoFirst?: boolean;
+  /** The header a band over the columns, out of their flow, under the page's own header, which the columns start below (the app's wide
+   * full chat): only its controls take a click, so the columns under it keep theirs. */
+  band?: boolean;
   /** Told whether the box the chat is given is `COMPACT_MAX` wide or less (true till it is measured): the worlds, the info panel and the handles
    * are not drawn then, and the app leaves their slots empty. One measure, here, for the layout and the app. */
   onCompact?: (compact: boolean) => void;
@@ -57,6 +60,7 @@ export function ChatLayout({
   rooms,
   info,
   infoFirst,
+  band,
   onCompact,
   moved,
   widths,
@@ -93,6 +97,7 @@ export function ChatLayout({
         role="region"
         aria-label="Chat"
         data-info-first={infoFirst === true ? "" : undefined}
+        data-band={band === true ? "" : undefined}
         data-compact={compact ? "" : undefined}
       >
         <div className={styles["header"]} data-region="header">

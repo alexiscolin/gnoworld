@@ -12,6 +12,8 @@ const EASE = 0.2;
 const FRAME_MS = 1000 / 60;
 const STILL = 0.002;
 const QUIET = "(prefers-reduced-motion: reduce), (pointer: coarse)";
+// The system's word, a finger, or this device's "Reduce animations" setting (the root's data-motion).
+const quiet = (): boolean => matchMedia(QUIET).matches || document.documentElement.dataset["motion"] === "reduce";
 
 // How much a planet `distance` pixels from the pointer grows: the most at it, smoothly none from `REACH` on.
 const magnifiedAt = (distance: number): number =>
@@ -134,7 +136,7 @@ export function dock(list: HTMLElement, signal: AbortSignal, cut: (cut: boolean)
     column = read();
     const { rests, top } = column;
     const focus = rests[column.links.findIndex((link) => link === focused)];
-    const at = matchMedia(QUIET).matches ? undefined : (pointer ?? (focus && top + focus.offset + focus.height / 2));
+    const at = quiet() ? undefined : (pointer ?? (focus && top + focus.offset + focus.height / 2));
     const moving = grow(column, sizes, { at, ease });
     anchor = at ?? anchor;
     // The drift is read off the page once the planets have their sizes, so one shift puts the anchor back under the pointer.

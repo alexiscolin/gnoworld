@@ -91,7 +91,7 @@
   }
 
   /* The rail is a computer's: a phone keeps the page's list (Hero's Worlds). */
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .rail {
       display: none;
     }

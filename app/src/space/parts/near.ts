@@ -79,8 +79,9 @@ export class Near {
 
   /** Turns the ground of the world `id` on `seconds` past its own spin; its clouds keep time. */
   lead(id: string, seconds: number, leaned: Quaternion): void {
-    const led = this.#led.get(id) ?? { ahead: seconds, leaned: new Quaternion() };
-    this.#led.set(id, { ahead: seconds, leaned: led.leaned.copy(leaned) });
+    const led = this.#led.get(id);
+    if (led === undefined) this.#led.set(id, { ahead: seconds, leaned: new Quaternion().copy(leaned) });
+    else [led.ahead, led.leaned] = [seconds, led.leaned.copy(leaned)];
   }
 
   /** Chooses which planets are drawn as themselves, from `eye`, `pxK` world units a pixel at distance 1, a few times a second; with
@@ -88,6 +89,8 @@ export class Near {
   choose(universe: Universe, eye: Vec, { pxK, seconds, open }: { pxK: number; seconds: number; open?: number }): void {
     const lists = { wanted: this.#wanted, sizes: this.#sizes, ahead: this.#ahead, warm: this.warm };
     sight(universe, { eye, pxK, seconds, open }, lists);
+    // More made ahead than are kept would be dropped and remade each choose.
+    this.#ahead.length = Math.min(this.#ahead.length, KEPT - this.#wanted.length);
     this.#wantedIndex = new Set(this.#wanted.map(({ index }) => index));
     for (const planet of [...this.#wanted, ...this.#ahead]) this.#make(planet);
     this.#forget();

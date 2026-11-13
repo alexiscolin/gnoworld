@@ -70,21 +70,19 @@ export function translationSide<C extends Watcher>(
     for (const client of clients)
       if (client.language === event.language && client.rooms.has(event.room)) write(client, text);
   };
-  const open = (world: string): ReadonlySet<Language> =>
-    new Set(
-      [...clients].flatMap(({ account, language, worlds }) =>
-        account !== undefined && language !== undefined && worlds.has(world) ? [language] : [],
-      ),
+  const open = (world: string): { account: string; language: Language }[] =>
+    [...clients].flatMap(({ account, language, worlds }) =>
+      account !== undefined && language !== undefined && worlds.has(world) ? [{ account, language }] : [],
     );
   return {
     /** What the stream hands out: a translation told, and the languages in use on a world. */
     api: {
       translation: keep,
-      languages: (world: string): readonly Language[] => languages.inUse(world, open(world)),
+      languages: (world: string, except?: string): readonly Language[] => languages.inUse(world, open(world), except),
     },
     /** The stream began or ended: a signed-in one's language is in use on its worlds from then. */
     touch: ({ account, language, worlds }: C): void => {
-      if (account !== undefined && language !== undefined) languages.touch(worlds, language);
+      if (account !== undefined && language !== undefined) languages.touch(worlds, language, account);
     },
     /** What a client missed after `after`: its rooms' events in its language. */
     missed: (client: C, after: number): Framed[] => {

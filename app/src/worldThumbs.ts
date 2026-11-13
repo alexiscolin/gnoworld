@@ -9,8 +9,6 @@ import { pictureOf } from "./lib/worldPictures.ts";
 /** Worlds drawn in one go: a shelf of sixty never holds the main thread for one long frame. */
 const BATCH = 6;
 const WAIT_MS = 80;
-// The page's whole life: a draw is never called off.
-const STAYS = new AbortController().signal;
 
 const pictures = createStore<ReadonlyMap<string, string>>(() => new Map());
 const asked = new Set<string>();
@@ -32,7 +30,7 @@ async function drawQueue(): Promise<void> {
   const { thumbsOf } = chunk;
   while (queue.length > 0) {
     // Each batch once the browser rests: never in the middle of a flight's frames or a fade (D428).
-    await restsFor(STAYS);
+    await restsFor();
     const batch = queue.splice(0, BATCH);
     const drawn = await thumbsOf(batch);
     // A world left without a picture (a lost context, a map that did not come) may be asked again, once.

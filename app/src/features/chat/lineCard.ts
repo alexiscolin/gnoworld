@@ -24,7 +24,7 @@ export function lineCard({ key, verdict, room, player, capture, mine, may }: Lin
   return shown ? { key, removable: mine || may } : undefined;
 }
 
-/** What a line's card needs of its list (LineView's `card`): none outside a room. A corrected line's card is its newest edit's, as its verdict is. */
+/** What a line's card needs of its list: none outside a room. A corrected line's card is its newest edit's, as its verdict is. */
 export function cardOf(
   {
     room,
@@ -43,3 +43,9 @@ export function cardOf(
   const key = keeping?.cards === undefined ? undefined : own(keeping.cards, msgid);
   return room === undefined ? undefined : { room, msgid, key, may: keeping?.moderate !== undefined, saving };
 }
+
+/** The same as bare values, for the props of a line that is drawn again only when one of them changes (F1222): no msgid, no card. */
+export const cardMarks = (...asked: Parameters<typeof cardOf>) => {
+  const card = cardOf(...asked);
+  return { cardMsgid: card?.msgid, cardKey: card?.key, may: card?.may ?? false, saving: card?.saving ?? false };
+};

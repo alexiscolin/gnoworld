@@ -6,7 +6,7 @@ import { cliFile, cliKey } from "../testing/cliSigner.ts";
 import { wallet } from "../testing/signer.ts";
 import type { Send } from "@gnoworld/service/net";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { asOf, makeMayModerate, type MayModerateOptions } from "./mayModerate.ts";
+import { asOf, makeMayModerate, mayWithin, type MayModerateOptions } from "./mayModerate.ts";
 import { makeOwners } from "./owners.ts";
 import { isTeam, mayCreateRoom, spared, type Roles } from "./roles.ts";
 import { staffOf } from "../rooms/types.ts";
@@ -168,6 +168,12 @@ describe("an owner's right", () => {
     expect(await setup({ holder: "failed" }).may(ALICE, REALM_ROOM, VISITOR)).toBe(false);
     expect(await setup({ holder: "fails" }).may(ALICE, REALM_ROOM, VISITOR)).toBe(false);
   });
+
+  it("reads no identity when nobody holds the namespace: there is no holder to match", async () => {
+    const t = setup({ holder: null });
+    expect(await t.may(ALICE, REALM_ROOM, VISITOR)).toBe(false);
+    expect(t.asked.identityOf).toEqual([]);
+  });
 });
 
 describe("the namespace comes from the server alone", () => {
@@ -246,6 +252,17 @@ describe("the chain's outage", () => {
     const result = may(ALICE, REALM_ROOM, VISITOR);
     await vi.advanceTimersByTimeAsync(5_000);
     expect(await result).toBe(false);
+  });
+});
+
+describe("mayWithin, a list's wait for the right", () => {
+  it("leaves no timer behind once the read answers, yes, no or a failure", async () => {
+    vi.useFakeTimers();
+    expect(await mayWithin(Promise.resolve({ as: "staff" }))).toBe(true);
+    expect(await mayWithin(Promise.resolve(false))).toBe(false);
+    expect(await mayWithin(Promise.reject(new Error("down")))).toBe(false);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(vi.getTimerCount()).toBe(0);
   });
 });
 

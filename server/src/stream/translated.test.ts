@@ -129,6 +129,15 @@ describe("the stream's translation events", () => {
     expect(ids(await client.frames("translation", 4))).toEqual(["m6", "m7", "m8", "m9"]);
   });
 
+  it("never pushes a room's verdicts out of a replay: its translations take only the room the verdicts leave", async () => {
+    const { stream, open } = setup({ pending: 4 });
+    for (let n = 0; n < 3; n += 1) stream.publish({ msgid: `v${String(n)}`, room: "#bubble", state: "checked" });
+    for (let n = 0; n < 4; n += 1) stream.translation(event(`m${String(n)}`));
+    const client = await open("rooms=%23bubble&language=fr");
+    expect(ids(await client.frames("verdict", 3))).toEqual(["v0", "v1", "v2"]);
+    expect(ids(await client.frames("translation", 1))).toEqual(["m3"]);
+  });
+
   it("drops a client that leaves them unread", async () => {
     const { stream, open } = setup({ pending: 2 });
     const client = await open("rooms=%23bubble&language=fr");
@@ -161,6 +170,23 @@ describe("the languages in use on a world", () => {
     expect(stream.languages("bubble")).toEqual(["fr"]);
     clock.now += 2 * 60_000;
     expect(stream.languages("bubble")).toEqual([]);
+  });
+
+  it("count one account's languages as one reader: its streams in four languages never push out another reader's", async () => {
+    const clock = { now: 1_000_000 };
+    const { stream, open } = setup({ now: () => clock.now });
+    await open("rooms=%23bubble&language=pt", { who: "bob" });
+    clock.now += 1000;
+    for (const language of ["fr", "de", "es", "it"])
+      await open(`rooms=%23bubble&language=${language}`, { who: "alice" });
+    expect(stream.languages("bubble")[0]).toBe("pt");
+  });
+
+  it("leave out the asker's own streams when asked for another's readers", async () => {
+    const { stream, open } = setup();
+    await open("rooms=%23bubble&language=de", { who: "alice" });
+    expect(stream.languages("bubble", ALICE)).toEqual([]);
+    expect(stream.languages("bubble", BOB)).toEqual(["de"]);
   });
 
   it("are none for a stream with no language, and a signed-in stream's own language is counted once", async () => {

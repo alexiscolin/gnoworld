@@ -1,11 +1,10 @@
 // The prices' history (slice 8, 8i; the markets row's sparklines, frame 6): each token's price at each of the prices timer's reads over the
 // last day, oldest first, kept in a file beside markets.json so a restart keeps the day, and served at GET /api/markets/history. What the file
 // holds is read back through its schema: a file refused, or older than a day, starts the day again.
-import { readFileSync } from "node:fs";
 import { MARKETS_HISTORY_MOST, MarketsHistory } from "@gnoworld/schemas/indexer";
 import { MARKET_SYMBOLS, type Markets } from "@gnoworld/schemas";
 import { Hono } from "hono";
-import { replaceFile } from "../replaceFile.ts";
+import { lastFile, replaceFile } from "../replaceFile.ts";
 
 const DAY_MS = 24 * 3_600_000;
 
@@ -25,12 +24,8 @@ export interface History {
 
 // The file as it was left, or none: missing, unreadable, refused by its schema, or older than a day.
 function kept(file: string, now: number): MarketsHistory | undefined {
-  try {
-    const parsed = MarketsHistory.safeParse(JSON.parse(readFileSync(file, "utf8")));
-    return parsed.success && now - Date.parse(parsed.data.updated) < DAY_MS ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
+  const parsed = lastFile(file, MarketsHistory);
+  return parsed !== undefined && now - Date.parse(parsed.updated) < DAY_MS ? parsed : undefined;
 }
 
 export function makeHistory(file: string, now: () => number): History {

@@ -364,7 +364,8 @@ if [ "${1:-}" = --mutants ]; then
 		guard sed 's# -m conntrack --ctstate ESTABLISHED##'
 	mutant "no rate limit" "a burst with no password gets 429" nginx sed '/limit_req zone=/d'
 	mutant "a flood answered 503" "a burst with no password gets 429" nginx sed '/limit_req_status 429/d'
-	mutant "a first load cut short" "a visitor's first load" nginx sed 's#burst=640#burst=60#'
+	mutant "a first load cut short" "a visitor's first load" nginx sed 's#zone=files burst=1024#zone=files burst=60#'
+mutant "the hashed files back in the visitors' zone" "a visitor's first load" nginx sed 's#zone=files burst=1024#zone=visitors burst=640#'
 	mutant "the burst back at 320" "a burst of 640 requests is served whole" nginx sed 's#burst=640#burst=320#'
 	mutant "one limit for every visitor" "a visitor is served right after another's burst" \
 		nginx sed 's#limit_req_zone $proxy_protocol_addr#limit_req_zone $server_port#'
@@ -861,9 +862,10 @@ PY
 	at_least "a burst with no password gets 429" "$(codes 429 198.51.100.1 'http://web:8080/[1-1600]')" 200
 	at_least "a burst with a wrong password gets 429" "$(codes 429 198.51.100.2 -u team:wrong 'http://web:8080/[1-1600]')" 200
 	at_least "a burst on the worker gets 429" "$(codes 429 198.51.100.3 -u "$auth" 'http://web:8080/sw.js?[1-1600]')" 200
-	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy.
+	# Each answer's code with its Cache-Control (a browser keeps a 429 that says immutable) and its policy. A hashed file sits under the
+	# files' zone (a burst of 1,024): 2,600 requests keep as many past it as 1,600 did past the visitors' 640.
 	kept=$(docker run --rm --network "$inside" "$CURL" -s -o /dev/null -w '%{http_code} %header{cache-control}|%header{content-security-policy}\n' --haproxy-protocol \
-		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-1600]" || true)
+		--haproxy-clientip 198.51.100.4 -u "$auth" "http://web:8080$first?[1-2600]" || true)
 	at_least "a burst on a hashed file gets 429" "$(printf '%s\n' "$kept" | grep -c '^429 ' || true)" 200
 	expect "a 429 on a hashed file revalidates" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f1 | sort -u)" "429 no-cache"
 	expect "a 429 carries the policy" "$(printf '%s\n' "$kept" | grep '^429 ' | cut -d'|' -f2- | sort -u)" "$bare"

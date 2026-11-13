@@ -39,7 +39,7 @@
   .mark[data-mark="ring"] {
     border: var(--line-width) solid var(--color-mine-line);
     border-block-start-color: var(--color-mine);
-    animation: turn var(--motion-spin) linear infinite;
+    animation: turn calc(var(--motion-spin) * var(--motion-scale)) linear infinite;
   }
 
   .mark[data-mark="dot"] {
@@ -50,12 +50,6 @@
     to {
       transform: rotate(1turn);
     }
-  }
-
-  /* The frame's small note: 12 px, muted. */
-  .note {
-    font: var(--font-meta);
-    color: var(--color-text-muted);
   }
 
   .lede {
@@ -77,22 +71,5 @@
 
   .status:empty {
     display: none;
-  }
-
-  /* A phone reads and fills the card and signs on a computer (U6): a coarse pointer gets the words, a computer the button. */
-  .phone {
-    display: none;
-    font: var(--font-meta);
-    color: var(--color-text-muted);
-  }
-
-  @media (pointer: coarse) {
-    .phone {
-      display: block;
-    }
-
-    .computer {
-      display: none;
-    }
   }
 }

@@ -25,9 +25,4 @@
       opacity: 0;
     }
   }
-
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
 }

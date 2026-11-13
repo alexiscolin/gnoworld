@@ -67,6 +67,10 @@ describe("visitor", () => {
     expect(visitor("2001:db8::ffff:203.0.113.7", undefined, undefined)).toBe("2001:db8:0:0::/64");
   });
 
+  it("counts by its /64 an address that only starts as a mapped one: the translated form ::ffff:0:a.b.c.d is IPv6", () => {
+    expect(visitor("::ffff:0:198.51.100.1", undefined, undefined)).toBe("0:0:0:0::/64");
+  });
+
   it.each([
     ["2001:db8:1:2:3:4:5:6", "2001:db8:1:2::/64"],
     ["2001:DB8:0001:0002::", "2001:db8:1:2::/64"],

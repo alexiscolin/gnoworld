@@ -10,18 +10,18 @@
 
   /* raw: under the dock's breakpoint (ChatScreen.tsx) the plate is a block at the page's top: it keeps the arrival pill's room
      above it, as a realm's view does (tokens.css), so the pill covers neither its trail nor its title */
-  @media (max-width: 1279px) {
+  @media (width < 1280px) {
     .earth + * {
       padding-block-start: var(--banner-room);
     }
   }
 
   /* raw: the dock's breakpoint (ChatScreen.tsx) */
-  @media (min-width: 1280px) {
+  @media (width >= 1280px) {
     .earth,
     .earth + * {
-      /* raw: the frames' blue tints the plate (f0039: #162238), as a world's colour tints its own */
-      --world: #5eaafd;
+      /* The frames' blue tints the plate (f0039: #162238), as a world's colour tints its own. */
+      --world: var(--world-earth);
       /* raw: the same 16% the plate takes (Panel.module.css) */
       --_tinted: color-mix(in oklab, var(--world) 16%, var(--color-surface));
     }

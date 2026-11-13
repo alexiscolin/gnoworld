@@ -20,26 +20,44 @@ import { PlaceFrame } from "./placeFrame.tsx";
 const RealmPlate = lazy(() => import("./plate/RealmPlate.tsx"));
 
 // The realm's room, asked of the server once when the world's list lacks it (D390, D392). The server's bot opens a room made a moment
-// after it answers, so the list is asked again till it holds the room, then the lists on the page are told (gnodice's "opens soon").
+// after it answers, so the list is asked again till it holds the room, then the page's lists are told (gnodice's "opens soon").
 // A refused ask, or a room still missing after the tries, is "failed": the dock says so and offers another go, never an empty column.
 const LISTED_TRIES = 10;
 const LISTED_STEP_MS = 400;
 
 type Made = "making" | "made" | "failed";
 
-/** Asks the room of `realm` when `world` does not list it, then asks the list again till it does, a few times. */
-export async function roomListed(
+type Api = Pick<ReturnType<typeof pageRoomsApi>, "rooms" | "realm">;
+interface Listing {
+  api?: Api;
+  /** Tells the page's lists once a room was asked for. */
+  changed?: () => void;
+}
+
+// Whether the world lists the room: at once, once it was asked for, never (asked for or the page left), or refused.
+async function listing(
   { realm, world, room }: { realm: string; world: string; room: string },
   alive: () => boolean,
-  api: Pick<ReturnType<typeof pageRoomsApi>, "rooms" | "realm"> = pageRoomsApi(),
-): Promise<boolean> {
+  api: Api,
+): Promise<"listed" | "made" | "missing" | "refused"> {
   for (let tries = 0; tries < LISTED_TRIES && alive(); tries += 1) {
-    const listed = await api.rooms(world);
-    if (listed.ok && roomIds(listed.value.sections).includes(room)) return true;
-    if (tries === 0 && !(await api.realm(realm)).ok) return false;
+    const answer = await api.rooms(world);
+    if (answer.ok && roomIds(answer.value.sections).includes(room)) return tries === 0 ? "listed" : "made";
+    if (tries === 0 && !(await api.realm(realm)).ok) return "refused";
     await new Promise((resolve) => setTimeout(resolve, LISTED_STEP_MS));
   }
-  return false;
+  return "missing";
+}
+
+/** Asks the room of `realm` when `world` does not list it, then asks the list again till it does, a few times. */
+export async function roomListed(
+  at: { realm: string; world: string; room: string },
+  alive: () => boolean,
+  { api = pageRoomsApi(), changed = roomsChanged }: Listing = {},
+): Promise<boolean> {
+  const found = await listing(at, alive, api);
+  if (found === "made" || (found === "missing" && alive())) changed();
+  return found === "listed" || found === "made";
 }
 
 function useRoomMade({ realm, world, room }: { realm: string; world: string; room: string }, known: boolean) {
@@ -50,9 +68,7 @@ function useRoomMade({ realm, world, room }: { realm: string; world: string; roo
     let live = true;
     roomListed({ realm, world, room }, () => live)
       .then((listed) => {
-        if (!live) return;
-        roomsChanged();
-        setDone({ room, made: listed ? "made" : "failed" });
+        if (live) setDone({ room, made: listed ? "made" : "failed" });
       })
       .catch((error: unknown) => {
         reportError(error);
@@ -72,6 +88,13 @@ function useRoomMade({ realm, world, room }: { realm: string; world: string; roo
   };
 }
 
+/** A realm's talk: the world its room talks in, the room by its whole id (as the chat keys it, which the plate reads), and the room's name
+ * in that world (which the chat's link joins). */
+export function realmTalk(realm: string, worlds: Parameters<typeof realmRoom>[1]) {
+  const { world, room } = realmRoom(realm, worlds);
+  return { talk: world, room, inWorld: room.split("/")[1] };
+}
+
 // The realm's chat: its room, made on the first open (useRoomMade), in its world (D389 to D392). The same element docks beside the
 // page or stands alone, full (full.ts).
 function useRealmChat({ realm, chain }: RealmAt, known: boolean) {
@@ -79,22 +102,22 @@ function useRealmChat({ realm, chain }: RealmAt, known: boolean) {
   const { namespace: owner, name } = realmName(realm);
   // A namespace that is an address reads short.
   const namespace = isAddress(owner) ? shortAddress(owner) : owner;
-  const where = realmRoom(realm, universe.worlds);
-  const { made, retry } = useRoomMade({ realm, world: where.world, room: where.room }, known);
+  const { talk, room, inWorld } = realmTalk(realm, universe.worlds);
+  const { made, retry } = useRoomMade({ realm, world: talk, room }, known);
   const place = chatPlace(
     {
-      slug: where.world,
+      slug: talk,
       name,
       description: `A realm of @${namespace} on ${chain.name}.`,
       inPage: true,
       realm,
-      room: where.room,
+      room,
     },
     universe,
     `@${namespace} · ${name}`,
   );
-  const chat = made === "made" ? { world: where.world, room: where.room.split("/")[1], place } : undefined;
-  return { namespace, name, talk: where.world, room: where.room, chat, failed: made === "failed", retry };
+  const chat = made === "made" ? { world: talk, room: inWorld, place } : undefined;
+  return { namespace, name, talk, room, chat, failed: made === "failed", retry };
 }
 
 // The owner's namespace as the kicker shows it: a link to its system's page when the universe lists one.

@@ -8,7 +8,6 @@ import type { ReadOptions } from "@gnoworld/chain/read";
 import { use, useEffect } from "react";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { Act, CallCountsContext, FunctionRow, OpenOnGnoweb, PAGE_ROWS, Unlisted } from "./FunctionRow.tsx";
-import calm from "./quiet.module.css";
 import styles from "./RealmFunctions.module.css";
 import { useFunctions, type Functions, type Result } from "./useFunctions.ts";
 import { isHeight } from "./useRealm.ts";
@@ -42,7 +41,7 @@ function Outcome({ name, result, href }: { name: string; result: Result | undefi
       <pre className={styles["result"]} dir="ltr" tabIndex={0} role="region" aria-label={`Result of ${name}`}>
         {result.text}
       </pre>
-      <p className={calm["note"]}>
+      <p className="meta">
         read on chain, free, no signature
         {height === undefined
           ? null
@@ -113,7 +112,7 @@ function Items({
 function Body({ functions, more, expanded }: { functions: Functions; more: string | undefined; expanded: boolean }) {
   const { listing, results, read } = functions;
   if (listing.state !== "listed") return <Unlisted listing={listing} href={more} />;
-  if (listing.names.length === 0) return <p className={calm["note"]}>There is no function to read here.</p>;
+  if (listing.names.length === 0) return <p className="meta">There is no function to read here.</p>;
   return <Items names={listing.names} results={results} read={read} more={more} expanded={expanded} href={more} />;
 }
 

@@ -1,6 +1,7 @@
 // A token realm's holders and supply (slice 13): what the server replayed from grc20's own events, drawn only when it holds something. Holders,
 // supply and today's transfers, the top holders by share, and a chart of transfers a day only when three days of the window hold one, else the
 // last transfer in words. A token whose events could not be trusted says its holders are unknown. Every text is the answer's, checked.
+import { utcDay } from "@gnoworld/core";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import type { TokenAnswer } from "@gnoworld/schemas/indexer";
@@ -8,13 +9,13 @@ import { Card, Cell, DayChart, Figures, Progress, Sidebar, Stack, type Figure } 
 import { PersonLink } from "../../features/chat/index.ts";
 import { ErrorView, useWhere } from "../../features/errors/index.ts";
 import { amountText, plain, short } from "../../lib/chainText.ts";
-import { utcDay } from "../../lib/days.ts";
+import { DAY_MS } from "../../lib/days.ts";
 import { isUnread, queryClient } from "../../lib/query/client.ts";
+import { dayLabel } from "./days.ts";
 import { tokenOptions } from "./tokenQuery.ts";
 
 type Token = TokenAnswer["tokens"][number];
 
-const DAY_MS = 86_400_000;
 const WINDOW = 30;
 /** Days with a transfer the window must hold before a chart is drawn: a flat line says nothing. */
 const CHART_FROM = 3;
@@ -27,16 +28,14 @@ const shareOf = (amount: string, supply: string): number =>
 function windowOf(days: Token["days"], today: string): { day: string; transfers: number }[] {
   const held = new Map(days.map(({ day, transfers }) => [day, transfers]));
   return Array.from({ length: WINDOW }, (_, back) => {
-    const day = new Date(Date.parse(today) - (WINDOW - 1 - back) * DAY_MS).toISOString().slice(0, 10);
+    const day = utcDay(new Date(Date.parse(today) - (WINDOW - 1 - back) * DAY_MS));
     return { day, transfers: held.get(day) ?? 0 };
   });
 }
 
-const dayWord = (day: string): string => utcDay(new Date(`${day}T12:00:00Z`), new Date());
-
 function figuresOf(token: Token, today: number): Figure[] {
   const { holders, supply, last, decimals } = token;
-  const sub = last === null ? "none yet" : `last on ${dayWord(last.day)}`;
+  const sub = last === null ? "none yet" : `last on ${dayLabel(last.day)}`;
   return [
     ...(holders === null ? [] : [{ key: "holders", label: "Holders", value: holders, sub: "with a balance" }]),
     ...(supply === null
@@ -92,14 +91,14 @@ function Transfers({ token, today }: { token: Token; today: string }) {
           <DayChart
             label="Transfers per day"
             values={window.map(({ transfers }) => transfers)}
-            labels={window.map(({ day }) => dayWord(day))}
+            labels={window.map(({ day }) => dayLabel(day))}
             noun={["transfer", "transfers"]}
           />
         </Card.Body>
       </Card>
     );
   return token.last === null ? null : (
-    <p className="meta">{`Last transfer ${dayWord(token.last.day)}, block ${String(token.last.height)}.`}</p>
+    <p className="meta">{`Last transfer ${dayLabel(token.last.day)}, block ${String(token.last.height)}.`}</p>
   );
 }
 
@@ -123,7 +122,7 @@ function OneToken({ token, today }: { token: Token; today: string }) {
 export function TokenBlock({ realm }: { realm: string }) {
   const read = useQuery(tokenOptions(realm), queryClient);
   const where = useWhere();
-  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const [today] = useState(() => utcDay(new Date()));
   if (read.isError) {
     const missing = isUnread<{ ok: false; reason: string }>(read.error) && read.error.read.reason === "not_found";
     return missing ? null : (

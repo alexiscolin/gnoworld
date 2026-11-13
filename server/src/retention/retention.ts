@@ -69,7 +69,7 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     ),
   };
   const guests = makeGuests(db, { now });
-  const guard = guarded(log);
+  const guard = guarded(log, "retention_failed");
   const count = (): number => N.parse(sql.count.get()).n;
   // Whether an alert's condition holds now and did not at the last tick: one alert a crossing, armed again once
   // it no longer holds. Each alert is logged by its name written out, which scripts/check_docs.py reads.

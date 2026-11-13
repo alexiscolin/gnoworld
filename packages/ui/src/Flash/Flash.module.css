@@ -73,9 +73,4 @@
   .title {
     font: var(--font-ui);
   }
-
-  .line {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
 }

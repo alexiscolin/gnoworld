@@ -29,6 +29,11 @@ export class Jumping {
     this.#out(`CHATHISTORY LATEST ${room} * ${String(HISTORY_LINES)}`);
   }
 
+  /** The room in view changed: a jump asked for another room is forgotten, so its late page does not take the room over. */
+  away(room: string | undefined): void {
+    this.#jumps.cancel(room);
+  }
+
   /** Reads a history page: the window of the jump waiting for it goes to the store; whether it was that page. */
   page(room: string, messages: readonly IrcMessage[]): boolean {
     const found = this.#jumps.answer(room, messages);

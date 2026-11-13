@@ -3,8 +3,6 @@
   .note {
     /* layout: a step under the list it speaks of */
     margin-block-start: var(--space-xs);
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 
   /* The column's list fills its height (the fill-column utility), so the reader's shortcuts stand at its foot (Alexis, 2026-11-07). */

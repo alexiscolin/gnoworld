@@ -20,7 +20,7 @@
     border-inline-start: 1px solid var(--color-line-strong);
   }
 
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .inPill {
       /* layout: the name, the icon and the chip on a line */
       display: inline-flex;

@@ -1,13 +1,13 @@
-import AxeBuilder from "@axe-core/playwright";
 import { adena } from "./adena.ts";
 import { accountPill, connectButton } from "./account.ts";
+import { axeOf } from "./axe.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // Slice 9h (frames 90 to 97): the arrival banners against the real server. A world is charted once a run, so this file owns
 // the first chart of /w/govdao (D210): no other journey opens it logged in. Serial; it waits on the page's own events.
 test.describe.configure({ mode: "serial" });
 
-const violations = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
+const violations = async (page: Page) => (await axeOf(page).analyze()).violations;
 const chartBanner = (page: Page) => page.getByText("First to chart · GovDAO");
 const sideways = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);

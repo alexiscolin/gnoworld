@@ -4,6 +4,7 @@
 // state and links to the realm on gnoweb. This file is a chunk of its own, asked only by a world with a realm (world.tsx).
 import { Button, Card, Cluster, Stack } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useRef, type ComponentType } from "react";
+import { reportedOr } from "../../lib/reported.ts";
 import { realmAt } from "../../realmAt.ts";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
 import { useQuery } from "@tanstack/react-query";
@@ -24,10 +25,16 @@ import { openOf, Read, SHOWN } from "./ProposalRows.tsx";
 const pinnedChunk = () => import("./Pinned.tsx");
 const none = () => ({ default: () => null });
 const PinnedForms = lazy<ComponentType<PinnedFormsProps>>(() =>
-  pinnedChunk().then((chunk) => ({ default: chunk.PinnedForms }), none),
+  reportedOr(
+    pinnedChunk().then((chunk) => ({ default: chunk.PinnedForms })),
+    none(),
+  ),
 );
 const PinnedBarPart = lazy<ComponentType<PinnedBarProps>>(() =>
-  pinnedChunk().then((chunk) => ({ default: chunk.PinnedBar }), none),
+  reportedOr(
+    pinnedChunk().then((chunk) => ({ default: chunk.PinnedBar })),
+    none(),
+  ),
 );
 
 /** The chat's bar's part of a world's pinned actions, as its code comes (a lazy component resolves to a function, never to another
@@ -57,7 +64,10 @@ function useProposals(path: string, options: ReadOptions) {
   const at = realmAt(path);
   const realm = at?.realm;
   const { data, error } = useQuery(
-    { ...proposalsOptions(at?.chain.rpc ?? "", realm ?? "", options), enabled: at !== undefined },
+    {
+      ...proposalsOptions(at?.chain.rpc ?? "", realm ?? "", options),
+      enabled: at !== undefined,
+    },
     queryClient,
   );
   const read = data ?? (isUnread<ChainRead<Proposal[]>>(error) ? error.read : undefined);

@@ -100,11 +100,16 @@ const secured = ({ socket, at, call, ca }: Secure): Promise<TLSSocket> =>
     );
   });
 
+/** Where the link way out listens. */
+export interface Endpoint {
+  host: string;
+  port: number;
+}
+
 // A TCP connection to the proxy, closed if the signal fires first.
-const dial = (proxy: string, signal: AbortSignal): Promise<Socket> =>
+const dial = (proxy: Endpoint, signal: AbortSignal): Promise<Socket> =>
   new Promise((resolve, reject) => {
-    const [host = "", port = ""] = proxy.split(":");
-    const socket = connect({ host, port: Number(port) });
+    const socket = connect(proxy);
     const fail = () => {
       socket.destroy();
       reject(new Refused(kindOf(signal)));
@@ -117,7 +122,7 @@ const dial = (proxy: string, signal: AbortSignal): Promise<Socket> =>
   });
 
 // The tunnel: CONNECT, and the proxy's answer. Anything but a 200 closes it; a 407 is the way out's refusal.
-async function tunnel(proxy: string, { url, signal }: Call): Promise<Socket> {
+async function tunnel(proxy: Endpoint, { url, signal }: Call): Promise<Socket> {
   const socket = await dial(proxy, signal);
   signal.addEventListener(
     "abort",
@@ -139,9 +144,9 @@ async function tunnel(proxy: string, { url, signal }: Call): Promise<Socket> {
   }
 }
 
-/** CONNECT `host:443` to the proxy (`host:port`), TLS to the page over it (certificate checked against the name). A 407 is `egress`.
+/** CONNECT `host:443` to the proxy, TLS to the page over it (certificate checked against the name). A 407 is `egress`.
  * A TLS failure, a hang-up or a reply head past 16 KiB is `network`; the connection closes when the request's signal aborts. */
-export function proxyTransport(proxy: string, options: Options = {}): Transport {
+export function proxyTransport(proxy: Endpoint, options: Options = {}): Transport {
   return async ({ url, headers, signal }) => {
     const call = { url, headers, signal };
     const socket = await tunnel(proxy, call);

@@ -3,15 +3,16 @@
 import { Button, Cluster, type IconName } from "@gnoworld/ui";
 import { useEffect } from "react";
 import { useApp } from "../../storeContext.tsx";
+import { composerBox } from "../chat/index.ts";
 import { FollowButton } from "../follow/index.ts";
 import { sharePlace, type SharedPlace } from "../share/index.ts";
 
 // The link goes to the chat; the focus follows it to the composer, so the reader can type at once (F2864). The composer is the
 // chat's own field: the jump to a fragment would blur it, so when there is one the click stops there. With none (the rooms have
 // not loaded, or a guest reads), the link keeps its jump.
-const focusComposer = (event: MouseEvent) => {
+const toComposer = (event: MouseEvent) => {
   if (!(event.target instanceof Element) || !event.target.closest("[href='#chat']")) return;
-  const composer = document.querySelector<HTMLElement>("#chat [role='textbox']");
+  const composer = composerBox(false);
   if (composer === null) return;
   event.preventDefault();
   composer.focus();
@@ -37,6 +38,8 @@ export interface ActionsProps {
   lead?: { label: string; href: string; icon?: IconName };
   /** A second action beside the main one, outlined: a realm's "Try a function". */
   second?: { label: string; href: string; icon?: IconName };
+  /** The row's own class, which its place sets: the plate's narrow placement and its entrance. */
+  className?: string | undefined;
 }
 
 // Whether the room's history came and holds nobody's words, only notices: nobody has said hi yet. False while the chat has not shown it.
@@ -59,11 +62,11 @@ function Leads({
   if (proposals !== undefined && isSitePath(proposals)) {
     return (
       <>
-        <Button href={proposals} emphasis="solid" icon="arrow">
+        <Button href={proposals} pad="wide" emphasis="solid" icon="arrow">
           Read the proposals
         </Button>
         {room === undefined ? null : (
-          <Button href="#chat" icon="chat">
+          <Button href="#chat" pad="wide" icon="chat">
             {`Say hi in ${room}`}
           </Button>
         )}
@@ -77,11 +80,11 @@ function Leads({
   };
   return (
     <>
-      <Button href={main.href} emphasis="solid" icon={main.icon ?? "arrow"}>
+      <Button href={main.href} pad="wide" emphasis="solid" icon={main.icon ?? "arrow"}>
         {main.label}
       </Button>
       {second === undefined ? null : (
-        <Button href={second.href} icon={second.icon ?? "arrow"}>
+        <Button href={second.href} pad="wide" icon={second.icon ?? "arrow"}>
           {second.label}
         </Button>
       )}
@@ -89,16 +92,16 @@ function Leads({
   );
 }
 
-export function Actions({ place, follow, ...leads }: ActionsProps) {
+export function Actions({ place, follow, className, ...leads }: ActionsProps) {
   // The focus follows the link to the chat's composer (F2864).
   useEffect(() => {
-    document.addEventListener("click", focusComposer);
+    document.addEventListener("click", toComposer);
     return () => {
-      document.removeEventListener("click", focusComposer);
+      document.removeEventListener("click", toComposer);
     };
   }, []);
   return (
-    <Cluster space="2xs">
+    <Cluster space="2xs" className={className}>
       <Leads {...leads} />
       {/* Follow and Share in words, as frame 30 draws them (D13915, reverses D536's icons: what they do was unclear). */}
       <FollowButton kind="worlds" id={follow} size="m" />

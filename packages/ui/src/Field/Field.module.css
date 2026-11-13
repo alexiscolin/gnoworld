@@ -97,11 +97,6 @@
     font: var(--font-field);
   }
 
-  .help {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
   .error {
     color: var(--color-danger);
     font: var(--font-meta);

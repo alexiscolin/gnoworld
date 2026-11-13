@@ -38,7 +38,14 @@ function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void;
       <Cluster space="3xs">
         {BAR.map((group, at) => (
           <Fragment key={group[0]?.format}>
-            {at === 0 ? null : <span role="separator" aria-orientation="vertical" className={styles["rule"]} />}
+            {at === 0 ? null : (
+              <span
+                role="separator"
+                aria-orientation="vertical"
+                className={styles["rule"]}
+                data-drops={at === BAR.length - 1 ? "" : undefined}
+              />
+            )}
             {group.map((tool) => {
               const { format } = tool;
               if (format === "link") return <Fragment key="link">{linkTool?.(tools)}</Fragment>;
@@ -49,6 +56,8 @@ function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void;
                   label={tool.label}
                   size={tools}
                   emphasis="plain"
+                  tool
+                  drops={at === BAR.length - 1}
                   onClick={() => {
                     onFormat(format);
                   }}

@@ -1,13 +1,8 @@
-/* The shared cards' bodies: they come in with the page's own fade and rise (enter.module.css); a row's rank and calls in the data's mono. */
+/* The shared cards' bodies: they come in with the page's own fade and rise (the design system's `enter` utility); a row's rank and calls in the data's mono. */
 @layer components {
   .body {
     color: var(--color-text);
     font-variant-numeric: tabular-nums;
-  }
-
-  .rank {
-    font: var(--font-data);
-    color: var(--color-text-muted);
   }
 
   .calls {

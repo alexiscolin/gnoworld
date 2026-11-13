@@ -3,7 +3,7 @@ import css from "./tokens.css?raw";
 import { groups, parseTokens, tokens } from "./tokens.ts";
 
 const value = (name: string) => tokens().find((token) => token.name === name)?.value;
-// docs/DESIGN-SYSTEM.md, "Colour": the nine base colours.
+// docs/DESIGN-SYSTEM.md, "Colour": the base colours, and the four the frames draw that no base colour mixes to exactly.
 const BASE: Record<string, string> = {
   space: "#05070D",
   night: "#0B0F18",
@@ -15,6 +15,10 @@ const BASE: Record<string, string> = {
   violet: "#B79CFF",
   coral: "#FF8A7A",
   dusk: "#6885D9",
+  slate: "#2C313C",
+  sky: "#5EAAFD",
+  white: "#FFFFFF",
+  mist: "#C8D0DE",
 };
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
@@ -95,6 +99,7 @@ describe("parseTokens", () => {
       "Shape",
       "Motion",
       "Effects",
+      "Direction",
     ]);
   });
 
@@ -123,6 +128,7 @@ describe("parseTokens", () => {
     ["--motion-fast", "Motion"],
     ["--ease-standard", "Motion"],
     ["--opacity-disabled", "Effects"],
+    ["--dir", "Direction"],
   ])("puts %s in %s", (name, group) => {
     expect(tokens().find((token) => token.name === name)?.group).toBe(group);
   });
@@ -146,7 +152,7 @@ describe("parseTokens", () => {
 });
 
 describe("the tokens", () => {
-  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values, all nine', () => {
+  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values, every one', () => {
     const primitives = tokens().filter((t) => t.group === "Primitives");
     const held = Object.keys(BASE);
     expect(primitives.map((t) => t.name).sort()).toEqual(held.map((name) => `--p-${name}`).sort());
@@ -258,6 +264,15 @@ describe("the tokens", () => {
       ["--motion-label", "0s"],
       ["--motion-scale", "0"],
     ]);
+  });
+});
+
+// The inline axis's sign, which a slide, a fade's side or a bar at a line's start multiplies: 1, and -1 in a box set right to left.
+describe("the writing direction", () => {
+  it("is 1, -1 under a right-to-left box, and 1 again under a left-to-right one inside it", () => {
+    expect(value("--dir")).toBe("1");
+    expect(css).toMatch(/\[dir="rtl"\]\s*\{\s*--dir: -1;\s*\}/);
+    expect(css).toMatch(/\[dir="ltr"\]\s*\{\s*--dir: 1;\s*\}/);
   });
 });
 

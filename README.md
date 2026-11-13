@@ -1,11 +1,11 @@
 # gnoworld
 
-![The approved prototype: the universe of gno.land, its worlds as planets, the live count and the chat](docs/assets/prototype.jpg)
+![The app: the universe of gno.land, its worlds as planets beside the Earth, the live count and the worlds' rail](docs/assets/app.jpg)
 
 gnoworld is a place to meet on gno.land. Every project is a world you can fly to, every
 world has its rooms to talk in, and Jarvis, an assistant, explains what a realm does and
-prepares the calls you sign yourself in Adena. The picture above is the approved prototype;
-the real app is rebuilt from it, slice by slice (slice 13, the realm plate and the social parts below, is the one in progress).
+prepares the calls you sign yourself in Adena. The picture above is the app itself, on Onyx; it is rebuilt from the
+approved prototype ([docs/prototype/](docs/prototype/)), slice by slice (slice 13, the realm plate and the social parts below, is the one in progress).
 
 ## What is here
 

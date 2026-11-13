@@ -12,24 +12,27 @@ export interface Listing {
   paths: () => readonly string[];
   /** The modification time of the file as last read, or none for a file that is not there. */
   stamp: () => number | undefined;
+  /** The file as parsed, none for a file that is missing or no good. */
+  worlds: () => Worlds | undefined;
 }
 
 interface Read {
   at: number;
   paths: readonly string[];
   set: ReadonlySet<string>;
+  file: Worlds | undefined;
 }
 
 function load(at: number, text: () => string): Read {
   try {
-    const { worlds } = Worlds.parse(JSON.parse(text()));
-    const paths = worlds
+    const file = Worlds.parse(JSON.parse(text()));
+    const paths = file.worlds
       .toSorted((a, b) => callsOf(b) - callsOf(a))
       .flatMap((world) => world.realms.map((realm) => realm.path));
-    return { at, paths, set: new Set(paths) };
+    return { at, paths, set: new Set(paths), file };
   } catch {
     // Read once, not for each ask: the same broken file is not read again until it changes.
-    return { at, paths: [], set: new Set() };
+    return { at, paths: [], set: new Set(), file: undefined };
   }
 }
 
@@ -51,7 +54,6 @@ export function worldsListing(
     known: (path) => current()?.set.has(path) === true,
     paths: () => current()?.paths ?? [],
     stamp: () => current()?.at,
+    worlds: () => current()?.file,
   };
 }
-
-export const knownRealms = (file: string): ((path: string) => boolean) => worldsListing(file).known;

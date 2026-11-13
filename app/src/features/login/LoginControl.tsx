@@ -3,6 +3,7 @@
 // the logout, the view draws the way in.
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { pageLoginApi } from "../../lib/api/login.ts";
+import { reportedOr } from "../../lib/reported.ts";
 import { useApp, useAppStore } from "../../storeContext.tsx";
 import { GET_STARTED } from "./getStartedAsk.ts";
 import { knowSession, logIn, logOut, pageClock, type SessionDeps } from "./logIn.ts";
@@ -17,9 +18,15 @@ async function follow(deps: SessionDeps, adena: unknown): Promise<void> {
   watchAccount(adena, { ...deps, listen });
 }
 
-// Adena's calls come with the first click that logs in: a page that never logs in does not load them.
+// Adena's calls come with the first click that logs in: a page that never logs in does not load them. Code a new version renamed is
+// reported, and the button says to reload.
 async function logInWithAdena(deps: SessionDeps): Promise<void> {
-  const { connect, pageAdena, signLogin } = await import("../../lib/adena/adena.ts");
+  const wallet = await reportedOr(import("../../lib/adena/adena.ts"), undefined);
+  if (wallet === undefined) {
+    deps.store.getState().loginActions.stopped({ reason: "new-version" });
+    return;
+  }
+  const { connect, pageAdena, signLogin } = wallet;
   await follow(deps, pageAdena());
   await logIn(pageAdena(), { ...deps, connect, sign: signLogin });
 }

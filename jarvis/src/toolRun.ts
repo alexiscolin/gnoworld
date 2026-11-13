@@ -10,6 +10,8 @@ import type { Trace } from "./tracing.ts";
 import type { Untrusted } from "./untrusted.ts";
 
 type Allowed = Extract<ReturnType<Allowlist<Definition>["check"]>, { ok: true }>;
+/** A tool call's time, unless the loop's parts set another. */
+export const TOOL_MS = 30_000;
 // A call run with its question's words and cards, seen through the call's own time.
 export type Runs = (call: Allowed, asked: Asked) => Promise<Ran>;
 
@@ -61,7 +63,7 @@ async function ranWithin(run: Run, call: Allowed, span: ReturnType<Trace["tool"]
       time.abort();
       resolve({ ok: false, reason: "timeout" });
     };
-    timer = setTimeout(stop, run.parts.toolTimeoutMs ?? 30_000);
+    timer = setTimeout(stop, run.parts.toolTimeoutMs ?? TOOL_MS);
     run.signal.addEventListener("abort", stop);
     // A signal fired before it listened fires no more.
     if (run.signal.aborted) stop();

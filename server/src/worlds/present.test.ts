@@ -1,11 +1,10 @@
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { join } from "node:path";
 import { PRESENCE_ANSWER_MAX, Presence, PresenceHours, PresencePeople } from "@gnoworld/schemas/indexer";
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { makePresence } from "./presence.ts";
 import { PRESENT_MS, countriesTo, startPresent } from "./present.ts";
-import { besideOf } from "../replaceFile.ts";
 
 // Who is here (slice 7, 7h, the sampler 7c left to the labels): the people the reconciler reads in each room a guest may see, a world's
 // counted once across its rooms, the bot left out; recorded into 7c's history, so a world rises against its own 14 days; and served as
@@ -186,32 +185,6 @@ describe("who is here", () => {
     ]);
   });
 
-  it("hands the server's own readers the counts it serves, the ticker's trends among them (7t)", async () => {
-    const { present, ask } = setup();
-    present.seen("#earth", ["gnoworld", "ada"]);
-    const held = present.current();
-    expect(held).toEqual(Presence.parse(JSON.parse((await ask()).body)));
-    expect(held.worlds.find(({ world }) => world === "earth")?.here).toBe(1);
-    present.seen("#bubble", ["gnoworld", "bo"]);
-    vi.advanceTimersByTime(1000);
-    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(1);
-  });
-
-  it("builds what it hands out under the answer's own rule: once a minute, or a second after a change, however often it is asked", () => {
-    const { present, listed } = setup();
-    present.seen("#earth", ["gnoworld", "ada"]);
-    present.current();
-    const built = listed.mock.calls.length;
-    for (let ask = 0; ask < 50; ask += 1) present.current();
-    expect(listed.mock.calls.length).toBe(built);
-    present.seen("#bubble", ["gnoworld", "bo"]);
-    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(0);
-    vi.advanceTimersByTime(999);
-    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(0);
-    vi.advanceTimersByTime(1);
-    expect(present.current().worlds.find(({ world }) => world === "bubble")?.here).toBe(1);
-  });
-
   it("answers counts alone, no name of anyone, public and kept a minute by any cache", async () => {
     const { present, ask } = setup();
     present.seen("#earth", ["gnoworld", "ada-lovelace"]);
@@ -233,46 +206,7 @@ describe("who is here", () => {
   });
 });
 
-// 7t3's score reads each world's people here and messages an hour against its own 14 days: the messages' history is kept as the people's is,
-// the busiest sample of each hour, in a file beside it; a world whose rooms went unread gives no signal, never a zero.
-describe("the chat's signals for the trends", () => {
-  const messagesOf = (file: string) => join(dirname(file), "presence-messages.json");
-  const pastOf = (file: string, world: string, count: number) => {
-    const clock = { at: T0 - 48 * HOUR };
-    const past = makePresence({ file, now: () => clock.at });
-    for (let hour = 0; hour < 48; hour += 1, clock.at += HOUR) past.record(new Map([[world, count]]));
-    expect(past.save()).toBe(true);
-  };
-
-  it("hands each world's people here and messages an hour, each beside its usual hour of the last 14 days", () => {
-    const file = fileOf();
-    pastOf(file, "bubble", 4);
-    pastOf(messagesOf(file), "bubble", 100);
-    const { present } = setup({ file, rates: { "#bubble": 5 } });
-    present.seen("#bubble", ["gnoworld", "a", "b", "c", "d", "e", "f"]);
-    present.seen("#earth", ["gnoworld", "a"]);
-    expect(present.chat()).toEqual([
-      { world: "bubble", here: { now: 6, usual: 4 }, messages: { now: 300, usual: 100 } },
-      { world: "earth", here: { now: 1, usual: null }, messages: { now: 0, usual: null } },
-    ]);
-  });
-
-  it("gives no signal of a world whose rooms went unread: unknown, never zero", () => {
-    const { present } = setup({ rates: { "#earth": 2 } });
-    present.seen("#bubble", ["gnoworld", "a"]);
-    expect(present.chat().map(({ world }) => world)).toEqual(["bubble"]);
-  });
-
-  it(`records each world's messages an hour every ${String(PRESENT_MS / MINUTE)} minutes beside its people, the busiest of each hour, none for a room unread`, () => {
-    const { present, file } = setup({ rates: { "#earth": 1.5, "#earth/kyoto": 0.5, "#bubble": 3 } });
-    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
-    present.seen("#earth", ["gnoworld", "ada"]);
-    vi.advanceTimersByTime(MINUTE);
-    const read = makePresence({ file: messagesOf(file), now: () => T0 + PRESENT_MS });
-    expect(read.history("earth")).toEqual([{ at: T0, people: 120 }]);
-    expect(read.history("bubble")).toEqual([]);
-  });
-
+describe("a plate's hours", () => {
   const hoursAt = async (present: ReturnType<typeof setup>["present"]) =>
     PresenceHours.parse(await (await present.routes.request("/hours?world=earth")).json()).hours;
 
@@ -296,45 +230,6 @@ describe("the chat's signals for the trends", () => {
     present.stop();
     const again = setup({ file });
     expect((await hoursAt(again.present)).at(-1)).toBe(9);
-  });
-
-  it("counts no room a guest cannot see, in the signals as in the messages' history", () => {
-    const { present, file } = setup({ rates: { "#earth": 2, "#earth/desk": 5, "#govdao/desk": 5 } });
-    present.seen("#earth", ["gnoworld", "ada"]);
-    present.seen("#earth/desk", ["gnoworld", ...Array.from({ length: 20 }, (_, at) => `p${String(at)}`)]);
-    present.seen("#govdao/desk", ["gnoworld", ...Array.from({ length: 20 }, (_, at) => `q${String(at)}`)]);
-    expect(present.chat()).toEqual([
-      { world: "earth", here: { now: 1, usual: null }, messages: { now: 120, usual: null } },
-    ]);
-    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
-    present.seen("#earth", ["gnoworld", "ada"]);
-    vi.advanceTimersByTime(MINUTE);
-    const read = makePresence({ file: messagesOf(file), now: () => T0 + PRESENT_MS });
-    expect(read.history("earth")).toEqual([{ at: T0, people: 120 }]);
-    expect(read.history("govdao")).toEqual([]);
-  });
-
-  it("says when its folder refuses the messages' history, and still records the people's", () => {
-    const file = fileOf();
-    mkdirSync(messagesOf(file));
-    const { present, logged } = setup({ file });
-    vi.advanceTimersByTime(PRESENT_MS - MINUTE);
-    present.seen("#bubble", ["gnoworld", "a"]);
-    vi.advanceTimersByTime(MINUTE);
-    expect(logged).toContainEqual(["alert", { error: "presence_write" }]);
-    expect(makePresence({ file, now: () => T0 + PRESENT_MS }).history("bubble")).toEqual([{ at: T0, people: 1 }]);
-  });
-
-  it("builds the signals with the answer, once a minute or a second after a change, however often they are asked", () => {
-    const { present, listed } = setup();
-    present.seen("#earth", ["gnoworld", "ada"]);
-    present.chat();
-    const built = listed.mock.calls.length;
-    for (let ask = 0; ask < 50; ask += 1) {
-      present.chat();
-      present.current();
-    }
-    expect(listed.mock.calls.length).toBe(built);
   });
 });
 
@@ -507,7 +402,7 @@ describe("the people online", () => {
     expect(await counts(present)).toEqual({ online: 4, countries: 1 });
   });
 
-  it("leaves the guests out of a world's trends and history (D353), whatever the figure served counts (D374)", async () => {
+  it("leaves the guests out of a world's history (D353), whatever the figure served counts (D374)", async () => {
     const guest = { guests: 50, accounts: new Set(["ada"]) };
     const { present, hereIn, file } = setup({
       watching: () => guest,
@@ -515,9 +410,8 @@ describe("the people online", () => {
     });
     vi.advanceTimersByTime(PRESENT_MS - MINUTE);
     present.seen("#earth", ["bo"]);
-    // Served: bo, ada and the 50 guests; the trend and the history: bo alone.
+    // Served: bo, ada and the 50 guests; the history: bo alone.
     expect(await hereIn("earth")).toBe(52);
-    expect(present.chat().find((each) => each.world === "earth")?.here.now).toBe(1);
     vi.advanceTimersByTime(MINUTE);
     // The file this presence wrote: its sample holds bo alone, never the 50 guests (the batch's review: a new file read nothing).
     expect(makePresence({ file, now: () => T0 + PRESENT_MS }).history("earth")).toEqual([{ at: T0, people: 1 }]);
@@ -624,14 +518,6 @@ describe("guests and who is here (D430)", () => {
       expect(present.here("#earth")).toBe(1);
       expect((await worlds()).find(({ world }) => world === "earth")?.here).toBe(1);
     });
-
-    it("counts no anon/ nick in the trends' signal either", () => {
-      const { present } = setup();
-      present.seen("#earth", ["gnoworld", "ada", "anon/brave-otter-ab23"]);
-      expect(present.chat()).toEqual([
-        { world: "earth", here: { now: 1, usual: null }, messages: { now: 0, usual: null } },
-      ]);
-    });
   });
 
   describe("a guest's lines in a world's messages an hour", () => {
@@ -641,26 +527,10 @@ describe("guests and who is here (D430)", () => {
       expect((await worlds()).find(({ world }) => world === "earth")?.perHour).toBe(90);
     });
 
-    it("leaves them out of the trend's messages now: the accounts' pace alone", () => {
-      const { present } = setup({ rates: { "#earth": 1 }, guests: { "#earth": 0.5 } });
-      present.seen("#earth", ["gnoworld", "ada"]);
-      expect(present.chat()[0]?.messages).toEqual({ now: 60, usual: null });
-    });
-
-    it("leaves them out of the messages' history the trend's usual is made of", () => {
-      const { present, file } = setup({ rates: { "#earth": 1 }, guests: { "#earth": 0.5 } });
-      vi.advanceTimersByTime(PRESENT_MS - MINUTE);
-      present.seen("#earth", ["gnoworld", "ada"]);
-      vi.advanceTimersByTime(MINUTE);
-      const read = makePresence({ file: besideOf(file, "messages"), now: () => T0 + PRESENT_MS });
-      expect(read.history("earth")).toEqual([{ at: T0, people: 60 }]);
-    });
-
-    it("still shows a world only guests talk in: its plate has the count, its trend none", async () => {
+    it("still shows a world only guests talk in: its plate has the count", async () => {
       const { present, worlds } = setup({ guests: { "#earth": 0.5 } });
       present.seen("#earth", ["gnoworld"]);
       expect((await worlds()).find(({ world }) => world === "earth")?.perHour).toBe(30);
-      expect(present.chat()[0]?.messages).toEqual({ now: 0, usual: null });
     });
 
     it("changes nothing when no guest speaks", async () => {
@@ -678,10 +548,9 @@ describe("guests and who is here (D430)", () => {
       expect((await worlds()).find(({ world }) => world === "earth")?.here).toBe(1);
     });
 
-    it("counts none in the trend or the history: a room with reading guests alone has 0 here, now and in the hour's record", () => {
+    it("counts none in the history: a room with reading guests alone has no person in the hour's record", () => {
       const { present, file } = setup({ open: { guests: 1, accounts: [] } });
       present.seen("#earth", ["gnoworld", "Guest-x", "GUEST-z"]);
-      expect(present.chat()[0]?.here).toEqual({ now: 0, usual: null });
       vi.advanceTimersByTime(PRESENT_MS - MINUTE);
       present.seen("#earth", ["gnoworld", "Guest-x", "GUEST-z"]);
       vi.advanceTimersByTime(MINUTE);
@@ -704,23 +573,24 @@ describe("guests and who is here (D430)", () => {
   });
 
   describe("the answer is built from each world once (L6)", () => {
-    it("builds 20,000 rooms of one world in a few milliseconds, a world's room list never copied for each room", () => {
+    it("builds 20,000 rooms of one world in a few milliseconds, a world's room list never copied for each room", async () => {
       // The clock is the real one here: fake timers fake performance.now too.
       vi.useRealTimers();
       const rooms = Array.from({ length: 20_000 }, (_, n) => ({ name: `#earth/room-${String(n)}`, world: "earth" }));
       // Copied for each room, 20,000 rooms cost about 110 ms here; pushed, under 5. The best of five fresh answers (one is kept a
       // minute), so a loaded machine's one slow run is not read as a copy (the gate's lanes took one to 230 ms); a copy is slow on each.
-      const runs = Array.from({ length: 5 }, () => {
+      const runs: number[] = [];
+      for (let run = 0; run < 5; run += 1) {
         const { present } = setup({ rooms });
         present.seen("#earth/room-1", ["gnoworld", "ada"]);
         const started = performance.now();
-        present.current();
-        return performance.now() - started;
-      });
+        await present.routes.request("/");
+        runs.push(performance.now() - started);
+      }
       expect(Math.min(...runs)).toBeLessThan(40);
     });
 
-    it("asks the rates of a world's rooms once in an answer: the plate and the trend share one read", () => {
+    it("asks the rates of a world's rooms once in an answer", async () => {
       const asked: (readonly string[])[] = [];
       const { present } = setup({
         rooms: [
@@ -732,7 +602,7 @@ describe("guests and who is here (D430)", () => {
       present.seen("#earth", ["gnoworld", "ada"]);
       asked.length = 0;
       vi.advanceTimersByTime(61_000);
-      present.current();
+      await present.routes.request("/");
       expect(asked).toHaveLength(2);
     });
   });

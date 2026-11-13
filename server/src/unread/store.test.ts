@@ -116,6 +116,25 @@ describe("unread's store of places", () => {
   });
 });
 
+describe("unread's store, a write that fails", () => {
+  it("writes none of a call's places when one fails, leaves the old rows, and throws", () => {
+    const t = setup();
+    t.unread.place(ALICE, "#bubble", T0 - DAY);
+    t.clock.now = T0 + 90 * DAY + MINUTE;
+    t.db.exec(
+      "CREATE TRIGGER refused BEFORE INSERT ON read_places WHEN NEW.room = '#bubble/club' BEGIN SELECT RAISE(ABORT, 'refused'); END",
+    );
+    expect(() =>
+      t.unread.places(BOB, [
+        { room: "#bubble", time: t.clock.now },
+        { room: "#bubble/club", time: t.clock.now },
+      ]),
+    ).toThrow("refused");
+    expect(t.db.prepare("SELECT account, room FROM read_places").all()).toEqual([{ account: ALICE, room: "#bubble" }]);
+    expect(t.db.isTransaction).toBe(false);
+  });
+});
+
 describe("unread's retention", () => {
   it("expires the places past 90 days with no write, at most `limit` a call, and says how many went", () => {
     const t = setup();

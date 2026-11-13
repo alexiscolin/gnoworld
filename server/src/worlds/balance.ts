@@ -4,8 +4,7 @@
 import { accountAsk } from "@gnoworld/chain/asks";
 import { Ugnot } from "@gnoworld/schemas/indexer";
 import { z } from "zod";
-import { limiter } from "../limit.ts";
-import { remember } from "../remember.ts";
+import { keptFlights } from "../flights.ts";
 import { abciQuery, Failure, type Send } from "./remote.ts";
 
 export type Balance = { state: "ok"; ugnot: string } | { state: "none" } | { state: "unavailable" };
@@ -62,27 +61,22 @@ export function balanceReader({
   now: () => number;
   perSecond?: number;
 }): BalanceReader {
-  const kept = new Map<string, { at: number; balance: Balance }>();
-  const asking = new Map<string, Promise<Balance>>();
-  const bucket = limiter({ max: perSecond, windowMs: 1000, keys: 1 });
+  // A balance read is kept a minute; one the node could not give is not.
+  const kept = keptFlights<Balance>({
+    now,
+    perSecond,
+    most: KEPT_MOST,
+    until: (balance) => (balance.state === "unavailable" ? undefined : now() + KEPT_MS),
+  });
   const read = async (address: string): Promise<Balance> => {
     try {
-      const text = await abciQuery({ send, rpc }, accountAsk(address), READ);
-      const balance = balanceOf(text);
-      remember(kept, [address, { at: now(), balance }], KEPT_MOST);
-      return balance;
+      return balanceOf(await abciQuery({ send, rpc }, accountAsk(address), READ));
     } catch {
       return UNAVAILABLE;
     }
   };
   return (address) => {
-    const hit = kept.get(address);
-    if (hit !== undefined && now() - hit.at < KEPT_MS) return Promise.resolve(hit.balance);
-    const running = asking.get(address);
-    if (running !== undefined) return running;
-    if (!bucket.take("all", now())) return Promise.resolve(UNAVAILABLE);
-    const ask = read(address).finally(() => asking.delete(address));
-    asking.set(address, ask);
-    return ask;
+    const asked = kept(address, () => read(address));
+    return asked === "limit" ? Promise.resolve(UNAVAILABLE) : asked;
   };
 }

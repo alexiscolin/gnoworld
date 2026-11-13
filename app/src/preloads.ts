@@ -27,8 +27,11 @@ export const preloadTags = (): string => tags(MAPS);
 // planet is built from them, 0.93 MB, the full size comes later). Only the data: the scene's chunks stay off.
 const worldFile = tag("/worlds.json");
 
-// The pages that hold the cosmos (routes.ts): the home, a universe's, the whole cosmos and a system.
-const COSMOS_PAGES: ReadonlySet<string> = new Set(["routes/home", "universe", "cosmos-universe", "cosmos-system"]);
+// The pages that hold the cosmos (routes.ts): the home, the whole cosmos and a system; a universe's home only for the default universe, the
+// one that draws space (another's draws its page alone).
+const COSMOS_PAGES: ReadonlySet<string> = new Set(["routes/home", "cosmos-universe", "cosmos-system"]);
+const isDefault = (data: unknown): boolean =>
+  typeof data === "object" && data !== null && "isDefault" in data && data.isDefault === true;
 
 const hasHub = (data: unknown): data is { slug: string; realms?: string[] } =>
   typeof data === "object" &&
@@ -41,11 +44,28 @@ const hasHub = (data: unknown): data is { slug: string; realms?: string[] } =>
 
 /** What a cosmos page's, an Earth's or a world's page preloads, by its route (routes.ts) and its loader's data: the worlds file and its maps; no other page. */
 export function pagePreloads(routeId: string, data: unknown): string {
-  if (COSMOS_PAGES.has(routeId)) return worldFile + preloadTags();
+  if (COSMOS_PAGES.has(routeId) || (routeId === "universe" && isDefault(data))) return worldFile + preloadTags();
   if (routeId === "routes/earth" || routeId === "universe-earth") return worldFile + preloadTags();
   if ((routeId === "routes/world" || routeId === "universe-world") && hasHub(data))
     return worldFile + tags(mapNamesOf(worldOf(hubWorldOf(data))).map((name) => [name, 2048] as const));
   return "";
+}
+
+/** What a page written ahead preloads, from what React Router rendered it with: none for the fallback page (SPA mode), which the host
+ * serves for every page not written ahead though it is rendered from the home's route. */
+export function documentPreloads({
+  isSpaMode,
+  staticHandlerContext: { matches, loaderData },
+}: {
+  isSpaMode: boolean;
+  staticHandlerContext: {
+    matches: readonly { route: { id: string } }[];
+    loaderData: Readonly<Record<string, unknown>>;
+  };
+}): string {
+  if (isSpaMode) return "";
+  const page = matches.at(-1)?.route.id ?? "";
+  return pagePreloads(page, loaderData[page]);
 }
 
 /** A page with its own preloads (pagePreloads) at the head's end, and a page with none as it was. */

@@ -2,10 +2,11 @@
 // by the page's query client, so a room's names are read once and a name read in the pill is not read again. Nothing is asked before a
 // mention is begun, and for the first 30 members at most. Each chain's block is asked once, for all of them (C14 of the review).
 import { readHeight } from "@gnoworld/chain/node";
-import { useQueries } from "@tanstack/react-query";
+import { queryOptions, useQueries } from "@tanstack/react-query";
 import { shortAddress } from "@gnoworld/schemas";
 import { readName, shownName, type Chain } from "../../lib/chain/names.ts";
-import { queryClient } from "../../lib/query/client.ts";
+import { queryClient, Unread } from "../../lib/query/client.ts";
+import { keys } from "../../lib/query/keys.ts";
 import { pageFetch } from "../../lib/query/policy.ts";
 import { pageNames } from "./pageNames.ts";
 import { nameOptions } from "./useReads.ts";
@@ -13,16 +14,17 @@ import { nameOptions } from "./useReads.ts";
 const MOST = 30;
 
 // A chain's block, read once while a mention is typed.
-const heightOptions = ({ rpc, chainId }: Chain, enabled: boolean) => ({
-  queryKey: ["member-names-height", chainId] as const,
-  enabled,
-  staleTime: 60_000,
-  queryFn: async ({ signal }: { signal: AbortSignal }): Promise<number> => {
-    const read = await readHeight(rpc, { fetch: pageFetch, signal, chainId });
-    if (!read.ok) throw new Error(`no block of ${chainId}`);
-    return read.value.height;
-  },
-});
+const heightOptions = ({ rpc, chainId }: Chain, enabled: boolean) =>
+  queryOptions({
+    queryKey: keys.height(chainId),
+    enabled,
+    staleTime: 60_000,
+    queryFn: async ({ signal }) => {
+      const read = await readHeight(rpc, { fetch: pageFetch, signal, chainId });
+      if (!read.ok) throw new Unread(read, read.failure);
+      return read.value.height;
+    },
+  });
 
 /** The names of those of `members` that have one, by address; read only while `asked`. */
 export function useMemberNames(members: readonly string[], asked: boolean): ReadonlyMap<string, string> {

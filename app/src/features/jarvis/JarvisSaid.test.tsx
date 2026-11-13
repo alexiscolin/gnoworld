@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { MemoryRouter } from "react-router";
-import { beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import type { KeptAnswer } from "../../lib/api/jarvis.ts";
+import { queryClient } from "../../lib/query/client.ts";
 import { StoreProvider } from "../../storeContext.tsx";
 import { SignedIn } from "../../../tests/grabStore.tsx";
 import { CHAIN, listing } from "../../../tests/callFixtures.ts";
@@ -26,9 +27,11 @@ beforeAll(async () => {
   modals();
   drawn = drawerOf(await drawing());
 });
+afterEach(() => {
+  queryClient.clear();
+});
 
-function draw(result: Result<KeptAnswer>, fallback?: string) {
-  const read = vi.fn(() => Promise.resolve(result));
+function draw(result: Result<KeptAnswer>, fallback?: string, read = vi.fn(() => Promise.resolve(result))) {
   const box = mount(
     <MemoryRouter>
       <StoreProvider>
@@ -82,6 +85,26 @@ describe("a kept public answer of Jarvis", () => {
     expect(read).toHaveBeenCalledTimes(1);
     expect(box.querySelector("[data-jarvis-markdown]")).toBeNull();
     expect(box.textContent).toContain("plain excerpt");
+  });
+
+  it("reads an answered line once for the page, however often it is drawn, and a refused one again when drawn again", async () => {
+    const first = draw({ ok: true, value: ANSWERED });
+    await settled(() => first.box.querySelector("[data-jarvis-markdown]") !== null);
+    const again = draw({ ok: true, value: ANSWERED }, undefined, first.read);
+    expect(again.box.querySelector("[data-jarvis-markdown]")).not.toBeNull();
+    expect(first.read).toHaveBeenCalledTimes(1);
+    queryClient.clear();
+    const refused = vi
+      .fn<() => Promise<Result<KeptAnswer>>>()
+      .mockResolvedValueOnce({ ok: false, reason: "unavailable" })
+      .mockResolvedValue({ ok: true, value: ANSWERED });
+    draw({ ok: true, value: ANSWERED }, "plain excerpt", refused);
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    const later = draw({ ok: true, value: ANSWERED }, "plain excerpt", refused);
+    await settled(() => later.box.querySelector("[data-jarvis-markdown]") !== null);
+    expect(refused).toHaveBeenCalledTimes(2);
   });
 
   it("shows the plain line while the read is out, then the card in its place, the read made once", async () => {

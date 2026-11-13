@@ -1,7 +1,7 @@
 // A realm's or a world's two-sentence explanation, made by Jarvis from the realm's outline alone and kept in the server's table of its own:
 // what the model answers, what jarvis gives the server, what the server gives a page, and a seed file's rows. Every text is capped here; the
 // server's own check (server/src/explain/check.ts) still decides ready or refused before anything is kept.
-import { RealmPath } from "./realmPath.ts";
+import { ChainId, RealmPath } from "./realmPath.ts";
 import { REALM_TAGS } from "./worlds.ts";
 import { z } from "./zod.ts";
 
@@ -29,7 +29,6 @@ export function tagsOf(tags: readonly string[]): RealmTag[] {
   return [...new Set(tags)].filter((tag): tag is RealmTag => known.has(tag)).slice(0, EXPLAIN_CAPS.tags);
 }
 
-const ChainId = z.string().check(z.regex(/^[a-z0-9][a-z0-9_-]{0,63}$/));
 const Tags = z.array(z.enum(REALM_TAGS)).check(z.maxLength(EXPLAIN_CAPS.tags));
 
 /** What the server asks jarvis: one realm on one chain, whose outline jarvis reads itself. */
@@ -57,7 +56,7 @@ export const JarvisExplained = z.discriminatedUnion("status", [
 export type JarvisExplained = z.infer<typeof JarvisExplained>;
 
 /** The kinds of subject an explanation is made for. A world's subject is its main realm's path until a composed line is decided. */
-export const EXPLAIN_KINDS = ["realm", "world"] as const;
+const EXPLAIN_KINDS = ["realm", "world"] as const;
 export const ExplainKind = z.enum(EXPLAIN_KINDS);
 export type ExplainKind = z.infer<typeof ExplainKind>;
 
@@ -75,7 +74,7 @@ export type Explanation = z.infer<typeof Explanation>;
 
 /** One row of a seed file the server loads at its start: a realm explained by the session's own agents, in the shape of Jarvis's answer. Its
  * text still passes the server's check; a row is kept with the model `seed` and never over a ready row of Jarvis's. */
-export const ExplainSeedRow = z.strictObject({
+const ExplainSeedRow = z.strictObject({
   chain: ChainId,
   realm: RealmPath,
   sure: z.boolean(),

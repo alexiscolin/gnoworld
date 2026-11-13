@@ -2,10 +2,11 @@
 // one muted label; the line's More menu folds it away.
 import { markdown, type Line } from "@gnoworld/core";
 import { useEffect, useRef } from "react";
-import { useJarvisHere, type JarvisHere } from "../../jarvisHere.ts";
+import type { JarvisHere } from "../../jarvisHere.ts";
 import { languageName, type Language } from "../../lib/language.ts";
-import { useTranslation, wantTranslation } from "../../translating.ts";
+import { wantTranslation } from "../../translating.ts";
 import { LineText } from "./LineText.tsx";
+import { useLineTranslation } from "./translationItem.ts";
 import styles from "./RoomView.module.css";
 
 // Asks for the line's translation while the row that holds this span is on screen, and stops asking once it leaves.
@@ -66,9 +67,7 @@ interface Props {
 
 /** The translation under a line, in the line's own text style and ink, set apart from the original by a rule at its start. */
 export function LineTranslation({ line, room, mine, me, known, stop }: Props) {
-  const here = useJarvisHere();
-  const language = here?.language ?? "en";
-  const translated = useTranslation(here === undefined ? undefined : room, line.id, language);
+  const { here, language, translated } = useLineTranslation(room, line.id);
   const askedIn = asksFor({ here, room, mine, line });
   return (
     <>

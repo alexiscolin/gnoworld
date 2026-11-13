@@ -130,17 +130,20 @@ function settled({ budget, log, paid }: Attempts, hold: { readonly id: number },
   return settlement.status === "gone" ? undefined : settlement.charged;
 }
 
+/** The longest wait between two attempts of one model request. */
+export const WAIT_MAX_MS = 8_000;
+
 // The wait before the next attempt, or none when the SDK would not retry: a dropped or timed-out connection, or the
 // API's x-should-retry, else 408, 409, 429 and 5xx (SDK 1.4.0's shouldRetry); what the API asks, up to 8 s.
 function delayOf(error: AnthropicError, attempt: number): number | undefined {
   // Up to a quarter off at random, as the SDK does, so the questions a 429 or a 529 stops do not retry in step.
-  const backoff = Math.min(500 * 2 ** (attempt - 1), 8_000) * (1 - Math.random() * 0.25);
+  const backoff = Math.min(500 * 2 ** (attempt - 1), WAIT_MAX_MS) * (1 - Math.random() * 0.25);
   if (error instanceof APIConnectionError) return backoff;
   const answered = answeredOf(error);
   if (answered === undefined || !retried(answered)) return undefined;
   const asked = askedWait(answered.headers);
   if (asked === undefined) return backoff;
-  return asked <= 8_000 ? asked : undefined;
+  return asked <= WAIT_MAX_MS ? asked : undefined;
 }
 
 // The status and headers of an error the API answered with: `instanceof APIError` would type its generics as any.

@@ -10,11 +10,6 @@
     font: var(--font-ui);
   }
 
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
   /* A guest's field: the box places it and takes its look (MessageBox.module.css's textbox), so it draws no edge of its own. */
   .field {
     inline-size: 100%;

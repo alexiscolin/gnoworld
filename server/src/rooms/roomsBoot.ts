@@ -7,7 +7,7 @@ import { send as netSend } from "@gnoworld/service/net";
 import type { Config } from "../config.ts";
 import { defaultHubs, defaultUniverse } from "../prices/universes.ts";
 import { visitorOf } from "../visitor.ts";
-import { knownRealms } from "../worlds/known.ts";
+import { worldsListing, type Listing } from "../worlds/known.ts";
 import { aheadRooms } from "./ahead.ts";
 import { chainHas } from "./onChain.ts";
 import { realmRoutes } from "./realmRoutes.ts";
@@ -15,6 +15,8 @@ import { roomsRoutes } from "./routes.ts";
 
 // `send` is the way out the chain read goes through, and `everyMs` the pause between two checks, a test's to set.
 type Parts = Pick<Parameters<typeof roomsRoutes>[0], "roles" | "rooms" | "session" | "log" | "nameCheck"> & {
+  /** The worlds file's reader the other routes share; one of its own for the file when none. */
+  listing?: Listing | undefined;
   send?: Send;
   everyMs?: number;
 };
@@ -27,11 +29,12 @@ export function roomsBoot(app: Hono, config: Config, parts: Parts): { stop: () =
   // The realm's route first: the moderators' routes answer every path under /api/rooms.
   if (config.worlds !== undefined && config.universes !== undefined) {
     const hubs = defaultHubs(config.universes);
+    const listing = parts.listing ?? worldsListing(config.worlds);
     app.route(
       "/api/rooms/realm",
       realmRoutes({
         rooms: parts.rooms,
-        known: knownRealms(config.worlds),
+        known: listing.known,
         onChain: chainHas({ send: parts.send ?? netSend, rpc: defaultUniverse(config.universes).rpc }),
         hubs,
         origins,
@@ -40,7 +43,7 @@ export function roomsBoot(app: Hono, config: Config, parts: Parts): { stop: () =
         visitor: (c) => visitorOf(c, trustedProxy),
       }),
     );
-    const ahead = aheadRooms({ file: config.worlds, rooms: parts.rooms, hubs, log: parts.log });
+    const ahead = aheadRooms({ file: config.worlds, listing, rooms: parts.rooms, hubs, log: parts.log });
     // `check` logs its own faults and never rejects; this is the last net.
     const check = (): void => {
       ahead.check().catch(() => {

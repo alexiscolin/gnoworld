@@ -26,13 +26,14 @@ const kicker = ({ kind, tag, here }: SearchItem) =>
 
 export function PlacePreview({
   item,
-  copied,
+  copySaid,
   go,
   chat,
   copy,
 }: {
   item: SearchItem;
-  copied: boolean;
+  /** What the last copy came to, for a moment: "Copied", or that it could not. */
+  copySaid: string | undefined;
   go: (item: SearchItem) => void;
   chat: (item: SearchItem) => void;
   copy: (item: SearchItem) => void;
@@ -79,7 +80,7 @@ export function PlacePreview({
                 copy(item);
               }}
             >
-              {copied ? "Copied" : "Copy link"}
+              {copySaid ?? "Copy link"}
             </Button>
           </>
         )}

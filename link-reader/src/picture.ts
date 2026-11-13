@@ -15,7 +15,7 @@ export interface Raster {
   width: number;
   height: number;
   /** RGBA. */
-  data: Uint8ClampedArray;
+  data: Uint8ClampedArray<ArrayBuffer>;
 }
 export interface Codecs {
   decodeJpeg(bytes: Uint8Array): Promise<Raster>;
@@ -34,6 +34,8 @@ export interface Info {
 export const SIDE_MAX = 4096;
 export const PIXELS_MAX = 2_000_000;
 export const SIDE_MIN = 64;
+/** A progressive JPEG decodes the whole picture once a scan: ours have 10, a hostile one tens of thousands. */
+export const SCANS_MAX = 32;
 /** What a transparent pixel is drawn over (the card's surface): alpha is blended onto it, and the JPEG is opaque. */
 export const SURFACE: readonly [number, number, number] = [245, 245, 245];
 
@@ -75,14 +77,21 @@ function frameAt(bytes: Uint8Array, at: number): Info | undefined {
   const [height, width] = [u16(bytes, at + 5), u16(bytes, at + 7)];
   return width === 0 || height === 0 ? undefined : { format: "jpeg", width, height, components: bytes[at + 9] };
 }
-// The one frame of a JPEG, or undefined for none, two, a height of 0 (a DNL would set it) or a segment past the end.
+// The scan markers from `from` on: byte stuffing keeps 0xFF 0xDA out of coded data, so each one starts a scan.
+function scans(bytes: Uint8Array, from: number): number {
+  let count = 0;
+  for (let at = bytes.indexOf(0xda, from); at >= 0 && count <= SCANS_MAX; at = bytes.indexOf(0xda, at + 1))
+    if (bytes[at - 1] === 0xff) count += 1;
+  return count;
+}
+// The one frame of a JPEG, or undefined for none, two, a height of 0 (a DNL would set it), a segment past the end or too many scans.
 function jpegInfo(bytes: Uint8Array): Info | undefined {
   if (!isJpeg(bytes)) return undefined;
   let found: Info | undefined;
   for (let from = 2; from < bytes.length;) {
     const segment = segmentAt(bytes, from);
     if (segment === undefined) return undefined;
-    if (segment.size === 0) break;
+    if (segment.size === 0) return scans(bytes, segment.at) > SCANS_MAX ? undefined : found;
     if (isFrame(segment.marker)) {
       const frame = frameAt(bytes, segment.at);
       if (found !== undefined || frame === undefined) return undefined;
@@ -94,7 +103,7 @@ function jpegInfo(bytes: Uint8Array): Info | undefined {
 }
 
 /** The format and size a header declares, or undefined if the bytes are neither a JPEG nor a PNG with a readable header, a JPEG with no frame
- * or two, a height of 0 or a segment past the end of the file. */
+ * or two, a height of 0, a segment past the end of the file or more than SCANS_MAX scans. */
 export function inspect(bytes: Uint8Array): Info | undefined {
   return pngInfo(bytes) ?? jpegInfo(bytes);
 }
@@ -128,7 +137,8 @@ if (!Reflect.has(globalThis, "ImageData")) {
 const buffer = (bytes: Uint8Array): ArrayBuffer =>
   bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length) as ArrayBuffer;
 const raster = (image: ImageData): Raster => ({ width: image.width, height: image.height, data: image.data });
-const imageData = (from: Raster): ImageData => new ImageData(new Uint8ClampedArray(from.data), from.width, from.height);
+// The raster's own pixels, never copied: the codecs copy them into their memory.
+const imageData = (from: Raster): ImageData => new ImageData(from.data, from.width, from.height);
 
 export const wasmCodecs: Codecs = {
   decodeJpeg: async (bytes) => (await ready.jpegDecoder(), raster(await decodeJpegWasm(buffer(bytes)))),
@@ -179,16 +189,26 @@ async function compressed(from: Raster, codecs: Codecs): Promise<ReaderCard["pic
   return null;
 }
 
-/** The card's picture from a page's image bytes, or null: it never rejects, and never decodes what its header refuses. */
-export async function reencode(bytes: Uint8Array, codecs: Codecs = wasmCodecs): Promise<ReaderCard["picture"]> {
+/** Why a picture's bytes gave none: a header refused, a codec that failed, or no quality under the cap. */
+export type Fault = "header" | "decode" | "size";
+
+/** The card's picture from a page's image bytes, or null, `failed` told why: it never rejects, and never decodes what its header
+ * refuses. */
+export async function reencode(
+  bytes: Uint8Array,
+  codecs: Codecs = wasmCodecs,
+  failed: (fault: Fault) => void = () => undefined,
+): Promise<ReaderCard["picture"]> {
   const info = inspect(bytes);
-  if (info === undefined || refused(info)) return null;
+  if (info === undefined || refused(info)) return (failed("header"), null);
   try {
     const decoded = await (info.format === "jpeg" ? codecs.decodeJpeg(bytes) : codecs.decodePng(bytes));
-    if (decoded.width !== info.width || decoded.height !== info.height) return null;
+    if (decoded.width !== info.width || decoded.height !== info.height) return (failed("decode"), null);
     flatten(decoded);
-    return await compressed(await shrunk(decoded, codecs), codecs);
+    const picture = await compressed(await shrunk(decoded, codecs), codecs);
+    if (picture === null) failed("size");
+    return picture;
   } catch {
-    return null;
+    return (failed("decode"), null);
   }
 }

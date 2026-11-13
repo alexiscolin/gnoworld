@@ -407,3 +407,47 @@ describe("a planet a few pixels across that the camera is flying towards", () =>
     expect(shown.get(0), "the quad goes once it stands whole").toBe(false);
   });
 });
+
+describe("an open system with more small planets than a Near keeps", () => {
+  it("makes each at most once over many chooses, never remaking what it dropped", () => {
+    let made = 0;
+    vi.mocked(drawnOf).mockImplementation(() => {
+      made += 1;
+      return {
+        group: new Object3D(),
+        look: { lean: 0, tilt: 0 },
+        ...Object.fromEntries(
+          ["setPlate", "setArrive", "setSun", "setTime", "setFar", "setClose", "setMoons"].map((name) => [
+            name,
+            () => undefined,
+          ]),
+        ),
+        dispose: () => undefined,
+      } as never;
+    });
+    const device = {
+      stage: { add: () => undefined, remove: () => undefined },
+      renderer: { initTexture: () => undefined, compileAsync: () => Promise.resolve() },
+      camera: new PerspectiveCamera(),
+      maps: { setOf: () => undefined, earth: () => undefined, dress: () => undefined, fullEarth: () => undefined },
+      planets: { show: () => undefined },
+      plate: {},
+      lens: { value: 0 },
+    };
+    const system = {
+      index: 0,
+      place: { x: 0, y: 0, z: 0 },
+      across: { x: 1, y: 0, z: 0 },
+      along: { x: 0, y: 0, z: 1 },
+      reach: 10,
+      planets: [] as unknown[],
+    };
+    // 2*0.1/(5*0.01) = 4 px each: between asked ahead and drawn as themselves.
+    for (let index = 0; index < 40; index++)
+      system.planets.push({ index, id: `w${String(index)}`, radius: 0.1, orbit: 0, phase: 0, speed: 0, system });
+    const near = new Near(device as never);
+    for (let choice = 0; choice < 10; choice++)
+      near.choose({ systems: [system] } as never, { x: 0, y: 0, z: 5 }, { pxK: 0.01, seconds: 0, open: 0 });
+    expect(made).toBeLessThanOrEqual(24);
+  });
+});

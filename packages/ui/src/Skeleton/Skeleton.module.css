@@ -11,7 +11,8 @@
     background: var(--color-fill-hover);
     animation:
       wait var(--motion-wait),
-      breathe var(--motion-ambient) var(--ease-standard) var(--motion-wait) infinite alternate;
+      breathe calc(var(--motion-ambient) * var(--motion-scale)) var(--ease-standard) var(--motion-wait) infinite
+        alternate;
     animation-play-state: var(--play, running);
   }
 
@@ -50,12 +51,6 @@
   @keyframes breathe {
     to {
       opacity: var(--opacity-disabled);
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .skeleton {
-      animation: wait var(--motion-wait);
     }
   }
 }

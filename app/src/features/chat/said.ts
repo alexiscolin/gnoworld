@@ -1,15 +1,8 @@
 // What the composer's field says of a draft (moved out of Composer.tsx, which grew past the lint's size): why it cannot
 // go, what Tab completes, and the bytes left near the end.
-import {
-  LINE_BYTES,
-  markdown,
-  mentionsRoom,
-  MULTILINE_BYTES,
-  MULTILINE_LINES,
-  relayOf,
-  type Composed,
-} from "@gnoworld/core";
+import { markdown, mentionsRoom, MULTILINE_BYTES, MULTILINE_LINES, type Composed } from "@gnoworld/core";
 import type { FieldProps } from "@gnoworld/ui";
+import { plural } from "../../lib/plural.ts";
 
 /** The bytes left from which the composer counts them. */
 export const NEAR = 50;
@@ -27,8 +20,6 @@ export const roomHint = (composed: Composed, groups: boolean): string | undefine
       ? ROOM_NOTIFIES
       : ROOM_SILENT
     : undefined;
-
-const plural = (count: number, unit: string) => `${String(count)} ${unit}${count === 1 ? "" : "s"}`;
 
 // Why a draft is too long: the line of several (named, from 1), the line, or the message past its lines or its bytes.
 function tooLong(composed: Extract<Composed, { kind: "long" | "tooBig" }>): string {
@@ -78,19 +69,11 @@ export const sendable = (
 ): composed is Extract<Composed, { kind: "line" | "lines" }> =>
   (composed.kind === "line" || composed.kind === "lines") && tooMany(composed, multiline) <= 0;
 
-// Of a message of lines, the one with the fewest bytes left in IRC's budget (named from 1) and what it has left.
-function tightest(lines: readonly string[], nick: string): { line: number; left: number } {
-  const budget = LINE_BYTES - relayOf(nick);
-  const lefts = lines.map((line) => budget - new TextEncoder().encode(line).length);
-  const left = Math.min(...lefts);
-  return { line: lefts.indexOf(left) + 1, left };
-}
-
 // The bytes left once few: a message of lines counts its tightest line's budget, about 440, when that is less than the
 // message's 4096, and names the line (F1720).
 function nearEnd(composed: Composed, { nick }: Context): string | undefined {
   if (!("left" in composed)) return undefined;
-  const tight = composed.kind === "lines" && nick !== undefined ? tightest(composed.lines, nick) : undefined;
+  const tight = composed.kind === "lines" && nick !== undefined ? composed.tightest : undefined;
   const line = tight !== undefined && tight.left < composed.left ? tight : undefined;
   const left = line?.left ?? composed.left;
   if (left >= NEAR) return undefined;

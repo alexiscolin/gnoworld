@@ -4,6 +4,6 @@ import type { Page } from "./fixtures.ts";
  * `words`, and takes the option named `name`. */
 export async function goBySearch(page: Page, words: string, name: RegExp): Promise<void> {
   await page.getByRole("button", { name: /^Search/ }).click();
-  await page.getByRole("searchbox", { name: "Search places" }).fill(words);
+  await page.getByRole("combobox", { name: "Search places" }).fill(words);
   await page.getByRole("listbox", { name: "Places" }).getByRole("option", { name }).click();
 }

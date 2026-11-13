@@ -6,8 +6,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { once } from "node:events";
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { jsonOf } from "@gnoworld/core";
-import { JARVIS_KEY_HEADER, type ApiError } from "@gnoworld/schemas";
-import { serverOptions } from "@gnoworld/service/http";
+import { ASK_WAIT_S, JARVIS_KEY_HEADER, type ApiError } from "@gnoworld/schemas";
+import { readBody, serverOptions } from "@gnoworld/service/http";
 import type { Log } from "@gnoworld/service/log";
 import type { Secret } from "@gnoworld/service/settings";
 
@@ -32,11 +32,15 @@ interface Options {
   readonly key?: Secret | undefined;
   // False once jarvis stops: every request is then not ready, its connection closed.
   readonly ready: () => boolean;
+  // How long a request runs before its handler's signal aborts: DEADLINE_MS unless a test sets it.
+  readonly deadlineMs?: number | undefined;
 }
 // A refusal this face makes itself, logged by its code; the methods a route takes; a connection to close after it.
 type Made = Reply & { readonly refused?: ApiError["error"]; readonly allow?: string; readonly close?: boolean };
 
 const MAX_BYTES = 256 * 1024;
+/** The longest a request runs: the door's wait less 10 s, so the door hears jarvis's answer before it gives up. */
+export const DEADLINE_MS = (ASK_WAIT_S.door - 10) * 1000;
 
 /** A refusal, as an `ApiError` with its status. */
 export const refusal = (error: ApiError["error"], status: number): Reply => ({ status, body: { error } });
@@ -84,17 +88,23 @@ async function handle(
   response.on("close", () => {
     if (!response.writableFinished) left.abort();
   });
+  const late = new AbortController();
+  const timer = setTimeout(() => {
+    late.abort();
+  }, options.deadlineMs ?? DEADLINE_MS);
   const { asked, named } = askedOf(served, request);
   let reply: Made;
   try {
     reply = holds(options.key, request)
-      ? await replyOf(asked, request, left.signal)
+      ? await replyOf(asked, request, AbortSignal.any([left.signal, late.signal]))
       : refused("unauthenticated", 401, { close: true });
   } catch (error) {
     if (left.signal.aborted) return;
     // Its name alone: a message may quote what the request sent.
     options.log("jarvis_failed", { ...named, status: 500, error: error instanceof Error ? error.name : typeof error });
     reply = refusal("internal", 500);
+  } finally {
+    clearTimeout(timer);
   }
   if (reply.refused !== undefined)
     options.log("jarvis_refused", { ...named, status: reply.status, error: reply.refused });
@@ -144,7 +154,7 @@ async function replyOf({ route, method, ready }: Asked, request: IncomingMessage
   }
   if (method === "GET") return handler(undefined, signal);
   if (!isJson(request.headers["content-type"])) return refused("unsupported", 415);
-  const text = await bodyOf(request);
+  const text = await readBody(request, MAX_BYTES);
   // The rest of the body is left unread, its connection closed once the refusal is written.
   if (text === undefined) return refused("too_large", 413, { close: true });
   const body = text === null ? undefined : jsonOf(text);
@@ -154,34 +164,3 @@ async function replyOf({ route, method, ready }: Asked, request: IncomingMessage
 
 // `application/json`, in any case, with any parameter.
 const isJson = (type: string | undefined) => type?.split(";")[0]?.trim().toLowerCase() === "application/json";
-
-// The body's text: undefined past 256 KiB, by its declared length before a byte is read, else once its bytes pass it,
-// never waiting for its end; null for bytes that are no UTF-8.
-function bodyOf(request: IncomingMessage): Promise<string | null | undefined> {
-  // No length declared reads as NaN, past no bound.
-  if (Number(request.headers["content-length"]) > MAX_BYTES) return Promise.resolve(undefined);
-  return new Promise((resolve, reject) => {
-    const chunks: Buffer[] = [];
-    let size = 0;
-    // The listeners live as long as the request, whose connection closes once a refusal is written; past the bound,
-    // its rest is counted and dropped, and the answer, given once, stays.
-    request.on("data", (chunk: Buffer) => {
-      size += chunk.byteLength;
-      if (size <= MAX_BYTES) chunks.push(chunk);
-      else resolve(undefined);
-    });
-    request.once("end", () => {
-      resolve(decoded(Buffer.concat(chunks)));
-    });
-    request.once("error", reject);
-  });
-}
-
-// Strict UTF-8, as JSON is: a byte that is none refuses the body.
-function decoded(bytes: Buffer): string | null {
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    return null;
-  }
-}

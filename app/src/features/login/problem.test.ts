@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { sayProblem } from "./problem.ts";
 
 describe("sayProblem", () => {
@@ -44,5 +44,15 @@ describe("sayProblem", () => {
 
   it("never says a server's refusal is the person's doing, nor names its code", () => {
     expect(sayProblem({ reason: "refused" })).not.toMatch(/declined|refused|400/);
+  });
+});
+
+describe("sayShort", () => {
+  // Loaded afresh inside the test: the function is made as its module loads, which a planted change reaches only when it loads after.
+  it("gives a stopped login's button its few words", async () => {
+    vi.resetModules();
+    const { sayShort } = await import("./problem.ts");
+    expect(sayShort({ reason: "missing" })).toBe("Install Adena");
+    expect(sayShort({ reason: "address", problem: "empty" })).toBe("Check Adena's address");
   });
 });

@@ -176,7 +176,7 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
         />
       </svg>
       {/* The two sides of the legend 8 px apart (the proposal's). */}
-      <div className={styles["legend"]}>
+      <div className={["meta", styles["legend"]].join(" ")}>
         <Cluster space="2xs">
           <span>
             ← {left.word} <b>{left.total ?? left.nodes.length}</b>
@@ -186,8 +186,8 @@ export function Network({ label, centre, left, right, selected, onSelect, picked
           </span>
         </Cluster>
       </div>
-      <p className={styles["legend"]}>square = pure package, round = realm</p>
-      <p className={styles["caption"]}>
+      <p className={["meta", styles["legend"]].join(" ")}>square = pure package, round = realm</p>
+      <p className="data-text">
         {picked === undefined
           ? "Select a node to read its path."
           : `${picked.detail ?? picked.label}${pickedHint === undefined ? "" : ` · ${pickedHint}`}`}

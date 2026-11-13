@@ -37,7 +37,12 @@ export function forwardPlaces(
     }, forget);
   };
 
+  // The rooms read at the last change: a change of another slice of the store leaves them, and asks nothing.
+  let seen: unknown;
   const schedule = (): void => {
+    const { rooms } = store.getState().chat;
+    if (rooms === seen) return;
+    seen = rooms;
     if (timer !== undefined || stopped || pending().length === 0) return;
     timer = setTimeout(flush, Math.max(0, last + everyMs - Date.now()));
   };

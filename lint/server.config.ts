@@ -12,7 +12,7 @@ const SERVER =
 const JARVIS =
   "Jarvis imports core, schemas, the service and chain packages, Node and its dependencies, never the server (docs/ARCHITECTURE.md).";
 const LINK_READER =
-  "The link reader imports core, schemas, Node and its dependencies, never the server, Jarvis, the service or chain packages (slice 13).";
+  "The link reader imports core, schemas, the service package, Node and its dependencies, never the server, Jarvis or the chain package (slice 13).";
 const SERVICE =
   "The service package imports core, schemas, Node and its dependencies, never the server, Jarvis, the app or the chain package (D111).";
 const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "link-reader/**/*.ts", "packages/service/**/*.ts"];
@@ -67,7 +67,13 @@ export default defineConfig(
             {
               target: "./link-reader",
               from: "./",
-              except: ["./link-reader", "./packages/core", "./packages/schemas", "./node_modules"],
+              except: [
+                "./link-reader",
+                "./packages/core",
+                "./packages/schemas",
+                "./packages/service",
+                "./node_modules",
+              ],
               message: LINK_READER,
             },
             {
@@ -86,7 +92,7 @@ export default defineConfig(
   { files: ["jarvis/**/*.ts"], rules: { "no-restricted-imports": banned("server|link-reader", JARVIS) } },
   {
     files: ["link-reader/**/*.ts"],
-    rules: { "no-restricted-imports": banned("server|jarvis|app|chain|service", LINK_READER) },
+    rules: { "no-restricted-imports": banned("server|jarvis|app|chain", LINK_READER) },
   },
   {
     files: ["packages/service/**/*.ts"],

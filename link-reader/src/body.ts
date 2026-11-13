@@ -5,6 +5,8 @@ import type { Kind } from "./fetch.ts";
 /** What a socket's end means: the request's own signal (a timeout) or the connection's (a network fault). */
 export const kindOf = (signal: AbortSignal): Kind => (signal.aborted ? "timeout" : "network");
 export const ended = { done: true as const, value: undefined };
+/** A size line is hex and an optional extension: past this with no newline, the reply is not HTTP. */
+const LINE_MAX = 1024;
 
 // What the body is read from: lines and runs of bytes out of the chunks that follow the head.
 interface Feed {
@@ -27,6 +29,7 @@ export function feedOf(chunks: AsyncIterator<Buffer>, first: Buffer, signal: Abo
         held = held.subarray(at + 1);
         return text;
       }
+      if (held.length > LINE_MAX) throw new Refused("network");
       if (!(await more())) throw new Refused(kindOf(signal));
     }
   };

@@ -4,6 +4,7 @@
 // kept out of store/: the first screen's budget has no room for it.
 import type { CardEvent } from "@gnoworld/schemas";
 import type { StoreApi } from "zustand/vanilla";
+import { trimOldest } from "@gnoworld/core";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { sessionChanged, type AppState } from "../../store/index.ts";
 import { own } from "../../store/record.ts";
@@ -41,13 +42,10 @@ function drop(copy: Copy, msgid: string): boolean {
   return true;
 }
 
-// The removals remembered, the oldest forgotten first: a Set walks in insertion order, so at most one is past the bound.
+// The removals remembered, the oldest forgotten first.
 function remember(gone: Set<string>, id: string): void {
   gone.add(id);
-  for (const old of gone) {
-    if (gone.size <= GONE_KEPT) break;
-    gone.delete(old);
-  }
+  trimOldest(gone, GONE_KEPT);
 }
 
 function slice({ setState: set, getState: get }: StoreApi<AppState & CardsSlice>): void {

@@ -12,11 +12,9 @@ interface Parts {
   link: () => Link | undefined;
   now: () => number;
   log: Log;
-  // The account that made a public room of the Earth, who moderates it too (D394); none for any other room.
-  maker?: ((room: string) => string | undefined) | undefined;
 }
 
-export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log, maker = () => undefined }: Parts) {
+export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log }: Parts) {
   const pins: Pins = makePins({
     db,
     fetch: (room, msgid) => link()?.line(room, msgid) ?? Promise.resolve("unanswered"),
@@ -26,8 +24,8 @@ export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log, maker 
   return {
     api: {
       pins,
-      // The room's world's moderators and the team, and its maker for a public room; everyone reads as the stream says.
-      mayPin: (room: string, who: string): boolean => staffOf(roles, room, who) || maker(room) === who,
+      // The room's world's moderators and the team; everyone reads as the stream says.
+      staff: (room: string, who: string): boolean => staffOf(roles, room, who),
       mayRead: (room: string, who: string | undefined): boolean => mayRead(roles, room, who),
     },
     // What the link hears, as its options take it: a line taken from a room (its author's delete, the bot's hide), and

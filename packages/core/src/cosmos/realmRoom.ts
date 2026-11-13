@@ -5,6 +5,7 @@
 // takes a hub's room by its name and two ids never meet.
 import { REALM_PREFIX } from "../chain/realm.ts";
 import { sha256 } from "../planet/sha256.ts";
+import { asciiBytes, hexOf } from "../text/bytes.ts";
 import { EARTH, hubWorldOf, worldIdOf } from "./worldId.ts";
 
 const ROOM_MAX = 64;
@@ -18,10 +19,8 @@ interface Hub {
   readonly realms?: readonly string[] | undefined;
 }
 
-const hexOf = (text: string): string =>
-  [...sha256(Uint8Array.from(text, (char) => char.charCodeAt(0) & 255)).slice(0, HEX / 2)]
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
+// Ten hex of the text's SHA-256; an ASCII text, as every realm path and world id is.
+const hashOf = (text: string): string => hexOf(sha256(asciiBytes(text)).subarray(0, HEX / 2));
 
 const slugOf = (text: string): string =>
   text
@@ -35,7 +34,7 @@ function worldSlug(id: string, hubs: readonly Hub[]): string {
     return id;
   return `${slugOf(id)
     .slice(0, WORLD_MAX - HEX - 1)
-    .replace(/-+$/, "")}-${hexOf(id)}`;
+    .replace(/-+$/, "")}-${hashOf(id)}`;
 }
 
 /** The world and the room of a realm's chat: `hubs` are the universe's, for the hub that holds the realm's world. */
@@ -50,5 +49,5 @@ export function realmRoom(path: string, hubs: readonly Hub[]): { world: string; 
   const tail = slugOf(unversioned.slice(unversioned.lastIndexOf("/") + 1)) || "realm";
   const fits = Math.min(TAIL_MAX, ROOM_MAX - 3 - HEX - world.length);
   const cut = tail.slice(0, fits).replace(/-+$/, "") || "realm";
-  return { world, room: `#${world}/${cut}-${hexOf(path)}` };
+  return { world, room: `#${world}/${cut}-${hashOf(path)}` };
 }

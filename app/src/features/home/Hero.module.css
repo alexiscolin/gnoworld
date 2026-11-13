@@ -44,7 +44,7 @@
     font-size: min(clamp(56px, 7vi, 112px), calc(1000px / var(--_chars)));
     font-weight: 600;
     line-height: 1;
-    letter-spacing: -0.03em;
+    letter-spacing: var(--tracking-tight);
   }
 
   .hero > * {
@@ -82,10 +82,9 @@
     gap: var(--space-2xs);
     color: var(--color-mine);
     /* raw: 13 px mono, a step over the kicker's, tracked as frame 6's word */
-    font: 500 13px/1 var(--family-mono);
+    font: 500 0.8125rem/1 var(--family-mono);
     /* raw: frame 6's wide tracking, a little closer at this size */
     letter-spacing: 0.2em;
-    text-transform: uppercase;
   }
 
   .pulse {
@@ -113,10 +112,10 @@
   }
 
   .line {
-    /* raw: the line's own grey (the prototype's #hero .heroCap), 22 px over the number (Alexis, 2026-11-09: "en plus gros") */
-    color: #c8d0de;
+    /* the line's own grey, 22 px over the number (Alexis, 2026-11-09: "en plus gros") */
+    color: var(--color-text-soft);
     /* raw: the line over the number, a step over the prototype's 17 px */
-    font: 400 22px/1.35 var(--family-sans);
+    font: 400 1.375rem/1.35 var(--family-sans);
     letter-spacing: normal;
   }
 
@@ -159,7 +158,7 @@
     /* raw: the night at 50% over the scene, as the prototype's 0.5 */
     background: var(--_fill, color-mix(in oklab, var(--color-surface) 50%, transparent));
     /* raw: 15 px, 500 (the prototype's #hero .cta .link) */
-    font: 500 15px/1 var(--family-sans);
+    font: 500 0.9375rem/1 var(--family-sans);
     text-decoration: none;
     white-space: nowrap;
   }
@@ -230,7 +229,7 @@
     text-transform: lowercase;
   }
 
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     /* Under the ways' pill, which a phone fixes at the top right just under its header (shellHeader.module.css). */
     .hero {
       /* layout: the hero starts under the pill fixed over the page's top */
@@ -270,14 +269,14 @@
   /* From 900 px the rail stands for the list (7i), and the list never shows while space loads or comes back: only where space cannot
      stand, refused or failed, does the page show it (D372; the universe marks it "fallback"). Its links stay in the page for a reader
      with no script. */
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .worlds:not([data-rail="fallback"]) {
       display: none;
     }
   }
 
   /* Over the page only where it holds: a screen of 800 px high, the list of worlds above it in the room that is left. */
-  @media (min-width: 900px) and (min-height: 800px) {
+  @media (width >= 900px) and (height >= 800px) {
     .hero {
       position: fixed;
       inset-inline-start: var(--space-xl);

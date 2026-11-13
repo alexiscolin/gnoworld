@@ -4,7 +4,6 @@
 import { Avatar, Button, Cluster, Dialog, Field, grouped, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
 import { NOT_CHECKED, networkOf, publicForever } from "../calls/index.ts";
-import appear from "../../enter.module.css";
 import styles from "./NameDialog.module.css";
 import { NAMEREG, NYM_PREFIX, nymProblem, NYM_RULE } from "./nym.ts";
 import type { Phase } from "./phase.ts";
@@ -30,7 +29,7 @@ const feeWords = ({ name, real }: NameDialogProps["network"], fee: string) =>
 function State({ phase }: { phase: Phase }) {
   return (
     <p role="status" className={styles["state"]}>
-      <span key={phase.kind} className={appear["enter"]}>
+      <span key={phase.kind} className="enter">
         {phase.kind === "working" || phase.kind === "failed" ? phase.text : null}
         {phase.kind === "done" ? `${phase.name} is registered, in block ${grouped(phase.height)}.` : null}
       </span>
@@ -69,7 +68,7 @@ export function NameDialog({ open, account, network, fee, phase, onRegister, onC
             ) : null}
             <Cluster>
               {form ? (
-                <span className={styles["computer"]}>
+                <span className="fine-only">
                   <Button emphasis="solid" type="submit" disabled={problem !== undefined}>
                     Register · 0 GNOT
                   </Button>
@@ -79,7 +78,7 @@ export function NameDialog({ open, account, network, fee, phase, onRegister, onC
             </Cluster>
             <State phase={phase} />
             <p className={styles["note"]}>{feeWords(network, fee)}</p>
-            <p className={[styles["phone"], styles["note"]].join(" ")}>To sign, use a computer.</p>
+            <p className={["coarse-only", styles["note"]].join(" ")}>To sign, use a computer.</p>
             <p className={styles["note"]}>
               {publicForever(NAMEREG)} {NOT_CHECKED}
             </p>

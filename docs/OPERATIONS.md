@@ -196,8 +196,9 @@ A flood meets the password, a limit per visitor (429 after a burst) and the cont
 cores and 1,504 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
 cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.7 core and 656 MB more when on (jarvis, its
 reader and their two ways out). The
-limit lets one address 640 requests at once and 20 a second after that (F3665); `auth_basic` runs after it, so a
-burst with a wrong password costs about 640 password checks, at the name in the file, before the 429s begin. To cut the public URL at once:
+limit lets one address 640 requests at once and 20 a second after that (F3665), and 1,024 more of the hashed files (assets,
+textures, world pictures) in a zone of their own, 5 a second after that, which a first visit asks for twice (D13127); `auth_basic` runs after it, so a
+burst with a wrong password costs about 640 password checks, 1,664 at most with the hashed files', at the name in the file, before the 429s begin. To cut the public URL at once:
 
 | Where | How | Back |
 |---|---|---|
@@ -528,11 +529,9 @@ Slice 3, the server's retention (3n):
   after five failures), `moderation_backlog` (a check waits two minutes or more), `moderation_queue_full` (a
   message left unchecked, the queue full); `card_shape` (the link reader answered a shape no schema takes),
   `card_backlog` and `card_queue_full` (the link cards' queue, as the two above); `irc_nick_taken` (above); `redact_refused`, `unknown_room`
-  and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history, or its
-  messages' (7t3), beside the database: rising and Trending by the rooms stay dark until the folder takes it);
-  `trends_write` (the worlds job could not write the chain's habits, trends-transactions.json and
-  trends-addresses.json, beside the database: Trending by the chain loses what the pass learned until the folder
-  takes it). `scripts/check_docs.py` keeps this list whole.
+  and `room_opened` (the rooms, below); `presence_write` (who is here could not write its history, or the
+  lines' history a plate's messages an hour read (8g), beside the database: rising stays dark until the folder takes it).
+  `scripts/check_docs.py` keeps this list whole.
 - **Before a public launch** (decision 154): the privacy policy, which says what reaches OpenAI and what
   is kept and how long, and the erasure path (slice 12) are blockers.
 
@@ -604,7 +603,8 @@ Jarvis is off until all three steps are done, in this order (10u-g2, D13987):
    `chmod 644` on it. Without it, `docker compose` refuses to start the stack.
 2. **The evals**, on a machine with Anthropic's key in a file nobody pastes (`evals/run.sh`'s header names the command),
    and their result committed in `evals/results/`: the last result must pass the gate, `python3 -I
-   deploy/jarvis-evals-gate.py evals/results evals/cases`, which prints `ok` or says why not: every `injection` case, every
+   deploy/jarvis-evals-gate.py evals/results evals/cases "$(node evals/fingerprint.ts)"`, which prints `ok` or says why
+   not (a result of other code, its fingerprint not this checkout's, is refused; `deploy/jarvis-on.sh` runs it so): every `injection` case, every
    `allowlist` case, every `ground` decline passes, a case seen twice passes only if every row did, and at least 9 of the
    `ground` suite's `on-topic-*` cases in 10. Only files named by their UTC time are read; a result it cannot read, one
    that lacks a case of those suites, or none at all is a refusal.

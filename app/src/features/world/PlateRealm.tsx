@@ -2,6 +2,7 @@
 // takes a world's pinned actions (D271) from that module too (the chat reaches no realm code of its own); code that cannot be fetched
 // leaves its place alone (F1763). This file holds only the doors to that chunk.
 import { lazy, Suspense, type ComponentType } from "react";
+import { reportedOr } from "../../lib/reported.ts";
 import type { site } from "../../places.ts";
 import type { PinnedBarProps } from "./Pinned.tsx";
 import type { ProposalsProps } from "./Proposals.tsx";
@@ -9,12 +10,18 @@ import type { Ring } from "./statusRing.ts";
 
 const realmPart = () => import("./Proposals.tsx");
 const none = () => ({ default: () => null });
-const Proposals = lazy<ComponentType<ProposalsProps>>(() => realmPart().catch(none));
+const Proposals = lazy<ComponentType<ProposalsProps>>(() => reportedOr(realmPart(), none()));
 const Status = lazy<ComponentType<Pick<ProposalsProps, "path" | "onRing">>>(() =>
-  realmPart().then((chunk) => ({ default: chunk.Status }), none),
+  reportedOr(
+    realmPart().then((chunk) => ({ default: chunk.Status })),
+    none(),
+  ),
 );
 const PinnedBar = lazy<ComponentType<PinnedBarProps>>(() =>
-  realmPart().then((chunk) => ({ default: chunk.PinnedBar }), none),
+  reportedOr(
+    realmPart().then((chunk) => ({ default: chunk.PinnedBar })),
+    none(),
+  ),
 );
 
 interface Universe {

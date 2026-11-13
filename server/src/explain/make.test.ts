@@ -188,6 +188,19 @@ describe("an explanation asked for", () => {
     expect(store.get(KEY)?.state).toBe("failed");
   });
 
+  it("never rejects when the table cannot keep the line nor note the failure: one log line, no crash", async () => {
+    const { explainer, store, lines } = setup();
+    vi.spyOn(store, "keep").mockImplementation(() => {
+      throw new Error("disk full");
+    });
+    vi.spyOn(store, "failedAt").mockImplementation(() => {
+      throw new Error("database closing");
+    });
+    explainer.answer(KEY);
+    await expect(explainer.idle()).resolves.toBeUndefined();
+    expect(lines.filter((line) => line.includes("explain_failed"))).toHaveLength(1);
+  });
+
   it("keeps the stripped, folded text of the check, and the tags of the closed list only", async () => {
     const { explainer, store } = setup({
       call: () =>
@@ -287,5 +300,23 @@ describe("the limits, counted before any work", () => {
     const { explainer, store } = setup({ perDay: 0 });
     store.keep(KEY, { text: GOOD, tags: [], model: "seed", now: T0 });
     for (let n = 0; n < 100; n += 1) expect(explainer.answer(KEY).status).toBe("ready");
+  });
+});
+
+describe("the new explanations one visitor starts", () => {
+  it("are 5 a day at most, though the day's cap holds more, and another visitor still starts one", () => {
+    const { explainer } = setup({ gapMs: 0 });
+    const started = Array.from({ length: 6 }, (_, n) => explainer.answer(other(n), "visitor-a").status);
+    expect(started).toEqual(["making", "making", "making", "making", "making", "none"]);
+    expect(explainer.answer(other(9), "visitor-b")).toEqual({ status: "making" });
+  });
+
+  it("gives a ready line without starting anything, and none for a miss", async () => {
+    const { explainer, explain } = setup();
+    expect(explainer.ready(KEY)).toBeUndefined();
+    expect(explain).not.toHaveBeenCalled();
+    explainer.answer(KEY);
+    await explainer.idle();
+    expect(explainer.ready({ ...KEY, kind: "world" })).toEqual({ status: "ready", text: GOOD, tags: ["token"] });
   });
 });

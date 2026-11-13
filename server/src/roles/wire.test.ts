@@ -95,7 +95,7 @@ function setup({
     },
     hubs: hubs ?? undefined,
     chat: {
-      mayPin: (_room, who) => who === MOD,
+      staff: (_room, who) => who === MOD,
       mayRead: () => true,
       pins: {
         list: () => [],

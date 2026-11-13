@@ -57,3 +57,8 @@ export const MessageMenuIconPlainOpen: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "More" }));
   },
 };
+
+// A bar's tool that opens a panel (the composer's link tool): an icon trigger with the bar's faint ink.
+export const ToolTrigger: Story = {
+  args: { trigger: null, label: "Link", icon: { name: "link", size: "xs", tool: true } },
+};

@@ -25,7 +25,7 @@ vi.mock("../../earthGround.ts", () => ({ attach: () => undefined }));
 vi.mock("../../lenses.ts", () => ({ lightSpace: () => () => undefined }));
 vi.mock("./spaceHook.ts", () => ({ exposeSpace: () => undefined }));
 vi.mock("../../mapView.ts", () => ({ isMap: () => false, onMap: () => () => undefined }));
-vi.mock("./worldsFile.ts", () => ({ worldsFile: () => new Promise(() => undefined) }));
+vi.mock("../../worldsFile.ts", () => ({ worldsFile: () => new Promise(() => undefined) }));
 vi.mock("./arrival.ts", () => ({ enterPage: () => undefined, landTags: () => undefined, waitTags: () => undefined }));
 
 describe("release", () => {

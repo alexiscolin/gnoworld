@@ -37,6 +37,13 @@ function leaveJump(store: Store, link: LinkRef, room: string): void {
   }, reportError);
 }
 
+// Out of the component: the compiler draws no dynamic import inside one.
+function awayFrom(store: Store, link: LinkRef, room: string | undefined): void {
+  import("./search/jumping.ts").then(({ jumpingOf }) => {
+    if (link.current !== undefined) jumpingOf(store, link.current).away(room);
+  }, reportError);
+}
+
 /** The address's key for words handed to the search (the palette's last row). */
 const FIND = "find";
 
@@ -111,7 +118,13 @@ export function useSearching(
     },
     [store, link, room],
   );
+  // Whether a jump was asked here: only then is the jump's chunk asked for when the room in view changes.
+  const jumpedRef = useRef(false);
+  useEffect(() => {
+    if (jumpedRef.current) awayFrom(store, link, room);
+  }, [store, link, room]);
   const found = (hit: SearchHit) => {
+    jumpedRef.current = true;
     openFound(store, link, hit).then((opened) => {
       if (!opened) return;
       const to = hit.room === room ? undefined : roomHref(hit.room, full);

@@ -8,7 +8,8 @@ export function presenceApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
   return {
     /** Who is here in each world a guest may see. */
-    read: (): Promise<Result<Presence>> => call({ path: "/api/presence", schema: Presence }),
+    read: (signal?: AbortSignal): Promise<Result<Presence>> =>
+      call({ path: "/api/presence", schema: Presence, signal }),
   };
 }
 

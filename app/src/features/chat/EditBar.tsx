@@ -2,7 +2,7 @@
 // drop the correction; Escape in the box drops it too, as the reply bar's does, and Save sends it.
 import { IconButton, Sidebar } from "@gnoworld/ui";
 import { useId, type KeyboardEvent, type ReactNode } from "react";
-import { FIELD } from "./composerHooks.ts";
+import { FIELD } from "./composerBox.ts";
 import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";
 

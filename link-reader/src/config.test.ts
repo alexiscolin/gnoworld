@@ -5,7 +5,12 @@ const ENV = { LINKS_LISTEN: "172.30.101.10:8084", LINKS_PROXY: "guard:4754", LIN
 
 describe("the reader's settings", () => {
   it("are read from the environment: the address, the way out and the number of reads at once", () => {
-    expect(readSettings(ENV)).toEqual({ host: "172.30.101.10", port: 8084, proxy: "guard:4754", max: 2 });
+    expect(readSettings(ENV)).toEqual({
+      host: "172.30.101.10",
+      port: 8084,
+      proxy: { host: "guard", port: 4754 },
+      max: 2,
+    });
   });
 
   it("take 2 reads at once when LINKS_MAX is not set", () => {

@@ -15,8 +15,9 @@ export function useChatSearch(ask: SearchAsk | undefined) {
       queryFn: ({ pageParam, signal }) => {
         // `enabled` keeps a query with no ask from running.
         if (ask === undefined) throw new Error("no search was asked");
-        return readApi(() =>
-          pageSearchApi().search(pageParam === undefined ? ask : { ...ask, before: pageParam }, signal),
+        return readApi(
+          (s) => pageSearchApi().search(pageParam === undefined ? ask : { ...ask, before: pageParam }, s),
+          signal,
         );
       },
       getNextPageParam: ({ next }) => next ?? undefined,

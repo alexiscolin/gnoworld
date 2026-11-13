@@ -3,8 +3,8 @@
 // Limits from sitemaps.org/protocol.html (read 2026-10-29): 50,000 URLs and 50 MB uncompressed a file. Values need entity escapes,
 // but a Slug is [a-z0-9-] (packages/schemas/src/data.ts) and the origin is constant: nothing here holds a character to escape.
 import { placesFrom } from "./dataPlaces.ts";
+import { ORIGIN } from "./meta.ts";
 
-const ORIGIN = "https://gno.world";
 const MAX_URLS = 50_000;
 
 interface Row {

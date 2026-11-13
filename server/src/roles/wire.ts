@@ -24,7 +24,7 @@ interface Deps {
   /** The default universe's hubs: slug and first realm's world id. */
   hubs: ReadonlyMap<string, string> | undefined;
   /** The chat's pin rule (a moderator of the room's world, the team, an Earth room's maker) and what an owner's hide and mute do. */
-  chat: Pick<Chat, "mayPin" | "mayRead" | "pins" | "hide" | "muteKeeping" | "roomsOf"> & {
+  chat: Pick<Chat, "staff" | "mayRead" | "pins" | "hide" | "muteKeeping" | "roomsOf"> & {
     rooms: Pick<Chat["rooms"], "maker">;
     // The link cards' flow, where they run.
     cards?: CardRoutesOptions["cards"] | undefined;
@@ -99,7 +99,7 @@ export function mountOwners(
   const links = serverLinks(db, { now: Date.now, chainId, secret: config.pepper });
   const rightsFrom = (pool: "act" | "show", identityOf: Links["identityOf"]) =>
     makeMayModerate({
-      staff: chat.mayPin,
+      staff: chat.staff,
       maker: (room, who) => chat.rooms.maker(room) === who,
       placeOf: (room) => {
         const namespace = namespaceOf(room);

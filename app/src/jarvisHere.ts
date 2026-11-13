@@ -50,10 +50,6 @@ export function tellJarvisHere(next: JarvisHere | undefined): void {
   changed();
 }
 
-/** The language a signed-in reader's stream asks the stored translations in: none for a guest or with the switch off. */
-export const translationLanguage = (): Language | undefined =>
-  here?.account !== undefined && here.auto !== false ? (here.language ?? "en") : undefined;
-
 /** Where Jarvis can be asked from now, as the chat last told. */
 export const useJarvisHere = (): JarvisHere | undefined =>
   useSyncExternalStore(

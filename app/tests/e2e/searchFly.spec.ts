@@ -8,7 +8,7 @@ import { answerSearchFrom } from "./searchServer.mjs";
 // a command's (no Chat, no link), Discover's Fly there and Chat, a realm found by a function name typed whole, a missing worlds' file, the
 // words handed to the chat's search, and `from:@me` with no words.
 const control = (page: Page) => page.getByRole("button", { name: /^Search/ });
-const field = (page: Page) => page.getByRole("searchbox", { name: "Search places" });
+const field = (page: Page) => page.getByRole("combobox", { name: "Search places" });
 const choices = (page: Page, name?: RegExp) =>
   page.getByRole("listbox", { name: "Places" }).getByRole("option", name === undefined ? {} : { name });
 const preview = (page: Page) => page.getByRole("region", { name: "Preview" });

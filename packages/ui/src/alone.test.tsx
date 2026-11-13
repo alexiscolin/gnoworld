@@ -90,6 +90,11 @@ beforeEach(() => {
   seen.length = 0;
   document.documentElement.style.setProperty("--motion-slow", "360ms");
   document.documentElement.style.removeProperty("--motion-scale");
+  // The reader's system has no reduced-motion preference: jsdom's own answers no to every query, "no preference" too.
+  vi.stubGlobal("matchMedia", (media: string) => ({
+    matches: media === "(prefers-reduced-motion: no-preference)",
+    media,
+  }));
 });
 
 afterEach(() => {
@@ -499,11 +504,14 @@ describe("the move", () => {
   it("does not move under reduced motion, nor under the app's calm setting: the swap is at once", () => {
     plate();
     const played = animating();
-    vi.stubGlobal("matchMedia", (media: string) => ({ matches: media.includes("reduce"), media }));
+    vi.stubGlobal("matchMedia", (media: string) => ({ matches: media === "(prefers-reduced-motion: reduce)", media }));
     fireEvent.click(expand("Hours"));
     expect(alone()).toHaveLength(1);
     fireEvent.keyDown(document, { key: "Escape" });
-    vi.unstubAllGlobals();
+    vi.stubGlobal("matchMedia", (media: string) => ({
+      matches: media === "(prefers-reduced-motion: no-preference)",
+      media,
+    }));
     document.documentElement.style.setProperty("--motion-scale", "0");
     fireEvent.click(expand("Hours"));
     expect(alone()).toHaveLength(1);

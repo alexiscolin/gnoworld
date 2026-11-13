@@ -8,9 +8,4 @@
     padding-inline-start: var(--space-m);
     font: var(--font-reading);
   }
-
-  .further {
-    font: var(--font-meta);
-    color: var(--color-text-muted);
-  }
 }

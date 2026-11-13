@@ -57,26 +57,22 @@ export function makeMutes({ db, send, roomsOf, now, forMs, max }: Options): Mute
       if (mode("-", account, world)) sql.lift.run(account, world, at);
     }
   };
+  // A mute added unless one is live; a world at its cap lifts the one ending first ("evict") or takes none ("refuse").
+  const add = (account: string, world: string, atCap: "evict" | "refuse"): "muted" | "already" | "full" => {
+    const at = now();
+    if (sql.live.get(account, world, at) !== undefined) return "already";
+    if (Count.parse(sql.count.get(world, at)).n >= max) {
+      if (atCap === "refuse") return "full";
+      sql.endFirst.run(at, world, at);
+      tick();
+    }
+    sql.add.run(account, world, at + forMs);
+    mode("+", account, world);
+    return "muted";
+  };
   return {
-    mute(account, world) {
-      const at = now();
-      if (sql.live.get(account, world, at) !== undefined) return false;
-      if (Count.parse(sql.count.get(world, at)).n >= max) {
-        sql.endFirst.run(at, world, at);
-        tick();
-      }
-      sql.add.run(account, world, at + forMs);
-      mode("+", account, world);
-      return true;
-    },
-    muteKeeping(account, world) {
-      const at = now();
-      if (sql.live.get(account, world, at) !== undefined) return "already";
-      if (Count.parse(sql.count.get(world, at)).n >= max) return "full";
-      sql.add.run(account, world, at + forMs);
-      mode("+", account, world);
-      return "muted";
-    },
+    mute: (account, world) => add(account, world, "evict") === "muted",
+    muteKeeping: (account, world) => add(account, world, "refuse"),
     tick,
     reapply() {
       for (const { account, world } of Rows.parse(sql.lives.all(now()))) mode("+", account, world);

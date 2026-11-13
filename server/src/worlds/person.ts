@@ -7,7 +7,6 @@ import { Address, type ApiError } from "@gnoworld/schemas";
 import { PERSON_CAPS, PERSON_MAX_BYTES, PersonCardData, Worlds } from "@gnoworld/schemas/indexer";
 import type { Log } from "@gnoworld/service/log";
 import { type Context, Hono } from "hono";
-import { readFileSync, statSync } from "node:fs";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import { limiter } from "../limit.ts";
@@ -63,24 +62,6 @@ export function callsOf(db: DatabaseSync, address: string): Pick<PersonCardData,
       .all(address),
   ).map((row) => ({ ...row, success: row.success === 1 }));
   return { calls: { total: total.calls, realms: total.realms, days }, latest };
-}
-
-/** The worlds file as the job last wrote it, read again only when its mtime changes; none for no file or a file that is no good. */
-export function worldsFile(file: string | undefined): () => Worlds | undefined {
-  let kept: { at: number; worlds: Worlds | undefined } | undefined;
-  return () => {
-    if (file === undefined) return undefined;
-    try {
-      const at = statSync(file).mtimeMs;
-      if (kept?.at !== at) {
-        const parsed = Worlds.safeParse(JSON.parse(readFileSync(file, "utf8")));
-        kept = { at, worlds: parsed.success ? parsed.data : undefined };
-      }
-      return kept.worlds;
-    } catch {
-      return undefined;
-    }
-  };
 }
 
 export interface Options {

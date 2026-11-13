@@ -21,26 +21,36 @@ import { realmView } from "../../places.ts";
 import { SEARCH_HASH } from "../search/index.ts";
 import type { JarvisQuestion } from "@gnoworld/schemas";
 import { JarvisCard, type JarvisCardContext } from "./JarvisCard.tsx";
-import type { FirstAsk } from "./JarvisListener.tsx";
+import type { FirstAsk } from "./asks.ts";
 import { JarvisSaid } from "./JarvisSaid.tsx";
 import { drawerOf } from "./drawer.ts";
-import { memoSaid } from "./memoSaid.ts";
 
 const api = pageJarvisApi();
 const noop = (): void => undefined;
-const readSaid = memoSaid(api.said);
 
-const mine = (here: JarvisHere) => (item: { room: string; account: string | undefined }) =>
+const mine = (here: JarvisHere) => (item: { room: string; account?: string | undefined }) =>
   item.room === here.room && item.account === here.account;
 
-// Asks, unless this account has an ask in flight in this room; the answer is the card's by its id, whatever room is in view by then.
+// What is asked while this account has an ask in flight in a room, asked in turn as each answer comes: the same ask again is not.
+const waiting: { here: JarvisHere; question: JarvisQuestion }[] = [];
+const same = (one: JarvisQuestion, other: JarvisQuestion): boolean => JSON.stringify(one) === JSON.stringify(other);
+
+// Asks, or waits while this account has an ask in flight in this room; the answer is the card's by its id, whatever room is in view by then.
 function ask(here: JarvisHere, question: JarvisQuestion): void {
-  if (jarvisItems().some((item) => mine(here)(item) && item.ask !== undefined && item.result === undefined)) return;
+  const running = jarvisItems().find((item) => mine(here)(item) && item.ask !== undefined && item.result === undefined);
+  if (running !== undefined) {
+    const asked = [running.ask, ...waiting.filter((each) => mine(here)(each.here)).map((each) => each.question)];
+    if (!asked.some((each) => each !== undefined && same(each, question))) waiting.push({ here, question });
+    return;
+  }
   const id = addJarvisItem({ room: here.room, account: here.account, ask: question });
   api
     .ask(question)
     .then((result) => {
       settleJarvisItem(id, result);
+      const next = waiting.findIndex((each) => mine(here)(each.here));
+      const [turn] = next < 0 ? [] : waiting.splice(next, 1);
+      if (turn !== undefined) ask(turn.here, turn.question);
     })
     .catch(reportError);
 }
@@ -145,7 +155,7 @@ export function JarvisHost({ first }: { first: FirstAsk }) {
       onFly: ctx.onFly,
     };
     setJarvisSaidDrawing((room, msgid, fallback) => (
-      <JarvisSaid key={msgid} {...{ room, msgid, card, fallback }} read={readSaid} />
+      <JarvisSaid key={msgid} {...{ room, msgid, card, fallback }} read={api.said} />
     ));
     return () => {
       setJarvisDrawing(undefined);

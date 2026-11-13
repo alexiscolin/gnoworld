@@ -6,26 +6,15 @@ import { CATEGORIES, type Answer, type ModerationInput } from "../moderation/pro
 import { jpegSize } from "./jpeg.ts";
 import type { Page, State } from "./store.ts";
 
-const READER_MS = 10_000;
-
-const within = <T>(work: Promise<T>, ms: number): Promise<T> =>
-  new Promise((resolve, reject) => {
-    const timer = setTimeout(() => {
-      reject(new Error("timeout"));
-    }, ms);
-    work.then(resolve, reject).finally(() => {
-      clearTimeout(timer);
-    });
-  });
-
-/** The reader's answer, held to the schema and to the picture's real size; "down" when it fails or takes too long, "shape" for an answer no schema takes. */
+/** The reader's answer, held to the schema and to the picture's real size; "down" when it fails (its client's own deadline included),
+ * "shape" for an answer no schema takes. */
 export async function readCard(
   reader: (url: string) => Promise<unknown>,
   url: string,
 ): Promise<ReaderCard | "down" | "shape"> {
   let raw: unknown;
   try {
-    raw = await within(reader(url), READER_MS);
+    raw = await reader(url);
   } catch {
     return "down";
   }

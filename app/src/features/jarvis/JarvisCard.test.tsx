@@ -106,6 +106,15 @@ describe("Jarvis's introduction", () => {
     expect(sent(ctx)).toEqual([{ question: "Who runs this realm?", room: ROOM }]);
   });
 
+  it("empties its field once its question is taken, and the count with it", () => {
+    const { box, ctx } = intro();
+    type(box, "Who runs this realm?");
+    enter(box);
+    expect(sent(ctx)).toEqual([{ question: "Who runs this realm?", room: ROOM }]);
+    expect(field(box).value).toBe("");
+    expect(box.textContent).toMatch(/(?<!\d)0\s*\/\s*500/);
+  });
+
   it("does not send on Enter that confirms an input method's composition", () => {
     const { box, ctx } = intro();
     type(box, "こんにちは");
@@ -172,7 +181,7 @@ const SAYS = {
   paused: /paused/i,
   capped: /share/i,
   early: /spoken/i,
-  busy: /busy/i,
+  busy: /still answering your last question/i,
   spent: /budget/i,
   off: /switched off/i,
 } as const;

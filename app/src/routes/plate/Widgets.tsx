@@ -24,11 +24,11 @@ function Square({ widget, expand }: { widget: Widget; expand: ReturnType<typeof 
             {unit === undefined ? null : <small>{unit}</small>}
           </span>
         </Cluster>
-        {detail === undefined ? null : <span className={styles["sub"]}>{detail}</span>}
+        {detail === undefined ? null : <span className="meta">{detail}</span>}
       </Stack>
       {more === undefined ? null : (
         <div className={styles["fold"]} data-open={open ? "" : undefined} inert={!open}>
-          <div className={styles["more"]}>
+          <div className={["data-text", styles["more"]].join(" ")}>
             <Stack as="ul" space="xs">
               {more.map((line) => (
                 <li key={line} dir="ltr">

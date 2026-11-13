@@ -9,5 +9,5 @@ export interface SidebarProps extends Composed {
 
 /** A side and a main part side by side, stacked once the main part would fall under half. */
 export function Sidebar({ side = "start", align = "start", ...rest }: SidebarProps) {
-  return place({ ...rest, className: styles["sidebar"], own: { "data-side": side, "data-align": align } });
+  return place({ ...rest, composition: styles["sidebar"], own: { "data-side": side, "data-align": align } });
 }

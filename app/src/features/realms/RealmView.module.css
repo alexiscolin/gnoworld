@@ -6,9 +6,6 @@
   .window {
     max-block-size: var(--web-h);
     overflow: auto;
-  }
-
-  .window {
     transition: max-block-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
@@ -57,6 +54,8 @@
   /* The page's own blocks, in the proposal's reading type: a column at 14 px over 1.65, titles that step down, links in the world's light, the
      notice as a tinted block with a bar. These sit over RealmBlocks' (the chat's previews keep theirs). */
   .window article {
+    --color-link: var(--world-light);
+
     /* raw: the proposal's reading colour, the text at 88 % */
     color: color-mix(in oklab, var(--color-text) 88%, transparent);
     /* raw: the proposal's page type, 14 px over 1.65 (--font-body is over 1.5) */
@@ -97,10 +96,6 @@
     margin-block-start: var(--space-2xs);
   }
 
-  .window article {
-    --color-link: var(--world-light);
-  }
-
   .window article a {
     color: var(--world-light);
     text-decoration: underline;
@@ -125,14 +120,14 @@
   .window article blockquote {
     background: var(--color-fill);
     /* raw: the proposal's 3 px bar at the quote's start */
-    box-shadow: inset 3px 0 0 var(--color-line-strong);
+    box-shadow: inset calc(3px * var(--dir)) 0 0 var(--color-line-strong);
     color: inherit;
   }
 
   .window article aside {
     background: var(--color-mine-soft);
     /* raw: the proposal's 3 px bar at the notice's start */
-    box-shadow: inset 3px 0 0 var(--color-mine);
+    box-shadow: inset calc(3px * var(--dir)) 0 0 var(--color-mine);
     /* raw: the proposal's notice type, 13.5 px */
     font-size: 0.84375rem;
   }
@@ -140,7 +135,7 @@
   .window article aside[data-severity="caution"] {
     background: var(--color-signal-soft);
     /* raw: the proposal's 3 px bar at the caution's start */
-    box-shadow: inset 3px 0 0 var(--color-signal);
+    box-shadow: inset calc(3px * var(--dir)) 0 0 var(--color-signal);
   }
 
   .window article aside > svg {

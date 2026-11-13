@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { lazy, Suspense } from "react";
 import { type MetaArgs, useLoaderData } from "react-router";
 import { chatPlace, EARTH_CHAT as EARTH, EARTH_KICKER, PlaceChat } from "../features/chat/index.ts";
+import { DOCKED } from "../features/chat/useMedia.ts";
 import { isMissing, RouteError } from "../features/errors/index.ts";
 import { Arrival } from "../features/passport/Later.tsx";
 import { useEntered, useLoaded, useSpace } from "../features/universe/index.ts";
@@ -15,9 +16,9 @@ import { earthMeta, failedPageMeta, missingUniverseMeta } from "../meta.ts";
 import { pageOf, site, type UniverseView } from "../places.ts";
 import styles from "./earth.module.css";
 import place from "./globe.module.css";
-import { DockChat, DOCKED, PlaceFrame, useFraming } from "./placeFrame.tsx";
+import { DockChat, PlaceFrame, useFraming } from "./placeFrame.tsx";
 
-// The plate's blocks (routes/plate), in a chunk once the first screen has drawn, asked once the door to space has come (chatDue), never on the first screen.
+// The plate's blocks (routes/plate), in a chunk of their own, asked once the page has loaded (useLoaded), never on the first screen.
 const EarthPlate = lazy(() => import("./plate/EarthPlate.tsx"));
 
 export function loader({ request }: { request: Request }) {

@@ -7,7 +7,7 @@
     margin-block: 0;
     color: var(--color-text-muted);
     /* raw: 13 px mono, the hero's kicker size */
-    font: 400 13px/1.35 var(--family-mono);
+    font: 400 0.8125rem/1.35 var(--family-mono);
   }
 
   .spark {

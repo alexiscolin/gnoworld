@@ -17,12 +17,17 @@ export function ChainCard({ call }: { call: ChainCall }) {
     <li data-chain="">
       <Card dashed compact>
         <Card.Header icon="link" level={3} title={`${short(call.actor)} called ${plain(call.func)}`} />
-        <p className={styles["meta"]}>
+        <p className="meta">
           on chain, <span className={styles["realm"]}>{plain(call.realm).replace("gno.land/", "")}</span> · block{" "}
           {call.height}
         </p>
         {at === undefined ? null : (
-          <Popover plain lazy label="Call detail" trigger={<span className={styles["details"]}>Details</span>}>
+          <Popover
+            plain
+            lazy
+            label="Call detail"
+            trigger={<span className={["meta", styles["details"]].join(" ")}>Details</span>}
+          >
             <Suspense fallback={<Skeleton lines={3} />}>
               <CallDetail hash={at.hash} index={at.index} />
             </Suspense>

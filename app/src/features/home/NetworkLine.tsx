@@ -7,11 +7,10 @@ import { queryClient } from "../../lib/query/client.ts";
 import { useClock } from "./clock.ts";
 import styles from "./NetworkLine.module.css";
 import { networkOptions } from "./networkQuery.ts";
+import { plural } from "../../lib/plural.ts";
 
 /** A last block older than this is a halted chain. */
 const STALE_MS = 10 * 60_000;
-
-const plural = (n: number, word: string): string => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
 
 export default function NetworkLine({ name }: { name: string }) {
   const { data } = useQuery(networkOptions, queryClient);

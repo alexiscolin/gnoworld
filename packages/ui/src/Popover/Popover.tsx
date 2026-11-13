@@ -8,10 +8,9 @@ import {
   type ReactNode,
   type ToggleEvent,
 } from "react";
-import { buttonLook, iconLook, iconSize, type IconControlSize } from "../Button/control.ts";
+import { buttonLook, type IconControlSize } from "../Button/control.ts";
 import { Icon, type IconName } from "../icons/Icon.tsx";
 import { Chip } from "../Chip/Chip.tsx";
-import { Tooltip } from "../Tooltip/Tooltip.tsx";
 import { rove } from "../roving.ts";
 import { useAtPoint } from "./atPoint.ts";
 import { floating, usePlaced } from "./floating.ts";
@@ -61,8 +60,8 @@ export interface PopoverProps {
   trigger: ReactNode;
   /** A trigger with no button's look: the words it holds as they are (a name in a line, which opens a person's card). */
   plain?: boolean;
-  /** An icon-only trigger as an IconButton's plain one (named by `label`), at this size, in place of the words. */
-  icon?: { name: IconName; size: IconControlSize };
+  /** An icon-only trigger as an IconButton's plain one (named by `label`), at this size, in place of the words; a bar's tool as IconButton's `tool`. */
+  icon?: { name: IconName; size: IconControlSize; tool?: boolean };
   /** Its panel drawn only while open: a popover of each of many rows (a person's card on each line) costs nothing closed. */
   lazy?: boolean;
   /** Whether the trigger is a Tab stop: a list that is one stop (a room's lines) leaves its rows' controls out until in focus. */
@@ -172,18 +171,16 @@ export function Menu({
   };
   return (
     <>
-      {icon === undefined ? (
-        <button type="button" {...trigger}>
-          {lead}
-          {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
-        </button>
-      ) : (
-        <Tooltip label={words}>
-          <button type="button" {...trigger} aria-label={words} {...iconLook(emphasis, size)}>
-            <Icon name={icon} size={iconSize(size)} />
-          </button>
-        </Tooltip>
-      )}
+      <Trigger
+        attrs={trigger}
+        plain={false}
+        icon={icon === undefined ? undefined : { name: icon, size, emphasis }}
+        tabbable
+        label={words}
+      >
+        {lead}
+        {wordsHidden ? <span className="visually-hidden">{words}</span> : words}
+      </Trigger>
       <div {...panel} aria-label={label} onKeyDown={move}>
         {items.map((item, at) => (
           <Fragment key={item.label}>

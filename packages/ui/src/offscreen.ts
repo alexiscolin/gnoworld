@@ -20,3 +20,23 @@ export function pauseOffscreen(node: HTMLElement | SVGElement): () => void {
 /** A ref for an element whose animation pauses out of view. */
 export const sightRef = (node: HTMLElement | SVGElement | null): (() => void) | undefined =>
   node === null ? undefined : pauseOffscreen(node);
+
+/** Calls `go` once, the first time `node` is seen in `root` (the page's, when none), at `threshold` of it. Returns what lets it go. */
+export function onceSeen(
+  node: Element,
+  { root, threshold = 0 }: { root: Element | null; threshold?: number },
+  go: () => void,
+): () => void {
+  const watch = new IntersectionObserver(
+    (entries) => {
+      if (!entries.some((entry) => entry.isIntersecting)) return;
+      watch.disconnect();
+      go();
+    },
+    { root, threshold },
+  );
+  watch.observe(node);
+  return () => {
+    watch.disconnect();
+  };
+}

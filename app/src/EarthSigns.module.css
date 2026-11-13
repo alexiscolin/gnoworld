@@ -180,7 +180,7 @@
 
   .head {
     /* raw: frame 55's head, mono 10 px */
-    font: 400 0.625rem/1.3 var(--family-mono);
+    font: 400 var(--text-2xs)/1.3 var(--family-mono);
     /* raw: the same, 7.2 px a letter */
     letter-spacing: 0.12em;
   }
@@ -203,7 +203,6 @@
 
   .head:not(:empty) {
     color: var(--color-text-muted);
-    text-transform: uppercase;
   }
 
   /* A person spoke here: one ring leaves the place as the bubble comes. */
@@ -247,8 +246,10 @@
     /* raw: the frames' faint fill */
     background: color-mix(in oklab, currentcolor 4%, transparent);
     /* a slow beat, the frames', for a minute (25 beats) while in view (offscreen.ts); a new trend beats again (EarthSigns.tsx keys it) */
-    animation: ring calc(var(--motion-ambient) * 0.8 * var(--motion-scale)) var(--ease-standard) 25 forwards;
+    animation: ring calc(var(--motion-ambient) * 0.8 * var(--motion-scale)) var(--ease-standard) 25;
     animation-play-state: var(--play, running);
+    /* raw: after its beats, faded out as each beat ends; at rest at 0.8 where motion is reduced (the system's word or the settings'), its beats taking no time */
+    opacity: calc(0.8 * (1 - var(--motion-scale)));
   }
 
   .dot {
@@ -342,8 +343,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .bubble,
-    .rings {
+    .bubble {
       animation: none;
     }
 
@@ -354,11 +354,6 @@
     .ping::after {
       animation: none;
       visibility: hidden;
-    }
-
-    .rings {
-      /* raw: the ring at rest, where it does not beat */
-      opacity: 0.8;
     }
   }
 }

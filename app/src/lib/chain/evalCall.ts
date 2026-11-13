@@ -2,16 +2,10 @@
 // packages/core/src/chain/evalName.ts; the server's door has its own, D92). The chain runs ANY expression it is sent, so the
 // defence is here: one `<realm>.<Name>()`, one of r/sys/users's two calls on a proved address (D283), or nothing. Each pattern
 // is built inside its function (typescript.md, F412).
-import { Address } from "@gnoworld/schemas";
+import { Address, isRealmPath } from "@gnoworld/schemas";
 
 export { evalNameOf, isAddress } from "@gnoworld/core";
-
-/** gno's grammar for a realm's path (mempackage.go:49-54,67-70,81-90 at v1.5.0), `_test` paths left out. */
-export function isRealmPath(path: string): boolean {
-  const word = "[a-z][a-z0-9]*(?:[_-][a-z0-9]+)*";
-  const realm = new RegExp(`^(?:[a-z0-9-]+\\.)+[a-z]{2,63}/r/${word}(?:/${word})*$`);
-  return realm.test(path) && !path.endsWith("_test");
-}
+export { isRealmPath } from "@gnoworld/schemas";
 
 /** An exported Go identifier, narrowed to ASCII: qfuncs' own test looks at one byte, so `_helper` passes it (keeper.go:1782).
  * At most 128 characters: a realm's own list may hold a name of a megabyte, which would be a request of that size. */

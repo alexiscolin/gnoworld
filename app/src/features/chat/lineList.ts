@@ -3,7 +3,7 @@ import type { Line, Reacting, Reaction, Shown, ShownLine } from "@gnoworld/core"
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { Entry } from "./chainEntries.ts";
 import type { JarvisEntry } from "./jarvisEntries.tsx";
-import { cardOf } from "./lineCard.ts";
+import { cardMarks } from "./lineCard.ts";
 import type { DayEntry } from "./lineMarks.ts";
 import type { RoomKeeping } from "./RoomKeeping.ts";
 
@@ -88,7 +88,7 @@ export const marksOf = (props: ListProps, id: string) => ({
   chips: props.chips.get(id),
   votes: props.votes.get(id),
   newHere: props.firsts.has(id),
-  card: cardOf(props, id),
+  ...cardMarks(props, id),
 });
 
 // What the reader keeps of a line, on this device (saved) and in its room (pinned) (4d).

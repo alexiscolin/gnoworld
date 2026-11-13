@@ -55,4 +55,24 @@ describe("the members' names under the composer", () => {
     const heights = fetched.mock.calls.map(([url]) => url).filter((url) => url.endsWith("/status"));
     expect(heights).toHaveLength(2);
   });
+
+  it("takes a block the node refused as a read that did not come whole: not asked again, not reported as a bug", async () => {
+    vi.useFakeTimers();
+    try {
+      const reported = vi.fn();
+      vi.stubGlobal("reportError", reported);
+      const fetched = vi.fn<(url: string) => Promise<Response>>(() =>
+        Promise.resolve(new Response("no", { status: 404 })),
+      );
+      vi.stubGlobal("fetch", fetched);
+      mount(<Names asked />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(20_000);
+      });
+      expect(fetched.mock.calls.filter(([url]) => url.endsWith("/status"))).toHaveLength(2);
+      expect(reported).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

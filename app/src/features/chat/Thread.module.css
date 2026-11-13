@@ -28,9 +28,4 @@
     font: var(--font-count);
     color: var(--color-text-muted);
   }
-
-  /* The thread's rows draw no bar, so they keep clear of the times' column alone, not of the room's bar as well. */
-  .list > li {
-    --_gutter: var(--chat-times);
-  }
 }

@@ -4,7 +4,7 @@
 import { data, useLocation } from "react-router";
 import { RouteError } from "../features/errors/index.ts";
 import { cosmosAt, homeOf, isHome } from "../cosmosAt.ts";
-import { worldsFile } from "../features/universe/worldsFile.ts";
+import { worldsFile } from "../worldsFile.ts";
 import { site } from "../places.ts";
 
 // A system is a namespace with a world in the worlds' file; one the file does not hold is no system. A file that did not come proves nothing.

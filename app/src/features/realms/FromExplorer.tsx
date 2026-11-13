@@ -1,7 +1,6 @@
 // A world's realm card (8g, frame 93): "REALM · FROM THE EXPLORER", its path, who deployed it and since which block, as the public indexer
 // read its deploy (F4875), and the block of its last call as the worlds' file holds it (its calls are the plate's figure), with the read's source and time; then "EXPLORER ↗" and "DOCS ↗".
 // A fact the indexer or the file did not give is left out, never a zero.
-import { shortAddress } from "@gnoworld/schemas";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { Card, Grid, grouped, Stack } from "@gnoworld/ui";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
@@ -9,6 +8,7 @@ import { realmAt, type RealmAt } from "../../realmAt.ts";
 import { ReadSource } from "./ReadSource.tsx";
 import { useRealmFacts } from "./useRealmFacts.ts";
 import { OutLinks } from "../../OutLinks.tsx";
+import { deployerLabel, heldOf } from "./worldsIndex.ts";
 
 function Fact({ label, children }: { label: string; children: string }) {
   return (
@@ -34,7 +34,7 @@ function Facts({
   const last = held?.lastHeight ?? null;
   return (
     <Grid min="s" space="s">
-      {deployer === undefined ? null : <Fact label="Deployed by">{held?.deployerName ?? shortAddress(deployer)}</Fact>}
+      {deployer === undefined ? null : <Fact label="Deployed by">{deployerLabel(held?.deployerName, deployer)}</Fact>}
       {firstBlock === undefined ? null : <Fact label="Since block">{grouped(firstBlock)}</Fact>}
       {last === null ? null : <Fact label="Last call at block">{grouped(last)}</Fact>}
     </Grid>
@@ -50,7 +50,7 @@ export interface FromExplorerProps {
 function RealmCard({ found, worlds }: { found: RealmAt; worlds: Worlds["worlds"] | undefined }) {
   const { realm, chain } = found;
   const read = useRealmFacts(chain.indexer, realm);
-  const held = worlds?.flatMap((world) => world.realms).find((each) => each.path === realm);
+  const held = worlds && heldOf(worlds, realm);
   const facts = read?.ok === true ? read.value : {};
   return (
     <Stack space="m">

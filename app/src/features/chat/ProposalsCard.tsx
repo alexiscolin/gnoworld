@@ -16,7 +16,6 @@ import { realmAt } from "../../realmAt.ts";
 import { ActionForm } from "../realms/index.ts";
 
 const GOVDAO = "gno.land/r/gov/dao";
-const FIVE_MINUTES = 5 * 60_000;
 /** The last proposals shown after the open ones, and the open ones shown with their Vote. */
 const LAST = 3;
 const OPEN_MOST = 5;
@@ -42,7 +41,7 @@ function useGovDao() {
   const page = realmView(GOVDAO, site.universeAt(useLocation().pathname));
   const at = realmAt(page);
   const { data, error } = useQuery(
-    { ...proposalsOptions(at?.chain.rpc ?? "", GOVDAO), staleTime: FIVE_MINUTES, enabled: at !== undefined },
+    { ...proposalsOptions(at?.chain.rpc ?? "", GOVDAO), enabled: at !== undefined },
     queryClient,
   );
   const read = data ?? (isUnread<ChainRead<Proposal[]>>(error) ? error.read : undefined);

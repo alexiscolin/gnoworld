@@ -8,5 +8,5 @@ export interface StackProps extends Composed {
 
 /** Its children one under the other, a space step apart. */
 export function Stack({ justify = "start", ...rest }: StackProps) {
-  return place({ ...rest, className: styles["stack"], own: { "data-justify": justify } });
+  return place({ ...rest, composition: styles["stack"], own: { "data-justify": justify } });
 }

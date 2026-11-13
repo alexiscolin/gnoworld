@@ -104,6 +104,13 @@
     background: var(--color-mine-line);
   }
 
+  /* Forced colours repaint the line's fill: the focus takes a ring instead. */
+  @media (forced-colors: active) {
+    .separator:focus-visible {
+      outline: var(--focus-width) solid Highlight;
+    }
+  }
+
   .conversation {
     /* layout: the conversation takes the width the other regions leave; a column of its own parts */
     display: flex;
@@ -114,6 +121,35 @@
     /* layout: a flex item shrinks below its content only with this, so the regions scroll and the page does not */
     min-inline-size: 0;
     min-block-size: 0;
+  }
+
+  /* A band over the columns (`band`), from the page header's foot, out of their flow: its row on the lines' own edge, its controls alone
+     taking a click; the columns from its foot, under a rule across the window; the conversation's lines under its title. */
+  .frame[data-band] > .header {
+    /* layout: the band over the columns' top, out of their way */
+    position: absolute;
+    inset-block-start: var(--banner-under);
+    inset-inline: 0;
+    /* layout: the title on the lines' own edge (the app's room), past the band's padding */
+    /* raw: no inset where the chat sets none, the lines' 32 px then */
+    padding-inline-start: calc(var(--space-m) + max(var(--chat-inset, 0px), var(--space-l)));
+    border-block-end: 0;
+    pointer-events: none;
+  }
+
+  .frame[data-band] > .header :is(a, button) {
+    pointer-events: auto;
+  }
+
+  .frame[data-band] > .header + * {
+    /* layout: the columns under the page's header, the band out of their flow */
+    margin-block-start: var(--banner-under);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  .frame[data-band] .conversation {
+    /* layout: the conversation's lines under its title */
+    padding-block-start: var(--chat-head);
   }
 
   /* The app says the chat is compact (one measure, one breakpoint: the conversation alone, the rooms behind a control). */

@@ -79,6 +79,11 @@
     }
   }
 
+  /* Bare rows (a thread's) draw no bar: they keep clear of the times' column alone, wide or narrow. */
+  .lines[data-bare] > li {
+    --_gutter: var(--chat-times);
+  }
+
   /* A line's foot: its reactions at the start, its thread's chip at the end, on one row; no row when it holds neither. */
   .foot {
     /* layout: the two on one row, the chips wrapping where they are many */
@@ -267,8 +272,6 @@
      whole in its title (UX review U2, U8). */
   .typing {
     padding-inline: var(--chat-inset);
-    font: var(--font-meta);
-    color: var(--color-text-muted);
     /* layout: one line of this font, which no token names */
     min-block-size: 1lh;
     /* layout: a step above and below, parting the line from the last message and the format bar */

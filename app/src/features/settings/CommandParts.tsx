@@ -2,7 +2,7 @@
 import { Button, Field, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent } from "react";
 import type { CliChallenge } from "../../lib/api/links.ts";
-import { canCopy } from "../../lib/copy.ts";
+import { canCopy, copyText } from "../../lib/copy.ts";
 import { clock, useCountdown } from "./useCountdown.ts";
 import styles from "./Settings.module.css";
 
@@ -33,14 +33,11 @@ export function Block({
             <Button
               size="s"
               onClick={() => {
-                navigator.clipboard.writeText(code.block).then(
-                  () => {
-                    onCopied("Copied");
-                  },
-                  () => {
-                    onCopied("Could not copy the block");
-                  },
-                );
+                copyText(code.block)
+                  .then((copied) => {
+                    onCopied(copied ? "Copied" : "Could not copy the block");
+                  })
+                  .catch(reportError);
               }}
             >
               Copy

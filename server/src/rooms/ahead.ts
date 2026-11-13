@@ -21,7 +21,7 @@ export interface AheadOptions {
   /** Waits `ms` between two batches, ending early when the signal aborts. */
   wait?: (ms: number, signal?: AbortSignal) => Promise<void>;
   /** The worlds file read once for the route too; the file alone when none. */
-  listing?: Listing;
+  listing?: Pick<Listing, "paths" | "stamp">;
   /** A realm's room, core's realmRoom unless a test counts the calls. */
   roomOf?: typeof realmRoom;
   /** The paths whose room is kept in memory. */

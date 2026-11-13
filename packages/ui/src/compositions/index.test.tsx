@@ -56,6 +56,43 @@ describe.each(ALL)("%s", (_, Composition) => {
     );
     expect(only(container).dataset["space"]).toBe("s");
   });
+
+  it("takes a block's own class, an id and ARIA beside its own class and step", () => {
+    const { container } = render(
+      <Composition as="ul" className="lines" id="room-lines" aria-label="Messages">
+        <li>gm</li>
+      </Composition>,
+    );
+    const box = only(container);
+    expect(box.classList).toContain("lines");
+    expect(box.classList.length).toBeGreaterThan(1);
+    expect(box.id).toBe("room-lines");
+    expect(screen.getByRole("list", { name: "Messages" })).toBe(box);
+    expect(box.dataset["space"]).toBe("s");
+  });
+
+  it("may be a list's item", () => {
+    const { container } = render(
+      <ul>
+        <Composition as="li">
+          <span>GovDAO</span>
+        </Composition>
+      </ul>,
+    );
+    expect(screen.getByRole("listitem").parentElement).toBe(only(container));
+  });
+
+  // The type is the composition's own, which the lint cannot see through `as`.
+  it.each(["button"] as const)("may be a %s that submits nothing", (element) => {
+    const { container } = render(
+      <Composition as={element} aria-expanded={false}>
+        <span>Proposal 15</span>
+      </Composition>,
+    );
+    const button = screen.getByRole("button", { name: "Proposal 15", expanded: false });
+    expect(button).toBe(only(container));
+    expect(button.getAttribute("type")).toBe("button");
+  });
 });
 
 describe("each composition's own choice", () => {
@@ -71,10 +108,17 @@ describe("each composition's own choice", () => {
   it("Grid's columns are at least the medium column, or as asked", () => {
     const { container, rerender } = render(<Grid>a</Grid>);
     expect(only(container).dataset["min"]).toBe("m");
-    for (const min of ["s", "l"] as const) {
-      rerender(<Grid min={min}>a</Grid>);
-      expect(only(container).dataset["min"]).toBe(min);
-    }
+    rerender(<Grid min="s">a</Grid>);
+    expect(only(container).dataset["min"]).toBe("s");
+  });
+
+  // The blocks' own rows (Disclosure's) draw these two with the utility classes: one definition for both.
+  it("Grid draws the text-meta and icon-text-meta templates with the utility classes of the same names", () => {
+    const { container, rerender } = render(<Grid template="text-meta">a</Grid>);
+    expect(only(container).classList).toContain("text-meta");
+    rerender(<Grid template="icon-text-meta">a</Grid>);
+    expect(only(container).classList).toContain("icon-text-meta");
+    expect(only(container).classList).not.toContain("text-meta");
   });
 
   it("Sidebar's side is its first child unless asked for the last", () => {
@@ -84,21 +128,11 @@ describe("each composition's own choice", () => {
     expect(only(container).dataset["side"]).toBe("end");
   });
 
-  it("Center holds a reading measure unless asked for a dialog's width", () => {
+  it("Center holds a reading measure unless asked for the whole page", () => {
     const { container, rerender } = render(<Center>a</Center>);
     expect(only(container).dataset["max"]).toBe("measure");
-    rerender(<Center max="dialog">a</Center>);
-    expect(only(container).dataset["max"]).toBe("dialog");
     rerender(<Center max="page">a</Center>);
     expect(only(container).dataset["max"]).toBe("page");
-  });
-
-  // F2164: the header sat against the viewport's top edge, its gutter being inline only.
-  it("Center's gutter is inline unless asked for all four edges", () => {
-    const { container, rerender } = render(<Center>a</Center>);
-    expect(only(container).dataset["gutter"]).toBe("inline");
-    rerender(<Center gutter="all">a</Center>);
-    expect(only(container).dataset["gutter"]).toBe("all");
   });
 });
 

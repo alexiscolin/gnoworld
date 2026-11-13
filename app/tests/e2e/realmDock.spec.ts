@@ -1,10 +1,11 @@
-import { indexer } from "../chain/indexerRoute.ts";
+import { chain } from "../chain/rpcRoute.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 
-// A realm page whose room cannot be made says so in its dock, with a way to try again: never an empty column (slice 13).
+// A realm page whose room cannot be made says so in its dock, with a way to try again: never an empty column. The chain reads its page,
+// as no room is asked for a realm nothing proved.
 test.describe("a realm page's dock when its room is not made", () => {
   test("says it, and asks the server again on Try again", async ({ page }) => {
-    await indexer(page);
+    await chain(page, { "gno.land/r/demo/hostile": "# hostile" });
     let asks = 0;
     await page.route("**/api/rooms/realm", async (route) => {
       asks += 1;
@@ -17,9 +18,10 @@ test.describe("a realm page's dock when its room is not made", () => {
     await page.goto("/r/demo/hostile");
     await hydrated(page);
     const dock = page.locator("[data-dock]");
-    await expect(dock.getByRole("alert")).toContainText("could not be opened");
+    const said = dock.getByRole("status").filter({ hasText: "The server is not answering." });
+    await expect(said).toBeVisible();
     await dock.getByRole("button", { name: "Try again" }).click();
     await expect.poll(() => asks).toBe(2);
-    await expect(dock.getByRole("alert")).toBeVisible();
+    await expect(said).toBeVisible();
   });
 });

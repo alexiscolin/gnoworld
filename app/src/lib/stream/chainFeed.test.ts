@@ -1,4 +1,4 @@
-import { Address, type ChainEvent, type RealmsDeployed } from "@gnoworld/schemas";
+import { Address, type ChainEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
@@ -68,23 +68,13 @@ describe("the chain's feed", () => {
     expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]).toHaveLength(17);
   });
 
-  it("puts a deploy in the ticker's, and a call in its world's, whatever order they came", () => {
+  it("puts a call in its world's lines, and a deploy or a frame that fails its schema nowhere", () => {
     const { store, say } = page();
     say("chain", deploy(5));
     say("chain", call(6));
+    say("chain", { ...call(7), func: "<img src=x>" });
     vi.advanceTimersByTime(BATCH_MS);
-    expect(store.getState().deploys.map(({ height }) => height)).toEqual([5]);
     expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.map(({ height }) => height)).toEqual([6]);
-  });
-
-  it("puts the count in the store at once, from the frame, and a frame that fails its schema nowhere", () => {
-    const { store, say } = page();
-    say("realms", { universe: "onyx", count: 17, height: 908297 });
-    say("realms", { universe: "onyx", count: -1, height: 1 });
-    say("chain", { ...call(1), func: "<img src=x>" });
-    vi.advanceTimersByTime(BATCH_MS);
-    expect(store.getState().realmsDeployed["onyx"]?.count).toBe(17);
-    expect(store.getState().chainByWorld).toEqual({});
   });
 
   it("opens a new window for the next burst, and drops what it holds when the page leaves", () => {
@@ -111,27 +101,23 @@ describe("the chain's feed", () => {
 
 // What the page hears, event by event, through the schemas: what the server sends is outside data to the page too, and a frame that
 // fails is dropped and said once, as a verdict or a signal is.
-const COUNT: RealmsDeployed = { universe: "onyx", count: 17, height: 908297 };
 const bidi = String.fromCodePoint(0x202e);
 const CALL: ChainEvent = call(900030);
 
 function feedOf() {
   vi.useFakeTimers();
   const heard = vi.fn<(events: readonly ChainEvent[]) => void>();
-  const counted = vi.fn<(count: RealmsDeployed) => void>();
   const log = vi.fn<(what: string) => void>();
-  const feed = chainFeed({ heard, counted }, log);
-  return { feed, heard, counted, log };
+  const feed = chainFeed({ heard }, log);
+  return { feed, heard, log };
 }
 
 describe("the chain's events on the page's stream", () => {
-  it("hands on a chain event and a count that pass their schemas", () => {
-    const { feed, heard, counted } = feedOf();
+  it("hands on a chain event that passes its schema", () => {
+    const { feed, heard } = feedOf();
     feed.chain(JSON.stringify(CALL));
-    feed.realms(JSON.stringify(COUNT));
     vi.advanceTimersByTime(BATCH_MS);
     expect(heard).toHaveBeenCalledWith([CALL]);
-    expect(counted).toHaveBeenCalledWith(COUNT);
   });
 
   it.each([
@@ -150,15 +136,6 @@ describe("the chain's events on the page's stream", () => {
     expect(heard).not.toHaveBeenCalled();
     expect(log).toHaveBeenCalledTimes(1);
     expect(log).toHaveBeenCalledWith("chain_unknown");
-  });
-
-  it("drops a count that fails its schema, and says it once", () => {
-    const { feed, counted, log } = feedOf();
-    feed.realms(JSON.stringify({ ...COUNT, count: -1 }));
-    feed.realms(JSON.stringify({ ...COUNT, count: "17" }));
-    expect(counted).not.toHaveBeenCalled();
-    expect(log).toHaveBeenCalledTimes(1);
-    expect(log).toHaveBeenCalledWith("realms_unknown");
   });
 
   it("holds 1,000 events at most while a window waits: the oldest are the ones dropped", () => {

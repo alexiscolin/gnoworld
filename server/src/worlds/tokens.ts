@@ -133,6 +133,8 @@ async function walkTokens(
 /** What a pass of the tokens reads and writes with. */
 export interface TokenPass {
   readonly db: DatabaseSync;
+  /** The store the server's route reads too, so a reset clears its answers as well; made from `db` when none. */
+  readonly store?: TokenStore | undefined;
   readonly log: Log;
   readonly reader: Reader & { readonly page?: number };
   readonly universe: string;
@@ -164,7 +166,7 @@ const replayed =
 export async function readTokens(pass: TokenPass): Promise<{ ok: true } | { ok: false; kind: Kind }> {
   let store: TokenStore;
   try {
-    store = tokenStore(pass.db, pass.universe);
+    store = pass.store ?? tokenStore(pass.db, pass.universe);
   } catch {
     return { ok: false, kind: "write" };
   }
@@ -188,6 +190,7 @@ export async function readTokens(pass: TokenPass): Promise<{ ok: true } | { ok: 
 /** The pass the rollup's pass ends with: a fault is logged by its kind and the next pass tries again. */
 export async function runTokens(pass: {
   readonly rollup?: { readonly db: DatabaseSync } | undefined;
+  readonly tokens?: TokenStore | undefined;
   readonly log: Log;
   readonly send: Send;
   readonly universe: { readonly id: string; readonly indexer: string };
@@ -198,6 +201,14 @@ export async function runTokens(pass: {
   const { rollup, universe, log, isStopped } = pass;
   if (rollup === undefined || isStopped()) return;
   const reader = { send: pass.send, indexer: universe.indexer, pace: pass.pace };
-  const read = await readTokens({ db: rollup.db, log, reader, universe: universe.id, isStopped, now: pass.now });
+  const read = await readTokens({
+    db: rollup.db,
+    store: pass.tokens,
+    log,
+    reader,
+    universe: universe.id,
+    isStopped,
+    now: pass.now,
+  });
   if (!read.ok) log("worlds_tokens_failed", { error: read.kind });
 }

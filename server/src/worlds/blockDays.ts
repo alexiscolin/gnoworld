@@ -1,5 +1,6 @@
-// The UTC day of a call (slice 13a), from its block's own time as the indexer gives it: a few blocks asked per day boundary by bisection,
-// never a height-to-date line, fifty to a request (onyx-1 answered fifty in 246 ms, onyxRollup.json).
+// The UTC day of a call (slice 13a), from its block's own time as the indexer gives it: a few rounds of blocks asked per day boundary, each
+// span cut into as many parts as a request holds, never a height-to-date line, fifty to a request (onyx-1 answered fifty in 246 ms,
+// onyxRollup.json).
 import { blockTimes } from "@gnoworld/chain/asks";
 import { z } from "zod";
 import { request, type Reading } from "./history.ts";
@@ -46,31 +47,34 @@ export async function timesOf(reading: Reading, heights: readonly number[]): Pro
   return times;
 }
 
-// One span of sorted heights whose ends' times are known: each height dated when both ends fall on one day, each end its own when they are
-// next to each other, else the span cut at its middle, whose height is asked next.
-function settle(
+// Whether a span of sorted heights whose ends' times are known is dated: each height when both ends fall on one day, each end its own when
+// they are next to each other; else it is to be cut.
+function dated(
   sorted: readonly number[],
-  span: readonly [number, number],
+  [lo, hi]: readonly [number, number],
   known: { times: Map<number, string>; days: Map<number, string> },
-) {
-  const [lo, hi] = span;
+): boolean {
   const timeAt = (i: number) => known.times.get(sorted[i] ?? -1) ?? "";
   const [low, high] = [timeAt(lo), timeAt(hi)];
   if (low > high) throw new Failure("shape");
-  if (low.slice(0, 10) === high.slice(0, 10) || hi - lo <= 1) {
-    for (let i = lo; i <= hi; i += 1) {
-      const height = sorted[i] ?? -1;
-      known.days.set(height, (known.times.get(height) ?? low).slice(0, 10));
-    }
-    return [];
+  if (low.slice(0, 10) !== high.slice(0, 10) && hi - lo > 1) return false;
+  for (let i = lo; i <= hi; i += 1) {
+    const height = sorted[i] ?? -1;
+    known.days.set(height, (known.times.get(height) ?? low).slice(0, 10));
   }
-  const middle = (lo + hi) >> 1;
-  return [[lo, middle] as const, [middle, hi] as const];
+  return true;
+}
+
+// A span cut into `parts` at evenly spread heights, at most one a height.
+function cut([lo, hi]: readonly [number, number], parts: number): (readonly [number, number])[] {
+  const cuts = Math.min(parts, hi - lo);
+  const bounds = Array.from({ length: cuts + 1 }, (_, k) => lo + Math.round((k * (hi - lo)) / cuts));
+  return bounds.slice(1).map((end, k) => [bounds[k] ?? lo, end] as const);
 }
 
 /**
- * The UTC day of each height, from the times `ask` gives: the two ends first, then the middle of each span whose ends fall on two days, one
- * request a round, until each span holds one day or none between its ends. A time that goes back as height rises fails.
+ * The UTC day of each height, from the times `ask` gives: the two ends first, then evenly spread heights of each span whose ends fall on two
+ * days, a request's worth a round, until each span holds one day or none between its ends. A time that goes back as height rises fails.
  */
 export async function daysOf(
   heights: readonly number[],
@@ -82,9 +86,13 @@ export async function daysOf(
   let probes = [...new Set([sorted[0] ?? -1, sorted.at(-1) ?? -1])];
   while (spans.length > 0) {
     for (const [height, time] of await ask(probes)) known.times.set(height, new Date(time).toISOString());
-    spans = spans.flatMap((span) => settle(sorted, span, known));
-    // A cut span comes back as two, the first ending at its middle.
-    probes = spans.filter((_, i) => i % 2 === 0).map(([, hi]) => sorted[hi] ?? -1);
+    const open = spans.filter((span) => !dated(sorted, span, known));
+    const parts = Math.max(2, Math.floor(BLOCKS_PER_ASK / Math.max(1, open.length)));
+    spans = open.flatMap((span) => cut(span, parts));
+    // The new ends of the cut spans, each asked once.
+    probes = [...new Set(spans.flatMap(([lo, hi]) => [sorted[lo] ?? -1, sorted[hi] ?? -1]))].filter(
+      (height) => !known.times.has(height),
+    );
   }
   return known;
 }

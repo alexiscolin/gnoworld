@@ -82,6 +82,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the evals gate blind to a lacking case" "the evals gate refuses a result that lacks a case" gate_py sed 's/lacking = sorted(wanted - passed.keys())/lacking = []; passed.update({case: True for case in wanted - passed.keys()})/'
 	mutant "the evals gate keeping the last row of a case" "the evals gate refuses a case seen twice when one row failed" gate_py sed 's/passed.get(key, True) and row\["success"\]/row["success"]/'
 	mutant "the evals gate reading any file name" "the evals gate reads only files named by their time" gate_py sed 's/if named.match(name)/if name.endswith(".json")/'
+	mutant "the evals gate blind to the code it judged" "the evals gate refuses a result of other code" gate_py sed 's/or judged != fingerprint:/or False:/'
 	# The reader's faults that need no code: its port on every address, a host off the relay's list, the relay open to a name
 	# its way out would still refuse (both lists given Anthropic's API), a container joined to the reader's network, the door's
 	# key not asked.
@@ -117,9 +118,12 @@ for suite, ids in suites.items():
         rows.append({"success": ok, "testCase": {"description": "%s/%s: about it" % (suite, i)}})
         if repeated and suite == "injection" and i == "a": rows.append({"success": True, "testCase": {"description": "%s/%s: about it" % (suite, i)}})
 json.dump({"results": {"results": rows}}, open("%s/results/%s.json" % (out, stamp), "w"))
-' "$1" "$2" "$3" "$4" "$5" "${6:-2026-11-11T000000Z}" "${7:-0}"
+open("%s/results/%s.fingerprint" % (out, stamp), "w").write(sys.argv[8] + "\n")
+' "$1" "$2" "$3" "$4" "$5" "${6:-2026-11-11T000000Z}" "${7:-0}" "$fingerprint"
 }
-gate_answer() { python3 -I "$gate" "$1/results" "$1/cases" 2>&1 || true; }
+# What this checkout's results are judged on (evals/fingerprint.ts), which jarvis-on.sh hands the gate too.
+fingerprint=$(node "$repo/evals/fingerprint.ts")
+gate_answer() { python3 -I "$gate" "$1/results" "$1/cases" "$fingerprint" 2>&1 || true; }
 gate_passes() { case $(gate_answer "$2") in ok) pass "$1" ;; *) fail "$1: $(gate_answer "$2")" ;; esac; }
 gate_refuses() { case $(gate_answer "$2") in ok) fail "$1" ;; *) pass "$1" ;; esac; }
 mkdir "$tmp/gate"
@@ -146,6 +150,12 @@ gate_refuses "the evals gate refuses a case seen twice when one row failed" "$tm
 synth "$tmp/gate/named" 10 0 1 0 2026-11-10T000000Z
 synth "$tmp/gate/named" 10 1 1 0 manual
 gate_refuses "the evals gate reads only files named by their time" "$tmp/gate/named"
+synth "$tmp/gate/other" 10 1 1 0
+printf '%064d\n' 0 >"$tmp/gate/other/results/2026-11-11T000000Z.fingerprint"
+gate_refuses "the evals gate refuses a result of other code" "$tmp/gate/other"
+synth "$tmp/gate/unjudged" 10 1 1 0
+rm "$tmp/gate/unjudged/results/2026-11-11T000000Z.fingerprint"
+gate_refuses "the evals gate refuses a result with no fingerprint beside it" "$tmp/gate/unjudged"
 # jarvis-on.sh: the one way to write JARVIS=on, through the same gate.
 on_script=$here/jarvis-on.sh
 printf 'ORIGINS=https://x.test\nJARVIS=off\n' >"$tmp/gate/env.yes"
@@ -158,6 +168,7 @@ expect "jarvis-on.sh writes nothing when the gate refuses" "$(grep -c '^JARVIS='
 mkdir -p "$tmp/gate/garbage/results"
 cp -r "$tmp/gate/all/cases" "$tmp/gate/garbage/cases"
 printf '{"results": []}' >"$tmp/gate/garbage/results/2026-11-11T000000Z.json"
+printf '%s\n' "$fingerprint" >"$tmp/gate/garbage/results/2026-11-11T000000Z.fingerprint"
 gate_refuses "the evals gate refuses a result it cannot read" "$tmp/gate/garbage"
 
 # --no-deps: the demo's services, proven already, are neither rebuilt nor recreated under the checks (F5302).

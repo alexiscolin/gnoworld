@@ -38,8 +38,6 @@
     margin-block: 0;
     /* raw: two short lines, so it stays clear of the hero's markets at 900 px */
     max-inline-size: 24ch;
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 
   .status:not(:empty) {
@@ -60,12 +58,12 @@
     padding-inline: var(--space-3xs);
     color: var(--color-text-muted);
     /* raw: the design system's 11 px Credits */
-    font: 400 11px/1 var(--family-sans);
+    font: 400 0.6875rem/1 var(--family-sans);
     cursor: pointer;
   }
 
   /* Under the plate's breakpoint no margin holds it: it lies over the page's words. */
-  @media (max-width: 1279px) {
+  @media (width < 1280px) {
     .credits {
       inset-block-end: var(--space-3xs);
       padding-block: var(--space-3xs);
@@ -75,7 +73,7 @@
   }
 
   /* On a phone it stands where the offer stood, above the views' bar. */
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .credits {
       inset-block-end: calc(var(--size-bar) + 3 * var(--space-s));
     }
@@ -97,7 +95,7 @@
   }
 
   /* Where the rail stands (core's RAIL.from), the word is centred on the rail's column, under its See all (Alexis, 2026-11-10). */
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     :root:has([data-rail]) .credits {
       /* layout: the rail's own width (Rail.module.css) */
       inline-size: calc(var(--_footprint) - var(--page-edge));
@@ -106,7 +104,7 @@
   }
 
   /* Level with the hero's foot, left of the rail's column (frames 4 and 17: 118 px wide, 25 from the edge). */
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .offer,
     .status {
       inset-block-end: var(--space-l);

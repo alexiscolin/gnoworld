@@ -2,7 +2,7 @@
 // each a rocky world of the product's own look (moonLook.ts), the size of its room's activity on a log scale, flaring when it speaks. The
 // first stands on the orbit the page draws, near the camera and in front of the planet, for depth; the others stand farther out, leaning.
 // A frame moves their angles alone, held under reduced motion. No room, no moon.
-import { EARTH } from "@gnoworld/core";
+import { damp, EARTH } from "@gnoworld/core";
 import {
   Group,
   LineSegments,
@@ -88,7 +88,7 @@ export class Moons {
       for (const slot of this.#slots) slot.alpha = 0;
     } else if (planet !== this.#of) this.#arrive(planet, view);
     if (this.#dirty && !gone) this.#sync(planet.id === EARTH ? 1 : MOONS_MOST, clock.still);
-    const ease = clock.still ? 1 : 1 - Math.exp(-delta / EASE_S);
+    const ease = clock.still ? 1 : damp(delta, EASE_S);
     this.group.visible = false;
     for (const shadow of this.shadows) shadow.w = 0;
     if (planet !== undefined) placeOf(planet, clock.seconds, this.#at);

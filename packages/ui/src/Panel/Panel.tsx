@@ -28,6 +28,7 @@ export function Panel({ label, look = "docked", caption, children }: PanelProps)
       className={styles["panel"]}
       aria-label={label}
       data-look={look}
+      data-world={look === "plate" ? "" : undefined}
       ref={(panel) => {
         // Set through the element's own style, never as a style attribute in the page: the policy refuses one (csp.ts).
         if (look !== "plate" || panel === null) return;
@@ -40,6 +41,7 @@ export function Panel({ label, look = "docked", caption, children }: PanelProps)
           <Kicker vertical>{caption}</Kicker>
         </div>
       ) : null}
+      {look === "plate" ? <span className={styles["fill"]} aria-hidden="true" data-fill="" /> : null}
       <div className={styles["content"]} data-content="">
         <Stack space="m">{children}</Stack>
       </div>

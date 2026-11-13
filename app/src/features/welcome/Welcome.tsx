@@ -3,9 +3,10 @@ import { Button, Card, Cluster, IconButton } from "@gnoworld/ui";
 import { useState, type KeyboardEvent, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 import { fullChatHref, leaveDock } from "../../fullChat.ts";
+import { askFor } from "../../pageAsks.ts";
 import { site } from "../../places.ts";
+import { focusComposer } from "../chat/index.ts";
 import { adenaHere, askGetStarted } from "../login/index.ts";
-import { focusComposer } from "./focusComposer.ts";
 import { seen } from "./seen.ts";
 import styles from "./Welcome.module.css";
 
@@ -14,6 +15,8 @@ export function Welcome() {
   const [open, setOpen] = useState(true);
   const navigate = useNavigate();
   const universe = site.universeAt(useLocation().pathname);
+  // With Adena in the page, its own connect: Get started's dialog is for a reader with none.
+  const adena = adenaHere();
   // Any use closes it for good.
   const using = (act: (from: HTMLElement) => void) => (event: MouseEvent<HTMLElement>) => {
     seen();
@@ -54,8 +57,18 @@ export function Welcome() {
         </Card.Body>
         <Card.Actions>
           <Cluster space="2xs" wrap="no">
-            <Button size="s" emphasis="solid" onClick={using(askGetStarted)}>
-              {adenaHere() ? "Connect Adena" : "Get started"}
+            <Button
+              size="s"
+              emphasis="solid"
+              onClick={using(
+                adena
+                  ? () => {
+                      askFor("log-in");
+                    }
+                  : askGetStarted,
+              )}
+            >
+              {adena ? "Connect Adena" : "Get started"}
             </Button>
             <Button size="s" emphasis="outline" onClick={using(sayHi)}>
               Say hi

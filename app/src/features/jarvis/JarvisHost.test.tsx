@@ -128,7 +128,7 @@ describe("Jarvis's host", () => {
     await settled(() => cards("#a3", ME).textContent.includes("Nothing new."));
   });
 
-  it("holds one ask in flight an account in a room: a second Catch up waits for the first", async () => {
+  it("holds one ask in flight an account in a room: a second Catch up while the first runs is not asked again", async () => {
     page([["#a4", ME]]);
     tell(place("#a4", ME));
     ask("jarvis-catch-up");
@@ -136,6 +136,44 @@ describe("Jarvis's host", () => {
     ask("jarvis-catch-up");
     await act(() => Promise.resolve());
     expect(bodies).toHaveLength(1);
+    act(() => held.get("#a4")?.(answered("Nothing new.")));
+    await act(() => new Promise((done) => setTimeout(done, 20)));
+    expect(bodies).toHaveLength(1);
+  });
+
+  it("asks a question sent while another is in flight once the first has its answer, never losing it", async () => {
+    const cards = page([["#a7", ME]]);
+    tell(place("#a7", ME));
+    act(() => {
+      askJarvis("first?");
+    });
+    await settled(() => bodies.length === 1);
+    act(() => {
+      askJarvis("second?");
+    });
+    await act(() => Promise.resolve());
+    expect(bodies).toHaveLength(1);
+    act(() => held.get("#a7")?.(answered("One.")));
+    await settled(() => bodies.length === 2);
+    expect(bodies[1]).toEqual({ question: "second?", room: "#a7" });
+    await settled(() => cards("#a7", ME).textContent.includes("One."));
+    expect(cards("#a7", ME).textContent).toContain("reading");
+  });
+
+  it("asks each of several questions taken at once, one after the other", async () => {
+    page([["#a8", ME]]);
+    tell(place("#a8", ME));
+    act(() => {
+      askJarvis("a?");
+      askJarvis("b?");
+    });
+    await settled(() => bodies.length === 1);
+    act(() => held.get("#a8")?.(answered("A.")));
+    await settled(() => bodies.length === 2);
+    expect(bodies).toEqual([
+      { question: "a?", room: "#a8" },
+      { question: "b?", room: "#a8" },
+    ]);
   });
 
   it("gives an answer to the room it was asked in: a late answer for room A never takes room B's pending ask", async () => {

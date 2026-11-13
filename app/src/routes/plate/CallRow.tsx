@@ -7,7 +7,7 @@ import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { PersonLink } from "../../features/chat/index.ts";
 import { Fact } from "../../features/calls/index.ts";
 import { agoText, HOUR_MS, utcMoment } from "../../lib/days.ts";
-import { callerName } from "./names.ts";
+import { callerName } from "../../features/realms/worldsIndex.ts";
 import styles from "./CallRow.module.css";
 
 type Call = RealmRollup["last"][number];
@@ -52,7 +52,7 @@ export function CallRow({
           </Cluster>
         }
         trail={
-          <span className={styles["when"]}>
+          <span className="data-text">
             <time>{when(time, height)}</time>
             {success ? null : <span className={styles["failed"]}> failed</span>}
           </span>
@@ -76,7 +76,7 @@ export function CallRow({
                           <span>{who}</span>
                         </Cluster>
                       </PersonLink>
-                      <span className={styles["address"]}>{caller}</span>
+                      <span className="data-text">{caller}</span>
                     </Stack>
                   )}
                 </Line>

@@ -52,6 +52,17 @@ describe("a field read from the device", () => {
       expect(device.read(field)).toEqual(DEVICE_EMPTY[field]);
   });
 
+  it("removes the key of the reminders field, which no page reads any more", () => {
+    held.words.set("gnoworld:device:reminders", "[]");
+    pageDevice().read("stamps");
+    expect(held.words.has("gnoworld:device:reminders")).toBe(false);
+  });
+
+  it("reads a blocked device as unreadable, the removal of that key refused too", () => {
+    held.state.blocked = true;
+    expect(pageDevice().read("stamps")).toBeUndefined();
+  });
+
   it("names each field's key under gnoworld:device:", () => {
     expect(pageDevice().keys.stamps).toBe("gnoworld:device:stamps");
     expect(pageDevice().keys.settings).toBe("gnoworld:device:settings");

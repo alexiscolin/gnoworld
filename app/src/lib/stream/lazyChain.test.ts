@@ -10,9 +10,6 @@ function setup() {
     chain: (data) => {
       told.push(`chain ${String(data)}`);
     },
-    realms: (data) => {
-      told.push(`realms ${String(data)}`);
-    },
     stop,
   };
   const loaded = Promise.withResolvers<ChainFeed>();
@@ -38,12 +35,12 @@ describe("the lazy feed", () => {
   it("loads once on the first event and gives it every event heard meanwhile, in order", async () => {
     const { lazy, load, told, arrive } = setup();
     lazy.chain("a");
-    lazy.realms("b");
+    lazy.chain("b");
     lazy.chain("c");
     expect(load).toHaveBeenCalledTimes(1);
     arrive();
     await vi.waitFor(() => {
-      expect(told).toEqual(["chain a", "realms b", "chain c"]);
+      expect(told).toEqual(["chain a", "chain b", "chain c"]);
     });
   });
 
@@ -73,7 +70,6 @@ describe("the lazy feed", () => {
       chain: (data) => {
         told.push(String(data));
       },
-      realms: () => undefined,
       stop: () => undefined,
     };
     const load = vi.fn<() => Promise<ChainFeed>>().mockRejectedValueOnce(new Error("offline")).mockResolvedValue(feed);

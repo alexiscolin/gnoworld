@@ -1,11 +1,11 @@
 import { readFileSync } from "node:fs";
 import type { Space } from "../../src/space/scene.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { countFlights, flightOf, goInPage, gpuOf, heapOf, landed, running } from "./sceneStage.ts";
+import { countFlights, flightOf, goInPage, gpuOf, heapOf, landed, running, shownLabels } from "./sceneStage.ts";
 
-// Flights (7g; ADR-0001 §7; ADR-0002 §1; frames 18, 19, 36, 88, 89, 101, 128, 129, 142), read off the engine (`__gnoworldSpace`: its rig, its
-// place): the flight to a system the reader aims at, Escape going up a level, a page's flight, a flight under reduced motion, and what twenty
-// flights leave behind (row 7's test, slice 7 §1). Every journey runs under the page's CSP, and fails on a violation (fixtures.ts).
+// Flights (7g; ADR-0001 §7; ADR-0002 §1; frames 18, 19, 36, 88, 89, 101, 128, 129, 142), read off the engine (`__gnoworldSpace`): the flight
+// to a system aimed at, Escape going up a level, the names hidden on the way, a page's flight, one under reduced motion, and what twenty
+// leave behind (row 7's test, slice 7 §1). Every journey runs under the page's CSP, and fails on a violation (fixtures.ts).
 const HOME = "/?test-gpu";
 const FRAME = { width: 1728, height: 1080 };
 // Small enough for twenty flights on the gate's software GPU, wide enough for a computer's layout.
@@ -90,14 +90,7 @@ const otherSystem = (page: Page) =>
 
 const systemPath = (id: string) => `/s/${encodeURIComponent(id)}`;
 
-// The names standing over the canvas: the engine's own layer (`options.labels`) holds them, each as visible as its opacity says.
-const labelsShown = (page: Page) =>
-  page.evaluate(
-    () =>
-      [...(Reflect.get(globalThis, "__gnoworldSpace") as Space).options.labels.children].filter(
-        (label) => Number(getComputedStyle(label).opacity) > 0.05,
-      ).length,
-  );
+const labelsShown = async (page: Page) => (await shownLabels(page)).length;
 
 // Each timed read below runs in the page, a frame at a time: a flight of a second or two is over before a journey's own read comes.
 test("flies to the system aimed at, lands, and goes back up to the universe on Escape", async ({ page }) => {
@@ -118,10 +111,9 @@ test("flies to the system aimed at, lands, and goes back up to the universe on E
   await flown(page);
 });
 
-// Frame 18 keeps its labels beside the flight: a flight leaves them as they are, only the home's dive hides them (the chief, 2026-11-03,
-// after the design review). Read in the page on every frame of the flight past 0.3 of the way, when a label told to go would have faded
-// long since; mid-way no labelled body may be in view, so some frame, not each, holds one.
-test("keeps the labels through a flight, as frame 18 does", async ({ page }) => {
+// No name while a flight runs (D13128; move.ts): they fade as it starts and come back as it lands. Read in the page on every frame of the
+// flight past 0.3 of the way, when a name told to go has faded long since.
+test("hides the names through a flight, and gives them back once it lands", async ({ page }) => {
   await withWorlds(page);
   await home(page);
   await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
@@ -147,7 +139,8 @@ test("keeps the labels through a flight, as frame 18 does", async ({ page }) => 
   await fly(page, to);
   const counts = await shown;
   expect(counts.length).toBeGreaterThan(0);
-  expect(Math.max(...counts), `labels on each frame past 0.3 of the way: ${counts.join(", ")}`).toBeGreaterThan(0);
+  expect(Math.max(...counts), `labels on each frame past 0.3 of the way: ${counts.join(", ")}`).toBe(0);
+  await expect.poll(() => labelsShown(page), SLOW).toBeGreaterThan(0);
 });
 
 // The streaks are the speed pass's: its strength follows the rig's speed, which a flight raises and a view at rest does not.

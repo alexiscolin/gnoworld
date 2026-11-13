@@ -88,4 +88,13 @@
     outline: var(--focus-width) solid var(--color-mine);
     outline-offset: var(--focus-offset);
   }
+
+  /* Forced colours repaint every fill in a few system colours: what only its fill marked as selected, pressed or current gets a ring
+     inside its edge, in the system's colour for a selection; focused, it shows the focus ring instead. */
+  @media (forced-colors: active) {
+    :is([aria-pressed="true"], [aria-selected="true"], [aria-current]:not([aria-current="false"])):not(:focus-visible) {
+      outline: var(--focus-width) solid Highlight;
+      outline-offset: calc(-1 * var(--focus-width));
+    }
+  }
 }

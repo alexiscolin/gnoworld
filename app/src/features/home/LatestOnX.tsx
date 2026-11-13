@@ -5,7 +5,7 @@ import { Card, Grid } from "@gnoworld/ui";
 import { queryOptions, useQuery } from "@tanstack/react-query";
 import universes from "../../../data/universes.json" with { type: "json" };
 import { BLOG_REALM, latestPosts } from "../../lib/chain/blog.ts";
-import { utcDay } from "../../lib/days.ts";
+import { utcShortDay } from "../../lib/days.ts";
 import { OutLinks } from "../../OutLinks.tsx";
 import styles from "./LatestOnX.module.css";
 import { gnowebLink } from "../../lib/chain/gnoweb.ts";
@@ -29,7 +29,7 @@ const blogOptions = (rpc: string) =>
   });
 
 // The blog posts are dated in UTC on chain: the day stays UTC.
-const dayOf = (date: string) => utcDay(new Date(date), new Date());
+const dayOf = (date: string) => utcShortDay(new Date(date), new Date());
 
 export function LatestOnX() {
   const rpc = chain?.rpc ?? "";

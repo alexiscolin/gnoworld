@@ -3,6 +3,7 @@ import { rollupName } from "@gnoworld/core";
 import { RealmRollup, ROLLUP_MAX_GZIP, type Worlds } from "@gnoworld/schemas/indexer";
 import { openDatabase } from "@gnoworld/service/db";
 import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { gzipSync } from "node:zlib";
@@ -177,9 +178,21 @@ describe("daysOf, the UTC day of each height from the blocks' times", () => {
     const { asks, timesOf } = prober(timeAt);
     const { days } = await daysOf(heights, timesOf);
     for (const height of heights) expect(days.get(height)).toBe(timeAt(height).slice(0, 10));
-    // Two ends, then for each boundary one probe per halving of 20,000.
-    expect(asks.flat().length).toBeLessThanOrEqual(2 + boundaries * (Math.ceil(Math.log2(heights.length)) + 1));
-    expect(asks.length).toBeLessThanOrEqual(Math.ceil(Math.log2(heights.length)) + 2);
+    // Two ends, then a request's worth of heights a round around each boundary: a few rounds, never a height a call.
+    expect(Math.max(...asks.map((asked) => asked.length))).toBeLessThanOrEqual(BLOCKS_PER_ASK);
+    expect(asks.length).toBeLessThanOrEqual(5);
+    expect(asks.flat().length).toBeLessThan(heights.length / 100);
+  });
+
+  it(`dates a page of 2,000 calls across a midnight in 3 rounds of ${String(BLOCKS_PER_ASK)} heights at most, never a bisection's 12`, async () => {
+    const start = Date.UTC(2026, 0, 1, 20);
+    const timeAt = (height: number) => new Date(start + height * 1_200).toISOString();
+    const heights = Array.from({ length: 2_000 }, (_, i) => i * 13);
+    const { asks, timesOf } = prober(timeAt);
+    const { days } = await daysOf(heights, timesOf);
+    for (const height of heights) expect(days.get(height)).toBe(timeAt(height).slice(0, 10));
+    expect(asks.length).toBeLessThanOrEqual(3);
+    expect(Math.max(...asks.map((asked) => asked.length))).toBeLessThanOrEqual(BLOCKS_PER_ASK);
   });
 
   it("asks only the two ends for heights of one day, and one for one height", async () => {
@@ -388,7 +401,7 @@ describe("rollupStore, the rollup's state in sqlite", () => {
     expect(file?.calls).toBe(250_000 - Math.ceil(250_000 / 3));
     expect(file?.days.map(({ day }) => day)).toEqual(Array.from({ length: 400 }, (_, i) => dayOf(lastDay - 399 + i)));
     expect(new Set(file?.top.map(({ address }) => address))).toEqual(
-      new Set(Array.from({ length: 20 }, (_, i) => addressOf(i))),
+      new Set(Array.from({ length: 20 }, (_, i) => realAddressOf(i))),
     );
     expect(file?.functions.map(({ name }) => name.slice(0, 3))).toEqual(Array.from({ length: 100 }, () => "Hot"));
     expect(file?.importers.total).toBe(5_000);
@@ -444,8 +457,14 @@ describe("rollupStore, the rollup's state in sqlite", () => {
 const START = Date.UTC(2025, 0, 1);
 const dayOf = (day: number) => new Date(START + day * DAY_MS).toISOString().slice(0, 10);
 // A caller of call `i`: one of 20 busy ones every tenth call, else one of 5,000 drawn by `random`.
+// An address as random as a real one, so the file compresses no better than a chain's would.
+const realAddressOf = (n: number): string =>
+  `g1${[...createHash("sha512").update(String(n)).digest()]
+    .slice(0, 38)
+    .map((byte) => BECH32[byte % 32] ?? "q")
+    .join("")}`;
 const busyCaller = (i: number, random: () => number) =>
-  addressOf(i % 10 === 0 ? (i / 10) % 20 : 100 + Math.floor(random() * 5_000));
+  realAddressOf(i % 10 === 0 ? (i / 10) % 20 : 100 + Math.floor(random() * 5_000));
 // A function of call `i`: an odd name every seventh, one of 300 cold ones every fourth, else one of 100 busy ones.
 const busyFunc = (i: number) => {
   if (i % 7 === 0) return `bad name ${String(i % 300)}`;
@@ -822,6 +841,31 @@ describe("writeRollups, the files", () => {
     rollups.reset();
     expect(await writeRollups(folder, worlds, rollups)).toEqual({ written: 0 });
     expect(readdirSync(folder)).toEqual(["keep.txt"]);
+  });
+
+  it("counts the realms whose file its schema refuses, for the pass to log once, and writes the others", async () => {
+    const { rollups } = store();
+    rollups.add([row(5, [call(A), call(A, "Register", "gno.land/r/gnops/other")])], dated({ 5: "2026-09-28" }), 5);
+    const bad: typeof rollups = {
+      ...rollups,
+      rollupOf: (path, importers, at) => {
+        const whole = rollups.rollupOf(path, importers, at);
+        return path === PATH && whole !== undefined ? { ...whole, calls: -1 } : whole;
+      },
+    };
+    const worlds = worldsOf({ gnops: [realmRow(PATH), realmRow("gno.land/r/gnops/other")] });
+    expect(await writeRollups(join(dir, "refused"), worlds, bad)).toEqual({ written: 1, refused: 1 });
+  });
+
+  it("says a write failed, never throws, when reading a realm's state throws", async () => {
+    const { rollups } = store();
+    const failing: typeof rollups = {
+      ...rollups,
+      rollupOf: () => {
+        throw new Error("database is locked");
+      },
+    };
+    expect(await writeRollups(join(dir, "thrown"), worldsOf({ gnops: [realmRow(PATH)] }), failing)).toBe(false);
   });
 
   it("matches the file the job wrote from onyx-1 (onyxValopersRollup.json): the contract the plate reads", () => {

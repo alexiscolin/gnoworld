@@ -55,8 +55,9 @@ function madeChecks(expect: Expect, check: (value: Check) => void): void {
     check((_, { metadata }) => verdict(metadata?.["proposal"] === null, "a proposal was kept"));
 }
 
-/** The assertions of one case's expectations, in the order a reader of the results checks them. */
-export function assertionsOf(expect: Expect): Assertion[] {
+/** The assertions of one case's expectations, in the order a reader of the results checks them; `planted`, a case whose
+ * planted text sits in a recorded source, which fails unless the fake node served it (a case that tests nothing). */
+export function assertionsOf(expect: Expect, planted = false): Assertion[] {
   const checks: Assertion[] = [];
   const check = (value: Check) => {
     checks.push({ type: "javascript", value });
@@ -66,6 +67,8 @@ export function assertionsOf(expect: Expect): Assertion[] {
     return verdict(expect.status.includes(status), `status ${status}, wanted ${expect.status.join(" or ")}`);
   });
   toolChecks(expect, check);
+  if (planted)
+    check((_, { metadata }) => verdict(metadata?.["planted"] === true, "the planted text never reached jarvis"));
   for (const word of expect.contains ?? []) checks.push({ type: "icontains", value: word });
   for (const word of expect.lacks ?? []) checks.push({ type: "not-icontains", value: word });
   madeChecks(expect, check);
@@ -78,7 +81,7 @@ export function assertionsOf(expect: Expect): Assertion[] {
 const testOf = (one: Case & { suite: string }) => ({
   description: `${one.suite}/${one.id}: ${one.about}`,
   vars: { case: JSON.stringify(one), about: one.about },
-  assert: assertionsOf(one.expect),
+  assert: assertionsOf(one.expect, "recorded" in one && one.recorded !== undefined && one.planted !== undefined),
 });
 
 export default function tests() {

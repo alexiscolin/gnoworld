@@ -144,6 +144,20 @@ describe("readCapped", () => {
     const { response } = chunked([wide.subarray(0, 2), wide.subarray(2)]);
     expect(await readCapped(response, 4)).toBe(String.fromCodePoint(0x1f600));
   });
+
+  it("refuses a body that is no UTF-8 by a shape Failure, never as text whose bytes it replaced", async () => {
+    const { response } = chunked([Uint8Array.from([0x7b, 0x22, 0xff, 0x22, 0x7d])]);
+    await expect(readCapped(response, 10)).rejects.toThrow(expect.objectContaining({ kind: "shape" }));
+  });
+
+  it("lets a read that fails rise, as a cut stream does", async () => {
+    const body = new ReadableStream<Uint8Array>({
+      pull() {
+        throw new Error("cut");
+      },
+    });
+    await expect(readCapped(new Response(body), 10)).rejects.toThrow("cut");
+  });
 });
 
 describe("readJson", () => {
@@ -168,6 +182,15 @@ describe("readJson", () => {
     expect(await readJson(new Response('{"a":[1]}'), 8)).toBeUndefined();
     expect(await readJson(new Response("<html>"), 100)).toBeUndefined();
     expect(await readJson(new Response(""), 100)).toBeUndefined();
+  });
+
+  it("reads none of a body that is no UTF-8, though its bytes replaced would be JSON", async () => {
+    expect(await readJson(new Response(Uint8Array.from([0x22, 0xff, 0x22])), 100)).toBeUndefined();
+  });
+
+  it("reads no JSON from a success that has no body at all, a 204, and does not throw", async () => {
+    expect(await readJson(new Response(null, { status: 204 }), 100)).toBeUndefined();
+    expect(await readJson(new Response(null, { status: 200 }), 100)).toBeUndefined();
   });
 });
 

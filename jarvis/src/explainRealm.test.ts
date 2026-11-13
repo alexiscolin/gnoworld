@@ -205,6 +205,27 @@ describe("a realm's explanation", () => {
     expect(empty.model.requests).toHaveLength(0);
   });
 
+  it("logs each failure by its kind alone: no profile, a read that failed, a model that failed, an answer it cannot read", async () => {
+    const failures = (events: () => Record<string, unknown>[]) =>
+      events().filter((event) => event["event"] === "jarvis_explain_failed");
+    const none = setup({ steps: [said(ANSWERS.token)] });
+    await none.ask(undefined, "other-chain");
+    expect(failures(none.events)).toEqual([{ event: "jarvis_explain_failed", reason: "profile" }]);
+    const unread = setup({ read: { ok: false, reason: "timeout" } });
+    await unread.ask();
+    expect(failures(unread.events)).toEqual([{ event: "jarvis_explain_failed", reason: "read" }]);
+    const refused = new APIError(400, { type: "error", error: { type: "invalid_request_error" } }, "no", new Headers());
+    const broken = setup({ steps: [refused] });
+    await broken.ask();
+    expect(failures(broken.events)).toEqual([{ event: "jarvis_explain_failed", reason: "model" }]);
+    const garbled = setup({ steps: [said("not json at all")] });
+    await garbled.ask();
+    expect(failures(garbled.events)).toEqual([{ event: "jarvis_explain_failed", reason: "answer" }]);
+    const fine = setup({ steps: [said(ANSWERS.token)] });
+    await fine.ask();
+    expect(failures(fine.events)).toEqual([]);
+  });
+
   it("says spent, not failed, once the budget is gone, and calls no model", async () => {
     const kit = budgetFor(1);
     closing.push(kit.close);

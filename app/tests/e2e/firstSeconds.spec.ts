@@ -2,19 +2,14 @@ import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { countFlights, flightOf, landed, running } from "./sceneStage.ts";
 
-// The first seconds (ADR-0003): a newcomer's "Start here" in the Earth's label is the one filled call; once a place was entered, the return
-// is the video's (frame 4): the Earth's heat, "Go explore" filled and "Join the chat" beside it. On the software GPU, with the recorded
-// worlds' file.
+// The first seconds (ADR-0003): the return is the video's (frame 4), "Go explore" filled and "Join the chat" beside it. On the software GPU,
+// with the recorded worlds' file.
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1728, height: 1080 };
 const PHONE = { width: 390, height: 844 };
 const RECORDED = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
 const SLOW = { timeout: 90_000 };
 const EARTH_HERE = { world: "earth", here: 184, perHour: 130, rise: 0.21 };
-
-// The crumb's way home from a world's page: 8a's header holds a "Universe" link too.
-const homeByCrumb = (page: Page) =>
-  page.getByRole("navigation", { name: "You are here" }).getByRole("link", { name: "Universe", exact: true }).click();
 
 test.describe.configure({ timeout: 180_000 });
 
@@ -97,90 +92,5 @@ test.describe("a reader who came back", () => {
     const list = page.getByRole("navigation", { name: "Worlds" });
     await expect(list.locator("p").first()).toHaveText("Worlds");
     await expect(list.getByRole("link", { name: "Bubble" })).toBeVisible();
-  });
-});
-
-// The labels' part (ADR-0003, 2b and 2e): "Start here" in the Earth's label, the labels as doors, the larger labels.
-
-const earthLabel = (page: Page) => page.locator("[data-labels] [data-world='earth']");
-
-test.describe("a newcomer's Earth label", () => {
-  test.use({ newcomer: true });
-
-  test("says Start here, the one filled call, enters the Earth at a click, and the return is the video's", async ({
-    page,
-  }) => {
-    await served(page);
-    await arrive(page);
-    await running(page);
-    await landed(page);
-    await expect(earthLabel(page)).toContainText("Start here →", SLOW);
-    await expect(earthLabel(page)).not.toContainText("▲");
-    expect(await filled(explore(page))).toBe(false);
-    // F4509: the Earth's label larger than the others, its call amber with a glow.
-    const start = await earthLabel(page).evaluate((label) => {
-      const other = document.querySelector("[data-labels] [data-world]:not([data-world='earth'])");
-      const probe = document.createElement("i");
-      probe.style.setProperty("color", "var(--color-warm)");
-      document.body.append(probe);
-      const warm = getComputedStyle(probe).color;
-      probe.remove();
-      const [title, , badge] = [...label.children].map((part) => getComputedStyle(part));
-      const size = (part: Element | null | undefined) =>
-        part === null || part === undefined ? 0 : parseFloat(getComputedStyle(part).fontSize);
-      return {
-        larger: parseFloat(title?.fontSize ?? "0") > size(other?.children[0]),
-        warm: badge?.backgroundColor === warm,
-        glow: badge?.boxShadow !== "none",
-      };
-    });
-    expect(start).toEqual({ larger: true, warm: true, glow: true });
-    await page.locator("canvas").evaluate((canvas) => {
-      canvas.style.visibility = "hidden";
-    });
-    await expect(earthLabel(page)).toHaveScreenshot("label-earth-start.png");
-    await page.locator("canvas").evaluate((canvas) => {
-      canvas.style.visibility = "";
-    });
-    // A label moves with the eye on every frame, so it is never still for a click's wait.
-    await earthLabel(page).click({ force: true });
-    await expect(page).toHaveURL(/\/earth$/, SLOW);
-    await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible(SLOW);
-
-    await page.goto(HOME);
-    await hydrated(page);
-    await running(page);
-    await landed(page);
-    await expect(earthLabel(page)).toContainText("▲ 21% · 130/h", SLOW);
-    await expect(earthLabel(page)).not.toContainText("Start here");
-    expect(await filled(explore(page))).toBe(true);
-    await expect(chat(page)).toBeVisible();
-    await chat(page).click();
-    await expect(page).toHaveURL(/\/earth$/, SLOW);
-    // F4515: the Earth's general room, read with no account asked.
-    await expect(page.locator("#chat")).toContainText("General chat", SLOW);
-    await expect(page.getByRole("dialog")).toHaveCount(0);
-  });
-
-  test("sees no Start here after a shared link to a world: a place was entered", async ({ page }) => {
-    await served(page);
-    await arrive(page, COMPUTER, { path: "/w/bubble?test-gpu" });
-    await homeByCrumb(page);
-    await expect(earthLabel(page)).toContainText("Earth", SLOW);
-    await expect(earthLabel(page)).not.toContainText("Start here");
-  });
-});
-
-test.describe("a reader who came back, and the labels", () => {
-  test("reads the labels larger: names at 16 px, figures at 15 px", async ({ page }) => {
-    await served(page);
-    await arrive(page);
-    await running(page);
-    await landed(page);
-    await expect(earthLabel(page)).toContainText("184 here", SLOW);
-    const sizes = await earthLabel(page).evaluate((element) =>
-      [...element.children].slice(0, 2).map((part) => getComputedStyle(part).fontSize),
-    );
-    expect(sizes).toEqual(["16px", "15px"]);
   });
 });

@@ -1,6 +1,7 @@
 // What the demo draws over the universe for the place the camera is at (D401): the orbits of the system it is in, faint, and on a
 // page the plate's fill, behind the planet, as the video's frame 20 (the planet stands over the plate's right side); a planet framed
 // close wears one orbit (D458).
+import { damp } from "@gnoworld/core";
 import {
   BufferGeometry,
   Float32BufferAttribute,
@@ -110,7 +111,7 @@ export class Round {
   /** Round `planet`, `seconds` on, as seen from `pose`, coming or going over a moment of `delta` real seconds a frame; none, it goes. */
   follow(planet: Planet | undefined, pose: Pose, { seconds, delta }: { seconds: number; delta: number }): void {
     if (planet !== undefined && this.gain.value < 1e-3) this.#face(pose);
-    const share = 1 - Math.exp(-delta / ROUND.ease);
+    const share = damp(delta, ROUND.ease);
     this.gain.value += ((planet === undefined ? 0 : ROUND.gain) - this.gain.value) * share;
     this.lines.visible = this.gain.value > 1e-3;
     if (planet === undefined || !this.lines.visible) return;

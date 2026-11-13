@@ -14,15 +14,21 @@ interface Point {
   folded: number;
 }
 
-// Per code point: where it starts in the text's UTF-16 units and in the text as the index folds it.
+// Per code point: where it starts in the text's UTF-16 units and in the text as the index folds it; each character folded once a text.
 function pointsOf(text: string): { points: Point[]; folded: string } {
   const points = Array.from(text).map((char) => ({ char, unit: 0, folded: 0 }));
+  const folds = new Map<string, string>();
   let folded = "";
   let unit = 0;
   for (const point of points) {
     [point.unit, point.folded] = [unit, folded.length];
     unit += point.char.length;
-    folded += fold(point.char);
+    let once = folds.get(point.char);
+    if (once === undefined) {
+      once = fold(point.char);
+      folds.set(point.char, once);
+    }
+    folded += once;
   }
   return { points, folded };
 }

@@ -39,7 +39,7 @@ export function defaultHubs(universesFile: string) {
 }
 
 /** Each hub of the default universe that lists realms, by its slug, with its first realm's world (core's hubWorldOf), from hubs.json beside
- * the universes' file: the trends read its rooms and its realms as one world (7t3). A hub with no realm is a world of its own, joined to no
+ * the universes' file: a hub's rooms and its realms are one world. A hub with no realm is a world of its own, joined to no
  * chain's world: one of its slug would be a realm alone in a namespace of that name, someone else's. */
 export function hubWorlds(universesFile: string): Map<string, string> {
   return new Map(

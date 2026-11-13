@@ -827,8 +827,16 @@ describe("a card in flight, a reader that hangs", () => {
   it("fails the page after the reader's timeout and fetches the next: a hung reader never blocks the one-at-a-time fetch for good", async () => {
     vi.useFakeTimers();
     try {
+      // A hung reader gives up at its client's own deadline (reader.ts), as the real one does.
       const { flow, reader, events } = setup({
-        read: (url) => (url.includes("hang") ? new Promise(() => undefined) : card()),
+        read: (url) =>
+          url.includes("hang")
+            ? new Promise((_resolve, reject) => {
+                setTimeout(() => {
+                  reject(new Error("timeout"));
+                }, 8000);
+              })
+            : card(),
       });
       flow.heard(said("m1", "https://hang.example/a"));
       flow.heard(said("m2", "https://ok.example/a", { account: BOB }));

@@ -78,7 +78,9 @@ export class Maps {
         ([maps, clouds]) => {
           this.#earth = { ...maps, clouds };
         },
-        () => undefined,
+        () => {
+          if (!signal.aborted) setTimeout(() => (this.#earthAsked = false), AGAIN_MS);
+        },
       );
     }
     return this.#earth;

@@ -154,7 +154,7 @@ function Body({ onCount, expanded = false, ...props }: RealmWritesProps) {
   }, [count, onCount]);
   if (listing.state !== "listed")
     return <Unlisted listing={listing} href={gnowebLink(props.chain.gnoweb, props.realm)} />;
-  if (functions.length === 0) return <p className={calm["note"]}>There is no write function to call here.</p>;
+  if (functions.length === 0) return <p className="meta">There is no write function to call here.</p>;
   return <Rows {...props} functions={functions} expanded={expanded} />;
 }
 

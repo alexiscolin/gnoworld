@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { bytes } from "../irc/irc.ts";
+import { utf8Bytes as bytes } from "../text/utf8.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 import {
   MAX_INLINE_DEPTH,

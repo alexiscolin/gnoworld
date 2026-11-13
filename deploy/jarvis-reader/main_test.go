@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"io"
 	"net"
@@ -361,5 +362,52 @@ func TestAuditLogsAMarkerForAnOverLongRowAndNoPartOfIt(t *testing.T) {
 	filterAudit(strings.NewReader("panic: "+strings.Repeat("y", 70000)+"\n"), &out)
 	if !strings.HasPrefix(out.String(), "panic: yyy") {
 		t.Fatalf("a line that is no row lost its head: %.40q", out.String())
+	}
+}
+
+func TestAuditNeverLogsAMalformedRow(t *testing.T) {
+	rows := []string{
+		`{"tool":"gno_render","args":{"path":"my private words"},"result":"ok"`,
+		`[{"args":"array words"}]`,
+		`{"tool":"t","result":"ok","duration_ms":1} trailing words`,
+		`{"tool":"t","result":"ok","args":"missing its time, words"}`,
+		`{"tool":null,"result":"ok","duration_ms":1,"args":"null words"}`,
+		`{"TOOL":"t","RESULT":"ok","DURATION_MS":1,"args":"case words"}`,
+		` ` + " " + `{"tool":"t","result":"ok","duration_ms":"1","args":"typed words"}`,
+	}
+	for _, row := range rows {
+		var out strings.Builder
+		filterAudit(strings.NewReader(row+"\n"), &out)
+		if got := strings.TrimSuffix(out.String(), "\n"); got != `{"audit":"malformed"}` {
+			t.Fatalf("row %q logged %q", row, got)
+		}
+	}
+}
+
+func TestAuditShowsAToolOrResultThatIsNoNameAsMalformed(t *testing.T) {
+	var out strings.Builder
+	filterAudit(strings.NewReader(`{"tool":"Gno render words","result":"ok","duration_ms":4}`+"\n"), &out)
+	var row map[string]any
+	if err := json.Unmarshal([]byte(out.String()), &row); err != nil || row["tool"] != "<malformed>" || row["result"] != "ok" ||
+		row["duration_ms"] != 4.0 || len(row) != 3 {
+		t.Fatalf("logged %q", out.String())
+	}
+}
+
+func TestAuditCutsWordsAtTheFirstBrace(t *testing.T) {
+	var out strings.Builder
+	filterAudit(strings.NewReader(`panic: oops {"args":"words after brace"}`+"\n"), &out)
+	if got := strings.TrimSuffix(out.String(), "\n"); got != "panic: oops " {
+		t.Fatalf("logged %q", got)
+	}
+	out.Reset()
+	filterAudit(strings.NewReader(`panic: `+`{"args":"over-long words"}`+strings.Repeat("y", 70000)+"\n"), &out)
+	if got := strings.TrimSuffix(out.String(), "\n"); got != "panic: " {
+		t.Fatalf("an over-long line logged %.80q", got)
+	}
+	out.Reset()
+	filterAudit(strings.NewReader("   \t\n"), &out)
+	if out.String() != "" {
+		t.Fatalf("a blank line logged %q", out.String())
 	}
 }

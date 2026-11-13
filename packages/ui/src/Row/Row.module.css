@@ -56,14 +56,4 @@
     font: var(--font-body);
     font-weight: var(--_weight);
   }
-
-  .subtitle {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
-  .activity {
-    color: var(--color-text-muted);
-    font: var(--font-data);
-  }
 }

@@ -1,7 +1,7 @@
 // The browser's client of the linked accounts (server/src/login/linkRoutes.ts, mounted at /api/links; owners' moderation, part 5), through the one
 // JSON call of lib/api/http.ts. The session is the server's cookie; no key is held or sent: a link is proven by Adena's signature or by the file the
 // command-line tool wrote, which the page only passes on. The command line's block is the server's, shown as it came.
-import { Address, Nonce, Proof } from "@gnoworld/schemas";
+import { Address, AnyChainId, Nonce, Proof } from "@gnoworld/schemas";
 import { jsonOf } from "@gnoworld/core";
 import { z } from "../jitless.ts";
 import { jsonCall, TIMEOUT_MS, type Fetcher, type Result } from "./http.ts";
@@ -36,7 +36,7 @@ const AdenaChallenge = z.object({
   nonce: Nonce,
   text: z.string(),
   expiresAt: z.iso.datetime(),
-  chainId: z.string().check(z.minLength(1), z.maxLength(50)),
+  chainId: AnyChainId,
 });
 const Released = z.object({ ok: z.literal(true) });
 const CliChallenge = z.object({

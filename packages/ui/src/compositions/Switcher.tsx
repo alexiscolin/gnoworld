@@ -5,5 +5,5 @@ export type SwitcherProps = Composed;
 
 /** Its children in a row, or all one under the other once the row is narrower than a measure. */
 export function Switcher(props: SwitcherProps) {
-  return place({ ...props, className: styles["switcher"] });
+  return place({ ...props, composition: styles["switcher"] });
 }

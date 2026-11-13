@@ -16,7 +16,7 @@ const LINES = {
   paused: "Jarvis is paused for you until tomorrow.",
   capped: "You have used your share of Jarvis for today.",
   early: "Jarvis is for accounts that have spoken here for a while.",
-  busy: "Jarvis is busy in this room: try again later.",
+  busy: "Jarvis is still answering your last question.",
   spent: "Jarvis has no budget left today.",
   off: "Jarvis is switched off.",
 } as const;
@@ -62,6 +62,7 @@ function Question({ send }: { send: (words: string) => void }) {
     event.preventDefault();
     if (words === "" || over) return;
     send(words);
+    setText("");
   };
   return (
     <form onSubmit={submit}>

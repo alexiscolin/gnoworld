@@ -10,7 +10,7 @@ import { LineBody } from "./LineBody.tsx";
 import { Head } from "./LineHead.tsx";
 import { LineText } from "./LineText.tsx";
 import { LineTranslation } from "./LineTranslation.tsx";
-import { LineCard, type LineCardProps } from "./LineCard.tsx";
+import { LineCard } from "./LineCard.tsx";
 import { LinePreview } from "./LinePreview.tsx";
 import { Reactions } from "./Reactions.tsx";
 import { Quote } from "./Replying.tsx";
@@ -121,8 +121,11 @@ export interface LineViewProps {
   verdict: StreamEvent["state"] | undefined;
   /** Whether a link's player is offered: not to a reader who saves data, nor in a direct message. */
   players: boolean;
-  /** What its card needs (link-previews L4, lineCard.ts's cardOf); none for a direct message's line, which has no card. */
-  card?: LineCardProps["card"];
+  /** What its card needs (link-previews L4, lineCard.ts's cardMarks): no msgid for a direct message's line, which has no card. */
+  cardMsgid?: string | undefined;
+  cardKey?: string | undefined;
+  may?: boolean;
+  saving?: boolean;
   /** Whether it is saved on this device, and whether it is pinned in its room (4d). */
   saved: boolean;
   pinned: boolean;
@@ -163,7 +166,7 @@ export const BARE_ROW = {
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread, votes, newHere, card, room } = props;
+  const { replies, onThread, inThread, votes, newHere, cardMsgid, cardKey, may, saving, room } = props;
   const row = rowOf({
     id: line.id,
     stop,
@@ -201,7 +204,11 @@ export function LineView(props: LineViewProps) {
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       <LinePreview blocks={blocks} verdict={verdict} tabbable={row.links} />
       <LineCard
-        card={card}
+        room={room}
+        msgid={cardMsgid}
+        cardKey={cardKey}
+        may={may}
+        saving={saving}
         text={line.text}
         blocks={blocks}
         player={embed !== undefined}

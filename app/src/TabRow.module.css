@@ -6,11 +6,6 @@
     margin-inline-start: auto;
   }
 
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
   .pending {
     inline-size: var(--space-2xl);
   }

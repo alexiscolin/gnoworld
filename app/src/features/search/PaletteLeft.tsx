@@ -71,7 +71,7 @@ export function PaletteLeft({ palette, children }: { palette: ReturnType<typeof 
         ) : null}
       </div>
       <div className={styles["results"]}>{children}</div>
-      <div className={styles["hints"]}>
+      <div className={["meta", styles["hints"]].join(" ")}>
         <Cluster space="xs">
           {HINTS.map(([key, what]) => (
             <span key={key}>

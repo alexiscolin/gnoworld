@@ -94,6 +94,20 @@ describe("Try it", () => {
     ).toBe("true");
   });
 
+  it("scrolls to the card without smoothing when the app's Reduce animations setting is on", async () => {
+    noMedia();
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    document.documentElement.dataset["motion"] = "reduce";
+    try {
+      const box = await card([["Deposit", 1200]]);
+      click(button(box, "Call Deposit"));
+      expect(scroll).toHaveBeenCalledWith({ behavior: "auto", block: "nearest" });
+    } finally {
+      delete document.documentElement.dataset["motion"];
+    }
+  });
+
   it("reads a row's function when its Read is clicked, and shows the result", async () => {
     const box = await card();
     const [read] = panels(box);

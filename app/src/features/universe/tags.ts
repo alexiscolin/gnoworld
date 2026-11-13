@@ -38,11 +38,8 @@ function tagsIn(root: ParentNode): gsap.core.Timeline {
  * lands; at once under reduced motion. */
 export function waitTags(): void {
   landed = false;
-  const parts = all(document, `${TAGS}, ${TAGS} h2, ${TAGS} p`);
-  gsap.killTweensOf(parts);
-  const lines = all(document, `${TAGS} h2, ${TAGS} p`);
-  if (lines.length > 0) gsap.set(lines, { clearProps: "transform,opacity" });
   const tags = all(document, TAGS);
+  gsap.killTweensOf(tags);
   if (tags.length === 0) return;
   if (motionOf().matches) gsap.set(tags, { autoAlpha: 0 });
   else gsap.to(tags, { autoAlpha: 0, duration: FADE, ease: EMPHASIZED, overwrite: true });

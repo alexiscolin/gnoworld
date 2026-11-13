@@ -67,7 +67,7 @@ export function GetStarted({ open, onClose, onConnect }: GetStartedProps) {
         </li>
       </ol>
       <Disclosure title="Further, if you want" size="s">
-        <p className={styles["further"]}>
+        <p className="meta">
           Test tokens are only needed to call realms, never to chat:{" "}
           <a href={FAUCET} {...NEW_TAB}>
             the faucet

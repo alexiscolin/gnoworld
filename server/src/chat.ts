@@ -4,7 +4,6 @@
 // its rules alone), through a fair queue, then acted on, streamed, and struck toward a mute; the routes
 // that tell the activity, the rooms by section and the verdicts, each room's to whom may see it.
 import type { DatabaseSync } from "node:sqlite";
-import type { Presence } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
 import type { RecentLines } from "./door/lines.ts";
@@ -35,7 +34,6 @@ import { linesAfter } from "./chatLines.ts";
 import type { Signals } from "./signals/signals.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
 import { keeping, reconcilerFor, sweeping } from "./rooms/wire.ts";
-import type { ChatWorld } from "./worlds/present.ts";
 
 export interface Chat extends ReturnType<typeof guestFor> {
   activity: Hono;
@@ -54,19 +52,16 @@ export interface Chat extends ReturnType<typeof guestFor> {
   cards: CardFlow | undefined;
   // The stored translations (slice 13): none while Jarvis is off; what the routes serve and the retention expires.
   translations: TranslationFlow | undefined;
-  // Whether an account may pin in a room: its world's moderators and the team.
-  mayPin: (room: string, who: string) => boolean;
+  // Whether an account is staff of a room: its world's moderators and the team.
+  staff: (room: string, who: string) => boolean;
   // An owner's moderation (D13936): a line hidden by the link's REDACT, a mute that ends none, a world's rooms.
   hide: (room: string, msgid: string) => boolean;
   muteKeeping: (account: string, world: string) => "muted" | "already" | "full";
   roomsOf: (world: string) => readonly string[];
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
-  // Who is here in each world (7h), where the server keeps its history, and what that route serves, for the ticker's trends (7t).
+  // Who is here in each world (7h), where the server keeps its history.
   presence?: Hono;
-  presenceNow?: () => Presence;
-  // Each world's rooms with their usual, for the trends' score (7t3).
-  presenceChat?: () => readonly ChatWorld[];
   // A public room's last lines moderation let through, for Jarvis's door (10g), and one by its id (10k).
   recent: RecentLines["recent"];
   // A room's last line's id, any room (D13985).
@@ -161,7 +156,7 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
   const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
   const rooms = keeping(keeper, { mutes, reconciler });
   const stopSweeping = sweeping(db, rooms, { now, ms: options.sweepMs ?? 60 * 60_000, roles: settings });
-  const kept = pinsFor(db, settings, { link: () => link, now, log, maker: keeper.maker });
+  const kept = pinsFor(db, settings, { link: () => link, now, log });
   const onMessage = hearing({ kept, cards, recent, activity, present, visible, progress, queue, now });
   const linked = {
     db,

@@ -14,8 +14,14 @@
     font: var(--font-meta);
   }
 
+  /* Words in capitals that a block tracks itself (the header's views, a bubble's head, "Online now"): the label's caps, apart from
+     its type, so they keep their case where capitals break the script, as the label does. */
+  .caps {
+    text-transform: uppercase;
+  }
+
   /* Arabic's script and Hebrew's, by the languages written in them. */
-  .label:is(
+  :is(.label, .caps):is(
     :lang(ar),
     :lang(fa),
     :lang(ur),
@@ -63,8 +69,8 @@
      #hnav .links): the header's views, and space's two views apart from them on a phone (F4691). No blur until the scene has a sky. */
   .control-bar {
     box-sizing: border-box;
-    /* raw: four pixels between the pill's edge and its controls */
-    padding: 4px;
+    /* four pixels between the pill's edge and its controls */
+    padding: var(--space-3xs);
     border: var(--line-width) solid var(--color-line);
     border-radius: var(--radius-pill);
     /* raw: 45% of the night, the prototype's rgba(8, 11, 18, 0.45) */
@@ -152,7 +158,7 @@
     margin: calc(-1 * (var(--focus-width) + var(--focus-offset)));
     /* A row cut by its edge fades out there (D379), so a cut chip reads as more to scroll, not as broken. */
     /* raw: the fade over the last 32 px, half a chip */
-    mask-image: linear-gradient(to right, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - 32px), transparent);
   }
 
   .scroll-row > * {
@@ -361,5 +367,32 @@
     color: inherit;
     font: inherit;
     text-align: inherit;
+  }
+
+  /* A box mounted as its state changes comes in from its own place: a fade and a small rise, on the motion tokens (still when motion is reduced). */
+  .enter {
+    animation: enter calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
+  }
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      translate: 0 var(--space-3xs);
+    }
+  }
+
+  /* What a coarse pointer (a phone) shows and what a computer shows: a phone reads and fills, a computer signs. */
+  .coarse-only {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .coarse-only {
+      display: block;
+    }
+
+    .fine-only {
+      display: none;
+    }
   }
 }

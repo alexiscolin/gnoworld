@@ -18,7 +18,7 @@ export function FieldWords({
   return (
     <>
       {help === undefined ? null : (
-        <p id={`${id}-help`} className={styles["help"]}>
+        <p id={`${id}-help`} className="meta">
           {help}
         </p>
       )}

@@ -6,7 +6,7 @@
 // the rest; a multisig's other signers are not counted.
 import { blockTimes, tipAsk, txsAbove } from "@gnoworld/chain/asks";
 import { isAddress } from "@gnoworld/core";
-import { ChainCount, NETWORK_DAYS, NetworkAnswer } from "@gnoworld/schemas/indexer";
+import { ChainCount, NETWORK_DAYS, NetworkAnswer, TipAnswer } from "@gnoworld/schemas/indexer";
 import type { Log } from "@gnoworld/service/log";
 import type { Hono } from "hono";
 import type { DatabaseSync } from "node:sqlite";
@@ -22,7 +22,6 @@ const NETWORK_PAGE = 1_000;
 export const NETWORK_PAGES = 20;
 const NETWORK_READ_BYTES = 4 * 1024 * 1024;
 
-const Tip = z.object({ data: z.object({ latestBlockHeight: ChainCount }) });
 // An empty page is null (onyx-1). A row is checked alone, so one odd row costs that row.
 const Page = z.object({
   data: z.object({ getTransactions: z.nullable(z.array(z.unknown())) }),
@@ -129,7 +128,7 @@ export async function networkPass(pass: NetworkPass): Promise<NetworkAnswer> {
   const { log } = pass;
   const reader = { send: pass.send, indexer: pass.indexer, pace: pass.pace, page: pass.page ?? NETWORK_PAGE };
   const reading = readingOf(reader, pass.isStopped);
-  const tipRead = Tip.safeParse(await request(reading, tipAsk()));
+  const tipRead = TipAnswer.safeParse(await request(reading, tipAsk()));
   if (!tipRead.success) throw new Failure("shape");
   const tip = tipRead.data.data.latestBlockHeight;
   let above = await startOf(pass, reading, tip);

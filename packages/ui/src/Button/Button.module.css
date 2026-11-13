@@ -36,6 +36,12 @@
     --_font: var(--font-ui);
   }
 
+  /* Before the large size's padding, which a large button keeps. */
+  .button[data-pad="wide"] {
+    /* raw: the proposal's own value, s1.html .button */
+    --_pad: 20px;
+  }
+
   .button[data-size="l"] {
     --_h: var(--control-l);
     --_pad: var(--space-m);
@@ -52,6 +58,29 @@
     --_accent: var(--color-danger);
     --_text: var(--color-danger);
     --_edge: var(--color-danger-line);
+  }
+
+  .button[data-tone="signal"] {
+    --_accent: var(--color-signal);
+    --_text: var(--color-signal);
+    --_edge: var(--color-signal-line);
+  }
+
+  .button[data-lead="close"] {
+    --_pad: var(--space-2xs) var(--space-xs);
+  }
+
+  /* A tool of a bar inside a box: the video's 62 % of the muted grey (the prototype's #fmtBar button); a pressed one keeps its ink. */
+  .button[data-tool] {
+    /* raw: the video's 62 % of the muted grey */
+    --_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);
+  }
+
+  /* raw: 24 rem, the width at which a bar's nine tools of 32 px no longer fit one row */
+  @container (inline-size < 24rem) {
+    .button[data-tool]:enabled {
+      --_h: var(--control-xs);
+    }
   }
 
   /* Pressed is selected: the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
@@ -95,6 +124,17 @@
     transition-property: background-color, border-color;
   }
 
+  /* The press over the nearest positioned box, whose hover lights the button as its own. */
+  .button[data-stretch]::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+  }
+
+  .button[data-stretch]:hover {
+    --_fill: var(--color-fill-hover);
+  }
+
   .button:disabled {
     cursor: not-allowed;
     opacity: var(--opacity-disabled);
@@ -110,18 +150,12 @@
     border: var(--line-width) solid currentcolor;
     border-block-start-color: transparent;
     border-radius: var(--radius-pill);
-    animation: spin var(--motion-spin) linear infinite;
+    animation: spin calc(var(--motion-spin) * var(--motion-scale)) linear infinite;
   }
 
   @keyframes spin {
     to {
       rotate: 1turn;
-    }
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .spinner {
-      animation: none;
     }
   }
 

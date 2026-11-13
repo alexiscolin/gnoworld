@@ -24,7 +24,7 @@ const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }
 const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBar }));
 // Who is typing is asked once someone is: a room where nobody types draws only its one empty line, kept so the composer never
 // moves, and the first screen does not carry the names' code (ADR-0001 §12).
-const NOBODY = <p className={styles["typing"]} />;
+const NOBODY = <p className={["meta", styles["typing"]].join(" ")} />;
 
 /** What a chat says in its room's place when the place has no room yet, a visitor's and an account's alike. */
 export const NoRoomYet = () => (

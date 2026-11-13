@@ -1,4 +1,4 @@
-import { renameSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFileSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 
 interface Replacement {
   readonly file: string;
@@ -32,3 +32,18 @@ export const replaceFile = (file: string, text: string): boolean => replaceFiles
 
 /** A file kept beside `file`, named after it (worlds.json, worlds-count.json), so the two never share a path. */
 export const besideOf = (file: string, name: string): string => `${file.replace(/\.json$/, "")}-${name}.json`;
+
+interface Schema<T> {
+  safeParse: (value: unknown) => { success: true; data: T } | { success: false };
+}
+
+/** The file a writer left, through its schema; none when it is missing, past `maxBytes` (never read whole), no JSON or refused. */
+export function lastFile<T>(file: string, schema: Schema<T>, maxBytes = Number.POSITIVE_INFINITY): T | undefined {
+  try {
+    if (Number.isFinite(maxBytes) && statSync(file).size > maxBytes) return undefined;
+    const parsed = schema.safeParse(JSON.parse(readFileSync(file, "utf8")));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Space } from "./scene.ts";
 import { Round } from "./parts/marks.ts";
+import { Free } from "./rig/free.ts";
 import { blankPose } from "./rig/pose.ts";
 import { advance, paint } from "./move.ts";
 import { openOf } from "./open.ts";
@@ -116,6 +117,17 @@ describe("the scene clock (rate: the share of real time it runs at, 0 after a mi
   });
 });
 
+describe("a view under reduced motion", () => {
+  it("sleeps a turning planet: the clock Free stops lets the loop nap", () => {
+    const space = pageAt();
+    const free = new Free();
+    free.advance(16, true, { pose: space.rig.pose, reach: { near: 1, far: 1e6 } });
+    (space.rig as { free: unknown }).free = free;
+    const state = { ...stateOf(space), pxPerSecond: 50 };
+    expect(napOf(space, state, { need: "none", calm: 9000 })).toBe(2000);
+  });
+});
+
 describe("a moon round the planet framed close", () => {
   it("keeps every frame drawn while the clock runs: paced at 15 frames a second, it jerked across the planet", () => {
     const state = { ...stateOf(pageAt()), pxPerSecond: 2 };
@@ -167,6 +179,29 @@ describe("a frame's paint", () => {
       const clock = rest.find((arg) => typeof arg === "object" && arg !== null && "delta" in arg);
       expect(clock).toMatchObject({ delta: 0.016 });
     }
+  });
+});
+
+describe("a system opened by the page", () => {
+  it("starts the minute of rest over, so its fade runs on a clock the rest had stopped, and only as it opens", () => {
+    const space = pageAt({ rate: 0 });
+    const rouse = vi.fn();
+    Object.assign(space.rig.free, { rouse });
+    Object.assign(space, { system: { index: 2 } });
+    Object.assign(space.labels, { tick: () => undefined });
+    Object.assign(space.stage, {
+      intro: { tick: () => undefined, aim: () => undefined, ready: true },
+      orbits: { of: () => undefined, gain: uniform() },
+      links: { tick: () => undefined },
+      effects: { busy: false, tick: () => undefined },
+      ground: { place: () => undefined },
+      round: { follow: () => undefined, lines: { quaternion: {} } },
+      moons: { follow: () => undefined },
+    });
+    paint(space, 16);
+    expect(rouse).toHaveBeenCalledTimes(1);
+    paint(space, 16);
+    expect(rouse).toHaveBeenCalledTimes(1);
   });
 });
 

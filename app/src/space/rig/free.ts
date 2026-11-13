@@ -1,6 +1,6 @@
 // The reader's hand on the pose (D401): a drag turns the view round what it looks at, a wheel brings it nearer what the pointer is
 // over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); still for 4 s, the view turns slowly on its own, and stops after a minute.
-import { smoothstep } from "@gnoworld/core";
+import { damp, smoothstep } from "@gnoworld/core";
 import { Quaternion, Vector3 } from "three";
 import type { Pose, Spot } from "./pose.ts";
 
@@ -114,7 +114,7 @@ export class Free {
     return this.wander.speed > 0 && !this.#still && this.#idle > this.wander.after && this.#hush() > 0;
   }
 
-  /** The share of real time the scene's clock runs at: 1, eased to 0 after a minute with no input, back up at the next. */
+  /** The share of real time the scene's clock runs at: 1, eased to 0 after a minute with no input, back up at the next; 0 under reduced motion. */
   get rate(): number {
     return this.#rate;
   }
@@ -134,7 +134,7 @@ export class Free {
     const dt = Math.min(delta, 50) / 1000;
     // The rest is counted in real time: a slow machine's capped steps would stretch the minute.
     this.#idle += real / 1000;
-    this.#rate = Math.min(this.#hush(), this.#rate + dt / RATE_RISE);
+    this.#rate = still ? 0 : Math.min(this.#hush(), this.#rate + dt / RATE_RISE);
     if (this.#held) this.#turnBy(this.#pending.yaw, this.#pending.pitch, pose);
     else {
       const decay = Math.exp(-dt / TURN_TAU);
@@ -163,7 +163,7 @@ export class Free {
       Math.min(reach.far, pose.distance * Math.exp(this.#zoom * ZOOM_TAU * (1 - decay))),
     );
     const anchored = !Number.isNaN(this.anchor.x);
-    this.#pull += ((anchored ? 1 : 0) - this.#pull) * (1 - Math.exp(-dt / PULL_TAU));
+    this.#pull += ((anchored ? 1 : 0) - this.#pull) * damp(dt, PULL_TAU);
     const share = (1 - distance / pose.distance) * this.#pull;
     if (anchored) {
       pose.look.x += (this.anchor.x - pose.look.x) * share;

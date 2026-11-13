@@ -5,7 +5,6 @@ import { EmptyState, Stack } from "@gnoworld/ui";
 import { Controls } from "./Controls.tsx";
 import { Detail } from "./Detail.tsx";
 import { Grid, moveAmongCards, TodayRows } from "./Cards.tsx";
-import appear from "../../../enter.module.css";
 import styles from "./Discover.module.css";
 import { Followed } from "./Followed.tsx";
 import { Shelves } from "./Shelves.tsx";
@@ -27,10 +26,7 @@ export interface DiscoverProps {
 export default function Discover({ discovery, universe, fly, chat, followed, ranked, go }: DiscoverProps) {
   const { picked, shelf, today, list } = discovery;
   return (
-    <div
-      className={[styles["discover"], appear["enter"]].join(" ")}
-      data-detail={picked === undefined ? undefined : ""}
-    >
+    <div className={[styles["discover"], "enter"].join(" ")} data-detail={picked === undefined ? undefined : ""}>
       <Shelves discovery={discovery} />
       <div className={styles["content"]} onKeyDown={moveAmongCards}>
         <Stack space="m">

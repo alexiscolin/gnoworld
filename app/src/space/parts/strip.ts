@@ -1,5 +1,6 @@
 // A hovered planet's own links in the Map, drawn wide and bright over the faint ones (GL lines stay one pixel): each link a quad whose
 // corners are pushed half the width to its side on the screen, by the GPU. One preallocated buffer, written each frame while it shows.
+import { damp } from "@gnoworld/core";
 import { BufferAttribute, BufferGeometry, DoubleSide, DynamicDrawUsage, Mesh, ShaderMaterial, Vector3 } from "three";
 import { placeOf, type Planet, type Vec } from "../layout.ts";
 import { ORBIT_COLOUR } from "./marks.ts";
@@ -94,7 +95,7 @@ export class Strip {
       this.mesh.geometry.setDrawRange(0, Math.min(links.length, MOST) * 6);
     }
     const to = links === undefined || links.length === 0 ? 0 : 1;
-    this.#gain.value += (to - this.#gain.value) * (still ? 1 : 1 - Math.exp(-delta / 1000 / EASE_S));
+    this.#gain.value += (to - this.#gain.value) * (still ? 1 : damp(delta / 1000, EASE_S));
     if (this.#gain.value < 1e-3) {
       this.#gain.value = 0;
       this.#links = NONE;

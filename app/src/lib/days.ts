@@ -10,9 +10,22 @@ export const HOUR_MS = 3_600_000;
 export const DAY_MS = 86_400_000;
 const UTC: Reader = { timeZone: "UTC" };
 
+// A formatter is costly to make and a room reads every line's day and time at each render: each kind is made once a zone. A zone left
+// unnamed is the device's as the page first asked.
+const made = new Map<string, Intl.DateTimeFormat>();
+const formatter = (kind: "day" | "clock", timeZone: string | undefined): Intl.DateTimeFormat => {
+  const name = `${kind} ${timeZone ?? ""}`;
+  const held =
+    made.get(name) ??
+    (kind === "day"
+      ? new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
+      : new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }));
+  made.set(name, held);
+  return held;
+};
+
 /** The zone's calendar date of a moment, "2026-11-04". */
-export const dayKey = (at: Date, timeZone?: string) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(at);
+export const dayKey = (at: Date, timeZone?: string) => formatter("day", timeZone).format(at);
 
 /** "4 Nov", with the year ("4 Nov 2026") when it is not this year's; always with it when `now` is left out. */
 export function shortDay(at: Date, now: Date | undefined, { timeZone }: Reader = {}): string {
@@ -32,14 +45,11 @@ export function dayName(at: Date, now: Date, reader: Reader = {}): string {
   return shortDay(at, now, reader);
 }
 
-const CLOCK = (timeZone?: string) =>
-  new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
-
 /** "16:06", the zone's own unless UTC is asked. */
-export const clock = (at: Date, { timeZone }: Reader = {}): string => CLOCK(timeZone).format(at);
+export const clock = (at: Date, { timeZone }: Reader = {}): string => formatter("clock", timeZone).format(at);
 
 /** A moment's day in UTC, for the sites whose day is the chain's: "4 Nov 2026". */
-export const utcDay = (at: Date, now?: Date): string => shortDay(at, now, UTC);
+export const utcShortDay = (at: Date, now?: Date): string => shortDay(at, now, UTC);
 
 /** A moment's day and time: "4 Nov, 16:06" ("4 Nov 2026, 16:06" when `now` is left out), the zone's own unless UTC is asked. */
 export const moment = (at: Date, now?: Date, reader: Reader = {}): string =>

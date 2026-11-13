@@ -39,7 +39,7 @@ export function RoomsList(props: RoomSectionsProps) {
         onChange={setQuery}
       />
       {query !== "" && found.length === 0 ? (
-        <p className={styles["note"]}>No room matches.</p>
+        <p className={["meta", styles["note"]].join(" ")}>No room matches.</p>
       ) : (
         <RoomSections {...props} sections={found} action={make ? <NewRoom /> : undefined} />
       )}

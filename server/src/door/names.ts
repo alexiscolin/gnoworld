@@ -4,6 +4,7 @@
 // 10,000 accounts at most: a name an hour, none ten minutes, a failure a minute.
 import { readEvaluated } from "@gnoworld/chain/node";
 import type { FailureKind } from "@gnoworld/chain/read";
+import { requestInit } from "@gnoworld/chain/transport";
 import type { Address } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import { send as netSend, type Send } from "@gnoworld/service/net";
@@ -44,7 +45,7 @@ async function readName(node: Node, account: Address): Promise<boolean | Failure
     now: () => new Date(node.now()),
     timeoutMs: TIMEOUT_MS,
     maxBytes: MAX_BYTES,
-    fetch: (url, init) => node.send(url, init ?? {}, TIMEOUT_MS),
+    fetch: (url, init) => node.send(url, requestInit(init), TIMEOUT_MS),
   });
   if (!read.ok) return read.failure.kind;
   const said = read.value.trimEnd();

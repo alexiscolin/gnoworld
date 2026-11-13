@@ -23,4 +23,13 @@ describe("adenaHere", () => {
     Reflect.set(globalThis, "adena", { AddEstablish: () => undefined });
     expect(adenaHere()).toBe(true);
   });
+
+  // Loaded afresh inside the test: the function is made as its module loads, which a planted change reaches only when it loads after.
+  it("reads the page's Adena whenever its module loads", async () => {
+    vi.resetModules();
+    const { adenaHere: loaded } = await import("./getStartedAsk.ts");
+    expect(loaded()).toBe(false);
+    Reflect.set(globalThis, "adena", { AddEstablish: () => undefined });
+    expect(loaded()).toBe(true);
+  });
 });

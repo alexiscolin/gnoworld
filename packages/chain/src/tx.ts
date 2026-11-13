@@ -1,6 +1,7 @@
 // One transaction by its hash (9d): what the call card follows after Adena signs, until the transaction is in a block. The
 // block's height, the call's returned value and its log come from the node's `tx`, never from the wallet's word. What the
 // realm wrote is text, cut at a size the card can hold, and never read as anything else.
+import { hexOf } from "@gnoworld/core";
 import { TxAnswer } from "@gnoworld/schemas/indexer";
 import { guarded, textOf, withoutSlash, type NodeOptions } from "./node.ts";
 import { failedRead, readChain, sourceOf, type ChainRead } from "./read.ts";
@@ -22,9 +23,9 @@ const CAP = 2048;
 const cut = (text: string): string => (text.length <= CAP ? text : `${text.slice(0, CAP).toWellFormed()}…`);
 
 // A hash in base64 as lower-case hex, or null for a text that is no base64.
-function hexOf(base64: string): string | null {
+function hashHex(base64: string): string | null {
   try {
-    return Array.from(atob(base64), (char) => char.charCodeAt(0).toString(16).padStart(2, "0")).join("");
+    return hexOf(Uint8Array.from(atob(base64), (char) => char.charCodeAt(0)));
   } catch {
     return null;
   }
@@ -35,7 +36,7 @@ function landedOf({ hash, height: text, tx_result: done }: Result, want: string)
   const height = Number(text);
   const { Error: refused, Data: data, Log: log = "" } = done.ResponseBase;
   const value = data === undefined || data === null || data === "" ? "" : textOf(data);
-  if (hexOf(hash) !== want || !Number.isSafeInteger(height) || height < 1 || value === null) return null;
+  if (hashHex(hash) !== want || !Number.isSafeInteger(height) || height < 1 || value === null) return null;
   return { height, failed: refused !== undefined && refused !== null, data: cut(value), log: cut(log) };
 }
 

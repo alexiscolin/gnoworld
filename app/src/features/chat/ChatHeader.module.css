@@ -69,7 +69,7 @@
     /* layout: the two columns, less the header's own padding and step: the kicker stands on the rooms' column's edge (Alexis, 2026-11-07) */
     inline-size: calc(var(--chat-worlds) + var(--chat-rooms) - 2 * var(--space-m));
     /* raw: the place's kicker a step under the label's size, so a room's whole name fits beside the rooms' control (Alexis, 2026-11-07) */
-    --font-label: 500 9.5px/1 var(--family-mono);
+    --font-label: 500 0.59375rem/1 var(--family-mono);
   }
 
   /* The chat's breakpoint, from its own width (ChatScreen.tsx's `data-compact`: no container query, none holds one since 0c71e5b1). A

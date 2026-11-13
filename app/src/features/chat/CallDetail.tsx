@@ -1,6 +1,6 @@
 // A call's detail, in the panel a chain line opens: what the call was given and what it cost, its block and time, its result and the events
 // it told. The server cut and stripped every text of it; each is cut and stripped again here and drawn as text only, never a link or markup.
-import { CALL_CAPS, RealmPath, type CallDetail as Detail } from "@gnoworld/schemas";
+import { CALL_DETAIL_CAPS, RealmPath, type CallDetail as Detail } from "@gnoworld/schemas";
 import { grouped, Kicker, Row, Skeleton, Stack } from "@gnoworld/ui";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorView, useWhere, type ErrorKind } from "../errors/index.ts";
@@ -51,7 +51,7 @@ function Head({ detail }: { detail: Detail }) {
         {...(RealmPath.safeParse(realm).success ? { href: realmPath(realm) } : {})}
       />
       {error === null ? null : (
-        <p className={[styles["data"], styles["failed"]].join(" ")}>{cut(error, CALL_CAPS.error)}</p>
+        <p className={[styles["data"], styles["failed"]].join(" ")}>{cut(error, CALL_DETAIL_CAPS.error)}</p>
       )}
       <p className="meta">{`block ${grouped(height)}${when}`}</p>
     </>
@@ -64,8 +64,10 @@ function Cost({ gas, fee }: Pick<Detail, "gas" | "fee">) {
 }
 
 const eventText = ({ type, attrs }: Detail["events"][number]): string => {
-  const pairs = attrs.map(({ key, value }) => `${cut(key, CALL_CAPS.key)}: ${cut(value, CALL_CAPS.value)}`);
-  return `${cut(type, CALL_CAPS.type)}${pairs.length === 0 ? "" : ` (${pairs.join(", ")})`}`;
+  const pairs = attrs.map(
+    ({ key, value }) => `${cut(key, CALL_DETAIL_CAPS.key)}: ${cut(value, CALL_DETAIL_CAPS.value)}`,
+  );
+  return `${cut(type, CALL_DETAIL_CAPS.type)}${pairs.length === 0 ? "" : ` (${pairs.join(", ")})`}`;
 };
 
 function Body({ detail }: { detail: Detail }) {
@@ -76,11 +78,11 @@ function Body({ detail }: { detail: Detail }) {
       <Cost gas={gas} fee={fee} />
       <Texts
         title="Arguments"
-        items={args.map((arg, at) => `${String(at)}: ${cut(arg, CALL_CAPS.arg)}`)}
+        items={args.map((arg, at) => `${String(at)}: ${cut(arg, CALL_DETAIL_CAPS.arg)}`)}
         more={moreArgs}
       />
       {send === null ? null : <p className="meta">Sent {cut(send, 64)}</p>}
-      {memo === null ? null : <p className="meta">Memo: {cut(memo, CALL_CAPS.memo)}</p>}
+      {memo === null ? null : <p className="meta">Memo: {cut(memo, CALL_DETAIL_CAPS.memo)}</p>}
       <Texts title="Events" items={events.map(eventText)} more={moreEvents} />
     </Stack>
   );

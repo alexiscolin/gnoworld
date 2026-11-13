@@ -33,7 +33,7 @@ function Stops({ row, discovery }: { row: StoreRow; discovery: Discovery }) {
                 <Planet world={stop.world} size="s" />
                 <Stack space="3xs">
                   <span className={styles["name"]}>{stop.name}</span>
-                  <span className={styles["sub"]}>
+                  <span className="data-text">
                     {why === "author" ? "same author" : "same style"} · {stop.callers} callers
                   </span>
                 </Stack>
@@ -56,7 +56,7 @@ function Stats({ row, here }: { row: StoreRow; here: number }) {
     <dl className={styles["stats"]}>
       {figures.map(([name, value]) => (
         <div key={name}>
-          <dt>{name}</dt>
+          <dt className="meta">{name}</dt>
           <dd>{value}</dd>
         </div>
       ))}

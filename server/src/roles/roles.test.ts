@@ -205,6 +205,18 @@ describe("loadRoles", () => {
       place: "(top)",
       code: "unrecognized_keys",
     },
+    {
+      kind: "a room of another world",
+      content: world({ rooms: [{ room: "#bubble/x", type: "open" }] }),
+      place: "worlds.0.rooms.0.room",
+      code: "custom",
+    },
+    {
+      kind: "a room's group the world does not hold",
+      content: world({ rooms: [{ room: "#earth/crew", type: "members", readers: "ghosts" }] }),
+      place: "worlds.0.rooms.0.readers",
+      code: "custom",
+    },
   ])("names the place and the kind of a fault in $kind", ({ content, place, code }) => {
     expect(failure(content)).toMatch(
       new RegExp(`roles file \\S+\\.json: ${place.replace(/[.()]/g, "\\$&")}: ${code}\\b`),

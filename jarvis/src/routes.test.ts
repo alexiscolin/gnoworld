@@ -1025,6 +1025,23 @@ describe("POST /ask: a function's explanation", () => {
     expect([none.ask, lacking.ask, lacking.explainer].map((spy) => spy.mock.calls.length)).toEqual([0, 0, 0]);
   });
 
+  it("logs a chain it has no loop for by its own reason, apart from a body its schema refused", async () => {
+    const lacking = await withExplainer();
+    await lacking.post(JARVIS_PATHS.ask, { ...chained, chain: "unknown-9" });
+    await lacking.post(JARVIS_PATHS.ask, { ...chained, chain: 'gno"land 1' });
+    expect(lacking.events().filter((event) => event["event"] === "jarvis_refused")).toEqual([
+      {
+        event: "jarvis_refused",
+        route: JARVIS_PATHS.ask,
+        method: "POST",
+        status: 400,
+        error: "refused",
+        reason: "no_chain",
+      },
+      { event: "jarvis_refused", route: JARVIS_PATHS.ask, method: "POST", status: 400, error: "refused" },
+    ]);
+  });
+
   it("refuses a chain that is no chain id, as it refuses any field its schema does not hold", async () => {
     const { post, explainer } = await withExplainer();
     expect((await post(JARVIS_PATHS.ask, { ...chained, chain: 'gno"land 1' })).status).toBe(400);

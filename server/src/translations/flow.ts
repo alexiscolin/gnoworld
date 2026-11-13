@@ -29,8 +29,8 @@ export interface TranslationFlowOptions {
   roles: Typed;
   /** None while Jarvis is off: nothing is made. */
   translate: Translate | undefined;
-  /** The languages in use on a world, the most recent first. */
-  languages: (world: string) => readonly Language[];
+  /** The languages in use on a world, the most read first; `except` an account whose own streams are left out. */
+  languages: (world: string, except?: string) => readonly Language[];
   publish: (event: TranslationEvent) => void;
   log: Log;
   now: () => number;
@@ -72,6 +72,13 @@ const MAKINGS_PER_MINUTE = 20;
 // A line worth translating: some text that is not a link and nothing else.
 const wanted = (text: string): boolean => text.trim() !== "" && !/^(?:https?:\/\/\S+\s*)+$/i.test(text.trim());
 
+// Whether another signed-in reader of the room's world reads the ask's language, among those a line is made in: a language read by none, or
+// by the asker alone, starts nothing, so one account cannot spend the day's budget on it.
+const readByOthers = (
+  languages: TranslationFlowOptions["languages"],
+  { room, language, account }: Pick<Ask, "room" | "language" | "account">,
+): boolean => languages(worldOf(room), account).slice(0, LANGUAGES_A_LINE).includes(language);
+
 const stopped = (outcomes: Iterable<Outcome>): "spent" | "off" | undefined =>
   [...outcomes].find((outcome): outcome is "spent" | "off" => outcome === "spent" || outcome === "off");
 
@@ -96,7 +103,8 @@ export function makeTranslationFlow(options: TranslationFlowOptions): Translatio
     const { room, ids, language, signedIn, account = "" } = asked;
     const jobs: { msgid: string; made: Promise<Outcome> }[] = [];
     const later: string[] = [];
-    if (!signedIn || !searchable(roles, room) || translate === undefined) return { jobs, later };
+    if (!signedIn || !searchable(roles, room) || translate === undefined || !readByOthers(languages, asked))
+      return { jobs, later };
     for (const msgid of ids) {
       const text = textOf(room, msgid, have);
       if (text === undefined) continue;

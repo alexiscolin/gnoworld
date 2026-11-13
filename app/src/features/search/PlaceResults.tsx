@@ -81,7 +81,7 @@ function Row({
         <span className={["truncate", styles["name"]].join(" ")}>
           <Marked text={item.name} hits={result.hits} />
         </span>
-        <span className={["truncate", styles["sub"]].join(" ")}>{result.note ?? item.description ?? ""}</span>
+        <span className="truncate meta">{result.note ?? item.description ?? ""}</span>
       </span>
       <Marks item={item} />
     </div>
@@ -114,7 +114,7 @@ export function PlaceResults({
   // A group's first row is the number of the rows before it.
   const firsts = groups.map((_, n) => groups.slice(0, n).reduce((sum, each) => sum + each.results.length, 0));
   return (
-    <div role="listbox" aria-label="Places" tabIndex={0} className={styles["listbox"]}>
+    <div id={LIST_ID} role="listbox" aria-label="Places" tabIndex={0} className={styles["listbox"]}>
       {groups.map((group, g) => (
         <div key={group.id} role="group" aria-label={group.label === "" ? "Results" : group.label}>
           {group.label === "" ? null : (
@@ -141,7 +141,9 @@ export function PlaceResults({
           })}
         </div>
       ))}
-      {more > 0 ? <p className={styles["more"]}>{`${String(more)} more · refine the words or the chips`}</p> : null}
+      {more > 0 ? (
+        <p className={["meta", styles["more"]].join(" ")}>{`${String(more)} more · refine the words or the chips`}</p>
+      ) : null}
     </div>
   );
 }

@@ -3,11 +3,12 @@ import { events, news } from "../../lateData.ts";
 import { useEffect, useState } from "react";
 import { unseenNotices } from "../../store/notices.ts";
 import { useApp } from "../../storeContext.tsx";
+import { useHere } from "../../useHere.ts";
 import { isLive, placeOf, universeAt } from "../events/index.ts";
+import { worldsFollowedIn } from "../follow/index.ts";
 import { feedOf, isUnread } from "./feed.ts";
 
 const MINUTE_MS = 60_000;
-const NOBODY: ReadonlyMap<string, number> = new Map();
 
 export function Watch({ onCount }: { onCount: (count: number) => void }) {
   // The clock read each minute: an event comes into the coming day, a news item ages out.
@@ -23,13 +24,17 @@ export function Watch({ onCount }: { onCount: (count: number) => void }) {
   // The count alone: a notice's words are the panel's, which brings the chat's naming with it.
   const notices = useApp(unseenNotices);
   const read = useApp(({ device }) => device.notificationsRead);
+  const follows = useApp(({ device }) => device.follows);
+  // Who is here as the page already holds it, never asked from here: the panel's own rows, counted as its All counts them.
+  const here = useHere(false);
   const universe = universeAt(location.pathname);
   const naming = {
     notice: () => ({ text: "", where: "", world: undefined, href: "" }),
     place: (world: string) => placeOf(universe, world),
     live: isLive,
   };
-  const items = feedOf({ notices, events, news, here: NOBODY, followed: [] }, naming, now);
+  const followed = worldsFollowedIn(follows, universe.id);
+  const items = feedOf({ notices, events, news, here, followed }, naming, now);
   const unread = items.filter((item) => isUnread(item, read)).length;
   useEffect(() => {
     onCount(unread);

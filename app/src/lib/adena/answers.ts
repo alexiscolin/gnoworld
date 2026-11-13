@@ -1,6 +1,6 @@
 // Adena's answers read as outside data (slice 9's plan, 9b): by their type, as the SDK tables them (bin/index.js:785-985),
 // each ending a call as a success or a failure with its reason. Nothing here asks Adena anything but the call it is given.
-import { ChallengeRequest } from "@gnoworld/schemas";
+import { AnyChainId } from "@gnoworld/schemas";
 import { z } from "../jitless.ts";
 
 export type CallFailure =
@@ -142,7 +142,8 @@ export async function read<T>(
   return parsed.success ? { ok: true, value: parsed.data } : refusal("malformed");
 }
 
-// The chain as the server's challenge takes it, not blank; the address stays the caller's to read, for it says why not.
-const Chain = ChallengeRequest.shape.chainId.check(z.refine((chain) => chain.trim() !== ""));
+// The chain as a wallet may name one, not blank, compared with the universe's later; the address stays the caller's to read, for it
+// says why not.
+const Chain = AnyChainId.check(z.refine((chain) => chain.trim() !== ""));
 export const Account = z.object({ address: z.string(), chainId: Chain });
 export const Network = z.object({ chainId: Chain });

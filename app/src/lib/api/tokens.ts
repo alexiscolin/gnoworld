@@ -9,8 +9,8 @@ function tokensApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
   return {
     /** The tokens of the realm at `realm`; a refusal `not_found` says it holds none the server knows. */
-    read: (realm: string): Promise<Result<TokenAnswer>> =>
-      call({ path: `/api/tokens/${rollupName(realm)}`, schema: TokenAnswer }),
+    read: (realm: string, signal?: AbortSignal): Promise<Result<TokenAnswer>> =>
+      call({ path: `/api/tokens/${rollupName(realm)}`, schema: TokenAnswer, signal }),
   };
 }
 

@@ -33,7 +33,7 @@ export default function TrendingCard() {
               <li key={item.world}>
                 <Row
                   look="plain"
-                  lead={<span className={styles["rank"]}>{at + 1}</span>}
+                  lead={<span className="data-text">{at + 1}</span>}
                   title={cutText(item.title, 40)}
                   {...(item.owner === null ? {} : { subtitle: shortAddress(item.owner) })}
                   trail={<span className={styles["calls"]}>{calls(item.calls)}</span>}

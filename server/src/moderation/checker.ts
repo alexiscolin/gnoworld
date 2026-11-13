@@ -31,9 +31,9 @@ interface Told {
   ask?: Ask | undefined;
 }
 
-// What the provider takes: a message, or a link card's text and picture (provider.ts).
 // The provider behind the lines' breaker: whether it is paused, and the client itself for another breaker (the link cards').
 export type Provider = Ask & { open: () => boolean; raw: Ask };
+// What the provider takes: a message, or a link card's text and picture (provider.ts).
 type Ask = (input: ModerationInput) => Promise<Answer | "unchecked">;
 
 /** OpenAI's client when a key is set, or the one the tests give, behind one breaker: made once, it is shared by the lines' check, the

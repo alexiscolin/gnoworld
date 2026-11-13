@@ -1,9 +1,8 @@
 // The Earth's plate (slice 13, D567): the adapter that gives the model what the chat knows of a universe's general room, who is here, from
-// how many countries, the realms deployed in 24 h, the messages an hour and the latest on X, with no block of the chain.
+// how many countries, the messages an hour and the latest on X, with no block of the chain.
 import { EARTH as EARTH_ID, stampKey } from "@gnoworld/core";
 import { EARTH_CHAT as EARTH } from "../../features/chat/index.ts";
 import { LatestOnX } from "../../features/home/LatestOnX.tsx";
-import { useEarthChain } from "../../features/world/useEarthChain.ts";
 import { useHours } from "../../features/world/useHours.ts";
 import { DOCS, explorerLink } from "../../lib/chain/explorer.ts";
 import { useQuery } from "@tanstack/react-query";
@@ -30,8 +29,6 @@ function earthLinks(universe: string) {
 }
 
 function useEarthPlate(universe: UniverseView): PlateModel {
-  // The Earth's room is followed for the page, which has no chat of its own to follow it.
-  useEarthChain();
   const here = useHere(true).get(EARTH.slug) ?? 0;
   const hours = useHours(EARTH.slug);
   // No read of the people (another universe's, or none came): no Countries figure; a read of none is a zero, and shows.

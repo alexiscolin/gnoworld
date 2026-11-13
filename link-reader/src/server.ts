@@ -3,6 +3,7 @@
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";
 import type { ReaderCard } from "@gnoworld/schemas";
+import { readBody, serverOptions } from "@gnoworld/service/http";
 import { z } from "zod";
 import { Refused } from "./fetch.ts";
 import type { Kind } from "./fetch.ts";
@@ -11,29 +12,17 @@ const BODY_MAX = 4096;
 const Ask = z.strictObject({ url: z.string() });
 
 export interface ServerDeps {
-  read: (url: string) => Promise<ReaderCard>;
+  /** The card of a URL; `signal` fires when its asker left. */
+  read: (url: string, signal: AbortSignal) => Promise<ReaderCard>;
   max: number;
-  /** One line per failure: its kind alone, never the URL. */
-  log: (entry: { kind: Kind | "bad_request" | "busy" | "crash" }) => void;
+  /** One line per failure: its kind alone, never the URL; `gone` for a client that left before its answer. */
+  log: (entry: { kind: Kind | "bad_request" | "busy" | "crash" | "gone" }) => void;
 }
 
 const send = (response: ServerResponse, status: number, body = "") =>
   response
     .writeHead(status, { "content-type": "application/json", "cache-control": "no-store", connection: "close" })
     .end(body);
-
-// The body, or undefined past the cap (declared or counted: a chunked body names no length).
-async function bodyOf(request: IncomingMessage): Promise<string | undefined> {
-  if (Number(request.headers["content-length"] ?? 0) > BODY_MAX) return undefined;
-  const parts: Buffer[] = [];
-  let size = 0;
-  for await (const part of request as AsyncIterable<Buffer>) {
-    size += part.length;
-    if (size > BODY_MAX) return undefined;
-    parts.push(part);
-  }
-  return Buffer.concat(parts).toString("utf8");
-}
 
 // The URL a request asks for, or undefined for a body that is not exactly `{"url": <string>}`.
 function urlOf(text: string): string | undefined {
@@ -47,12 +36,19 @@ function urlOf(text: string): string | undefined {
   return parsed.success ? parsed.data.url : undefined;
 }
 
+// One request, its response, and the signal its client's leaving fires.
+interface Exchange {
+  request: IncomingMessage;
+  response: ServerResponse;
+  left: AbortSignal;
+}
+
 // The answer to one page: its card, the kind of its refusal (422), or nothing at all (500).
-async function answer({ read, log }: ServerDeps, url: string, response: ServerResponse): Promise<void> {
+async function answer({ read, log }: ServerDeps, url: string, { response, left }: Exchange): Promise<void> {
   try {
-    send(response, 200, JSON.stringify(await read(url)));
+    send(response, 200, JSON.stringify(await read(url, left)));
   } catch (error) {
-    const kind = error instanceof Refused ? error.kind : "crash";
+    const kind = left.aborted ? "gone" : error instanceof Refused ? error.kind : "crash";
     log({ kind });
     send(
       response,
@@ -62,15 +58,16 @@ async function answer({ read, log }: ServerDeps, url: string, response: ServerRe
   }
 }
 
-async function card(deps: ServerDeps, request: IncomingMessage, response: ServerResponse): Promise<void> {
-  const text = await bodyOf(request);
+async function card(deps: ServerDeps, exchange: Exchange): Promise<void> {
+  const { request, response } = exchange;
+  const text = await readBody(request, BODY_MAX);
   if (text === undefined) return void send(response, 413);
-  const url = urlOf(text);
+  const url = text === null ? undefined : urlOf(text);
   if (url === undefined) {
     deps.log({ kind: "bad_request" });
     return void send(response, 400);
   }
-  await answer(deps, url, response);
+  await answer(deps, url, exchange);
 }
 
 function readerHandler(deps: ServerDeps): (request: IncomingMessage, response: ServerResponse) => void {
@@ -86,9 +83,13 @@ function readerHandler(deps: ServerDeps): (request: IncomingMessage, response: S
       return void send(response, 503);
     }
     active += 1;
-    card(deps, request, response)
+    const left = new AbortController();
+    response.once("close", () => {
+      if (!response.writableFinished) left.abort();
+    });
+    card(deps, { request, response, left: left.signal })
       .catch(() => {
-        deps.log({ kind: "crash" });
+        deps.log({ kind: left.signal.aborted ? "gone" : "crash" });
       })
       .finally(() => {
         active -= 1;
@@ -96,7 +97,7 @@ function readerHandler(deps: ServerDeps): (request: IncomingMessage, response: S
   };
 }
 
-/** The HTTP server: the handler with a header limit of 8 KiB, 5 s for the headers and 10 s for a whole request (a slow client frees its place). */
+/** The HTTP server: the handler with a header limit of 8 KiB and every service's timeouts (a slow client frees its place). */
 export function readerServer(deps: ServerDeps): Server {
-  return createServer({ headersTimeout: 5000, requestTimeout: 10_000, maxHeaderSize: 8192 }, readerHandler(deps));
+  return createServer({ ...serverOptions(), maxHeaderSize: 8192 }, readerHandler(deps));
 }

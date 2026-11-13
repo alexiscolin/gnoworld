@@ -1,12 +1,13 @@
 // What the linked accounts say when a call does not go through: what happened and what to do, in the person's words, never a code.
 import { shortDay } from "../../lib/days.ts";
 import type { Result } from "../../lib/api/http.ts";
+import { transportWords } from "../../lib/api/transportWords.ts";
 
 type Why = Exclude<Result<never>, { ok: true }>["reason"];
 const UNREACHED = "The server could not be reached. Try again in a moment.";
-const UNEXPECTED = "Something unexpected came back. Please try again.";
 
 const SAID: Record<Why, string> = {
+  ...transportWords(UNREACHED),
   unauthenticated: "Your session is too old to change links. Sign in again to confirm.",
   full: "This identity holds ten accounts already. Unlink one first.",
   too_many: "Too many tries: wait a minute, then try again.",
@@ -14,13 +15,6 @@ const SAID: Record<Why, string> = {
     "The server did not accept this. The code may have expired or been used, or the account is linked elsewhere.",
   forbidden: "This page is not allowed to do that here.",
   not_found: "That account is not linked any more.",
-  not_ready: UNREACHED,
-  unavailable: UNREACHED,
-  internal: UNREACHED,
-  network: UNREACHED,
-  malformed: UNEXPECTED,
-  unsupported: UNEXPECTED,
-  too_large: UNEXPECTED,
 };
 
 /** The sentence for a call the server refused or could not answer. */

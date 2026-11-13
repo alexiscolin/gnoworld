@@ -1,6 +1,6 @@
 import { ReaderCard } from "@gnoworld/schemas";
-import { describe, expect, it, vi } from "vitest";
-import { readCard } from "./card.ts";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { CARD_MS, readCard } from "./card.ts";
 import { Refused } from "./fetch.ts";
 import type { Deps, Reply, Request } from "./fetch.ts";
 import type { Codecs, Raster } from "./picture.ts";
@@ -234,5 +234,104 @@ describe("no card", () => {
     });
     await readCard(PAGE, deps, { ...codecs(), decodeJpeg: decode, decodePng: decode });
     expect(decode).not.toHaveBeenCalled();
+  });
+});
+
+describe("one deadline for the whole card", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  const PICTURE = "https://cdn.example.com/p.jpg";
+  const ROUTES: Record<string, () => Reply> = {
+    [PAGE]: () => html(og("og:title", "T") + og("og:image", PICTURE)),
+    [PICTURE]: () => image(photo()),
+  };
+  // Hosts that answer by URL after `ms`, or never; the signal of each request kept.
+  const slow = (ms: number | undefined) => {
+    const signals: AbortSignal[] = [];
+    const deps: Deps = {
+      lookup: () => Promise.resolve([PUBLIC]),
+      transport: (request) => {
+        signals.push(request.signal);
+        const reply = ROUTES[request.url.href] ?? (() => ({ status: 404, headers: {}, body: once(new Uint8Array()) }));
+        return new Promise((resolve) => {
+          if (ms !== undefined)
+            setTimeout(() => {
+              resolve(reply());
+            }, ms);
+        });
+      },
+    };
+    return { deps, signals };
+  };
+
+  it("stops the picture at the card's deadline, though the page and the picture each come within their own 5 s", async () => {
+    vi.useFakeTimers();
+    expect(CARD_MS).toBe(7000);
+    const { deps, signals } = slow(4000);
+    const decode = vi.fn(() => Promise.resolve(raster(640, 480)));
+    const card = readCard(PAGE, deps, { ...codecs(), decodeJpeg: decode });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((await card).picture).toBeNull();
+    expect(signals[1]?.aborted).toBe(true);
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("decodes nothing once the deadline passed while the picture waited for the decoder", async () => {
+    vi.useFakeTimers();
+    const { deps } = slow(0);
+    const hold = <T>(job: () => Promise<T>) =>
+      new Promise<T>((resolve) => {
+        setTimeout(() => {
+          resolve(job());
+        }, 8000);
+      });
+    const decode = vi.fn(() => Promise.resolve(raster(640, 480)));
+    const card = readCard(PAGE, { ...deps, hold }, { ...codecs(), decodeJpeg: decode });
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect((await card).picture).toBeNull();
+    expect(decode).not.toHaveBeenCalled();
+  });
+
+  it("stops the reader's work at once when its asker leaves: the fetch's signal fires", async () => {
+    vi.useFakeTimers();
+    const { deps, signals } = slow(undefined);
+    const left = new AbortController();
+    const card = readCard(PAGE, { ...deps, signal: left.signal }, codecs()).catch((error: unknown) => error);
+    await vi.advanceTimersByTimeAsync(10);
+    expect(signals[0]?.aborted).toBe(false);
+    left.abort();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(signals[0]?.aborted).toBe(true);
+    expect(await card).toBeInstanceOf(Refused);
+  });
+});
+
+describe("a picture left out", () => {
+  const PICTURE = "https://cdn.example.com/p.jpg";
+  it.each([
+    { name: "its fetch's refusal", served: photo, address: "https://cdn.example.com/none.jpg", kind: "status" },
+    { name: "a header that is no picture", served: () => enc("<html></html>"), address: PICTURE, kind: "header" },
+    { name: "a decoder that fails", served: photo, address: PICTURE, kind: "decode", fails: true },
+  ])("logs $name, its kind alone, never the URL", async ({ served, address, kind, fails }) => {
+    const { deps } = web({
+      [PAGE]: () => html(og("og:title", "T") + og("og:image", address)),
+      [PICTURE]: () => image(served()),
+    });
+    const log = vi.fn();
+    const broken = fails === true ? { decodeJpeg: () => Promise.reject(new Error("trap")) } : {};
+    const card = await readCard(PAGE, { ...deps, log }, { ...codecs(), ...broken });
+    expect(card.picture).toBeNull();
+    expect(log.mock.calls).toEqual([[{ picture: kind }]]);
+  });
+
+  it("logs nothing for a card whose picture was made", async () => {
+    const { deps } = web({
+      [PAGE]: () => html(og("og:title", "T") + og("og:image", "https://cdn.example.com/p.jpg")),
+      "https://cdn.example.com/p.jpg": () => image(photo()),
+    });
+    const log = vi.fn();
+    expect((await readCard(PAGE, { ...deps, log }, codecs())).picture).not.toBeNull();
+    expect(log).not.toHaveBeenCalled();
   });
 });

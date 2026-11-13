@@ -29,11 +29,6 @@
     letter-spacing: normal;
   }
 
-  .sub {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
   /* A square's detail is held shut and out of reach while closed; it opens with the card's own move, not a move of its own. */
   .fold {
     /* layout: one row, whose height is the detail's */
@@ -50,10 +45,5 @@
   .fold > .more {
     min-block-size: 0;
     overflow: hidden;
-  }
-
-  .more {
-    color: var(--color-text-muted);
-    font: var(--font-data);
   }
 }

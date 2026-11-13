@@ -2,7 +2,6 @@
 import { shortAddress } from "@gnoworld/schemas";
 import { grouped, Stack } from "@gnoworld/ui";
 import type { CallCard as Card_ } from "../../lib/calls.ts";
-import appear from "../../enter.module.css";
 import styles from "./CallCard.module.css";
 import { sayFailure, shown } from "./say.ts";
 
@@ -19,7 +18,7 @@ export function CallStatus({ card }: { card: Card_ }) {
   const { state } = card;
   if (state.kind === "signing") {
     return (
-      <p role="status" className={[styles["line"], appear["enter"]].join(" ")}>
+      <p role="status" className={[styles["line"], "enter"].join(" ")}>
         <Mark kind="ring" />
         <span>Waiting for your signature in Adena…</span>
       </p>
@@ -27,7 +26,7 @@ export function CallStatus({ card }: { card: Card_ }) {
   }
   if (state.kind === "landing") {
     return (
-      <p role="status" className={[styles["line"], appear["enter"]].join(" ")}>
+      <p role="status" className={[styles["line"], "enter"].join(" ")}>
         <Mark kind="ring" />
         <span>
           Landing in a block… <Tx hash={state.hash} />
@@ -39,14 +38,14 @@ export function CallStatus({ card }: { card: Card_ }) {
   if (state.kind === "done") {
     return (
       <Stack space="2xs">
-        <p role="status" className={[styles["line"], appear["enter"]].join(" ")}>
+        <p role="status" className={[styles["line"], "enter"].join(" ")}>
           <Mark kind="dot" />
           <span>
             Signed · <Tx hash={state.hash} />, in block {grouped(state.height)}.
           </span>
         </p>
         {state.value === "" ? null : (
-          <p className={[styles["value"], appear["enter"]].join(" ")}>Returned {shown(state.value)}</p>
+          <p className={[styles["value"], "enter"].join(" ")}>Returned {shown(state.value)}</p>
         )}
       </Stack>
     );
@@ -54,7 +53,7 @@ export function CallStatus({ card }: { card: Card_ }) {
   if (state.kind === "failed") {
     return (
       <Stack space="2xs">
-        <p role="status" className={appear["enter"]}>
+        <p role="status" className="enter">
           {sayFailure(state)}
         </p>
         {state.hash === undefined || state.reason === "unseen" ? null : (

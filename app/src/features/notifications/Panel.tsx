@@ -13,7 +13,6 @@ import { placeOf, universeAt } from "../events/index.ts";
 import { isUnread, type Item, type NoticeKind } from "./feed.ts";
 import { Head, Line, WorldChips } from "./PanelParts.tsx";
 import { useFeed } from "./useFeed.ts";
-import appear from "../../enter.module.css";
 import styles from "./Panel.module.css";
 
 const KINDS: { id: "all" | NoticeKind; label: string }[] = [
@@ -142,7 +141,7 @@ export function Panel({
         {shown.length === 0 ? (
           <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />
         ) : (
-          <ol key={`${kind}:${world ?? ""}`} className={[styles["list"], appear["enter"]].join(" ")}>
+          <ol key={`${kind}:${world ?? ""}`} className={[styles["list"], "enter"].join(" ")}>
             {shown.map((item) => (
               <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={open} />
             ))}
@@ -152,7 +151,7 @@ export function Panel({
         <ComingSoon name="New realms and proposals, from the chain">
           New realms and proposals, from the chain
         </ComingSoon>
-        <p className={styles["note"]}>What you have read is kept on this device alone.</p>
+        <p className="meta">What you have read is kept on this device alone.</p>
       </Surface>
       {leaving.dialog}
     </div>,

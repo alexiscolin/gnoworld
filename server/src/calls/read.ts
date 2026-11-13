@@ -2,7 +2,7 @@
 // schema each. The answer is a stranger's text: stripped of control and format characters and cut before it is kept or served.
 import { blockTimes } from "@gnoworld/chain/asks";
 import { callAsk } from "@gnoworld/chain/callAsk";
-import { CALL_CAPS, CallDetail, stripHidden } from "@gnoworld/schemas";
+import { CALL_DETAIL_CAPS, CallDetail, strictUtf8, stripHidden } from "@gnoworld/schemas";
 import { fetchCapped, jsonOrFail, type Send } from "@gnoworld/service/net";
 import { z } from "zod";
 import { parseBlockTimes } from "../worlds/blockDays.ts";
@@ -74,11 +74,9 @@ async function ask(where: { send: Send; indexer: string; maxBytes: number }, bod
     body: JSON.stringify(body),
   };
   const bytes = await fetchCapped(where.send, { url: where.indexer, init }, { ms: CALL_MS, maxBytes: where.maxBytes });
-  try {
-    return jsonOrFail(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
-  } catch (error) {
-    throw error instanceof Failure ? error : new Failure("shape");
-  }
+  const text = strictUtf8(bytes);
+  if (text === null) throw new Failure("shape");
+  return jsonOrFail(text);
 }
 
 // The block's time, or null: a call's detail is worth showing without it.
@@ -96,10 +94,10 @@ type Message = Row["messages"][number]["value"];
 type Event = NonNullable<NonNullable<Row["response"]>["events"]>[number];
 
 const eventOf = ({ type, attrs }: Event) => ({
-  type: cut(type ?? "", CALL_CAPS.type),
-  attrs: (attrs ?? []).slice(0, CALL_CAPS.attrs).map(({ key, value }) => ({
-    key: cut(key, CALL_CAPS.key),
-    value: cut(value, CALL_CAPS.value),
+  type: cut(type ?? "", CALL_DETAIL_CAPS.type),
+  attrs: (attrs ?? []).slice(0, CALL_DETAIL_CAPS.attrs).map(({ key, value }) => ({
+    key: cut(key, CALL_DETAIL_CAPS.key),
+    value: cut(value, CALL_DETAIL_CAPS.value),
   })),
 });
 
@@ -114,15 +112,15 @@ function detailOf(row: Row, value: Message, time: string | null): unknown {
     realm: value.pkg_path,
     func: cut(value.func ?? "", 64),
     success: row.success,
-    error: orNull(row.response?.error, CALL_CAPS.error),
+    error: orNull(row.response?.error, CALL_DETAIL_CAPS.error),
     gas: { used: row.gas_used, wanted: row.gas_wanted },
     fee: row.gas_fee,
     send: orNull(value.send, 64),
-    memo: orNull(row.memo, CALL_CAPS.memo),
-    args: args.slice(0, CALL_CAPS.args).map((arg) => cut(arg, CALL_CAPS.arg)),
-    moreArgs: Math.max(0, args.length - CALL_CAPS.args),
-    events: events.slice(0, CALL_CAPS.events).map(eventOf),
-    moreEvents: Math.max(0, events.length - CALL_CAPS.events),
+    memo: orNull(row.memo, CALL_DETAIL_CAPS.memo),
+    args: args.slice(0, CALL_DETAIL_CAPS.args).map((arg) => cut(arg, CALL_DETAIL_CAPS.arg)),
+    moreArgs: Math.max(0, args.length - CALL_DETAIL_CAPS.args),
+    events: events.slice(0, CALL_DETAIL_CAPS.events).map(eventOf),
+    moreEvents: Math.max(0, events.length - CALL_DETAIL_CAPS.events),
   };
 }
 

@@ -1,6 +1,7 @@
 // The links between worlds, drawn while the Map shows a system, the home or a world (D433): a line from each world to those it is built on
 // and those built on it, from the worlds' file's imports (cosmosWorld.ts's usesOf), the planets' ends following their orbits. One
 // preallocated, bounded buffer, written each frame; the orbits' colour, their faint strength for a system's own links, a world's brighter.
+import { damp } from "@gnoworld/core";
 import { BufferAttribute, BufferGeometry, DynamicDrawUsage, LineSegments, ShaderMaterial, Vector3 } from "three";
 import { placeOf, type Planet, type System, type Universe, type Vec } from "../layout.ts";
 import { LENS_DIM } from "../shaders/planets.ts";
@@ -120,7 +121,7 @@ export class Links {
     const same = links === this.#shown && bright === this.#bright;
     if (!same && this.gain.value < 1e-3) this.#set(links, bright, lens);
     const to = same && links !== NONE ? 1 : 0;
-    this.gain.value += (to - this.gain.value) * (1 - Math.exp(-delta / 1000 / EASE_S));
+    this.gain.value += (to - this.gain.value) * damp(delta / 1000, EASE_S);
     if (this.gain.value < 1e-3) {
       this.gain.value = 0;
       return;

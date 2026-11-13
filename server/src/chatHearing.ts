@@ -21,17 +21,16 @@ interface Seen {
   now: () => number;
 }
 
-// What the chat hands on of who is here (7h, 7t3): its route, what it serves and the trends' signals; none without its file.
-export const presentOf = (present: Present | undefined) =>
-  present === undefined ? {} : { presence: present.routes, presenceNow: present.current, presenceChat: present.chat };
+// What the chat hands on of who is here (7h): its route; none without its file.
+export const presentOf = (present: Present | undefined) => (present === undefined ? {} : { presence: present.routes });
 
-// Who is here (7h), in the rooms a guest may see: none without its file.
-// What the presence reads of the stream: who has the site open (D352) and each world (D374).
 // What the presence reads of the activity: the accounts' pace, and the guests' beside it (D374).
 const ratesOf = ({ rates, guestRates }: Activity) => ({ rates, guestRates });
 
+// What the presence reads of the stream: who has the site open (D352) and each world (D374).
 const watchersOf = ({ watching, watchingIn }: Stream) => ({ watching, inWorlds: watchingIn });
 
+// Who is here (7h), in the rooms a guest may see: none without its file.
 export function presentFor(db: DatabaseSync, file: string | undefined, { visible, activity, stream, log, now }: Seen) {
   if (file === undefined) return undefined;
   return startPresent({

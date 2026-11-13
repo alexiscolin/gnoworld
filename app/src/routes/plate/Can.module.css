@@ -1,7 +1,0 @@
-/* What it can do: the line under the chips, in the data type. */
-@layer components {
-  .hint {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-}

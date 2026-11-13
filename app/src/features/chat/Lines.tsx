@@ -4,7 +4,7 @@
 // list is one tab stop, a line, the arrows moving among them; a line pointed at or focused shows its bar.
 import { foldEdits, reactionsOn, threadsOf, type Line, type Reacting } from "@gnoworld/core";
 import { useEntries } from "./chainEntries.ts";
-import { withJarvis } from "./jarvisEntries.tsx";
+import { useSaidAnswers, withJarvis } from "./jarvisEntries.tsx";
 import { useJarvisItems } from "../../jarvisHere.ts";
 import { lineKeeping } from "./LineKeeping.tsx";
 import {
@@ -59,7 +59,7 @@ export function Lines(props: LinesProps) {
   // Here, not in the list a pointer redraws: the grouping is read once as the lines change.
   const now = useNow();
   const entries = withDays(
-    withJarvis(useEntries(lines, props.room), useJarvisItems(props.room, props.me)),
+    withJarvis(useEntries(lines, props.room), useJarvisItems(props.room, props.me), useSaidAnswers(props.room)),
     new Date(now),
   );
   return (

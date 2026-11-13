@@ -1,9 +1,10 @@
 // A call's detail (GET /api/calls/<hash>/<index>): what one call of a transaction did, read by the server from the indexer and cut to
 // these caps. Every text is a stranger's, already stripped of control and format characters and cut; the page strips and cuts it again.
 import { Address } from "./address.ts";
+import { ChainRealmPath } from "./realmPath.ts";
 import { z } from "./zod.ts";
 
-export const CALL_CAPS = {
+export const CALL_DETAIL_CAPS = {
   args: 10,
   events: 5,
   attrs: 6,
@@ -41,27 +42,27 @@ export const CallDetail = z.strictObject({
   /** The block's time, or null when the indexer did not give it. */
   time: z.nullable(z.iso.datetime()),
   caller: Address,
-  realm: z.string().check(z.maxLength(256), z.regex(/^gno\.land\/r\/[a-z0-9][a-z0-9_/-]*$/)),
+  realm: ChainRealmPath,
   func: text(64),
   success: z.boolean(),
   /** The chain's error text of a failed call. */
-  error: z.nullable(text(CALL_CAPS.error)),
+  error: z.nullable(text(CALL_DETAIL_CAPS.error)),
   gas: z.strictObject({ used: count(), wanted: count() }),
   fee: z.nullable(z.strictObject({ amount: count(), denom: z.string().check(z.regex(/^[a-z]{2,16}$/)) })),
   send: z.nullable(text(64)),
-  memo: z.nullable(text(CALL_CAPS.memo)),
-  args: z.array(text(CALL_CAPS.arg)).check(z.maxLength(CALL_CAPS.args)),
+  memo: z.nullable(text(CALL_DETAIL_CAPS.memo)),
+  args: z.array(text(CALL_DETAIL_CAPS.arg)).check(z.maxLength(CALL_DETAIL_CAPS.args)),
   moreArgs: count(),
   events: z
     .array(
       z.strictObject({
-        type: text(CALL_CAPS.type),
+        type: text(CALL_DETAIL_CAPS.type),
         attrs: z
-          .array(z.strictObject({ key: text(CALL_CAPS.key), value: text(CALL_CAPS.value) }))
-          .check(z.maxLength(CALL_CAPS.attrs)),
+          .array(z.strictObject({ key: text(CALL_DETAIL_CAPS.key), value: text(CALL_DETAIL_CAPS.value) }))
+          .check(z.maxLength(CALL_DETAIL_CAPS.attrs)),
       }),
     )
-    .check(z.maxLength(CALL_CAPS.events)),
+    .check(z.maxLength(CALL_DETAIL_CAPS.events)),
   moreEvents: count(),
 });
 export type CallDetail = z.infer<typeof CallDetail>;

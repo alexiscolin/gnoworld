@@ -49,6 +49,20 @@ describe("a mention in the field", () => {
     expect(pieces("@g1short").drawn).toEqual(["@g1short"]);
   });
 
+  it("is one chip for an address run on by another, as the room reads one mention there", () => {
+    expect(pieces(`@${ALICE}@${ALICE}`).drawn).toEqual(["[@g10gh7…3y5tv]", `@${ALICE}`]);
+    expect(mentions(markdown(`@${ALICE}@${ALICE}`))).toEqual([ALICE]);
+  });
+
+  it.each([
+    ["a combining mark", "e\u0301"],
+    ["a zero-width space", "x\u200b"],
+    ["a tag character", "x\u{e0001}"],
+  ])("is no chip after %s, where the room reads no mention either", (_, prior) => {
+    expect(pieces(`${prior}@${ALICE}`).drawn).toEqual([`${prior}@${ALICE}`]);
+    expect(mentions(markdown(`${prior}@${ALICE}`))).toEqual([]);
+  });
+
   it("carries data-mention and the address in its title in the page, the design system's look", () => {
     const editor = createComposerEditor();
     const root = document.createElement("div");

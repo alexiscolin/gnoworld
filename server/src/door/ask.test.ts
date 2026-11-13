@@ -921,63 +921,17 @@ describe("Jarvis's guards before any model call", () => {
     });
   });
 
-  describe("a room's cap", () => {
+  describe("a room's questions", () => {
     const own = (at: number, room = "#bubble") => ({ body: { question: `a question number ${String(at)}`, room } });
 
-    it("is 30 questions an hour, the 31st answered busy, counting no question and no strike", async () => {
-      const { ask, sent, quota, counted, day, clock } = setup({ perMinute: 1000 });
+    it("takes an account's 31st question of the hour in one room: only the person's own limits hold it (D13130)", async () => {
+      const { ask, sent, quota, clock } = setup({ perMinute: 1000 });
       quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (let at = 0; at < 30; at += 1) {
+      for (let at = 0; at < 31; at += 1) {
         await passed(await ask(own(at)));
         clock.now += 10_000;
       }
-      expect(await answerOf(await ask(own(30)))).toEqual([200, { status: "busy" }]);
-      expect(sent).toHaveLength(30);
-      expect(counted()).toEqual([{ account: ANNA, day: "2026-11-04", count: 30 }]);
-      expect(day.paused(ANNA)).toBe(false);
-      await passed(await ask(own(31, "#other")));
-    });
-
-    it("lets a room ask again an hour after its questions", async () => {
-      const { ask, quota, clock } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (let at = 0; at < 30; at += 1) await ask(own(at));
-      expect(await answerOf(await ask(own(30)))).toEqual([200, { status: "busy" }]);
-      clock.now += 61 * MINUTE;
-      expect(await answerOf(await ask(own(31)))).toEqual([200, ANSWER()]);
-    });
-
-    it("does not count a served answer or a question the list declined", async () => {
-      const { ask, sent, quota } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (let at = 0; at < 40; at += 1) await ask({ body: HERE });
-      for (let at = 0; at < 2; at += 1) await ask({ body: POEM });
-      for (let at = 0; at < 29; at += 1) await passed(await ask(own(at)));
-      expect(sent).toHaveLength(30);
-      expect(await answerOf(await ask(own(29)))).toEqual([200, { status: "busy" }]);
-    });
-
-    it("serves a kept answer in a full room, never busy, and answers a fresh question busy", async () => {
-      const { ask, quota, work } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      await ask({ body: HERE });
-      for (let at = 0; at < 29; at += 1) await ask(own(at));
-      work.splice(0);
-      expect(await answerOf(await ask({ body: HERE }))).toEqual([200, ANSWER()]);
-      expect(await answerOf(await ask(own(3)))).toEqual([200, ANSWER()]);
-      expect(await answerOf(await ask(own(30)))).toEqual([200, { status: "busy" }]);
-      expect(await answerOf(await ask({ body: POEM }))).toEqual([200, { status: "declined" }]);
-    });
-
-    it("is a room's, not an account's: many accounts in one room share it", async () => {
-      const { ask, quota } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      quota.change({ setting: "unlimited", account: BEN, unlimited: true });
-      for (let at = 0; at < 15; at += 1) {
-        await ask({ ...own(at), token: ANNA_TOKEN });
-        await ask({ ...own(100 + at), token: BEN_TOKEN });
-      }
-      expect(await answerOf(await ask({ ...own(200), token: BEN_TOKEN }))).toEqual([200, { status: "busy" }]);
+      expect(sent).toHaveLength(31);
     });
   });
 });
@@ -1150,90 +1104,6 @@ describe("Jarvis's guards, second round", () => {
       day.spend(ANNA, SHARE);
       expect(await answerOf(await ask())).toEqual([200, { status: "paused" }]);
     });
-
-    it("answers busy before full: a full room is told so with no name read", async () => {
-      const { ask, quota, work } = setup({ perMinute: 1000, named: false });
-      quota.change({ setting: "unlimited", account: BEN, unlimited: true });
-      for (let at = 0; at < 5; at += 1) await ask(distinct(at));
-      for (let at = 5; at < 30; at += 1) await ask({ ...distinct(at), token: BEN_TOKEN });
-      work.splice(0);
-      expect(await answerOf(await ask(distinct(30)))).toEqual([200, { status: "busy" }]);
-      expect(work).toEqual(["read #bubble"]);
-    });
-  });
-
-  describe("the room's cap", () => {
-    it("is a sliding hour: busy at 59 minutes after the first question, free at 60, then full again", async () => {
-      const { ask, quota, clock } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (let at = 0; at < 30; at += 1) {
-        await ask(distinct(at));
-        clock.now += 10_000;
-      }
-      clock.now = T0 + 59 * MINUTE;
-      expect(await answerOf(await ask(distinct(30)))).toEqual([200, { status: "busy" }]);
-      clock.now = T0 + 60 * MINUTE;
-      expect(await answerOf(await ask(distinct(31)))).toEqual([200, ANSWER()]);
-      expect(await answerOf(await ask(distinct(32)))).toEqual([200, { status: "busy" }]);
-    });
-
-    it("lets exactly 30 of 35 accounts' questions at once reach jarvis", async () => {
-      const { ask, sent } = setup({ perMinute: 1000 });
-      const answers = await Promise.all(
-        Array.from(
-          { length: 35 },
-          async (_, at) => (await answerOf(await ask({ ...distinct(at), token: crowd(at) })))[1],
-        ),
-      );
-      expect(sent).toHaveLength(30);
-      expect(answers.filter((answered) => JSON.stringify(answered).includes("busy"))).toHaveLength(5);
-    });
-
-    it("counts the fixed asks' misses with the questions", async () => {
-      const { ask, quota } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (const letter of "abcdefghijklmno") await ask({ body: { ...EXPLAIN, function: `F${letter}` } });
-      for (let at = 0; at < 15; at += 1) await passed(await ask(distinct(at)));
-      expect(await answerOf(await ask(distinct(15)))).toEqual([200, { status: "busy" }]);
-    });
-
-    it("is eaten by no question the room refused", async () => {
-      const { ask, sent, quota } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: BEN, unlimited: true });
-      for (let at = 0; at < 35; at += 1) expect((await ask({ ...distinct(at, "#bubble/crew") })).status).toBe(403);
-      for (let at = 0; at < 30; at += 1) await passed(await ask({ ...distinct(at, "#bubble/crew"), token: BEN_TOKEN }));
-      expect(sent).toHaveLength(30);
-    });
-
-    it("gives its slot back for a quota full, a spent, an off and a call failing before the model", async () => {
-      const full = setup({ perMinute: 1000, named: false });
-      for (let at = 0; at < 40; at += 1) await full.ask(distinct(at));
-      for (let at = 100; at < 105; at += 1) await passed(await full.ask({ ...distinct(at), token: BEN_TOKEN }));
-      for (const called of [
-        { ok: true, answer: { status: "spent" } },
-        { ok: true, answer: { status: "off" } },
-        { ok: false, error: "down" },
-        { ok: false, error: "refused" },
-      ] as const) {
-        const { ask, quota } = setup({ perMinute: 1000, answer: () => Promise.resolve(called) });
-        quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-        for (let at = 0; at < 35; at += 1) await ask(distinct(at));
-        expect(JSON.stringify(await (await ask(distinct(99))).json())).not.toContain("busy");
-      }
-    });
-
-    it("keeps its slot for a failed answer that cost, as for a slow or a wrong one", async () => {
-      for (const called of [
-        { ok: true, answer: { status: "failed", cost: 5 } },
-        { ok: false, error: "slow" },
-        { ok: false, error: "shape" },
-      ] as const) {
-        const { ask, quota } = setup({ perMinute: 1000, answer: () => Promise.resolve(called) });
-        quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-        for (let at = 0; at < 30; at += 1) await ask(distinct(at));
-        expect(await answerOf(await ask(distinct(30)))).toEqual([200, { status: "busy" }]);
-      }
-    });
   });
 
   describe("the share and the strikes", () => {
@@ -1321,10 +1191,14 @@ describe("Jarvis's guards, second round", () => {
       const early = setup({ heard: false });
       await early.ask();
       expect(early.events().at(-1)).toBe(line("early"));
-      const { ask, events, quota } = setup({ perMinute: 1000 });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (let at = 0; at < 31; at += 1) await ask(distinct(at));
+      const held = deferred<Asked>();
+      const { ask, events, sent } = setup({ perMinute: 100, answer: () => held.promise });
+      const first = ask(distinct(0));
+      await expect.poll(() => sent.length).toBe(1);
+      await ask(distinct(1));
       expect(events().at(-1)).toBe(line("busy", room));
+      held.resolve({ ok: true, answer: PAID() });
+      await first;
     });
   });
 });
@@ -1375,7 +1249,7 @@ describe("Jarvis's guards, step 4", () => {
     expect(sent).toHaveLength(1);
   });
 
-  it("charges 0.05 $ to the share for a call whose cost it cannot learn, and keeps its question and slot", async () => {
+  it("charges 0.05 $ to the share for a call whose cost it cannot learn, and keeps its question", async () => {
     for (const error of ["slow", "failed", "shape", "lost"] as const) {
       const { ask, counted, sent } = setup({ perMinute: 100, answer: () => Promise.resolve({ ok: false, error }) });
       for (let at = 0; at < 5; at += 1) await ask(distinct(at));
@@ -1392,7 +1266,7 @@ describe("Jarvis's guards, step 4", () => {
     }
   });
 
-  it("charges the cost of a spent that carries one, and gives the question and the slot back only when nothing was spent", async () => {
+  it("charges the cost of a spent that carries one, and gives the question back only when nothing was spent", async () => {
     const costly = setup({
       perMinute: 100,
       answer: () => Promise.resolve({ ok: true, answer: { status: "spent", cost: 50_000 } }),
@@ -1406,18 +1280,6 @@ describe("Jarvis's guards, step 4", () => {
     expect(free.counted()).toEqual([{ account: ANNA, day: "2026-11-04", count: 0 }]);
   });
 
-  it("keeps the slot of a spent that cost, gives it back for one that cost nothing", async () => {
-    for (const [answer, busy] of [
-      [{ status: "spent", cost: 1 }, true],
-      [{ status: "spent" }, false],
-    ] as const) {
-      const { ask, quota } = setup({ perMinute: 1000, answer: () => Promise.resolve({ ok: true, answer }) });
-      quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-      for (let at = 0; at < 30; at += 1) await ask(distinct(at));
-      expect(JSON.stringify(await (await ask(distinct(30))).json()).includes("busy")).toBe(busy);
-    }
-  });
-
   it("answers an empty room's catch-up at the door, with no model and nothing counted", async () => {
     const { ask, sent, counted } = setup({ perMinute: 100, empty: true });
     const answered = { status: "answered", markdown: "Nothing was said here yet.", buttons: [] };
@@ -1425,12 +1287,6 @@ describe("Jarvis's guards, step 4", () => {
     expect([sent, counted()]).toEqual([[], []]);
     await passed(await ask(distinct(0)));
     expect(sent).toHaveLength(1);
-  });
-
-  it("takes the room's cap only for a room the chat has heard", async () => {
-    const { ask, quota } = setup({ perMinute: 1000, last: null });
-    quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
-    for (let at = 0; at < 35; at += 1) await passed(await ask(distinct(at)));
   });
 
   it("keeps no answer whose call began before its room's lines changed", async () => {

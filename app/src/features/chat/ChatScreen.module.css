@@ -17,7 +17,7 @@
 
   /* Where no dock holds the chat (under 1280 px) it fades in as it mounts, on the entering curve; beside a plate or alone over the scene the
      dock's glass fill-in does it (ui's Panel). */
-  @media (max-width: 1279px) {
+  @media (width < 1280px) {
     .screen:not([data-full]) {
       opacity: 1;
       transition: var(--transition-fade);
@@ -34,7 +34,8 @@
   .screen[data-full] {
     position: fixed;
     inset: var(--flash-room) 0 0;
-    /* raw: above the page's header, whose z-index is 2 (shellHeader.module.css), until the layers' tokens come with the scene */
+    /* raw: over the page, the plate and the dock; under the page's header from 900 px (4, shellHeader.module.css), which it runs
+       under to the window's top; over a phone's header and its bars (2) */
     z-index: 3;
   }
 
@@ -53,37 +54,6 @@
      stood, the chat's surface under it. */
   :root:has(.screen[data-full]:not([data-compact])) {
     --chat-head: calc(var(--control-m) + 2 * var(--space-s));
-  }
-
-  /* Its columns from the site's header's foot, under a rule, as its still copy, marked as it, keeps them while it shrinks back to its dock (fullMove.ts); the place and the room the conversation's own title, over its first lines
-     (Alexis, 2026-11-09: "au-dessus du chat"). The band keeps its row, so the title stands over the conversation's column. */
-  [data-full]:not([data-compact]) [data-region="header"] {
-    /* layout: the band over the columns' top, out of their way */
-    position: absolute;
-    inset-block-start: var(--banner-under);
-    inset-inline: 0;
-    /* layout: the title on the lines' own edge (RoomView.module.css's room), past the band's padding */
-    /* raw: no inset where the chat sets none, the lines' 32 px then */
-    padding-inline-start: calc(var(--space-m) + max(var(--chat-inset, 0px), var(--space-l)));
-    border-block-end: 0;
-    pointer-events: none;
-  }
-
-  /* Only the band's controls take a click: the rest of it lets the columns under it have theirs. */
-  [data-full]:not([data-compact]) [data-region="header"] :is(a, button) {
-    pointer-events: auto;
-  }
-
-  /* The columns from the site's header's foot, under a rule across the window (Alexis, 2026-11-09). */
-  [data-full]:not([data-compact]) [data-region="header"] + * {
-    /* layout: the columns under the site's header, the band out of their flow */
-    margin-block-start: var(--banner-under);
-    border-block-start: var(--line-width) solid var(--color-line);
-  }
-
-  [data-full]:not([data-compact]) [data-region="conversation"] {
-    /* layout: the conversation's lines under its title */
-    padding-block-start: var(--chat-head);
   }
 
   /* Full bleed on a wide screen, the arrival's pill stands in its band's empty centre (frame 73), under the site's header: the lines
@@ -120,10 +90,10 @@
     padding-block-end: var(--space-s);
   }
 
-  /* raw: the 320 px dock of a window under 1400 px: the list keeps 300 px */
-  @media (max-width: 1399px) {
+  /* The narrow dock of a window under 1400 px: the list keeps its width. */
+  @media (width < 1400px) {
     .screen:not([data-full]) {
-      --chat-inset: 8px;
+      --chat-inset: var(--space-2xs);
     }
   }
 

@@ -25,8 +25,17 @@ export function report(kind: ErrorKind, route: string): void {
   if (REPORTED.has(kind) && typeof reportError === "function") reportError(new Error(`${kind} at ${route}`));
 }
 
-let stamped: Date | undefined;
-/** The moment the page first needed a reference, the same on every read. */
-export function stamp(): Date {
-  return (stamped ??= new Date());
+const stamps = new WeakMap<object, Date>();
+// A thrown string or number cannot key a WeakMap: the last one is kept by its value.
+let loose: { error: unknown; at: Date } | undefined;
+
+/** The moment the page first needed a reference for `error`, the same on every read of it. */
+export function stamp(error: unknown): Date {
+  if ((typeof error === "object" && error !== null) || typeof error === "function") {
+    const at = stamps.get(error) ?? new Date();
+    stamps.set(error, at);
+    return at;
+  }
+  if (loose === undefined || !Object.is(loose.error, error)) loose = { error, at: new Date() };
+  return loose.at;
 }

@@ -1,6 +1,6 @@
 import { CARD_CAPS } from "@gnoworld/schemas";
 import { describe, expect, it, vi } from "vitest";
-import { inspect, PIXELS_MAX, reencode, SIDE_MAX, SIDE_MIN, SURFACE, wasmCodecs } from "./picture.ts";
+import { inspect, PIXELS_MAX, reencode, SCANS_MAX, SIDE_MAX, SIDE_MIN, SURFACE, wasmCodecs } from "./picture.ts";
 import type { Codecs, Raster } from "./picture.ts";
 import {
   animated,
@@ -110,6 +110,42 @@ describe("inspect: a header that hides its frame", () => {
     const { codecs, decoded } = spy();
     await expect(reencode(bytes, codecs)).resolves.toBeNull();
     expect(decoded()).toBe(0);
+  });
+});
+
+/** The JPEG with the bytes from its second scan marker to its third repeated before EOI until it has `total` scans. */
+function scanned(jpeg: Uint8Array, total: number): Uint8Array {
+  const marks = [...jpeg.keys()].filter((at) => jpeg[at] === 0xff && jpeg[at + 1] === 0xda);
+  const scan = jpeg.subarray(marks[1] ?? 0, marks[2] ?? 0);
+  const end = jpeg.length - 2;
+  const added = Array.from({ length: total - marks.length }, () => scan);
+  return Buffer.concat([jpeg.subarray(0, end), ...added, jpeg.subarray(end)]);
+}
+
+describe("inspect: a JPEG of too many scans", () => {
+  it("refuses a progressive JPEG of tens of thousands of scans, each one more pass of the whole picture, and hands no byte to a decoder", async () => {
+    const hostile = scanned(progressive(), 40_000);
+    expect(hostile.length).toBeGreaterThan(400_000);
+    expect(inspect(hostile)).toBeUndefined();
+    const { codecs, decoded } = spy();
+    await expect(reencode(hostile, codecs)).resolves.toBeNull();
+    expect(decoded()).toBe(0);
+  });
+
+  it("holds the cap's own edge: 32 scans are decoded, 33 are not", async () => {
+    expect(SCANS_MAX).toBe(32);
+    expect(inspect(scanned(progressive(), 32))).toMatchObject({ format: "jpeg", width: 640, height: 480 });
+    expect(inspect(scanned(progressive(), 33))).toBeUndefined();
+    const inside = spy();
+    await reencode(scanned(progressive(), 32), inside.codecs);
+    expect(inside.decoded()).toBe(1);
+  });
+
+  it("counts the scans from the first one on: an Exif thumbnail's scans before the frame are not the picture's", () => {
+    const thumbnail = Buffer.concat(Array.from({ length: 40 }, () => Buffer.from([0xff, 0xda])));
+    const exif = Buffer.concat([Buffer.from([0xff, 0xe1]), Buffer.from([0, thumbnail.length + 2]), thumbnail]);
+    const jpeg = progressive();
+    expect(inspect(Buffer.concat([jpeg.subarray(0, 2), exif, jpeg.subarray(2)]))).toMatchObject({ width: 640 });
   });
 });
 

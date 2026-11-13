@@ -24,6 +24,18 @@ vi.mock("./logIn.ts", async (actual) => ({
   logOut: flow.logOut,
 }));
 vi.mock("../../lib/adena/adena.ts", () => flow.adena);
+// Each Adena the account's watch is handed, the real watch still run.
+const watched = vi.hoisted(() => ({ adenas: [] as unknown[] }));
+vi.mock("./watch.ts", async (actual) => {
+  const real = await actual<typeof import("./watch.ts")>();
+  return {
+    ...real,
+    watchAccount: (adena: unknown, deps: Parameters<typeof real.watchAccount>[1]) => {
+      watched.adenas.push(adena);
+      real.watchAccount(adena, deps);
+    },
+  };
+});
 
 // jsdom has no reportError: the page's own, where an error the control cannot act on goes.
 const reported = vi.fn();
@@ -175,6 +187,52 @@ describe("the login control", () => {
     await settled(() => reported.mock.calls.length > 0);
     expect(reported).toHaveBeenCalledWith(new Error("refused"));
     expect(button(box, "Connect Adena")).toBeDefined();
+  });
+});
+
+describe("the Adena a call card set (F5651)", () => {
+  it("is followed for its account, and no Adena is watched before one is set", async () => {
+    watched.adenas.length = 0;
+    flow.knowSession.mockImplementation(() => new Promise(() => undefined));
+    const root = drawn();
+    await vi.dynamicImportSettled();
+    expect(watched.adenas).toEqual([]);
+    const adena = { On: vi.fn() };
+    act(() => {
+      depsOf(flow.knowSession.mock.calls[0]).store.setState({ wallet: adena });
+    });
+    await settled(() => watched.adenas.length > 0);
+    expect(watched.adenas).toEqual([adena]);
+    expect(adena.On).toHaveBeenCalled();
+    act(() => {
+      root.unmount();
+    });
+  });
+});
+
+describe("a login whose wallet code cannot be fetched", () => {
+  it("says a new version is out on its button, reports it, and logs in with nothing", async () => {
+    flow.knowSession.mockImplementation((deps) => {
+      (deps as SessionDeps).store.getState().loginActions.signedOut();
+      return Promise.resolve();
+    });
+    vi.doMock("../../lib/adena/adena.ts", () => {
+      throw new Error("chunk");
+    });
+    try {
+      const box = mount(
+        <StoreProvider>
+          <Account />
+        </StoreProvider>,
+      );
+      await settled(() => button(box, "Connect Adena") !== undefined);
+      click(button(box, "Connect Adena"));
+      await settled(() => button(box, "Reload the page") !== undefined);
+      expect(reported).toHaveBeenCalled();
+      expect(flow.logIn).not.toHaveBeenCalled();
+    } finally {
+      vi.doMock("../../lib/adena/adena.ts", () => flow.adena);
+    }
   });
 });
 

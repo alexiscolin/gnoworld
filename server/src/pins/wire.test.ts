@@ -69,24 +69,18 @@ describe("the pins and an edit the link heard", () => {
   });
 });
 
-// D394: the maker of a room anyone made on the Earth moderates it, so pins it, and no other room.
-describe("who may pin", () => {
-  it("is the room's world's moderators and the team, and the maker of the room alone for a room anyone made", () => {
+// The maker of a room anyone made on the Earth pins it by the owner's right (roles/mayModerate.ts), never as staff.
+describe("the staff of a room", () => {
+  it("is the room's world's moderators and the team, never the maker of a room anyone made", () => {
     const db = openDatabase(":memory:", [PIN_TABLES]);
     opened.push(db);
     const roles = { worlds: new Map([["earth", { rules: {} as never, moderators: new Set([MOD]) }]]) };
-    const { api } = pinsFor(db, roles, {
-      link: () => undefined,
-      now: () => 0,
-      log: () => undefined,
-      maker: (room) => (room === "#earth/cafe" ? ALICE : undefined),
-    });
+    const { api } = pinsFor(db, roles, { link: () => undefined, now: () => 0, log: () => undefined });
     expect([
-      api.mayPin("#earth/cafe", ALICE),
-      api.mayPin("#earth/cafe", BOB),
-      api.mayPin("#earth/cafe", MOD),
-      api.mayPin("#earth/other", ALICE),
-      api.mayPin("#earth/other", MOD),
-    ]).toEqual([true, false, true, false, true]);
+      api.staff("#earth/cafe", ALICE),
+      api.staff("#earth/cafe", BOB),
+      api.staff("#earth/cafe", MOD),
+      api.staff("#earth/other", MOD),
+    ]).toEqual([false, false, true, true]);
   });
 });

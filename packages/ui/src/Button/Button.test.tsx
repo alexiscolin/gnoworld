@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import type { ReactElement } from "react";
@@ -5,6 +6,17 @@ import { describe, expect, it, vi } from "vitest";
 import { eachStory, staysText } from "../testing.tsx";
 import { Button, type ButtonProps } from "./Button.tsx";
 import * as stories from "./Button.stories.tsx";
+
+// jsdom's URL is not the one node reads a file from.
+// This project's module URLs start at the repository's root (/packages/…), where Vitest runs.
+const sheet = readFileSync(`.${new URL("./Button.module.css", import.meta.url).pathname}`, "utf8");
+
+// What a rule of the sheet sets, its declarations as one line, its comments left out.
+const rule = (selector: string) =>
+  (new RegExp(`\\n  ${selector.replaceAll(/[.[\]()*+?^$|]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "")
+    .replaceAll(/\/\*[\s\S]*?\*\//g, "")
+    .replaceAll(/\s+/g, " ")
+    .trim();
 
 // A form that counts its submissions, the button rendered inside it.
 function inForm(button: ReactElement) {
@@ -193,6 +205,63 @@ describe("Button", () => {
     expect([link.dataset["tone"], link.dataset["size"]]).toEqual(["danger", "l"]);
   });
 
+  // The composer's Ask Jarvis drew its violet and its close spark from outside, over the button's own rules (lot E, E4).
+  it("takes the signal tone, Jarvis's violet: its words', its edge's and, solid, its fill's", () => {
+    render(<Button tone="signal">Jarvis</Button>);
+    expect(screen.getByRole("button").dataset["tone"]).toBe("signal");
+    expect(rule('.button[data-tone="signal"]')).toBe(
+      "--_accent: var(--color-signal); --_text: var(--color-signal); --_edge: var(--color-signal-line);",
+    );
+  });
+
+  it("keeps its icon close to the control before it when its lead is close: a step less at its start", () => {
+    const { rerender } = render(<Button>Jarvis</Button>);
+    expect(screen.getByRole("button").hasAttribute("data-lead")).toBe(false);
+    rerender(<Button lead="close">Jarvis</Button>);
+    expect(screen.getByRole("button").dataset["lead"]).toBe("close");
+    expect(rule('.button[data-lead="close"]')).toBe("--_pad: var(--space-2xs) var(--space-xs);");
+  });
+
+  // The plate's talk bar stretched its link over the bar and lit it with the bar's hover, from outside (lot E, E4).
+  it("stretched, covers its positioned box with its press and answers that box's hover as its own", () => {
+    const { rerender } = render(<Button href="#chat">Open chat</Button>);
+    expect(screen.getByRole("link").hasAttribute("data-stretch")).toBe(false);
+    rerender(
+      <Button href="#chat" stretch>
+        Open chat
+      </Button>,
+    );
+    expect(screen.getByRole("link", { name: "Open chat" }).hasAttribute("data-stretch")).toBe(true);
+    expect(rule(".button[data-stretch]::after")).toBe('content: ""; position: absolute; inset: 0;');
+    expect(rule(".button[data-stretch]:hover")).toBe("--_fill: var(--color-fill-hover);");
+  });
+
+  // The composer's format bar drew its tools' ink and their narrow height from outside, reaching its link tool's button too (lot E, E4).
+  it("as a bar's tool, takes the bar's faint ink, and the smallest height where its box is under 24 rem", () => {
+    const { rerender } = render(<Button>Link</Button>);
+    expect(screen.getByRole("button").hasAttribute("data-tool")).toBe(false);
+    rerender(<Button tool>Link</Button>);
+    expect(screen.getByRole("button").hasAttribute("data-tool")).toBe(true);
+    expect(rule(".button[data-tool]")).toBe("--_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);");
+    expect(sheet).toMatch(
+      /@container \(inline-size < 24rem\) \{\s*\.button\[data-tool\]:enabled \{\s*--_h: var\(--control-xs\);\s*\}/,
+    );
+  });
+
+  // The plate set its links' 20 px from outside, on every link in its actions' box (lot E, E4).
+  it("sits its words 20 px in when its padding is wide, a large button keeping its own", () => {
+    const { rerender } = render(<Button href="#chat">Say hi</Button>);
+    expect(screen.getByRole("link").hasAttribute("data-pad")).toBe(false);
+    rerender(
+      <Button href="#chat" pad="wide">
+        Say hi
+      </Button>,
+    );
+    expect(screen.getByRole("link").dataset["pad"]).toBe("wide");
+    expect(rule('.button[data-pad="wide"]')).toBe("--_pad: 20px;");
+    expect(sheet.indexOf('.button[data-pad="wide"]')).toBeLessThan(sheet.indexOf('.button[data-size="l"]'));
+  });
+
   it("as a link, takes no disabled, busy or handler: it goes where its href says", () => {
     expect(linkTakesNoPress).toBe(true);
   });
@@ -215,7 +284,7 @@ describe("Button", () => {
       })),
     ).flat();
     for (const emphasis of ["solid", "outline", "quiet"]) {
-      for (const tone of ["neutral", "danger"])
+      for (const tone of ["neutral", "danger", "signal"])
         expect(shown.some((b) => b.emphasis === emphasis && b.tone === tone)).toBe(true);
     }
     for (const size of ["s", "m", "l"]) expect(shown.some((b) => b.size === size)).toBe(true);

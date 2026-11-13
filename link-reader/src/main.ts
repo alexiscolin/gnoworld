@@ -1,6 +1,7 @@
 // The link reader's process: LINKS_LISTEN (host:port), LINKS_PROXY (host:port of the link way out), LINKS_MAX; LINKS_DIRECT=1 for development.
 import { lookup } from "node:dns/promises";
-import { readCard } from "./card.ts";
+import { stop } from "@gnoworld/service/http";
+import { CARD_MS, readCard } from "./card.ts";
 import { readSettings } from "./config.ts";
 import { readerServer } from "./server.ts";
 import { directTransport, proxyTransport } from "./transport.ts";
@@ -24,12 +25,16 @@ const hold = <T>(job: () => Promise<T>): Promise<T> => {
   );
   return run;
 };
+const log = (entry: Record<string, string>) => {
+  process.stdout.write(`${JSON.stringify({ time: new Date().toISOString(), ...entry })}\n`);
+};
 const server = readerServer({
-  read: (url) => readCard(url, { ...ways, hold }),
+  read: (url, signal) => readCard(url, { ...ways, hold, signal, log }),
   max: settings.max,
-  log: (entry) => process.stdout.write(`${JSON.stringify({ time: new Date().toISOString(), ...entry })}\n`),
+  log,
 });
 server.listen(settings.port, settings.host);
+// The reads in flight end within a card's time; what still stalls then is cut, before the runtime's SIGKILL at 10 s.
 process.once("SIGTERM", () => {
-  server.close(() => process.exit(0));
+  stop(server, () => process.exit(0), CARD_MS + 1000);
 });

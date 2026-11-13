@@ -41,11 +41,13 @@ export function useJarvis(quick: ReactNode) {
 // Its spark and its name, "Jarvis", read as "Ask Jarvis". Where Jarvis cannot answer the button stays, disabled and greyed, and says why in its name.
 function JarvisButton({ onMention, off }: { onMention: (mention: string) => void; off: string | undefined }) {
   return (
-    <span className={styles["jarvis"]} data-off={off === undefined ? undefined : ""}>
+    <span className={styles["jarvis"]}>
       <Button
         icon="spark"
         size="s"
         emphasis="quiet"
+        tone="signal"
+        lead="close"
         disabled={off !== undefined}
         onClick={() => {
           onMention(JARVIS_MENTION);

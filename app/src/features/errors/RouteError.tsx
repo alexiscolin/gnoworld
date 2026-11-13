@@ -23,7 +23,7 @@ export function RouteError({ noun, size = "page" }: { noun?: string; size?: "pag
   // The time is read in the browser only: the server's page has none, so nothing differs at hydration.
   const reference = useSyncExternalStore(
     () => () => undefined,
-    () => referenceOf(stamp(), pathname),
+    () => referenceOf(stamp(error), pathname),
     () => undefined,
   );
   useEffect(() => {

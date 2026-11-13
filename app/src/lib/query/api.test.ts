@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Result } from "../api/http.ts";
+import { presenceApi } from "../api/presence.ts";
 import { readApi, resultOf } from "./api.ts";
 import { makeQueryClient, Unread } from "./client.ts";
 
@@ -12,6 +13,13 @@ const kindOf = async (reason: Parameters<typeof refused>[0]) =>
   readApi(() => Promise.resolve(refused(reason))).catch((error: unknown) =>
     error instanceof Unread ? error.failure : error,
   );
+
+const hanging = (_url: string, init?: RequestInit) =>
+  new Promise<Response>((_resolve, reject) => {
+    init?.signal?.addEventListener("abort", () => {
+      reject(new Error("aborted"));
+    });
+  });
 
 describe("a server read as a query", () => {
   it("gives the value of an answer", async () => {
@@ -35,6 +43,18 @@ describe("a server read as a query", () => {
     await expect(resultOf(Promise.reject(new Error("bug")))).rejects.toThrow("bug");
   });
 
+  it("gives a read cancelled before it answered as a network failure, not a bug", async () => {
+    const client = makeQueryClient();
+    const read = resultOf(
+      client.query({
+        queryKey: ["cancelled"],
+        queryFn: ({ signal }) => readApi((s) => presenceApi(hanging).read(s), signal),
+      }),
+    );
+    await client.cancelQueries({ queryKey: ["cancelled"] });
+    expect(await read).toEqual({ ok: false, reason: "network" });
+  });
+
   it("keeps the last good answer when a fresh read is refused", async () => {
     const client = makeQueryClient();
     const key = ["presence"];
@@ -47,5 +67,23 @@ describe("a server read as a query", () => {
       client.query({ queryKey: key, staleTime: 0, queryFn: () => readApi(() => Promise.resolve(refused("network"))) }),
     ).rejects.toBeInstanceOf(Unread);
     expect(client.getQueryData(key)).toBe(1);
+  });
+
+  it("ends the call when the query is cancelled: the fetch's signal is aborted and the call settles", async () => {
+    let seen: AbortSignal | undefined;
+    const fetcher = (_url: string, init?: RequestInit) =>
+      new Promise<Response>((_resolve, reject) => {
+        seen = init?.signal ?? undefined;
+        seen?.addEventListener("abort", () => {
+          reject(new Error("aborted"));
+        });
+      });
+    const query = new AbortController();
+    const read = readApi((signal) => presenceApi(fetcher).read(signal), query.signal).catch((error: unknown) =>
+      error instanceof Unread ? error.failure : error,
+    );
+    query.abort();
+    expect(seen?.aborted).toBe(true);
+    expect(await read).toEqual({ kind: "down" });
   });
 });

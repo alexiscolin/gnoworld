@@ -172,6 +172,8 @@ function told(clock = OPENED) {
   let said: ((time: number) => void) | undefined;
   let ended: (() => void) | undefined;
   let follows = 0;
+  const languages: (string | undefined)[] = [];
+  let stops = 0;
   // Not a literal, so a part the asker no longer takes (its clock) is still handed, as the page's was.
   const parts = {
     verdicts: (_room: string, ids: readonly string[]) => {
@@ -182,11 +184,14 @@ function told(clock = OPENED) {
     judgedAll: () => undefined,
     held: () => undefined,
     linked,
-    follow: (_room: string, on: { since: (time: number) => void; dead: () => void }) => {
+    follow: (_room: string, on: { since: (time: number) => void; dead: () => void }, language?: string) => {
       follows += 1;
+      languages.push(language);
       said = on.since;
       ended = on.dead;
-      return () => undefined;
+      return () => {
+        stops += 1;
+      };
     },
     now: () => clock,
   };
@@ -197,7 +202,7 @@ function told(clock = OPENED) {
   const end = () => {
     ended?.();
   };
-  return { asker, sent, say, end, follows: () => follows };
+  return { asker, sent, say, end, follows: () => follows, languages, stops: () => stops };
 }
 const HOUR = 3_600_000;
 
@@ -274,11 +279,21 @@ describe("verdictAsker, asking anew", () => {
     expect(t.sent).toEqual([["a"], ["a"]]);
   });
 
+  it("follows the room's stream again in a new language, the stream before closed", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice", language: "de" });
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice", language: "de" });
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice", language: "fr" });
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice" });
+    expect(t.languages).toEqual(["de", "fr", undefined]);
+    expect(t.stops()).toBe(2);
+  });
+
   it("follows the room's stream again for a new reader, and asks anew at its word", () => {
     const t = told();
     t.asker.show("#bubble", LINES.slice(0, 1));
     t.say(OPENED);
-    t.asker.show("#bubble", LINES.slice(0, 1), "g1alice");
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice" });
     expect(t.follows()).toBe(2);
     t.say(OPENED);
     expect(t.sent).toEqual([["a"], ["a"]]);
@@ -317,6 +332,15 @@ describe("verdictAsker, when the stream ends for good", () => {
     expect(t.follows()).toBe(1);
     vi.advanceTimersByTime(1);
     expect(t.follows()).toBe(2);
+  });
+
+  it("follows the stream again in the reader's language after the route's minute", () => {
+    vi.useFakeTimers();
+    const t = told();
+    t.asker.show("#bubble", LINES, { reader: "g1alice", language: "fr" });
+    t.end();
+    vi.advanceTimersByTime(BUSY_REST_MS);
+    expect(t.languages).toEqual(["fr", "fr"]);
   });
 
   it.each([

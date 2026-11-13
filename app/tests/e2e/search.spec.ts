@@ -9,7 +9,7 @@ const control = (page: Page) => page.getByRole("button", { name: /^Search/ });
 const palette = (page: Page) => page.getByRole("dialog", { name: "Search" });
 const choices = (page: Page, name?: RegExp) =>
   page.getByRole("listbox", { name: "Places" }).getByRole("option", name === undefined ? {} : { name });
-const field = (page: Page) => page.getByRole("searchbox", { name: "Search places" });
+const field = (page: Page) => page.getByRole("combobox", { name: "Search places" });
 // The empty field is Discover (D373): its shelves stand where the results come once words are typed.
 const shelves = (page: Page) => page.getByRole("listbox", { name: "Shelves" });
 

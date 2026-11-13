@@ -9,7 +9,7 @@ import { BATCH_MS } from "../../lib/stream/chainFeed.ts";
 import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
 import { tellJarvisHere } from "../../jarvisHere.ts";
-import { translationNow } from "../../translating.ts";
+import { translationLines, translationNow } from "../../translating.ts";
 import { cardsIn } from "./cardsIn.ts";
 import { useVerdicts, type Shown } from "./useVerdicts.ts";
 
@@ -42,6 +42,10 @@ vi.mock(import("./linked.ts"), async (original) => {
   chunk.loads += 1;
   await chunk.gate;
   return original();
+});
+vi.mock(import("../../translating.ts"), async (original) => {
+  const real = await original();
+  return { ...real, translationLines: vi.fn(real.translationLines) };
 });
 const SINCE = { time: "2026-10-26T12:00:00.000Z" };
 
@@ -98,12 +102,12 @@ afterEach(() => {
 });
 
 describe("useVerdicts: the code that finds a link in a line, asked with the first lines", () => {
-  const draw = async (lines: readonly Line[] | undefined, saving = false) => {
+  const draw = async (lines: readonly Line[] | undefined, saving = false, reader?: string) => {
     const sources = fakeStream();
     const host = document.createElement("div");
     root = createRoot(host);
     const mounted = root;
-    let now: Shown & { using: typeof store } = { room: "#bubble", lines, reader: undefined, saving, using: store };
+    let now: Shown & { using: typeof store } = { room: "#bubble", lines, reader, saving, using: store };
     redraw = (change) => {
       now = { ...now, ...change };
       mounted.render(<Probe shown={now} using={now.using} />);
@@ -174,10 +178,13 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     expect(asked).toEqual([]);
   });
 
+  const setting = (change: { language?: "de" | "fr"; autoTranslate?: boolean }) => {
+    store.getState().deviceActions.change("settings", (held) => ({ ...held, ...change }));
+  };
+
   it("asks the stream for a signed-in reader's language, and holds the translations it tells", async () => {
-    tellJarvisHere({ room: "#bubble", universe: { id: "u", isDefault: true }, account: "g1x", language: "de" });
-    const sources = await draw([]);
-    tellJarvisHere(undefined);
+    setting({ language: "de" });
+    const sources = await draw([], false, "g1x");
     expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble&language=de"]);
     sources.opened[0]?.emit("translation", {
       room: "#bubble",
@@ -190,6 +197,51 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
       state: "done",
       text: "Hallo",
     });
+  });
+
+  it("follows again when the reader's language changes or the translation is switched off", async () => {
+    setting({ language: "de" });
+    const sources = await draw([], false, "g1x");
+    for (const next of [{ language: "fr" as const }, { autoTranslate: false }]) {
+      await act(async () => {
+        setting(next);
+        await pausedBriefly();
+      });
+    }
+    expect(sources.opened.map(({ url }) => url)).toEqual([
+      "/api/stream?rooms=%23bubble&language=de",
+      "/api/stream?rooms=%23bubble&language=fr",
+      "/api/stream?rooms=%23bubble",
+    ]);
+    expect(sources.opened.map(({ closed }) => closed)).toEqual([1, 1, 0]);
+  });
+
+  it("opens a signed-in reader's stream once, in the device's language, whenever Jarvis's place is told", async () => {
+    setting({ language: "fr" });
+    const sources = await draw([], false, "g1x");
+    await act(async () => {
+      tellJarvisHere({ room: "#bubble", universe: { id: "u", isDefault: true }, account: "g1x", language: "fr" });
+      await pausedBriefly();
+    });
+    await act(async () => {
+      tellJarvisHere(undefined);
+      await pausedBriefly();
+    });
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble&language=fr"]);
+  });
+
+  it("asks a guest's stream in no language, whatever the device says", async () => {
+    setting({ language: "fr" });
+    const sources = await draw([]);
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble"]);
+  });
+
+  it("tells the translations which lines the room's store holds", async () => {
+    store.getState().chatActions.follow(["#bubble"]);
+    await draw([]);
+    const told = vi.mocked(translationLines).mock.calls.at(-1)?.[0];
+    expect(told?.("#bubble")).toEqual([]);
+    expect(told?.("#nowhere")).toBeUndefined();
   });
 
   it("asks the server of the line that holds a link, once the code came, and of none other", async () => {
@@ -207,16 +259,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const sources = await draw([]);
     sources.opened[0]?.emit("signal", CHART);
     expect(store.getState().signals.map(({ world, kind }) => `${world} ${kind}`)).toEqual(["bubble chart"]);
-    expect(sources.opened[0]?.heard()).toEqual([
-      "card",
-      "chain",
-      "error",
-      "realms",
-      "signal",
-      "since",
-      "translation",
-      "verdict",
-    ]);
+    expect(sources.opened[0]?.heard()).toEqual(["card", "chain", "error", "signal", "since", "translation", "verdict"]);
   });
 
   it("hands a verdict of the stream to the store", async () => {
@@ -226,13 +269,11 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
   });
 
   // Slice 9g (F5784): the chain's frames of the page's own stream reach the store, in a batch, through the lazily loaded feed.
-  it("hands a chain frame and a realms frame to the store, the call in its world's lines and the count at once", async () => {
+  it("hands a chain frame to the store, the call in its world's lines", async () => {
     const sources = await draw([]);
     sources.opened[0]?.emit("chain", CALL);
-    sources.opened[0]?.emit("realms", { universe: "onyx", count: 17, height: 908297 });
     await vi.waitFor(() => {
       expect(store.getState().chainByWorld[chainKey("onyx", "bubble")]?.map(({ id }) => id)).toEqual(["h900030:0"]);
-      expect(store.getState().realmsDeployed["onyx"]?.count).toBe(17);
     });
   });
 

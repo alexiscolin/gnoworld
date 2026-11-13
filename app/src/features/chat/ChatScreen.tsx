@@ -24,7 +24,7 @@ import type { UniverseView } from "../../places.ts";
 import { worldsFollowedIn } from "../follow/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import type { ChatWorld } from "./place.ts";
-import { useMedia } from "./useMedia.ts";
+import { DOCKED, useMedia } from "./useMedia.ts";
 import type { useThreads } from "./Threading.tsx";
 import { useUnread } from "./useUnread.ts";
 import { Worlds } from "./Worlds.tsx";
@@ -102,9 +102,6 @@ export interface ChatScreenProps {
   children: ReactNode;
 }
 
-// The window where the chat has a dock beside the scene (ui's Panel.Layout): under it the chat is the page, as a phone's.
-const DOCKABLE = "(min-width: 1280px)";
-
 // What a thread open puts in the info panel's place: its panel; none while no thread is open.
 const threadAside = (threads: ChatScreenProps["threads"]) =>
   "threaded" in threads.view && threads.view.threaded ? <>{threads.aside}</> : undefined;
@@ -158,7 +155,7 @@ function arrived({ currentTarget, target }: SyntheticEvent<HTMLElement>) {
 // The screen's box: whether the chat docks, is full, and whether its layout has measured itself (true till it has, so no panel is drawn
 // before its width is known).
 function useBox(place: ChatPlace) {
-  const dockable = useMedia(DOCKABLE);
+  const dockable = useMedia(DOCKED);
   const [params] = useSearchParams();
   const full = takesPage(dockable, place) || asksFull(params);
   useFullMark(full);
@@ -179,7 +176,6 @@ export function ChatScreen(props: ChatScreenProps) {
   const navigate = useNavigate();
   const follows = useApp((state) => state.device.follows);
   const followed = worldsFollowedIn(follows, place.universe.id);
-  const columns = useColumns();
   const unreadWorlds = useUnread(full);
   const here = usePeople({ screenRef, people, compact, present, closeThread: threads.close });
   const searching = useSearching(search, { world: place, full, compact, closeThread: threads.close });
@@ -187,6 +183,8 @@ export function ChatScreen(props: ChatScreenProps) {
   // The place's buttons stand in the planet's bar where the info panel shows, else in the header.
   const buttons = <PlaceActs acts={placeActs(searching.act, here.ask)} />;
   const bar = { wide: full && !compact, buttons, close: closeFull(dockable, place) };
+  // The wide full chat's header, a band over the columns (its still copy, shrinking back to the dock, keeps the mark: fullMove.ts).
+  const columns = { ...useColumns(), band: bar.wide };
   const aside = asideOf({ thread, panel: searching.panel, bar });
   return (
     <FullProvider value={full}>

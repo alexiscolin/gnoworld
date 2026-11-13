@@ -1437,21 +1437,6 @@ describe("the chat, as the server starts it", () => {
         .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
     });
 
-    it("hands the server's other readers what /api/presence serves, for the ticker's trends (7t)", async () => {
-      const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
-      const { peer, chat, app } = await linked(
-        { worlds: roled(), moderation: OFF },
-        { presence: file, now: () => Date.now() },
-      );
-      if (chat.presence === undefined) throw new Error("no presence route");
-      app.route("/api/presence", chat.presence);
-      await answer(peer, "#bubble", "~@gnoworld ada bo");
-      await expect
-        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
-        .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
-      expect(chat.presenceNow?.()).toEqual(Presence.parse(await (await app.request("/api/presence")).json()));
-    });
-
     it("leaves a hidden open room and an archived room out of who is here, as a guest sees neither (7h)", async () => {
       const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
       const hidden = roled();
@@ -1477,11 +1462,6 @@ describe("the chat, as the server starts it", () => {
     it("serves no presence without its file", () => {
       const { chat } = setup({ worlds: roled(), moderation: OFF, ergo: undefined });
       expect(chat.presence).toBeUndefined();
-    });
-
-    it("hands no presence to another reader without its file (7t)", () => {
-      const { chat } = setup({ worlds: roled(), moderation: OFF, ergo: undefined });
-      expect(chat.presenceNow).toBeUndefined();
     });
 
     it("voices a writer who joins a members-write room, at once", async () => {
@@ -1550,8 +1530,8 @@ describe("the chat, as the server starts it", () => {
           "/api/pins",
           pinsRoutes({
             pins: t.chat.pins,
-            mayPin: (room, who) => Promise.resolve(t.chat.mayPin(room, who) ? { as: "staff" } : false),
-            mayShow: (room, who) => Promise.resolve(t.chat.mayPin(room, who) ? { as: "staff" } : false),
+            mayPin: (room, who) => Promise.resolve(t.chat.staff(room, who) ? { as: "staff" } : false),
+            mayShow: (room, who) => Promise.resolve(t.chat.staff(room, who) ? { as: "staff" } : false),
             readable: t.chat.mayRead,
             session: (token) => {
               const who = tokens.get(token ?? "");
@@ -1576,9 +1556,9 @@ describe("the chat, as the server starts it", () => {
       it("lets its world's moderators and the team pin there, and no member, writer or other world's moderator", () => {
         const { chat } = here();
         for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"])
-          expect([MOD, TEAM, MEMBER, WRITER].map((who) => chat.mayPin(room, who))).toEqual([true, true, false, false]);
-        expect(chat.mayPin("#other", WRITER)).toBe(true);
-        expect(chat.mayPin("#other", MOD)).toBe(false);
+          expect([MOD, TEAM, MEMBER, WRITER].map((who) => chat.staff(room, who))).toEqual([true, true, false, false]);
+        expect(chat.staff("#other", WRITER)).toBe(true);
+        expect(chat.staff("#other", MOD)).toBe(false);
       });
 
       it("answers a members room's pins to its members alone, through the route, and says who may pin", async () => {

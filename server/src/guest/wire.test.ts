@@ -119,7 +119,8 @@ describe("the guest chat as the chat starts it (D430)", () => {
     );
     expect((await said).status).toBe(200);
     expect(provider).toHaveBeenCalledExactlyOnceWith("hello there");
-    const earth = Presence.parse(chat.presenceNow?.()).worlds.find(({ world }) => world === "earth");
+    const here = await chat.presence?.request("/");
+    const earth = Presence.parse(await here?.json()).worlds.find(({ world }) => world === "earth");
     expect(earth?.perHour).toBe(12);
     const activity = await (await chat.activity.request("/?worlds=earth")).json();
     expect(JSON.stringify(activity)).toContain('"perMinute":0');

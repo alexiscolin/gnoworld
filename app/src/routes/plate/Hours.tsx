@@ -3,7 +3,6 @@
 import { Card, DayChart, grouped, Stack, useAlone } from "@gnoworld/ui";
 import type { Hours as HoursRead } from "../../features/world/useHours.ts";
 import { hourCounts } from "./figures.ts";
-import styles from "./Chart.module.css";
 
 const HOUR_MS = 3_600_000;
 // "13:00": the hour's start in UTC, as the day chart's axis words it.
@@ -30,7 +29,7 @@ export function Hours({ hours }: { hours: HoursRead | undefined }) {
             now="now"
             suffix=" UTC"
           />
-          <span className={styles["foot"]}>
+          <span className="meta">
             {peak === 0
               ? `No message in the last ${String(counts.length)} hours (small dots).`
               : `Peak ${grouped(peak)} an hour at ${labels[counts.indexOf(peak)] ?? ""} UTC · ${String(quiet)} of ${String(counts.length)} hours without a message (small dots)`}

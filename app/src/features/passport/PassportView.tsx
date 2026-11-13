@@ -2,16 +2,15 @@
 // stamp for each world this device visited, by day, Charted: the ones charted first). Its code comes when it is first opened. Nothing of it
 // leaves the device.
 import { EARTH, hubWorldOf, labelName, passportCount, utcDay } from "@gnoworld/core";
-import { Badge, Cluster, Dialog, Kicker, Skeleton, Stack, Stat, Tabs } from "@gnoworld/ui";
-import { Suspense, useState } from "react";
+import { Badge, Cluster, Dialog, Kicker, Skeleton, Stack, Stat, TabPanel, Tabs } from "@gnoworld/ui";
+import { Suspense, useId, useState } from "react";
 import { site } from "../../places.ts";
 import { PassportSlot } from "../../slots.tsx";
 import { useApp } from "../../storeContext.tsx";
-import { useWorldsFile } from "../../worldsFile.ts";
 import { useShownName } from "../names/index.ts";
 import { challengeSteps } from "../quests/index.ts";
 import { useWorldsCount } from "../universe/index.ts";
-import appear from "../../enter.module.css";
+import { useWorldsFile } from "../../worldsFile.ts";
 import { TabRow } from "../../TabRow.tsx";
 import { ChartedTab, StampsTab } from "./StampsTab.tsx";
 import { stampsOf } from "./stamps.ts";
@@ -78,11 +77,13 @@ type TabId = "challenges" | "stamps" | "charted";
 
 // The three tabs, pinned at the row's end.
 function PassportTabs({
+  id,
   tab,
   onSelect,
   stamps,
   charted,
 }: {
+  id: string;
   tab: TabId;
   onSelect: (tab: TabId) => void;
   stamps: number;
@@ -91,6 +92,7 @@ function PassportTabs({
   return (
     <Tabs
       label="Passport"
+      id={id}
       size="s"
       selected={tab}
       onSelect={(id) => {
@@ -117,6 +119,7 @@ function Passport({
   who: string;
 }) {
   const [tab, setTab] = useState<TabId>("challenges");
+  const tabsId = useId();
   // The day the dialog opened on, as the expedition's card keeps it.
   const now = useOpenedAt(open);
   const device = useApp(({ device: held }) => held);
@@ -156,9 +159,9 @@ function Passport({
               loading={worlds === undefined}
             />
           }
-          tabs={<PassportTabs tab={tab} onSelect={setTab} stamps={stamps.length} charted={first.length} />}
+          tabs={<PassportTabs id={tabsId} tab={tab} onSelect={setTab} stamps={stamps.length} charted={first.length} />}
         />
-        <div role="tabpanel" key={tab} className={appear["enter"]}>
+        <TabPanel key={tab} id={tabsId} tab={tab}>
           {tab === "challenges" ? (
             <Stack space="m">
               <Suspense fallback={<Skeleton shape="card" />}>
@@ -173,7 +176,7 @@ function Passport({
           ) : (
             <ChartedTab stamps={first} now={now} />
           )}
-        </div>
+        </TabPanel>
         <Kicker>
           {device.notKept ? "This device did not keep the last change" : "Export or clear it in the settings"}
         </Kicker>

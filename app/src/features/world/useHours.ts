@@ -1,9 +1,8 @@
 // A plate's hours (8g): the world's chat hours, asked once the page runs; the read is a chunk of its own (hours.ts).
 import type { PresenceHours } from "@gnoworld/schemas/indexer";
 import { queryOptions, useQuery } from "@tanstack/react-query";
-import { queryClient, Unread } from "../../lib/query/client.ts";
+import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
-import { pageFetch } from "../../lib/query/policy.ts";
 
 export type Hours = PresenceHours;
 
@@ -11,11 +10,7 @@ export type Hours = PresenceHours;
 const hoursOptions = (world: string) =>
   queryOptions({
     queryKey: keys.hours(world),
-    queryFn: async ({ signal }) => {
-      const hours = await import("./hours.ts").then(({ readHours }) => readHours(world, { fetch: pageFetch, signal }));
-      if (hours === undefined) throw new Unread(undefined);
-      return hours;
-    },
+    queryFn: ({ signal }) => import("./hours.ts").then(({ readHours }) => readHours(world, signal)),
   });
 
 /** The hours of `world` (as who is here names it) once read; undefined while they come or when the server gave none. */

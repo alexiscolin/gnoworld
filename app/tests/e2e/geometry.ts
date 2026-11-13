@@ -1,8 +1,6 @@
 import { expect, type Page } from "./fixtures.ts";
 import { colours } from "./pixels.ts";
 
-export { colours };
-
 // A box measured at the video's size, held to 2 px of a frame's, for anti-aliasing and compression: what the geometry journeys share.
 const NEAR = 2;
 interface Box {

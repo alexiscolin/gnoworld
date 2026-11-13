@@ -23,7 +23,7 @@ export type RealmRoomRequest = z.infer<typeof RealmRoomRequest>;
 export const MadeRoom = z.strictObject({ room: RoomId });
 export type MadeRoom = z.infer<typeof MadeRoom>;
 
-export const RoomType = z.enum(["open", "announcement", "accounts", "members", "members-write"]);
+const RoomType = z.enum(["open", "announcement", "accounts", "members", "members-write"]);
 
 /** A room as listed: its type, and (D394) the people in it now and the lines it had in 24 hours, each left out when zero or unknown. */
 const ListedRoom = z.object({

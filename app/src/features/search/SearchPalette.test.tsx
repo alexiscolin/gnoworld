@@ -406,6 +406,18 @@ describe("the chips", () => {
 });
 
 describe("the keys and the preview", () => {
+  it("the field is a combobox that names the chosen row, as a screen reader follows it", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "gno");
+    press(field(box), "ArrowDown");
+    const chosen = rows(box)[active(box)];
+    expect(field(box).getAttribute("role")).toBe("combobox");
+    expect(chosen?.id).toBeTruthy();
+    expect(field(box).getAttribute("aria-activedescendant")).toBe(chosen?.id);
+    expect(field(box).getAttribute("aria-controls")).toBe(chosen?.closest("[role='listbox']")?.id);
+  });
+
   it("↑↓ choose round the ends, and the preview follows the chosen place", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
@@ -465,6 +477,24 @@ describe("the keys and the preview", () => {
     const input = field(box) as HTMLInputElement;
     input.setSelectionRange(0, 3);
     expect(press(input, "c", { metaKey: true }).defaultPrevented).toBe(false);
+  });
+});
+
+describe("the palette's copy that fails", () => {
+  it.each([
+    ["refused", { clipboard: { writeText: () => Promise.reject(new Error("denied")) } }],
+    ["with no clipboard, a page that is not secure", {}],
+  ])("says it could not copy where Copied shows, %s", async (_, navigator) => {
+    vi.stubGlobal("navigator", navigator);
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bubble");
+    press(field(box), "c", { metaKey: true });
+    await settled(() => preview(box).textContent.includes("Could not copy"));
+    expect(preview(box).textContent).not.toContain("Copied");
+    expect(report).not.toHaveBeenCalled();
   });
 });
 

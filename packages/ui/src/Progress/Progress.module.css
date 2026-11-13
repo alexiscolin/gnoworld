@@ -25,10 +25,9 @@
   }
 
   .step {
-    /* raw: an 8 px dot, the prototype's .dots i */
-    inline-size: 8px;
-    /* raw: the same */
-    block-size: 8px;
+    /* an 8 px dot, the prototype's .dots i */
+    inline-size: var(--size-dot-l);
+    block-size: var(--size-dot-l);
     border: var(--line-width) solid var(--color-line-strong);
     border-radius: var(--radius-pill);
     transition:

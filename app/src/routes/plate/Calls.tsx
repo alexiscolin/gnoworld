@@ -6,8 +6,7 @@ import { Card, Cell, Cluster, DayChart, grouped, PagedList, Stack, Tabs, useAlon
 import type { RealmRollup, Worlds } from "@gnoworld/schemas/indexer";
 import { CallRow } from "./CallRow.tsx";
 import { dayLabel, dayValues } from "./days.ts";
-import { callerName } from "./names.ts";
-import styles from "./Chart.module.css";
+import { callerName } from "../../features/realms/worldsIndex.ts";
 
 type Call = RealmRollup["last"][number] & { at: number };
 
@@ -55,11 +54,9 @@ function CallsChart({
         callers={days.map((d) => d.callers)}
       />
       <Stack space="2xs">
-        <span
-          className={styles["foot"]}
-        >{`${String(quiet)} of ${String(days.length)} days without a call (small dots).`}</span>
+        <span className="meta">{`${String(quiet)} of ${String(days.length)} days without a call (small dots).`}</span>
         {all === 0 ? null : (
-          <span className={styles["foot"]}>
+          <span className="meta">
             {failed === 0
               ? `All ${grouped(all)} of its last calls succeeded (indexer).`
               : `${grouped(failed)} of its last ${grouped(all)} calls failed (indexer).`}

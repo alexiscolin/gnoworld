@@ -1,7 +1,7 @@
 import { beforeEach, expect, test, vi } from "vitest";
 
 const { worldsFile } = vi.hoisted(() => ({ worldsFile: vi.fn() }));
-vi.mock("../features/universe/worldsFile.ts", () => ({ worldsFile }));
+vi.mock("../worldsFile.ts", () => ({ worldsFile }));
 import { clientLoader } from "./cosmos.tsx";
 
 const at = (path: string) => ({ request: new Request(`https://gno.world${path}`) });

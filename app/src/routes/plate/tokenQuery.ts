@@ -8,7 +8,7 @@ import { keys } from "../../lib/query/keys.ts";
 export const tokenOptions = (realm: string) =>
   queryOptions({
     queryKey: keys.token(realm),
-    queryFn: () => readApi(() => pageTokensApi().read(realm)),
+    queryFn: ({ signal }) => readApi((s) => pageTokensApi().read(realm, s), signal),
     staleTime: 60_000,
     retry: false,
   });

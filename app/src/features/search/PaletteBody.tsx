@@ -10,7 +10,6 @@ import { HandOff } from "./HandOff.tsx";
 import { PaletteLeft } from "./PaletteLeft.tsx";
 import { PlacePreview } from "./PlacePreview.tsx";
 import { PlaceResults } from "./PlaceResults.tsx";
-import appear from "../../enter.module.css";
 import styles from "./SearchDialog.module.css";
 import type { SearchItem } from "./types.ts";
 import type { usePalette } from "./usePalette.ts";
@@ -71,20 +70,20 @@ export function DiscoverSheet({
 
 export function TypedSheet({
   palette,
-  copied,
+  copySaid,
   go,
   chat,
   copy,
 }: {
   palette: Palette;
-  copied: boolean;
+  copySaid: string | undefined;
   go: (item: SearchItem) => void;
   chat: (item: SearchItem) => void;
   copy: (item: SearchItem) => void;
 }) {
   const { chosen, flat, active, choose } = palette;
   return (
-    <div className={[styles["body"], appear["enter"]].join(" ")}>
+    <div className={[styles["body"], "enter"].join(" ")}>
       <PaletteLeft palette={palette}>
         {flat.length === 0 ? (
           <Empty query={palette.query} />
@@ -99,7 +98,7 @@ export function TypedSheet({
         <PlacePreview
           key={`${chosen.kind}:${chosen.path}`}
           item={chosen}
-          copied={copied}
+          copySaid={copySaid}
           go={go}
           chat={chat}
           copy={copy}

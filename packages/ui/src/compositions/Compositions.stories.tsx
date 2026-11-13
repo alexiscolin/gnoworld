@@ -64,8 +64,8 @@ export const Switcher: Story = {
 
 export const Center: Story = {
   render: () => (
-    <layout.Center max="dialog" space="m">
-      <p>A dialog holds its text at 490 px, and the measure at 65 characters.</p>
+    <layout.Center space="m">
+      <p>A reading measure holds its text at 65 characters, in the middle of its room.</p>
     </layout.Center>
   ),
 };
@@ -105,7 +105,7 @@ export const Justify: Story = {
 export const Columns: Story = {
   render: () => (
     <layout.Stack space="l">
-      {(["s", "m", "l"] as const).map((min) => (
+      {(["s", "m"] as const).map((min) => (
         <layout.Grid key={min} as="ul" min={min}>
           {[...worlds, "Arcade"].map((world) => (
             <li key={world}>{world}</li>
@@ -141,7 +141,7 @@ export const Twelve: Story = {
   ),
 };
 
-const TEMPLATES = ["icon-text-meta", "text-meta", "label-value", "main-aside"] as const;
+const TEMPLATES = ["icon-text-meta", "text-meta", "label-value"] as const;
 
 export const Templates: Story = {
   render: () => (

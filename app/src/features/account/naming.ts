@@ -3,27 +3,30 @@
 // new universe, so nothing it held opens the dialog later or for another account.
 import { useEffect, useState } from "react";
 import { onAsked, tellNameless } from "../../pageAsks.ts";
+import { useJustLoggedIn } from "./justLoggedIn.ts";
 
-/** Whether the name dialog shows, and whether a name can be picked: the label's `pickable`, none until the page's chain answered. */
+/** Whether the name dialog shows, and whether a name can be picked: the label's `pickable`, none until the page's chain answered; and
+ * whether a login just ran its course. */
 export function useNaming(connecting: boolean, address: string | undefined, universe: string) {
+  const justIn = useJustLoggedIn(connecting, address);
   const [naming, setNaming] = useState(false);
-  const [fresh, setFresh] = useState(false);
+  const [pending, setPending] = useState(false);
   const [pickable, setPickable] = useState<boolean | undefined>(undefined);
-  const [seen, setSeen] = useState(universe);
-  if (universe !== seen) {
-    setSeen(universe);
-    setFresh(false);
-  }
-  if (connecting && !fresh) {
-    setFresh(true);
+  const [seen, setSeen] = useState({ universe, address, justIn });
+  if (universe !== seen.universe) setPending(false);
+  if (address !== seen.address) {
     setNaming(false);
     setPickable(undefined);
+    setPending(false);
   }
-  if (fresh && !connecting && (address === undefined || pickable !== undefined)) {
-    setFresh(false);
-    setNaming(address !== undefined && pickable === true);
+  if (justIn !== seen.justIn) setPending(justIn);
+  if (universe !== seen.universe || address !== seen.address || justIn !== seen.justIn)
+    setSeen({ universe, address, justIn });
+  if (pending && pickable !== undefined) {
+    setPending(false);
+    setNaming(pickable);
   }
-  return { naming, setNaming, pickable: pickable === true, setPickable };
+  return { naming, setNaming, pickable: pickable === true, setPickable, justIn };
 }
 
 /** While the account logged in has no name to be read by, the chat is told so, and its ask to pick one opens the dialog (D13982). */

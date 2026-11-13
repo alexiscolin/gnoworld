@@ -5,6 +5,8 @@ import { shortAddress, type Address, type Challenge } from "@gnoworld/schemas";
 import { Button, Cluster, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { pageLinksApi } from "../../lib/api/links.ts";
+import { reportedOr } from "../../lib/reported.ts";
+import { WORDS } from "../errors/index.ts";
 import { sayProblem } from "../login/index.ts";
 import { Linked, Stale } from "./LinkStates.tsx";
 import { LINKED_ELSEWHERE, linkProblem, notSigned } from "./linkWords.ts";
@@ -27,8 +29,9 @@ type Step =
   | { at: "linked"; address: Address };
 type SetStep = (step: Step) => void;
 
-// Adena's calls are the page's own, loaded with the first wallet gesture (LoginControl.tsx).
-const wallet = () => import("../../lib/adena/adena.ts");
+// Adena's calls are the page's own, loaded with the first wallet gesture (LoginControl.tsx); none when their code cannot be fetched.
+const wallet = () => reportedOr(import("../../lib/adena/adena.ts"), undefined);
+const STALE_CODE = WORDS["new-version"].short;
 const refusedWith = (reason: Parameters<typeof linkProblem>[0]): Step =>
   reason === "unauthenticated" ? { at: "stale" } : { at: "idle", said: linkProblem(reason) };
 // A verify's refusals by cause: the code is spent by then, a new one comes with the next Continue.
@@ -44,7 +47,12 @@ const SAME = "Adena is on the account you are logged in as. Switch to the accoun
 // Reads the account Adena is on, and asks the server for a code to link it.
 async function start(me: Address, set: SetStep): Promise<void> {
   set({ at: "busy", doing: "Reading the account Adena is on…" });
-  const { connect, pageAdena } = await wallet();
+  const adena = await wallet();
+  if (adena === undefined) {
+    set({ at: "idle", said: STALE_CODE });
+    return;
+  }
+  const { connect, pageAdena } = adena;
   const found = await connect(pageAdena());
   if (!found.ok) set({ at: "idle", said: sayProblem(found) });
   else if (found.address === me) set({ at: "idle", said: SAME });
@@ -60,7 +68,12 @@ async function start(me: Address, set: SetStep): Promise<void> {
 // Has Adena sign the server's text for the account chosen, then posts the proof.
 async function sign({ address, chainId, challenge }: Ready, set: SetStep, onLinked: () => void): Promise<void> {
   set({ at: "ready", address, chainId, challenge, waiting: true });
-  const { signLogin, connect, pageAdena } = await wallet();
+  const adena = await wallet();
+  if (adena === undefined) {
+    set({ at: "ready", address, chainId, challenge, said: STALE_CODE });
+    return;
+  }
+  const { signLogin, connect, pageAdena } = adena;
   const signed = await signLogin(pageAdena(), { address, chainId, text: challenge.text });
   if (!signed.ok) {
     const on = signed.reason === "mismatch" ? await connect(pageAdena()) : undefined;

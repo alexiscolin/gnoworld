@@ -7,12 +7,11 @@ import { Button, IconButton } from "@gnoworld/ui";
 import { lazy, Suspense, useEffect, useState, type ReactNode } from "react";
 import { useJarvisHere } from "../../jarvisHere.ts";
 import { onAsked } from "../../pageAsks.ts";
-import type { FirstAsk } from "../jarvis/index.ts";
+import { JARVIS_ASKS, loadListener, type FirstAsk } from "../jarvis/index.ts";
 import { LoginControl, useLogin } from "../login/index.ts";
-import { useJustLoggedIn } from "./justLoggedIn.ts";
 import { useNaming, useNamelessTold } from "./naming.ts";
 
-const JarvisListener = lazy(async () => ({ default: (await import("../jarvis/index.ts")).JarvisListener }));
+const JarvisListener = lazy(async () => ({ default: await loadListener() }));
 const Face = lazy(async () => ({ default: (await import("./Face.tsx")).Face }));
 const Opened = lazy(async () => ({ default: (await import("./OpenedJarvis.tsx")).OpenedJarvis }));
 // The name (9f) is read once the first screen is up: the short address stands in until it is there.
@@ -61,8 +60,6 @@ function Trigger({ pill, onClick }: { pill: ReactNode; onClick: () => void }) {
 }
 
 // Jarvis's panel is brought once the chat in view can ask it (jarvisHere.ts): its code is a late chunk.
-const JARVIS_ASKS = ["jarvis", "jarvis-catch-up", "jarvis-ask", "jarvis-said"] as const satisfies readonly FirstAsk[];
-
 function JarvisDoor() {
   const here = useJarvisHere() !== undefined;
   // An ask made while the listener's code is still on its way is kept, and handed to it.
@@ -91,8 +88,7 @@ function JarvisDoor() {
 }
 
 // What comes after the first screen, each in a chunk of its own: Jarvis's listener, and the notice of a login that is linked.
-function LateDoors({ connecting, address }: { connecting: boolean; address: Address | undefined }) {
-  const justIn = useJustLoggedIn(connecting, address);
+function LateDoors({ justIn, address }: { justIn: boolean; address: Address | undefined }) {
   return (
     <>
       <JarvisDoor />
@@ -119,7 +115,7 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
   const [asked, setAsked] = useState(false);
   const [again, setAgain] = useState(0);
   const address = login.session.kind === "in" ? login.session.address : undefined;
-  const { naming, setNaming, setPickable, pickable } = useNaming(login.step !== "idle", address, universe);
+  const { naming, setNaming, setPickable, pickable, justIn } = useNaming(login.step !== "idle", address, universe);
   useNamelessTold(address !== undefined && pickable, setNaming);
   const ask = () => {
     setAsked(true);
@@ -178,7 +174,7 @@ export function AccountMenu({ universe, network = null }: { universe: string; ne
           />
         </Suspense>
       )}
-      <LateDoors connecting={login.step !== "idle"} address={address} />
+      <LateDoors justIn={justIn} address={address} />
       <LoginControl login={login} logIn={logIn} network={network} />
     </>
   );

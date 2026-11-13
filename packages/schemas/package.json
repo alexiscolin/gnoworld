@@ -13,6 +13,7 @@
     "./proposal": "./src/proposal.ts"
   },
   "dependencies": {
+    "@gnoworld/core": "workspace:*",
     "zod": "4.6.7"
   }
 }

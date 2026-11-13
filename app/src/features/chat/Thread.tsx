@@ -17,7 +17,7 @@ import styles from "./Thread.module.css";
 /** The graphemes of a root's words the title keeps. */
 export const TITLE_LENGTH = 60;
 
-const LINES = [shared["plain"], shared["scrolls"], room["lines"], styles["list"]].join(" ");
+const LINES = [shared["plain"], shared["scrolls"], room["lines"]].join(" ");
 
 export interface ThreadProps {
   /** The msgid of the thread's root: a line of the room's lines, or a line the window no longer holds. */
@@ -77,7 +77,7 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
       <div className={styles["body"]}>
         <Stack space="s">
           <p className={styles["count"]}>{countOf(replies.length)}</p>
-          <ol aria-label="In this thread" className={LINES}>
+          <ol aria-label="In this thread" className={LINES} data-bare="">
             {rows.map((line) => (
               <LineView key={line.id} line={line} me={me} members={known} {...BARE_ROW} inThread />
             ))}

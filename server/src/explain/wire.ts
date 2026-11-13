@@ -1,12 +1,12 @@
 // The explanations' wiring at the server's start: the table's seed read, the explainer on Jarvis's door and the route; none without the universes' file.
 import { defaultUniverse } from "../prices/universes.ts";
+import type { Worlds } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";
 import { fileURLToPath } from "node:url";
 import type { DatabaseSync } from "node:sqlite";
 import type { Log } from "@gnoworld/service/log";
 import type { Config } from "../config.ts";
 import type { Jarvis } from "../door/jarvis.ts";
-import { worldsFile } from "../worlds/person.ts";
 import { realmsListed } from "./listed.ts";
 import { makeExplainer } from "./make.ts";
 import { explainRoutes } from "./routes.ts";
@@ -28,12 +28,15 @@ export function explainBoot({
   app,
   db,
   config,
+  worlds,
   jarvis,
   log,
 }: {
   app: Hono;
   db: DatabaseSync;
   config: Config;
+  /** The worlds file, read once for every reader (worlds/known.ts). */
+  worlds: () => Worlds | undefined;
   /** Jarvis's door when it is switched on, else none. */
   jarvis: Pick<Jarvis, "explain"> | undefined;
   log: Log;
@@ -42,7 +45,7 @@ export function explainBoot({
   const universe = defaultUniverse(config.universes);
   const store = makeExplanations(db);
   loadSeed({ file: config.explain.seed ?? BUNDLED_SEED, store, now: Date.now, log });
-  const listed = realmsListed(worldsFile(config.worlds));
+  const listed = realmsListed(worlds);
   const explainer = makeExplainer({
     store,
     jarvis,

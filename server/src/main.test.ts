@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -8,10 +8,13 @@ import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { rollupName } from "@gnoworld/core";
 import { Challenge, Ticket } from "@gnoworld/schemas";
-import { Presence, Trends } from "@gnoworld/schemas/indexer";
+import { NetworkAnswer, Presence, TokenAnswer, Trending } from "@gnoworld/schemas/indexer";
+import { openDatabase } from "@gnoworld/service/db";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { migrations } from "./migrations.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { loadRoles } from "./roles/roles.ts";
@@ -734,8 +737,6 @@ describe("the server's process", { timeout: 30_000 }, () => {
       expect(way.seen).toEqual(["rpc.the-default.example:443"]);
       server.child.kill("SIGTERM");
       expect(await exited(server)).toBe(0);
-      // 7t3: the chain's habits are kept beside the database, never beside the file nginx serves.
-      expect(readdirSync(dir).filter((name) => name.startsWith("trends-"))).toEqual([]);
     } finally {
       way.close();
     }
@@ -834,76 +835,6 @@ describe("the server's process", { timeout: 30_000 }, () => {
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
-    expect(
-      JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence-messages.json"), "utf8")),
-      "7t3",
-    ).toEqual({});
-  });
-
-  it("answers the ticker's trends at /api/trends, none with no worlds job and no one here, never a 404 (7t)", async () => {
-    for (const env of [settings(), { ...settings(), DATABASE: ":memory:" }]) {
-      const port = await listening(start(env));
-      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/trends`);
-      expect(answer.status).toBe(200);
-      expect(answer.headers.get("cache-control")).toBe("public, max-age=60");
-      expect(Trends.parse(await answer.json())).toEqual({ items: [] });
-    }
-  });
-
-  // 7t3: a hub whose rooms surge against its own 14 days is Trending by its chat, and the Rising item names no world already Trending.
-  it("names at /api/trends the hub whose people here surge against its own 14 days as Trending, and not again as rising (7t, 7t3)", async () => {
-    const ergo = await fakeErgo();
-    const env = settings();
-    const oper = join(folder("gnoworld-oper-"), "oper");
-    writeFileSync(oper, `${PASSWORD}\n`);
-    // Bubble's last 47 hours held one person each: six now is a rise of 5 on its usual hour (core's riseOf).
-    const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
-    const past = Array.from({ length: 47 }, (_, back) => ({ at: hour - (back + 1) * 3_600_000, people: 1 })).reverse();
-    writeFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), JSON.stringify({ bubble: past }));
-    const port = await listening(start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper }));
-    const peer = await ergo.peer(0);
-    await welcome(peer);
-    await peer.next(/^NAMES #bubble$/);
-    peer.say(":ergo.test 324 gnoworld #bubble +nt");
-    peer.say(":ergo.test 347 gnoworld #bubble :End");
-    peer.say(":ergo.test 353 gnoworld = #bubble :~@gnoworld ada bo cy dee eve fay");
-    peer.say(":ergo.test 366 gnoworld #bubble :End");
-    await expect
-      .poll(async () => Trends.parse(await (await fetch(`http://127.0.0.1:${String(port)}/api/trends`)).json()).items, {
-        timeout: 10_000,
-      })
-      .toEqual([
-        { kind: "trending", by: "here", world: "bubble", count: 6, rise: 5, at: expect.any(String) as unknown },
-      ]);
-  });
-
-  // 7t3: the chain's habits beside the database, counts alone; a database held in memory keeps none.
-  it("keeps each world's chain windows beside its database, and none for a database held in memory", async () => {
-    const habits = (env: Record<string, string>) => {
-      const dir = folder("gnoworld-worlds-");
-      writeFileSync(
-        join(dir, "universes.json"),
-        readFileSync(new URL("../../app/data/universes.json", import.meta.url), "utf8"),
-      );
-      writeFileSync(join(dir, "hubs.json"), "[]");
-      return { ...env, WORLDS_FILE: join(dir, "worlds.json"), UNIVERSES_FILE: join(dir, "universes.json") };
-    };
-    const env = settings();
-    const kept = start(habits(env));
-    await listening(kept);
-    kept.child.kill("SIGTERM");
-    expect(await exited(kept)).toBe(0);
-    expect(
-      readdirSync(dirname(env["DATABASE"] ?? ""))
-        .filter((name) => name.startsWith("trends-"))
-        .sort(),
-    ).toEqual(["trends-addresses.json", "trends-transactions.json"]);
-    const memory = habits({ ...settings(), DATABASE: ":memory:" });
-    const none = start(memory);
-    await listening(none);
-    none.child.kill("SIGTERM");
-    expect(await exited(none)).toBe(0);
-    expect(readdirSync(dirname(memory.WORLDS_FILE)).filter((name) => name.startsWith("trends-"))).toEqual([]);
   });
 
   it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {
@@ -924,7 +855,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  // 7t3: the trends read a hub's rooms and its realms as one world, from the hubs beside the universes the job reads.
+  // The hubs beside the universes the job reads are read as it starts.
   it("does not start a worlds job with no hubs.json beside UNIVERSES_FILE: it fails closed, naming the file", async () => {
     const dir = folder("gnoworld-worlds-");
     const universes = join(dir, "universes.json");
@@ -1447,6 +1378,120 @@ describe("the server's process", { timeout: 30_000 }, () => {
       expect(replayed).toContain(who.address);
     },
   );
+
+  // The universe the worlds job reads in the two cases below: a default one, with its hubs file beside it.
+  const universeFiles = (rpc: string, indexer: string) => {
+    const dir = folder("gnoworld-mounts-");
+    const universes = join(dir, "universes.json");
+    const base = { id: "b", name: "U", chainId: "b-1", gnoweb: "https://gnoweb.example", testnet: true, default: true };
+    writeFileSync(universes, JSON.stringify([{ ...base, rpc, indexer }]));
+    writeFileSync(join(dir, "hubs.json"), "[]");
+    return { dir, universes };
+  };
+
+  it("serves a visitor each public route main mounts beside the chain: trending, network, tokens, people, calls, search, unread and translations", async () => {
+    const origin = "https://gnoworld.test";
+    const [rpc, indexer] = ["https://rpc.fake.example:443", "https://indexer.fake.example/graphql/query"];
+    const { dir, universes } = universeFiles(rpc, indexer);
+    // A chain with no realm and no transaction, so the worlds job's first pass ends and tells its ranking and its health.
+    const hook = join(dir, "chain.mjs");
+    writeFileSync(
+      hook,
+      `import { fakeChain, pagedCalls, withBlocks } from ${JSON.stringify(new URL("testing/fakeWorldsChain.ts", import.meta.url).href)};
+const real = globalThis.fetch;
+const calls = pagedCalls([]);
+const time = new Date().toISOString();
+const tip = (request) => request.query.includes("latestBlockHeight") ? JSON.stringify({ data: { latestBlockHeight: 100 } }) : calls(request);
+const chain = fakeChain({ paths: () => "", indexer: withBlocks(tip, () => time) }, { rpc: ${JSON.stringify(rpc)}, indexer: ${JSON.stringify(indexer)} });
+globalThis.fetch = (input, init) => {
+  const url = String(input instanceof Request ? input.url : input);
+  return url.startsWith("https://rpc.fake.example") || url.startsWith(${JSON.stringify(indexer)}) ? chain.send(url, init ?? {}, 0) : real(input, init);
+};
+`,
+    );
+    const env: Record<string, string> = {
+      ...settings(),
+      ORIGINS: origin,
+      UNIVERSES_FILE: universes,
+      WORLDS_FILE: join(dir, "worlds.json"),
+    };
+    // A token the worlds job replayed before, in the default universe's tables.
+    const realm = "gno.land/r/demo/coin";
+    const seed = openDatabase(env["DATABASE"] ?? "", migrations);
+    seed.exec("INSERT INTO grc20_state VALUES ('b', 1, NULL, NULL)");
+    seed
+      .prepare("INSERT INTO grc20_tokens VALUES (?, ?, 'COIN', 'Coin', 2, '100', 1, 0, 1, '2026-11-12')")
+      .run(`${realm}.COIN.0000000`, rollupName(realm));
+    seed.close();
+    const port = await listening(start(env, [...FLAGS, "--import", hook]));
+    const at = (path: string, init: RequestInit = {}) => fetch(`http://127.0.0.1:${String(port)}${path}`, init);
+    await expect.poll(async () => (await at("/api/network")).status, { timeout: 20_000 }).toBe(200);
+    expect(NetworkAnswer.parse(await (await at("/api/network")).json()).universe).toBe("b");
+    expect(Trending.parse(await (await at("/api/trending")).json()).items).toEqual([]);
+    const token = await at(`/api/tokens/${rollupName(realm)}`);
+    expect([token.status, TokenAnswer.parse(await token.json()).tokens.map(({ symbol }) => symbol)]).toEqual([
+      200,
+      ["COIN"],
+    ]);
+    expect((await at(`/api/tokens/${"0".repeat(32)}`)).status).toBe(404);
+    expect([(await at("/api/people/nobody")).status, (await at("/api/calls/nothing")).status]).toEqual([400, 400]);
+    const found = await at("/api/search?q=hello&world=bubble");
+    expect([found.status, await found.json()]).toEqual([
+      200,
+      { hits: [], next: null, total: 0, capped: false, partial: false },
+    ]);
+    expect((await at("/api/unread")).status).toBe(401);
+    const foreign = await at("/api/unread", {
+      method: "POST",
+      headers: { origin: "https://evil.test", "content-type": "application/json" },
+      body: JSON.stringify({ places: [] }),
+    });
+    expect(foreign.status).toBe(403);
+    const translations = await at("/api/translations?room=%23bubble&ids=m1&language=fr");
+    expect([translations.status, await translations.json()]).toEqual([
+      200,
+      { room: "#bubble", language: "fr", translations: [], pending: [] },
+    ]);
+  });
+
+  it("explains for a visitor only a realm the worlds file lists on the default universe's chain, Jarvis on", async () => {
+    const way = await tunnels();
+    try {
+      const { dir, universes } = universeFiles("https://rpc.example:443", "https://indexer.example/graphql/query");
+      const listed = "gno.land/r/leon/home";
+      const worlds = join(dir, "worlds.json");
+      const row = { path: listed, deployer: null, deployerName: null, functions: [], imports: [] };
+      const counts = { calls: null, callers: null, lastHeight: null };
+      const file = { version: 1, universe: "b", updated: "2026-11-13T10:00:00.000Z" };
+      writeFileSync(
+        worlds,
+        JSON.stringify({ ...file, worlds: [{ id: "leon", namespace: "leon", realms: [{ ...row, ...counts }] }] }),
+      );
+      const server = start({
+        ...settings(),
+        UNIVERSES_FILE: universes,
+        WORLDS_FILE: worlds,
+        JARVIS_URL: "http://127.0.0.1:9",
+        JARVIS_DOOR_KEY_FILE: doorKeyFile(),
+        JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+        JARVIS: "on",
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      const port = await listening(server);
+      // The worlds job reaches no chain through this way out, so the file stays as written.
+      await until(() => server.out.stdout.includes('"event":"worlds_failed"'));
+      const explained = async (chain: string, realm: string) =>
+        (
+          await fetch(`http://127.0.0.1:${String(port)}/api/explanations/realm/${chain}/${encodeURIComponent(realm)}`)
+        ).json();
+      expect(await explained("b-1", "gno.land/r/leon/other")).toEqual({ status: "none" });
+      expect(await explained("onyx-1", listed)).toEqual({ status: "none" });
+      expect(await explained("b-1", listed)).toEqual({ status: "making" });
+    } finally {
+      way.close();
+    }
+  });
 
   it("opens no admin listener and no door without their settings", async () => {
     const server = start({ ...settings(), ORIGINS: "https://gnoworld.test" });

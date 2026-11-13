@@ -151,6 +151,12 @@ describe("Free's clock rate", () => {
     }
   });
 
+  it("is 0 at once under reduced motion: the orbits, spins and moons all stop with the clock", () => {
+    const [free, pose] = rested();
+    free.advance(16, true, { pose, reach: REACH });
+    expect(free.rate).toBe(0);
+  });
+
   it("is kept at 1 by a rouse every few seconds, however long", () => {
     const [free, pose] = rested();
     for (let t = 0; t < 130; t += 5) {

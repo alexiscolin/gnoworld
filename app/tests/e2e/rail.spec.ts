@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { running } from "./sceneStage.ts";
+import { running, shownLabels } from "./sceneStage.ts";
 
 // The rail (frame 4 and 16, 7i): the Earth, the trends, the rising worlds and the seeds as planets with their names down the right edge,
 // 25 at most, ending on the last (8p); one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
@@ -74,12 +74,7 @@ const railLinks = (page: Page) => rail(page).locator("li a");
 const names = (page: Page) => railLinks(page).allTextContents();
 // Every label shown ends left of `x`, the rail's left edge.
 async function clearOf(page: Page, x: number) {
-  const rights = await page.$$eval("[data-labels] > *", (labels) =>
-    labels
-      .filter((label) => Number(getComputedStyle(label).opacity) > 0.05)
-      .map((label) => label.getBoundingClientRect().right),
-  );
-  for (const right of rights) expect(right).toBeLessThanOrEqual(x);
+  for (const { right } of await shownLabels(page)) expect(right).toBeLessThanOrEqual(x);
 }
 // The fades the column's mask holds: the top's alone, or the foot's too while the column holds more than it shows.
 const fadesOf = (page: Page) =>
@@ -134,7 +129,7 @@ test("lists the Earth, then the trends, people before callers, the rising world 
 test("keeps the labels out of its band", async ({ page }) => {
   await arrived(page);
   const { x } = await boxOf(page, "nav[aria-label='Worlds']:not([data-rail])");
-  await expect.poll(() => page.locator("[data-labels] > *").count(), SLOW).toBeGreaterThan(0);
+  await expect.poll(async () => (await shownLabels(page)).length, SLOW).toBeGreaterThan(0);
   await clearOf(page, x);
 });
 
@@ -303,8 +298,6 @@ test("holds 25 worlds at most in its fixed panel, which scrolls to its last worl
   await page.keyboard.press("End");
   await expect(railLinks(page).last()).toBeFocused();
   await expect(railLinks(page).last()).toBeInViewport();
-  const ticker = await boxOf(page, "[data-ticker]");
-  expect(y + height).toBeLessThanOrEqual(ticker.y);
 });
 
 for (const size of [

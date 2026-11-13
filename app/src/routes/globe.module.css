@@ -29,7 +29,7 @@
 
   /* A window this wide loads the scene by itself: the room is kept from the first paint, or the plate jumps half a screen under the reader. */
   /* raw: the phone's end and the plate's breakpoint */
-  @media (min-width: 900px) and (max-width: 1279px) {
+  @media (900px <= width < 1280px) {
     .globe:is([data-earth="waiting"], [data-world="waiting"]) {
       display: block;
     }
@@ -37,7 +37,7 @@
 
   /* Beside the plate, between its words and the dock (frame 39): the ring keeps 28 px off each, and the globe stands 16 px over the frame's
      middle, which leaves the pill's row under it. The window's height caps it. */
-  @media (min-width: 1280px) {
+  @media (width >= 1280px) {
     .globe,
     .globe + * {
       --_dock: var(--chat-dock-s);
@@ -181,7 +181,7 @@
   }
 
   /* raw: the dock widens at 1400 px (DESIGN-SYSTEM.md, Layout), and the globe's span with it */
-  @media (min-width: 1400px) {
+  @media (width >= 1400px) {
     .globe,
     .globe + * {
       --_dock: var(--chat-dock);

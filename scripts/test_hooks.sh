@@ -7086,6 +7086,17 @@ out=$(chk) || fail "check_nginx refused a burst of 6, twice the 3 files of the b
 sed 's#zone=visitors burst=640#zone=visitors burst=5#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 out=$(chk) && fail "check_nginx passed a burst of 5, under twice the 3 files of the build: $out"
 printf '%s\n' "$out" | grep -qi "burst" || fail "check_nginx did not name the burst of 5: $out"
+# The hashed files are counted under their own zone: two of them need a files' burst of 4, and 3 is refused by that zone's name.
+mkdir -p "$nc/app/build/client/assets" "$nc/app/build/client/textures"
+printf 'x\n' >"$nc/app/build/client/assets/a.js" && printf 'x\n' >"$nc/app/build/client/textures/b.webp"
+sed 's#zone=files burst=1024#zone=files burst=3#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+grep -q 'zone=files burst=3 ' "$nc/deploy/web/nginx.conf" || fail "the fixture did not plant a files' burst of 3"
+out=$(chk) && fail "check_nginx passed a files' burst of 3 for 2 hashed files, whose first load is 4 requests: $out"
+printf '%s\n' "$out" | grep -qi "files' burst" || fail "check_nginx did not name the files' burst that a first load overruns: $out"
+sed 's#zone=files burst=1024#zone=files burst=4#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+out=$(chk) || fail "check_nginx refused a files' burst of 4, twice the 2 hashed files: $out"
+rm "$nc/app/build/client/assets/a.js" "$nc/app/build/client/textures/b.webp"
+rmdir "$nc/app/build/client/assets" "$nc/app/build/client/textures"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 chk >/dev/null || fail "check_nginx refused the image's burst for a build of 3 files"
 # The table the burst lives in (F3665, Alexis, 2026-11-02): the visitors' zone has two live lines, both at 640, and its rate is unchanged. Each

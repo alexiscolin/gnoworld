@@ -1,15 +1,15 @@
 // The worlds pass's reading half: the list, the packages, the names and each realm's history, in that order, with the last file as the
 // memory of what was already known.
 import { Worlds } from "@gnoworld/schemas/indexer";
-import { readFileSync } from "node:fs";
 import type { Log } from "@gnoworld/service/log";
-import { knownFacts, namesOf, sinceOf, type Gathered } from "./assemble.ts";
+import { knownFacts, namesOf, type Gathered } from "./assemble.ts";
 import { compareLists, sorted } from "./compare.ts";
 import { keptPaths, isSystem } from "./group.ts";
-import { readHistories, type StampedHistory } from "./history.ts";
+import { readHistories, type History } from "./history.ts";
 import { readRealmPaths } from "./list.ts";
 import { readNames } from "./names.ts";
 import { readPackages } from "./packages.ts";
+import { lastFile } from "../replaceFile.ts";
 import { pacer, type Kind, type Send } from "./remote.ts";
 
 export interface Universe {
@@ -33,23 +33,18 @@ export interface ReadSettings {
 
 // The last file, or none when it is not there, is no good file, or is another universe's.
 function loadLast(file: string, universe: string): Worlds | undefined {
-  try {
-    const parsed = Worlds.safeParse(JSON.parse(readFileSync(file, "utf8")));
-    return parsed.success && parsed.data.universe === universe ? parsed.data : undefined;
-  } catch {
-    return undefined;
-  }
+  const parsed = lastFile(file, Worlds);
+  return parsed?.universe === universe ? parsed : undefined;
 }
 
-// Every realm's history from the indexer, each stamped once the read has ended; none when it failed, each realm keeping its last counts.
+// Every realm's history from the indexer; none when it failed, each realm keeping its last counts.
 async function readCalls(
   settings: ReadSettings,
-  read: { pace: () => Promise<void>; paths: readonly string[]; sinceOf: (path: string) => number | undefined },
-): Promise<Map<string, StampedHistory> | "stopped"> {
+  read: { pace: () => Promise<void>; paths: readonly string[] },
+): Promise<Map<string, History> | "stopped"> {
   const { send, universe, isStopped, log } = settings;
   const page = settings.historyPage === undefined ? {} : { page: settings.historyPage };
   const calls = await readHistories({ send, indexer: universe.indexer, pace: read.pace, ...page }, read.paths, {
-    sinceOf: read.sinceOf,
     isStopped,
   });
   if (!calls.ok) {
@@ -58,8 +53,7 @@ async function readCalls(
     return new Map();
   }
   if (calls.skipped > 0) log("worlds_history_skipped", { error: "shape" });
-  const at = settings.now();
-  return new Map([...calls.histories].map(([path, history]) => [path, { ...history, at }]));
+  return calls.histories;
 }
 
 // The list, the packages, the names and the histories, in that order, or the kind of fault that ends the pass.
@@ -87,7 +81,7 @@ export async function gather(settings: ReadSettings): Promise<Gathered | Kind> {
     deployer === null || earlierNames.has(deployer) ? [] : [deployer],
   );
   const names = await readNames({ send, rpc: universe.rpc, pace }, unnamed);
-  const histories = await readCalls(settings, { pace, paths, sinceOf: sinceOf(lastRealms) });
+  const histories = await readCalls(settings, { pace, paths });
   if (histories === "stopped") return "stopped";
   const news = compareLists([...lastRealms.keys()], list.paths);
   return { lastWorlds, lastRealms, paths, news, facts, fresh, earlierNames, names, histories };

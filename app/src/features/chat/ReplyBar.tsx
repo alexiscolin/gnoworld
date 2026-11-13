@@ -1,7 +1,7 @@
 // The composer's reply bar (slice 4's 4d): over the field, the line the next one answers.
 import { IconButton, Sidebar } from "@gnoworld/ui";
 import { useId, useLayoutEffect, type KeyboardEvent, type RefObject } from "react";
-import { FIELD } from "./composerHooks.ts";
+import { FIELD } from "./composerBox.ts";
 import { Replying, type Answered } from "./Replying.tsx";
 import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";

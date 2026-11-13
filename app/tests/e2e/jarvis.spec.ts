@@ -5,7 +5,7 @@ import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // Jarvis end to end on the real server and Ergo, its two routes (/api/jarvis/state, /api/jarvis/ask) stubbed: the three ways in (the
 // account menu, the composer's + menu, a line that starts with `@jarvis `), the answer card, the error line, the off state and the guest's
-// card. The room never hears an ask.
+// card. A person's own question is said to the room as any line; a fixed ask never is.
 const json =
   (body: unknown, status = 200) =>
   (route: Route) =>
@@ -57,7 +57,9 @@ test.describe("Jarvis", () => {
     await expect(cards(page).filter({ hasText: "Vote YES before it closes." })).toBeVisible();
   });
 
-  test("takes a line that starts with @jarvis as a question, not as a message to the room", async ({ page }) => {
+  test("takes a line that starts with @jarvis as a question, and says it to the room once, as any line", async ({
+    page,
+  }) => {
     await state(page, true);
     const asked = await answering(page, ANSWER);
     await inGames(page);
@@ -68,7 +70,7 @@ test.describe("Jarvis", () => {
     await page.getByRole("button", { name: "Send" }).click();
     await expect(cards(page).filter({ hasText: "Vote YES before it closes." })).toBeVisible();
     expect(asked).toEqual([{ question, room: ROOM }]);
-    await expect(heard(page).filter({ hasText: question })).toHaveCount(0);
+    await expect(heard(page).filter({ hasText: question })).toHaveCount(1);
   });
 
   test("says one plain line when the answer fails, and when Jarvis declines", async ({ page }) => {
@@ -95,7 +97,10 @@ test.describe("Jarvis", () => {
     await state(page, false);
     await inGames(page);
     await expect(page.getByRole("button", { name: "Ask Jarvis", exact: true })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Ask Jarvis: Jarvis is off for now" })).toBeVisible();
+    // Chromium reads the hidden reason as a box of its own, so a space comes before its colon.
+    const off = page.getByRole("button", { name: /^Ask Jarvis ?: Jarvis is off for now$/ });
+    await expect(off).toBeVisible();
+    await expect(off).toBeDisabled();
     await page.getByRole("button", { name: "Add", exact: true }).click();
     const item = page.getByRole("menuitem", { name: /^Jarvis/ });
     await expect(item).toHaveAttribute("aria-disabled", "true");

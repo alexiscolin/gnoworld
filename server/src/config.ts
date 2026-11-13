@@ -1,7 +1,7 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
 import { jsonOf } from "@gnoworld/core";
-import { Key } from "@gnoworld/schemas";
+import { ChainId, Key } from "@gnoworld/schemas";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
@@ -88,7 +88,7 @@ const settingsSchema = () =>
         .string()
         .default("onyx-1,gnoland-1")
         .transform((list) => list.split(","))
-        .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,49}$/))),
+        .pipe(z.array(z.string().refine((chain) => ChainId.safeParse(chain).success))),
       // The sites a POST may come from (CSRF); none by default, so every POST is refused until set.
       ORIGINS: list(z.string().refine(isOrigin)),
       NEW_ACCOUNTS_PER_HOUR: z

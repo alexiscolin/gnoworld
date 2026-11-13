@@ -10,20 +10,24 @@ import { Hono } from "hono";
 import { getCookie } from "hono/cookie";
 import { z } from "zod";
 import { roomCounts } from "./earth.ts";
-import { realmPaths, worldRooms } from "./rooms.ts";
+import { realmPaths, worldRoomStates } from "./rooms.ts";
 import { roomType, type Typed } from "./types.ts";
 
 // The Earth's thousand public rooms and the moderators' 20, as RoomList takes.
 const SECTION_ROOMS = 1_100;
 const DAY_MS = 24 * 60 * 60_000;
+// A guest's answer is kept this long per world, as its header says; the worlds kept are bounded.
+const GUEST_MS = 5_000;
+const GUESTS_MAX = 64;
 // The lines of a day are counted again at most this often: one pass over the verdicts serves every ask.
 const COUNTS_MS = 30_000;
 
 interface Options {
   db: DatabaseSync;
   roles: Typed;
-  // Whether an account, or a guest (undefined), sees a room listed: no default, so none is open by mistake.
-  visible: (room: string, who: string | undefined) => boolean;
+  // Whether an account, or a guest (undefined), sees a room listed: no default, so none is open by mistake. `archived`
+  // is the room's flag when the caller already read it.
+  visible: (room: string, who: string | undefined, archived?: boolean) => boolean;
   // The account of a session's token (login.ts's session).
   session?: ((token: string | undefined) => string | undefined) | undefined;
   // The people in a room now, none when it was not read lately (the presence's `here`).
@@ -91,6 +95,21 @@ function byUse(db: DatabaseSync, seen: readonly string[], counts: Counts): strin
 // A world's slug, 64 characters at most, as the activity route asks.
 const World = RoomList.shape.world.check(z.maxLength(64));
 
+// The guests' answers, one a world, each kept for GUEST_MS.
+function guestAnswers(now: () => number) {
+  const kept = new Map<string, { at: number; body: RoomList }>();
+  return {
+    get: (world: string): RoomList | undefined => {
+      const held = kept.get(world);
+      return held !== undefined && now() - held.at < GUEST_MS ? held.body : undefined;
+    },
+    set: (world: string, body: RoomList): void => {
+      if (kept.size >= GUESTS_MAX) kept.clear();
+      kept.set(world, { at: now(), body });
+    },
+  };
+}
+
 export function listRoutes({
   db,
   roles,
@@ -106,22 +125,29 @@ export function listRoutes({
     if (counted === undefined || at - counted.at >= COUNTS_MS) counted = { at, lines: roomCounts(db, at - DAY_MS) };
     return counted.lines;
   };
+  const guests = guestAnswers(now);
   app.get("/", (c) => {
     const asked = c.req.queries("world");
     const parsed = World.safeParse(asked?.length === 1 ? asked[0] : undefined);
     if (!parsed.success) return c.json({ error: "refused" } satisfies ApiError, 400);
     const world = parsed.data;
     const who = session(getCookie(c, "__Host-session"));
-    const counts = { here, messages: lines() };
-    const listed = worldRooms(db, world).filter((room) => visible(room, who));
-    const seen = world === "earth" ? byUse(db, listed, counts) : listed;
     // The answer depends on the session: a shared cache keeps each cookie's apart (F585).
     c.header("cache-control", `${who === undefined ? "public" : "private"}, max-age=5`);
     c.header("vary", "cookie");
-    return c.json({
+    const kept = who === undefined ? guests.get(world) : undefined;
+    if (kept !== undefined) return c.json(kept);
+    const counts = { here, messages: lines() };
+    const listed = worldRoomStates(db, world)
+      .filter(({ name, archived }) => visible(name, who, archived))
+      .map(({ name }) => name);
+    const seen = world === "earth" ? byUse(db, listed, counts) : listed;
+    const body = {
       world,
       sections: sectionsOf(roles, world, { seen, counts, realms: realmPaths(db, world) }),
-    } satisfies RoomList);
+    } satisfies RoomList;
+    if (who === undefined) guests.set(world, body);
+    return c.json(body);
   });
   return app;
 }

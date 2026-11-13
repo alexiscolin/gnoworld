@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -96,5 +97,25 @@ describe("IconButton", () => {
     for (const size of ["s", "m", "l"]) expect(shown.some((b) => b.size === size)).toBe(true);
     for (const emphasis of ["outline", "plain"]) expect(shown.some((b) => b.emphasis === emphasis)).toBe(true);
     expect(shown.some((b) => b.pressed === "true") && shown.some((b) => b.count === "99+")).toBe(true);
+  });
+
+  // The composer's format bar set its tools' look and hid its lists from outside, by their place in its row (lot E, E4).
+  it("as a bar's tool, wears the tool look, and, dropping, marks its anchor so a narrow bar goes without it", () => {
+    const { rerender } = render(<IconButton icon="list-bulleted" label="Bulleted list" />);
+    const button = () => screen.getByRole("button", { name: "Bulleted list" });
+    expect([button().hasAttribute("data-tool"), button().parentElement?.hasAttribute("data-drops")]).toEqual([
+      false,
+      false,
+    ]);
+    rerender(<IconButton icon="list-bulleted" label="Bulleted list" tool drops />);
+    expect([button().hasAttribute("data-tool"), button().parentElement?.hasAttribute("data-drops")]).toEqual([
+      true,
+      true,
+    ]);
+    // This project's module URLs start at the repository's root (/packages/…), where Vitest runs.
+    const tooltipSheet = readFileSync(`.${new URL("../Tooltip/Tooltip.module.css", import.meta.url).pathname}`, "utf8");
+    expect(tooltipSheet).toMatch(
+      /@container \(inline-size < 18rem\) \{\s*\.anchor\[data-drops\] \{\s*display: none;\s*\}/,
+    );
   });
 });

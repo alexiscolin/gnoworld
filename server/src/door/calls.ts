@@ -1,5 +1,5 @@
-// The door's calls to jarvis for an ask (D13985): the answers kept, the one call in flight for the same ask, the room's cap
-// and the effects of an answer on the account's quota and share. Asks with the same key at once share one call, never
+// The door's calls to jarvis for an ask (D13985): the answers kept, the one call in flight for the same ask, and the effects
+// of an answer on the account's quota and share. Asks with the same key at once share one call, never
 // stopped for a reader leaving; a quota full for the asker that made it sends the others back through. The effects run
 // before the call leaves the table, so a later ask finds the answer kept or none in flight.
 import {
@@ -13,15 +13,13 @@ import {
 import type { Day } from "./day.ts";
 import type { Jarvis, Failure } from "./jarvis.ts";
 import type { Counted } from "./quota.ts";
-import { makeRoomCap } from "./roomcap.ts";
 import type { Kept } from "./kept.ts";
 import type { Served } from "./served.ts";
 
 export type Called = { ok: true; answer: JarvisPaidAnswer } | { ok: false; error: Failure };
 type Outcome = { full: true } | { full: false; called: Called };
-/** What a call comes to for its asker: served, told the room is full, the quota full, or jarvis's word. */
-export type Result =
-  { kind: "served"; answer: JarvisAnswer } | { kind: "busy" } | { kind: "full" } | { kind: "called"; called: Called };
+/** What a call comes to for its asker: served, the quota full, or jarvis's word. */
+export type Result = { kind: "served"; answer: JarvisAnswer } | { kind: "full" } | { kind: "called"; called: Called };
 
 /** One ask of one account, as the door makes it. */
 export interface Asked {
@@ -29,8 +27,6 @@ export interface Asked {
   who: Address;
   room: string;
   started: number;
-  // Whether the chat has heard the room: only such a room has a cap.
-  heard: boolean;
   // The ask, without the room's lines, which are read when its call is made.
   ask: JarvisQuestion;
   // The chain of a function ask's room, found by the door, and the key its answer is kept under, none when it is never kept.
@@ -85,13 +81,11 @@ const keepable = (ask: JarvisQuestion, called: Called): boolean =>
     called.answer.version === EXPLAIN_VERSION);
 
 export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Deps) {
-  const cap = makeRoomCap();
   const flights = new Map<string, Promise<Outcome>>();
-  // What an answer does to the account's quota, the room's slot, its share, and the answers kept. A call is never stopped
+  // What an answer does to the account's quota, its share, and the answers kept. A call is never stopped
   // when its asker leaves: it ends, and its cost is the share of the one who asked first.
   const settle = ({ who, room, started, key, keptKey, ask }: Asked, called: Called): void => {
     if (nothing(called)) quota.giveBack(who, started);
-    if (nothing(called) || (!called.ok && called.error === "down")) cap.give(room, started);
     const cost = costOf(called);
     day.spend(who, cost, started);
     const page = called.ok ? forPage(called.answer) : undefined;
@@ -104,10 +98,7 @@ export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Dep
     try {
       // A function's explanation is given no line of the room: it reads the code alone, so every room may share it.
       const lines = isExplain(ask) ? [] : recent(room, "ask" in ask ? "" : who);
-      if (!quota.take(who, await named(who), started)) {
-        cap.give(room, started);
-        return { full: true };
-      }
+      if (!quota.take(who, await named(who), started)) return { full: true };
       const called = await jarvis.ask(
         { ...ask, lines, ...(chain === undefined || !isExplain(ask) ? {} : { chain }) },
         new AbortController().signal,
@@ -143,8 +134,6 @@ export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Dep
       const result = await wait(flight);
       if (result !== undefined) return result;
     }
-    // A room the chat never heard has no line to answer from: its cap is the account's limits.
-    if (asked.heard && !cap.take(asked.room, asked.started)) return { kind: "busy" };
     return make(asked);
   };
 }

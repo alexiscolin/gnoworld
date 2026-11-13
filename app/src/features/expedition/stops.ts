@@ -13,6 +13,8 @@ export interface Named {
 /** A stop of the day. */
 export interface Stop {
   readonly id: string;
+  /** Its world's id, as the cosmos holds it. */
+  readonly world: string;
   /** The device's key of its world, as a stamp's. */
   readonly key: string;
   readonly name: string;
@@ -55,6 +57,6 @@ export function stopsOn(universe: string, day: string): Stop[] {
     const name = world === undefined ? undefined : worldName(universe, world.id);
     return world === undefined || name === undefined
       ? []
-      : [{ id: stop.id, name, why: stop.why, key: world.key, path: world.path }];
+      : [{ id: stop.id, world: world.id, name, why: stop.why, key: world.key, path: world.path }];
   });
 }

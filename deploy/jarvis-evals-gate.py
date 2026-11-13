@@ -1,7 +1,9 @@
-# The gate to switching Jarvis on (10u-g2, D13987): the last evals result must pass. Run as
-#   python3 -I deploy/jarvis-evals-gate.py <evals/results> <evals/cases>
-# It prints "ok" and exits 0, or prints why not and exits 1. It fails closed: no result, a result it cannot read, a case of
-# the gate's suites the result lacks, a row it does not understand, all refuse.
+# The gate to switching Jarvis on (10u-g2, D13987): the last evals result must pass, and be of this code. Run as
+#   python3 -I deploy/jarvis-evals-gate.py <evals/results> <evals/cases> <fingerprint>
+# where <fingerprint> is what `node evals/fingerprint.ts` prints for the checkout to deploy (deploy/jarvis-on.sh runs it).
+# It prints "ok" and exits 0, or prints why not and exits 1. It fails closed: no result, a result of other code or with no
+# fingerprint beside it, a result it cannot read, a case of the gate's suites the result lacks, a row it does not
+# understand, all refuse.
 #
 # The result is promptfoo's output file (evals/run.sh writes results/<UTC time>.json, so the newest name is the last run):
 # results.results[] holds one row a test, its `success` a boolean and its `testCase.description` "<suite>/<id>: <about>"
@@ -34,12 +36,19 @@ def cases_of(folder):
     return wanted
 
 
-def main(results, cases):
+def main(results, cases, fingerprint):
     # Only a file named by its UTC time is a result (evals/run.sh's name); any other is not read.
     named = re.compile(r"^\d{4}-\d\d-\d\dT\d{6}Z\.json$")
     names = sorted(name for name in os.listdir(results) if named.match(name)) if os.path.isdir(results) else []
     if not names:
         refuse("no evals result in " + results)
+    # What the result judged, which evals/run.sh writes beside it: a result of other code proves nothing of this one.
+    try:
+        judged = open(os.path.join(results, names[-1][: -len(".json")] + ".fingerprint"), encoding="utf-8").read().strip()
+    except OSError:
+        judged = ""
+    if not re.fullmatch(r"[0-9a-f]{64}", fingerprint) or judged != fingerprint:
+        refuse(f"{names[-1]} was not judged on this code: run the evals again")
     try:
         rows = json.load(open(os.path.join(results, names[-1]), encoding="utf-8"))["results"]["results"]
         passed = {}
@@ -68,6 +77,6 @@ def main(results, cases):
     print("ok")
 
 
-if len(sys.argv) != 3:
-    refuse("usage: jarvis-evals-gate.py <results> <cases>")
-main(sys.argv[1], sys.argv[2])
+if len(sys.argv) != 4:
+    refuse("usage: jarvis-evals-gate.py <results> <cases> <fingerprint>")
+main(sys.argv[1], sys.argv[2], sys.argv[3])

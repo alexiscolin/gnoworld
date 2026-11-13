@@ -9,7 +9,7 @@ import { forgetPath, recentPaths } from "../../lib/recents.ts";
 import { universePrefix } from "../../places.ts";
 import { realmAt } from "../../realmAt.ts";
 import { RouterLink } from "../../routerLink.tsx";
-import { realmPage } from "../../lib/realmPage.ts";
+import { realmPageHref } from "../../lib/realmPage.ts";
 import { SEARCH } from "../../space/openEvent.ts";
 import { useWorldsFile } from "../../worldsFile.ts";
 import { useFollow } from "../follow/index.ts";
@@ -60,7 +60,12 @@ function Followed({
   const { toggle } = useFollow("worlds", stampKey(universe, id));
   const path = file?.find((world) => world.id === id)?.realms[0]?.path ?? `${REALM_PREFIX}${id}`;
   return (
-    <Place name={id.split("/").at(-1) ?? id} id={id} href={realmPage(path) ?? realmRoute(path, base)} remove={toggle} />
+    <Place
+      name={id.split("/").at(-1) ?? id}
+      id={id}
+      href={realmPageHref(path) ?? realmRoute(path, base)}
+      remove={toggle}
+    />
   );
 }
 

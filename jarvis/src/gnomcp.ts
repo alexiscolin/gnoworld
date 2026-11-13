@@ -12,6 +12,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
 import { SocketTransport, type Address } from "./socketTransport.ts";
+import { until } from "./until.ts";
 import { logLines } from "./gnomcpLog.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 import { visible } from "./untrusted.ts";
@@ -52,6 +53,8 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
   let child = await spawn(setup);
   let closed = false;
   let starting: Promise<Child | undefined> | undefined;
+  // The client of a start under way, which close() ends rather than waits for.
+  let opening: Client | undefined;
   // At most 3 starts in 10 minutes, but for a child dropped for its message's size, which spends none of them.
   const counted = (at: number) => {
     while (at - (starts[0] ?? at) > 10 * 60_000) starts.shift();
@@ -64,12 +67,21 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
     }
     removeHome(child);
     try {
-      child = await spawn(setup);
+      child = await spawn(setup, (client) => {
+        opening = client;
+      });
       return child;
     } catch (error) {
-      setup.log("jarvis_gnomcp_down", { error: error instanceof Error ? error.message : String(error) });
+      if (!closed) setup.log("jarvis_gnomcp_down", { error: error instanceof Error ? error.message : String(error) });
       return undefined;
+    } finally {
+      opening = undefined;
     }
+  };
+  // A call that failed, by its tool and its kind; one its asker ended is no failure of gnomcp's.
+  const logged = (tool: string, ran: Ran, signal: AbortSignal | undefined): Ran => {
+    if (!ran.ok && signal?.aborted !== true) setup.log("jarvis_gnomcp_failed", { tool, reason: ran.reason });
+    return ran;
   };
   // One start for the calls that find the child ended at once.
   const live = (): Promise<Child | undefined> => {
@@ -84,13 +96,15 @@ export async function startGnomcp(setup: Setup): Promise<Gnomcp> {
       // ponytail: a find over 10b's table of seven reads.
       const parsed = tools.find((tool) => tool.name === name)?.args.safeParse(args);
       if (parsed?.success !== true) return { ok: false, reason: "refused" };
-      const current = closed ? undefined : await live();
-      if (current === undefined) return { ok: false, reason: "down" };
-      return sent(current, { name, arguments: parsed.data }, { timeout, ...(signal && { signal }) });
+      const current = closed ? undefined : await until(live(), signal);
+      if (current === undefined) return { ok: false, reason: signal?.aborted === true ? "timeout" : "down" };
+      const options = { timeout, ...(signal && { signal }) };
+      return logged(name, await sent(current, { name, arguments: parsed.data }, options), signal);
     },
     async close() {
-      // A start under way ends first, so the child it makes is the one closed.
+      // A start under way is ended, its requests failing once its client closes, then the child it left is closed.
       closed = true;
+      await opening?.close();
       await starting;
       await child.client.close();
       removeHome(child);
@@ -145,10 +159,11 @@ function transportOf(setup: Setup, timeout: number): { transport: Transport; hom
   return { transport, home };
 }
 
-async function spawn(setup: Setup): Promise<Child> {
+async function spawn(setup: Setup, opened?: (client: Client) => void): Promise<Child> {
   const timeout = setup.startTimeoutMs ?? 30_000;
   const { transport, home } = transportOf(setup, timeout);
   const client = new Client({ name: "jarvis", version: "1.0.0" });
+  opened?.(client);
   const child: Child = { client, home, alive: true, oversized: false };
   client.onclose = () => {
     child.alive = false;

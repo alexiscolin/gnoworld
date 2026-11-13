@@ -1,6 +1,7 @@
 // The motion of a card opening alone (D13979), by hand on the compositor (opacity and transform only, never a layout or a repaint per frame): the plate's
 // other blocks fade and settle away, then the card grows from its cell to the pane; closing, the card shrinks back to its cell while the others come in
 // one after another. The card is laid out where it ends and drawn where it began (a FLIP), its words appearing only as it nears its size.
+import { motionWelcome } from "./motion.ts";
 
 const SETTLE = 8;
 const STEP = 40;
@@ -15,10 +16,7 @@ function timing() {
 }
 
 /** Whether the card can move: the browser animates, the reader welcomes motion and the app's calm setting is not on. */
-export const canMove = () =>
-  typeof Element.prototype.animate === "function" &&
-  !matchMedia("(prefers-reduced-motion: reduce)").matches &&
-  timing().ms > 0;
+export const canMove = () => typeof Element.prototype.animate === "function" && motionWelcome() && timing().ms > 0;
 
 /** What is not the card nor holds it, up to `top`: the siblings along its way in the page's order, which the sheet hides while it is open. */
 export function othersOf(card: HTMLElement, top: HTMLElement): HTMLElement[] {

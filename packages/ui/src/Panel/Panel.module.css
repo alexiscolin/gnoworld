@@ -67,23 +67,20 @@
 
   /* The plate is the container its blocks' queries ask (Grid's twelve columns): narrow or wide by its own width, never the screen's. */
   .panel[data-look="plate"] {
-    /* The world's colour lit, from the plate's own --world (the root's follows the root's). */
-    --world-light: color-mix(in oklab, var(--world) 62%, var(--color-text));
-
     container: plate / inline-size;
     /* raw: the proposal's body sets it (s1.html, base); the plate's type is drawn as its pictures are */
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* A page's arrival (D401): GSAP plays it (the app's features/universe/arrival.ts), the plate's fill by `--plate-in`. */
-  .panel[data-look="plate"]::before {
-    opacity: var(--plate-in, 1);
+  /* The plate's fill, drawn on the wide plate alone (below); a page's arrival (D401) fades it by its opacity (the app's features/universe/arrival.ts). */
+  .fill {
+    display: none;
   }
 
   .panel[data-look="plate"] {
-    /* raw: the world's tint over the night, 16% (the prototype's #fPlate); amber when the data has none */
-    --_fill: color-mix(in oklab, var(--world) 16%, var(--color-surface));
+    /* The world's tint over the night (the prototype's #fPlate), of the plate's own --world (data-world). */
+    --_fill: var(--color-plate);
 
     /* The plain fill, no dot grid (D486). */
     --_ground: var(--_fill);
@@ -92,7 +89,7 @@
   }
 
   /* raw: under the plate's breakpoint the plate is a block of the page: the bottom nav and the "View in space" pill stand over its last lines */
-  @media (max-width: 1279px) {
+  @media (width < 1280px) {
     .panel[data-look="plate"] {
       /* layout: room under its last line for them */
       padding-block-end: var(--space-2xl);
@@ -100,7 +97,7 @@
   }
 
   /* raw: a phone's width: the plate is the page's width, no line and no corner (the proposal's data-m="phone") */
-  @media (max-width: 560px) {
+  @media (width <= 560px) {
     .panel[data-look="plate"] {
       border: 0;
       border-radius: 0;
@@ -108,7 +105,7 @@
       margin-inline: calc(-1 * var(--space-s));
     }
 
-    .panel[data-look="plate"]::before {
+    .fill {
       border-radius: 0;
     }
   }
@@ -119,7 +116,7 @@
     position: absolute;
     /* The atlas caption: 0.32em apart, 10.5 px, at 45% (the prototype's #fVertical), set through the label style's own values. */
     --tracking-caps: 0.32em;
-    --font-label: 500 10.5px/1 var(--family-mono);
+    --font-label: 500 0.65625rem/1 var(--family-mono);
     --color-text-muted: color-mix(in oklab, var(--color-text) 45%, transparent);
 
     /* raw: the caption's ink stands at x 49 to 59 and ends 55 px over the plate's foot (frame 20) */
@@ -136,17 +133,17 @@
   /* The one breakpoint of the plate and the dock beside it: 808, 320 and the margins leave 104 px of sky at 1280. Under it the
      plate is a block in the page and the chat takes the page, as a phone's does (DESIGN-SYSTEM.md, Breakpoints). */
   /* raw: the width where the plate and the dock fit with a sky between */
-  @media (min-width: 1280px) {
+  @media (width >= 1280px) {
     .dock {
       position: fixed;
-      /* raw: above the page's header, which the full chat covers (shellHeader.module.css holds 2) */
+      /* raw: over the page, the plate and the signs on the globe; under the page's header (the app's shellHeader.module.css holds 4) */
       z-index: 3;
       inset-block: var(--dock-top) var(--space-m);
       inset-inline-end: var(--page-edge);
       inline-size: var(--chat-dock-now);
       overflow: clip;
-      /* raw: the outline's own colour and edge, drawn over its right side, which the dock covers */
-      border: var(--line-width) solid #2c313c;
+      /* the outline's own colour and edge, drawn over its right side, which the dock covers */
+      border: var(--line-width) solid var(--color-outline);
       border-start-end-radius: var(--radius-l);
       border-end-end-radius: var(--radius-l);
     }
@@ -176,8 +173,7 @@
       position: fixed;
       inset-block: var(--dock-top) var(--space-m);
       inset-inline: var(--page-edge);
-      /* raw: the prototype's and the frames' own value */
-      border: var(--line-width) solid #2c313c;
+      border: var(--line-width) solid var(--color-outline);
       border-radius: var(--radius-l);
       pointer-events: none;
     }
@@ -198,8 +194,8 @@
     }
 
     /* The fill stands apart from the words: the fade and a globe's circle are cut out of it alone, and no word fades with them. */
-    .panel[data-look="plate"]::before {
-      content: "";
+    .fill {
+      display: block;
       position: absolute;
       inset-block: 0;
       inline-size: 100%;
@@ -212,7 +208,7 @@
       visibility: var(--plate-fill);
       /* raw: the fill itself fades into space over the plate's last --plate-fade, never a layer over the scene, whose planet passes over
          the plate's edge (Alexis, 2026-11-10: "la planète de ce côté doit passer au-dessus") */
-      mask-image: linear-gradient(to right, #000 calc(100% - var(--plate-fade)), transparent);
+      mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - var(--plate-fade)), transparent);
     }
 
     .panel[data-look="plate"] .content {

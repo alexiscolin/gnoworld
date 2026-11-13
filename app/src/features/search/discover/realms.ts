@@ -2,7 +2,7 @@
 import { stampKey, type StoreRow } from "@gnoworld/core";
 import type { Worlds } from "@gnoworld/schemas/indexer";
 import { fullChatHref, holdsChat } from "../../../fullChat.ts";
-import { realmPage } from "../../../lib/realmPage.ts";
+import { realmPageHref } from "../../../lib/realmPage.ts";
 import { visitedIn } from "../../../lib/visits.ts";
 import type { SearchItem } from "../types.ts";
 
@@ -15,7 +15,7 @@ export const itemOf = (row: StoreRow, universe: string): SearchItem => ({
   name: row.path.replace(/^gno\.land\/r\//, ""),
   kind: "realm",
   universe,
-  path: realmPage(row.path) ?? row.path,
+  path: realmPageHref(row.path) ?? row.path,
   namespace: row.namespace,
   world: row.world,
 });

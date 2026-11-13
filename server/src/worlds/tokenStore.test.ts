@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { describe, expect, it } from "vitest";
 import { rollupName } from "@gnoworld/core";
+import { TOKEN_CAPS } from "@gnoworld/schemas/indexer";
 import { TOKEN_TABLES, tokenStore, type TokenEvent, type TokenTx } from "./tokenStore.ts";
 
 const REALM = "gno.land/r/demo/coin";
@@ -52,6 +53,48 @@ describe("the token replay", () => {
   it("marks a token ambiguous, with no holders, for a balance below zero", () => {
     const token = run(fresh(), [born], [move("", A, 5n)], [move(B, A, 1n)]);
     expect(token).toMatchObject({ ambiguous: true, supply: null, holders: null, top: [] });
+  });
+
+  it("drops the row of a holder whose whole balance moves, one holder fewer", () => {
+    const token = run(fresh(), [born], [move("", A, 100n)], [move("", B, 50n)], [move(B, A, 50n)]);
+    expect(token).toMatchObject({ supply: "150", holders: 1, top: [{ address: A, amount: "150" }] });
+  });
+
+  it("marks a token ambiguous for a burn past its supply, and for a holder past the cap", () => {
+    const later = (tamper: string, event: TokenEvent) => {
+      const db = new DatabaseSync(":memory:");
+      db.exec(TOKEN_TABLES);
+      const store = tokenStore(db, "onyx");
+      run(store, [born], [move("", A, 100n)]);
+      db.exec(tamper);
+      store.add({
+        txs: [{ height: 3, events: [event] }],
+        dated: { days: new Map([[3, "2026-11-12"]]), times: new Map() },
+        through: 3,
+        now: NOW,
+      });
+      return store.answerOf(rollupName(REALM))?.tokens[0];
+    };
+    expect(later("UPDATE grc20_tokens SET supply = '10'", move(A, "", 50n))).toMatchObject({
+      ambiguous: true,
+      top: [],
+    });
+    const capped = `UPDATE grc20_tokens SET holders = ${String(TOKEN_CAPS.balances)}`;
+    expect(later(capped, move("", B, 1n))).toMatchObject({ ambiguous: true, top: [] });
+  });
+
+  it("counts no day and no last move for a transfer whose block has no date", () => {
+    const store = fresh();
+    store.add({
+      txs: [
+        { height: 1, events: [born] },
+        { height: 2, events: [move("", A, 5n)] },
+      ],
+      dated: { days: new Map(), times: new Map() },
+      through: 2,
+      now: NOW,
+    });
+    expect(store.answerOf(rollupName(REALM))?.tokens[0]).toMatchObject({ supply: "5", days: [], last: null });
   });
 
   it("marks a token ambiguous for a name announced twice, and for a transfer to oneself", () => {

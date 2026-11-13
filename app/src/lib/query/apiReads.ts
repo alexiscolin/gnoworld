@@ -13,13 +13,19 @@ const MINUTE_MS = 60_000;
 export const presenceOptions = queryOptions({
   queryKey: keys.presence(),
   refetchInterval: MINUTE_MS,
-  queryFn: () => readApi(() => pagePresenceApi().read()),
+  queryFn: ({ signal }) => readApi((s) => pagePresenceApi().read(s), signal),
 });
 
 /** A world's rooms' messages a minute. */
 export const activityOptions = (slug: string) =>
-  queryOptions({ queryKey: keys.activity(slug), queryFn: () => readApi(() => pageActivityApi().read(slug)) });
+  queryOptions({
+    queryKey: keys.activity(slug),
+    queryFn: ({ signal }) => readApi((s) => pageActivityApi().read(slug, s), signal),
+  });
 
 /** The rooms the server lists for `world`, for the reader `query` names (chat/names.ts's roomsQuery). */
 export const roomsOptions = (world: string, query: string) =>
-  queryOptions({ queryKey: keys.rooms(query), queryFn: () => readApi(() => pageRoomsApi().rooms(world)) });
+  queryOptions({
+    queryKey: keys.rooms(query),
+    queryFn: ({ signal }) => readApi((s) => pageRoomsApi().rooms(world, s), signal),
+  });

@@ -11,8 +11,6 @@ export const TOKEN_PACKAGE = "gno.land/p/nt/grc20/v0";
 
 /** The most of each: holders and days in an answer, tokens in one, tokens a realm shows, tokens kept, and balance rows kept for one token. */
 export const TOKEN_CAPS = { holders: 20, days: 30, perRealm: 3, tokens: 10_000, balances: 100_000, name: 64 } as const;
-/** The most bytes of an answer: three tokens of twenty holders at their caps. */
-export const TOKEN_MAX_BYTES = 16 * 1024;
 
 /** The largest amount the chain holds in one balance or one transfer. */
 export const INT64_MAX = 9_223_372_036_854_775_807n;

@@ -44,7 +44,7 @@ export function BubbleSign({
       <span className={styles["who"]}>{initial(name)}</span>
       <div>
         {/* The name and place whole, on two lines where the room's pill leaves them too little. */}
-        <div className={`${String(styles["head"])} ${String(styles["headRow"])}`}>
+        <div className={`caps ${String(styles["head"])} ${String(styles["headRow"])}`}>
           <span>{`${name} · ${place ?? ""}`}</span>
           {label === undefined ? null : (
             <span data-room="" className={styles["room"]}>

@@ -2,6 +2,7 @@
 // server counts (server/src/moderation/rules.ts, which folds a line with chat/fold.ts first): `@` after what folds
 // to no letter, digit or `_`, then an account's address, g1 and 38 of bech32's characters, a word whole; its form
 // alone, the checksum unread. None in code, nor in a link's label. So the per-message cap holds for each one shown.
+import { ADDRESS_BODY } from "../chain/evalName.ts";
 import { fold } from "../chat/fold.ts";
 import { inlines } from "./nodes.ts";
 import { before } from "./scan.ts";
@@ -11,7 +12,6 @@ import type { Block, Inline } from "./types.ts";
 // which the server's newer tables may know as a letter (F817). No character class before `$`: V8 14.6 (Chromium
 // 156, Node 26) misses a letter past the BMP there (F816).
 const WORDLY_END = /(?:\p{L}|\p{N}|_|\p{Cn})$/u;
-const MENTION = /@(g1[qpzry9x8gf2tvdw0s3jn54khce6mua7l]{38})(?![\p{L}\p{N}_])/uy;
 
 /** The account a mention at `at` (an `@`) names, or none: none after what folds to a letter, a digit, `_` or nothing
  * (a mark or a format character, which the server drops, joining the `@` to what is before them). */
@@ -19,8 +19,19 @@ export function mentionAt(source: string, at: number): string | undefined {
   const prior = before(source, at);
   const folded = prior === undefined ? " " : fold(prior);
   if (folded === "" || WORDLY_END.test(folded)) return undefined;
-  MENTION.lastIndex = at;
-  return MENTION.exec(source)?.[1];
+  const mention = new RegExp(`@(${ADDRESS_BODY})(?![\\p{L}\\p{N}_])`, "uy");
+  mention.lastIndex = at;
+  return mention.exec(source)?.[1];
+}
+
+/** Each mention a plain text holds, as a room's line reads one: where its `@` stands, where it ends, and its account. */
+export function mentionSpans(text: string): { at: number; end: number; account: string }[] {
+  const found: { at: number; end: number; account: string }[] = [];
+  for (let at = text.indexOf("@"); at >= 0; at = text.indexOf("@", at + 1)) {
+    const account = mentionAt(text, at);
+    if (account !== undefined) found.push({ at, end: at + 1 + account.length, account });
+  }
+  return found;
 }
 
 /** The accounts a message's tree mentions, each once, in the order first named. */

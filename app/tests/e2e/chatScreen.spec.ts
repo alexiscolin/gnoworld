@@ -112,7 +112,7 @@ test.describe("the chat as the video shows it", () => {
     expect(t.x + t.width).toBeGreaterThan(row.x + row.width - 4);
     expect(x.y).toBeGreaterThan(t.y + t.height - 2);
     expect(f.x).toBeLessThan(t.x);
-    await expect(first.locator("[data-country]")).toHaveCount(0);
+    await expect(first.locator("[data-line-country]")).toHaveCount(0);
   });
 
   test("puts the pinned line first in the conversation, above the messages, its author and words in view", async ({

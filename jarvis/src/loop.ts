@@ -79,17 +79,20 @@ export interface Run {
   turns: number;
 }
 
+/** The SHA-256 of texts, each framed by its length in bytes, so no two lists of parts give one hash. */
+export function hashParts(parts: readonly string[]): string {
+  const hash = createHash("sha256");
+  for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}\0`).update(part);
+  return hash.digest("hex");
+}
+
 /** The loop for these parts, and its prompt's version: the SHA-256 of its system prompt, skills and tools. */
 export function makeLoop(parts: Parts) {
   const system = parts.system ?? systemOf(parts.skills.index);
   // The concierge's loop, not a one-job loop with its own system prompt, is the one that may decline.
   const offered =
     parts.system === undefined ? [...parts.tools.allowlist.offered(), DECLINE] : parts.tools.allowlist.offered();
-  const hash = createHash("sha256");
-  for (const part of [system, parts.skills.digest, JSON.stringify(offered)]) {
-    hash.update(`${String(Buffer.byteLength(part))}\0`).update(part);
-  }
-  const version = hash.digest("hex");
+  const version = hashParts([system, parts.skills.digest, JSON.stringify(offered)]);
   const tools = new Set(parts.tools.allowlist.offered().map(({ name }) => name));
   const named = (name: string) => (tools.has(name) ? name : undefined);
   return {

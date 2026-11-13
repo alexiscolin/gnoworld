@@ -4,7 +4,8 @@
 // composeMultilineBatch, v2.19.1). Read as one message, its lines joined by breaks. The relay is untrusted: a batch
 // past Ergo's caps, of mixed commands, targets or senders, or holding a CTCP is none.
 import type { Batch } from "./batch.ts";
-import { bytes, type IrcMessage } from "./irc.ts";
+import { utf8Bytes } from "../text/utf8.ts";
+import type { IrcMessage } from "./irc.ts";
 
 export const MULTILINE = "draft/multiline";
 const CONCAT = "draft/multiline-concat";
@@ -40,7 +41,7 @@ function joined(parts: readonly IrcMessage[], shape: Shape): string | undefined 
 
 // A text Ergo sends as a message of several lines: one line at least not blank, within its bytes.
 function sendable(text: string): boolean {
-  return text.replaceAll("\n", "") !== "" && bytes(text) <= MULTILINE_BYTES;
+  return text.replaceAll("\n", "") !== "" && utf8Bytes(text) <= MULTILINE_BYTES;
 }
 
 /** The message a multiline batch holds, or none. */

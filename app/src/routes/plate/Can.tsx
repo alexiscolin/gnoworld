@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Button, Card, Chip, Cluster, Stack } from "@gnoworld/ui";
 import type { Capability } from "./capabilities.ts";
-import styles from "./Can.module.css";
 
 export function Can({ can, link }: { can: readonly Capability[]; link: string | undefined }) {
   const [picked, setPicked] = useState<string>();
@@ -37,9 +36,7 @@ export function Can({ can, link }: { can: readonly Capability[]; link: string | 
                 {label}
               </Chip>
             ))}
-            {can.length === 0 ? (
-              <span className={styles["hint"]}>Its imports name no coin, admin or token package.</span>
-            ) : null}
+            {can.length === 0 ? <span className="meta">Its imports name no coin, admin or token package.</span> : null}
           </Cluster>
           <p className="data-text" aria-live="polite">
             {line === undefined ? "Select a capability to read what shows it." : `${line.label} · ${line.line}`}

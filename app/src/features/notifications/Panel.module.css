@@ -45,7 +45,7 @@
 
   /* Where a dock stands, the panel takes the dock's own box, so it covers the chat whole, one edge, never a second beside it
      (Alexis, 2026-11-09: "effet double largeur"): ui Panel.module.css's dock, its inset and its width at each size. */
-  @media (min-width: 1280px) {
+  @media (width >= 1280px) {
     .place {
       inset: var(--dock-top) var(--page-edge) var(--space-m) auto;
       inline-size: var(--chat-dock-now);
@@ -87,10 +87,5 @@
 
   .mark[data-unread] {
     color: var(--color-mine);
-  }
-
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 }

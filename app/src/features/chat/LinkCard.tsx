@@ -101,7 +101,7 @@ export default function LinkCard({ cardKey, room, msgid, href, saving, removable
         <Card.Body>
           {saving || data.picture === null ? null : <Picture cardKey={cardKey} size={data.picture} href={href} />}
           {data.description === "" ? null : (
-            <p dir="auto" className={styles["description"]}>
+            <p dir="auto" className="meta">
               {data.description}
             </p>
           )}

@@ -1,5 +1,6 @@
 // A frame's moves (D401): the rig and the page's hold, the level, the eased values, the names, the effects and the frame's last draw.
 // Split from the loop (frame.ts), which decides whether the frame is drawn.
+import { damp } from "@gnoworld/core";
 import type { Space } from "./scene.ts";
 import { placeOf, type Planet, type System, type Vec } from "./layout.ts";
 import { ORBIT_GAIN } from "./parts/marks.ts";
@@ -83,14 +84,14 @@ const sunGain = (space: Space, paged: boolean): number =>
 
 function dim(space: Space, paged: boolean, delta: number): void {
   const { gains, plate, frame } = space.stage;
-  const share = 1 - Math.exp(-delta / 1000 / EASE_S);
+  const share = damp(delta / 1000, EASE_S);
   // The full chat coming over the scene dims it out with the chat's growth (and back in with its shrinking): the scene draws on for that moment
   // (scene.ts's `seen`), never freezing as the chat's mark is set.
   const veil = space.options.inChat !== true && coveredByChat() ? 0 : 1;
   ease(gains.sun, sunGain(space, paged) * veil, share);
   ease(gains.dust, (paged ? PAGE.dust : 1) * veil, share);
   ease(gains.stars, (paged ? PAGE.stars : 1) * veil, share);
-  ease(plate.shown, plated(space) ? 1 : 0, 1 - Math.exp(-delta / 1000 / PLATE_S));
+  ease(plate.shown, plated(space) ? 1 : 0, damp(delta / 1000, PLATE_S));
   plate.sync();
   const alone = aloneOf(space);
   ease(frame.uSolo, alone === undefined ? 0 : 1, share);
@@ -103,7 +104,7 @@ function dim(space: Space, paged: boolean, delta: number): void {
 function lighten(space: Space, delta: number): void {
   settleHover(space);
   const on = space.lens !== undefined || hoverLit(space) !== undefined;
-  ease(space.stage.frame.uLens, on ? 1 : 0, space.options.still() ? 1 : 1 - Math.exp(-delta / 1000 / LENS_S));
+  ease(space.stage.frame.uLens, on ? 1 : 0, space.options.still() ? 1 : damp(delta / 1000, LENS_S));
 }
 
 // The level follows the camera at rest: zoomed far out of a system, the universe; zoomed close to a system from far out, it.
@@ -145,10 +146,12 @@ export function paint(space: Space, delta: number): void {
     page: Math.min(1, Math.max(0, (1 - stage.gains.sun.value) / (1 - PAGE.sun))),
   });
   space.labels.system = space.system;
-  open(stage.frame, openedOf(space, stage.frame.uOpenNow.value), {
+  // A system opened with no input (an arrival by code) after the rest stopped the clock starts the minute over: its fade runs on that clock.
+  const opened = open(stage.frame, openedOf(space, stage.frame.uOpenNow.value), {
     seconds: space.seconds,
     still: space.options.still(),
   });
+  if (opened) rig.free.rouse();
   space.labels.plan = space.plan;
   space.labels.marked = space.planet;
   // No name while a flight runs: they come as it lands, never popping in and out on the way (Alexis, 2026-11-09).
@@ -233,5 +236,5 @@ function orbits(space: Space, delta: number): void {
   // A crowded system's orbits each fainter, so that together they stay lines and never a grey disc.
   const crowd = Math.min(1, Math.sqrt(CLEAR_ORBITS / system.planets.length));
   const to = planned ? ORBIT_GAIN * crowd * Math.min(1, Math.max(0, near)) : 0;
-  ease(stage.orbits.gain, to, 1 - Math.exp(-delta / 1000 / ORBITS_S));
+  ease(stage.orbits.gain, to, damp(delta / 1000, ORBITS_S));
 }

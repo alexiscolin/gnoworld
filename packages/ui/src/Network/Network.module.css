@@ -16,8 +16,8 @@
   }
 
   .node rect {
-    /* raw: the world's colour at 30 % over the space, the dot's fill (the proposal's .nd) */
-    fill: color-mix(in oklab, var(--world) 30%, var(--color-space));
+    /* the dot's fill (the proposal's .nd) */
+    fill: var(--world-deep);
     stroke: var(--world-light);
     stroke-width: 1.4;
     transition: fill var(--motion-fast) var(--ease-standard);
@@ -74,20 +74,10 @@
     fill-opacity: 0.6;
   }
 
-  .legend {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
   .legend b {
     color: var(--color-text);
     font: var(--font-data);
     font-weight: 500;
-  }
-
-  .caption {
-    color: var(--color-text-muted);
-    font: var(--font-data);
   }
 
   /* The curves draw one after another and the halo breathes, once it is seen (the proposal's drawFrom and halo). */
@@ -108,19 +98,21 @@
     }
   }
 
+  /* The motion scale is 0 under reduced motion, the system's or the app's setting: every duration and delay goes to 0 and the drawing stands whole. */
+  .net[data-seen] .edge {
+    /* raw: the proposal's value, no token names it */
+    animation: draw calc(0.9s * var(--motion-scale)) var(--ease-out-3)
+      calc((0.2s + var(--j, 0) * 0.06s) * var(--motion-scale)) backwards;
+  }
+
+  .net[data-seen] .halo {
+    /* raw: the proposal's value, no token names it */
+    /* a minute of breaths (19), then it rests; a new graph breathes again (Network.tsx keys it) */
+    animation: breathe calc(3.2s * var(--motion-scale)) ease-in-out 19 forwards;
+    animation-play-state: var(--play, running);
+  }
+
   @media (prefers-reduced-motion: no-preference) {
-    .net[data-seen] .edge {
-      /* raw: the proposal's value, no token names it */
-      animation: draw 0.9s var(--ease-out-3) calc(0.2s + var(--j, 0) * 0.06s) backwards;
-    }
-
-    .net[data-seen] .halo {
-      /* raw: the proposal's value, no token names it */
-      /* a minute of breaths (19), then it rests; a new graph breathes again (Network.tsx keys it) */
-      animation: breathe 3.2s ease-in-out 19 forwards;
-      animation-play-state: var(--play, running);
-    }
-
     /* raw: held back till seen, so the first frame is empty rather than whole */
     .net:not([data-seen]) .edge {
       stroke-dashoffset: 1;

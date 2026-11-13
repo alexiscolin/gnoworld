@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { act, useState } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, button, click, modals, noMedia, settled } from "../../../tests/mount.tsx";
+import { all, button, click, modals, noMedia, one, settled } from "../../../tests/mount.tsx";
 import { mountInStore, type AppStore } from "../../../tests/inStore.tsx";
 import { PassportView } from "./PassportView.tsx";
 
@@ -92,6 +92,15 @@ describe("the passport dialog", () => {
     expect(tabs.map((each) => each.textContent.trim())).toEqual(["Challenges", "Stamps 2", "Charted 1"]);
     expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
     expect(all(box, "svg[role='img']")[0]?.getAttribute("aria-label")).toBe("onyx, earned");
+  });
+
+  it("names the open tab's panel by its tab", async () => {
+    stamp({ "onyx:gov/dao": "2026-11-01" }, {});
+    const box = await drawn(open());
+    click(tab(box, "Stamps"));
+    const panel = one(box, "[role='tabpanel']");
+    expect(panel.getAttribute("aria-labelledby")).toBe(tab(box, "Stamps")?.id);
+    expect(tab(box, "Stamps")?.id).toBeTruthy();
   });
 
   it("shows no stamp and no 0% on a passport with none", async () => {

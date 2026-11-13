@@ -245,6 +245,16 @@ const bad: [string, () => Promise<Response>, string][] = [
   ["a price past what a number holds", text('{"bitcoin":{"usd":1e999,"usd_24h_change":1}}'), "shape"],
   ["no coin priced at all", json({}), "no_price"],
   ["every coin without a price", json({ bitcoin: {}, "gno-land": {}, atomone: {} }), "no_price"],
+  [
+    "a body that is no UTF-8, though its bytes replaced would be JSON",
+    () =>
+      Promise.resolve(
+        new Response(
+          Uint8Array.from([...Buffer.from(JSON.stringify({ ...ANSWER, pad: "" }).slice(0, -2)), 0xff, 0x22, 0x7d]),
+        ),
+      ),
+    "shape",
+  ],
   ["a body that is not JSON", text("<html>Just a moment...</html>"), "not_json"],
   ["an empty body", text(""), "not_json"],
   ["a 204 with no body at all", () => Promise.resolve(new Response(null, { status: 204 })), "not_json"],

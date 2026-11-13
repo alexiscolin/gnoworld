@@ -612,7 +612,7 @@ describe("the digest's contract (10k)", () => {
     expect(asked({})).toBe(true);
     expect(asked({ realm: "gno.land/p/demo/avl" })).toBe(false);
     expect(asked({ realm: "gno.land/r/demo/poll:page" })).toBe(false);
-    expect(asked({ realm: `gno.land/r/${"a".repeat(120)}` })).toBe(false);
+    expect(asked({ realm: `gno.land/r/${"a".repeat(128)}/${"a".repeat(117)}` })).toBe(false);
     expect(asked({ universe: "Onyx" })).toBe(false);
     expect(asked({ universe: "" })).toBe(false);
     expect(asked({ page: "# forged" })).toBe(false);

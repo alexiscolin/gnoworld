@@ -21,8 +21,32 @@ function motion(allowed: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: query === "(prefers-reduced-motion: no-preference)" && allowed,
     media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
   }));
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout"] });
+}
+
+// The system's word changing while the page is open: the query's change event, as the browser sends it.
+function liveMotion() {
+  const heard = new Set<() => void>();
+  let allowed = true;
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() {
+      return query === "(prefers-reduced-motion: no-preference)" && allowed;
+    },
+    media: query,
+    addEventListener: (_: string, listener: () => void) => heard.add(listener),
+    removeEventListener: (_: string, listener: () => void) => heard.delete(listener),
+  }));
+  vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout"] });
+  return {
+    reduce: () => {
+      allowed = false;
+      for (const listener of heard) listener();
+    },
+    heard,
+  };
 }
 
 function advance(ms: number) {
@@ -35,6 +59,65 @@ describe("Stat", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    delete document.documentElement.dataset["arrive"];
+    delete document.documentElement.dataset["motion"];
+  });
+
+  it("stops counting, standing at its value, when reduced motion is turned on mid-visit", async () => {
+    motion(true);
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(300);
+    expect(drawn(container)).not.toBe("21,480");
+    document.documentElement.dataset["motion"] = "reduce";
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(drawn(container)).toBe("21,480");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stops counting, standing at its value, when the system's word turns to reduced motion mid-visit, and stops listening when it goes", () => {
+    const system = liveMotion();
+    const { container, unmount } = render(<Stat value={21480} caption="Today" />);
+    advance(300);
+    expect(drawn(container)).not.toBe("21,480");
+    act(() => {
+      system.reduce();
+    });
+    expect(drawn(container)).toBe("21,480");
+    expect(vi.getTimerCount()).toBe(0);
+    unmount();
+    expect(system.heard.size).toBe(0);
+  });
+
+  it("reads the flight's mark as the count starts and when the page changes, never once a frame", () => {
+    motion(true);
+    const flight = document.body.appendChild(document.createElement("div"));
+    flight.dataset["flown"] = "flying";
+    const query = vi.spyOn(document, "querySelector");
+    try {
+      render(<Stat value={21480} caption="Today" />);
+      advance(2_000);
+      expect(query.mock.calls.filter(([selector]) => selector === "[data-flown='flying']").length).toBe(1);
+    } finally {
+      query.mockRestore();
+      flight.remove();
+    }
+  });
+
+  it("counts nothing, and asks for no frame, before the arrival's wait clears", async () => {
+    motion(true);
+    document.documentElement.dataset["arrive"] = "wait";
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(2_000);
+    expect(drawn(container)).toBe("0");
+    expect(vi.getTimerCount()).toBe(0);
+    delete document.documentElement.dataset["arrive"];
+    await act(async () => {
+      await Promise.resolve();
+    });
+    advance(1_300);
+    expect(drawn(container)).toBe("21,480");
   });
 
   it("writes its number in English's grouping, the app's one language, its unit and its caption", () => {

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { fullChatHref, holdsChat } from "../../fullChat.ts";
+import { copyText } from "../../lib/copy.ts";
 import { rememberPath } from "../../lib/recents.ts";
 import { site, universePath, type UniverseView } from "../../places.ts";
 import { useExplore } from "../home/index.ts";
@@ -13,17 +14,17 @@ import { realmChat } from "./discover/realms.ts";
 export function useGo(universe: UniverseView, close: () => void) {
   const navigate = useNavigate();
   const explore = useExplore({ earth: universe.earth.path, worlds: universe.worlds, universe: universe.id });
-  const [copied, setCopied] = useState(false);
-  // "Copied" says so for a moment; the palette's closing ends its timer.
+  // What the copy came to says so for a moment, "Copied" or not; the palette's closing ends its timer.
+  const [copySaid, setCopySaid] = useState<string>();
   useEffect(() => {
-    if (!copied) return undefined;
+    if (copySaid === undefined) return undefined;
     const timer = setTimeout(() => {
-      setCopied(false);
+      setCopySaid(undefined);
     }, 1500);
     return () => {
       clearTimeout(timer);
     };
-  }, [copied]);
+  }, [copySaid]);
   const pathOf = (item: SearchItem): string => {
     // The chat of the world in view, else the Earth's, opened on the words (features/chat/Searching.tsx).
     if (item.kind === "messages")
@@ -65,12 +66,11 @@ export function useGo(universe: UniverseView, close: () => void) {
     go(item, to ?? (own ? item.path : realmChat(item, home.earth.path)));
   };
   const copy = (item: SearchItem) => {
-    navigator.clipboard
-      .writeText(new URL(pathOf(item), location.origin).href)
-      .then(() => {
-        setCopied(true);
+    copyText(new URL(pathOf(item), location.origin).href)
+      .then((copied) => {
+        setCopySaid(copied ? "Copied" : "Could not copy");
       })
       .catch(reportError);
   };
-  return { go, chat, copy, copied };
+  return { go, chat, copy, copySaid };
 }

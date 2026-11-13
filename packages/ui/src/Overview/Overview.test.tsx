@@ -7,12 +7,21 @@ import { Overview } from "./Overview.tsx";
 import * as stories from "./Overview.stories.tsx";
 
 // docs/DESIGN-SYSTEM.md, "Storybook shows everything": each component the entry gives, by the region that shows it and the mark it
-// leaves there; tsc fails this object the day a component joins the entry with nothing named here. stillCopy, sightRef, Room, useAlone, holdsEscape, typedIn, composing and grouped are helpers
+// leaves there; tsc fails this object the day a component joins the entry with nothing named here. stillCopy, sightRef, Room, useAlone, holdsEscape, typedIn, composing, grouped and nameColour are helpers
 // with nothing to draw.
 const SHOWN: Record<
   Exclude<
     keyof typeof ui,
-    "stillCopy" | "sightRef" | "Room" | "useAlone" | "holdsEscape" | "typedIn" | "composing" | "grouped"
+    | "stillCopy"
+    | "sightRef"
+    | "Room"
+    | "useAlone"
+    | "holdsEscape"
+    | "typedIn"
+    | "composing"
+    | "grouped"
+    | "nameColour"
+    | "motionWelcome"
   >,
   readonly [region: string, mark: string]
 > = {
@@ -36,6 +45,7 @@ const SHOWN: Record<
   Tooltip: ["Icon buttons", "[aria-hidden='true'][data-shown]"],
   Chip: ["Chips", "[data-tone]"],
   Tabs: ["Tabs", "[role='tablist']"],
+  TabPanel: ["Tabs", "[role='tabpanel']"],
   Popover: ["Popovers", "[popover]"],
   Menu: ["Popovers", "[role='menu']"],
   Dialog: ["Dialogs", "dialog"],
@@ -44,7 +54,6 @@ const SHOWN: Record<
   NavItem: ["Rows", "[data-nav-item]"],
   Row: ["Rows", "[data-look]"],
   Field: ["Fields", "input"],
-  Combobox: ["Fields", "input[role='combobox']"],
   Switch: ["Fields", "input[role='switch']"],
   Select: ["Fields", "select"],
   FieldWords: ["Fields", "p[id$='-help']"],

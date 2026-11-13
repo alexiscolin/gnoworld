@@ -1,14 +1,13 @@
 // Try it (the proposal's card): a quiet box that says where to start, the Read and Write tabs with their counts, each a paged list of rows that
 // open in place.
-import { Button, Card, Cluster, grouped, Stack, Tabs, useAlone } from "@gnoworld/ui";
-import { use, useRef, useState } from "react";
+import { Button, Card, Cluster, grouped, motionWelcome, Stack, TabPanel, Tabs, useAlone } from "@gnoworld/ui";
+import { use, useId, useRef, useState } from "react";
 import { callsIn } from "../calls/index.ts";
 import { useApp } from "../../storeContext.tsx";
 import { CallCountsContext } from "./FunctionRow.tsx";
 import { RealmFunctions } from "./RealmFunctions.tsx";
 import type { Where } from "./RealmPageCard.tsx";
 import { RealmWrites, startHere } from "./RealmWrites.tsx";
-import appear from "../../enter.module.css";
 import calm from "./quiet.module.css";
 import { useCallable } from "./useCallable.ts";
 
@@ -32,10 +31,40 @@ function StartHere({ start, onStart }: { start: { name: string; calls: number };
   );
 }
 
+function KindTabs({
+  id,
+  tab,
+  counts,
+  onSelect,
+}: {
+  id: string;
+  tab: "read" | "write";
+  counts: Record<"read" | "write", number>;
+  onSelect: (tab: "read" | "write") => void;
+}) {
+  return (
+    <Tabs
+      label="Function kind"
+      id={id}
+      size="xs"
+      plainCount
+      tabs={[
+        { id: "read", label: "Read", count: counts.read },
+        { id: "write", label: "Write", count: counts.write },
+      ]}
+      selected={tab}
+      onSelect={(picked) => {
+        onSelect(picked === "write" ? "write" : "read");
+      }}
+    />
+  );
+}
+
 export function TryCard({ realm, chain, options }: Where) {
   const expand = useAlone("try");
   const { open } = expand;
   const [tab, setTab] = useState<"read" | "write">("read");
+  const tabsId = useId();
   const [reads, setReads] = useState(0);
   const [writes, setWrites] = useState(0);
   const [opening, setOpening] = useState<{ name: string; n: number }>();
@@ -54,19 +83,7 @@ export function TryCard({ realm, chain, options }: Where) {
           actions={
             // The card's own switch stands in its header, as Calls per day's scale does: the title first, then what it shows
             // (Alexis, 2026-11-10: "mauvaise hiérarchie avec le système d'onglets en dessous").
-            <Tabs
-              label="Function kind"
-              size="xs"
-              plainCount
-              tabs={[
-                { id: "read", label: "Read", count: reads },
-                { id: "write", label: "Write", count: writes },
-              ]}
-              selected={tab}
-              onSelect={(id) => {
-                setTab(id === "write" ? "write" : "read");
-              }}
-            />
+            <KindTabs id={tabsId} tab={tab} counts={{ read: reads, write: writes }} onSelect={setTab} />
           }
           expand={expand}
         />
@@ -77,13 +94,13 @@ export function TryCard({ realm, chain, options }: Where) {
               setTab("write");
               setOpening({ name: start.name, n: (opening?.n ?? 0) + 1 });
               cardRef.current?.scrollIntoView({
-                behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+                behavior: motionWelcome() ? "smooth" : "auto",
                 block: "nearest",
               });
             }}
           />
         )}
-        <div role="tabpanel" className={appear["enter"]} hidden={tab !== "read"}>
+        <TabPanel id={tabsId} tab="read" hidden={tab !== "read"}>
           <Stack space="s">
             <RealmFunctions
               realm={realm}
@@ -92,10 +109,10 @@ export function TryCard({ realm, chain, options }: Where) {
               onCount={setReads}
               {...(options === undefined ? {} : { options })}
             />
-            <p className={calm["note"]}>No wallet needed: a read runs here and shows its result.</p>
+            <p className="meta">No wallet needed: a read runs here and shows its result.</p>
           </Stack>
-        </div>
-        <div role="tabpanel" className={appear["enter"]} hidden={tab !== "write"}>
+        </TabPanel>
+        <TabPanel id={tabsId} tab="write" hidden={tab !== "write"}>
           <Stack space="s">
             <p className={[calm["box"], "fill-box"].join(" ")}>Every write needs a connected wallet and a signature.</p>
             <RealmWrites
@@ -110,7 +127,7 @@ export function TryCard({ realm, chain, options }: Where) {
               }}
             />
           </Stack>
-        </div>
+        </TabPanel>
       </Card>
     </section>
   );

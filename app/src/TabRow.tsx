@@ -13,7 +13,7 @@ export function TabRow({ figures, tabs }: { figures: ReactNode; tabs: ReactNode 
 }
 
 export function Note({ children }: { children: ReactNode }) {
-  return <p className={styles["note"]}>{children}</p>;
+  return <p className="meta">{children}</p>;
 }
 
 /** The place of a figure not read yet, as wide as a figure. */

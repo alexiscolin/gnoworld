@@ -4,7 +4,7 @@
 //  - the view's: once the page's space has drawn its first frame, and the browser is idle, the plate's code and the rollup files of the worlds in view;
 //  - the reader's intent: a pointer resting on a link to a realm (150 ms), its focus, a press or a touch, whatever the device: the realm's reads.
 // Never at first paint (the scene's chunk delayed the loader by seconds when preloaded then, preloads.ts), never under Save-Data.
-import { HOVER_MS } from "./intent.ts";
+import { afterDwell } from "./intent.ts";
 import { savesData } from "./lib/saveData.ts";
 
 const warm = () => import("./warm.ts");
@@ -39,7 +39,7 @@ function whenIdle(cb: () => void): () => void {
 
 // The links' intent, listened to once for the page's life: one at a time, the last, and none for a pointer that left before its delay.
 let listening = false;
-let pending: ReturnType<typeof setTimeout> | undefined;
+let pending = (): void => undefined;
 
 function realmLink(target: EventTarget | null): HTMLAnchorElement | undefined {
   const link = target instanceof Element ? target.closest("a[href]") : null;
@@ -51,35 +51,41 @@ function realmLink(target: EventTarget | null): HTMLAnchorElement | undefined {
 function listen(): void {
   if (listening) return;
   listening = true;
-  const intent = (link: HTMLAnchorElement | undefined, after: number, pressed: boolean) => {
-    clearTimeout(pending);
-    if (link === undefined) return;
-    pending = setTimeout(() => {
-      // A pointer that left within the delay asks nothing.
-      if (pressed || link.matches(":hover, :focus-visible"))
-        warm().then((chunk) => {
-          chunk.warmRealm(link.pathname, pressed);
-        }, report);
-    }, after);
+  const reads = (link: HTMLAnchorElement, pressed: boolean) => {
+    warm()
+      .then((chunk) => {
+        chunk.warmRealm(link.pathname, pressed);
+      })
+      .catch(report);
+  };
+  // A pointer that left within the delay, or a slow link, asks nothing (intent.ts).
+  const intent = (link: HTMLAnchorElement | undefined) => {
+    pending();
+    pending =
+      link === undefined
+        ? () => undefined
+        : afterDwell(link, () => {
+            reads(link, false);
+          });
   };
   const { documentElement: root } = document;
   root.addEventListener("pointerover", (event) => {
-    if (event.pointerType !== "touch") {
-      intent(realmLink(event.target), HOVER_MS, false);
-    }
+    if (event.pointerType !== "touch") intent(realmLink(event.target));
   });
   root.addEventListener("pointerout", () => {
-    clearTimeout(pending);
+    pending();
   });
   root.addEventListener("focusin", (event) => {
-    intent(realmLink(event.target), HOVER_MS, false);
+    intent(realmLink(event.target));
   });
   // A press or a touch is the click's own start: the reads begin now, not at the click.
   for (const type of ["pointerdown", "touchstart"] as const)
     root.addEventListener(
       type,
       (event) => {
-        intent(realmLink(event.target), 0, true);
+        pending();
+        const link = realmLink(event.target);
+        if (link !== undefined) reads(link, true);
       },
       { passive: true },
     );
@@ -92,7 +98,9 @@ export function warmView(place: { kind: string; id: string }): () => void {
   listen();
   const leaving = new AbortController();
   const stop = whenIdle(() => {
-    warm().then((chunk) => chunk.warmBatch(place, leaving.signal), report);
+    warm()
+      .then((chunk) => chunk.warmBatch(place, leaving.signal))
+      .catch(report);
   });
   return () => {
     stop();

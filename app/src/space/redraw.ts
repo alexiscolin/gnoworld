@@ -31,8 +31,20 @@ const changed = (now: readonly number[], then: readonly number[]): boolean =>
     return Math.abs(value - was) > EASED * Math.max(Math.abs(value), Math.abs(was), FLOOR);
   });
 
+const NONE: readonly number[] = [];
+
+// Copies `from` into `to` in place: the last drawn moment keeps two buffers, never a new array a frame.
+const keep = (from: readonly number[], to: number[]): void => {
+  to.length = from.length;
+  from.forEach((value, at) => {
+    to[at] = value;
+  });
+};
+
 export class Redraw {
   #drawn: Moment | undefined;
+  readonly #eye: number[] = [];
+  readonly #shown: number[] = [];
   #told = false;
   /** Set by the loop while it paces a view with something moving (rest.ts): a frame that would be "none" is drawn all the same. */
   live = false;
@@ -42,14 +54,19 @@ export class Redraw {
     this.#told = true;
   }
 
-  /** What the frame `now` needs; what is drawn becomes what the next is measured against. */
+  /** What the frame `now` needs; what is drawn becomes what the next is measured against. A moving frame is drawn whatever its numbers,
+   * so it does not read them: the next one, drawn once more, does. */
   check(now: Moment): Need {
     const then = this.#drawn;
+    const shown = now.moving ? NONE : now.shown;
     let need: Need =
-      then === undefined || this.#told || now.moving || changed(now.shown, then.shown) ? "full" : slow(now, then);
+      then === undefined || this.#told || now.moving || changed(shown, then.shown) ? "full" : slow(now, then);
     if (need === "none" && this.live) need = "ambient";
     if (need !== "none") {
-      this.#drawn = { ...now, eye: [...now.eye], shown: [...now.shown] };
+      keep(now.eye, this.#eye);
+      keep(shown, this.#shown);
+      const { pxK, distance, seconds, pxPerSecond, moving } = now;
+      this.#drawn = { eye: this.#eye, shown: this.#shown, pxK, distance, seconds, pxPerSecond, moving };
       this.#told = false;
     }
     return need;

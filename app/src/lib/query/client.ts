@@ -3,7 +3,7 @@
 // answer nobody uses is let go after ten minutes, which bounds a tab's memory to the places it recently showed. The hooks pass this client to
 // `useQuery` themselves, so no provider sits over the first screen.
 import type { FailureKind } from "@gnoworld/chain/read";
-import { environmentManager, QueryCache, QueryClient } from "@tanstack/react-query";
+import { CancelledError, environmentManager, QueryCache, QueryClient } from "@tanstack/react-query";
 
 /** How long a fresh read is shared: a read younger than this is not asked again. */
 export const FRESH_MS = 15_000;
@@ -35,9 +35,13 @@ const retry = (count: number, error: Error): boolean => {
 /** Whether `error` is an `Unread` carrying a `read` of the type the caller's query throws. */
 export const isUnread = <R>(error: unknown): error is Unread<R> => error instanceof Unread;
 
-/** For a read nobody waits on (asked ahead): a read that did not come whole is expected and said by the view's own ask; anything else is a bug and rises. */
+/** Whether `error` is the query's own end: cancelled because its last viewer left while it was being read. */
+export const isCancelled = (error: unknown): error is CancelledError => error instanceof CancelledError;
+
+/** For a read nobody waits on (asked ahead): a read that did not come whole, or that was cancelled, is expected and said by the view's
+ * own ask; anything else is a bug and rises. */
 export const quietUnread = (error: unknown): void => {
-  if (!(error instanceof Unread)) throw error;
+  if (!(error instanceof Unread) && !isCancelled(error)) throw error;
 };
 
 export const makeQueryClient = (): QueryClient =>

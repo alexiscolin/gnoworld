@@ -12,9 +12,9 @@ export function roomsApi(fetcher: Fetcher, timeoutMs = TIMEOUT_MS) {
   const call = jsonCall(fetcher, timeoutMs);
   return {
     /** A world's rooms a reader may see, by section. */
-    rooms: async (world: string): Promise<Result<RoomList>> => {
+    rooms: async (world: string, signal?: AbortSignal): Promise<Result<RoomList>> => {
       if (!RoomList.shape.world.safeParse(world).success) return { ok: false, reason: "malformed" };
-      const result = await call({ path: `/api/rooms?world=${world}`, schema: RoomList });
+      const result = await call({ path: `/api/rooms?world=${world}`, schema: RoomList, signal });
       if (!result.ok) return result;
       const { value } = result;
       const own =

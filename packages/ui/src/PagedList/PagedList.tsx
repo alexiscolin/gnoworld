@@ -125,7 +125,7 @@ function Foot({
   const more = total - drawn;
   return (
     <Cluster justify="between" space="xs">
-      <span className={styles["note"]}>
+      <span className="meta">
         {drawn} of {total}
         {all.matching < all.items ? ` matching, ${String(all.items)} in all` : ""}
         {note === undefined ? "" : ` \u00b7 ${note}`}

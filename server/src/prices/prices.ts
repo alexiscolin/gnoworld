@@ -4,10 +4,10 @@
 // package, on a node checked to be its chain (D120), so no visitor's browser asks a chain (decision of 2026-10-31). What
 // comes back is capped, parsed, checked field by field, only the file's fields written; a failure keeps the last file and is
 // logged by its kind, never by what it held. A coin without a price is no token (an unlisted id is left out of the answer).
-import { readFileSync } from "node:fs";
 import { readHeight } from "@gnoworld/chain/node";
 import type { Failure as ReadFailure, FailureKind } from "@gnoworld/chain/read";
-import { Markets, MARKET_SYMBOLS, MarketBlock } from "@gnoworld/schemas";
+import { requestInit } from "@gnoworld/chain/transport";
+import { Markets, MARKET_SYMBOLS, MarketBlock, strictUtf8 } from "@gnoworld/schemas";
 import type { Log } from "@gnoworld/service/log";
 import {
   Failure,
@@ -20,7 +20,7 @@ import {
   type Send,
 } from "@gnoworld/service/net";
 import { repeat, waits } from "../repeat.ts";
-import { besideOf, replaceFile } from "../replaceFile.ts";
+import { besideOf, lastFile, replaceFile } from "../replaceFile.ts";
 import { makeHistory, type History } from "./history.ts";
 import { seedLines } from "./seed.ts";
 
@@ -106,7 +106,7 @@ async function readBlock({ url: from, chainId }: { url: URL; chainId: string }, 
     chainId,
     timeoutMs: TIMEOUT_MS,
     maxBytes: MAX_BYTES,
-    fetch: (url, init) => send(url, init ?? {}, TIMEOUT_MS),
+    fetch: (url, init) => send(url, requestInit(init), TIMEOUT_MS),
   });
   if (!read.ok) throw failureOf(read.failure);
   const block = MarketBlock.safeParse({ ...read.value, host: from.hostname });
@@ -124,14 +124,7 @@ function withInterval(block: MarketBlock | undefined, before: MarketBlock | unde
 }
 
 // The block of the markets.json this timer last wrote (so a restart has it at once), or none: no file, or one the schema refuses.
-function lastBlock(file: string): MarketBlock | undefined {
-  try {
-    const last = Markets.safeParse(JSON.parse(readFileSync(file, "utf8")));
-    return last.success ? last.data.block : undefined;
-  } catch {
-    return undefined;
-  }
-}
+const lastBlock = (file: string): MarketBlock | undefined => lastFile(file, Markets)?.block;
 
 export function startPrices(options: Options): Prices {
   const { file, log, send = netSend, now = Date.now, everyMs = EVERY_MS } = options;
@@ -143,8 +136,9 @@ export function startPrices(options: Options): Prices {
   // One GET through the way out: the JSON of the body, capped, or the kind of failure.
   async function get(url: string, maxBytes = MAX_BYTES): Promise<unknown> {
     const init = { method: "GET", headers: { accept: "application/json" } };
-    const bytes = await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes });
-    return jsonOrFail(Buffer.from(bytes).toString("utf8"));
+    const text = strictUtf8(await fetchCapped(send, { url, init }, { ms: TIMEOUT_MS, maxBytes }));
+    if (text === null) throw new Failure("shape");
+    return jsonOrFail(text);
   }
 
   // The history's one seeding from CoinGecko's own past: once a process, right after a price was read (so the way out works), its failure only

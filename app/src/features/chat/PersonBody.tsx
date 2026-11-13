@@ -2,15 +2,14 @@
 // under it. The row and the cards' places are drawn at once, a figure or a card not yet read a skeleton, so nothing moves as the read comes;
 // only the cards' chunk (PersonBlocks) is asked later. A failed read is one inline line.
 import type { PersonCardData } from "@gnoworld/schemas/indexer";
-import { Cluster, Skeleton, Stack, Stat, Tabs } from "@gnoworld/ui";
+import { Cluster, Skeleton, Stack, Stat, TabPanel, Tabs } from "@gnoworld/ui";
 import { useQuery } from "@tanstack/react-query";
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useId, useState } from "react";
 import { queryClient } from "../../lib/query/client.ts";
 import { PendingCard, PendingFigure, TabRow } from "../../TabRow.tsx";
 import { ErrorView, useWhere } from "../errors/index.ts";
 import { wholeGnot } from "./personData.ts";
 import { personOptions } from "./personQueries.ts";
-import appear from "../../enter.module.css";
 import type { PersonTab } from "./PersonBlocks.tsx";
 
 const PersonBlocks = lazy(() => import("./PersonBlocks.tsx"));
@@ -73,6 +72,7 @@ function Places({ tab }: { tab: PersonTab }) {
 export function PersonBody({ address }: { address: string }) {
   const where = useWhere();
   const [tab, setTab] = useState<PersonTab>("activity");
+  const tabsId = useId();
   const { data, isError, refetch, dataUpdatedAt } = useQuery(personOptions(address), queryClient);
   if (isError)
     return (
@@ -92,6 +92,7 @@ export function PersonBody({ address }: { address: string }) {
         tabs={
           <Tabs
             label="Person"
+            id={tabsId}
             size="s"
             selected={tab}
             onSelect={(id) => {
@@ -105,7 +106,7 @@ export function PersonBody({ address }: { address: string }) {
           />
         }
       />
-      <div role="tabpanel" key={tab} className={appear["enter"]}>
+      <TabPanel key={tab} id={tabsId} tab={tab}>
         {data === undefined ? (
           <Places tab={tab} />
         ) : (
@@ -113,7 +114,7 @@ export function PersonBody({ address }: { address: string }) {
             <PersonBlocks tab={tab} data={data} address={address} now={dataUpdatedAt} />
           </Suspense>
         )}
-      </div>
+      </TabPanel>
     </Stack>
   );
 }

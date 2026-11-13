@@ -16,12 +16,17 @@ export interface Open {
 
 export const openOf = (): Open => ({ uOpenNow: { value: -1 }, uOpenWas: { value: -1 }, uOpenAt: { value: OVER } });
 
-/** Opens the system at `index` (-1: the galaxy) on the clock's `seconds`; `still`: with no fade. Nothing is written where it is open already. */
-export function open(uniforms: Open, index: number, { seconds, still }: { seconds: number; still: boolean }): void {
-  if (uniforms.uOpenNow.value === index) return;
+/** Opens the system at `index` (-1: the galaxy) on the clock's `seconds`; `still`: with no fade. Where it is open already, a fade under way
+ * ends at once when `still`, whose clock stands; nothing else is written. Returns whether it opened another system. */
+export function open(uniforms: Open, index: number, { seconds, still }: { seconds: number; still: boolean }): boolean {
+  if (uniforms.uOpenNow.value === index) {
+    if (still && uniforms.uOpenAt.value !== OVER) [uniforms.uOpenWas.value, uniforms.uOpenAt.value] = [-1, OVER];
+    return false;
+  }
   uniforms.uOpenWas.value = still ? -1 : uniforms.uOpenNow.value;
   uniforms.uOpenNow.value = index;
   uniforms.uOpenAt.value = still ? OVER : seconds;
+  return true;
 }
 
 /** The system whose planets are drawn: the one the camera is in or goes to; on a flight out to the galaxy, `was`, the one it leaves, till it

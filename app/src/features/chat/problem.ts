@@ -1,27 +1,21 @@
 // What the page says when a pin, an unpin or a save does not happen (slice 4's 4d, R9): what happened and what to do, in
 // the person's words, never a code, one sentence for each cause the server or the device gives.
 import type { FlashMessage } from "@gnoworld/ui";
+import { transportWords } from "../../lib/api/transportWords.ts";
 import type { Done } from "./askPins.ts";
 
 type Reason = Exclude<Done, { ok: true }>["reason"];
 const UNREACHED = "The chat server could not be reached. Try again in a moment.";
-const UNEXPECTED = "Something unexpected came back. Please try again.";
 
 // Each reason's sentence: the type wants every reason a call of the server can end with.
 const SAID: Record<Reason, string> = {
+  ...transportWords(UNREACHED),
   full: "This room has ten pins already. Unpin one first.",
   too_many: "Too many pins and unpins in a minute. Try again shortly.",
   forbidden: "Only this world's moderators can pin in this room.",
   unauthenticated: "Your session ended: log in again.",
   not_found: "This message is no longer in the room's history.",
   refused: "This message cannot be pinned: only a plain message of an account can.",
-  not_ready: UNREACHED,
-  unavailable: UNREACHED,
-  internal: UNREACHED,
-  network: UNREACHED,
-  malformed: UNEXPECTED,
-  unsupported: UNEXPECTED,
-  too_large: UNEXPECTED,
 };
 
 /** The flash of a pin or an unpin the server refused. */

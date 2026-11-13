@@ -1,4 +1,4 @@
-import { pauseOffscreen } from "../offscreen.ts";
+import { onceSeen, pauseOffscreen } from "../offscreen.ts";
 import { useEffect, useRef, useState } from "react";
 
 /** The width a graph has before it is measured (the proposal's 360). */
@@ -31,16 +31,9 @@ export function useSeen() {
       setSeen(true);
       return undefined;
     }
-    const watch = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        setSeen(true);
-        watch.disconnect();
-      }
+    return onceSeen(node, { root: null }, () => {
+      setSeen(true);
     });
-    watch.observe(node);
-    return () => {
-      watch.disconnect();
-    };
   }, []);
   return { ref, seen, span };
 }

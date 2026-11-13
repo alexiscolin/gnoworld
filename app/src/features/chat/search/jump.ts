@@ -33,8 +33,9 @@ export class Jumps {
     return waiting.msgid;
   }
 
-  cancel(): void {
-    this.#waiting = undefined;
+  /** Forgets the jump waiting, unless it is for `room`, the room now in view. */
+  cancel(room?: string): void {
+    if (this.#waiting?.room !== room) this.#waiting = undefined;
   }
 }
 

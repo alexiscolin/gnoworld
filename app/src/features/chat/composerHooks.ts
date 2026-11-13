@@ -3,6 +3,7 @@
 import type { Composed } from "@gnoworld/core";
 import { useEffect, useState, type RefObject } from "react";
 import type { RefusedTags } from "../../store/dms.ts";
+import { FIELD } from "./composerBox.ts";
 import { useMedia } from "./useMedia.ts";
 import type { CardAsked } from "./cardCommands.ts";
 import { editRefusal, roomHint, said, sendable } from "./said.ts";
@@ -50,9 +51,6 @@ export function useRefusal(
     },
   };
 }
-
-/** The composer's field in a form: the editable box, which a textarea was. */
-export const FIELD = '[role="textbox"]';
 
 // The box takes the focus as the composer starts, when asked, never again: it is the reader's after.
 export function useFocusAtStart(formRef: RefObject<HTMLFormElement | null>, focus: boolean | undefined) {

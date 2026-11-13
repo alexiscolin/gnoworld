@@ -13,7 +13,7 @@ export function LogInToWrite() {
         <Cluster justify="between">
           <Stack space="3xs">
             <strong className={styles["lead"]}>Join the conversation</strong>
-            <span className={styles["note"]}>{LOG_IN_TO_WRITE}</span>
+            <span className="meta">{LOG_IN_TO_WRITE}</span>
           </Stack>
           <Button
             emphasis="solid"

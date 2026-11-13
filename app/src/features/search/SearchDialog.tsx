@@ -56,7 +56,7 @@ export default function SearchDialog({
     palette.reset();
     onClose();
   };
-  const { go, chat, copy, copied } = useGo(universe, close);
+  const { go, chat, copy, copySaid } = useGo(universe, close);
   const fly = (row: StoreRow) => {
     go(itemOf(row, universe.id));
   };
@@ -80,11 +80,11 @@ export default function SearchDialog({
           onPaletteKey(event, { chosen, count: flat.length, active, choose, go, chat, copy, close });
         }}
       >
-        <PaletteField palette={palette} />
+        <PaletteField palette={palette} listing={discovering || flat.length === 0 ? undefined : active} />
         {discovering ? (
           <DiscoverSheet palette={palette} discovery={discovery} universe={universe} fly={fly} chat={talk} go={go} />
         ) : (
-          <TypedSheet palette={palette} copied={copied} go={go} chat={chat} copy={copy} />
+          <TypedSheet palette={palette} copySaid={copySaid} go={go} chat={chat} copy={copy} />
         )}
       </div>
     </Dialog>

@@ -56,7 +56,6 @@ export function forget(state: State): void {
   state.states.drop();
   state.lines.drop();
   state.redacts.clear();
-  // A relay waiting on a connection that ended is not taken: Ergo never answers it.
   // A relay waiting on a connection that ended may have been taken before it: unsure, never refused.
   for (const settle of state.relays.values()) settle("unsure");
   state.relays.clear();

@@ -12,13 +12,12 @@ import { send as netSend, publicUrl } from "@gnoworld/service/net";
 import { repeat, waitsAfterOutcome, type Outcome } from "../repeat.ts";
 import { besideOf, replaceFiles } from "../replaceFile.ts";
 import { worldsOf } from "./assemble.ts";
-import type { StampedHistory } from "./history.ts";
 import { runNetwork } from "./network.ts";
 import { rollUp } from "./rollup.ts";
+import type { TokenStore } from "./tokenStore.ts";
 import { gather, type Universe } from "./readPass.ts";
 import { kindOf, pacer, type Kind, type Send } from "./remote.ts";
 import { fitted } from "./shed.ts";
-import { habitsAt, makeTrends, type ChainRead } from "./chainTrends.ts";
 import { setTimeout as sleep } from "node:timers/promises";
 
 export interface RunOptions {
@@ -35,10 +34,10 @@ export interface RunOptions {
   /** The transactions a page of the indexer's read asks, history.ts's unless a test says less. */
   historyPage?: number;
   isStopped?: () => boolean;
-  /** Told each pass that wrote its files: the file, and the histories this pass read (7t's trends). */
-  trends?: { passed: (worlds: Worlds, read: ReadonlyMap<string, StampedHistory>) => void };
   /** Each realm's rollup (13a): its state's database and the folder of its files; none without it. */
   rollup?: { db: DatabaseSync; dir: string };
+  /** The token store the server's route reads too, so a reset of a pass clears the route's answers; none: each pass makes its own. */
+  tokens?: TokenStore;
   /** Told each pass the ranking of the last 7 days, once the rollup's files are written. */
   trending?: (trending: Trending) => void;
   /** The network's line of health: its tables' database, and told each pass its answer; none without it. */
@@ -60,8 +59,8 @@ interface Settings {
   readonly maxBytes: number;
   readonly historyPage?: number;
   readonly isStopped: () => boolean;
-  readonly trends?: RunOptions["trends"];
   readonly rollup?: RunOptions["rollup"];
+  readonly tokens?: RunOptions["tokens"];
   readonly trending?: RunOptions["trending"];
   readonly network?: RunOptions["network"];
 }
@@ -78,13 +77,8 @@ function settingsOf(options: RunOptions): Settings {
   };
 }
 
-// What follows a pass that wrote its files: the trends told, each realm's rollup, then the network's line.
-async function passed(
-  settings: Settings,
-  worlds: Worlds,
-  histories: ReadonlyMap<string, StampedHistory>,
-): Promise<void> {
-  settings.trends?.passed(worlds, histories);
+// What follows a pass that wrote its files: each realm's rollup, then the network's line.
+async function passed(settings: Settings, worlds: Worlds): Promise<void> {
   await rollUp({ ...settings, pace: pacer(settings.wait, settings.pauseMs, settings.now) }, worlds);
   await runNetwork(settings);
 }
@@ -118,7 +112,7 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
     ]);
     if (!written) return fail("write");
     settings.log("worlds_written", { ms: settings.now() - start });
-    await passed(settings, file.data, read.histories);
+    await passed(settings, file.data);
     return { wrote: true };
   } catch (error) {
     return fail(kindOf(error));
@@ -127,8 +121,6 @@ export async function runWorlds(options: RunOptions): Promise<Outcome> {
 
 export interface WorldsJob {
   stop: () => void;
-  /** The chain's part of the trends, each pass against the one before (7t). */
-  trends: () => ChainRead;
 }
 
 // The universe's addresses, or a refusal at start: https on a public name, no user, and an id that is a plain slug.
@@ -138,17 +130,12 @@ function checked(universe: Universe): void {
   if (publicUrl(universe.indexer) === null) throw new RangeError("worlds: the indexer is no public https address");
 }
 
-/** Runs a pass at start and after each pass ends, one at a time, `everyMs` apart; `stop` ends it, and a pass under way writes nothing. Each
- * world's window is kept in `habits`' files (7t3), counts alone; without them the chain's signals have no habit. */
-export function startWorlds(
-  options: RunOptions & { everyMs?: number; habits?: { transactions: string; addresses: string } },
-): WorldsJob {
+/** Runs a pass at start and after each pass ends, one at a time, `everyMs` apart; `stop` ends it, and a pass under way writes nothing. */
+export function startWorlds(options: RunOptions & { everyMs?: number }): WorldsJob {
   checked(options.universe);
   const everyMs = options.everyMs ?? EVERY_MS;
-  const habits = options.habits === undefined ? {} : { habits: habitsAt(options.habits, options.now ?? Date.now) };
-  const trends = makeTrends({ ...habits, log: options.log });
   const job = repeat({
-    pass: (isStopped) => runWorlds({ ...options, isStopped, trends }),
+    pass: (isStopped) => runWorlds({ ...options, isStopped }),
     failed: () => {
       options.log("worlds_failed", { error: "internal" });
     },
@@ -157,8 +144,6 @@ export function startWorlds(
   return {
     stop() {
       job.stop();
-      trends.save();
     },
-    trends: trends.chain,
   };
 }

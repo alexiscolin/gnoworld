@@ -1,6 +1,6 @@
 // A realm's card and the pages of cards: Today's rows with their "See all", and a shelf's grid. A card is a button that opens the realm's
 // detail; the arrows move among the cards.
-import { STYLES, type ShelfId, type StoreRow, type TodayRow } from "@gnoworld/core";
+import { isAddress, STYLES, type ShelfId, type StoreRow, type TodayRow } from "@gnoworld/core";
 import { shortAddress } from "@gnoworld/schemas";
 import { EmptyState, Grid as Columns, Sidebar, Stack } from "@gnoworld/ui";
 import type { KeyboardEvent } from "react";
@@ -14,7 +14,7 @@ const LABELS = new Map<string, string>(STYLES.map(({ id, label }) => [id, label]
 /** A shelf draws this many cards; the rest asks for a style or a filter. */
 const GRID_MAX = 60;
 
-const short = (namespace: string) => (/^g1[0-9a-z]{38}$/.test(namespace) ? shortAddress(namespace) : namespace);
+const short = (namespace: string) => (isAddress(namespace) ? shortAddress(namespace) : namespace);
 export const shortOf = short;
 
 // One owner often deploys the same names in several worlds (`sinopia/market`, `minhwa/market`): the card names the world it is in, and an
@@ -59,7 +59,7 @@ function Card({ row, discovery }: { row: StoreRow; discovery: Discovery }) {
           <Planet world={row.world} size="s" />
           <Stack space="3xs">
             <span className={["truncate", styles["name"]].join(" ")}>{titleOf(row)}</span>
-            <span className={["truncate", styles["sub"]].join(" ")}>
+            <span className="truncate data-text">
               {part === null ? "" : `${part} · `}@{short(row.namespace)}
               {row.author === null ? "" : ` · ${row.author}`}
             </span>
@@ -107,7 +107,7 @@ export function TodayRows({ rows, discovery }: { rows: readonly TodayRow[]; disc
           <Stack space="xs">
             <div className={styles["rowHead"]}>
               <h3>{row.title}</h3>
-              <span className={styles["why"]}>{row.why}</span>
+              <span className={["meta", styles["why"]].join(" ")}>{row.why}</span>
               {row.shelf === undefined ? null : <SeeAll shelf={row.shelf} show={discovery.show} />}
             </div>
             <div className={styles["strip"]}>
@@ -142,7 +142,7 @@ export function Grid({ rows, discovery }: { rows: readonly StoreRow[]; discovery
       <Stack space="xs">
         <div className={styles["rowHead"]}>
           <h3>{nameOfShelf(discovery.shelf)}</h3>
-          <span className={styles["why"]} role="status">{`${String(rows.length)} realms`}</span>
+          <span className={["meta", styles["why"]].join(" ")} role="status">{`${String(rows.length)} realms`}</span>
         </div>
         {rows.length === 0 ? (
           <EmptyState look="inline" line="Nothing here with these filters. Clear one of them." />
@@ -155,7 +155,9 @@ export function Grid({ rows, discovery }: { rows: readonly StoreRow[]; discovery
         )}
       </Stack>
       {rows.length > GRID_MAX ? (
-        <p className={styles["why"]}>{`${String(rows.length - GRID_MAX)} more · refine with a style or a filter`}</p>
+        <p
+          className={["meta", styles["why"]].join(" ")}
+        >{`${String(rows.length - GRID_MAX)} more · refine with a style or a filter`}</p>
       ) : null}
     </>
   );

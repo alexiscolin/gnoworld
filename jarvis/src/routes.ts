@@ -57,9 +57,9 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
       body: { ask: caps.ask / DOLLAR, translate: caps.translate / DOLLAR } satisfies JarvisBudgets,
     };
   };
-  // A body its schema refuses, logged as this face's own refusals are (http.ts).
-  const refused = (route: string): Reply => {
-    log("jarvis_refused", { route, method: "POST", status: 400, error: "refused" });
+  // A body its schema refuses, logged as this face's own refusals are (http.ts); a reason for a body it holds but cannot serve.
+  const refused = (route: string, reason?: "no_chain"): Reply => {
+    log("jarvis_refused", { route, method: "POST", status: 400, error: "refused", ...(reason && { reason }) });
     return refusal("refused", 400);
   };
   return {
@@ -76,7 +76,7 @@ export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, d
             : run === "fast" && catchUp !== undefined
               ? catchUp
               : ask;
-        if (asking === undefined) return refused(JARVIS_PATHS.ask);
+        if (asking === undefined) return refused(JARVIS_PATHS.ask, "no_chain");
         return replyOf(await asking(question, signal), log);
       },
     },

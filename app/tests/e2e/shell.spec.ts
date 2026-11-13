@@ -24,19 +24,16 @@ const edgesOf = (page: Page) =>
       const text = (node.textContent ?? "").trim();
       const parent = node.parentElement;
       // The bell's count overhangs its button's corner by design (the video's frames): the button, measured below, carries it.
-      if (
-        text === "" ||
-        parent?.closest("script, style, [hidden], [data-ticker], [data-full], [data-tone=new][aria-hidden]") !== null
-      )
+      if (text === "" || parent?.closest("script, style, [hidden], [data-full], [data-tone=new][aria-hidden]") !== null)
         continue;
       if (getComputedStyle(parent).visibility === "hidden") continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       for (const rect of range.getClientRects()) take(text.slice(0, 30), rect);
     }
-    // The ticker is a strip across the foot of the screen, edge to edge by design.
+    // The full chat spans the screen, edge to edge by design.
     for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
-      if (control.closest("[data-ticker], [data-full]") === null)
+      if (control.closest("[data-full]") === null)
         take(
           `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
           control.getBoundingClientRect(),

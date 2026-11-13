@@ -10,7 +10,7 @@ interface Attrs {
 }
 
 // What opens a popover's panel: the button look as given, the plain class alone (words as they are), or an icon-only
-// plain IconButton's look named by the label, in a tooltip.
+// IconButton's look (plain unless it says) named by the label, in a tooltip.
 export function Trigger({
   attrs,
   plain,
@@ -21,7 +21,7 @@ export function Trigger({
 }: {
   attrs: Attrs;
   plain: boolean;
-  icon: { name: IconName; size: IconControlSize } | undefined;
+  icon: { name: IconName; size: IconControlSize; emphasis?: "outline" | "plain"; tool?: boolean } | undefined;
   tabbable: boolean;
   label: string;
   children: ReactNode;
@@ -30,7 +30,13 @@ export function Trigger({
   if (icon !== undefined) {
     return (
       <Tooltip label={label}>
-        <button type="button" {...attrs} {...iconLook("plain", icon.size)} aria-label={label} {...stop}>
+        <button
+          type="button"
+          {...attrs}
+          {...iconLook(icon.emphasis ?? "plain", icon.size, icon.tool)}
+          aria-label={label}
+          {...stop}
+        >
           <Icon name={icon.name} size={iconSize(icon.size)} />
         </button>
       </Tooltip>

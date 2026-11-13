@@ -9,6 +9,29 @@ export type Right = { as: "staff" } | { as: "maker" } | { as: "owner"; owner: Ad
 /** What the log says of an act: what gave the right, and the owner's address for an owner's. */
 export const asOf = (right: Right) => (right.as === "owner" ? { as: right.as, owner: right.owner } : { as: right.as });
 
+// How long a list waits for the right (an owner's is a chain read) before it says the reader may not.
+const READ_MS = 5_000;
+
+/** A read that cannot tell the right, or does not within 5 s, says no: a list still shows. */
+export const mayWithin = (read: Promise<Right | false>): Promise<boolean> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      resolve(false);
+    }, READ_MS);
+    read
+      .then(
+        (right) => {
+          resolve(right !== false);
+        },
+        () => {
+          resolve(false);
+        },
+      )
+      .finally(() => {
+        clearTimeout(timer);
+      });
+  });
+
 interface Place {
   namespace: string;
   /** The reader of the room's own chain (makeOwners' `lookup`): the holder, null for nobody, undefined for a read that failed. */

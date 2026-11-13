@@ -30,14 +30,11 @@ import { makeSearch } from "./search/index.ts";
 import { searchRoutes } from "./search/routes.ts";
 import { unreadBoot, unreadExpiry } from "./unread/boot.ts";
 import { callRoutes } from "./calls/routes.ts";
-import { listRooms, worldOf } from "./rooms/rooms.ts";
 import { roomsBoot } from "./rooms/roomsBoot.ts";
 import { networkRoutes } from "./worlds/network.ts";
-import { peopleRoutes, worldsFile } from "./worlds/person.ts";
+import { peopleRoutes } from "./worlds/person.ts";
 import { trendingRoutes } from "./worlds/trending.ts";
 import { tokenRoutes } from "./worlds/tokenRoutes.ts";
-import { tokenStore } from "./worlds/tokenStore.ts";
-import { trendsRoutes } from "./worlds/trends.ts";
 import { dirname, join } from "node:path";
 import { bootSignals } from "./signals/boot.ts";
 import { bootJobs } from "./jobs/boot.ts";
@@ -70,7 +67,11 @@ const retention = startRetention(db, {
   said: memory.said,
   unread: unreadExpiry,
 });
-const { prices, worlds, previews, hubs, trending, network, balance } = bootJobs({ config, db, log });
+const { prices, worlds, previews, hubs, tokens, trending, network, balance, listing, worldsRead } = bootJobs({
+  config,
+  db,
+  log,
+});
 let draining = false;
 const app = makeApp(log, () => !draining);
 app.route("/api/login", loginFrom(db, config, { log }));
@@ -121,27 +122,15 @@ if (chat.guest !== undefined) app.route("/api/guest", chat.guest);
 if (chat.presence !== undefined) app.route("/api/presence", chat.presence);
 // The markets row's sparklines (8i): the prices timer's day, a 404 while it has none or without the timer.
 app.route("/api/markets/history", historyRoutes(prices?.history ?? (() => undefined)));
-// The home's ticker's trends (7t): the worlds job's last passes and who is here, a few items; none without either, never a 404.
-app.route(
-  "/api/trends",
-  trendsRoutes({
-    chain: worlds?.trends ?? (() => ({ worlds: [], newest: [] })),
-    presence: chat.presenceNow,
-    chat: chat.presenceChat,
-    hubs,
-    now: Date.now,
-  }),
-);
 // The chat's /trending card: the last 7 days' most called worlds, the last pass's, a 404 while it has none.
 app.route("/api/trending", trendingRoutes(trending));
 // A person's card: their calls and system from the rollup, their balance from the node; none without the worlds job's chain.
 if (balance !== undefined)
   app.route(
     "/api/people",
-    peopleRoutes({ db, worlds: worldsFile(config.worlds), balance, proxy: config.trustedProxy, log, now: Date.now }),
+    peopleRoutes({ db, worlds: worldsRead, balance, proxy: config.trustedProxy, log, now: Date.now }),
   );
 // A token realm's holders and supply, replayed by the worlds job from grc20's events; a 404 for a realm with none, always one without the chain.
-const tokens = config.universes === undefined ? undefined : tokenStore(db, defaultUniverse(config.universes).id);
 app.route(
   "/api/tokens",
   tokenRoutes({ answer: (hash) => tokens?.answerOf(hash), proxy: config.trustedProxy, now: Date.now }),
@@ -159,7 +148,7 @@ app.route(
     search,
     roles,
     archived: chat.rooms.archived,
-    rooms: (world) => listRooms(db).flatMap(({ name }) => (worldOf(name) === world ? [name] : [])),
+    rooms: chat.roomsOf,
     session,
     origins: config.origins,
     proxy: config.trustedProxy,
@@ -181,14 +170,14 @@ if (config.universes !== undefined)
       now: Date.now,
     }),
   );
-const roomsAhead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck });
+const ahead = roomsBoot(app, config, { roles, rooms: chat.rooms, session, log, nameCheck: chat.nameCheck, listing });
 // The owner's right and the links (owners' moderation, part 4): the pins ask the right, /api/links lists and makes the links.
 mountOwners(app, { db, config, hubs, chat, spared: spared(roles), session, signedAt, log });
 // Whether it is on, told to any page; off with no door at all (10u-a).
 app.route("/api/jarvis", stateRoutes({ on: door?.settings.on ?? false }));
 if (door !== undefined)
   mountDoor(app, { door, chat, memory: memory.ask, session, signedAt, origins: config.origins, log });
-explainBoot({ app, db, config, jarvis: door?.settings.on === true ? door.jarvis : undefined, log });
+explainBoot({ app, db, config, worlds: worldsRead, jarvis: door?.settings.on === true ? door.jarvis : undefined, log });
 // The admin API on a listener of its own, never the public one (ADR-0002 §6), with the login for its own site, so the
 // console's session cookie is its alone; none without ADMIN_PORT. The network that walls it off is deploy's.
 const adminApp = adminBoot({ db, config, roles, door, log, ready: () => !draining });
@@ -203,7 +192,7 @@ const drain = (): void => {
   if (draining) return;
   draining = true;
   log("stopping");
-  for (const job of [retention, prices, worlds, previews, chain, roomsAhead]) job?.stop();
+  for (const job of [retention, prices, worlds, previews, chain, ahead]) job?.stop();
   // The IRC link first. The database last, once the HTTP server and Ergo's socket have both let their
   // connections go: a line Ergo sent before the stop still meets an open database (the socket's deadline
   // bounds the wait).

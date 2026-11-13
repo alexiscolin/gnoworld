@@ -36,7 +36,7 @@ describe("RoomsView", () => {
     // 4e's UX review (U16): an account's navigation holds its direct messages too, and says so.
     expect(
       view({
-        dms: { world: "bubble", partners: [], current: undefined, onlyKnown: false, onOnlyKnown: () => undefined },
+        dms: { world: "bubble", partners: [], current: undefined },
       }),
     ).toMatch(/^<nav[^>]*aria-label="Rooms and direct messages"/);
     expect(headings(html)).toEqual(["Talk", "Rooms"]);
@@ -108,8 +108,7 @@ describe("RoomsView", () => {
   });
 });
 
-// 4e: an account's direct messages, under the rooms: each conversation a link to its page, the one shown marked;
-// a choice to hear from those it talked with alone.
+// 4e: an account's direct messages, under the rooms: each conversation a link to its page, the one shown marked.
 describe("RoomsView: direct messages", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
   const CAROL = "g1l6m6l6carqlqqqqqqqqqqqqqqqqqqqqqnkkanc";
@@ -117,9 +116,6 @@ describe("RoomsView: direct messages", () => {
     world: "bubble",
     partners: [ALICE, CAROL],
     current: undefined,
-    onlyKnown: false,
-    onOnlyKnown: () => undefined,
-    notKept: false,
     ...over,
   });
 
@@ -144,12 +140,6 @@ describe("RoomsView: direct messages", () => {
     );
   });
 
-  it("says in view, under the list, when the device did not keep the choices, and not otherwise", () => {
-    expect(said(view({ dms: dms({ notKept: true }) }))).toContain("Not kept on this device");
-    expect(said(view({ dms: dms({ notKept: true, partners: [] }) }))).toContain("Not kept on this device");
-    expect(said(view({ dms: dms() }))).not.toContain("Not kept on this device");
-  });
-
   it("says when there is none yet, and has no section for a guest", () => {
     // 4e's UX review (U4): the empty list says how to start one.
     expect(said(view({ dms: dms({ partners: [] }) })).replaceAll("&#x27;", "'")).toContain(
@@ -167,8 +157,6 @@ describe("RoomsView: notifications", () => {
     world: "bubble",
     partners: [ALICE],
     current: undefined,
-    onlyKnown: false,
-    onOnlyKnown: () => undefined,
   };
   // The row's words of the room or conversation linked at `href`: its list item's, markup taken off.
   const rowAt = (html: string, href: string, last = false) => {

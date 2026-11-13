@@ -1,6 +1,7 @@
 // The home's first screen follows its featured world (D520): the worlds orbit, so every couple of seconds the view is searched again near
 // where it stands, and the eye eased round the Earth's light cone toward it, slow and never at a jump; a reader's drag or wheel wins and
 // the follow waits out a pause; none under reduced motion. The Earth keeps its place and its light.
+import { damp } from "@gnoworld/core";
 import type { Space } from "./scene.ts";
 import type { Circle } from "./goals.ts";
 import { copySpot } from "./rig/pose.ts";
@@ -114,10 +115,10 @@ class Follow {
     if (view === undefined || universe === undefined || circle === undefined || !this.#at(space)) return;
     lightOf(universe.earth, seconds, this.#frame);
     const target = this.#search(space, view, circle);
-    const share = 1 - Math.exp(-delta / 1000 / TAU.view);
+    const share = damp(delta / 1000, TAU.view);
     const next = { turn: toward(view.turn, target.turn, share), roll: toward(view.roll, target.roll, share) };
     latch.view = next;
-    this.#steer(space, next, 1 - Math.exp(-delta / 1000 / (seconds < this.#slow ? TAU.back : TAU.pose)));
+    this.#steer(space, next, damp(delta / 1000, seconds < this.#slow ? TAU.back : TAU.pose));
   }
 
   // Whether the view follows now: at rest on the first screen, motion allowed, the hand not moving it.

@@ -62,3 +62,17 @@ test("a new page starts the plate's rise count again: the cards of the next plac
   newPage("realm:next");
   expect(body?.dataset["rise"]).toBeUndefined();
 });
+
+test("the plate's fill fades in by its own opacity, never by a custom property the whole plate would inherit", async () => {
+  show(
+    `<main><div data-exit><div data-look="plate"><span data-fill></span><div data-content><p data-planet>k</p><h1>T</h1></div></div></div></main>`,
+  );
+  newPage("world:fill");
+  enterPage(false, false);
+  await wait(30);
+  const plate = document.querySelector<HTMLElement>("[data-look='plate']");
+  const opacity = document.querySelector<HTMLElement>("[data-fill]")?.style.opacity ?? "";
+  expect(opacity).not.toBe("");
+  expect(Number(opacity)).toBeLessThan(0.5);
+  expect(plate?.style.getPropertyValue("--plate-in")).toBe("");
+});

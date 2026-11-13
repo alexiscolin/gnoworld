@@ -647,6 +647,36 @@ describe("the retention's runs (3n)", () => {
   });
 });
 
+describe("the owned tables' retention", () => {
+  it("logs an owner's expiry that throws as the retention's failure, never the search's, and goes on to the next", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const lines: string[] = [];
+    const asked: number[] = [];
+    makeRetention(db, {
+      log: logger(PEPPER, (line) => lines.push(line)),
+      now: () => T0,
+      batch: 7,
+      cards: {
+        expire: () => {
+          throw new RangeError("full");
+        },
+      },
+      kept: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(lines.filter((line) => line.includes("cards_expire"))).toEqual([
+      expect.stringContaining('"event":"retention_failed"') as unknown,
+    ]);
+    expect(lines.join("")).not.toContain("search_failed");
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});
+
 describe("the translations' retention", () => {
   it("asks the translations to expire, with the budget the earlier owners leave", () => {
     const db = openDatabase(":memory:", [...TABLES]);

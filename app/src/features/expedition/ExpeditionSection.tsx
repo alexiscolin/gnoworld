@@ -1,6 +1,6 @@
 // The passport's expedition: today's three stops, the same for everyone and new each UTC day, on a route, the time to the next one, the badge
 // of the day to earn and one button to the next stop; how many are reached, and the streak of days all three were.
-import { reachedOn, streakOn, utcDay } from "@gnoworld/core";
+import { streakOn, utcDay } from "@gnoworld/core";
 import { Badge, Button, Card, Cluster, Grid, Stack } from "@gnoworld/ui";
 import { useState } from "react";
 import { Link } from "react-router";
@@ -9,7 +9,7 @@ import { discOf } from "../../lib/worldDisc.ts";
 import { useApp } from "../../storeContext.tsx";
 import { WorldPlanet } from "../../WorldPlanet.tsx";
 import styles from "./Expedition.module.css";
-import { stopsOn } from "./stops.ts";
+import { progressOn } from "./next.ts";
 
 const HOUR = 3_600_000;
 const MINUTE = 60_000;
@@ -27,11 +27,8 @@ export function ExpeditionSection({ universe }: { readonly universe: string }) {
   const today = utcDay(now);
   const done = useApp(({ device }) => device.expedition);
   const days = useApp(({ device }) => streakOn(device.streak, today));
-  const stops = stopsOn(universe, today);
+  const { stops, reached, count, next } = progressOn(universe, today, done);
   if (stops.length === 0) return null;
-  const reached = new Set(reachedOn(done, today));
-  const count = stops.filter(({ key }) => reached.has(key)).length;
-  const next = stops.find(({ key }) => !reached.has(key));
   return (
     <Card>
       <Card.Header
@@ -47,20 +44,17 @@ export function ExpeditionSection({ universe }: { readonly universe: string }) {
           </p>
           <div className={styles["route"]}>
             <Grid min="s" space="m" as="ul">
-              {stops.map(({ id, name, why, path, key }) => {
-                const world = key.slice(universe.length + 1);
-                return (
-                  <li key={id} className={styles["stop"]}>
-                    <WorldPlanet world={world} fallback={discOf(world)} name={name} size="l" decorative />
-                    <Link to={path} className={styles["name"]}>
-                      {name}
-                    </Link>
-                    <span className={["meta", styles["line"], reached.has(key) ? styles["reached"] : ""].join(" ")}>
-                      {reached.has(key) ? "Reached today" : why}
-                    </span>
-                  </li>
-                );
-              })}
+              {stops.map(({ id, world, name, why, path, key }) => (
+                <li key={id} className={styles["stop"]}>
+                  <WorldPlanet world={world} fallback={discOf(world)} name={name} size="l" decorative />
+                  <Link to={path} className={styles["name"]}>
+                    {name}
+                  </Link>
+                  <span className={["meta", styles["line"], reached.has(key) ? styles["reached"] : ""].join(" ")}>
+                    {reached.has(key) ? "Reached today" : why}
+                  </span>
+                </li>
+              ))}
             </Grid>
           </div>
           <Cluster justify="between" space="m">

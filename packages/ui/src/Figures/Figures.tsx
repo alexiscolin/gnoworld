@@ -89,7 +89,7 @@ export function Figures({ label, figures }: FiguresProps) {
                 <Value value={value} unit={unit} />
                 {spark === undefined || spark.length < 2 ? null : <Trace values={spark} />}
               </Cluster>
-              <span className={styles["sub"]}>{sub}</span>
+              <span className="meta">{sub}</span>
             </Stack>
           </div>
         ))}

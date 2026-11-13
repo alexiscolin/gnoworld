@@ -2,6 +2,7 @@ import { useEffect, useEffectEvent, useLayoutEffect, useRef, useState, type RefO
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
 import { Cluster, Stack } from "../compositions/index.ts";
+import { motionWelcome } from "../motion.ts";
 import { surface } from "../Popover/floating.ts";
 import styles from "./Flash.module.css";
 import { stillCopy } from "../stillCopy.ts";
@@ -29,7 +30,7 @@ const LIFETIME = 5_000;
 // there is no Web Animations API (jsdom), so a closed flash is gone at once for the tests and a screen reader.
 function leaveByCopy(pill: HTMLElement) {
   if (typeof pill.animate !== "function") return;
-  if (getComputedStyle(document.documentElement).getPropertyValue("--motion-scale").trim() === "0") return;
+  if (!motionWelcome()) return;
   const ghost = stillCopy(pill);
   if (ghost === undefined) return;
   ghost.inert = true;
@@ -119,7 +120,7 @@ function Pill({ message, onClose, banner }: { message: FlashMessage; onClose: ()
         <Stack space="3xs">
           <p className={styles["title"]}>{title}</p>
           {/* A banner's line is in the one label style, as frames 18, 23 and 93 draw it ("TODAY'S EXPEDITION · 1 OF 3"). */}
-          {line === undefined ? null : <p className={banner ? "label" : styles["line"]}>{line}</p>}
+          {line === undefined ? null : <p className={banner ? "label" : "meta"}>{line}</p>}
         </Stack>
         <Cluster space="2xs">
           {action === undefined ? null : (

@@ -1,12 +1,19 @@
 import { Explanation } from "@gnoworld/schemas";
+import { openDatabase } from "@gnoworld/service/db";
 import { describe, expect, it, vi } from "vitest";
+import { migrations } from "../migrations.ts";
+import { makeExplainer } from "./make.ts";
 import { explainRoutes } from "./routes.ts";
+import { makeExplanations } from "./store.ts";
 
 const peer = { incoming: { socket: { remoteAddress: "203.0.113.7" } } };
 const REALM = "gno.land/r/demo/defi/grc20factory";
 const url = (kind: string, chain: string, subject: string) => `/${kind}/${chain}/${encodeURIComponent(subject)}`;
 const setup = (answer: Explanation = { status: "making" }) => {
-  const explainer = { answer: vi.fn(() => answer) };
+  const explainer = {
+    answer: vi.fn(() => answer),
+    ready: vi.fn(() => (answer.status === "ready" ? answer : undefined)),
+  };
   const clock = { now: 0 };
   const routes = explainRoutes({ explainer, now: () => clock.now });
   return { explainer, clock, routes };
@@ -19,14 +26,20 @@ describe("GET /<kind>/<chain>/<subject>", () => {
     expect(response.status).toBe(200);
     const body: unknown = await response.json();
     expect(body).toEqual({ status: "ready", text: "A token.", tags: ["token"] });
-    expect(explainer.answer).toHaveBeenCalledWith({ kind: "realm", chain: "onyx-1", subject: REALM });
+    expect(explainer.answer).toHaveBeenCalledWith(
+      { kind: "realm", chain: "onyx-1", subject: REALM },
+      expect.any(String),
+    );
     expect(Explanation.safeParse(body).success).toBe(true);
   });
 
   it("answers a world's by its main realm's path as its own kind", async () => {
     const { routes, explainer } = setup();
     await routes.request(url("world", "onyx-1", REALM), {}, peer);
-    expect(explainer.answer).toHaveBeenCalledWith({ kind: "world", chain: "onyx-1", subject: REALM });
+    expect(explainer.answer).toHaveBeenCalledWith(
+      { kind: "world", chain: "onyx-1", subject: REALM },
+      expect.any(String),
+    );
   });
 
   it("caches a ready line for the browser and nothing else", async () => {
@@ -67,6 +80,19 @@ describe("GET /<kind>/<chain>/<subject>", () => {
     expect(explainer.answer).toHaveBeenCalledTimes(20);
   });
 
+  it("serves a line already made while every visitor together is past 20 a second, and starts nothing then", async () => {
+    const made = setup({ status: "ready", text: "A token.", tags: ["token"] });
+    const statuses: number[] = [];
+    for (let n = 0; n < 22; n += 1)
+      statuses.push((await made.routes.request(url("realm", "onyx-1", REALM), {}, peer)).status);
+    expect(statuses).toEqual(Array.from({ length: 22 }, () => 200));
+    expect(made.explainer.answer).toHaveBeenCalledTimes(20);
+    const miss = setup({ status: "none" });
+    for (let n = 0; n < 20; n += 1) await miss.routes.request(url("realm", "onyx-1", REALM), {}, peer);
+    expect((await miss.routes.request(url("realm", "onyx-1", REALM), {}, peer)).status).toBe(429);
+    expect(miss.explainer.answer).toHaveBeenCalledTimes(20);
+  });
+
   it("holds one visitor to 60 a minute, counting a refused request, and serves another visitor", async () => {
     const { routes, clock } = setup({ status: "none" });
     const first: number[] = [];
@@ -85,5 +111,29 @@ describe("GET /<kind>/<chain>/<subject>", () => {
     }
     expect((await routes.request(url("scam", "onyx-1", REALM), {}, third)).status).toBe(400);
     expect((await routes.request(url("realm", "onyx-1", REALM), {}, third)).status).toBe(429);
+  });
+});
+
+describe("the new explanations one visitor starts, counted by its /48", () => {
+  it("six visitors in one /48: the sixth is refused", async () => {
+    const db = openDatabase(":memory:", migrations);
+    const explainer = makeExplainer({
+      store: makeExplanations(db),
+      jarvis: { explain: () => new Promise(() => undefined) },
+      known: () => true,
+      now: () => 0,
+      log: () => undefined,
+      perDay: 30,
+      gapMs: 0,
+    });
+    const routes = explainRoutes({ explainer, now: () => 0 });
+    const statuses: unknown[] = [];
+    for (let n = 1; n <= 6; n += 1) {
+      const from = { incoming: { socket: { remoteAddress: `2001:db8:1:${String(n)}::1` } } };
+      const answer = await routes.request(url("realm", "onyx-1", `gno.land/r/demo/r${String(n)}`), {}, from);
+      statuses.push(Explanation.parse(await answer.json()).status);
+    }
+    expect(statuses).toEqual(["making", "making", "making", "making", "making", "none"]);
+    db.close();
   });
 });

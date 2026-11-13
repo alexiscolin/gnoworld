@@ -53,7 +53,7 @@ export function RoomPreview({ item, go }: { item: SearchItem; go: (item: SearchI
       <Kicker>{`Room · ${item.place ?? ""}`}</Kicker>
       <h3 className={styles["title"]}>{`#${item.name}`}</h3>
       {item.topic === undefined ? null : <p className={styles["description"]}>{item.topic}</p>}
-      <p className={styles["stats"]}>
+      <p className={["meta", styles["stats"]].join(" ")}>
         {item.here === undefined ? null : (
           <span>
             <span className={styles["here"]}>{item.here}</span> here now

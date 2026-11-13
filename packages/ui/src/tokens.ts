@@ -43,6 +43,7 @@ export function groups() {
     { name: "Shape", prefixes: ["--radius-", "--line-", "--focus-"] },
     { name: "Motion", prefixes: ["--motion-", "--ease-", "--transition-"] },
     { name: "Effects", prefixes: ["--opacity-", "--shadow-"] },
+    { name: "Direction", prefixes: ["--dir"] },
   ];
 }
 

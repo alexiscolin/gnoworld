@@ -1551,6 +1551,7 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     ],
     ["tasks", (n) => fill("- [ ] a\n", n)],
     ["items with continuations", (n) => fill("- a\n  b\n", n)],
+    ["an item continued by a line of code spans", (n) => "- a\n  " + fill("`a` ", n - 6)],
     ["ordered items nested", (n) => fill("1. a\n   1. b\n", n)],
     ["a list of rules", (n) => fill("- a\n---\n", n)],
     ["pipes alone", (n) => fill("|", n)],

@@ -2,6 +2,8 @@
 import { act } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
+import { presenceOptions } from "../../lib/query/apiReads.ts";
+import { queryClient } from "../../lib/query/client.ts";
 import { Watch } from "./Watch.tsx";
 
 const START = Date.parse("2026-11-05T12:00:00.000Z");
@@ -38,8 +40,8 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-// The bell's count: one for each unread line of the three kinds the page holds without asking (messages, the coming and live events,
-// the news of 14 days), none for the worlds followed, which the panel alone asks the server for.
+// The bell's count: one for each unread line, as the panel counts its All: the messages, the coming and live events, the news of 14 days, and
+// the worlds followed where people are, once the page holds who is here (the panel, the search or a plate asked the server).
 describe("the bell's count", () => {
   const noted = {
     id: "m1",
@@ -67,6 +69,19 @@ describe("the bell's count", () => {
       store.getState().noticeActions.add(noted);
     });
     expect(last()).toBe(3);
+  });
+
+  it("counts a followed world where people are, as the panel's All does, once the page holds who is here", async () => {
+    localStorage.setItem("gnoworld:device:follows", JSON.stringify({ worlds: ["onyx:bubble"], people: [] }));
+    queryClient.setQueryData(presenceOptions.queryKey, {
+      worlds: [{ world: "bubble", here: 4, perHour: 0, rise: null }],
+    });
+    try {
+      const { last } = await counted();
+      expect(last()).toBe(1);
+    } finally {
+      queryClient.clear();
+    }
   });
 
   it("counts a live event, and drops a line from the count once it is read by its id", async () => {

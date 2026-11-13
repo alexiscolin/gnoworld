@@ -6,25 +6,14 @@ import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
 import { iconNode } from "../icons/iconNode.ts";
 import { Skeleton } from "../Skeleton/Skeleton.tsx";
-import {
-  Avatars,
-  Cards,
-  Chips,
-  Dialogs,
-  Fields,
-  Links,
-  Planets,
-  Popovers,
-  Rows,
-  Stats,
-  TabRows,
-} from "./Interface.tsx";
+import { Avatars, Cards, Chips, Dialogs, Fields, Links, Planets, Popovers, Rows, Stats } from "./Interface.tsx";
 import { Marks } from "./Marks.tsx";
 import { NavItems } from "./NavItems.tsx";
 import { Compositions, Frames, Kickers, Layout } from "./Frames.tsx";
 import { PlateRegions } from "./Plate.tsx";
 import { Region } from "./Region.tsx";
 import { Soon } from "./Soon.tsx";
+import { TabRows } from "./TabRows.tsx";
 
 function Buttons() {
   return (

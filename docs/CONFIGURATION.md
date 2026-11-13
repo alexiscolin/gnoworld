@@ -96,7 +96,7 @@ The server's own defaults apply to what `compose.yaml` does not set. Compose for
 | `JARVIS_DOOR_KEY_FILE` | none | secret file | Required once `JARVIS=on` |
 | `JARVIS_TIMEOUT_S` | `900` | 1 to 900 | How long the door waits for an answer |
 | `JARVIS_QUESTION_CHARS` | `500` | 1 to 8000 | A question's length |
-| `JARVIS_QUOTA`, `JARVIS_QUOTA_UNNAMED` | `20`, `5` | 1 to 1000 | First values of a day's questions per account (named, unnamed); the database keeps them after the first start |
+| `JARVIS_QUOTA`, `JARVIS_QUOTA_UNNAMED` | `30`, `30` | 1 to 1000 | First values of a day's questions per account (named, unnamed); the database keeps them after the first start |
 | `JARVIS_UNLIMITED` | none | comma list of addresses, 1000 at most, no duplicate | Accounts with no quota (first value) |
 | `JARVIS_NAMES_RPC`, `JARVIS_NAMES_CHAIN` | `https://rpc.gno.land`, `gnoland-1` | https origin; chain id | Where an account's name is read, and the chain id that node must name |
 | `EXPLAIN_SEED_FILE` | the seed shipped with the server, `server/src/explain/onyxSeed.json` | absolute path, 8 MiB at most | The realms' explanations written in advance, read at every start when `UNIVERSES_FILE` is set (OPERATIONS.md, "The realms' explanations"); a file that does not parse stops the server |
@@ -187,7 +187,8 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 | Search | requests a minute per visitor, per account; a second in all | 20, 60, 10 | `server/src/search/routes.ts` lines 19 to 22 |
 | Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 30 to 33 |
 | Guest | a line's length | 280 characters, 400 bytes | `server/src/guest/rules.ts` |
-| nginx | requests a visitor | 20 a second, burst 640 (Alexis, F3665) | `deploy/web/nginx.conf` lines 44 and 97 |
+| nginx | requests a visitor | 20 a second, burst 640 (Alexis, F3665) | `deploy/web/nginx.conf` lines 43 and 99 |
+| nginx | hashed files a visitor (assets, textures, world pictures) | 5 a second, burst 1,024, a zone of its own (D13127) | `deploy/web/nginx.conf` lines 47 and 123 |
 | nginx | login | 1 a second, burst 20, besides the server's 10 a minute | lines 46 and 191 |
 | nginx | connections a visitor, per worker | 32; 4096 | lines 98 and 12 |
 | nginx | API body | 16 KiB | line 184 |

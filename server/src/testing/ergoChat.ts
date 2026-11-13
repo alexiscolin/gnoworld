@@ -5,16 +5,8 @@ import { z } from "zod";
 import { startChat } from "../chat.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
-import { LOGIN_TABLES } from "../login/login.ts";
-import { TICKET_TABLES } from "../login/ticket.ts";
-import { PROGRESS_TABLES } from "../moderation/catchup.ts";
-import { VERDICT_TABLES } from "../moderation/check.ts";
-import { MUTE_TABLES } from "../moderation/mute.ts";
+import { migrations } from "../migrations.ts";
 import type { Answer } from "../moderation/provider.ts";
-import { PIN_TABLES } from "../pins/pins.ts";
-import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
-import { ROOM_SAID } from "../rooms/earth.ts";
-import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { answer } from "./answers.ts";
 import type { Ergo } from "./ergo.ts";
 import { oper, stops } from "./ergoKit.ts";
@@ -30,20 +22,8 @@ const provider =
   };
 // A watcher a chat: its nick of its own.
 let watchers = 0;
-export const TABLES = [
-  LOGIN_TABLES,
-  TICKET_TABLES,
-  ROOM_TABLES,
-  VERDICT_TABLES,
-  PROGRESS_TABLES,
-  MUTE_TABLES,
-  ROOM_STATE,
-  REALM_TABLES,
-  REALM_PATH,
-  EARTH_TABLES,
-  ROOM_SAID,
-  PIN_TABLES,
-];
+// The schema production runs, every migration in its order.
+export const TABLES = migrations;
 const MUTE = { strikes: 3, windowMinutes: 10, minutes: 5, max: 50 };
 interface More {
   db?: DatabaseSync;

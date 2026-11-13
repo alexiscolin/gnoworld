@@ -20,6 +20,7 @@ import { readingOf, walkCalls, type Reader, type Row } from "./history.ts";
 import { Failure, kindOf, type Kind, type Send } from "./remote.ts";
 import { rollupStore, type RollupStore } from "./rollupStore.ts";
 import { runTokens } from "./tokens.ts";
+import type { TokenStore } from "./tokenStore.ts";
 import { rowsSince, sinceOf, trendingOf } from "./trending.ts";
 import { replaceFile } from "../replaceFile.ts";
 
@@ -85,31 +86,51 @@ export async function writeRollups(
   folder: string,
   worlds: Worlds,
   store: RollupStore,
-): Promise<{ written: number } | false> {
+): Promise<{ written: number; refused?: number } | false> {
   const importers = importersOf(worlds);
+  const names = new Set<string>();
+  let refused = 0;
   try {
     mkdirSync(folder, { recursive: true });
+    for (const { path } of worlds.worlds.flatMap(({ realms }) => realms)) {
+      const written = writeOne(folder, path, store.rollupOf(path, importers.get(path), worlds.updated));
+      if (written === false) return false;
+      if (written === "refused") refused += 1;
+      else if (written !== undefined) names.add(written.name);
+      await new Promise((resolve) => setImmediate(resolve));
+    }
+    removeStale(folder, names);
   } catch {
     return false;
   }
-  const names = new Set<string>();
-  for (const { path } of worlds.worlds.flatMap(({ realms }) => realms)) {
-    const whole = store.rollupOf(path, importers.get(path), worlds.updated);
-    const file = RealmRollup.safeParse(whole === undefined ? undefined : fitted(whole));
-    if (file.success && !replaceFile(join(folder, `${rollupName(path)}.json`), `${JSON.stringify(file.data)}\n`))
-      return false;
-    if (file.success) names.add(`${rollupName(path)}.json`);
-    await new Promise((resolve) => setImmediate(resolve));
-  }
-  // A file this pass wrote none for would keep a realm's last counts, a restarted chain's among them.
+  return refused === 0 ? { written: names.size } : { written: names.size, refused };
+}
+
+// One realm's file written whole: its name, or "refused" for one its schema refuses, none for a realm with nothing, false when the folder
+// does not take it.
+function writeOne(
+  folder: string,
+  path: string,
+  whole: RealmRollup | undefined,
+): { name: string } | "refused" | undefined | false {
+  if (whole === undefined) return undefined;
+  const file = RealmRollup.safeParse(fitted(whole));
+  if (!file.success) return "refused";
+  const name = `${rollupName(path)}.json`;
+  return replaceFile(join(folder, name), `${JSON.stringify(file.data)}\n`) ? { name } : false;
+}
+
+// A file this pass wrote none for would keep a realm's last counts, a restarted chain's among them.
+function removeStale(folder: string, names: ReadonlySet<string>): void {
   for (const name of readdirSync(folder))
     if (/^[0-9a-f]{32}\.json$/.test(name) && !names.has(name)) unlinkSync(join(folder, name));
-  return { written: names.size };
 }
 
 /** What a pass of the rollup reads and writes with: its settings (none: no rollup), the job's way out, its pace and its stop. */
 export interface RollupPass {
   readonly rollup?: { readonly db: DatabaseSync; readonly dir: string } | undefined;
+  /** The token store the server's route reads, replayed into by each pass; none: a store made for the pass. */
+  readonly tokens?: TokenStore | undefined;
   readonly log: Log;
   readonly send: Send;
   readonly universe: { readonly id: string; readonly indexer: string };
@@ -119,6 +140,12 @@ export interface RollupPass {
   readonly now: () => number;
   /** Told the ranking of the last 7 days (trending.ts) once the files are written; none: nobody asks. */
   readonly trending?: ((trending: Trending) => void) | undefined;
+}
+
+// What a pass logs of its files: a write the folder refused, or the realms whose file the schema refused.
+function toldOf(written: Awaited<ReturnType<typeof writeRollups>>, log: Log): void {
+  if (written === false) log("worlds_rollup_failed", { error: "write" });
+  else if (written.refused !== undefined) log("worlds_rollup_failed", { error: "shape", value: written.refused });
 }
 
 /** A pass of the rollup over the worlds' file just written; a stop writes no file. */
@@ -140,7 +167,7 @@ export async function rollUp(pass: RollupPass, worlds: Worlds): Promise<void> {
   const known = new Set(worlds.worlds.flatMap(({ realms }) => realms.map(({ path }) => path)));
   const read = await readRollup(reader, store, { known, isStopped });
   if (!read.ok) failed(read.kind);
-  if (!isStopped() && (await writeRollups(rollup.dir, worlds, store)) === false) failed("write");
+  if (!isStopped()) toldOf(await writeRollups(rollup.dir, worlds, store), log);
   if (!isStopped()) pass.trending?.(trendingOf(worlds, rowsSince(rollup.db, sinceOf(pass.now())), pass.now()));
   await runTokens(pass);
 }

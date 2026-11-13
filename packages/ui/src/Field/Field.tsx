@@ -28,6 +28,8 @@ export interface FieldProps {
   shape?: "pill" | undefined;
   /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
   describedBy?: string | undefined;
+  /** A search box that keeps the focus while arrows choose a row of the list it names: the list's id, and the id of the chosen row. */
+  combobox?: { controls: string | undefined; activedescendant: string | undefined } | undefined;
 }
 
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
@@ -45,7 +47,7 @@ function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boo
 
 interface BoxProps extends Pick<
   FieldProps,
-  "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable" | "shape"
+  "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable" | "shape" | "combobox"
 > {
   kind: NonNullable<FieldProps["kind"]>;
   id: string;
@@ -64,6 +66,7 @@ function Box({
   placeholder,
   resizable,
   shape,
+  combobox,
   onChange,
 }: BoxProps) {
   const composingRef = useRef(false);
@@ -97,6 +100,14 @@ function Box({
   ) : (
     <input
       {...shared}
+      {...(combobox === undefined
+        ? {}
+        : {
+            role: "combobox",
+            "aria-expanded": combobox.controls !== undefined,
+            "aria-controls": combobox.controls,
+            "aria-activedescendant": combobox.activedescendant,
+          })}
       type={TYPES[kind]}
       onChange={(event) => {
         onChange(event.target.value);
@@ -165,6 +176,7 @@ export function Field({
   resizable,
   enterAddsLine,
   placeholder,
+  combobox,
 }: FieldProps) {
   const id = useId();
   const described = describing(id, { prefix, help, error, describedBy });
@@ -179,6 +191,7 @@ export function Field({
       placeholder={placeholder}
       resizable={resizable}
       shape={shape}
+      combobox={combobox}
       onChange={onChange}
     />
   );

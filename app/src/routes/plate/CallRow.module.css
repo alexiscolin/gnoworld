@@ -16,13 +16,6 @@
     color: var(--color-text-muted);
   }
 
-  /* The time and the full address: the data type, a little quieter. */
-  .when,
-  .address {
-    color: var(--color-text-muted);
-    font: var(--font-data);
-  }
-
   .failed {
     color: var(--color-danger);
   }

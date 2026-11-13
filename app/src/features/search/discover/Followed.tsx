@@ -6,8 +6,7 @@ import { PlaceResults } from "../PlaceResults.tsx";
 import { sortPlaces } from "../ranks.ts";
 import type { SearchItem } from "../types.ts";
 import styles from "./Discover.module.css";
-
-const plural = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? "" : "s"}`;
+import { plural } from "../../../lib/plural.ts";
 
 const noteOf = ({ realmCount, rank }: SearchItem) =>
   realmCount === undefined || rank === undefined
@@ -35,7 +34,7 @@ export function Followed({
     <Stack space="xs">
       <div className={styles["rowHead"]}>
         <h3>Following</h3>
-        <span className={styles["why"]} role="status">
+        <span className={["meta", styles["why"]].join(" ")} role="status">
           {plural(worlds.length, "world")}
         </span>
       </div>

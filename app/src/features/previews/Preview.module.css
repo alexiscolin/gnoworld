@@ -67,9 +67,4 @@
     position: absolute;
     inset: 0;
   }
-
-  .when {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
 }

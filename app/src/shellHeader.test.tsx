@@ -212,6 +212,17 @@ test("/w/: the World level has a name", () => {
   expect(world?.name).not.toBe("");
 });
 
+// A realm's page names its World level by the realm's last part, its version left out; a path that is no realm's, by itself.
+test.each([
+  ["/r/gnoswap/access/v1", "access"],
+  ["/r/gnoland/blog", "blog"],
+  ["/net/gnoland/r/gnoland/blog", "blog"],
+  ["/r/demo/boards/v2/", "boards"],
+])("%s: the World level is named %s", (path, name) => {
+  const world = levelsOf(site.universeAt(path), path).levels.find((level) => level.view === "world");
+  expect(world?.name).toBe(name);
+});
+
 // O4: "Testnet" says what the data says of a universe, not what a name or a default says. The real data has one testnet and it is
 // the default one (Onyx), so this site is planted: its default is no testnet, and its second universe, not the default, is one.
 describe("the header's Testnet, on a planted site", () => {

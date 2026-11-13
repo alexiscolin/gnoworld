@@ -19,6 +19,10 @@ export type IconButtonProps = Face & {
   count?: number;
   /** The count's tone: the design system's mint, or its coral for what is new to the reader, the bell's alone (frames 6, 86, 87). */
   countTone?: "mine" | "new";
+  /** A tool of a bar inside a box (the composer's format bar): the bar's faint ink, 24 px where the box is under 24 rem. */
+  tool?: boolean;
+  /** One of the tools a narrow bar goes without first (its box under 18 rem): the format bar's lists. */
+  drops?: boolean;
   onClick?: (event: MouseEvent<HTMLButtonElement>) => void;
 };
 
@@ -40,17 +44,19 @@ export function IconButton({
   expanded,
   count,
   countTone = "mine",
+  tool,
+  drops,
   onClick,
 }: IconButtonProps) {
   const counted = shown(count);
   return (
-    <Tooltip label={label}>
+    <Tooltip label={label} drops={drops}>
       <button
         type="button"
         aria-label={counted === null ? label : `${label}, ${counted.said}`}
         aria-pressed={pressed}
         aria-expanded={expanded}
-        {...iconLook(emphasis, size)}
+        {...iconLook(emphasis, size, tool)}
         onClick={onClick}
       >
         {icon === undefined ? <span aria-hidden="true">{emoji}</span> : <Icon name={icon} size={iconSize(size)} />}

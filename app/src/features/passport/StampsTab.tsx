@@ -1,14 +1,14 @@
 // The passport's stamps by day, as the app writes days, the first of a day shown and the rest one press away; and the stamps charted first.
 import { Cluster, Kicker, ShowMore, Stack, Stamp } from "@gnoworld/ui";
 import { useState } from "react";
-import { dayName, utcDay } from "../../lib/days.ts";
+import { dayName, utcShortDay } from "../../lib/days.ts";
 import { Note } from "../../TabRow.tsx";
 import { byDay, SHOWN, type StampView } from "./stamps.ts";
 
 const UTC = { timeZone: "UTC" };
 
 // A stamp's day as its mark says it: "4 Nov".
-const markDay = (day: string, now: Date) => (day === "" ? "" : utcDay(new Date(`${day}T00:00:00Z`), now));
+const markDay = (day: string, now: Date) => (day === "" ? "" : utcShortDay(new Date(`${day}T00:00:00Z`), now));
 
 function StampOf({ stamp, now }: { stamp: StampView; now: Date }) {
   return (
