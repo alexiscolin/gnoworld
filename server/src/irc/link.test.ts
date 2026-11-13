@@ -2004,7 +2004,7 @@ describe("the link's relays (D430)", () => {
   };
 
   it("sends the relay with a label of its own and resolves true on the line Ergo answers it with", async () => {
-    const { link, peer } = await up();
+    const { link, peer } = await up({ relayMs: 2000 });
     const taken = link.relay("#bubble", NICK, "hello");
     const sent = await peer.next(/RELAYMSG/);
     const label = /^@label=(\S+) RELAYMSG #bubble anon\/brave-otter-ab23 :?hello$/.exec(sent)?.[1];
@@ -2035,8 +2035,8 @@ describe("the link's relays (D430)", () => {
   it("resolves unsure after its bound when Ergo says nothing: the line may still come. It drops the entry and ignores a late answer", async () => {
     const { link, peer, said } = await up();
     const taken = link.relay("#bubble", NICK, "swallowed");
-    const sent = await peer.next(/RELAYMSG/);
     expect(link.relaying()).toBe(1);
+    const sent = await peer.next(/RELAYMSG/);
     await expect(taken).resolves.toBe("unsure");
     expect(link.relaying()).toBe(0);
     peer.say(`@label=${/^@label=(\S+) /.exec(sent)?.[1] ?? ""} :${NICK}!~u@h PRIVMSG #bubble :swallowed`);
