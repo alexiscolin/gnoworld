@@ -75,7 +75,7 @@ run #31): one noted retry, never for a security test, each repaired. Next: deplo
 Until the ruleset is on, the branch reaches main through today's way (/pre-merge, Alexis's merge and push).
 
 ## 8. Dependencies to ask for
-zizmor (approved, D13144): version and date read on its registry at install. Each removal knip proposes: asked.
+zizmor (approved, D13144): 1.32.0, released 2026-11-02 (PyPI, read 2026-11-13), installed by its wheel's hash. Each removal knip proposes: asked.
 ## 9. Questions for Alexis
 The "before" table and its targets (phase 1's exit); the agent account's name and address (phase 2); branches or
 worktrees holding unmerged work (phase 4).
