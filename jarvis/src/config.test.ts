@@ -1127,12 +1127,12 @@ describe("deploy/test.sh", () => {
       `config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0`,
     );
     expect(script()).toContain(`"$here/jarvis/Dockerfile"; do`);
-    // Its stop takes jarvis's profile too, which a down of the demo's alone leaves up.
+    // Its stop takes jarvis's and links's profiles too, which a down of the demo's alone leaves up (F13130).
     expect(script()).toContain(
-      `docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 ||\n\t\t\techo "test.sh: the project`,
+      `docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 ||\n\t\t\techo "test.sh: the project`,
     );
     expect(script()).toContain(
-      `docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 || true #`,
+      `docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 || true #`,
     );
     // The proofs of its absence, by commands no profile switches on, before jarvis's own start (red pass, R4).
     const at = (text: string) => script().indexOf(text);

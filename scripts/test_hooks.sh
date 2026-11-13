@@ -9575,6 +9575,20 @@ printf '%s\n' "$out" | grep -q "failed=1" && printf '%s\n' "$out" | grep -q "sur
 : >"$dm/env.log"
 out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deploy/test.sh's first run under --mutants failed under a stub that passes: $out"
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
+# Each down -v of its project takes every profile compose.yaml names (F13130): test-links.sh starts `links`, which a down of demo and
+# jarvis left up with its networks' fixed ranges, so --mutants' first run, a project of its own, could not start (2026-11-13).
+profiles=$(sed -n 's/^ *profiles: \[\(.*\)\]$/\1/p' "$here/../deploy/compose.yaml" | tr ',' '\n' | tr -d ' "' | sort -u)
+[ -n "$profiles" ] || fail "deploy/compose.yaml names no profile any more: update test_hooks.sh's deploy_stop"
+given=$(sed -n 's/^files=.*\(--profile [a-z_-]*\).*/\1/p' "$ds")
+[ -n "$given" ] || fail "deploy/test.sh's files= gives no profile any more: update test_hooks.sh's deploy_stop"
+grep 'docker compose -p "$project" $files .*down -v' "$ds" >"$t/ds.downs" || true
+[ "$(grep -c . "$t/ds.downs")" -ge 2 ] || fail "deploy/test.sh no longer has its start's and its cleanup's down -v: update test_hooks.sh's deploy_stop"
+while IFS= read -r line; do
+	for p in $profiles; do
+		case "$line $given " in *"--profile $p "*) ;; *) echo "$p" ;; esac
+	done
+done <"$t/ds.downs" >"$t/ds.unprofiled"
+[ ! -s "$t/ds.unprofiled" ] || fail "a down -v of deploy/test.sh leaves its profile(s) $(sort -u "$t/ds.unprofiled" | tr '\n' ' ')up (F13130)"
 fi
 
 if part deploy_checks; then

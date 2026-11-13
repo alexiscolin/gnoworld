@@ -164,9 +164,9 @@ cleanup() {
 	kill "$canary_pid" 2>/dev/null || true
 	wait "$canary_pid" 2>/dev/null || true
 	if [ -n "${started:-}" ]; then
-		# jarvis's profile too, which test-jarvis.sh starts (10j-4): a down of the demo's alone leaves it up.
-		docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 ||
-			echo "test.sh: the project $project is still up: docker compose -p $project --profile demo --profile jarvis down -v" >&2
+		# jarvis's and links's profiles too, which test-jarvis.sh and test-links.sh start (10j-4, F13130): a down of the demo's alone leaves them up.
+		docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 ||
+			echo "test.sh: the project $project is still up: docker compose -p $project --profile demo --profile jarvis --profile links down -v" >&2
 	fi
 	rm -r "$tmp"
 }
@@ -654,7 +654,7 @@ FAKE
 	done
 	[ "$failed" = "$before" ] || exit 1
 	started=yes
-	docker compose -p "$project" $files --profile jarvis down -v >/dev/null 2>&1 || true # what an interrupted run left
+	docker compose -p "$project" $files --profile jarvis --profile links down -v >/dev/null 2>&1 || true # what an interrupted run left
 	# The demo without jarvis, which test-jarvis.sh starts under its own profile at the end (10j-4).
 	if ! docker compose -p "$project" $files up -d --build --wait web guard ergo server egress; then
 		echo "test.sh: the stack did not start: $(docker compose -p "$project" $files logs --no-log-prefix --tail 1 guard web ergo server egress 2>&1 | tr '\n' ' ')" >&2
