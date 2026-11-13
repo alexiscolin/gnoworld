@@ -5,6 +5,7 @@ import type { Ran } from "./gnomcp.ts";
 import { gnomcpTools } from "./gnomcpTools.ts";
 import { loadSkills } from "./skills.ts";
 import { capture } from "./testing/kit.ts";
+import { data as explainData, explainBox } from "./testing/explainTools.ts";
 import { placesData } from "./testing/placesData.ts";
 import { toolbox } from "./toolbox.ts";
 import { cardTools } from "./tools/cards.ts";
@@ -15,6 +16,7 @@ import { loadPlaces, placesTool } from "./tools/places.ts";
 const data = placesData();
 afterAll(() => {
   data.remove();
+  explainData.remove();
 });
 
 const SKILLS = fileURLToPath(new URL("../skills", import.meta.url));
@@ -209,5 +211,73 @@ describe("each allowed call, run by its own runner", () => {
     expect(
       await tools.run({ ok: true, name: "load_skill", args: { skill: "gno", reference: "gnokey.md" } }, asked()),
     ).toEqual({ ok: false, reason: "refused" });
+  });
+});
+
+// D13920: a function's explanation reads the code alone, on one chain's profile.
+describe("the tools a function's explanation is offered", () => {
+  const REALM = "gno.land/r/gov/dao";
+  const READ = { profile: "gnoland", path: REALM, symbols: ["Vote"] };
+  const BUTTON = { button: { type: "fly", label: "Fly to GovDAO", place: "/w/govdao" } };
+  const offeredBy = (own: { allowlist: { offered: () => { name: string }[] } }) =>
+    own.allowlist
+      .offered()
+      .map(({ name }) => name)
+      .sort();
+
+  it("are gno_read, load_skill, give_button and find_place, and no live read: no render, eval, status, history, activity, packages, nor gnoscope's", () => {
+    expect(offeredBy(explainBox().box.explain("gnoland"))).toEqual([
+      "find_place",
+      "give_button",
+      "gno_read",
+      "load_skill",
+    ]);
+  });
+
+  it.each([
+    "gno_render",
+    "gno_eval",
+    "gno_status",
+    "gno_history",
+    "gno_activity",
+    "gno_packages",
+    "get_realm_state",
+    "explain_tx",
+  ])("refuse a call to %s the model makes anyway: unknown to the allowlist, and never run", async (name) => {
+    const { box, calls } = explainBox();
+    const own = box.explain("gnoland");
+    expect(own.allowlist.check(name, { profile: "gnoland", realm: REALM })).toEqual({
+      ok: false,
+      reason: "unknown_tool",
+    });
+    await own.run({ ok: true, name, args: {} } as never, asked());
+    expect(calls).not.toHaveBeenCalled();
+  });
+
+  it("read on their one profile and refuse a gno_read of another, so an answer is read on the chain it is kept for", () => {
+    const own = explainBox().box.explain("gnoland");
+    expect(own.allowlist.check("gno_read", READ)).toMatchObject({ ok: true, name: "gno_read" });
+    expect(own.allowlist.check("gno_read", { ...READ, profile: "onyx" })).toEqual({
+      ok: false,
+      reason: "bad_arguments",
+    });
+  });
+
+  it("let a button name no chain or the one chain, and refuse one that names another: its card would read that chain's live page", () => {
+    const own = explainBox().box.explain("gnoland");
+    expect(own.allowlist.check("give_button", BUTTON)).toMatchObject({ ok: true });
+    expect(own.allowlist.check("give_button", { ...BUTTON, profile: "gnoland" })).toMatchObject({ ok: true });
+    expect(own.allowlist.check("give_button", { ...BUTTON, profile: "onyx" })).toEqual({
+      ok: false,
+      reason: "bad_arguments",
+    });
+  });
+
+  it("leave the main loop's button and tools as they are, live reads and any profile included", () => {
+    const { box } = explainBox();
+    const names = box.allowlist.offered().map(({ name }) => name);
+    expect(names).toContain("gno_render");
+    expect(names).toContain("get_realm_state");
+    expect(box.allowlist.check("give_button", { ...BUTTON, profile: "onyx" })).toMatchObject({ ok: true });
   });
 });

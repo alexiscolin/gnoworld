@@ -30,11 +30,8 @@ afterEach(() => {
 });
 
 describe("the chain's slice", () => {
-  it("starts with no line in any room, no deploy for the ticker and no count: nothing is shown before its chain event", () => {
-    const state = createAppStore().getState();
-    expect(state.chainByWorld).toEqual({});
-    expect(state.deploys).toEqual([]);
-    expect(state.realmsDeployed).toEqual({});
+  it("starts with no line in any world: nothing is shown before its chain event", () => {
+    expect(createAppStore().getState().chainByWorld).toEqual({});
   });
 
   it("keeps a world's calls under that world, oldest first, each with its height", () => {
@@ -60,20 +57,19 @@ describe("the chain's slice", () => {
     ]);
   });
 
-  it("keeps the last 50 lines of a world and the last 20 deploys, the oldest out", () => {
+  it("keeps the last 50 lines of a world, the oldest out", () => {
     const store = createAppStore();
     store.getState().chainActions.heard(Array.from({ length: 70 }, (_, n) => call(n)));
-    store.getState().chainActions.heard(Array.from({ length: 30 }, (_, n) => deploy(1000 + n)));
     expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]).toHaveLength(50);
     expect(store.getState().chainByWorld[chainKey("onyx", "govdao")]?.[0]?.height).toBe(20);
-    expect(store.getState().deploys).toHaveLength(20);
-    expect(store.getState().deploys[0]?.height).toBe(1010);
   });
 
-  it("holds a deploy for the ticker and none in a world's lines, and a call in a world's lines and not the ticker", () => {
+  it("holds a call in a world's lines and no deploy, and changes nothing for a batch of deploys alone", () => {
     const store = createAppStore();
     store.getState().chainActions.heard([deploy(5), call(6)]);
-    expect(store.getState().deploys.map(({ height }) => height)).toEqual([5]);
+    const before = store.getState();
+    store.getState().chainActions.heard([deploy(7)]);
+    expect(store.getState()).toBe(before);
     expect(
       Object.values(store.getState().chainByWorld)
         .flat()
@@ -114,25 +110,6 @@ describe("the chain's slice", () => {
     expect(Object.keys(store.getState().chainByWorld)).toHaveLength(200);
     expect(store.getState().chainByWorld[chainKey("onyx", "w0")]?.map(({ height }) => height)).toEqual([0, 900]);
     expect(store.getState().chainByWorld[chainKey("onyx", "w200")]).toBeUndefined();
-  });
-
-  it("keeps a universe's count with its height, and a count at an older height does not replace a newer one", () => {
-    const store = createAppStore();
-    store.getState().chainActions.counted({ universe: "onyx", count: 17, height: 908297 });
-    store.getState().chainActions.counted({ universe: "onyx", count: 16, height: 908290 });
-    expect(store.getState().realmsDeployed["onyx"]).toEqual({ universe: "onyx", count: 17, height: 908297 });
-    store.getState().chainActions.counted({ universe: "onyx", count: 18, height: 908300 });
-    expect(store.getState().realmsDeployed["onyx"]?.count).toBe(18);
-    store.getState().chainActions.counted({ universe: "onyx", count: 19, height: 908300 });
-    expect(store.getState().realmsDeployed["onyx"]?.count).toBe(19);
-  });
-
-  it("leaves the ticker's deploys the very list it was when a batch holds no deploy", () => {
-    const store = createAppStore();
-    store.getState().chainActions.heard([deploy(5)]);
-    const before = store.getState().deploys;
-    store.getState().chainActions.heard([call(6)]);
-    expect(store.getState().deploys).toBe(before);
   });
 
   it("updates in one set for a batch: a subscriber is told once", () => {

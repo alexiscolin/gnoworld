@@ -43,8 +43,20 @@ describe("loadConfig", () => {
       chains: ["onyx-1", "gnoland-1"],
       origins: [],
       newAccountsPerHour: 5,
+      guests: { on: true, perVisitor: 10, perHour: 600, living: 5000 },
       moderation: { openaiKey: undefined, thresholds: {}, newAccountHours: 24, mute: MUTE },
+      cards: { enabled: false, readerUrl: undefined, thresholds: { sexual: 0.3 } },
+      explain: { seed: undefined, perDay: 30 },
     });
+  });
+
+  it("reads the explanations' seed file and daily cap, the cap from 1 to 1000", () => {
+    expect(loadConfig({ ...ENV, EXPLAIN_SEED_FILE: "/data/seed.json", EXPLAIN_PER_DAY: "5" }).explain).toEqual({
+      seed: "/data/seed.json",
+      perDay: 5,
+    });
+    for (const bad of ["0", "1001", "x"]) expect(() => loadConfig({ ...ENV, EXPLAIN_PER_DAY: bad })).toThrow();
+    expect(() => loadConfig({ ...ENV, EXPLAIN_SEED_FILE: "seed.json" })).toThrow();
   });
 
   it("reads the login's lists, each item as it is sent", () => {
@@ -345,6 +357,34 @@ describe("loadConfig", () => {
     expect(loadConfig(low).moderation.mute).toEqual({ strikes: 1, windowMinutes: 1, minutes: 1, max: 1 });
   });
 
+  it("reads the guest chat's switch, on by default, and its limits (D430, plan 3.3)", () => {
+    expect(loadConfig(ENV).guests).toEqual({ on: true, perVisitor: 10, perHour: 600, living: 5000 });
+    expect(loadConfig({ ...ENV, GUEST_CHAT: "on" }).guests.on).toBe(true);
+    expect(loadConfig({ ...ENV, GUEST_CHAT: "off" }).guests.on).toBe(false);
+    const env = { ...ENV, GUEST_NAMES_PER_VISITOR_HOUR: "3", GUEST_NAMES_PER_HOUR: "50", GUEST_LIVING: "100" };
+    expect(loadConfig(env).guests).toEqual({ on: true, perVisitor: 3, perHour: 50, living: 100 });
+  });
+
+  it("refuses a switch that is neither on nor off, naming the setting and never its value", () => {
+    for (const value of ["", "OFF", "0", "false", "no", "secret-value"]) {
+      const text = failure({ ...ENV, GUEST_CHAT: value });
+      expect(text).toContain("GUEST_CHAT");
+      expect(text).not.toContain("secret-value");
+    }
+  });
+
+  it.each(["GUEST_NAMES_PER_VISITOR_HOUR", "GUEST_NAMES_PER_HOUR", "GUEST_LIVING"])(
+    "refuses %s at zero, signed, padded, written with a point or past its ceiling, and takes its ceiling",
+    (name) => {
+      const ceiling =
+        { GUEST_NAMES_PER_VISITOR_HOUR: 1000, GUEST_NAMES_PER_HOUR: 10_000, GUEST_LIVING: 50_000 }[name] ?? 0;
+      for (const value of ["0", "-1", "+1", "01", "1.5", " 1", String(ceiling + 1)])
+        expect(failure({ ...ENV, [name]: value })).toContain(name);
+      expect(Object.values(loadConfig({ ...ENV, [name]: String(ceiling) }).guests)).toContain(ceiling);
+      expect(Object.values(loadConfig({ ...ENV, [name]: "1" }).guests)).toContain(1);
+    },
+  );
+
   it("takes a new account's hours from 1, and thresholds just above 0 and of exactly 1", () => {
     expect(loadConfig({ ...ENV, NEW_ACCOUNT_HOURS: "1" }).moderation.newAccountHours).toBe(1);
     expect(
@@ -505,18 +545,23 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090" }).jarvis).toEqual({
       on: false,
       url: "http://jarvis:8090",
-      timeoutMs: 1_500_000,
-      questionChars: 2000,
-      first: { quota: 20, quotaUnnamed: 5, unlimited: [] },
+      timeoutMs: 900_000,
+      questionChars: 500,
+      first: { quota: 30, quotaUnnamed: 30, unlimited: [] },
       namesRpc: "https://rpc.gno.land",
       namesChain: "gnoland-1",
     });
   });
 
   it("switches Jarvis on only for JARVIS=on exactly, off for anything else, never stopping the server (Alexis, off by default)", () => {
+    const JARVIS_DOOR_KEY_FILE = file("door-on", "d".repeat(32));
     const door = (value: string | undefined) =>
-      loadConfig({ ...ENV, JARVIS_URL: "http://jarvis:8090", ...(value === undefined ? {} : { JARVIS: value }) }).jarvis
-        ?.on;
+      loadConfig({
+        ...ENV,
+        JARVIS_URL: "http://jarvis:8090",
+        JARVIS_DOOR_KEY_FILE,
+        ...(value === undefined ? {} : { JARVIS: value }),
+      }).jarvis?.on;
     expect([undefined, "", "ON", "yes", "1", " on", "on "].map(door)).toEqual([
       false,
       false,
@@ -530,11 +575,51 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     expect(loadConfig({ ...ENV, JARVIS: "on" }).jarvis).toBeUndefined();
   });
 
+  // 10u-g2: the key the door proves itself to jarvis with, from a file, never printed.
+  describe("the door's key", () => {
+    const URL = { ...ENV, JARVIS_URL: "http://jarvis:8090" };
+    const DOOR = `d${"0".repeat(31)}`;
+
+    it("reads the key from its file without its newline, into a value that never prints", () => {
+      const key = loadConfig({ ...URL, JARVIS_DOOR_KEY_FILE: file("door-read", `${DOOR}\n`) }).jarvis?.key;
+      expect(key?.reveal()).toBe(DOOR);
+      expect(inspect(key) + JSON.stringify(key)).not.toContain(DOOR);
+    });
+
+    it("has none while off with no file", () => {
+      expect(loadConfig(URL).jarvis?.key).toBeUndefined();
+    });
+
+    it("refuses to start on without the file, naming the setting", () => {
+      expect(failure({ ...URL, JARVIS: "on" })).toMatch(/^Error: setting JARVIS_DOOR_KEY_FILE: required/);
+    });
+
+    it.each([
+      ["a file that does not exist", "/nonexistent/door", /unreadable/],
+      ["a key of 31 bytes", file("door-31", "k".repeat(31)), /too_short/],
+      ["an empty file", file("door-none", ""), /too_short/],
+    ])("refuses %s, off or on, never printing a key", (_case, path, message) => {
+      for (const JARVIS of ["on", "off"]) {
+        expect(failure({ ...URL, JARVIS, JARVIS_DOOR_KEY_FILE: path })).toMatch(message);
+      }
+    });
+
+    it("takes a key of 32 bytes, the shortest", () => {
+      const env = { ...URL, JARVIS: "on", JARVIS_DOOR_KEY_FILE: file("door-32", "k".repeat(32)) };
+      expect(loadConfig(env).jarvis?.on).toBe(true);
+    });
+
+    it("stops the server for a key file named with no jarvis address", () => {
+      expect(failure({ ...ENV, JARVIS_DOOR_KEY_FILE: file("door-orphan", DOOR) })).toContain("JARVIS_URL");
+    });
+  });
+
   it("reads every door setting it is given, the widest each allows", () => {
     const env = {
       ...ENV,
       JARVIS_URL: "https://jarvis.internal:8443",
-      JARVIS_TIMEOUT_S: "3600",
+      JARVIS_DOOR_KEY_FILE: file("door-wide", "d".repeat(32)),
+      JARVIS_TIMEOUT_S: "900",
       JARVIS_QUESTION_CHARS: "8000",
       JARVIS_QUOTA: "1000",
       JARVIS_QUOTA_UNNAMED: "1",
@@ -542,10 +627,12 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
       JARVIS_NAMES_RPC: "https://rpc.test5.gno.land",
       JARVIS_NAMES_CHAIN: `test5.${"x".repeat(44)}`,
     };
-    expect(loadConfig({ ...env, JARVIS: "on" }).jarvis).toEqual({
+    const { key, ...door } = loadConfig({ ...env, JARVIS: "on" }).jarvis ?? {};
+    expect(key?.reveal()).toBe("d".repeat(32));
+    expect(door).toEqual({
       on: true,
       url: "https://jarvis.internal:8443",
-      timeoutMs: 3_600_000,
+      timeoutMs: 900_000,
       questionChars: 8000,
       first: { quota: 1000, quotaUnnamed: 1, unlimited: [ANNA, BEN] },
       namesRpc: "https://rpc.test5.gno.land",
@@ -560,7 +647,7 @@ describe("loadConfig, Jarvis's door and the admin API", () => {
     ["JARVIS_URL", "http://jarvis:8090/ask"],
     ["JARVIS_URL", "ftp://jarvis"],
     ["JARVIS_TIMEOUT_S", "0"],
-    ["JARVIS_TIMEOUT_S", "3601"],
+    ["JARVIS_TIMEOUT_S", "901"],
     ["JARVIS_QUESTION_CHARS", "8001"],
     ["JARVIS_QUOTA", "0"],
     ["JARVIS_QUOTA", "1001"],

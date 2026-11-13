@@ -4,7 +4,7 @@ import styles from "./Icon.module.css";
 export type IconName = keyof typeof GLYPHS;
 export interface IconProps {
   name: IconName;
-  size?: "m" | "l";
+  size?: "s" | "m" | "l";
 }
 
 // The icons that point along the text: they turn right to left (docs/DESIGN-SYSTEM.md, "Icons").

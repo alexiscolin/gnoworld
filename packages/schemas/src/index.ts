@@ -10,6 +10,7 @@ export {
   EarthRooms,
   Ecosystems,
   EMBED_PREFIXES,
+  holdsHidden,
   Events,
   Genres,
   Hubs,
@@ -19,19 +20,27 @@ export {
   Universes,
 } from "./data.ts";
 export { Expedition, Quests } from "./discovery.ts";
-export { OnAir, XPosts } from "./feeds.ts";
+export { BlogPost, OnAir } from "./feeds.ts";
 export { CallRequest } from "./call.ts";
+export { AnyChainId, ChainId, isRealmPath } from "./realmPath.ts";
+export { jsonOfBytes, strictUtf8 } from "./utf8.ts";
+export { CALL_DETAIL_CAPS, CallDetail, CallHash, CallIndex, callAddress, indexerHash } from "./callDetail.ts";
+export { CARD_CAPS, CardEvent, CardRemove, LineCards, LinkCard, ReaderCard } from "./cards.ts";
+// The one rule for hidden (Cc, Cf) characters, which the link reader applies to a page's text.
+export { stripHidden } from "./hidden.ts";
 export { QueryAnswer, StatusAnswer } from "./chain.ts";
 export { Day } from "./day.ts";
 // The chain events' schemas are values at "@gnoworld/schemas/chainEvents" (a page loads them on its first event, in a chunk of its own); here, the types.
 export type { ChainEvent, RealmsDeployed } from "./chainEvents.ts";
 export {
+  ASK_WAIT_S,
   AnswerButton,
   Digest,
   DigestBlock,
   DOOR_CAPS,
-  JARVIS_CAPS,
+  EXPLAIN_VERSION,
   JARVIS_LINES,
+  JARVIS_KEY_HEADER,
   JARVIS_PATHS,
   JarvisAnswer,
   JarvisAsk,
@@ -43,19 +52,33 @@ export {
   JarvisDigestRequest,
   JARVIS_LANGUAGES,
   JarvisMadeDigest,
+  JarvisPaidAnswer,
   JarvisQuestion,
   JarvisSettings,
+  JarvisState,
   JarvisTranslate,
-  JarvisTranslateRequest,
   JarvisTranslation,
   ProposedAction,
   TRANSLATION_CAPS,
 } from "./jarvis.ts";
-export { CreateRoom, MadeRoom, RoomId, RoomList, RoomName, RoomType } from "./rooms.ts";
+export { JARVIS_EXAMPLES, jarvisExamples } from "./jarvisExamples.ts";
+export { CreateRoom, MadeRoom, RealmRoomRequest, RoomId, RoomList, RoomName } from "./rooms.ts";
 export { MARKET_SYMBOLS, MarketBlock, MarketToken, Markets } from "./markets.ts";
 export { PinId, PinList, PinnedLine, PinRequest, PINS_MAX, Time } from "./pins.ts";
+export {
+  SEARCH_PAGE,
+  SEARCH_Q_MAX,
+  SEARCH_Q_MIN,
+  SEARCH_SNIPPET,
+  SearchHit,
+  SearchPage,
+  SearchQuery,
+} from "./search.ts";
+export { Unread, UnreadPlaces, UNREAD_COUNT_MOST, UNREAD_PLACES_MOST } from "./unread.ts";
 export { ChartAnswer, ChartRequest, Signal } from "./signals.ts";
-export { Key, Slug } from "./slug.ts";
+export { Key } from "./slug.ts";
+export { Guest, GuestCause, GuestRefusal, GuestSaid, GuestSayRequest } from "./guest.ts";
+export { LineTranslations, TRANSLATIONS_ASKED, TRANSLATIONS_WAIT_MS, TranslationEvent } from "./translations.ts";
 export { LineVerdicts, StreamEvent, StreamSince, VerdictId, VERDICTS_ASKED } from "./stream.ts";
 export { Challenge, ChallengeRequest, Me, Nonce, Proof, Ticket, TicketRequest, VerifyRequest } from "./login.ts";
 // The worlds' count (7n2), which the home's hero reads, in the barrel and so in the store's chunk: its head is the worlds' file's too (behind
@@ -78,3 +101,16 @@ export const ApiError = z.object({
   ]),
 });
 export type ApiError = z.infer<typeof ApiError>;
+export {
+  EXPLAIN_CAPS,
+  Explanation,
+  ExplainKind,
+  ExplainSeed,
+  JarvisExplained,
+  JarvisExplainRequest,
+  REALM_EXPLAIN_VERSION,
+  REALM_TAGS,
+  RealmExplanation,
+  tagsOf,
+  type RealmTag,
+} from "./explain.ts";

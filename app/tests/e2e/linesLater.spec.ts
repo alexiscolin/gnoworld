@@ -1,4 +1,4 @@
-import { lines, word } from "./chat.ts";
+import { beforeTheList, lines, word } from "./chat.ts";
 import { expect, test } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, opened } from "./scripted.ts";
@@ -36,14 +36,10 @@ test.describe("the lines view, loaded after the page", () => {
     await expect(list).toHaveAttribute("aria-busy", "true");
     await expect(form.getByRole("textbox", { name: "Message #games" })).toBeVisible();
     await expect(lines(page)).toHaveCount(0);
-    // Nothing waits for the lines: Tab from the last control before them (the rooms' column ends with Saved) skips the
-    // list's place for the quick actions (5q), then the composer.
-    await page.getByRole("button", { name: "Saved" }).focus();
+    // Nothing waits for the lines: Tab from the last control before them (the separator that resizes the rooms' column) skips
+    // the list's place and reaches the composer.
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
-    await expect(page.getByRole("button", { name: "Who's here" })).toBeFocused();
-    // The quick actions are a row of five since 5a1e8335 (frame 104): the keys pass the rest of it, then the composer.
-    for (let presses = 0; presses < 6 && (await form.locator(":focus").count()) === 0; presses += 1)
-      await page.keyboard.press("Tab");
     await expect(form.locator(":focus")).toHaveCount(1);
     release();
     await expect(lines(page)).toHaveCount(2);

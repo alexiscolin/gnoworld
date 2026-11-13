@@ -7,7 +7,7 @@ import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { LOGIN_TABLES } from "../login/login.ts";
 import type { Rules } from "../roles/roles.ts";
-import { accountKey, checkAgain, makeChecker, VERDICT_TABLES } from "./check.ts";
+import { accountKey, checkAgain, makeChecker, VERDICT_TABLES, withBreaker } from "./check.ts";
 import { answer } from "../testing/answers.ts";
 import { makeQueue } from "./queue.ts";
 import type { Answer } from "./provider.ts";
@@ -43,16 +43,22 @@ const setup = (provider: (text: string) => Promise<Answer | "unchecked">, thresh
   const clock = { now: T0 };
   const asked: string[] = [];
   const lines: string[] = [];
-  const check = makeChecker({
-    db,
-    rulesOf: (room) => (room === "#bubble" ? RULES : undefined),
-    provider: (text) => {
+  const log = logger(PEPPER, (line) => lines.push(line));
+  // The breaker is the server's one, made around the provider before the check sees it (checker.ts's providerOf).
+  const behind = withBreaker(
+    (text) => {
       asked.push(text);
       return provider(text);
     },
+    { now: () => clock.now, log },
+  );
+  const check = makeChecker({
+    db,
+    rulesOf: (room) => (room === "#bubble" ? RULES : undefined),
+    provider: behind,
     thresholds,
     pepper: PEPPER,
-    log: logger(PEPPER, (line) => lines.push(line)),
+    log,
     now: () => clock.now,
   });
   const rows = () => z.array(Row).parse(db.prepare("SELECT * FROM verdicts ORDER BY msgid").all());

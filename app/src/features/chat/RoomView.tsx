@@ -10,9 +10,11 @@ import { lazy, Suspense, use, type ReactNode } from "react";
 import type { ErgoState } from "../../lib/ergo/ergo.ts";
 import type { RoomKeeping, RoomPins } from "./RoomKeeping.ts";
 import { ChainCallsContext, ChainPlaceContext } from "./chainThread.ts";
+import { useJarvisItems } from "../../jarvisHere.ts";
 import type { LinesProps } from "./Lines.tsx";
 import styles from "./RoomView.module.css";
 import { chunked } from "./Failing.tsx";
+import { NO_ROOM_YET } from "./loginWords.ts";
 
 // The lines view (the lines, what is under them, a line's bar) is asked once the room holds a line: lines come over the
 // WebSocket after the page is drawn, so its code is never the first screen's (ADR-0001 §12; docs/decisions.md,
@@ -22,7 +24,14 @@ const Lines = lazy(async () => ({ default: (await import("./Lines.tsx")).Lines }
 const PinBar = lazy(async () => ({ default: (await import("./PinBar.tsx")).PinBar }));
 // Who is typing is asked once someone is: a room where nobody types draws only its one empty line, kept so the composer never
 // moves, and the first screen does not carry the names' code (ADR-0001 §12).
-const NOBODY = <p className={styles["typing"]} />;
+const NOBODY = <p className={["meta", styles["typing"]].join(" ")} />;
+
+/** What a chat says in its room's place when the place has no room yet, a visitor's and an account's alike. */
+export const NoRoomYet = () => (
+  <p role="status" className={styles["lead"]}>
+    {NO_ROOM_YET}
+  </p>
+);
 const Typists = chunked(async () => ({ default: (await import("./Typists.tsx")).Typists }), {
   waiting: NOBODY,
   failed: NOBODY,
@@ -40,7 +49,8 @@ function RoomLines(props: LinesProps) {
   // A room the chain told a call of holds one item at least, as a card of its thread among no message.
   const place = use(ChainPlaceContext);
   const told = place !== undefined && props.room === `#${place.slug}` && use(ChainCallsContext).length > 0;
-  return props.lines.length === 0 && !told ? (
+  const asked = useJarvisItems(props.room, props.me).length > 0;
+  return props.lines.length === 0 && !told && !asked ? (
     waiting(false)
   ) : (
     <Suspense fallback={waiting(true)}>
@@ -140,7 +150,7 @@ export function RoomView(props: RoomViewProps) {
   const { lines = [], members = [], refused, typing, read, paged, reactions, cannotReact } = state ?? {};
   const connected = chat === "connected";
   return (
-    <div className={styles["main"]}>
+    <div className={styles["main"]} data-chat-state={chat}>
       <Lead status={connected ? null : NOTICES[chat]} />
       <PinsAbove key={`${String(room)} pins`} pins={pins} />
       <RoomLines

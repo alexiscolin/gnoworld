@@ -1,0 +1,37 @@
+/* The chat's skeleton (Loading.tsx): a column at the chat's own inset, its bars of a few widths. */
+@layer components {
+  .chat {
+    box-sizing: border-box;
+    padding: var(--space-m) var(--chat-inset);
+    /* raw: its shapes stand at once, not after the skeleton's 300 ms wait */
+    --motion-wait: 0s;
+  }
+
+  .chip,
+  .short,
+  .mid,
+  .long,
+  .full {
+    display: block;
+  }
+
+  .chip {
+    inline-size: var(--space-2xl);
+  }
+
+  .short {
+    inline-size: 30%;
+  }
+
+  .mid {
+    inline-size: 50%;
+  }
+
+  .long {
+    inline-size: 75%;
+  }
+
+  .full {
+    inline-size: 92%;
+  }
+}

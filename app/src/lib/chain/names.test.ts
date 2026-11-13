@@ -49,6 +49,15 @@ describe("readName", () => {
     expect(expressions()).toEqual([DELETED]);
   });
 
+  // C14 of the review: a room's members are read together, so the block is asked once a chain, not once an account.
+  it("takes the block it is given and asks the node for none, the name read at it", async () => {
+    const { fetcher, expressions } = node({ [DELETED]: "(false bool)", [NAME]: '("aeddi" string)' });
+    const read = await readName(RPC, { ...on, height: 55000 }, options(fetcher));
+    expect(read).toMatchObject({ ok: true, value: { name: "aeddi", height: 55000 } });
+    expect(fetcher.mock.calls.filter(([url]) => url.endsWith("/status"))).toEqual([]);
+    expect(expressions()).toEqual([DELETED, NAME]);
+  });
+
   it("is a failure, never a no-name, when the node does not answer: the account's name is unknown", async () => {
     const fetcher = vi.fn<ChainFetch>(() => Promise.reject(new TypeError("offline")));
     const read = await readName(RPC, on, options(fetcher));

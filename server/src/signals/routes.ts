@@ -3,12 +3,10 @@
 // order is the origin, the session, the account's count, then the body and the world, so authorization stands before any
 // work and every call of an account is counted, a refused one too (D211, D216): 20 an hour. The winner's signal is told
 // once on the stream, never the answer's word alone.
-import { ChartRequest, type Address, type ApiError, type ChartAnswer, type Signal } from "@gnoworld/schemas";
-import { type Context, Hono } from "hono";
-import { getCookie } from "hono/cookie";
-import { routePath } from "hono/route";
+import { ChartRequest, type Address, type ChartAnswer, type Signal } from "@gnoworld/schemas";
+import { Hono } from "hono";
 import type { Log } from "@gnoworld/service/log";
-import { guard, json, type Guarded } from "../guard.ts";
+import { baseRefusals, guard, json, refuserOf, sessionOf, type Refusals, type Guarded } from "../guard.ts";
 import type { Roles } from "../roles/roles.ts";
 import { limiter } from "../limit.ts";
 import type { Signals } from "./signals.ts";
@@ -32,13 +30,9 @@ interface Options {
 }
 
 const refusals = {
-  origin: ["forbidden", 403],
-  type: ["unsupported", 415],
-  session: ["unauthenticated", 401],
-  body: ["refused", 400],
-  limit: ["too_many", 429],
+  ...baseRefusals,
   not_found: ["not_found", 404],
-} as const satisfies Record<string, readonly [ApiError["error"], 400 | 401 | 403 | 404 | 415 | 429]>;
+} as const satisfies Refusals;
 
 export function signalRoutes({
   signals,
@@ -51,16 +45,12 @@ export function signalRoutes({
   chartable,
 }: Options): Hono<Guarded> {
   const calls = limiter({ max: CALLS_PER_HOUR, windowMs: 60 * 60_000, keys: 100_000 });
-  const refuse = (c: Context, cause: keyof typeof refusals): Response => {
-    const [error, status] = refusals[cause];
-    log("signal_refused", { route: routePath(c), status, error: cause });
-    return c.json({ error } satisfies ApiError, status);
-  };
+  const refuse = refuserOf(log, "signal_refused", refusals);
   const app = new Hono<Guarded>();
   app.use(guard(origins, refuse));
 
   app.post("/chart", async (c) => {
-    const who = session(getCookie(c, "__Host-session"));
+    const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
     if (!calls.take(who, now())) return refuse(c, "limit");
     const body = ChartRequest.safeParse(await json(c));

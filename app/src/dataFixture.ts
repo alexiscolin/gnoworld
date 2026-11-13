@@ -44,7 +44,6 @@ const GOOD: Files = {
   "earthOrbit.json": [{ name: "gnosh.ai", url: "https://gnosh.ai" }],
   "earthRooms.json": [{ room: "#earth/lisbon", lat: 38.7, lon: -9.1 }],
   "news.json": [{ id: "n1", title: "News", date: "2026-10-29", link: "https://gno.land/" }],
-  "xPosts.json": [],
   "onAir.json": [],
 };
 

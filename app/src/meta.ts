@@ -41,14 +41,9 @@ export function ecosystemMeta(ecosystem: Ecosystem | undefined): MetaDescriptor[
   });
 }
 
-/** The list of places lives at /list in every universe: it has no place of its own in the data. */
+/** /list goes to the home with the search palette open (D355): a page that is no place, never indexed. */
 export function listMeta(): MetaDescriptor[] {
-  return pageMeta({
-    title: "Places · gno.world",
-    description: `Every place of ${HUB}, to filter by genre.`,
-    path: "/list",
-    testnet: false,
-  });
+  return unindexed("Places");
 }
 
 /** A universe's page that no universe answers to. */

@@ -1,10 +1,11 @@
 // The server's settings, from the environment, checked at start (ADR-0002 §7): a secret only ever
 // comes from the file a *_FILE setting names, and an error names the setting, never its value.
 import { jsonOf } from "@gnoworld/core";
-import { Key } from "@gnoworld/schemas";
+import { ChainId, Key } from "@gnoworld/schemas";
 import { isIP } from "node:net";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
+import { cardSettings, cardsConfigOf, cardsNeedReader, type CardsConfig } from "./cards/settings.ts";
 import { adminOf, apartFromPublic, doorOf, doorSettings, type AdminConfig, type DoorConfig } from "./door/settings.ts";
 import type { Thresholds } from "./moderation/decide.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
@@ -32,6 +33,8 @@ export interface Config {
   chains: string[];
   origins: string[];
   newAccountsPerHour: number;
+  // The guest chat (D430): its switch, and the new names an hour a visitor and in all, and the guests living at once (plan 3.3).
+  guests: { on: boolean; perVisitor: number; perHour: number; living: number };
   // The worlds that can be first charted (D218): every world when none is named.
   firstToChart: ReadonlySet<string> | undefined;
   authSocket: string | undefined;
@@ -60,6 +63,10 @@ export interface Config {
   jarvis: DoorConfig | undefined;
   // The admin API's own listener (ADR-0002 §6): none without its port.
   admin: AdminConfig | undefined;
+  // The realms' two-sentence explanations: a seed file read at the start, none by default, and the new ones Jarvis may make a day.
+  explain: { seed: string | undefined; perDay: number };
+  // Link cards (slice 13, D13906): a kill switch, off by default, with the link reader's address; the thresholds a card is held to.
+  cards: CardsConfig;
 }
 
 // Built at each read, not at import: StrykerJS can only turn on a mutant that runs inside a test (F412).
@@ -81,7 +88,7 @@ const settingsSchema = () =>
         .string()
         .default("onyx-1,gnoland-1")
         .transform((list) => list.split(","))
-        .pipe(z.array(z.string().regex(/^[a-z0-9][a-z0-9.-]{0,49}$/))),
+        .pipe(z.array(z.string().refine((chain) => ChainId.safeParse(chain).success))),
       // The sites a POST may come from (CSRF); none by default, so every POST is refused until set.
       ORIGINS: list(z.string().refine(isOrigin)),
       NEW_ACCOUNTS_PER_HOUR: z
@@ -90,6 +97,11 @@ const settingsSchema = () =>
         .transform(Number)
         .pipe(z.number().max(1000))
         .default(5),
+      // GUEST_CHAT=off puts the site back to read-only guests (plan section 8): both guest routes answer 404, nothing is relayed.
+      GUEST_CHAT: z.enum(["on", "off"]).default("on"),
+      GUEST_NAMES_PER_VISITOR_HOUR: whole(1000, 10),
+      GUEST_NAMES_PER_HOUR: whole(10_000, 600),
+      GUEST_LIVING: whole(50_000, 5000),
       // The worlds that can be first charted (D218): unset, every world (D210); else slugs, at least one.
       FIRST_TO_CHART_WORLDS: z
         .string()
@@ -121,6 +133,8 @@ const settingsSchema = () =>
       // The preview job's file (8f), written like MARKETS_FILE: the default universe's hubs' pages, each checked before it is written.
       PREVIEWS_FILE: absolute.optional(),
       UNIVERSES_FILE: absolute.optional(),
+      EXPLAIN_SEED_FILE: absolute.optional(),
+      EXPLAIN_PER_DAY: whole(1000, 30),
       HUBS_FILE: absolute.optional(),
       OPENAI_API_KEY_FILE: z.string().min(1).optional(),
       // A score that hides a category in place of OpenAI's own flag, by category: {"harassment": 0.9}.
@@ -144,9 +158,11 @@ const settingsSchema = () =>
       MUTE_MINUTES: whole(10_080, 5),
       // Ergo's ban list holds 100 a room (3b's table): the mutes leave the moderators their share of it.
       MUTE_MAX: whole(100, 50),
+      ...cardSettings(),
       ...doorSettings(),
     })
-    .superRefine(apartFromPublic);
+    .superRefine(apartFromPublic)
+    .superRefine(cardsNeedReader);
 
 export function loadConfig(env: Record<string, string | undefined>): Config {
   const settings = parseSettings(settingsSchema(), env);
@@ -165,6 +181,12 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     chains: CHAINS,
     origins: ORIGINS,
     newAccountsPerHour: NEW_ACCOUNTS_PER_HOUR,
+    guests: {
+      on: settings.GUEST_CHAT === "on",
+      perVisitor: settings.GUEST_NAMES_PER_VISITOR_HOUR,
+      perHour: settings.GUEST_NAMES_PER_HOUR,
+      living: settings.GUEST_LIVING,
+    },
     firstToChart: settings.FIRST_TO_CHART_WORLDS === undefined ? undefined : new Set(settings.FIRST_TO_CHART_WORLDS),
     authSocket: AUTH_SOCKET,
     ergo: ergoOf(env, { host: ERGO_HOST, port: ERGO_PORT, passwordFile: ERGO_OPER_PASSWORD_FILE }),
@@ -183,8 +205,10 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       newAccountHours: NEW_ACCOUNT_HOURS,
       mute: { strikes: MUTE_STRIKES, windowMinutes: MUTE_WINDOW_MINUTES, minutes: MUTE_MINUTES, max: MUTE_MAX },
     },
+    explain: { seed: settings.EXPLAIN_SEED_FILE, perDay: settings.EXPLAIN_PER_DAY },
     jarvis: doorOf(env, settings),
     admin: adminOf(env, settings),
+    cards: cardsConfigOf(settings, MODERATION_THRESHOLDS),
   };
 }
 

@@ -1,12 +1,177 @@
-/* A realm's view (5h): where the page was read, in the page's own small type. */
+/* A realm's page in its plate: the window it scrolls in, the page's look in it (the proposal's .md), and the boxes of Try it. */
 @layer components {
-  /* The top centre's slot stays free above the view's first line (tokens.css, --banner-room). */
-  .view {
-    padding-block-start: var(--banner-room);
+  /* The page's window: as tall as its page, up to a height that is taller on a wide plate or once the card is expanded, shorter on a narrow one
+     (Alexis, 2026-11-10: a short page leaves no empty window); past it, its foot fades into the card till it is scrolled to the end, and a
+     wheel at either end goes on to the plate (RealmPageCard.tsx). */
+  .window {
+    max-block-size: var(--web-h);
+    overflow: auto;
+    transition: max-block-size calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
   }
 
-  .meta {
+  /* The foot's fade: a strip stuck to the window's foot, into the hub card's fill, that eases to nothing
+     as the page is scrolled to its end. */
+  .window::after {
+    content: "";
+    position: sticky;
+    inset-block-end: 0;
+    display: block;
+    /* raw: the last 32 px fade into the card, the same length as the app's scroll rows */
+    block-size: 2rem;
+    /* layout: the strip lies over the foot of the page, taking no room */
+    margin-block-start: -2rem;
+    background: linear-gradient(to bottom, transparent, var(--color-card));
+    pointer-events: none;
+    transition: opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .window[data-end]::after {
+    opacity: 0;
+  }
+
+  @container plate (min-width: 62.5rem) {
+    .window {
+      max-block-size: var(--web-h-l);
+    }
+  }
+
+  @container plate (max-width: 37.5rem) {
+    .window {
+      max-block-size: var(--web-h-s);
+    }
+  }
+
+  /* A call card opened inside the page (a form's Call) is never cut: the window grows to hold it. */
+  .window:has(article article) {
+    max-block-size: none;
+  }
+
+  .window[data-open] {
+    /* raw: the open card fills the pane (Room's --plate-room), less its header's and margins' room, 8 rem */
+    max-block-size: max(var(--web-h-l), calc(var(--plate-room, 0px) - 8rem));
+  }
+
+  /* The page's own blocks, in the proposal's reading type: a column at 14 px over 1.65, titles that step down, links in the world's light, the
+     notice as a tinted block with a bar. These sit over RealmBlocks' (the chat's previews keep theirs). */
+  .window article {
+    --color-link: var(--world-light);
+
+    /* raw: the proposal's reading colour, the text at 88 % */
+    color: color-mix(in oklab, var(--color-text) 88%, transparent);
+    /* raw: the proposal's page type, 14 px over 1.65 (--font-body is over 1.5) */
+    font: 400 0.875rem/1.65 var(--family-sans);
+  }
+
+  .window article h1 {
+    color: var(--color-text);
+    /* raw: the proposal's page title */
+    font: 600 1.625rem/1.2 var(--family-sans);
+    letter-spacing: -0.02em;
+  }
+
+  .window article h2 {
+    color: var(--color-text);
+    /* raw: the proposal's section title */
+    font: 600 1.1875rem/1.3 var(--family-sans);
+  }
+
+  .window article h3 {
+    color: var(--color-text);
+    /* raw: the proposal's sub-section title */
+    font: 600 0.9375rem/1.3 var(--family-sans);
+  }
+
+  .window article > :is(h1, h2, h3, h4, h5, h6):not(:first-child) {
+    /* layout: the proposal puts every title one 16 px step under what comes before, no air of its own (RealmBlocks gives the chat's) */
+    margin-block-start: 0;
+  }
+
+  .window article :is(ul, ol) {
+    /* layout: the proposal's lists sit in the page's 16 px step like any block */
+    margin-block: 0;
+  }
+
+  .window article :is(li + li, aside p + p) {
+    /* layout: a hair between the items of a list, which the page's flow does not space */
+    margin-block-start: var(--space-2xs);
+  }
+
+  .window article a {
+    color: var(--world-light);
+    text-decoration: underline;
+    /* raw: the proposal's underline, 3 px under the words */
+    text-underline-offset: 3px;
+  }
+
+  .window article code {
+    color: var(--color-text);
+  }
+
+  .window article em {
     color: var(--color-text-muted);
-    font: var(--font-meta);
+  }
+
+  .window article :is(blockquote, aside) {
+    padding: var(--space-xs) var(--space-s);
+    border: 0;
+    border-radius: var(--radius-m);
+  }
+
+  .window article blockquote {
+    background: var(--color-fill);
+    /* raw: the proposal's 3 px bar at the quote's start */
+    box-shadow: inset calc(3px * var(--dir)) 0 0 var(--color-line-strong);
+    color: inherit;
+  }
+
+  .window article aside {
+    background: var(--color-mine-soft);
+    /* raw: the proposal's 3 px bar at the notice's start */
+    box-shadow: inset calc(3px * var(--dir)) 0 0 var(--color-mine);
+    /* raw: the proposal's notice type, 13.5 px */
+    font-size: 0.84375rem;
+  }
+
+  .window article aside[data-severity="caution"] {
+    background: var(--color-signal-soft);
+    /* raw: the proposal's 3 px bar at the caution's start */
+    box-shadow: inset calc(3px * var(--dir)) 0 0 var(--color-signal);
+  }
+
+  .window article aside > svg {
+    display: none;
+  }
+
+  .window article aside > div {
+    display: block;
+  }
+
+  .window article aside p:first-child {
+    color: var(--color-text);
+  }
+
+  .window article table {
+    /* raw: the proposal's table type, 13 px */
+    font-size: 0.8125rem;
+  }
+
+  .window article td,
+  .window article th {
+    padding: var(--space-2xs) var(--space-xs);
+    border-block: 0;
+    border-block-start: var(--line-width) solid var(--color-line);
+    font-weight: 400;
+  }
+
+  .window article th {
+    border-block-start: 0;
+    box-shadow: 0 var(--line-width) 0 var(--color-line-strong);
+    color: var(--color-text);
+    font-weight: 500;
+    white-space: normal;
+  }
+
+  .window article tbody tr:nth-child(even) {
+    background: none;
   }
 }

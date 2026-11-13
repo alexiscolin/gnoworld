@@ -1,0 +1,187 @@
+// The camera's rig (D401, docs/plans/dive.md): it alone moves the view. A flight or the reader's hand change its pose; the lens
+// shift slides a page's planet into the page's circle (sine.inOut 1.7 s in, 0.8 s out); it stands the camera at the eye.
+import { Vector3, type PerspectiveCamera } from "three";
+import { Flight, type Goal } from "./flight.ts";
+import { Free, type Reach } from "./free.ts";
+import { blankPose, copySpot, eyeOf, spot } from "./pose.ts";
+
+export type { Goal } from "./flight.ts";
+
+/** The screen, in the page's pixels. */
+interface Screen {
+  readonly width: number;
+  readonly height: number;
+}
+
+const SHIFT_IN_S = 1.7;
+const SHIFT_OUT_S = 0.8;
+const NO_SHIFT = { x: 0, y: 0 };
+const sineInOut = (t: number): number => -(Math.cos(Math.PI * t) - 1) / 2;
+const LONGEST_STEP_MS = 50;
+/** How near and how far the eye may stand from what it looks at, for the demo's universe. */
+export const REACH: Reach = { near: 0.2, far: 9000 };
+
+export class Rig {
+  /** Where the camera is: what it looks at, how far, from where. */
+  readonly pose = blankPose();
+  /** The eye on the stage, this frame. */
+  readonly eye = spot();
+  readonly free = new Free();
+  /** How near and far the hand may bring the eye. */
+  reach: Reach = REACH;
+  /** How fast the stage seems to move: the eye's way over its distance to what it looks at, a second. */
+  speed = 0;
+  /** The flights' length, the reader's tuning (1, the demo's). */
+  /** Whether a page's body is what the view looks at: the wheel leaves it be. */
+  page = false;
+  readonly #ray = new Vector3();
+  #flight: Flight | undefined;
+  #placed = false;
+  readonly #was = spot();
+  // The lens shift, in pixels: where its glide began, where it goes, and the share of the way (0 to 1) it has gone. A new place to go to
+  // always glides from the shift shown now, never jumps (a page's circle that changes while the planet is already in one).
+  readonly #from = { x: 0, y: 0 };
+  readonly #to = { x: 0, y: 0 };
+  readonly #now = { x: 0, y: 0 };
+  #share = 0;
+  #shareTime = 1;
+  #shareSeconds = 1;
+  // Where the flight the slide rides was when it was asked; -1, none.
+  #rideFrom = -1;
+
+  /** Whether a pose was ever given: none till the first view comes. */
+  get placed(): boolean {
+    return this.#placed;
+  }
+
+  /** Whether a flight runs. */
+  get flying(): boolean {
+    return this.#flight !== undefined;
+  }
+
+  /** How far the flight that runs has gone, eased, 0 to 1; 1 with none. */
+  get along(): number {
+    return this.#flight?.along ?? 1;
+  }
+
+  /** Whether the view moves by a flight, the hand or the lens: owes a frame each frame. The slow turn at rest does not: it runs at the
+   * loop's own rate for scenery. */
+
+  /** Stands the camera at `goal` at once (its first view, or under reduced motion). */
+  jump(goal: Goal): void {
+    if (!goal.pose(this.pose)) return;
+    this.#flight = undefined;
+    this.#placed = true;
+    eyeOf(this.pose, this.#was);
+    goal.near?.();
+    goal.landed?.();
+  }
+
+  /** Flies to `goal` from where the camera is, at speed if it already moves; at once where it never stood. */
+  fly(goal: Goal): void {
+    if (!this.#placed) {
+      this.jump(goal);
+      return;
+    }
+    const moving = this.#flight !== undefined || this.free.moving;
+    this.free.stop();
+    // A slide that rode the flight cut short goes on riding the new one, from the shift shown now: its share never jumps with the swap.
+    const riding = this.#rideFrom >= 0;
+    this.#flight = new Flight(this.pose, goal, { moving });
+    if (riding) this.#slideTo(this.#to, this.#shareSeconds === SHIFT_IN_S, false);
+  }
+
+  /** The lens shift that puts the screen's middle on a page's circle, `shift` pixels, sliding in; none, sliding out. While a flight runs
+   * the slide rides it, ending as it lands, never after; with none it slides over a moment, or at once where `still`. */
+  lens(shift: { readonly x: number; readonly y: number } | undefined, still = false): void {
+    const to = shift ?? NO_SHIFT;
+    if (to.x !== this.#to.x || to.y !== this.#to.y) this.#slideTo(to, shift !== undefined, still);
+  }
+
+  // The lens shift shown now.
+  get #shown(): { x: number; y: number } {
+    const [from, to, share] = [this.#from, this.#to, this.#share];
+    [this.#now.x, this.#now.y] = [from.x + (to.x - from.x) * share, from.y + (to.y - from.y) * share];
+    return this.#now;
+  }
+
+  // Starts the lens's slide to `to`, from the shift shown now: riding the flight that runs, at once where `still`, else over its moment.
+  #slideTo(to: { readonly x: number; readonly y: number }, into: boolean, still: boolean): void {
+    const along = still ? undefined : this.#flight?.along;
+    Object.assign(this.#from, this.#shown);
+    Object.assign(this.#to, to);
+    this.#rideFrom = along ?? -1;
+    this.#shareTime = along === undefined && !still ? 0 : 1;
+    this.#shareSeconds = into ? SHIFT_IN_S : SHIFT_OUT_S;
+    this.#share = still ? 1 : 0;
+  }
+
+  /** `delta` ms on, `still` under reduced motion. */
+  advance(delta: number, still: boolean, real = delta): void {
+    const step = Math.min(delta, LONGEST_STEP_MS);
+    const flight = this.#flight;
+    if (flight?.advance(step, still, this.pose) === true) {
+      this.#flight = undefined;
+      flight.goal.landed?.();
+    } else if (flight === undefined) this.free.advance(step, still, { pose: this.pose, reach: this.reach, real });
+    this.#slide(step);
+    eyeOf(this.pose, this.eye);
+    const moved = Math.hypot(this.eye.x - this.#was.x, this.eye.y - this.#was.y, this.eye.z - this.#was.z);
+    this.speed = step > 0 ? moved / (step / 1000) / Math.max(this.pose.distance, 1e-6) : 0;
+    copySpot(this.eye, this.#was);
+  }
+
+  // The lens's slide a step on: with the flight it rides, from where the flight was when it was asked to its landing; else by its time.
+  #slide(step: number): void {
+    if (this.#rideFrom >= 0) {
+      const flight = this.#flight;
+      const t = flight === undefined ? 1 : (flight.along - this.#rideFrom) / Math.max(1 - this.#rideFrom, 1e-6);
+      this.#share = Math.min(1, Math.max(0, t));
+      if (flight === undefined) this.#rideFrom = -1;
+    } else if (this.#shareTime < 1) {
+      this.#shareTime = Math.min(1, this.#shareTime + step / 1000 / this.#shareSeconds);
+      this.#share = sineInOut(this.#shareTime);
+    }
+  }
+
+  /** Sets the free hand's zoom anchor to the point under the screen's `x`, `y` on the plane through what the view looks at, square to
+   * it: a wheel brings the view nearer what the pointer is over. */
+  anchorAt(
+    x: number,
+    y: number,
+    { camera, screen: { width, height } }: { camera: PerspectiveCamera; screen: Screen },
+  ): void {
+    const { anchor } = this.free;
+    if (!this.free.pointed) {
+      anchor.x = NaN;
+      return;
+    }
+    // The ray from the eye through the pointer: the unprojected point less the eye, a unit.
+    const ray = this.#ray
+      .set((x / width) * 2 - 1, -(y / height) * 2 + 1, 0.5)
+      .unproject(camera)
+      .sub(camera.position)
+      .normalize();
+    const { look, way } = this.pose;
+    const ahead = (look.x - this.eye.x) * way.x + (look.y - this.eye.y) * way.y + (look.z - this.eye.z) * way.z;
+    const along = ahead / (ray.x * way.x + ray.y * way.y + ray.z * way.z);
+    anchor.x = along > 0 ? this.eye.x + ray.x * along : NaN;
+    anchor.y = this.eye.y + ray.y * along;
+    anchor.z = this.eye.z + ray.z * along;
+  }
+
+  /** Stands `camera` at the eye, turned to what the pose looks at, with its field of view (kept upright on a tall screen) and lens shift. */
+  aim(camera: PerspectiveCamera, { width, height }: Screen): void {
+    const { up, way, fov } = this.pose;
+    camera.position.set(this.eye.x, this.eye.y, this.eye.z);
+    camera.up.set(up.x, up.y, up.z);
+    camera.lookAt(this.eye.x - way.x, this.eye.y - way.y, this.eye.z - way.z);
+    const aspect = width > 0 && height > 0 ? width / height : 1;
+    camera.fov = aspect >= 1 ? fov : (360 / Math.PI) * Math.atan(Math.tan((fov * Math.PI) / 360) / aspect);
+    const { x, y } = this.#shown;
+    if (x !== 0 || y !== 0) camera.setViewOffset(width, height, x, y, width, height);
+    else camera.clearViewOffset();
+    camera.updateProjectionMatrix();
+    camera.updateMatrixWorld();
+  }
+}

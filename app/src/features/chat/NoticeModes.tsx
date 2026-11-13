@@ -1,7 +1,8 @@
 // A room's notification mode, chosen in the room (slice 4's 4f-n; ADR-0002, "Menu and settings"): all messages, mentions
 // (and replies, and a mention of the room where it counts) or nothing, mentions included. Kept on the device.
 import { NOTICE_MODES, type NoticeMode } from "@gnoworld/core";
-import { Chip, Cluster, Stack } from "@gnoworld/ui";
+import { Chip, Cluster } from "@gnoworld/ui";
+import { Setting } from "./RoomMenu.tsx";
 import { roomLabel } from "./names.ts";
 
 export interface NoticeModesProps {
@@ -22,8 +23,15 @@ const WORDS: Record<NoticeMode, string> = {
 
 export function NoticeModes({ room, mode, onMode, notKept }: NoticeModesProps) {
   return (
-    <Stack space="3xs">
-      <p className="label">Notify me about</p>
+    <Setting
+      label="Notify me about"
+      help={
+        <>
+          <p>{WORDS[mode]}</p>
+          {notKept === true ? <p>Not kept on this device</p> : null}
+        </>
+      }
+    >
       <div role="group" aria-label={`Notifications for ${roomLabel(room)}`}>
         <Cluster space="2xs">
           {NOTICE_MODES.map((each) => (
@@ -39,8 +47,6 @@ export function NoticeModes({ room, mode, onMode, notKept }: NoticeModesProps) {
           ))}
         </Cluster>
       </div>
-      <p>{WORDS[mode]}</p>
-      {notKept === true ? <p>Not kept on this device</p> : null}
-    </Stack>
+    </Setting>
   );
 }

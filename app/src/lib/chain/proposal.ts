@@ -11,6 +11,8 @@ export type { Proposal };
 
 /** The most characters of a page that are read. */
 const PAGE_READ = 64 * 1024;
+/** The most pages of the realm's home that are read to find an open proposal. */
+const PAGES_MAX = 4;
 /** The most proposals a home page gives. */
 const LISTED_MAX = 50;
 
@@ -20,11 +22,11 @@ const LISTED = /^###[ \t]+\[Prop[ \t]+#(\d{1,9})[ \t]+-[ \t]+(.*)\]\(\/r\/gov\/d
 const STATUS = /^Status:[ \t]+(.+)$/;
 // The realm's word for a proposal open for votes, on its home page.
 const OPEN_STATE = "ACTIVE";
-// A proposal's own page: its one block of stats, open or not, its yes and its no as `- YES PERCENT: 33.33333333333333%`.
+// A proposal's own page: its one block of stats, open or not, its yes and its no as `- YES PERCENT: 33.33333333333333%` (a float the realm prints may be in exponent form, `1e-05`).
 const STATS = /^###[ \t]+Stats$/;
 const OPEN = /^-[ \t]+\*\*Proposal is open for votes\*\*$/;
-const YES = /^-[ \t]+YES PERCENT:[ \t]+(\d{1,3}(?:\.\d{1,20})?)%$/;
-const NO = /^-[ \t]+NO PERCENT:[ \t]+(\d{1,3}(?:\.\d{1,20})?)%$/;
+const YES = /^-[ \t]+YES PERCENT:[ \t]+(\d{1,3}(?:\.\d{1,20})?(?:e[+-]\d{1,3})?)%$/;
+const NO = /^-[ \t]+NO PERCENT:[ \t]+(\d{1,3}(?:\.\d{1,20})?(?:e[+-]\d{1,3})?)%$/;
 // Markdown's backslash before a punctuation mark (`gno\-core`), which the realm adds to a title.
 const ESCAPED = /\\([!-/:-@[-`{-~])/g;
 
@@ -96,7 +98,17 @@ export function votesOf(text: string): { open: boolean; yes: number; no: number 
   return { open: only(block, OPEN) !== undefined, yes, no };
 }
 
-/** The proposals a realm's home page lists, newest first as written, the newest open one with its yes and no from its own page: two
+// The realm lists five a page: while none is open, the next pages (`?page=N`) may hold one; a page that fails or adds none ends it.
+async function addOlderPages(read: (path: string) => Promise<ChainRead<string>>, listed: Proposal[]): Promise<void> {
+  for (let n = 2; n <= PAGES_MAX && !listed.some(({ state }) => state === OPEN_STATE); n++) {
+    const next = await read(`?page=${String(n)}`);
+    const fresh = next.ok ? proposalsOf(next.value).filter(({ id }) => !listed.some((each) => each.id === id)) : [];
+    if (fresh.length === 0) return;
+    listed.push(...fresh);
+  }
+}
+
+/** The proposals a realm's home page lists, newest first as written, the newest open one with its yes and no from its own page: a few
  * requests at most, or a typed failure of the first. A page of votes that does not come leaves the list as it is. */
 export async function readProposals(
   rpc: string,
@@ -106,6 +118,7 @@ export async function readProposals(
   const page = await readPage(rpc, { realm }, options);
   if (!page.ok) return page;
   const listed = proposalsOf(page.value);
+  await addOlderPages((path) => readPage(rpc, { realm, path }, options), listed);
   const open = listed.find(({ state }) => state === OPEN_STATE);
   if (open === undefined) return { ok: true, value: listed, source: page.source };
   const own = await readPage(rpc, { realm, path: String(open.id) }, options);
@@ -114,3 +127,13 @@ export async function readProposals(
   const value = voted === undefined ? listed : listed.map((each) => (each === open ? voted : each));
   return { ok: true, value, source: page.source };
 }
+
+/** A state's chip: the realm's word, in the tone it says (accepted in the mint, open in the signal's, refused in the danger's). */
+export const toneOf = (state: string) =>
+  /accept|pass|execut/i.test(state)
+    ? "mine"
+    : /activ|open/i.test(state)
+      ? "signal"
+      : /reject|fail|refus|deni/i.test(state)
+        ? "danger"
+        : "neutral";

@@ -268,6 +268,36 @@ describe("a source's facts", () => {
     ]);
   });
 
+  it("finds a link and a word in a nested list and in a task, which a page draws as an outline", () => {
+    const source = ["- top", "  - nested https://gno.land/r/demo/nested", "- [x] done [task](/r/demo/task)"].join("\n");
+    const facts = sourceFactsOf(source, ORIGIN);
+    expect([...facts.links].sort()).toEqual(["https://gno.land/r/demo/nested", "https://gno.land/r/demo/task"]);
+    expect([...facts.words]).toEqual(expect.arrayContaining(["top", "nested", "done", "task"]));
+  });
+
+  it("finds a link and a word in a table's head and in its cells", () => {
+    const source = ["| name | [head](/r/demo/head) |", "| --- | --- |", "| cell | https://gno.land/r/demo/cell |"].join(
+      "\n",
+    );
+    const facts = sourceFactsOf(source, ORIGIN);
+    expect([...facts.links].sort()).toEqual(["https://gno.land/r/demo/cell", "https://gno.land/r/demo/head"]);
+    expect([...facts.words]).toEqual(expect.arrayContaining(["name", "head", "cell"]));
+  });
+
+  it("finds a link and a word in each of a page's columns, and nothing in a rule", () => {
+    const source = [
+      "<gno-columns>",
+      "left [l](/r/demo/left)",
+      "<gno-columns-sep>",
+      "---",
+      "right https://gno.land/r/demo/right",
+      "</gno-columns>",
+    ].join("\n");
+    const facts = sourceFactsOf(source, ORIGIN);
+    expect([...facts.links].sort()).toEqual(["https://gno.land/r/demo/left", "https://gno.land/r/demo/right"]);
+    expect([...facts.words]).toEqual(expect.arrayContaining(["left", "right"]));
+  });
+
   it("finds its numbers as written in its raw text, and its words as a person reads them, lower-cased", () => {
     const facts = sourceFactsOf(`## 1.250 votes\n\nby @${ADDRESS.toUpperCase()}, Ok g1short _g1under xg1no`, ORIGIN);
     expect([...facts.numbers]).toContain("1.250");

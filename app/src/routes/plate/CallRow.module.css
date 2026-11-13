@@ -1,0 +1,45 @@
+/* A call's row (the proposal's .rc row and .call-card): the function in the mono and the world's light, who called in the muted grey, the time in the
+   data type; its facts, once open, in the call card's look (a line, 12 px corners, the resting fill). The row and its opening are the design
+   system's Disclosure; the hairlines between rows are the list's. */
+@layer components {
+  .call {
+    font: var(--font-meta);
+    overflow-wrap: anywhere;
+  }
+
+  .func {
+    color: var(--world-light);
+    font: var(--font-mono-ui);
+  }
+
+  .who {
+    color: var(--color-text-muted);
+  }
+
+  .failed {
+    color: var(--color-danger);
+  }
+
+  .card {
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+  }
+
+  .inside {
+    padding: var(--space-s);
+  }
+
+  .name {
+    /* layout: a heading's own margin, which the browser gives it, taken off */
+    margin: 0;
+    font: var(--font-card-title);
+  }
+
+  /* The card's values read in the body's type, in the text's ink (the proposal's call card). */
+  .card dd {
+    color: var(--color-text);
+    font: var(--font-reading);
+    overflow-wrap: anywhere;
+  }
+}

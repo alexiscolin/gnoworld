@@ -11,9 +11,13 @@ export interface BubbleMessage {
   readonly text: string;
   /** The speaker's declared country (two capitals), or none: it is never guessed. */
   readonly country?: string;
+  /** A world's line (D565): `country` is only the key of its speaker's own spot, so none needs to be a country's code. */
+  readonly spot?: boolean;
   readonly visibility: "public" | "private" | "dm";
   readonly joined: boolean;
   readonly hub?: string;
+  /** The room it was said in, by its id, when the caller names its rooms. */
+  readonly room?: string;
   readonly mentions?: readonly string[];
   /** Hidden by the moderation bot. */
   readonly hidden?: boolean;
@@ -33,6 +37,8 @@ export interface Bubble {
   readonly account: string;
   readonly country: string;
   readonly text: string;
+  /** The room its line was said in, when known. */
+  readonly room?: string;
   readonly since: number;
   readonly until: number;
   readonly own: boolean;

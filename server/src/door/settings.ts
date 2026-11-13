@@ -3,15 +3,17 @@
 // API. A setting of either given
 // without the one that opens it stops the server, as a door meant that would not open. The quotas and the allowlist
 // here are first values alone: the database keeps them from the first start (quota.ts).
-import { Address, DOOR_CAPS } from "@gnoworld/schemas";
+import { Address, ASK_WAIT_S, DOOR_CAPS } from "@gnoworld/schemas";
 import { z } from "zod";
-import { host, isOrigin, list, port, whole } from "@gnoworld/service/settings";
+import { host, isOrigin, keyFile, list, port, type Secret, whole } from "@gnoworld/service/settings";
 
 export interface DoorConfig {
   // Jarvis switched on: JARVIS=on exactly; off by default, and for any other value (Alexis, off by default).
   on: boolean;
   // jarvis's address on the network only the two share (D42): a bare origin.
   url: string;
+  // What the door proves itself to jarvis with, in a header of every request; required once jarvis is on (10u-g2).
+  key: Secret | undefined;
   timeoutMs: number;
   questionChars: number;
   first: { quota: number; quotaUnnamed: number; unlimited: Address[] };
@@ -36,11 +38,12 @@ export function doorSettings() {
     // Any text at all: only `on` switches Jarvis on, and no value stops the server.
     JARVIS: z.string().optional(),
     JARVIS_URL: z.string().refine(isOrigin).optional(),
-    // Longer than the loop's worst: 8 turns of 3 attempts of 60 s, and a minute for its tools (D94).
-    JARVIS_TIMEOUT_S: whole(3600, 1500),
-    JARVIS_QUESTION_CHARS: whole(DOOR_CAPS.question, 2000),
-    JARVIS_QUOTA: whole(DOOR_CAPS.quota, 20),
-    JARVIS_QUOTA_UNNAMED: whole(DOOR_CAPS.quota, 5),
+    JARVIS_DOOR_KEY_FILE: z.string().min(1).optional(),
+    // At most what the page waits for less 10 s, and longer than the loop's worst, 874 s (ASK_WAIT_S in schemas).
+    JARVIS_TIMEOUT_S: whole(ASK_WAIT_S.door, ASK_WAIT_S.door),
+    JARVIS_QUESTION_CHARS: whole(DOOR_CAPS.question, 500),
+    JARVIS_QUOTA: whole(DOOR_CAPS.quota, 30),
+    JARVIS_QUOTA_UNNAMED: whole(DOOR_CAPS.quota, 30),
     JARVIS_UNLIMITED: list(Address)
       .refine(unique)
       .refine((entries) => entries.length <= DOOR_CAPS.unlimited),
@@ -90,9 +93,11 @@ export function doorOf(env: Env, settings: Settings): DoorConfig | undefined {
     );
     return undefined;
   }
+  const on = settings.JARVIS === "on";
   return {
-    on: settings.JARVIS === "on",
+    on,
     url: JARVIS_URL,
+    key: keyFile("JARVIS_DOOR_KEY_FILE", settings.JARVIS_DOOR_KEY_FILE, on),
     timeoutMs: JARVIS_TIMEOUT_S * 1000,
     questionChars: JARVIS_QUESTION_CHARS,
     first: { quota: JARVIS_QUOTA, quotaUnnamed: JARVIS_QUOTA_UNNAMED, unlimited: settings.JARVIS_UNLIMITED },

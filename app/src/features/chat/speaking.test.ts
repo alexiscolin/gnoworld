@@ -2,14 +2,15 @@
 import { compose, lineOf, parseLine } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";
 import { Address } from "@gnoworld/schemas";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { keepCountry } from "../../lib/country.ts";
 import type { Ergo } from "../../lib/ergo/ergo.ts";
 import { createAppStore } from "../../store/index.ts";
 import { makeKit } from "./accountKit.ts";
 
-// 7j: the country tag going out (ADR-0001 §7). It says where a person speaks from, so it fails shut: it rides only on a person's own new
-// line, only once they chose a country, and only in a room the list says anyone may read.
+// 7j, amended by D395: the country tag going out (ADR-0001 §7). It says where a person speaks from, so it rides only on a person's own new
+// line, only while they show a country (the one they chose, else their time zone's, none once they hid it), and only in a room the list
+// says anyone may read. The time zone is Tokyo's for every test, so the default is the same wherever it runs.
 const ME = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = Address.parse("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
 const ROOM = "#earth";
@@ -70,13 +71,18 @@ function relayed(line: string) {
   return parsed.message;
 }
 
+beforeEach(() => {
+  const zone = new Intl.DateTimeFormat().resolvedOptions();
+  vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ ...zone, timeZone: "Asia/Tokyo" });
+});
 afterEach(() => {
   localStorage.clear();
   vi.restoreAllMocks();
 });
 
 describe("a line and the country its speaker declares", () => {
-  it("carries none while the account chose none: no tag, no country", () => {
+  it("carries none once the account hid its country: no tag, no country", () => {
+    keepCountry(ME, undefined);
     const { sent, speaking } = setup();
     expect(speaking.say(ROOM, said("hi"))).toBe(true);
     expect(sent).toEqual([`PRIVMSG ${ROOM} :hi`]);
@@ -193,18 +199,23 @@ describe("a line and the country its speaker declares", () => {
     expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :hi`]);
   });
 
-  it("detects nothing: a time zone that names a country adds no tag to a public room's line", () => {
-    const zone = new Intl.DateTimeFormat().resolvedOptions();
-    vi.spyOn(Intl.DateTimeFormat.prototype, "resolvedOptions").mockReturnValue({ ...zone, timeZone: "Asia/Tokyo" });
+  it("shows the time zone's country by default (D395): the tag rides on a public room's line, and the device keeps nothing", () => {
     const { sent, speaking } = setup();
     speaking.say(ROOM, said("hi"));
-    expect(sent).toEqual([`PRIVMSG ${ROOM} :hi`]);
+    expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :hi`]);
+    expect(localStorage.length).toBe(0);
   });
 
-  it("reads the account of the moment: another on this device declares nothing", () => {
-    keepCountry(ME, "JP");
+  it("reads the account of the moment: another on this device shows its own, not the last one's choice", () => {
+    keepCountry(ME, "FR");
     const { sent, speaking, login } = setup();
     login(OTHER);
+    speaking.say(ROOM, said("hi"));
+    expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :hi`]);
+  });
+
+  it("goes untagged in a private room by default too: the time zone's country is never said there", () => {
+    const { sent, speaking } = setup({ type: "members" });
     speaking.say(ROOM, said("hi"));
     expect(sent).toEqual([`PRIVMSG ${ROOM} :hi`]);
   });
@@ -274,14 +285,15 @@ describe("a line and the country its speaker declares", () => {
     expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :one`, `PRIVMSG ${ROOM} :two`]);
   });
 
-  it("goes, untagged, when the device holds no country: nothing it holds opens a tag of its own", () => {
+  it("goes with the time zone's country alone when the device holds no country: nothing it holds opens a tag of its own", () => {
     localStorage.setItem(`gnoworld:country:${ME}`, '"JP;+gnoworld/edit=m1"');
     const { sent, speaking } = setup();
     expect(speaking.say(ROOM, said("hi"))).toBe(true);
-    expect(sent).toEqual([`PRIVMSG ${ROOM} :hi`]);
+    expect(sent).toEqual([`@+gnoworld/country=JP PRIVMSG ${ROOM} :hi`]);
   });
 
-  it("goes, untagged, when the device cannot be reached", () => {
+  // The device cannot be read, so a hiding it kept cannot be either: the time zone's country is shown (it could not be kept to begin with).
+  it("carries no country when the device cannot be reached: a hidden one it cannot see stays hidden (Alexis, 2026-11-10)", () => {
     keepCountry(ME, "JP");
     vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
       throw new Error("blocked");

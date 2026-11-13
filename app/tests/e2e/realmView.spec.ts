@@ -1,49 +1,13 @@
-import AxeBuilder from "@axe-core/playwright";
-import { FUNCTIONS, PAGES } from "../chain/chainFixture.ts";
-import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
+import { readFileSync } from "node:fs";
+import { PAGES } from "../chain/chainFixture.ts";
 import { indexer } from "../chain/indexerRoute.ts";
-import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { chain, RPC } from "../chain/rpcRoute.ts";
+import { expect, hydrated, test } from "./fixtures.ts";
+import { violations } from "./axe.ts";
 
 // 5h's journey (plan §1): a realm page holding a script, an image with onerror, a javascript: link and a hidden form field
 // shows them as text, every field visible. The view is a client route read once; the RPC is answered here as a browser would
 // get it (the recorded answers of tests/chain), and whether a real RPC answers a browser at all is F2841.
-const RPC = "https://rpc.onyx.testnets.gno.land/**";
-const HEIGHT = 786661;
-const TIME = "2026-10-30T23:43:10Z";
-
-// Page of the realm the browser asks: `pages` by realm path, the rest "no page".
-async function chain(page: Page, pages: Record<string, string>): Promise<{ asked: string[] }> {
-  const asked: string[] = [];
-  await indexer(page);
-  await page.route(RPC, async (route) => {
-    const url = new URL(route.request().url());
-    // A request is told by its query (vm/qrender, vm/qfuncs, vm/qeval) when it has one, by its path otherwise (/status).
-    const query = (url.searchParams.get("path") ?? "").replaceAll('"', "");
-    asked.push(query === "" ? url.pathname : query);
-    const cors = { "access-control-allow-origin": "*", "content-type": "application/json" };
-    if (url.pathname === "/status") {
-      await route.fulfill({ headers: cors, body: JSON.stringify(statusEnvelope(HEIGHT, TIME)) });
-      return;
-    }
-    if (query === "vm/qfuncs") {
-      await route.fulfill({ headers: cors, body: JSON.stringify(queryEnvelope({ data: JSON.stringify(FUNCTIONS) })) });
-      return;
-    }
-    const hex = (url.searchParams.get("data") ?? "").slice(2);
-    const realm = decodeURIComponent(hex.replace(/(..)/g, "%$1")).split(":")[0] ?? "";
-    const body = pages[realm];
-    await route.fulfill({
-      headers: cors,
-      body: JSON.stringify(
-        body === undefined
-          ? queryEnvelope({ data: null, error: { "@type": "/vm.InvalidPkgPathError" } })
-          : queryEnvelope({ data: body }),
-      ),
-    });
-  });
-  return { asked };
-}
-
 const HOSTILE = [
   "# Welcome",
   "<script>window.hacked = 1</script>",
@@ -57,7 +21,7 @@ const HOSTILE = [
   "</gno-form>",
 ].join("\n");
 
-const violations = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
+const RECORDED_WORLDS: unknown = JSON.parse(readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8"));
 
 test.describe("a realm's view", () => {
   test("shows a hostile page as text, every field in view, and reads the chain once", async ({ page }) => {
@@ -65,7 +29,7 @@ test.describe("a realm's view", () => {
     await page.goto("/r/demo/hostile");
     await hydrated(page);
     const main = page.getByRole("main");
-    await expect(main.getByRole("heading", { level: 1, name: "gno.land/r/demo/hostile" })).toBeVisible();
+    await expect(main.getByRole("heading", { level: 1, name: "hostile", exact: true })).toBeVisible();
     await expect(main.getByRole("heading", { name: "Welcome" })).toBeVisible();
     await expect(main).toContainText("<script>window.hacked = 1</script>");
     await expect(main).toContainText("<img src=x onerror=window.hacked=2>");
@@ -73,11 +37,14 @@ test.describe("a realm's view", () => {
     // Every field in view, a hidden one with its name and value.
     await expect(main.getByText("amount")).toBeVisible();
     await expect(main.getByText("g1attacker")).toBeVisible();
-    await expect(main.locator("script, img, input, textarea, select, form, a[href^='javascript:']")).toHaveCount(0);
+    // The realm's page, not the chat beside it, which has its composer.
+    await expect(
+      main.locator("#page").locator("script, img, input, textarea, select, form, a[href^='javascript:']"),
+    ).toHaveCount(0);
     expect(await page.evaluate(() => "hacked" in window)).toBe(false);
     // The height it was read at, and the link to the realm on gnoweb.
     await expect(main).toContainText("Read at block 786,661");
-    await expect(main.getByRole("link", { name: "Open it on gnoweb" })).toHaveAttribute(
+    await expect(main.getByRole("link", { name: "Open on gnoweb" })).toHaveAttribute(
       "href",
       "https://onyx.testnets.gno.land/r/demo/hostile",
     );
@@ -90,16 +57,15 @@ test.describe("a realm's view", () => {
     expect(asked.filter((path) => path === "vm/qeval")).toHaveLength(0);
   });
 
-  test("shows the realm's facts from the indexer with their source, once, and its failure as a state beside the page", async ({
+  test("shows the realm plate's facts from the indexer once, and keeps the page when the indexer is down", async ({
     page,
   }) => {
     await chain(page, { "gno.land/r/demo/dao": "# DAO" });
     const { asked } = await indexer(page);
     await page.goto("/r/demo/dao");
     await hydrated(page);
-    const facts = page.getByRole("main").getByRole("region", { name: "Facts from the indexer" });
-    await expect(facts).toContainText("12,345");
-    await expect(facts).toContainText("Read from indexer.onyx.testnets.gno.land at ");
+    const main = page.getByRole("main");
+    await expect(main).toContainText("12,345");
     expect(await violations(page)).toEqual([]);
     await page.waitForTimeout(1000);
     expect(asked).toHaveLength(1);
@@ -109,11 +75,9 @@ test.describe("a realm's view", () => {
     await indexer(page, { down: true });
     await page.reload();
     await hydrated(page);
-    const main = page.getByRole("main");
-    await expect(
-      main.getByRole("status").filter({ hasText: "Read from indexer.onyx.testnets.gno.land" }),
-    ).toContainText("did not answer");
     await expect(main).toContainText("DAO");
+    await expect(main).not.toContainText("12,345");
+    await expect(main.getByRole("alert")).toHaveCount(0);
     expect(await violations(page)).toEqual([]);
   });
 
@@ -143,7 +107,7 @@ test.describe("a realm's view", () => {
     const main = page.getByRole("main");
     await expect(main).toContainText("This page is too large to show here (over 256 KB).");
     await expect(main).not.toContainText("Secret");
-    await expect(main.getByRole("link", { name: "Open it on gnoweb" })).toBeVisible();
+    await expect(main.getByRole("link", { name: "Open on gnoweb" })).toBeVisible();
   });
 
   test("shows a failed read's state with the link to gnoweb when the RPC cannot be reached", async ({ page }) => {
@@ -152,13 +116,13 @@ test.describe("a realm's view", () => {
     await hydrated(page);
     const alert = page.getByRole("main").getByRole("alert");
     await expect(alert).toContainText("This page could not be read here");
-    await expect(page.getByRole("main").getByRole("link", { name: "Open it on gnoweb" })).toHaveAttribute(
+    await expect(page.getByRole("main").getByRole("link", { name: "Open on gnoweb" })).toHaveAttribute(
       "href",
       "https://onyx.testnets.gno.land/r/demo/dao",
     );
   });
 
-  test("goes back to where the reader came from, and a path that is no realm's is not found", async ({ page }) => {
+  test("shows a realm reached from the site, and a path that is no realm's is not found", async ({ page }) => {
     await chain(page, { "gno.land/r/demo/dao": "# DAO" });
     await page.goto("/list");
     await hydrated(page);
@@ -167,11 +131,36 @@ test.describe("a realm's view", () => {
       window.dispatchEvent(new PopStateEvent("popstate"));
     });
     await expect(page.getByRole("main").getByRole("heading", { name: "DAO", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Back" }).click();
-    await expect(page).toHaveURL(/\/$|\/list$/);
     await page.goto("/r/Demo/dao");
     await hydrated(page);
     await expect(page.getByRole("alert")).toContainText("No realm here");
+  });
+
+  test("shows a realm that is not on the chain as not found: no pill, no planet, no chat", async ({ page }) => {
+    await chain(page, {});
+    await page.goto("/r/defrewr");
+    await hydrated(page);
+    const main = page.getByRole("main");
+    await expect(page.getByRole("alert")).toContainText("No realm here");
+    await expect(main).toContainText("defrewr");
+    await expect(main).not.toContainText("On chain");
+    // The not-found page keeps the frame's empty globe box; no world is placed in it.
+    await expect(page.locator("[data-globe]:not([data-world=waiting])")).toHaveCount(0);
+    await expect(page.getByRole("textbox")).toHaveCount(0);
+  });
+
+  test("shows a namespace no world has as not found: an alert and no system kept", async ({ page }) => {
+    await page.route("**/worlds.json", (route) =>
+      route.fulfill({ body: JSON.stringify(RECORDED_WORLDS), contentType: "application/json" }),
+    );
+    await page.goto("/s/defrewr");
+    await hydrated(page);
+    await expect(page.getByRole("alert")).toContainText("No system here");
+    await expect(page.locator("[data-globe]")).toHaveCount(0);
+    // A namespace that has one is a system, not an alert.
+    await page.goto("/s/gnoland");
+    await hydrated(page);
+    await expect(page.getByRole("alert")).toHaveCount(0);
   });
 
   for (const [name, width, height] of [
@@ -203,15 +192,21 @@ test.describe("a realm's view", () => {
       test(`a recorded realm page, on a ${name}'s screen`, async ({ page }) => {
         await page.setViewportSize({ width, height });
         await chain(page, { "gno.land/r/gnoland/coins": COINS });
+        // A first visit's welcome card is not the page: it is told away, and the arrival's pill, which stands for five seconds, is masked.
+        await page.addInitScript(() => {
+          localStorage.setItem("gnoworld:welcomed", "1");
+        });
         await page.goto("/r/gnoland/coins");
         await hydrated(page);
         await expect(page.getByRole("main")).toContainText("Read at block");
-        await expect(page).toHaveScreenshot(`realm-view-${name}.png`, { mask: [page.getByRole("banner")] });
+        await expect(page).toHaveScreenshot(`realm-view-${name}.png`, {
+          mask: [page.getByRole("banner"), page.locator("[data-banner]")],
+        });
       });
 
-      // Frame 26 lights no view on a world's page, nor does a realm's: a realm is served the page written at /, Cosmos lit,
-      // and hydration patches no attribute (react-dom 19.3.1), so the light must follow the path once the page wakes (F4880).
-      test(`lights no view on a realm's page or a world's, and Cosmos on the cosmos, on a ${name}'s screen`, async ({
+      // The World view is the one lit on a world's page and on a realm's; hydration patches no attribute (react-dom 19.3.1), so the
+      // light must follow the path once the page wakes. The galaxy is lit on its own page.
+      test(`lights the World view on a realm's page or a world's, and Galaxy on the galaxy's, and none on the home, on a ${name}'s screen`, async ({
         page,
       }) => {
         await page.setViewportSize({ width, height });
@@ -220,12 +215,17 @@ test.describe("a realm's view", () => {
         for (const path of ["/r/gnoland/coins", "/w/bubble"]) {
           await page.goto(path);
           await hydrated(page);
-          await expect(views.getByRole("link", { name: "Universe" })).toBeVisible();
-          await expect(views.locator("[aria-current]")).toHaveCount(0);
+          await expect(views.getByRole("link", { name: "Galaxy" })).toBeVisible();
+          await expect(views.locator("[aria-current]")).toHaveCount(1);
+          await expect(views.locator("[aria-current='page']")).toContainText("World");
         }
+        await page.goto("/universe");
+        await hydrated(page);
+        await expect(views.locator("[aria-current='page']")).toHaveText("Galaxy");
+        // The home is the Earth's first screen: no level is lit there.
         await page.goto("/");
         await hydrated(page);
-        await expect(views.locator("[aria-current='page']")).toHaveText("Universe");
+        await expect(views.locator("[aria-current]")).toHaveCount(0);
       });
     }
   });

@@ -64,8 +64,8 @@ export const Switcher: Story = {
 
 export const Center: Story = {
   render: () => (
-    <layout.Center max="dialog" space="m">
-      <p>A dialog holds its text at 490 px, and the measure at 65 characters.</p>
+    <layout.Center space="m">
+      <p>A reading measure holds its text at 65 characters, in the middle of its room.</p>
     </layout.Center>
   ),
 };
@@ -105,7 +105,7 @@ export const Justify: Story = {
 export const Columns: Story = {
   render: () => (
     <layout.Stack space="l">
-      {(["s", "m", "l"] as const).map((min) => (
+      {(["s", "m"] as const).map((min) => (
         <layout.Grid key={min} as="ul" min={min}>
           {[...worlds, "Arcade"].map((world) => (
             <li key={world}>{world}</li>
@@ -125,5 +125,34 @@ export const WideSide: Story = {
         Where people speak from: countries are opt-in, and a city never shows, so this runs long
       </Kicker>
     </layout.Sidebar>
+  ),
+};
+
+export const Twelve: Story = {
+  render: () => (
+    <layout.Grid cols={12} space="s">
+      <layout.Cell span={8}>
+        <p>Calls per day: 8 of 12 columns, 12 on a narrow plate.</p>
+      </layout.Cell>
+      <layout.Cell span={4}>
+        <p>Who calls it: 4 of 12.</p>
+      </layout.Cell>
+    </layout.Grid>
+  ),
+};
+
+const TEMPLATES = ["icon-text-meta", "text-meta", "label-value"] as const;
+
+export const Templates: Story = {
+  render: () => (
+    <layout.Stack>
+      {TEMPLATES.map((template) => (
+        <layout.Grid key={template} template={template} space="s">
+          <p>{template}</p>
+          <Button size="s">Try it</Button>
+          {template === "icon-text-meta" ? <p>meta</p> : null}
+        </layout.Grid>
+      ))}
+    </layout.Stack>
   ),
 };

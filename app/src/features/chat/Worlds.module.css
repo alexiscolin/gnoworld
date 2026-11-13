@@ -1,6 +1,8 @@
 /* The column of worlds: planets one under another at the video's 44 px, no text, a ring around the one in view (frame 80). */
 @layer components {
   .list {
+    /* the fill-column utility lays it: the planets from the top, the credits at the column's foot (Alexis, 2026-11-07) */
+    box-sizing: border-box;
     /* raw: the first planet stands 23 px under the region's top in the frame (76 - 53), 24 here */
     padding-block: var(--space-m) var(--space-s);
     /* the frame's planets stand 23 px from the column's edge and 15 from its rule: the column's centre 4 px to the right */
@@ -27,7 +29,8 @@
     border-radius: var(--radius-pill);
   }
 
-  .picture {
+  /* The picture, and ui's disc (48 px, inline) that stands in for it, fill the planet's 44 px box: the column never moves as one gives way */
+  .planet span {
     inline-size: 100%;
     block-size: 100%;
     vertical-align: top;
@@ -41,13 +44,74 @@
     outline-offset: 3px;
   }
 
+  /* A followed or recent place: its remove control sits at the planet's top right corner, shown on hover or focus, as Discord's. */
+  .removable {
+    position: relative;
+  }
+
+  /* the tooltip's anchor sits on the line's top, not its baseline: a disc's baseline is not a picture's, and the line grew 6 px when one gave way */
+  .removable > :first-child {
+    vertical-align: top;
+  }
+
+  /* a world's line in the column: the anchor its pill stands on */
+  .entry {
+    position: relative;
+  }
+
+  /* A world's unseen lines, in the coral of new things, at its planet's top right; it takes no pointer */
+  .pill {
+    position: absolute;
+    inset-block-start: calc(-1 * var(--space-3xs));
+    inset-inline-end: calc(-1 * var(--space-3xs));
+    /* layout: the figure centred in the pill */
+    display: grid;
+    /* layout: the figure centred in the pill */
+    place-items: center;
+    block-size: var(--size-counter);
+    min-inline-size: var(--size-counter);
+    padding: 0 var(--space-3xs);
+    border-radius: var(--radius-l);
+    background: var(--color-new);
+    color: var(--color-ink);
+    font: var(--font-data);
+    pointer-events: none;
+  }
+
+  .remove {
+    position: absolute;
+    /* layout: the planet's corner, past its ring, which stands 3 px off */
+    inset-block-start: calc(-1 * var(--space-2xs));
+    inset-inline-end: calc(-1 * var(--space-2xs));
+    opacity: 0;
+  }
+
+  .removable:hover .remove,
+  .removable:focus-within .remove {
+    opacity: 1;
+  }
+
+  /* The short rule between the hubs and the places opened last, as Discord's between its home and its servers. */
+  .rule {
+    /* raw: half a planet's width */
+    inline-size: 22px;
+    /* layout: centred in the column, a step from the planets round it */
+    margin: var(--space-xs) auto;
+    border: 0;
+    border-block-start: calc(2 * var(--line-width)) solid var(--color-line);
+  }
+
   /* The textures' credit at the column's foot, in the label style, muted; its padding makes a target of 24 px at least. */
   .credits {
     display: block;
+    /* layout: pushed to the column's foot */
+    margin-block-start: auto;
     inline-size: 100%;
     padding-block: var(--space-2xs);
     text-align: center;
     color: var(--color-text-muted);
+    /* a foot note in the narrow column (Alexis, 2026-11-08: "en plus petit") */
+    font-size: var(--text-3xs);
   }
 
   .credits:hover {

@@ -68,6 +68,10 @@ describe("the lines' verdicts, from the server", () => {
 
   it("hands on the server's refusal as its reason", async () => {
     const { api } = server(json(403, { error: "forbidden" }));
-    expect(await api.verdicts("#bubble/crew", ["m1"])).toEqual({ ok: false, reason: "forbidden" });
+    expect(await api.verdicts("#bubble/crew", ["m1"])).toEqual({
+      ok: false,
+      reason: "forbidden",
+      body: { error: "forbidden" },
+    });
   });
 });

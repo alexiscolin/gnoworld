@@ -1,0 +1,718 @@
+{
+  "version": 1,
+  "universe": "onyx",
+  "path": "gno.land/r/gnops/valopers",
+  "updated": "2026-11-09T17:33:17.448Z",
+  "height": 1016042,
+  "calls": 95,
+  "callers": 70,
+  "days": [
+    { "day": "2026-09-28", "calls": 2, "callers": 2 },
+    { "day": "2026-09-29", "calls": 52, "callers": 37 },
+    { "day": "2026-09-30", "calls": 9, "callers": 8 },
+    { "day": "2026-10-01", "calls": 16, "callers": 14 },
+    { "day": "2026-10-02", "calls": 6, "callers": 5 },
+    { "day": "2026-10-03", "calls": 2, "callers": 2 },
+    { "day": "2026-10-05", "calls": 5, "callers": 3 },
+    { "day": "2026-10-06", "calls": 1, "callers": 1 },
+    { "day": "2026-10-16", "calls": 1, "callers": 1 },
+    { "day": "2026-10-24", "calls": 1, "callers": 1 }
+  ],
+  "top": [
+    { "address": "g154xep0mgxuccm7r29fe0fjfswwq3jjhxshg29h", "calls": 4 },
+    { "address": "g1dzwjx4s8t4damqqs8exufzvaww0g0jnqemcfcv", "calls": 4 },
+    { "address": "g19kz7kupu9l9lrkrw3nptqzz9tn3v3vv7crp796", "calls": 3 },
+    { "address": "g1eyr3hfdcup4rr5xlcd63vc5t64a03u9kecx2v0", "calls": 3 },
+    { "address": "g1p2av3saw8h3s37w4d0cplcemmeqmmnxhpezx2g", "calls": 3 },
+    { "address": "g1u8v0tgx5r6aun4rz8t65c3tlw0fc83488fsnv7", "calls": 3 },
+    { "address": "g14dwr0qm5j054r9jpfkv0kwdn3z4ptcx9vn8kj9", "calls": 2 },
+    { "address": "g14ymnmcklzc8zlr7q5hzc370jv433ltx0aq90np", "calls": 2 },
+    { "address": "g18u6htlfee0hyhlqs7dv9y3mdrtz4sn3hmj3n07", "calls": 2 },
+    { "address": "g1apx2ktj0tc7gqzaqtgl9xluflnqehgpqla0anv", "calls": 2 },
+    { "address": "g1fqcddarc4s9qap788t7lksgag4mq7g2gevc8ht", "calls": 2 },
+    { "address": "g1kvhxjxmurtzhjqsxzsjl6sqrwy2d86wrlmncdy", "calls": 2 },
+    { "address": "g1manfred47kzduec920z88wfr64ylksmdcedlf5", "calls": 2 },
+    { "address": "g1thrjnx75dgc95qed7x9edd0rvvpj5d5vevj50h", "calls": 2 },
+    { "address": "g1u86nekvlf7ppehkf0a6zpdwth5fvh0uljv7x2l", "calls": 2 },
+    { "address": "g1uzxyk9fvtk0zfsl20kswvatt2da67sjjh4fud0", "calls": 2 },
+    { "address": "g1y4l44w8fwl8tj473y49l3ay3k2nad0pdhchn3d", "calls": 2 },
+    { "address": "g1078xslm886lv9ad4w5zxxfg8nt07gprk5kwcak", "calls": 1 },
+    { "address": "g128jzzkpyryjg6h8yjpn774mnmskuehjgw9rp9z", "calls": 1 },
+    { "address": "g12e22uqd4jjvvsk6g95re3a44sxuephd5kkrt7m", "calls": 1 }
+  ],
+  "last": [
+    {
+      "func": "Register",
+      "caller": "g1k4kum5pp4r297yx9v868j9578t6de5mm2atd2h",
+      "height": 630828,
+      "success": true,
+      "time": "2026-10-24T10:48:06.241Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1rppw28c4u4h2pmf46q3956uv44zjwapelctsac",
+      "height": 432356,
+      "success": true,
+      "time": "2026-10-16T00:06:21.928Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g187qre9w8v90wp7fhgulwnwegarlulwn2da2gzp",
+      "height": 195631,
+      "success": true,
+      "time": "2026-10-06T00:44:26.768Z"
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1p2av3saw8h3s37w4d0cplcemmeqmmnxhpezx2g",
+      "height": 188861,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1p2av3saw8h3s37w4d0cplcemmeqmmnxhpezx2g",
+      "height": 187069,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1p2av3saw8h3s37w4d0cplcemmeqmmnxhpezx2g",
+      "height": 187037,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g13nwzm5dfd26ue74jr6sc39gyn3qze0rj5cvpcw",
+      "height": 181456,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1sdcuehd3shlxr0q4xu9s6tcg0m0kf9q4uxzvdc",
+      "height": 179969,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1plf3fmy0h4395jcxxh63g7mzeypr06f9yrdk4d",
+      "height": 131365,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g19r7z72ap3kjkfwrqw587twjvllq6gjc94nxyqu",
+      "height": 128417,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1u86nekvlf7ppehkf0a6zpdwth5fvh0uljv7x2l",
+      "height": 122718,
+      "success": true,
+      "time": "2026-10-02T22:56:30.914Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g19zqln3nnwcp4hqlvg7kv08p8ghe2cpk69qn0vs",
+      "height": 111346,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1eyr3hfdcup4rr5xlcd63vc5t64a03u9kecx2v0",
+      "height": 109937,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1eyr3hfdcup4rr5xlcd63vc5t64a03u9kecx2v0",
+      "height": 109910,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1ufv8890g6smsryw3990zthpyw26g244nsd6fvp",
+      "height": 105925,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g14m0n559xdj00qwvp6ck0xesprrq26kgprgjt4j",
+      "height": 103617,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g19sqhfxveuzdmf244xsslmwd638l9mjcdq76hym",
+      "height": 95994,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1px2y5wuj8y0tfq59unwy90qrw7j5evsa9zs3vk",
+      "height": 93460,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g12e22uqd4jjvvsk6g95re3a44sxuephd5kkrt7m",
+      "height": 91016,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateSigningKey",
+      "caller": "g1uzxyk9fvtk0zfsl20kswvatt2da67sjjh4fud0",
+      "height": 87407,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g13tx3jp4spy90dtpyxr7gjp2mfgvjnfxr7kt3ue",
+      "height": 87384,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateMoniker",
+      "caller": "g1manfred47kzduec920z88wfr64ylksmdcedlf5",
+      "height": 87212,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g154xep0mgxuccm7r29fe0fjfswwq3jjhxshg29h",
+      "height": 87176,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateKeepRunning",
+      "caller": "g154xep0mgxuccm7r29fe0fjfswwq3jjhxshg29h",
+      "height": 87170,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1tna3nssljelk9cq7whzsyd4rtwfgrmczgl3fs2",
+      "height": 87168,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1manfred47kzduec920z88wfr64ylksmdcedlf5",
+      "height": 86907,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1nez986lpnmyxcrgdzm4kw5l2375hdwvytfujc8",
+      "height": 85594,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g18dw5qfv2zlh372hh3wvdv9k4ywu7jcgmrnnsep",
+      "height": 85439,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1eyr3hfdcup4rr5xlcd63vc5t64a03u9kecx2v0",
+      "height": 84036,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1n70hju0sew704tmzfxkhy64uer6prjsm2xwlxs",
+      "height": 79561,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1cm5z4slw83sa3x0gttkvv64nx5dc39n2yxk296",
+      "height": 78851,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g16dwv69e304eek3y0qn7tfdujtrq6m3wh9tcc9f",
+      "height": 76085,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1fqcddarc4s9qap788t7lksgag4mq7g2gevc8ht",
+      "height": 75080,
+      "success": true,
+      "time": "2026-09-30T23:26:33.135Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1fqcddarc4s9qap788t7lksgag4mq7g2gevc8ht",
+      "height": 74957,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1tv58fhdus9pxfhdzc2srkzreh34r4p66cnqtkq",
+      "height": 71386,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1u86nekvlf7ppehkf0a6zpdwth5fvh0uljv7x2l",
+      "height": 71140,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1nqvsxzcgagsps3qe4ffs0stxxzxxaj2nmuem07",
+      "height": 68790,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1zlrdlcs65d6yhschadhvlf3qnw9ruelh9rn6wn",
+      "height": 64262,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1kqdfj5ps9auyj5gzjwt079rlg6rpke9gspqudc",
+      "height": 62886,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1f363suf6h7trgyshs5gmf80f2ee9lfzjs3hr03",
+      "height": 60567,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1ppvaadzu0smzqyrgvw73hjdrhvlu43l7g7tw3f",
+      "height": 59882,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g18lnmr5td4g5td0w0e3cmt5lvgd8xwzekat0dhy",
+      "height": 49907,
+      "success": true,
+      "time": "2026-09-29T22:48:03.593Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1eep2z6k5u0t5964a5fa6qtqplkt9pnk926kh34",
+      "height": 49336,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1vcwp9c4yqjxuxqtfaq3ehx8czrqam2k9c83w9d",
+      "height": 49264,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1qd974fj0wgkmj5ah2euqygs7w86tgsskme6n05",
+      "height": 49199,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1npaccm9xucl696fns8j7na44fmeucduflh59uu",
+      "height": 49071,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateMoniker",
+      "caller": "g154xep0mgxuccm7r29fe0fjfswwq3jjhxshg29h",
+      "height": 48992,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g154xep0mgxuccm7r29fe0fjfswwq3jjhxshg29h",
+      "height": 48932,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g16mldrfu90pe5r97cjm3xk02m7a3d0z8g9g3r75",
+      "height": 46512,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1uzxyk9fvtk0zfsl20kswvatt2da67sjjh4fud0",
+      "height": 46033,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g12q9wd2vqsy40qh2nvsz6km6r8ac94y0j6r4ca9",
+      "height": 45815,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1thrjnx75dgc95qed7x9edd0rvvpj5d5vevj50h",
+      "height": 44931,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1thrjnx75dgc95qed7x9edd0rvvpj5d5vevj50h",
+      "height": 44884,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1apx2ktj0tc7gqzaqtgl9xluflnqehgpqla0anv",
+      "height": 44819,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1apx2ktj0tc7gqzaqtgl9xluflnqehgpqla0anv",
+      "height": 44700,
+      "success": true,
+      "time": "2026-09-29T17:55:03.356Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1sxvcr9xp0tqcqjheaeqmzjw3tqt6nm2gsv0n9e",
+      "height": 44346,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g14dwr0qm5j054r9jpfkv0kwdn3z4ptcx9vn8kj9",
+      "height": 44112,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g14dwr0qm5j054r9jpfkv0kwdn3z4ptcx9vn8kj9",
+      "height": 44078,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g138mdf0gqzue3ra2r335upclngn8t8r0n72cn3h",
+      "height": 43690,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1u8v0tgx5r6aun4rz8t65c3tlw0fc83488fsnv7",
+      "height": 42912,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1u8v0tgx5r6aun4rz8t65c3tlw0fc83488fsnv7",
+      "height": 42840,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1lyt8fg7e987jgh7kxa3fn8zlcx295kdzuj7d8d",
+      "height": 42697,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1u8v0tgx5r6aun4rz8t65c3tlw0fc83488fsnv7",
+      "height": 42635,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1pau0v59hme9hnvf63gsfpdm3xc3pkkawu6jpu7",
+      "height": 42089,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1z360harzpshhdnlrdgj5ljkx2aeckzavkyl9g0",
+      "height": 41641,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g14ymnmcklzc8zlr7q5hzc370jv433ltx0aq90np",
+      "height": 40029,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g14ymnmcklzc8zlr7q5hzc370jv433ltx0aq90np",
+      "height": 40004,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g18u6htlfee0hyhlqs7dv9y3mdrtz4sn3hmj3n07",
+      "height": 39954,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g18u6htlfee0hyhlqs7dv9y3mdrtz4sn3hmj3n07",
+      "height": 39934,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1mndkvypn3339m6yvkyutal5hk6m2yeqp5d52ly",
+      "height": 39803,
+      "success": true,
+      "time": "2026-09-29T13:19:21.979Z"
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1dzwjx4s8t4damqqs8exufzvaww0g0jnqemcfcv",
+      "height": 39732,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1jaxzh9epmtachaf6tx6ftxgq6pndcctxrf68tr",
+      "height": 39252,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g128jzzkpyryjg6h8yjpn774mnmskuehjgw9rp9z",
+      "height": 39113,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1pd2jqrgc0hwsx3evqk8lakvz7y89zkx4nc78g0",
+      "height": 39104,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1u7g4cejjqsm44nha34hzpzu6df6a7egc9rpqw5",
+      "height": 39084,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1arw7msrsupe436spp4knv3pnp0n3gn4vjeksmt",
+      "height": 39046,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateKeepRunning",
+      "caller": "g1dzwjx4s8t4damqqs8exufzvaww0g0jnqemcfcv",
+      "height": 39017,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateMoniker",
+      "caller": "g1dzwjx4s8t4damqqs8exufzvaww0g0jnqemcfcv",
+      "height": 39014,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1kvhxjxmurtzhjqsxzsjl6sqrwy2d86wrlmncdy",
+      "height": 38490,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1kvhxjxmurtzhjqsxzsjl6sqrwy2d86wrlmncdy",
+      "height": 38407,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g19kz7kupu9l9lrkrw3nptqzz9tn3v3vv7crp796",
+      "height": 38397,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g19kz7kupu9l9lrkrw3nptqzz9tn3v3vv7crp796",
+      "height": 38349,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g19kz7kupu9l9lrkrw3nptqzz9tn3v3vv7crp796",
+      "height": 38092,
+      "success": true,
+      "time": "2026-09-29T11:43:01.129Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1pskxvnzkawh4hze3tdn8u7jj59pcs4ukku7fv5",
+      "height": 37824,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g15crxnxd79syggtha6ymfhy8m8a4ytqel58cwkg",
+      "height": 37409,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1078xslm886lv9ad4w5zxxfg8nt07gprk5kwcak",
+      "height": 37395,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1c5z9tqmcjendp46l8v6c2lu8xmrdyrk0tp5vn3",
+      "height": 37298,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g15g0la8fyn4mvulrw39vmngs3z9vzhefkyyef9y",
+      "height": 36569,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "UpdateDescription",
+      "caller": "g1y4l44w8fwl8tj473y49l3ay3k2nad0pdhchn3d",
+      "height": 36077,
+      "success": true,
+      "time": "2026-09-29T09:49:33.601Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1y4l44w8fwl8tj473y49l3ay3k2nad0pdhchn3d",
+      "height": 35977,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1dzwjx4s8t4damqqs8exufzvaww0g0jnqemcfcv",
+      "height": 35264,
+      "success": true,
+      "time": null
+    },
+    {
+      "func": "Register",
+      "caller": "g1etf3rd7dqghksj8r5yunkgmvpupdfszdjhuzju",
+      "height": 35034,
+      "success": true,
+      "time": "2026-09-29T08:50:51.431Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1e3vld469ekks28mhtd4aqua3mdaz64qgdtz29k",
+      "height": 34657,
+      "success": true,
+      "time": "2026-09-29T08:29:38.743Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g17xcvw4uvehrywupnhncgpm6llat69syhne8s56",
+      "height": 19656,
+      "success": true,
+      "time": "2026-09-28T18:25:27.125Z"
+    },
+    {
+      "func": "Register",
+      "caller": "g1edq4dugw0sgat4zxcw9xardvuydqf6cgleuc8p",
+      "height": 0,
+      "success": true,
+      "time": "2026-09-28T00:00:00.000Z"
+    }
+  ],
+  "importers": { "total": 1, "top": [{ "path": "gno.land/r/gnops/valopers/proposal", "calls": 0 }] },
+  "functions": [
+    { "name": "Register", "calls": 70 },
+    { "name": "UpdateDescription", "calls": 19 },
+    { "name": "UpdateMoniker", "calls": 3 },
+    { "name": "UpdateKeepRunning", "calls": 2 },
+    { "name": "UpdateSigningKey", "calls": 1 }
+  ]
+}

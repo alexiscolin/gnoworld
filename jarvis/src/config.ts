@@ -4,8 +4,22 @@
 // the models, gnoscope's switch and server, the places' and skills' folders, gnomcp and the chain profiles it may read.
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { absolute, databasePath, host, parseSettings, port, readWord, Secret, whole } from "@gnoworld/service/settings";
+import {
+  absolute,
+  databasePath,
+  host,
+  hostPort,
+  keyFile,
+  parseSettings,
+  port,
+  readWord,
+  Secret,
+  whole,
+} from "@gnoworld/service/settings";
+import { DEADLINE_MS } from "./http.ts";
+import { WAIT_MAX_MS } from "./model.ts";
 import { DOLLAR, MODELS, type Model } from "./prices.ts";
+import { TOOL_MS } from "./toolRun.ts";
 import { isNetwork } from "./tools/gnoscopeTools.ts";
 
 export interface JarvisConfig {
@@ -26,7 +40,8 @@ export interface JarvisConfig {
   // The folder of the places' data files (app/data's).
   places: string;
   skills: string;
-  gnomcp: { command: string; config: string };
+  // A child it spawns, or, with an address, the gnomcp a container of its own serves over TCP (10u-g2).
+  gnomcp: { command: string; config: string } | { address: { host: string; port: number } };
   // The chain profiles gnomcp may read for jarvis, and those of them with an indexer.
   profiles: { read: string[]; indexed: string[] };
 }
@@ -38,6 +53,8 @@ export interface Served {
   // refused (F5288).
   listen: { host: string; port: number; names: string[] };
   database: string;
+  // What the door proves itself with, in a header of every request; required once jarvis is on (10u-g2).
+  doorKey: Secret | undefined;
   // A UTC day's caps in nano-dollars, prices.ts's unit: the questions', and the translations' apart (D47).
   budgets: { ask: number; translate: number };
   // How long a stop waits for the questions in flight before it cuts them (D178).
@@ -57,8 +74,9 @@ const servedShape = () => ({
     .pipe(z.array(z.string().regex(/^(?:[a-z0-9][a-z0-9.-]{0,252}|\[[0-9a-f:.]{2,45}\])$/))),
   // A file's absolute path, never ":memory:": a restart would open the day again at zero (D45).
   JARVIS_DATABASE: databasePath.pipe(absolute),
-  JARVIS_BUDGET_USD: whole(500, 45),
-  JARVIS_TRANSLATION_BUDGET_USD: whole(500, 5),
+  JARVIS_DOOR_KEY_FILE: z.string().min(1).optional(),
+  JARVIS_BUDGET_USD: whole(500, 3),
+  JARVIS_TRANSLATION_BUDGET_USD: whole(500, 1),
   JARVIS_DRAIN_S: whole(600, 20),
 });
 const budgetsOf = (settings: { JARVIS_BUDGET_USD: number; JARVIS_TRANSLATION_BUDGET_USD: number }) => ({
@@ -69,8 +87,10 @@ const budgetsOf = (settings: { JARVIS_BUDGET_USD: number; JARVIS_TRANSLATION_BUD
 /** jarvis's switch and what it reads whatever it says; throws naming the first wrong setting, never its value. */
 export function loadServed(env: Record<string, string | undefined>): Served {
   const settings = parseSettings(z.object(servedShape()), env);
+  const on = settings.JARVIS === "on";
   return {
-    on: settings.JARVIS === "on",
+    on,
+    doorKey: keyFile("JARVIS_DOOR_KEY_FILE", settings.JARVIS_DOOR_KEY_FILE, on),
     listen: { host: settings.JARVIS_HOST, port: settings.JARVIS_PORT, names: settings.JARVIS_HOSTNAMES },
     database: settings.JARVIS_DATABASE,
     budgets: budgetsOf(settings),
@@ -92,8 +112,8 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
       ...servedShape(),
       ANTHROPIC_API_KEY_FILE: z.string().min(1),
       JARVIS_QUESTION_CHARS: whole(8_000, 2_000),
-      JARVIS_TURNS: whole(20, 8),
-      JARVIS_OUTPUT_TOKENS: whole(16_000, 4_096),
+      JARVIS_TURNS: whole(4, 4),
+      JARVIS_OUTPUT_TOKENS: whole(1_000, 1_000),
       JARVIS_CALL_TIMEOUT_S: whole(600, 60),
       // Two at most, never more (ADR-0002 §5), or none.
       JARVIS_RETRIES: z.enum(["0", "1", "2"]).default("2").transform(Number),
@@ -112,8 +132,10 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
         .pipe(z.array(z.string().refine(isNetwork))),
       JARVIS_DATA_DIR: absolute.default(fileURLToPath(new URL("../../app/data", import.meta.url))),
       JARVIS_SKILLS_DIR: absolute.default(fileURLToPath(new URL("../skills", import.meta.url))),
-      JARVIS_GNOMCP_COMMAND: absolute,
-      JARVIS_GNOMCP_CONFIG: absolute,
+      JARVIS_GNOMCP_COMMAND: absolute.optional(),
+      JARVIS_GNOMCP_CONFIG: absolute.optional(),
+      // host:port, the port written plainly; replaces the command when set.
+      JARVIS_GNOMCP_ADDRESS: hostPort().optional(),
       JARVIS_PROFILES: z
         .string()
         .transform((list) => list.split(","))
@@ -124,7 +146,12 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
         .transform((list) => (list === "" ? [] : list.split(",")))
         .pipe(profiles),
     })
-    .superRefine(({ JARVIS_PROFILES, JARVIS_INDEXER_PROFILES }, ctx) => {
+    .superRefine(({ JARVIS_PROFILES, JARVIS_INDEXER_PROFILES, JARVIS_GNOMCP_ADDRESS, ...spawned }, ctx) => {
+      if (longestAskMs(spawned) > DEADLINE_MS) ctx.addIssue({ code: "custom", path: ["JARVIS_CALL_TIMEOUT_S"] });
+      if (JARVIS_GNOMCP_ADDRESS === undefined) {
+        for (const name of ["JARVIS_GNOMCP_COMMAND", "JARVIS_GNOMCP_CONFIG"] as const)
+          if (spawned[name] === undefined) ctx.addIssue({ code: "custom", path: [name], message: "required" });
+      }
       const readable = new Set(JARVIS_PROFILES);
       for (const [at, name] of JARVIS_INDEXER_PROFILES.entries()) {
         if (!readable.has(name)) ctx.addIssue({ code: "custom", path: ["JARVIS_INDEXER_PROFILES", at] });
@@ -150,7 +177,27 @@ export function loadJarvisConfig(env: Record<string, string | undefined>): Jarvi
     },
     places: settings.JARVIS_DATA_DIR,
     skills: settings.JARVIS_SKILLS_DIR,
-    gnomcp: { command: settings.JARVIS_GNOMCP_COMMAND, config: settings.JARVIS_GNOMCP_CONFIG },
+    gnomcp: gnomcpOf(settings),
     profiles: { read: settings.JARVIS_PROFILES, indexed: settings.JARVIS_INDEXER_PROFILES },
   };
+}
+
+// A question's longest run: each turn's attempts at their time with the waits between them, and the tools between turns.
+// A digest's 8 turns are not counted: the request's deadline cuts them.
+function longestAskMs(caps: { JARVIS_TURNS: number; JARVIS_RETRIES: number; JARVIS_CALL_TIMEOUT_S: number }): number {
+  const turn = (caps.JARVIS_RETRIES + 1) * caps.JARVIS_CALL_TIMEOUT_S * 1000 + caps.JARVIS_RETRIES * WAIT_MAX_MS;
+  return caps.JARVIS_TURNS * turn + (caps.JARVIS_TURNS - 1) * TOOL_MS;
+}
+
+// The address when one is set, else the spawn's command and configuration, which the schema made both present.
+function gnomcpOf(settings: Record<string, unknown>): JarvisConfig["gnomcp"] {
+  const Address = z.object({ host: z.string(), port: z.number() });
+  const Gnomcp = z.union([
+    z.object({ JARVIS_GNOMCP_ADDRESS: Address }).transform(({ JARVIS_GNOMCP_ADDRESS: address }) => ({ address })),
+    z.object({ JARVIS_GNOMCP_COMMAND: z.string(), JARVIS_GNOMCP_CONFIG: z.string() }).transform((spawned) => ({
+      command: spawned.JARVIS_GNOMCP_COMMAND,
+      config: spawned.JARVIS_GNOMCP_CONFIG,
+    })),
+  ]);
+  return Gnomcp.parse(settings);
 }

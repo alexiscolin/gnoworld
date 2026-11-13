@@ -7,6 +7,9 @@ export default [
   index("routes/home.tsx"),
   route("earth", "routes/earth.tsx"),
   route("list", "routes/list.tsx"),
+  // The cosmos's other views are its page too: the whole cosmos far out, and a namespace's system (D344).
+  route("universe", "routes/cosmos.tsx", { id: "cosmos-universe" }),
+  route("s/:system", "routes/cosmos.tsx", { id: "cosmos-system" }),
   route("w/:world", "routes/world.tsx"),
   route("e/:ecosystem", "routes/ecosystem.tsx"),
   route("r/*", "routes/realm.tsx"),

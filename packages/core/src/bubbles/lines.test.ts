@@ -37,6 +37,10 @@ describe("bubbleLines", () => {
     ]);
   });
 
+  it("gives a line the room it was said in, when the room is named", () => {
+    expect(read([room([line("m1")], { room: "#earth/builders" })])[0]?.room).toBe("#earth/builders");
+  });
+
   it("names a guest by its nick, which is all a guest has", () => {
     const guest = { ...line("m1", { from: "guest-7" }) };
     delete guest.account;

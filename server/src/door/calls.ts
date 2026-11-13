@@ -1,0 +1,139 @@
+// The door's calls to jarvis for an ask (D13985): the answers kept, the one call in flight for the same ask, and the effects
+// of an answer on the account's quota and share. Asks with the same key at once share one call, never
+// stopped for a reader leaving; a quota full for the asker that made it sends the others back through. The effects run
+// before the call leaves the table, so a later ask finds the answer kept or none in flight.
+import {
+  EXPLAIN_VERSION,
+  type Address,
+  type JarvisAnswer,
+  JarvisAsk,
+  JarvisPaidAnswer,
+  JarvisQuestion,
+} from "@gnoworld/schemas";
+import type { Day } from "./day.ts";
+import type { Jarvis, Failure } from "./jarvis.ts";
+import type { Counted } from "./quota.ts";
+import type { Kept } from "./kept.ts";
+import type { Served } from "./served.ts";
+
+export type Called = { ok: true; answer: JarvisPaidAnswer } | { ok: false; error: Failure };
+type Outcome = { full: true } | { full: false; called: Called };
+/** What a call comes to for its asker: served, the quota full, or jarvis's word. */
+export type Result = { kind: "served"; answer: JarvisAnswer } | { kind: "full" } | { kind: "called"; called: Called };
+
+/** One ask of one account, as the door makes it. */
+export interface Asked {
+  key: string;
+  who: Address;
+  room: string;
+  started: number;
+  // The ask, without the room's lines, which are read when its call is made.
+  ask: JarvisQuestion;
+  // The chain of a function ask's room, found by the door, and the key its answer is kept under, none when it is never kept.
+  chain?: string | undefined;
+  keptKey?: string | undefined;
+}
+
+interface Deps {
+  quota: Counted<"take" | "giveBack">["quota"];
+  named: Counted<"take">["named"];
+  recent: (room: string, asker: string) => JarvisAsk["lines"];
+  jarvis: Pick<Jarvis, "ask">;
+  day: Pick<Day, "spend">;
+  served: Pick<Served, "get" | "set">;
+  kept: Pick<Kept, "get" | "set">;
+}
+
+/** What the page reads of an answer: never its cost; a `failed` is no answer but a failure, so none. */
+function forPage(answer: JarvisPaidAnswer): JarvisAnswer | undefined {
+  if (answer.status === "failed") return undefined;
+  if (answer.status === "answered") return { status: "answered", markdown: answer.markdown, buttons: answer.buttons };
+  return { status: answer.status };
+}
+
+/** A call as the door's relay answers it: what the page reads, or the failure. */
+export type Relayed = { ok: true; answer: JarvisAnswer } | { ok: false; error: Failure };
+export function forRelay(called: Called): Relayed {
+  if (!called.ok) return called;
+  const page = forPage(called.answer);
+  return page === undefined ? { ok: false, error: "failed" } : { ok: true, answer: page };
+}
+
+// What a call that may have spent and told nothing is charged to the share: 0.05 $, in millionths.
+const UNKNOWN_COST = 50_000;
+const costOf = (called: Called): number => {
+  if (!called.ok) return ["slow", "failed", "shape", "lost"].includes(called.error) ? UNKNOWN_COST : 0;
+  return "cost" in called.answer ? (called.answer.cost ?? 0) : 0;
+};
+// Whether jarvis made nothing and spent nothing for a call: its question is given back.
+const nothing = (called: Called): boolean =>
+  called.ok
+    ? (called.answer.status === "spent" || called.answer.status === "off") && costOf(called) === 0
+    : called.error === "refused";
+
+// A function's explanation reads the code alone: it is kept only when jarvis says its code reads all succeeded, under the prompt's version the door knows.
+const isExplain = (ask: JarvisQuestion): boolean => "ask" in ask && ask.ask === "function";
+const keepable = (ask: JarvisQuestion, called: Called): boolean =>
+  !isExplain(ask) ||
+  (called.ok &&
+    called.answer.status === "answered" &&
+    called.answer.keep === true &&
+    called.answer.version === EXPLAIN_VERSION);
+
+export function callsOf({ quota, named, recent, jarvis, day, served, kept }: Deps) {
+  const flights = new Map<string, Promise<Outcome>>();
+  // What an answer does to the account's quota, its share, and the answers kept. A call is never stopped
+  // when its asker leaves: it ends, and its cost is the share of the one who asked first.
+  const settle = ({ who, room, started, key, keptKey, ask }: Asked, called: Called): void => {
+    if (nothing(called)) quota.giveBack(who, started);
+    const cost = costOf(called);
+    day.spend(who, cost, started);
+    const page = called.ok ? forPage(called.answer) : undefined;
+    if (page === undefined || !keepable(ask, called)) return;
+    served.set(key, page, { room, started });
+    if (keptKey !== undefined) kept.set(keptKey, page, isExplain(ask) ? undefined : { room, started });
+  };
+  const call = async (asked: Asked): Promise<Outcome> => {
+    const { who, room, started, ask, chain } = asked;
+    try {
+      // A function's explanation is given no line of the room: it reads the code alone, so every room may share it.
+      const lines = isExplain(ask) ? [] : recent(room, "ask" in ask ? "" : who);
+      if (!quota.take(who, await named(who), started)) return { full: true };
+      const called = await jarvis.ask(
+        { ...ask, lines, ...(chain === undefined || !isExplain(ask) ? {} : { chain }) },
+        new AbortController().signal,
+      );
+      settle(asked, called);
+      return { full: false, called };
+    } finally {
+      flights.delete(asked.key);
+    }
+  };
+  // The call of an ask nobody is making: in the table before it starts any work, so a throw never leaves it a rejection.
+  const make = async (asked: Asked): Promise<Result> => {
+    const outcome = Promise.resolve().then(() => call(asked));
+    flights.set(asked.key, outcome);
+    const done = await outcome;
+    return done.full ? { kind: "full" } : { kind: "called", called: done.called };
+  };
+  // Another's call waited for: served from what it made, or its word as it is; none for a quota full, which is its asker's.
+  const wait = async (flight: Promise<Outcome>): Promise<Result | undefined> => {
+    const outcome = await flight;
+    if (outcome.full) return undefined;
+    const { called } = outcome;
+    const page = called.ok ? forPage(called.answer) : undefined;
+    if (page?.status === "answered" || page?.status === "declined") return { kind: "served", answer: page };
+    return { kind: "called", called };
+  };
+  return async (asked: Asked): Promise<Result> => {
+    for (;;) {
+      const held = served.get(asked.key) ?? (asked.keptKey === undefined ? undefined : kept.get(asked.keptKey));
+      if (held !== undefined) return { kind: "served", answer: held };
+      const flight = flights.get(asked.key);
+      if (flight === undefined) break;
+      const result = await wait(flight);
+      if (result !== undefined) return result;
+    }
+    return make(asked);
+  };
+}

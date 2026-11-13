@@ -4,6 +4,7 @@
 // app/tests/chain/onyxRealmDeploy.json. The indexer has no time field (F2950), so every fact carries its age as a block height
 // and no chart by date stands on it (F2974).
 import { RealmDeployAnswer, REALM_FACTS_CAPS, type RealmFactsValue } from "@gnoworld/schemas/indexer";
+import { indexerUrl } from "./asks.ts";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 
 // A filter on a message's value lets a message of another type through (history.ts, 7k3): the type is chosen by `typeUrl`, and the reader
@@ -19,8 +20,11 @@ export async function readFacts(
 ): Promise<ChainRead<RealmFactsValue>> {
   // A name past the cap is refused before anything is asked.
   if (path.length > REALM_FACTS_CAPS.path) return failedRead("bad-name", sourceOf(indexer, options));
-  const asked = `${indexer}?query=${encodeURIComponent(DEPLOY_QUERY)}&variables=${encodeURIComponent(JSON.stringify({ path }))}`;
-  const answer = await readChain(asked, RealmDeployAnswer, options);
+  const answer = await readChain(
+    indexerUrl(indexer, { query: DEPLOY_QUERY, variables: { path } }),
+    RealmDeployAnswer,
+    options,
+  );
   if (!answer.ok) return answer;
   const [deploy] = answer.value.data.getTransactions ?? [];
   if (deploy === undefined) return failedRead("no-realm", answer.source);

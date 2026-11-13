@@ -10,7 +10,7 @@ interface Image {
   readonly data: Uint8ClampedArray;
   readonly width: number;
 }
-export interface Tools {
+interface Tools {
   readonly images: readonly Image[];
   /** The first picture. */
   readonly image: Image;
@@ -71,7 +71,7 @@ const install = async (base64s: readonly string[]) => {
 
 /** Decodes `pictures` on a page of their own, then runs `read` there on `input`: `read` reaches the tools as `globalThis.__pixels`, and
  * the functions `helpers` declares as the page's own. */
-export async function reading<Input, Output>(
+async function reading<Input, Output>(
   page: Page,
   pictures: readonly Buffer[],
   [read, input, helpers = ""]: readonly [(given: Input) => Output, Input, string?],
@@ -126,63 +126,3 @@ export const colours = (page: Page, picture: Buffer, boxes: Box[]) => reading(pa
 
 /** A 64-bit hash of a picture's decoded pixels: a 0 px pin, whatever the PNG's own encoding. */
 export const pixelHash = (page: Page, picture: Buffer) => reading(page, [picture], [hashOf, undefined]);
-
-/** Per disc, inside 95% of its radius: the shares of its pixels white-hot (luma over 170, warm), white (as bright, its blue two
- * thirds of its red or more), deep red, glowing gold or red (any of the last two in the left, night half too), pale and cold; and the
- * mean CIE Lab of its pixels over luma 30. */
-export interface Glow {
-  readonly hot: number;
-  readonly white: number;
-  readonly red: number;
-  readonly glow: number;
-  readonly night: number;
-  readonly pale: number;
-  readonly lab: readonly [number, number, number];
-}
-const glowOf = (discs: readonly { x: number; y: number; r: number }[]) => {
-  const { image, luma, labAt, rgbAt, inside } = Reflect.get(globalThis, "__pixels") as Tools;
-  const KINDS = ["hot", "white", "red", "glow", "pale"] as const;
-  const kindsOf = ([red, green, blue]: Rgb, light: number) => {
-    const hot = light > 170 && red > blue + 20;
-    const warm = !hot && red > 90;
-    return {
-      hot,
-      white: light > 170 && blue >= (2 / 3) * red,
-      red: warm && red > green * 1.6,
-      glow: warm && red > green && green >= blue && red - blue > 50,
-      pale: light > 70 && red <= blue + 20,
-    };
-  };
-  const tally = (points: readonly [number, number][], centre: number) => {
-    const counts = { hot: 0, white: 0, red: 0, glow: 0, pale: 0, left: 0, night: 0, seen: 0 };
-    const lab = [0, 0, 0];
-    for (const [px, py] of points) {
-      const light = luma(image, px, py);
-      const kinds = kindsOf(rgbAt(image, px, py), light);
-      for (const kind of KINDS) counts[kind] += Number(kinds[kind]);
-      counts.left += Number(px < centre);
-      counts.night += Number(px < centre && kinds.glow);
-      if (light <= 30) continue;
-      counts.seen += 1;
-      for (const [at, value] of labAt(image, px, py).entries()) lab[at] = (lab[at] ?? 0) + value;
-    }
-    return { counts, lab };
-  };
-  return discs.map((disc) => {
-    const points = inside(disc, 0.95);
-    const { counts, lab } = tally(points, disc.x);
-    const [all, seen] = [Math.max(points.length, 1), Math.max(counts.seen, 1)];
-    return {
-      ...{ hot: counts.hot / all, white: counts.white / all, red: counts.red / all, glow: counts.glow / all },
-      ...{ night: counts.night / Math.max(counts.left, 1), pale: counts.pale / all },
-      lab: [(lab[0] ?? 0) / seen, (lab[1] ?? 0) / seen, (lab[2] ?? 0) / seen] as const,
-    };
-  });
-};
-
-/** What glows on each disc of `picture`, and its colour (a glowing world's vents, their edges, its veins, and what no crust is). */
-export const glows = (
-  page: Page,
-  picture: Buffer,
-  discs: readonly { x: number; y: number; r: number }[],
-): Promise<Glow[]> => reading(page, [picture], [glowOf, discs]);

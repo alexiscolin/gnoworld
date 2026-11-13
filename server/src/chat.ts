@@ -4,35 +4,38 @@
 // its rules alone), through a fair queue, then acted on, streamed, and struck toward a mute; the routes
 // that tell the activity, the rooms by section and the verdicts, each room's to whom may see it.
 import type { DatabaseSync } from "node:sqlite";
-import type { Presence } from "@gnoworld/schemas/indexer";
 import type { Hono } from "hono";
 import { makeActivity } from "./activity/activity.ts";
-import { makeRecentLines, type RecentLines } from "./door/lines.ts";
+import type { RecentLines } from "./door/lines.ts";
+import type { Answers } from "./door/said.ts";
 import { activityRoutes } from "./activity/routes.ts";
 import type { Config } from "./config.ts";
-import { ircLink, type Link, type Said } from "./irc/link.ts";
+import type { Said } from "./irc/link.ts";
 import type { Command } from "./irc/lines.ts";
 import type { Log } from "@gnoworld/service/log";
+import type { CardFlow } from "./cards/flow.ts";
+import type { ChatCards } from "./cards/wire.ts";
+import type { Translate, TranslationFlow } from "./translations/flow.ts";
 import { makeProgress } from "./moderation/catchup.ts";
-import { checkerFor, strikesFor } from "./moderation/checker.ts";
+import { checkerFor, nameCheckerFor, providerOf, strikesFor } from "./moderation/checker.ts";
 import type { Answer } from "./moderation/provider.ts";
 import { makeQueue } from "./moderation/queue.ts";
 import { moderate } from "./moderation/way.ts";
 import type { Pins } from "./pins/pins.ts";
 import { pinsFor } from "./pins/wire.ts";
-import { ensureNamed, ensureRooms, listRooms } from "./rooms/rooms.ts";
 import { makeRooms, type Rooms } from "./rooms/create.ts";
 import { listRoutes } from "./rooms/list.ts";
-import { listed, mayRead, publicRoom, staffOf, type World } from "./rooms/types.ts";
-import { getConnInfo } from "@hono/node-server/conninfo";
-import { passedLines, type Signals } from "./signals/signals.ts";
+import { mayRead, type World } from "./rooms/types.ts";
+import { linkFor, listedTo, ownerActs, seedRooms, stopper, verdictsFor } from "./chatParts.ts";
+import { hearing, presentFor, presentOf } from "./chatHearing.ts";
+import { guestFor, type GuestSettings } from "./guest/wire.ts";
+import type { Search } from "./search/index.ts";
+import { linesAfter } from "./chatLines.ts";
+import type { Signals } from "./signals/signals.ts";
 import { makeStream, type Stream } from "./stream/stream.ts";
-import { verdictRoutes } from "./stream/verdicts.ts";
-import { visitor } from "./visitor.ts";
-import { keeping, reconcilerFor, typedRooms } from "./rooms/wire.ts";
-import { countriesTo, startPresent, type ChatWorld, type Present } from "./worlds/present.ts";
+import { keeping, reconcilerFor, sweeping } from "./rooms/wire.ts";
 
-export interface Chat {
+export interface Chat extends ReturnType<typeof guestFor> {
   activity: Hono;
   // A world's rooms by section, to whom may see them (4b).
   roomList: Hono;
@@ -41,24 +44,34 @@ export interface Chat {
   verdicts: Hono;
   // The moderators' rooms (3l), made and archived through the link.
   rooms: Rooms;
+  // A room's name checked as a message of its world is (D394), for the Earth's public rooms.
+  nameCheck: ReturnType<typeof nameCheckerFor>;
   // Each room's pins (4d), kept in the database: read from Ergo by their lines' ids, dropped as their lines leave.
   pins: Pins;
-  // Whether an account may pin in a room: its world's moderators and the team.
-  mayPin: (room: string, who: string) => boolean;
+  // The link cards (slice 13): none unless they are on; what the routes serve and the retention expires.
+  cards: CardFlow | undefined;
+  // The stored translations (slice 13): none while Jarvis is off; what the routes serve and the retention expires.
+  translations: TranslationFlow | undefined;
+  // Whether an account is staff of a room: its world's moderators and the team.
+  staff: (room: string, who: string) => boolean;
+  // An owner's moderation (D13936): a line hidden by the link's REDACT, a mute that ends none, a world's rooms.
+  hide: (room: string, msgid: string) => boolean;
+  muteKeeping: (account: string, world: string) => "muted" | "already" | "full";
+  roomsOf: (world: string) => readonly string[];
   // Whether an account, or a guest (undefined), may read a room: the stream's rule, for the pins' route (4d).
   mayRead: (room: string, who: string | undefined) => boolean;
-  // Who is here in each world (7h), where the server keeps its history, and what that route serves, for the ticker's trends (7t).
+  // Who is here in each world (7h), where the server keeps its history.
   presence?: Hono;
-  presenceNow?: () => Presence;
-  // Each world's rooms with their usual, for the trends' score (7t3).
-  presenceChat?: () => readonly ChatWorld[];
   // A public room's last lines moderation let through, for Jarvis's door (10g), and one by its id (10k).
   recent: RecentLines["recent"];
-  line: RecentLines["line"];
+  // A room's last line's id, any room (D13985).
+  last: RecentLines["last"];
+  // Jarvis's answers said to a room and kept by their line's id: none without the door's part in the options.
+  said: Answers | undefined;
   stop: () => Promise<void>;
 }
 
-interface Settings {
+export interface Settings extends Partial<Pick<GuestSettings, "origins" | "guests" | "defaults">> {
   // Each world's rules, and since 3m its moderators, groups and typed rooms (rooms/types.ts).
   worlds: ReadonlyMap<string, World>;
   team?: ReadonlySet<string> | undefined;
@@ -69,7 +82,7 @@ interface Settings {
   spared?: (account: string) => boolean;
 }
 
-interface Options {
+export interface Options {
   log: Log;
   pepper: string;
   now?: () => number;
@@ -77,6 +90,8 @@ interface Options {
   provider?: (text: string) => Promise<Answer | "unchecked">;
   // How often ended mutes are lifted.
   tickMs?: number;
+  // How often the Earth's public rooms nobody writes in are archived (D394).
+  sweepMs?: number;
   // How often every room is read from Ergo and put back as its type says (3m).
   reconcileMs?: number;
   // The account of a session's token (login.ts's session), for the rooms a reader may see.
@@ -86,106 +101,51 @@ interface Options {
   // The first signals' store (slice 9h): with it, the first line of a public room that passed moderation is recorded and
   // told on the stream; without it, none is.
   signals?: Signals | undefined;
+  // The search index (slice 13): the lines that pass moderation, a guest's among them, enter it, a REDACT or the room's join keeps it true.
+  search?: Search | undefined;
+  // Link cards (slice 13, L3): the link reader's call and the card's thresholds; none, no card.
+  cards?: ChatCards | undefined;
+  // jarvis's translate call, as the door's client makes it; none while Jarvis is off, and no line is translated.
+  translate?: Translate | undefined;
   // How long after a refused hide (the line not yet in Ergo's history) it is asked again (F2462).
   redactRetryMs?: number;
   // The file who-is-here keeps its history in (7h); none keeps none.
   presence?: string;
+  // What the lines that pass tell Jarvis's door (D13985): the account of each, and the room of a line taken or edited.
+  // `said`: what Jarvis's public answers need of the door, the hosts a link may name.
+  door?: {
+    heard: { said: (account: string) => void };
+    changed: (room: string) => void;
+    said?: { hosts: readonly string[] };
+  };
 }
 
 // A world's rooms at most, its main room aside (3l).
 const ROOMS_PER_WORLD = 20;
-
-// A channel in Ergo the server did not make: with operator-only-creation, an operator made it (3l).
-const unknownChannels =
-  (db: DatabaseSync, log: Log) =>
-  (names: readonly string[]): void => {
-    const known = new Set(listRooms(db).map(({ name }) => name));
-    for (const room of names) if (!known.has(room)) log("alert", { error: "unknown_room", room });
-  };
-
-// Whom a room is listed to: an archived room is a hidden one.
-const listedTo =
-  (settings: Settings, keeper: Rooms) =>
-  (room: string, who: string | undefined): boolean =>
-    keeper.archived(room) ? staffOf(settings, room, who) : listed(settings, room, who);
-
-// The verdicts of lines older than the stream's replay, by the stream's own rule of who reads (4g).
-function verdictsFor(db: DatabaseSync, settings: Settings, { session = () => undefined, now = Date.now }: Options) {
-  return verdictRoutes({
-    db,
-    readable: (room, who) => mayRead(settings, room, who),
-    session,
-    visitor: (c) => visitor(getConnInfo(c).remote.address ?? "", c.req.header("x-real-ip"), settings.trustedProxy),
-    now,
-  });
-}
-
-// What the chat hands on of who is here (7h, 7t3): its route, what it serves and the trends' signals; none without its file.
-const presentOf = (present: Present | undefined) =>
-  present === undefined ? {} : { presence: present.routes, presenceNow: present.current, presenceChat: present.chat };
-
-// Who is here (7h), in the rooms a guest may see: none without its file.
-function presentFor(
-  db: DatabaseSync,
-  file: string | undefined,
-  parts: Omit<Parameters<typeof startPresent>[0], "file" | "rooms">,
-) {
-  return file === undefined ? undefined : startPresent({ ...parts, file, rooms: () => listRooms(db) });
-}
-
-interface Heard {
-  kept: ReturnType<typeof pinsFor>;
-  recent: ReturnType<typeof makeRecentLines>;
-  activity: ReturnType<typeof makeActivity>;
-  present: ReturnType<typeof presentFor>;
-  visible: ReturnType<typeof listedTo>;
-  progress: ReturnType<typeof makeProgress>;
-  queue: ReturnType<typeof makeQueue<Said>>;
-  now: () => number;
-}
-
-// What the chat does with each line the link hears: kept, counted, shown by its country, noted and queued for its check.
-function hearing({ kept, recent, activity, present, visible, progress, queue, now }: Heard) {
-  return (said: Said, replayed: boolean): void => {
-    kept.onEdit(said);
-    recent.edited(said);
-    // A line of a history page is no activity now, whatever its time.
-    if (!replayed) activity.count(said.room, said.account, now());
-    countriesTo(present, visible)(said, replayed);
-    progress.heard(said);
-    // A line the full queue drops is left unchecked, with the alert.
-    if (!queue.push(said)) progress.settled(said);
-  };
-}
 
 // The stream's routes, for whom may read each room.
 const streamFor = (stream: ReturnType<typeof makeStream>, settings: Settings, { session }: Options) =>
   stream.routes({ proxy: settings.trustedProxy, visible: (room, who) => mayRead(settings, room, who), session });
 
 export function startChat(db: DatabaseSync, settings: Settings, options: Options): Chat {
-  const { worlds, ergo } = settings;
   const { log, pepper, now = Date.now } = options;
-  ensureRooms(db, [...worlds.keys()], now());
-  ensureNamed(db, typedRooms(worlds), now());
-  const check = checkerFor(db, settings, options);
+  seedRooms(db, settings, now());
+  // One provider behind one breaker for the lines, the rooms' names and the guests' lines.
+  const ask = providerOf(settings, { ...options, now });
+  const check = checkerFor(db, settings, { ...options, ask });
   const stream = options.stream ?? makeStream();
   const progress = makeProgress(db);
   const send = (command: Command, params: readonly string[]): boolean => link?.send(command, params) ?? false;
   const { mutes, strike } = strikesFor(db, settings, { send, pepper, now });
-  const recent = makeRecentLines({ isPublic: (room) => publicRoom(settings, room) });
-  const passed = passedLines({ roles: settings, recent, stream, signals: options.signals });
-  const run = moderate({ db, check, send, stream, progress, strike, passed });
+  const lines = { ...options, now, stream, ask, link: () => link };
+  const { recent, answers, index, cards, translations, afterPassed } = linesAfter(db, settings, lines);
+  const run = moderate({ db, check, send, stream, progress, strike, passed: afterPassed });
   const queue = makeQueue<Said>({ run, log, now });
   const keeper = makeRooms({ db, send, now, max: ROOMS_PER_WORLD });
   const lifts = setInterval(mutes.tick, options.tickMs ?? 10_000);
   const activity = makeActivity();
   const visible = listedTo(settings, keeper);
-  const present = presentFor(db, options.presence, {
-    open: (room) => visible(room, undefined),
-    rates: activity.rates,
-    now,
-    log,
-  });
+  const present = presentFor(db, options.presence, { visible, activity, stream, log, now });
   const reconciler = reconcilerFor(db, settings, {
     seen: present?.seen,
     keeper,
@@ -194,51 +154,57 @@ export function startChat(db: DatabaseSync, settings: Settings, options: Options
     log,
   });
   const passes = setInterval(reconciler.ask, options.reconcileMs ?? 60_000);
+  const rooms = keeping(keeper, { mutes, reconciler });
+  const stopSweeping = sweeping(db, rooms, { now, ms: options.sweepMs ?? 60 * 60_000, roles: settings });
   const kept = pinsFor(db, settings, { link: () => link, now, log });
-  const link: Link | undefined =
-    ergo === undefined
-      ? undefined
-      : ircLink({
-          ...ergo,
-          rooms: () => listRooms(db).map(({ name }) => name),
-          lastChecked: progress.last,
-          hold: progress.hold,
-          drained: () => queue.idle(),
-          ...(options.redactRetryMs === undefined ? {} : { redactRetryMs: options.redactRetryMs }),
-          onReady: () => {
-            reconciler.flags();
-            mutes.reapply();
-            reconciler.ask();
-          },
-          onJoin: reconciler.joined,
-          ...kept.hooks,
-          onRedact: (room, msgid) => {
-            kept.hooks.onRedact(room, msgid);
-            recent.taken(room, msgid);
-          },
-          onChannels: unknownChannels(db, log),
-          onMessage: hearing({ kept, recent, activity, present, visible, progress, queue, now }),
-          log,
-        });
+  const onMessage = hearing({ kept, cards, recent, activity, present, visible, progress, queue, now });
+  const linked = {
+    db,
+    ergo: settings.ergo,
+    redactRetryMs: options.redactRetryMs,
+    progress,
+    queue,
+    reconciler,
+    mutes,
+    log,
+    onMessage,
+  };
+  const link = linkFor({ ...linked, cards, translations, kept: index.kept(kept), recent: index.recent });
   return {
+    ...guestFor(db, settings, {
+      ...options,
+      log,
+      pepper,
+      now,
+      provider: ask,
+      passed: index.recent.passed,
+      activity,
+      archived: keeper.archived,
+      link: () => link,
+    }),
     activity: activityRoutes(activity, { db, now, visible, session: options.session }),
-    roomList: listRoutes({ db, roles: settings, visible, session: options.session }),
+    roomList: listRoutes({ db, roles: settings, visible, session: options.session, here: present?.here, now }),
     stream: streamFor(stream, settings, options),
     verdicts: verdictsFor(db, settings, options),
-    rooms: keeping(keeper, { mutes, reconciler }),
+    rooms,
+    nameCheck: nameCheckerFor(settings, { ...options, ask }),
     ...kept.api,
+    cards,
+    translations,
     ...presentOf(present),
     recent: recent.recent,
-    line: recent.line,
-    stop: async () => {
-      clearInterval(lifts);
-      clearInterval(passes);
-      present?.stop();
-      // Nothing more starts once stopping: a line left waiting is caught up at the next start.
-      queue.stop();
-      await link?.stop();
-      await queue.idle();
-      stream.close();
-    },
+    last: recent.last,
+    said: answers,
+    ...ownerActs(db, send, mutes),
+    stop: stopper({
+      timers: [lifts, passes],
+      sweep: stopSweeping,
+      present,
+      queue,
+      cards,
+      translations,
+      link: () => link,
+      stream,
+    }),
   };
 }

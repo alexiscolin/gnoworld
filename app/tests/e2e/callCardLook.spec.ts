@@ -1,5 +1,5 @@
 import { adena } from "./adena.ts";
-import { callAndSign, calls, callWallet, connect, openRealm, signNow, writeChain } from "./callCard.ts";
+import { callAndSign, calls, openCall, callWallet, connect, openRealm, signNow, writeChain } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
 // The card's four states as they look, on a computer's screen (9d; frames 31 to 33 and 108 to 114): the preview, the wait for
@@ -16,7 +16,7 @@ test.describe("the call card, as it looks", () => {
     await openRealm(page, () => connect(page));
     const mask = [page.getByRole("banner")];
     const article = calls(page).getByRole("article");
-    await calls(page).getByRole("button", { name: "Call SetBio" }).click();
+    await openCall(page, "SetBio");
     await article.getByRole("textbox", { name: "bio" }).fill("hello gno");
     await expect(article).toHaveScreenshot("call-card-preview.png", { mask });
     await article.getByRole("button", { name: "Sign in Adena" }).click();

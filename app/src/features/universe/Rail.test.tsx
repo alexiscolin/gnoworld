@@ -1,17 +1,20 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot } from "react-dom/client";
+import { MemoryRouter, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, mount, nth, one } from "../../../tests/mount.tsx";
-import type { CosmosWorld, LabelSignals } from "../../scene/cosmos/cosmosWorld.ts";
-import { MAGNIFIED, REACH } from "./railDock.ts";
-import { Rail, PORTRAIT_SIZE, type RailSource } from "./Rail.tsx";
-import { RAIL_MINUTE, type RailPlaces } from "./railWorlds.ts";
-import { Portraits } from "./worldsFeed.ts";
+import type { CosmosWorld } from "../../space/cosmosWorld.ts";
+import { StoreProvider } from "../../storeContext.tsx";
+import { Rail } from "./Rail.tsx";
+import type { Known, RailPlaces } from "../../railWorlds.ts";
+import type { WorldSignals } from "./signals.ts";
 
-// The rail (frame 4, 7i): the Earth and the worlds of the moment as links, one stop in the tab order, the arrows moving among them, ending
-// on the last (8p); each planet the planets' own portrait once drawn; magnified like a dock under the pointer, never under reduced motion
-// nor on a touch screen. Where it stands, the page's plain list of worlds steps aside.
+// The rail (frame 4, 7i, 8p): the Earth and the worlds of the moment as links, one tab stop, the arrows moving among them; magnified like a
+// dock under the pointer, never under reduced motion nor on a touch screen. Its feed is the test's, told by hand (railFeed.ts).
+const MAGNIFIED = 1.55; // railDock.ts's, no longer exported
+const REACH = 230;
+const RAIL_MINUTE = 60_000;
 const NOW = Date.parse("2026-11-03T12:00:00.000Z");
 const world = (id: string, extra: Partial<CosmosWorld> = {}): CosmosWorld => ({
   id,
@@ -26,7 +29,7 @@ const WORLDS = [
   world("art/hall"),
   world("demo/fresh", { seen: "2026-11-02T12:00:00.000Z" }),
 ];
-const SIGNALS: LabelSignals = {
+const SIGNALS: WorldSignals = {
   present: new Map([
     ["earth", { here: 3, perHour: 0, rise: null }],
     ["gov/dao", { here: 12, perHour: 0, rise: null }],
@@ -41,33 +44,28 @@ const PLACES: RailPlaces = {
   earth: "/earth",
   worlds: [{ slug: "govdao", path: "/w/govdao", realms: ["gno.land/r/gov/dao"] }],
 };
-const PORTRAIT = "data:image/jpeg;base64,AAAA";
 
-type Data = ReturnType<RailSource["data"]>;
+// The feed the rail reads (railFeed.ts): what `data` gives, and who listens.
+type Data = Known | undefined;
+const feeding = vi.hoisted((): { held: Data; listeners: Set<() => void> } => ({
+  held: undefined,
+  listeners: new Set(),
+}));
+vi.mock("../../railFeed.ts", () => ({
+  subscribe: (listener: () => void) => {
+    feeding.listeners.add(listener);
+    return () => feeding.listeners.delete(listener);
+  },
+  data: () => feeding.held,
+  feed: () => undefined,
+}));
 const KNOWN: Data = { worlds: WORLDS, signals: SIGNALS };
-function sourceOf(data: Data | "none" = KNOWN) {
-  const listeners = new Set<() => void>();
-  let held: Data = data === "none" ? undefined : data;
-  // The scene's portraits, as the feed asks them.
-  const portraits = vi.fn<(ids: readonly string[], size: number) => Promise<ReadonlyMap<string, string>>>(
-    () => new Promise(() => undefined),
-  );
-  const source: RailSource = {
-    subscribe: (listener: () => void) => {
-      listeners.add(listener);
-      return () => listeners.delete(listener);
-    },
-    data: () => held,
-    portraits: new Portraits(portraits),
-  };
-  const tell = (next: Data) => {
-    held = next;
-    act(() => {
-      for (const listener of listeners) listener();
-    });
-  };
-  return { source, portraits, tell };
-}
+const tell = (next: Data) => {
+  feeding.held = next;
+  act(() => {
+    for (const listener of feeding.listeners) listener();
+  });
+};
 
 function media({ reduced = false, touch = false } = {}) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -77,10 +75,22 @@ function media({ reduced = false, touch = false } = {}) {
   }));
 }
 
-function rail(source = sourceOf().source) {
-  const open = vi.fn<(href: string) => void>();
-  const box = mount(<Rail source={source} places={PLACES} open={open} />);
-  return { box, open };
+// Each rail its own universe: the page keeps a universe's order across its pages (Rail.tsx's `orders`), which a test must not inherit.
+let universes = 0;
+function Where() {
+  return <output data-at={useLocation().pathname} />;
+}
+const page = () => (
+  <MemoryRouter>
+    <StoreProvider>
+      <Where />
+      <Rail places={PLACES} universe={`test-${String((universes += 1))}`} />
+    </StoreProvider>
+  </MemoryRouter>
+);
+function rail() {
+  const box = mount(page());
+  return { box, at: () => one(box, "output").dataset["at"] };
 }
 // The rail in a root of its own, for a test that takes it off the page.
 function alone() {
@@ -88,7 +98,7 @@ function alone() {
   document.body.append(box);
   const root = createRoot(box);
   act(() => {
-    root.render(<Rail source={sourceOf().source} places={PLACES} open={vi.fn()} />);
+    root.render(page());
   });
   return { box, root };
 }
@@ -120,12 +130,14 @@ beforeEach(() => {
     toFake: ["setTimeout", "clearTimeout", "Date", "requestAnimationFrame", "cancelAnimationFrame"],
   });
   media();
+  tell(KNOWN);
   vi.stubGlobal("ResizeObserver", Watching);
   resized.told.length = 0;
   resized.watched = 0;
   resized.gone = 0;
 });
 afterEach(() => {
+  feeding.held = undefined;
   vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
@@ -145,27 +157,27 @@ describe("the rail", () => {
   });
 
   it("shows nothing before the worlds come", () => {
-    const { box } = rail(sourceOf("none").source);
+    const { box } = (tell(undefined), rail());
     expect(box.querySelector("nav")).toBeNull();
   });
 
   it("goes to a world's page through the page's router on a plain click, and leaves a click with a key to the browser", () => {
-    const { box, open } = rail();
+    const { box, at } = rail();
     const go = nth(worlds(box), 1);
     const plain = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
     act(() => {
       go.dispatchEvent(plain);
     });
-    expect(open).toHaveBeenCalledWith("/w/govdao");
+    expect(at()).toBe("/w/govdao");
     expect(plain.defaultPrevented).toBe(true);
     for (const held of [{ metaKey: true }, { ctrlKey: true }, { shiftKey: true }, { altKey: true }, { button: 1 }]) {
       const withKey = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0, ...held });
       act(() => {
-        go.dispatchEvent(withKey);
+        nth(worlds(box), 2).dispatchEvent(withKey);
       });
       expect(withKey.defaultPrevented).toBe(false);
     }
-    expect(open).toHaveBeenCalledTimes(1);
+    expect(at()).toBe("/w/govdao");
   });
 
   it("names each world's link by its name alone: its planet says nothing more", () => {
@@ -254,8 +266,7 @@ describe("the rail's keyboard", () => {
   });
 
   it("gives the tab stop back to the first world when the list shrinks under it", () => {
-    const { source, tell } = sourceOf();
-    const { box } = rail(source);
+    const { box } = rail();
     const links = worlds(box);
     nth(links, 0).focus();
     press(nth(links, 0), "End");
@@ -266,8 +277,7 @@ describe("the rail's keyboard", () => {
   });
 
   it("holds its order while a world has the focus", () => {
-    const { source, tell } = sourceOf();
-    const { box } = rail(source);
+    const { box } = rail();
     nth(worlds(box), 1).focus();
     act(() => {
       nth(worlds(box), 1).dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
@@ -288,8 +298,7 @@ describe("the rail's order, held while the reader is on it", () => {
   };
 
   it("holds its order under the pointer, and takes the latest once the pointer leaves", () => {
-    const { source, tell } = sourceOf();
-    const { box } = rail(source);
+    const { box } = rail();
     const nav = one(box, "nav[aria-label='Worlds']");
     act(() => {
       nav.dispatchEvent(new MouseEvent("pointerenter"));
@@ -304,8 +313,7 @@ describe("the rail's order, held while the reader is on it", () => {
   });
 
   it("takes the latest once the focus leaves the rail, not while it moves inside it", () => {
-    const { source, tell } = sourceOf();
-    const { box } = rail(source);
+    const { box } = rail();
     const [first, second] = [nth(worlds(box), 0), nth(worlds(box), 1)];
     act(() => {
       first.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
@@ -320,89 +328,6 @@ describe("the rail's order, held while the reader is on it", () => {
       second.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: document.body }));
     });
     expect(names(box).slice(1, 3)).toEqual(["go", "GovDAO"]);
-  });
-});
-
-describe("the rail's planets", () => {
-  it("asks the scene once for the portraits of the worlds it shows, never a seed's, at the size a magnified planet takes", () => {
-    const { source, portraits } = sourceOf();
-    rail(source);
-    expect(portraits).toHaveBeenCalledTimes(1);
-    expect(portraits).toHaveBeenCalledWith(
-      ["earth", "gov/dao", "games/go", "art/hall"],
-      PORTRAIT_SIZE,
-      expect.any(AbortSignal),
-    );
-    expect(PORTRAIT_SIZE).toBeGreaterThanOrEqual(Math.ceil(64 * MAGNIFIED));
-  });
-
-  it("shows the drawn disc until a portrait comes, then the portrait", async () => {
-    const { source, portraits } = sourceOf();
-    let drawn: (portraits: ReadonlyMap<string, string>) => void = () => undefined;
-    portraits.mockImplementation(
-      () =>
-        new Promise((done) => {
-          drawn = done;
-        }),
-    );
-    const { box } = rail(source);
-    const picture = () => nth(worlds(box), 1).querySelector("img")?.getAttribute("src") ?? "";
-    expect(picture()).toMatch(/^data:image\/svg\+xml/);
-    await act(async () => {
-      drawn(new Map([["gov/dao", PORTRAIT]]));
-      await Promise.resolve();
-    });
-    expect(picture()).toBe(PORTRAIT);
-  });
-
-  it("asks for a world's portrait once, drawn or not, and never twice while an ask is on its way", async () => {
-    const { source, portraits, tell } = sourceOf();
-    portraits.mockResolvedValue(new Map([["gov/dao", PORTRAIT]]));
-    rail(source);
-    await act(async () => {
-      await Promise.resolve();
-    });
-    vi.advanceTimersByTime(60_000);
-    tell({
-      worlds: [...WORLDS, world("new/one")],
-      signals: { ...SIGNALS, present: new Map([...SIGNALS.present, ["new/one", { here: 2, perHour: 0, rise: null }]]) },
-    });
-    await act(async () => {
-      await Promise.resolve();
-    });
-    expect(portraits).toHaveBeenLastCalledWith(["new/one"], PORTRAIT_SIZE, expect.any(AbortSignal));
-    expect(portraits).toHaveBeenCalledTimes(2);
-  });
-
-  it("asks nothing again when the rail comes back to the same page: the portraits outlive it", async () => {
-    const { source, portraits } = sourceOf();
-    portraits.mockResolvedValue(new Map([["gov/dao", PORTRAIT]]));
-    for (let visit = 0; visit < 3; visit += 1) {
-      const box = document.createElement("div");
-      document.body.append(box);
-      const root = createRoot(box);
-      act(() => {
-        root.render(<Rail source={source} places={PLACES} open={vi.fn()} />);
-      });
-      await act(async () => {
-        await Promise.resolve();
-      });
-      act(() => {
-        root.unmount();
-      });
-      box.remove();
-    }
-    expect(portraits).toHaveBeenCalledTimes(1);
-  });
-
-  it("asks nothing again for the worlds an ask on its way holds when the list changes", () => {
-    const { source, portraits, tell } = sourceOf();
-    rail(source);
-    vi.advanceTimersByTime(60_000);
-    const present = new Map(SIGNALS.present);
-    present.set("games/go", { here: 90, perHour: 0, rise: null });
-    tell({ worlds: WORLDS, signals: { ...SIGNALS, present } });
-    expect(portraits).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -434,9 +359,9 @@ describe("the rail's magnification", () => {
     frames();
   };
   // A layout that answers the dock as a page's would, read off the DOM as it stands: a link 85 px of planet, gap and name, 98 at least, its
-  // planet 64 px times its --_mag (none for the `planetless` one), each edge on the page's grid of 1/64 px as Chromium lays out, then moved
+  // planet 64 px times its --_mag, each edge on the page's grid of 1/64 px as Chromium lays out, then moved
   // by the translate the dock writes, a transform, in floats. What it gives: a planet's middle on the page.
-  const flowing = (box: HTMLElement, { planetless = -1 } = {}) => {
+  const flowing = (box: HTMLElement) => {
     const list = one(box, "nav[aria-label='Worlds'] ul");
     const grid = (value: number) => Math.round(value * 64) / 64;
     const shift = () => Number(/(-?[\d.]+)px/.exec(list.style.getPropertyValue("translate"))?.[1] ?? 0);
@@ -451,7 +376,7 @@ describe("the rail's magnification", () => {
       ) +
       shift() -
       scrolled();
-    const side = (at: number) => (at === planetless ? 0 : 64 * magnification(nth(worlds(box), at)));
+    const side = (at: number) => 64 * magnification(nth(worlds(box), at));
     vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function laidOut(this: HTMLElement) {
       const links = worlds(box);
       const link = links.indexOf(this);
@@ -461,9 +386,10 @@ describe("the rail's magnification", () => {
       if (planet >= 0) return new DOMRect(1612, topOf(planet), grid(side(planet)), grid(side(planet)));
       return new DOMRect();
     });
-    return (at: number) => {
-      const { top, height } = nth(worlds(box), at).firstElementChild?.getBoundingClientRect() ?? new DOMRect();
-      return top + height / 2;
+    // How far the place `pointed` is from where it stood at rest in link `at` (its top `restTop`, 98 px high), at the same share of the link.
+    return (at: number, pointed: number, restTop = 160 + 98 * at) => {
+      const { top, height } = nth(worlds(box), at).getBoundingClientRect();
+      return Math.abs(top + ((pointed - restTop) / 98) * height - pointed);
     };
   };
   const reach = (box: HTMLElement, at: number) => {
@@ -522,7 +448,7 @@ describe("the rail's magnification", () => {
     frames();
     const sizes = worlds(box).map(magnification);
     expect(nth(sizes, 2)).toBe(Math.max(...sizes));
-    expect(Math.abs(middle(2) - pointed)).toBeLessThanOrEqual(3);
+    expect(middle(2, pointed)).toBeLessThanOrEqual(3);
     expect(nth(sizes, 2)).toBeGreaterThan(1.5);
   });
 
@@ -532,25 +458,17 @@ describe("the rail's magnification", () => {
     const pointed = 160 + 98 * 2 + 32 + 40;
     point(box, pointed);
     frames();
-    expect(Math.abs(middle(2) + 40 * magnification(nth(worlds(box), 2)) - pointed)).toBeLessThanOrEqual(3);
+    expect(middle(2, pointed)).toBeLessThanOrEqual(3);
   });
 
   it("holds the upper world for a pointer on the line between two", () => {
     const { box } = rail();
-    const middle = flowing(box);
+    flowing(box);
     const pointed = 160 + 98 * 2;
     point(box, pointed);
     frames();
-    expect(Math.abs(middle(1) + 66 * magnification(nth(worlds(box), 1)) - pointed)).toBeLessThanOrEqual(3);
-  });
-
-  it("keeps a world whose planet has no size where it stood, as the planets above it grow", () => {
-    const { box } = rail();
-    flowing(box, { planetless: 2 });
-    point(box, 160 + 98 * 2 + 49);
-    frames();
-    expect(Math.abs(nth(worlds(box), 2).getBoundingClientRect().top - (160 + 98 * 2))).toBeLessThanOrEqual(1);
-    expect(magnification(nth(worlds(box), 1))).toBeGreaterThan(1.2);
+    // The line itself is the upper link's foot: it stays at the pointer.
+    expect(Math.abs(nth(worlds(box), 1).getBoundingClientRect().bottom - pointed)).toBeLessThanOrEqual(3);
   });
 
   it("aims at the world under the pointer in a column scrolled before it was pointed at", () => {
@@ -562,7 +480,7 @@ describe("the rail's magnification", () => {
     const pointed = 160 + 98 * 2 + 32;
     point(box, pointed);
     frames();
-    expect(Math.abs(middle(3) - pointed)).toBeLessThanOrEqual(3);
+    expect(middle(3, pointed, 160 + 98 * 2)).toBeLessThanOrEqual(3);
   });
 
   it("holds the planet it left under the place it left as the planets shrink back, then stands the column at rest", () => {
@@ -577,15 +495,14 @@ describe("the rail's magnification", () => {
       vi.advanceTimersByTime(50);
     });
     expect(magnification(nth(worlds(box), 2))).toBeGreaterThan(1.1);
-    expect(Math.abs(middle(2) - pointed)).toBeLessThanOrEqual(3);
+    expect(middle(2, pointed)).toBeLessThanOrEqual(3);
     frames();
     expect(one(box, "nav[aria-label='Worlds'] ul").style.getPropertyValue("translate")).toBe("0 0px");
     expect(vi.getTimerCount()).toBe(0);
   });
 
   it("measures its worlds at rest again when they change while their planets are grown", () => {
-    const { source, tell } = sourceOf();
-    const { box } = rail(source);
+    const { box } = rail();
     const middle = flowing(box);
     point(box, 160 + 98 * 2 + 32);
     act(() => {
@@ -597,7 +514,7 @@ describe("the rail's magnification", () => {
     point(box, pointed);
     frames();
     expect(magnification(nth(worlds(box), 5))).toBeGreaterThan(1.5);
-    expect(Math.abs(middle(5) - pointed)).toBeLessThanOrEqual(3);
+    expect(middle(5, pointed)).toBeLessThanOrEqual(3);
     leave(box);
     expect(one(box, "nav[aria-label='Worlds'] ul").style.getPropertyValue("translate")).toBe("0 0px");
   });
@@ -625,7 +542,7 @@ describe("the rail's magnification", () => {
     frames();
     const sizes = worlds(box).map(magnification);
     expect(nth(sizes, 3)).toBe(Math.max(...sizes));
-    expect(Math.abs(middle(3) - pointed)).toBeLessThanOrEqual(3);
+    expect(middle(3, pointed, 160 + 98 * 2)).toBeLessThanOrEqual(3);
   });
 
   it("grows nothing under a finger, though the screen's main pointer is fine", () => {
@@ -666,18 +583,36 @@ describe("the rail's magnification", () => {
     expect(magnification(nth(worlds(box), 3))).toBeCloseTo(MAGNIFIED, 2);
   });
 
+  // The rail laid out, then hovered or reached by keyboard: no world grows.
+  const growsNothing = (by: "pointer" | "keyboard") => {
+    const { box } = rail();
+    lay(box);
+    if (by === "pointer") point(box, 160 + 49);
+    else reach(box, 2);
+    expect(worlds(box).map(magnification)).toEqual([1, 1, 1, 1, 1]);
+  };
+
   it.each([
     ["under reduced motion, for the pointer", { reduced: true }, "pointer"],
     ["under reduced motion, for the keyboard", { reduced: true }, "keyboard"],
     ["on a touch screen", { touch: true }, "pointer"],
   ] as const)("grows nothing %s", (_, quiet, by) => {
     media(quiet);
-    const { box } = rail();
-    lay(box);
-    if (by === "pointer") point(box, 160 + 49);
-    else reach(box, 2);
-    expect(worlds(box).map(magnification)).toEqual([1, 1, 1, 1, 1]);
+    growsNothing(by);
   });
+
+  it.each(["pointer", "keyboard"] as const)(
+    "grows nothing under the app's Reduce animations setting, for the %s",
+    (by) => {
+      media();
+      document.documentElement.dataset["motion"] = "reduce";
+      try {
+        growsNothing(by);
+      } finally {
+        delete document.documentElement.dataset["motion"];
+      }
+    },
+  );
 
   it("asks no frame once every planet stands at its size", () => {
     const { box } = rail();
@@ -725,8 +660,7 @@ describe("the page's plain list of worlds", () => {
   });
 
   it("steps aside while the rail stands, and comes back when the worlds go", () => {
-    const { source, tell } = sourceOf();
-    rail(source);
+    rail();
     expect(list.dataset["rail"]).toBe("standing");
     tell(undefined);
     expect(list.dataset["rail"]).toBe("none");
@@ -734,7 +668,7 @@ describe("the page's plain list of worlds", () => {
 
   it("stays, and the rail stands not, while the rail would hold the Earth alone (Alexis, B2-5)", () => {
     const earthAlone = { ...SIGNALS, present: new Map([["earth", { here: 3, perHour: 0, rise: null }]]) };
-    const { box } = rail(sourceOf({ worlds: [], signals: earthAlone }).source);
+    const { box } = (tell({ worlds: [], signals: earthAlone }), rail());
     expect(box.querySelector("nav")).toBeNull();
     expect(list.dataset["rail"]).toBe("none");
   });

@@ -118,8 +118,9 @@ function useNewestInView(
       atEndRef.current = atEnd(box);
     } else if (atEndRef.current) box.scrollTop = box.scrollHeight;
   }, [lines, fresh, reactions]);
-  // The list shrinks as the composer grows (a six-line draft): no scroll event comes, so a reader at the end is kept there by
-  // the new size, else the newest lines are lost under the composer (review 6 of 5q).
+  // The list shrinks as the composer grows (a six-line draft), and a line grows as its card, preview or image comes: no
+  // scroll event comes for either, so a reader at the end is kept there by the new size, else the newest lines are lost
+  // under the composer or below the fold. The box and each line are watched; a line that comes is watched as it does.
   useEffect(() => {
     const box = listRef.current;
     if (box === null || typeof ResizeObserver === "undefined") return;
@@ -127,7 +128,14 @@ function useNewestInView(
       if (atEndRef.current) box.scrollTop = box.scrollHeight;
     });
     watch.observe(box);
+    for (const line of box.children) watch.observe(line);
+    const added = new MutationObserver((changes) => {
+      for (const change of changes)
+        for (const node of change.addedNodes) if (node instanceof Element) watch.observe(node);
+    });
+    added.observe(box, { childList: true });
     return () => {
+      added.disconnect();
       watch.disconnect();
     };
   }, []);

@@ -42,6 +42,7 @@ review card and stops.
 | Tests that wait on a state, not a time | Jarvis's and the service's tests that tell two behaviours apart by a wall-clock bound of 0.9 to 2 s (F5315: `gnoscope.test.ts`, `tracing.test.ts:71`, `model.test.ts:150`, `net.test.ts:57`) wait on a count, a flag or fake timers instead; with the app's tests unsteady under load (F5305 to F5307) | The gate runs at loads of 64 to 176 on 14 cores, and a time bound fails a correct build there (F5112's class); by Alexis, slice 10's /pre-merge |
 | Nested tsconfig files protected | A sandbox write ban on the repository's own `tsconfig.json` files below its root (`app/`, `server/`, `jarvis/`, `packages/*/`), measured first against what StrykerJS writes in its copies, each with its probe case and harness mutant | An agent's shell created an empty `packages/core/tsconfig.json` during slice 10's /pre-merge, which no rule refused (F5316); a wider ban could stop StrykerJS; by Alexis |
 | The next testnet in one change | Before the testnet after Onyx: `app/data/universes.json` the one source of the chains; `deploy/egress/acl.yaml`, `deploy/egress/jarvis-acl.yaml`, `deploy/jarvis/gnomcp.toml`, compose's `JARVIS_PROFILES` and `jarvis/src/config.ts`'s default derived from it, or held to it by a test that fails when they differ; the `onyx-1` of `deploy/test.sh`'s and `deploy/k6/run.sh`'s logins read from it; the gno toolchain's chain named once (`check.sh`'s `gno-toolchains/onyx`, `.claude/rules/gno.md`'s `chain/onyx`); `docs/OPERATIONS.md`'s steps for what moves by hand: the realms deployed again, the agent key funded, gnomcp's writable profile | Onyx will be followed by another testnet (Alexis, 2026-11-05): Onyx's name is written by hand in five places of `deploy/`, Jarvis and the harness, beside the data file the app already reads |
+| A claimed fix held to its test | After slice 9 (D326): a fix a report or the ledger calls done names the test that fails without it, and a check refuses the claim when no such test exists | slice-9n-hooks: 9n's report, D322 and the ledger (F6076, F6077 fixed) claimed a refusal of `.git/info/attributes` and a merge shown from its own tree; the patch held neither, found only by /pre-merge's agents (F6080, F6081) |
 | The harness, reusable elsewhere | Not before it has proven itself: two or three product merges in a row whose harness findings fall (`docs/review-log.md`, "The harness, measured"). Then its generic core (the hooks and their install, `merge.sh`, the secret scan, the guard, `/pre-merge` and its agents, the findings ledger, `harness_mutate.py`) leaves what is gnoworld's own (`check.sh`'s steps, the lint rules, gno's mutations, the app), likely as a Claude Code plugin; what a plugin may carry is read in Claude Code's docs first. Its known limits travel with it: one repository shared with the sandbox (F152, F153, F163), so `main` protected with the CI required stays each project's boundary | Alexis, 2026-10-18: reuse it in other projects, after the proofs. Extracted earlier, it would freeze a version no product work has tested |
 
 ## The demo stack, after 1c
@@ -111,7 +112,6 @@ Alexis, 2026-10-23: slice 3's reviews found these; none bites today, each comes 
 | Item | Delivers | Why |
 |---|---|---|
 | More worlds than `_headers` holds (F2461) | The build's stop at 100 rules, about 20 worlds, replaced before the data reaches it: a host's rules that scale, and no stop for nginx, which has no such cap | Alexis, 2026-10-30: kept for now, one world today; the data's growth decides when |
-| A Combobox group's id (F2410) | `ui`'s `Combobox` says or checks that a group's id holds no space and no repeat, since it is joined into `aria-labelledby`; with its next change | An id with a space leaves the group unnamed for a screen reader; the palette's kinds have none today |
 | The composer's lost key (F2411) | The cause of the Home and End lost after a Tab's focus found, and `composer.spec.ts`'s `caretAt` stops pressing them again | The test retries, so a composer that loses the first key would still pass; F2402 left the cause unexplained |
 
 ## The design system, after slice 2
@@ -140,6 +140,11 @@ comes with the slice that brings what it needs.
 
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the
 slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; once logged in, a phone writes (docs/decisions.md, 2026-10-28).
+
+**Where it stands:** slices 0 to 11 are built and in `main` (its tree holds `jarvis/`, `evals/`, `gno/r/seal` and `gno/r/satellite`), except 4b (images
+and files) and 4d (the Discord bridge), which have no code in `server/src` or `app/src`. Slice 12
+is not started: there is no `admin/` and no PostHog in the code (the server's admin API, `server/src/door/admin.ts`, holds Jarvis's
+settings only). What came after slice 9, on `pingpong` and not yet in `main`, is slice 13 below.
 
 | # | Slice | Delivers | Tests first (the main ones) | Human | Asks |
 |---|---|---|---|---|---|
@@ -186,6 +191,75 @@ takes its lines. A slice's plan names the video's frames each of its screens is 
 | One staging of `deploy/web/nginx.conf` for a test: `app/tests/nginx.ts` repeats `scripts/check_nginx.py`'s (5m's review, row 14) | The next slice that touches either |
 | The ticker's five `sample-` rows (`app/data/news.json`, `events.json`) leave before a public deploy, with a refusal at deploy that counts them (5m's review, row 11) | The slice that deploys in public |
 | The home's sparklines and the frame's spacing of the live line (decisions, 2026-10-31) | The markets' history, once the file holds one |
+| Delete the flight panel, no longer shown (D332): `app/src/features/universe/FlightPanel.tsx`, its sheet and test, `SceneHost`'s `flown.flight`, the scene's `onFlight` said, and the journeys that read its phases (`flights.spec.ts`) | The ping-pong's landing, or the next slice that touches the flights |
+
+## After the ping-pong of 2026-11-07
+
+What the ping-pong decided or found and left for parts of their own (`.claude/tmp/slice-8/reports/pingpong-list.md` holds each remark).
+
+| What | Goes to |
+|---|---|
+| Anyone speaks in every room under a random name, unique, new at each visit; an Adena account keeps more (its registered name, what only an account does); the online count counts everyone; a world's trend counts no guest (D351–D353). Tier 1 (the relay's authorization, the login): a plan first (what Adena adds, a guest name's uniqueness, a guest's rate, the filter on every message, what is kept to bar one), tests first, the security-reviewer | A part of its own, planned in `docs/plans/` and read by Alexis before any code |
+| Search and the list as one: the views' bar without List; one panel for both, fewer duplicates, every shortcut and filter (prefixes `#`, `@`, `/r/`, `g1…`, `>`), Alexis to pick a layout among the artifact's A, B and C (https://claude.ai/artifact/9qAtswDFFT4AifRKinXaSo); the Places page goes | After Alexis's pick |
+| The online count counts each open stream: a guest's two tabs count twice, a visitor up to 8 (4 chat + 4 Earth slots), and a guest on Ergo twice (`present.ts` dedups by name); count guests as distinct visitor keys (`who`, one per /64). Tier 1 (`server/src/stream/stream.ts`): tests first, the red pass, the security review (the batch's security review, 2026-11-07) | After the demo |
+| `/universe` written ahead: today a reload or a shared link gets the host's 404 and the SPA fallback (the page draws, the status and the link preview lie); it needs a server loader in `routes/cosmos.tsx` before `prerenderPaths` can list it (the batch's review, 2026-11-07; tried: the build skips it) | The pages, after the ping-pong |
+| The home's `worlds.json` preload also runs on another universe's home (`/net/gnoland/`), which draws no scene: one wasted fetch there (the batch's review) | The pages, after the ping-pong |
+| A fresh `/list` on a computer opens the palette (`/#search`) under the home's loader, whose shield makes it inert and takes the focus; and the prerendered `/list` renders a `<Navigate>` the static router ignores (the build's warning) (the batch's review) | The search, after the ping-pong |
+| A chat's peek on a planet's hover: its two last lines and "Enter · chat →" (D371's proposal 2); the server serves no room's last lines outside the chat yet | After the ping-pong, with the chat for everyone |
+| Today's expedition: three places a day to visit (a live world, a new realm, a realm never seen), each visit stamping the passport, as the video's frame 18 (D371's proposal 4) | After the ping-pong, with the passport |
+| A poster of the home's view behind the canvas, crossfaded at the first frame; the loader over it (remarks 2, 25) | With the loader's final look |
+| Back from the Earth's page to the Universe at once: the Earth's globe and the cosmos kept in memory a few minutes, then freed; later, systems kept as one travels (remarks 26, 27) | The scene's memory |
+| The newcomer's opening aside no longer shows (its words are the loader's): Opening, HomeOpening, firstArrival, yieldHero, data-yield and their tests are dead | The loader's landing |
+| Labels that meet after a turn of the drag (a station's name under the header, on the Earth, "valopers" on Saturn); the stations spread for the view at rest alone (D349) | The labels' layout |
+| A "final" preview beside the workshop: the site built as in production, served with the same backend and data, to judge timings and the loader | The harness, if Alexis wants it |
+
+## After the ping-pong of 2026-11-09
+
+| What | Goes to |
+|---|---|
+| The realm plate, as approved (D566): the proposal `.claude/tmp/design/realm-explorer/` v7 built in the app: hero, talk bar, figures, calls per day with its calls, who calls it, what it can do, its page, Try it (Read/Write, Start here, call cards, typed reads), around it, the detail widgets; no tabs; every list bounded; the worlds job's per-realm rollup with exact days; `$help` links that open a call card. Acceptance tests in its plan | `docs/plans/slice-realm-plate.md` |
+| The name, plain to see (D13953): an account with no name on the page's chain gets the "Pick a name and a face" dialog (`features/names/NameDialog.tsx`) right after Connect, as the prototype does (`docs/prototype/source/index.html:1409`, `dialog#profile`), once, "Later" closing it; signed, the name is real on `r/sys/namereg/v0` | Done 2026-11-11 (D13981, `features/account/`, the workshop's way) |
+| A realm's author moderates its room (D13953): the deployer the worlds job reads is linked to the address that logs in through a proof the deployer's key signs on chain (a transaction from gnokey naming the Adena address), read by the server; the roles stay per world today | Built as D13927's simpler way (the namespace's holder, linked accounts, a command-line proof): [owners-moderation.md](owners-moderation.md); see "Slice 13's days" below |
+
+## Slice 13's days, 2026-11-10 to 11-12
+
+Built on `pingpong`, not yet in `main`: `main` takes it after the hardening slice (tests and journeys for every behaviour, the pictures, no
+regression, a security review of the whole, `deploy/test.sh` green). The demo is the evening of 2026-11-12, run from the Docker stack on
+Alexis's Mac behind Tailscale Funnel (D13944, D13030): no new big part waits for it beyond the rows below.
+
+| What | State | Plan |
+|---|---|---|
+| The realm plate (Try it, Around it, the detail widgets) and its journeys | Built, the journeys brought back to the new plate (D13992) | [slice-realm-plate.md](slice-realm-plate.md) |
+| The owners' moderation, with linked accounts (the namespace's holder moderates: hide, mute, pins; a link by Adena or by a command-line proof; a release for a key linked by phishing) | Built: `server/src/login/` links, `roles/owners.ts`, `moderation/routes.ts`, the account menu's linked accounts | [owners-moderation.md](owners-moderation.md) |
+| Search: the chat's own search over the public rooms (`server/src/search/`) and the palette's hand-off | Built: the index, the route, the screens | [search.md](search.md) |
+| Link previews: a card under a line, read by the link reader (`link-reader/`, `server/src/cards/`) | Built, off by default: `LINK_CARDS=0` until `deploy/test.sh` has passed in Alexis's Terminal, then `LINK_CARDS=1` and `--profile links` (OPERATIONS.md, "Switching the link cards on") | [link-previews.md](link-previews.md) |
+| Jarvis: its answers as cards in the chat, kept explanations (7 days) and "here" (1 hour), gnomcp in its own keyless reader | Built | [slice-10.md](slice-10.md); OPERATIONS.md, "Forget Jarvis's kept explanations" |
+| The composer on Lexical, with `/`, `@` and `#` suggestions and `/market` (D13999, D13902, D13904) | Built | none |
+| The markets chart card, compact (D13997) | Built | none |
+| The planets' depth (D13993), the Earth's real hour (D13947), regions of the other worlds from their seed (D13996) | Built | none |
+| The calendar's dialog removed; Events and Media greyed "coming soon" (D13995, D13921) | Done | none |
+| The shared cards `/market`, `/trending` and `/proposals`: a line every reader of the room sees drawn as its card (D13018) | Built | none |
+| The welcome card on a first visit and the Get started dialog for a browser with no Adena (D13017); the passport in three tabs, Challenges, Stamps, Charted (D13027) | Built; "Take the tour" waits for a video (D13019) | none |
+| One error system: every failure sorted into one kind, drawn by one view in three sizes (D13022) | Built | none |
+| The explorer's additions: the person card with balance and tokens, token worlds, a call's detail, search of realms by function name, the network line (D13023, D13028) | Built | [slice-13-explorer.md](slice-13-explorer.md) |
+| The chat's search by `from:` with no words, and the palette's "Following" chip (D13024, D13006); Ask Jarvis and `@jarvis` in the composer (D13025) | Built | [search.md](search.md) |
+| A realm's page whose realm is not on the chain becomes the shared not-found view (D13026) | Built | none |
+| The realms' and worlds' explanations by Jarvis, from their code alone, kept in the server's database, seeded for 322 of Onyx's realms (D13031, D13032) | Built | none |
+| The demo's script `deploy/demo.sh`, with backup, wipe and restore (D13030) | Built | [DEMO.md](../DEMO.md) |
+| Gnoworld online in one command | A plan only | [online.md](online.md) |
+
+**Waits after the demo** (D13944 and the rows above):
+
+| What | Plan |
+|---|---|
+| Private rooms | [private-rooms.md](private-rooms.md) |
+| The shared link's image (an Open Graph picture per link) | [share-image.md](share-image.md) |
+| Jarvis's queued ask | Not planned yet |
+| Search by meaning (Alexis, 2026-11-12, for the morning after the demo): an English phrase finds the worlds and realms whose descriptions answer it (the 830 seeded explanations, the worlds' names and descriptions), by words (the server's full-text index) and by meaning (each description's embedding made once, the phrase's at each search), results past a relevance floor ordered by relevance and activity together, the most active first among the relevant, never one off the subject; Jarvis's "why it matches" line later | Not planned yet: the next slice's first plan |
+| One timeline for every view's arrival (D13945): the scene, the header, the plate, the chat and the labels enter and leave on one clock | Not planned yet |
+| The 8K Earth map | Not planned yet |
+| CI and continuous improvement | After the demo (D13944) |
+| `lint/app.config.ts` and the design reviewer's trigger still name `app/src/scene/`, which is `app/src/space/` now; `scripts/workshop.sh` and `app/lab.config.ts` serve a lab whose pages are gone | A harness change, Alexis's |
 
 ## Phase 1: social on chain
 
@@ -206,7 +280,7 @@ phase 0 is done. Realms are written by Claude and audited (`docs/REVIEW.md`, tie
 | Voice rooms | Its ADR first; then a WebRTC voice room per world, with live moderation |
 | Room games | Its ADR first, after sessions and the sponsor; a game bot and a game realm, results on chain, no money |
 | Push | `draft/webpush` through the PWA: mentions, followed worlds, event reminders; and chosen chain events through gnotif (realms declare their triggers in its on-chain registry; our own gnotifd reads the public indexer, as it does, and pushes to our worker, which shows them). Before: ADR-0001 §12 nuanced (gnotif's push carries the text, which the chain made public; chat wake-ups stay empty), how gnotif authenticates an opt-in, one sender key for Ergo and gnotifd, gnotif's registry on mainnet |
-| Events by moderators | `/event` in a world, on the calendar and in its JSON-LD |
+| Events by moderators | `/event` in a world and in its JSON-LD; the chat header's Events is greyed "coming soon" since the calendar's dialog left (D13995), and a place's events will come from a realm on chain (D13901) |
 | Social details | "New here"; routed questions with opt-in helpers, "Thanks" and "helped N"; the weekly report, written by the team |
 | On-chain extras of ADR-0001 | Globe beacons as a ring buffer; tips and stamps in the same transaction |
 

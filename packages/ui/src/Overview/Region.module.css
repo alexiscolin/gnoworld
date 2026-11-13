@@ -1,0 +1,7 @@
+/* What a plate's blocks (Figures, the Grid's twelve columns) ask of their surroundings: a container named "plate" (Panel's look), so a story that
+   draws one block alone narrows by its own width, never the screen's. */
+@layer components {
+  .plate {
+    container: plate / inline-size;
+  }
+}

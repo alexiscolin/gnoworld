@@ -1,0 +1,13 @@
+@layer components {
+  .planet {
+    min-inline-size: var(--avatar-m);
+    inline-size: var(--avatar-m);
+    /* raw: a picture's stand-in, the world's colour lit from the upper left (the proposal's .planet) */
+    background: radial-gradient(
+      circle at 32% 30%,
+      color-mix(in oklab, var(--world) 40%, var(--color-lit)),
+      var(--world) 48%,
+      var(--world-deep) 100%
+    );
+  }
+}

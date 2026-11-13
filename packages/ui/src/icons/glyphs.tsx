@@ -1,13 +1,15 @@
-// The 55 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
+// The 61 icons of docs/DESIGN-SYSTEM.md, "Icons": a 16 px grid, drawn by Icon with a 1.5 px stroke
 // in the colour of the text around it.
-import type { ReactElement } from "react";
+import { messageGlyphs, type Glyph } from "./messageGlyphs.tsx";
 
 export const GLYPHS = {
+  ...messageGlyphs,
   close: <path d="M4 4l8 8M12 4l-8 8" />,
   plus: <path d="M8 3v10M3 8h10" />,
   arrow: <path d="M3 8h10M9 4l4 4-4 4" />,
   "arrow-up-right": <path d="M5 11l6-6M6 5h5v5" />,
   chevron: <path d="M4 6l4 4 4-4" />,
+  hash: <path d="M6.5 2.5l-1.5 11M11 2.5l-1.5 11M3 6h10.5M2.5 10h10.5" />,
   search: (
     <>
       <circle cx="7" cy="7" r="4.5" />
@@ -89,12 +91,7 @@ export const GLYPHS = {
       <path d="M9 7L3 13M7 5L3 9M11 9l-4 4" />
     </>
   ),
-  at: (
-    <>
-      <circle cx="8" cy="8" r="2.5" />
-      <path d="M10.5 8v1a2 2 0 0 0 4 0V8a6.5 6.5 0 1 0-2.5 5.1" />
-    </>
-  ),
+  at: <path d="M10.5 8a2.5 2.5 0 1 1-5 0 2.5 2.5 0 1 1 5 0M10.5 8v1a2 2 0 0 0 4 0V8a6.5 6.5 0 1 0-2.5 5.1" />,
   mail: (
     <>
       <rect x="2.5" y="3.5" width="11" height="9" rx="1.5" />
@@ -108,7 +105,11 @@ export const GLYPHS = {
       <path d="M2.5 6.5h11M5.5 2v3M10.5 2v3" />
     </>
   ),
+  video: (
+    <path d="M3 4.5h6A1.5 1.5 0 0 1 10.5 6v4A1.5 1.5 0 0 1 9 11.5H3A1.5 1.5 0 0 1 1.5 10V6A1.5 1.5 0 0 1 3 4.5zM10.5 7l4-2.5v7l-4-2.5" />
+  ),
   spark: <path d="M8 2v4M8 10v4M2 8h4M10 8h4" />,
+  retry: <path d="M13.3 7.3a5.3 5.3 0 1 0-1.5 3.8M13.3 3.3v4h-4" />,
   news: (
     <>
       <rect x="2.5" y="3" width="11" height="10" rx="1.5" />
@@ -127,11 +128,13 @@ export const GLYPHS = {
       <path d="M2 10c2 1.5 10 -1 12 -4" />
     </>
   ),
-  cluster: (
+  // Space seen flat (D427): a map folded in three.
+  map: <path d="M2 4l4-1.5 4 1.5 4-1.5v9.5L10 13l-4-1.5L2 13zM6 2.5v9M10 4v9" />,
+  orbits: (
     <>
-      <circle cx="5" cy="5.5" r="2" />
-      <circle cx="11" cy="5" r="1.5" />
-      <circle cx="8.5" cy="11" r="2.5" />
+      <circle cx="8" cy="8" r="1.5" />
+      <circle cx="8" cy="8" r="4" />
+      <circle cx="8" cy="8" r="6.5" />
     </>
   ),
   bold: <path d="M5 3h4a2.5 2.5 0 0 1 0 5H5zM5 8h4.5a2.5 2.5 0 0 1 0 5H5z" />,
@@ -198,4 +201,4 @@ export const GLYPHS = {
       <circle cx="11" cy="11.5" r="1.5" />
     </>
   ),
-} satisfies Record<string, ReactElement>;
+} satisfies Record<string, Glyph>;

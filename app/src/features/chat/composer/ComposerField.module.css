@@ -1,0 +1,53 @@
+/* The composer's field, which shows the formatting in place. The box's grid places it (MessageBox.module.css); this is what it holds:
+   the marks as they read, a quote with its bar, the lists, the code. */
+@layer components {
+  .text {
+    /* layout: a message of 10 lines at most, then the field scrolls */
+    max-block-size: calc(10lh + var(--space-s));
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .text p {
+    /* layout: a line is a paragraph with no space between */
+    margin: 0;
+    /* The chat's own type, as the field's: the page's paragraphs are the body's. */
+    font: inherit;
+  }
+
+  /* The theme's classes (THEME): Lexical draws an underline and a strike as spans. */
+  .underline {
+    text-decoration: underline;
+  }
+
+  .strike {
+    text-decoration: line-through;
+  }
+
+  .both {
+    text-decoration: underline line-through;
+  }
+
+  .text blockquote {
+    /* layout: a quote is a line, with no space round it */
+    margin: 0;
+  }
+
+  .text :is(ul, ol) {
+    /* layout: a list is lines, with no space round it */
+    margin: 0;
+    padding-inline-start: var(--space-m);
+  }
+
+  .text a {
+    color: var(--color-mine);
+    text-decoration: underline;
+  }
+
+  .placeholder {
+    color: var(--color-text-muted);
+    font: var(--font-chat);
+    pointer-events: none;
+  }
+}

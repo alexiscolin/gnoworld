@@ -1,4 +1,4 @@
-import { LOOKUP } from "../../src/scene/planet/chunks.ts";
+import { LOOKUP } from "../../src/space/planet/chunks.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 
 // Where a map's two ends meet, a lookup that takes the wrong longitude, or another's derivatives, reads a far mip or a far place: a line

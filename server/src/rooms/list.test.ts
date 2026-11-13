@@ -1,14 +1,18 @@
-import type { DatabaseSync } from "node:sqlite";
+import type { DatabaseSync, SQLInputValue } from "node:sqlite";
 import { RoomList } from "@gnoworld/schemas";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
+import { VERDICT_TABLES } from "../moderation/check.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./create.ts";
+import { ROOM_SAID } from "./earth.ts";
 import { ensureNamed, ensureRooms, ROOM_TABLES } from "./rooms.ts";
 import { listRoutes } from "./list.ts";
 import type { Typed } from "./types.ts";
 
 const T0 = Date.parse("2026-10-25T12:00:00.000Z");
+const GUEST_MS = 5_000;
 const REFUSED = JSON.stringify({ error: "refused" });
 const RULES = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
 const opened: DatabaseSync[] = [];
@@ -50,8 +54,22 @@ const TOKENS = new Map([
   ["mod", "mod"],
 ]);
 
-const setup = (roles: Typed = ROLES, see: typeof visible = visible) => {
-  const db = openDatabase(":memory:", [ROOM_TABLES]);
+const setup = (
+  roles: Typed = ROLES,
+  see: Parameters<typeof listRoutes>[0]["visible"] = visible,
+  here: (room: string) => number | undefined = () => undefined,
+) => {
+  // Each request comes five seconds after the last, so no answer is the cache's, unless a test holds the clock.
+  const clock = { now: T0 };
+  const db = openDatabase(":memory:", [
+    ROOM_TABLES,
+    VERDICT_TABLES,
+    ROOM_STATE,
+    REALM_TABLES,
+    REALM_PATH,
+    EARTH_TABLES,
+    ROOM_SAID,
+  ]);
   opened.push(db);
   // Made in an order no sort would give: the order of the answer is the route's.
   ensureNamed(
@@ -73,8 +91,12 @@ const setup = (roles: Typed = ROLES, see: typeof visible = visible) => {
     logger("a-pepper-of-forty-characters-0123456789", () => true),
     () => true,
   );
-  app.route("/api/rooms", listRoutes({ db, roles, visible: see, session: (token) => TOKENS.get(token ?? "") }));
-  const ask = async (query: string, headers: Record<string, string> = {}) => {
+  app.route(
+    "/api/rooms",
+    listRoutes({ db, roles, visible: see, here, now: () => clock.now, session: (token) => TOKENS.get(token ?? "") }),
+  );
+  const ask = async (query: string, headers: Record<string, string> = {}, hold = false) => {
+    if (!hold) clock.now += GUEST_MS;
     const response = await app.request(`/api/rooms${query}`, { headers });
     return { response, status: response.status, text: await response.text() };
   };
@@ -86,10 +108,28 @@ const setup = (roles: Typed = ROLES, see: typeof visible = visible) => {
     );
     return { list: RoomList.parse(JSON.parse(text)), cache: response.headers.get("cache-control"), text };
   };
-  return { db, app, ask, sectionsFor };
+  return { db, app, ask, sectionsFor, clock };
 };
 
 const open = (...rooms: string[]) => rooms.map((room) => ({ room, type: "open" }));
+
+describe("GET /api/rooms?world=, a realm's room", () => {
+  it("carries its realm's path for a guest and an account, and no other room carries one", async () => {
+    const { db, sectionsFor } = setup();
+    ensureNamed(db, [{ name: "#bubble/golf-0123456789", world: "bubble" }], T0);
+    db.prepare(
+      "INSERT INTO realm_rooms (name, path) VALUES ('#bubble/golf-0123456789', 'gno.land/r/bubble/golf')",
+    ).run();
+    const rooms = (list: RoomList) => list.sections.flatMap((section) => section.rooms);
+    for (const who of [undefined, "member"]) {
+      const found = rooms((await sectionsFor(who, "bubble")).list);
+      expect(found.find(({ room }) => room === "#bubble/golf-0123456789")?.realm).toBe("gno.land/r/bubble/golf");
+      expect(found.filter(({ room }) => room !== "#bubble/golf-0123456789").every((one) => !("realm" in one))).toBe(
+        true,
+      );
+    }
+  });
+});
 
 describe("GET /api/rooms?world=", () => {
   it("answers a guest the sections in the file's order, then a section named null with the other rooms", async () => {
@@ -105,7 +145,7 @@ describe("GET /api/rooms?world=", () => {
     });
   });
 
-  // What the client's RoomList takes: the file's 50 sections and the others, 500 rooms a section.
+  // What the client's RoomList takes: the file's 50 sections and the others, 1,100 rooms a section (D394: the Earth's thousand).
   // 50 named sections, then `count` rooms a guest sees after 100 it does not (#big/r0000 to r0099), all made
   // in reverse: the answer's order is the route's, and its cap counts the rooms a reader sees.
   const big = (count: number) => {
@@ -127,17 +167,17 @@ describe("GET /api/rooms?world=", () => {
     return { ...t, seen: others.slice(100) };
   };
 
-  it("answers 51 sections at most, and 500 rooms a reader sees in the others, the main room first, then by name", async () => {
-    const { sectionsFor, seen } = big(600);
+  it("answers 51 sections at most, and 1,100 rooms a reader sees in the others, the main room first, then by name", async () => {
+    const { sectionsFor, seen } = big(1200);
     const { list } = await sectionsFor(undefined, "big");
     expect(list.sections).toHaveLength(51);
     expect(list.sections.at(-1)?.name).toBeNull();
-    expect(list.sections.at(-1)?.rooms.map(({ room }) => room)).toEqual(["#big", ...seen.slice(0, 499)]);
+    expect(list.sections.at(-1)?.rooms.map(({ room }) => room)).toEqual(["#big", ...seen.slice(0, 1099)]);
   });
 
   it.each([
-    [499, 500],
-    [500, 500],
+    [1099, 1100],
+    [1100, 1100],
   ])("lists %i rooms seen and the main room in the others as %i", async (count, listed) => {
     const { sectionsFor } = big(count);
     expect((await sectionsFor(undefined, "big")).list.sections.at(-1)?.rooms).toHaveLength(listed);
@@ -368,5 +408,161 @@ describe("GET /api/rooms?world=, a malformed world", () => {
     const { ask } = setup();
     expect((await ask("?world=Earth", { cookie: "__Host-session=mod" })).status).toBe(400);
     expect((await ask(`?world=${"a".repeat(64)}`)).text).toBe(JSON.stringify({ world: "a".repeat(64), sections: [] }));
+  });
+});
+
+// D394: the Earth's public square: each room's counts, the team's rooms first, the others by use.
+describe("GET /api/rooms?world=earth, the public square", () => {
+  const MIN = 60_000;
+  const DAY = 24 * 60 * MIN;
+  const square = (here: Record<string, number> = {}) => {
+    const t = setup(
+      { worlds: new Map([["earth", { rules: RULES }]]) },
+      () => true,
+      (room) => here[room],
+    );
+    const make = (name: string, madeAt: number, { lines = 0, at = T0 - MIN }: { lines?: number; at?: number } = {}) => {
+      ensureNamed(t.db, [{ name: `#earth/${name}`, world: "earth" }], madeAt);
+      t.db
+        .prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, 'g1x', ?)")
+        .run(`#earth/${name}`, madeAt);
+      for (let n = 0; n < lines; n += 1)
+        t.db
+          .prepare("INSERT INTO verdicts (msgid, room, account, action, at) VALUES (?, ?, 'h', 'pass', ?)")
+          .run(`${name}-${String(n)}`, `#earth/${name}`, at);
+    };
+    return { ...t, make };
+  };
+  const names = async (t: ReturnType<typeof square>) =>
+    (await t.sectionsFor()).list.sections.at(-1)?.rooms.map(({ room }) => room);
+
+  it("puts the rooms the moderators made first, by name, then people here now, then messages in 24 h, then the newest", async () => {
+    const t = square({ "#earth/few": 1, "#earth/crowd": 5 });
+    t.make("old-quiet", T0 - 9 * DAY);
+    t.make("new-quiet", T0 - DAY);
+    t.make("talky", T0 - 5 * DAY, { lines: 4 });
+    t.make("few", T0 - 6 * DAY, { lines: 9 });
+    t.make("crowd", T0 - 7 * DAY);
+    expect(await names(t)).toEqual([
+      "#earth",
+      "#earth/alpha",
+      "#earth/attic",
+      "#earth/crew",
+      "#earth/desk",
+      "#earth/door",
+      "#earth/garden",
+      "#earth/lounge",
+      "#earth/news",
+      "#earth/zeta",
+      "#earth/crowd",
+      "#earth/few",
+      "#earth/talky",
+      "#earth/new-quiet",
+      "#earth/old-quiet",
+    ]);
+  });
+
+  it("counts a room's messages of the last 24 hours and the people here, and leaves a zero out", async () => {
+    const t = square({ "#earth/crowd": 5 });
+    t.make("crowd", T0 - DAY, { lines: 2 });
+    t.make("talky", T0 - DAY, { lines: 3, at: T0 - 2 * DAY });
+    t.make("calm", T0 - DAY);
+    const rooms = (await t.sectionsFor()).list.sections
+      .at(-1)
+      ?.rooms.filter(({ room }) => /crowd|talky|calm|garden/.test(room));
+    expect(rooms).toEqual([
+      { room: "#earth/garden", type: "open" },
+      { room: "#earth/crowd", type: "open", here: 5, messages: 2 },
+      { room: "#earth/calm", type: "open" },
+      { room: "#earth/talky", type: "open" },
+    ]);
+  });
+
+  it("breaks a tie of people, messages and age by name, and keeps the moderators' rooms first past 1,100 rooms", async () => {
+    const t = square();
+    t.make("zz", T0 - DAY);
+    t.make("aa", T0 - DAY);
+    expect((await names(t))?.slice(-2)).toEqual(["#earth/aa", "#earth/zz"]);
+    for (let n = 0; n < 1200; n += 1) t.make(`m${String(n).padStart(4, "0")}`, T0 - DAY - n);
+    const all = await names(t);
+    expect(all).toHaveLength(1100);
+    expect(all?.slice(0, 3)).toEqual(["#earth", "#earth/alpha", "#earth/attic"]);
+  });
+
+  it("keeps another world's rooms by name, whatever its counts", async () => {
+    const t = setup(ROLES, visible, () => 9);
+    const { list } = await t.sectionsFor(undefined, "bubble");
+    expect(list.sections.at(-1)?.rooms.map(({ room }) => room)).toEqual(["#bubble", "#bubble/x"]);
+  });
+});
+
+describe("GET /api/rooms?world=earth at 5,000 rooms", () => {
+  const crowded = (rooms: number) => {
+    const t = setup(ROLES, () => true);
+    const add = t.db.prepare("INSERT INTO earth_rooms (name, maker, created_at) VALUES (?, 'g1x', ?)");
+    for (let n = 0; n < rooms; n += 1) {
+      const name = `#earth/r${String(n).padStart(5, "0")}`;
+      ensureNamed(t.db, [{ name, world: "earth" }], T0 - 1000);
+      add.run(name, T0 - 1000);
+    }
+    // The statements the route runs, by their text.
+    const ran: string[] = [];
+    const prepare = t.db.prepare.bind(t.db);
+    vi.spyOn(t.db, "prepare").mockImplementation((sql) => {
+      const statement = prepare(sql);
+      return new Proxy(statement, {
+        get(target, name) {
+          const member: unknown = Reflect.get(target, name);
+          if (typeof member !== "function") return member;
+          return (...args: SQLInputValue[]): unknown => {
+            if (name === "all" || name === "get") ran.push(sql);
+            return Reflect.apply(member, target, args);
+          };
+        },
+      });
+    });
+    return { ...t, ran };
+  };
+
+  it("runs the room query once for two guests within 5 s, and again once the 5 s are past", async () => {
+    const t = crowded(5000);
+    const rooms = (): number => t.ran.filter((sql) => sql.includes("FROM rooms WHERE world")).length;
+    const first = await t.ask("?world=earth", {}, true);
+    const second = await t.ask("?world=earth", {}, true);
+    expect(second.text).toBe(first.text);
+    expect(rooms()).toBe(1);
+    t.clock.now += GUEST_MS;
+    await t.ask("?world=earth", {}, true);
+    expect(rooms()).toBe(2);
+  });
+
+  it("never gives a session the guest's answer, and runs the same statements for 10 rooms as for 5,000", async () => {
+    const small = crowded(10);
+    await small.ask("?world=earth", { cookie: "__Host-session=member" });
+    const big = crowded(5000);
+    await big.ask("?world=earth", { cookie: "__Host-session=member" });
+    expect(big.ran.length).toBe(small.ran.length);
+  });
+
+  it("never gives a guest the list a member got within 5 s, nor a member the guest's", async () => {
+    const member = { cookie: "__Host-session=member" };
+    const memberFirst = setup();
+    expect((await memberFirst.ask("?world=earth", member, true)).text).toContain("#earth/crew");
+    expect((await memberFirst.ask("?world=earth", {}, true)).text).not.toContain("#earth/crew");
+    const guestFirst = setup();
+    expect((await guestFirst.ask("?world=earth", {}, true)).text).not.toContain("#earth/crew");
+    expect((await guestFirst.ask("?world=earth", member, true)).text).toContain("#earth/crew");
+  });
+
+  it("asks whether a room is listed with its archived flag, read in the query that lists the rooms", async () => {
+    const asked: [string, boolean | undefined][] = [];
+    const t = setup(ROLES, (room, _who, archived) => {
+      asked.push([room, archived]);
+      return true;
+    });
+    t.db.prepare("UPDATE rooms SET archived = 1 WHERE name = '#earth/zeta'").run();
+    await t.ask("?world=earth");
+    expect(asked.find(([room]) => room === "#earth/zeta")?.[1]).toBe(true);
+    expect(asked.find(([room]) => room === "#earth/alpha")?.[1]).toBe(false);
   });
 });

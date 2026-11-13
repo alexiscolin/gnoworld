@@ -304,7 +304,7 @@ describe("no overlap", () => {
   });
 });
 
-// The distances the eye looks at the Earth from at rest: the Earth's view at 26 units, a mouse's lean and the sway about it.
+// Distances around the Earth's view at 26 units, kept as a margin.
 const DISTANCES = [26, 25, 27, 24, 28];
 
 describe("depth", () => {

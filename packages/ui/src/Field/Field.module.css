@@ -10,6 +10,9 @@
     border: var(--line-width) solid var(--_line);
     border-radius: var(--radius-m);
     background: var(--color-fill);
+    transition:
+      border-color var(--motion-base) var(--ease-standard),
+      background-color var(--motion-base) var(--ease-standard);
   }
 
   .box[aria-invalid="true"],
@@ -22,11 +25,21 @@
 
     /* A drag of the box's handle never makes it wider than its place: its neighbour stays in view. */
     max-inline-size: 100%;
-    /* Frame 10's field is 46 px: the default control inside its two edges (F5967). */
-    min-block-size: calc(var(--control-m) + 2 * var(--line-width));
+    /* A field is a control's height, its edges inside it, so a field and a button on one row line up (Alexis, 2026-11-08: "la même
+       hauteur de CTA et recherche"; was frame 10's 46 px, F5967). */
+    min-block-size: var(--control-m);
     padding-block: var(--space-2xs);
     padding-inline: var(--space-s);
     font: var(--font-field);
+  }
+
+  /* A list's filter: a pill on the space's ground with its line inside, one control high, in the data type. */
+  .box[data-shape="pill"] {
+    min-block-size: var(--control-s);
+    padding-block: 0;
+    border-radius: var(--radius-pill);
+    background: var(--color-space);
+    font: var(--font-data);
   }
 
   .box::placeholder {
@@ -68,8 +81,8 @@
     flex: 1;
     min-inline-size: 0;
 
-    /* The frame's edges are outside this height, as a bare box's are. */
-    min-block-size: var(--control-m);
+    /* The frame's edges are inside the control's height, as a bare box's are. */
+    min-block-size: calc(var(--control-m) - 2 * var(--line-width));
     padding-inline-start: var(--space-2xs);
     border: 0;
     background: transparent;
@@ -82,11 +95,6 @@
   .prefix {
     color: var(--color-text-muted);
     font: var(--font-field);
-  }
-
-  .help {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 
   .error {

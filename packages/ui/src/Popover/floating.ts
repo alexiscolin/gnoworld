@@ -23,22 +23,30 @@ interface Placing {
  * until placed is seen from then on. */
 function place(anchor: Element, box: HTMLElement, { side, align }: Placing) {
   const at = anchor.getBoundingClientRect();
-  const { width, height } = box.getBoundingClientRect();
+  // Its own size: the enter draws it scaled (surface.module.css), and a box placed by that smaller size stays that much too near.
+  const scale = Number.parseFloat(getComputedStyle(box).scale) || 1;
+  const drawn = box.getBoundingClientRect();
+  const [width, height] = [drawn.width / scale, drawn.height / scale];
   const { clientWidth, clientHeight } = document.documentElement;
   const step = Number.parseFloat(getComputedStyle(box).getPropertyValue("--space-2xs")) || 0;
   const spots = { below: at.bottom + step, above: at.top - step - height };
   const fits = { below: spots.below + height <= clientHeight - step, above: spots.above >= step };
   const other = side === "below" ? "above" : "below";
-  const top = spots[fits[side] || !fits[other] ? side : other];
+  const chosen = fits[side] || !fits[other] ? side : other;
+  const top = spots[chosen];
   let start = at.left;
   if (align === "center") start = at.left + (at.width - width) / 2;
   else if (getComputedStyle(anchor).direction === "rtl") start = at.right - width;
-  box.style.left = `${String(Math.max(step, Math.min(start, clientWidth - step - width)))}px`;
+  const left = Math.max(step, Math.min(start, clientWidth - step - width));
+  box.style.left = `${String(left)}px`;
+  // It grows from its trigger's middle, on the side it faces: the exit's travel is toward it too (surface.module.css).
+  box.style.setProperty("--_dir", chosen === "below" ? "-1" : "1");
+  box.style.transformOrigin = `${String(at.left + at.width / 2 - left)}px ${chosen === "below" ? "0" : "100%"}`;
   box.style.top = `${String(Math.max(step, Math.min(top, clientHeight - step - height)))}px`;
   box.style.removeProperty("visibility");
 }
 
-/** Keeps an open box placed by its anchor while the page scrolls or the window resizes; placed again whenever
+/** Keeps an open box placed by its anchor while the page scrolls, the window resizes or the box itself changes size; placed again whenever
  * `again` changes, a box shown late among them. */
 export function usePlaced(
   anchor: RefObject<Element | null>,
@@ -54,8 +62,12 @@ export function usePlaced(
     const stop = new AbortController();
     addEventListener("scroll", again, { capture: true, passive: true, signal: stop.signal });
     addEventListener("resize", again, { signal: stop.signal });
+    // A box whose content arrives after it opens (a card's blocks) grows, and is placed again for its new size.
+    const grows = typeof ResizeObserver === "function" ? new ResizeObserver(again) : undefined;
+    if (box.current !== null) grows?.observe(box.current);
     return () => {
       stop.abort();
+      grows?.disconnect();
     };
   }, [anchor, box, open, side, align, again]);
 }

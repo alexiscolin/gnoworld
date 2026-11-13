@@ -1,160 +1,202 @@
-// The passport (ADR-0002 §1, Passport; frame 99's "Worlds you visited 3/19"): the worlds this device stamped, by constellation, a star
-// system each, its worlds counted once; the worlds charted here first; then today's expedition and the quests, which slice 8's other part
-// fills (slots.ts). A wide dialog over the place; its code comes when it is first opened. Nothing of it leaves the device.
-import {
-  constellationsOf,
-  type Constellation,
-  EARTH,
-  hubWorldOf,
-  labelName,
-  passportCount,
-  stampedIn,
-  stampKey,
-} from "@gnoworld/core";
-import { Dialog, Kicker, Progress, Row, Stack, Stat } from "@gnoworld/ui";
+// The passport: a dialog over the place, its figures and its three tabs on one row (Challenges: today's expedition and the quests, Stamps: a
+// stamp for each world this device visited, by day, Charted: the ones charted first). Its code comes when it is first opened. Nothing of it
+// leaves the device.
+import { EARTH, hubWorldOf, labelName, passportCount, utcDay } from "@gnoworld/core";
+import { Badge, Cluster, Dialog, Kicker, Skeleton, Stack, Stat, TabPanel, Tabs } from "@gnoworld/ui";
+import { Suspense, useId, useState } from "react";
 import { site } from "../../places.ts";
 import { PassportSlot } from "../../slots.tsx";
 import { useApp } from "../../storeContext.tsx";
-import { useWorldsFile } from "../../worldsFile.ts";
+import { useShownName } from "../names/index.ts";
+import { challengeSteps } from "../quests/index.ts";
 import { useWorldsCount } from "../universe/index.ts";
-import styles from "./Passport.module.css";
+import { useWorldsFile } from "../../worldsFile.ts";
+import { TabRow } from "../../TabRow.tsx";
+import { ChartedTab, StampsTab } from "./StampsTab.tsx";
+import { stampsOf } from "./stamps.ts";
 
-const DAY = new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" });
-const dayOf = (day: string) => DAY.format(new Date(`${day}T00:00:00Z`));
+const hubsOf = (universe: string) => site.worlds.filter((world) => world.universe === universe);
+
+// The moment the dialog last opened: a passport left mounted past midnight takes the new day when it opens again.
+function useOpenedAt(open: boolean): Date {
+  const [at, setAt] = useState(() => new Date());
+  const [wasOpen, setWasOpen] = useState(open);
+  if (wasOpen !== open) {
+    setWasOpen(open);
+    if (open) setAt(() => new Date());
+  }
+  return at;
+}
 
 // A world's name as the reader knows it: a hub's own, the Earth's, else the one its id gives.
 function namesOf(universe: string): (id: string) => string {
-  const hubs = new Map(
-    site.worlds.filter((world) => world.universe === universe).map((world) => [hubWorldOf(world), world.name]),
-  );
+  const hubs = new Map(hubsOf(universe).map((world) => [hubWorldOf(world), world.name]));
   return (id) => hubs.get(id) ?? (id === EARTH ? "Earth" : (labelName(id) ?? id));
 }
 
-type Named = (id: string) => string;
-
-function ConstellationList({ constellations }: { constellations: readonly Constellation[] }) {
-  if (constellations.length === 0) return null;
-  return (
-    <section aria-labelledby="passport-constellations">
-      <Stack space="xs">
-        <h3 id="passport-constellations">Constellations</h3>
-        <Stack as="ul" space="3xs">
-          {constellations.map(({ id, worlds: all, stamped: some }) => (
-            <li key={id}>
-              <Row
-                look="divided"
-                title={id === EARTH ? "Earth" : id}
-                subtitle={some === all ? "Every world stamped" : `${String(all - some)} still to visit`}
-                trail={
-                  <Progress
-                    label={`Constellation ${id}`}
-                    kind="steps"
-                    value={some}
-                    max={all}
-                    shown={`${String(some)}/${String(all)}`}
-                  />
-                }
-              />
-            </li>
-          ))}
-        </Stack>
-      </Stack>
-    </section>
-  );
-}
-
-function Firsts({
-  ids,
-  charted,
-  universe,
-  nameOf,
+// The figures at the row's start, narrow enough to leave the tabs on their row: the stamps out of the worlds listed ("108/594"), the
+// systems, the worlds charted first, the challenge steps.
+function Figures({
+  stamps,
+  count,
+  systems,
+  first,
+  steps,
+  loading,
 }: {
-  ids: readonly string[];
-  charted: Readonly<Record<string, string>>;
-  universe: string;
-  nameOf: Named;
+  stamps: number;
+  count: { stamped: number; listed: number } | undefined;
+  systems: number;
+  first: number;
+  steps: { done: number; of: number };
+  loading: boolean;
 }) {
-  if (ids.length === 0) return null;
   return (
-    <section aria-labelledby="passport-firsts">
-      <Stack space="xs">
-        <h3 id="passport-firsts">You charted it</h3>
-        <p className={styles["note"]}>Uncharted worlds you were the first on this device to visit.</p>
-        <Stack as="ul" space="3xs">
-          {ids.map((id) => (
-            <li key={id}>
-              <Row look="divided" title={nameOf(id)} subtitle={dayOf(charted[stampKey(universe, id)] ?? "")} />
-            </li>
-          ))}
+    <Cluster space="s" align="baseline">
+      <Stat
+        size="s"
+        value={count === undefined ? stamps : count.stamped}
+        {...(count === undefined ? {} : { unit: `/${String(count.listed)}` })}
+        caption="stamps"
+      />
+      {loading ? (
+        <Stack space="2xs">
+          <Skeleton />
+          <Skeleton />
         </Stack>
-      </Stack>
-    </section>
+      ) : (
+        <Stat size="s" value={systems} caption="systems" />
+      )}
+      <Stat size="s" value={first} caption="charted first" />
+      <Stat size="s" value={steps.done} unit={`/${String(steps.of)}`} caption="steps" />
+    </Cluster>
   );
 }
 
-function Stamps({ recent, nameOf }: { recent: readonly { id: string; day: string }[]; nameOf: Named }) {
+type TabId = "challenges" | "stamps" | "charted";
+
+// The three tabs, pinned at the row's end.
+function PassportTabs({
+  id,
+  tab,
+  onSelect,
+  stamps,
+  charted,
+}: {
+  id: string;
+  tab: TabId;
+  onSelect: (tab: TabId) => void;
+  stamps: number;
+  charted: number;
+}) {
   return (
-    <section aria-labelledby="passport-stamps">
-      <Stack space="xs">
-        <h3 id="passport-stamps">Stamps</h3>
-        {recent.length === 0 ? (
-          <p className={styles["note"]}>No stamp yet: visit a world and it stamps your passport.</p>
-        ) : (
-          <Stack as="ul" space="3xs">
-            {recent.map(({ id, day }) => (
-              <li key={id}>
-                <Row look="divided" title={nameOf(id)} subtitle={day === "" ? "Stamped" : dayOf(day)} />
-              </li>
-            ))}
-          </Stack>
-        )}
-      </Stack>
-    </section>
+    <Tabs
+      label="Passport"
+      id={id}
+      size="s"
+      selected={tab}
+      onSelect={(id) => {
+        onSelect(id === "stamps" || id === "charted" ? id : "challenges");
+      }}
+      tabs={[
+        { id: "challenges", label: "Challenges" },
+        { id: "stamps", label: "Stamps", count: stamps },
+        { id: "charted", label: "Charted", count: charted },
+      ]}
+    />
   );
 }
 
-export function PassportView({ universe, open, onClose }: { universe: string; open: boolean; onClose: () => void }) {
-  const stamps = useApp(({ device }) => device.stamps);
-  const charted = useApp(({ device }) => device.charted);
-  const notKept = useApp(({ device }) => device.notKept);
-  const stamped = stampedIn(stamps, universe);
-  const count = passportCount(stamped.size, useWorldsCount(open) ?? undefined);
+function Passport({
+  universe,
+  open,
+  onClose,
+  who,
+}: {
+  universe: string;
+  open: boolean;
+  onClose: () => void;
+  who: string;
+}) {
+  const [tab, setTab] = useState<TabId>("challenges");
+  const tabsId = useId();
+  // The day the dialog opened on, as the expedition's card keeps it.
+  const now = useOpenedAt(open);
+  const device = useApp(({ device: held }) => held);
+  const universeName = site.universes.find(({ id }) => id === universe)?.name ?? universe;
   const worlds = useWorldsFile(open);
-  const constellations = constellationsOf(worlds ?? [], stamped).filter(({ stamped: some }) => some > 0);
-  const nameOf = namesOf(universe);
-  const recent = [...stamped]
-    .map((id) => ({ id, day: stamps[stampKey(universe, id)] ?? "" }))
-    .sort((a, b) => b.day.localeCompare(a.day) || a.id.localeCompare(b.id));
-  const firsts = [...stampedIn(charted, universe)];
+  const stamps = stampsOf({
+    universe,
+    universeName,
+    stamps: device.stamps,
+    charted: device.charted,
+    nameOf: namesOf(universe),
+    worlds: worlds ?? [],
+    hubs: new Set(hubsOf(universe).map(hubWorldOf)),
+  });
+  const first = stamps.filter(({ gold }) => gold);
+  const count = passportCount(stamps.length, useWorldsCount(open) ?? undefined);
+  const steps = challengeSteps(universe, utcDay(now), device);
+  const systems = new Set(stamps.map(({ system }) => system)).size;
   return (
     <Dialog
-      title="Passport"
-      description="A stamp for each world you visit, kept on this device."
+      title={who}
+      kicker={who === "Passport" ? universeName : `Passport · ${universeName}`}
       wide
       open={open}
       onClose={onClose}
+      lead={<Badge name={universe} icon="passport" tone="primary" earned />}
     >
-      <Stack space="l">
-        <section aria-label="Worlds you visited">
-          <Stack space="xs">
-            <Stat value={stamped.size} caption="Worlds you visited" />
-            {count === undefined ? null : (
-              <Progress
-                label="Worlds you visited"
-                value={count.stamped}
-                max={count.listed}
-                shown={`${String(count.stamped)}/${String(count.listed)}`}
-              />
-            )}
-          </Stack>
-        </section>
-        <ConstellationList constellations={constellations} />
-        <Firsts ids={firsts} charted={charted} universe={universe} nameOf={nameOf} />
-        <PassportSlot name="passportExpedition" universe={universe} />
-        <PassportSlot name="passportQuests" universe={universe} />
-        <Stamps recent={recent} nameOf={nameOf} />
-        <Kicker>{notKept ? "This device did not keep the last change" : "Export or clear it in the settings"}</Kicker>
+      <Stack space="m">
+        <TabRow
+          figures={
+            <Figures
+              stamps={stamps.length}
+              count={count}
+              systems={systems}
+              first={first.length}
+              steps={steps}
+              loading={worlds === undefined}
+            />
+          }
+          tabs={<PassportTabs id={tabsId} tab={tab} onSelect={setTab} stamps={stamps.length} charted={first.length} />}
+        />
+        <TabPanel key={tab} id={tabsId} tab={tab}>
+          {tab === "challenges" ? (
+            <Stack space="m">
+              <Suspense fallback={<Skeleton shape="card" />}>
+                <PassportSlot key={now.getTime()} name="passportExpedition" universe={universe} />
+              </Suspense>
+              <Suspense fallback={<Skeleton shape="card" />}>
+                <PassportSlot name="passportQuests" universe={universe} />
+              </Suspense>
+            </Stack>
+          ) : tab === "stamps" ? (
+            <StampsTab stamps={stamps} now={now} />
+          ) : (
+            <ChartedTab stamps={first} now={now} />
+          )}
+        </TabPanel>
+        <Kicker>
+          {device.notKept ? "This device did not keep the last change" : "Export or clear it in the settings"}
+        </Kicker>
       </Stack>
     </Dialog>
+  );
+}
+
+// The account's name heads the dialog; its read comes only for a session that is in.
+function Named(props: { universe: string; open: boolean; onClose: () => void; account: string }) {
+  const { account, ...rest } = props;
+  const who = useShownName(account, props.universe);
+  return <Passport {...rest} who={who} />;
+}
+
+export function PassportView(props: { universe: string; open: boolean; onClose: () => void }) {
+  const session = useApp(({ login }) => login.session);
+  return session.kind === "in" ? (
+    <Named {...props} account={session.address} />
+  ) : (
+    <Passport {...props} who="Passport" />
   );
 }

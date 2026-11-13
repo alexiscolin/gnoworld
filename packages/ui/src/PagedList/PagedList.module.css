@@ -1,0 +1,28 @@
+/* A paged list: its filter and sort on one row, rows told apart by a hairline, its count and "Show more" at the foot. */
+@layer components {
+  .filter {
+    /* layout: the filter takes the row's room, no narrower than a column */
+    flex: 1;
+    min-inline-size: var(--column-2xs);
+  }
+
+  .rows {
+    /* layout: a list's own margin and padding, which the browser gives it, taken off: the card's Stack spaces it */
+    margin-block: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .rows > li + li {
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  /* A row that enters (a fresh read's new call, a page's "Show more") eases in; the tokens are 0 under reduced motion. */
+  .rows > li {
+    transition: opacity var(--motion-slow) var(--ease-standard);
+
+    @starting-style {
+      opacity: 0;
+    }
+  }
+}

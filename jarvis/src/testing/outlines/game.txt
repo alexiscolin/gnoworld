@@ -1,0 +1,74 @@
+-- README.md --
+// 4128 bytes (not Gno source — content omitted; fetch with full=true)
+-- gnomod.toml --
+// 221 bytes (not Gno source — content omitted; fetch with full=true)
+-- idle.gno --
+// 9368 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: errors, strconv, time, gno.land/p/g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv/x/games/accrual/v0, gno.land/p/nt/avl/v0
+
+// Package idle is a mine that keeps working while you are not looking at it.
+//
+// Ore accrues at a rate set by your level. Claim banks it, Upgrade spends the
+// bank to dig faster, and at level 10 you may Prestige: start over at level 1
+// carrying a permanent multiplier. There are no turns, no block hook and no
+// keeper. The realm stores what you had and when, and everything else is
+// arithmetic done at the moment somebody asks.
+//
+// Nothing here rolls dice. Everything a player can do is a pure function of
+// when they did it, so there is no block hash to grind and no ordering to
+// front-run, and the page can tell you exactly what an action will produce
+// before you sign it.
+package idle
+
+// Period is one minute of unix time. A level-1 mine digs one ore a minute.
+const Period = …
+
+// Start opens a mine for the caller. One per address, forever: Prestige is the
+// only way to start over, and it keeps your lifetime total.
+func Start(cur realm) string
+
+// Claim banks whatever the mine has dug since the last claim. Claiming often
+// and claiming rarely pay exactly the same, by construction: see accrual.
+func Claim(cur realm) string
+
+// Upgrade spends banked ore to raise the level, which raises both the rate and
+// the ceiling.
+func Upgrade(cur realm) string
+
+// Prestige resets a level-10 mine to level 1 for a permanent +1 multiplier.
+// Banked and pending ore are burned; the lifetime total is not.
+func Prestige(cur realm) string
+
+// Pending reports what is sitting in an address's mine right now, unclaimed.
+func Pending(owner address) int64
+
+// Banked reports an address's spendable ore.
+func Banked(owner address) int64
+
+// Level reports an address's level and prestige.
+func Level(owner address) (int64, int64)
+
+// FullAt reports the unix second at which an address's mine starts wasting
+// what it digs, which is the only deadline in this game.
+func FullAt(owner address) int64
+
+// unexported:
+//	var errNoMine = …
+//	type mine struct {
+//		owner		address
+//		level		int64
+//	}
+//	var mines avl.Tree
+-- idle_test.gno --
+// 9468 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: strings, testing, gno.land/p/nt/avl/v0, gno.land/p/nt/testutils/v0, gno.land/p/nt/uassert/v0
+
+func TestStartOpensALevelOneMine(t *testing.T)
+
+func TestUpgrade(t *testing.T)
+-- render.gno --
+// 4983 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: sort, strconv, strings, gno.land/p/g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv/kit/ui/v0
+
+// Render shows every mine, or one mine's card at /r/.../idle:<address>.
+func Render(path string) string

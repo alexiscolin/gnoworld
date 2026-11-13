@@ -25,9 +25,9 @@ export interface Line {
 
 // Ergo folds A to Z alone (casemapping ascii, deploy/ergo/ircd.yaml.tmpl), its names being ASCII alone
 // (irc/i18n/common.go:74, v2.19.1).
-export const fold = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
+export const casemap = (name: string): string => name.replace(/[A-Z]/g, (letter) => letter.toLowerCase());
 /** Whether two names, of rooms or nicks, are one name to Ergo. */
-export const sameName = (one: string, other: string): boolean => fold(one) === fold(other);
+export const sameName = (one: string, other: string): boolean => casemap(one) === casemap(other);
 /** The nick of a source: nick!user@host, nick@host, or a nick alone. */
 export const nickOf = (source: string): string => source.replace(/[!@].*$/s, "");
 const compare = (one: string, other: string): number => (one < other ? -1 : one > other ? 1 : 0);
@@ -55,7 +55,7 @@ export function concerns({ command, params }: IrcMessage): string | undefined {
   if (EVERYWHERE.includes(command)) return "*";
   const place = Object.hasOwn(PLACES, command) ? PLACES[command] : undefined;
   const room = place === undefined ? undefined : params[place];
-  return room === undefined ? undefined : fold(room);
+  return room === undefined ? undefined : casemap(room);
 }
 
 // A time Ergo writes, on a day that exists: the string reads back as itself.
@@ -174,7 +174,7 @@ export function redactAfter<T extends { readonly id: string }>(
  * room, folded, and its msgid; none for any other reply, an INVALID_TARGET, which names no line, among them. */
 export function refusedOf({ command, params }: IrcMessage): { room: string; id: string } | undefined {
   const [about, , target = "", id = ""] = params;
-  return command === "FAIL" && about === "REDACT" && params.length === 5 ? { room: fold(target), id } : undefined;
+  return command === "FAIL" && about === "REDACT" && params.length === 5 ? { room: casemap(target), id } : undefined;
 }
 
 /** The room I look at, and my nick in it. */

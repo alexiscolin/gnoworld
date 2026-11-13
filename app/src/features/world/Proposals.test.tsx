@@ -4,18 +4,20 @@ import { createRoot } from "react-dom/client";
 import { describe, expect, it, vi } from "vitest";
 import { queryEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { mount } from "../../../tests/mount.tsx";
+import { quietFreshQueries } from "../../../tests/queries.ts";
 import type { ChainFetch, ChainRead } from "@gnoworld/chain/read";
 import type { Proposal } from "../../lib/chain/proposal.ts";
 import { HOME, PATH } from "../../../tests/govdaoFixtures.ts";
 import Proposals from "./Proposals.tsx";
 
-// A world's proposals on its plate (5k): drawn from the realm's home page as RECORDED on onyx-1 (tests/chain/recorded), which
-// states no threshold, so the page draws no "of 66.66%" and no ring; a read that fails says its state and links to gnoweb. The ring
-// itself is drawn from a proposal that gave its tally, invented here: no recorded page has one.
-const flush = () =>
-  act(async () => {
-    await new Promise((done) => setTimeout(done, 0));
-  });
+// A world's proposals (5k): the realm's home page as RECORDED on onyx-1 states no threshold, so no ring and no "of 66.66%"; a failed read says its
+// state and links to gnoweb; a ring comes only from a tally, invented here.
+// A read ends, then the query tells its readers a timer later: two turns.
+const turns = async () => {
+  await new Promise((done) => setTimeout(done, 0));
+  await new Promise((done) => setTimeout(done, 0));
+};
+const flush = () => act(turns);
 
 function answering(response: () => Response) {
   return vi.fn<ChainFetch>(() => Promise.resolve(response()));
@@ -24,6 +26,7 @@ function answering(response: () => Response) {
 // The block again, its realm's proposals read as `value`.
 async function readingAs(value: Proposal[]) {
   vi.resetModules();
+  await quietFreshQueries();
   vi.doMock("../../lib/chain/proposal.ts", async (original) => ({
     ...(await original<typeof import("../../lib/chain/proposal.ts")>()),
     readProposals: (): Promise<ChainRead<Proposal[]>> =>
@@ -57,7 +60,7 @@ describe("a world's proposals", () => {
     vi.doUnmock("../../lib/chain/proposal.ts");
   });
 
-  it("draws the newest proposal under its pill and the newest three as cards, each with its gnoweb link, and no tally", async () => {
+  it("draws the newest three as rows of the Proposals card, each a link to gnoweb, and no pill and no tally when none is open", async () => {
     const el = mount(
       <Proposals
         path={PATH}
@@ -65,15 +68,15 @@ describe("a world's proposals", () => {
       />,
     );
     await flush();
-    expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 37");
-    expect([...el.querySelectorAll("h3")].map((h) => h.textContent)).toEqual([
+    expect(el.querySelector("h2")?.textContent).toBe("Proposals");
+    expect(el.querySelector("[role='status']")).toBeNull();
+    expect([...el.querySelectorAll("a[target='_blank'] .truncate")].map((h) => h.textContent)).toEqual([
       "Set validator gno-core-validator-1 to voting power 60",
       "Set validator gno-core-validator-1 to voting power 500",
       "Set node halt height",
     ]);
     expect(el.querySelector("a[href='https://onyx.testnets.gno.land/r/gov/dao:37']")).not.toBeNull();
     expect(el.textContent).not.toMatch(/YES|66\.66/);
-    expect(el.querySelector("svg")).toBeNull();
   });
 
   it("hands the page no ring for a proposal that gave no tally", async () => {
@@ -91,6 +94,7 @@ describe("a world's proposals", () => {
 
   it("hands the page no ring of the last realm while another's read is on its way (7e's review, B1-2)", async () => {
     vi.resetModules();
+    await quietFreshQueries();
     const read = vi
       .fn<() => Promise<ChainRead<Proposal[]>>>()
       .mockResolvedValueOnce({
@@ -107,15 +111,15 @@ describe("a world's proposals", () => {
     const onRing = vi.fn();
     const box = document.createElement("div");
     const root = createRoot(box);
-    await act(async () => {
+    act(() => {
       root.render(<Moving path="/r/gov/dao" onRing={onRing} />);
-      await new Promise((done) => setTimeout(done, 0));
     });
+    await flush();
     expect(onRing).toHaveBeenLastCalledWith({ lit: 0.33, mark: 0.6666 });
-    await act(async () => {
+    act(() => {
       root.render(<Moving path="/r/bubble" onRing={onRing} />);
-      await new Promise((done) => setTimeout(done, 0));
     });
+    await flush();
     expect(onRing).toHaveBeenLastCalledWith(undefined);
     expect(box.textContent).not.toContain("Proposal 15");
     act(() => {
@@ -139,10 +143,10 @@ describe("a world's proposals", () => {
     const Tallied = await tallied();
     const leaving = vi.fn();
     const root = createRoot(document.createElement("div"));
-    await act(async () => {
+    act(() => {
       root.render(<Tallied path={PATH} onRing={leaving} />);
-      await new Promise((done) => setTimeout(done, 0));
     });
+    await flush();
     expect(leaving).toHaveBeenLastCalledWith({ lit: 0.33, mark: 0.6666 });
     act(() => {
       root.unmount();
@@ -186,7 +190,7 @@ describe("a world's proposals", () => {
     await flush();
     expect(el.querySelector("[role='status']")?.textContent).toBe("Proposal 15 · YES 33% of 66.66%");
     // 7e: the ring is the scene's tilted orbit, never a flat one on the plate (decision of 2026-10-31): the page hands it the tally.
-    expect(el.querySelector("svg")).toBeNull();
+    expect(el.querySelector("svg[role='img'], circle, path[stroke-dasharray]")).toBeNull();
     expect(onRing).toHaveBeenCalledExactlyOnceWith({ lit: 0.33, mark: 0.6666 });
     vi.doUnmock("../../lib/chain/proposal.ts");
   });

@@ -1,6 +1,6 @@
 import type { Line } from "@gnoworld/core";
 import { describe, expect, it, vi } from "vitest";
-import { nextLine, stopOf } from "./lineFocus.ts";
+import { menuPoint, nextLine, stopOf } from "./lineFocus.ts";
 
 // The green pass (G5): the moves among a room's lines, read apart from the page (the app's tests render on the
 // server, where no key is pressed).
@@ -71,5 +71,17 @@ describe("the list's tab stop", () => {
   it("is none in an empty list", () => {
     expect(stopOf([], "b")).toBeUndefined();
     expect(stopOf([], undefined)).toBeUndefined();
+  });
+});
+
+// A line's menu asked at a point (a right-click, a long-press, the context-menu key).
+describe("the point a line's menu opens at", () => {
+  const corner = { left: 40, top: 300 };
+  it("is the pointer's, for a right-click", () => {
+    expect(menuPoint({ clientX: 120, clientY: 340 }, corner)).toEqual({ x: 120, y: 340 });
+  });
+
+  it("is the line's own corner for the context-menu key, which gives no pointer", () => {
+    expect(menuPoint({ clientX: 0, clientY: 0 }, corner)).toEqual({ x: 40, y: 300 });
   });
 });

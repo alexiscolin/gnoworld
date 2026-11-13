@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { build, defineConfig, parseSync, type Plugin } from "vite";
 import { glslSpaces } from "./src/glsl.ts";
 import { precached } from "./src/sw/precache.ts";
+import { workshopDataFiles } from "./tests/e2e/workshopData.mjs";
 
 // The PWA's worker (ADR-0001 §12): src/sw/sw.ts built on its own into /sw.js, one classic script, with the
 // files it precaches (hashed ones and the shell) and their digests. Built once the whole build is done:
@@ -74,14 +75,18 @@ const CHUNKS = [
     test: /\/app\/src\/(?:store\/|storeContext\.tsx|lib\/saveData\.ts|lib\/api\/http\.ts$|lib\/copy\.ts$)/,
   },
   // Not the activity chart (F304), the stat (F2868), Avatar, Popover, Card, Skeleton (3 KB on every page, F2926), Breadcrumb, EmptyState,
-  // Combobox, Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i): the chunks
-  // that need them load them after the first screen.
+  // Field (7.7 KB, F2976), Tabs (the bell's panel at its first press, 482 B, slice 8), Progress and Sparkline (8i), and the plate's
+  // Figures, Network, PagedList and Room (slice 13, D13979): the chunks that need them load them after the first screen.
   {
     name: "ui",
-    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Combobox|Field|Row|Tabs|Progress|Sparkline)\/)/,
+    test: /\/packages\/ui\/src\/(?!(?:ActivityChart|Stat|Avatar|Popover|Card|Skeleton|Breadcrumb|EmptyState|Field|Listbox|Row|Tabs|Progress|Sparkline|Figures|Network|PagedList)\/|(?:alone|flip|roomDom)\.tsx?$)/,
   },
   // three never: two lazy parts of the scene (the cosmos, a world's page) share some of it, and a share of two would put it on the first screen.
-  { name: "vendor", test: /^(?!.*\/node_modules\/three\/).*\/node_modules\//, minShareCount: 2 },
+  {
+    name: "vendor",
+    test: /^(?!.*\/node_modules\/three\/)(?!.*\/(?:useQueries|queriesObserver)\.js$).*\/node_modules\//,
+    minShareCount: 2,
+  },
 ];
 
 // The workshop's dev servers, the app's and the lab's (scripts/workshop.sh gives each its port): this machine alone, the exact names
@@ -119,6 +124,21 @@ export const workshopBackend = () => {
   };
 };
 
+// The files the workshop's backend writes into WORKSHOP_DATA_DIR (scripts/workshop.sh), served at their names and nothing else of the folder
+// (tests/e2e/workshopData.mjs); no plugin without the folder, and none in a build.
+export const workshopData = (dir: string | undefined): Plugin[] =>
+  dir === undefined || dir === ""
+    ? []
+    : [
+        {
+          name: "gnoworld:workshop-data",
+          apply: "serve",
+          configureServer(server) {
+            server.middlewares.use(workshopDataFiles(dir));
+          },
+        },
+      ];
+
 /** A built chunk parsed, for the shaders' spaces to go (src/glsl.ts); the lab's build takes it too. */
 export const parsed = (code: string) => parseSync("chunk.js", code, { sourceType: "module" }).program;
 
@@ -130,7 +150,23 @@ export default defineConfig({
     babel({ presets: [reactCompilerPreset({ panicThreshold: "all_errors" })] }),
     glslSpaces(parsed),
     serviceWorker,
+    workshopData(process.env["WORKSHOP_DATA_DIR"]),
   ],
   build: { target: TARGET, rolldownOptions: { output: { codeSplitting: { groups: CHUNKS } } } },
   server: { ...workshopServer(), proxy: workshopBackend() },
+  // The dev server bundles the composer's editor at its start, not when a page first asks for it: found later, it is bundled again
+  // while the page runs, and a page holding the two bundles sees two Lexical cores ("not a constructor that subclasses LexicalNode").
+  optimizeDeps: {
+    include: [
+      "lexical",
+      "@lexical/code-core",
+      "@lexical/history",
+      "@lexical/link",
+      "@lexical/list",
+      "@lexical/markdown",
+      "@lexical/rich-text",
+      "@lexical/selection",
+      "@lexical/utils",
+    ],
+  },
 });

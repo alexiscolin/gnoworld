@@ -1,4 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
+import { violations } from "./axe.ts";
 import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, test, type Page } from "./fixtures.ts";
@@ -21,8 +21,8 @@ const at = async (page: Page, selector: string) => {
 };
 const document_ = (page: Page) =>
   page.evaluate(() => ({ scroll: document.documentElement.scrollHeight, inner: window.innerHeight }));
-const expand = (page: Page) => page.getByRole("button", { name: "Expand the chat" });
-const shrink = (page: Page) => page.getByRole("button", { name: "Shrink the chat" });
+const expand = (page: Page) => page.getByRole("button", { name: "Open the full chat" });
+const shrink = (page: Page) => page.getByRole("button", { name: "Close the full chat" });
 
 test.describe("a world's page: the dock and the full chat", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
@@ -33,11 +33,11 @@ test.describe("a world's page: the dock and the full chat", () => {
     await logIn(page, "dock-look");
     await open(page, { width: 1728, as: ACCOUNT, height: 1080, full: false });
     const dock = await at(page, "[data-chat-layout]");
-    // Frame 26: the dock's edge at x 1343 to 1344, from y 98 to y 1056, 360 px wide.
-    near(dock.x, 1344);
-    near(dock.y, 98);
-    near(dock.width, 360);
-    near(dock.y + dock.height, 1056);
+    // The dock is 418 px wide, its right edge 25 px in from the window's, under the site's header (y 99) and 25 px above the foot.
+    near(dock.x, 1285);
+    near(dock.y, 99);
+    near(dock.width, 418);
+    near(dock.y + dock.height, 1055);
     const plate = await page.getByRole("region", { name: "Bubble" }).boundingBox();
     if (plate === null) throw new Error("no plate");
     expect(plate.x + plate.width).toBeLessThanOrEqual(dock.x + 1);
@@ -54,7 +54,7 @@ test.describe("a world's page: the dock and the full chat", () => {
   test("keeps the lines 300 px wide or more in the 320 px dock at 1366 px, beside the plate", async ({ page }) => {
     await open(page, { width: 1366, as: "guest-dockxx", height: 768, full: false });
     const dock = await at(page, "[data-chat-layout]");
-    near(dock.width, 320);
+    near(dock.width, 378);
     const line = await lines(page).first().boundingBox();
     if (line === null) throw new Error("no line");
     expect(line.width).toBeGreaterThanOrEqual(300);
@@ -83,6 +83,9 @@ test.describe("a world's page: the dock and the full chat", () => {
     await open(page, { width: 1728, as: ACCOUNT, height: 1080, full: false });
     await expand(page).click();
     await expect(page).toHaveURL(/chat=full/);
+    // The dock's chat and the full one are both drawn while the move fades; one is left once it ends.
+    await expect(page.locator('[data-region="info"]')).toBeVisible();
+    await expect(page.locator('[data-region="worlds"]')).toHaveCount(1);
     await expect(page.locator('[data-region="worlds"]')).toBeVisible();
     const root = await at(page, "[data-chat-layout]");
     near(root.x, 0, 0);
@@ -94,29 +97,32 @@ test.describe("a world's page: the dock and the full chat", () => {
     await expect(page.getByRole("group", { name: "Message box" })).toBeInViewport();
     const sizes = await document_(page);
     expect(sizes.scroll).toBe(sizes.inner);
-    await expect(page.getByRole("heading", { level: 1, name: "Bubble" })).toHaveCount(1);
+    // The page behind the full chat is out of the accessibility tree: its heading is not read twice nor at all.
+    await expect(page.getByRole("heading", { level: 1, name: "Bubble" })).toHaveCount(0);
     // A reload keeps it, and a room chosen keeps it.
     await page.reload();
     await expect(page.locator('[data-region="worlds"]')).toBeVisible();
     await expect(shrink(page)).toBeVisible();
     await page
       .getByRole("navigation", { name: /^Rooms/ })
-      .getByRole("link", { name: "#bubble", exact: true })
+      .getByRole("link", { name: "bubble", exact: true })
       .click();
     await expect(page).toHaveURL(/chat=full/);
     await shrink(page).click();
     await expect(page).not.toHaveURL(/chat=full/);
     await expect(expand(page)).toBeVisible();
-    near((await at(page, "[data-chat-layout]")).width, 360);
+    await expect(page.locator("[data-chat-layout]")).toHaveCount(1);
+    near((await at(page, "[data-chat-layout]")).width, 418);
   });
 
   test("passes axe docked and expanded", async ({ page }) => {
     await logIn(page, "dock-axe");
     await open(page, { width: 1728, as: ACCOUNT, height: 1080, full: false });
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await violations(page)).toEqual([]);
     await expand(page).click();
-    await expect(page.locator('[data-region="worlds"]')).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    await expect(page.locator('[data-region="info"]')).toBeVisible();
+    await expect(page.locator('[data-region="worlds"]')).toHaveCount(1);
+    expect(await violations(page)).toEqual([]);
   });
 
   test("is the whole page under 1280 px, a phone's: the lines, no dock, no expand control, the composer in view", async ({
@@ -127,12 +133,16 @@ test.describe("a world's page: the dock and the full chat", () => {
     await expect(expand(page)).toHaveCount(0);
     await expect(shrink(page)).toHaveCount(0);
     const root = await at(page, "[data-chat-layout]");
-    near(root.x, 0, 0);
-    near(root.width, 1100, 1);
+    // The page's own side margin (16 px) is round the chat.
+    near(root.x, 16, 0);
+    near(root.width, 1068, 1);
     await expect(lines(page)).toHaveCount(2);
+    // A world's page under the dock's width keeps the plate first and the chat a block of the page under it: the composer is
+    // reached by scrolling, not in view at once.
+    const plate = await page.getByRole("region", { name: "Bubble" }).boundingBox();
+    expect(root.y).toBeGreaterThanOrEqual((plate?.y ?? Infinity) + (plate?.height ?? 0));
+    await page.getByRole("group", { name: "Message box" }).scrollIntoViewIfNeeded();
     await expect(page.getByRole("group", { name: "Message box" })).toBeInViewport();
-    const sizes = await document_(page);
-    expect(sizes.scroll).toBe(sizes.inner);
   });
 });
 

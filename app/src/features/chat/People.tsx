@@ -6,6 +6,7 @@ import { BOT, isAccount } from "./names.ts";
 import type { Line } from "@gnoworld/core";
 import { Country, countriesHere } from "./Country.tsx";
 import { Person } from "./Person.tsx";
+import { PersonLink } from "./PersonLinkLazy.tsx";
 import shared from "./lists.module.css";
 import styles from "./People.module.css";
 
@@ -32,7 +33,10 @@ export interface PeopleProps {
 function Who({ nick, account, said }: { nick: string; account: boolean; said?: string }) {
   return (
     <Cluster space="2xs">
-      <Avatar address={nick} name={nick} decorative />
+      {/* A guest has no address to draw a face from: its disc of night, ringed, keeps the names on one edge. */}
+      <span className={account ? undefined : styles["guest"]}>
+        <Avatar address={nick} name={nick} decorative />
+      </span>
       {said === undefined ? null : <span className="visually-hidden">{said}</span>}
       <Person name={nick} guest={!account} account={account} />
     </Cluster>
@@ -64,11 +68,17 @@ export function People({ members, connected, me, onMessage, canFollow = false, l
                     {/* A visible name, the word that says what it does for a screen reader's list. */}
                     <Who nick={nick} account={account} said="Message " />
                   </button>
+                ) : account ? (
+                  // The reader's own row, or a reader who cannot write: the name opens the card, as everywhere.
+                  <PersonLink address={nick}>
+                    <Who nick={nick} account />
+                  </PersonLink>
                 ) : (
                   <Who nick={nick} account={account} />
                 )}
                 <Cluster space="2xs">
                   <Country code={countries.get(nick)} />
+                  {account ? <PersonLink address={nick} asIcon="m" /> : null}
                   {canFollow && account && nick !== me ? (
                     <Suspense fallback={null}>
                       <FollowButton kind="people" id={nick} size="m" />

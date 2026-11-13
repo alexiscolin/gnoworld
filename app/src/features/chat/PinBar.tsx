@@ -1,18 +1,18 @@
-// The room's pins above its lines (slice 4's 4d; the prototype's #pinBar): one line, the newest pin and a count, which
-// opens into the stack; each pin's author and its words, drawn from Markdown as a line's are (nothing from Ergo reaches
-// HTML), and for a reader who may pin, an Unpin of each. PinStack is the drawing; PinBar holds whether it is open and
-// says in a flash why an unpin did not happen.
-import { markdown } from "@gnoworld/core";
+// The room's pins above its lines: each pin one line, its author and its words cut to the line, the first three at once, a
+// "+N" opening the rest; the bar is never taller than three lines (the rest scrolls inside it). For a reader who may pin,
+// an Unpin of each. PinStack is the drawing; PinBar holds whether the rest is open and says in a flash why an unpin did not happen.
 import type { PinnedLine } from "@gnoworld/schemas";
-import { Flash, Icon, IconButton, Stack, type FlashMessage } from "@gnoworld/ui";
+import { Button, Flash, Icon, IconButton, type FlashMessage } from "@gnoworld/ui";
 import { useState } from "react";
 import type { Done } from "./askPins.ts";
-import { Markdown } from "./Message.tsx";
 import { shortAddress } from "./names.ts";
 import { Person } from "./Person.tsx";
 import shared from "./lists.module.css";
 import styles from "./PinBar.module.css";
 import { pinProblem } from "./problem.ts";
+
+/** Pins shown before the "+N". */
+const SHOWN = 3;
 
 export interface PinStackProps {
   /** The room's pins, the newest pinned first. */
@@ -24,51 +24,42 @@ export interface PinStackProps {
   onUnpin: (id: string) => void;
 }
 
-/** The pin bar as drawn: nothing for no pin; the newest pin's author and words cut to one line, with the count of
- * the others, in the button that opens the stack; open, every pin with its author and its words. */
+/** The pin bar as drawn: nothing for no pin; the first three pins a line each; with more, a "+N" that opens the rest in the same
+ * three lines' height, and "Hide" to shut them. */
 export function PinStack({ pins, may, open, onToggle, onUnpin }: PinStackProps) {
-  const [first] = pins;
-  if (first === undefined) return null;
+  if (pins.length === 0) return null;
+  const rows = open ? pins : pins.slice(0, SHOWN);
+  const more = pins.length - SHOWN;
   return (
     <section aria-label="Pinned messages" className={styles["bar"]}>
-      <button type="button" className={styles["head"]} aria-expanded={open} onClick={onToggle}>
-        <Icon name="pin" />
-        <span className={["truncate", styles["newest"]].join(" ")} title={first.text}>
-          <b>
-            <Person name={first.account} guest={false} />
-          </b>{" "}
-          {first.text}
-        </span>
-        {pins.length > 1 ? (
-          <small className={styles["count"]}>{open ? "Hide" : `+${String(pins.length - 1)}`}</small>
-        ) : null}
-      </button>
-      {open ? (
-        <div className={styles["pins"]}>
-          <Stack as="ul" space="2xs">
-            {pins.map((pin) => (
-              <li key={pin.id} className={[shared["card"], styles["pin"]].join(" ")}>
-                <b className={styles["who"]}>
-                  <Person name={pin.account} guest={false} />
-                </b>{" "}
-                <Markdown blocks={markdown(pin.text)} />
-                {may ? (
-                  <span className={styles["unpin"]}>
-                    <IconButton
-                      icon="close"
-                      label={`Unpin ${shortAddress(pin.account)}'s message`}
-                      size="s"
-                      emphasis="plain"
-                      onClick={() => {
-                        onUnpin(pin.id);
-                      }}
-                    />
-                  </span>
-                ) : null}
-              </li>
-            ))}
-          </Stack>
-        </div>
+      <ul className={[shared["plain"], styles["pins"]].join(" ")}>
+        {rows.map((pin) => (
+          <li key={pin.id} className={styles["pin"]}>
+            <Icon name="pin" />
+            <span className="truncate" title={pin.text}>
+              <b className={styles["who"]}>
+                <Person name={pin.account} guest={false} />
+              </b>{" "}
+              {pin.text}
+            </span>
+            {may ? (
+              <IconButton
+                icon="close"
+                label={`Unpin ${shortAddress(pin.account)}'s message`}
+                size="xs"
+                emphasis="plain"
+                onClick={() => {
+                  onUnpin(pin.id);
+                }}
+              />
+            ) : null}
+          </li>
+        ))}
+      </ul>
+      {more > 0 ? (
+        <Button size="s" emphasis="quiet" expanded={open} onClick={onToggle}>
+          {open ? "Hide" : `+${String(more)}`}
+        </Button>
       ) : null}
     </section>
   );

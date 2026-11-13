@@ -1,0 +1,49 @@
+/* The plate's squares (slice 13): hub cards on the twelve columns; the narrow plate's tighter card padding is the plate's to set (its container is
+   37.5 rem, Panel). */
+@layer components {
+  /* raw: the narrow plate (37.5 rem, as the grid's own container query) */
+  @container plate (max-width: 37.5rem) {
+    .widgets {
+      --plate-pad: var(--space-s);
+      --plate-zone: var(--space-l);
+    }
+  }
+
+  /* The squares of a row are one height: each fills its cell. */
+  .widgets > * > * > * {
+    /* layout: the card fills the cell the grid stretched */
+    block-size: 100%;
+  }
+
+  .value {
+    font: var(--font-figure-s);
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .value small {
+    /* layout: the unit a small step after the value */
+    padding-inline-start: var(--space-2xs);
+    color: var(--color-text-muted);
+    font: var(--font-reading);
+    letter-spacing: normal;
+  }
+
+  /* A square's detail is held shut and out of reach while closed; it opens with the card's own move, not a move of its own. */
+  .fold {
+    /* layout: one row, whose height is the detail's */
+    display: grid;
+    /* layout: shut */
+    grid-template-rows: 0fr;
+  }
+
+  .fold[data-open] {
+    /* layout: open to the detail's own height */
+    grid-template-rows: 1fr;
+  }
+
+  .fold > .more {
+    min-block-size: 0;
+    overflow: hidden;
+  }
+}

@@ -1,0 +1,101 @@
+/* The talk bar (the proposal's .talk): a pill on the resting fill, 64 px at least, whose one link, the button's, stretches over the whole bar, so the
+   bar is the target and answers the pointer; the button answers the bar's hover as its own. Its entrance: the bar slides in at 0.6 s, the faces pop one
+   by one from 0.8 s, the words fade in at 1.1 s. */
+@layer components {
+  .talk {
+    position: relative;
+    min-block-size: var(--talk-h);
+    padding-block: var(--space-xs);
+    /* raw: the bar's words sit 20 px in, its button 12 from the edge */
+    padding-inline: 20px var(--space-xs);
+    background: var(--color-fill);
+    transition: background-color var(--motion-fast) var(--ease-standard);
+  }
+
+  /* The words give way (cut with an ellipsis) before the bar's button does: a long line never runs out of the bar. */
+  .who {
+    /* layout: the faces and words take what the button leaves */
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+
+  .said {
+    min-inline-size: 0;
+  }
+
+  .talk:hover {
+    background: var(--color-fill-hover);
+  }
+
+  /* Stacked faces overlap, each ringed in the night (the avatar's own ring); an initial centred in its disc by the line. */
+  .face {
+    --_bg: var(--color-fill);
+
+    display: inline-block;
+    inline-size: var(--avatar-m);
+    /* layout: each face stands 8 px over the one before it */
+    margin-inline-start: calc(var(--space-2xs) * -1);
+    background: var(--_bg);
+    box-shadow: 0 0 0 var(--line-width) var(--color-space);
+    color: var(--color-ink);
+    font: var(--font-label);
+    line-height: var(--avatar-m);
+  }
+
+  .faces {
+    text-align: center;
+  }
+
+  .face:first-child {
+    /* layout: the first stands where it is */
+    margin-inline-start: 0;
+  }
+
+  .title {
+    font: var(--font-ui);
+  }
+
+  .words {
+    color: var(--color-text-muted);
+    font: var(--font-reading);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .talk {
+      /* raw: the proposal's score, 0.6 s at 0.6 s */
+      animation: slide calc(0.6s * var(--motion-scale)) var(--ease-out-3) calc(0.6s * var(--motion-scale)) both;
+    }
+
+    .face {
+      /* raw: the proposal's score, each face 0.4 s from 0.8 s, 0.08 s apart, overshooting */
+      animation: pop calc(0.4s * var(--motion-scale)) cubic-bezier(0.3, 1.6, 0.5, 1)
+        calc((0.8s + var(--n) * 0.08s) * var(--motion-scale)) both;
+    }
+
+    .words {
+      /* raw: the proposal's score, 0.5 s at 1.1 s */
+      animation: appear calc(0.5s * var(--motion-scale)) ease calc(1.1s * var(--motion-scale)) both;
+    }
+  }
+
+  @keyframes slide {
+    from {
+      opacity: 0;
+      /* raw: the proposal's score */
+      transform: translateX(calc(-24px * var(--dir)));
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.4);
+    }
+  }
+
+  @keyframes appear {
+    from {
+      opacity: 0;
+    }
+  }
+}

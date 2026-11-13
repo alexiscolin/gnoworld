@@ -1,5 +1,6 @@
+import { readFileSync } from "node:fs";
 import { render } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { eachStory } from "../testing.tsx";
 import { ChatLayout } from "./ChatLayout.tsx";
 import * as stories from "./ChatLayout.stories.tsx";
@@ -47,6 +48,70 @@ describe("ChatLayout", () => {
 
   it("has stories for the full chat, one without its info panel, and one with the panel first", () => {
     const shown = eachStory(stories, (container) => [...container.querySelectorAll("[data-region]")].length);
-    expect(shown).toEqual([5, 4, 5]);
+    // The fourth, the band, draws the full chat's five regions as the first does.
+    expect(shown).toEqual([5, 4, 5, 5]);
+  });
+
+  describe("measuring its own box", () => {
+    let width = 0;
+    beforeAll(() => {
+      Object.defineProperty(HTMLElement.prototype, "offsetWidth", { get: () => width, configurable: true });
+    });
+    afterEach(() => {
+      width = 0;
+    });
+    afterAll(() => {
+      Reflect.deleteProperty(HTMLElement.prototype, "offsetWidth");
+    });
+
+    it.each([
+      [900, true],
+      [901, false],
+    ])("tells the app a box %i px wide is compact: %s, and marks its frame as so", (px, compact) => {
+      width = px;
+      const told = vi.fn();
+      const { container } = render(
+        <ChatLayout header="h" onCompact={told}>
+          <div>talk</div>
+        </ChatLayout>,
+      );
+      expect(told).toHaveBeenLastCalledWith(compact);
+      expect(container.querySelector("[data-chat-layout]")?.hasAttribute("data-compact")).toBe(compact);
+    });
+  });
+});
+
+// The app's full chat put its header over the columns from outside, by the regions' attributes (lot E, E4).
+describe("ChatLayout's band", () => {
+  it("marks its frame when its header is a band over the columns, and leaves it unmarked otherwise", () => {
+    const { container, rerender } = render(full);
+    const frame = () => container.querySelector("[data-chat-layout]");
+    expect(frame()?.hasAttribute("data-band")).toBe(false);
+    rerender(
+      <ChatLayout header={<div>head</div>} band>
+        <div>talk</div>
+      </ChatLayout>,
+    );
+    expect(frame()?.hasAttribute("data-band")).toBe(true);
+  });
+
+  it("draws the band out of the columns' flow under the page's header, the columns from its foot, its controls alone taking a click", () => {
+    // This project's module URLs start at the repository's root (/packages/…), where Vitest runs.
+    const sheet = readFileSync(`.${new URL("./ChatLayout.module.css", import.meta.url).pathname}`, "utf8").replaceAll(
+      /\/\*[\s\S]*?\*\//g,
+      "",
+    );
+    const rule = (selector: string) =>
+      (new RegExp(`\\n  ${selector.replaceAll(/[.[\]()*+?^$|]/g, "\\$&")} \\{([^}]*)\\}`).exec(sheet)?.[1] ?? "")
+        .replaceAll(/\s+/g, " ")
+        .trim();
+    expect(rule(".frame[data-band] > .header")).toBe(
+      "position: absolute; inset-block-start: var(--banner-under); inset-inline: 0; padding-inline-start: calc(var(--space-m) + max(var(--chat-inset, 0px), var(--space-l))); border-block-end: 0; pointer-events: none;",
+    );
+    expect(rule(".frame[data-band] > .header :is(a, button)")).toBe("pointer-events: auto;");
+    expect(rule(".frame[data-band] > .header + *")).toBe(
+      "margin-block-start: var(--banner-under); border-block-start: var(--line-width) solid var(--color-line);",
+    );
+    expect(rule(".frame[data-band] .conversation")).toBe("padding-block-start: var(--chat-head);");
   });
 });

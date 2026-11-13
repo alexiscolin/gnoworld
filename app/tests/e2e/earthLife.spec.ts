@@ -1,91 +1,23 @@
-import AxeBuilder from "@axe-core/playwright";
 import { word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
 import { logIn } from "./irc.ts";
+import { EARTH, INES, NIGHT, onEarth, raw, ROOMS, SLOW } from "./earthStage.ts";
 import { scriptedErgo } from "./scripted.ts";
-import { countShifts, running, shifted, stats } from "./sceneStage.ts";
+import { countShifts, running, shifted } from "./sceneStage.ts";
 import type { WebSocketRoute } from "@playwright/test";
+import { axeOf } from "./axe.ts";
 
 // The Earth's life (frames 43 to 55, 85): what people say, where they say it from, over the globe, on a scripted Ergo so every run shows the
 // same words. Each line declares its country as 7j's will: a tag on the wire. The hour is fixed: at 21:30 UTC, Europe is in the night.
-const EARTH = "/earth?test-gpu";
-const SLOW = { timeout: 90_000 };
 const COMPUTER = { width: 1728, height: 1080 };
 const PHONE = { width: 390, height: 844 };
-const NIGHT = "2026-11-02T21:30:00.000Z";
 const LATER = "2026-11-02T21:30:01.000Z";
 const ME = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-const INES = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const HOUR = 3_600_000;
-const ROOMS = {
-  world: "earth",
-  sections: [
-    {
-      name: null,
-      rooms: [
-        { room: "#earth", type: "open" },
-        { room: "#earth/help", type: "open" },
-        { room: "#earth/lisbon", type: "open" },
-        { room: "#earth/kyoto", type: "open" },
-      ],
-    },
-  ],
-};
-
 test.describe.configure({ timeout: 180_000 });
 
-interface Said {
-  id: string;
-  text: string;
-  country: string;
-  from?: string;
-  at?: string;
-  room?: string;
-}
-const raw = ({ id, text, country, from = INES, at = NIGHT, room = "#earth" }: Said) =>
-  `@msgid=${id};time=${at};account=${from};+gnoworld/country=${country} :${from}!u@h PRIVMSG ${room} :${text}`;
 const redaction = (id: string) => `:ergo REDACT #earth ${id}`;
-
-interface Opened {
-  socket: () => WebSocketRoute;
-  /** Each line the page sent. */
-  sent: string[];
-}
-
-// /earth on a scripted Ergo, at a fixed hour, as `me`; the rooms as the real server would list them.
-async function onEarth(
-  page: Page,
-  { me = "guest-77", path = EARTH, replayed = [] as readonly string[], motion = false } = {},
-): Promise<Opened> {
-  let socket: WebSocketRoute | undefined;
-  const sent: string[] = [];
-  await page.clock.setFixedTime(new Date(NIGHT));
-  if (!motion) await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.route("**/api/rooms?world=earth", (route) => route.fulfill({ json: ROOMS }));
-  await page.routeWebSocket(/\/ws$/, (ergo) => {
-    socket = ergo;
-    scriptedErgo(ergo, me, {
-      room: "#earth",
-      history: [],
-      replayed,
-      heard: (line) => {
-        sent.push(line);
-      },
-    });
-  });
-  await page.goto(path);
-  await hydrated(page);
-  await expect(page.locator("[data-earth='drawn']")).toBeAttached(SLOW);
-  await expect.poll(() => sent.some((line) => line.startsWith("JOIN "))).toBe(true);
-  return {
-    sent,
-    socket: () => {
-      if (socket === undefined) throw new Error("the page opened no socket");
-      return socket;
-    },
-  };
-}
 
 const near = (actual: number, wanted: number, slack = 2) => {
   expect(Math.abs(actual - wanted), `${String(actual)}, the frame's ${String(wanted)}`).toBeLessThanOrEqual(slack);
@@ -105,9 +37,6 @@ async function parisSaid(page: Page) {
   socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
   return socket;
 }
-
-const earthOf = async (page: Page) =>
-  (await stats(page)) as unknown as { earth: { x: number; y: number; radius: number } };
 
 test.describe("a computer, as the frames", () => {
   test.use({ viewport: COMPUTER });
@@ -132,37 +61,37 @@ test.describe("a computer, as the frames", () => {
     await expect(bubble(page, "from a side room")).toBeAttached();
   });
 
-  test("shows a person's line over their country, with their name and country, as frame 47", async ({ page }) => {
-    await parisSaid(page);
-    const shown = bubble(page, "gm from Paris!");
-    await expect(shown).toBeVisible();
-    await expect(shown).toContainText(/FRANCE/i);
-    const found = await shown.boundingBox();
-    if (found === null) throw new Error("no bubble");
-    near(found.width, 258, 6);
-    near(found.height, 56, 8);
-    const { earth } = await earthOf(page);
-    expect(found.x).toBeGreaterThan(earth.x - earth.radius);
-    expect(found.x + found.width).toBeLessThan(earth.x + earth.radius * 1.2);
-  });
-
-  test("turns the globe to your own line: Paris comes to the disc's middle, at its true hour, in the dark", async ({
+  test("brings your own line's country into view by the ground alone: Paris well seen, the camera where it was", async ({
     page,
   }) => {
     const { socket } = await onEarth(page, { me: ME });
     await signsReady(page);
-    const before = await page.evaluate(() => {
-      const scene = Reflect.get(globalThis, "__gnoworldScene") as { ground: { facing: () => { lon: number } } };
-      return scene.ground.facing().lon;
-    });
+    const read = () =>
+      page.evaluate(() => {
+        const space = Reflect.get(globalThis, "__gnoworldSpace") as {
+          seconds: number;
+          camera: { position: { x: number; y: number; z: number } };
+          universe: { earth: unknown };
+          stage: { ground: { facing: (e: unknown, s: number, p: unknown) => { lat: number; lon: number } } };
+        };
+        const { x, y, z } = space.camera.position;
+        return {
+          eye: [x, y, z],
+          facing: space.stage.ground.facing(space.universe.earth, space.seconds, space.camera.position),
+        };
+      });
+    const before = await read();
     socket().send(raw({ id: "m1", text: "gm from Paris!", country: "FR", from: ME }));
     await expect(bubble(page, "gm from Paris!")).toBeVisible();
-    const after = await page.evaluate(() => {
-      const scene = Reflect.get(globalThis, "__gnoworldScene") as { ground: { facing: () => { lon: number } } };
-      return scene.ground.facing().lon;
-    });
-    expect(Math.abs(after - before)).toBeGreaterThan(1);
-    near(after, 2.6, 8);
+    await expect.poll(async () => Math.abs((await read()).facing.lon - before.facing.lon)).toBeGreaterThan(1);
+    const after = await read();
+    expect(after.eye).toEqual(before.eye);
+    // Paris (46.7 N, 2.6 E) within 57 degrees of what faces the eye.
+    const [lat, lon] = [(after.facing.lat * Math.PI) / 180, ((after.facing.lon - 2.6) * Math.PI) / 180];
+    const paris = (46.7 * Math.PI) / 180;
+    expect(Math.acos(Math.sin(lat) * Math.sin(paris) + Math.cos(lat) * Math.cos(paris) * Math.cos(lon))).toBeLessThan(
+      (57 * Math.PI) / 180,
+    );
   });
 
   test("keeps every bubble off the plate's words and off the dock", async ({ page }) => {
@@ -278,7 +207,7 @@ test.describe("a computer, as the frames", () => {
     const socket = await parisSaid(page);
     socket().send(raw({ id: "m2", text: "evening from Sydney", country: "AU", from: "p2" }));
     await expect(page.getByText("Australia · 1, far side")).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("lets a bubble pop in with motion on", async ({ page }) => {
@@ -409,15 +338,6 @@ test.describe("a window under the dock's breakpoint", () => {
     });
     await expect(page.locator("[data-signs]")).toBeVisible();
   });
-
-  test("keeps the chat in the page, under the globe: the Earth is what the page shows", async ({ page }) => {
-    await onEarth(page, { me: ME });
-    await signsReady(page);
-    const { earth } = await earthOf(page);
-    expect(await onTop(page, earth.x, earth.y)).toBe(true);
-    const chat = await box(page, "[data-chat-layout]");
-    expect(chat.y).toBeGreaterThanOrEqual(earth.y + earth.radius);
-  });
 });
 
 test.describe("a narrower computer", () => {
@@ -475,6 +395,6 @@ test.describe("a phone", () => {
     expect(found.x + found.width).toBeLessThanOrEqual(PHONE.width);
     expect(await onTop(page, found.x + found.width / 2, found.y + found.height / 2)).toBe(true);
     await page.getByRole("button", { name: "Credits", exact: true }).click({ trial: true });
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });

@@ -9,6 +9,7 @@
     padding-inline: var(--space-xs);
     border-radius: var(--radius-s);
     background: var(--_fill);
+    transition: background-color var(--motion-fast) var(--ease-standard);
   }
 
   .row:hover {
@@ -43,6 +44,10 @@
     text-decoration: none;
   }
 
+  button.link {
+    cursor: pointer;
+  }
+
   .link[aria-current="true"] {
     font-weight: 500;
   }
@@ -50,15 +55,5 @@
   .title {
     font: var(--font-body);
     font-weight: var(--_weight);
-  }
-
-  .subtitle {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
-  }
-
-  .activity {
-    color: var(--color-text-muted);
-    font: var(--font-data);
   }
 }

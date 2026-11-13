@@ -8,8 +8,20 @@
     text-transform: uppercase;
   }
 
+  /* A secondary line: the muted grey in the meta type (a source's age, a note under a figure, a count's unit). */
+  .meta {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+  }
+
+  /* Words in capitals that a block tracks itself (the header's views, a bubble's head, "Online now"): the label's caps, apart from
+     its type, so they keep their case where capitals break the script, as the label does. */
+  .caps {
+    text-transform: uppercase;
+  }
+
   /* Arabic's script and Hebrew's, by the languages written in them. */
-  .label:is(
+  :is(.label, .caps):is(
     :lang(ar),
     :lang(fa),
     :lang(ur),
@@ -57,12 +69,23 @@
      #hnav .links): the header's views, and space's two views apart from them on a phone (F4691). No blur until the scene has a sky. */
   .control-bar {
     box-sizing: border-box;
-    /* raw: four pixels between the pill's edge and its controls */
-    padding: 4px;
+    /* four pixels between the pill's edge and its controls */
+    padding: var(--space-3xs);
     border: var(--line-width) solid var(--color-line);
     border-radius: var(--radius-pill);
     /* raw: 45% of the night, the prototype's rgba(8, 11, 18, 0.45) */
     background: color-mix(in oklab, var(--color-surface) 45%, transparent);
+  }
+
+  /* The icon buttons in a bar, each round and as tall as the bar's links, so a hover or a selection fills the pill's inner height and
+     keeps inside its rounded ends: the views' two icons and the search. Over the plain icon control's square corners. */
+  .round-controls button {
+    /* raw: a view link's 34 px inside the 44 px pill (shellHeader.module.css) */
+    --_h: var(--round-h);
+
+    /* layout: no room to share with the pill's 40 px controls: the icons are its links' height */
+    margin-block: 0;
+    border-radius: var(--radius-pill);
   }
 
   /* A control whose press covers its whole card: its box drawn over the card, which places it (position: relative); a column's item, a
@@ -74,17 +97,239 @@
     content: "";
   }
 
-  /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
+  /* A column's opening edge: the line that parts it from the one before, its content a step off it. */
+  .rule-start {
+    padding-inline-start: var(--space-s);
+    border-inline-start: var(--line-width) solid var(--color-line);
+  }
+
+  /* Held at the top of a chat's scrolling box, over the lines that pass under it, in the chat's own fill: the day's label, the dock's
+     rooms. A scrolling box with padding above sets `--_held-top` to the padding negated, so it holds at the box's edge, not
+     under the padding, where the lines show. */
+  :root {
+    /* raw: no padding above, as a box with none */
+    --_held-top: 0px;
+  }
+
+  .held-top {
+    /* layout: held at the top of its scrolling box while the lines pass under */
+    position: sticky;
+    inset-block-start: var(--_held-top);
+    /* raw: over the lines under it, which stand at auto */
+    z-index: 1;
+    background: var(--color-surface);
+  }
+
+  /* A column's item: the pill of the rooms' column (38 px high, a step each side of its words), shared by its items and Discover's shelves. */
+  .column-item {
+    min-block-size: var(--chat-item);
+    padding-inline: var(--space-xs);
+    border-radius: var(--radius-item);
+  }
+
+  /* The pointer's light on a box that has a fill at rest: the fill brightens, nothing moves (the Select, the chips, Discover's cards). */
+  .fill-hover:hover {
+    background: var(--color-fill-hover);
+  }
+
+  /* Tags and a signal on one line that never wraps, the last one cut by an ellipsis where the place is narrow: a card's last line. */
+  .tag-line {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2xs);
+  }
+
+  .tag-line > * {
+    flex: none;
+  }
+
+  .tag-line > :last-child {
+    flex: 0 1 auto;
+  }
+
+  /* Chips (or any controls) in one row that scrolls across instead of wrapping; no bar, the cut chip says there is more. */
+  .scroll-row {
+    display: flex;
+    gap: var(--space-2xs);
+    /* No bar: base.css's `*` has none anywhere (D379). */
+    overflow: auto hidden;
+    /* Room inside the clip for a chip's focus ring, taken back outside, so the ring is never cut and the row keeps its place. */
+    padding: calc(var(--focus-width) + var(--focus-offset));
+    margin: calc(-1 * (var(--focus-width) + var(--focus-offset)));
+    /* A row cut by its edge fades out there (D379), so a cut chip reads as more to scroll, not as broken. */
+    /* raw: the fade over the last 32 px, half a chip */
+    mask-image: linear-gradient(calc(90deg * var(--dir)), #000 calc(100% - 32px), transparent);
+  }
+
+  .scroll-row > * {
+    flex: none;
+  }
+
   /* Words kept on one line with what follows them: a link and its arrow, a caption and its unit (8g's plates). */
   .nowrap {
     white-space: nowrap;
   }
 
+  /* What stands over a box's end, centred on its height: a field's Clear, a list's arrow. The box is its positioned parent, and the
+     element's own class sets how far in from the end it stands. */
+  .box-end {
+    position: absolute;
+    inset-block: 0;
+    display: grid;
+    place-items: center;
+  }
+
+  /* An icon and its words or figure on one line, sharing a middle; `.with-icon` keeps a small step between them. */
+  .with-icon,
+  .inline-center {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .with-icon {
+    gap: var(--space-3xs);
+  }
+
+  /* A box that is hidden stays hidden: its display here would otherwise beat the attribute's. */
+  .with-icon[hidden],
+  .inline-center[hidden] {
+    display: none;
+  }
+
+  /* A row of block width whose items share a middle. */
+  .row-center {
+    display: flex;
+    align-items: center;
+  }
+
+  /* A quiet box: a step of air inside, the fill's tint, rounded; what a panel says in place of a list. */
+  .fill-box {
+    padding: var(--space-xs) var(--space-s);
+    border-radius: var(--radius-m);
+    background: var(--color-fill);
+  }
+
+  /* A line of figures or a path to read: the muted grey in the data type, broken anywhere where it is longer than its place. */
+  .data-text {
+    color: var(--color-text-muted);
+    font: var(--font-data);
+    overflow-wrap: anywhere;
+  }
+
+  /* A lead, the words and a trailing part on one row, the words taking what the two leave: a row of a list. */
+  .icon-text-meta {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  /* A definition's value, the margin the browser gives it taken off: a fact of a card. */
+  .fact-value {
+    margin: 0;
+    min-inline-size: 0;
+  }
+
+  /* A code word in the interface's mono, with no box of its own (a number in a row). */
+  .plain-code {
+    padding: 0;
+    background: none;
+    font: var(--font-mono-ui);
+  }
+
+  /* The words and a trailing part on one row, the words taking what the trailing part leaves: a row with no lead. */
+  .text-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+  }
+
+  /* One box whose content sits in its middle: a round button's arrow. */
+  .grid-center {
+    display: grid;
+    place-items: center;
+  }
+
+  /* A block that fills its line with its words at the start: a menu's act, a row's link (a button would centre them). */
+  .full-start {
+    inline-size: 100%;
+    text-align: start;
+  }
+
+  /* A word and its mark side by side on one inline grid, sharing a middle: a name and its chevron. */
+  .inline-columns {
+    display: inline-grid;
+    grid-auto-flow: column;
+    align-items: center;
+  }
+
+  /* A round mark: a dot, whose size its own class sets. */
+  .disc {
+    aspect-ratio: 1;
+    border-radius: 50%;
+  }
+
+  /* A round mark's ring: a disc of the mine line over it, still and unseen; the mark's own rule makes it beat (compositor properties only). */
+  .ring {
+    position: relative;
+  }
+
+  .ring::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: var(--color-mine-line);
+    opacity: 0;
+  }
+
+  /* A box placed by its own insets in its positioned parent: a name over the scene, a tag beside a planet. */
+  .placed {
+    position: absolute;
+  }
+
+  /* A pill's ends. */
+  .pill-ends {
+    border-radius: var(--radius-pill);
+  }
+
+  /* A link that draws no underline of its own: a pill that is a link. */
+  .no-underline {
+    text-decoration: none;
+  }
+
+  /* A box that takes the pointer where its parent lets none through. */
+  .hit {
+    pointer-events: auto;
+  }
+
+  /* A control with no edge of its own: its fill and ink are all that show. */
+  .no-edge {
+    border: 0;
+  }
+
+  /* The fill and the ink of a control ease as it is pointed at. */
+  .tint {
+    transition: var(--transition-tint);
+  }
+
+  /* The pointer's hand over what can be pressed. */
+  .pointer {
+    cursor: pointer;
+  }
+
+  /* One line, cut with an ellipsis at its end: a name that is longer than its place. */
   .truncate {
     min-inline-size: 0;
     overflow: clip;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  /* A column the height of its region, its children one under the other: a last child with an auto start margin stands at its foot. */
+  .fill-column {
+    display: flex;
+    flex-direction: column;
+    min-block-size: 100%;
   }
 
   /* Words for assistive technology alone: a figure's value while its digits count, a chart's table. */
@@ -97,5 +342,57 @@
     overflow: hidden;
     clip-path: inset(50%);
     white-space: nowrap;
+  }
+
+  /* A card open alone (Card's `open`, Room): what is off its way is gone from the pane, out of the flow and unseen, as wide as it was and no taller than
+     nothing, its animations kept and never restarted. Room marks it. */
+  [data-aside] {
+    position: absolute;
+    inline-size: 100%;
+    block-size: 0;
+    overflow: clip;
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  /* A button that is no control to the eye: its words as they are (a name in a line that opens a person's window, a step greyed). */
+  .bare {
+    padding: 0;
+    /* raw: 2 px each side lifts the box past 24 px (WCAG 2.5.8) and the matching negative margin gives the room back */
+    padding-block: 2px;
+    /* layout: the room the padding took, given back, so a line keeps its measures */
+    margin-block: -2px;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    text-align: inherit;
+  }
+
+  /* A box mounted as its state changes comes in from its own place: a fade and a small rise, on the motion tokens (still when motion is reduced). */
+  .enter {
+    animation: enter calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) both;
+  }
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      translate: 0 var(--space-3xs);
+    }
+  }
+
+  /* What a coarse pointer (a phone) shows and what a computer shows: a phone reads and fills, a computer signs. */
+  .coarse-only {
+    display: none;
+  }
+
+  @media (pointer: coarse) {
+    .coarse-only {
+      display: block;
+    }
+
+    .fine-only {
+      display: none;
+    }
   }
 }

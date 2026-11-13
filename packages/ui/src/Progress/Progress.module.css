@@ -14,6 +14,7 @@
 
   .fill {
     fill: var(--color-primary);
+    transition: width var(--motion-slow) var(--ease-standard);
   }
 
   .steps {
@@ -24,12 +25,14 @@
   }
 
   .step {
-    /* raw: an 8 px dot, the prototype's .dots i */
-    inline-size: 8px;
-    /* raw: the same */
-    block-size: 8px;
+    /* an 8 px dot, the prototype's .dots i */
+    inline-size: var(--size-dot-l);
+    block-size: var(--size-dot-l);
     border: var(--line-width) solid var(--color-line-strong);
     border-radius: var(--radius-pill);
+    transition:
+      background-color var(--motion-base) var(--ease-standard),
+      border-color var(--motion-base) var(--ease-standard);
   }
 
   .step[data-done] {
@@ -60,6 +63,7 @@
 
   .arcFill {
     stroke: var(--color-primary);
+    transition: stroke-dasharray var(--motion-slow) var(--ease-standard);
   }
 
   .shown {

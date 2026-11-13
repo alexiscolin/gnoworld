@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { canCopy, copyAddress } from "./copy.ts";
+import { canCopy, copyAddress, copyText } from "./copy.ts";
 
 // Share and the arrival banners copy the world's address the same way (the review's F5629): whether the browser can, and
 // what came of it, in words.
@@ -23,6 +23,29 @@ describe("copying an address", () => {
     expect(await copyAddress("https://gno.world/w/bubble")).toBe("Copied");
     expect(writeText).toHaveBeenCalledWith("https://gno.world/w/bubble");
     vi.stubGlobal("navigator", { clipboard: { writeText: () => Promise.reject(new Error("denied")) } });
+    expect(await copyAddress("https://gno.world/w/bubble")).toBe("Could not copy the address");
+  });
+});
+
+describe("copying a text", () => {
+  it("is true once the clipboard took the text", async () => {
+    const writeText = vi.fn(() => Promise.resolve());
+    vi.stubGlobal("navigator", { clipboard: { writeText } });
+    expect(await copyText("a line")).toBe(true);
+    expect(writeText).toHaveBeenCalledWith("a line");
+  });
+
+  it("is false, throwing nothing, for a refused copy, a page with no clipboard and a clipboard with no writeText", async () => {
+    vi.stubGlobal("navigator", { clipboard: { writeText: () => Promise.reject(new Error("denied")) } });
+    expect(await copyText("a line")).toBe(false);
+    vi.stubGlobal("navigator", {});
+    expect(await copyText("a line")).toBe(false);
+    vi.stubGlobal("navigator", { clipboard: {} });
+    expect(await copyText("a line")).toBe(false);
+  });
+
+  it("says a page with no clipboard could not copy the address, as a refusal does, throwing nothing", async () => {
+    vi.stubGlobal("navigator", {});
     expect(await copyAddress("https://gno.world/w/bubble")).toBe("Could not copy the address");
   });
 });

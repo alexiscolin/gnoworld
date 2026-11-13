@@ -3,6 +3,7 @@ import { page, type PageBlock } from "@gnoworld/core";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
+import { SignedIn } from "../../../tests/grabStore.tsx";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
 import {
   after,
@@ -12,6 +13,7 @@ import {
   field,
   inputs,
   listing,
+  SIBLING_CHAIN,
   typed,
   warnsMembers,
 } from "../../../tests/callFixtures.ts";
@@ -45,6 +47,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
   const sibling = vi.fn<ChainFetch>(() => after(under, answer));
   const box = mount(
     <StoreProvider>
+      <SignedIn />
       <div data-test="under">
         <RealmBlocks
           via={via}
@@ -58,7 +61,7 @@ async function form(source: string, read: () => Promise<Response> = answer) {
           via={via}
           origin={CHAIN.gnoweb}
           blocks={blocksOf(gnoForm("SetProfile", input("name")))}
-          call={{ realm: REALM, chain: CHAIN, options: { fetch: sibling } }}
+          call={{ realm: REALM, chain: SIBLING_CHAIN, options: { fetch: sibling } }}
         />
       </div>
     </StoreProvider>,
@@ -68,6 +71,8 @@ async function form(source: string, read: () => Promise<Response> = answer) {
   });
   return one(box, '[data-test="under"]');
 }
+// The call card is the form's next sibling; the page's blocks sit in an article of their own now (RealmBlocks).
+const CARD = "figure + article";
 const gnoForm = (exec: string, ...fields: string[]) => `<gno-form exec="${exec}">\n${fields.join("\n")}\n</gno-form>`;
 const input = (name: string, extra = "", type = "text") => `<gno-input name="${name}" type="${type}" ${extra}/>`;
 
@@ -76,7 +81,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
     const box = await form(gnoForm("SetProfile", input("name", 'value="bob" '), input("times", 'value="3" ')));
     const caller = await calling(box, "Call SetProfile");
     click(caller);
-    const card = one(box, "article");
+    const card = one(box, CARD);
     expect(follows(caller, card)).toBe(true);
     // After the form's frame, not inside it: a frame of its own and the column's width, its values in the card's own type.
     expect(one(box, "figure").contains(card)).toBe(false);
@@ -90,9 +95,9 @@ describe("a page's gno-form as a Form block with a Call", () => {
     const box = await form(gnoForm("SetProfile", input("name", 'value="bob" '), input("times", 'value="3" ')));
     const caller = await calling(box, "Call SetProfile");
     click(caller);
-    typed(inputs(one(box, "article"))[1], "9");
+    typed(inputs(one(box, CARD))[1], "9");
     click(caller);
-    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["bob", "9"]);
+    expect(inputs(one(box, CARD)).map((i) => i.value)).toEqual(["bob", "9"]);
   });
 
   it("shows a hidden field in the card as a field to read and edit, and the form still says it is hidden", async () => {
@@ -100,7 +105,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
       gnoForm("SetProfile", input("name", 'value="g1attacker" ', "hidden"), input("times", 'value="3" ')),
     );
     click(await calling(box, "Call SetProfile"));
-    const [name] = inputs(one(box, "article"));
+    const [name] = inputs(one(box, CARD));
     expect(name?.value).toBe("g1attacker");
     expect(name?.type).not.toBe("hidden");
     expect(one(box, "figure").textContent).toContain("hidden");
@@ -115,13 +120,13 @@ describe("a page's gno-form as a Form block with a Call", () => {
       ),
     );
     click(await calling(box, "Call SetProfile"));
-    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["a bio", "7"]);
+    expect(inputs(one(box, CARD)).map((i) => i.value)).toEqual(["a bio", "7"]);
   });
 
   it("leaves a parameter the form does not name empty, to fill in", async () => {
     const box = await form(gnoForm("SetProfile", input("name", 'value="bob" ')));
     click(await calling(box, "Call SetProfile"));
-    expect(inputs(one(box, "article")).map((i) => i.value)).toEqual(["bob", ""]);
+    expect(inputs(one(box, CARD)).map((i) => i.value)).toEqual(["bob", ""]);
   });
 
   it("sets its Call at the end of its line at its own width, worded Call for the function, as a write row's", async () => {
@@ -160,7 +165,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
   it("keeps the prefilled text's problem, with the Sign button disabled: a form's value the type refuses is not signed", async () => {
     const box = await form(gnoForm("SetProfile", input("name", 'value="bob" '), input("times", 'value="1e3" ')));
     click(await calling(box, "Call SetProfile"));
-    const card = one(box, "article");
+    const card = one(box, CARD);
     expect(card.textContent).toMatch(/not in the form the field takes/);
     expect(button(card, "Sign in Adena")?.hasAttribute("disabled")).toBe(true);
   });
@@ -187,7 +192,7 @@ describe("a page's gno-form as a Form block with a Call", () => {
   ])("shows %s as the read-only form, with no Call", async (_name, source) => {
     const box = await form(source);
     expect(all(box, "button")).toHaveLength(0);
-    expect(all(box, "article")).toHaveLength(0);
+    expect(all(box, CARD)).toHaveLength(0);
     expect(one(box, "figure").textContent).toContain("read only");
   });
 
@@ -222,19 +227,19 @@ describe("a form whose drawing left fields out", () => {
   it("is the read-only form with no Call though what is drawn fits the function: a hidden field may be among those left out", async () => {
     const under = vi.fn<ChainFetch>(answer);
     const sibling = vi.fn<ChainFetch>(() => after(under, answer));
-    const at = (fetch: ChainFetch, left: number) => (
+    const at = (fetch: ChainFetch, left: number, chain: typeof CHAIN) => (
       <CallableForm
         exec="SetProfile"
         path=""
         left={left}
         fields={[input("name"), input("times")]}
-        call={{ realm: REALM, chain: CHAIN, options: { fetch } }}
+        call={{ realm: REALM, chain, options: { fetch } }}
       />
     );
     const box = mount(
       <StoreProvider>
-        <div data-test="under">{at(under, 1)}</div>
-        <div data-test="sibling">{at(sibling, 0)}</div>
+        <div data-test="under">{at(under, 1, CHAIN)}</div>
+        <div data-test="sibling">{at(sibling, 0, SIBLING_CHAIN)}</div>
       </StoreProvider>,
     );
     await vi.waitFor(() => {
@@ -257,7 +262,7 @@ describe("a form's card among a page's headings", () => {
     async (before, level) => {
       const box = await form(`${before}${FORM}`);
       click(await calling(box, "Call SetProfile"));
-      expect(one(one(box, "article"), "h2, h3, h4").tagName).toBe(level);
+      expect(one(one(box, CARD), "h2, h3, h4").tagName).toBe(level);
     },
   );
 });
@@ -274,6 +279,7 @@ describe("a GovDAO page's vote form", () => {
     ];
     const box = mount(
       <StoreProvider>
+        <SignedIn />
         <RealmBlocks
           via={via}
           origin={CHAIN.gnoweb}
@@ -287,6 +293,6 @@ describe("a GovDAO page's vote form", () => {
       </StoreProvider>,
     );
     click(await calling(box, "Call MustVoteOnProposalSimple"));
-    warnsMembers(one(box, "article"));
+    warnsMembers(one(box, CARD));
   });
 });

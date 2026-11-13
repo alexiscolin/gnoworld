@@ -2,7 +2,7 @@
 // next, so a 75 to 165 Hz screen keeps exactly those rates. Every value is a plain number: the loop calls these on each refresh, and
 // allocates nothing there.
 
-export type FrameRate = 0 | 10 | 30 | 60;
+export type FrameRate = 0 | 10 | 15 | 30 | 60;
 
 /** What the rate depends on, as the loop holds it. */
 export interface LoopState {
@@ -22,6 +22,7 @@ export interface LoopState {
   readonly sinceInput: number;
 }
 
+const SETTLED_AFTER_MS = 20_000;
 const IDLE_AFTER_MS = 60_000;
 // How early a refresh may draw. It absorbs a refresh's jitter, and whatever it lends comes back out of the next budget.
 const SLACK_MS = 8;
@@ -31,7 +32,8 @@ export function frameRate(state: LoopState): FrameRate {
   if (state.hidden || state.covered) return 0;
   if (state.busy || state.owed) return 60;
   if (!state.focused || state.still) return 0;
-  return state.sinceInput >= IDLE_AFTER_MS ? 10 : 30;
+  if (state.sinceInput >= IDLE_AFTER_MS) return 10;
+  return state.sinceInput >= SETTLED_AFTER_MS ? 15 : 30;
 }
 
 /** Whether a refresh `elapsed` ms after the last one draws, with `carried` ms of budget held over. */

@@ -2,7 +2,8 @@
 // a realm's decoded state, an address, search over all code on chain", each with our own strict schema and `network`
 // required, one of the networks Jarvis names in gnoscope's own words, so no call searches every chain it indexes. Not
 // get_realm_state's wider read, which a public node nobody funds pays for. A field or a tool gnoscope gains is none.
-import { Address } from "@gnoworld/schemas";
+import { ADDRESS_BODY } from "@gnoworld/core";
+import { Address, isRealmPath } from "@gnoworld/schemas";
 import { z } from "zod";
 
 // gnoscope explains; the chain's own reads state (Alexis, 2026-11-04: "gnoscope pour expliquer").
@@ -50,6 +51,7 @@ export function gnoscopeTools(networks: readonly string[]) {
         .string()
         .max(256)
         .regex(/^gno\.land\/r\/[a-z0-9_\-/.]+$/)
+        .refine(isRealmPath)
         .describe("The realm's path, such as `gno.land/r/gov/dao`."),
     }),
   };
@@ -66,7 +68,7 @@ function addressAndCode(network: z.ZodEnum<Record<string, string>>) {
       network,
       address: z
         .string()
-        .regex(/^g1[02-9ac-hj-np-z]{38}$/)
+        .regex(new RegExp(`^${ADDRESS_BODY}$`))
         .refine((text) => Address.safeParse(text).success)
         .describe("A gno address, `g1` and 38 characters, its checksum good."),
     }),

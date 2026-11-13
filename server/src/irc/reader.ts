@@ -42,6 +42,8 @@ export interface Options {
   lineMs?: number;
   // How long after a hide Ergo does not know the line yet it is asked again (F2462).
   redactRetryMs?: number;
+  // How long Ergo has to answer a relayed line (D430).
+  relayMs?: number;
 }
 
 // The lines Ergo sends that ask for an answer, as 3b's table found them.
@@ -59,7 +61,7 @@ export function reader(options: Options, state: State) {
   // whole is handed on marked, to be hidden.
   const heard = (message: IrcMessage, readable: boolean): void => {
     const got = said(message, state.joined);
-    if (answered(state, message, got)) return;
+    if (answered(state, message, got ?? said(message, state.joined, true))) return;
     const batched = replayed(state, message);
     if (got !== undefined) onMessage(readable ? got : { ...got, unreadable: true }, batched);
   };

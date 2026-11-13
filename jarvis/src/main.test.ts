@@ -11,8 +11,9 @@ import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes
 import {
   type AnswerButton,
   ApiError,
+  JARVIS_KEY_HEADER,
   JARVIS_PATHS,
-  JarvisAnswer,
+  JarvisPaidAnswer,
   type JarvisAsk,
   JarvisBudgets,
   JarvisMadeDigest,
@@ -25,11 +26,20 @@ import { makeBudget } from "./budget.ts";
 import { jarvisMigrations } from "./migrations.ts";
 import { fakeAnthropic, type FakeStep, held } from "./testing/fakeAnthropic.ts";
 import { fakeGnomcp, type Scenario } from "./testing/fakeGnomcp.ts";
+import { fakeGnomcpTcp } from "./testing/fakeGnomcpTcp.ts";
 import { fakeGnoscope } from "./testing/fakeGnoscope.ts";
 import { bodyOf, onLoopback } from "./testing/loopback.ts";
 import { message, text, toolUse } from "./testing/fakeModel.ts";
 import { REALM_TYPE } from "./testing/realm.ts";
 import { loadPlaces } from "./tools/places.ts";
+
+// The door's key, as the test makes it up; every request of the test carries it, as the door's do (10u-g2).
+const DOOR_KEY = `door-key-${"d".repeat(40)}`;
+const fetch = (url: string, init: RequestInit = {}) =>
+  globalThis.fetch(url, {
+    ...init,
+    headers: { ...Object.fromEntries(new Headers(init.headers)), [JARVIS_KEY_HEADER]: DOOR_KEY },
+  });
 
 interface Jarvis {
   child: ChildProcessByStdio<null, Readable, Readable>;
@@ -82,6 +92,7 @@ const local = async (answer: (request: IncomingMessage, body: string) => { statu
 const setup = async (steps: FakeStep[] = [], over: { gnomcp?: Scenario } = {}) => {
   const dir = folder();
   writeFileSync(join(dir, "anthropic"), `${KEY}\n`);
+  writeFileSync(join(dir, "door-key"), `${DOOR_KEY}\n`);
   const model = await fakeAnthropic(steps);
   closers.push(model.close);
   const gnoscope = await fakeGnoscope();
@@ -98,6 +109,7 @@ const setup = async (steps: FakeStep[] = [], over: { gnomcp?: Scenario } = {}) =
     JARVIS_DATABASE: join(dir, "jarvis.db"),
     JARVIS_DRAIN_S: "60",
     ANTHROPIC_API_KEY_FILE: join(dir, "anthropic"),
+    JARVIS_DOOR_KEY_FILE: join(dir, "door-key"),
     JARVIS_GNOMCP_COMMAND: gnomcp.command,
     JARVIS_GNOMCP_CONFIG: "/etc/jarvis/gnomcp.toml",
     JARVIS_PROFILES: "onyx",
@@ -248,7 +260,7 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
       const url = await listening(start(off));
       const response = await ask(url, QUESTION);
       expect(response.status).toBe(200);
-      expect(JarvisAnswer.parse(await response.json())).toEqual({ status: "off" });
+      expect(JarvisPaidAnswer.parse(await response.json())).toEqual({ status: "off" });
       expect(model.seen).toEqual([]);
       expect(gnomcp.starts()).toEqual([]);
       expect(gnoscope.requests).toEqual([]);
@@ -260,7 +272,7 @@ describe("jarvis's process: switched off", { timeout: 60_000 }, () => {
     const url = await listening(start({ ...env, JARVIS: "off", JARVIS_BUDGET_USD: "3" }));
     expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toEqual({
       ask: 3,
-      translate: 5,
+      translate: 1,
     });
     expect(JarvisBudgets.parse(await (await setBudget(url, "translate", 2)).json())).toEqual({ ask: 3, translate: 2 });
   });
@@ -298,18 +310,64 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const url = await listening(jarvis);
     const response = await ask(url, QUESTION);
     expect(response.status).toBe(200);
-    expect(JarvisAnswer.parse(await response.json())).toEqual({
+    expect(JarvisPaidAnswer.parse(await response.json())).toEqual({
       status: "answered",
       markdown: "Onyx is at block 7.",
       buttons: [],
+      cost: expect.any(Number) as number,
     });
     const [first] = model.seen;
     expect(first?.key).toBe(KEY);
-    expect(namesOf(first?.body)).toEqual([...READS, "load_skill", "find_place", "give_button"]);
+    expect(namesOf(first?.body)).toEqual([...READS, "load_skill", "find_place", "give_button", "decline"]);
     expect(first?.body).toMatchObject({ model: "claude-sonnet-5-5", inference_geo: "global" });
     expect(gnomcp.starts()).toHaveLength(1);
     expect(gnoscope.requests).toEqual([]);
     expect(jarvis.out.stdout + jarvis.out.stderr).not.toContain(KEY);
+  });
+
+  it.each([
+    ["catch-up", { ask: "catch-up", room: "#bubble", lines: [] }, "claude-haiku-5-5"],
+    ["here", { ask: "here", room: "#bubble", lines: [] }, "claude-sonnet-5-5"],
+    [
+      "function",
+      { ask: "function", room: "#bubble", realm: "gno.land/r/gov/dao", function: "Vote", chain: "onyx-1", lines: [] },
+      "claude-sonnet-5-5",
+    ],
+    ["a person's own question", QUESTION, "claude-sonnet-5-5"],
+  ])("asks the model for %s on its own model, catch-up on the fast one", async (name, body, model) => {
+    const run = await setup([ended("Done.")]);
+    const url = await listening(start(run.env));
+    expect(JarvisPaidAnswer.parse(await (await ask(url, body)).json())).toMatchObject({ status: "answered" });
+    expect(run.model.seen[0]?.body).toMatchObject({ model });
+    const all = [...READS, "load_skill", "find_place", "give_button", "decline"];
+    // A function's explanation reads the code alone: the four tools, no decline (D13920).
+    const code = ["gno_read", "load_skill", "find_place", "give_button"];
+    expect(namesOf(run.model.seen[0]?.body)).toEqual(
+      name === "catch-up" ? ["decline"] : name === "function" ? code : all,
+    );
+  });
+
+  it("explains a function on the profile of the chain the door named, and refuses a chain it has no profile for", async () => {
+    const run = await setup([ended("Done.")]);
+    const url = await listening(start(run.env));
+    const explain = { ask: "function", room: "#bubble", realm: "gno.land/r/gov/dao", function: "Vote", lines: [] };
+    // onyx is a universe and a profile; gnoland is a universe with no profile here; the last is neither.
+    expect((await ask(url, { ...explain, chain: "gnoland-1" })).status).toBe(400);
+    expect((await ask(url, { ...explain, chain: "nowhere-1" })).status).toBe(400);
+    // No chain at all: never the first profile, which would read a chain nobody named.
+    expect((await ask(url, explain)).status).toBe(400);
+    expect(run.model.seen).toHaveLength(0);
+    const answer = JarvisPaidAnswer.parse(await (await ask(url, { ...explain, chain: "onyx-1" })).json());
+    // No code read found the function, so jarvis does not say to keep it.
+    expect(answer).toMatchObject({ status: "answered" });
+    expect(answer).not.toHaveProperty("keep");
+    // The one profile it reads on is the chain's own.
+    const read = (
+      run.model.seen[0]?.body as {
+        tools?: { name: string; input_schema: { properties?: { profile?: { enum?: string[] } } } }[];
+      }
+    ).tools?.find(({ name }) => name === "gno_read");
+    expect(read?.input_schema.properties?.profile?.enum).toEqual(["onyx"]);
   });
 
   it("offers gnoscope's reads with its switch on, once it listed them at start", async () => {
@@ -322,6 +380,7 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
       "find_place",
       "give_button",
       ...GNOSCOPE_READS,
+      "decline",
     ]);
   });
 
@@ -333,8 +392,8 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const routes = { ...outbound, [GNOSCOPE]: closed.origin };
     const jarvis = start({ ...env, JARVIS_GNOSCOPE: "on", JARVIS_TEST_OUTBOUND: JSON.stringify(routes) });
     const url = await listening(jarvis);
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
-    expect(namesOf(model.seen[0]?.body)).toEqual([...READS, "load_skill", "find_place", "give_button"]);
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
+    expect(namesOf(model.seen[0]?.body)).toEqual([...READS, "load_skill", "find_place", "give_button", "decline"]);
     expect(lines(jarvis).some(({ event, reason }) => event === "jarvis_gnoscope_down" && reason === "start")).toBe(
       true,
     );
@@ -356,10 +415,11 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const { env, model, gnoscope } = await setup([calls, ended("Here it is.")]);
     const url = await listening(start({ ...env, JARVIS_GNOSCOPE: "on" }));
     const response = await ask(url, QUESTION);
-    expect(JarvisAnswer.parse(await response.json())).toEqual({
+    expect(JarvisPaidAnswer.parse(await response.json())).toEqual({
       status: "answered",
       markdown: "Here it is.",
       buttons: [fly],
+      cost: expect.any(Number) as number,
     });
     const of = resultsOf(model.seen[1]?.body);
     expect(of("toolu_1")).toContain('"chain_id":"onyx-1"');
@@ -390,8 +450,8 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     ]);
     const url = await listening(start(env));
     const vote = action("Vote").button;
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ buttons: [vote] });
     expect(resultsOf(model.seen[3]?.body)("toolu_3")).toContain("Refused, nothing kept");
     expect(node.received.filter(({ path }) => path === "/status")).toHaveLength(1);
     expect(node.received.filter(({ path }) => path.startsWith("/abci_query"))).toHaveLength(3);
@@ -401,11 +461,11 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     const { env, dir, model } = await setup([ended("Back.")]);
     spentDay(join(dir, "jarvis.db"));
     const url = await listening(start({ ...env, JARVIS_BUDGET_USD: "1" }));
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toEqual({ status: "spent" });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toEqual({ status: "spent" });
     expect(model.seen).toEqual([]);
     expect(JarvisBudgets.parse(await (await fetch(`${url}${JARVIS_PATHS.budgets}`)).json())).toMatchObject({ ask: 1 });
     expect(JarvisBudgets.parse(await (await setBudget(url, "ask", 2)).json())).toMatchObject({ ask: 2 });
-    expect(JarvisAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
+    expect(JarvisPaidAnswer.parse(await (await ask(url, QUESTION)).json())).toMatchObject({ status: "answered" });
     expect(model.seen).toHaveLength(1);
   });
 
@@ -429,12 +489,12 @@ describe("jarvis's process: switched on", { timeout: 60_000 }, () => {
     expect(model.seen).toHaveLength(1);
   });
 
-  it("answers internal when the API refuses its key, and never prints the key", async () => {
+  it("answers failed, with its cost, when the API refuses its key, and never prints the key", async () => {
     const { env } = await setup([{ status: 401, error: "authentication_error" }]);
     const jarvis = start(env);
     const url = await listening(jarvis);
     const response = await ask(url, QUESTION);
-    expect([response.status, ApiError.parse(await response.json()).error]).toEqual([502, "internal"]);
+    expect([response.status, JarvisPaidAnswer.parse(await response.json())]).toMatchObject([200, { status: "failed" }]);
     await printed(jarvis, () => jarvis.out.stdout.includes('"event":"jarvis_model_error"'));
     expect(jarvis.out.stdout + jarvis.out.stderr).not.toContain(KEY);
   });
@@ -523,7 +583,7 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     );
     expect([503, "refused"]).toContain(late);
     answer.answer(ended("Just in time."));
-    expect(JarvisAnswer.parse(await (await inFlight).json())).toMatchObject({ status: "answered" });
+    expect(JarvisPaidAnswer.parse(await (await inFlight).json())).toMatchObject({ status: "answered" });
     expect(await exited(jarvis)).toBe(0);
     expect(lines(jarvis).filter(({ event }) => event === "stopping")).toHaveLength(1);
     const pids = gnomcp.starts().map(({ pid }) => pid);
@@ -580,14 +640,25 @@ describe("jarvis's process: its stop on SIGTERM", { timeout: 60_000 }, () => {
     const socket = connect(Number(url.port), "127.0.0.1");
     socket.on("error", () => undefined);
     await once(socket, "connect");
+    // Node answers 100 Continue as it hands the request to jarvis's handler: the stop then always finds it in its body.
+    const handed = new Promise<void>((resolve) => {
+      let heard = "";
+      socket.on("data", (chunk: Buffer) => {
+        heard += chunk.toString("latin1");
+        if (heard.startsWith("HTTP/1.1 100 ")) resolve();
+      });
+    });
     socket.write(
-      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: 100\r\n\r\n{"question`,
+      `POST ${JARVIS_PATHS.ask} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n${JARVIS_KEY_HEADER}: ${DOOR_KEY}\r\nContent-Length: 100\r\nExpect: 100-continue\r\n\r\n`,
     );
+    await handed;
+    socket.write(`{"question`);
     // events.once rejects on the reset a cut connection may give first.
     const closed = new Promise((resolve) => socket.on("close", resolve));
     jarvis.child.kill("SIGTERM");
     expect(await exited(jarvis)).toBe(0);
     await closed;
+    expect(lines(jarvis).some((line) => line.event === "jarvis_refused")).toBe(false);
   });
 
   it("stops at once when off, with nothing in flight", async () => {
@@ -781,7 +852,7 @@ function workspaces(): string[] {
 }
 
 describe("the files jarvis's image takes", () => {
-  it("are its package, its skills, its places' data, the packages it imports and gnomcp's settings, nothing else", () => {
+  it("are its package, its skills, its places' data and the packages it imports, nothing else: no gnomcp's settings", () => {
     const allowed = new RegExp(
       [
         "^(package\\.json|pnpm-lock\\.yaml|pnpm-workspace\\.yaml)$",
@@ -790,7 +861,6 @@ describe("the files jarvis's image takes", () => {
         "^jarvis/skills/[a-z-]+/.+$",
         "^packages/(core|schemas|service|chain)/src/.+\\.ts$",
         "^app/data/[a-zA-Z]+\\.json$",
-        "^deploy/jarvis/gnomcp\\.toml$",
       ].join("|"),
     );
     const files = imageFiles();
@@ -798,7 +868,7 @@ describe("the files jarvis's image takes", () => {
     expect(files.filter((path) => !allowed.test(path))).toEqual([]);
   });
 
-  it("hold the package files the install reads and gnomcp's settings, past .dockerignore", () => {
+  it("hold the package files the install reads, past .dockerignore", () => {
     const files = imageFiles();
     for (const path of [
       "package.json",
@@ -806,7 +876,6 @@ describe("the files jarvis's image takes", () => {
       "pnpm-workspace.yaml",
       "jarvis/package.json",
       ...workspaces().map((name) => `packages/${name}/package.json`),
-      "deploy/jarvis/gnomcp.toml",
     ])
       expect(files, path).toContain(path);
   });
@@ -893,7 +962,7 @@ describe("jarvis's Dockerfile", () => {
     expect(dockerfile).not.toMatch(/^ADD /m);
     expect(dockerfile).not.toMatch(/^(ENV|ARG) /m);
     const froms = new Set(copiesOf(dockerfile).flatMap((copy) => (copy.from === undefined ? [] : [copy.from])));
-    expect([...froms].sort()).toEqual(["build", "gnomcp"]);
+    expect([...froms].sort()).toEqual(["build"]);
   });
 
   it("lays its last stage out where compose and jarvis's defaults read it, /app", () => {
@@ -918,7 +987,7 @@ describe("jarvis's Dockerfile", () => {
   it("runs Node 24 alone, pinned by digest, as a user of its own, with its flag and jarvis's entry", () => {
     const dockerfile = read("deploy/jarvis/Dockerfile");
     const froms = [...dockerfile.matchAll(/^FROM (\S+)/gm)].map((match) => match[1] ?? "");
-    expect(froms.length).toBeGreaterThanOrEqual(3);
+    expect(froms.length).toBeGreaterThanOrEqual(2);
     for (const from of froms) expect(from).toMatch(/@sha256:[0-9a-f]{64}$/);
     expect(froms.at(-1)).toMatch(/^gcr\.io\/distroless\/nodejs24-debian13:nonroot@/);
     const last = dockerfile.slice(dockerfile.lastIndexOf("\nFROM "));
@@ -930,21 +999,17 @@ describe("jarvis's Dockerfile", () => {
     expect(words.slice(1, -1)).toEqual([expect.stringMatching(/^--max-old-space-size=\d+$/)]);
   });
 
-  it("copies gnomcp 0.11.0 from its signed release's image, pinned by digest, and nothing else from it", () => {
-    const dockerfile = read("deploy/jarvis/Dockerfile");
-    const gnomcp =
-      "ghcr.io/gnoverse/gnomcp:0.11.0@sha256:b253d4238a236036b54cd6227c313e2609ce32dd361d71b2410d3096f6461a95";
-    expect(dockerfile).toContain(`FROM ${gnomcp} AS gnomcp\n`);
-    const fromIt = copiesOf(dockerfile).filter((copy) => copy.from === "gnomcp");
-    expect(fromIt.map((copy) => copy.sources)).toEqual([["/usr/local/bin/gnomcp"]]);
-    expect(dockerfile).toMatch(/^COPY --from=gnomcp \/usr\/local\/bin\/gnomcp \/gnomcp\/gnomcp$/m);
+  it("holds no gnomcp: no stage from its image, no copy of its binary or of its settings (10u-g2, the reader's)", () => {
+    const code = read("deploy/jarvis/Dockerfile")
+      .split("\n")
+      .filter((line) => !line.startsWith("#"))
+      .join("\n");
+    expect(code).not.toMatch(/gnomcp/i);
   });
 
-  it("gives its file's folder to jarvis's user alone, and copies gnomcp's settings it names", () => {
+  it("gives its file's folder to jarvis's user alone", () => {
     const dockerfile = read("deploy/jarvis/Dockerfile");
     expect(dockerfile).toMatch(/^COPY --from=build --chown=65533:65533 \/data \/data$/m);
-    expect(dockerfile).toMatch(/^COPY deploy\/jarvis\/gnomcp\.toml deploy\/jarvis\/$/m);
-    expect(read(".dockerignore").split("\n")).toContain("!deploy/jarvis/gnomcp.toml");
   });
 });
 
@@ -968,5 +1033,56 @@ describe("the .dockerignore reader", () => {
     expect(ignoredBy(["/deploy/secrets"])("deploy/secrets/key")).toBe(true);
     expect(ignoredBy(["file[0-9].ts"])("file7.ts")).toBe(true);
     expect(ignoredBy(["file[!0-9].ts"])("file7.ts")).toBe(false);
+  });
+});
+
+describe("jarvis's process: its door's key", () => {
+  it("answers 401 to a request without the key, or with a wrong one, and serves one that carries it", async () => {
+    const { env, model } = await setup();
+    const url = await listening(start(env));
+    const asked = (headers: Record<string, string>) => globalThis.fetch(`${url}${JARVIS_PATHS.budgets}`, { headers });
+    expect((await asked({})).status).toBe(401);
+    expect((await asked({ [JARVIS_KEY_HEADER]: DOOR_KEY.replace("d", "e") })).status).toBe(401);
+    expect((await asked({ [JARVIS_KEY_HEADER]: DOOR_KEY })).status).toBe(200);
+    expect(model.seen).toEqual([]);
+  });
+
+  it("stops at start, never listening, when it is on with no key file, or one under 32 bytes, saying neither", async () => {
+    const { env, dir } = await setup();
+    const without = Object.fromEntries(Object.entries(env).filter(([name]) => name !== "JARVIS_DOOR_KEY_FILE"));
+    writeFileSync(join(dir, "short"), "s".repeat(31));
+    for (const [rest, word] of [
+      [without, "required"],
+      [{ ...without, JARVIS_DOOR_KEY_FILE: join(dir, "short") }, "too_short"],
+    ] as const) {
+      const jarvis = start({ ...rest });
+      expect(await exited(jarvis)).not.toBe(0);
+      expect(jarvis.out.stderr).toContain(`setting JARVIS_DOOR_KEY_FILE: ${word}`);
+      expect(jarvis.out.stderr + jarvis.out.stdout).not.toContain("s".repeat(31));
+      expect(lines(jarvis).some(({ event }) => event === "listening")).toBe(false);
+    }
+  });
+
+  it("logs no word of the key, a wrong one included", async () => {
+    const { env } = await setup();
+    const jarvis = start(env);
+    const url = await listening(jarvis);
+    await globalThis.fetch(`${url}${JARVIS_PATHS.budgets}`, { headers: { [JARVIS_KEY_HEADER]: "a-wrong-key-sent" } });
+    await fetch(`${url}${JARVIS_PATHS.budgets}`);
+    expect(jarvis.out.stdout + jarvis.out.stderr).not.toContain(DOOR_KEY);
+    expect(jarvis.out.stdout).not.toContain("a-wrong-key-sent");
+  });
+
+  it("reaches gnomcp over TCP when its address is set, spawning no child of its own", async () => {
+    const { env, dir } = await setup();
+    const rest = Object.fromEntries(
+      Object.entries(env).filter(([name]) => name !== "JARVIS_GNOMCP_COMMAND" && name !== "JARVIS_GNOMCP_CONFIG"),
+    );
+    const tcp = await fakeGnomcpTcp({ answers: pollReads() });
+    const jarvis = start({ ...rest, JARVIS_GNOMCP_ADDRESS: `${tcp.address.host}:${String(tcp.address.port)}` });
+    await listening(jarvis);
+    expect(tcp.connections()).toBe(1);
+    // gnomcp's own folders are made by the spawn alone.
+    expect(readdirSync(dir).filter((name) => name.startsWith("jarvis-gnomcp-"))).toEqual([]);
   });
 });

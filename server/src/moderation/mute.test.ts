@@ -166,3 +166,30 @@ describe("the mute, its green pass (3j)", () => {
     ]);
   });
 });
+
+describe("a mute that evicts none (an owner's)", () => {
+  it("mutes like the automatic one, answering already for a live mute", () => {
+    const { sent, mutes } = setup();
+    expect([mutes.muteKeeping("g1a", "bubble"), mutes.muteKeeping("g1a", "bubble")]).toEqual(["muted", "already"]);
+    expect(sent).toEqual(["SAMODE #bubble +b m:g1a", "SAMODE #bubble-ops +b m:g1a"]);
+  });
+
+  it("is refused full when the world holds its cap of live mutes, ending none and sending nothing", () => {
+    const { db, sent, mutes } = setup({ max: 2 });
+    mutes.mute("g1a", "bubble");
+    mutes.mute("g1b", "bubble");
+    sent.length = 0;
+    expect(mutes.muteKeeping("g1c", "bubble")).toBe("full");
+    expect(sent).toEqual([]);
+    expect(db.prepare("SELECT count(*) AS n FROM mutes WHERE until > ?").get(T0)).toEqual({ n: 2 });
+  });
+
+  it("counts the cap per world and frees a place when a mute ends", () => {
+    const { clock, mutes } = setup({ max: 1 });
+    mutes.mute("g1a", "bubble");
+    expect(mutes.muteKeeping("g1b", "earth")).toBe("muted");
+    expect(mutes.muteKeeping("g1c", "bubble")).toBe("full");
+    clock.now = T0 + 5 * MINUTE;
+    expect(mutes.muteKeeping("g1c", "bubble")).toBe("muted");
+  });
+});

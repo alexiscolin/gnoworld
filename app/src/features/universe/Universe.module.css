@@ -14,78 +14,21 @@
     visibility: visible;
   }
 
-  /* The space opens like an iris (ADR-0002, "Loader"; frames 1 and 2). On the canvas alone: the text comes first. An animation and not
-     a kept clip, which would cost the compositor a mask at every frame. */
-  .canvas[data-opened] {
-    /* raw: 1.5 s, from the frames; the curve is the design system's --ease-emphasized, which tokens.css does not hold yet */
-    animation: iris 1.5s cubic-bezier(0.7, 0, 0.2, 1);
+  /* A page opened from its URL: the scene is out of sight till its planet is itself (frame.ts's data-sharp), then comes in from black on the
+     arrival's clock (arrival.ts starts the box in that frame). */
+  .canvas[data-first] {
+    transition: opacity calc(var(--motion-arrive) * var(--motion-scale)) var(--ease-emphasized);
   }
 
-  @keyframes iris {
-    from {
-      /* raw: nothing yet, in the unit of the end */
-      clip-path: circle(0vmax at 50% 50%);
-    }
-
-    to {
-      /* raw: half a window's diagonal is 71vmax at most, so this passes the corners */
-      clip-path: circle(72vmax at 50% 50%);
-    }
+  .canvas[data-first]:not([data-sharp]) {
+    opacity: 0;
   }
 
-  @media (prefers-reduced-motion: reduce) {
-    .canvas[data-opened] {
-      animation: none;
-    }
-  }
-
-  /* What stands under the header, over the scene: the flights' panel, a system's crumb (7v). */
-  .underHeader {
-    position: fixed;
-    /* raw: under the header's 96 px (shellHeader.module.css), a step down: frame 18's 103 px */
-    inset-block-start: calc(96px + var(--space-2xs));
-    /* raw: over the labels' layer (0) and the canvas (-1), as the header is */
-    z-index: 1;
-  }
-
-  /* A system's card (7v, the GUI board's option B): under the header, in the hero's gutter, frame 45's kicker over the system's name and
-     its line, 6 px apart. */
-  .crumb {
-    /* raw: the hero's 48 px from the left (Hero.module.css) */
-    inset-inline-start: 48px;
-    /* layout: the kicker, the name and its line in a column */
-    display: flex;
-    /* layout: the kicker, the name and its line in a column */
-    flex-direction: column;
-    /* raw: option B's 6 px between its three lines */
-    /* layout: the arrangement option B draws */
-    gap: 6px;
-  }
-
-  .system {
-    /* layout: the name's own lines, no heading margin */
-    margin-block: 0;
-    color: var(--color-text);
-    /* raw: option B's name, 30 px semibold, a hundredth of an em closer */
-    font: 600 30px/1.1 var(--family-sans);
-    letter-spacing: -0.01em;
-  }
-
-  .about {
-    /* layout: the line's own, no paragraph margin */
-    margin-block: 0;
-    /* raw: the hero line's grey (Hero.module.css) and option B's 14 px */
-    color: #c8d0de;
-    /* raw: option B's 14 px */
-    font: 400 14px/1.3 var(--family-sans);
-  }
-
-  /* Above the views' bar and the ticker on a phone (Ticker.module.css), in the gutter, within reach. */
+  /* Above the views' bar on a phone, in the gutter, within reach. */
   .offer,
   .status {
     position: fixed;
-    /* raw: the bar's 44 px, the ticker's 34 px and three steps of space */
-    inset-block-end: calc(78px + 3 * var(--space-s));
+    inset-block-end: calc(var(--size-bar) + 3 * var(--space-s));
     inset-inline-end: var(--space-s);
   }
 
@@ -95,8 +38,6 @@
     margin-block: 0;
     /* raw: two short lines, so it stays clear of the hero's markets at 900 px */
     max-inline-size: 24ch;
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 
   .status:not(:empty) {
@@ -107,6 +48,9 @@
 
   /* Wherever textures show (DESIGN-SYSTEM.md, Regions): one word in the page's bottom margin, under the frame's corner. */
   .credits {
+    /* The rail's footprint (core's RAIL), written by the button as the rail writes its own: under it, the word is centred on the rail. */
+    --_footprint: initial;
+
     position: fixed;
     /* raw: the 24 px margin under the frame, all of it, for a finger */
     inset: auto var(--space-m) 0 auto;
@@ -114,21 +58,12 @@
     padding-inline: var(--space-3xs);
     color: var(--color-text-muted);
     /* raw: the design system's 11 px Credits */
-    font: 400 11px/1 var(--family-sans);
+    font: 400 0.6875rem/1 var(--family-sans);
     cursor: pointer;
   }
 
-  /* On the home it stands at the ticker's right end, as the frames' texture line does, over the news running under it. */
-  .credits[data-over-ticker] {
-    /* raw: over the ticker's own 2 */
-    z-index: 3;
-    /* raw: the ticker's 34 px */
-    block-size: 34px;
-    background: var(--color-space);
-  }
-
   /* Under the plate's breakpoint no margin holds it: it lies over the page's words. */
-  @media (max-width: 1279px) {
+  @media (width < 1280px) {
     .credits {
       inset-block-end: var(--space-3xs);
       padding-block: var(--space-3xs);
@@ -138,10 +73,9 @@
   }
 
   /* On a phone it stands where the offer stood, above the views' bar. */
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .credits {
-      /* raw: the bar's 44 px, the ticker's 34 px and three steps of space */
-      inset-block-end: calc(78px + 3 * var(--space-s));
+      inset-block-end: calc(var(--size-bar) + 3 * var(--space-s));
     }
   }
 
@@ -152,15 +86,28 @@
     }
   }
 
+  .credits {
+    transition: color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
   .credits:hover {
     color: var(--color-text);
   }
 
+  /* Where the rail stands (core's RAIL.from), the word is centred on the rail's column, under its See all (Alexis, 2026-11-10). */
+  @media (width >= 900px) {
+    :root:has([data-rail]) .credits {
+      /* layout: the rail's own width (Rail.module.css) */
+      inline-size: calc(var(--_footprint) - var(--page-edge));
+      text-align: center;
+    }
+  }
+
   /* Level with the hero's foot, left of the rail's column (frames 4 and 17: 118 px wide, 25 from the edge). */
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .offer,
     .status {
-      inset-block-end: var(--space-2xl);
+      inset-block-end: var(--space-l);
       /* raw: the rail's 143 px and a step of space */
       inset-inline-end: calc(143px + var(--space-m));
     }

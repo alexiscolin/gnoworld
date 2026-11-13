@@ -6,6 +6,10 @@
     block-size: var(--_size);
   }
 
+  .icon[data-size="s"] {
+    --_size: var(--icon-s);
+  }
+
   .icon[data-size="m"] {
     --_size: var(--icon-m);
   }

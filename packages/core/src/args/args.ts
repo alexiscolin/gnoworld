@@ -2,6 +2,8 @@
 // arguments of a `MsgCall`, or per field why not. The rules are gno's `convert.go` (gnolang/gno 07e44776c261, tag v1.5.1,
 // what onyx-1 and gnoland-1 run), read as `vm/qfuncs` writes types (keeper.go:1795: each is its base type) and kept
 // canonical: stricter than Go where Go is lenient, never looser, so a text reads one way only.
+import { HIDDEN_CLASS, hasHidden } from "../text/hidden.ts";
+import { utf8Bytes } from "../text/utf8.ts";
 
 export type Kind = "string" | "bool" | "integer" | "float" | "bytes";
 export type Problem = "format" | "range" | "long" | "underflow" | "malformed" | "length";
@@ -106,25 +108,15 @@ function bytesProblem(text: string, length: number | undefined): Problem | undef
   return length !== undefined && (text.length / 4) * 3 - pad !== length ? "length" : undefined;
 }
 
-/** The control and format characters but newline and tab (bidi overrides, zero-width, escapes): a card would draw text unlike the
- * signed bytes (D231). */
-export const HIDDEN = /(?![\n\t])[\p{Cc}\p{Cf}]/u;
-// The UTF-8 bytes of a well-formed text, counted up to `limit` and no further.
-function bytesUpTo(text: string, limit: number): number {
-  let bytes = 0;
-  for (const char of text) {
-    const code = char.codePointAt(0) ?? 0;
-    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
-    if (bytes > limit) break;
-  }
-  return bytes;
-}
+/** The hidden characters but newline and tab (bidi overrides, zero-width, escapes, the Hangul fillers): a card would draw text
+ * unlike the signed bytes (D231). */
+export const HIDDEN = new RegExp(`(?![\\n\\t])[${HIDDEN_CLASS}]`, "u");
 
 /** What a CallRequest refuses of any argument, whatever its field: a hidden character, an ill-formed text, or past 8,192 bytes.
  * `callArgs` does not: the request does, and a card asks both (packages/schemas/src/call.ts, D203, D231). */
 export function textProblem(text: string): Problem | undefined {
-  if (!text.isWellFormed() || HIDDEN.test(text)) return "malformed";
-  return bytesUpTo(text, 8192) > 8192 ? "long" : undefined;
+  if (!text.isWellFormed() || hasHidden(text, "\n\t")) return "malformed";
+  return utf8Bytes(text, 8192) > 8192 ? "long" : undefined;
 }
 
 function problemOf(shape: Shape, text: string): Problem | undefined {

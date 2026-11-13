@@ -4,9 +4,11 @@
 import { labelName, worldIdOf } from "@gnoworld/core";
 import { data, useLoaderData, useLocation, type MetaArgs } from "react-router";
 import { Arrival } from "../features/passport/Later.tsx";
-import { PlaceError } from "../features/errors/index.ts";
-import { RealmView } from "../features/realms/index.ts";
-import { useEntered } from "../features/universe/index.ts";
+import { ErrorView, RouteError, useWhere } from "../features/errors/index.ts";
+import { useKnown } from "../features/realms/known.ts";
+import { useWorldsFile } from "../worldsFile.ts";
+import { PlaceFrame } from "./placeFrame.tsx";
+import { RealmPage } from "./realmPage.tsx";
 import { realmMeta } from "../meta.ts";
 import { site } from "../places.ts";
 import { realmAt } from "../realmAt.ts";
@@ -23,18 +25,33 @@ export function meta({ loaderData }: MetaArgs<typeof clientLoader>) {
 
 export default function Realm() {
   const found = useLoaderData<typeof clientLoader>();
-  // A realm's view is a world's page, a place entered: the rail and the labels link a world with no hub there (ADR-0003 §4).
-  useEntered();
   const world = worldIdOf(found.realm);
   const { pathname } = useLocation();
+  const universe = site.universeAt(pathname).id;
+  const { realm, chain } = found;
+  const listed = useWorldsFile(true)?.some((each) => each.realms.some((one) => one.path === realm)) === true;
+  const known = useKnown({ rpc: chain.rpc, realm, origin: chain.gnoweb }, listed);
+  const where = useWhere();
+  if (known === "no")
+    return (
+      <PlaceFrame
+        label="Realm"
+        plate={
+          <ErrorView kind="not-found" noun="realm" size="place" where={where} note={`${realm} on ${chain.name}`} />
+        }
+      />
+    );
   return (
     <>
-      <RealmView {...found} />
-      <Arrival universe={site.universeAt(pathname).id} world={world} name={labelName(world) ?? world} path={pathname} />
+      <RealmPage found={found} known={known === "yes"} />
+      {known === "yes" ? (
+        <Arrival universe={universe} world={world} name={labelName(world) ?? world} path={pathname} />
+      ) : null}
     </>
   );
 }
 
 export function ErrorBoundary() {
-  return <PlaceError what="realm" />;
+  // Inside the plate, as any page's content is: never loose at the screen's corner (D535).
+  return <PlaceFrame label="Realm" plate={<RouteError noun="realm" size="place" />} />;
 }

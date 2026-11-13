@@ -1,6 +1,6 @@
 import { spawn, spawnSync, type ChildProcessByStdio } from "node:child_process";
 import { once } from "node:events";
-import { mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer as createHttpServer } from "node:http";
 import { connect, type AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -8,13 +8,17 @@ import { dirname, join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Readable } from "node:stream";
 import { fileURLToPath } from "node:url";
+import { rollupName } from "@gnoworld/core";
 import { Challenge, Ticket } from "@gnoworld/schemas";
-import { Presence, Trends } from "@gnoworld/schemas/indexer";
+import { NetworkAnswer, Presence, TokenAnswer, Trending } from "@gnoworld/schemas/indexer";
+import { openDatabase } from "@gnoworld/service/db";
 import { afterEach, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { migrations } from "./migrations.ts";
 import { CATEGORIES } from "./moderation/provider.ts";
 import { fakeErgo, message, PASSWORD, welcome } from "./testing/fakeErgo.ts";
 import { loadRoles } from "./roles/roles.ts";
+import { cliFile, cliKey } from "./testing/cliSigner.ts";
 import { wallet, type Wallet } from "./testing/signer.ts";
 
 interface Server {
@@ -40,6 +44,14 @@ const folder = (prefix: string): string => {
   const dir = mkdtempSync(join(tmpdir(), prefix));
   folders.push(dir);
   return dir;
+};
+
+// The key the door proves itself to jarvis with, in a file of its own (10u-g2).
+const DOOR_KEY = `door-key-${"d".repeat(40)}`;
+const doorKeyFile = (): string => {
+  const path = join(folder("gnoworld-door-"), "door-key");
+  writeFileSync(path, `${DOOR_KEY}\n`);
+  return path;
 };
 
 const settings = (): Record<string, string> => {
@@ -196,6 +208,56 @@ describe("the server's process", { timeout: 30_000 }, () => {
     for (const path of ["/admin", "/api/admin", "/api/login/admin"]) {
       expect((await fetch(`http://127.0.0.1:${String(port)}${path}`)).status).toBe(404);
     }
+  });
+
+  it("links a command-line key over the real process: the block from the server, a file from the fixture, the list, and an unlink", async () => {
+    const origin = "http://gnoworld.test";
+    const port = await listening(start({ ...settings(), ORIGINS: origin }));
+    const call = (path: string, init: RequestInit = {}): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}/api/${path}`, init);
+    const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      call(path, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const who = wallet();
+    const made = Challenge.parse(await (await posted("login/challenge", { chainId: "onyx-1" })).json());
+    const verified = await posted("login/verify", {
+      nonce: made.nonce,
+      address: who.address,
+      proof: who.sign("onyx-1", made.text),
+    });
+    const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    const foreign = await call("links/challenge", {
+      method: "POST",
+      headers: { origin: "https://evil.test", "content-type": "application/json", cookie },
+      body: JSON.stringify({ kind: "cli", address: cliKey().address }),
+    });
+    expect(foreign.status).toBe(403);
+    expect((await posted("links/challenge", { kind: "cli", address: cliKey().address })).status).toBe(401);
+    const key = cliKey();
+    const code = z
+      .object({ nonce: z.string(), memo: z.string(), block: z.string(), expiresAt: z.string() })
+      .parse(await (await posted("links/challenge", { kind: "cli", address: key.address }, cookie)).json());
+    expect(code.block).toContain(key.address);
+    expect(code.block).toContain(code.memo);
+    expect(code.block).toContain("gnoworld-link");
+    const done = await posted(
+      "links/verify",
+      { nonce: code.nonce, address: key.address, file: cliFile(key, code.memo) },
+      cookie,
+    );
+    expect(done.status).toBe(200);
+    const listed = z
+      .object({ members: z.array(z.object({ address: z.string(), kind: z.string() })), linked: z.boolean() })
+      .parse(await (await call("links", { headers: { cookie } })).json());
+    expect(listed.linked).toBe(true);
+    expect(listed.members.map(({ address, kind }) => `${kind} ${address}`).toSorted()).toEqual(
+      [`adena ${who.address}`, `cli ${key.address}`].toSorted(),
+    );
+    expect((await posted("links/unlink", { address: key.address }, cookie)).status).toBe(200);
+    expect(await (await call("links", { headers: { cookie } })).json()).toMatchObject({ members: [], linked: false });
   });
 
   it("mints a ticket for Ergo over the real process, for the cookie's account", async () => {
@@ -372,6 +434,58 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await rooms({ cookie: await session(lead) })).toContain("#bubble/crew");
   });
 
+  it("serves the guest chat over the real process: a members room never reaches the link, an open room fails closed with no key, GUEST_CHAT=off is 404 (D430)", async () => {
+    const origin = "http://gnoworld.test";
+    const ergo = await fakeErgo();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    const crew = { room: "#bubble/crew", type: "members", readers: "crew" };
+    writeFileSync(
+      roles,
+      JSON.stringify({
+        team: [],
+        trusted: [],
+        worlds: [{ slug: "bubble", moderators: [], rules, groups: { crew: [] }, rooms: [crew] }],
+      }),
+    );
+    const env = {
+      ...settings(),
+      ORIGINS: origin,
+      ROLES_FILE: roles,
+      ERGO_PORT: String(ergo.port),
+      ERGO_OPER_PASSWORD_FILE: oper,
+    };
+    const port = await listening(start(env));
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    const post = (path: string, body: unknown, cookie = ""): Promise<Response> =>
+      fetch(`http://127.0.0.1:${String(port)}${path}`, {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
+        body: JSON.stringify(body),
+      });
+    const made = await post("/api/guest", {});
+    expect(made.status).toBe(200);
+    const cookie = (made.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
+    expect(cookie).toMatch(/^__Host-guest=/);
+    const members = await post("/api/guest/say", { room: "#bubble/crew", text: "hi" }, cookie);
+    expect([members.status, await members.json()]).toEqual([404, { error: "not_found" }]);
+    const open = await post("/api/guest/say", { room: "#bubble", text: "hi" }, cookie);
+    expect([open.status, await open.json()]).toEqual([503, { error: "not_ready", cause: "unchecked" }]);
+    peer.say("PING :sync");
+    await peer.next(/^PONG sync$/);
+    expect(peer.lines.filter((line) => line.includes("RELAYMSG"))).toEqual([]);
+    const off = await listening(start({ ...settings(), ORIGINS: origin, GUEST_CHAT: "off" }));
+    const refused = await fetch(`http://127.0.0.1:${String(off)}/api/guest`, {
+      method: "POST",
+      headers: { origin, "content-type": "application/json" },
+      body: "{}",
+    });
+    expect([refused.status, await refused.json()]).toEqual([404, { error: "not_found" }]);
+  });
+
   it("lists a world's rooms by section from the roles file, to a guest only the rooms it may see (4b)", async () => {
     const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
     const roles = join(folder("gnoworld-roles-"), "roles.json");
@@ -421,6 +535,68 @@ describe("the server's process", { timeout: 30_000 }, () => {
     expect(await exited(second)).toBe(0);
     const after = new DatabaseSync(env["DATABASE"] ?? "");
     const kept = after.prepare("SELECT msgid FROM verdicts ORDER BY msgid").all();
+    after.close();
+    expect(kept).toEqual([{ msgid: "new" }]);
+  });
+
+  it("hands Jarvis's kept answers to the retention: a row past its time goes when it starts, a live one stays (D13920)", async () => {
+    const env = settings();
+    const first = start(env);
+    await listening(first);
+    first.child.kill("SIGTERM");
+    expect(await exited(first)).toBe(0);
+    const seed = new DatabaseSync(env["DATABASE"] ?? "");
+    const add = seed.prepare(
+      "INSERT INTO jarvis_kept (key, answer, at, until, room, bytes) VALUES (?, '{}', ?, ?, NULL, 2)",
+    );
+    add.run("past", Date.now() - 2000, Date.now() - 1000);
+    add.run("live", Date.now(), Date.now() + 60_000);
+    seed.close();
+    const second = start(env);
+    await listening(second);
+    second.child.kill("SIGTERM");
+    expect(await exited(second)).toBe(0);
+    const after = new DatabaseSync(env["DATABASE"] ?? "");
+    const rows = after.prepare("SELECT key FROM jarvis_kept ORDER BY key").all();
+    after.close();
+    expect(rows).toEqual([{ key: "live" }]);
+  });
+
+  it("hands the search index to the retention and to the chat: old lines go when it starts, a REDACT heard drops its line (B1)", async () => {
+    const ergo = await fakeErgo();
+    const env = settings();
+    const oper = join(folder("gnoworld-oper-"), "oper");
+    writeFileSync(oper, `${PASSWORD}\n`);
+    const roles = join(folder("gnoworld-roles-"), "roles.json");
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    writeFileSync(
+      roles,
+      JSON.stringify({ team: [], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
+    );
+    const first = start({ ...env, ROLES_FILE: roles });
+    await listening(first);
+    first.child.kill("SIGTERM");
+    expect(await exited(first)).toBe(0);
+    const day = 24 * 60 * 60_000;
+    const seed = new DatabaseSync(env["DATABASE"] ?? "");
+    const add = seed.prepare(
+      "INSERT INTO lines (room, world, msgid, account, at, link, text) VALUES ('#bubble', 'bubble', ?, 'g1a', ?, 0, ?)",
+    );
+    add.run("old", Date.now() - 91 * day, "ancient words");
+    add.run("new", Date.now() - day, "recent words");
+    add.run("taken", Date.now() - day, "regretted words");
+    seed.close();
+    const second = start({ ...env, ROLES_FILE: roles, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper });
+    await listening(second);
+    const peer = await ergo.peer(0);
+    await welcome(peer);
+    peer.say(":a!u@h REDACT #bubble taken");
+    peer.say("PING :settled");
+    await peer.next(/^PONG settled$/);
+    second.child.kill("SIGTERM");
+    expect(await exited(second)).toBe(0);
+    const after = new DatabaseSync(env["DATABASE"] ?? "");
+    const kept = after.prepare("SELECT msgid FROM lines ORDER BY msgid").all();
     after.close();
     expect(kept).toEqual([{ msgid: "new" }]);
   });
@@ -561,8 +737,6 @@ describe("the server's process", { timeout: 30_000 }, () => {
       expect(way.seen).toEqual(["rpc.the-default.example:443"]);
       server.child.kill("SIGTERM");
       expect(await exited(server)).toBe(0);
-      // 7t3: the chain's habits are kept beside the database, never beside the file nginx serves.
-      expect(readdirSync(dir).filter((name) => name.startsWith("trends-"))).toEqual([]);
     } finally {
       way.close();
     }
@@ -661,76 +835,6 @@ describe("the server's process", { timeout: 30_000 }, () => {
     server.child.kill("SIGTERM");
     expect(await exited(server)).toBe(0);
     expect(JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), "utf8"))).toEqual({});
-    expect(
-      JSON.parse(readFileSync(join(dirname(env["DATABASE"] ?? ""), "presence-messages.json"), "utf8")),
-      "7t3",
-    ).toEqual({});
-  });
-
-  it("answers the ticker's trends at /api/trends, none with no worlds job and no one here, never a 404 (7t)", async () => {
-    for (const env of [settings(), { ...settings(), DATABASE: ":memory:" }]) {
-      const port = await listening(start(env));
-      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/trends`);
-      expect(answer.status).toBe(200);
-      expect(answer.headers.get("cache-control")).toBe("public, max-age=60");
-      expect(Trends.parse(await answer.json())).toEqual({ items: [] });
-    }
-  });
-
-  // 7t3: a hub whose rooms surge against its own 14 days is Trending by its chat, and the Rising item names no world already Trending.
-  it("names at /api/trends the hub whose people here surge against its own 14 days as Trending, and not again as rising (7t, 7t3)", async () => {
-    const ergo = await fakeErgo();
-    const env = settings();
-    const oper = join(folder("gnoworld-oper-"), "oper");
-    writeFileSync(oper, `${PASSWORD}\n`);
-    // Bubble's last 47 hours held one person each: six now is a rise of 5 on its usual hour (core's riseOf).
-    const hour = Math.floor(Date.now() / 3_600_000) * 3_600_000;
-    const past = Array.from({ length: 47 }, (_, back) => ({ at: hour - (back + 1) * 3_600_000, people: 1 })).reverse();
-    writeFileSync(join(dirname(env["DATABASE"] ?? ""), "presence.json"), JSON.stringify({ bubble: past }));
-    const port = await listening(start({ ...env, ERGO_PORT: String(ergo.port), ERGO_OPER_PASSWORD_FILE: oper }));
-    const peer = await ergo.peer(0);
-    await welcome(peer);
-    await peer.next(/^NAMES #bubble$/);
-    peer.say(":ergo.test 324 gnoworld #bubble +nt");
-    peer.say(":ergo.test 347 gnoworld #bubble :End");
-    peer.say(":ergo.test 353 gnoworld = #bubble :~@gnoworld ada bo cy dee eve fay");
-    peer.say(":ergo.test 366 gnoworld #bubble :End");
-    await expect
-      .poll(async () => Trends.parse(await (await fetch(`http://127.0.0.1:${String(port)}/api/trends`)).json()).items, {
-        timeout: 10_000,
-      })
-      .toEqual([
-        { kind: "trending", by: "here", world: "bubble", count: 6, rise: 5, at: expect.any(String) as unknown },
-      ]);
-  });
-
-  // 7t3: the chain's habits beside the database, counts alone; a database held in memory keeps none.
-  it("keeps each world's chain windows beside its database, and none for a database held in memory", async () => {
-    const habits = (env: Record<string, string>) => {
-      const dir = folder("gnoworld-worlds-");
-      writeFileSync(
-        join(dir, "universes.json"),
-        readFileSync(new URL("../../app/data/universes.json", import.meta.url), "utf8"),
-      );
-      writeFileSync(join(dir, "hubs.json"), "[]");
-      return { ...env, WORLDS_FILE: join(dir, "worlds.json"), UNIVERSES_FILE: join(dir, "universes.json") };
-    };
-    const env = settings();
-    const kept = start(habits(env));
-    await listening(kept);
-    kept.child.kill("SIGTERM");
-    expect(await exited(kept)).toBe(0);
-    expect(
-      readdirSync(dirname(env["DATABASE"] ?? ""))
-        .filter((name) => name.startsWith("trends-"))
-        .sort(),
-    ).toEqual(["trends-addresses.json", "trends-transactions.json"]);
-    const memory = habits({ ...settings(), DATABASE: ":memory:" });
-    const none = start(memory);
-    await listening(none);
-    none.child.kill("SIGTERM");
-    expect(await exited(none)).toBe(0);
-    expect(readdirSync(dirname(memory.WORLDS_FILE)).filter((name) => name.startsWith("trends-"))).toEqual([]);
   });
 
   it("keeps no history beside a database held in memory: no /api/presence (7h)", async () => {
@@ -751,7 +855,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
     }
   });
 
-  // 7t3: the trends read a hub's rooms and its realms as one world, from the hubs beside the universes the job reads.
+  // The hubs beside the universes the job reads are read as it starts.
   it("does not start a worlds job with no hubs.json beside UNIVERSES_FILE: it fails closed, naming the file", async () => {
     const dir = folder("gnoworld-worlds-");
     const universes = join(dir, "universes.json");
@@ -1039,7 +1143,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
       return [answer.status, await answer.json()];
     };
     const [leads, strangers] = [await signIn(lead), await signIn(stranger)];
-    const settled = { quota: 20, quotaUnnamed: 5, unlimited: [], budgets: null };
+    const settled = { quota: 30, quotaUnnamed: 30, unlimited: [], budgets: null };
     expect(await read(leads)).toEqual([200, settled]);
     expect(await read(strangers)).toEqual([403, { error: "forbidden" }]);
     const change = { chainId: "onyx-1", change: { setting: "quota", questions: 30 } };
@@ -1079,7 +1183,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
       const answer = await reading;
       expect([answer.status, await answer.json()]).toEqual([
         200,
-        { quota: 20, quotaUnnamed: 5, unlimited: [], budgets: { ask: 45, translate: 5 } },
+        { quota: 30, quotaUnnamed: 30, unlimited: [], budgets: { ask: 45, translate: 5 } },
       ]);
       expect(await exit).toBe(0);
     } finally {
@@ -1091,12 +1195,15 @@ describe("the server's process", { timeout: 30_000 }, () => {
   it("opens the door switched off unless JARVIS is on, and asks jarvis only once it is (Alexis, off by default)", async () => {
     const origin = "https://gnoworld.test";
     const ask = async (env: Record<string, string>) => {
+      const who = wallet();
       const port = await listening(
         start({
           ...settings(),
           ORIGINS: origin,
           JARVIS_URL: "http://127.0.0.1:9",
+          JARVIS_DOOR_KEY_FILE: doorKeyFile(),
           JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+          JARVIS_UNLIMITED: who.address,
           ...env,
         }),
       );
@@ -1106,7 +1213,6 @@ describe("the server's process", { timeout: 30_000 }, () => {
           headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
           body: JSON.stringify(body),
         });
-      const who = wallet();
       const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
       const verified = await posted("/api/login/verify", {
         nonce: made.nonce,
@@ -1119,10 +1225,41 @@ describe("the server's process", { timeout: 30_000 }, () => {
     };
     expect(await ask({})).toEqual([200, { status: "off" }]);
     expect(await ask({ JARVIS: "yes" })).toEqual([200, { status: "off" }]);
+    // The allowlist skips the first-ask check, so the question reaches jarvis, which is not there (D13985).
     expect(await ask({ JARVIS: "on" })).toEqual([503, { error: "not_ready" }]);
   });
 
-  it("opens the translation's and the digest's doors beside the question's, off unless JARVIS is on (10k)", async () => {
+  it("tells any page whether Jarvis is on at GET /api/jarvis/state: on only with JARVIS_URL and JARVIS=on, never on the admin listener (10u-a)", async () => {
+    const state = async (env: Record<string, string>) => {
+      const port = await listening(start({ ...settings(), ORIGINS: "https://gnoworld.test", ...env }));
+      const answer = await fetch(`http://127.0.0.1:${String(port)}/api/jarvis/state`);
+      return [answer.status, await answer.json()];
+    };
+    const door = {
+      JARVIS_URL: "http://127.0.0.1:9",
+      JARVIS_DOOR_KEY_FILE: doorKeyFile(),
+      JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+    };
+    expect(await state({})).toEqual([200, { on: false }]);
+    expect(await state({ JARVIS: "on" })).toEqual([200, { on: false }]);
+    expect(await state(door)).toEqual([200, { on: false }]);
+    expect(await state({ ...door, JARVIS: "yes" })).toEqual([200, { on: false }]);
+    expect(await state({ ...door, JARVIS: "on" })).toEqual([200, { on: true }]);
+    const server = start({
+      ...settings(),
+      ORIGINS: "https://gnoworld.test",
+      ...door,
+      JARVIS: "on",
+      ADMIN_PORT: "0",
+      ADMIN_ORIGINS: "https://admin.gnoworld.test",
+    });
+    await listening(server);
+    await until(() => server.out.stdout.includes('"event":"admin_listening"'));
+    const admin = Number(/"event":"admin_listening".*"port":(\d+)/.exec(server.out.stdout)?.[1]);
+    expect((await fetch(`http://127.0.0.1:${String(admin)}/api/jarvis/state`)).status).toBe(404);
+  });
+
+  it("opens the digest's door beside the question's, off unless JARVIS is on (10k)", async () => {
     const origin = "https://gnoworld.test";
     const both = async (env: Record<string, string>) => {
       const port = await listening(
@@ -1130,6 +1267,7 @@ describe("the server's process", { timeout: 30_000 }, () => {
           ...settings(),
           ORIGINS: origin,
           JARVIS_URL: "http://127.0.0.1:9",
+          JARVIS_DOOR_KEY_FILE: doorKeyFile(),
           JARVIS_NAMES_RPC: "https://127.0.0.1:9",
           ...env,
         }),
@@ -1148,98 +1286,13 @@ describe("the server's process", { timeout: 30_000 }, () => {
         proof: who.sign("onyx-1", made.text),
       });
       const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
-      const line = await posted("/api/jarvis/translate", { room: "#bubble", msgid: "m1", language: "fr" }, cookie);
       const realm = await posted("/api/jarvis/digest", { universe: "onyx", realm: "gno.land/r/demo/poll" }, cookie);
-      return [line.status, await line.json(), realm.status, await realm.json()];
+      return [realm.status, await realm.json()];
     };
-    expect(await both({})).toEqual([200, { status: "off" }, 200, { status: "off" }]);
-    expect(await both({ JARVIS: "on" })).toEqual([404, { error: "not_found" }, 503, { error: "not_ready" }]);
+    expect(await both({})).toEqual([200, { status: "off" }]);
+    expect(await both({ JARVIS: "on" })).toEqual([503, { error: "not_ready" }]);
   });
 
-  it("translates a public line by the server's own record of it, never a text the page sends (10k, red pass R7)", async () => {
-    const origin = "https://gnoworld.test";
-    const heard: string[] = [];
-    const jarvis = createHttpServer((req, res) => {
-      let body = "";
-      req.on("data", (chunk: Buffer) => (body += chunk.toString()));
-      req.on("end", () => {
-        heard.push(`${req.url ?? ""} ${body}`);
-        res
-          .writeHead(200, { "content-type": "application/json" })
-          .end('{"status":"translated","text":"Bonjour le monde."}');
-      });
-    });
-    jarvis.listen(0, "127.0.0.1");
-    await once(jarvis, "listening");
-    try {
-      const ergo = await fakeErgo();
-      const oper = join(folder("gnoworld-oper-"), "oper");
-      writeFileSync(oper, `${PASSWORD}\n`);
-      const roles = join(folder("gnoworld-roles-"), "roles.json");
-      const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
-      writeFileSync(
-        roles,
-        JSON.stringify({ team: [], trusted: [], worlds: [{ slug: "bubble", moderators: [], rules }] }),
-      );
-      // OpenAI's moderation answers nothing flagged, from a preload that stands in for its address alone: a public line
-      // passes only once checked, and only a line that passed is kept for Jarvis (10g-1).
-      const keys = folder("gnoworld-openai-");
-      writeFileSync(join(keys, "openai"), `sk-made-up-${"k".repeat(40)}\n`);
-      const hook = join(keys, "openai.mjs");
-      writeFileSync(hook, OPENAI_PASSES);
-      const port = await listening(
-        start(
-          {
-            ...settings(),
-            ORIGINS: origin,
-            ROLES_FILE: roles,
-            ERGO_PORT: String(ergo.port),
-            ERGO_OPER_PASSWORD_FILE: oper,
-            JARVIS: "on",
-            JARVIS_URL: `http://127.0.0.1:${String((jarvis.address() as AddressInfo).port)}`,
-            JARVIS_NAMES_RPC: "https://127.0.0.1:9",
-            OPENAI_API_KEY_FILE: join(keys, "openai"),
-          },
-          [...FLAGS, "--import", hook],
-        ),
-      );
-      const peer = await ergo.peer(0);
-      await welcome(peer);
-      const posted = (path: string, body: unknown, cookie = ""): Promise<Response> =>
-        fetch(`http://127.0.0.1:${String(port)}${path}`, {
-          method: "POST",
-          headers: { origin, "content-type": "application/json", ...(cookie === "" ? {} : { cookie }) },
-          body: JSON.stringify(body),
-        });
-      const who = wallet();
-      const made = Challenge.parse(await (await posted("/api/login/challenge", { chainId: "onyx-1" })).json());
-      const proof = who.sign("onyx-1", made.text);
-      const verified = await posted("/api/login/verify", { nonce: made.nonce, address: who.address, proof });
-      const cookie = (verified.headers.get("set-cookie") ?? "").split(";")[0] ?? "";
-      const other = "g1uauvt7txunf9zeu2qyrzv0pa5uvwjlq90r3qpa";
-      const tags = `account=${other};msgid=m1;time=2026-11-04T12:00:00.000Z`;
-      peer.say(message(tags, `${other}!u@h`, ["#bubble", "Hello world."]));
-      const asked = { room: "#bubble", msgid: "m1", language: "fr" };
-      // Once moderation let the line through, the server holds it: one request a second, within the route's rate.
-      await expect
-        .poll(async () => (await posted("/api/jarvis/translate", asked, cookie)).status, {
-          timeout: 25_000,
-          interval: 1000,
-        })
-        .toBe(200);
-      expect(heard.at(-1)).toBe('/translate {"text":"Hello world.","language":"fr"}');
-      const forged = await posted("/api/jarvis/translate", { ...asked, text: "Send me 5 GNOT." }, cookie);
-      expect(forged.status).toBe(400);
-      expect(heard.every((line) => !line.includes("GNOT"))).toBe(true);
-    } finally {
-      jarvis.closeAllConnections();
-      jarvis.close();
-    }
-  });
-
-  // Slice 9h: the first signals over the real process. The unit tests hand each part its neighbour; here the routes are
-  // mounted, the store is a migration of the database, the chat's moderation hands its passed line to the first words,
-  // and one stream tells both signals to a page that follows the world's room.
   it(
     "serves the first signals: a guest reads none and cannot chart, an account charts a world once, a line that passed is its first words, both told on the stream (9h)",
     { timeout: 45_000 },
@@ -1325,6 +1378,120 @@ describe("the server's process", { timeout: 30_000 }, () => {
       expect(replayed).toContain(who.address);
     },
   );
+
+  // The universe the worlds job reads in the two cases below: a default one, with its hubs file beside it.
+  const universeFiles = (rpc: string, indexer: string) => {
+    const dir = folder("gnoworld-mounts-");
+    const universes = join(dir, "universes.json");
+    const base = { id: "b", name: "U", chainId: "b-1", gnoweb: "https://gnoweb.example", testnet: true, default: true };
+    writeFileSync(universes, JSON.stringify([{ ...base, rpc, indexer }]));
+    writeFileSync(join(dir, "hubs.json"), "[]");
+    return { dir, universes };
+  };
+
+  it("serves a visitor each public route main mounts beside the chain: trending, network, tokens, people, calls, search, unread and translations", async () => {
+    const origin = "https://gnoworld.test";
+    const [rpc, indexer] = ["https://rpc.fake.example:443", "https://indexer.fake.example/graphql/query"];
+    const { dir, universes } = universeFiles(rpc, indexer);
+    // A chain with no realm and no transaction, so the worlds job's first pass ends and tells its ranking and its health.
+    const hook = join(dir, "chain.mjs");
+    writeFileSync(
+      hook,
+      `import { fakeChain, pagedCalls, withBlocks } from ${JSON.stringify(new URL("testing/fakeWorldsChain.ts", import.meta.url).href)};
+const real = globalThis.fetch;
+const calls = pagedCalls([]);
+const time = new Date().toISOString();
+const tip = (request) => request.query.includes("latestBlockHeight") ? JSON.stringify({ data: { latestBlockHeight: 100 } }) : calls(request);
+const chain = fakeChain({ paths: () => "", indexer: withBlocks(tip, () => time) }, { rpc: ${JSON.stringify(rpc)}, indexer: ${JSON.stringify(indexer)} });
+globalThis.fetch = (input, init) => {
+  const url = String(input instanceof Request ? input.url : input);
+  return url.startsWith("https://rpc.fake.example") || url.startsWith(${JSON.stringify(indexer)}) ? chain.send(url, init ?? {}, 0) : real(input, init);
+};
+`,
+    );
+    const env: Record<string, string> = {
+      ...settings(),
+      ORIGINS: origin,
+      UNIVERSES_FILE: universes,
+      WORLDS_FILE: join(dir, "worlds.json"),
+    };
+    // A token the worlds job replayed before, in the default universe's tables.
+    const realm = "gno.land/r/demo/coin";
+    const seed = openDatabase(env["DATABASE"] ?? "", migrations);
+    seed.exec("INSERT INTO grc20_state VALUES ('b', 1, NULL, NULL)");
+    seed
+      .prepare("INSERT INTO grc20_tokens VALUES (?, ?, 'COIN', 'Coin', 2, '100', 1, 0, 1, '2026-11-12')")
+      .run(`${realm}.COIN.0000000`, rollupName(realm));
+    seed.close();
+    const port = await listening(start(env, [...FLAGS, "--import", hook]));
+    const at = (path: string, init: RequestInit = {}) => fetch(`http://127.0.0.1:${String(port)}${path}`, init);
+    await expect.poll(async () => (await at("/api/network")).status, { timeout: 20_000 }).toBe(200);
+    expect(NetworkAnswer.parse(await (await at("/api/network")).json()).universe).toBe("b");
+    expect(Trending.parse(await (await at("/api/trending")).json()).items).toEqual([]);
+    const token = await at(`/api/tokens/${rollupName(realm)}`);
+    expect([token.status, TokenAnswer.parse(await token.json()).tokens.map(({ symbol }) => symbol)]).toEqual([
+      200,
+      ["COIN"],
+    ]);
+    expect((await at(`/api/tokens/${"0".repeat(32)}`)).status).toBe(404);
+    expect([(await at("/api/people/nobody")).status, (await at("/api/calls/nothing")).status]).toEqual([400, 400]);
+    const found = await at("/api/search?q=hello&world=bubble");
+    expect([found.status, await found.json()]).toEqual([
+      200,
+      { hits: [], next: null, total: 0, capped: false, partial: false },
+    ]);
+    expect((await at("/api/unread")).status).toBe(401);
+    const foreign = await at("/api/unread", {
+      method: "POST",
+      headers: { origin: "https://evil.test", "content-type": "application/json" },
+      body: JSON.stringify({ places: [] }),
+    });
+    expect(foreign.status).toBe(403);
+    const translations = await at("/api/translations?room=%23bubble&ids=m1&language=fr");
+    expect([translations.status, await translations.json()]).toEqual([
+      200,
+      { room: "#bubble", language: "fr", translations: [], pending: [] },
+    ]);
+  });
+
+  it("explains for a visitor only a realm the worlds file lists on the default universe's chain, Jarvis on", async () => {
+    const way = await tunnels();
+    try {
+      const { dir, universes } = universeFiles("https://rpc.example:443", "https://indexer.example/graphql/query");
+      const listed = "gno.land/r/leon/home";
+      const worlds = join(dir, "worlds.json");
+      const row = { path: listed, deployer: null, deployerName: null, functions: [], imports: [] };
+      const counts = { calls: null, callers: null, lastHeight: null };
+      const file = { version: 1, universe: "b", updated: "2026-11-13T10:00:00.000Z" };
+      writeFileSync(
+        worlds,
+        JSON.stringify({ ...file, worlds: [{ id: "leon", namespace: "leon", realms: [{ ...row, ...counts }] }] }),
+      );
+      const server = start({
+        ...settings(),
+        UNIVERSES_FILE: universes,
+        WORLDS_FILE: worlds,
+        JARVIS_URL: "http://127.0.0.1:9",
+        JARVIS_DOOR_KEY_FILE: doorKeyFile(),
+        JARVIS_NAMES_RPC: "https://127.0.0.1:9",
+        JARVIS: "on",
+        HTTPS_PROXY: way.proxy,
+        NODE_USE_ENV_PROXY: "1",
+      });
+      const port = await listening(server);
+      // The worlds job reaches no chain through this way out, so the file stays as written.
+      await until(() => server.out.stdout.includes('"event":"worlds_failed"'));
+      const explained = async (chain: string, realm: string) =>
+        (
+          await fetch(`http://127.0.0.1:${String(port)}/api/explanations/realm/${chain}/${encodeURIComponent(realm)}`)
+        ).json();
+      expect(await explained("b-1", "gno.land/r/leon/other")).toEqual({ status: "none" });
+      expect(await explained("onyx-1", listed)).toEqual({ status: "none" });
+      expect(await explained("b-1", listed)).toEqual({ status: "making" });
+    } finally {
+      way.close();
+    }
+  });
 
   it("opens no admin listener and no door without their settings", async () => {
     const server = start({ ...settings(), ORIGINS: "https://gnoworld.test" });

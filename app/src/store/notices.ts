@@ -7,7 +7,7 @@ import { DEFAULT_MODE, type Notice, type NoticeMode } from "@gnoworld/core";
 import type { StateCreator } from "zustand/vanilla";
 import type { NoticePrefs } from "../lib/notices/prefs.ts";
 import type { ChatSlice } from "./chat.ts";
-import { heardFrom, type DmSlice } from "./dms.ts";
+import type { DmSlice } from "./dms.ts";
 import type { LoginSlice } from "./login.ts";
 
 /** The notices kept at most for each place (a room, a conversation), the newest: a flood in one drops its own oldest. */
@@ -58,13 +58,12 @@ export const modeOf = (state: State, room: string): NoticeMode => own(state.noti
 // Where the reader has seen a room up to: the page's mark, or Ergo's reading place, the later; a conversation, the mark.
 const markOf = (state: State, where: string) => later(own(state.noticeSeen, where), roomOf(state, where)?.read);
 
-// Whether a notice counts: a conversation's after its mark, while the store keeps that conversation and the account
-// hears from its partner (else it has no row to open or to mark seen); a room's while the page follows it, its mode is not
-// none and the reader has not seen its time.
+// Whether a notice counts: a conversation's after its mark, while the store keeps that conversation (else it has no row to
+// open or to mark seen); a room's while the page follows it, its mode is not none and the reader has not seen its time.
 function unseen(state: State, notice: Notice): boolean {
   const { kind, where, time } = notice;
   if (kind === "dm") {
-    if (!Object.hasOwn(state.dms, where) || !heardFrom(state.dmChoices, where)) return false;
+    if (!Object.hasOwn(state.dms, where)) return false;
   } else if (roomOf(state, where) === undefined || modeOf(state, where) === "none") return false;
   return time > (markOf(state, where) ?? "");
 }
@@ -84,29 +83,41 @@ export function unseenNotices(state: State): readonly Notice[] {
 // came before a drop is never new to oneself.
 const meOf = ({ chat, login }: State) => chat.me ?? (login.session.kind === "in" ? login.session.address : undefined);
 
-// The lines of a room in all mode that are new to the reader: past its mark, another's, no NOTICE, no edit. None while
-// the mark is unknown, as a history page makes no notice then (a never read room is not "200 unread").
+// When this page opened, on its clock: a room it never read (Ergo's place `*`, or none yet) counts the lines that came since, none from
+// before, so a never read room is no "200 unread".
+// ponytail: the page's own clock, kept per page; a room's own follow time if a reload's lines must count from the first visit.
+const PAGE_OPENED = new Date().toISOString();
+
+// The lines of a room that are new to the reader: past its mark (or the page's opening while none is known), another's, no NOTICE, no edit.
 function newLines(state: State, where: string) {
-  const mark = markOf(state, where);
-  if (mark === undefined) return [];
+  const mark = markOf(state, where) ?? PAGE_OPENED;
   const me = meOf(state);
   return (roomOf(state, where)?.lines ?? []).filter(
     ({ time, kind, edits, account }) => kind !== "notice" && edits === undefined && account !== me && time > mark,
   );
 }
 
-/** What each place counts, in one pass: a room's unseen notices, or in all mode its new lines, which a notice is one of;
- * none in none; a conversation's unseen notices. A place that counts nothing is not in it. */
+/** What each place counts, in one pass: a room in all mode its new lines, which a notice is one of; a room in mentions mode the same
+ * once its reading place is known (the mode says what notifies, not what is unread), before it its unseen notices and the lines since the
+ * page opened, each line once; none in none; a conversation's unseen notices. A place that counts nothing is not in it. */
 export function placeCounts(state: State): ReadonlyMap<string, number> {
   const counts = new Map<string, number>();
-  // A room in all mode counts its lines, whatever its notices.
-  const byLines = (where: string) => roomOf(state, where) !== undefined && modeOf(state, where) === "all";
+  const add = (where: string, count: number) => {
+    if (count > 0) counts.set(where, (counts.get(where) ?? 0) + count);
+  };
+  const held = (where: string, mode: NoticeMode) => roomOf(state, where) !== undefined && modeOf(state, where) === mode;
+  const byLines = (where: string) =>
+    held(where, "all") || (held(where, "mentions") && markOf(state, where) !== undefined);
+  // The unseen notices of a room in mentions mode whose place is unknown, by line: its lines since the page opened count beside them, once.
+  const noticed = new Set<string>();
   for (const notice of state.notices) {
-    if (!byLines(notice.where) && unseen(state, notice)) counts.set(notice.where, (counts.get(notice.where) ?? 0) + 1);
+    if (byLines(notice.where) || !unseen(state, notice)) continue;
+    add(notice.where, 1);
+    noticed.add(notice.id);
   }
   for (const where of Object.keys(state.chat.rooms)) {
-    const lines = byLines(where) ? newLines(state, where).length : 0;
-    if (lines > 0) counts.set(where, lines);
+    if (byLines(where)) add(where, newLines(state, where).length);
+    else if (held(where, "mentions")) add(where, newLines(state, where).filter(({ id }) => !noticed.has(id)).length);
   }
   return counts;
 }

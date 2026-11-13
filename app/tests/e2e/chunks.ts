@@ -15,40 +15,22 @@ export const DYNAMIC_IMPORT = /\bimport\(`\.\/([\w.-]+\.js)`\)/;
 
 /** Each late chunk by its name, the chunks a page holds before it (their closures are not its weight), and its cap in bytes. `after`
  * absent: the chunk alone. Each cap's history is here or beside its chunk's pattern in budgets.spec.ts, before 7y's steady names. */
+// D401's rebuild left four rows: `scene` (D13952; three is in the `earth` chunk it imports), `Rail`, `thumbs` and `generated`; the other
+// 17 chunks (mountUniverse, cosmos, web, restSearch, flights, part...) are no file of the build. Raised on 2026-11-09 to the weights, 256 B ahead
+// (D386, provisional); the first screen of every page that shows space holds `root` and `universe`.
 export const LATE: readonly { chunk: string; after?: readonly string[]; cap: number }[] = [
-  // 159,847 B in this measure with the Earth's stations' three classes (Alexis, 2026-11-04, "Oui, 160 256"); 160,325 B once 7v2, 7b9,
-  // 7f5 and slice-8 met, inside the night's +1 KiB (night-caps.md; where the last 467 B come from: hardening); 160,357 B with 8l's restIn; 160,382 B with GovDAO's class fixed by hand (slice-8, core's worldAnchor).
-  { chunk: "scene", after: ["mountUniverse"], cap: 160_382 },
-  // 16 KiB since 7d6 (Alexis, 2026-11-02); 16.5 KiB with 7v's views (Alexis, 2026-11-03); 17 KiB after 7v's merge (Alexis, 2026-11-04);
-  // 7x2's loader and text box, 7v2's ratio, bands and a Plan half lit, 7b9's star's warmth (the night's +1 KiB, the chief), measured.
-  { chunk: "cosmos", after: ["scene"], cap: 17_345 },
-  // 6,834 B with the mass, the hero's box it shares (7u; Alexis, "Oui, 6 706") and its rims' touch; its pills a chunk apart; 6,837
-  // on its merge into slice-7, inside the 256 B margin; 7,178 with 8m's mass thinned round the page's text (Alexis, 2026-11-05, "oui").
-  { chunk: "web", after: ["scene", "cosmos"], cap: 7178 },
-  { chunk: "webNames", after: ["scene", "cosmos", "web"], cap: 1219 },
-  { chunk: "restSearch", after: ["scene", "cosmos"], cap: 10_442 },
-  { chunk: "nebulae", after: ["scene", "cosmos"], cap: 3790 },
-  { chunk: "labelled", after: ["scene", "cosmos"], cap: 6502 },
-  { chunk: "Rail", after: ["scene", "cosmos"], cap: 7026 },
-  { chunk: "portraits", after: ["scene", "cosmos"], cap: 1797 },
-  { chunk: "flights", after: ["scene"], cap: 18_391 },
-  // A system's arrival: 2,304 B, 2.25 KiB, for no column of worlds at rest (Alexis, 2026-11-04, "Oui aux deux", 7v's column patch).
-  { chunk: "restArrival", after: ["scene", "cosmos", "restSearch"], cap: 2304 },
-  // The rocks' laying, what is left of the depth (7p) once the Earth's view took the home's far worlds (7x2): 1,445 B, 1.5 KiB.
-  { chunk: "restRocks", after: ["scene", "cosmos", "restSearch"], cap: 1536 },
-  // The Earth's view (7x2): its stations, scenery, belt, names and caption; 13,815 B with 7v2, 7b9, 7f5 and 7u (night-caps.md); then 8m's
-  // Summed on the 8h+8p+8n merge (8p's label chips, 8n's search event), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-  { chunk: "earthView", after: ["scene", "cosmos"], cap: 14_707 },
-  { chunk: "restPlan", after: ["scene", "cosmos", "restSearch", "labelled"], cap: 2419 },
-  // Summed on the 8h+8p+8n merge (8p's chips, 8n's full Plan "+N"), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-  { chunk: "orbits", after: ["scene", "cosmos", "labelled"], cap: 2652 },
-  { chunk: "rocks", after: ["scene", "cosmos", "labelled"], cap: 1318 },
-  // 12,607 B with the loader of a station's page's view (8l), the night's +1 KiB (night-caps.md; the chief, 2026-11-05).
-  { chunk: "part", after: ["scene"], cap: 12_607 },
-  // A station's page's view (8l): its station in the planet's place; a new limit at its size (the chief, 2026-11-05), 5,170 B.
-  { chunk: "stationView", after: ["scene", "part"], cap: 5170 },
+  // The scene, three's `earth`, the generated worlds' chunk and the shaders it imports: 190,507 B measured on 2026-11-12, 194,353 B on
+  // 2026-11-13, 256 B ahead (D13948, provisional till the hardening; its history D386 and D13961).
+  { chunk: "scene", after: ["root", "universe"], cap: 194_609 },
+  // On the home's first screen now, not behind the cosmos (7i): 7,293 B on 2026-11-07 beyond the scene and the cosmos (D386); 16,007 B beyond
+  // `root` and `universe` (its worlds, their thumbs, the home's views and the follow chunks it imports), 256 B ahead (+8,970 B); 19,370 B
+  // measured on 2026-11-13, 256 B ahead (D13948, provisional till the hardening).
+  { chunk: "Rail", after: ["root", "universe"], cap: 19_626 },
+  // A world's planet drawn as its thumb anywhere (Discover, search, the chat's worlds): 347 B alone (D386); 2,436 B alone on 2026-11-09,
+  // 256 B ahead (+2,089 B over D386's 603 B).
+  { chunk: "thumbs", cap: 2692 },
   // 10 KiB since 2026-11-03 (Alexis, docs/decisions.md, up to 10 KiB for 7b8): its temperate worlds' coasts, shapes and climates and the
-  // cream veins took 9,325 B, 109 past 9 KiB; their size plus a tenth passes 10 KiB, the most he gave.
+  // cream veins took 9,325 B, 109 past 9 KiB; their size plus a tenth passes 10 KiB, the most he gave. 9,441 B on 2026-11-09: no raise.
   { chunk: "generated", cap: 10_189 },
 ];
 

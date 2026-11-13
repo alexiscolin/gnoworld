@@ -2,13 +2,14 @@
 // jsdom cannot see, since it applies no stylesheet. Each test walks every story Storybook built.
 import AxeBuilder from "@axe-core/playwright";
 import type { Page } from "../e2e/fixtures.ts";
-import { BUTTONS, contrast, CONTROLS, expect, open, pixel, RING, stories, test } from "./storybook.ts";
+import { BUTTONS, contrast, CONTROLS, expect, open, pixel, RING, settle, stories, test } from "./storybook.ts";
 
 test("every story renders with no error and passes axe", async ({ page }) => {
   const errors: string[] = [];
   page.on("pageerror", (error) => errors.push(error.message));
   for (const id of await stories(page)) {
     await open(page, id);
+    await settle(page);
     const found = (await new AxeBuilder({ page }).include("#storybook-root").analyze()).violations;
     expect
       .soft(
@@ -59,29 +60,28 @@ test("no story scrolls sideways at 320 px, and text at 200% still fits its contr
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "200%";
     });
-    // Each word's box against its control's: a control grows with its text, so no word sticks out.
-    // What is hidden from assistive technology is decoration, as a count's badge on a corner.
-    const spilled = await page.evaluate(
-      (buttons) =>
-        [...document.querySelectorAll(buttons)].filter((button) => {
-          const outer = button.getBoundingClientRect();
-          const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
-          for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
-            if (node.parentElement?.closest("[aria-hidden='true']") || node.textContent?.trim() === "") continue;
-            const words = document.createRange();
-            words.selectNodeContents(node);
-            const inner = words.getBoundingClientRect();
-            const out =
-              inner.top < outer.top ||
-              inner.bottom > outer.bottom ||
-              inner.left < outer.left ||
-              inner.right > outer.right;
-            if (out) return true;
-          }
-          return false;
-        }).length,
-      BUTTONS,
-    );
+    // Each word's box against its control's: a control grows with its text, so no word sticks out; one that keeps a single line and
+    // clips it, as a chip does, cuts its words at its sides, never above or below. What is hidden from assistive technology is
+    // decoration, as a count's badge on a corner.
+    const spilled = await page.evaluate((buttons) => {
+      const sticksOut = (inner: DOMRect, outer: DOMRect, cuts: boolean) =>
+        inner.top < outer.top ||
+        inner.bottom > outer.bottom ||
+        (!cuts && (inner.left < outer.left || inner.right > outer.right));
+      return [...document.querySelectorAll(buttons)].filter((button) => {
+        const outer = button.getBoundingClientRect();
+        const style = getComputedStyle(button);
+        const cuts = ["hidden", "clip"].includes(style.overflowX) && style.whiteSpace === "nowrap";
+        const walker = document.createTreeWalker(button, NodeFilter.SHOW_TEXT);
+        for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+          if (node.parentElement?.closest("[aria-hidden='true']") || node.textContent?.trim() === "") continue;
+          const words = document.createRange();
+          words.selectNodeContents(node);
+          if (sticksOut(words.getBoundingClientRect(), outer, cuts)) return true;
+        }
+        return false;
+      }).length;
+    }, BUTTONS);
     expect.soft(spilled, `${id}: controls whose text spills at 200%`).toBe(0);
   }
 });
@@ -167,8 +167,8 @@ test("a bare button wears none of the browser's face: no fill, no edge, no paddi
   expect(face).toEqual(["rgba(0, 0, 0, 0)", "none", "none", "0px"]);
 });
 
-// The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS
-// rules"): each state is turned off in place, transitions stilled, and the control must look different.
+// The state the accessibility tree sees is the state the CSS draws (docs/DESIGN-SYSTEM.md, "CSS rules"): each state is turned off in place,
+// transitions stilled, and the control must look different, in itself, a part of it (a chevron, a dot's rect) or the item mirroring it.
 test("in every story, a pressed, selected, expanded or current control looks unlike its resting self", async ({
   page,
 }) => {
@@ -190,16 +190,24 @@ test("in every story, a pressed, selected, expanded or current control looks unl
           s.boxShadow,
           s.fontWeight,
           s.outlineStyle,
+          s.fill,
+          s.stroke,
+          s.transform,
+          s.rotate,
         ].join();
       };
+      const parts = (e: Element) => [e, ...e.querySelectorAll("*")].map(looks).join("|");
       const on = names.map((name) => `#storybook-root [${name}]:not([${name}="false"])`).join(", ");
       const result = [...document.querySelectorAll(on)].map((element) => {
         const name = names.find((n) => element.hasAttribute(n)) ?? "";
         const value = element.getAttribute(name) ?? "";
-        const shown = looks(element);
+        const mirror = name === "aria-current" ? element.closest("[data-current]") : null;
+        const shown = parts(element);
         element.setAttribute(name, "false");
-        const resting = looks(element);
+        mirror?.removeAttribute("data-current");
+        const resting = parts(element);
         element.setAttribute(name, value);
+        mirror?.setAttribute("data-current", "");
         return shown === resting ? `${name} on ${element.outerHTML.slice(0, 60)}` : "";
       });
       still.remove();
@@ -309,8 +317,10 @@ for (const touch of [false, true]) {
     });
 
     // A chip that is a mark sits at the smallest control, one that acts and a tab at the small one; a popover's trigger at
-    // the default one, and a field's box at the default one with its two edges, 46 px (frame 10, F5967).
-    test("chips, tabs and triggers are as tall as their size's control, a field 2 px taller", async ({ page }) => {
+    // the default one, and a field's box at the default one, its edges inside it, 44 px (Alexis, 2026-11-08, Field.module.css; was 46).
+    test("chips, tabs and triggers are as tall as their size's control, a field the default one's too", async ({
+      page,
+    }) => {
       const heights = async (id: string, selector: string) => {
         await open(page, id);
         return [
@@ -324,7 +334,7 @@ for (const touch of [false, true]) {
       expect(await heights("chip--marks", "[data-tone]"), "marks").toEqual([24]);
       expect(await heights("chip--control", "button"), "a chip that acts").toEqual([32]);
       expect(await heights("tabs--segmented", "[role='tab']"), "tabs").toEqual([32]);
-      expect(await heights("field--text", "input"), "a field").toEqual([46]);
+      expect(await heights("field--text", "input"), "a field").toEqual([44]);
       expect(await heights("popover--anchored", "[aria-haspopup]"), "a popover's trigger").toEqual([44]);
     });
 
@@ -369,19 +379,22 @@ test("a field's edge is the strong line at rest and under the pointer, the dange
   expect(await edge(), "invalid").toBe(await token("--color-danger-line"));
 });
 
+// Stopped as every duration is, by --motion-scale: a turn of 0 s plays nothing, under the system's setting or the site's own.
 test("a busy button's spinner turns, and stops under reduced motion", async ({ page }) => {
-  const spin = async () => {
+  const spin = async (motion = "") => {
     await open(page, "button--busy");
-    return page.evaluate(() =>
-      [...document.querySelectorAll("#storybook-root [aria-busy] [aria-hidden='true']")].map((e) => {
+    return page.evaluate((motion) => {
+      if (motion !== "") document.documentElement.dataset["motion"] = motion;
+      return [...document.querySelectorAll("#storybook-root [aria-busy] [aria-hidden='true']")].map((e) => {
         const style = getComputedStyle(e);
         return [style.animationName === "none" ? "none" : "spins", style.animationDuration];
-      }),
-    );
+      });
+    }, motion);
   };
   expect(await spin()).toEqual([["spins", "0.8s"]]);
+  expect(await spin("reduce"), "the site's setting").toEqual([["spins", "0s"]]);
   await page.emulateMedia({ reducedMotion: "reduce" });
-  expect((await spin()).map(([name]) => name)).toEqual(["none"]);
+  expect(await spin(), "the system's setting").toEqual([["spins", "0s"]]);
 });
 
 // The design's motion: "Hovered items follow the pointer at once and ease back on leave". Each
@@ -511,6 +524,11 @@ test("the flash's region sits in the flow, taking no room; its flash is in the t
 // Opaque until the blur behind a panel is widely Baseline: what passes behind never shows through (F262).
 test("a flash's panel is the surface's night, opaque", async ({ page }) => {
   await open(page, "flash--timed");
+  // Its fade in (D13969) is played first: an opacity read half way is the fade's, not the panel's.
+  await settle(page);
+  await page
+    .getByRole("status")
+    .evaluate((region) => Promise.all(region.getAnimations({ subtree: true }).map((a) => a.finished)));
   const [panel, night, through] = await page.getByRole("status").evaluate((region) => {
     const probe = document.body.appendChild(document.createElement("div"));
     probe.style.background = "var(--color-surface)";

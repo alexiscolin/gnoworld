@@ -1,4 +1,4 @@
-import { Address, CallRequest } from "@gnoworld/schemas";
+import { Address, CallRequest, stripHidden } from "@gnoworld/schemas";
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { connect, signLogin } from "./adena.ts";
@@ -204,7 +204,7 @@ describe("callContract: the way through", () => {
         fc.array(fc.string({ unit: "grapheme" }), { maxLength: 6 }),
         async (realm, func, graphemes) => {
           // The request refuses control and format characters (D231).
-          const args = graphemes.map((text) => text.replace(/(?![\n\t])[\p{Cc}\p{Cf}]/gu, ""));
+          const args = graphemes.map((text) => stripHidden(text, "\n\t"));
           const request = CallRequest.parse({ ...REQUEST, realm, func, args });
           const adena = new Fake();
           await callContract(adena, request, ONYX);

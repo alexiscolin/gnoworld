@@ -25,11 +25,18 @@ const r = (rest: string): string => `gno.land/r/${rest}`;
 const idsOf = (paths: string[]) => groupWorlds(paths).map((world) => world.id);
 
 describe("groupWorlds, a world is a product (decision of 2026-11-01, 11)", () => {
-  it("keeps every realm of the recorded list once, in 91 namespaces and 533 worlds", () => {
+  it("keeps every realm of the recorded list once but the chain's own 10, in 90 namespaces and 525 worlds (D346)", () => {
     const worlds = groupWorlds(ONYX);
-    expect(worlds.flatMap((world) => world.realms).sort()).toEqual([...ONYX].sort());
-    expect(new Set(worlds.map((world) => world.namespace)).size).toBe(91);
-    expect(worlds).toHaveLength(533);
+    const theirs = ONYX.filter((path) => !path.startsWith("gno.land/r/sys/"));
+    expect(theirs).toHaveLength(733);
+    expect(worlds.flatMap((world) => world.realms).sort()).toEqual([...theirs].sort());
+    expect(new Set(worlds.map((world) => world.namespace)).size).toBe(90);
+    expect(worlds).toHaveLength(525);
+  });
+
+  // The chain's own realms (r/sys: names, users, params, validators…) are its machinery, not worlds (Alexis, 2026-11-07, D346).
+  it("leaves out the chain's own realms, under r/sys", () => {
+    expect(idsOf([r("sys/namereg/v0"), r("sys/users"), r("sys/params"), r("gnoswap/pool")])).toEqual(["gnoswap/pool"]);
   });
 
   it("puts a realm's versions under one world", () => {

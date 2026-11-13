@@ -7,6 +7,7 @@
   ],
   "exports": {
     ".": "./src/index.ts",
+    "./fonts": "./src/fonts.ts",
     "./layers.css": "./src/layers.css",
     "./styles.css": "./src/styles.css"
   },

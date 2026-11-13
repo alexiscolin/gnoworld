@@ -1,6 +1,6 @@
 // Which messages the Earth shows as bubbles (ADR-0001 §7, docs/plans/slice-6.md): a pure function of the messages, the
 // time, the viewer, the rules and what is already on screen. No clock, no chance, nothing it is given is changed.
-import { fold } from "../chat/room.ts";
+import { casemap } from "../chat/room.ts";
 import { isBlank } from "../markdown/nodes.ts";
 import { centreOf } from "./countries.ts";
 import { cutText } from "./cut.ts";
@@ -9,6 +9,10 @@ import { isOpen, newestFirst, readWindow } from "./window.ts";
 import type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
 
 export type { Bubble, BubbleMessage, PickArgs, Picked, Viewer } from "./types.ts";
+
+/** A bubble keeps this many times `maxChars` graphemes of its line, marks included: the words it shows are read from them and cut
+ * to `maxChars` with their ellipsis late (app BubbleWords), the Markdown reader not being the first screen's (ADR-0001 §12). */
+const RAW = 4;
 
 interface Candidate {
   readonly message: BubbleMessage;
@@ -56,7 +60,7 @@ function far(run: Run, country: string): boolean {
 
 /** The one rule of what a bubble may be made of, for a new one and one on screen (F3366): a bubble stands for its line. */
 function allowed(run: Run, m: BubbleMessage): boolean {
-  return isOpen(m) && !run.blocked.has(fold(m.account));
+  return isOpen(m) && !run.blocked.has(casemap(m.account));
 }
 
 /** Whether a bubble of the state may stay on screen: its line is still listed, allowed and says what it said (a correction
@@ -66,14 +70,14 @@ function visible(run: Run, s: Bubble): boolean {
   return (
     line !== undefined &&
     allowed(run, line) &&
-    cutText(line.text, run.chars) === s.text &&
+    cutText(line.text, run.chars * RAW) === s.text &&
     (s.own || !far(run, s.country))
   );
 }
 
 function rankOf(run: Run, m: BubbleMessage): number {
-  if (fold(m.account) === run.me) return 0;
-  if ((m.mentions ?? []).some((a) => fold(a) === run.me)) return 1;
+  if (casemap(m.account) === run.me) return 0;
+  if ((m.mentions ?? []).some((a) => casemap(a) === run.me)) return 1;
   return run.viewer.hub !== undefined && m.hub === run.viewer.hub ? 2 : 3;
 }
 
@@ -101,7 +105,7 @@ function count(run: Run, country: string): void {
 
 /** A candidate's text cut, or none when the cut leaves nothing to say: the only place a text is segmented. */
 function say(run: Run, c: Candidate): string | undefined {
-  const text = cutText(c.message.text, run.chars);
+  const text = cutText(c.message.text, run.chars * RAW);
   return isBlank(text) ? undefined : text;
 }
 
@@ -112,13 +116,14 @@ function put(run: Run, c: Candidate, text: string): void {
     account: message.account,
     country: c.country,
     text,
+    ...(message.room === undefined ? {} : { room: message.room }),
     since: run.now,
     until: run.now + run.show,
     own: c.rank === 0,
   };
   run.state.set(bubble.id, bubble);
   run.screen = [...run.screen, bubble];
-  run.began.set(fold(message.account), run.now);
+  run.began.set(casemap(message.account), run.now);
 }
 
 /** Takes a bubble off the screen; it stays in the state, so it is not shown again and its speaker still waits. */
@@ -172,7 +177,7 @@ function placeYours(run: Run, c: Candidate, done: Set<string>): void {
 }
 
 function placeOther(run: Run, c: Candidate): void {
-  const waiting = run.now - (run.began.get(fold(c.message.account)) ?? -Infinity) < run.delay;
+  const waiting = run.now - (run.began.get(casemap(c.message.account)) ?? -Infinity) < run.delay;
   const taken = run.screen.length >= run.max || run.screen.some((s) => s.country === c.country);
   if (waiting || taken || far(run, c.country)) count(run, c.country);
   else {
@@ -204,8 +209,8 @@ export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs):
     max: rules.maxOnScreen,
     chars: rules.maxChars,
     age: rules.maxAgeSeconds * 1000,
-    me: fold(viewer.account),
-    blocked: new Set([...viewer.muted, ...viewer.banned].map(fold)),
+    me: casemap(viewer.account),
+    blocked: new Set([...viewer.muted, ...viewer.banned].map(casemap)),
     state: new Map(),
     began: new Map(),
     tally: new Map(),
@@ -214,7 +219,7 @@ export function pickBubbles(...[messages, now, viewer, rules, shown]: PickArgs):
   for (const [id, bubble] of remembered(shown, window, run)) run.state.set(id, bubble);
   settle(run);
   for (const s of run.state.values())
-    run.began.set(fold(s.account), Math.max(run.began.get(fold(s.account)) ?? -Infinity, s.since));
+    run.began.set(casemap(s.account), Math.max(run.began.get(casemap(s.account)) ?? -Infinity, s.since));
 
   const yours = new Set<string>();
   for (const c of candidates(run)) {

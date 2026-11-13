@@ -103,6 +103,8 @@ function schema() {
       team: Addresses,
       trusted: Addresses,
       worlds: z.array(world(Addresses)).refine((worlds) => unique(worlds.map(({ slug }) => slug))),
+      // The rules of a world the file does not list (D380, D430): a realm's room is judged by them, and a guest's words start from them.
+      defaults: rules().optional(),
     })
     .superRefine(({ team, trusted, worlds }, ctx) => {
       // The team is trusted and moderates every world by itself: listing it again is a mistake.
@@ -139,6 +141,7 @@ export interface Section {
 }
 
 export interface Roles {
+  defaults?: Rules | undefined;
   team: ReadonlySet<Address>;
   trusted: ReadonlySet<Address>;
   worlds: ReadonlyMap<
@@ -169,8 +172,9 @@ export function loadRoles(path: string): Roles {
     const place = issue === undefined || issue.path.length === 0 ? "(top)" : issue.path.join(".");
     throw new Error(`roles file ${path}: ${place}: ${issue?.code ?? "invalid"}`);
   }
-  const { team, trusted, worlds } = parsed.data;
+  const { team, trusted, worlds, defaults } = parsed.data;
   return {
+    defaults,
     team: new Set(team),
     trusted: new Set(trusted),
     worlds: new Map(

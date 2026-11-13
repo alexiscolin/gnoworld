@@ -3,6 +3,12 @@
 @layer components {
   .chip {
     --_fill: var(--color-fill);
+
+    /* A pill is one line: a row too narrow for it hides it, never breaks its words; and never wider than that row, so a name with no space
+       in it is cut at the pill's edge and pushes nothing sideways. */
+    max-inline-size: 100%;
+    overflow: hidden;
+    white-space: nowrap;
   }
 
   /* A mark's one line of text fills its height with its own leading. */
@@ -24,8 +30,25 @@
       color var(--motion-base) var(--ease-standard);
   }
 
+  /* The dock's room shortcuts: the video's pill, 27 px high. */
+  .chip[data-size="chip"] {
+    --_h: var(--control-chip);
+    --_pad: var(--space-xs);
+    --_font: var(--font-chip);
+
+    padding-block: 0;
+    text-decoration: none;
+  }
+
+  /* A control at the smallest size: its words at the interface's size over the mark's, the pointer's. */
+  button.chip[data-size="xs"] {
+    --_font: var(--font-ui);
+
+    cursor: pointer;
+  }
+
   /* The pointer lightens a neutral chip at rest, never a selected one's cream or a tone's tint. */
-  .chip[data-size="s"][data-tone="neutral"]:not([aria-pressed="true"]):hover {
+  .chip:is(button, a)[data-tone="neutral"]:not([aria-pressed="true"], [aria-current="true"]):hover {
     --_fill: var(--color-fill-hover);
   }
 
@@ -53,13 +76,46 @@
     --_ink: var(--color-danger);
   }
 
-  /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"). */
-  .chip[aria-pressed="true"] {
+  /* Selected is the cream fill (docs/DESIGN-SYSTEM.md, "Colour"); a link in view says so by aria-current. */
+  .chip:is([aria-pressed="true"], [aria-current="true"]) {
     --_fill: var(--color-primary);
     --_ink: var(--color-ink);
   }
 
+  .chip[data-strong] {
+    --_font: var(--font-chip);
+  }
+
+  .dot {
+    inline-size: var(--size-dot);
+    background: currentcolor;
+  }
+
+  /* The live dot's beat: a ring in mint that grows and leaves (the home's hero has the same), from 0.85 s on, for a minute (25 beats), then it rests with the
+     ring gone; a new word in the chip beats it again (Chip.tsx keys the dot). */
+  /* The motion scale is 0 under reduced motion, the system's or the app's setting: the ring is gone at once. */
+  .chip[data-tone="mine"] .dot::after {
+    /* raw: the proposal's score; paused out of view (offscreen.ts) */
+    animation: beat calc(2.4s * var(--motion-scale)) ease-out calc(0.85s * var(--motion-scale)) 25 forwards;
+    animation-play-state: var(--play, running);
+  }
+
+  /* On the compositor: the ring grows 8 px past the 6 px dot (22/6 across) and fades. */
+  @keyframes beat {
+    from {
+      opacity: 1;
+      transform: scale(1);
+    }
+
+    70%,
+    to {
+      opacity: 0;
+      /* raw: the proposal's 8 px ring over the 6 px dot */
+      transform: scale(3.67);
+    }
+  }
+
   .count {
-    font: var(--font-data);
+    font: var(--font-count);
   }
 }

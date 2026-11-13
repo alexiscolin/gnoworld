@@ -3,17 +3,18 @@
 // args or memo ever travels: what a stranger wrote reaches a room as bounded names or not at all. The height is the block a
 // fact stands at, so a reader sees where a gap is; nothing is a time, a transaction having none.
 import { Address } from "./address.ts";
+import { funcName } from "./data.ts";
+import { ChainRealmPath } from "./realmPath.ts";
 import { Key } from "./slug.ts";
 import { z } from "./zod.ts";
 
-/** The longest function name and realm path, in characters. A realm's path is not `RealmPath` (data.ts, 128): a path an account deploys under its own address and nested names can be longer, and a deploy shows whatever the chain accepted. */
-const CHAIN_CAPS = { func: 64, realm: 256, id: 140 } as const;
+/** The longest function name and event id, in characters. A realm's path is `ChainRealmPath`, not `RealmPath`: a namespace an account
+ * deploys under can be longer than a world's, and a deploy shows whatever the chain accepted. */
+const CHAIN_CAPS = { func: 64, id: 140 } as const;
 
 const height = () => z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.nonnegative());
 /** Where an event stands: its transaction's hash and its message's place in it (`hash:index`), the key a page draws it under. */
 const id = () => z.string().check(z.minLength(1), z.maxLength(CHAIN_CAPS.id));
-const realm = () =>
-  z.string().check(z.maxLength(CHAIN_CAPS.realm), z.regex(/^gno\.land\/r\/[a-z][a-z0-9_-]*(?:\/[a-z][a-z0-9_-]*)*$/));
 
 /** A call to a world's realm, or a realm deployed (which names no world and no function): an event of the chain at a block. */
 export const ChainEvent = z.union([
@@ -22,16 +23,16 @@ export const ChainEvent = z.union([
     kind: z.literal("call"),
     universe: Key,
     world: Key,
-    realm: realm(),
+    realm: ChainRealmPath,
     actor: Address,
-    func: z.string().check(z.maxLength(CHAIN_CAPS.func), z.regex(/^[A-Za-z_][A-Za-z0-9_]*$/)),
+    func: funcName(CHAIN_CAPS.func),
     height: height(),
   }),
   z.strictObject({
     id: id(),
     kind: z.literal("deploy"),
     universe: Key,
-    realm: realm(),
+    realm: ChainRealmPath,
     actor: Address,
     height: height(),
   }),

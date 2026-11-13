@@ -66,7 +66,14 @@ const text =
     Promise.resolve(new Response(body, { status }));
 
 // The timer against a fake CoinGecko: `answers` one after another, the last one again once they run out.
-function setup(answers: (() => Promise<Response>)[], options: { everyMs?: number; folder?: string } = {}) {
+// The one read of every token's recent past (the history's seeding) is answered apart, an empty list by default (nothing to seed
+// with), and kept out of `calls`, which counts the price reads.
+const SEED_PATH = "/api/v3/coins/markets";
+function setup(
+  answers: (() => Promise<Response>)[],
+  options: { everyMs?: number; folder?: string; seed?: () => Promise<Response> } = {},
+) {
+  const seeds: Call[] = [];
   const folder = options.folder ?? fresh();
   const file = join(folder, "markets.json");
   const calls: Call[] = [];
@@ -77,6 +84,10 @@ function setup(answers: (() => Promise<Response>)[], options: { everyMs?: number
     now: () => NOW,
     everyMs: options.everyMs ?? 60_000,
     send: (url, init, ms) => {
+      if (new URL(url).pathname === SEED_PATH) {
+        seeds.push({ url, init, ms });
+        return (options.seed ?? json([]))();
+      }
       calls.push({ url, init, ms });
       const answer = answers[Math.min(calls.length, answers.length) - 1];
       if (answer === undefined) throw new Error("no answer planned");
@@ -84,7 +95,7 @@ function setup(answers: (() => Promise<Response>)[], options: { everyMs?: number
     },
   });
   running.push(timer);
-  return { folder, file, calls, lines, timer };
+  return { folder, file, calls, seeds, lines, timer };
 }
 const written = (file: string): string => readFileSync(file, "utf8");
 const settled = async (calls: Call[], count: number): Promise<void> => {
@@ -234,6 +245,16 @@ const bad: [string, () => Promise<Response>, string][] = [
   ["a price past what a number holds", text('{"bitcoin":{"usd":1e999,"usd_24h_change":1}}'), "shape"],
   ["no coin priced at all", json({}), "no_price"],
   ["every coin without a price", json({ bitcoin: {}, "gno-land": {}, atomone: {} }), "no_price"],
+  [
+    "a body that is no UTF-8, though its bytes replaced would be JSON",
+    () =>
+      Promise.resolve(
+        new Response(
+          Uint8Array.from([...Buffer.from(JSON.stringify({ ...ANSWER, pad: "" }).slice(0, -2)), 0xff, 0x22, 0x7d]),
+        ),
+      ),
+    "shape",
+  ],
   ["a body that is not JSON", text("<html>Just a moment...</html>"), "not_json"],
   ["an empty body", text(""), "not_json"],
   ["a 204 with no body at all", () => Promise.resolve(new Response(null, { status: 204 })), "not_json"],
@@ -344,6 +365,7 @@ describe("the prices timer: a bad answer keeps the last file", () => {
       now: () => NOW,
       everyMs: 30,
       send: (url, init, ms) => {
+        if (new URL(url).pathname === SEED_PATH) return json([])();
         calls.push({ url, init, ms });
         return json(ANSWER)();
       },
@@ -398,9 +420,115 @@ describe("the prices timer: a bad answer keeps the last file", () => {
   );
 });
 
+// CoinGecko's /coins/markets with sparkline=true: each coin's price over the last 7 days, `sparkline_in_7d.price`
+// (docs.coingecko.com/reference/coins-markets). 168 prices a coin here, a line rising by one each point.
+const spark = (id: string, from: number, n = 168) => ({
+  id,
+  current_price: from,
+  sparkline_in_7d: { price: Array.from({ length: n }, (_, i) => from + i) },
+});
+const SEEDED = [spark("gno-land", 1), spark("atomone", 1000), spark("bitcoin", 50000)];
+const dayOf = (folder: string): { tokens: { symbol: string; usd: number[] }[] } =>
+  JSON.parse(readFileSync(join(folder, "markets-history.json"), "utf8")) as never;
+
+describe("the prices timer: seeding a short history from CoinGecko's own past", () => {
+  it("asks once, for the three coins in dollars with their sparkline, by the same way out and its timeout", async () => {
+    const { file, seeds } = setup([json(ANSWER)], { seed: json(SEEDED) });
+    await wrote(file);
+    expect(seeds).toHaveLength(1);
+    const asked = new URL(seeds[0]?.url ?? "");
+    expect(asked.origin).toBe("https://api.coingecko.com");
+    expect(asked.searchParams.get("vs_currency")).toBe("usd");
+    expect(asked.searchParams.get("sparkline")).toBe("true");
+    expect((asked.searchParams.get("ids") ?? "").split(",").sort()).toEqual(["atomone", "bitcoin", "gno-land"]);
+    expect(seeds[0]?.url).not.toMatch(/api_key/i);
+    expect(seeds[0]?.ms).toBeLessThanOrEqual(10_000);
+  });
+
+  it("seeds each line with a day resampled to the history's interval: 288 prices, oldest first, then this read's", async () => {
+    const { file, folder } = setup([json(ANSWER)], { seed: json(SEEDED) });
+    await wrote(file);
+    const [gnot = [], atone = [], btc = []] = dayOf(folder).tokens.map((line) => line.usd);
+    expect(dayOf(folder).tokens[0]?.symbol).toBe("GNOT");
+    expect(gnot).toHaveLength(288);
+    // The last day of seven is the last 24 of 168 points, 143 to 167 for a line rising by one, then the read's own price (which pushes the first of the 288 out).
+    expect(gnot[0]).toBeGreaterThan(144);
+    expect(gnot[0]).toBeLessThan(145);
+    expect(gnot[286]).toBeCloseTo(1 + 167, 6);
+    expect(gnot[287]).toBe(0.058157);
+    expect(gnot.slice(0, 287)).toEqual([...gnot.slice(0, 287)].sort((x, y) => x - y));
+    expect(atone[287]).toBe(0.083482);
+    expect(btc[287]).toBe(77454);
+  });
+
+  it("asks nothing when every line is already long enough", async () => {
+    const folder = fresh();
+    const full = {
+      updated: new Date(NOW - 60_000).toISOString(),
+      tokens: ["GNOT", "ATONE", "BTC"].map((symbol) => ({ symbol, usd: Array.from({ length: 288 }, () => 1) })),
+    };
+    writeFileSync(join(folder, "markets-history.json"), JSON.stringify(full));
+    const { file, seeds } = setup([json(ANSWER)], { folder, seed: json(SEEDED) });
+    await wrote(file);
+    expect(seeds).toHaveLength(0);
+  });
+
+  it("asks once per process: a second read of a history that stayed short asks no more", async () => {
+    const { calls, seeds } = setup([json(ANSWER)], { everyMs: 5 });
+    await vi.waitFor(() => {
+      expect(calls.length).toBeGreaterThanOrEqual(3);
+    });
+    expect(seeds).toHaveLength(1);
+  });
+
+  it("leaves today's behaviour on a failed read: the price is written, one point, the failure logged by its kind", async () => {
+    const { file, folder, lines } = setup([json(ANSWER)], { seed: () => Promise.reject(new Error("boom 10.1.2.3")) });
+    await wrote(file);
+    await failed(lines);
+    expect(dayOf(folder).tokens.map((line) => line.usd.length)).toEqual([1, 1, 1]);
+    expect(lines.map(kindOf)).toContain("request");
+    expect(JSON.parse(lines[0] ?? "{}")).toMatchObject({ event: "prices_history_seed_failed" });
+    expect(lines.join("")).not.toMatch(NEVER_LOGGED);
+  });
+
+  it.each([
+    ["a huge answer", text(JSON.stringify([{ ...SEEDED[0], pad: "x".repeat(1_000_000) }])), "too_large"],
+    ["a body that is not JSON", text("<html>Just a moment...</html>"), "not_json"],
+    ["a 429", text("{}", 429), "rate_limited"],
+    ["not a list", json({ gno: 1 }), "shape"],
+    ["a price as text", json([{ id: "gno-land", sparkline_in_7d: { price: ["1"] } }]), "shape"],
+    [
+      "a price at zero",
+      json([{ id: "gno-land", sparkline_in_7d: { price: Array.from({ length: 168 }, () => 0) } }]),
+      "shape",
+    ],
+    [
+      "a line far too long",
+      json([{ id: "gno-land", sparkline_in_7d: { price: Array.from({ length: 20_000 }, () => 1) } }]),
+      "shape",
+    ],
+  ])("refuses %s and leaves the history as a read alone makes it", async (_, answer, kind) => {
+    const { file, folder, lines } = setup([json(ANSWER)], { seed: answer });
+    await wrote(file);
+    await failed(lines);
+    expect(dayOf(folder).tokens.map((line) => line.usd.length)).toEqual([1, 1, 1]);
+    expect(lines.map(kindOf)).toContain(kind);
+  });
+
+  it("leaves a coin without a sparkline, or one the timer does not price, unseeded", async () => {
+    const { file, folder } = setup([json(ANSWER)], {
+      seed: json([{ id: "gno-land", sparkline_in_7d: null }, spark("dogecoin", 5), spark("bitcoin", 50000)]),
+    });
+    await wrote(file);
+    expect(dayOf(folder).tokens.map((line) => line.usd.length)).toEqual([1, 1, 288]);
+  });
+});
+
 describe("the prices timer: its own way out, with no send given", () => {
   it("goes out by the server's send: CoinGecko's address, a timeout, no redirect followed, and writes a good answer", async () => {
-    const fetched = vi.fn<(url: string, init: RequestInit) => Promise<Response>>(() => json(ANSWER)());
+    const fetched = vi.fn<(url: string, init: RequestInit) => Promise<Response>>((url) =>
+      json(new URL(url).pathname === SEED_PATH ? [] : ANSWER)(),
+    );
     vi.stubGlobal("fetch", fetched);
     const folder = fresh();
     const file = join(folder, "markets.json");
@@ -408,7 +536,10 @@ describe("the prices timer: its own way out, with no send given", () => {
       startPrices({ file, log: logger("a-pepper-of-forty-characters-0123456789", () => undefined), now: () => NOW }),
     );
     await wrote(file);
-    expect(fetched).toHaveBeenCalledTimes(1);
+    // One price read a pass, and the week's seed once at most beside it (the batch's review).
+    const paths = fetched.mock.calls.map(([asked]) => new URL(asked).pathname);
+    expect(paths.filter((path) => path === "/api/v3/simple/price")).toHaveLength(1);
+    expect(paths.filter((path) => path === SEED_PATH).length).toBeLessThanOrEqual(1);
     const [url, init] = fetched.mock.calls[0] ?? [];
     expect(String(url)).toMatch(/^https:\/\/api\.coingecko\.com\/api\/v3\/simple\/price\?/);
     expect(init?.redirect).toBe("error");
@@ -483,6 +614,7 @@ describe("the prices timer: when it runs", () => {
       log: logger("a-pepper-of-forty-characters-0123456789", () => undefined),
       now: () => NOW,
       send: (url, init, ms) => {
+        if (new URL(url).pathname === SEED_PATH) return json([])();
         calls.push({ url, init, ms });
         return answer();
       },
@@ -509,6 +641,7 @@ describe("the prices timer: when it runs", () => {
       log: logger("a-pepper-of-forty-characters-0123456789", () => undefined),
       now: () => NOW,
       send: (url, init, ms) => {
+        if (new URL(url).pathname === SEED_PATH) return json([])();
         calls.push({ url, init, ms });
         return Promise.reject(new Error("down"));
       },
@@ -744,6 +877,7 @@ function withRpc(
     now: () => NOW,
     everyMs: options.everyMs ?? 60_000,
     send: (url, init, ms) => {
+      if (new URL(url).pathname === SEED_PATH) return json([])();
       calls.push({ url, init, ms });
       return url.startsWith("https://api.coingecko.com/") ? prices() : height();
     },
@@ -793,6 +927,48 @@ describe("the prices timer: the block height", () => {
       updated: "2026-10-31T12:00:00.000Z",
       tokens: TOKENS,
       block: BLOCK,
+    });
+  });
+
+  // The average seconds between blocks (D354): from the block just read and the one in the file the timer last wrote.
+  describe("the interval between blocks", () => {
+    const keep = (block: unknown) => {
+      const folder = fresh();
+      writeFileSync(
+        join(folder, "markets.json"),
+        `${JSON.stringify({ source: "CoinGecko", updated: "2026-10-31T11:55:00.000Z", tokens: [TOKENS[0]], ...(block === undefined ? {} : { block }) })}\n`,
+      );
+      return folder;
+    };
+    const intervalAfter = async (before: unknown, now = status(786661)) => {
+      const { file, lines } = withRpc({ height: json(now) }, { folder: keep(before) });
+      await wrote(file);
+      expect(heightLogged(lines)).toEqual([]);
+      return (JSON.parse(written(file)) as { block?: { interval?: number } }).block?.interval;
+    };
+    // 786661 at 11:59:10.12 and 786601 sixty blocks before it, 116.4 s earlier: 1.94 s a block.
+    const BEFORE = { height: 786601, time: "2026-10-31T11:57:13.723456789Z", host: BLOCK.host };
+
+    it("is the seconds between the two blocks over their heights, read back from the last file (a restart has it)", async () => {
+      expect(await intervalAfter(BEFORE)).toBeCloseTo(1.94, 5);
+    });
+
+    it("is left out on the first file, with no block in the last one", async () => {
+      expect(await intervalAfter(undefined)).toBeUndefined();
+    });
+
+    it("is left out when the height did not rise: equal, or lower", async () => {
+      expect(await intervalAfter({ ...BEFORE, height: 786661 })).toBeUndefined();
+      expect(await intervalAfter({ ...BEFORE, height: 786700 })).toBeUndefined();
+    });
+
+    it("is left out when the last block's time does not parse, or the new one is not after it", async () => {
+      expect(await intervalAfter({ ...BEFORE, time: "not a time" })).toBeUndefined();
+      expect(await intervalAfter({ ...BEFORE, time: "2026-10-31T12:30:00Z" })).toBeUndefined();
+    });
+
+    it("is left out, with the prices kept, when it is past 600 s (a chain halted between the reads)", async () => {
+      expect(await intervalAfter({ ...BEFORE, height: 786660, time: "2026-10-31T10:00:00Z" })).toBeUndefined();
     });
   });
 

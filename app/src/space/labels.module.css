@@ -1,0 +1,74 @@
+/* The universe's names (D401, the demo's pills): a pill per name, moved by transform; shown or not by `.on`. */
+@layer components {
+  .pill {
+    inset-block-start: 0;
+    inset-inline-start: 0;
+    /* layout: the name and the people here a small step apart (the row's own, row-center, is set in labels.ts) */
+    gap: var(--space-3xs);
+    padding: var(--space-3xs) var(--space-2xs);
+    border: var(--line-width) solid var(--color-line);
+    background: var(--color-pill-glass);
+    color: var(--color-text);
+    font: var(--font-label);
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      opacity var(--motion-label) var(--ease-emphasized),
+      border-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard),
+      color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* On the home's first screen a world's name stands under its disc, centred, in the Earth tag's size and face (D543, D546, D549). */
+  .under {
+    /* layout: a wider step between the name and the people here, as the Earth tag's */
+    gap: var(--space-xs);
+    padding: var(--space-2xs) var(--space-s);
+    border-color: var(--color-line-strong);
+    translate: -50% 0;
+  }
+
+  .under b {
+    font: var(--font-action);
+  }
+
+  /* The people here: the glyph at the label's text height, and the number right after it. */
+  .count {
+    color: var(--color-mine);
+  }
+
+  /* A layer only while the name shows and moves. */
+  .pill.on {
+    will-change: transform;
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* A name the pointed planet does not light, in the Map. */
+  .pill.on.dim {
+    opacity: 0.3;
+  }
+
+  .pill:hover {
+    border-color: var(--color-line-strong);
+  }
+
+  /* Another system named from inside one (D460): no fill, a dashed edge and a sun's ring before it, in the quiet tone; it lights up as
+     it is pointed at. */
+  .other {
+    border-style: dashed;
+    background: transparent;
+    color: var(--color-text-muted);
+  }
+
+  .other::before {
+    content: "";
+    inline-size: var(--size-dot-l);
+    aspect-ratio: 1;
+    border: var(--line-width) solid currentColor;
+    border-radius: 50%;
+  }
+
+  .other:hover {
+    color: var(--color-text);
+  }
+}

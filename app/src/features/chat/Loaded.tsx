@@ -1,8 +1,10 @@
 // The world's rooms once listed (slice 4's 4b, moved out of ChatPanel.tsx): the switcher, the conversation in view (a
 // room, or a direct message, 4e) and what writes in it.
 import type { Line } from "@gnoworld/core";
-import type { Address, RoomList } from "@gnoworld/schemas";
+import type { RoomList } from "@gnoworld/schemas";
+import { Chip } from "@gnoworld/ui";
 import { useId, type ReactNode, type RefObject } from "react";
+import { useLinks } from "../../useLinks.ts";
 import { useAppStore } from "../../storeContext.tsx";
 import type { AppState } from "../../store/index.ts";
 import type { Dms } from "./Dms.tsx";
@@ -10,41 +12,37 @@ import type { ChatLink } from "./link.ts";
 import { useComposing } from "./composing.ts";
 import { dmActs } from "./dmActs.ts";
 import type { Say } from "./linkTypes.ts";
-import { groupsAt, roomIds, talkingOf } from "./names.ts";
-import { NoticeModes } from "./NoticeModes.tsx";
-import { OnlyKnown } from "./OnlyKnown.tsx";
-import { RoomMenu } from "./RoomMenu.tsx";
+import { groupsAt, hereOf, roomIds, talkingOf } from "./names.ts";
 import { multilineOf, roomActs } from "./roomActs.ts";
 import { useRoomKeeping } from "./RoomKeeping.ts";
 import { RoomChips } from "./RoomChips.tsx";
 import { ChatScreen, type ChatPlace } from "./ChatScreen.tsx";
-import { Dock } from "./Dock.tsx";
-import { CountryChoice } from "./CountryChoice.tsx";
+import { Dock, quickActionsOf } from "./Dock.tsx";
+import { JarvisTold } from "./jarvisTold.tsx";
 import { Saved } from "./Saved.tsx";
 import { Media } from "./Media.tsx";
 import { NoticeStatus, RoomsView } from "./RoomsView.tsx";
-import { unreadOf } from "./unread.ts";
+import { RoomsList } from "./RoomsList.tsx";
+import { badged, unreadOf } from "./unread.ts";
 import { useOpened, useWhoIsHere } from "./whoIsHere.tsx";
-import { RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
+import { NoRoomYet, RoomView, type RoomViewOver, type RoomViewProps } from "./RoomView.tsx";
 import { shownOf } from "./shown.tsx";
 import { usePins } from "./usePins.ts";
 import type { Shown } from "./roomShown.ts";
+import { useNow } from "./useNow.ts";
 import { useRoomKeys } from "./useRoomKeys.ts";
 import type { Noticing } from "./useNotices.ts";
 import { useThreads } from "./Threading.tsx";
-import { Writer } from "./Writer.tsx";
+import { RoomWriter } from "./Writer.tsx";
 
 const NO_LINES: readonly Line[] = [];
 const NO_MEMBERS: readonly string[] = [];
 
-// A room's notification modes, an account's; a direct message has none of its own (4f-n).
-const modesOf = (room: string | undefined, notify: Noticing["notify"]) =>
-  room === undefined || notify === undefined ? undefined : <NoticeModes room={room} {...notify} />;
+// The room's own world, the id's first segment: a hub's other realms' rooms are other worlds, which the hint does not name.
+const ownsRoom = (worlds: readonly string[] | undefined, room: string | undefined) =>
+  room !== undefined && worlds?.includes(room.slice(1).split("/")[0] ?? "") === true;
 
 const addressOf = (session: AppState["login"]["session"]) => (session.kind === "in" ? session.address : undefined);
-
-// The country an account declares (7j): the choice is the account's, so it stands in a conversation's menu too.
-const countryOf = (me: Address | undefined) => (me === undefined ? undefined : <CountryChoice account={me} />);
 
 // The world's rooms once listed: the switcher, the room in view and what writes in it.
 export interface LoadedProps {
@@ -79,14 +77,12 @@ function Rail({
   signedIn,
   sections,
   current,
-  lines,
   dms,
   failed,
   noticing,
 }: Pick<LoadedProps, "sections" | "dms" | "failed" | "noticing"> & {
   signedIn: boolean;
   current: string | undefined;
-  lines: readonly Line[];
 }) {
   return (
     <RoomsView
@@ -96,7 +92,7 @@ function Rail({
       failed={failed}
       badges={noticing.badges}
       notices={noticing.list}
-      media={<Media room={current} lines={lines} />}
+      media={<Media room={current} />}
       saved={signedIn ? <Saved /> : undefined}
     />
   );
@@ -122,7 +118,7 @@ function useConversation(props: LoadedProps) {
     { sayTo, focus: opened.focus, noteId, seen: noticing.seen, acts: bar },
   );
   const lines = state?.lines ?? NO_LINES;
-  return { room, acts, me, noteId, people, shown, lines, members: state?.members ?? NO_MEMBERS };
+  return { room, acts, me, people, shown, lines, noteId, members: state?.members ?? NO_MEMBERS };
 }
 
 /** The conversation in view: a direct message's problem, said in the room's place, then the room with its composer. */
@@ -137,90 +133,99 @@ function LoadedRoom({
   view: RoomViewOver;
   composer: ReactNode;
 }) {
+  const room = shown && <RoomView key={shown.key} {...shown.view} {...view} composer={composer} />;
   return (
     <>
       {problem === undefined ? null : <p role="status">{problem}</p>}
-      {shown === undefined ? null : <RoomView key={shown.key} {...shown.view} {...view} composer={composer} />}
+      {room ?? (problem === undefined ? <NoRoomYet /> : null)}
     </>
   );
 }
 
-// A direct message's header says what it is, where a room's says the place (frame f0080).
-const kickerOf = (shown: Shown | undefined) => (shown?.kind === "dm" ? "Direct message" : undefined);
+// What the composer's description points at: the header shows a direct message's mark, a screen reader hears its note.
+function DmNote({ shown, id }: { shown: Shown | undefined; id: string }) {
+  return shown?.kind === "dm" ? (
+    <p id={id} className="visually-hidden">
+      {shown.note}
+    </p>
+  ) : null;
+}
 
 export function Loaded(props: LoadedProps) {
   const { sections, verdicts, saving, chat, session, link, dms, noticing, failed, place } = props;
-  const { room, acts, me, noteId, people, shown, lines, members } = useConversation(props);
+  const { room, acts, me, people, shown, lines, members, noteId } = useConversation(props);
+  const now = useNow();
+  // The owner of the place's world wears a mark beside the room's name (owners' moderation, part 5); the server's list says who owns what.
+  const owner = ownsRoom(useLinks(me)?.worlds, room);
   const ids = roomIds(sections);
   // What the reader keeps in the room in view and the room's pins, which are asked for it: none for a direct message.
   const { keeping, pins } = useRoomKeeping(room, usePins(useAppStore(), room, me));
   const composing = useComposing(shown, me);
   const threads = useThreads({ shown, state: props.state, session, rooms: ids, acts });
-  const rail = (
-    <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} lines={lines} noticing={noticing} />
-  );
+  const rail = <Rail signedIn={me !== undefined} {...{ sections, dms, failed }} current={room} noticing={noticing} />;
   const writer =
     shown === undefined ? undefined : (
-      <Writer
+      <RoomWriter
         session={session}
         rooms={ids}
         groups={groupsAt(sections, room)}
         multiline={multilineOf(link)}
+        quick={quickActionsOf(place, shown, session)}
         {...shown.writer}
         {...composing.writer}
       />
     );
-  // An account's menu always holds the choice of whom it hears from, so it is always there.
+  // The room's name opens the place's rooms under a search (D487); the room's settings wait for their own place.
   const menu = (
-    <RoomMenu note={shown?.note} noteId={noteId}>
-      {modesOf(room, noticing.notify)}
-      {dms.nav === undefined ? null : <OnlyKnown {...dms.nav} />}
-      {countryOf(me)}
-    </RoomMenu>
+    <RoomsList sections={sections} current={room} failed={failed} badge={(id) => badged(noticing.badges?.[id])} />
   );
   return (
     <ChatScreen
       place={place}
       title={shown?.title ?? place.name}
-      kicker={kickerOf(shown)}
       chips={<RoomChips sections={sections} current={room} badges={noticing.badges} />}
-      menu={{ label: shown?.kind === "dm" ? "Conversation" : "Room", content: menu }}
-      mark={shown?.mark}
+      menu={{ label: "Rooms", content: menu }}
+      mark={
+        owner ? (
+          <>
+            {shown?.mark}
+            <Chip tone="signal">Owner</Chip>
+          </>
+        ) : (
+          shown?.mark
+        )
+      }
       rail={rail}
       unread={unreadOf(noticing.badges)}
-      talking={talkingOf(props.state?.members, chat === "connected")}
+      talking={talkingOf(lines, now, chat === "connected")}
+      present={hereOf(props.state?.members, chat === "connected")}
       here={{ lines, members }}
       people={people}
       threads={threads}
+      search={{ room, sections, members, me, link }}
       status={<NoticeStatus notices={noticing.list} />}
     >
-      {(ask) => (
-        <LoadedRoom
-          problem={dms.problem}
-          shown={shown}
-          view={{
-            verdicts,
-            saving,
-            keeping,
-            pins,
-            chat,
-            me,
-            ...composing.view,
-            ...threads.view,
-          }}
-          composer={
-            <Dock
-              onWhoIsHere={ask}
-              place={place}
-              dm={shown?.kind === "dm"}
-              writes={session.kind === "in"}
-              pinned={place.pinned}
-            >
-              {writer}
-            </Dock>
-          }
-        />
-      )}
+      <JarvisTold place={place} shown={shown} account={me} />
+      <LoadedRoom
+        problem={dms.problem}
+        shown={shown}
+        view={{
+          verdicts,
+          saving,
+          keeping,
+          pins,
+          chat,
+          me,
+          ...composing.view,
+          ...threads.view,
+        }}
+        composer={
+          <>
+            <DmNote shown={shown} id={noteId} />
+            <Dock pinned={place.pinned}>{writer}</Dock>
+          </>
+        }
+      />
     </ChatScreen>
   );
 }

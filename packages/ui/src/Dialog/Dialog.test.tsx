@@ -1,4 +1,4 @@
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { userEvent } from "@testing-library/user-event";
 import { useState, type ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -85,6 +85,16 @@ describe("Dialog", () => {
       </Dialog>,
     );
     expect(dialog().dataset["width"]).toBe("wide");
+  });
+
+  it("wears a mark before its heading when given one", () => {
+    render(
+      <Dialog title="Passport" open={false} onClose={vi.fn()} lead={<i data-testid="seal" />}>
+        Body
+      </Dialog>,
+    );
+    expect(dialog().querySelector("[data-testid='seal']")).not.toBeNull();
+    expect(dialog().querySelector("h2")?.textContent).toBe("Passport");
   });
 
   it("opens when asked, and closes when asked, without calling its onClose", () => {
@@ -191,6 +201,37 @@ describe("Dialog", () => {
     });
     return cancel;
   };
+
+  // A press beside the dialog lands on the dialog element itself (the backdrop's), outside its box.
+  const boxed = () => {
+    vi.spyOn(dialog(), "getBoundingClientRect").mockReturnValue({
+      left: 100,
+      right: 600,
+      top: 100,
+      bottom: 500,
+    } as DOMRect);
+  };
+  const press = (down: Element, at: { clientX: number; clientY: number }) => {
+    fireEvent.pointerDown(down, at);
+    fireEvent.click(dialog(), at);
+  };
+
+  it("closes on a press beside it, once, as Close does", () => {
+    render(<Held />);
+    boxed();
+    press(dialog(), { clientX: 20, clientY: 20 });
+    expect(screen.getByText("Closed 1")).toBeTruthy();
+    expect(dialog().open).toBe(false);
+  });
+
+  it("stays open when a press starts inside it and ends beside it, a selection dragged out, or lands inside its box", () => {
+    render(<Held />);
+    boxed();
+    press(screen.getByText("Stamps"), { clientX: 20, clientY: 20 });
+    press(dialog(), { clientX: 300, clientY: 300 });
+    expect(screen.getByText("Closed 0")).toBeTruthy();
+    expect(dialog().open).toBe(true);
+  });
 
   it("asks its page on Esc, once, and closes when the page says so", () => {
     render(<Held />);

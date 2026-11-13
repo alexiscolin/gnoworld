@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { data, type ClientLoaderFunctionArgs, type MetaArgs, type RouteObject } from "react-router";
 import { use } from "react";
-import { afterEach, describe, expect, test, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
 import { fakeStream } from "../../tests/fakeStream.ts";
+import { expectFollowAndShare } from "../../tests/plateButtons.ts";
+import { noMedia, noObservers } from "../../tests/mount.tsx";
 import { BACK_HOME, alertOf, render, routeError } from "../../tests/render.tsx";
 import { drawRoute, expectStreamClosedOnLeave } from "../../tests/routed.tsx";
 import { ChainCard } from "../features/chat/ChainCard.tsx";
@@ -16,8 +18,10 @@ import World, { clientLoader, ErrorBoundary, loader, meta } from "./world.tsx";
 
 // The page's chat is the real one, but for the test that watches the stream's way to the room: there the chat is the room's wiring alone (its
 // stream followed through useVerdicts, its thread's cards drawn from the calls the page gave), the rooms' own service being no business of it.
+// The shell's host draws it (routed.tsx), the chain's contexts given from what the page holds.
+const NO_CALLS: readonly never[] = [];
 const probing = vi.hoisted(() => ({ on: false, place: undefined as { slug: string } | undefined }));
-vi.mock(import("../features/chat/index.ts"), async (original) => {
+vi.mock(import("../features/chat/Chat.tsx"), async (original) => {
   const actual = await original();
   const Probe = () => {
     useVerdicts(useAppStore(), { room: "#govdao", lines: undefined, reader: undefined, saving: false });
@@ -34,7 +38,14 @@ vi.mock(import("../features/chat/index.ts"), async (original) => {
     ...actual,
     Chat: (props: Parameters<typeof actual.Chat>[0]) => {
       probing.place = props.place;
-      return probing.on ? <Probe /> : <actual.Chat {...props} />;
+      if (!probing.on) return <actual.Chat {...props} />;
+      return (
+        <ChainPlaceContext value={props.chain?.place}>
+          <ChainCallsContext value={props.chain?.calls ?? NO_CALLS}>
+            <Probe />
+          </ChainCallsContext>
+        </ChainPlaceContext>
+      );
     },
   };
 });
@@ -67,12 +78,32 @@ const failures: [string, () => never][] = [
   ]),
 ];
 
+// The page holds the space behind it, which asks the screen's media.
+beforeEach(() => {
+  noMedia();
+  noObservers();
+});
+
+// The plate's blocks are a chunk asked once the page has loaded (world.tsx's `loaded`, D567): the build writes the frame, the kicker and the
+// title; the lede, the actions and the figures are drawn in the DOM once it has run, the chain not answering.
+const drawn = async (path: string, ready: string) => {
+  fakeStream();
+  vi.stubGlobal("fetch", () => Promise.reject(new Error("offline")));
+  const page = drawRoute(route(clientLoader), path);
+  await vi.waitFor(() => {
+    expect(page.box.textContent).toContain(ready);
+  });
+  return { ...page, plate: page.box.querySelector("section[data-look='plate']") };
+};
+
 describe("a world's page", () => {
   // GovDAO has a realm (hubs.json): its page leads with reading the proposals, at the realm's view; Bubble has none.
   test("leads with Read the proposals, at the realm's view, for a world with a realm only", async () => {
-    const govdao = await render(route(), "/w/govdao");
-    expect(govdao).toMatch(/<a [^>]*href="\/r\/gov\/dao"[^>]*>(?:<svg.*?<\/svg>)?Read the proposals/);
-    expect(await render(route(), "/w/bubble")).not.toContain("Read the proposals");
+    const govdao = await drawn("/w/govdao", "the votes that accept or refuse them");
+    expect(govdao.plate?.querySelector("a[href='/r/gov/dao']")?.textContent).toBe("Read the proposals");
+    govdao.leave();
+    const bubble = await drawn("/w/bubble", "the BUBBLE token");
+    expect(bubble.box.textContent).not.toContain("Read the proposals");
   });
 
   test("shows the world's name and its description", async () => {
@@ -99,11 +130,8 @@ describe("a world's page", () => {
   test("a world with no capture shows no preview: no picture on its page, no og:image in its tags", async () => {
     const html = await render(route(), "/w/bubble");
     expect(html).not.toMatch(/<(figure|picture|img|video|canvas|iframe|object|embed)\b|data-preview/i);
-    // The one icon of the main action (frame 26) is a decorative glyph of the design system: no other drawing.
-    const drawings = html.match(/<svg\b[^>]*>/gi) ?? [];
-    expect(drawings.length).toBeGreaterThan(0);
-    for (const drawing of drawings)
-      expect(drawing).toMatch(/aria-hidden="true"[^>]*data-icon=|data-icon=[^>]*aria-hidden="true"/);
+    // The main action's icon (frame 26) comes with the plate's chunk: the first paint draws nothing at all.
+    expect(html).not.toMatch(/<svg\b/i);
     const tags = JSON.stringify(meta(metaArgs(bubbleOf())));
     expect(tags).not.toMatch(/og:image|twitter:image|"image"/i);
   });
@@ -112,15 +140,13 @@ describe("a world's page", () => {
     const html = await render(route(), "/w/nowhere");
     expect(html).toContain('role="alert"');
     expect(html).toContain("<h1>No world here</h1>");
-    expect(html).toContain("<p>No world of gno.land goes by that name.</p>");
+    expect(html).toContain("You are lost in space: no world of gno.world goes by that address.");
     expect(alertOf(html)).toMatch(BACK_HOME);
   });
 
-  test.each(failures)("says it could not load on %s, apart from not found", async (_, failing) => {
+  test.each(failures)("says its own failure on %s, apart from not found", async (_, failing) => {
     const html = await render(route(failing), "/w/bubble");
     expect(html).toContain('role="alert"');
-    expect(html).toContain("<h1>This world could not load</h1>");
-    expect(html).toContain("<p>Try again in a moment.</p>");
     expect(alertOf(html)).toMatch(BACK_HOME);
     expect(html).not.toContain("No world here");
   });
@@ -198,23 +224,24 @@ describe("a world's page, by the case of its path (F376)", () => {
   });
 });
 
-// Slice 5j, 8g (frames 22, 93, 104): the crumb above the title says where the world is and what it is, "UNIVERSE › GAMES › DAPP", the
-// universe a link to its cosmos; a world the data gives no kind is a hub.
-describe("a world's page, its crumb", () => {
-  test("says the universe, the genre and the kind, in that order, before the title", async () => {
-    const html = await render(route(), "/w/bubble");
+// Slice 5j, 8g (frames 22, 93, 104): the plate's kicker says what the world is, "GAMES · DAPP"; a world the data gives no kind is a hub. The crumb
+// "Universe > Games > dApp" is gone with the plate's rebuild (D428, D567): the header's levels say where it is (the plan space-simple).
+describe("a world's page, its kicker", () => {
+  const kickerOf = async (path: string) => {
+    const html = await render(route(), path);
     const plate = html.slice(html.indexOf('data-look="plate"'));
-    const trail = /<nav aria-label="You are here"[\s\S]*?<\/nav>/.exec(plate)?.[0] ?? "";
-    const words = [...trail.matchAll(/>([^<>]+)</g)].map(([, word]) => word);
-    expect(words).toEqual(["Universe", "Games", "dApp"]);
-    expect(trail).toMatch(/<a [^>]*href="\/"[^>]*>Universe<\/a>/);
-    expect(plate.indexOf("You are here")).toBeLessThan(plate.indexOf("<h1"));
+    return { plate, kicker: />([^<>]+)<\/p><\/div><\/div><div [^>]*data-title/.exec(plate)?.[1] };
+  };
+
+  test("says the genre and the kind, in that order, before the title, and no crumb", async () => {
+    const { plate, kicker } = await kickerOf("/w/bubble");
+    expect(kicker).toBe("Games · dApp");
+    expect(plate).not.toContain("You are here");
+    expect(plate).not.toMatch(/<a [^>]*href="\/"[^>]*>Universe<\/a>/);
   });
 
   test("says DAO for GovDAO, with no genre", async () => {
-    const html = await render(route(), "/w/govdao");
-    const trail = /<nav aria-label="You are here"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? "";
-    expect([...trail.matchAll(/>([^<>]+)</g)].map(([, word]) => word)).toEqual(["Universe", "DAO"]);
+    expect((await kickerOf("/w/govdao")).kicker).toBe("DAO");
   });
 });
 
@@ -228,13 +255,13 @@ describe("a world's plate", () => {
   test("is a plate named for the world, holding the one heading, the description and the kicker", async () => {
     const { html, tag } = await plateOf();
     expect(tag).toContain('aria-label="Bubble"');
-    const inside = html.slice(html.indexOf(tag));
-    expect(inside.indexOf("<h1")).toBeGreaterThan(0);
-    expect(inside.indexOf("the BUBBLE token, its governance")).toBeGreaterThan(inside.indexOf("<h1"));
     expect(html.match(/<h1\b/g)).toHaveLength(1);
-    // The crumb is part of the plate: it opens before the plate closes.
-    const plate = inside.slice(0, inside.indexOf("</section>"));
-    expect(plate).toMatch(/aria-label="You are here"/);
+    // The description is the plate's chunk's (D567), drawn after the title, in the plate.
+    const { plate, box } = await drawn("/w/bubble", "the BUBBLE token, its governance");
+    expect(box.querySelectorAll("h1")).toHaveLength(1);
+    expect(plate?.textContent).toContain("Games · dApp");
+    const text = plate?.textContent ?? "";
+    expect(text.indexOf("the BUBBLE token, its governance")).toBeGreaterThan(text.indexOf("Bubble"));
   });
 
   test("says its kind in its vertical caption, to the eye only", async () => {
@@ -248,12 +275,12 @@ describe("a world's plate", () => {
     expect(html).not.toMatch(/here now|messages now|<canvas\b|data-value=|data-hour=/i);
   });
 
-  // Share needs the browser's clipboard, unknown to the build: the page it writes has no Share, and never a Follow (no
-  // account's store to follow into). The connected worlds and the chart's words follow what the data holds: no link, no block.
-  test("offers Follow and Share in the page the build writes, at the first paint", async () => {
-    const { html } = await plateOf();
-    expect(html).toMatch(/>Follow</);
-    expect(html).toMatch(/>Share</);
+  // Follow and Share are the plate's chunk's, in words (D13915 reverses D536's icons): the build writes neither, nor a Share the clipboard
+  // of the build could not serve.
+  test("offers Follow and Share once the plate has come, and the build writes neither", async () => {
+    expect((await plateOf()).html).not.toMatch(/>(Follow|Share)</);
+    const { plate } = await drawn("/w/bubble", "the BUBBLE token");
+    expectFollowAndShare(plate);
   });
 
   test("has no connected worlds block: Bubble links to no world", async () => {
@@ -261,22 +288,23 @@ describe("a world's plate", () => {
     expect(html).not.toMatch(/connected worlds/i);
   });
 
-  test("pre-renders the activity's frame with its rate of 0 and no bars, which come with the client", async () => {
-    const { html } = await plateOf();
-    expect(html).toMatch(/activity · last 24 h/i);
-    expect(html).toMatch(/0 msgs\/h now/i);
-    expect(html).not.toMatch(/data-hour/);
+  // The plate's first figure, who is here now (the activity chart's frame, "0 msgs/h now", is gone with the plate's rebuild): 0 while no room told.
+  test("shows who is here now as 0 while no count has come, with no bars", async () => {
+    const { plate } = await drawn("/w/bubble", "the BUBBLE token");
+    const figures = plate?.querySelector("section[aria-label='Figures']");
+    expect(figures?.textContent).toContain("Here now");
+    expect(figures?.textContent).toContain("people in the world");
+    expect(plate?.querySelector("[data-hour]")).toBeNull();
   });
 
   // The main action is the link to the world's chat, named for what it does: it fails while the plate's only link is a trail.
   test("has a main action: a link in the plate to the chat on the page, which the page holds", async () => {
-    const { tag, html } = await plateOf();
-    const plate = html.slice(html.indexOf(tag), html.indexOf("</section>", html.indexOf(tag)));
-    const links = [...plate.matchAll(/<a\b[^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/g)];
-    // The crumb's link to the universe, then the one action.
-    expect(links.map(([, href]) => href)).toEqual(["/", "#chat"]);
-    expect(links[1]?.[2]).toMatch(/Say hi in the chat/);
-    expect(html).toMatch(/<div id="chat"[^>]*>/);
+    const { plate, box } = await drawn("/w/bubble", "the BUBBLE token");
+    const links = [...(plate?.querySelectorAll("a") ?? [])];
+    // The crumb's link to the universe is gone (D428): the one action is the plate's only link for a world with no realm.
+    expect(links.map((link) => link.getAttribute("href"))).toEqual(["#chat"]);
+    expect(links[0]?.textContent).toBe("Say hi in the chat");
+    expect(box.querySelector("#chat")).not.toBeNull();
   });
 
   // F2865: the page reads and tabs in the order it is drawn on a computer, the plate first; a phone draws the chat above it by CSS
@@ -289,11 +317,12 @@ describe("a world's plate", () => {
 
 // Slice 9g (F5784, frames 20 to 35): a world's page follows its main room's stream once it has run, and the room draws as a card the call
 // the stream tells for its own world and universe, never one of another's.
+// The chat comes once space's door has, 2.5 s at most (useSpace's FIRST_SCREEN_MS), and with it the room's stream: here no scene draws.
+const DOOR = 4_000;
 describe("a world's page and the chain's stream", () => {
   afterEach(() => {
     probing.on = false;
     probing.place = undefined;
-    vi.unstubAllGlobals();
   });
   const call = (id: string, world: string, universe = "onyx") => ({
     id,
@@ -310,25 +339,31 @@ describe("a world's page and the chain's stream", () => {
     probing.on = true;
     const sources = fakeStream();
     const { box } = drawRoute(route(), "/w/govdao");
-    await vi.waitFor(() => {
-      expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23govdao"]);
-    });
+    await vi.waitFor(
+      () => {
+        expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23govdao"]);
+      },
+      { timeout: DOOR },
+    );
     sources.opened[0]?.emit("chain", call("a:0", "bubble"));
     sources.opened[0]?.emit("chain", call("b:0", "govdao", "gnoland"));
     sources.opened[0]?.emit("chain", call("c:0", "govdao"));
     await vi.waitFor(() => {
       expect(box.querySelectorAll("[data-chain]")).toHaveLength(1);
     });
-    expect(box.querySelector("[data-chain]")?.textContent).toContain("g10gh7…y5tv called MustVoteOnProposal");
+    expect(box.querySelector("[data-chain]")?.textContent).toContain("g10gh7…3y5tv called MustVoteOnProposal");
   });
 
   test("gives the chat its place: the world, its kicker, its way home and the worlds beside it", async () => {
     probing.on = true;
     fakeStream();
     drawRoute(route(), "/w/govdao");
-    await vi.waitFor(() => {
-      expect(probing.place).toBeDefined();
-    });
+    await vi.waitFor(
+      () => {
+        expect(probing.place).toBeDefined();
+      },
+      { timeout: DOOR },
+    );
     // GovDAO pins Vote (D271): the chat's bar has its pills and cards too, apart from what the place says.
     expect(probing.place).toHaveProperty("pinned");
     expect({ ...probing.place, pinned: undefined }).toMatchObject({
@@ -338,8 +373,10 @@ describe("a world's page and the chain's stream", () => {
       kicker: "Onyx · GovDAO",
       home: "/",
       worlds: [
+        { slug: "earth", name: "Earth", href: "/earth" },
         { slug: "bubble", name: "Bubble", href: "/w/bubble" },
         { slug: "govdao", name: "GovDAO", href: "/w/govdao" },
+        // The stations round the Earth are no place while STATIONS_SHOWN is off (places.ts): the worlds beside it are Bubble and GovDAO.
       ],
     });
   });
@@ -360,6 +397,6 @@ describe("a world's page and the chain's stream", () => {
 
   test("closes the stream when the page is left", async () => {
     probing.on = true;
-    await expectStreamClosedOnLeave(route(), "/w/govdao");
+    await expectStreamClosedOnLeave(route(), "/w/govdao", DOOR);
   });
 });

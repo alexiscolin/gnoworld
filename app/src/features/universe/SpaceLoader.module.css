@@ -1,0 +1,81 @@
+/* The loader (SpaceLoader.tsx): the black of space, the logo where the header's stands and one thin bar, centred, filling left to right. It
+   leaves by one fade once the bar is full; opacity and transform only. */
+@layer components {
+  .loader {
+    position: fixed;
+    inset: 0;
+    /* raw: over the header's and the views' bar's layers, and every control of the page */
+    z-index: 100;
+    background: var(--color-space);
+    /* raw: the one fade out, 400 ms, after the bar's last 200 ms of fill; under reduced motion a short fade at once */
+    transition: opacity calc(200ms + 200ms * var(--motion-scale)) var(--ease-standard) calc(200ms * var(--motion-scale));
+    outline: none;
+  }
+
+  .loader[data-leaving] {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  /* The header's logo: its row is 44 px high under the page's edge, the logo centred in it (shellHeader.module.css). */
+  .brand {
+    position: absolute;
+    inset-block-start: var(--space-s);
+    inset-inline-start: var(--space-s);
+    block-size: var(--control-m);
+    /* layout: the logo in the middle of its row, as the header centres it */
+    display: flex;
+    /* layout: and across it */
+    align-items: center;
+    color: var(--color-text);
+  }
+
+  @media (width >= 900px) {
+    .brand {
+      /* raw: the header's 34 px from the top on a computer */
+      inset-block-start: 34px;
+      inset-inline-start: var(--page-edge);
+    }
+  }
+
+  .bar {
+    position: absolute;
+    /* raw: the bar's middle on the screen's middle */
+    inset: 50% auto auto 50%;
+    /* raw: 240 px long, a fifth of a laptop's screen, never past the phone's width less its edges */
+    inline-size: min(240px, calc(100vi - 2 * var(--space-l)));
+    /* raw: 2 px thin */
+    block-size: 2px;
+    border-radius: var(--radius-pill);
+    /* The bar's whole length in grey, under the white fill: where the loading stands is read against it. */
+    background: var(--color-line-strong);
+    transform: translate(-50%, -50%);
+  }
+
+  .fill {
+    display: block;
+    block-size: 100%;
+    border-radius: inherit;
+    background: var(--color-text);
+    transform: scaleX(0);
+    transform-origin: left;
+    /* raw: a step of the fill, and the last one, 200 ms */
+    transition: transform calc(200ms * var(--motion-scale)) linear;
+  }
+
+  .fill[data-step="1"] {
+    transform: scaleX(0.25);
+  }
+
+  .fill[data-step="2"] {
+    transform: scaleX(0.5);
+  }
+
+  .fill[data-step="3"] {
+    transform: scaleX(0.75);
+  }
+
+  .fill[data-step="4"] {
+    transform: scaleX(1);
+  }
+}

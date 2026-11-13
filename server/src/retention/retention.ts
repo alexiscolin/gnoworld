@@ -8,9 +8,12 @@ import { join } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { z } from "zod";
 import type { Log } from "@gnoworld/service/log";
+import { makeGuests } from "../guest/guests.ts";
+import { guarded } from "../search/guard.ts";
+import { expireIndex } from "../search/retention.ts";
 
 // Ergo's `expire-time` (deploy/ergo/ircd.yaml.tmpl): a line older than that is gone from Ergo, and so is its pin.
-const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;
+export const ERGO_EXPIRE_MS = 90 * 24 * 60 * 60_000;
 
 interface Options {
   log: Log;
@@ -23,6 +26,18 @@ interface Options {
   batches?: number;
   // Ergo's data folder and its cap; none, no measure.
   ergoData?: { dir: string; maxBytes: number } | undefined;
+  // The search index: its lines past 90 days or its row cap, in what a tick's budget leaves after the verdicts.
+  search?: { expire: (limit: number) => number };
+  // The link cards (slice 13): their pages past 30 days or their caps, in what the search leaves of the budget.
+  cards?: { expire: (limit: number) => number };
+  // Jarvis's kept answers (D13920): those past their time or the table's caps, after the cards, in what the budget leaves.
+  kept?: { expire: (limit: number) => number };
+  // Jarvis's public answers: past the cards' days or the table's caps, after the kept answers.
+  said?: { expire: (limit: number) => number };
+  // The stored translations: past 30 days or the table's cap, after the others.
+  translations?: { expire: (limit: number) => number };
+  // The unread pill's reading places: past 90 days, after the translations.
+  unread?: { expire: (limit: number) => number };
 }
 
 export interface Retention {
@@ -42,6 +57,10 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     ),
     // A pin ends with Ergo's history: its line's time (Ergo's ISO time, which sorts as a string) past `expire-time`.
     pins: db.prepare("DELETE FROM pins WHERE time < ?"),
+    // A guest's lines by the hour: those older than 25 hours go, each room's latest hour kept for the sweep's idle test.
+    said: db.prepare(
+      "DELETE FROM room_said WHERE hour < ? AND hour < (SELECT max(hour) FROM room_said AS later WHERE later.room = room_said.room)",
+    ),
     count: db.prepare("SELECT count(*) AS n FROM verdicts"),
     // Counted up to the tick's budget, which is all a tick may take of them.
     old: db.prepare("SELECT count(*) AS n FROM (SELECT 1 FROM verdicts WHERE at < ? AND action <> 'pending' LIMIT ?)"),
@@ -49,6 +68,8 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
       "SELECT (page_count - freelist_count) * page_size AS n FROM pragma_page_count, pragma_freelist_count, pragma_page_size",
     ),
   };
+  const guests = makeGuests(db, { now });
+  const guard = guarded(log, "retention_failed");
   const count = (): number => N.parse(sql.count.get()).n;
   // Whether an alert's condition holds now and did not at the last tick: one alert a crossing, armed again once
   // it no longer holds. Each alert is logged by its name written out, which scripts/check_docs.py reads.
@@ -73,17 +94,42 @@ export function makeRetention(db: DatabaseSync, options: Options): Retention {
     if (rises("unreadable", bytes === undefined)) log("alert", { error: "ergo_volume_unreadable" });
     if (bytes !== undefined && rises("ergo", near(bytes, cap))) log("alert", { error: "ergo_volume_near_cap" });
   };
+  // The link cards' pages and Jarvis's kept answers past their days or caps, in what the budget leaves.
+  const expireWith = (
+    name: string,
+    owner: { expire: (limit: number) => number } | undefined,
+    budget: number,
+  ): number => {
+    const asked = Math.min(batch, budget);
+    const taken = guard(name, () => owner?.expire(asked) ?? 0, 0);
+    return taken === asked ? 0 : budget - taken;
+  };
+  const expireOwned = (budget: number): number => {
+    const owned = [
+      ["cards_expire", options.cards],
+      ["kept_expire", options.kept],
+      ["said_expire", options.said],
+      ["translations_expire", options.translations],
+      ["unread_expire", options.unread],
+    ] as const;
+    return owned.reduce((left, [name, owner]) => (left > 0 ? expireWith(name, owner, left) : left), budget);
+  };
   return {
     tick() {
       let budget = batch * batches;
       // At most 10 a room: no batch.
       sql.pins.run(new Date(now() - ERGO_EXPIRE_MS).toISOString());
+      // The guests unused for 24 hours, with their ended strikes and mutes (D430).
+      guests.purge();
+      sql.said.run(Math.floor((now() - 25 * 60 * 60_000) / (60 * 60_000)));
       // The verdicts past their days are the oldest ones: the same walk takes them and those past the cap.
       const old = N.parse(sql.old.get(now() - 180 * 24 * 60 * 60_000, budget)).n;
       for (let over = Math.max(old, count() - maxVerdicts), removed = 1; over > 0 && budget > 0 && removed > 0;) {
         removed = Number(sql.oldest.run(Math.min(batch, budget, over)).changes);
         [over, budget] = [over - removed, budget - removed];
       }
+      budget = expireIndex({ db, log, search: options.search, batch }, budget);
+      budget = expireOwned(budget);
       if (rises("verdicts", near(count(), maxVerdicts))) log("alert", { error: "verdicts_near_cap" });
       if (rises("database", near(N.parse(sql.used.get()).n, maxBytes))) log("alert", { error: "database_near_cap" });
       // A backlog's ticks follow at once: Ergo's folder is walked on the timed ones alone (3NB-8).

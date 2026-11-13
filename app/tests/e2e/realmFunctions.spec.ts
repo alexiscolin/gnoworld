@@ -1,7 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { EVALS, FUNCTIONS } from "../chain/chainFixture.ts";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { indexer } from "../chain/indexerRoute.ts";
+import { violations } from "./callCard.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // 5i's journey (plan §1, ADR-0002 §4): a realm's read functions are buttons; a click reads one call through vm/qeval, free, and
@@ -95,8 +95,14 @@ const touched = (page: Page) =>
 const fits = async (page: Page) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 };
-const violations = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
 const reads = (page: Page) => page.getByRole("region", { name: "Read functions" });
+// Try it's rows: a function is a row that opens in place, and its "Read X" button is inside (shut rows are inert).
+const rows = (page: Page) => reads(page).getByRole("button", { name: /^\w+\(/ });
+// A read takes nothing: the row's own click opens it and reads (its Read button is for reading again).
+const readFn = (page: Page, name: string) =>
+  reads(page)
+    .getByRole("button", { name: new RegExp(`^${name}\\(`) })
+    .click();
 const readers = (names: string[], type = "int64") =>
   names.map((FuncName) => ({ FuncName, Params: null, Results: [{ Name: ".res.0", Type: type, Value: "" }] }));
 
@@ -106,7 +112,7 @@ test.describe("a realm's read functions", () => {
     const seen = await chain(page);
     await page.goto("/r/gnoland/wugnot");
     await hydrated(page);
-    await expect(reads(page).getByRole("button")).toHaveCount(1);
+    await expect(rows(page)).toHaveCount(1);
     await expect(reads(page)).not.toContainText("Withdraw");
     expect(seen.funcs).toBe(1);
     expect(seen.evals).toEqual([]);
@@ -116,10 +122,20 @@ test.describe("a realm's read functions", () => {
       const list: unknown = Reflect.get(window, "__touched");
       if (Array.isArray(list)) list.length = 0;
     });
-    await reads(page).getByRole("button", { name: "TotalSupply" }).click();
+    await readFn(page, "TotalSupply");
     await expect(reads(page)).toContainText(SUPPLY);
     await expect(reads(page)).toContainText(LABEL);
     await expect(reads(page)).toContainText("block 786,661");
+    // The note and the result's box share one left edge.
+    const left = (text: string | RegExp) =>
+      reads(page)
+        .getByText(text)
+        .evaluate((el) => el.getBoundingClientRect().left);
+    expect(await left(LABEL)).toBe(
+      await reads(page)
+        .getByRole("region", { name: "Result of TotalSupply" })
+        .evaluate((el) => el.getBoundingClientRect().left),
+    );
     expect(seen.evals).toEqual([`${REALM}.TotalSupply()`]);
     // A click is two requests, the call and the height it is stamped with, and nothing after: no list again, no poll.
     await page.waitForTimeout(1500);
@@ -135,8 +151,8 @@ test.describe("a realm's read functions", () => {
     const seen = await chain(page, { functions: readers(names) });
     await page.goto("/r/gnoland/wugnot");
     await hydrated(page);
-    await expect(reads(page).getByRole("button")).toHaveCount(1);
-    await reads(page).getByRole("button", { name: "TotalSupply" }).click();
+    await expect(rows(page)).toHaveCount(1);
+    await readFn(page, "TotalSupply");
     await expect(reads(page)).toContainText(LABEL);
     expect(seen.evals).toEqual([`${REALM}.TotalSupply()`]);
   });
@@ -145,11 +161,11 @@ test.describe("a realm's read functions", () => {
     await chain(page, { evals: {} });
     await page.goto("/r/gnoland/wugnot");
     await hydrated(page);
-    await reads(page).getByRole("button", { name: "TotalSupply" }).click();
+    await readFn(page, "TotalSupply");
     await expect(reads(page).getByRole("status")).toContainText("The chain refused this read");
-    await expect(reads(page).getByRole("link", { name: /gnoweb/ })).toHaveAttribute(
+    await expect(reads(page).getByRole("link", { name: "Open on gnoweb" })).toHaveAttribute(
       "href",
-      "https://onyx.testnets.gno.land/r/gnoland/wugnot$help",
+      "https://onyx.testnets.gno.land/r/gnoland/wugnot",
     );
     await expect(page.getByRole("main")).toContainText("wrapped GNOT");
   });
@@ -158,8 +174,10 @@ test.describe("a realm's read functions", () => {
     await chain(page, { fail: true });
     await page.goto("/r/gnoland/wugnot");
     await hydrated(page);
-    await expect(reads(page).getByRole("status")).toContainText(/\S/);
-    await expect(reads(page).getByRole("link", { name: /gnoweb/ })).toBeVisible();
+    // The read is tried again twice, with a backoff (D13973), before it is a state: about 3 s, said in words.
+    await expect(reads(page)).toContainText("Trying again…");
+    await expect(reads(page).getByRole("status")).toContainText(/Try again/, { timeout: 15_000 });
+    await expect(reads(page).getByRole("link", { name: "Open on gnoweb" })).toBeVisible();
   });
 
   test("a long list is searchable", async ({ page }) => {
@@ -167,12 +185,12 @@ test.describe("a realm's read functions", () => {
     await chain(page, { functions: many, evals: { Get07Value: "(seven string)" } });
     await page.goto("/r/gnoland/wugnot");
     await hydrated(page);
-    await expect(reads(page).getByRole("button")).toHaveCount(30);
-    await reads(page)
-      .getByRole("searchbox", { name: /function/i })
-      .fill("get07");
-    await expect(reads(page).getByRole("button")).toHaveCount(1);
-    await reads(page).getByRole("button", { name: "Get07Value" }).click();
+    // A page of 12, the foot counting them; the filter reads all thirty.
+    await expect(rows(page)).toHaveCount(12);
+    await expect(reads(page)).toContainText("12 of 30");
+    await reads(page).getByRole("textbox", { name: "Filter read functions" }).fill("get07");
+    await expect(rows(page)).toHaveCount(1);
+    await readFn(page, "Get07Value");
     await expect(reads(page)).toContainText("(seven string)");
   });
 
@@ -185,14 +203,14 @@ test.describe("a realm's read functions", () => {
       await chain(page, { evals: {} });
       await page.goto("/r/gnoland/wugnot");
       await hydrated(page);
-      await expect(reads(page).getByRole("button")).toHaveCount(1);
+      await expect(rows(page)).toHaveCount(1);
       expect(await violations(page)).toEqual([]);
-      await reads(page).getByRole("button", { name: "TotalSupply" }).click();
+      await readFn(page, "TotalSupply");
       await expect(reads(page).getByRole("status")).toBeVisible();
       expect(await violations(page)).toEqual([]);
       await page.unroute(RPC);
       await chain(page);
-      await reads(page).getByRole("button", { name: "TotalSupply" }).click();
+      await reads(page).getByRole("button", { name: "Read TotalSupply" }).click();
       await expect(reads(page)).toContainText(LABEL);
       expect(await violations(page)).toEqual([]);
       await fits(page);
@@ -206,7 +224,7 @@ test.describe("a realm's read functions", () => {
       await chain(page, { evals: { TotalSupply: long } });
       await page.goto("/r/gnoland/wugnot");
       await hydrated(page);
-      await reads(page).getByRole("button", { name: "Read TotalSupply" }).click();
+      await readFn(page, "TotalSupply");
       const result = reads(page).getByRole("region", { name: "Result of TotalSupply" });
       await expect(result).toContainText("line 199 of a long answer");
       expect(await result.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
@@ -225,10 +243,10 @@ test.describe("a realm's read functions", () => {
       await chain(page, { functions: many, evals: { [wide]: "(x string)" } });
       await page.goto("/r/gnoland/wugnot");
       await hydrated(page);
-      await expect(reads(page).getByRole("searchbox", { name: /function/i })).toBeVisible();
+      await expect(reads(page).getByRole("textbox", { name: "Filter read functions" })).toBeVisible();
       expect(await violations(page)).toEqual([]);
       await fits(page);
-      await reads(page).getByRole("button", { name: wide }).click();
+      await readFn(page, wide);
       await expect(reads(page)).toContainText(LABEL);
       expect(await violations(page)).toEqual([]);
       await fits(page);
@@ -247,9 +265,9 @@ test.describe("a realm's read functions", () => {
         await chain(page);
         await page.goto("/r/gnoland/wugnot");
         await hydrated(page);
-        await expect(reads(page).getByRole("button", { name: "TotalSupply" })).toBeVisible();
+        await expect(rows(page)).toHaveCount(1);
         await expect(reads(page)).toHaveScreenshot(`read-functions-listed-${name}.png`);
-        await reads(page).getByRole("button", { name: "TotalSupply" }).click();
+        await readFn(page, "TotalSupply");
         await expect(reads(page)).toContainText(LABEL);
         await expect(reads(page)).toHaveScreenshot(`read-functions-read-${name}.png`);
       });

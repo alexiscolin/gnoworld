@@ -3,6 +3,7 @@
 // that very part, and writes previews.json beside and renamed over. One call at a time, a pause apart, each capped in time and size. No
 // check, no capture: a page the check hides is dropped, one it could not read keeps only what an earlier check passed. Nothing a chain
 // wrote reaches a log: a fault is logged by its kind.
+import { utf8Bytes } from "@gnoworld/core";
 import {
   Capture,
   CAPTURE_MAX_BYTES,
@@ -11,14 +12,14 @@ import {
   PREVIEWS_MAX_BYTES,
   RealmPath,
 } from "@gnoworld/schemas/indexer";
-import { readFileSync, statSync } from "node:fs";
+import { setTimeout as sleep } from "node:timers/promises";
 import { renderAsk } from "@gnoworld/chain/asks";
 import type { Log } from "@gnoworld/service/log";
 import { decide, type Thresholds } from "../moderation/decide.ts";
 import { moderationClient, type Answer } from "../moderation/provider.ts";
 import { publicUrl, reachedNothing, send as netSend } from "@gnoworld/service/net";
 import { repeat, waitsAfterOutcome, type Outcome, type Repeating } from "../repeat.ts";
-import { replaceFile } from "../replaceFile.ts";
+import { lastFile, replaceFile } from "../replaceFile.ts";
 import { abciQuery, Absent, isDown, kindOf, pacer, type Kind, type Send } from "../worlds/remote.ts";
 
 /** What the check says of a capture's text. */
@@ -44,16 +45,13 @@ export const READ_MS = 10_000;
 /** The most bytes of a page the chain is asked for: a page past them is no capture. */
 export const PAGE_READ_MAX_BYTES = 64 * 1024;
 
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
 /** A page's first CAPTURE_MAX_BYTES bytes in UTF-8, cut after the last line's end within them, else between two characters. */
 export function capturedOf(page: string): string {
   let bytes = 0;
   let at = 0;
   let lineEnd = -1;
   for (const char of page) {
-    const code = char.codePointAt(0) ?? 0;
-    bytes += code < 0x80 ? 1 : code < 0x800 ? 2 : code < 0x10000 ? 3 : 4;
+    bytes += utf8Bytes(char);
     if (bytes > CAPTURE_MAX_BYTES) return page.slice(0, lineEnd >= 0 ? lineEnd : at);
     at += char.length;
     if (char === "\n") lineEnd = at;
@@ -88,17 +86,10 @@ export function checkFor(
 // The last file's captures by their paths, or none when it is not there, is past the cap (never read whole), is no good file, or is
 // another universe's.
 function lastOf(file: string, universe: string): Map<string, Capture> {
-  try {
-    const parsed =
-      statSync(file).size > PREVIEWS_MAX_BYTES
-        ? undefined
-        : Previews.safeParse(JSON.parse(readFileSync(file, "utf8"))).data;
-    return new Map(
-      parsed?.universe === universe ? parsed.previews.map((capture) => [capture.path, capture] as const) : [],
-    );
-  } catch {
-    return new Map();
-  }
+  const parsed = lastFile(file, Previews, PREVIEWS_MAX_BYTES);
+  return new Map(
+    parsed?.universe === universe ? parsed.previews.map((capture) => [capture.path, capture] as const) : [],
+  );
 }
 
 // The pages a pass reads: realm paths alone, each once, in sort()'s order, the first PREVIEWS_MAX.

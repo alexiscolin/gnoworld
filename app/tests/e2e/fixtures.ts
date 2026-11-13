@@ -101,7 +101,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
     },
     { auto: true },
   ],
-  // ADR-0003: a device new to gnoworld sees the home's opening, "Start here" and the first visit's buttons. A journey's browser is a new
+  // ADR-0003: a device new to gnoworld sees "Start here" and the first visit's buttons. A journey's browser is a new
   // device, so each one is a reader who came back, as the video's frames are, unless it asks to be a newcomer.
   newcomer: [false, { option: true }],
   returning: [
@@ -110,7 +110,7 @@ export const test = (process.env["SANDBOX_RUNTIME"] ? ownBrowser : base).extend<
         await context.addInitScript(() => {
           // A document with no origin of its own (about:blank) keeps no storage, and refuses it.
           try {
-            for (const key of ["gnoworld:entered", "gnoworld:opened"]) localStorage.setItem(key, "1");
+            localStorage.setItem("gnoworld:entered", "1");
           } catch {
             return;
           }
@@ -213,6 +213,8 @@ export const reactMark = () => Object.keys(document).some((key) => key.startsWit
 
 export async function hydrated(page: Page): Promise<void> {
   await page.waitForFunction(reactMark);
+  // The home's loader covers the page (and takes its pointer) until the dive starts or 2.5 s pass.
+  await expect(page.getByRole("status", { name: "Loading space" })).toHaveCount(0, { timeout: 10_000 });
 }
 
 // The site's pages: each place of the data, at its path and at its canonical address (the same page, written twice, with

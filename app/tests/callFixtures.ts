@@ -14,6 +14,8 @@ export const CHAIN = {
   gnoweb: "https://onyx.testnets.gno.land",
   indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
 };
+/** Another chain's address for a sibling panel: two panels of one chain and realm share one read, so one that must read on its own is on its own. */
+export const SIBLING_CHAIN = { ...CHAIN, rpc: "https://rpc.sibling.example:443" };
 export const CUR = { Name: "cur", Type: realmType(), Value: "" };
 export const field = (Name: string, Type: string) => ({ Name, Type, Value: "" });
 
@@ -51,7 +53,8 @@ export function typed(box: HTMLInputElement | undefined, text: string): void {
   });
 }
 
-/** Clicks `name` under `box` with no wallet asked: the card it opens leaves its Sign in Adena to the person. The card, opened. */
+/** Clicks `name` under `box` with no wallet asked: the card it opens leaves its Sign in Adena (Connect Adena, for a visitor who has not
+ * connected it) to the person. The card, opened. */
 export async function openedUnsigned(box: HTMLElement, name: string): Promise<HTMLElement> {
   const touched = vi.fn(() => undefined);
   Object.defineProperty(globalThis, "adena", { get: touched, configurable: true });
@@ -59,7 +62,7 @@ export async function openedUnsigned(box: HTMLElement, name: string): Promise<HT
     click(await calling(box, name));
     expect(touched).not.toHaveBeenCalled();
     const card = one(box, "article");
-    expect(card.textContent).toContain("Sign in Adena");
+    expect(card.textContent).toMatch(/Sign in Adena|Connect Adena/);
     return card;
   } finally {
     Reflect.deleteProperty(globalThis, "adena");
@@ -89,7 +92,8 @@ export const MEMBERS_ONLY =
 export function warnsMembers(card: HTMLElement): void {
   const lines = [...card.querySelectorAll("p")].filter((line) => line.textContent === MEMBERS_ONLY);
   expect(lines).toHaveLength(1);
-  const sign = button(card, "Sign in Adena");
+  // A visitor who has not connected Adena is asked to connect it where the card would sign (CallCard.tsx's Actions).
+  const sign = button(card, "Sign in Adena") ?? button(card, "Connect Adena");
   expect(lines[0] !== undefined && sign !== undefined && follows(lines[0], sign)).toBe(true);
 }
 

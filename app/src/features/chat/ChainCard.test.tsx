@@ -36,7 +36,7 @@ describe("the chain's lines in a room", () => {
     expect(item.hasAttribute("data-chain")).toBe(true);
     expect(one(item, "article").getAttribute("data-edge")).toBe("dashed");
     expect(item.querySelector("svg")).not.toBeNull();
-    expect(one(item, "h3").textContent).toBe("g10gh7…y5tv called MustVoteOnProposal");
+    expect(one(item, "h3").textContent).toBe("g10gh7…3y5tv called MustVoteOnProposal");
     expect(one(item, "p").textContent).toBe("on chain, r/gov/dao · block 900030");
   });
 
@@ -44,7 +44,7 @@ describe("the chain's lines in a room", () => {
     const { box } = mountLine(line(1));
     expect(box.textContent).not.toContain(ALICE);
     expect(box.textContent).toContain("g10gh7");
-    expect(box.textContent).toContain("y5tv");
+    expect(box.textContent).toContain("3y5tv");
   });
 
   it("draws a line's words as text only, capped, whatever it holds (the schema stops these first; this is the second wall)", () => {
@@ -69,21 +69,28 @@ describe("the chain's lines in a room", () => {
     }
   });
 
+  // An address is its first six and last five characters, as the schemas' shortAddress cuts it (D13015).
   // Whole lines: a hostile name is stripped and capped, not replaced by text, and an address is cut only past 12 characters.
   it.each([
-    ["a bidi override", `Vote${bidi}`, "g10gh7…y5tv called Vote"],
-    ["a control character", "Vo\u0007te", "g10gh7…y5tv called Vote"],
-    ["a name of 10 KB", "A".repeat(10_000), `g10gh7…y5tv called ${"A".repeat(64)}`],
+    ["a bidi override", `Vote${bidi}`, "g10gh7…3y5tv called Vote"],
+    ["a control character", "Vo\u0007te", "g10gh7…3y5tv called Vote"],
+    ["a name of 10 KB", "A".repeat(10_000), `g10gh7…3y5tv called ${"A".repeat(64)}`],
   ])("draws the title of a function with %s as one whole line", (_, func, title) => {
     expect(one(mountLine(line(1, func)).item, "h3").textContent).toBe(title);
   });
 
   it.each([
     ["12 characters whole", "g1abcdefghij", "g1abcdefghij"],
-    ["13 characters by its ends", "g1abcdefghijk", "g1abcd…hijk"],
+    ["13 characters by its ends", "g1abcdefghijk", "g1abcd…ghijk"],
   ])("draws an actor of %s", (_, actor, shown) => {
     const { item } = mountLine({ ...line(1), actor: actor as ChainCall["actor"] });
     expect(one(item, "h3").textContent).toBe(`${shown} called MustVoteOnProposal`);
+  });
+
+  it("offers a call's detail only for an id that is a transaction's hash and a message's place", () => {
+    const hash = "ee2jB+mHq8SSTv19Z50gOsyXAJnhW2MqTn/JhkErVss=";
+    expect(mountLine({ ...line(1), id: `${hash}:0` }).item.textContent).toContain("Details");
+    expect(mountLine({ ...line(1), id: "h1:0" }).item.textContent).not.toContain("Details");
   });
 
   it("draws a realm of 100 characters capped at 64 with its path, and with no gno.land prefix", () => {

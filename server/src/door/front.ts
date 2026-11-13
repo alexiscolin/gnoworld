@@ -4,9 +4,8 @@
 // account by its HMAC alone (log.ts) and never what was asked.
 import type { Address, ApiError } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
-import { getCookie } from "hono/cookie";
 import type { Log } from "@gnoworld/service/log";
-import { guard, type Guarded } from "../guard.ts";
+import { baseRefusals, guard, sessionOf, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Failure } from "./jarvis.ts";
 
@@ -24,11 +23,7 @@ export interface Front {
 type Status = 400 | 401 | 403 | 404 | 415 | 429 | 502 | 503 | 504;
 
 const refusals = {
-  origin: ["forbidden", 403],
-  type: ["unsupported", 415],
-  session: ["unauthenticated", 401],
-  limit: ["too_many", 429],
-  body: ["refused", 400],
+  ...baseRefusals,
   room: ["forbidden", 403],
   line: ["not_found", 404],
   quota: ["full", 429],
@@ -41,6 +36,7 @@ const failures = {
   shape: ["internal", 502],
   failed: ["internal", 502],
   down: ["not_ready", 503],
+  lost: ["not_ready", 503],
   slow: ["not_ready", 504],
   gone: ["not_ready", 503],
   refused: ["refused", 400],
@@ -75,7 +71,7 @@ export function frontOf(front: Front, { path, perMinute }: { path: string; perMi
   app.use(path, guard(origins, refuse));
   // Who asks, once the session, the switch and the rate let it through; else the answer that ends the request.
   const admit = (c: Context): Address | Response => {
-    const who = session(getCookie(c, "__Host-session"));
+    const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
     if (!on) {
       log("jarvis_off", { route, status: 200, account: who });

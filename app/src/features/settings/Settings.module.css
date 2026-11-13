@@ -1,39 +1,121 @@
-/* The settings: sections under their titles, a choice a row with its words and a muted line under them. */
+/* The settings: each part under its title, a rule over every part but the first; a setting's name over its line in the muted tone. The
+   quality is the header's bar of controls holding three radios, a cream fill sliding under the chosen one; each clear is a row under a rule. */
 @layer components {
-  .choices {
-    /* layout: the choices in a column */
-    display: grid;
-    /* layout: a small step between them */
-    gap: var(--space-2xs);
-    /* layout: a fieldset's own margin, padding and frame taken off: its legend titles it */
-    margin: 0;
-    padding: 0;
-    border: 0;
+  .section + .section {
+    padding-block-start: var(--space-m);
+    border-block-start: var(--line-width) solid var(--color-line);
   }
 
-  .choice {
-    /* layout: the box and its words on a row */
-    display: flex;
-    /* layout: the box on the words' first line */
-    align-items: baseline;
-    /* layout: a step between the box and the words */
-    gap: var(--space-2xs);
+  .name {
     font: var(--font-body);
+    font-weight: 500;
+  }
+
+  /* Two lines kept for the chosen quality's words, the longest's, so a choice never moves the rows under it. */
+  .line {
+    min-block-size: 2lh;
+  }
+
+  .segment {
+    --_at: 0;
+    --_inside: calc(100% - 2 * var(--space-3xs));
+
+    /* layout: the fill stands over the bar's inside */
+    position: relative;
+    /* layout: the options on one row */
+    display: inline-grid;
+    /* layout: one column per option */
+    grid-auto-flow: column;
+    /* layout: every column as wide as the widest, so the fill is one column wide */
+    grid-auto-columns: 1fr;
     cursor: pointer;
   }
 
-  .help {
-    /* layout: the help on its own line under the choice's words */
-    display: block;
-    color: var(--color-text-muted);
-    font: var(--font-meta);
+  .segment[data-at="1"] {
+    --_at: 1;
   }
 
-  .soon {
-    font: var(--font-body);
+  .segment[data-at="2"] {
+    --_at: 2;
   }
 
-  .file input {
-    font: var(--font-meta);
+  /* One column of three, a step in from the bar's edge as its options are (control-bar's four pixels). */
+  .fill {
+    position: absolute;
+    inset-block: var(--space-3xs);
+    inset-inline-start: calc(var(--space-3xs) + var(--_inside) / 3 * var(--_at));
+    inline-size: calc(var(--_inside) / 3);
+    /* Its edge in its own cream: forced colours draw the edge where they drop the fill. */
+    border: var(--line-width) solid var(--color-primary);
+    border-radius: inherit;
+    background: var(--color-primary);
+    transition: inset-inline-start calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* An option is its word over the fill, its radio drawn as nothing over the whole option: the pointer, the keyboard and its focus ring
+     land on the radio itself. */
+  .option {
+    --_ink: var(--color-text-muted);
+
+    position: relative;
+    padding-block: var(--space-2xs);
+    padding-inline: var(--space-s);
+    border-radius: inherit;
+    color: var(--_ink);
+    font: var(--font-ui);
+    /* The small control's 32 px: a 16 px line with a step over and under it. */
+    line-height: var(--space-s);
+    text-align: center;
+    transition: color calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .option:hover {
+    --_ink: var(--color-text);
+  }
+
+  .option:has(:checked) {
+    --_ink: var(--color-ink);
+  }
+
+  .radio {
+    position: absolute;
+    inset: 0;
+    /* layout: a radio's own margin taken off, so it covers its option exactly */
+    margin: 0;
+    border-radius: inherit;
+    appearance: none;
+    /* The bar's pointer, which a radio's own sheet would turn back to the arrow. */
+    cursor: inherit;
+  }
+
+  .clear {
+    padding-block-start: var(--space-xs);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  /* The text Adena signs and the command's block: set apart (.fill-box, .data-text), never wrapped, scrolled across where it is long. */
+  .block {
+    /* layout: a block's own vertical margin taken off */
+    margin-block: 0;
+    border: var(--line-width) solid var(--color-line);
+    /* layout: a long line scrolls inside the box, never widening the dialog */
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+
+  /* The command's block is read as typed: its lines are kept and scroll across. */
+  .block[data-scroll] {
+    white-space: pre;
+  }
+
+  /* The block's Copy in its top corner, over the text. */
+  .code {
+    position: relative;
+  }
+
+  .copy {
+    position: absolute;
+    inset-block-start: var(--space-2xs);
+    inset-inline-end: var(--space-2xs);
   }
 }

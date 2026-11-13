@@ -13,6 +13,17 @@ export interface RoomMenuProps {
   children?: ReactNode;
 }
 
+/** One of the menu's choices: its name in the label's type, its control, and what it does in the small muted type under it. */
+export function Setting({ label, help, children }: { label: string; help?: ReactNode; children: ReactNode }) {
+  return (
+    <Stack space="xs" as="section">
+      <h3 className="label">{label}</h3>
+      {children}
+      {help === undefined ? null : <div className="meta">{help}</div>}
+    </Stack>
+  );
+}
+
 /** Whether the room says anything of itself: a visitor's menu with no note is not offered. */
 export const hasNote = (note: ReactNode) => note !== undefined && note !== "";
 
@@ -22,7 +33,7 @@ export const visitorMenu = (note: ReactNode) =>
 
 export function RoomMenu({ note, noteId, children }: RoomMenuProps) {
   return (
-    <Stack space="s">
+    <Stack space="l">
       {hasNote(note) ? <p id={noteId}>{note}</p> : null}
       {children}
     </Stack>

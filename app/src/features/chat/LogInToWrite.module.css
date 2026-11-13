@@ -1,0 +1,28 @@
+/* A guest's place of the composer: inside the composer's own box (MessageBox.module.css), its words and the way in. */
+@layer components {
+  .inner {
+    /* layout: across the box's three columns */
+    grid-column: 1 / -1;
+    padding: var(--space-s);
+  }
+
+  .lead {
+    font: var(--font-ui);
+  }
+
+  /* A guest's field: the box places it and takes its look (MessageBox.module.css's textbox), so it draws no edge of its own. */
+  .field {
+    inline-size: 100%;
+    color: var(--color-text);
+  }
+
+  .field::placeholder {
+    color: var(--color-text-faint);
+  }
+
+  /* Why a guest's line did not go, under the box, in the field's error ink. */
+  .problem {
+    color: var(--color-danger);
+    font: var(--font-meta);
+  }
+}

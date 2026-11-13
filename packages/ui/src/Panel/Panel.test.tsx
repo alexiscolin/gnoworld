@@ -36,6 +36,17 @@ describe("Panel", () => {
     expect(panel().dataset["look"]).toBe("floating");
   });
 
+  it("gives the plate alone a fill element the arrival fades, never a custom property the plate's words inherit", () => {
+    const { container, rerender } = render(
+      <Panel label="World" look="plate">
+        x
+      </Panel>,
+    );
+    expect(container.querySelector("[data-fill]")?.getAttribute("aria-hidden")).toBe("true");
+    rerender(<Panel label="World">x</Panel>);
+    expect(container.querySelector("[data-fill]")).toBeNull();
+  });
+
   it("draws no box for a part it does not have: a body alone is its one child", () => {
     render(
       <Panel label="Dock">
@@ -68,23 +79,24 @@ describe("Panel", () => {
       expect(caption.closest("[class*='label']")).not.toBeNull();
     });
 
-    // F3269: the plate's title is fitted to its words as the prototype's fitName does (the column over 0.58 em a letter, from 4
-    // letters), in steps a sheet reads: each step holds the longest name its size fits, so no name runs past the text column.
+    // The plate's title is fitted to its words as the proposal's build does it: 640 px over the letters at 0.56 em, at most 120 px; 340 px on a narrow plate.
+    const size = (name: string, property: string) =>
+      screen.getByRole("region", { name }).style.getPropertyValue(property);
     it.each([
-      ["Earth", "6"],
-      ["GovDAO", "6"],
-      ["BUBBLE", "6"],
-      ["Boopers", "8"],
-      ["Fresh Mint", "10"],
-      ["Art Hall Lagos", "16"],
-      ["Kyoto builders of dapps", "more"],
-    ])("fits the title of %s to the step %s", (label, fit) => {
+      ["Earth", "120px", "120px"],
+      ["GovDAO", "120px", "101px"],
+      ["Boopers", "120px", "87px"],
+      ["Fresh Mint", "114px", "61px"],
+      ["Art Hall Lagos", "82px", "43px"],
+      ["Kyoto builders of dapps", "50px", "26px"],
+    ])("fits the title of %s to %s, and %s on a narrow plate", (label, wide, narrow) => {
       render(
         <Panel label={label} look="plate">
           x
         </Panel>,
       );
-      expect(screen.getByRole("region", { name: label }).dataset["fit"]).toBe(fit);
+      expect(size(label, "--_tsz")).toBe(wide);
+      expect(size(label, "--_tsz-narrow")).toBe(narrow);
     });
 
     it("counts a name's letters, not its code units: an emoji is one", () => {
@@ -93,12 +105,13 @@ describe("Panel", () => {
           x
         </Panel>,
       );
-      expect(screen.getByRole("region", { name: "🌍🌍🌍🌍🌍🌍" }).dataset["fit"]).toBe("6");
+      expect(size("🌍🌍🌍🌍🌍🌍", "--_tsz")).toBe("120px");
+      expect(size("🌍🌍🌍🌍🌍🌍", "--_tsz-narrow")).toBe("101px");
     });
 
     it("fits no title of a panel that is no plate", () => {
       render(<Panel label="Fresh Mint">x</Panel>);
-      expect(screen.getByRole("region", { name: "Fresh Mint" }).dataset["fit"]).toBeUndefined();
+      expect(size("Fresh Mint", "--_tsz")).toBe("");
     });
 
     it("draws no caption for another look, whatever a caller passes", () => {

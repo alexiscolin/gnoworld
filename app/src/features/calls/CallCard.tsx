@@ -27,13 +27,16 @@ export interface CallCardProps {
   level?: 2 | 3 | 4 | undefined;
   /** The call's name, its title when it has one (a pinned action's label); else its function. */
   title?: string | undefined;
+  /** The login the signature needs: logged out, the card's first button is the login itself. Left out, the account is taken as in. */
+  login?: { signedIn: boolean; onLogIn: () => void } | undefined;
 }
 
-function Row({ label, children }: { label: string; children: ReactNode }) {
+/** A fact of a card: its label, then its value (a pair of a definition list). */
+export function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
       <dt className="label">{label}</dt>
-      <dd className={styles["value"]}>{children}</dd>
+      <dd className={["fact-value", styles["value"]].join(" ")}>{children}</dd>
     </>
   );
 }
@@ -87,13 +90,31 @@ function Arguments({ card, onEdit }: Pick<CallCardProps, "card" | "onEdit">) {
   );
 }
 
-function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "network" | "fee" | "onEdit">) {
+function Actions({ card, onSign, onCancel, onRetry, login }: Omit<CallCardProps, "network" | "fee" | "onEdit">) {
   const { state } = card;
+  const out = login !== undefined && !login.signedIn;
+  // A failure the login caused is mended by the login: the card goes back to its preview once Adena is connected.
+  if (out && (state.kind === "preview" || (state.kind === "failed" && state.reason === "logged-out"))) {
+    return (
+      <Card.Actions>
+        <Button
+          emphasis="solid"
+          onClick={() => {
+            if (state.kind === "failed") onRetry();
+            login.onLogIn();
+          }}
+        >
+          Connect Adena
+        </Button>
+        <Button onClick={onCancel}>Cancel</Button>
+      </Card.Actions>
+    );
+  }
   if (state.kind === "preview") {
     const stuck = problemsOf(card).some((problem) => problem !== undefined);
     return (
       <Card.Actions>
-        <span className={styles["computer"]}>
+        <span className="fine-only">
           <Button emphasis="solid" disabled={stuck} onClick={onSign}>
             Sign in Adena
           </Button>
@@ -130,7 +151,18 @@ function Actions({ card, onSign, onCancel, onRetry }: Omit<CallCardProps, "netwo
   );
 }
 
-export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry, level, title }: CallCardProps) {
+export function CallCard({
+  card,
+  network,
+  fee,
+  onEdit,
+  onSign,
+  onCancel,
+  onRetry,
+  level,
+  title,
+  login,
+}: CallCardProps) {
   const preview = card.state.kind === "preview";
   return (
     <Card>
@@ -143,25 +175,25 @@ export function CallCard({ card, network, fee, onEdit, onSign, onCancel, onRetry
       <Card.Body>
         <p className={styles["lede"]}>A call to {card.realm}. Adena asks you to sign it.</p>
         <dl className={[shared["edge"], styles["block"]].join(" ")}>
-          <Row label="REALM">{card.realm}</Row>
-          <Row label="FUNCTION">{card.func}</Row>
-          <Row label="ARGUMENTS">
+          <Fact label="REALM">{card.realm}</Fact>
+          <Fact label="FUNCTION">{card.func}</Fact>
+          <Fact label="ARGUMENTS">
             <Arguments card={card} onEdit={onEdit} />
-          </Row>
-          <Row label="NETWORK">{networkOf(network)}</Row>
-          <Row label="FEE">{fee}</Row>
+          </Fact>
+          <Fact label="NETWORK">{networkOf(network)}</Fact>
+          <Fact label="FEE">{fee}</Fact>
         </dl>
         {preview
           ? warningsOf(card).map((warning) => (
-              <p key={warning} className={styles["note"]}>
+              <p key={warning} className="meta">
                 {warning}
               </p>
             ))
           : null}
         <CallStatus card={card} />
-        {preview ? <p className={styles["phone"]}>To sign, use a computer.</p> : null}
+        {preview ? <p className="meta coarse-only">To sign, use a computer.</p> : null}
       </Card.Body>
-      <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} />
+      <Actions card={card} onSign={onSign} onCancel={onCancel} onRetry={onRetry} login={login} />
     </Card>
   );
 }

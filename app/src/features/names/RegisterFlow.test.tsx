@@ -44,7 +44,7 @@ const feesRead = (): Promise<ChainRead<CallFees>> => Promise.resolve({ ok: true,
 const LANDED = { height: 55_414, failed: false, data: "", log: "ok" };
 
 const props = () => hoisted.drawn.at(-1) as NameDialogProps;
-const settled = () => act(() => Promise.resolve());
+const flushed = () => act(() => Promise.resolve());
 
 function Signed() {
   useAppStore().getState().loginActions.signedIn(ACCOUNT);
@@ -113,25 +113,25 @@ describe("RegisterFlow: the fee", () => {
   it("asks the universe's indexer for Register's fees once, and words what it read as the call card does", async () => {
     const fees = vi.fn(feesRead);
     flow({ fees });
-    await settled();
+    await flushed();
     expect(fees).toHaveBeenCalledExactlyOnceWith(UNIVERSE.indexer, { realm: NAMEREG, func: "Register" });
     expect(props().fee).toBe(feeText(FEES));
   });
 
   it("words no estimate when the read gave none", async () => {
     flow({ fees: () => Promise.resolve({ ok: false, failure: { kind: "down", next: "Try again." }, source }) });
-    await settled();
+    await flushed();
     expect(props().fee).toBe(feeText(undefined));
   });
 
   it("reads again for another universe's indexer, and not for a render that changes nothing", async () => {
     const fees = vi.fn(feesRead);
     const { change } = flow({ fees });
-    await settled();
+    await flushed();
     change({ open: false });
     expect(fees).toHaveBeenCalledTimes(1);
     change({ universe: { ...UNIVERSE, indexer: "https://indexer.other" } });
-    await settled();
+    await flushed();
     expect(fees).toHaveBeenCalledTimes(2);
     expect(fees).toHaveBeenLastCalledWith("https://indexer.other", { realm: NAMEREG, func: "Register" });
   });
@@ -141,7 +141,7 @@ describe("RegisterFlow: the fee", () => {
     vi.stubGlobal("reportError", report);
     const boom = new Error("boom");
     flow({ fees: () => Promise.reject(boom) });
-    await settled();
+    await flushed();
     expect(report).toHaveBeenCalledWith(boom);
     expect(props().fee).toBe(feeText(undefined));
   });
@@ -219,7 +219,7 @@ describe("RegisterFlow: what the dialog is told of a registration", () => {
       expect(wallet.asked.some((entry) => entry.call === "DoContract")).toBe(true);
     });
     props().onRegister("alexis043");
-    await settled();
+    await flushed();
     expect(props().phase).toEqual({ kind: "working", text: "Waiting for your signature in Adena…" });
     gate.resolve({ status: "failure", type: "TRANSACTION_REJECTED", message: "", data: {} });
   });

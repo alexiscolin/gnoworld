@@ -17,6 +17,9 @@ import { BENCHES, CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } f
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const BOX = { ...BASELINE_ALSO, allowProperties: ["field-sizing", "resize"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
+// No scroll bar anywhere (D379): the base styles hide them with scrollbar-width, everywhere a browser has it since 2024. No blue under a
+// drag (Alexis, 2026-11-08): user-select, which a browser without it ignores.
+const BARS = { ...BASELINE_ALSO, allowProperties: ["scrollbar-width", "user-select"] };
 
 export default defineConfig(
   includeIgnoreFile(`${import.meta.dirname}/.gitignore`),
@@ -67,7 +70,7 @@ export default defineConfig(
   // No state at a module's top in a workspace's source; core's and ui's own lists, below, hold it too, and the
   // tests' lists replace it.
   {
-    files: ["server/src/**/*.ts", "jarvis/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
+    files: ["server/src/**/*.ts", "jarvis/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"],
     rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, MODULE_STATE] },
   },
   react,
@@ -111,13 +114,14 @@ export default defineConfig(
   { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
   // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone (F1729).
   { files: ["packages/ui/src/Field/**/*.css"], rules: { "css/use-baseline": ["error", BOX] } },
+  { files: ["packages/ui/src/base.css"], rules: { "css/use-baseline": ["error", BARS] } },
   {
     // A module of the app, the services or the packages is TypeScript: one in another extension would pass the walls and
     // gnoworld/chain-read unread, which read .ts and .tsx (D123, F5277). Last, so no later list replaces it.
     files: [
-      "{app/src,server,jarvis,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",
+      "{app/src,server,jarvis,link-reader,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",
       // The services hold no JSX: a .tsx there would pass their walls unread (F5281).
-      "{server,jarvis,packages/service}/**/*.tsx",
+      "{server,jarvis,link-reader,packages/service}/**/*.tsx",
     ],
     languageOptions: { parser: tseslint.parser },
     rules: {

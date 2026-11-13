@@ -2,7 +2,8 @@
 // (net.ts): an answer's text, UTF-8 checked, and an abci_query through the envelope QueryAnswer describes, base64 checked.
 import { abciQueryOf } from "@gnoworld/chain/abci";
 import type { AbciAsk } from "@gnoworld/chain/asks";
-import { QueryAnswer } from "@gnoworld/schemas";
+import { textOf } from "@gnoworld/chain/node";
+import { QueryAnswer, strictUtf8 } from "@gnoworld/schemas";
 import { Failure, fetchCapped, kindOf, reachedNothing, type Kind, type Limits, type Send } from "@gnoworld/service/net";
 
 export { Failure, kindOf, type Kind, type Send };
@@ -29,22 +30,9 @@ export async function fetchText(
   request: { readonly url: string; readonly init: RequestInit },
   limits: Limits,
 ): Promise<string> {
-  const bytes = await fetchCapped(send, request, limits);
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
-  } catch {
-    throw new Failure("shape");
-  }
-}
-
-// The text of a base64 Data, or null when it is no base64 or no UTF-8.
-function textOf(base64: string): string | null {
-  if (base64.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) return null;
-  try {
-    return new TextDecoder("utf-8", { fatal: true }).decode(Buffer.from(base64, "base64"));
-  } catch {
-    return null;
-  }
+  const text = strictUtf8(await fetchCapped(send, request, limits));
+  if (text === null) throw new Failure("shape");
+  return text;
 }
 
 // Whether the chain refused the query: an error beside the result, or an error in its body.

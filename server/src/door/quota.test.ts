@@ -40,6 +40,14 @@ const countOf = (db: DatabaseSync, account: string, day: string): number | undef
 };
 
 describe("the quota", () => {
+  it("says whether an account is on the allowlist, as the admin changes it (D13985, the share does not apply to it)", () => {
+    const { quota } = setup();
+    expect([quota.unlimited(CAT), quota.unlimited(ANNA)]).toEqual([true, false]);
+    quota.change({ setting: "unlimited", account: ANNA, unlimited: true });
+    quota.change({ setting: "unlimited", account: CAT, unlimited: false });
+    expect([quota.unlimited(CAT), quota.unlimited(ANNA)]).toEqual([false, true]);
+  });
+
   it("lets an account with a mainnet name ask 20 questions a UTC day, and refuses the 21st", () => {
     const { quota } = setup();
     const answers = takes(() => quota.take(ANNA, true), 21);

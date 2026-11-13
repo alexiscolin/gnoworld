@@ -1,6 +1,6 @@
 // The lines the server's IRC link writes and reads (slice 3's plan, 3h, 3j, 3k): each through formatLine;
 // the commands the bot may send, each in its only forms; a room's message as the link hands it on.
-import { formatLine, isCountryCode, toIrcCommand, type IrcMessage } from "@gnoworld/core";
+import { formatLine, GUEST_PREFIX, isCountryCode, JARVIS_NICK, toIrcCommand, type IrcMessage } from "@gnoworld/core";
 
 /** A room's message, as Ergo marked it: the account it set, the message's id and its time, and the id
  * of the line it corrects when it is an edit. */
@@ -19,7 +19,7 @@ export interface Said {
   few?: true;
 }
 
-export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK";
+export type Command = "REDACT" | "NOTICE" | "SAMODE" | "JOIN" | "KICK" | "RELAYMSG";
 
 export const NICK = "gnoworld";
 
@@ -41,6 +41,23 @@ function roomMode([room = "", mode = "", arg, ...more]: readonly string[]): bool
   return /^(?:[+-][Iv]|-[qaoh])$/.test(mode) && person(arg);
 }
 
+// A guest's line by RELAYMSG (D430): a room, a nick only the server builds (anon/ and two words and four base32 characters, 32
+// at most) or Jarvis's one, a text of one line with no control character, the whole line within the 510 bytes of IRC. The room
+// and the text are never the guest's to shape beyond that.
+const guestNick = (nick: string): boolean =>
+  new RegExp(`^${GUEST_PREFIX}[a-z]{2,10}-[a-z]{2,10}-[a-z2-7]{4}$`).test(nick) && nick.length <= 32;
+const oneLine = (text: string): boolean => text.trim() !== "" && text.isWellFormed() && !/[\0-\x1f\x7f]/.test(text);
+
+function relayForm([room = "", nick = "", text = "", ...more]: readonly string[]): boolean {
+  return (
+    ROOM.test(room) &&
+    (nick === JARVIS_NICK || guestNick(nick)) &&
+    oneLine(text) &&
+    more.length === 0 &&
+    Buffer.byteLength(`RELAYMSG ${room} ${nick} :${text}`) <= 510
+  );
+}
+
 // A REDACT in one room; a NOTICE to one account, by Ergo's shape of a name (letters, digits, - and _: F655); a
 // room's mode (roomMode); a JOIN of one room; a KICK of one person, never the bot, from one room, with its reason
 // (3m). Another command has no form.
@@ -49,6 +66,7 @@ const FORMS = new Map<string, (params: readonly string[]) => boolean>(
     REDACT: ([room = ""]: readonly string[]) => ROOM.test(room),
     NOTICE: ([to = ""]: readonly string[]) => /^[A-Za-z0-9_-]{1,64}$/.test(to),
     SAMODE: roomMode,
+    RELAYMSG: relayForm,
     JOIN: ([room = "", ...more]: readonly string[]) => ROOM.test(room) && more.length === 0,
     KICK: ([room = "", who = "", reason = "", ...more]: readonly string[]) =>
       ROOM.test(room) && person(who) && reason !== "" && more.length === 0,
@@ -57,10 +75,10 @@ const FORMS = new Map<string, (params: readonly string[]) => boolean>(
 
 export const allowed = (command: string, params: readonly string[]): boolean => FORMS.get(command)?.(params) === true;
 
-export function line(name: string, params: readonly string[]): string {
+export function line(name: string, params: readonly string[], tags: ReadonlyMap<string, string> = new Map()): string {
   const command = toIrcCommand(name);
   if (command === undefined) throw new RangeError(`link: ${name} is no command`);
-  return `${formatLine({ tags: new Map(), command, params })}\r\n`;
+  return `${formatLine({ tags, command, params })}\r\n`;
 }
 
 // The JOIN lines for these rooms, 510 bytes each at most; a name that would break a line, or fill one
@@ -97,15 +115,27 @@ function marks(tags: IrcMessage["tags"]): { time?: string; edits?: string; count
 // rules, the check and the strikes, and its hide is refused (F723).
 const STATUS = /^[~&@%+]+(?=#)/;
 
+// The bot's own line, or a relayed one (D430): said for a guest after the server judged it, so nothing to check, count or hide
+// again. A connection can take no nick with the relay's separator, so this holds whatever the tags say.
+const sender = (source: string | undefined): string => source?.split("!")[0] ?? "";
+const relayed = (source: string | undefined): boolean => sender(source).includes("/");
+const ours = (source: string | undefined, answering: boolean): boolean =>
+  sender(source) === NICK || (!answering && relayed(source));
+// A line's account: the tag Ergo sets, or for a relayed line asked about, the anon nick it was said under.
+const accountOf = ({ tags, source }: IrcMessage, answering: boolean): string =>
+  answering && relayed(source) ? sender(source) : (tags.get("account") ?? "");
+
 // A room's message as the link hands it on, or nothing: a channel line of one of its rooms, with the
-// account and the id Ergo set, from someone else, with text.
-export function said(
-  { tags, source, params: [target = "", text = ""] }: IrcMessage,
-  joined: ReadonlySet<string>,
-): Said | undefined {
+// account and the id Ergo set, from someone else, with text. `answering`: the answer to a question about one line, where a
+// relayed guest's line is a line too, its account the anon nick as the relay's own record has it (F13720).
+export function said(message: IrcMessage, joined: ReadonlySet<string>, answering = false): Said | undefined {
+  const {
+    tags,
+    source,
+    params: [target = "", text = ""],
+  } = message;
   const room = target.replace(STATUS, "");
-  const [account = "", msgid = ""] = [tags.get("account"), tags.get("msgid")];
-  const fields = [text, account, msgid];
-  if (fields.includes("") || source?.split("!")[0] === NICK || !joined.has(room)) return undefined;
+  const [account, msgid] = [accountOf(message, answering), tags.get("msgid") ?? ""];
+  if ([text, account, msgid].includes("") || ours(source, answering) || !joined.has(room)) return undefined;
   return { room, account, msgid, text, ...marks(tags), ...(room === target ? {} : { few: true as const }) };
 }

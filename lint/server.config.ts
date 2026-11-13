@@ -11,9 +11,11 @@ const SERVER =
   "The server imports core, schemas, the service and chain packages, Node and its framework, never Jarvis (docs/ARCHITECTURE.md).";
 const JARVIS =
   "Jarvis imports core, schemas, the service and chain packages, Node and its dependencies, never the server (docs/ARCHITECTURE.md).";
+const LINK_READER =
+  "The link reader imports core, schemas, the service package, Node and its dependencies, never the server, Jarvis or the chain package (slice 13).";
 const SERVICE =
   "The service package imports core, schemas, Node and its dependencies, never the server, Jarvis, the app or the chain package (D111).";
-const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "packages/service/**/*.ts"];
+const SERVICES = ["server/**/*.ts", "jarvis/**/*.ts", "link-reader/**/*.ts", "packages/service/**/*.ts"];
 // By name, so the ban holds wherever node_modules sits (F385): the browser's code, the workspaces a folder never imports, and
 // a require made by hand, which crosses the zones unread (D123, F5278).
 const banned = (workspaces: string, message: string): Linter.RuleEntry => [
@@ -63,6 +65,18 @@ export default defineConfig(
               message: JARVIS,
             },
             {
+              target: "./link-reader",
+              from: "./",
+              except: [
+                "./link-reader",
+                "./packages/core",
+                "./packages/schemas",
+                "./packages/service",
+                "./node_modules",
+              ],
+              message: LINK_READER,
+            },
+            {
               target: "./packages/service",
               from: "./",
               except: ["./packages/service", "./packages/core", "./packages/schemas", "./node_modules"],
@@ -74,11 +88,15 @@ export default defineConfig(
       "no-console": "error",
     },
   },
-  { files: ["server/**/*.ts"], rules: { "no-restricted-imports": banned("jarvis", SERVER) } },
-  { files: ["jarvis/**/*.ts"], rules: { "no-restricted-imports": banned("server", JARVIS) } },
+  { files: ["server/**/*.ts"], rules: { "no-restricted-imports": banned("jarvis|link-reader", SERVER) } },
+  { files: ["jarvis/**/*.ts"], rules: { "no-restricted-imports": banned("server|link-reader", JARVIS) } },
+  {
+    files: ["link-reader/**/*.ts"],
+    rules: { "no-restricted-imports": banned("server|jarvis|app|chain", LINK_READER) },
+  },
   {
     files: ["packages/service/**/*.ts"],
-    rules: { "no-restricted-imports": banned("server|jarvis|app|chain", SERVICE) },
+    rules: { "no-restricted-imports": banned("server|jarvis|link-reader|app|chain", SERVICE) },
   },
   {
     // A test calls the server it started.

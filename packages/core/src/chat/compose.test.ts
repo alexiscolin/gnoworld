@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, test, vi } from "vitest";
-import { bytes, LINE_BYTES, parseLine } from "../irc/irc.ts";
+import { LINE_BYTES, parseLine } from "../irc/irc.ts";
+import { utf8Bytes as bytes } from "../text/utf8.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 import { COMMANDS, compose, relayOf } from "./compose.ts";
 
@@ -147,6 +148,7 @@ describe("compose: a draft of several lines", () => {
       lines: [to("- one"), to("- two")],
       text: "- one\n- two",
       left: MULTILINE_BYTES - bytes("- one\n- two"),
+      tightest: { line: 1, left: LINE_BYTES - relayOf(NICK) - bytes(to("- one")) },
     });
   });
 
@@ -275,6 +277,7 @@ describe("compose: a draft of several lines", () => {
       lines: [to("one"), to(""), to("  two")],
       text: "one\n\n  two",
       left: MULTILINE_BYTES - 10,
+      tightest: { line: 3, left: LINE_BYTES - relayOf(NICK) - bytes(to("  two")) },
     });
   });
 

@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import { buttonsOf, lineOf, lines } from "./chat.ts";
 import type { WebSocketRoute } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { MEMBER, scriptedErgo, type HistoryLine } from "./scripted.ts";
 import { SITE } from "./sites.ts";
+import { axeOf } from "./axe.ts";
 
 // 4g (docs/decisions.md, 2026-10-26; slice 4's plan §1, §3): a link's player loads on a click, once "checked"; no
 // third party is reached before. The verdicts' stream answered here, each (re)connection reading `verdicts()`; every
@@ -132,7 +132,8 @@ test.describe("a link's player", () => {
     });
     const { away } = await room(page, () => "");
     await expect(play(page)).toBeEnabled();
-    expect(asked).toEqual([`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v1`]);
+    // The imgur line has no player, but its https link may wear a card (linked.ts), which waits on a verdict as a player does.
+    expect(asked).toEqual([`${SITE}/api/verdicts?room=%23bubble%2Fgames&ids=v1%2Cv2`]);
     expect(away).toEqual([]);
   });
 
@@ -262,15 +263,15 @@ test.describe("a link's player", () => {
   test("passes axe with a player waiting and one playing, on a computer's and a phone's screen", async ({ page }) => {
     let said = "";
     await room(page, () => said);
-    expect((await new AxeBuilder({ page }).include("ol").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("ol").analyze()).violations).toEqual([]);
     said = event("v1", "checked");
     await play(page).click();
     await expect(lineOf(page, "watch").locator("iframe")).toBeVisible();
     // The frame's own document is the service's (here a stand-in): axe reads the page around it.
-    expect((await new AxeBuilder({ page }).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
     // F881: on a phone's screen too, the frame whole inside its line, at a video's 16/9.
     await page.setViewportSize({ width: 390, height: 800 });
-    expect((await new AxeBuilder({ page }).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("ol").exclude("iframe").analyze()).violations).toEqual([]);
     const frame = await lineOf(page, "watch").locator("iframe").boundingBox();
     const line = await lineOf(page, "watch").boundingBox();
     if (frame === null || line === null) throw new Error("the frame or its line has no box");

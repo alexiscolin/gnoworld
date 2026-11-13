@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { logOutHere } from "./account.ts";
+import { connectButton, logOutHere } from "./account.ts";
 import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn, talk, ticketOf, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
+import { axeOf } from "./axe.ts";
 
 // A world's rooms (slice 4's 4b) on the real server and Ergo: api.mjs gives Bubble a section Talk (#games, then the
 // main room) and #news outside it. Each test logs in a wallet of its own (?as=), its tickets its own, and its account
@@ -76,7 +76,7 @@ function guestNicks(page: Page): string[] {
 }
 
 const chatStatus = (page: Page) => page.getByRole("status").filter({ hasText: /chat/ });
-const heading = (page: Page, room: string) => page.getByRole("heading", { level: 2, name: room, exact: true });
+const heading = (page: Page, room: string) => page.getByRole("heading", { name: room, exact: true });
 
 test.describe("a world's rooms", () => {
   test("shows a visitor the rooms by section, a room's history and who is here, as a guest", async ({ page }) => {
@@ -84,13 +84,13 @@ test.describe("a world's rooms", () => {
     const history = word("history");
     await say(page, { address, room: "#bubble/games" }, [history]);
     await logOutHere(page);
-    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
+    await expect(connectButton(page)).toBeVisible();
     const nicks = guestNicks(page);
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(roomsNav(page).getByRole("heading")).toHaveText(["Talk", "Rooms"]);
-    await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
-    await expect(roomsNav(page).getByRole("link", { name: "#games" })).toHaveAttribute("aria-current", "true");
+    await expect(roomsNav(page).getByRole("link")).toHaveText(["games", "bubble", "news"]);
+    await expect(roomsNav(page).getByRole("link", { name: "games" })).toHaveAttribute("aria-current", "true");
     await expect(heading(page, "#games")).toBeVisible();
     await expect(lineOf(page, history)).toHaveCount(1);
     await expect(lineOf(page, history)).toContainText(`${address.slice(0, 6)}…${address.slice(-5)}`);
@@ -138,13 +138,13 @@ test.describe("a world's rooms", () => {
     await expect(lineOf(page, games)).toHaveCount(1);
     let sockets = 0;
     page.on("websocket", () => (sockets += 1));
-    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await roomsNav(page).getByRole("link", { name: "bubble" }).click();
     await expect(page).toHaveURL(/\/w\/bubble\?chat=full$/);
     await expect(heading(page, "#bubble")).toBeVisible();
-    await expect(roomsNav(page).getByRole("link", { name: "#bubble" })).toHaveAttribute("aria-current", "true");
+    await expect(roomsNav(page).getByRole("link", { name: "bubble" })).toHaveAttribute("aria-current", "true");
     await expect(lineOf(page, main)).toHaveCount(1);
     await expect(lineOf(page, games)).toHaveCount(0);
-    await roomsNav(page).getByRole("link", { name: "#news" }).click();
+    await roomsNav(page).getByRole("link", { name: "news" }).click();
     await expect(page).toHaveURL(/\/w\/bubble\?room=news&chat=full$/);
     await expect(heading(page, "#news")).toBeVisible();
     await expect(lineOf(page, main)).toHaveCount(0);
@@ -189,11 +189,11 @@ test.describe("a world's rooms", () => {
     const address = await inGames(page);
     const nicks = guestNicks(page);
     // The account menu is the page's header's, which the full chat covers: the chat is docked, then expanded again.
-    await page.getByRole("button", { name: "Shrink the chat" }).click();
+    await page.getByRole("button", { name: "Close the full chat" }).click();
     await logOutHere(page);
-    await page.getByRole("button", { name: "Expand the chat" }).click();
-    await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
-    await expect(roomsNav(page).getByRole("link")).toHaveText(["#games", "#bubble", "#news"]);
+    await page.getByRole("button", { name: "Open the full chat" }).click();
+    await expect(connectButton(page)).toBeVisible();
+    await expect(roomsNav(page).getByRole("link")).toHaveText(["games", "bubble", "news"]);
     await expect(heading(page, "#games")).toBeVisible();
     await expect.poll(() => nicks.length).toBeGreaterThan(0);
     await expect(whoIsHere(page).getByText(`${nicks.at(-1) ?? ""} (guest)`, { exact: true })).toBeVisible();
@@ -208,7 +208,9 @@ test.describe("a world's rooms", () => {
     await page.goto("/w/bubble?room=games&chat=full");
     await hydrated(page);
     await expect(whoIsHere(page)).toContainText(/\b[1-9]\d* here/);
-    await page.getByRole("button", { name: "Close the chat" }).click();
+    // The full chat closes to its dock; the page then leaves the world by the site's logo.
+    await page.getByRole("button", { name: "Close the full chat" }).click();
+    await page.getByRole("link", { name: "gnoworld", exact: true }).click();
     await expect(page).toHaveURL(/\/net\/onyx\/?$|\/$/);
     await expect.poll(() => closed).toBe(true);
   });
@@ -240,7 +242,7 @@ test.describe("a world's rooms", () => {
     await hydrated(page);
     await expect(lineOf(page, seen)).toHaveCount(1);
     await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 

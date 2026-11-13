@@ -7,8 +7,9 @@ import { anchorOf, natureOf, worldAnchor, type Nature, type RealmFunctions } fro
 import { ROWS } from "./rows.ts";
 import { sha256 } from "./sha256.ts";
 import { between, seedShare } from "./shares.ts";
+import { asciiBytes } from "../text/bytes.ts";
 
-export { anchorOf, ANCHORS, MAPS, natureOf, type Anchor, type MapName, type Nature, type RealmFunctions };
+export { anchorOf, ANCHORS, asciiBytes, MAPS, natureOf, type Anchor, type MapName, type Nature, type RealmFunctions };
 
 /** Above this the warp smears a map's real detail (Alexis's review of the mock-up, 2026-11-01). */
 export const MAX_WARP_FREQUENCY = 2.4;
@@ -21,18 +22,6 @@ const RING_LEAN = [0.3, 0.65] as const;
 const RING_INNER = [1.25, 1.45] as const;
 const RING_WIDTH = [0.62, 0.95] as const;
 const RING_OPACITY = [0.34, 0.72] as const;
-const LAST_ASCII = 127;
-
-/** The bytes of a text that is ASCII by its schema, for want of a TextEncoder: past it a code unit would wrap, and two ids be one planet. */
-export function asciiBytes(text: string): Uint8Array {
-  const bytes = new Uint8Array(text.length);
-  for (let at = 0; at < text.length; at += 1) {
-    const unit = text.charCodeAt(at);
-    if (unit > LAST_ASCII) throw new RangeError("a text past ASCII");
-    bytes[at] = unit;
-  }
-  return bytes;
-}
 
 const DOMAIN = asciiBytes("gnoworld/planet/v1");
 

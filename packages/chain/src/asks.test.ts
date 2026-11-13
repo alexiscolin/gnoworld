@@ -1,5 +1,16 @@
+import { evalOwner } from "@gnoworld/core";
 import { describe, expect, it } from "vitest";
-import { callsAbove, callsFirst, callsInBlock, docAsk, fileAsk, nameAsk, pathsAsk, renderAsk } from "./asks.ts";
+import {
+  callsAbove,
+  callsFirst,
+  callsInBlock,
+  docAsk,
+  fileAsk,
+  nameAsk,
+  ownerAsk,
+  pathsAsk,
+  renderAsk,
+} from "./asks.ts";
 
 const ADDRESS = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 
@@ -37,4 +48,18 @@ describe("the indexer's asks", () => {
     expect(callsInBlock(9).query).toContain("block_height: { eq: $height }");
     expect(callsInBlock(9).query).not.toContain("limit");
   });
+});
+
+describe("ownerAsk", () => {
+  it("asks core's one builder's expression for a registered name, as a vm/qeval", () => {
+    expect(ownerAsk("nym-alexiscolin000")).toEqual({ path: "vm/qeval", data: evalOwner("nym-alexiscolin000") });
+    expect(ownerAsk("nym-alexiscolin000")?.data).toContain('ResolveName("nym-alexiscolin000")');
+  });
+
+  it.each(['nym")+Evil("', "nym/evil", "Nym", "", "1abc", "a".repeat(65)])(
+    "asks nothing for the namespace %j",
+    (namespace) => {
+      expect(ownerAsk(namespace)).toBeNull();
+    },
+  );
 });

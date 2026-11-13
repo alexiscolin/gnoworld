@@ -48,6 +48,7 @@ export function Reactions({ to, chips, react }: ReactionsProps) {
           ) : (
             <Chip
               key={each.emoji}
+              size="xs"
               label={nameOf(each)}
               count={each.count}
               selected={each.mine}

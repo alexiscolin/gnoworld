@@ -7,23 +7,49 @@ import type { Unstyled } from "./testing.tsx";
 // No component the entry gives takes className or style (docs/DESIGN-SYSTEM.md, "No outside
 // styling"): tsc fails this object the day one does, or the day a component joins the entry.
 type Exported = typeof ui;
-const unstyled: { [Name in keyof Exported]: Unstyled<ComponentProps<Exported[Name]>> } = {
+// `iconNode` makes a node of a glyph and `stillCopy` a still copy of a part, `nameColour` a name's colour, `motionWelcome` whether motion is welcome: functions, not components, with no props to style; `Room` takes children and data attributes alone.
+const unstyled: {
+  [
+    Name in Exclude<
+      keyof Exported,
+      | "iconNode"
+      | "sightRef"
+      | "stillCopy"
+      | "useAlone"
+      | "grouped"
+      | "holdsEscape"
+      | "typedIn"
+      | "composing"
+      | "nameColour"
+      | "motionWelcome"
+      | Composition
+    >
+  ]: Unstyled<ComponentProps<Exported[Name]>>;
+} = {
   Button: true,
+  Room: true,
   ActivityChart: true,
+  DayChart: true,
+  Figures: true,
+  Network: true,
+  PagedList: true,
+  ShowMore: true,
+  Cell: true,
   Avatar: true,
+  Badge: true,
+  Stamp: true,
   Breadcrumb: true,
   Card: true,
-  Center: true,
   ChatLayout: true,
   Chip: true,
-  Cluster: true,
   ComingSoon: true,
-  Combobox: true,
   Dialog: true,
+  Disclosure: true,
   EmptyState: true,
   Field: true,
+  FieldWords: true,
+  Listbox: true,
   Flash: true,
-  Grid: true,
   Icon: true,
   IconButton: true,
   Kicker: true,
@@ -32,19 +58,30 @@ const unstyled: { [Name in keyof Exported]: Unstyled<ComponentProps<Exported[Nam
   Menu: true,
   NavItem: true,
   Panel: true,
+  Planet: true,
   PlanetThumb: true,
   Popover: true,
   Progress: true,
   Row: true,
   Select: true,
-  Sidebar: true,
   Skeleton: true,
   Sparkline: true,
-  Stack: true,
   Stat: true,
-  Switcher: true,
+  Switch: true,
   Tabs: true,
+  TabPanel: true,
   Tooltip: true,
+};
+// The layout primitives take a block's own class, so a block names, labels or styles its box and keeps their layout; never a style.
+type Composition = "Center" | "Cluster" | "Grid" | "Sidebar" | "Stack" | "Switcher";
+type Classed<P> = [Extract<keyof P, "className">] extends [never] ? false : Unstyled<Omit<P, "className">>;
+const classed: { [Name in Composition]: Classed<ComponentProps<Exported[Name]>> } = {
+  Center: true,
+  Cluster: true,
+  Grid: true,
+  Sidebar: true,
+  Stack: true,
+  Switcher: true,
 };
 // A component's named parts are statics of it, which the map above does not reach.
 const parts: [
@@ -59,53 +96,77 @@ const parts: [
 
 // What @gnoworld/ui gives the app and the admin console: a component left out of the entry
 // would pass its own tests and still be out of their reach.
-it("exports every component of the design system, and nothing else", () => {
+it("exports every component of the design system, iconNode, stillCopy, sightRef, grouped and useAlone, nothing else", () => {
   expect(Object.keys(ui).sort()).toEqual(
     [
       "ActivityChart",
       "Avatar",
+      "Badge",
       "Breadcrumb",
       "Button",
       "Card",
+      "Cell",
       "Center",
       "ChatLayout",
       "Chip",
       "Cluster",
       "ComingSoon",
-      "Combobox",
+      "DayChart",
       "Dialog",
+      "Disclosure",
       "EmptyState",
       "Field",
+      "FieldWords",
+      "Figures",
       "Flash",
       "Grid",
       "Icon",
       "IconButton",
       "Kicker",
       "LinkProvider",
+      "Listbox",
       "Logo",
       "Menu",
       "NavItem",
+      "Network",
+      "PagedList",
       "Panel",
+      "Planet",
       "PlanetThumb",
       "Popover",
       "Progress",
+      "Room",
       "Row",
       "Select",
+      "ShowMore",
       "Sidebar",
       "Skeleton",
       "Sparkline",
       "Stack",
+      "Stamp",
       "Stat",
+      "Switch",
       "Switcher",
+      "TabPanel",
       "Tabs",
       "Tooltip",
+      "grouped",
+      "iconNode",
+      "sightRef",
+      "stillCopy",
+      "nameColour",
+      "holdsEscape",
+      "typedIn",
+      "composing",
+      "motionWelcome",
+      "useAlone",
     ].sort(),
   );
   for (const component of Object.values(ui)) expect(typeof component).toBe("function");
 });
 
-it("lets no component it exports take outside styling", () => {
-  expect([...Object.values(unstyled), ...parts].every(Boolean)).toBe(true);
+it("lets no component it exports take outside styling, but a composition its block's class", () => {
+  expect([...Object.values(unstyled), ...parts, ...Object.values(classed)].every(Boolean)).toBe(true);
 });
 
 const here = (path: string) => decodeURIComponent(new URL(path, import.meta.url).pathname);

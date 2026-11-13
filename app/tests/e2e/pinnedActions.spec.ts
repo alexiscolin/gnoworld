@@ -1,29 +1,23 @@
-import { sound } from "./callCard.ts";
 import type { Locator } from "@playwright/test";
+import { sound } from "./callCard.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { openGovdao } from "./govdaoChain.ts";
 
-// 9e-1 (Alexis, 2026-11-06): GovDAO's pinned "Vote" (hubs.json) on its page under Read the proposals and in the chat's quick actions
-// beside Who's here, each once vm/qfuncs confirms it; its card names the realm and the function, every field empty and editable.
+// 9e-1 (Alexis, 2026-11-06): GovDAO's pinned "Vote" (hubs.json) on its page under Read the proposals and in the chat's pinned row,
+// each once vm/qfuncs confirms it; its card names the realm and the function, every field empty and editable.
 const opened = openGovdao;
 const plate = (page: Page) => page.locator("[data-look='plate']");
-const bar = (page: Page) => page.getByRole("toolbar", { name: "Quick actions" });
-// A world with a realm's own row (frame 31), Catch up left out where the dock is narrow; the pinned pills come after it.
-const ROW = ["Who's here", "Proposal", "Events", "Realm"];
+// The row over the composer holds a world's pinned pills alone: the room's quick actions are in the composer's + menu.
+const bar = (page: Page) => page.getByRole("toolbar", { name: "Pinned actions" });
 
-// The form's distance under the actions' row (Share, or Say hi in the chat), in px.
-async function stepUnderRow(page: Page, form: Locator): Promise<number> {
-  const share = await plate(page)
-    .getByRole("button", { name: "Share" })
-    .or(plate(page).getByRole("link", { name: "Say hi in the chat" }))
-    .last()
-    .boundingBox();
-  const under = await form.boundingBox();
-  return (under?.y ?? NaN) - ((share?.y ?? NaN) + (share?.height ?? NaN));
+// Whether `lower` starts below where `upper` ends.
+async function follows(upper: Locator, lower: Locator): Promise<boolean> {
+  const [top, bottom] = [await upper.boundingBox(), await lower.boundingBox()];
+  return top !== null && bottom !== null && bottom.y >= top.y + top.height;
 }
 
 for (const width of [390, 1280] as const) {
-  test(`GovDAO's pinned Vote at ${String(width)} px: on the page under Read the proposals and beside Who's here, with no violation`, async ({
+  test(`GovDAO's pinned Vote at ${String(width)} px: on the page under Read the proposals and in the pinned row over the composer, with no violation`, async ({
     page,
   }) => {
     await opened(page, width);
@@ -31,13 +25,14 @@ for (const width of [390, 1280] as const) {
       .getByRole("figure")
       .filter({ has: page.getByRole("button", { name: "Vote" }) });
     await expect(form).toBeVisible();
-    const read = await plate(page).getByRole("link", { name: "Read the proposals" }).boundingBox();
-    const under = await form.boundingBox();
-    expect(read !== null && under !== null && under.y >= read.y + read.height).toBe(true);
-    // A step of 32 px (--space-l) after the actions' row, as f0030 leaves about 28 under Read the proposals (design review, 9e-1).
-    const gap = await stepUnderRow(page, form);
-    expect(Math.abs(gap - 32), `the form stands ${String(gap)} px under the row`).toBeLessThanOrEqual(1);
-    await expect(bar(page).getByRole("button")).toHaveText([...ROW, "Vote"]);
+    // The form comes after the actions' row and the figures, and before the Proposals card, which stays last among them.
+    const above = plate(page).getByRole("link", { name: "Read the proposals" });
+    const figures = plate(page).getByRole("region", { name: "Figures" });
+    const proposals = plate(page).getByRole("heading", { name: "Proposals", exact: true });
+    expect(await follows(above, form), "the form under the actions' row").toBe(true);
+    expect(await follows(figures, form), "the form under the figures").toBe(true);
+    expect(await follows(form, proposals), "the Proposals card under the form").toBe(true);
+    await expect(bar(page).getByRole("button")).toHaveText(["Vote"]);
 
     await bar(page).getByRole("button", { name: "Vote" }).click();
     const card = page.getByRole("article").filter({ hasText: "MustVoteOnProposalSimple" });
@@ -48,14 +43,17 @@ for (const width of [390, 1280] as const) {
     );
     for (const name of ["pid", "option"]) {
       const box = card.getByRole("textbox", { name, exact: true });
-      await expect(box).toHaveValue("");
+      await expect(box).toHaveText("");
       await expect(box).toBeEditable();
     }
     // The card opens over the bar inside the dock: the bar stays on the screen, the card scrolls in its own box (design review, 9e-1).
+    // Under 1280 px the chat is a block of the page, which scrolls: the bar is there, not fixed to the screen.
     const row = await bar(page).boundingBox();
-    expect(row !== null && row.y + row.height <= (page.viewportSize()?.height ?? 0)).toBe(true);
-    await card.getByRole("button", { name: "Sign in Adena" }).scrollIntoViewIfNeeded();
-    await expect(card.getByRole("button", { name: "Sign in Adena" })).toBeInViewport();
+    if (width >= 1280) expect(row !== null && row.y + row.height <= (page.viewportSize()?.height ?? 0)).toBe(true);
+    else await expect(bar(page)).toBeVisible();
+    // A visitor's card offers Connect Adena where a connected account's offers Sign in Adena.
+    await card.getByRole("button", { name: "Connect Adena" }).scrollIntoViewIfNeeded();
+    await expect(card.getByRole("button", { name: "Connect Adena" })).toBeInViewport();
     // Its title is the action's name, as the video's card is named ("Boop the pot", f0110); the function keeps its row.
     await expect(card.getByRole("heading", { name: "Vote" })).toBeVisible();
     await sound(page);
@@ -63,14 +61,15 @@ for (const width of [390, 1280] as const) {
 }
 
 test("GovDAO shows no pinned Vote anywhere when vm/qfuncs does not list its function", async ({ page }) => {
-  // The plate and the bar each read the functions: both answers, before any absence is asserted (the combined review of 9e-1).
+  // The plate and the bar read the functions: the answer, before any absence is asserted (the combined review of 9e-1).
   let answers = 0;
   page.on("response", (response) => {
     if (decodeURIComponent(response.url()).includes("vm/qfuncs")) answers += 1;
   });
   await opened(page, 1280, []);
-  await expect.poll(() => answers).toBe(2);
-  await expect(bar(page).getByRole("button", { name: "Who's here" })).toBeVisible();
+  // One read for both: the plate and the bar share the realm's functions' query.
+  await expect.poll(() => answers).toBe(1);
+  await expect(page.getByRole("textbox", { name: "Message #govdao" })).toBeVisible();
   await expect(plate(page).getByRole("link", { name: "Read the proposals" })).toBeVisible();
   // The answer parsed and drawn: a task after the response, as callFixtures' after() waits in the unit tests.
   await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 0)));
@@ -88,12 +87,15 @@ test("GovDAO keeps its plate and its chat's bar when the pinned actions' code ca
   // What only the proposals' code draws, after the failed chunk: a proposal read from the chain. The pre-rendered page holds the rest,
   // its "Proposals" heading too, so a journey waiting on those passed while the page fell (F5941, refuted by the verifier).
   await expect(
-    plate(page).getByRole("heading", { name: "Set validator gno-core-validator-1 to voting power 60" }).first(),
+    plate(page)
+      .getByRole("link", { name: /Set validator gno-core-validator-1 to voting power 60/ })
+      .first(),
   ).toBeVisible();
   await expect(page.getByRole("heading", { name: "This world could not load" })).toHaveCount(0);
   await expect(plate(page).getByRole("heading", { level: 1 })).toHaveText("GovDAO");
   await expect(plate(page).getByRole("link", { name: "Read the proposals" })).toBeVisible();
-  await expect(bar(page).getByRole("button")).toHaveText(ROW);
+  await expect(page.getByRole("textbox", { name: "Message #govdao" })).toBeVisible();
+  await expect(bar(page).getByRole("button")).toHaveCount(0);
   await expect(page.getByRole("button", { name: "Vote" })).toHaveCount(0);
 });
 

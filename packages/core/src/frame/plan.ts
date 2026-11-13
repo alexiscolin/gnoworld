@@ -5,29 +5,24 @@
 // top view is its stations' (station/scenery.ts).
 import { GRAIN, WORLD_LEAST, WORLD_MOST, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { textHash, unitOf } from "../space/cell.ts";
-import { LEAN } from "../space/drift.ts";
 import type { Arrival } from "./arrival.ts";
 import { onPlane, orbitPlace } from "./disc.ts";
+import { PLAN_MOST } from "./postcard.ts";
 import type { Planned } from "../lod/drawn.ts";
 import { boxOf, MARGIN, meet, namesOf } from "./planNames.ts";
-import { along, cameraTowards, DEGREE, focalOf, looksFrom, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
+import { along, cameraTowards, focalOf, looksFrom, placeOf, REST_SCREENS, STAR_HEART } from "./restLook.ts";
 
-/** The most worlds a Plan draws, the largest first: past them its others are dust. */
-const PLAN_MOST = 12;
 // A Plan's own lens, in degrees (the chief, 2026-11-04): a chart, its orbits round their star, where the home's 42.5 degrees put the outer
 // ellipse's centre 122 px under it; the offset falls with the lens's tangent, 17 px here at the video's screen (7v's design review, F4470).
 const PLAN_LENS = 7;
-// A mouse leans a Plan's eye half the home's, as an arrival leaned before a system's dynamic view leaned less (7v's design review, F4468).
-const PLAN_LEAN = LEAN / 2;
-// Seen 30 degrees over the plane: its orbits read as ellipses half as high as wide, the mock-up's.
-const SLANT = 30 * DEGREE;
+// How many turns of its camera are tried: the spin of the Plan on the screen, from its address's first.
 const TURNS = 24;
-// Its outer orbit spans this share of the narrower screen's width; its largest world this share of that orbit.
-const SPAN = 0.78;
+// Its outer orbit, with its largest world, spans this share of the screen's height; its largest world this share of that orbit.
+const SPAN_HEIGHT = 0.86;
 const LARGEST = 0.14;
 // The inner orbit, as a share of the outer one, and the least gap between two, in their worlds' radii: a disc's width and air, so which
 // ring a world is on reads (the design review's second pass, F4470); the gaps growing an eighth a ring outward, the mock-up's 130 to 180 px.
-const INNER = 0.24;
+const INNER = 0.5;
 const GAP = 2.2;
 const GROW = 1.12;
 // At most this many orbits a Plan draws, the mock-up's five: its worlds share them, nearest the star first, so a Plan of any size reads as a
@@ -47,11 +42,11 @@ const NEAR_BEST = 0.8;
 // A world's own size, its use's, before its system's room caps it (7v's design review, F4470: gnoswap's 16 stood at their crowd's cap).
 const sizeOf = ({ radius, own }: Orbiter) => own ?? radius;
 
-/** The worlds a Plan of `system` draws: its bodies, the largest `PLAN_MOST` by their own size, in the order of their orbits, nearest the
- * star first. */
-const planWorlds = (system: StarSystem): Orbiter[] =>
+/** The worlds a Plan of `system` draws: the bodies its dynamic view stands (`only`, the same set in both views), else its bodies, the largest
+ * `PLAN_MOST` by their own size; in the order of their orbits, nearest the star first. */
+const planWorlds = (system: StarSystem, only?: ReadonlySet<string>): Orbiter[] =>
   system.worlds
-    .filter(({ radius }) => radius >= GRAIN)
+    .filter(({ radius, id }) => radius >= GRAIN && (only === undefined || only.has(id)))
     .sort((a, b) => sizeOf(b) - sizeOf(a))
     .slice(0, PLAN_MOST)
     .sort((a, b) => a.orbit - b.orbit);
@@ -155,31 +150,34 @@ export interface Plan extends Arrival {
   readonly host: string | undefined;
 }
 
-/** `system`'s Plan: the eye over its plane at a slant, far enough that its outer orbit spans most of the narrower screen, at the first turn
+/** `system`'s Plan: the eye straight over its plane, far enough that its outer orbit spans most of the narrower screen, at the first turn
  * from its address's whose largest size that stands every world readable is within a fifth of the best turn's; its first turn at the least
  * size if none does. Its postcard holds the Plan's worlds, still, and leaves out every other. */
-export function planOf(system: StarSystem): Plan {
+export function planOf(system: StarSystem, only?: ReadonlySet<string>): Plan {
   const still = { ...system, spin: 0 };
-  const worlds = planWorlds(system);
+  const worlds = planWorlds(system, only);
   const [screen] = REST_SCREENS;
   // The eye's distance in units of the outer orbit, then the orbits in the system's units: the Plan stands in its system's room.
   const room = Math.max(...system.worlds.map(({ orbit }) => orbit), 1);
-  const distance = (focalOf(screen.height, PLAN_LENS) * (1 + LARGEST) * room) / ((SPAN / 2) * screen.width);
-  // Its plane kept level: the camera's up is the plane's own normal, so no tilt of the system rolls its orbits on the screen; read off the
-  // plane here, for the depth's module would split out of the view at rest's chunk to come with the Plan's.
-  const up = { x: NaN, y: NaN, z: NaN };
-  onPlane({ place: ORIGIN, tilt: system.tilt, node: system.node }, { along: 0, across: 0, up: 1 }, up);
+  const distance = (focalOf(screen.height, PLAN_LENS) * (1 + LARGEST) * room) / ((SPAN_HEIGHT * screen.height) / 2);
+  // Straight over its plane, looking down its normal: the orbits are circles. The camera's up is a direction in the plane, one for each
+  // turn, so the turn only spins the Plan on the screen; read off the plane here, for the depth's module would split out of the view at
+  // rest's chunk to come with the Plan's.
+  const normal = { x: NaN, y: NaN, z: NaN };
+  onPlane({ place: ORIGIN, tilt: system.tilt, node: system.node }, { along: 0, across: 0, up: 1 }, normal);
+  const eye = along(system.place, normal, distance);
   const first = unitOf(textHash(`plan ${system.id}`));
-  const cameras = Array.from({ length: TURNS }, (_, at) => {
+  const spins = Array.from({ length: TURNS }, (_, at) => {
     const turn = 2 * Math.PI * (first + at / TURNS);
-    const way = { x: NaN, y: NaN, z: NaN };
+    const spin = { x: NaN, y: NaN, z: NaN };
     onPlane(
-      { place: { x: 0, y: 0, z: 0 }, tilt: system.tilt, node: system.node },
-      { along: Math.cos(SLANT) * Math.cos(turn), across: Math.cos(SLANT) * Math.sin(turn), up: Math.sin(SLANT) },
-      way,
+      { place: ORIGIN, tilt: system.tilt, node: system.node },
+      { along: Math.cos(turn), across: Math.sin(turn), up: 0 },
+      spin,
     );
-    return cameraTowards(along(system.place, way, distance), system.place, up);
+    return spin;
   });
+  const cameras = spins.map((spin) => cameraTowards(eye, system.place, spin));
   const sizes = Array.from({ length: Math.floor(Math.log(LEAST / LARGEST) / Math.log(SHRINK)) + 1 }, (_, at) =>
     planOrbits(worlds, LARGEST * SHRINK ** at).map((world) => ({
       ...world,
@@ -193,7 +191,7 @@ export function planOf(system: StarSystem): Plan {
   const chosen = readableAt.findIndex((at) => at >= 0 && SHRINK ** (at - best) >= NEAR_BEST);
   const [placed, camera] = [
     sizes[chosen < 0 ? sizes.length - 1 : (readableAt[chosen] ?? 0)] ?? [],
-    cameras[Math.max(chosen, 0)] ?? cameraTowards(system.place, system.place, up),
+    cameras[Math.max(chosen, 0)] ?? cameraTowards(system.place, system.place, normal),
   ];
   const hidden = new Set(
     system.worlds.filter(({ id }) => !placed.some((world) => world.id === id)).map(({ id }) => id),
@@ -203,8 +201,7 @@ export function planOf(system: StarSystem): Plan {
     look: system.place,
     postcard: { system: still, worlds: placed, depth: placed.map(() => 1), hidden },
     lens: PLAN_LENS,
-    up,
-    lean: PLAN_LEAN,
+    up: spins[Math.max(chosen, 0)] ?? normal,
     ...namesOf(still, placed, { camera, lens: PLAN_LENS, crowded: chosen < 0 }),
   };
 }

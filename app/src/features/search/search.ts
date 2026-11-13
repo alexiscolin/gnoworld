@@ -1,94 +1,206 @@
-// The search drawer's search: one pass over the places the page already holds, so typing sends no request.
-import { labelName, type PlaceKind } from "@gnoworld/core";
-import type { siteOf } from "../../places.ts";
-import { realmPage } from "../../scene/cosmos/planWords.ts";
+// The palette's search: one pass over the index of the places the page already holds, so typing sends no request. A query is a name, or
+// opens with a mark: `#` a room, `@` a namespace, `/r/` a realm's path, `>` a command (D355). The best 50 come back, with how many answered.
+import { compareRanks } from "@gnoworld/core";
+import { realmPageHref } from "../../lib/realmPage.ts";
+import { matchLower, parseQuery, wordsOf, type Parsed } from "./match.ts";
+import { byFunctions, type Entry, type SearchIndex } from "./searchIndex.ts";
+import {
+  COMMANDS,
+  RANKED,
+  type RankedSort,
+  type Found,
+  type SearchFilter,
+  type SearchItem,
+  type SearchOptions,
+  type SearchResult,
+  type SearchSort,
+} from "./types.ts";
+import { keeping } from "./filters.ts";
+import { NONE, tabbed } from "./tabs.ts";
 
-/** A group of the drawer: a kind of place, or the stations, worlds of a kind of their own round the Earth (8l). */
-export type SearchKind = PlaceKind | "station";
-export interface SearchItem {
-  name: string;
-  kind: SearchKind;
-  universe: string;
-  path: string;
-  /** What a world is when it is no plain hub, as frame 98's "DAO · 96" says it. */
-  tag?: string;
+/** The most results a list draws: past it, the words are to be refined. */
+export const SHOWN = 50;
+const FUZZY_CAP = 500;
+interface Scored {
+  score: number;
+  result: SearchResult;
 }
-export interface SearchGroup {
-  kind: SearchKind;
-  count: number;
-  items: SearchItem[];
+
+// What narrows a search: the chips' test, and a note to give each result.
+interface Ask {
+  keep: (item: SearchItem) => boolean;
+  sort: SearchSort;
+  /** Whether a chip or a namespace narrows the places, which leaves no room nor person. */
+  narrowed?: boolean;
+  note?: (entry: Entry) => string;
 }
 
-/** The groups' order in the drawer, as frame 98 lists them: the ecosystems, the hubs, the Earth, the universes, then the stations at its
- * foot. */
-const ORDER: SearchKind[] = ["ecosystem", "world", "earth", "cosmos", "station"];
+const resultOf = (
+  entry: Entry,
+  hits: readonly number[],
+  note: ((entry: Entry) => string) | undefined,
+): SearchResult => ({
+  item: entry.item,
+  hits,
+  ...(note === undefined ? {} : { note: note(entry) }),
+  ...(entry.room === undefined ? {} : { room: true as const }),
+});
 
-// A world's kind as its row's tag says it; a hub is the plain kind and says none, a station has its own group.
-const TAGS: Readonly<Record<string, string>> = { dao: "DAO", dapp: "dApp" };
+// How an entry answers `text`: by its name, or failing that by its functions (the plain ones, or a few letters off when `fuzzy`).
+function scoredOf(
+  entry: Entry,
+  text: string,
+  { fuzzy, note }: { fuzzy: boolean; note: Ask["note"] },
+): Scored | undefined {
+  const m = matchLower(entry, text, fuzzy);
+  if (m !== undefined)
+    return { score: m.score, result: fuzzy ? { item: entry.item, hits: [] } : resultOf(entry, m.hits, note) };
+  const found = byFunctions(entry, text, fuzzy);
+  if (found === undefined) return undefined;
+  return { score: found.score, result: { ...resultOf(entry, [], note), note: found.note } };
+}
 
-/** The places whose name holds the query, whatever the case, in groups by kind; the names that start with it come first
- * in a group. A query is text, never a pattern; the empty one finds every place. */
-export function searchPlaces(items: SearchItem[], query: string): SearchGroup[] {
-  const wanted = query.trim().toLowerCase();
-  const starts: SearchItem[][] = ORDER.map(() => []);
-  const holds: SearchItem[][] = ORDER.map(() => []);
-  for (const item of items) {
-    const at = item.name.toLowerCase().indexOf(wanted);
-    const group = ORDER.indexOf(item.kind);
-    if (at === 0) starts[group]?.push(item);
-    else if (at > 0) holds[group]?.push(item);
+// The entries that pass the ask and answer `text`: the plain matches, and only when few, those a few letters off.
+function rank(entries: readonly Entry[], text: string, { keep, note }: Pick<Ask, "keep" | "note">): Scored[] {
+  const found: Scored[] = [];
+  const missed: Entry[] = [];
+  for (const entry of entries) {
+    if (!keep(entry.item)) continue;
+    const scored = scoredOf(entry, text, { fuzzy: false, note });
+    if (scored === undefined) missed.push(entry);
+    else found.push(scored);
   }
-  return ORDER.flatMap((kind, n) => {
-    const found = [...(starts[n] ?? []), ...(holds[n] ?? [])];
-    return found.length === 0 ? [] : [{ kind, count: found.length, items: found }];
-  });
+  if (found.length < SHOWN / 5 && text.length >= 4) {
+    // ponytail: past this many names a few letters off the pass stops: the best 50 come from the first ones, and the count says "more".
+    for (const entry of missed) {
+      if (found.length >= FUZZY_CAP) break;
+      const scored = scoredOf(entry, text, { fuzzy: true, note });
+      if (scored !== undefined) found.push(scored);
+    }
+  }
+  return found;
 }
 
-// A world's item: a station in its own group, a DAO or a dApp with its tag.
-function worldItem(item: SearchItem, kind: string | undefined): SearchItem {
-  const tag = TAGS[kind ?? ""];
-  return { ...item, kind: kind === "station" ? "station" : "world", ...(tag === undefined ? {} : { tag }) };
-}
+const KEYS: Readonly<Record<string, (item: SearchItem) => number>> = {
+  here: (item) => item.here ?? 0,
+  activity: (item) => item.calls ?? 0,
+  newest: (item) => item.seen ?? 0,
+};
 
-/** One item for each place of the site: a world or an ecosystem by its name, a universe's cosmos by the universe's name
- * and its Earth by that name too, so none is mistaken for another universe's. */
-export function searchItemsOf(site: ReturnType<typeof siteOf>): SearchItem[] {
-  const names = new Map(site.universes.map((universe) => [universe.id, universe.name]));
-  const listed = new Map([...site.worlds, ...site.ecosystems].map((each) => [each.path, each]));
-  const items = site.places.map(({ kind, universe, path }): SearchItem => {
-    const home = names.get(universe) ?? universe;
-    const row = listed.get(path);
-    if (kind === "cosmos") return { name: home, kind, universe, path };
-    if (kind === "earth") return { name: `Earth of ${home}`, kind, universe, path };
-    const name = row?.name ?? path;
-    return kind === "world" ? worldItem({ name, kind, universe, path }, row?.kind) : { name, kind, universe, path };
-  });
-  // The schema lets two universes hold the same name: the option then says which universe it leads to.
-  const seen = new Map<string, number>();
-  for (const { name, kind } of items) seen.set(`${kind}/${name}`, (seen.get(`${kind}/${name}`) ?? 0) + 1);
-  return items.map((item) =>
-    (seen.get(`${item.kind}/${item.name}`) ?? 0) > 1
-      ? { ...item, name: `${item.name} (${names.get(item.universe) ?? item.universe})` }
-      : item,
+const rankedBy = (sort: SearchSort): RankedSort | undefined => RANKED.find((each) => each === sort);
+
+// The order a sort asks, or none: the first thing that tells two results apart.
+const bySort = (sort: SearchSort, a: SearchItem, b: SearchItem): number => {
+  if (sort === "name") return a.name.localeCompare(b.name);
+  const ranked = rankedBy(sort);
+  if (ranked !== undefined) {
+    // What the file says nothing of goes after what it does.
+    if (a.rank === undefined || b.rank === undefined)
+      return Number(b.rank !== undefined) - Number(a.rank !== undefined);
+    return compareRanks(ranked)(a.rank, b.rank);
+  }
+  const key = KEYS[sort];
+  return key === undefined ? 0 : key(b) - key(a);
+};
+
+const orderOf = (sort: SearchSort) => (a: Scored, b: Scored) => {
+  const [x, y] = [a.result.item, b.result.item];
+  return (
+    bySort(sort, x, y) ||
+    b.score - a.score ||
+    (y.here ?? 0) - (x.here ?? 0) ||
+    (y.calls ?? 0) - (x.calls ?? 0) ||
+    (a.score > 0 ? x.name.length - y.name.length : 0)
   );
+};
+
+// The best few, in the order asked, and how many there were.
+function best(found: Scored[], sort: SearchSort, shown = SHOWN): Found {
+  if (shown <= 0) return { results: [], total: found.length };
+  const results = found.sort(orderOf(sort)).map(({ result }) => result);
+  return { results: results.slice(0, shown), total: results.length };
 }
 
-// The chord, in a module of its own: the header's button reads it on the first screen, the search itself is the drawer's chunk.
-export { opensPalette } from "./chord.ts";
+const all = (entries: readonly Entry[], keep: (item: SearchItem) => boolean): Scored[] =>
+  entries.filter((entry) => keep(entry.item)).map((entry) => ({ score: 0, result: { item: entry.item, hits: [] } }));
 
-/** A full Plan's namespace's worlds (F5470), from the worlds file the drawer reads already, each to its realm's page, while the words are the
- * namespace's alone; none for other words, no namespace, no file yet or no such world. */
-export function namespaceGroup(
-  worlds: readonly { id: string; namespace: string; realms: readonly { path?: string | null }[] }[] | undefined,
-  namespace: string,
-  query: string,
-): { id: string; label: string; options: { id: string; label: string }[] }[] {
-  if (namespace === "" || query.trim() !== namespace) return [];
-  const options = (worlds ?? []).flatMap(({ id, namespace: its, realms }) => {
-    const page = its === namespace ? realmPage(realms[0]?.path ?? undefined) : undefined;
-    return page === undefined ? [] : [{ id: page, label: labelName(id) ?? id }];
-  });
-  return options.length === 0
-    ? []
-    : [{ id: "namespace", label: `Worlds of ${namespace} · ${String(options.length)}`, options }];
+// A system by its namespace; a namespace named whole also lists its realms.
+function inNamespaces(index: SearchIndex, text: string, { keep, sort }: Ask): Found {
+  const systems = rank(index.systems, text, { keep });
+  const whole = index.systems.find(({ lower }) => lower === text);
+  const realms =
+    whole === undefined ? [] : all(index.realms, (item) => item.namespace === whole.item.name && keep(item));
+  const found = best(systems, sort);
+  const more = best(realms, sort, SHOWN - found.results.length);
+  return { results: [...found.results, ...more.results], total: found.total + more.total };
+}
+
+// A realm by its path; one typed whole is offered, listed or not, when no listed realm answers.
+function inRealms(index: SearchIndex, text: string, ask: Ask): Found {
+  const found = best(rank(index.realms, text, ask), ask.sort);
+  const page = found.total > 0 ? undefined : realmPageHref(`gno.land/r/${text}`);
+  if (page === undefined) return found;
+  const item: SearchItem = { name: text, kind: "realm", universe: "", path: page, description: "A realm, by its path" };
+  return { results: [{ item, hits: [] }], total: 1 };
+}
+
+// A plain word: the places, then the systems, then the realms, the best 50 of them all and how many answered.
+function inEverything(index: SearchIndex, text: string, ask: Ask): Found {
+  const results: SearchResult[] = [];
+  let total = 0;
+  for (const entries of [index.places, index.systems, index.realms]) {
+    const found = best(rank(entries, text, ask), ask.sort, SHOWN - results.length);
+    results.push(...found.results);
+    total += found.total;
+  }
+  return { results, total };
+}
+
+const COMMAND_ENTRIES = COMMANDS.map((item) => ({ item, lower: item.name, words: wordsOf(item.name) }));
+
+const askOf = ({
+  filters = new Set<SearchFilter>(),
+  sort = "relevance",
+  namespace,
+  tab = "all",
+}: Partial<SearchOptions> = {}) => {
+  const ask: Ask = { keep: keeping(filters, namespace), sort, narrowed: filters.size > 0 || namespace !== undefined };
+  return { ask, tab };
+};
+
+// Every place, for the groups of the empty field to cut.
+function listing(index: SearchIndex, { keep, sort }: Ask): Found {
+  const places = all([...index.places, ...index.systems], keep);
+  return {
+    results: (sort === "relevance" ? places : places.sort(orderOf(sort))).map(({ result }) => result),
+    total: places.length,
+  };
+}
+
+// The places, rooms and people the words ask for, by their mark; whether a world's main room counts among the rooms.
+function partsOf(index: SearchIndex, { mode, text }: Parsed, ask: Ask) {
+  const anyone = { keep: () => true };
+  const people = ask.narrowed === true ? NONE : best(rank(index.people, text, anyone), ask.sort);
+  if (mode === "room") {
+    const note = ({ room }: Entry) => `${room ?? ""} · room`;
+    const rooms = best(rank(index.rooms, text, { ...ask, note }), ask.sort);
+    return { parts: { places: NONE, rooms, people: NONE }, mains: true };
+  }
+  if (mode === "namespace")
+    return { parts: { places: inNamespaces(index, text, ask), rooms: NONE, people }, mains: true };
+  const rooms = ask.narrowed === true ? NONE : best(rank(index.rooms, text, anyone), ask.sort);
+  return { parts: { places: inEverything(index, text, ask), rooms, people }, mains: false };
+}
+
+/** The best results of `query` over the `index`: a name matches places, systems and stations, then rooms and people; `#` rooms; `@` the
+ * systems, and a namespace named whole also lists its realms, then people; `/r/` the realms; `>` the commands. The chips and the
+ * namespace narrow places alone, so a narrowed search holds no room nor person. An empty name lists every place. */
+export function searchPlaces(index: SearchIndex, query: string, options?: Partial<SearchOptions>): Found {
+  const { mode, text } = parseQuery(query);
+  if (mode === "command") return best(rank(COMMAND_ENTRIES, text, { keep: () => true }), "relevance");
+  const { ask, tab } = askOf(options);
+  if (mode === "realm") return inRealms(index, text, ask);
+  if (text === "" && mode !== "room" && mode !== "namespace") return listing(index, ask);
+  const { parts, mains } = partsOf(index, { mode, text }, ask);
+  return tabbed(parts, tab, mains);
 }

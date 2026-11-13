@@ -1,17 +1,16 @@
-/* The quick actions: pills that share the row's width, each an edge round the resting fill, its words centred (the
-   prototype's #quick, index.html:323-325: 32 px high, 12 px, a step between them). */
+/* A world's pinned actions over the composer (D271): pills that share the row's width, each an edge round the resting fill, its words
+   centred (the prototype's #quick, index.html:323-325: 32 px high, 12 px, a step between them). The quick actions are the composer's +. */
 @layer components {
   .bar {
     /* layout: the pills side by side, sharing the row; no composition lets each child grow by its own width */
     display: flex;
-    /* layout: a world's pinned pills after the row's own that do not fit go to a line of their own, never off the dock */
+    /* layout: the pills that do not fit go to a line of their own, never off the dock */
     flex-wrap: wrap;
     /* layout: a step between the pills */
     gap: var(--space-2xs);
-    padding-block: var(--space-s);
+    padding-block-end: var(--space-s);
   }
 
-  .action,
   .pinned > * {
     /* layout: each pill grows from its words' width to share what the row has left */
     flex: 1 0 auto;
@@ -24,44 +23,12 @@
     cursor: pointer;
   }
 
-  /* A later slice's pill: its place in the row, its face the pill's, greyed by ComingSoon. */
-  .soon {
-    /* layout: the slot is a row, so the inert button and its face fill it */
-    display: flex;
-    /* layout: the slot grows as a pill does */
-    flex: 1 0 auto;
-  }
-
-  .soon > *,
-  .soon button {
-    /* layout: the tooltip's box, then the inert button, fill the slot */
-    display: flex;
-    /* layout: the tooltip's box, then the inert button, fill the slot */
-    flex: 1 0 auto;
-  }
-
-  /* The greyed pill's face: a pill as the others, its words centred. */
-  .soon .action {
-    /* layout: its words centred, as a button's are */
-    display: grid;
-    /* layout: its words centred, as a button's are */
-    place-items: center;
-  }
-
-  /* Catch up, where the row is narrow (a dock's, a phone's): the pills that work keep the row. */
-  @container quick (inline-size < 560px) {
-    .soon[data-wide] {
-      display: none;
-    }
-  }
-
-  .action:hover,
   .pinned > *:hover {
     border-color: var(--color-line-strong);
     background: var(--color-fill-hover);
   }
 
-  /* A world's pinned actions (D271) come from another feature's code, a button or a link: the row gives each the pill's look. */
+  /* A world's pinned actions come from another feature's code, a button or a link: the row gives each the pill's look. */
   .pinned {
     /* layout: the pinned pills are the row's own children */
     display: contents;
@@ -76,14 +43,15 @@
     text-decoration: none;
   }
 
-  /* The quick actions and the composer under the lines, set off by a rule across the conversation. */
+  /* The pinned actions and what writes under the lines, set off by a rule across the conversation. */
   .dock {
-    /* layout: the row reads its own width (Catch up), not the window's */
-    container: quick / inline-size;
     /* the video's 21 px under the box, from the tokens: 16 and 4 */
-    padding-block-end: calc(var(--space-s) + var(--space-3xs));
+    padding-block: var(--space-s) calc(var(--space-s) + var(--space-3xs));
     padding-inline: var(--chat-inset);
     border-block-start: var(--line-width) solid var(--color-line);
+    /* layout: the composer's box, wider than the dock's inset: a step off the edge, its words (not its edge) on the lines' left (MessageBox.module.css) */
+    --box-bleed: calc(var(--chat-inset) - var(--space-2xs));
+    --box-in: calc(max(var(--chat-inset), var(--space-l)) - var(--space-2xs) - var(--line-width));
   }
 
   /* The card a pinned action opens over the row (D271): it scrolls in its own box, so the row and what writes stay on screen. */

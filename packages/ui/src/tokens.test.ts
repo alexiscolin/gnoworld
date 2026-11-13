@@ -3,7 +3,7 @@ import css from "./tokens.css?raw";
 import { groups, parseTokens, tokens } from "./tokens.ts";
 
 const value = (name: string) => tokens().find((token) => token.name === name)?.value;
-// docs/DESIGN-SYSTEM.md, "Colour": the nine base colours.
+// docs/DESIGN-SYSTEM.md, "Colour": the base colours, and the four the frames draw that no base colour mixes to exactly.
 const BASE: Record<string, string> = {
   space: "#05070D",
   night: "#0B0F18",
@@ -15,6 +15,10 @@ const BASE: Record<string, string> = {
   violet: "#B79CFF",
   coral: "#FF8A7A",
   dusk: "#6885D9",
+  slate: "#2C313C",
+  sky: "#5EAAFD",
+  white: "#FFFFFF",
+  mist: "#C8D0DE",
 };
 
 // WCAG 2.2's contrast ratio, from two #rrggbb colours.
@@ -51,9 +55,38 @@ describe("parseTokens", () => {
     ]);
   });
 
-  it("puts every token of the file in a group the page draws", () => {
+  // The plate's and the composer's own layout variables, and the animation's per-element ones, are set in :root as defaults for a stylesheet's
+  // `var()` (slice 13): not design tokens, so no group draws them; a new name in none still fails here, until it is a token with its group or is named here.
+  const LAYOUT_VARIABLES = [
+    "--chart-h",
+    "--chart-h-l",
+    "--chart-open",
+    "--talk-h",
+    "--web-h",
+    "--web-h-l",
+    "--web-h-s",
+    "--fn-row-h",
+    "--row-h",
+    "--box-bleed",
+    "--box-in",
+    "--d",
+    "--play",
+    "--n",
+    "--j",
+    "--pk",
+    "--spark-line",
+    "--spark-area",
+  ];
+  const drawn = () => tokens().filter((token) => !LAYOUT_VARIABLES.includes(token.name));
+
+  it("puts every token of the file in a group the page draws, but the layout variables named here", () => {
     expect(tokens().length).toBeGreaterThan(0);
-    for (const token of tokens()) expect(groups().map((g) => g.name)).toContain(token.group);
+    for (const token of drawn()) expect(groups().map((g) => g.name)).toContain(token.group);
+    expect(
+      tokens()
+        .filter((token) => token.group === "Other")
+        .map((token) => token.name),
+    ).toEqual(LAYOUT_VARIABLES);
   });
 
   it("keeps the page's groups in their order", () => {
@@ -66,6 +99,7 @@ describe("parseTokens", () => {
       "Shape",
       "Motion",
       "Effects",
+      "Direction",
     ]);
   });
 
@@ -83,6 +117,7 @@ describe("parseTokens", () => {
     ["--measure", "Size"],
     ["--dialog-w", "Size"],
     ["--popover-w", "Size"],
+    ["--popover-wide", "Size"],
     ["--plate-w", "Size"],
     ["--chat-dock", "Size"],
     ["--thumb-m", "Size"],
@@ -93,6 +128,7 @@ describe("parseTokens", () => {
     ["--motion-fast", "Motion"],
     ["--ease-standard", "Motion"],
     ["--opacity-disabled", "Effects"],
+    ["--dir", "Direction"],
   ])("puts %s in %s", (name, group) => {
     expect(tokens().find((token) => token.name === name)?.group).toBe(group);
   });
@@ -116,7 +152,7 @@ describe("parseTokens", () => {
 });
 
 describe("the tokens", () => {
-  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values, all nine', () => {
+  it('hold the base colours of docs/DESIGN-SYSTEM.md, "Colour", at their values, every one', () => {
     const primitives = tokens().filter((t) => t.group === "Primitives");
     const held = Object.keys(BASE);
     expect(primitives.map((t) => t.name).sort()).toEqual(held.map((name) => `--p-${name}`).sort());
@@ -124,9 +160,11 @@ describe("the tokens", () => {
   });
 
   it("make every colour role of primitives only, never of a raw value", () => {
-    for (const token of tokens().filter((t) => t.name.startsWith("--color-"))) {
+    // A link takes the colour of the text round it (`--color-link`, 977255f1): no colour of its own, so none to be raw.
+    for (const token of tokens().filter((t) => t.name.startsWith("--color-") && t.value !== "currentcolor")) {
       expect(token.value).not.toMatch(/#[0-9a-f]{3,8}\b|\b(rgb|hsl|oklch|oklab)a?\(/i);
-      expect(token.value).toMatch(/var\(--p-[\w-]+\)/);
+      // A role may be a wash of another role (the pill glass is the surface's): that one is of primitives in its turn.
+      expect(token.value).toMatch(/var\(--(?:p|color)-[\w-]+\)/);
     }
   });
 
@@ -183,10 +221,12 @@ describe("the tokens", () => {
     ["--dialog-w", "490px"],
     ["--dialog-wide", "760px"],
     ["--popover-w", "300px"],
+    ["--popover-wide", "440px"],
     ["--thumb-s", "32px"],
     ["--thumb-m", "52px"],
     ["--plate-w", "808px"],
-    ["--chat-dock", "360px"],
+    ["--chat-dock", "420px"],
+    ["--chat-dock-s", "380px"],
     ["--thumb-l", "64px"],
     ["--avatar-s", "20px"],
     ["--avatar-m", "24px"],
@@ -214,12 +254,25 @@ describe("the tokens", () => {
     expect(parseTokens(`:root {${coarse}}`).map(({ name }) => name)).not.toContain("--control-m");
   });
 
-  it("still the fast and the base motion under reduced motion, and keep the wait", () => {
+  // D363: every other duration is multiplied by --motion-scale, 0 here.
+  it("still the fast and the base motion under reduced motion, and the scale of every other, and keep the wait", () => {
     const reduced = /@media \(prefers-reduced-motion: reduce\)\s*\{\s*:root\s*\{([^}]*)\}/.exec(css)?.[1] ?? "";
     expect(parseTokens(`:root {${reduced}}`).map(({ name, value: v }) => [name, v])).toEqual([
       ["--motion-fast", "0s"],
       ["--motion-base", "0s"],
+      ["--motion-slow", "0s"],
+      ["--motion-label", "0s"],
+      ["--motion-scale", "0"],
     ]);
+  });
+});
+
+// The inline axis's sign, which a slide, a fade's side or a bar at a line's start multiplies: 1, and -1 in a box set right to left.
+describe("the writing direction", () => {
+  it("is 1, -1 under a right-to-left box, and 1 again under a left-to-right one inside it", () => {
+    expect(value("--dir")).toBe("1");
+    expect(css).toMatch(/\[dir="rtl"\]\s*\{\s*--dir: -1;\s*\}/);
+    expect(css).toMatch(/\[dir="ltr"\]\s*\{\s*--dir: 1;\s*\}/);
   });
 });
 

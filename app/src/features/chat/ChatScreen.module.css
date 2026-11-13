@@ -5,21 +5,63 @@
   .screen {
     /* layout: the screen fills the slot the page gives it, and the regions scroll alone, the page none */
     block-size: 100%;
+    /* the chat fades in over its skeleton (Loading.tsx) */
+    animation: arrive calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard) backwards;
+  }
+
+  @keyframes arrive {
+    from {
+      opacity: 0;
+    }
+  }
+
+  /* Where no dock holds the chat (under 1280 px) it fades in as it mounts, on the entering curve; beside a plate or alone over the scene the
+     dock's glass fill-in does it (ui's Panel). */
+  @media (width < 1280px) {
+    .screen:not([data-full]) {
+      opacity: 1;
+      transition: var(--transition-fade);
+    }
+
+    @starting-style {
+      .screen:not([data-full]) {
+        opacity: 0;
+      }
+    }
   }
 
   /* Full bleed over the page, the video's frames 56 to 77, below a flash that stays, as the page is (F2165). */
   .screen[data-full] {
     position: fixed;
     inset: var(--flash-room) 0 0;
-    /* raw: above the page's header, whose z-index is 2 (shellHeader.module.css), until the layers' tokens come with the scene */
+    /* raw: over the page, the plate and the dock; under the page's header from 900 px (4, shellHeader.module.css), which it runs
+       under to the window's top; over a phone's header and its bars (2) */
     z-index: 3;
   }
 
-  /* Full bleed on a wide screen, the arrival's pill stands in its header's empty centre (frame 73), the 52 px band holding its
-     one row: the lines keep their place under the header (frame 66). */
+  /* The lines read larger than the site's 13.5 px chat text, in the full chat and in the dock alike (Alexis, 2026-11-07, "plus gros en mode
+     full size"; 2026-11-08, the dock "plus gros et convivial"); a phone's keeps the site's. */
+  .screen:not([data-compact]) {
+    --font-chat: var(--font-chat-l);
+  }
+
+  /* The full chat drawn, the cover its page wore from its first paint goes (shellHeader.module.css). */
+  :root:has(.screen[data-full])::before {
+    content: none;
+  }
+
+  /* The wide full chat's band, under the site's header, whose 96 px the chat leaves it (Alexis, 2026-11-09): the header stays where it
+     stood, the chat's surface under it. */
+  :root:has(.screen[data-full]:not([data-compact])) {
+    --chat-head: calc(var(--control-m) + 2 * var(--space-s));
+  }
+
+  /* Full bleed on a wide screen, the arrival's pill stands in its band's empty centre (frame 73), under the site's header: the lines
+     keep their place under the band (frame 66). */
   :root:has(.screen[data-full]) {
     --banner-top: calc(
-      var(--flash-room) + (var(--chat-head) - var(--control-s) - var(--space-2xs) * 2 - var(--line-width) * 2) / 2
+      var(--flash-room) + var(--banner-under) +
+        (var(--chat-head) - var(--control-s) - var(--space-2xs) * 2 - var(--line-width) * 2) / 2
     );
   }
 
@@ -39,10 +81,19 @@
     --chat-inset: var(--space-m);
   }
 
-  /* raw: the 320 px dock of a window under 1400 px: the list keeps 300 px */
-  @media (max-width: 1399px) {
+  /* The dock beside a place's plate: its header's first row on the plate's crumbs' line, the 24 px row 27 px under the plate's top (frame
+     20; Alexis, 2026-11-07), the row being a small control high. */
+  .screen:not([data-full]) [data-region="header"] {
+    /* raw: the crumbs' row's middle, 27 px and half its 24 px under the plate's top (ui Panel's plate), less half this row */
+    padding-block-start: calc(27px + 12px - var(--control-s) / 2);
+    /* layout: the name a step off the band's line, as frame 38 */
+    padding-block-end: var(--space-s);
+  }
+
+  /* The narrow dock of a window under 1400 px: the list keeps its width. */
+  @media (width < 1400px) {
     .screen:not([data-full]) {
-      --chat-inset: 8px;
+      --chat-inset: var(--space-2xs);
     }
   }
 
@@ -54,5 +105,10 @@
   .rail {
     padding: var(--space-s) var(--space-xs);
     overflow-wrap: anywhere;
+  }
+
+  /* The place's bar over the search panel: the inset the info panel gives it, so its buttons stay where they were. */
+  .bar {
+    padding: var(--chat-panel-inset) var(--chat-panel-inset) 0;
   }
 }

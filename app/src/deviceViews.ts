@@ -3,7 +3,7 @@
 // closes it, and a link opens it.
 import { useLocation, useNavigate } from "react-router";
 
-const DEVICE_VIEWS = ["passport", "settings", "saved"] as const;
+const DEVICE_VIEWS = ["passport", "settings", "saved", "release"] as const;
 export type DeviceView = (typeof DEVICE_VIEWS)[number];
 
 const viewOf = (hash: string): DeviceView | undefined => DEVICE_VIEWS.find((view) => hash === `#${view}`);

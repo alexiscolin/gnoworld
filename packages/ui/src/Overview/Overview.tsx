@@ -1,29 +1,19 @@
 import { Button } from "../Button/Button.tsx";
 import { IconButton } from "../Button/IconButton.tsx";
-import { Center, Cluster, Grid, Sidebar, Stack, Switcher } from "../compositions/index.ts";
+import { Cluster, Grid, Stack } from "../compositions/index.ts";
 import { EmptyState } from "../EmptyState/EmptyState.tsx";
 import { Flash } from "../Flash/Flash.tsx";
 import { Icon, ICON_NAMES } from "../icons/Icon.tsx";
+import { iconNode } from "../icons/iconNode.ts";
 import { Skeleton } from "../Skeleton/Skeleton.tsx";
-import { Activity } from "./Activity.tsx";
-import {
-  Avatars,
-  Cards,
-  Chips,
-  Dialogs,
-  Fields,
-  Links,
-  Planets,
-  Popovers,
-  Rows,
-  Stats,
-  TabRows,
-} from "./Interface.tsx";
+import { Avatars, Cards, Chips, Dialogs, Fields, Links, Planets, Popovers, Rows, Stats } from "./Interface.tsx";
+import { Marks } from "./Marks.tsx";
 import { NavItems } from "./NavItems.tsx";
-import { Kicker } from "../Kicker/Kicker.tsx";
-import { Frames, Kickers, Layout } from "./Frames.tsx";
+import { Compositions, Frames, Kickers, Layout } from "./Frames.tsx";
+import { PlateRegions } from "./Plate.tsx";
 import { Region } from "./Region.tsx";
 import { Soon } from "./Soon.tsx";
+import { TabRows } from "./TabRows.tsx";
 
 function Buttons() {
   return (
@@ -58,23 +48,6 @@ function IconButtons() {
   );
 }
 
-function Compositions() {
-  return (
-    <Sidebar space="m">
-      <Kicker vertical>Hub atlas</Kicker>
-      <Switcher>
-        <Center max="measure">
-          <p>Stack, Cluster, Grid, Sidebar, Switcher and Center do all the layout.</p>
-        </Center>
-        <Grid min="s">
-          <Kicker dot="warm">Live</Kicker>
-          <Kicker dot="signal">An uncharted signal</Kicker>
-        </Grid>
-      </Switcher>
-    </Sidebar>
-  );
-}
-
 // The elements the base layer styles, and the label in a script whose caps it leaves alone.
 function Text() {
   return (
@@ -105,18 +78,27 @@ function Flashes() {
   );
 }
 
+// iconNode's glyph as it is drawn outside React (space's name pills), mounted by hand.
+const mountNode = (el: HTMLSpanElement | null) => el?.replaceChildren(iconNode("people", "s"));
+
 function Icons() {
   return (
-    <Grid as="ul" min="s" space="xs">
-      {ICON_NAMES.map((name) => (
-        <li key={name}>
-          <Cluster space="2xs">
-            <Icon name={name} />
-            <code>{name}</code>
-          </Cluster>
-        </li>
-      ))}
-    </Grid>
+    <Stack>
+      <Grid as="ul" min="s" space="xs">
+        {ICON_NAMES.map((name) => (
+          <li key={name}>
+            <Cluster space="2xs">
+              <Icon name={name} />
+              <code>{name}</code>
+            </Cluster>
+          </li>
+        ))}
+      </Grid>
+      <Cluster space="2xs">
+        <span data-icon-node ref={mountNode} />
+        <code>iconNode</code>
+      </Cluster>
+    </Stack>
   );
 }
 
@@ -175,11 +157,10 @@ export function Overview() {
       </Region>
       <Region name="Stats">
         <Stats />
+        <Marks />
         <Soon />
       </Region>
-      <Region name="Activity">
-        <Activity />
-      </Region>
+      <PlateRegions />
       <Region name="Planets">
         <Planets />
       </Region>

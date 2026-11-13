@@ -25,19 +25,4 @@
   .state:empty {
     display: none;
   }
-
-  /* A phone reads and signs on a computer (U6): a coarse pointer gets the words, a computer the button. */
-  .phone {
-    display: none;
-  }
-
-  @media (pointer: coarse) {
-    .phone {
-      display: block;
-    }
-
-    .computer {
-      display: none;
-    }
-  }
 }

@@ -36,7 +36,7 @@ function fieldRow(field: FormField, at: number): ReactNode[] {
       "dt",
       { key: `t${String(at)}`, dir: "ltr" },
       name,
-      createElement("small", { className: styles["kind"] }, ` ${kind}`),
+      createElement("small", { className: "meta" }, ` ${kind}`),
     ),
     createElement("dd", { key: `d${String(at)}` }, ...details(field)),
   ];
@@ -74,11 +74,11 @@ export function RealmForm({
       "figcaption",
       { dir: "ltr" },
       exec === "" ? "Form" : `Form: ${exec}`,
-      path === "" ? undefined : createElement("small", { className: styles["kind"] }, ` · path: ${path}`),
-      createElement("small", { className: styles["kind"] }, ` · ${note}`),
+      path === "" ? undefined : createElement("small", { className: "meta" }, ` · path: ${path}`),
+      createElement("small", { className: "meta" }, ` · ${note}`),
     ),
     createElement("dl", null, ...fields.flatMap(fieldRow)),
-    left === 0 ? undefined : createElement("p", { className: styles["kind"], "data-left": "" }, leftOut(left)),
+    left === 0 ? undefined : createElement("p", { className: "meta", "data-left": "" }, leftOut(left)),
     children,
   );
 }

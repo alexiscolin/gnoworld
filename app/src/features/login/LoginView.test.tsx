@@ -18,7 +18,7 @@ const SOURCES = import.meta.glob<string>(["../../**/*.{ts,tsx}", "!../../**/*.te
   import: "default",
   eager: true,
 });
-const HERE = "../../features/login/LoginView.test.tsx";
+const HERE = "./LoginView.test.tsx";
 const STATIC = /^(?:import|export)\s(?!type\b)[^;]*?from\s+["'](\.[^"']*)["']/gm;
 const isNames = (file: string) => /\/features\/names\/|\/lib\/chain\/names\.ts$/.test(file);
 
@@ -104,10 +104,50 @@ describe("LoginView", () => {
     );
   });
 
+  // Alexis, 2026-11-07: the login's error stood beside the button; it is the button's own words now, short, the whole sentence its
+  // description and its status region's, which shows nothing on its own (D377).
+  it.each([
+    [{ reason: "too_many" } as const, "Wait a minute", "Too many tries: wait a minute, then try again."],
+    [{ reason: "locked" } as const, "Unlock Adena", "Unlock Adena, then try again."],
+    [
+      { reason: "address", problem: "checksum" } as const,
+      "Check Adena's address",
+      "Adena's address does not match its checksum: a character in it is wrong.",
+    ],
+  ])(
+    "says why the last login stopped in its button, short, the whole sentence its description: %j",
+    (problem, short, whole) => {
+      const html = view({ problem });
+      const escaped = (words: string) => words.replaceAll("'", "&#x27;");
+      expect(buttons(html)).toEqual([escaped(short)]);
+      expect(html).toContain(`aria-description="${escaped(whole)}"`);
+      expect(html).toMatch(/<p role="status" class="[^"]*visually-hidden[^"]*">/);
+    },
+  );
+
   it("says why the last login stopped, in its status region", () => {
     const html = view({ problem: { reason: "address", problem: "checksum" } });
     expect(html).toMatch(/role="status"[^>]*>[^<]*Adena&#x27;s address does not match its checksum/);
   });
+});
+
+describe("LoginView: what a problem changes", () => {
+  it("shows the problem's whole sentence, not hidden, once the session is in, and hides the one that has a button", () => {
+    const shown = view({ session: { kind: "in", address: ADDRESS }, problem: { reason: "network" } });
+    expect(shown).toMatch(/<p role="status" class="(?![^"]*visually-hidden)[^"]*">/);
+    expect(view({ problem: { reason: "network" } })).toMatch(/<p role="status" class="[^"]*visually-hidden[^"]*">/);
+  });
+
+  it.each(["wallet", "signing", "verifying"] as const)(
+    "keeps the step's words, no alert and no description, while a login is at %s though a problem is kept",
+    (step) => {
+      const html = view({ step, problem: { reason: "locked" } });
+      expect(buttons(html)).not.toContain("Unlock Adena");
+      expect(html).not.toContain("aria-description");
+      expect(buttons(html)).toHaveLength(1);
+      expect(html).not.toContain("<svg");
+    },
+  );
 });
 
 describe("the first screen and the account's name", () => {

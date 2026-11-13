@@ -135,6 +135,6 @@ describe("a thread's chip, under its root", () => {
 
   it("names what the chip does for a screen reader, not the count alone", () => {
     const [root = ""] = markup(view());
-    expect(said(chipOf(root)?.[0] ?? "")).toMatch(/^2 replies\b.*\bthread\b/i);
+    expect(chipOf(root)?.[0]).toMatch(/aria-label="2 replies, open the thread"/);
   });
 });

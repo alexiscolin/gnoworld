@@ -86,7 +86,7 @@ describe("activity", () => {
     const activity = makeActivity();
     for (let n = 0; n < 150_000; n += 1) activity.count("#bubble", `account-${String(n)}`, T0);
     for (let n = 0; n < 20_000; n += 1) activity.count(`#room-${String(n)}`, `r${String(n)}`, T0 + MINUTE);
-    expect(activity.size()).toEqual({ accounts: 100_000, rooms: 10_000, minutes: 10_000 });
+    expect(activity.size()).toEqual({ accounts: 100_000, rooms: 10_000, minutes: 10_000, guests: 0 });
   });
 
   it("keeps a room's last five minutes alone, however many minutes it has counted", () => {
@@ -94,4 +94,56 @@ describe("activity", () => {
     for (let n = 0; n < 1000; n += 1) activity.count("#bubble", `a${String(n)}`, T0 + n * MINUTE);
     expect(activity.size().minutes).toBeLessThanOrEqual(5);
   });
+});
+
+describe("a guest's lines (D353, D374)", () => {
+  it("counts a guest's line in the guests' rates alone, never in the rates the trends and the history read", () => {
+    const activity = makeActivity();
+    activity.count("#bubble", "ada", T0);
+    activity.countGuest("#bubble", "brave-otter-ab23", T0);
+    activity.countGuest("#bubble", "calm-heron-cd34", T0);
+    expect(activity.rates(["#bubble"], T0)).toEqual(new Map([["#bubble", 1 / 5]]));
+    expect(activity.guestRates(["#bubble"], T0)).toEqual(new Map([["#bubble", 2 / 5]]));
+  });
+
+  it("counts no account line among the guests' rates", () => {
+    const activity = makeActivity();
+    activity.count("#bubble", "ada", T0);
+    expect(activity.guestRates(["#bubble"], T0)).toEqual(new Map([["#bubble", 0]]));
+  });
+
+  it("counts a guest 10 times a minute at most, so a relay never fakes a storm either", () => {
+    const activity = makeActivity();
+    for (let n = 0; n < 1000; n += 1) activity.countGuest("#bubble", "spammer", T0 + n);
+    expect(activity.guestRates(["#bubble"], T0 + 1000)).toEqual(new Map([["#bubble", 10 / 5]]));
+  });
+
+  it("forgets a guest's minute once it is five minutes old, as an account's", () => {
+    const activity = makeActivity();
+    activity.countGuest("#bubble", "a", T0);
+    expect(activity.guestRates(["#bubble"], T0 + 5 * MINUTE - 1)).toEqual(new Map([["#bubble", 1 / 5]]));
+    expect(activity.guestRates(["#bubble"], T0 + 5 * MINUTE)).toEqual(new Map([["#bubble", 0]]));
+  });
+
+  it("holds its guests in the size it reports, bounded like the accounts' (a guest name is no account's)", () => {
+    const activity = makeActivity();
+    activity.count("#bubble", "ada", T0);
+    activity.countGuest("#bubble", "ada", T0);
+    expect(activity.size().accounts).toBe(1);
+    expect(activity.rates(["#bubble"], T0)).toEqual(new Map([["#bubble", 1 / 5]]));
+  });
+});
+
+describe("the guests' counts stay bounded (D430)", () => {
+  it(
+    "holds at most 100,000 guest names and 10,000 rooms, 150,000 names counted, the accounts' held apart",
+    { timeout: 30_000 },
+    () => {
+      const activity = makeActivity();
+      for (let n = 0; n < 150_000; n += 1) activity.countGuest("#bubble", `guest-${String(n)}`, T0);
+      for (let n = 0; n < 20_000; n += 1) activity.countGuest(`#room-${String(n)}`, `g${String(n)}`, T0 + MINUTE);
+      expect(activity.size()).toEqual({ accounts: 0, rooms: 0, minutes: 0, guests: 100_000 });
+      expect(activity.guestRates(["#room-9999", "#room-10000"], T0 + MINUTE).get("#room-10000")).toBe(0);
+    },
+  );
 });

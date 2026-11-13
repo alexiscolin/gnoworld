@@ -5,9 +5,9 @@
 // third party here, whatever the moderation's verdict (4g draws the players, in the room's list).
 // Its composer, given, tags every line with the root's msgid; a guest gets a word in its place.
 import { excerpt, foldEdits, threadsOf, type Line } from "@gnoworld/core";
-import { IconButton, Sidebar, Stack } from "@gnoworld/ui";
+import { composing, IconButton, Sidebar, Stack } from "@gnoworld/ui";
 import { useEffect, useEffectEvent, useRef, type KeyboardEvent, type ReactNode } from "react";
-import { LineView } from "./LineView.tsx";
+import { BARE_ROW, LineView } from "./LineView.tsx";
 import shared from "./lists.module.css";
 import { mentionable } from "./names.ts";
 import { shortened } from "./shortened.ts";
@@ -60,51 +60,31 @@ export function Thread({ root, lines, members, me, onClose, composer }: ThreadPr
   useEffect(() => {
     start();
   }, []);
-  // An Escape that ends an input method's composition belongs to the composition: Safari marks it with keyCode 229, not
-  // isComposing (R5). The legacy keyCode is the one signal there is: read by name, as the types mark it deprecated.
+  // An Escape that ends an input method's composition belongs to the composition (R5, Safari's keyCode 229 included).
   const escape = (event: KeyboardEvent) => {
-    const { nativeEvent } = event;
-    if (
-      event.key !== "Escape" ||
-      event.defaultPrevented ||
-      nativeEvent.isComposing ||
-      Reflect.get(nativeEvent, "keyCode") === 229
-    )
-      return;
+    if (event.key !== "Escape" || event.defaultPrevented || composing(event.nativeEvent)) return;
     event.preventDefault();
     onClose();
   };
   return (
     <aside ref={boxRef} aria-label="Thread" className={styles["panel"]} onKeyDown={escape}>
-      <Stack space="s">
+      <header className={styles["head"]}>
         <Sidebar side="end" space="2xs">
-          <h3 className={styles["title"]}>{title === "" ? "Thread" : `Thread: ${title}`}</h3>
+          <h2 className={styles["title"]}>{title === "" ? "Thread" : `Thread: ${title}`}</h2>
           <IconButton icon="close" label="Close the thread" size="s" emphasis="plain" onClick={onClose} />
         </Sidebar>
-        <p className={styles["count"]}>{countOf(replies.length)}</p>
-        <ol aria-label="In this thread" className={LINES}>
-          {rows.map((line) => (
-            <LineView
-              key={line.id}
-              line={line}
-              me={me}
-              members={known}
-              stop={false}
-              actions={null}
-              fresh={false}
-              verdict={undefined}
-              players={false}
-              saved={false}
-              pinned={false}
-              chips={undefined}
-              react={undefined}
-              answers={undefined}
-              inThread
-            />
-          ))}
-        </ol>
-        {composer}
-      </Stack>
+      </header>
+      <div className={styles["body"]}>
+        <Stack space="s">
+          <p className={styles["count"]}>{countOf(replies.length)}</p>
+          <ol aria-label="In this thread" className={LINES} data-bare="">
+            {rows.map((line) => (
+              <LineView key={line.id} line={line} me={me} members={known} {...BARE_ROW} inThread />
+            ))}
+          </ol>
+          {composer}
+        </Stack>
+      </div>
     </aside>
   );
 }

@@ -5,7 +5,7 @@ import { boxOf, meet, namesOf } from "./planNames.ts";
 import { along, cameraTowards, looksFrom, placeOf } from "./restLook.ts";
 
 // A Plan's names, pinned where StrykerJS found planNames.ts loose (8r, 2026-11-05): plan.test.ts reads them through planOf; these call
-// namesOf on the Plans of systems named crowd<n>, found by a search over crowd0 to crowd299 (and the eye turned aside by up to 0.6
+// namesOf on the Plans of systems named crowd<n>, found again by a search over crowd0 to crowd299 for the Plan seen straight over (and the eye turned aside by up to 0.6
 // of its distance) where each rule decides.
 describe("a name's box", () => {
   const box = (left: number, top: number) => ({ left, right: left + 10, top, bottom: top + 10 });
@@ -63,20 +63,21 @@ describe("namesOf", () => {
     expect(host).toBeUndefined();
   });
 
-  // crowd26's smallest are w13 and w2 (0.044); its largest w9 (0.071) has no room; w7 (0.069) is the largest named.
+  // Found again for the Plan seen straight over (D415): crowd80's smallest is w10 (0.049); its largest unnamed, w2 (0.078), has no room; w12
+  // and w1 (0.079) and w3 (0.077) are named.
   it("names the largest first, and gives the +N the place of the smallest named world that must go", () => {
-    const { system, worlds, camera, lens } = crowdPlan(26);
+    const { system, worlds, camera, lens } = crowdPlan(80);
     const { named, host } = namesOf(system, worlds, { camera, lens, crowded: true });
-    for (const id of ids(26, [1, 5, 7])) expect(named.has(id), id).toBe(true);
-    for (const id of ids(26, [13, 2, 9])) expect(named.has(id), id).toBe(false);
-    expect(host).toBe(ids(26, [2])[0]);
+    for (const id of ids(80, [1, 12, 3])) expect(named.has(id), id).toBe(true);
+    for (const id of ids(80, [10, 2])) expect(named.has(id), id).toBe(false);
+    expect(host).toBe(ids(80, [10])[0]);
   });
 
   it("stands the +N's room under its world's disc", () => {
-    const { system, worlds, camera, lens } = crowdPlan(17);
+    const { system, worlds, camera, lens } = crowdPlan(123);
     const { named, host } = namesOf(system, worlds, { camera, lens, crowded: true });
-    expect(host).toBe(ids(17, [13])[0]);
-    expect(named.has(ids(17, [5])[0] ?? "")).toBe(true);
+    expect(host).toBe(ids(123, [6])[0]);
+    expect(named.has(ids(123, [3])[0] ?? "")).toBe(true);
   });
 
   // crowd26's largest world is w9 (0.071).

@@ -109,8 +109,9 @@ const setup = ({ steps = [], chain = {}, cap = 45 * DOLLAR, keepBytes, chains = 
   const cards = cardTools({ chains, places, read: () => Promise.reject(new Error("no gnomcp")), fetch: node });
   const caps = {
     questionChars: 2_000,
+    // /ask's caps (D13985): a digest keeps its own, 8 turns and 4,096 tokens.
     turns: 4,
-    outputTokens: 4_096,
+    outputTokens: 1_000,
     callTimeoutMs: 60_000,
     retries: 2,
     toolResultBytes: 16 * 1024,
@@ -166,6 +167,22 @@ describe("a realm's digest, read on its universe's node", () => {
     expect(first).toContain(`source=\\"page\\"`);
     expect(first).toContain(`source=\\"functions\\"`);
     expect(first).toContain("efefefef");
+    expect(first).toContain("Results");
+  });
+
+  it("answers invalid for a universe the cards list but the places do not hold, reading nothing", async () => {
+    const { parts, node, model, signal } = setup();
+    const digests = makeDigests({ ...parts, cards: { ...parts.cards, chains: ["onyx", "ghost"] } });
+    expect(await digests.digest({ universe: "ghost", realm: REALM }, signal())).toEqual({ kind: "invalid" });
+    expect(node).not.toHaveBeenCalled();
+    expect(model.requests).toHaveLength(0);
+  });
+
+  it("answers failed, not invalid, for a realm whose question the loop refuses as too long", async () => {
+    const long = `gno.land/r/demo/${"a".repeat(2_100)}`;
+    const { ask, model } = setup({ chain: { realms: [long] } });
+    expect(await ask(long)).toEqual({ kind: "failed" });
+    expect(model.requests).toHaveLength(0);
   });
 
   it("offers the model give_digest and propose_action, and nothing else", async () => {
@@ -206,6 +223,20 @@ describe("a realm's digest, read on its universe's node", () => {
     const { ask, model } = setup();
     expect(await ask("gno.land/r/demo/none")).toEqual({ kind: "none" });
     expect(model.requests).toHaveLength(0);
+  });
+
+  it("logs a read that failed by its step and its kind, never the realm: a node of another chain, a realm it does not hold", async () => {
+    const unread = (events: () => Record<string, unknown>[]) =>
+      events().filter((event) => event["event"] === "jarvis_digest_unread");
+    const other = setup({ chain: { network: "gnoland-1" } });
+    await other.ask();
+    expect(unread(other.events)).toEqual([{ event: "jarvis_digest_unread", reason: "height:other-chain" }]);
+    const missing = setup();
+    await missing.ask("gno.land/r/demo/none");
+    expect(unread(missing.events)).toEqual([{ event: "jarvis_digest_unread", reason: "page:no-realm" }]);
+    const read = setup({ steps: [give(digest()), done()] });
+    await read.ask();
+    expect(unread(read.events)).toEqual([]);
   });
 
   it("answers invalid for a universe none of jarvis's chains names, reading nothing", async () => {
@@ -549,7 +580,7 @@ describe("a digest's reads and what it keeps (StrykerJS, the review's V4, V5)", 
 
 describe("a digest the model ends without (the security review's S1)", () => {
   it.each([
-    ["its turns used up", () => Array.from({ length: 4 }, () => give(digest("4,321")))],
+    ["its 8 turns used up", () => Array.from({ length: 8 }, () => give(digest("4,321")))],
     ["max_tokens", () => [message({ content: [text("cut")], stop: "max_tokens", model: "claude-haiku-5-5" })]],
     ["a refusal", () => [message({ content: [], stop: "refusal", model: "claude-haiku-5-5" })]],
     [
@@ -559,6 +590,30 @@ describe("a digest the model ends without (the security review's S1)", () => {
   ])("is a none kept for its 10 minutes after %s, so its next readers pay nothing", async (_, steps) => {
     const { ask, model } = setup({ steps: steps() });
     expect(await ask()).toEqual({ kind: "none" });
+    const asked = model.requests.length;
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests).toHaveLength(asked);
+  });
+});
+
+describe("a digest's loop, apart from /ask's (10u-g)", () => {
+  it("keeps its own caps whatever /ask's: 4,096 output tokens a request, and 8 turns before it gives up", async () => {
+    const { ask, model } = setup({ steps: Array.from({ length: 9 }, () => give(digest("4,321"))) });
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests).toHaveLength(8);
+    expect(model.requests.every((request) => request.max_tokens === 4_096)).toBe(true);
+  });
+
+  it("offers no `decline`: a realm page that tells the model to call it steers nothing", async () => {
+    const { ask, model } = setup({ steps: [said(toolUse("t1", "decline", {})), done()] });
+    expect(model.requests).toEqual([]);
+    expect(await ask()).toEqual({ kind: "none" });
+    expect(model.requests[0]?.tools?.some((tool) => "name" in tool && tool.name === "decline")).toBe(false);
+  });
+
+  it("keeps the none of such a page for its 10 minutes: the next reader pays nothing", async () => {
+    const { ask, model } = setup({ steps: [said(toolUse("t1", "decline", {})), done()] });
+    await ask();
     const asked = model.requests.length;
     expect(await ask()).toEqual({ kind: "none" });
     expect(model.requests).toHaveLength(asked);

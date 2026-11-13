@@ -75,7 +75,9 @@ export function lineFetches(timeoutMs: number): Fetches {
       return promise;
     },
     paged(room) {
-      if (requests.length < REQUESTS) requests.push({ room, pending: undefined });
+      // Never dropped, whatever the questions fill: a dropped page leaves its batch to the next question. The catch-up has one
+      // page in flight, so the list is bounded by REQUESTS and one.
+      requests.push({ room, pending: undefined });
     },
     opened(ref, room) {
       const [head] = requests;
@@ -96,8 +98,8 @@ export function lineFetches(timeoutMs: number): Fetches {
     closed(ref) {
       const pending = open.get(ref);
       open.delete(ref);
-      if (pending !== undefined && asked.get(`${pending.room} ${pending.msgid}`) === pending)
-        done(pending, pending.found ?? "gone");
+      // A question's batch only: `done` lets a question already answered be.
+      if (pending !== undefined) done(pending, pending.found ?? "gone");
     },
     failed() {
       const pending = requests.shift()?.pending;

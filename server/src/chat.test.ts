@@ -14,11 +14,13 @@ import { pinsRoutes } from "./pins/routes.ts";
 import { loadConfig } from "./config.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
+import { SAID_TABLES } from "./door/said.ts";
 import { LOGIN_TABLES } from "./login/login.ts";
 import { PROGRESS_TABLES } from "./moderation/catchup.ts";
 import { VERDICT_TABLES } from "./moderation/check.ts";
 import { MUTE_TABLES } from "./moderation/mute.ts";
-import { ROOM_STATE } from "./rooms/create.ts";
+import { EARTH_TABLES, REALM_PATH, REALM_TABLES, ROOM_STATE } from "./rooms/create.ts";
+import { ROOM_SAID } from "./rooms/earth.ts";
 import type { Answer } from "./moderation/provider.ts";
 import type { Room, Rules } from "./roles/roles.ts";
 import { listRooms, ROOM_TABLES } from "./rooms/rooms.ts";
@@ -67,6 +69,8 @@ const setup = (
     // The first signals' store, as main hands it to the chat (slice 9h).
     signals?: boolean;
   } = {},
+  // What the lines that pass tell Jarvis's door (D13985).
+  extra?: Pick<Parameters<typeof startChat>[2], "door">,
 ) => {
   const db = openDatabase(":memory:", [
     LOGIN_TABLES,
@@ -75,8 +79,13 @@ const setup = (
     PROGRESS_TABLES,
     MUTE_TABLES,
     ROOM_STATE,
+    REALM_TABLES,
+    REALM_PATH,
+    EARTH_TABLES,
+    ROOM_SAID,
     PIN_TABLES,
     SIGNAL_TABLES,
+    SAID_TABLES,
   ]);
   const signals = withSignals ? makeSignals(db, { now: now ?? Date.now }) : undefined;
   const options = {
@@ -88,6 +97,7 @@ const setup = (
     ...(session === undefined ? {} : { session }),
     ...(redactRetryMs === undefined ? {} : { redactRetryMs }),
     ...(presence === undefined ? {} : { presence }),
+    ...extra,
     signals,
   };
   const chat = startChat(db, settings, options);
@@ -178,10 +188,11 @@ describe("the chat, as the server starts it", () => {
   const linked = async (
     settings: Omit<Parameters<typeof startChat>[1], "ergo">,
     more: Parameters<typeof setup>[1] = {},
+    extra?: Parameters<typeof setup>[2],
   ) => {
     const ergo = await fakeErgo();
     const ergoAt = { host: "127.0.0.1", port: ergo.port, password: PASSWORD };
-    const chat = setup({ ...settings, ergo: ergoAt }, { now: () => T0, ...more });
+    const chat = setup({ ...settings, ergo: ergoAt }, { now: () => T0, ...more }, extra);
     const peer = await ergo.peer(0);
     await welcome(peer);
     const Verdicts = z.array(z.object({ msgid: z.string(), action: z.string(), reason: z.string().nullable() }));
@@ -216,6 +227,35 @@ describe("the chat, as the server starts it", () => {
     peer.say(message("account=g1a;msgid=m1", "a!u@h", ["+#bubble", "buy spam"]));
     await expect.poll(verdicts).toEqual([{ msgid: "m1", action: "hide", reason: "banned_word" }]);
     expect(await peer.next(/^REDACT /)).toMatch(/^REDACT #bubble m1 /);
+  });
+
+  it("hides a line for an owner with the link's REDACT, writing no verdict and no strike, whatever the count (part 4b, M9)", async () => {
+    const { peer, verdicts, chat, db } = await linked(
+      { worlds: worlds("bubble"), moderation: OFF },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    const ids = ["m1", "m2", "m3", "m4"];
+    for (const id of ids) peer.say(message(`account=g1a;msgid=${id}`, "a!u@h", ["#bubble", "hello"]));
+    await expect.poll(verdicts).toHaveLength(4);
+    const before = verdicts();
+    for (const id of ids) expect(chat.hide("#bubble", id)).toBe(true);
+    await expect
+      .poll(() => peer.lines.filter((line) => /^REDACT #bubble m\d :hidden by a moderator/.test(line)))
+      .toHaveLength(4);
+    expect(verdicts()).toEqual(before);
+    expect(peer.lines.some((line) => MUTE_LINE.test(line))).toBe(false);
+    expect(db.prepare("SELECT count(*) AS n FROM mutes").get()).toEqual({ n: 0 });
+  });
+
+  it("mutes for an owner in every room of the world, ending no live mute, and refuses the cap's next (part 4b)", async () => {
+    const { peer, chat } = await linked(
+      { worlds: worlds("bubble"), moderation: { ...OFF, mute: { ...MUTE, max: 1 } } },
+      { provider: () => Promise.resolve("unchecked") },
+    );
+    expect(chat.muteKeeping("g1a", "bubble")).toBe("muted");
+    await expect.poll(() => peer.lines.filter((line) => MUTE_LINE.test(line))).toContain("SAMODE #bubble +b m:g1a");
+    expect(chat.muteKeeping("g1b", "bubble")).toBe("full");
+    expect(chat.roomsOf("bubble")).toContain("#bubble");
   });
 
   it("passes the moderation's settings on: a new account's hours, and the thresholds", async () => {
@@ -1397,21 +1437,6 @@ describe("the chat, as the server starts it", () => {
         .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
     });
 
-    it("hands the server's other readers what /api/presence serves, for the ticker's trends (7t)", async () => {
-      const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
-      const { peer, chat, app } = await linked(
-        { worlds: roled(), moderation: OFF },
-        { presence: file, now: () => Date.now() },
-      );
-      if (chat.presence === undefined) throw new Error("no presence route");
-      app.route("/api/presence", chat.presence);
-      await answer(peer, "#bubble", "~@gnoworld ada bo");
-      await expect
-        .poll(async () => Presence.parse(await (await app.request("/api/presence")).json()).worlds, { timeout: 10_000 })
-        .toEqual([{ world: "bubble", here: 2, perHour: 0, rise: null }]);
-      expect(chat.presenceNow?.()).toEqual(Presence.parse(await (await app.request("/api/presence")).json()));
-    });
-
     it("leaves a hidden open room and an archived room out of who is here, as a guest sees neither (7h)", async () => {
       const file = join(mkdtempSync(join(tmpdir(), "gnoworld-chat-presence-")), "presence.json");
       const hidden = roled();
@@ -1437,11 +1462,6 @@ describe("the chat, as the server starts it", () => {
     it("serves no presence without its file", () => {
       const { chat } = setup({ worlds: roled(), moderation: OFF, ergo: undefined });
       expect(chat.presence).toBeUndefined();
-    });
-
-    it("hands no presence to another reader without its file (7t)", () => {
-      const { chat } = setup({ worlds: roled(), moderation: OFF, ergo: undefined });
-      expect(chat.presenceNow).toBeUndefined();
     });
 
     it("voices a writer who joins a members-write room, at once", async () => {
@@ -1510,7 +1530,8 @@ describe("the chat, as the server starts it", () => {
           "/api/pins",
           pinsRoutes({
             pins: t.chat.pins,
-            mayPin: t.chat.mayPin,
+            mayPin: (room, who) => Promise.resolve(t.chat.staff(room, who) ? { as: "staff" } : false),
+            mayShow: (room, who) => Promise.resolve(t.chat.staff(room, who) ? { as: "staff" } : false),
             readable: t.chat.mayRead,
             session: (token) => {
               const who = tokens.get(token ?? "");
@@ -1535,17 +1556,19 @@ describe("the chat, as the server starts it", () => {
       it("lets its world's moderators and the team pin there, and no member, writer or other world's moderator", () => {
         const { chat } = here();
         for (const room of ["#bubble", "#bubble/crew", "#bubble/desk"])
-          expect([MOD, TEAM, MEMBER, WRITER].map((who) => chat.mayPin(room, who))).toEqual([true, true, false, false]);
-        expect(chat.mayPin("#other", WRITER)).toBe(true);
-        expect(chat.mayPin("#other", MOD)).toBe(false);
+          expect([MOD, TEAM, MEMBER, WRITER].map((who) => chat.staff(room, who))).toEqual([true, true, false, false]);
+        expect(chat.staff("#other", WRITER)).toBe(true);
+        expect(chat.staff("#other", MOD)).toBe(false);
       });
 
       it("answers a members room's pins to its members alone, through the route, and says who may pin", async () => {
         const { app } = here();
         const get = (who?: string) =>
-          app.request("/api/pins?room=%23bubble%2Fcrew", {
-            headers: who === undefined ? {} : { cookie: `__Host-session=${who}` },
-          });
+          app.request(
+            "/api/pins?room=%23bubble%2Fcrew",
+            { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
+            { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+          );
         for (const who of [undefined, "writer"]) expect((await get(who)).status).toBe(403);
         const member = PinList.parse(await (await get("member")).json());
         expect([member.may, member.pins.map(({ id }) => id)]).toEqual([false, ["m1"]]);
@@ -1556,15 +1579,19 @@ describe("the chat, as the server starts it", () => {
       it("refuses a pin and an unpin in this world to another world's moderator, and to a member", async () => {
         const { app, db } = here();
         const post = (path: string, who: string) =>
-          app.request(`/api/pins${path}`, {
-            method: "POST",
-            headers: {
-              origin: "https://gnoworld.test",
-              "content-type": "application/json",
-              cookie: `__Host-session=${who}`,
+          app.request(
+            `/api/pins${path}`,
+            {
+              method: "POST",
+              headers: {
+                origin: "https://gnoworld.test",
+                "content-type": "application/json",
+                cookie: `__Host-session=${who}`,
+              },
+              body: JSON.stringify({ room: "#bubble/crew", msgid: "m1" }),
             },
-            body: JSON.stringify({ room: "#bubble/crew", msgid: "m1" }),
-          });
+            { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+          );
         for (const who of ["writer", "member"]) {
           expect((await post("", who)).status).toBe(403);
           expect((await post("/unpin", who)).status).toBe(403);
@@ -1780,6 +1807,28 @@ describe("the chat, as the server starts it", () => {
       await expect.poll(() => chat.recent("#bubble", ASKER).map(({ text }) => text)).toEqual(["after"]);
     });
 
+    it("keeps Jarvis's public answers only with the door's part, and drops one when its line is hidden", async () => {
+      const without = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
+      expect(without.chat.said).toBeUndefined();
+      const door = {
+        heard: { said: () => undefined },
+        changed: () => undefined,
+        said: { hosts: ["gno.land"] },
+      };
+      const { chat, peer, db } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing, { door });
+      const full = JSON.stringify({ status: "answered", markdown: "It closes today.", buttons: [] });
+      db.prepare(
+        "INSERT INTO jarvis_said (room, msgid, answer, asker, question, at, bytes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+      ).run("#bubble", "b1", full, "g1a", "what", T0, full.length);
+      expect(chat.said?.get("#bubble", "b1")).toEqual({
+        status: "answered",
+        markdown: "It closes today.",
+        buttons: [],
+      });
+      peer.say(":mod!u@h REDACT #bubble b1 :off topic");
+      await expect.poll(() => chat.said?.get("#bubble", "b1")).toBeUndefined();
+    });
+
     it("drops a line its author deletes, and one its author edits, at once", async () => {
       const { chat, peer, verdicts } = await linked({ worlds: worlds("bubble"), moderation: OFF }, passing);
       peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "first"]));
@@ -1812,6 +1861,69 @@ describe("the chat, as the server starts it", () => {
         { msgid: "m2", action: "pass", reason: "members_room" },
       ]);
       expect([chat.recent("#bubble/crew", "g1a"), chat.recent("#bubble/desk", "g1a")]).toEqual([[], []]);
+    });
+  });
+
+  describe("what the passed lines tell Jarvis's door (D13985)", () => {
+    const passing = { provider: () => Promise.resolve(OFF_ANSWER) };
+    const crew = new Map<string, World>([
+      [
+        "bubble",
+        {
+          rules: RULES,
+          rooms: new Map([["#bubble/crew", { type: "members", readers: "crew", hidden: false }]]),
+        },
+      ],
+    ]);
+    const door = () => {
+      const heard: string[] = [];
+      const changed: string[] = [];
+      return {
+        heard,
+        changed,
+        door: {
+          heard: { said: (account: string) => heard.push(account) },
+          changed: (room: string) => changed.push(room),
+        },
+      };
+    };
+
+    it("hands on the account of a line that passed, in a public room and in a members room, and of none it hides", async () => {
+      const spy = door();
+      const { peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing, { door: spy.door });
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      peer.say(message("account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      peer.say(message("account=g1c;msgid=m3", "c!u@h", ["#bubble/crew", "between us"]));
+      await expect.poll(verdicts).toHaveLength(3);
+      peer.say(":ergo.test BATCH +h chathistory #bubble");
+      peer.say(message("batch=h;account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      peer.say(":ergo.test BATCH -h");
+      peer.say(message("account=g1d;msgid=m4;+gnoworld/edit=m1", "d!u@h", ["#bubble", "hello again"]));
+      await expect.poll(verdicts).toHaveLength(4);
+      expect([...spy.heard].sort()).toEqual(["g1a", "g1c"]);
+    });
+
+    it("keeps a room's last line's id, a members room's too, moved by a line that passed alone", async () => {
+      const { chat, peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing);
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "hello"]));
+      peer.say(message("account=g1c;msgid=m3", "c!u@h", ["#bubble/crew", "between us"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      peer.say(message("account=g1b;msgid=m2", "b!u@h", ["#bubble", "spam here"]));
+      await expect.poll(verdicts).toHaveLength(3);
+      expect([chat.last("#bubble"), chat.last("#bubble/crew"), chat.last("#none")]).toEqual(["m1", "m3", undefined]);
+      expect(chat.recent("#bubble/crew", "g1x")).toEqual([]);
+    });
+
+    it("tells the door the room of a line taken or edited", async () => {
+      const spy = door();
+      const { peer, verdicts } = await linked({ worlds: crew, moderation: OFF }, passing, { door: spy.door });
+      peer.say(message("account=g1a;msgid=m1", "a!u@h", ["#bubble", "first"]));
+      peer.say(message("account=g1a;msgid=m2", "a!u@h", ["#bubble", "secnod"]));
+      await expect.poll(verdicts).toHaveLength(2);
+      peer.say(":mod!u@h REDACT #bubble m1 :off topic");
+      await expect.poll(() => spy.changed).toEqual(["#bubble"]);
+      peer.say(message("account=g1a;msgid=m3;+gnoworld/edit=m2", "a!u@h", ["#bubble", "second"]));
+      await expect.poll(() => spy.changed).toEqual(["#bubble", "#bubble"]);
     });
   });
 

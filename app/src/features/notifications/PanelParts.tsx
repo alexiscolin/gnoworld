@@ -1,6 +1,7 @@
 // The bell panel's parts (frames 86, 87): its head, the worlds to filter by, and a line, its mark mint while unread.
-import { Chip, Cluster, Icon, IconButton, Row } from "@gnoworld/ui";
+import { Button, Chip, Cluster, Icon, IconButton, Row } from "@gnoworld/ui";
 import { whenOf, type Item } from "./feed.ts";
+import { hrefProp } from "../chat/index.ts";
 import styles from "./Panel.module.css";
 
 // The panel's head: its title and the way to mark everything read.
@@ -8,9 +9,9 @@ export function Head({ onMarkAll }: { onMarkAll: () => void }) {
   return (
     <Cluster justify="between" space="s">
       <h2 className={styles["title"]}>Notifications</h2>
-      <button type="button" className={`label ${String(styles["markAll"])}`} onClick={onMarkAll}>
-        Mark all read
-      </button>
+      <Button emphasis="link" size="s" onClick={onMarkAll}>
+        <span className={`label ${String(styles["markAll"])}`}>Mark all read</span>
+      </Button>
     </Cluster>
   );
 }
@@ -111,7 +112,7 @@ export function Line({
         subtitleLook="label"
         lead={lead}
         trail={when}
-        href={item.href}
+        {...hrefProp(item.href)}
       />
     </li>
   );

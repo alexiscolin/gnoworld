@@ -53,6 +53,3 @@ export const deploysQuery = (before: number | undefined, limit: number): string 
 /** The height and time of these blocks. */
 export const blocksQuery = (heights: readonly number[]): string =>
   `{ getBlocks(where: { _or: [${heights.map((height) => `{ height: { eq: ${String(height)} } }`).join(", ")}] }, limit: ${String(heights.length)}) { height time } }`;
-
-/** The newest block the indexer holds. */
-export const tipQuery = "{ latestBlockHeight }";

@@ -2,6 +2,8 @@
 // drop the correction; Escape in the box drops it too, as the reply bar's does, and Save sends it.
 import { IconButton, Sidebar } from "@gnoworld/ui";
 import { useId, type KeyboardEvent, type ReactNode } from "react";
+import { FIELD } from "./composerBox.ts";
+import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";
 
 interface EditingProps {
@@ -28,7 +30,7 @@ export function useEditing(
   return {
     bar: editing ? (
       <Sidebar side="end" space="2xs">
-        <p id={id} className={styles["replying"]}>
+        <p id={id} className={[styles["replying"], rules["quote"]].join(" ")}>
           Editing a message
         </p>
         <IconButton
@@ -39,7 +41,7 @@ export function useEditing(
           onClick={(event) => {
             const form = event.currentTarget.closest("form");
             onCancelEdit?.();
-            form?.querySelector("textarea")?.focus();
+            form?.querySelector<HTMLElement>(FIELD)?.focus();
           }}
         />
       </Sidebar>

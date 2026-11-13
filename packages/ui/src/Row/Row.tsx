@@ -18,6 +18,12 @@ export interface RowProps {
   current?: boolean;
   /** A link for the lead and the words; the trail stays out of it, so its controls are not inside a link. */
   href?: string;
+  /** The link goes to another site: in a new tab, and the other site is told nothing of this one. */
+  external?: boolean;
+  /** The words cut at the end of the line, as a list of one-line rows has them. */
+  truncate?: boolean;
+  /** A button for the lead and the words (a row that does something here); `href` and `onClick` are never both. */
+  onClick?: () => void;
 }
 
 // The row's words: its title, and its subtitle and activity when it has them.
@@ -26,18 +32,55 @@ function Words({
   subtitle,
   activity,
   label,
+  truncate,
 }: {
   title: string;
   subtitle: string | undefined;
   activity: string | undefined;
   label: boolean;
+  truncate: boolean | undefined;
 }) {
   return (
     <Stack space="3xs">
-      <span className={styles["title"]}>{title}</span>
-      {subtitle === undefined ? null : <span className={label ? "label" : styles["subtitle"]}>{subtitle}</span>}
-      {activity === undefined ? null : <span className={styles["activity"]}>{activity}</span>}
+      <span className={[styles["title"], truncate === true ? "truncate" : ""].join(" ")}>{title}</span>
+      {subtitle === undefined ? null : <span className={label ? "label" : "meta"}>{subtitle}</span>}
+      {activity === undefined ? null : <span className="data-text">{activity}</span>}
     </Stack>
+  );
+}
+
+// What the lead and the words are inside: a button, a link or nothing.
+function Body({
+  led,
+  current,
+  href,
+  external,
+  onClick,
+}: {
+  led: ReactNode;
+  current: boolean;
+  href: string | undefined;
+  external: boolean | undefined;
+  onClick: (() => void) | undefined;
+}) {
+  const now = current ? "true" : undefined;
+  if (onClick !== undefined) {
+    return (
+      <button type="button" className={["full-start", styles["link"]].join(" ")} aria-current={now} onClick={onClick}>
+        {led}
+      </button>
+    );
+  }
+  if (href === undefined) return led;
+  return (
+    <Anchor
+      href={href}
+      className={["full-start", styles["link"]].join(" ")}
+      aria-current={now}
+      {...(external === true ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+    >
+      {led}
+    </Anchor>
   );
 }
 
@@ -52,8 +95,13 @@ export function Row({
   look = "plain",
   current = false,
   href,
+  external,
+  truncate,
+  onClick,
 }: RowProps) {
-  const words = <Words title={title} subtitle={subtitle} activity={activity} label={subtitleLook === "label"} />;
+  const words = (
+    <Words title={title} subtitle={subtitle} activity={activity} label={subtitleLook === "label"} truncate={truncate} />
+  );
   const led =
     lead === undefined ? (
       words
@@ -63,16 +111,13 @@ export function Row({
         {words}
       </Sidebar>
     );
-  const body =
-    href === undefined ? (
-      led
-    ) : (
-      <Anchor href={href} className={styles["link"]} aria-current={current ? "true" : undefined}>
-        {led}
-      </Anchor>
-    );
+  const body = <Body led={led} current={current} href={href} external={external} onClick={onClick} />;
   return (
-    <div className={styles["row"]} data-look={look} aria-current={current && href === undefined ? "true" : undefined}>
+    <div
+      className={styles["row"]}
+      data-look={look}
+      aria-current={current && href === undefined && onClick === undefined ? "true" : undefined}
+    >
       {trail === undefined ? (
         body
       ) : (

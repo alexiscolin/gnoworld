@@ -1,37 +1,45 @@
-/* The dock's rooms as a row of pills (frame 26: 27 px high, 12 px words, the one in view cream, a count in muted words). */
+/* The dock's rooms as a row of pills (frame 26): ui's Chip at the video's 27 px, the one in view cream, a count after its name. */
 @layer components {
   .row {
-    /* layout: kept to its own height above the lines, at the lines' inset */
+    /* layout: kept to its own height above the lines, at the lines' inset, a step of its own fill under the pills */
     flex: none;
-    padding: var(--space-xs) var(--chat-inset) 0;
+    padding: var(--space-xs) var(--chat-inset);
+    /* held over the lines that scroll up under it by `held-top` (utilities.css): none shows through the pills */
   }
 
-  .chip {
-    /* layout: a pill the width of its words, a line 25 px high inside its 1 px edges: the video's 27 px */
-    display: inline-block;
-    /* raw: the video's pill is 27 px high, its edges 1 px each */
-    line-height: 25px;
-    padding-inline: var(--space-xs);
-    border: var(--line-width) solid var(--color-line-strong);
-    border-radius: var(--radius-pill);
-    font-family: var(--family-sans);
-    /* raw: the video's 12 px words */
-    font-size: 12px;
-    text-decoration: none;
-    color: var(--color-text);
+  /* the "+N" chip: a fade as it comes */
+  li[data-more] {
+    animation: chips-in calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
   }
 
-  .chip[aria-current="true"] {
-    border-color: transparent;
-    background: var(--color-primary);
-    color: var(--color-ink);
+  /* a chip the row's width does not hold: out of the flow at once, fading, and left to the row's `inert` for the keyboard and readers */
+  li[data-away] {
+    position: absolute;
+    opacity: 0;
   }
 
-  .chip span[aria-hidden] {
-    /* layout: a step from the name */
-    margin-inline-start: var(--space-3xs);
-    color: var(--color-text-muted);
-    /* raw: the count a step under the name, as the video's rooms' */
-    font-size: 10px;
+  .row li {
+    /* layout: a pill keeps its width, so a row too narrow sends the last ones out (data-away), never two lines */
+    flex: none;
+  }
+
+  li[data-chip] {
+    transition: opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  li[data-make] {
+    /* layout: the new room's plus at the row's far end */
+    margin-inline-start: auto;
+  }
+
+  .row ul {
+    /* layout: one line whatever the rooms' number; what does not fit waits out of the flow */
+    overflow: hidden;
+  }
+
+  @keyframes chips-in {
+    from {
+      opacity: 0;
+    }
   }
 }

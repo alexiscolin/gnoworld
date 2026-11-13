@@ -128,6 +128,7 @@ describe("the login's calls to the server", () => {
     expect(await server(json(401, { error: "unauthenticated" })).api.ticket()).toEqual({
       ok: false,
       reason: "unauthenticated",
+      body: { error: "unauthenticated" },
     });
   });
 
@@ -137,18 +138,22 @@ describe("the login's calls to the server", () => {
   });
 
   it.each([
-    [json(500, { error: "internal" }), "internal"],
-    [{ status: 502 }, "unavailable"],
-    [json(429, { error: "too_many" }), "too_many"],
-    [json(401, { error: "unauthenticated" }), "unauthenticated"],
-    [{ status: 401, text: "<html>401</html>", type: "text/html" }, "malformed"],
-  ])("never takes a failure of me for nobody: %j gives %s", async (answer, reason) => {
-    expect(await server(answer).api.me()).toEqual({ ok: false, reason });
+    [json(500, { error: "internal" }), "internal", { error: "internal" }],
+    [{ status: 502 }, "unavailable", undefined],
+    [json(429, { error: "too_many" }), "too_many", { error: "too_many" }],
+    [json(401, { error: "unauthenticated" }), "unauthenticated", { error: "unauthenticated" }],
+    [{ status: 401, text: "<html>401</html>", type: "text/html" }, "malformed", undefined],
+  ])("never takes a failure of me for nobody: %j gives %s", async (answer, reason, body) => {
+    expect(await server(answer).api.me()).toEqual({ ok: false, reason, body });
   });
 
   it("logs out, the server answering with no body", async () => {
     expect(await server({ status: 204 }).api.logout()).toEqual({ ok: true, value: undefined });
-    expect(await server(json(500, { error: "internal" })).api.logout()).toEqual({ ok: false, reason: "internal" });
+    expect(await server(json(500, { error: "internal" })).api.logout()).toEqual({
+      ok: false,
+      reason: "internal",
+      body: { error: "internal" },
+    });
   });
 
   // Every code the server answers (packages/schemas' ApiError), on every POST.
@@ -166,7 +171,11 @@ describe("the login's calls to the server", () => {
   it.each(POSTS.flatMap((call) => CODES.map(([status, code]) => ({ name: call.name, status, code, run: call.run }))))(
     "$name: a $status answering $code gives that reason",
     async ({ status, code, run }) => {
-      expect(await run(server(json(status, { error: code })).api)).toEqual({ ok: false, reason: code });
+      expect(await run(server(json(status, { error: code })).api)).toEqual({
+        ok: false,
+        reason: code,
+        body: { error: code },
+      });
     },
   );
 
@@ -179,7 +188,7 @@ describe("the login's calls to the server", () => {
     [json(400, { error: "teapot" }), "malformed"],
     [{ status: 307 }, "malformed"],
   ])("gives a reason to an answer with no code of the server's: %j gives %s", async (answer, reason) => {
-    expect(await server(answer).api.challenge("onyx-1")).toEqual({ ok: false, reason });
+    expect(await server(answer).api.challenge("onyx-1")).toEqual({ ok: false, reason, body: answer.json });
   });
 
   it.each([

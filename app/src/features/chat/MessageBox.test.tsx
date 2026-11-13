@@ -3,11 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { all, button, click, mount, one } from "../../../tests/mount.tsx";
 import { MessageBox } from "./MessageBox.tsx";
 
-// 5q: the composer's one box (frame 23.58.01): a small format bar, the field, and at its foot two marks that work today
-// (@ and /: the video's + and emoji wait for their features) and a round Send.
+// 5q: the composer's one box (frame 23.58.01): a small format bar, the field, and at its foot a round Send alone (the @ and /
+// marks went, D418: both are typed).
 const draw = (over: Partial<Parameters<typeof MessageBox>[0]> = {}) =>
   mount(
-    <MessageBox onFormat={() => undefined} onInsert={() => undefined} send="Send" goes {...over}>
+    <MessageBox
+      onFormat={() => undefined}
+      linkTool={() => <button type="button" aria-label="Link" />}
+      send="Send"
+      goes
+      {...over}
+    >
       <textarea aria-label="Message #games" />
     </MessageBox>,
   );
@@ -24,7 +30,7 @@ describe("the composer's box", () => {
   it("sets a rule between the format bar's groups: after the marks, after the code and the quote", () => {
     const bar = one(draw(), '[role="group"][aria-label="Format"]');
     const order = [...bar.querySelectorAll("button, [role='separator']")].map((each) =>
-      each.getAttribute("role") === "separator" ? "|" : each.getAttribute("aria-label"),
+      each.getAttribute("role") === "separator" ? "|" : (each.getAttribute("aria-label") ?? each.textContent),
     );
     expect(order).toEqual([
       "Bold",
@@ -42,17 +48,22 @@ describe("the composer's box", () => {
     expect(bar.querySelectorAll("[role='separator'][aria-orientation='vertical']")).toHaveLength(2);
   });
 
-  it("puts an @ or a / in the draft through its marks, and offers no button for what does not work yet", () => {
-    const onInsert = vi.fn();
-    const box = draw({ onInsert });
-    click(button(box, "Mention someone"));
-    click(button(box, "Start a command"));
-    expect(onInsert.mock.calls).toEqual([["@"], ["/"]]);
-    // The foot holds these two and Send, nothing else: the buttons outside the format bar, by their names.
-    const foot = all(box, "button")
+  // The link has no format to apply in place: its tool is the caller's, a popover that asks for the address.
+  it("draws the link tool the caller gives, between Code and Quote", () => {
+    const bar = one(
+      draw({ linkTool: () => <button type="button">Link tool</button> }),
+      '[role="group"][aria-label="Format"]',
+    );
+    const names = all(bar, "button").map((each) => each.getAttribute("aria-label") ?? each.textContent);
+    expect(names.slice(4, 7)).toEqual(["Code", "Link tool", "Quote"]);
+  });
+
+  it("holds Send alone at its foot: no @ nor / button", () => {
+    // The buttons outside the format bar, by their names.
+    const foot = all(draw(), "button")
       .filter((each) => each.closest('[aria-label="Format"]') === null)
       .map((each) => each.getAttribute("aria-label") ?? each.textContent);
-    expect(foot).toEqual(["Mention someone", "Start a command", "Send"]);
+    expect(foot).toEqual(["Send"]);
   });
 
   it("applies a format of the bar to the draft", () => {

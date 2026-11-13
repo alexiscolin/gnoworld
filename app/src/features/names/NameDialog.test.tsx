@@ -279,7 +279,7 @@ describe("NameDialog: what the form holds and how it is drawn", () => {
       new RegExp(`^${parts.map((part) => `_${part}_\\w+`).join(" ")}$`).test(each.className);
     expect(named(one(box, "p[role=status]"), "state")).toBe(true);
     expect(all(box, "p").filter((each) => named(each, "note"))).toHaveLength(3);
-    expect(named(one(box, "button[type=submit]").closest("span") ?? box, "computer")).toBe(true);
-    expect(all(box, "p").filter((each) => named(each, "phone", "note"))).toHaveLength(1);
+    expect((one(box, "button[type=submit]").closest("span") ?? box).className).toBe("fine-only");
+    expect(all(box, "p").filter((each) => /^coarse-only _note_\w+$/.test(each.className))).toHaveLength(1);
   });
 });

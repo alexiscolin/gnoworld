@@ -5,6 +5,19 @@
     border-block-end: var(--line-width) solid var(--color-line);
   }
 
+  /* Every row of one height, a guest's too: the height of the buttons an account's row holds. */
+  .row > * {
+    min-block-size: var(--control-m);
+  }
+
+  /* A guest's face is the night disc alone, which the panel's own night hides: a hairline ring says it is there. */
+  .guest {
+    /* layout: the ring hugs the disc alone, which a line's own height would grow */
+    display: grid;
+    border-radius: var(--radius-pill);
+    box-shadow: 0 0 0 var(--line-width) var(--color-line-strong);
+  }
+
   /* A person the reader may write to: face and name in one button, plain as the row's words are. */
   .person {
     border-radius: var(--radius-s);

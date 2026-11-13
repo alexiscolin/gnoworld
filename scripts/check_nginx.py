@@ -193,12 +193,15 @@ def main():
     bare = re.search(r'default\s+"([^"]*)"', table.read_text())
     bare = bare.group(1) if bare else None
     by_path = rules(headers.read_text())
-    # A visitor's first load asks for every file of the build twice (deploy/test.sh does), so the visitors' burst must hold twice the files or a
-    # first visit gets a 429 (F3385: 44 of 220 requests at a burst of 160). Docker is not needed to see it.
-    files = sum(1 for p in client.rglob("*") if p.is_file())
-    bursts = [int(n) for n in re.findall(r"zone=visitors\s+burst=(\d+)", pathlib.Path("deploy/web/nginx.conf").read_text())]
-    if not bursts or min(bursts) < 2 * files:
-        fail(f"the visitors' burst in deploy/web/nginx.conf is {min(bursts) if bursts else 'missing'}, under twice the build's {files} files ({2 * files}): a first visit would get a 429 (F3385)")
+    # A visitor's first load asks for every file of the build twice (deploy/test.sh does), so each zone's burst must hold twice its files or a
+    # first visit gets a 429 (F3385: 44 of 220 requests at a burst of 160): the hashed files under the files' zone, the rest under the visitors'.
+    hashed = ("assets", "textures", "world-pictures")
+    found = [p.relative_to(client).parts[0] for p in client.rglob("*") if p.is_file()]
+    conf = pathlib.Path("deploy/web/nginx.conf").read_text()
+    for zone, files in (("files", sum(1 for top in found if top in hashed)), ("visitors", sum(1 for top in found if top not in hashed))):
+        bursts = [int(n) for n in re.findall(rf"zone={zone}\s+burst=(\d+)", conf)]
+        if not bursts or min(bursts) < 2 * files:
+            fail(f"the {zone}' burst in deploy/web/nginx.conf is {min(bursts) if bursts else 'missing'}, under twice the build's {files} files of that zone ({2 * files}): a first visit would get a 429 (F3385)")
 
     with tempfile.TemporaryDirectory(prefix="check-nginx.") as where:
         where = os.path.realpath(where)

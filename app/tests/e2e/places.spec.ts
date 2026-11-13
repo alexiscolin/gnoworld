@@ -1,8 +1,8 @@
-import AxeBuilder from "@axe-core/playwright";
 import { placesFrom } from "../../src/dataPlaces.ts";
 import ecosystems from "../../data/ecosystems.json" with { type: "json" };
 import hubs from "../../data/hubs.json" with { type: "json" };
 import universes from "../../data/universes.json" with { type: "json" };
+import { violations } from "./axe.ts";
 import { expect, hydrated, test } from "./fixtures.ts";
 
 // Slice 5's 5d: every place of the data has its page, at its path and at its canonical address.
@@ -33,13 +33,11 @@ test.describe("every place of the data files", () => {
 });
 
 test.describe("the pages added in 5d", () => {
-  // 8g (d4fb504a): the Earth's plate lists no world, the List does; its way to the worlds is the crumb's Universe, a link to the cosmos.
+  // The header's levels say where the place is; the plate carries no crumb.
   test("/earth is the Earth, its heading and a way to the worlds", async ({ page }) => {
     await page.goto("/earth");
     await expect(page.getByRole("heading", { level: 1, name: "Earth" })).toBeVisible();
-    await expect(
-      page.locator("[data-look='plate'] nav[aria-label='You are here']").getByRole("link", { name: "Universe" }),
-    ).toBeVisible();
+    await expect(page.locator("header nav[aria-label='Views']").getByRole("link", { name: /Galaxy/ })).toBeVisible();
   });
 
   test("a universe with no world draws its Earth and says nothing of worlds", async ({ page }) => {
@@ -48,13 +46,17 @@ test.describe("the pages added in 5d", () => {
     await expect(page.getByText(/no world yet/i)).toHaveCount(0);
   });
 
-  // 8g (frame 104): the crumb over the title, "Universe > Games > dApp", says where the world is, in place of a kicker: one way to say it.
-  test("a world's page names its universe in a crumb over its title, and in no other trail", async ({ page }) => {
+  test("a world's page says its genre and kind over its title, in the header's levels, and in no crumb", async ({
+    page,
+  }) => {
     await page.goto("/w/bubble");
-    const crumb = page.locator("[data-look='plate'] nav[aria-label='You are here']");
-    await expect(crumb).toHaveCount(1);
-    await expect(crumb.locator("li").first()).toHaveText("Universe");
+    const plate = page.locator("[data-look='plate']");
+    await expect(plate.getByText("Games · dApp")).toBeVisible();
+    await expect(plate.locator("nav[aria-label='You are here']")).toHaveCount(0);
     await expect(page.getByRole("navigation", { name: /breadcrumb/i })).toHaveCount(0);
+    await expect(
+      page.locator("header nav[aria-label='Views']").getByRole("link", { name: "Bubble", exact: true }),
+    ).toBeVisible();
   });
 
   test("a link from the Earth to a world changes the page without a reload", async ({ page }) => {
@@ -69,18 +71,16 @@ test.describe("the pages added in 5d", () => {
     expect(await page.evaluate(() => "stayed" in window)).toBe(true);
   });
 
-  test("/list lists the worlds and, with the data holding no genre, offers no filter", async ({ page }) => {
-    await page.goto("/list");
-    await expect(page.getByRole("link", { name: "Bubble" })).toHaveAttribute("href", "/w/bubble");
-    await expect(page.getByRole("group", { name: "Genres" })).toHaveCount(0);
-  });
-
-  test("/list: the keyboard reaches a place's link and Enter follows it", async ({ page }) => {
+  test("/list goes to the home with the search palette open, Discover on its empty field (D355, D373)", async ({
+    page,
+  }) => {
     await page.goto("/list");
     await hydrated(page);
-    await page.getByRole("link", { name: "Bubble" }).focus();
-    await expect(page.getByRole("link", { name: "Bubble" })).toBeFocused();
-    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(/\/#search$/);
+    await expect(page.getByRole("dialog", { name: "Search" })).toBeVisible();
+    // Its empty field is Discover (D373): the places are found by their name.
+    await page.getByRole("combobox", { name: "Search places" }).fill("bubb");
+    await page.getByRole("option", { name: /Bubble/ }).click();
     await expect(page).toHaveURL("/w/bubble");
   });
 
@@ -131,7 +131,7 @@ for (const width of widths) {
         await expect(page.getByRole("heading", { level: 1 })).not.toHaveText(
           /^No (page|world|universe|ecosystem) here$/,
         );
-        expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+        expect(await violations(page)).toEqual([]);
         expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width);
       });
     }

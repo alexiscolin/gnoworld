@@ -29,8 +29,8 @@ export function defaultUniverse(file: string): { id: string; rpc: string; chainI
   return { id: chosen.id, rpc: chosen.rpc, chainId: chosen.chainId, indexer: chosen.indexer };
 }
 
-// The hubs of the default universe, from hubs.json beside the universes' file, through the data's schema: a bad file names itself alone.
-function defaultHubs(universesFile: string) {
+/** The hubs of the default universe, from hubs.json beside the universes' file, through the data's schema: a bad file names itself alone. */
+export function defaultHubs(universesFile: string) {
   const file = join(dirname(universesFile), "hubs.json");
   const parsed = Hubs.safeParse(dataOf(file, "hubs"));
   if (!parsed.success) throw new Error(`hubs: ${file} does not hold a good list of hubs`);
@@ -39,7 +39,7 @@ function defaultHubs(universesFile: string) {
 }
 
 /** Each hub of the default universe that lists realms, by its slug, with its first realm's world (core's hubWorldOf), from hubs.json beside
- * the universes' file: the trends read its rooms and its realms as one world (7t3). A hub with no realm is a world of its own, joined to no
+ * the universes' file: a hub's rooms and its realms are one world. A hub with no realm is a world of its own, joined to no
  * chain's world: one of its slug would be a realm alone in a namespace of that name, someone else's. */
 export function hubWorlds(universesFile: string): Map<string, string> {
   return new Map(

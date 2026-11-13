@@ -1,4 +1,4 @@
-# gnomcp 0.11.0's profiles for jarvis (JARVIS_GNOMCP_CONFIG, D86): each universe of app/data/universes.json on its own
+# gnomcp 0.11.0's profiles for jarvis (the reader's /etc/gnomcp/profiles.toml, deploy/jarvis-reader/Dockerfile, D86): each universe of app/data/universes.json on its own
 # node and indexer, and gnomcp's three built-ins redefined on the mainnet's chain, which gnomcp never writes to (it writes
 # to dev and testnet chains alone: internal/profiles/validate.go, testnetChainNames). jarvis refuses to start unless
 # gnomcp lists every profile read-only; the model may name jarvis's own profiles alone (JARVIS_PROFILES). Checked on

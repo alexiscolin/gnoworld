@@ -1,0 +1,50 @@
+/* The welcome card: over space at the bottom left, above the dock's line and clear of the chat column; a bottom sheet on a phone. */
+@layer components {
+  .welcome {
+    position: fixed;
+    /* the atlas caption stands in the page's edge: the card starts past it */
+    inset-inline-start: calc(var(--page-edge) + var(--space-xl));
+    inset-block-end: var(--page-edge);
+    /* raw: over the scene, under the chat's and the pill's layers (the pill's bar holds 2, shellHeader.module.css) */
+    z-index: 1;
+    /* raw: a card's width, never past the screen's gutters */
+    inline-size: min(26rem, calc(100% - var(--page-edge) * 2));
+    /* the card's own fill is faint: over the page it needs the surface under it */
+    background: var(--color-surface);
+    border-radius: var(--radius-box);
+    opacity: 0;
+    visibility: hidden;
+    translate: 0 var(--space-2xs);
+    transition:
+      opacity calc(var(--motion-base) * 0.7 * var(--motion-scale)) var(--ease-in),
+      translate calc(var(--motion-base) * 0.7 * var(--motion-scale)) var(--ease-in),
+      visibility calc(var(--motion-base) * 0.7 * var(--motion-scale));
+  }
+
+  .welcome[data-open] {
+    opacity: 1;
+    visibility: visible;
+    translate: none;
+    transition:
+      opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      translate calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      visibility calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  @starting-style {
+    .welcome[data-open] {
+      opacity: 0;
+      translate: 0 var(--space-2xs);
+    }
+  }
+
+  @media (width <= 40rem) {
+    .welcome {
+      inset-inline: 0;
+      inset-block-end: 0;
+      inline-size: auto;
+      border-end-start-radius: 0;
+      border-end-end-radius: 0;
+    }
+  }
+}

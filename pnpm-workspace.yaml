@@ -2,6 +2,7 @@ packages:
   - app
   - server
   - jarvis
+  - link-reader
   - packages/*
 
 # Supply chain, made explicit: no package younger than a day, no dependency build script

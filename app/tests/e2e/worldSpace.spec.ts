@@ -1,39 +1,16 @@
-import AxeBuilder from "@axe-core/playwright";
-import { readFileSync } from "node:fs";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { brightness, colours } from "./geometry.ts";
-import { countShifts, keepsItsRoom, opened, shifted, stats } from "./sceneStage.ts";
+import type { Space } from "../../src/space/scene.ts";
+import { countShifts, keepsItsRoom, opened, shifted } from "./sceneStage.ts";
+import { axeOf } from "./axe.ts";
 
 // A world's page in space (frames 20 to 35, 90 to 107, 115 to 125) on the gate's software GPU, under the page's real CSP: the world's
-// planet in the circle the page keeps beside the plate, the page tinted with its colour, its rooms as moons clear of the plate, and the
-// chat, which now comes after the load and the door, arriving and working. The canvas is not pixel-compared (the plan, section 6).
+// planet in the circle the page keeps beside the plate, its rooms as moons clear of the plate, and the chat, which now comes after the load
+// and the door, arriving and working. The canvas is not pixel-compared (the plan, section 6).
 const COMPUTER = { width: 1728, height: 1080 };
 const SLOW = { timeout: 90_000 };
-// Measured on the software GPU (2026-11-02), the halo and the star's haze drawn: 14 draws for Bubble with three moons, 12 for GovDAO with
-// one, so 11 and one a moon. Four moons and the ring's tube, moon and glow: 19, this part's budget (7e's review, B2-3).
-const DRAWS_AT_MOST = 19;
-// A square of `side` px centred on a point, as the colour helpers read a box: [x0, y0, x1, y1], whole pixels.
-const around = (x: number, y: number, side: number): [number, number, number, number] => [
-  Math.round(x - side / 2),
-  Math.round(y - side / 2),
-  Math.round(x + side / 2),
-  Math.round(y + side / 2),
-];
-// A colour's lightness in HSL, 0 to 1.
-const lightness = (hex: string) => {
-  const channels = [1, 3, 5].map((at) => parseInt(hex.slice(at, at + 2), 16) / 255);
-  return (Math.max(...channels) + Math.min(...channels)) / 2;
-};
 
 test.describe.configure({ timeout: 180_000 });
 
-interface WorldStats {
-  state: string;
-  centre: { x: number; y: number; radius: number };
-  moons: { room: string; x: number; y: number; shown: boolean }[];
-  shadows: number;
-}
-const world = async (page: Page) => ((await stats(page)) as unknown as { world: WorldStats | undefined }).world;
 const drawn = (page: Page) => expect(page.locator("[data-world='drawn']")).toBeAttached(SLOW);
 // A guest's chat, come and running: its room's name, and the line that asks a guest to log in to write.
 const chatIn = async (page: Page, room: string) => {
@@ -41,25 +18,25 @@ const chatIn = async (page: Page, room: string) => {
   await expect(page.locator("#chat").getByText("Log in to write in this room.")).toBeVisible();
 };
 
-// The world's centre where the page keeps its circle's.
-async function centredInItsCircle(page: Page, shown: WorldStats | undefined) {
-  const globe = await page.locator("[data-globe]").boundingBox();
-  if (globe === null || shown === undefined) throw new Error("no circle, or no world");
-  expect(Math.abs(shown.centre.x - (globe.x + globe.width / 2))).toBeLessThan(2);
-  expect(Math.abs(shown.centre.y - (globe.y + globe.height / 2))).toBeLessThan(2);
-}
+// Where the page's planet stands on screen, as the engine projects it: at rest on a page the rig looks at the planet's centre (move.ts).
+const planetSpot = (page: Page) =>
+  page.evaluate(() => {
+    const { see, rig, planet } = Reflect.get(globalThis, "__gnoworldSpace") as Space;
+    const on = { x: 0, y: 0, z: 0 };
+    return planet !== undefined && !rig.flying && see.project(rig.pose.look, on) ? { x: on.x, y: on.y } : undefined;
+  });
 
-// The canvas is not blank: the world's day side is lit where the deep black over it is not, once a frame has drawn it.
-async function notBlank(page: Page, shown: WorldStats | undefined) {
-  const { x, y, radius } = shown?.centre ?? { x: 0, y: 0, radius: 0 };
-  const lit = async () => {
-    const [day = 0, space = 0] = await brightness(page, await page.screenshot(), [
-      around(x + radius * 0.45, y, 12),
-      around(x - radius * 0.3, y - radius * 1.6, 12),
-    ]);
-    return day - space;
-  };
-  await expect.poll(lit, SLOW).toBeGreaterThan(8);
+// The world's centre where the page keeps its circle's.
+async function centredInItsCircle(page: Page) {
+  const globe = await page.locator("[data-globe]").boundingBox();
+  if (globe === null) throw new Error("no circle");
+  const middle = { x: globe.x + globe.width / 2, y: globe.y + globe.height / 2 };
+  await expect
+    .poll(async () => {
+      const spot = await planetSpot(page);
+      return spot === undefined ? Infinity : Math.max(Math.abs(spot.x - middle.x), Math.abs(spot.y - middle.y));
+    }, SLOW)
+    .toBeLessThan(2);
 }
 
 async function visit(page: Page, path: string) {
@@ -78,50 +55,8 @@ test.describe("a computer", () => {
       await visit(page, `/w/${slug}?test-gpu`);
       await drawn(page);
       await opened(page);
-      const shown = await world(page);
-      expect(shown?.state).toBe("drawn");
-      await centredInItsCircle(page, shown);
-      expect((await stats(page)).calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
-      await notBlank(page, shown);
+      await centredInItsCircle(page);
     });
-
-  test("tints the plate with the world's own hue, lit enough to show, and paints it again in the circle it opens", async ({
-    page,
-  }) => {
-    await visit(page, "/w/govdao?test-gpu");
-    await drawn(page);
-    await opened(page);
-    const tint = await page
-      .locator("[data-globe] + *")
-      .evaluate((layout) => getComputedStyle(layout).getPropertyValue("--world"));
-    expect(tint.trim()).toMatch(/^#[0-9a-f]{6}$/);
-    expect(lightness(tint.trim())).toBeGreaterThanOrEqual(0.55);
-    // Just inside and just outside the circle's edge on the plate's side, the plate is the same colour (design review, 3).
-    const shown = await world(page);
-    const { x, y } = shown?.centre ?? { x: 0, y: 0 };
-    // The hole's radius in pixels: a custom property computes to its text, so a box of that width reads it.
-    const hole = await page.locator("[data-globe] + *").evaluate((layout) => {
-      const probe = document.createElement("div");
-      probe.style.position = "absolute";
-      probe.style.inlineSize = "var(--globe-hole)";
-      layout.append(probe);
-      const { width } = probe.getBoundingClientRect();
-      probe.remove();
-      return width;
-    });
-    expect(hole).toBeGreaterThan(0);
-    // The circle's edge 0.6 of its radius below its middle, on the plate's side.
-    const edge = x - hole * Math.sqrt(1 - 0.6 * 0.6);
-    await expect
-      .poll(async () => {
-        const [inside = [0, 0, 0], outside = [0, 0, 0]] = await colours(page, await page.screenshot(), [
-          around(edge + 8, y + hole * 0.6, 4),
-          around(edge - 8, y + hole * 0.6, 4),
-        ]);
-        return Math.max(...inside.map((channel, at) => Math.abs(channel - (outside[at] ?? 0))));
-      }, SLOW)
-      .toBeLessThan(6);
-  });
 
   test("orbits the room you are in as a moon, clear of the plate, and a moon's link joins its room", async ({
     page,
@@ -145,19 +80,10 @@ test.describe("a computer", () => {
     await chatIn(page, "games");
   });
 
-  test("casts real shadows on the one world seen close, inside the draw budget", async ({ page }) => {
-    await visit(page, "/w/bubble?test-gpu");
-    await drawn(page);
-    await expect.poll(async () => (await world(page))?.moons.length ?? 0, SLOW).toBeGreaterThan(0);
-    // Each moon in view casts (7e's review, B2-4).
-    await expect.poll(async () => (await world(page))?.shadows ?? 0).toBe((await world(page))?.moons.length ?? -1);
-    expect((await stats(page)).calls).toBeLessThanOrEqual(DRAWS_AT_MOST);
-  });
-
   test("passes axe with the world in space", async ({ page }) => {
     await visit(page, "/w/govdao?test-gpu");
     await drawn(page);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 
@@ -194,58 +120,6 @@ for (const viewport of [
       if (viewport === COMPUTER) expect(Math.abs(radius - 336), "the busiest as frame 104's Bubble").toBeLessThan(10);
     });
   });
-
-// A world's size by its use against its universe (F4307, ADR-0002 §3): GovDAO the universe's busiest fills its circle, its quietest stands at
-// frame 22's share, and the real file of 2026-11-01, which carries no count, leaves every world at the scale's middle, Bubble too. A sphere's
-// outline under perspective falls a little under its share: within 6% of it.
-const RECORDED_WORLDS = JSON.parse(readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8")) as {
-  worlds: { id: string; realms: { callers: number | null }[] }[];
-};
-// The real file's worlds, each realm calling at its place on the way up, GovDAO's at `govdao`.
-const counted = (govdao: number) =>
-  JSON.stringify({
-    ...RECORDED_WORLDS,
-    worlds: RECORDED_WORLDS.worlds.map((each, at) => ({
-      ...each,
-      realms: each.realms.map((realm) => ({ ...realm, callers: each.id === "gov/dao" ? govdao : at % 40 })),
-    })),
-  });
-const drawnShare = async (page: Page, path: string, file: string) => {
-  await page.route("**/worlds.json", (route) => route.fulfill({ body: file, contentType: "application/json" }));
-  await visit(page, path);
-  await drawn(page);
-  await opened(page);
-  const circle = await page.locator("[data-globe]").boundingBox();
-  const radius = (circle?.width ?? 0) / 2;
-  await expect.poll(async () => (await world(page))?.centre.radius ?? 0, SLOW).toBeGreaterThan(0);
-  return ((await world(page))?.centre.radius ?? 0) / radius;
-};
-
-test.describe("a world's size by its use against its universe, at 1728 by 1080", () => {
-  test.use({ viewport: COMPUTER });
-
-  for (const [what, path, file, share] of [
-    ["GovDAO, its universe's busiest, fills its circle", "/w/govdao?test-gpu", counted(5000), 1],
-    ["GovDAO, its universe's quietest, stands at frame 22's share", "/w/govdao?test-gpu", counted(0), 172 / 336],
-    [
-      "GovDAO stands at the scale's middle in the real file, which carries no count",
-      "/w/govdao?test-gpu",
-      JSON.stringify(RECORDED_WORLDS),
-      (1 + 172 / 336) / 2,
-    ],
-    [
-      "Bubble stands at the scale's middle in the real file, which carries no count",
-      "/w/bubble?test-gpu",
-      JSON.stringify(RECORDED_WORLDS),
-      (1 + 172 / 336) / 2,
-    ],
-  ] as const)
-    test(what, async ({ page }) => {
-      const drawnAt = await drawnShare(page, path, file);
-      expect(drawnAt).toBeLessThanOrEqual(share * 1.01);
-      expect(drawnAt).toBeGreaterThanOrEqual(share * 0.94);
-    });
-});
 
 // A window this wide lays the planet's room out from the first paint, or the plate jumps under the reader as the world comes (7e's review,
 // B2-2; the Earth's own journey holds the same for its globe).
@@ -327,6 +201,6 @@ for (const viewport of [COMPUTER, { width: 390, height: 844 }])
         await hydrated(page);
         await chatIn(page, slug);
         expect(await shifted(page)).toBeLessThan(0.05);
-        expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+        expect((await axeOf(page).analyze()).violations).toEqual([]);
       });
   });

@@ -1,5 +1,6 @@
 import { renameSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import { glslSpaces } from "./src/glsl.ts";
 import { parsed, workshopHosts, workshopServer } from "./vite.config.ts";
@@ -35,6 +36,8 @@ export default defineConfig({
   },
   // The dev server scans its entry from the lab's root, where the build's `lab/realism.html` (from app/) is not.
   optimizeDeps: { entries: ["realism.html"] },
+  // Its own dependency cache, under the app's: sharing the app's, its optimization overwrote the app's and the app answered 504.
+  cacheDir: fileURLToPath(new URL("node_modules/.vite/lab", import.meta.url)),
   server: workshopServer(),
   preview: { host: "127.0.0.1", port: 5199, strictPort: true, allowedHosts: workshopHosts() },
 });

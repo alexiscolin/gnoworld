@@ -2,13 +2,12 @@ import { expect, hydrated, test } from "./fixtures.ts";
 import { calmed } from "./figures.ts";
 import { scriptedErgo } from "./scripted.ts";
 
-// How the pages of slice 5's 5d look: the Earth, the list and a world's plate, on a phone and on a computer. Each page
+// How the pages of slice 5's 5d look: the Earth and a world's plate, on a phone and on a computer. Each page
 // is the same every run (the header's account is masked; a world's chat is left out; its figures are the fixture's, its people a
 // scripted Ergo's, its arrival's pill closed).
 const WIDTHS = [390, 1280] as const;
 const PAGES: [name: string, path: string][] = [
   ["earth", "/earth"],
-  ["list", "/list"],
   ["gnoland-earth", "/net/gnoland/earth"],
   ["world-plate", "/w/bubble"],
 ];
@@ -25,7 +24,7 @@ for (const width of WIDTHS) {
         await page.goto(path);
         await hydrated(page);
         // A world's page holds its chat, which loads after the page: its plate alone is drawn (frame 26: the kicker, the title,
-        // the activity's words, the actions); the other pages say where they are in a trail.
+        // the activity's words, the actions); the other pages are taken whole.
         const world = path.startsWith("/w/");
         if (world) await calmed(page);
         const shown = world ? page.locator("[data-look='plate']") : page;
@@ -35,7 +34,7 @@ for (const width of WIDTHS) {
         if (world || path.endsWith("/earth"))
           await page.evaluate(() => document.getElementById("chat")?.style.setProperty("display", "none"));
         await expect(
-          world ? page.locator("[data-look='plate']") : page.getByRole("navigation", { name: "You are here" }),
+          world ? page.locator("[data-look='plate']") : page.getByRole("heading", { level: 1, name: "Earth" }),
         ).toBeVisible();
         await expect(shown).toHaveScreenshot(`${name}-${String(width)}.png`, { mask: [page.getByRole("banner")] });
       });

@@ -1,0 +1,20 @@
+/* The room read around a found message (slice 13, C): the band over its lines, and the found message marked among them. */
+@layer components {
+  .banner {
+    padding: var(--space-xs) var(--chat-panel-inset);
+    border-block-end: var(--line-width) solid var(--color-line);
+    background: var(--color-card);
+  }
+
+  .banner a,
+  .banner button {
+    font-weight: 500;
+  }
+
+  /* The found message among the room's lines. */
+  .found {
+    border-radius: var(--radius-m);
+    outline: var(--line-width) solid var(--color-mine-line);
+    background: var(--color-mine-soft);
+  }
+}

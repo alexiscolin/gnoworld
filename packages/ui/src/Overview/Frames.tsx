@@ -1,11 +1,11 @@
 import { ChatLayout } from "../ChatLayout/ChatLayout.tsx";
-import { Cluster } from "../compositions/index.ts";
+import { Center, Cluster, Grid, Sidebar, Switcher } from "../compositions/index.ts";
 import { Kicker } from "../Kicker/Kicker.tsx";
 import { Logo } from "../Logo/Logo.tsx";
 import { Panel } from "../Panel/Panel.tsx";
 import { Region } from "./Region.tsx";
 
-// Two parts of the overview that stand apart: the kickers and the chat's frame, drawn with samples.
+// Parts of the overview that stand apart: the kickers, the compositions and the chat's frame, drawn with samples.
 export function Kickers() {
   return (
     <Cluster space="l">
@@ -44,5 +44,22 @@ export function Frames() {
         </Panel>
       </Region>
     </>
+  );
+}
+
+export function Compositions() {
+  return (
+    <Sidebar space="m">
+      <Kicker vertical>Hub atlas</Kicker>
+      <Switcher>
+        <Center max="measure">
+          <p>Stack, Cluster, Grid, Sidebar, Switcher and Center do all the layout.</p>
+        </Center>
+        <Grid min="s">
+          <Kicker dot="warm">Live</Kicker>
+          <Kicker dot="signal">An uncharted signal</Kicker>
+        </Grid>
+      </Switcher>
+    </Sidebar>
   );
 }

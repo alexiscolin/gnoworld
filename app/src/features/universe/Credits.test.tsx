@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { beforeAll, describe, expect, it } from "vitest";
 import { all, button, click, mount, one, settled } from "../../../tests/mount.tsx";
-import { CREDITS } from "../../scene/planet/credits.ts";
+import { CREDITS } from "../../space/planet/credits.ts";
 import { Credits } from "./Credits.tsx";
 
 const LABEL = "Credits";
@@ -46,7 +46,9 @@ describe("the credits", () => {
     const links = all(one(box, "dialog"), "a").map((link) => link.getAttribute("href"));
     for (const credit of CREDITS) expect(links).toContain(credit.source);
     for (const credit of CREDITS) expect(links).toContain(credit.licenceUrl);
-    expect(links).toHaveLength(CREDITS.length * 2);
+    // The home's prices: CoinGecko is credited in the same dialog, after the rows.
+    expect(links).toContain("https://www.coingecko.com");
+    expect(links).toHaveLength(CREDITS.length * 2 + 1);
     for (const credit of CREDITS) expect(one(box, "dialog").textContent).toContain(credit.read);
   });
 

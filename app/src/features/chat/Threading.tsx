@@ -64,7 +64,7 @@ export function useThreads(page: Page) {
             Panel = lazy(load);
           }}
         >
-          <Suspense fallback={<Standing word="Opening the thread…" close={close} />}>
+          <Suspense fallback={<Standing word="Opening the thread…" close={close} busy />}>
             <Panel {...page} shown={shown} open={open} close={close} typed={typed} />
           </Suspense>
         </Failing>

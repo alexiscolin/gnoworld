@@ -13,7 +13,7 @@ import { Places, TypingOut } from "./telling.ts";
 
 // What the kit reads as it speaks and the room's menu sets, through here: an account loads both, and a file of its own would be one more on
 // every first load's list and in nginx's table (F3665).
-export { keepCountry, keptCountry, zoneCountry } from "../../lib/country.ts";
+export { keepCountry, shownCountry } from "../../lib/country.ts";
 
 /** What the link lends: the store, the connection and the key of its session ("guest" or an address), the way out to
  * Ergo, and the rooms Ergo said I am in. */

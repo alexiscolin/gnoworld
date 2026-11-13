@@ -1,6 +1,7 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { CallRequest } from "./call.ts";
+import { stripHidden } from "./hidden.ts";
 
 const CALLER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const REQUEST = {
@@ -11,8 +12,8 @@ const REQUEST = {
   args: ["1", "two"],
 };
 
-// What the property tests strip from generated text: the characters the request refuses.
-const CONTROL = /(?![\n\t])[\p{Cc}\p{Cf}]/gu;
+// What the property tests strip from generated text: the characters the request refuses, by the code's own rule.
+const visible = (text: string) => stripHidden(text, "\n\t");
 
 describe("CallRequest", () => {
   it("takes one call: a chain, a caller, a realm, an exported function and string arguments", () => {
@@ -24,7 +25,7 @@ describe("CallRequest", () => {
     const edge = {
       chainId: "a".repeat(50),
       caller: CALLER,
-      realm: `gno.land/r/${"a".repeat(245)}`,
+      realm: `gno.land/r/${"a".repeat(128)}/${"a".repeat(116)}`,
       func: `A${"a".repeat(127)}`,
       args: Array.from({ length: 32 }, () => "a".repeat(8192)),
     };
@@ -66,7 +67,7 @@ describe("CallRequest", () => {
     ["a realm in capitals", { realm: "gno.land/r/Demo/Counter" }],
     ["a realm with a newline", { realm: "gno.land/r/demo/counter\n" }],
     ["a realm with a query", { realm: "gno.land/r/demo/counter?x=1" }],
-    ["a realm of 257 characters", { realm: `gno.land/r/${"a".repeat(246)}` }],
+    ["a realm of 257 characters", { realm: `gno.land/r/${"a".repeat(128)}/${"a".repeat(117)}` }],
     ["a function with a space", { func: "Inc rement" }],
     ["a function that starts with a digit", { func: "1A" }],
     ["a function with brackets", { func: "A()" }],
@@ -102,7 +103,7 @@ describe("CallRequest", () => {
   it("parses what it was given, whatever the call's shape: a valid request parses back to itself", () => {
     fc.assert(
       fc.property(fc.array(fc.string({ unit: "grapheme" }), { maxLength: 8 }), (args) => {
-        const request = { ...REQUEST, args: args.map((arg) => arg.replace(CONTROL, "")) };
+        const request = { ...REQUEST, args: args.map(visible) };
         expect(CallRequest.parse(request)).toEqual(request);
       }),
     );
@@ -115,7 +116,7 @@ describe("CallRequest", () => {
         fc.constantFrom("\u0000", "\u001b", "\u007f", "\u0085", "\u200b", "\u200f", "\u202e", "\u2066", "\ufeff"),
         fc.string({ unit: "grapheme", maxLength: 6 }),
         (before, hidden, after) => {
-          const args = [`${before.replace(CONTROL, "")}${hidden}${after.replace(CONTROL, "")}`];
+          const args = [`${visible(before)}${hidden}${visible(after)}`];
           expect(CallRequest.safeParse({ ...REQUEST, args }).success).toBe(false);
         },
       ),

@@ -2,7 +2,8 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { replaceFile, replaceFiles } from "./replaceFile.ts";
+import { z } from "zod";
+import { lastFile, replaceFile, replaceFiles } from "./replaceFile.ts";
 
 const folders: string[] = [];
 const folder = (): string => {
@@ -130,5 +131,28 @@ describe("replaceFiles", () => {
     ).toBe(false);
     expect(readFileSync(first, "utf8")).toBe("new a");
     expect(readdirSync(dir).sort()).toEqual(["a.json", "b.json"]);
+  });
+});
+
+describe("lastFile", () => {
+  const Shape = z.object({ n: z.number() });
+
+  it("gives the file through its schema", () => {
+    const file = join(folder(), "a.json");
+    writeFileSync(file, '{"n":3}');
+    expect(lastFile(file, Shape)).toEqual({ n: 3 });
+  });
+
+  it("gives none for a file missing, past its cap, not JSON, or refused by its schema", () => {
+    const dir = folder();
+    const write = (name: string, text: string): string => {
+      writeFileSync(join(dir, name), text);
+      return join(dir, name);
+    };
+    expect(lastFile(join(dir, "none.json"), Shape)).toBeUndefined();
+    expect(lastFile(write("big.json", `{"n":${"1".repeat(20)}}`), Shape, 10)).toBeUndefined();
+    expect(lastFile(write("broken.json", "{"), Shape)).toBeUndefined();
+    expect(lastFile(write("other.json", '{"n":"3"}'), Shape)).toBeUndefined();
+    expect(lastFile(write("small.json", '{"n":3}'), Shape, 7)).toEqual({ n: 3 });
   });
 });

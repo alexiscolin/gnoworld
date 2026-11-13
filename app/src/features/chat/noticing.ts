@@ -2,7 +2,17 @@
 // line addressed to the account, none for a guest; the notices of a line REDACT takes away or of a room the account is
 // out of; a conversation seen as Ergo's place for it passes. The classifier is core's (roomNotice, dmNotice); this reads
 // what it needs from the store.
-import { dmNotice, dmOf, lineOf, readAfter, roomNotice, type IrcMessage, type Line, type RoomAt } from "@gnoworld/core";
+import {
+  dmNotice,
+  dmOf,
+  lineOf,
+  readAfter,
+  roomNotice,
+  trimOldest,
+  type IrcMessage,
+  type Line,
+  type RoomAt,
+} from "@gnoworld/core";
 import type { createAppStore } from "../../store/index.ts";
 import { modeOf, roomOf } from "../../store/notices.ts";
 import type { AppState } from "../../store/index.ts";
@@ -74,10 +84,7 @@ export class Noticer {
   #redacted(id: string): void {
     this.#store.getState().noticeActions.drop(id);
     this.#gone.add(id);
-    for (const old of this.#gone) {
-      if (this.#gone.size <= GONE_KEPT) break;
-      this.#gone.delete(old);
-    }
+    trimOldest(this.#gone, GONE_KEPT);
   }
 
   // Ergo's reading place, `MARKREAD <place> timestamp=…`: for a conversation, from another device, it sees it up to there;

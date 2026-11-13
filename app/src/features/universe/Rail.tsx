@@ -1,28 +1,31 @@
 // The rail (frames 4 and 16; ADR-0002 §1's rail and §10; 7i): the Earth and the worlds of the moment down the right edge, each its planet and
-// its name, 25 at most, the column scrolling to its end with no link after them (frames 6, 17); one stop in the tab order, the arrows among the worlds; each planet its own portrait once the scene
-// drew it, ui's drawn disc till then. Where it stands, the page's plain list of worlds steps aside: the rail stands for it.
-import { RAIL } from "@gnoworld/core";
-import { PlanetThumb } from "@gnoworld/ui";
-import { useEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type KeyboardEvent } from "react";
-import { followed } from "../../lib/followed.ts";
-import { worldsFollowedIn } from "../follow/index.ts";
+// its name, 25 at most, the column scrolling to its end, "See all" under it; one stop in the tab order, the arrows among the worlds; each
+// planet its real one once drawn (WorldPlanet), ui's disc till then. Where it stands, the page's plain list of worlds steps aside for it.
+import { Button } from "@gnoworld/ui";
+import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import type { WorldPlaces } from "../../lib/hubWorld.ts";
 import { nextLine } from "../../lib/nextLine.ts";
+import { RouterLink } from "../../routerLink.tsx";
+import { SEARCH } from "../../space/openEvent.ts";
+import { useApp } from "../../storeContext.tsx";
+import { WorldPlanet } from "../../WorldPlanet.tsx";
+import { worldsFollowedIn } from "../follow/index.ts";
+import { afterDwell } from "../../intent.ts";
 import { dock } from "./railDock.ts";
-import { RailOrder, type RailPlaces } from "./railWorlds.ts";
-import type { CosmosPage, Known, Portraits } from "./worldsFeed.ts";
+import { warmWorld } from "./space.ts";
+import { data, feed, subscribe } from "../../railFeed.ts";
+import { keptRail, RailOrder, type RailEntry } from "../../railWorlds.ts";
+import { useSwapped } from "../../swapped.ts";
+import { sameKind } from "./useSpace.ts";
+import { inSystem, useResting } from "./views.ts";
+import { useLens, useLit, withEarth } from "../../lenses.ts";
+import { loading, RETURN_AFTER, riseIn } from "./rise.ts";
 import styles from "./Rail.module.css";
+import { FOOTPRINT } from "./railFootprint.ts";
 
-/** A portrait's side, in the page's pixels: a 64 px planet as the dock magnifies it. */
-export const PORTRAIT_SIZE = 100;
-// The rail's footprint, which the labels keep clear (core's RAIL): its width comes from it.
-const FOOTPRINT = { "--_footprint": `${String(RAIL.footprint)}px` } as CSSProperties;
-
-/** What the rail reads: the worlds and what is known of them, and the scene's portraits of their planets, which outlive the rail. */
-export interface RailSource {
-  readonly subscribe: (listener: () => void) => () => void;
-  readonly data: () => Known | undefined;
-  readonly portraits: Pick<Portraits, "subscribe" | "drawn" | "ask">;
-}
+const unknown = () => undefined;
+const noEntries = () => NO_ENTRIES;
+const NO_ENTRIES: readonly RailEntry[] = [];
 
 // The page's plain list of worlds (Hero.tsx), marked while the rail stands for it.
 function standFor(standing: boolean): void {
@@ -68,33 +71,45 @@ function holdWhileOn(rail: HTMLElement, order: RailOrder, signal: AbortSignal): 
   );
 }
 
-// The rail's order and portraits from its source, and while it stands: the page's list stepping aside, the hold, the dock and the cut.
-function useRail(source: RailSource, places: RailPlaces, followed: readonly string[]) {
-  const [order] = useState(() => new RailOrder(places));
+// What a tag and a system keep of the rail's worlds; none far out with no tag.
+function keepOf(only: ReadonlySet<string> | undefined, system: string | undefined) {
+  if (only === undefined && system === undefined) return undefined;
+  return (id: string) => (only?.has(id) ?? true) && (system === undefined || inSystem(id, system));
+}
+
+// Each universe's rail order, kept across the pages that show the rail: a page of the cosmos replacing another (the galaxy, the Earth's
+// ecosystem) draws the worlds it had at once, never an empty rail that fills (sameKind).
+const orders = new Map<string, RailOrder>();
+function orderOf(universe: string, places: WorldPlaces): RailOrder {
+  const order = orders.get(universe) ?? new RailOrder(places);
+  orders.set(universe, order);
+  return order;
+}
+
+// The rail's order from the feed, and while it stands: the feed asking, the page's list stepping aside, the hold, the dock and the cut.
+function useRail(places: WorldPlaces, followed: readonly string[], universe: string) {
+  const [order] = useState(() => orderOf(universe, places));
   useEffect(() => {
     order.follow(followed);
   }, [order, followed]);
-  const known = useSyncExternalStore(source.subscribe, source.data);
-  const entries = useSyncExternalStore(order.subscribe, order.entries);
-  const drawn = useSyncExternalStore(source.portraits.subscribe, source.portraits.drawn);
+  // The build's pre-render knows no world: the rail is drawn once the page runs.
+  const known = useSyncExternalStore(subscribe, data, unknown);
+  const entries = useSyncExternalStore(order.subscribe, order.entries, noEntries);
   const railRef = useRef<HTMLElement>(null);
   const [cut, setCut] = useState(false);
   // A rail of the Earth alone stands not, and leaves the page its list of hubs (Alexis, 2026-11-03).
   const standing = known !== undefined && entries.some(({ section }) => section !== "earth");
   useEffect(() => {
+    const leaving = new AbortController();
+    feed(leaving.signal);
+    return () => {
+      leaving.abort();
+      order.dispose();
+    };
+  }, [order]);
+  useEffect(() => {
     if (known !== undefined) order.read(known);
   }, [order, known]);
-  useEffect(
-    () => () => {
-      order.dispose();
-    },
-    [order],
-  );
-  useEffect(() => {
-    // A seed shows no portrait: it is unknown till charted.
-    const ids = entries.filter(({ section }) => section !== "seed").map(({ id }) => id);
-    source.portraits.ask(ids, PORTRAIT_SIZE);
-  }, [source, entries]);
   useEffect(() => {
     const rail = railRef.current;
     const leaving = new AbortController();
@@ -109,35 +124,34 @@ function useRail(source: RailSource, places: RailPlaces, followed: readonly stri
       standFor(false);
     };
   }, [standing, order]);
-  return { entries: standing ? entries : [], drawn, railRef, cut };
+  // A tag's rail (D425) and a system's (D428): the worlds they keep, in place of the rail's own; far out, the rail's own.
+  const lens = useLens();
+  const lit = useLit();
+  const system = useResting();
+  const only = lens === undefined ? undefined : withEarth(lit?.sets.get(lens));
+  const kept = keepOf(only, system);
+  const shown = kept === undefined || known === undefined ? entries : keptRail(known, places, kept);
+  return { entries: standing ? shown : NO_ENTRIES, railRef, cut, keep: `${lens ?? ""} ${system ?? ""}` };
 }
 
 const NONE: readonly string[] = [];
-const unchanging = () => () => undefined;
 
-// The worlds the reader follows, by their ids, the last followed first, as the page's store holds them; none where the page gives none.
-function useFollowed(follows: CosmosPage["follows"]): readonly string[] {
-  const held = useSyncExternalStore(
-    follows?.store.subscribe ?? unchanging,
-    () => follows?.store.getState().device.follows,
-  );
-  return held === undefined || follows === undefined ? NONE : worldsFollowedIn(held, follows.universe);
-}
-
-export function Rail({
-  source,
-  places,
-  open,
-  follows,
-}: {
-  source: RailSource;
-  places: RailPlaces;
-  open: (href: string) => void;
-  /** Where the worlds the reader follows are read: they come after the Earth. */
-  follows?: CosmosPage["follows"];
-}) {
-  const { entries, drawn, railRef, cut } = useRail(source, places, useFollowed(follows));
+/** The rail of the universe `universe`, its links going to `places`. */
+export function Rail({ places, universe }: { places: WorldPlaces; universe: string }) {
+  // The worlds the reader follows, the last followed first, as one string React compares as it is.
+  const key = useApp((state) => worldsFollowedIn(state.device.follows, universe).join("\n"));
+  const followed = key === "" ? NONE : key.split("\n");
+  const rail = useRail(places, followed, universe);
+  const { railRef, cut } = rail;
+  const columnRef = useRef<HTMLUListElement>(null);
+  const entries = useSwapped(rail.keep, rail.entries, columnRef);
   const [stop, setStop] = useState(0);
+  // The rail rises in with the hero as space comes back from a page; under the first load's loader it rises with the rest.
+  const present = entries.length > 0;
+  useEffect(() => {
+    const rail = railRef.current;
+    if (present && rail !== null && !loading() && !sameKind()) riseIn(rail.querySelectorAll("li"), RETURN_AFTER);
+  }, [present, railRef]);
   if (entries.length === 0) return null;
   const moved = (event: KeyboardEvent<HTMLUListElement>) => {
     const links = [...event.currentTarget.querySelectorAll("li > a")];
@@ -151,24 +165,31 @@ export function Rail({
   // The world last reached keeps the tab stop, or the first once the list is shorter than its place.
   const tabStop = stop < entries.length ? stop : 0;
   return (
-    <nav aria-label="Worlds" className={styles["rail"]} style={FOOTPRINT} ref={railRef}>
+    <nav aria-label="Worlds" className={styles["rail"]} style={FOOTPRINT} ref={railRef} data-exit="">
       <div className={styles["column"]} data-cut={cut || undefined}>
-        <ul className={styles["worlds"]} onKeyDown={moved}>
+        <ul className={styles["worlds"]} onKeyDown={moved} ref={columnRef}>
           {entries.map(({ id, title, section, href }, at) => (
             <li key={id}>
-              <a
+              <RouterLink
                 href={href}
                 className={styles["world"]}
                 tabIndex={at === tabStop ? 0 : -1}
-                onClick={(event) => {
-                  followed(event, href, open);
-                }}
-                onFocus={() => {
+                onFocus={(event) => {
                   setStop(at);
+                  afterDwell(event.currentTarget, () => {
+                    warmWorld(id);
+                  });
+                }}
+                onPointerEnter={(event) => {
+                  afterDwell(event.currentTarget, () => {
+                    warmWorld(id);
+                  });
                 }}
               >
-                <PlanetThumb
-                  src={drawn.get(id) ?? ""}
+                {/* A seed shows its disc: it is unknown till charted. */}
+                <WorldPlanet
+                  world={section === "seed" ? "" : id}
+                  fallback=""
                   name={title}
                   kind={section === "seed" ? "signal" : "world"}
                   size="l"
@@ -176,10 +197,21 @@ export function Rail({
                   magnify
                 />
                 <span className={["label", styles["name"]].join(" ")}>{title}</span>
-              </a>
+              </RouterLink>
             </li>
           ))}
         </ul>
+      </div>
+      {/* The rail shows the worlds of the moment; every place is the search palette's (D355), asked open on no words. */}
+      <div className={styles["foot"]}>
+        <Button
+          size="s"
+          onClick={() => {
+            window.dispatchEvent(new CustomEvent(SEARCH, { detail: "" }));
+          }}
+        >
+          See all<span className="visually-hidden"> places</span>
+        </Button>
       </div>
     </nav>
   );

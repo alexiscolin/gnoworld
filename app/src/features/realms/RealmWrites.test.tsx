@@ -1,30 +1,20 @@
 // @vitest-environment jsdom
-import { realmType } from "@gnoworld/core";
 import { queryEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { StoreProvider } from "../../storeContext.tsx";
-import { Grab, state } from "../../../tests/grabStore.tsx";
+import { Grab, SignedIn, state } from "../../../tests/grabStore.tsx";
 import { Address } from "@gnoworld/schemas";
 import { all, button, click, follows, mount, one } from "../../../tests/mount.tsx";
-import { typed, warnsMembers } from "../../../tests/callFixtures.ts";
+import { CHAIN, CUR, field, typed, warnsMembers } from "../../../tests/callFixtures.ts";
 import { recordedAdena } from "../../../tests/recordedAdena.ts";
 import { RealmWrites } from "./RealmWrites.tsx";
 
 // 9d, widened by 9e: every write function a call can carry is a "Call" row that opens the card under it, never a modal (frame
 // 33): any count of fields, none too (D254); a type a call does not carry gets a way to gnoweb. NOT recorded: the function list is
 // written in the shape of vm/qfuncs.
-const CHAIN = {
-  name: "Onyx",
-  chainId: "onyx-1",
-  rpc: "https://rpc.onyx.testnets.gno.land:443",
-  gnoweb: "https://onyx.testnets.gno.land",
-  indexer: "https://indexer.onyx.testnets.gno.land/graphql/query",
-};
 const REALM = "gno.land/r/demo/profile";
-const CUR = { Name: "cur", Type: realmType(), Value: "" };
-const field = (Name: string, Type: string) => ({ Name, Type, Value: "" });
 const FUNCTIONS = [
   { FuncName: "SetBio", Params: [CUR, field("bio", "string")], Results: null },
   { FuncName: "SetProfile", Params: [CUR, field("name", "string"), field("times", "int64")], Results: null },
@@ -49,6 +39,7 @@ const chain = (functions: unknown = FUNCTIONS) =>
 async function panel(fetcher: ChainFetch = chain()) {
   const box = mount(
     <StoreProvider>
+      <SignedIn />
       <RealmWrites realm={REALM} chain={CHAIN} options={{ fetch: fetcher }} />
     </StoreProvider>,
   );
@@ -82,6 +73,21 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(all(box, "dialog, [role=dialog], [aria-modal]")).toHaveLength(0);
   });
 
+  it("offers the login as the card's first button when nobody is logged in: Connect Adena, never a Sign that would fail", async () => {
+    const box = mount(
+      <StoreProvider>
+        <RealmWrites realm={REALM} chain={CHAIN} options={{ fetch: chain() }} />
+      </StoreProvider>,
+    );
+    await vi.waitFor(() => {
+      expect(box.querySelector("[aria-busy]")).toBeNull();
+    });
+    click(button(box, "Call Deposit"));
+    const card = one(box, "article");
+    expect(button(card, "Connect Adena")).toBeDefined();
+    expect(button(card, "Sign in Adena")).toBeUndefined();
+  });
+
   it("opens a write with no field as a card with nothing to fill and a Sign button that is enabled, and asks Adena nothing yet (D254)", async () => {
     const touched = vi.fn(() => undefined);
     Object.defineProperty(globalThis, "adena", { get: touched, configurable: true });
@@ -103,7 +109,8 @@ describe("a realm's write functions, with the call card inline", () => {
     for (const name of ["Upload", "Configure"]) {
       const row = all(box, "li").find((li) => li.textContent.includes(name));
       expect(row, name).toBeDefined();
-      expect(row ? all(row, "button") : []).toHaveLength(0);
+      // The row's own toggle opens it in place; no button does anything else (no Call).
+      expect(row ? all(row, "button").filter((b) => b.getAttribute("aria-expanded") === null) : []).toHaveLength(0);
       const link = row?.querySelector("a");
       expect(link?.textContent).toContain("Open in gnoweb");
       expect(link?.getAttribute("href")).toBe(`${CHAIN.gnoweb}/r/demo/profile`);
@@ -271,17 +278,17 @@ describe("a realm's write functions, with the call card inline", () => {
     expect(all(onyx, "article input")).toHaveLength(1);
   });
 
-  // The rows are the frame's (F5741 to F5744): an outlined small pill, the name in mono and muted on the pill's line. The stylesheet
-  // is read as empty here, so the rules (the hairlines, the step) are the Mac Studio's pictures.
-  it("draws each row's Call as a small outlined pill, and its name as its own mono, muted part on the pill's line (F5741, F5742, F5743)", async () => {
+  // The proposal's row: a solid small pill (its Run) inside the open row, whose name is the row's own mono title. The stylesheet is read as
+  // empty here, so the rules (the hairlines, the step) are the pictures'.
+  it("draws each row's Call as a small solid pill inside the row that opens in place, its name the row's title (the proposal's .fn)", async () => {
     const box = await panel();
     const call = button(box, "Call SetBio");
-    expect(call?.dataset["emphasis"]).toBe("outline");
+    expect(call?.dataset["emphasis"]).toBe("solid");
     expect(call?.dataset["size"]).toBe("s");
-    const name = all(box, "li span").find((s) => s.textContent === "SetBio");
-    expect(name?.className).toContain("name");
-    expect(name?.parentElement?.className).toContain("line");
-    expect(name?.parentElement?.contains(call ?? null)).toBe(true);
+    const row = all(box, "li").find((li) => li.textContent.includes("SetBio"));
+    const toggle = row?.querySelector("button[aria-expanded]");
+    expect(toggle?.textContent).toBe("SetBio(cur realm, bio string)");
+    expect(toggle?.getAttribute("aria-controls")).toBe(call?.closest("[id]")?.id);
   });
 });
 
@@ -315,6 +322,7 @@ describe("a vote on GovDAO", () => {
     const box = mount(
       <StoreProvider>
         <Grab />
+        <SignedIn />
         <RealmWrites realm={DAO} chain={CHAIN} options={{ fetch: chain([VOTE]) }} />
       </StoreProvider>,
     );
@@ -372,14 +380,11 @@ describe("a vote on GovDAO", () => {
 });
 
 describe("a realm's write rows, as parts", () => {
-  it("draws a row that has no Call with the rows' own list, item, line and name, and a Call row's fee read through the view's options", async () => {
+  it("draws a row that has no Call as a row that opens in place, and a Call row's fee read through the view's options", async () => {
     const fetcher = chain();
     const box = await panel(fetcher);
     const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
-    expect(row?.className).toMatch(/item/);
-    expect(row?.firstElementChild?.className).toMatch(/line/);
-    expect(row?.querySelector("span")?.className).toMatch(/name/);
-    expect(one(box, "ul").className).toMatch(/list/);
+    expect(row?.querySelector("button[aria-expanded]")?.textContent).toBe("Upload(cur realm, data []uint8)");
     click(button(box, "Call SetBio"));
     await vi.waitFor(() => {
       expect(fetcher.mock.calls.some(([url]) => url.startsWith(CHAIN.indexer))).toBe(true);
@@ -396,6 +401,6 @@ describe("a realm's write rows, as parts", () => {
       expect(all(box, "li").length).toBeGreaterThan(0);
     });
     const row = all(box, "li").find((li) => li.textContent.includes("Upload"));
-    expect(row?.querySelector("a, button")).toBeNull();
+    expect(row?.querySelector("a, button:not([aria-expanded])")).toBeNull();
   });
 });

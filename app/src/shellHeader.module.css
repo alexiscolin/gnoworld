@@ -3,11 +3,10 @@
    and the account on a row, the network under them, and the views in a bar at the foot of the screen, which the page leaves
    room for. The one breakpoint of both is here. */
 @layer components {
-  /* The views' bar's height, one source for the bar and the room the page leaves under it on a phone; the two are no parent and child. */
-  .views,
+  /* The views' bar's height, one source for the bars and the room the page leaves under them on a phone; the two are no parent and child. */
+  .bars,
   .page {
-    /* raw: the pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links) */
-    --_bar: 44px;
+    --_bar: var(--size-bar);
   }
 
   .header {
@@ -35,19 +34,6 @@
     display: contents;
   }
 
-  /* What drops when the header runs short, the network and the account kept: Jarvis, the chat and the counter (the menu keeps the
-     passport), on a phone too. */
-  .drops {
-    display: none;
-  }
-
-  @media (min-width: 1280px) {
-    .drops {
-      /* layout: the control itself is the row's item */
-      display: contents;
-    }
-  }
-
   .network {
     /* layout: the network on its own row under the logo and the account on a phone */
     grid-column: 1 / -1;
@@ -55,37 +41,48 @@
     order: 1;
     /* layout: a paragraph with no margin of its own: the grid spaces it */
     margin-block: 0;
-    color: var(--color-text-muted);
-    font: var(--font-ui);
   }
 
-  .caution {
-    /* layout: the warning icon and its chip on a line, off the network's name */
-    display: inline-flex;
-    /* layout: the icon and the chip share a middle */
-    align-items: center;
-    /* layout: a step between them, and off the name */
-    gap: var(--space-3xs);
-    /* layout: the arrangement the prototype and the frames draw */
-    margin-inline-start: var(--space-2xs);
-    color: var(--color-warm);
+  /* Where one is and how one looks (D424), side by side, a bar over the page's foot on a phone. */
+  .bars {
+    /* layout: the two pills side by side */
+    display: flex;
+    /* layout: a step between the pills */
+    gap: var(--space-2xs);
+    position: fixed;
+    inset-inline: var(--space-s);
+    inset-block-end: var(--space-s);
+    /* raw: above the page's content and the welcome card (1) until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
+    z-index: 2;
   }
 
-  /* The views: a pill with its links and the search, a bar over the page's foot on a phone. */
-  .views {
-    /* layout: the links, the divider and the search in one row */
+  /* The views: a pill with its levels and the chat; the ways: Space and Map. */
+  .views,
+  .ways {
+    /* layout: the links in one row */
     display: flex;
     /* layout: they share a middle */
     align-items: center;
     /* layout: the links 2 px apart (the prototype's #hnav .links) */
     /* raw: the prototype's and the frames' own value */
     gap: 2px;
-    position: fixed;
-    inset-inline: var(--space-s);
-    inset-block-end: var(--space-s);
-    /* raw: above the page's content until the layers' tokens come with the scene (DESIGN-SYSTEM.md, Layers) */
-    z-index: 1;
     block-size: var(--_bar);
+  }
+
+  .views {
+    /* The fill's place, written on the pill by the header (viewsIndicator.ts). */
+    /* raw: none till the header measures it */
+    --_fill-x: 0px;
+    /* raw: none till the header measures it */
+    --_fill-w: 0px;
+
+    /* layout: the box the fill stands in */
+    position: relative;
+    /* layout: the fill's own stacking, so its -1 stays over the pill's glass, cream (D369) */
+    isolation: isolate;
+    /* layout: the phone's bar but for the ways' pill */
+    flex: 1;
+    min-inline-size: 0;
   }
 
   .view {
@@ -93,72 +90,385 @@
     display: grid;
     /* layout: the label in the middle of its link */
     place-items: center;
-    /* raw: a link is 34 px tall inside the 44 px pill */
-    block-size: 34px;
+    /* a link is 34 px tall inside the 44 px pill */
+    block-size: var(--round-h);
     border-radius: var(--radius-pill);
     color: var(--color-text-muted);
     /* raw: the views are 11.5 px sans, 0.1em apart (the prototype's #hnav .links button; the video's letters are those) */
-    font: 500 11.5px/1 var(--family-sans);
+    font: 500 0.71875rem/1 var(--family-sans);
     /* raw: the prototype's and the frames' own value */
     letter-spacing: 0.1em;
     text-decoration: none;
-    text-transform: uppercase;
+    /* a way to look is a button: none of a button's own edge (no-edge) or fill; its fill and ink ease as it is pointed at, or pressed
+       in place (tint; the views' own fill slides apart, .fill) */
+    background: transparent;
+    cursor: pointer;
   }
 
   /* A step at each side of a view's name: the prototype's 16 px on a screen 390 px wide or more, a pixel less each 10 px narrower, 12 at the
      least, so a bar 320 px wide holds its three names on one line (F4691). */
-  .views .view {
+  :is(.views, .ways) .view {
     /* raw: 16 px at 390 px wide, 12 at 350 and under */
     padding-inline: clamp(var(--space-xs), calc(var(--space-s) - (390px - 100vi) / 10), var(--space-s));
   }
 
-  .view[aria-current="page"] {
-    background: var(--color-primary);
+  /* A way's icon before its word, on one line. */
+  .view:has(svg) {
+    /* layout: the icon and the word on one line */
+    grid-auto-flow: column;
+    /* raw: a step between them, as the bar's icons sit */
+    /* layout: the icon and the word apart */
+    gap: 6px;
+  }
+
+  /* A level's mark, its word and its name's pill on one line (D444); on a narrow bar the name gives way, cut shorter. */
+  .view:has(.mark),
+  .named {
+    /* layout: the mark and the words, or the word and the name, on one line */
+    grid-auto-flow: column;
+    /* layout: the first whole, the second giving way */
+    grid-template-columns: auto minmax(0, max-content);
+    /* layout: they share a middle */
+    align-items: center;
+    /* raw: a step between them, as the bar's icons sit */
+    /* layout: each a step from the next */
+    gap: 6px;
+    min-inline-size: 0;
+  }
+
+  .named {
+    /* layout: the word and the name, a grid of their own in the level */
+    display: grid;
+    transition: gap calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* In the full chat a level's name folds into its word, and opens again as the chat closes: the links and the pill move with it (D503). */
+  .view[data-bare] .named {
+    /* layout: no step left where the name stood */
+    gap: 0;
+  }
+
+  .view[data-bare] .name {
+    max-inline-size: 0;
+    padding-inline: 0;
+    opacity: 0;
+  }
+
+  .level {
+    font: var(--font-label);
+    opacity: 0.75;
+  }
+
+  /* The place's name as the data gives it, in a small pill of its own, cut when long (truncate): no capitals, no spacing. */
+  .name {
+    /* raw: a name past 16 letters cut, so the bar keeps its width; the pill's sides on top */
+    max-inline-size: calc(16ch + 12px);
+    /* raw: a pill 15 px tall, 6 px at each side */
+    padding: 2px 6px;
+    border-radius: var(--radius-pill);
+    /* raw: the pill a faint wash of the link's own ink, on the glass as on the cream */
+    background: color-mix(in oklab, currentColor 14%, transparent);
+    font: var(--font-label);
+    letter-spacing: 0;
+    text-transform: none;
+    transition-property: max-inline-size, padding, opacity;
+    transition-duration: calc(var(--motion-slow) * var(--motion-scale));
+    transition-timing-function: var(--ease-standard);
+  }
+
+  /* A system is a namespace, read as one: in mono, as an address or a path is; a world is a place, its name in the interface's own face. */
+  .name[data-level="world"] {
+    font-family: var(--family-sans);
+    /* raw: a world's name a weight over its system's */
+    font-weight: 600;
+  }
+
+  /* Each level's mark, colourless (D444): three stars for the galaxy, a sun in its ring for a system, a planet for a world. */
+  .mark {
+    inline-size: var(--icon-s);
+    aspect-ratio: 1;
+    border-radius: 50%;
+  }
+
+  .mark[data-level="universe"] {
+    border-radius: 0;
+    /* raw: three dots of 1.5 px, as a few stars */
+    background:
+      radial-gradient(circle at 20% 40%, currentColor 1.5px, transparent 2px),
+      radial-gradient(circle at 80% 25%, currentColor 1.3px, transparent 1.8px),
+      radial-gradient(circle at 50% 82%, currentColor 1.7px, transparent 2.2px);
+  }
+
+  .mark[data-level="system"] {
+    /* raw: a sun of 2.5 px in a ring at 45% */
+    background: radial-gradient(circle, currentColor 2.5px, transparent 3px);
+    /* raw: its ring the link's ink at 45% */
+    box-shadow: inset 0 0 0 var(--line-width) color-mix(in oklab, currentColor 45%, transparent);
+  }
+
+  .mark[data-level="world"] {
+    /* raw: a planet a step smaller than the sun's ring */
+    inline-size: 10px;
+    background: currentColor;
+  }
+
+  /* A place this tab saw past the level in view: dimmed till pointed at, its mark hollow. */
+  .view[data-beyond]:not(:hover, :focus-visible) {
+    opacity: 0.5;
+  }
+
+  /* A wide computer says each level's word: the mark, which stands for it on a phone, would say it twice; its column goes with it, so the
+     words stand in the middle of their pill. */
+  @media (width >= 1340px) {
+    .mark {
+      display: none;
+    }
+
+    .view:has(.mark) {
+      /* layout: the words alone, giving way */
+      grid-template-columns: minmax(0, max-content);
+    }
+  }
+
+  .view[data-beyond] .mark[data-level="world"] {
+    background: transparent;
+    /* raw: the planet's edge alone, 1.5 px */
+    box-shadow: inset 0 0 0 1.5px currentColor;
+  }
+
+  .view[data-beyond] .mark[data-level="system"] {
+    background: none;
+  }
+
+  /* Between two levels, the video's chevron (the breadcrumb's, packages/ui), at 60%. */
+  .chevron::before {
+    content: "\203a";
+  }
+
+  .chevron {
+    /* raw: how far the chevron leans off the cream, the room a level's padding gives the other side */
+    --_lean: 8px;
+
+    /* layout: the chevron keeps its room when the levels give way */
+    flex: none;
+    color: var(--color-text-muted);
+    /* raw: the breadcrumb's 60% */
+    opacity: 0.6;
+    /* layout: the chevron between two levels */
+    margin-inline: var(--space-2xs);
+    font: var(--font-ui);
+    /* It leans as the cream slides, never moving a level. */
+    transition: translate calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* Beside one fill, the cream or a pointed level's alike, whose edge is the level's own, the chevron leans away from it: as far from the
+     fill as from the next words. Between two fills it stands in the middle, as far from each. */
+  .view:is([aria-current="page"], :hover, :focus-visible)
+    + .chevron:not(:has(+ .view:is([aria-current="page"], :hover, :focus-visible))) {
+    translate: calc(var(--_lean) * var(--dir)) 0;
+  }
+
+  .chevron:has(+ .view:is([aria-current="page"], :hover, :focus-visible)):not(
+      .view:is([aria-current="page"], :hover, :focus-visible) + .chevron
+    ) {
+    translate: calc(-1 * var(--_lean) * var(--dir)) 0;
+  }
+
+  /* The chat's divider and its link are the pill's own items. */
+  .chatWay {
+    /* layout: the divider and the link are the pill's own items */
+    display: contents;
+  }
+
+  .view:disabled {
+    cursor: not-allowed;
+    opacity: var(--opacity-disabled);
+  }
+
+  .views .view[aria-current="page"] {
     color: var(--color-ink);
   }
 
+  /* Until the fill is placed (before the page wakes, or with no script), the current level wears it itself. */
+  .views:not([data-filled]) .view[aria-current="page"] {
+    background: var(--color-primary);
+  }
+
+  /* A world's page has no Map yet, and the full chat leaves space a level away (Alexis, 2026-11-09): the ways fade out there, their room
+     kept so the levels beside them stand still. */
+  .ways {
+    transition:
+      opacity calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard),
+      visibility calc(var(--motion-slow) * var(--motion-scale));
+  }
+
+  .ways[data-away] {
+    opacity: 0;
+    visibility: hidden;
+  }
+
+  /* The current level wears the cream itself till the fill is placed, then hands it over: that hand-over is no change to ease (the fill
+     slides in its place), so the current link eases its ink alone, never its background, and the first paint shows no fade. */
+  .views .view[aria-current="page"] {
+    transition-property: color;
+  }
+
+  .view:not([aria-current="page"]) {
+    transition: var(--transition-tint);
+  }
+
+  /* One cream in the header, where one is (D444): the way one looks wears a faint fill. */
+  .ways .view:is([aria-current="page"], [aria-pressed="true"]) {
+    background: var(--color-fill-hover);
+    color: var(--color-text);
+  }
+
+  /* Under the dock's width a page with a chat is its chat (useMedia.ts's DOCKED): Chat would change nothing there, and the ways,
+     away on a world's page, keep no room. */
+  @media (width < 1280px) {
+    .ways[data-away],
+    .chatWay[data-chat-page] {
+      display: none;
+    }
+  }
+
+  /* A phone's bar: the places' names alone and the ways' icons alone, their kinds and words for a screen reader. */
+  /* The search: beside the bell on a computer; in the views' pill on a phone, after a divider, a control's own size centred in the pill's
+     34 px, so the pill keeps its height. */
   .divider {
+    /* layout: the line keeps its room when the levels give way */
+    flex: none;
     /* raw: a line 1 px wide and 16 high, 4 px off each side (the prototype's .vsep) */
     inline-size: 1px;
     /* raw: the prototype's and the frames' own value */
     block-size: 16px;
     /* layout: the arrangement the prototype and the frames draw */
-    /* raw: the prototype's and the frames' own value */
-    margin-inline: 4px;
+    margin-inline: var(--space-3xs);
     background: var(--color-line-strong);
   }
 
-  /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
-  /* The search is a control's own size, 44 px, centred in the pill's 34 px between its padding: the pill keeps its height. */
-  .views button {
-    /* layout: the control's overflow is shared by both sides, so it stays on the pill's middle line */
-    /* raw: the 34 px between the pill's padding */
-    margin-block: calc((34px - var(--control-m)) / 2);
+  .phoneSearch {
+    /* layout: the button is the pill's own item */
+    display: contents;
+
+    /* raw: the target is the control's 44 px; the veil (an inset shadow) stops at the transparent 5 px edge, so the look stays the pill's 34 px */
+    --round-h: var(--control-m);
   }
 
+  .phoneSearch button {
+    /* raw: the 5 px edge the 44 px target keeps over the pill's 34 */
+    border-width: 5px;
+  }
+
+  @media (width >= 900px) {
+    .phoneSearch {
+      display: none;
+    }
+  }
+
+  @media (width < 900px) {
+    .wideSearch {
+      display: none;
+    }
+  }
+
+  /* Where the bar cannot hold every word beside the logo and the account (a phone's, and a computer's under 1340 px), each level is its mark and
+     its name, the ways their icons. */
+  @media (width < 1340px) {
+    .level,
+    .word {
+      display: none;
+    }
+
+    /* The word hidden, the name alone in its level, giving way. */
+    .named {
+      /* layout: the name's pill no wider than the room the bar leaves */
+      grid-template-columns: minmax(0, max-content);
+    }
+
+    .name {
+      /* raw: 8 letters and the pill's sides, fewer where the bar gives way */
+      max-inline-size: calc(8ch + 12px);
+    }
+  }
+
+  /* The ways where the bar cannot hold them (F4691): a pill of their own at the scene's top right, under the header; a phone's bar at the
+     foot keeps its one row, a computer's levels the room. */
+  @media (width < 1140px) {
+    .ways {
+      position: fixed;
+      /* raw: under the header, 96 px high (a phone's: 16 px, a 40 px row, 4 px, a 20 px line, 16 px), a step below it */
+      inset-block-start: calc(96px + var(--space-2xs));
+      inset-inline-end: var(--page-edge, var(--space-s));
+    }
+  }
+
+  @media (width < 900px) {
+    .chevron {
+      /* raw: a phone's levels a step closer, so the lean is less */
+      --_lean: 6px;
+
+      /* layout: the links' own padding around the chevron, no more: a 320 px bar keeps its names */
+      margin-inline: 0;
+    }
+  }
+
+  /* The pill's one fill (D369): under the current view, sliding and resizing to the next one's words; behind the links, in the pill's own
+     stacking. */
+  .fill {
+    position: absolute;
+    /* raw: the fill as tall as a link, 34 px, in the 44 px pill */
+    inset-block: 5px;
+    inset-inline-start: 0;
+    /* raw: under the links, above the pill's own glass */
+    z-index: -1;
+    inline-size: var(--_fill-w, 0);
+    border-radius: var(--radius-pill);
+    background: var(--color-primary);
+    translate: var(--_fill-x, 0) 0;
+    transition: opacity calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* No level in view (the home's first screen has none): the fill fades where it stood, never a cream with no level's ink on it. */
+  .views[data-empty] > .fill {
+    opacity: 0;
+  }
+
+  .views:not([data-filled]) > .fill {
+    /* layout: no fill till it is placed */
+    display: none;
+  }
+
+  /* A view not current lights under the pointer, its words brightening on a faint fill. */
+  .view:not([aria-current="page"]):hover {
+    background: var(--color-fill);
+    color: var(--color-text);
+  }
+
+  /* The page leaves the room the bar needs at its end: the bar, its gap under it and one more over it. */
   .page {
-    /* The bar, its gap under it and one more over it. */
     padding-block-end: calc(var(--_bar) + 2 * var(--space-s));
   }
 
-  @media (min-width: 900px) {
+  @media (width >= 900px) {
     .header {
       /* layout: logo, views, the end: the views in the exact middle while the end fits its half; past it, the end keeps its controls whole
          and the views give way to the left */
-      grid-template-columns: minmax(0, 1fr) auto minmax(max-content, 1fr);
+      grid-template-columns: minmax(max-content, 1fr) minmax(0, auto) minmax(max-content, 1fr);
       /* a control's words stay on one line: the row never grows a second */
       white-space: nowrap;
-      /* raw: 34 px from the top, 32 each side, and 18 under the 44 px row: 96 high in all (DESIGN-SYSTEM.md, Layout) */
-      padding: 34px var(--space-l) 18px;
-      /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it. */
+      /* raw: 34 px from the top and 18 under the 44 px row, 96 high in all (DESIGN-SYSTEM.md, Layout); each side the page's edge, the rail's and the dock's */
+      padding: 34px var(--page-edge) 18px;
+      /* Fixed at the screen's top, in the page's flow so its 96 px stay reserved; its box takes no click from the page under it, and the dialogs and popovers it holds (the palette, the account menu) are boxes of their own. */
       position: sticky;
       inset-block-start: 0;
-      /* raw: above the page and the fixed plate until the layers' tokens come with the scene */
-      z-index: 2;
+      /* raw: above the page, the fixed plate and the full chat's 3, which runs under it to the window's top as it opens, stands and
+         shrinks back to its dock (D445), until the layers' tokens come with the scene */
+      z-index: 4;
       pointer-events: none;
     }
 
-    .header :is(a, button, nav, p) {
+    .header :is(a, button, nav, p, dialog, [popover]) {
       pointer-events: auto;
     }
 
@@ -174,18 +484,76 @@
     }
 
     .network {
-      /* layout: the network is one cell of the end's row, before the account, not a row of its own */
+      /* layout: the network is one cell of the end's row, not a row of its own: last, at the right, where the account's pill names it once
+         the session is known, so it never jumps sides (Alexis, 2026-11-07) */
       grid-column: auto;
-      order: 0;
+      order: 1;
+    }
+
+    /* Logged in, the account's pill names the network (Network.tsx, D330). */
+    .pilled {
+      display: none;
+    }
+
+    .bars {
+      /* layout: in the header's flow, its middle cell */
+      position: static;
     }
 
     .views {
-      position: static;
-      inset: auto;
+      /* layout: as wide as its links, and no wider than the room the logo and the end leave: its names give way */
+      flex: 0 1 auto;
+    }
+
+    .bars {
+      /* layout: the middle cell shrinks below its links' width instead of running under the logo */
+      min-inline-size: 0;
+    }
+
+    .ways {
+      /* layout: Space and Map keep their width: the levels give way before them */
+      flex: none;
     }
 
     .page {
       padding-block-end: 0;
+    }
+  }
+
+  /* A chat's page opened full covers itself from its first paint (fullChat.ts marks the root before React draws), till the chat is drawn
+     (its screen marked full lifts it, ChatScreen.module.css): a chat that grows out of its dock grows over the page, never over a cover.
+     A page whose chat never comes shows itself after 4 s. */
+  :root[data-chat="full"]::before {
+    content: "";
+    /* layout: over the whole window */
+    position: fixed;
+    inset: 0;
+    /* raw: the full chat's own layer (ChatScreen.module.css): under the page's header from 900 px (4), over a phone's */
+    z-index: 3;
+    background: var(--color-surface);
+    /* raw: the cover's last word, 4 s, past a chat's slowest first draw on a phone's network */
+    animation: chat-cover-out 0s 4s forwards;
+  }
+
+  @keyframes chat-cover-out {
+    to {
+      visibility: hidden;
+    }
+  }
+
+  /* A page opened from its URL: the header and the page's column wait out of sight with the scene (root.tsx's data-first) till the arrival takes it (arrival.ts);
+     if the code never does, it shows after 6 s. */
+  @media (prefers-reduced-motion: no-preference) {
+    :root[data-first] :is(.header, .page) {
+      opacity: 0;
+      /* raw: the hold's last word, 6 s, past the slowest first draw */
+      animation: held 0s 6s forwards;
+    }
+
+    @keyframes held {
+      to {
+        opacity: 1;
+      }
     }
   }
 }

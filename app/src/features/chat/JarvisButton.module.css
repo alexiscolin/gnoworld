@@ -1,0 +1,15 @@
+/* The composer's Ask Jarvis: its spark and its word in Jarvis's violet on a quiet button (ui Button's signal tone, its lead close), fading in
+   as it comes. */
+@layer components {
+  .jarvis {
+    /* layout: beside the quick actions' button in the foot's row */
+    display: inline-flex;
+    animation: jarvis-in var(--motion-base) ease-out;
+  }
+
+  @keyframes jarvis-in {
+    from {
+      opacity: 0;
+    }
+  }
+}

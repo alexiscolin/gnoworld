@@ -1,17 +1,15 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, modals, noMedia, settled } from "../../../tests/mount.tsx";
+import { all, button, click, modals, noMedia, one, settled } from "../../../tests/mount.tsx";
 import { mountInStore, type AppStore } from "../../../tests/inStore.tsx";
-import { PassportCounter } from "./Counter.tsx";
 import { PassportView } from "./PassportView.tsx";
 
-// The passport (slice 8; ADR-0002 §1 and §3): the header's counter, the stamps out of the worlds the reader's view lists, the stamps alone
-// before the count; the dialog's constellations, each world counted once, a constellation with no stamp not shown (no 0%), the worlds
-// charted here, the stamps newest first.
+// The passport: its figures, the three tabs (Challenges first), the stamps by day with the rest one press away, a stamp for each world id so
+// two worlds of one name are two stamps naming their systems, the stamps charted first.
 const listed = vi.hoisted(() => ({
   count: undefined as number | null | undefined,
-  worlds: undefined as { id: string; namespace: string }[] | undefined,
+  worlds: undefined as { id: string; namespace: string; nature?: string }[] | undefined,
 }));
 vi.mock("../universe/index.ts", () => ({ useWorldsCount: () => listed.count }));
 vi.mock("../../worldsFile.ts", () => ({ useWorldsFile: () => listed.worlds }));
@@ -25,6 +23,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -42,89 +41,150 @@ const stamp = (stamps: Record<string, string>, charted: Record<string, string> =
 };
 const text = (element: Element) => element.textContent.replaceAll(/\s+/g, " ").trim();
 
-describe("the header's counter", () => {
-  it("shows the stamps alone before the count is known", async () => {
-    stamp({ "onyx:a/1": "2026-11-01", "onyx:a/2": "2026-11-02", "gnoland:a/1": "2026-11-02" });
-    const box = await drawn(<PassportCounter universe="onyx" listed={undefined} onOpen={() => undefined} />);
-    expect(text(box)).toBe("Passport 2");
-  });
+const tab = (box: HTMLElement, name: string) =>
+  all(box, "[role='tab']").find((each) => each.textContent.startsWith(name));
+const marks = (box: HTMLElement) =>
+  all(box, "[role='tabpanel'] svg[role='img']").map((each) => each.getAttribute("aria-label"));
 
-  it("shows the stamps out of the worlds listed, and opens the passport", async () => {
-    stamp({ "onyx:a/1": "2026-11-01", "onyx:a/2": "2026-11-02", "onyx:a/3": "2026-11-02" });
-    const open = vi.fn();
-    const box = await drawn(<PassportCounter universe="onyx" listed={19} onOpen={open} />);
-    expect(text(box)).toBe("Passport 3/19");
-    act(() => {
-      all(box, "button")[0]?.click();
-    });
-    expect(open).toHaveBeenCalledOnce();
-  });
-
-  it("counts a new stamp at once, with no reload", async () => {
-    const box = await drawn(<PassportCounter universe="onyx" listed={18} onOpen={() => undefined} />);
-    expect(text(box)).toBe("Passport 0/18");
-    act(() => {
-      store?.getState().deviceActions.change("stamps", (held) => ({ ...held, "onyx:a/1": "2026-11-05" }));
-    });
-    expect(text(box)).toBe("Passport 1/18");
-  });
-});
+// The dialog left mounted, its `open` turned by a button.
+function Toggled() {
+  const [shown, setShown] = useState(true);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => {
+          setShown(!shown);
+        }}
+      >
+        toggle
+      </button>
+      <PassportView universe="onyx" open={shown} onClose={() => undefined} />
+    </>
+  );
+}
 
 describe("the passport dialog", () => {
   const open = () => <PassportView universe="onyx" open onClose={() => undefined} />;
+  // The day is "4 Nov" in the current year: the clock is the test's.
+  const today = () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T12:00:00Z"));
+  };
 
-  it("shows the stamps out of the worlds listed", async () => {
-    stamp({ "onyx:gov/dao": "2026-11-01", "onyx:games/chess": "2026-11-04" });
-    listed.count = 19;
-    const box = await drawn(open());
-    const bar = all(box, "[role='progressbar']").find(
-      (each) => each.getAttribute("aria-label") === "Worlds you visited",
-    );
-    expect(bar?.getAttribute("aria-valuenow")).toBe("2");
-    expect(bar?.getAttribute("aria-valuemax")).toBe("19");
-    expect(text(box)).toContain("2/19");
-  });
-
-  it("shows each constellation started, its worlds counted once, and none with no stamp", async () => {
-    stamp({ "onyx:gov/dao": "2026-11-01" });
-    listed.count = 4;
-    listed.worlds = [
-      { id: "gov/dao", namespace: "gov" },
-      { id: "gov/boards", namespace: "gov" },
-      { id: "gov/dao", namespace: "gov" },
-      { id: "games/chess", namespace: "games" },
-    ];
-    const box = await drawn(open());
-    const constellations = all(box, "[role='progressbar']").filter((each) =>
-      each.getAttribute("aria-label")?.startsWith("Constellation"),
-    );
-    expect(constellations.map((each) => each.getAttribute("aria-label"))).toEqual(["Constellation gov"]);
-    expect(constellations[0]?.getAttribute("aria-valuemax")).toBe("2");
-    expect(text(box)).toContain("1 still to visit");
-    expect(text(box)).not.toContain("games");
-    expect(text(box)).not.toContain("0/");
-  });
-
-  it("shows no constellation and no 0% on a passport with no stamp", async () => {
-    listed.count = 4;
-    listed.worlds = [{ id: "gov/dao", namespace: "gov" }];
-    const box = await drawn(open());
-    expect(text(box)).not.toContain("Constellations");
-    expect(text(box)).toContain("No stamp yet");
-  });
-
-  it("lists the stamps newest first, and the worlds charted here", async () => {
+  it("counts the stamps out of the worlds listed, and the systems and the worlds charted first", async () => {
     stamp(
-      { "onyx:gov/dao": "2026-11-01", "onyx:games/chess": "2026-11-04", "gnoland:x/y": "2026-11-05" },
+      { "onyx:gov/dao": "2026-11-01", "onyx:games/chess": "2026-11-04", "onyx:games/go": "2026-11-04" },
       { "onyx:games/chess": "2026-11-04" },
     );
+    listed.count = 19;
+    listed.worlds = [];
     const box = await drawn(open());
-    const stamps = all(box, "section[aria-labelledby='passport-stamps'] li").map(text);
-    expect(stamps).toHaveLength(2);
-    expect(stamps[0]).toContain("Nov 4, 2026");
-    expect(stamps[1]).toContain("Nov 1, 2026");
-    const firsts = all(box, "section[aria-labelledby='passport-firsts'] li").map(text);
-    expect(firsts).toHaveLength(1);
+    expect(text(box)).toMatch(/3\s*\/19\s*stamps/i);
+    expect(text(box)).toMatch(/2\s*systems/i);
+    expect(text(box)).toMatch(/1\s*charted first/i);
+  });
+
+  it("opens on Challenges, first of three tabs, the stamps and the charted ones counted", async () => {
+    stamp({ "onyx:gov/dao": "2026-11-01", "onyx:games/chess": "2026-11-04" }, { "onyx:games/chess": "2026-11-04" });
+    const box = await drawn(open());
+    const tabs = all(box, "[role='tab']");
+    expect(tabs.map((each) => each.textContent.trim())).toEqual(["Challenges", "Stamps 2", "Charted 1"]);
+    expect(tabs[0]?.getAttribute("aria-selected")).toBe("true");
+    expect(all(box, "svg[role='img']")[0]?.getAttribute("aria-label")).toBe("onyx, earned");
+  });
+
+  it("names the open tab's panel by its tab", async () => {
+    stamp({ "onyx:gov/dao": "2026-11-01" }, {});
+    const box = await drawn(open());
+    click(tab(box, "Stamps"));
+    const panel = one(box, "[role='tabpanel']");
+    expect(panel.getAttribute("aria-labelledby")).toBe(tab(box, "Stamps")?.id);
+    expect(tab(box, "Stamps")?.id).toBeTruthy();
+  });
+
+  it("shows no stamp and no 0% on a passport with none", async () => {
+    listed.count = 4;
+    const box = await drawn(open());
+    click(tab(box, "Stamps"));
+    expect(text(box)).toContain("No stamp yet");
+    expect(text(box)).not.toContain("0%");
+  });
+
+  it("groups the stamps by day, newest first, as the app writes days", async () => {
+    today();
+    stamp({
+      "onyx:a/one": "2026-11-12",
+      "onyx:a/two": "2026-11-11",
+      "onyx:gov/dao": "2026-11-01",
+      "onyx:games/chess": "2026-11-04",
+      "gnoland:x/y": "2026-11-05",
+    });
+    const box = await drawn(open());
+    click(tab(box, "Stamps"));
+    const days = all(box, "section p.label").map(text);
+    expect(days).toEqual(["Today · 1 stamp", "Yesterday · 1 stamp", "4 Nov · 1 stamp", "1 Nov · 1 stamp"]);
+    expect(marks(box)).toHaveLength(4);
+  });
+
+  it("takes the day again each time it opens, so a passport left mounted past midnight shows the new day", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-11-12T23:00:00Z"));
+    stamp({ "onyx:a/one": "2026-11-12" });
+    const box = await drawn(<Toggled />);
+    click(tab(box, "Stamps"));
+    expect(all(box, "section p.label").map(text)).toEqual(["Today · 1 stamp"]);
+    click(button(box, "toggle"));
+    vi.setSystemTime(new Date("2026-11-13T01:00:00Z"));
+    click(button(box, "toggle"));
+    click(tab(box, "Stamps"));
+    expect(all(box, "section p.label").map(text)).toEqual(["Yesterday · 1 stamp"]);
+  });
+
+  it("shows seven stamps of a day and the rest after Show N more", async () => {
+    today();
+    stamp(Object.fromEntries(Array.from({ length: 10 }, (_, at) => [`onyx:ns/w${String(at)}`, "2026-11-12"])));
+    const box = await drawn(open());
+    click(tab(box, "Stamps"));
+    expect(marks(box)).toHaveLength(7);
+    click(all(box, "button").find((each) => each.textContent === "Show 3 more"));
+    expect(marks(box)).toHaveLength(10);
+    expect(all(box, "button").some((each) => each.textContent.startsWith("Show"))).toBe(false);
+  });
+
+  it("shows seven of the stamps charted first and the rest after Show N more", async () => {
+    today();
+    const days = Object.fromEntries(Array.from({ length: 10 }, (_, at) => [`onyx:ns/w${String(at)}`, "2026-11-12"]));
+    stamp(days, days);
+    const box = await drawn(open());
+    click(tab(box, "Charted"));
+    expect(marks(box)).toHaveLength(7);
+    click(all(box, "button").find((each) => each.textContent === "Show 3 more"));
+    expect(marks(box)).toHaveLength(10);
+  });
+
+  it("keeps two worlds of one name apart, each stamp naming its system", async () => {
+    stamp({ "onyx:nym-ana/hello": "2026-11-05", "onyx:g1abc/hello": "2026-11-05" });
+    listed.worlds = [
+      { id: "nym-ana/hello", namespace: "nym-ana", nature: "game" },
+      { id: "g1abc/hello", namespace: "g1abc" },
+    ];
+    const box = await drawn(open());
+    click(tab(box, "Stamps"));
+    expect(marks(box).toSorted()).toEqual([
+      expect.stringContaining("hello, g1abc, stamped"),
+      expect.stringContaining("hello, nym-ana, stamped"),
+    ]);
+    expect(text(box)).toMatch(/2\s*systems/i);
+  });
+
+  it("lists the worlds charted first in gold in their tab", async () => {
+    stamp({ "onyx:gov/dao": "2026-11-01", "onyx:games/chess": "2026-11-04" }, { "onyx:games/chess": "2026-11-04" });
+    const box = await drawn(open());
+    click(tab(box, "Charted"));
+    expect(marks(box)).toHaveLength(1);
+    expect(marks(box)[0]).toContain("charted first");
+    expect(all(box, "svg[data-gold]")).toHaveLength(1);
   });
 
   it("says when the device did not keep the last change", async () => {

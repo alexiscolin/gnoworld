@@ -1,7 +1,7 @@
 import { Address, toAddress } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
 import type { Roles } from "../roles/roles.ts";
-import { desired, listed, mayRead, openRoom, publicRoom, roomType } from "./types.ts";
+import { desired, listed, mayRead, openRoom, publicRoom, roomType, searchable } from "./types.ts";
 
 const TEAM = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const MOD = Address.parse("g1zgldsmn6ck6w4p325xd3j8y779ky6fpjnz3uh9");
@@ -149,5 +149,61 @@ describe("a room's type (4b)", () => {
     ["#gone/room", "open"],
   ])("types %s as %s", (room, type) => {
     expect(roomType(ROLES, room)).toBe(type);
+  });
+});
+
+describe("a realm's room, which no file types", () => {
+  const room = "#bubble/golf-0123456789";
+  it("is open to every account and guest, and its world's moderators and the team are no more than anyone in it", () => {
+    expect(desired(ROLES, room, { archived: false })).toEqual({ modes: "M", invites: [], voiced: [] });
+    expect([mayRead(ROLES, room, undefined), listed(ROLES, room, undefined), openRoom(ROLES, room)]).toEqual([
+      true,
+      true,
+      true,
+    ]);
+  });
+});
+
+// Slice 13, B1 (D13924): the rooms whose lines the index holds are those a guest or an account may read, listed or not
+// hidden: open, announcement and accounts rooms, never a members room, never a hidden one.
+describe("the rooms the search index holds", () => {
+  const typed = {
+    team: new Set<string>(),
+    worlds: new Map([
+      [
+        "earth",
+        {
+          rules: RULES,
+          groups: new Map([["readers", new Set([READER])]]),
+          rooms: new Map([
+            ["#earth/news", { type: "announcement" as const, hidden: false }],
+            ["#earth/club", { type: "accounts" as const, hidden: false }],
+            ["#earth/door", { type: "accounts" as const, hidden: true }],
+            ["#earth/hushed", { type: "announcement" as const, hidden: true }],
+            ["#earth/secret", { type: "open" as const, hidden: true }],
+            ["#earth/crew", { type: "members" as const, readers: "readers", hidden: false }],
+            ["#earth/desk", { type: "members-write" as const, readers: "readers", writers: "readers", hidden: false }],
+            ["#earth/vault", { type: "members" as const, readers: "readers", hidden: true }],
+          ]),
+        },
+      ],
+    ]),
+  };
+
+  it("are the open, announcement and accounts rooms, and a room the file does not type", () => {
+    expect(["#earth", "#earth/news", "#earth/club", "#earth/untyped"].map((room) => searchable(typed, room))).toEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
+  });
+
+  it("are never a members room, a members-write room, or a hidden one of any type", () => {
+    expect(
+      ["#earth/crew", "#earth/desk", "#earth/vault", "#earth/secret", "#earth/door", "#earth/hushed"].map((room) =>
+        searchable(typed, room),
+      ),
+    ).toEqual([false, false, false, false, false, false]);
   });
 });

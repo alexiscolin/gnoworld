@@ -1,9 +1,10 @@
 // jarvis's real entry for an eval run (provider.ts), started as the image starts it, switched on, with the test
-// preload that moves the universes' nodes to the run's recorded node (jarvis/src/testing/outbound.ts); on a spent
-// day's file, its budgets used up. Its stop waits for it to exit, then removes its folder (10j's review, V6).
+// preload that moves the universes' nodes to the run's recorded node (jarvis/src/testing/outbound.ts), and gnomcp
+// given profiles of that node, which the preload cannot move; on a spent day's file, its budgets used up. Its stop waits
+// for it to exit, then removes its folder (10j's review, V6).
 import { spawn } from "node:child_process";
 import { once } from "node:events";
-import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { seedSpent } from "./budget.ts";
 
@@ -11,11 +12,17 @@ export interface Started {
   url: string;
   stop: () => Promise<void>;
 }
+interface Universe {
+  id: string;
+  chainId: string;
+  rpc: string;
+}
 export interface Setup {
   root: string;
-  // The run's recorded node and spans' receiver, and the universes it records.
+  // The run's recorded node and spans' receiver, each universe's node for gnomcp, and the universes it records.
   fakes: string;
-  universes: readonly { id: string; rpc: string }[];
+  rpcs: ReadonlyMap<string, string>;
+  universes: readonly Universe[];
   spent: boolean;
   key: string;
   gnomcp: string;
@@ -28,11 +35,28 @@ export interface Setup {
 // A stop's longest wait before the child is killed: its drain (1 s here) and gnomcp's close.
 const STOP_MS = 10_000;
 
+/** gnomcp's profiles for a run, as deploy/jarvis/gnomcp.toml writes the live ones: each universe on its recorded node,
+ * with an indexer named for jarvis's start check alone, and gnomcp's three built-ins redefined on the last universe's
+ * chain and node, which it never writes to. */
+export function gnomcpConfig(universes: readonly Universe[], rpcs: ReadonlyMap<string, string>, fakes: string): string {
+  const profile = (name: string, rpc: string, chainId: string) =>
+    `[${name}]\nrpc-url = "${rpc}"\nchain-id = "${chainId}"\n`;
+  const own = universes.map(
+    ({ id, chainId }) => `${profile(id, rpcs.get(id) ?? "", chainId)}tx-indexer-url = "${fakes}/indexer/${id}"\n`,
+  );
+  const last = universes.at(-1);
+  const rpc = last === undefined ? "" : (rpcs.get(last.id) ?? "");
+  const builtIns = ["local", "testnet", "sapphire"].map((name) => profile(name, rpc, last?.chainId ?? ""));
+  return [...own, ...builtIns].join("\n");
+}
+
 export async function startJarvis(setup: Setup): Promise<Started> {
   mkdirSync(setup.scratch, { recursive: true });
   const dir = mkdtempSync(join(setup.scratch, "jarvis-"));
   const database = join(dir, "jarvis.db");
   if (setup.spent) seedSpent(database);
+  const profiles = join(dir, "gnomcp.toml");
+  writeFileSync(profiles, gnomcpConfig(setup.universes, setup.rpcs, setup.fakes));
   const nodes = setup.universes.map((one) => [new URL(one.rpc).origin, `${setup.fakes}/node/${one.id}`]);
   const ids = setup.universes.map((one) => one.id).join(",");
   const env = {
@@ -47,7 +71,7 @@ export async function startJarvis(setup: Setup): Promise<Started> {
     JARVIS_DRAIN_S: "1",
     ANTHROPIC_API_KEY_FILE: setup.key,
     JARVIS_GNOMCP_COMMAND: setup.gnomcp,
-    JARVIS_GNOMCP_CONFIG: join(setup.root, "deploy/jarvis/gnomcp.toml"),
+    JARVIS_GNOMCP_CONFIG: profiles,
     JARVIS_PROFILES: ids,
     JARVIS_INDEXER_PROFILES: ids,
     JARVIS_TRACES_URL: `${setup.fakes}/v1/traces`,

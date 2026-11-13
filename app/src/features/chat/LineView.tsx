@@ -1,16 +1,18 @@
 // A room's line (slice 4's 4b, moved out of Lines.tsx): its marks, its time, its author, its text drawn from Markdown
-// (4c), its link's player (4g), its link's page preview (8f) and its bar. One that mentions the reader says so (4d), one of the reader's own says
+// (4c), its link's player (4g), its link's page preview (8f), its link's card (L4) and its bar. One that mentions the reader says so (4d), one of the reader's own says
 // "you" (4e).
-import { markdown, mentions, pollOf, type Block, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
+import { markdown, mentions, type Line, type Reacting, type ShownLine } from "@gnoworld/core";
 import type { StreamEvent } from "@gnoworld/schemas";
 import type { ReactNode } from "react";
 import { Embed } from "./Embed.tsx";
 import { embedIn } from "./embeds.ts";
-import { Markdown } from "./Message.tsx";
+import { LineBody } from "./LineBody.tsx";
 import { Head } from "./LineHead.tsx";
+import { LineText } from "./LineText.tsx";
+import { LineTranslation } from "./LineTranslation.tsx";
+import { LineCard } from "./LineCard.tsx";
 import { LinePreview } from "./LinePreview.tsx";
 import { Reactions } from "./Reactions.tsx";
-import { PollView } from "./PollView.tsx";
 import { Quote } from "./Replying.tsx";
 import { ThreadChip } from "./ThreadChip.tsx";
 import styles from "./RoomView.module.css";
@@ -33,22 +35,6 @@ const knownOf = (names: string, members: ReadonlySet<string>, me?: string): stri
     .filter((address) => address === me || members.has(address))
     .join(" ");
 
-// A line's text drawn, its mentions of `known` (space-separated) shortened. A component of its own, with a string the
-// compiler compares by value: the line keeps its drawing while others join and leave (F812's cost).
-// Its links are Tab stops on the list's stop alone (U1).
-interface LineTextProps {
-  blocks: readonly Block[];
-  me: string | undefined;
-  known: string;
-  stop: boolean;
-}
-
-function LineText({ blocks, me, known, stop }: LineTextProps) {
-  return (
-    <Markdown blocks={blocks} className={styles["text"]} me={me} members={new Set(known.split(" "))} tabbable={stop} />
-  );
-}
-
 // The prototype's divider: a row of its own, its word in the label style and a rule running on.
 function NewDivider() {
   return (
@@ -64,17 +50,6 @@ function NewDivider() {
   );
 }
 
-// A line's words, or a poll's bars in their place (core's poll.ts).
-function Body({
-  line,
-  votes,
-  react,
-  children,
-}: Pick<LineViewProps, "line" | "votes" | "react"> & { children: ReactNode }) {
-  const poll = votes === undefined ? undefined : pollOf(line.text);
-  return poll === undefined ? children : <PollView to={line.id} poll={poll} votes={votes ?? ""} react={react} />;
-}
-
 // A line's reactions under it, when it has any (4d).
 function Chips({ to, chips, react }: { to: string; chips: string | undefined; react: LineViewProps["react"] }) {
   return chips === undefined || chips === "" ? null : <Reactions to={to} chips={chips} react={react} />;
@@ -86,19 +61,29 @@ const quoteKnown = (answers: Line | undefined, members: ReadonlySet<string>, me:
 
 // How a row stands in its list: the list's tab stop or not, its links Tab stops, and its msgid on a line that opens a
 // thread (the focus comes back to it). A thread's own row is none of the list's: no stop, its links Tab stops.
+// A line that goes on its author's group draws no face and name, but for the one that opens the New divider.
 function rowOf({
   id,
   stop,
   inThread,
   threads,
+  grouped,
+  fresh,
 }: {
   id: string;
   stop: boolean;
   inThread: true | undefined;
   threads: boolean;
+  grouped: boolean | undefined;
+  fresh: boolean;
 }) {
-  const attrs = { ...(threads ? { "data-line": id } : {}), tabIndex: inThread === true ? undefined : stop ? 0 : -1 };
-  return { attrs, links: stop || inThread === true };
+  const show = grouped === true && !fresh;
+  const attrs = {
+    ...(threads ? { "data-line": id } : {}),
+    ...(show ? { "data-grouped": "" } : {}),
+    tabIndex: inThread === true ? undefined : stop ? 0 : -1,
+  };
+  return { attrs, links: stop || inThread === true, grouped: show };
 }
 
 interface ChipOf {
@@ -111,10 +96,9 @@ interface ChipOf {
 // The chip of the thread a line roots, when the page opens threads and the line has replies; none for a line without.
 function chipOf({ id, replies, stop, onThread }: ChipOf) {
   return replies === undefined || onThread === undefined ? null : (
-    <>
-      {" "}
+    <span className={styles["thread"]}>
       <ThreadChip id={id} count={replies} stop={stop} onThread={onThread} />
-    </>
+    </span>
   );
 }
 
@@ -129,12 +113,19 @@ export interface LineViewProps {
   stop: boolean;
   /** Its bar, while pointed at or focused. */
   actions: ReactNode;
+  /** Whether it goes on its author's group: no face and name, its time in the gutter on hover. */
+  grouped?: boolean;
   /** Whether it is the first line past the reading place as the room opened (4f). */
   fresh: boolean;
   /** Its verdict from the server's stream, which a link's player waits on (4g). */
   verdict: StreamEvent["state"] | undefined;
   /** Whether a link's player is offered: not to a reader who saves data, nor in a direct message. */
   players: boolean;
+  /** What its card needs (link-previews L4, lineCard.ts's cardMarks): no msgid for a direct message's line, which has no card. */
+  cardMsgid?: string | undefined;
+  cardKey?: string | undefined;
+  may?: boolean;
+  saving?: boolean;
   /** Whether it is saved on this device, and whether it is pinned in its room (4d). */
   saved: boolean;
   pinned: boolean;
@@ -152,13 +143,38 @@ export interface LineViewProps {
   onThread?: ((id: string) => void) | undefined;
   /** A row of a thread's own list: no quote, no tab stop of the list's, its links Tab stops. */
   inThread?: true | undefined;
-  /** Where its author comes from, when they opted in: none draws no tag. */
+  /** The room it is in, where its translation is asked and drawn; none for a thread's own row. */
+  room?: string | undefined;
 }
+
+/** The props of a row with no bar, chip, mark, player or quote: what a thread's row and a plain row take beside its line, reader and members. */
+export const BARE_ROW = {
+  stop: false,
+  actions: null,
+  fresh: false,
+  verdict: undefined,
+  players: false,
+  saved: false,
+  pinned: false,
+  chips: undefined,
+  react: undefined,
+  answers: undefined,
+} satisfies Pick<
+  LineViewProps,
+  "stop" | "actions" | "fresh" | "verdict" | "players" | "saved" | "pinned" | "chips" | "react" | "answers"
+>;
 
 export function LineView(props: LineViewProps) {
   const { line, me, members, stop, actions, fresh, verdict, players, saved, pinned, chips, react, answers } = props;
-  const { replies, onThread, inThread, votes, newHere } = props;
-  const row = rowOf({ id: line.id, stop, inThread, threads: onThread !== undefined });
+  const { replies, onThread, inThread, votes, newHere, cardMsgid, cardKey, may, saving, room } = props;
+  const row = rowOf({
+    id: line.id,
+    stop,
+    inThread,
+    threads: onThread !== undefined,
+    grouped: props.grouped,
+    fresh,
+  });
   const blocks = markdown(line.text);
   // Its first link to an accepted service gets a player, but for a reader who saves data (4g).
   const embed = players ? embedIn(blocks) : undefined;
@@ -179,19 +195,34 @@ export function LineView(props: LineViewProps) {
       {...row.attrs}
     >
       {fresh ? <NewDivider /> : null}
-      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere }} />
+      <Head {...{ line, mine, me, mentioned, saved, pinned, newHere, grouped: row.grouped }} />
       {inThread === true ? null : <Quote line={line} answers={answers} known={quoted} />}
-      <div data-line-text="" className={votes === undefined ? undefined : styles["wide"]}>
-        <Body line={line} votes={votes} react={react}>
-          <LineText blocks={blocks} me={me} known={known} stop={row.links} />
-        </Body>
-      </div>
+      <LineBody line={line} votes={votes} react={react} players={players} room={room}>
+        <LineText blocks={blocks} me={me} known={known} stop={row.links} />
+      </LineBody>
+      <LineTranslation line={line} room={room} mine={mine} me={me} known={known} stop={row.links} />
       {embed === undefined ? null : <Embed key={embed.src} embed={embed} verdict={verdict} />}
       <LinePreview blocks={blocks} verdict={verdict} tabbable={row.links} />
+      <LineCard
+        room={room}
+        msgid={cardMsgid}
+        cardKey={cardKey}
+        may={may}
+        saving={saving}
+        text={line.text}
+        blocks={blocks}
+        player={embed !== undefined}
+        verdict={verdict}
+        mine={mine}
+        tabbable={row.links}
+      />
       {/* Before the chips in the Tab order, so Reply is a few presses away; it floats, so its place shows nowhere (U2). */}
       {actions}
-      <Chips to={line.id} chips={chips} react={react} />
-      {chipOf({ id: line.id, replies, stop, onThread })}
+      {/* The reactions at the line's start, the thread's chip at its end, on one row; none drawn, no row. */}
+      <div className={styles["foot"]}>
+        <Chips to={line.id} chips={chips} react={react} />
+        {chipOf({ id: line.id, replies, stop, onThread })}
+      </div>
     </li>
   );
 }

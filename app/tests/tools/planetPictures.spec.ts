@@ -4,7 +4,7 @@ import { running } from "../e2e/sceneStage.ts";
 import { pictureFile } from "../../src/lib/pictureFile.ts";
 import { inputsHash, MANIFEST, PICTURES, worldIds } from "./pictureInputs.ts";
 
-// Takes the picture of each world of the chat's column once, from the scene as the universe's rail draws it (Scene.portraits: the same
+// Takes the picture of each world of the chat's column once, from the scene as the universe's rail draws it (Space.portraits: the same
 // renderer, camera and light), 88 px for a 44 px planet at 2x, encoded as WebP in the browser; and writes the manifest the unit test checks.
 const SIDE = 88;
 const QUALITY = 0.85;
@@ -21,10 +21,10 @@ test("takes the chat's planet pictures", async ({ page }) => {
   const ids = worldIds();
   const taken = await page.evaluate(
     async ({ ids, side, quality }) => {
-      const scene = Reflect.get(globalThis, "__gnoworldScene") as {
-        portraits(ids: string[], size: number, signal: AbortSignal): Promise<Map<string, string>>;
+      const scene = Reflect.get(globalThis, "__gnoworldSpace") as {
+        portraits(ids: string[], size: number): Promise<Map<string, string>>;
       };
-      const drawn = await scene.portraits(ids, side, new AbortController().signal);
+      const drawn = await scene.portraits(ids, side);
       const webp: [string, string][] = [];
       for (const [id, url] of drawn) {
         const picture = new Image();

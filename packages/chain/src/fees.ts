@@ -3,6 +3,7 @@
 // each row is checked again, and only a successful call with one message of that realm and function counts: a transaction of
 // several messages paid one fee for all. A transaction has no time, so the read is bounded by blocks under the tip, in the query.
 import { CALL_FEES_CAPS, CallFeesAnswer, TipAnswer } from "@gnoworld/schemas/indexer";
+import { indexerUrl, tipAsk } from "./asks.ts";
 import { failedRead, readChain, sourceOf, type ChainRead, type ReadOptions } from "./read.ts";
 
 type Row = NonNullable<CallFeesAnswer["data"]["getTransactions"]>[number];
@@ -67,14 +68,12 @@ export async function readCallFees(
   const { realm, func } = call;
   if (realm.length > CALL_FEES_CAPS.path || func.length > CALL_FEES_CAPS.func)
     return failedRead("bad-name", sourceOf(indexer, options));
-  const ask = (query: string, variables: object) =>
-    `${indexer}?query=${encodeURIComponent(query)}&variables=${encodeURIComponent(JSON.stringify(variables))}`;
-  const tip = await readChain(ask("{ latestBlockHeight }", {}), TipAnswer, options);
+  const tip = await readChain(indexerUrl(indexer, tipAsk()), TipAnswer, options);
   if (!tip.ok) return tip;
   let read: ChainRead<CallFees> = failedRead("bad-name", sourceOf(indexer, options));
   for (const window of WINDOWS) {
     const from = Math.max(0, tip.value.data.latestBlockHeight - window);
-    read = await above(ask(QUERY, { path: realm, func, from }), call, options);
+    read = await above(indexerUrl(indexer, { query: QUERY, variables: { path: realm, func, from } }), call, options);
     if (!read.ok || read.value.fees.length === LATEST || from === 0) break;
   }
   return read;

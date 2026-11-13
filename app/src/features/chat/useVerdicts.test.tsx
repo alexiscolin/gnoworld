@@ -8,6 +8,9 @@ import { fakeStream } from "../../../tests/fakeStream.ts";
 import { BATCH_MS } from "../../lib/stream/chainFeed.ts";
 import { chainKey } from "../../store/chain.ts";
 import { createAppStore } from "../../store/index.ts";
+import { tellJarvisHere } from "../../jarvisHere.ts";
+import { translationLines, translationNow } from "../../translating.ts";
+import { cardsIn } from "./cardsIn.ts";
 import { useVerdicts, type Shown } from "./useVerdicts.ts";
 
 // The verdicts' asker reads a line's Markdown for a player's link: that code is asked once a room holds a line, never
@@ -40,6 +43,10 @@ vi.mock(import("./linked.ts"), async (original) => {
   await chunk.gate;
   return original();
 });
+vi.mock(import("../../translating.ts"), async (original) => {
+  const real = await original();
+  return { ...real, translationLines: vi.fn(real.translationLines) };
+});
 const SINCE = { time: "2026-10-26T12:00:00.000Z" };
 
 const line = (id: string, text: string): Line => ({
@@ -49,7 +56,7 @@ const line = (id: string, text: string): Line => ({
   text,
   kind: "message",
 });
-const settled = () => new Promise((resolve) => setTimeout(resolve, 20));
+const pausedBriefly = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 const CHART: Signal = {
   kind: "chart",
@@ -95,19 +102,19 @@ afterEach(() => {
 });
 
 describe("useVerdicts: the code that finds a link in a line, asked with the first lines", () => {
-  const draw = async (lines: readonly Line[] | undefined, saving = false) => {
+  const draw = async (lines: readonly Line[] | undefined, saving = false, reader?: string) => {
     const sources = fakeStream();
     const host = document.createElement("div");
     root = createRoot(host);
     const mounted = root;
-    let now: Shown & { using: typeof store } = { room: "#bubble", lines, reader: undefined, saving, using: store };
+    let now: Shown & { using: typeof store } = { room: "#bubble", lines, reader, saving, using: store };
     redraw = (change) => {
       now = { ...now, ...change };
       mounted.render(<Probe shown={now} using={now.using} />);
     };
     await act(async () => {
       redraw({});
-      await settled();
+      await pausedBriefly();
     });
     return sources;
   };
@@ -117,7 +124,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     await draw(undefined);
     await act(async () => {
       redraw({ lines: [] });
-      await settled();
+      await pausedBriefly();
     });
     expect(chunk.loads).toBe(0);
   });
@@ -127,12 +134,12 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const sources = await draw([line("a", link)]);
     await act(async () => {
       redraw({ room: "#other", lines: [line("x", link)] });
-      await settled();
+      await pausedBriefly();
     });
     expect(chunk.loads).toBe(1);
     chunk.open();
     await act(async () => {
-      await settled();
+      await pausedBriefly();
     });
     expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble", "/api/stream?rooms=%23other"]);
   });
@@ -171,6 +178,72 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     expect(asked).toEqual([]);
   });
 
+  const setting = (change: { language?: "de" | "fr"; autoTranslate?: boolean }) => {
+    store.getState().deviceActions.change("settings", (held) => ({ ...held, ...change }));
+  };
+
+  it("asks the stream for a signed-in reader's language, and holds the translations it tells", async () => {
+    setting({ language: "de" });
+    const sources = await draw([], false, "g1x");
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble&language=de"]);
+    sources.opened[0]?.emit("translation", {
+      room: "#bubble",
+      msgid: "t-from-stream",
+      language: "de",
+      status: "translated",
+      text: "Hallo",
+    });
+    expect(translationNow({ room: "#bubble", id: "t-from-stream", language: "de" })).toMatchObject({
+      state: "done",
+      text: "Hallo",
+    });
+  });
+
+  it("follows again when the reader's language changes or the translation is switched off", async () => {
+    setting({ language: "de" });
+    const sources = await draw([], false, "g1x");
+    for (const next of [{ language: "fr" as const }, { autoTranslate: false }]) {
+      await act(async () => {
+        setting(next);
+        await pausedBriefly();
+      });
+    }
+    expect(sources.opened.map(({ url }) => url)).toEqual([
+      "/api/stream?rooms=%23bubble&language=de",
+      "/api/stream?rooms=%23bubble&language=fr",
+      "/api/stream?rooms=%23bubble",
+    ]);
+    expect(sources.opened.map(({ closed }) => closed)).toEqual([1, 1, 0]);
+  });
+
+  it("opens a signed-in reader's stream once, in the device's language, whenever Jarvis's place is told", async () => {
+    setting({ language: "fr" });
+    const sources = await draw([], false, "g1x");
+    await act(async () => {
+      tellJarvisHere({ room: "#bubble", universe: { id: "u", isDefault: true }, account: "g1x", language: "fr" });
+      await pausedBriefly();
+    });
+    await act(async () => {
+      tellJarvisHere(undefined);
+      await pausedBriefly();
+    });
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble&language=fr"]);
+  });
+
+  it("asks a guest's stream in no language, whatever the device says", async () => {
+    setting({ language: "fr" });
+    const sources = await draw([]);
+    expect(sources.opened.map(({ url }) => url)).toEqual(["/api/stream?rooms=%23bubble"]);
+  });
+
+  it("tells the translations which lines the room's store holds", async () => {
+    store.getState().chatActions.follow(["#bubble"]);
+    await draw([]);
+    const told = vi.mocked(translationLines).mock.calls.at(-1)?.[0];
+    expect(told?.("#bubble")).toEqual([]);
+    expect(told?.("#nowhere")).toBeUndefined();
+  });
+
   it("asks the server of the line that holds a link, once the code came, and of none other", async () => {
     const sources = await draw([line("a", "https://youtu.be/dQw4w9WgXcQ"), line("b", "only words")]);
     sources.opened[0]?.emit("since", SINCE);
@@ -186,7 +259,7 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
     const sources = await draw([]);
     sources.opened[0]?.emit("signal", CHART);
     expect(store.getState().signals.map(({ world, kind }) => `${world} ${kind}`)).toEqual(["bubble chart"]);
-    expect(sources.opened[0]?.heard()).toEqual(["chain", "error", "realms", "signal", "since", "verdict"]);
+    expect(sources.opened[0]?.heard()).toEqual(["card", "chain", "error", "signal", "since", "translation", "verdict"]);
   });
 
   it("hands a verdict of the stream to the store", async () => {
@@ -196,14 +269,39 @@ describe("useVerdicts: the code that finds a link in a line, asked with the firs
   });
 
   // Slice 9g (F5784): the chain's frames of the page's own stream reach the store, in a batch, through the lazily loaded feed.
-  it("hands a chain frame and a realms frame to the store, the call in its world's lines and the count at once", async () => {
+  it("hands a chain frame to the store, the call in its world's lines", async () => {
     const sources = await draw([]);
     sources.opened[0]?.emit("chain", CALL);
-    sources.opened[0]?.emit("realms", { universe: "onyx", count: 17, height: 908297 });
     await vi.waitFor(() => {
       expect(store.getState().chainByWorld[chainKey("onyx", "bubble")]?.map(({ id }) => id)).toEqual(["h900030:0"]);
-      expect(store.getState().realmsDeployed["onyx"]?.count).toBe(17);
     });
+  });
+
+  // Link previews L4: a `card` frame reaches the store through its lazily loaded feed, in the order it came; one it cannot read is said once.
+  it("hands a card frame to the store, a later one without a key taking the card away", async () => {
+    const sources = await draw([]);
+    const key = "a".repeat(64);
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m1", key });
+    await vi.waitFor(() => {
+      expect(cardsIn(store.getState())?.cards["#bubble"]).toEqual({ m1: key });
+    });
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m1", key: null });
+    await vi.waitFor(() => {
+      expect(cardsIn(store.getState())?.cards["#bubble"]).toEqual({});
+    });
+  });
+
+  it("says a card frame it cannot read once, and keeps the store as it was", async () => {
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const sources = await draw([]);
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m1", key: "../x" });
+    sources.opened[0]?.emit("card", { room: "#bubble", msgid: "m2", key: "../y" });
+    await vi.waitFor(() => {
+      expect(report).toHaveBeenCalledTimes(1);
+    });
+    expect(String(report.mock.calls[0]?.[0])).toContain("card_unknown");
+    expect(cardsIn(store.getState())).toBeUndefined();
   });
 
   it("says a chain frame it cannot read once, and keeps the store as it was", async () => {

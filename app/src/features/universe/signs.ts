@@ -5,7 +5,6 @@ import {
   countryTrends,
   isPublicRoom,
   pickBubbles,
-  turnTo,
   type Bubble,
   type Count,
   type EarthRoom,
@@ -13,7 +12,7 @@ import {
   type Trend,
 } from "@gnoworld/core/bubbles";
 import { createStore, type StoreApi } from "zustand/vanilla";
-import type { Ground } from "../../scene/earth/marks.ts";
+import type { Ground } from "../../space/earth/ground.ts";
 import type { AppState } from "../../store/index.ts";
 import { own } from "../../store/record.ts";
 
@@ -40,6 +39,9 @@ export interface SignsDeps {
   readonly rules: Rules;
   /** Where the side rooms stand (app/data/earthRooms.json). */
   readonly places: readonly { readonly room: string; readonly lat: number; readonly lon: number }[];
+  /** On a world with no countries (D565): the lines of the rooms the page follows, its own, are its bubbles, each standing on its speaker's
+   * own spot (spot.ts), and none of the Earth's counts, trends, pins or turn to your country. */
+  readonly world?: { readonly id: string };
 }
 
 const NOTHING: Snapshot = { bubbles: [], counts: [], trends: [], pins: [] };
@@ -67,7 +69,8 @@ export class Signs {
   readonly #state = createStore<Snapshot>(() => NOTHING);
   #said = JSON.stringify(NOTHING);
   #shown: readonly Bubble[] = [];
-  #faced: ReadonlySet<string> = new Set();
+  // When each message of the last pick was said, by id: a bubble's turn of the planet depends on it (D13001).
+  #at = new Map<string, number>();
 
   constructor(deps: SignsDeps) {
     this.#deps = deps;
@@ -76,6 +79,9 @@ export class Signs {
   readonly subscribe = this.#state.subscribe;
 
   readonly snapshot = this.#state.getState;
+
+  /** When the message `id` was said, in milliseconds; none for a bubble the last pick no longer holds. */
+  readonly said = (id: string): number | undefined => this.#at.get(id);
 
   /** Starts it; what this returns stops it. */
   start(): () => void {
@@ -103,6 +109,7 @@ export class Signs {
     const { chat, verdicts } = this.#deps.store.getState();
     const types = this.#types();
     return Object.entries(chat.rooms).map(([room, { lines }]) => ({
+      room,
       type: types.get(room),
       lines,
       hidden: (id) => own(own(verdicts, room) ?? {}, id) === "hidden",
@@ -122,29 +129,28 @@ export class Signs {
   // ponytail: each pick reads every followed room's lines, 100 rooms of 200 at most, on a line and once a second, never on a frame; the Earth
   // holds a few side rooms, and only the lines young enough for a bubble are parsed for mentions.
   #pick(): void {
-    const { store, ground, rules } = this.#deps;
+    const { store, ground, rules, world } = this.#deps;
     const { me } = store.getState().chat;
     const now = Date.now();
     const how = { joined: me !== undefined, since: now - rules.maxAgeSeconds * 1000 };
     const read = this.#rooms().map((room) => ({ room, messages: bubbleLines([room], how) }));
-    const facing = ground.facing();
+    // A world's speaker is the place the pick keys on (one bubble each, none on the far side), so no facing is given.
+    const facing = world === undefined ? ground.facing() : undefined;
     const viewer = { account: me ?? "", muted: [], banned: [], ...(facing === undefined ? {} : { facing }) };
     const messages = read.flatMap((each) => each.messages);
-    const { bubbles, counts, shown } = pickBubbles(messages, now, viewer, rules, this.#shown);
+    this.#at = new Map(messages.map(({ id, at }) => [id, at]));
+    const placed =
+      world === undefined
+        ? messages
+        : messages.map((one) => ({ ...one, country: one.account.toLowerCase(), spot: true, joined: true }));
+    const { bubbles, counts, shown } = pickBubbles(placed, now, viewer, rules, this.#shown);
     this.#shown = shown;
-    this.#face(bubbles);
+    if (world !== undefined) {
+      this.#publish({ ...NOTHING, bubbles });
+      return;
+    }
     const whole = read.filter((each) => reaches(each.room, now)).flatMap((each) => each.messages);
     this.#publish({ bubbles, counts, trends: countryTrends(whole, now), pins: this.#pins() });
-  }
-
-  // The globe turns to a line of yours once, as it comes (ADR-0002 §1).
-  #face(bubbles: readonly Bubble[]): void {
-    const mine = bubbles.filter(({ own: yours }) => yours);
-    for (const { id, country } of mine) {
-      const place = this.#faced.has(id) ? undefined : turnTo(country);
-      if (place !== undefined) this.#deps.ground.face(place);
-    }
-    this.#faced = new Set(mine.map(({ id }) => id));
   }
 
   #publish(next: Snapshot): void {

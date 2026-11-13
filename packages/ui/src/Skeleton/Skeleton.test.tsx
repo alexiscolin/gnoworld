@@ -16,6 +16,8 @@ describe("Skeleton", () => {
   it("draws a card's shape, and as many lines as asked", () => {
     const { container, rerender } = render(<Skeleton shape="card" />);
     expect((container.firstElementChild as HTMLElement).dataset["shape"]).toBe("card");
+    rerender(<Skeleton shape="disc" />);
+    expect((container.firstElementChild as HTMLElement).dataset["shape"]).toBe("disc");
     rerender(<Skeleton lines={3} />);
     expect(container.querySelectorAll("[data-shape='line']")).toHaveLength(3);
   });

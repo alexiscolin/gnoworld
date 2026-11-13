@@ -84,6 +84,19 @@ describe("logger", () => {
     expect(lines.join("")).not.toContain(other);
   });
 
+  it("writes what gave a moderation right and a link's way as they are, and the owner's address as its HMAC, never in clear", () => {
+    const { log, lines } = capture();
+    const owner = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
+    log("line_hidden", { account: ADDRESS, as: "owner", owner, kind: "cli" });
+    const line = Line.parse(JSON.parse(lines[0] ?? ""));
+    expect(line).toMatchObject({
+      as: "owner",
+      kind: "cli",
+      owner: createHmac("sha256", PEPPER).update(owner).digest("hex"),
+    });
+    expect(lines.join("")).not.toContain(owner);
+  });
+
   it("writes a duration in milliseconds as a number", () => {
     const { log, lines } = capture();
     log("moderation_backlog", { ms: 30_000 });

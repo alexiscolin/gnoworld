@@ -55,6 +55,8 @@ interface Attempts {
   readonly wait?: Wait | undefined;
   // The question's: once its asker left, nothing more is sent, waited for or retried (D177).
   readonly signal?: AbortSignal | undefined;
+  // The question's running total of what its attempts were charged, in nano-dollars, added to as each settles.
+  readonly paid?: { nano: number } | undefined;
 }
 type Called = { ok: true; answer: Anthropic.Message } | { ok: false; reason: "spent" | "failed" | "timeout" | "gone" };
 type Tried = Called | { ok: false; reason: "error"; error: AnthropicError };
@@ -121,23 +123,27 @@ function failedCost(error: unknown): 0 | undefined {
 }
 
 // What the budget charged, or nothing it could say for a hold already spent at its deadline.
-function settled({ budget, log }: Attempts, hold: { readonly id: number }, real: number | undefined) {
+function settled({ budget, log, paid }: Attempts, hold: { readonly id: number }, real: number | undefined) {
   const settlement = budget.settle(hold, real);
+  if (paid !== undefined && settlement.status !== "gone") paid.nano += settlement.charged;
   if (settlement.status !== "settled") log("jarvis_budget_settle", { reason: settlement.status });
   return settlement.status === "gone" ? undefined : settlement.charged;
 }
+
+/** The longest wait between two attempts of one model request. */
+export const WAIT_MAX_MS = 8_000;
 
 // The wait before the next attempt, or none when the SDK would not retry: a dropped or timed-out connection, or the
 // API's x-should-retry, else 408, 409, 429 and 5xx (SDK 1.4.0's shouldRetry); what the API asks, up to 8 s.
 function delayOf(error: AnthropicError, attempt: number): number | undefined {
   // Up to a quarter off at random, as the SDK does, so the questions a 429 or a 529 stops do not retry in step.
-  const backoff = Math.min(500 * 2 ** (attempt - 1), 8_000) * (1 - Math.random() * 0.25);
+  const backoff = Math.min(500 * 2 ** (attempt - 1), WAIT_MAX_MS) * (1 - Math.random() * 0.25);
   if (error instanceof APIConnectionError) return backoff;
   const answered = answeredOf(error);
   if (answered === undefined || !retried(answered)) return undefined;
   const asked = askedWait(answered.headers);
   if (asked === undefined) return backoff;
-  return asked <= 8_000 ? asked : undefined;
+  return asked <= WAIT_MAX_MS ? asked : undefined;
 }
 
 // The status and headers of an error the API answered with: `instanceof APIError` would type its generics as any.

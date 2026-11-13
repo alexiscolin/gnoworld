@@ -55,6 +55,17 @@ function popovers() {
 
 Object.assign(HTMLElement.prototype, popovers());
 
+// ...and no `:popover-open`: a popover is open here when the stand-in shows it.
+const matches: unknown = Reflect.get(Element.prototype, "matches");
+Object.defineProperty(Element.prototype, "matches", {
+  configurable: true,
+  writable: true,
+  value(this: Element, selector: string) {
+    if (selector === ":popover-open") return this instanceof HTMLElement && this.style.display === "block";
+    return typeof matches === "function" && Boolean(Reflect.apply(matches, this, [selector]));
+  },
+});
+
 document.addEventListener("click", (event) => {
   const trigger = event.target instanceof Element ? event.target.closest("[popovertarget]") : null;
   const panel = document.getElementById(trigger?.getAttribute("popovertarget") ?? "");
@@ -62,4 +73,22 @@ document.addEventListener("click", (event) => {
 });
 
 // jsdom has no matchMedia: every query answers no, so motion that waits for "no-preference" stays still.
-Object.assign(window, { matchMedia: (media: string) => ({ matches: false, media }) });
+Object.assign(window, {
+  matchMedia: (media: string) => ({
+    matches: false,
+    media,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }),
+});
+
+// jsdom has no ResizeObserver: a box that is watched is read once, and never told of a resize (the journeys' own).
+if (!("ResizeObserver" in globalThis)) {
+  Object.assign(globalThis, {
+    ResizeObserver: class {
+      observe = () => undefined;
+      unobserve = () => undefined;
+      disconnect = () => undefined;
+    },
+  });
+}

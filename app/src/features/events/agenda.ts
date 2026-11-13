@@ -1,57 +1,8 @@
-// The calendar (ADR-0002 §1, Events and calendar; slice 8): the data's events as an agenda by day, in the reader's own time, the coming and
-// the live ones (an hour from their start), those whose date waits for confirmation last; and the reminders' window. Pure: the clock is
-// given.
-import { comingEvents, isDated, LIVE_FOR_MS, startOf, type CalendarEvent } from "../../lib/coming.ts";
+// An event's time (ADR-0002 §1, Events and calendar): whether it is dated, and live, an hour from its start. Pure: the clock is given.
+import { isDated, LIVE_FOR_MS, startOf, type CalendarEvent } from "../../lib/coming.ts";
 
 export { isDated, type CalendarEvent } from "../../lib/coming.ts";
-
-/** How long before its start a reminder fires. */
-const REMIND_BEFORE_MS = 10 * 60 * 1000;
-/** The farthest a reminder's timer is armed: past it, the page arms it again when it opens (a timer past 2^31 ms fires at once). */
-const REMIND_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 /** Whether `event` is live at `now`: begun, and within its hour. */
 export const isLive = (event: CalendarEvent, now: number): boolean =>
   isDated(event) && startOf(event) <= now && now < startOf(event) + LIVE_FOR_MS;
-
-/** A day of the agenda: its first instant in the reader's time, and its events in their order. */
-export interface AgendaDay<Event extends CalendarEvent = CalendarEvent> {
-  readonly day: number;
-  readonly events: readonly Event[];
-}
-
-/** The agenda at `now`: the dated events coming or live, by day in the reader's time, the soonest first; and the undated ones. In `world`
- * alone when one is named. */
-export function agendaOf<Event extends CalendarEvent>(
-  events: readonly Event[],
-  now: number,
-  world?: string,
-): { days: AgendaDay<Event>[]; undated: Event[] } {
-  const here = events.filter((event) => world === undefined || event.world === world);
-  const dated = comingEvents(here, now);
-  const days: AgendaDay<Event>[] = [];
-  for (const event of dated) {
-    const at = new Date(startOf(event));
-    const day = new Date(at.getFullYear(), at.getMonth(), at.getDate()).getTime();
-    const last = days.at(-1);
-    if (last?.day === day) days[days.length - 1] = { day, events: [...last.events, event] };
-    else days.push({ day, events: [event] });
-  }
-  return { days, undated: here.filter((event) => !isDated(event)) };
-}
-
-/** What the reminders asked come to at `now`: those to tell now (their time came, the event not over), those whose event is over unasked
- * (never told after a gap), and the next to arm within the window, if any. */
-export function remindersAt(
-  events: readonly CalendarEvent[],
-  reminders: Readonly<Record<string, { readonly fired: boolean }>>,
-  now: number,
-): { due: CalendarEvent[]; over: CalendarEvent[]; next: number | undefined } {
-  const asked = events.filter((event) => isDated(event) && reminders[event.id]?.fired === false);
-  const due = asked.filter((event) => startOf(event) - REMIND_BEFORE_MS <= now && now < startOf(event) + LIVE_FOR_MS);
-  const over = asked.filter((event) => now >= startOf(event) + LIVE_FOR_MS);
-  const coming = asked
-    .map((event) => startOf(event) - REMIND_BEFORE_MS)
-    .filter((at) => at > now && at - now <= REMIND_WINDOW_MS);
-  return { due, over, next: coming.length === 0 ? undefined : Math.min(...coming) };
-}

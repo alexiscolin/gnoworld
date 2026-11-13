@@ -11,6 +11,13 @@
     block-size: 22px;
   }
 
+  /* On the plate it fills the box it is given: the figure's 64 by 32, a card's full width at the plate's spark height. */
+  .spark[data-fills] {
+    inline-size: 100%;
+    block-size: 100%;
+    overflow: visible;
+  }
+
   .spark[data-tone="up"] {
     --_tone: var(--color-mine);
   }
@@ -26,6 +33,11 @@
     vector-effect: non-scaling-stroke;
   }
 
+  .line,
+  .area {
+    transition: d var(--motion-slow) var(--ease-standard);
+  }
+
   .top {
     stop-color: var(--_tone);
     /* raw: the area's shade at the line's height, frame 6 */
@@ -35,5 +47,39 @@
   .foot {
     stop-color: var(--_tone);
     stop-opacity: 0;
+  }
+}
+
+/* The arrival (the proposal's score): the line draws itself, then its area fades in; the card's own delays come through --spark-line and
+   --spark-area, which a card sets from its own place (Card's --d). Only the one at rest keeps its dash, so a line is whole without motion. */
+@layer components {
+  .spark[data-arrives] .line {
+    stroke-dasharray: 1;
+  }
+
+  /* The motion scale is 0 under reduced motion, the system's or the app's setting: the drawing stands whole at once. */
+  .spark[data-arrives] .line {
+    /* raw: the proposal's score */
+    animation: draw calc(0.8s * var(--motion-scale)) var(--ease-out-3)
+      calc(var(--spark-line, 0.9s) * var(--motion-scale)) both;
+    animation-play-state: var(--play, running);
+  }
+
+  .spark[data-arrives] .area {
+    /* raw: the proposal's score */
+    animation: appear calc(0.6s * var(--motion-scale)) ease calc(var(--spark-area, 1.2s) * var(--motion-scale)) both;
+    animation-play-state: var(--play, running);
+  }
+
+  @keyframes draw {
+    from {
+      stroke-dashoffset: 1;
+    }
+  }
+
+  @keyframes appear {
+    from {
+      opacity: 0;
+    }
   }
 }

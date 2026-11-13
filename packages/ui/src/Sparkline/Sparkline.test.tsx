@@ -5,8 +5,10 @@ import { Sparkline } from "./Sparkline.tsx";
 // 8i: a price's day as a line; the drawing reads its values between their lowest and highest.
 const svg = (container: HTMLElement) => container.querySelector("svg");
 const pointsOf = (container: HTMLElement) =>
-  (container.querySelector("polyline")?.getAttribute("points") ?? "")
-    .split(" ")
+  (container.querySelectorAll("path")[1]?.getAttribute("d") ?? "")
+    .replaceAll(/[ML]/g, "")
+    .trim()
+    .split(/\s+/)
     .map((pair) => pair.split(",").map(Number));
 
 describe("Sparkline", () => {

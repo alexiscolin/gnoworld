@@ -4,6 +4,8 @@
 import { createElement, lazy, Suspense, type ComponentProps } from "react";
 
 export { NameLabel } from "./Label.tsx";
+export { useShownName } from "./useShownName.ts";
+export { useMemberNames } from "./useMemberNames.ts";
 
 const Dialog = lazy(async () => ({ default: (await import("./PickName.tsx")).PickName }));
 

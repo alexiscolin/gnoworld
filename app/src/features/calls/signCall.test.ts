@@ -3,6 +3,8 @@ import type { ChainRead } from "@gnoworld/chain/read";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it, vi } from "vitest";
 import { callContract } from "../../lib/adena/call.ts";
+import { queryClient } from "../../lib/query/client.ts";
+import { keys } from "../../lib/query/keys.ts";
 import { createAppStore } from "../../store/index.ts";
 import { recordedAdena, SIGNED_HASH } from "../../../tests/recordedAdena.ts";
 import { signCall, type SignDeps } from "./signCall.ts";
@@ -76,6 +78,20 @@ describe("signCall: the card's course", () => {
       func: "SetBio",
       args: ["hello"],
     });
+  });
+
+  it("makes its realm's kept page and facts stale once the chain says it landed, and leaves them alone when it failed", async () => {
+    const [page, facts] = [keys.page(ONYX.rpc, NEW.realm, undefined), keys.facts("https://idx", NEW.realm)];
+    const keep = () => {
+      for (const key of [page, facts]) queryClient.setQueryData(key, 1);
+    };
+    const stale = () => [page, facts].map((key) => queryClient.getQueryState(key)?.isInvalidated);
+    keep();
+    const refused = setup({ read: () => Promise.resolve(found({ ...LANDED, failed: true })) });
+    await signCall("SetBio", refused.deps);
+    expect(stale()).toEqual([false, false]);
+    await signCall("SetBio", setup().deps);
+    expect(stale()).toEqual([true, true]);
   });
 
   it("rises, as a bug and not a state, when it is asked in a store that has no calls' slice (F5726)", async () => {

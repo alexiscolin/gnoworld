@@ -61,6 +61,36 @@ describe("loadRoles", () => {
     expect(loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url))).worlds.has("earth")).toBe(true);
   });
 
+  it("reads the defaults, the rules of a world the file does not list (D380, D430), and none when the file has none", () => {
+    const defaults = { bannedWords: ["scam"], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    expect(loadRoles(written(JSON.stringify({ ...FILE, defaults }))).defaults).toEqual(defaults);
+    expect(load().defaults).toBeUndefined();
+  });
+
+  it("refuses defaults of another shape: a stray key, a missing rule, a negative count, a non-object", () => {
+    const rules = { bannedWords: [], linksPerMessage: 3, mentionsPerMessage: 5, linksForNewAccount: 2 };
+    for (const defaults of [
+      { ...rules, extra: 1 },
+      { ...rules, linksPerMessage: undefined },
+      { ...rules, mentionsPerMessage: -1 },
+      { rules },
+      [],
+      "strict",
+      null,
+    ])
+      expect(failure(JSON.stringify({ ...FILE, defaults }))).toContain("defaults");
+  });
+
+  it("ships defaults as plain as a listed world's rules, so an unlisted world is judged as a listed one (8l)", () => {
+    const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
+    expect(shipped.defaults).toEqual({
+      bannedWords: [],
+      linksPerMessage: 3,
+      mentionsPerMessage: 5,
+      linksForNewAccount: 2,
+    });
+  });
+
   it("ships a world for the Earth and each hub of app/data/hubs.json, and no other, so every hub's page has its chat (8l)", () => {
     const shipped = loadRoles(fileURLToPath(new URL("../../roles.json", import.meta.url)));
     const hubs = Hubs.parse(
@@ -174,6 +204,18 @@ describe("loadRoles", () => {
       content: JSON.stringify({ ...FILE, admins: [] }),
       place: "(top)",
       code: "unrecognized_keys",
+    },
+    {
+      kind: "a room of another world",
+      content: world({ rooms: [{ room: "#bubble/x", type: "open" }] }),
+      place: "worlds.0.rooms.0.room",
+      code: "custom",
+    },
+    {
+      kind: "a room's group the world does not hold",
+      content: world({ rooms: [{ room: "#earth/crew", type: "members", readers: "ghosts" }] }),
+      place: "worlds.0.rooms.0.readers",
+      code: "custom",
     },
   ])("names the place and the kind of a fault in $kind", ({ content, place, code }) => {
     expect(failure(content)).toMatch(

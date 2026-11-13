@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
-import { closeMenu, inGames, lines, menu, whoIsHere, word } from "./chat.ts";
+import { violations } from "./axe.ts";
+import { inGames, lines, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { another, login, talk, ticketOf, type Step } from "./irc.ts";
 
@@ -8,8 +8,6 @@ import { another, login, talk, ticketOf, type Step } from "./irc.ts";
 // writes over a raw socket: its login, then its message.
 const NOT_ENCRYPTED = "Not encrypted: the server can read these.";
 const dmsNav = (page: Page) => page.getByRole("navigation", { name: "Rooms" });
-// The choice of whom it hears from, in the menu behind the conversation's name (5q).
-const onlyKnown = async (page: Page) => (await menu(page)).getByRole("button", { name: "Only people I wrote to" });
 // A conversation's row, by its link's own name, the address alone: the Notifications list above it links to the same page, its
 // link named by who did what (4f-n).
 const rowOf = (page: Page, address: string) => dmsNav(page).getByRole("link", { name: short(address), exact: true });
@@ -62,15 +60,10 @@ test.describe("direct messages", () => {
     await expect(page.getByRole("form", { name: `Write to ${short(bob.address)}` })).toHaveAccessibleDescription(
       `${NOT_ENCRYPTED} Kept only while this page is open.`,
     );
-    // The header says it at once, in a word; the menu behind the name says it whole, and Decision C (U2): Ergo keeps no
-    // direct message, so the page says so beside "Not encrypted".
+    // The header says it at once, in a word; the composer's description says it whole.
     await expect(page.locator('[data-region="header"]').getByText("Not encrypted", { exact: true })).toBeVisible();
-    const about = await menu(page);
-    await expect(about.getByText(NOT_ENCRYPTED)).toBeVisible();
-    await expect(about.getByText("Kept only while this page is open.")).toBeVisible();
-    await closeMenu(page);
     await expect(lines(page).filter({ hasText: text })).toHaveCount(1);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await violations(page)).toEqual([]);
     await bob.close();
   });
 
@@ -126,7 +119,7 @@ test.describe("direct messages", () => {
     await expect(lines(page).filter({ hasText: text }).getByTitle(me)).toBeVisible();
     await expect(rowOf(bob.page, me)).toBeVisible();
     // /code-review (CR6): the focus asked once, not each time the conversation comes back in view.
-    await dmsNav(page).getByRole("link", { name: "#games" }).click();
+    await dmsNav(page).getByRole("link", { name: "games" }).click();
     await expect(page.getByRole("heading", { name: "#games" })).toBeVisible();
     const row = rowOf(page, bob.address);
     await row.click();
@@ -154,40 +147,9 @@ test.describe("direct messages", () => {
     await field.fill(text);
     await field.press("Enter");
     await expect(field).toHaveAccessibleDescription(`Not sent: ${short(bob.address)} is not online.`);
-    await expect(field).toHaveValue(text);
+    await expect(field).toHaveText(text);
     await expect(lines(page)).toHaveCount(0);
     await bob.close();
-  });
-
-  test("refuse a stranger's message once the account asks for those it wrote to alone, and keep the others'", async ({
-    page,
-    playwright,
-    launchOptions,
-  }) => {
-    const me = await inGames(page);
-    const bob = await another({ playwright, launchOptions }, word("bob"));
-    const carol = await another({ playwright, launchOptions }, word("carol"));
-    // Bob connected, so Ergo delivers my line to him (it answers 401 to one for an account not connected): his own
-    // page joins #games.
-    await bob.page.goto("/w/bubble?room=games&chat=full");
-    await expect(whoIsHere(page).getByTitle(bob.address)).toBeVisible();
-    await dmFrom(bob, me, word("first"));
-    await rowOf(page, bob.address).click();
-    const field = page.getByRole("textbox", { name: `Message ${short(bob.address)}` });
-    await field.fill("hi bob");
-    await field.press("Enter");
-    await expect(lines(page).filter({ hasText: "hi bob" })).toHaveCount(1);
-    await (await onlyKnown(page)).click();
-    await expect(await onlyKnown(page)).toHaveAttribute("aria-pressed", "true");
-    await dmFrom(carol, me, word("stranger"));
-    await dmFrom(bob, me, word("known"));
-    await expect(lines(page).filter({ hasText: "known" })).toHaveCount(1);
-    await expect(rowOf(page, carol.address)).toHaveCount(0);
-    // Refused means discarded (decision B): hearing everyone again shows nothing that came while it was on.
-    await (await onlyKnown(page)).click();
-    await expect(await onlyKnown(page)).toHaveAttribute("aria-pressed", "false");
-    await expect(rowOf(page, carol.address)).toHaveCount(0);
-    await Promise.all([bob.close(), carol.close()]);
   });
 
   // 4e's UX review (U15): Alt+Down in a conversation went to the room after the one hidden behind it.

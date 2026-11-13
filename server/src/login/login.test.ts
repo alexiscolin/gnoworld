@@ -14,7 +14,9 @@ import {
   makeLogin,
   makeSigned,
   NONCE_ACTION,
+  NONCE_LINK,
   NONCE_HOST,
+  verifies,
   verifyProof,
   type Login,
   type Verify,
@@ -35,7 +37,7 @@ afterEach(() => {
 });
 
 const setup = (options: { verify?: Verify; nonceCap?: number } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
   opened.push(db);
   const clock = { now: T0 };
   const login = makeLogin(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -57,7 +59,7 @@ describe("the nonces' table", () => {
       const file = join(folder, "gnoworld.sqlite");
       // As 3c and 3d made it: their migrations, in their order.
       openDatabase(file, [LOGIN_TABLES, TICKET_TABLES]).close();
-      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+      const db = openDatabase(file, [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
       try {
         const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
         expect(typeof login.challenge("onyx-1", DOMAIN)).toBe("object");
@@ -590,6 +592,30 @@ describe("the token", () => {
     expect(login.session(made.token)).toBe(holds ? made.address : undefined);
   });
 
+  it("tells when a live token was signed, and nothing for an unknown, an ended or an expired one", async () => {
+    const { clock, login } = setup();
+    const made = await token(login);
+    clock.now += 5 * MINUTE;
+    expect(login.signedAt(made.token)).toBe(T0);
+    expect([login.signedAt(undefined), login.signedAt("a-token-nobody-holds")]).toEqual([undefined, undefined]);
+    clock.now = T0 + 90 * DAY;
+    expect(login.signedAt(made.token)).toBeUndefined();
+    const ended = await token(login);
+    login.logout(ended.token);
+    expect(login.signedAt(ended.token)).toBeUndefined();
+  });
+
+  it("keeps each token's own signing time when another login follows, and renews nothing by asking", async () => {
+    const { clock, login } = setup();
+    const first = await token(login);
+    clock.now += 20 * DAY;
+    expect(login.signedAt(first.token)).toBe(T0);
+    const later = await token(login);
+    expect([login.signedAt(first.token), login.signedAt(later.token)]).toEqual([T0, T0 + 20 * DAY]);
+    clock.now += 11 * DAY;
+    expect(login.signedAt(first.token)).toBeUndefined();
+  });
+
   it("renews on use for 30 days, and ends 90 days after its signature whatever the use", async () => {
     const { clock, login } = setup();
     const made = await token(login);
@@ -761,6 +787,18 @@ describe("verifyProof", () => {
   });
 });
 
+describe("verifies", () => {
+  it("answers false, a boolean, when the verifier throws or rejects", async () => {
+    const me = wallet();
+    const expected = { signer: me.address, chainId: "onyx-1", data: "a text" };
+    const throws: Verify = () => {
+      throw new Error("verifier broke");
+    };
+    expect(await verifies(throws, me.sign("onyx-1", "a text"), expected)).toBe(false);
+    expect(await verifies(() => Promise.reject(new Error("down")), me.sign("onyx-1", "a text"), expected)).toBe(false);
+  });
+});
+
 function retyped(proof: Proof, typeUrl: string): Proof {
   return { ...proof, signature: { ...proof.signature, pubKey: { ...proof.signature.pubKey, typeUrl } } };
 }
@@ -783,7 +821,7 @@ describe("a signed action", () => {
   const HEAD = ["Change gnoworld's settings (admin, version 1)", "", "Jarvis: the daily quota is 20 questions"];
   const ACTION = '{"setting":"quota","questions":20}';
   const signedSetup = (options: { verify?: Verify } = {}) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const clock = { now: T0 };
     const signed = makeSigned(db, { chains: CHAINS, now: () => clock.now, ...options });
@@ -801,7 +839,7 @@ describe("a signed action", () => {
     try {
       const file = join(folder, "gnoworld.sqlite");
       openDatabase(file, [LOGIN_TABLES, NONCE_HOST]).close();
-      const db = openDatabase(file, [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+      const db = openDatabase(file, [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
       try {
         const login = makeLogin(db, { chains: CHAINS, now: () => T0 });
         challenge(login);
@@ -920,7 +958,7 @@ describe("a signed action", () => {
   });
 
   it("issues an action's nonce for the chains the login takes alone, under the same cap", () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const signed = makeSigned(db, { chains: CHAINS, now: () => T0, nonceCap: 2 });
     const login = makeLogin(db, { chains: CHAINS, now: () => T0, nonceCap: 2 });
@@ -938,7 +976,7 @@ describe("a signed action", () => {
 describe("the admin console's login", () => {
   const CONSOLE = "admin.gnoworld.test";
   const consoleSetup = () => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const clock = { now: T0 };
     const now = () => clock.now;

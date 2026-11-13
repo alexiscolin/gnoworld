@@ -27,12 +27,166 @@
     --_pad: var(--space-s);
   }
 
+  /* The hub card: a plate's card, on the faint card fill with its line and the plate's own padding; 6 % and the strong line under the pointer
+     unless it is fixed; dashed, no fill. */
+  .card[data-look="hub"] {
+    --_fill: var(--color-card);
+    --_pad: var(--plate-pad);
+
+    border-radius: var(--radius-box);
+    transition:
+      background-color var(--motion-fast) var(--ease-standard),
+      border-color var(--motion-fast) var(--ease-standard);
+  }
+
+  /* The title near the card's top, a step less above it than at its sides (Alexis, 2026-11-10: "rapprocher les titres des hauts des sections"):
+     16 px on a wide plate, 12 on a narrow one. */
+  .card[data-look="hub"]:not([data-flush]) {
+    padding-block-start: max(var(--space-xs), calc(var(--_pad) - var(--space-2xs)));
+  }
+
+  .card[data-look="hub"]:hover:not([data-fixed]) {
+    border-color: var(--color-line-strong);
+    background: var(--color-card-hover);
+  }
+
+  .card[data-look="hub"][data-edge="dashed"] {
+    --_fill: transparent;
+  }
+
+  .card[data-look="hub"] .title {
+    font: var(--font-card-title);
+    letter-spacing: -0.01em;
+    white-space: nowrap;
+  }
+
+  /* A long title is cut with an ellipsis in its own box, never run under the buttons at the end (Alexis, 2026-11-12). */
+  .card[data-look="hub"] .header > * > :first-child,
+  .card[data-look="hub"] .header > * > :first-child > * {
+    min-inline-size: 0;
+  }
+
+  .card[data-look="hub"] .title {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* The header row: 28 px and 8 more below it; its title, a hint that gives way, and the buttons at the end. */
+  .card[data-look="hub"] .header {
+    block-size: var(--control-header);
+    /* layout: the card's own */
+    margin-block-end: var(--space-2xs);
+    /* The row measures its own width: a narrow square's title and hint follow it (below). */
+    container-type: inline-size;
+  }
+
+  /* raw: a narrow square (a third of a narrow plate), where the card title's size leaves its buttons no room (Alexis, 2026-11-11) */
+  @container (inline-size < 20rem) {
+    .card[data-look="hub"] .title {
+      font: var(--font-ui);
+    }
+  }
+
+  /* raw: the narrowest square, where even the smaller title and the buttons fill the row: the hint gives way */
+  @container (inline-size < 13rem) {
+    .hint {
+      display: none;
+    }
+  }
+
+  .header > * {
+    block-size: 100%;
+  }
+
+  /* A header's words break only between words: a list that breaks anywhere (the chat's lines, for long addresses) would squeeze the
+     kicker and its icon onto lines of their own. */
+  .header {
+    overflow-wrap: normal;
+  }
+
+  /* The buttons and the hint at the end of the row keep their size; the meta line gives way first, then the title, so a short title
+     is never cut beside a long path. */
+  .end {
+    /* layout: this row's own arrangement */
+    flex: none;
+    min-inline-size: 0;
+  }
+
+  .meta {
+    min-inline-size: 0;
+    /* layout: this row's own arrangement; it shrinks far faster than the title (its weight against the title's 1) */
+    flex: 0 1000 auto;
+    /* layout: right after the title, the buttons pushed to the end (Alexis, 2026-11-10: "plus coller les 2") */
+    margin-inline-end: auto;
+  }
+
+  .card[data-look="hub"][data-flush] {
+    --_pad: 0;
+  }
+
+  /* A card stretched taller than its parts (a row of cards as tall as the tallest) keeps its actions at its foot. */
+  .card > :only-child {
+    block-size: 100%;
+  }
+
+  .mark {
+    /* layout: the mark keeps its size beside the title */
+    flex: none;
+    inline-size: var(--control-l);
+  }
+
+  .actions {
+    /* layout: the actions at the card's foot */
+    margin-block-start: auto;
+  }
+
   .title {
     font: var(--font-body);
     font-weight: 500;
   }
 
+  .lead {
+    /* layout: the icon's own box, no line's leading under it */
+    display: flex;
+    color: var(--color-text-muted);
+  }
+
   .title[data-size="large"] {
     font: var(--font-title-m);
+  }
+
+  /* An open card fills the pane (--plate-room, set by Room): its chart takes half of it, no less than a wide plate's. */
+  .card[data-alone] {
+    --chart-open: max(var(--chart-h-l), calc(var(--plate-room, 0px) * 0.45));
+
+    min-block-size: var(--plate-room, auto);
+  }
+
+  /* The plate's entrance (the proposal's score): a card waits unseen, rises 16 px over 0.7 s once it is (--d, its place in the arrival), and its
+     parts' own entrances (a chart's bars, a line drawing) wait with it through --play. Without motion nothing waits. */
+  @media (prefers-reduced-motion: no-preference) {
+    .card[data-rise] {
+      --play: paused;
+    }
+
+    .card[data-rise]:not([data-state="in"]) {
+      opacity: 0;
+    }
+
+    .card[data-rise][data-state="in"] {
+      --play: running;
+
+      /* raw: the proposal's score, 0.7 s, scaled by the motion setting (0 where the app's calm setting asks) */
+      animation: rise calc(0.7s * var(--motion-scale)) var(--ease-out-3) calc(var(--d, 0s) * var(--motion-scale))
+        backwards;
+    }
+
+    @keyframes rise {
+      from {
+        opacity: 0;
+        /* raw: the proposal's score */
+        transform: translateY(16px);
+      }
+    }
   }
 }

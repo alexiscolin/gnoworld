@@ -2,6 +2,8 @@ import { once } from "node:events";
 import { createServer, type IncomingHttpHeaders, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
+import { JARVIS_KEY_HEADER } from "@gnoworld/schemas";
+import { Secret } from "@gnoworld/service/settings";
 import { jarvisClient } from "./jarvis.ts";
 
 // 10g (D42, D94): the door's one call to jarvis a question, on the network the two share, tested against a fake jarvis.
@@ -54,9 +56,38 @@ const QUESTION = () => ({
   room: "#bubble",
   lines: [{ speaker: 1, text: "the poll closes today", time: "2026-11-04T12:00:00.000Z" }],
 });
-const ANSWERED = () => ({ status: "answered", markdown: "The poll closes today.", buttons: [] });
+const ANSWERED = () => ({ status: "answered", markdown: "The poll closes today.", buttons: [], cost: 1234 });
 const BUDGETS = () => ({ ask: 45, translate: 5 });
 const live = () => new AbortController().signal;
+
+// 10u-g2: the door proves itself to jarvis with its key, in one header of every request.
+describe("the door's key", () => {
+  const KEY = `door-key-${"k".repeat(40)}`;
+  const BUDGET = { budget: "ask" as const, dollars: 3 };
+
+  it("sends the key with every call: a question, a translation, a digest, the budgets and a change of one", async () => {
+    const jarvis = await fakeJarvis(Array.from({ length: 5 }, () => json({})));
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000, key: new Secret(KEY) });
+    await client.ask(QUESTION(), live());
+    await client.translate({ text: "The vote closes.", language: "fr" }, live());
+    await client.digest({ universe: "onyx", realm: "gno.land/r/demo/poll" }, live());
+    await client.budgets();
+    await client.setBudget(BUDGET);
+    expect(jarvis.heard.map(({ headers }) => headers[JARVIS_KEY_HEADER])).toEqual([KEY, KEY, KEY, KEY, KEY]);
+  });
+
+  it("sends none when it has none", async () => {
+    const jarvis = await fakeJarvis([json({})]);
+    await jarvisClient({ url: jarvis.url, timeoutMs: 5000 }).budgets();
+    expect(jarvis.heard[0]?.headers[JARVIS_KEY_HEADER]).toBeUndefined();
+  });
+
+  it("answers failed for a jarvis that refuses the key with 401, never repeating it", async () => {
+    const jarvis = await fakeJarvis([json({ error: "unauthenticated" }, 401)]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000, key: new Secret(KEY) });
+    expect(await client.budgets()).toEqual({ ok: false, error: "failed" });
+  });
+});
 
 describe("asking jarvis", () => {
   it("posts the question as JSON to /ask, with no cookie, no session and nothing of the asker's", async () => {
@@ -103,6 +134,24 @@ describe("asking jarvis", () => {
     expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "shape" });
   });
 
+  it("reads a declined question with its cost, and refuses an answer with no cost as the wrong shape (D13985)", async () => {
+    const jarvis = await fakeJarvis([
+      json({ status: "declined", cost: 77 }),
+      json({ status: "failed", cost: 5 }),
+      json({ status: "spent", cost: 9 }),
+      json({ status: "answered", markdown: "x", buttons: [] }),
+      json({ status: "declined" }),
+      json({ status: "paused" }),
+      json({ status: "answered", markdown: "x", buttons: [], cost: -1 }),
+    ]);
+    const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
+    expect(await client.ask(QUESTION(), live())).toEqual({ ok: true, answer: { status: "declined", cost: 77 } });
+    expect(await client.ask(QUESTION(), live())).toEqual({ ok: true, answer: { status: "failed", cost: 5 } });
+    expect(await client.ask(QUESTION(), live())).toEqual({ ok: true, answer: { status: "spent", cost: 9 } });
+    for (let at = 0; at < 4; at += 1)
+      expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "shape" });
+  });
+
   it("answers failed when jarvis answers an error", async () => {
     const jarvis = await fakeJarvis([json({ error: "internal" }, 500)]);
     const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
@@ -116,13 +165,13 @@ describe("asking jarvis", () => {
     expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "slow" });
   });
 
-  it("answers down when nothing listens", async () => {
+  it("answers lost when nothing listens, a thrown error that is no timeout, apart from a 503 down", async () => {
     const jarvis = await fakeJarvis([]);
     const server = servers.pop();
     server?.close();
     if (server !== undefined) await once(server, "close");
     const client = jarvisClient({ url: jarvis.url, timeoutMs: 5000 });
-    expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "down" });
+    expect(await client.ask(QUESTION(), live())).toEqual({ ok: false, error: "lost" });
   });
 
   it("answers slow past its timeout, and never hangs", async () => {
@@ -220,7 +269,7 @@ describe("jarvis's budgets", () => {
     server?.closeAllConnections();
     server?.close();
     if (server !== undefined) await once(server, "close");
-    expect(await client.budgets()).toEqual({ ok: false, error: "down" });
+    expect(await client.budgets()).toEqual({ ok: false, error: "lost" });
   });
 });
 
@@ -265,8 +314,8 @@ describe("a translation and a digest from jarvis (10k)", () => {
     server?.closeAllConnections();
     server?.close();
     if (server !== undefined) await once(server, "close");
-    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "down" });
-    expect(await client.digest(DIGEST(), live())).toEqual({ ok: false, error: "down" });
+    expect(await client.translate(TRANSLATE(), live())).toEqual({ ok: false, error: "lost" });
+    expect(await client.digest(DIGEST(), live())).toEqual({ ok: false, error: "lost" });
   });
 
   it("stops each with the request that asked", async () => {

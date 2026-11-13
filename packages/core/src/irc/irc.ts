@@ -1,6 +1,7 @@
 // IRCv3 lines: tags, source, command and parameters (modern.ircdocs.horse, "Message Format";
 // ircv3.net/specs/extensions/message-tags). Over WebSocket, one message is one line.
 // Written by Claude against the pairing's tests, Alexis away (docs/decisions.md, 2026-10-22).
+import { utf8Bytes } from "../text/utf8.ts";
 
 /** ASCII letters in upper case, or a three-digit numeric: made only by toIrcCommand and parseLine. */
 export type IrcCommand = string & { readonly __brand: "IrcCommand" };
@@ -32,16 +33,6 @@ const CLIENT_TAGS_MAX = 4094;
 function isTagKey(key: string): boolean {
   const label = "[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?";
   return new RegExp(`^\\+?(?:${label}(?:\\.${label})*/)?[A-Za-z0-9-]+$`).test(key);
-}
-
-/** The UTF-8 length of a string, without encoding it; a lone surrogate counts three, as the character replacing it. */
-export function bytes(text: string): number {
-  let size = 0;
-  for (const char of text) {
-    const point = char.codePointAt(0) ?? 0;
-    size += point < 0x80 ? 1 : point < 0x800 ? 2 : point < 0x10000 ? 3 : 4;
-  }
-  return size;
 }
 
 const ESCAPES: Readonly<Record<string, string>> = { ";": "\\:", " ": "\\s", "\\": "\\\\", "\r": "\\r", "\n": "\\n" };
@@ -99,7 +90,7 @@ function readParams(text: string): string[] {
 // The rest of a line once its tags and their one space are read: source, command, parameters. It counts
 // whole, the spaces before its command too (F667); a source is never empty, as formatLine writes none (F669).
 function readBody(whole: string, tags: Map<string, string>): IrcParsed {
-  if (bytes(whole) > LINE_BYTES) return { ok: false, error: "body-too-long" };
+  if (utf8Bytes(whole) > LINE_BYTES) return { ok: false, error: "body-too-long" };
   const body = whole.replace(/^ +/, "");
   const [source, afterSource] = body.startsWith(":") ? split(body.slice(1)) : ["", body];
   if (body.startsWith(":") && source === "") return { ok: false, error: "empty-source" };
@@ -124,7 +115,7 @@ export function parseLine(line: string): IrcParsed {
   const space = text.indexOf(" ");
   const tags = space === -1 ? text : text.slice(0, space);
   // The @ and one space: IRCv3 counts one, and the spaces after it are not tags.
-  if (bytes(tags) + 1 > TAGS_MAX) return { ok: false, error: "tags-too-long" };
+  if (utf8Bytes(tags) + 1 > TAGS_MAX) return { ok: false, error: "tags-too-long" };
   if (space === -1) return { ok: false, error: "no-command" };
   return readBody(text.slice(space + 1), readTags(tags.slice(1)));
 }
@@ -141,7 +132,7 @@ function formatTags(tags: ReadonlyMap<string, string>): string {
     written.push(value === "" ? key : `${key}=${escapeTagValue(value)}`);
   }
   const data = written.join(";");
-  if (bytes(data) > CLIENT_TAGS_MAX) refuse("a client sends 4094 bytes of tag data at most");
+  if (utf8Bytes(data) > CLIENT_TAGS_MAX) refuse("a client sends 4094 bytes of tag data at most");
   return data;
 }
 
@@ -165,6 +156,6 @@ export function formatLine(message: IrcMessage): string {
     refuse("a source is a word with no NUL, CR or LF");
   }
   const body = [...(source === undefined ? [] : [`:${source}`]), command, ...formatParams(params)].join(" ");
-  if (bytes(body) > LINE_BYTES) refuse("a line holds 510 bytes after its tags");
+  if (utf8Bytes(body) > LINE_BYTES) refuse("a line holds 510 bytes after its tags");
   return data === "" ? body : `@${data} ${body}`;
 }

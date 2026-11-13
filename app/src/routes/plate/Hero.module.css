@@ -1,0 +1,109 @@
+/* The hero's entrance (the proposal's score): the pills pop at 0.35 s, each action rises 8 px from 0.45 s, 0.05 s apart; the title, the kicker and the
+   lede are the route's, played by the arrival (features/universe/arrival.ts). */
+@layer components {
+  /* At the kicker's row, the plate's right: its pills centred in the row's 28 px. A narrow plate puts them in the flow, under the title. */
+  .pills {
+    position: absolute;
+    /* raw: the pills' 24 px centred in the header controls' row */
+    inset-block-start: calc((var(--control-header) - var(--control-xs)) / 2);
+    inset-inline-end: 0;
+  }
+
+  @container plate (max-width: 37.5rem) {
+    .pills {
+      position: static;
+      /* layout: the step to the lede, 16 px as every step inside the top */
+      margin-block-end: var(--space-s);
+    }
+
+    /* Under the title the status comes first, then the rank (the proposal's phone), each chip whole: the row wraps, never a chip. */
+    .pillRow {
+      /* layout: the proposal's phone order */
+      flex-flow: row-reverse wrap;
+      /* layout: packed to the start of the row */
+      justify-content: flex-end;
+    }
+
+    .pill {
+      white-space: nowrap;
+    }
+
+    /* Follow and Share stand at the kicker's row, to the right, as the pills do wide (the proposal's phone, s3b.js topr). */
+    .row > :nth-last-child(-n + 2) {
+      position: absolute;
+      inset-block-start: 0;
+      inset-inline-end: 0;
+    }
+
+    .row > :nth-last-child(2) {
+      inset-inline-end: calc(var(--control-s) + var(--space-2xs));
+    }
+  }
+
+  .pill {
+    display: inline-block;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .pill {
+      /* raw: the proposal's score, 0.45 s at 0.35 s */
+      animation: pop calc(0.45s * var(--motion-scale)) var(--ease-out-3) calc(0.35s * var(--motion-scale)) both;
+    }
+
+    .row > :nth-child(2) {
+      --n: 1;
+    }
+
+    .row > :nth-child(3) {
+      --n: 2;
+    }
+
+    .row > :nth-child(4) {
+      --n: 3;
+    }
+  }
+
+  @keyframes pop {
+    from {
+      opacity: 0;
+      /* raw: the proposal's score */
+      transform: scale(0.9);
+    }
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      /* raw: the proposal's score */
+      transform: translateY(8px);
+    }
+  }
+
+  /* The sentence still being read keeps its two lines' room (the lede's own font), so it never pushes what is under it. */
+  .room {
+    visibility: hidden;
+  }
+
+  /* A sentence that comes after the plate fades in where its room was kept. */
+  .sentence {
+    animation: sentence-in calc(var(--motion-slow) * var(--motion-scale)) var(--ease-emphasized) backwards;
+  }
+
+  @keyframes sentence-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+/* Each action's rise, in the utilities' layer so a status that comes into the row later (Follow's "Kept for this visit only") rises
+   as the actions do rather than take the .enter utility's fade. */
+@layer utilities {
+  @media (prefers-reduced-motion: no-preference) {
+    .acts > .row > * {
+      /* raw: the proposal's score, each action 0.5 s from 0.45 s, 0.05 s apart */
+      animation: rise calc(0.5s * var(--motion-scale)) var(--ease-out-3)
+        calc((0.45s + var(--n) * 0.05s) * var(--motion-scale)) both;
+    }
+  }
+}

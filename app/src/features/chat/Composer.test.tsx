@@ -1,15 +1,15 @@
 // @vitest-environment jsdom
 import { compose, type Composed } from "@gnoworld/core";
-import { completions } from "./complete.ts";
 import { renderToStaticMarkup } from "react-dom/server";
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
+import { createRoot } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, markup, one } from "../../../tests/mount.tsx";
-import { Composer, Preview, typingOf } from "./Composer.tsx";
-import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable, withHint } from "./said.ts";
+import { all, markup, noMedia, one } from "../../../tests/mount.tsx";
+import { Composer, typingOf } from "./Composer.tsx";
+import { NEAR, ROOM_NOTIFIES, ROOM_SILENT, roomHint, said, sendable } from "./said.ts";
 import { tooFast } from "./pace.ts";
 import { refusalAfter } from "./composerHooks.ts";
+import { acting, FIELD, inPage } from "../../../tests/composer.tsx";
 
 const ROOM = "#bubble/games";
 const NICK = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
@@ -29,7 +29,6 @@ const toPartner = () =>
       onSay={() => true}
     />,
   );
-const CHOICES = { commands: ["/me"], rooms: ["#games", "#gnogolf", "#news"], people: [] };
 const names = (markup: string) => [...markup.matchAll(/aria-label="([^"]+)"/g)].map((found) => found[1]);
 
 describe("Composer", () => {
@@ -65,14 +64,17 @@ describe("Composer", () => {
   it("tells a refusal not told yet as it starts, and one it already knew as it starts not", () => {
     const refused = { count: 1, draft: "fixed", why: "Not sent: g10gh7…3y5tv is not online." };
     const composer = (props: { fresh?: boolean; draft: string }) =>
-      renderToStaticMarkup(
+      inPage(
         <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={() => true} refused={refused} {...props} />,
       );
-    expect(composer({ fresh: true, draft: "fixed" })).toContain("Not sent: g10gh7…3y5tv is not online.");
-    expect(composer({ fresh: true, draft: "" })).toMatch(/<textarea[^>]*>fixed<\/textarea>/);
-    expect(composer({ fresh: false, draft: "" })).not.toContain("Not sent");
-    expect(composer({ draft: "" })).not.toContain("Not sent");
-    expect(composer({ draft: "" })).not.toMatch(/value="fixed"/);
+    expect(composer({ fresh: true, draft: "fixed" }).host.textContent).toContain(
+      "Not sent: g10gh7…3y5tv is not online.",
+    );
+    expect(composer({ fresh: true, draft: "" }).held()).toBe("fixed");
+    expect(composer({ fresh: false, draft: "" }).host.textContent).not.toContain("Not sent");
+    const none = composer({ draft: "" });
+    expect(none.host.textContent).not.toContain("Not sent");
+    expect(none.held()).toBe("");
   });
 
   it("is a form named for the room, its field labelled, Send off while the line is empty", () => {
@@ -95,54 +97,8 @@ describe("Composer", () => {
     expect(toPartner()).not.toContain("see when you type");
   });
 
-  it("previews the line out of the keyboard's and the screen reader's reach, its links too", () => {
-    const markup = renderToStaticMarkup(
-      <Preview composed={compose(ROOM, "**see** [docs](https://gno.land/docs)", NICK)} />,
-    );
-    expect(markup).toMatch(
-      /^<div(?=[^>]* inert="")[^>]*><span><strong>see<\/strong> <a href="https:\/\/gno.land\/docs"/,
-    );
-    expect(markup).not.toContain("aria-hidden");
-  });
-
-  // 4d: the preview reads the line as the room will, the account's own mention apart as it will be.
-  it("previews a mention of the account itself apart, as the room will show it, and another's plain", () => {
-    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-    const markup = renderToStaticMarkup(
-      <Composer
-        room={ROOM}
-        nick={NICK}
-        rooms={[]}
-        members={[]}
-        draft={`note to @${NICK} and @${ALICE}`}
-        onSay={() => true}
-      />,
-    );
-    expect(markup).toContain(`<span data-mention="me" title="${NICK}">`);
-    expect(markup).toContain(`<span data-mention="" title="${ALICE}">`);
-  });
-
-  // F812: the preview shortens as the room will, a ground lookalike (BOB's short form) whole.
-  it("previews a member's mention shortened and anyone else's whole, as the room will show them (F812)", () => {
-    const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-    const ground = "g1jg8m2vtwlmmyz8swgu76ug4tklwnays8yvsqf5";
-    const markup = renderToStaticMarkup(
-      <Composer
-        room={ROOM}
-        nick={NICK}
-        rooms={[]}
-        members={[ALICE, NICK]}
-        draft={`@${ALICE} @${ground} @${NICK}`}
-        onSay={() => true}
-      />,
-    );
-    expect(markup).toContain(`<span data-mention="" title="${ALICE}">@g10gh7…3y5tv</span>`);
-    expect(markup).toContain(`<span data-mention="" title="${ground}">@${ground}</span>`);
-    expect(markup).toContain(`<span data-mention="me" title="${NICK}">@g1jg8m…vsqf5</span>`);
-  });
-
-  it("starts from the room's draft, its preview with it", () => {
-    const markup = renderToStaticMarkup(
+  it("starts from the room's draft, its marks drawn as what they mean, and sends it as the same Markdown", () => {
+    const page = inPage(
       <Composer
         room={ROOM}
         nick={NICK}
@@ -153,25 +109,18 @@ describe("Composer", () => {
         onSay={() => true}
       />,
     );
-    expect(markup).toMatch(/<textarea[^>]*>kept \*\*draft\*\*<\/textarea>/);
-    expect(markup).toContain("<strong>draft</strong>");
+    expect(page.box.textContent).toBe("kept draft");
+    expect(page.box.querySelector("strong")?.textContent).toBe("draft");
+    expect(page.held()).toBe("kept **draft**");
   });
 
-  // 8k: the U of frame 73 writes `++`; the preview shows it as the room will.
-  it("shows an underlined draft underlined in its preview", () => {
-    const markup = renderToStaticMarkup(
-      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft="kept ++draft++" onSay={() => true} />,
-    );
-    expect(markup).toContain("<u>draft</u>");
-  });
-
-  it("starts empty with no draft given, and writes a stored draft as a value, never as markup", () => {
-    expect(html()).toMatch(/<textarea[^>]*><\/textarea>/);
-    const markup = renderToStaticMarkup(
+  it("starts empty with no draft given, and writes a stored draft as text, never as markup", () => {
+    expect(inPage(<Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={() => true} />).held()).toBe("");
+    const page = inPage(
       <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft={'"><img src=x onerror=1>'} onSay={() => true} />,
     );
-    expect(markup).toContain("&quot;&gt;&lt;img src=x onerror=1&gt;</textarea>");
-    expect(markup).not.toMatch(/<img/);
+    expect(page.box.textContent).toBe('"><img src=x onerror=1>');
+    expect(page.host.querySelector("img")).toBeNull();
   });
 
   it("says nothing of a line not sent before any was", () => {
@@ -232,52 +181,6 @@ describe("what the composer's field says of @room", () => {
   });
 });
 
-describe("what the composer's field says of a completion", () => {
-  const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
-  it.each([
-    ["/", { help: "Tab completes /me." }],
-    ["/m", { help: "Tab completes /me." }],
-    ["#g", { help: "Tab completes #games; also #gnogolf." }],
-    ["say #n", { help: "Tab completes #news." }],
-    ["#n", { help: "Tab completes #news." }],
-    ["hi @g10", { help: "Tab completes @g10gh7…3y5tv." }],
-    [`${"x".repeat(419)} #g`, { error: "Too long by 3 bytes." }],
-    [`${"x".repeat(412)} #g`, { help: "Tab completes #games; also #gnogolf." }],
-  ])("says, of %j, %j: an unknown command waits, a line too long does not", (draft, shown) => {
-    const choices = { ...CHOICES, people: [ALICE] };
-    expect(said(compose(ROOM, draft, NICK), false, { completion: completions(draft, choices) })).toStrictEqual(shown);
-  });
-
-  it("says a line not sent before any completion", () => {
-    expect(said(compose(ROOM, "#g", NICK), true, { completion: completions("#g", CHOICES) })).toStrictEqual({
-      error: "Not sent: the chat is not ready yet. Try again in a moment.",
-    });
-  });
-});
-
-describe("what the composer's field says of three completions", () => {
-  it("names the first, then the others, a comma apart", () => {
-    const choices = { commands: [], rooms: ["#a1", "#a2", "#a3"], people: [] };
-    expect(said(compose(ROOM, "#a", NICK), false, { completion: completions("#a", choices) })).toStrictEqual({
-      help: "Tab completes #a1; also #a2, #a3.",
-    });
-  });
-});
-
-describe("the composer's preview", () => {
-  const preview = (draft: string) => renderToStaticMarkup(<Preview composed={compose(ROOM, draft, NICK)} />);
-  it("shows the line as the room will read it: an action as one, one slash of two", () => {
-    expect(preview("/me **waves**")).toMatch(/inert="">\* <span><strong>waves<\/strong><\/span><\/div>$/);
-    expect(preview("//shrug")).toMatch(/inert=""><span>\/shrug<\/span><\/div>$/);
-  });
-
-  it("shows nothing of a line that cannot go", () => {
-    expect(preview("a".repeat(600))).toBe("");
-    expect(preview("/nick bob")).toBe("");
-    expect(preview("   ")).toBe("");
-  });
-});
-
 // 4d's pre-merge: a draft given lets a render show what the composer says of it.
 describe("the composer, from a draft", () => {
   const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -293,24 +196,9 @@ describe("the composer, from a draft", () => {
         onSay={() => true}
       />,
     );
-  it.each([
-    ["hi @g10", "Tab completes @g10gh7…3y5tv."],
-    ["@g10", "Tab completes @g10gh7…3y5tv."],
-    ["hi @", "Tab completes @g10gh7…3y5tv."],
-    ["/m", "Tab completes /me."],
-  ])("says what Tab completes %j to", (draft, help) => {
-    expect(from(draft)).toContain(help);
-  });
-
-  // The UX review (U9): typing is told from the first key, so the field says so, until it has something else to say.
-  it("tells the writer the room sees them type, unless the field has another help to give", () => {
-    const told = "People in this room see when you type.";
-    expect(from("")).toContain(told);
-    expect(from("hello")).toContain(told);
-    expect(from("/m")).not.toContain(told);
-    expect(from("a".repeat(400))).not.toContain(told);
-    // An error is the field's word alone: the line too long to go.
-    expect(from("a".repeat(600))).not.toContain(told);
+  // C3 of the review: the list of suggestions says what a word may become, so the field's help no longer names it.
+  it("says nothing of what Tab completes: the suggestions' list does", () => {
+    for (const draft of ["hi @g10", "@g10", "hi @", "/m", "#g"]) expect(from(draft)).not.toContain("Tab completes");
   });
 
   // N3: the hint is read from the draft as typed or completed, from the room's own rule, none in a direct message.
@@ -366,17 +254,6 @@ describe("the composer, from a draft", () => {
     expect(markup).not.toContain("@room notifies");
   });
 
-  // G8 (F1507): a room offers @room as a completion and says it does not notify when its page told no room counts it; a
-  // direct message does neither.
-  it("offers @room while it is typed in a room, none in a direct message", () => {
-    const typed = (room: string, label?: string) =>
-      renderToStaticMarkup(
-        <Composer room={room} label={label} nick={NICK} rooms={[]} members={[]} draft="@ro" onSay={() => true} />,
-      );
-    expect(typed(ROOM)).toContain("@room");
-    expect(typed("g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv", "g10gh7…3y5tv")).not.toContain("@room");
-  });
-
   it("says @room does not notify in a room whose page told nothing of the rooms where it counts", () => {
     const markup = renderToStaticMarkup(
       <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} draft="@room hello" onSay={() => true} />,
@@ -385,13 +262,6 @@ describe("the composer, from a draft", () => {
     expect(markup).not.toContain(ROOM_NOTIFIES);
   });
 
-  it.each(["hi@g10", "hi @g10 there", "hi @ g10"])(
-    "offers no person for %j: no word after @ ends the draft",
-    (draft) => {
-      expect(from(draft)).not.toContain("Tab completes @");
-    },
-  );
-
   it("leaves Send on for a line that can go, off for one that cannot", () => {
     expect(from("hello")).not.toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled)/);
     expect(from("/nick bob")).toMatch(/<button(?=[^>]*type="submit")(?=[^>]*disabled="")[^>]*>/);
@@ -399,7 +269,7 @@ describe("the composer, from a draft", () => {
 });
 
 // draft/multiline (docs/decisions.md row 255): Shift+Enter adds a line to the draft, Enter sends it; a message of
-// several lines is previewed as the room reads it, and what keeps it from going is said.
+// several lines goes as it is, and what keeps it from going is said.
 describe("the composer, a draft of several lines", () => {
   const from = (draft: string) =>
     renderToStaticMarkup(
@@ -407,36 +277,26 @@ describe("the composer, a draft of several lines", () => {
     );
 
   it("holds the draft in a box of several lines, labelled for the room", () => {
-    expect(from("")).toMatch(/<textarea[^>]*>/);
-    expect(from("")).not.toMatch(/<input[^>]*type="text"/);
+    expect(from("")).toMatch(/<div[^>]*role="textbox"[^>]*aria-multiline="true"/);
+    expect(from("")).not.toMatch(/<textarea/);
   });
 
-  it("previews a draft of several lines as the room reads it, a list as a list", () => {
-    expect(renderToStaticMarkup(<Preview composed={compose(ROOM, "- one\n- two", NICK)} />)).toMatch(
-      /<ul><li>one<\/li><li>two<\/li><\/ul>/,
-    );
-  });
-
-  it("describes the box by the hint that Shift+Enter adds a line, which a message near its cap's help replaces", () => {
+  // Alexis, 2026-11-08 (D418): no standing hint under the field, of the typing nor of how to add a line.
+  it("says nothing under an empty field", () => {
     const markup = from("");
-    const described = /<textarea[^>]* aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "?";
-    expect(markup).toMatch(new RegExp(`id="${described}"[^>]*>[^<]*Shift\\+Enter adds a line\\.<`));
-  });
-
-  // F1714 (CR2, by Alexis): on a touch screen Enter adds a line and Send sends; the help names the form that applies.
-  it("hints that Enter adds a line and Send sends on a touch screen, Shift+Enter on a computer", () => {
-    expect(withHint({}, true, true).help).toBe("Enter adds a line; Send sends it.");
-    expect(withHint({}, true, false).help).toBe("Shift+Enter adds a line.");
-    expect(withHint({}, false, true).help).toBe(
-      "People in this room see when you type. Enter adds a line; Send sends it.",
-    );
-    expect(withHint({ error: "No." }, false, true)).toStrictEqual({ error: "No." });
+    expect(markup).not.toContain("Shift+Enter adds a line.");
+    expect(markup).not.toContain("see when you type");
   });
 
   it("says what keeps a draft from going in the box, in place of the hint", () => {
     const markup = from("/nick bob");
     expect(markup).toContain("/nick is not a command. /me sends an action.");
     expect(markup).not.toContain("Shift+Enter adds a line.");
+  });
+
+  it("does not call a command being typed unknown while its suggestions are open", () => {
+    expect(from("/")).not.toContain("is not a command");
+    expect(from("/ma")).not.toContain("is not a command");
   });
 
   it("names the line too long, from 1, and a message too many lines by how many", () => {
@@ -593,7 +453,7 @@ describe("Composer: a reply", () => {
   // The code review (CR7): the field, which Reply focuses, is described by the bar that says which line it answers.
   it("describes its field by the line it answers", () => {
     const markup = draw(to("the first line"));
-    const describedBy = /<(?:input|textarea)[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
+    const describedBy = /<[^>]*role="textbox"[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "";
     const ids = describedBy.split(" ");
     // The field is described by its help too (4f's typing disclosure): the bar is one of what describes it.
     const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
@@ -638,105 +498,55 @@ describe("Composer: a reply", () => {
 describe("Enter in the composer's box", () => {
   const lines = (count: number) => Array.from({ length: count }, (_, at) => `line ${String(at)}`).join("\n");
 
-  let root: Root | undefined;
-  let host: HTMLElement;
-  beforeEach(() => {
-    Reflect.set(globalThis, "IS_REACT_ACT_ENVIRONMENT", true);
-    // jsdom has no matchMedia: a computer's pointer, which is not coarse.
-    // ... nor the popover API, which the composer's live region uses; the pop-up itself is the journeys'.
-    Object.assign(HTMLElement.prototype, { togglePopover: vi.fn(), showPopover: vi.fn(), hidePopover: vi.fn() });
-    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
-    host = document.body.appendChild(document.createElement("div"));
-  });
-  afterEach(() => {
-    act(() => {
-      root?.unmount();
-    });
-    host.remove();
-    vi.unstubAllGlobals();
-  });
-
-  // Presses Enter in the box of a composer holding `draft`; what onSay was given.
-  function enter(draft: string, multiline: boolean | undefined): Composed[] {
+  // Presses Enter in the box of a composer holding `draft`; what onSay was given, and the page.
+  async function enter(draft: string, props: Partial<Parameters<typeof Composer>[0]> = {}) {
     const went: Composed[] = [];
-    root = createRoot(host);
-    act(() => {
-      root?.render(
-        <Composer
-          room="#bubble/games"
-          nick={NICK}
-          rooms={["#games"]}
-          members={[]}
-          draft={draft}
-          multiline={multiline}
-          onSay={(composed) => {
-            went.push(composed);
-            return true;
-          }}
-        />,
-      );
-    });
-    const box = host.querySelector("textarea");
-    act(() => {
-      box?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-    });
-    return went;
+    const page = inPage(
+      <Composer
+        room={ROOM}
+        nick={NICK}
+        rooms={["#games"]}
+        members={[]}
+        draft={draft}
+        onSay={(composed) => {
+          went.push(composed);
+          return true;
+        }}
+        {...props}
+      />,
+    );
+    await page.press("Enter");
+    return { went, page };
   }
 
-  it("sends a draft of 21 lines on a connection with draft/multiline, once", () => {
-    expect(enter(lines(21), true)).toHaveLength(1);
+  it("sends a draft of 21 lines on a connection with draft/multiline, once", async () => {
+    expect((await enter(lines(21), { multiline: true })).went).toHaveLength(1);
   });
 
-  it("sends a draft of 21 lines while it is not known whether the connection has it (R2)", () => {
-    expect(enter(lines(21), undefined)).toHaveLength(1);
+  it("sends a draft of 21 lines while it is not known whether the connection has it (R2)", async () => {
+    expect((await enter(lines(21), { multiline: undefined })).went).toHaveLength(1);
   });
 
-  it("sends nothing of 21 lines on a connection without draft/multiline, whatever the Send button says", () => {
-    expect(enter(lines(21), false)).toEqual([]);
+  it("sends nothing of 21 lines on a connection without draft/multiline, whatever the Send button says", async () => {
+    expect((await enter(lines(21), { multiline: false })).went).toEqual([]);
   });
-
-  const press = (slow: (composed: Composed) => string | undefined) => {
-    const sent: Composed[] = [];
-    root = createRoot(host);
-    act(() => {
-      root?.render(
-        <Composer
-          room={ROOM}
-          nick={NICK}
-          rooms={[]}
-          members={[]}
-          draft="hello"
-          slow={slow}
-          onSay={(composed) => {
-            sent.push(composed);
-            return true;
-          }}
-        />,
-      );
-    });
-    act(() => {
-      host
-        .querySelector("textarea")
-        ?.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
-    });
-    return sent;
-  };
 
   // F2092 (AP3): the composer asks the link, as Send is pressed, whether the account is past the server's pace.
-  it("sends nothing and keeps the draft when the link says the account is too fast, and says why", () => {
+  it("sends nothing and keeps the draft when the link says the account is too fast, and says why", async () => {
     const why = tooFast({ limit: "messages", wait: 12_001 });
     expect(why).toBe("Too fast: 20 messages a minute at most. Try again in 13 s.");
-    expect(press(() => why)).toEqual([]);
-    expect(host.textContent).toContain(why);
-    expect(host.querySelector("textarea")?.value).toBe("hello");
+    const { went, page } = await enter("hello", { slow: () => why });
+    expect(went).toEqual([]);
+    expect(page.host.textContent).toContain(why);
+    expect(page.held()).toBe("hello");
   });
 
   it("names the lines' limit as it names the messages'", () => {
     expect(tooFast({ limit: "lines", wait: 1000 })).toBe("Too fast: 100 lines a minute at most. Try again in 1 s.");
   });
 
-  it("sends the draft when the link says nothing against it", () => {
-    expect(press(() => undefined)).toHaveLength(1);
+  it("sends the draft when the link says nothing against it", async () => {
+    expect((await enter("hello", { slow: () => undefined })).went).toHaveLength(1);
   });
 });
 
@@ -765,14 +575,20 @@ describe("Composer: an edit", () => {
     const markup = draw();
     expect(words(markup)).toContain("Editing a message");
     expect(names(markup)).toContain("Cancel the edit");
-    expect(markup).toMatch(/<textarea[^>]*>the first words<\/textarea>/);
     expect(markup).toMatch(/<button[^>]*type="submit"[^>]*>.*>Save<\/span><\/button>/);
     expect(markup).not.toMatch(/>Send<\/span><\/button>/);
   });
 
+  it("starts from the words of the message edited, and sends with Save", () => {
+    const page = inPage(
+      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={() => true} draft="the first words" editing />,
+    );
+    expect(page.held()).toBe("the first words");
+  });
+
   it("describes its field by the bar that says what is edited", () => {
     const markup = draw();
-    const ids = (/<textarea[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "").split(" ");
+    const ids = (/<[^>]*role="textbox"[^>]*aria-describedby="([^"]+)"/.exec(markup)?.[1] ?? "").split(" ");
     const described = ids.map((id) => new RegExp(`<p[^>]*id="${id}"[^>]*>(.*?)</p>`, "s").exec(markup)?.[1] ?? "");
     expect(described.map(words)).toContain("Editing a message");
   });
@@ -819,9 +635,8 @@ describe("Composer: submitting an edit", () => {
   HTMLElement.prototype.togglePopover = () => false;
   const host = document.createElement("div");
   const root = createRoot(host);
-  // jsdom has no matchMedia: a computer's pointer, which is not coarse (the composer reads it as it mounts).
   beforeEach(() => {
-    vi.stubGlobal("matchMedia", () => ({ matches: false, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    noMedia();
   });
   afterEach(() => {
     act(() => {
@@ -874,12 +689,49 @@ describe("the composer's box", () => {
   it("holds the format bar, the field and the send button in one group named Message box", () => {
     const box = one(boxed(), '[role="group"][aria-label="Message box"]');
     expect(all(box, '[role="group"][aria-label="Format"]')).toHaveLength(1);
-    expect(all(box, "textarea, [role='textbox']")).toHaveLength(1);
+    expect(all(box, FIELD)).toHaveLength(1);
     expect(all(box, "button[type='submit']")).toHaveLength(1);
   });
 
   it("keeps the box inside the form, so Enter and the send button still say the line", () => {
     const view = boxed();
     expect(one(view, "form").contains(one(view, '[aria-label="Message box"]'))).toBe(true);
+  });
+});
+
+// The card commands: each sends its card's line as any message, so every reader's page draws the card and a guest's goes the same way.
+describe("the composer's card commands", () => {
+  const sent = async (draft: string, label?: string) => {
+    const onSay = vi.fn(() => true);
+    const page = inPage(
+      <Composer room={ROOM} nick={NICK} rooms={[]} members={[]} onSay={onSay} draft={draft} label={label} />,
+    );
+    await acting(() => {
+      page.host.querySelector("form")?.requestSubmit();
+    });
+    return { onSay, page };
+  };
+
+  it.each([
+    ["/market GNOT", "💹 Market prices GNOT"],
+    ["/trending", "📈 Most called worlds this week"],
+    ["/proposals", "🏛️ GovDAO proposals"],
+  ])("sends %s as the line any client reads, and empties the field", async (draft, text) => {
+    const { onSay, page } = await sent(draft);
+    expect(onSay).toHaveBeenCalledTimes(1);
+    expect(onSay.mock.calls[0]).toMatchObject([{ kind: "line", text }, draft]);
+    expect(page.held()).toBe("");
+  });
+
+  it("refuses an unknown token in words, sending nothing", async () => {
+    const { onSay, page } = await sent("/market eth");
+    expect(onSay).not.toHaveBeenCalled();
+    expect(page.host.textContent).toContain("/market takes one token");
+  });
+
+  it("is an unknown command in a direct message, which has no room for the card", async () => {
+    const { onSay, page } = await sent("/trending", "g10gh7…3y5tv");
+    expect(onSay).not.toHaveBeenCalled();
+    expect(page.host.textContent).toContain("/trending is not a command");
   });
 });

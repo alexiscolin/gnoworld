@@ -3,21 +3,27 @@
 // it to an account alone, a room letting accounts alone speak (+M). The design system's field holds the line and
 // says what keeps it from going (too long for IRC's 510 bytes, a command it does not know, the chat away) or the
 // bytes left near the end, or what Tab completes the word being typed to (a command, a room, an account). A format
-// bar wraps the selection in Markdown's marks; the line shows below as it reads.
-import type { Composed } from "@gnoworld/core";
-import { composeDraft } from "./polling.ts";
-import { Field, Stack } from "@gnoworld/ui";
-import { useRef, useState, type KeyboardEvent, type SubmitEvent } from "react";
-import { completed } from "./complete.ts";
-import { completionOf, useFocusAtStart, useHelp, useRefusal, useSelection, type Refused } from "./composerHooks.ts";
+// bar wraps the selection in Markdown's marks.
+import { compose, type Composed } from "@gnoworld/core";
+import { composeDraft, DRAFT_COMMANDS } from "./polling.ts";
+import { cardAsked, CARD_COMMANDS } from "./cardCommands.ts";
+import { Stack } from "@gnoworld/ui";
+import { useRef, useState, type ReactNode, type SubmitEvent } from "react";
+import { FIELD } from "./composerBox.ts";
+import { useFocusAtStart, useHelp, useRefusal, type Refused } from "./composerHooks.ts";
+import { LinkTool } from "./composer/LinkTool.tsx";
+import { ComposerField, THEME } from "./composer/ComposerField.tsx";
+import { createComposerEditor } from "./composer/markdownEditor.ts";
+import { suggestions } from "./composer/suggest.ts";
 import { useEditing } from "./EditBar.tsx";
-import { formatted, inserted, type Edit, type Format } from "./format.ts";
-import { Message } from "./Message.tsx";
+import { useJarvis } from "./JarvisButton.tsx";
 import { MessageBox } from "./MessageBox.tsx";
-import { roomLabel } from "./names.ts";
+import { NameNudge } from "./NameNudge.tsx";
+import { actsOf } from "./composer/acts.ts";
+import { useMemberNames } from "../names/index.ts";
+import { peopleOf, roomLabel } from "./names.ts";
 import { useAnswering } from "./ReplyBar.tsx";
 import type { Answered } from "./Replying.tsx";
-import styles from "./Composer.module.css";
 
 /** What an edit leaving `draft` tells the room of the account's typing (IRCv3's +typing), read as compose reads a
  * draft: text is active, an empty field done, a slash command nothing (the spec's), `//` text. */
@@ -27,33 +33,17 @@ export function typingOf(draft: string): "active" | "done" | undefined {
   return text.startsWith("/") && !text.startsWith("//") ? undefined : "active";
 }
 
-/** The draft as the room will read it, an action as one, the account's own mention apart, a member's shortened (F812),
- * out of reach of the keyboard and of a screen reader (the field says it already); nothing of a line that cannot go. */
-export function Preview({
-  composed,
-  me,
-  members,
-}: {
-  composed: Composed;
-  me?: string | undefined;
-  members?: ReadonlySet<string> | undefined;
-}) {
-  if (composed.kind !== "line" && composed.kind !== "lines") return null;
-  return (
-    <div className={styles["preview"]} inert>
-      {composed.kind === "line" && composed.action ? "* " : null}
-      <Message text={composed.text} me={me} members={members} />
-    </div>
-  );
-}
-
 export interface ComposerProps {
   room: string;
+  /** The room's quick actions, which the box's + opens (QuickActions.tsx); none in a thread. */
+  quick?: ReactNode;
   /** The account's nick, which Ergo puts before each line it relays: the line's room is what it leaves. */
   nick: string;
   /** The world's rooms by label, and the room's members, whose other accounts a word after `@` completes to. */
   rooms: readonly string[];
   members: readonly string[];
+  /** The members' gno.land names by address, for those who have one, in place of the chains' (a test's): `@` suggests them by name. */
+  names?: ReadonlyMap<string, string> | undefined;
   /** Whether a mention of the whole room counts in this room (4f-n); the field says so as `@room` stands in the draft. */
   groups?: boolean | undefined;
   /** Sends the draft as composed (and as written, which a refused direct message puts back); whether it went. */
@@ -105,44 +95,52 @@ function useDraft({ draft: kept = "", onDraft, onTyping }: Pick<ComposerProps, "
   return { draft, setDraft, change };
 }
 
+// What a card command composes: its line, or nothing when it was asked wrong (the field says why).
+const composedCard = (room: string, nick: string, card: NonNullable<ReturnType<typeof cardAsked>>): Composed =>
+  card.ok ? compose(room, card.text, nick) : { kind: "empty" };
+
+// What a word being typed may become: a direct message has no card commands, no @room and no Jarvis.
+const choicesOf = (
+  inRoom: boolean,
+  jarvis: { answers: boolean; examples: readonly string[] | undefined },
+  { rooms, people }: { rooms: readonly string[]; people: readonly string[] },
+) => ({
+  rooms,
+  people,
+  commands: inRoom ? [...DRAFT_COMMANDS, ...CARD_COMMANDS] : DRAFT_COMMANDS,
+  group: inRoom,
+  jarvis: jarvis.answers && inRoom,
+  examples: inRoom ? jarvis.examples : undefined,
+});
+
 export function Composer(props: ComposerProps) {
   const { room, nick, rooms, members, onSay, label: to, refused } = props;
   const { draft, setDraft, change } = useDraft(props);
   const refusal = useRefusal(refused, draft, { setDraft, fresh: props.fresh, gone: props.gone });
   const [failed, setFailed] = useState<boolean | string>(false);
+  const [editor] = useState(() => createComposerEditor(draft, THEME));
   const formRef = useRef<HTMLFormElement>(null);
   const label = to ?? roomLabel(room);
-  const composed = composeDraft(room, draft, nick);
-  const completion = completionOf(draft, { rooms, members, nick, group: to === undefined });
-  const { coarse, shown, goes } = useHelp(composed, props, { failed, completion, draft });
-  // The selection an edit leaves is put back in the box once it shows the new draft.
-  const { box, keep } = useSelection(formRef, draft);
+  // A card command sends its card's line (a direct message has no room for it, so it is an unknown command there).
+  const card = to === undefined ? cardAsked(draft) : undefined;
+  const composed: Composed = card === undefined ? composeDraft(room, draft, nick) : composedCard(room, nick, card);
+  const people = peopleOf(members, nick);
+  const read = useMemberNames(people, props.names === undefined && /(^|\s)@\S*$/u.test(draft));
+  const names = props.names ?? read;
+  const jarvis = useJarvis(props.quick);
+  const choices = choicesOf(to === undefined, jarvis, { rooms, people });
+  const listed = suggestions(draft, { ...choices, names });
+  // A command still being typed, its suggestions on screen, is not yet an unknown one.
+  const { coarse, shown, goes } = useHelp(composed, props, { failed, draft, card, completing: listed.length > 0 });
   useFocusAtStart(formRef, props.focus);
-  // An edit of the format bar or of a completion: the new draft, its selection, and no line not sent any more.
-  const apply = (next: Edit) => {
-    keep(next);
-    change(next.text);
+  const box = () => formRef.current?.querySelector(FIELD) ?? undefined;
+  // What the field does leaves no line not sent: the failure said for the last one goes as the draft changes.
+  const edited = () => {
     setFailed(false);
     refusal.said();
   };
-  const insert = (mark: string) => {
-    const start = box()?.selectionStart ?? draft.length;
-    apply(inserted({ text: draft, start, end: box()?.selectionEnd ?? start }, mark));
-  };
-  const format = (kind: Format) => {
-    const start = box()?.selectionStart ?? draft.length;
-    apply(formatted({ text: draft, start, end: box()?.selectionEnd ?? start }, kind));
-  };
-  // Tab in the box takes the first completion while the caret ends the draft; else, and anywhere else in the form,
-  // it moves on, as it always does.
-  const complete = (event: KeyboardEvent<HTMLFormElement>) => {
-    if (event.key !== "Tab" || event.shiftKey || completion === undefined) return;
-    const input = box();
-    if (event.target !== input || input.selectionStart !== draft.length) return;
-    event.preventDefault();
-    apply(completed(draft, completion));
-  };
-  const answering = useAnswering(props, { formRef, box, otherwise: complete });
+  const { format, link, take, mention } = actsOf(editor, draft, edited);
+  const answering = useAnswering(props, { formRef, box });
   const editing = useEditing(props, box, answering);
   const send = (event: SubmitEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -151,7 +149,11 @@ export function Composer(props: ComposerProps) {
     const went = slow === undefined && onSay(composed, draft);
     setFailed(slow ?? !went);
     refusal.said();
-    if (went) change("");
+    if (!went) return;
+    // A line to Jarvis goes to the room as any line, so the room sees the question, and is asked of Jarvis once it went: the answer is
+    // the asker's card.
+    jarvis.asked(draft);
+    change("");
   };
   return (
     <form
@@ -164,25 +166,31 @@ export function Composer(props: ComposerProps) {
       <Stack space="2xs">
         {editing.bar}
         {/* The video's one rounded box: the format bar, the field, and at its foot the marks, the field's words and Send. */}
-        <MessageBox onFormat={format} onInsert={insert} send={editing.send} goes={goes}>
-          <Field
-            kind="lines"
+        <MessageBox
+          onFormat={format}
+          linkTool={(size) => <LinkTool onApply={link} size={size} />}
+          send={editing.send}
+          goes={goes}
+          quick={jarvis.quickWith(mention)}
+        >
+          <ComposerField
+            editor={editor}
+            value={draft}
             enterAddsLine={coarse}
             label={`Message ${label}`}
             placeholder={`Message ${label}`}
-            hideLabel
-            resizable={false}
             describedBy={editing.describedBy}
-            value={draft}
+            names={names}
+            suggestions={listed}
+            onTake={take}
             onChange={(value) => {
               change(value);
-              setFailed(false);
-              refusal.said();
+              edited();
             }}
             {...(refusal.why === undefined ? shown : { error: refusal.why })}
           />
         </MessageBox>
-        <Preview composed={composed} me={nick} members={new Set(members)} />
+        <NameNudge />
       </Stack>
     </form>
   );

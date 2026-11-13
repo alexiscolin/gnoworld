@@ -18,7 +18,8 @@ const said = (html: string) =>
 describe("RoomSections", () => {
   it("lists each section that has a room, its name over its links, as a visitor's page does: no count", () => {
     const html = renderToStaticMarkup(<RoomSections sections={SECTIONS} current="#bubble" />);
-    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => m[1])).toEqual(["Talk", "Rooms"]);
+    // A section's name is the button that folds it (Folding): its words are the heading's, after the chevron.
+    expect([...html.matchAll(/<h2[^>]*>(.*?)<\/h2>/g)].map((m) => said(m[1] ?? ""))).toEqual(["Talk", "Rooms"]);
     expect([...html.matchAll(/<a [^>]*href="([^"]*)"/g)].map((m) => m[1])).toEqual([
       "/w/bubble",
       "/w/bubble?room=games",
@@ -28,7 +29,7 @@ describe("RoomSections", () => {
 
   it("names a lone section with no name Rooms, and marks the room shown", () => {
     const html = renderToStaticMarkup(<RoomSections sections={SECTIONS.slice(1, 2)} current="#bubble/games" />);
-    expect(html).toContain(">Rooms</h2>");
+    expect(html).toMatch(/<h2[^>]*><button [^>]*aria-expanded="true"[^>]*>.*Rooms<\/span>.*<\/button><\/h2>/);
     expect(html).toContain('aria-current="true"');
   });
 
@@ -45,14 +46,27 @@ describe("RoomSections", () => {
   });
 });
 
+describe("a realm world's rooms", () => {
+  const own = "#nym-alexiscolin000-gnoradio-0123456789/home-0123456789";
+  const other = "#nym-alexiscolin000-gnoradio-0123456789/other-0123456789";
+  it("lists the room one is in, as the current one with no link, and no other room of that world", () => {
+    const sections = [{ name: null, rooms: [own, other].map((room) => ({ room, type: "open" as const })) }];
+    const html = renderToStaticMarkup(<RoomSections sections={sections} current={own} />);
+    expect(html).toContain("home");
+    expect(html).toContain('aria-current="true"');
+    expect(html).not.toContain("other");
+    expect(html).not.toContain("<a ");
+  });
+});
+
 describe("RoomsNav", () => {
   it("is a navigation named as it is told, reached by code and never by the tab key", () => {
     const html = renderToStaticMarkup(<RoomsNav label="Rooms">in it</RoomsNav>);
     expect(html).toMatch(/^<nav /);
     expect(html).toContain('aria-label="Rooms"');
     expect(html).toContain('tabindex="-1"');
-    // The navigation has its own look; its column scrolls in its region (ChatLayout), not in a list of its own.
-    expect(html).toMatch(/class="_nav_\w+"/);
+    // The navigation has its own look and fills the column (the `fill-column` utility); its column scrolls in its region (ChatLayout).
+    expect(html).toMatch(/class="_nav_\w+ fill-column"/);
     expect(html).toContain(">in it</nav>");
   });
 });

@@ -14,6 +14,10 @@
     box-shadow: var(--shadow-popover);
   }
 
+  .panel[data-wide] {
+    --_w: var(--popover-wide);
+  }
+
   .panel[data-kind="menu"] {
     --_w: max-content;
 
@@ -23,12 +27,10 @@
   /* A row of the menu, on no fill but under the pointer or the keyboard. */
   .item {
     display: block;
-    inline-size: 100%;
     min-block-size: var(--control-m);
     padding-inline: var(--space-xs);
     border-radius: var(--radius-s);
     font: var(--font-ui);
-    text-align: start;
     cursor: pointer;
   }
 
@@ -48,6 +50,21 @@
 
   .item[data-tone="danger"] {
     color: var(--color-danger);
+  }
+
+  /* A later slice's act: greyed and inert, its "Soon" at the row's end (ComingSoon's look). */
+  .item[aria-disabled="true"] {
+    opacity: var(--opacity-disabled);
+    cursor: not-allowed;
+  }
+
+  .item[aria-disabled="true"]:is(:hover, :focus-visible) {
+    background: none;
+  }
+
+  .soon {
+    /* layout: the chip at the row's end, after the words */
+    margin-inline-start: auto;
   }
 
   .separator {

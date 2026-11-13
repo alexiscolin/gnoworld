@@ -52,6 +52,17 @@ describe("a field read from the device", () => {
       expect(device.read(field)).toEqual(DEVICE_EMPTY[field]);
   });
 
+  it("removes the key of the reminders field, which no page reads any more", () => {
+    held.words.set("gnoworld:device:reminders", "[]");
+    pageDevice().read("stamps");
+    expect(held.words.has("gnoworld:device:reminders")).toBe(false);
+  });
+
+  it("reads a blocked device as unreadable, the removal of that key refused too", () => {
+    held.state.blocked = true;
+    expect(pageDevice().read("stamps")).toBeUndefined();
+  });
+
   it("names each field's key under gnoworld:device:", () => {
     expect(pageDevice().keys.stamps).toBe("gnoworld:device:stamps");
     expect(pageDevice().keys.settings).toBe("gnoworld:device:settings");
@@ -153,8 +164,16 @@ describe("a field read from the device", () => {
     put("settings", { quality: "ultra", calm: true, phone3d: "yes", subtitles: "fr" });
     const device = pageDevice();
     expect(device.read("settings")).toEqual({ ...DEFAULT_SETTINGS, calm: true });
-    device.write("settings", { quality: "low", calm: true, phone3d: false });
-    expect(stored("settings")).toEqual({ quality: "low", calm: true, phone3d: false, subtitles: "fr" });
+    device.write("settings", { ...DEFAULT_SETTINGS, quality: "low", calm: true });
+    expect(stored("settings")).toEqual({ ...DEFAULT_SETTINGS, quality: "low", calm: true, subtitles: "fr" });
+  });
+
+  it("reads the reader's language among the list's and automatic translation as a switch, on and English by default", () => {
+    expect(pageDevice().read("settings")).toMatchObject({ language: "en", autoTranslate: true });
+    put("settings", { language: "fr", autoTranslate: false });
+    expect(pageDevice().read("settings")).toMatchObject({ language: "fr", autoTranslate: false });
+    put("settings", { language: "xx", autoTranslate: "no" });
+    expect(pageDevice().read("settings")).toMatchObject({ language: "en", autoTranslate: true });
   });
 
   it("reads a setting named like an object's own key as a newer page's, never as a setting", () => {
@@ -180,11 +199,6 @@ describe("a field read from the device", () => {
     expect(read?.worlds).toHaveLength(FOLLOWS_KEPT);
     expect(read?.worlds[0]).toBe("gnoland:w0");
     expect(read?.people).toEqual([]);
-  });
-
-  it("reads a reminder's fired flag, and drops one of another shape", () => {
-    put("reminders", { e1: { fired: false }, e2: { fired: "no" }, e3: { fired: true, at: 1 } });
-    expect(pageDevice().read("reminders")).toEqual({ e1: { fired: false } });
   });
 
   it("forgets the notifications read when their shape is another", () => {
@@ -233,11 +247,9 @@ describe("a field written to the device", () => {
   it("reads back what it wrote, field by field", () => {
     const device = pageDevice();
     device.write("streak", { day: "2026-11-05", count: 3, best: 3 });
-    device.write("reminders", { e1: { fired: true } });
     device.write("quests", { q1: ["s1"] });
     const again = pageDevice();
     expect(again.read("streak")).toEqual({ day: "2026-11-05", count: 3, best: 3 });
-    expect(again.read("reminders")).toEqual({ e1: { fired: true } });
     expect(again.read("quests")).toEqual({ q1: ["s1"] });
   });
 });

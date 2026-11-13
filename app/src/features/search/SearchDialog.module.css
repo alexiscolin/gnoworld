@@ -1,0 +1,216 @@
+/* The search palette (D355): the field on top; typing, the chips and the results at the start and the chosen place's preview at the end, in
+   the dialog's large sheet (Discover is the empty field's, discover/); a phone keeps the first part alone. */
+@layer components {
+  .palette {
+    /* the dialog's surface keeps a line whole: the words wrap here, and a row's name cuts itself */
+    white-space: normal;
+    /* layout: the field on top, the sheet's body under it */
+    display: grid;
+    /* layout: the body takes the room left */
+    grid-template-rows: auto minmax(0, 1fr);
+    /* layout: the palette's own arrangement */
+    row-gap: var(--space-s);
+    /* raw: the sheet's height, which the body scrolls inside */
+    block-size: min(680px, 80dvb);
+    min-block-size: 0;
+  }
+
+  .body {
+    /* layout: the results beside the preview */
+    display: grid;
+    /* layout: the results take the room, the preview Discover's detail's measure, so the filters and the sort hold one line (Alexis,
+       2026-11-08: "sur une ligne … agrandis la colonne") */
+    grid-template-columns: minmax(0, 1fr) var(--column-l);
+    min-block-size: 0;
+  }
+
+  .left {
+    /* layout: the chips, the results in the room left, the hints */
+    display: grid;
+    /* layout: the results take the room left */
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    /* layout: one column the width of the region, whatever a row's words are */
+    grid-template-columns: minmax(0, 1fr);
+    /* layout: the palette's own arrangement */
+    row-gap: var(--space-xs);
+    min-inline-size: 0;
+    min-block-size: 0;
+    padding-inline-end: var(--space-s);
+  }
+
+  .head {
+    /* layout: the kinds, then the chips and the sort */
+    display: grid;
+    /* layout: the palette's own arrangement */
+    row-gap: var(--space-2xs);
+  }
+
+  .results {
+    /* layout: the list fills the room left and scrolls inside it */
+    display: grid;
+    min-block-size: 0;
+  }
+
+  .listbox {
+    overflow: auto;
+    min-block-size: 0;
+  }
+
+  .more {
+    /* layout: a line of its own under the rows */
+    margin: 0;
+    padding: var(--space-xs);
+  }
+
+  .group {
+    padding: var(--space-xs) var(--space-xs) var(--space-3xs);
+    color: var(--color-text-muted);
+  }
+
+  .row {
+    /* layout: the planet, the words, the marks */
+    display: grid;
+    /* layout: the words take the room */
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* layout: the palette's own arrangement */
+    place-items: center start;
+    /* layout: the palette's own arrangement */
+    gap: var(--space-xs);
+    padding: var(--space-2xs) var(--space-xs);
+    border-radius: var(--radius-m);
+    cursor: pointer;
+    transition: background-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  /* The hand-off row under the list: the width of the list, its words at the start. */
+  .handOff {
+    inline-size: 100%;
+    text-align: start;
+  }
+
+  .row[aria-selected="true"] {
+    background: var(--color-fill-hover);
+  }
+
+  .words {
+    /* layout: the name over its line */
+    display: grid;
+    min-inline-size: 0;
+  }
+
+  .name {
+    color: var(--color-text);
+  }
+
+  .name mark {
+    background: none;
+    color: var(--color-mine);
+  }
+
+  .meta {
+    color: var(--color-text-muted);
+  }
+
+  .tag {
+    color: var(--color-warm);
+    font: var(--font-label);
+  }
+
+  .here {
+    color: var(--color-mine);
+    font: var(--font-meta);
+  }
+
+  .hints {
+    padding-block-start: var(--space-xs);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  .hints kbd {
+    padding: 0 var(--space-3xs);
+    border: var(--line-width) solid var(--color-line);
+    border-radius: var(--radius-s);
+    font: inherit;
+  }
+
+  .preview {
+    /* layout: the portrait, then its words and actions, from the top */
+    display: grid;
+    /* layout: the palette's own arrangement */
+    align-content: start;
+    /* layout: the preview's column is its width, whatever its words are */
+    grid-template-columns: minmax(0, 1fr);
+
+    /* layout: the palette's own arrangement */
+    gap: var(--space-s);
+    min-inline-size: 0;
+    overflow: auto;
+  }
+
+  /* A preview comes up as the chosen place changes (SearchDialog.tsx keys it by the place): a 120 ms fade in. */
+  section.preview {
+    animation: preview-in calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  @keyframes preview-in {
+    from {
+      opacity: 0;
+    }
+  }
+
+  .title {
+    /* layout: the palette's own arrangement */
+    margin: 0;
+  }
+
+  .description {
+    /* layout: the palette's own arrangement */
+    margin: 0;
+    color: var(--color-text-muted);
+  }
+
+  .stats {
+    /* layout: the people, then the lines a day */
+    display: flex;
+    /* layout: the palette's own arrangement */
+    gap: var(--space-s);
+    /* layout: the paragraph's own margin goes */
+    margin: 0;
+  }
+
+  .lines {
+    /* layout: the last lines, one under the other, in a box */
+    display: grid;
+    /* layout: the palette's own arrangement */
+    gap: var(--space-xs);
+    padding: var(--space-xs);
+    border-radius: var(--radius-m);
+    background: var(--color-fill-hover);
+  }
+
+  .line {
+    color: var(--color-text-muted);
+    overflow-wrap: anywhere;
+  }
+
+  .line b {
+    color: var(--color-text);
+    font-weight: 500;
+  }
+
+  /* A phone has the results alone. */
+  @media (width <= 640px) {
+    .body {
+      /* layout: the palette's own arrangement */
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .left {
+      padding-inline-end: 0;
+    }
+
+    .preview {
+      display: none;
+    }
+  }
+}

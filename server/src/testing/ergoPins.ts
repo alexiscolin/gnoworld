@@ -47,7 +47,8 @@ export async function pinsFor(e: Awaited<ReturnType<typeof start>>, more: Parame
     "/api/pins",
     pinsRoutes({
       pins: started.chat.pins,
-      mayPin: started.chat.mayPin,
+      mayPin: (room, who) => Promise.resolve(started.chat.staff(room, who) ? { as: "staff" } : false),
+      mayShow: (room, who) => Promise.resolve(started.chat.staff(room, who) ? { as: "staff" } : false),
       readable: started.chat.mayRead,
       session,
       origins: [ORIGIN],

@@ -1,17 +1,16 @@
-/* The rail (frames 4 and 16): a dark glass column at the right edge, under the header, as tall as its worlds down to over the ticker
+/* The rail (frames 4 and 16): a dark glass column at the right edge, under the header, as tall as its worlds down to the page's foot
    (DESIGN-SYSTEM.md, Rail), its planets one under the other, 98 px apart, each with its name in the label style under it; past that, the
    column scrolls to its last planet under the panel's foot, which fades it (frames 6, 17: no link ends it). Its width comes from its footprint, which the labels keep
    clear (core's RAIL), and which the rail writes on itself. */
 @layer components {
   .rail {
-    /* raw: frame 4's 25 px between the rail and the window's right edge */
-    --_edge: 25px;
+    /* The page's edge, the header's own (D13956) */
+    --_edge: var(--page-edge);
     /* The rail's footprint from the window's right edge (core's RAIL), written by the rail: unset, the rail takes its content's width. */
     --_footprint: initial;
 
     position: fixed;
-    /* raw: frame 4's rail from 98 px of 1,080, under the header */
-    inset-block-start: 98px;
+    inset-block-start: var(--dock-top);
     inset-inline-end: var(--_edge);
     /* raw: over the labels' layer (0) and the canvas (-1), as the flight panel is */
     z-index: 1;
@@ -24,8 +23,9 @@
   }
 
   .column {
-    /* raw: the panel down to 1,024 px of 1,080 at most, frame 4's foot, over the ticker and its air */
-    max-block-size: calc(100vb - 154px);
+    /* raw: the panel down to 1,058 px of 1,080 at most, its 22 px of air kept where the ticker stood (Alexis, 2026-11-09); less the 52 px of See
+       all under the column */
+    max-block-size: calc(100vb - 120px - 52px);
     /* layout: the planets scroll inside the panel, which keeps its edge */
     overflow: auto;
     /* raw: a planet the dock or the scroll moves past the panel's top fades over 12 px, under its edge */
@@ -50,6 +50,17 @@
     list-style-type: none;
   }
 
+  .foot {
+    /* layout: See all in the middle of the column, under the last planet */
+    display: grid;
+    /* layout: See all in the middle of the column */
+    justify-items: center;
+    /* raw: See all's own 52 px under the column: the column's max height leaves it */
+    block-size: 52px;
+    /* layout: See all in the middle of its 52 px */
+    align-content: center;
+  }
+
   .world {
     /* layout: the planet over its name, both in the middle of the column */
     display: grid;
@@ -72,6 +83,7 @@
     overflow: hidden;
     overflow-wrap: anywhere;
     text-align: center;
+    transition: color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
   }
 
   .world:is(:hover, :focus-visible) .name {
@@ -79,7 +91,7 @@
   }
 
   /* The rail is a computer's: a phone keeps the page's list (Hero's Worlds). */
-  @media (max-width: 899px) {
+  @media (width < 900px) {
     .rail {
       display: none;
     }

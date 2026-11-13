@@ -44,6 +44,17 @@ export const port = () =>
     .transform(Number)
     .pipe(z.number().max(65_535));
 
+// A host and its port written `host:port`: a name or an IPv4 address, and the port plainly, from 1 to 65,535.
+export const hostPort = () =>
+  z
+    .string()
+    .regex(/^[a-z0-9][a-z0-9.-]{0,252}:[1-9]\d{0,4}$/i)
+    .transform((text) => ({
+      host: text.slice(0, text.lastIndexOf(":")),
+      port: Number(text.slice(text.lastIndexOf(":") + 1)),
+    }))
+    .refine(({ port }) => port <= 65_535);
+
 // A list of entries parted by commas, none when empty, each checked by `item`.
 export const list = <T extends z.core.$ZodType<unknown, string>>(item: T) =>
   z
@@ -97,4 +108,12 @@ export function readSecret(setting: string, path: string): string {
   }
   if (text.length < 32) throw new Error(`setting ${setting}: too_short`);
   return text;
+}
+
+/** A key a shared secret is read from, in a file: none when no file is named and none is required, else readWord's
+ * rules (32 bytes at least, one word of printable ASCII), in a value that never prints. */
+export function keyFile(setting: string, path: string | undefined, required: boolean): Secret | undefined {
+  if (path !== undefined) return new Secret(readWord(setting, path));
+  if (required) throw new Error(`setting ${setting}: required`);
+  return undefined;
 }

@@ -1,0 +1,6 @@
+/* Around it: a row of the list beside the graph, a planet, a path and what it is. */
+@layer components {
+  .note {
+    white-space: nowrap;
+  }
+}

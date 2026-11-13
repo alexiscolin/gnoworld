@@ -1,10 +1,11 @@
 import fc from "fast-check";
 import { describe, expect, test } from "vitest";
-import { bytes } from "../irc/irc.ts";
+import { utf8Bytes as bytes } from "../text/utf8.ts";
 import { MULTILINE_BYTES, MULTILINE_LINES } from "../irc/multiline.ts";
 import {
   MAX_INLINE_DEPTH,
   MAX_QUOTE_DEPTH,
+  inWord,
   markdown,
   mentions,
   mentionsRoom,
@@ -662,6 +663,11 @@ describe("markdown: blocks", () => {
   test("reads marks at a line's start as marks, not a list", () => {
     reads("*a*", paragraph(em(text("a"))));
     reads("**a** b", paragraph(strong(text("a")), text(" b")));
+  });
+
+  test("reads a whole table as paragraphs in the chat, and an alert as a quote with no severity", () => {
+    expect(markdown("| a |\n|---|\n| 1 |").map(({ type }) => type)).toEqual(["paragraph"]);
+    expect(markdown("> [!NOTE]\n> x")[0]).not.toHaveProperty("severity");
   });
 
   test.each(["# Heading", "## Heading", "<script>alert(1)</script>", "---", "***", "| a | b |"])(
@@ -1329,5 +1335,19 @@ describe("markdown: whatever comes", () => {
     };
     expect(linear(pile)).toBe(true);
     expect(depthOf(markdown(pile(16_000)))).toBeLessThanOrEqual(MAX_INLINE_DEPTH);
+  });
+});
+
+describe("inWord: the characters a mark's run never opens or closes inside", () => {
+  test("holds letters and digits of any script in a word, and no space, punctuation, symbol or line edge", () => {
+    expect(["a", "7", "é", "字"].map((char) => inWord(char))).toEqual([true, true, true, true]);
+    expect([" ", "\n", ".", "-", "$", undefined].map((char) => inWord(char))).toEqual([
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+    ]);
   });
 });

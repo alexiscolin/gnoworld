@@ -1,15 +1,15 @@
 import { ShaderChunk, ShaderLib } from "three";
 import { describe, expect, it } from "vitest";
 import { glslSpaces, stripChunk as stripWith, stripGlsl } from "./glsl.ts";
-import { ORBITING } from "./scene/cosmos/dots.ts";
-import { AIR_FRAGMENT, AIR_VERTEX } from "./scene/planet/airShader.ts";
-import { FIELD, LOOKUP, SEAMS } from "./scene/planet/chunks.ts";
-import { DETAIL, FORMS, NOISE } from "./scene/planet/generatedParts.ts";
-import { GENERATED_FRAGMENT } from "./scene/planet/generatedShader.ts";
-import { RING_FRAGMENT, RING_VERTEX } from "./scene/planet/ringShader.ts";
-import { HALO_FRAGMENT, HALO_VERTEX, LIGHT_UNIFORMS, LIGHTS } from "./scene/planet/signShaders.ts";
-import { COMMON, PARTS, SHADE, TURNED } from "./scene/planet/surfaceParts.ts";
-import { SURFACE_VERTEX } from "./scene/planet/surfaceShader.ts";
+import { AIR_FRAGMENT, AIR_VERTEX } from "./space/planet/airShader.ts";
+import { FIELD, LOOKUP, SEAMS } from "./space/planet/chunks.ts";
+import { DETAIL, FORMS, NOISE } from "./space/planet/generatedParts.ts";
+import { GENERATED_FRAGMENT } from "./space/planet/generatedShader.ts";
+import { RING_FRAGMENT, RING_VERTEX } from "./space/planet/ringShader.ts";
+import { HALO_FRAGMENT, HALO_VERTEX, LIGHT_UNIFORMS, LIGHTS } from "./space/planet/signShaders.ts";
+import { COMMON, PARTS, SHADE, TURNED } from "./space/planet/surfaceParts.ts";
+import { SURFACE_VERTEX } from "./space/planet/surfaceShader.ts";
+import { PLANETS_FRAGMENT, PLANETS_VERTEX } from "./space/shaders/planets.ts";
 
 // Vite's own parser, which the build hands the plugin: loaded as it runs, for its types would bring Node's into the browser's program.
 const VITE = "vite";
@@ -183,7 +183,19 @@ describe("a shader's spaces, stripped", () => {
   });
 
   it("keeps every token of our own shaders, in order", () => {
-    const ours = [ORBITING, AIR_VERTEX, AIR_FRAGMENT, FIELD, SEAMS, LOOKUP, NOISE, FORMS, DETAIL, GENERATED_FRAGMENT];
+    const ours = [
+      PLANETS_VERTEX,
+      PLANETS_FRAGMENT,
+      AIR_VERTEX,
+      AIR_FRAGMENT,
+      FIELD,
+      SEAMS,
+      LOOKUP,
+      NOISE,
+      FORMS,
+      DETAIL,
+      GENERATED_FRAGMENT,
+    ];
     const shaders = [...ours, RING_VERTEX, RING_FRAGMENT, LIGHT_UNIFORMS, LIGHTS, HALO_VERTEX, HALO_FRAGMENT];
     for (const glsl of [...shaders, TURNED, COMMON, PARTS, SHADE, SURFACE_VERTEX])
       expect(tokensOf(stripGlsl(glsl))).toEqual(tokensOf(glsl));

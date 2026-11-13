@@ -1,8 +1,8 @@
 // What this device keeps for whoever uses it, guest or account (slice 8; ADR-0002 §1, "Device"): the settings, the passport's stamps and
-// the worlds charted here, the streak, today's expedition, the quests, the worlds and people followed, the reminders and the notifications read. Nothing of it leaves the
+// the worlds charted here, the streak, today's expedition, the quests, the worlds and people followed and the notifications read. Nothing of it leaves the
 // device. Each field is one key, read through its schema: an entry that is none is dropped and kept aside (a newer page's, written back),
 // another shape forgets the key, and a device that refuses (blocked, full) is read as unreadable, which the store then never writes over.
-import { Address, Day, Time } from "@gnoworld/schemas";
+import { Address, Day, JARVIS_LANGUAGES, Time } from "@gnoworld/schemas";
 import type { DraftStorage } from "../drafts/drafts.ts";
 import { z } from "../jitless.ts";
 import {
@@ -22,6 +22,9 @@ const STAMPS_KEPT = 10_000;
 const Key = z.string().check(z.minLength(1), z.maxLength(256), z.regex(/^[^\s\0-\x1f\x7f]+$/));
 const Count = z.int().check(z.minimum(0), z.maximum(100_000));
 
+/** A field no page keeps any more (the reminders), its key removed on the device's first read. */
+const RETIRED = "gnoworld:device:reminders";
+
 const Quality = z.enum(["auto", "high", "low"]);
 /** The settings (ADR-0002 §1, Menu and settings): each has its default when the device holds none. Fields of later slices are added. */
 const SETTINGS = {
@@ -31,14 +34,16 @@ const SETTINGS = {
   calm: z.boolean(),
   /** The 3D on a phone, where the list is the default. */
   phone3d: z.boolean(),
+  /** The language the room's lines are translated into. */
+  language: z.enum(JARVIS_LANGUAGES),
+  /** Whether the lines on screen are translated as they come. */
+  autoTranslate: z.boolean(),
 };
 
 /** The streak by UTC day: the last day counted, the days in a row to it, the longest run. */
 const Streak = z.strictObject({ day: Day, count: Count, best: Count });
 /** Today's expedition: its UTC day and the stops reached that day. */
 const ExpeditionDone = z.strictObject({ day: Day, reached: z.array(Key).check(z.maxLength(32)) });
-/** A reminder of an event: whether it fired, so it fires once. */
-const Reminder = z.strictObject({ fired: z.boolean() });
 
 /** The notifications read: every one up to `through`, and the ones marked read one by one after it, by id. */
 const NotificationsRead = z.strictObject({
@@ -53,7 +58,8 @@ interface Codec<T> {
   write: (value: T, strange: unknown) => unknown;
 }
 
-const isRecord = (raw: unknown): raw is Record<string, unknown> =>
+/** Whether `raw` is a plain object: not null, not a list. */
+export const isRecord = (raw: unknown): raw is Record<string, unknown> =>
   typeof raw === "object" && raw !== null && !Array.isArray(raw);
 
 // A record by key: the entries its schema reads, at most `kept`; the others kept aside.
@@ -116,7 +122,6 @@ const CODECS: { [K in DeviceField]: Codec<DeviceFields[K]> } = {
     },
     write: (value, strange) => ({ ...(isRecord(strange) ? strange : {}), ...value }),
   },
-  reminders: recordOf(Reminder, FOLLOWS_KEPT),
   notificationsRead: oneOf(NotificationsRead),
 };
 
@@ -129,10 +134,15 @@ function device(storage: () => DraftStorage): Device {
   // What each key held that this page could not read, from its last read: written back with the field.
   const strange: Partial<Record<DeviceField, unknown>> = {};
   const codec = <K extends DeviceField>(field: K) => CODECS[field] as Codec<DeviceFields[K]>;
+  let swept = false;
   return {
     keys,
     read: (field) => {
       try {
+        if (!swept) {
+          swept = true;
+          storage().removeItem(RETIRED);
+        }
         const held = storage().getItem(keys[field]);
         if (held === null) return DEVICE_EMPTY[field];
         let raw: unknown;

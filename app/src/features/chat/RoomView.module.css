@@ -30,8 +30,8 @@
     display: flex;
     /* layout: one under the other */
     flex-direction: column;
-    /* layout: a step apart, as the video's are */
-    gap: var(--space-s);
+    /* layout: no gap: each line holds its own room (its padding), so the pointer crosses from one to the next and to its bar without leaving a row */
+    gap: 0;
   }
 
   /* The conversation's own list: it takes what the pins above it and the composer below leave, and scrolls alone, never
@@ -45,30 +45,112 @@
     min-block-size: 0;
     overflow: auto;
     /* raw: 20 px above the first line and below the last (the prototype's #chatList padding) */
-    padding-block: 20px;
-    padding-inline: calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
+    --_pad: 20px;
+    padding-block: var(--_pad);
+    /* held labels stand at the box's edge, not under its padding (utilities.css) */
+    --_held-top: calc(-1 * var(--_pad));
+    --_room: max(var(--chat-inset), var(--space-l));
+    padding-inline: calc(var(--_room) - var(--focus-width) - var(--focus-offset))
+      calc(var(--chat-inset) - var(--focus-width) - var(--focus-offset));
     /* the video's chat text, a half point under the body's */
     font: var(--font-chat);
   }
 
   .lines > li {
-    /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (six
-       controls and its inset), so the bar, which rises over the line above's last row, covers no word (U1). */
-    --_gutter: calc(8 * var(--control-s));
+    /* The room at the line's end for its bar, on every row: the width of the bar of a reader who may pin (nine
+       small controls and its inset) and the times' column it keeps clear, so the bar covers no word (U1) and no time. */
+    --_gutter: calc(9 * var(--control-xs) + var(--chat-times));
     /* layout: the line holds its bar (LineActions), placed over its end */
     position: relative;
     /* layout: room for the focus ring, drawn outside the line, which the list that scrolls would clip */
     margin-inline: calc(var(--focus-width) + var(--focus-offset));
     padding-inline-end: var(--_gutter);
+    /* a row to point at, as Slack's: its own room above and below its words, which the fill and the bar's overlap hold */
+    padding-block: var(--space-3xs);
+    border-radius: var(--radius-s);
     overflow-wrap: anywhere;
     scroll-margin-block: calc(var(--focus-width) + var(--focus-offset));
   }
 
-  /* raw: the width under which the bar stands under the line, in the flow (LineActions), which then keeps no room */
+  /* Narrow, the bar floats over the line's end as it does wide, which keeps no room for it: the line never moves as the bar comes. */
   @container (inline-size < 24rem) {
     .lines > li {
       --_gutter: calc(0 * var(--control-s));
     }
+  }
+
+  /* Bare rows (a thread's) draw no bar: they keep clear of the times' column alone, wide or narrow. */
+  .lines[data-bare] > li {
+    --_gutter: var(--chat-times);
+  }
+
+  /* A line's foot: its reactions at the start, its thread's chip at the end, on one row; no row when it holds neither. */
+  .foot {
+    /* layout: the two on one row, the chips wrapping where they are many */
+    display: flex;
+    /* layout: the same */
+    flex-wrap: wrap;
+    /* layout: the same */
+    align-items: center;
+    /* layout: a small step between the chips */
+    gap: var(--space-3xs);
+  }
+
+  .foot:empty {
+    display: none;
+  }
+
+  .thread {
+    /* layout: at the line's end */
+    margin-inline-start: auto;
+  }
+
+  /* The foot reaches the row's end, through the room the line keeps for its bar: the thread's chip under the time, not mid-row. */
+  .lines > li > .foot {
+    /* layout: the same */
+    margin-inline-end: calc(-1 * var(--_gutter));
+  }
+
+  /* The line pointed at: a faint fill and nothing else, so no line under it moves. */
+  .lines > li:hover {
+    background: var(--color-fill);
+  }
+
+  /* A line that goes on its author's group (LineView's `grouped`): close under the one before it, a head of marks only; its time
+     waits at the row's end under the heads' times, shown as the line is pointed at or holds the focus. */
+  .lines > li[data-grouped] {
+    /* layout: nothing: a line of the group sits on its row's padding alone */
+    margin-block-start: 0;
+  }
+
+  /* A line that opens a group stands a step under the one before it, as the video's lines do: the step less the two paddings. */
+  .lines > li:not([data-grouped]) {
+    /* layout: the step the video puts between lines, less the paddings of the two rows */
+    margin-block-start: calc(var(--space-s) - var(--space-3xs) * 2);
+  }
+
+  .lines > li:first-child {
+    /* layout: the first line takes no step: the list's padding is its room */
+    margin-block-start: 0;
+  }
+
+  .groupTime {
+    position: absolute;
+    /* layout: at the row's far end, where its head's time stands, so every time of the room is in one column (Alexis, 2026-11-07) */
+    inset-inline-end: 0;
+    /* layout: on the text's first line, which the row's padding and the text's hair put under the row's top */
+    inset-block-start: calc(var(--space-3xs) + var(--space-3xs) / 2);
+    color: var(--color-text-muted);
+    /* the head's own time in mono on a line twice its size, the chat's text line within a pixel, so it stands on the text's first line */
+    font: var(--text-2xs)/2 var(--family-mono);
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .lines > li:hover .groupTime,
+  .lines > li:focus-within .groupTime {
+    opacity: 1;
   }
 
   .lines > li:last-child {
@@ -86,9 +168,6 @@
   /* Above a reply, the line it answers, in one line and muted, set apart by a rule at its start as a quote is, its
      author in the text's own colour and bolder: the prototype's quote (4d). */
   .replying {
-    padding-inline-start: var(--space-xs);
-    border-inline-start: var(--line-width) solid var(--color-line-strong);
-    color: var(--color-text-muted);
     overflow: hidden;
     white-space: nowrap;
     text-overflow: ellipsis;
@@ -108,13 +187,17 @@
     border-radius: 4px;
     color: var(--color-text-muted);
     font-family: var(--family-mono);
-    /* raw: the frames' size, under every text token */
-    font-size: 9px;
+    font-size: var(--text-3xs);
     line-height: 1.2;
     /* raw: the frames' tracking, a tighter one than the labels' */
     letter-spacing: 0.06em;
     /* raw: the frames set it on the name's baseline, a pixel under the row's centre */
     translate: 0 1px;
+  }
+
+  /* The face opens its author's card, as the name does. */
+  .face {
+    cursor: pointer;
   }
 
   /* An account's first words in the room: the video's mint "new here" tag after the name (frame 56). */
@@ -125,8 +208,7 @@
     background: var(--color-mine-soft);
     color: var(--color-mine);
     font-family: var(--family-mono);
-    /* raw: the frame's tag, 10 px, under every text token */
-    font-size: 10px;
+    font-size: var(--text-2xs);
   }
 
   /* A line's head: its face, who, what it is marked and the time at the far end, which runs over the room kept for the
@@ -139,8 +221,8 @@
   .head .time {
     /* layout: the far end of the head's row */
     margin-inline-start: auto;
-    /* raw: the video's time, 10 px in mono (the prototype's #chatList li em) */
-    font: 10px/1 var(--family-mono);
+    /* the video's time in mono (the prototype's #chatList li em) */
+    font: var(--text-2xs)/1 var(--family-mono);
   }
 
   [data-line-text] {
@@ -186,24 +268,10 @@
     color: var(--color-mine);
   }
 
-  /* A quote set apart from the sender's own words, by a rule at its start and a muted colour (F783). */
-  .text blockquote {
-    padding-inline-start: var(--space-xs);
-    border-inline-start: var(--line-width) solid var(--color-line-strong);
-    color: var(--color-text-muted);
-  }
-
-  /* Code kept as written scrolls on its own, wider than the line (F783). */
-  .text pre {
-    overflow: auto;
-  }
-
   /* Always drawn, one line high, so the composer below never moves as typists come and go; cut to one line, its
      whole in its title (UX review U2, U8). */
   .typing {
     padding-inline: var(--chat-inset);
-    font: var(--font-meta);
-    color: var(--color-text-muted);
     /* layout: one line of this font, which no token names */
     min-block-size: 1lh;
     /* layout: a step above and below, parting the line from the last message and the format bar */
@@ -224,10 +292,50 @@
     margin-inline-end: calc(-1 * var(--_gutter));
   }
 
+  /* A day's first line: its name in the label style and a quiet rule, held at the list's top while the day is in view (D13922). */
+  .lines > li.day {
+    /* held at the top over its day's lines by `held-top` (utilities.css) */
+    /* layout: no step above, which a held label would leave open to the lines under it */
+    margin-block-start: 0;
+    /* layout: the word and its rule side by side, the rule taking what the word leaves */
+    display: flex;
+    /* layout: a step between the word and its rule */
+    column-gap: var(--space-2xs);
+    /* layout: a line's own room above and below, and none at its end for a bar */
+    padding-inline-end: 0;
+    /* layout: the same, none at its end for a bar */
+    margin-inline-end: 0;
+    color: var(--color-text-muted);
+  }
+
+  .lines > li.day::after {
+    content: "";
+    /* layout: the rule on the word's line */
+    align-self: center;
+    /* layout: the rule takes the row's rest */
+    flex: 1;
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
   /* A poll's bars run the line's whole width, over the room kept for its bar, as the video's frame 73 draws them. */
+  /* A line's translation, under its words: the text's own size and ink, a rule at its start and a step in, no box. */
+  .translation {
+    /* layout: a step under the original, the rule drawn at the start of the translation alone */
+    margin-block-start: var(--space-3xs);
+    border-inline-start: var(--line-width) solid var(--color-line-strong);
+    /* layout: the words a step in from the rule */
+    padding-inline-start: var(--space-s);
+  }
+
+  .translated {
+    display: block;
+  }
+
   .wide {
     /* layout: over the room kept for the line's bar */
     margin-inline-end: calc(-1 * var(--_gutter));
+    /* layout: a card or a poll stands a step under its author's name, not against it */
+    margin-block-start: var(--space-2xs);
   }
 
   .divider::after {

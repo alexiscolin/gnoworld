@@ -1,6 +1,6 @@
 // The pins' slice of the store (slice 4's 4d): each room's pins and whether the reader may pin there, as the server
 // answers (GET /api/pins). A slice of its own, beside the verdicts': they come from the server, not from Ergo's lines.
-import type { IrcMessage } from "@gnoworld/core";
+import { trimOldest, type IrcMessage } from "@gnoworld/core";
 import { RoomId, type PinList } from "@gnoworld/schemas";
 import type { StateCreator } from "zustand/vanilla";
 import { lastKept, own } from "./record.ts";
@@ -38,11 +38,7 @@ export const pinsSlice: StateCreator<PinsSlice> = (set, get) => {
   const gone = new Set<string>();
   const redacted = (room: string, id: string): void => {
     gone.add(`${room} ${id}`);
-    // A Set walks in insertion order: the first is the oldest, and at most one is past the bound.
-    for (const old of gone) {
-      if (gone.size <= GONE_KEPT) break;
-      gone.delete(old);
-    }
+    trimOldest(gone, GONE_KEPT);
     const { pins } = get();
     const held = own(pins, room);
     if (held?.pins.some((pin) => pin.id === id) !== true) return;

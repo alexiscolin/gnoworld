@@ -6,7 +6,6 @@ import {
   failedPageMeta,
   failedWorldMeta,
   homeMeta,
-  listMeta,
   missingUniverseMeta,
   notFoundMeta,
   worldMeta,
@@ -109,10 +108,6 @@ describe("the tags of a page", () => {
     expect(page.get("description")?.length).toBeLessThanOrEqual(160);
   });
 
-  test("the list names /list: it has no place of its own in the data", () => {
-    expect(tags(listMeta()).get("link:canonical")).toBe("https://gno.world/list");
-  });
-
   test.each([
     ["no universe", missingUniverseMeta(), "No universe here · gno.world"],
     ["no ecosystem", ecosystemMeta(undefined), "No ecosystem here · gno.world"],
@@ -131,7 +126,6 @@ describe("the tags of a page", () => {
       homeMeta(other),
       earthMeta(other),
       ...site.worlds.map(worldMeta),
-      listMeta(),
     ].map((meta) => tags(meta).get("description"));
     expect(new Set(descriptions).size).toBe(descriptions.length);
   });
@@ -242,14 +236,6 @@ describe.each(pages)("the page of $name", ({ meta: build, testnet, canonical, he
 });
 
 describe("a page that is no place", () => {
-  test("the list has its Twitter Card and JSON-LD, and is indexed", () => {
-    const meta = listMeta();
-    expect(content(meta, "name", "twitter:card")).toEqual(["summary"]);
-    expect(content(meta, "name", "robots")).toEqual([]);
-    expect(ld(meta)).toHaveLength(1);
-    expect(ld(meta)[0]).toMatchObject({ "@type": "WebPage", name: "Places", url: "https://gno.world/list" });
-  });
-
   test("an unknown world or ecosystem or universe, and a page that failed, carry no card and no JSON-LD, and are noindex", () => {
     const unindexed = [
       worldMeta(undefined),

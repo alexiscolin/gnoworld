@@ -1,4 +1,4 @@
-import AxeBuilder from "@axe-core/playwright";
+import { axeOf } from "./axe.ts";
 import type { Locator, WebSocketRoute } from "@playwright/test";
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -322,7 +322,7 @@ test.describe("the reading place", () => {
     const { ergo } = await room(page, { me: ACCOUNT, read: T(0) });
     ergo().send(typingOf("active"));
     await expect(typist(page)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
     await expect(page.getByRole("list", { name: "Messages" }).locator("..")).toHaveScreenshot(
       "typing-new-computer.png",
       {

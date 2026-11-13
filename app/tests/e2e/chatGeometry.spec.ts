@@ -34,25 +34,26 @@ test.describe("the chat at the video's size", () => {
     const talk = await at('[data-region="conversation"]');
     const info = await at('[data-region="info"]');
 
-    // The frame: a header 53 px high (52 and its rule), worlds 82, rooms 158, the conversation the rest, the panel 300.
+    // A header 76 px high under the site's header, worlds 82, rooms 232 (the column resizes), the conversation the rest, the panel
+    // 420; the four columns start under the header's rule and reach the foot.
     near(root.height, 1080);
-    near(header.height, 53);
+    near(header.height, 76);
     near(header.width, root.width);
     for (const region of [worlds, rooms, talk, info]) {
-      near(region.y, root.y + 53);
-      near(region.height, root.height - 53);
+      near(region.y, header.y + 1);
+      near(region.y + region.height, root.y + root.height);
     }
     near(worlds.x, root.x);
     near(worlds.width, 82);
     near(rooms.x, root.x + 82);
-    near(rooms.width, 158);
-    near(talk.x, root.x + 240);
-    near(talk.width, root.width - 540);
-    near(info.width, 300);
-    near(info.x, root.x + root.width - 300);
+    near(rooms.width, 232);
+    near(talk.x, root.x + 314);
+    near(talk.width, root.width - 734);
+    near(info.width, 420);
+    near(info.x, root.x + root.width - 420);
 
     // A line: the nebula 20 px, the name beside it, the time at the edge 32 px in, the text 22 px under the head, the
-    // next line 58 px on (frame rows 146 and 204).
+    // next line 63 px on.
     const [first, second] = [lines(page).nth(0), lines(page).nth(1)];
     const [row1, row2, face, time, text] = await Promise.all([
       first.boundingBox(),
@@ -67,22 +68,16 @@ test.describe("the chat at the video's size", () => {
     near(face.width, 20);
     near(face.height, 20);
     near(text.y - face.y, 22, 2);
-    near(row2.y - row1.y, 58, 2);
+    near(row2.y - row1.y, 63, 2);
 
-    // The pinned line over the lines, at the same inset; the quick actions 32 px high; the composer box 16 px round and
-    // as wide as the lines, 16 px under the quick actions.
+    // The pinned line over the lines, at the same inset; the composer box 16 px round and 8 px off the column's edge.
     const pin = await at('[aria-label="Pinned messages"]');
     near(pin.x, talk.x + 32);
     expect(pin.y + pin.height).toBeLessThanOrEqual(row1.y);
-    const quick = await at('[role="toolbar"][aria-label="Quick actions"]');
     const message = await at('[role="group"][aria-label="Message box"]');
-    // The row holds a place's pills (8d): the first stands for them all.
-    const button = await at('[role="toolbar"][aria-label="Quick actions"] button >> nth=0');
-    near(button.height, 32);
-    near(message.x, talk.x + 32);
-    near(message.width, talk.width - 64);
-    near(message.y - (button.y + button.height), 16, 2);
-    expect(quick.y + quick.height).toBeLessThanOrEqual(message.y);
+    // The box a step (8 px) off the column's edge, wider than the lines; its words on the lines' left.
+    near(message.x, talk.x + 8);
+    near(message.width, talk.width - 16);
     near(talk.y + talk.height - (message.y + message.height), 20, 2);
     const radius = await page
       .locator('[role="group"][aria-label="Message box"]')
@@ -107,10 +102,12 @@ test.describe("the chat at the video's size", () => {
       return { radius: css.borderTopLeftRadius, cream: red + green + blue > 600, size: css.fontSize };
     });
     expect(current).toEqual({ radius: "10px", cream: true, size: "14px" });
-    // The pin's words stand at y 84, 13 px on its line; the first line's head 129 (frame: 84 and 129).
+    // The pin's words stand 30 px under the header's foot, in 13 px type; the first line's head 18 px into its row.
     const pin = await page.getByRole("region", { name: "Pinned messages" }).getByRole("button").first().boundingBox();
     if (pin === null) throw new Error("no pin");
-    near(pin.y + pin.height / 2, 84, 3);
+    const bar = await page.locator('[data-region="header"]').boundingBox();
+    if (bar === null) throw new Error("no header");
+    near(pin.y + pin.height / 2 - (bar.y + bar.height), 30, 3);
     expect(
       await page
         .getByRole("region", { name: "Pinned messages" })
@@ -119,12 +116,13 @@ test.describe("the chat at the video's size", () => {
         .evaluate((element) => getComputedStyle(element).fontSize),
     ).toBe("13px");
     const line = lines(page).first();
-    const [face, time] = await Promise.all([
+    const [face, time, row] = await Promise.all([
       line.locator("[data-kind]").first().boundingBox(),
       line.locator("time").boundingBox(),
+      line.boundingBox(),
     ]);
-    if (face === null || time === null) throw new Error("no line");
-    near(face.y + face.height / 2, 129, 3);
+    if (face === null || time === null || row === null) throw new Error("no line");
+    near(face.y + face.height / 2 - row.y, 18, 3);
     const look = await line.locator("time").evaluate((element) => {
       const css = getComputedStyle(element);
       return { size: css.fontSize, mono: /mono/i.test(css.fontFamily) };
@@ -149,7 +147,7 @@ test.describe("the chat at the video's size", () => {
     if (row1 === null || row2 === null) throw new Error("no people");
     // 61, not the frame's 41: each row holds 8c's Follow button, a control 44 px high since the 9m tokens (--control-m, F5967).
     near(row2.y - row1.y, 61);
-    // Send is round, 32 px; the format bar's icons 13 px in the muted grey; the field has no handle or ring of its own.
+    // Send is round, 32 px; the format bar's icons 16 px in the muted grey; the field has no handle or ring of its own.
     const send = await page.getByRole("button", { name: "Send" }).evaluate((element) => {
       const css = getComputedStyle(element);
       return { radius: css.borderTopLeftRadius, wide: element.getBoundingClientRect().width };
@@ -169,45 +167,30 @@ test.describe("the chat at the video's size", () => {
         icon: element.querySelector("svg")?.getBoundingClientRect().width,
         ink: getComputedStyle(element).color,
       }));
-    near(bar.icon ?? 0, 13, 0.5);
+    near(bar.icon ?? 0, 16, 0.5);
     expect(bar.ink).not.toBe("rgb(244, 246, 250)");
   });
 
-  test("draws the quick actions as the video's pills: an edge, 12 px words centred, the row's whole width shared", async ({
+  test("draws the composer's Add button and the format bar's buttons at the full chat's control size", async ({
     page,
   }) => {
     await logIn(page, "geometry-pills");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
-    const pill = page.locator('[role="toolbar"][aria-label="Quick actions"] button').first();
-    const look = await pill.evaluate((e) => {
-      const css = getComputedStyle(e);
-      const text = document.createRange();
-      text.selectNodeContents(e);
-      const [at, around] = [text.getBoundingClientRect(), e.getBoundingClientRect()];
-      return {
-        edge: css.borderTopWidth,
-        // Drawn: an edge of a colour, not the transparent one.
-        seen: !/^rgba\(.*, 0\)$/.test(css.borderTopColor) && css.borderTopColor !== "transparent",
-        size: css.fontSize,
-        offCentre: Math.round(Math.abs(at.left + at.width / 2 - (around.left + around.width / 2))),
-      };
-    });
-    expect(look).toEqual({ edge: "1px", seen: true, size: "12px", offCentre: 0 });
-    // A place's pills share the row (8d): the first at its start, the last at its end.
-    const last = page.locator('[role="toolbar"][aria-label="Quick actions"] button').last();
-    const [row, bar, end] = await Promise.all([
-      page.locator('[role="toolbar"][aria-label="Quick actions"]').boundingBox(),
-      pill.boundingBox(),
-      last.boundingBox(),
+    // Quick actions are not a row any more: the box's Add button holds them, inside the box.
+    await expect(page.locator('[role="toolbar"][aria-label="Quick actions"]')).toHaveCount(0);
+    const [add, message] = await Promise.all([
+      page.getByRole("group", { name: "Message box" }).getByRole("button", { name: "Add" }).boundingBox(),
+      page.getByRole("group", { name: "Message box" }).boundingBox(),
     ]);
-    if (row === null || bar === null || end === null) throw new Error("not drawn");
-    near(bar.x, row.x);
-    near(end.x + end.width, row.x + row.width);
-    // The format bar's buttons are the smallest control, 24 px square (the video's 24 high).
+    if (add === null || message === null) throw new Error("not drawn");
+    expect(add.x).toBeGreaterThanOrEqual(message.x);
+    expect(add.x + add.width).toBeLessThanOrEqual(message.x + message.width);
+    expect(add.y + add.height).toBeLessThanOrEqual(message.y + message.height);
+    // The format bar's buttons are 32 px square in the full chat, 24 px in the dock.
     const tool = await page.getByRole("group", { name: "Format" }).getByRole("button").first().boundingBox();
     if (tool === null) throw new Error("not drawn");
-    near(tool.height, 24);
-    near(tool.width, 24);
+    near(tool.height, 32);
+    near(tool.width, 32);
   });
 
   // 5q2, the differences 5q left (frames f0060, f0066, f0080 and the prototype's CSS): each held by what the frame shows.
@@ -236,16 +219,16 @@ test.describe("the chat at the video's size", () => {
       return { width: css.outlineWidth, offset: css.outlineOffset, style: css.outlineStyle };
     });
     expect(ring).toEqual({ width: "2px", offset: "3px", style: "solid" });
-    // The format bar: three groups, two rules of 1 px by 12 px between them (prototype #fmtBar .sep).
+    // The format bar: three groups, two rules of 1 px by 16 px between them.
     const rules = page.getByRole("group", { name: "Format" }).getByRole("separator");
     await expect(rules).toHaveCount(2);
     for (const rule of await rules.all()) {
       const box = await rule.boundingBox();
       if (box === null) throw new Error("no rule");
       near(box.width, 1, 0.5);
-      near(box.height, 12, 0.5);
+      near(box.height, 16, 0.5);
     }
-    // The thread: the title and the lines at the video's 13.5 px (prototype #threadPane .ttl2 b, #threadList li).
+    // The thread: the title and the lines at the full chat's 15 px (the dock's are 13.5 px).
     await threadOf(lines(page).first());
     const panel = page.getByRole("complementary", { name: "Thread" });
     await expect(panel).toBeVisible();
@@ -253,16 +236,17 @@ test.describe("the chat at the video's size", () => {
       title: getComputedStyle(element.querySelector("h3") ?? element).fontSize,
       text: getComputedStyle(element.querySelector("[data-line-text]") ?? element).fontSize,
     }));
-    expect(sizes).toEqual({ title: "13.5px", text: "13.5px" });
+    expect(sizes).toEqual({ title: "15px", text: "15px" });
   });
 
   test("names a direct message's header 'Direct message', the room's keeps its place", async ({ page }) => {
     await logIn(page, "geometry-dm");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
     const header = page.locator('[data-region="header"]');
-    await expect(header.getByText("Direct message", { exact: true })).toHaveCount(0);
+    await expect(header.getByText("Direct message with", { exact: true })).toHaveCount(0);
     await page.goto(`/w/bubble?dm=${MEMBER}&chat=full`);
-    await expect(header.getByText("Direct message", { exact: true })).toBeVisible();
+    // The header names the partner after the words: "Direct message with g10gh7…3y5tv".
+    await expect(header.getByText("Direct message with", { exact: true })).toBeVisible();
   });
 
   test("draws the rooms as chips in the dock, a row under the header, none in the full chat", async ({ page }) => {
@@ -298,6 +282,10 @@ test.describe("the chat at the video's size", () => {
   test("looks as the video's frame does", async ({ page }) => {
     await logIn(page, "geometry-look");
     await open(page, { width: 1728, as: ACCOUNT, pinned: true, height: 1080 });
-    await expect(page.locator("[data-chat-layout]")).toHaveScreenshot("chat-screen-computer.png");
+    // The site header's account, search and bell change from one run to the next (the account's address, a count): the whole header is masked,
+    // for each one's width moves with them, and a box masked per control moves its edges.
+    await expect(page.locator("[data-chat-layout]")).toHaveScreenshot("chat-screen-computer.png", {
+      mask: [page.getByRole("banner")],
+    });
   });
 });

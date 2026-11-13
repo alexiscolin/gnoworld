@@ -2,8 +2,9 @@
 import { act } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { all, mount } from "../../../tests/mount.tsx";
+import { all, mount, noMedia } from "../../../tests/mount.tsx";
 import { site } from "../../places.ts";
+import { StoreProvider } from "../../storeContext.tsx";
 import { Hero } from "./Hero.tsx";
 
 // "Go explore" (ADR-0003 §3) flies to the busiest world: a plain click asks where, then goes there through the router, so 7g's flight
@@ -20,7 +21,12 @@ function heroIn() {
     ],
     { initialEntries: ["/"] },
   );
-  const box = mount(<RouterProvider router={router} />);
+  // The hero's tags (Lenses) read the page's store.
+  const box = mount(
+    <StoreProvider>
+      <RouterProvider router={router} />
+    </StoreProvider>,
+  );
   const explore = all(box, "a").find((link) => link.textContent === "Go explore");
   if (explore === undefined) throw new Error("no Go explore");
   return { router, explore, universe };
@@ -30,6 +36,8 @@ function heroIn() {
 const reported = vi.fn();
 beforeEach(() => {
   vi.stubGlobal("reportError", reported);
+  // The hero's tags (Lenses) ask the screen's media.
+  noMedia();
 });
 // An answer that comes when the test says.
 function answerLater() {
@@ -87,13 +95,16 @@ describe("Go explore's click", () => {
 
   // F4507: what goes wrong between the click and the answer.
   it("goes to the Earth its address names when the answer fails", async () => {
-    where.exploreTo.mockRejectedValue(new Error("the chunk did not come"));
+    const failure = new Error("the chunk did not come");
+    where.exploreTo.mockRejectedValue(failure);
     const { router, explore } = heroIn();
     await act(async () => {
       explore.click();
       await vi.dynamicImportSettled();
     });
     expect(router.state.location.pathname).toBe("/earth");
+    expect(reported).toHaveBeenCalledExactlyOnceWith(failure);
+    reported.mockClear();
   });
 
   it("asks once for a second click while the first one's answer comes", async () => {

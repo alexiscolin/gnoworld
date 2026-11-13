@@ -25,10 +25,12 @@ function fieldOf(name: string, value: string): FormField {
 }
 
 // The function the action calls, and its texts and fields, when the chain confirms it: a write a call carries, every argument named for a parameter.
-function confirmed(listing: Listing, { function: name, args }: ProposedCall) {
+function confirmed(listing: Listing, { function: name, args }: ProposedCall, exact: boolean) {
   const write = writeOf(listing, name);
   if (write === undefined || !Object.keys(args).every((arg) => write.fields.some((field) => field.name === arg)))
     return undefined;
+  // Jarvis's proposal names every parameter, as the server's check does (D225, D226): one left out is none.
+  if (exact && write.fields.length !== Object.keys(args).length) return undefined;
   // Own keys only (a Map of the entries): a parameter the realm calls `constructor` must not find the object's own function.
   const given = new Map(Object.entries(args));
   const fields = write.fields.map((field) => fieldOf(field.name, given.get(field.name) ?? ""));
@@ -61,6 +63,7 @@ export function ActionForm({
   options,
   viewHref,
   bar,
+  exact = false,
 }: {
   action: ProposedCall;
   label?: string;
@@ -69,12 +72,14 @@ export function ActionForm({
   viewHref?: string;
   /** In the quick actions bar: the card the bar draws, which the pill opens. */
   bar?: { card: string };
+  /** Every parameter of the function is named: what a proposal of Jarvis is held to. */
+  exact?: boolean;
 }) {
   const store = useAppStore();
   const place: CallPlace = { realm: action.realm, chain, options };
   const listing = useCallable(chain.rpc, action.realm, options);
   const id = `${chain.chainId} ${action.realm}.${action.function}#${useId()}`;
-  const checked = confirmed(listing, action);
+  const checked = confirmed(listing, action, exact);
   if (checked === undefined) return null;
   const { write, texts, fields } = checked;
   const compact = viewHref !== undefined && fields.length > 2;

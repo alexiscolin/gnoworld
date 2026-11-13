@@ -41,27 +41,49 @@
     --_space: var(--space-2xl);
   }
 
+  /* The plate's step between its zones (--plate-zone). */
+  .space[data-space="zone"] {
+    --_space: var(--plate-zone);
+  }
+
   /* A list that a composition places keeps none of its own marks, margins or indent; Center's
      inline padding is its gutter. */
-  :is(ul, ol).space {
+  :is(ul, ol, dl).space {
     margin-block: 0;
     list-style: none;
   }
 
-  :is(ul, ol).space:not(.center) {
+  :is(ul, ol, dl).space:not(.center) {
     padding-inline-start: 0;
   }
 
   .stack {
     display: flex;
     flex-direction: column;
+    justify-content: var(--_justify, normal);
+  }
+
+  .stack[data-justify="center"] {
+    --_justify: center;
   }
 
   .cluster {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
+    align-items: var(--_align, center);
     justify-content: var(--_justify);
+  }
+
+  .cluster[data-align="baseline"] {
+    --_align: baseline;
+  }
+
+  .cluster[data-align="end"] {
+    --_align: flex-end;
+  }
+
+  .cluster[data-wrap="no"] {
+    flex-wrap: nowrap;
   }
 
   .cluster[data-justify="start"] {
@@ -82,6 +104,7 @@
 
   .grid {
     display: grid;
+    align-items: var(--_align, stretch);
     grid-template-columns: repeat(auto-fit, minmax(min(var(--_min), 100%), 1fr));
   }
 
@@ -93,13 +116,59 @@
     --_min: var(--column-m);
   }
 
-  .grid[data-min="l"] {
-    --_min: var(--column-l);
+  /* Twelve columns: a child says how many it spans (data-span), a narrow plate stacks them or, with data-span-narrow, puts two in a
+     row. The plate is a container named "plate" (Panel). */
+  .grid[data-cols="12"] {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
+  }
+
+  :where(.grid[data-cols="12"]) > [data-span] {
+    grid-column: span var(--_span);
+  }
+
+  /* A cell's one block fills its row's height: the cards of a row stand as tall as each other (the proposal's bento). */
+  :where(.grid[data-cols="12"]) > [data-span] > :only-child {
+    block-size: 100%;
+  }
+
+  .grid[data-cols="12"] > [data-span="3"] {
+    --_span: 3;
+  }
+  .grid[data-cols="12"] > [data-span="4"] {
+    --_span: 4;
+  }
+  .grid[data-cols="12"] > [data-span="6"] {
+    --_span: 6;
+  }
+  .grid[data-cols="12"] > [data-span="8"] {
+    --_span: 8;
+  }
+  .grid[data-cols="12"] > [data-span="12"] {
+    --_span: 12;
+  }
+
+  @container plate (max-width: 37.5rem) {
+    .grid[data-cols="12"] > [data-span] {
+      --_span: 12;
+    }
+    .grid[data-cols="12"] > [data-span-narrow="6"] {
+      --_span: 6;
+    }
+  }
+
+  /* A small label before its value. A row's two templates, a lead, a text and a trailing part, and a text and its trailing part, are the
+     utility classes of their names (utilities.css), which Grid adds. */
+  .grid[data-template="label-value"] {
+    grid-template-columns: var(--column-2xs) minmax(0, 1fr);
   }
 
   .sidebar {
     display: flex;
     flex-wrap: wrap;
+  }
+
+  .sidebar[data-align="center"] {
+    align-items: center;
   }
 
   .sidebar[data-side="start"] > :first-child,
@@ -131,16 +200,8 @@
     margin-inline: auto;
   }
 
-  .center[data-gutter="all"] {
-    padding-block: var(--_space);
-  }
-
   .center[data-max="measure"] {
     --_max: var(--measure);
-  }
-
-  .center[data-max="dialog"] {
-    --_max: var(--dialog-w);
   }
 
   .center[data-max="page"] {

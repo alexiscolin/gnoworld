@@ -3,16 +3,16 @@
 // first; then the fast model, offered give_digest and propose_action alone (D170), whose cards pass 10d's grounding on
 // those reads. Kept in jarvis's file per universe and realm with the height it was read at, one digest serving every
 // reader for 10 minutes; past them the realm is read again, and only a changed page or list pays for a new one (D193).
-import { createHash } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 import { readFunctionList, readHeight, readRender } from "@gnoworld/chain/node";
 import type { ChainFetch } from "@gnoworld/chain/read";
 import { jsonOf } from "@gnoworld/core";
 import { Digest, ProposedAction, type JarvisDigestRequest } from "@gnoworld/schemas";
+import type { Log } from "@gnoworld/service/log";
 import { z } from "zod";
 import { allowlist } from "./allowlist.ts";
 import { boundOf, CACHE_BYTES, together } from "./cache.ts";
-import { makeLoop, type Result } from "./loop.ts";
+import { hashParts, makeLoop, type Result } from "./loop.ts";
 import { cutPage, type cardTools, type RealmRead } from "./tools/cards.ts";
 import { realmCards } from "./tools/realmCards.ts";
 import type { Places, Universe } from "./tools/places.ts";
@@ -112,7 +112,7 @@ export function makeDigests(parts: Parts) {
     return { digested: answerOf({ card, height: realm.at.height }), made: true };
   };
   const make = async (asked: JarvisDigestRequest, universe: Universe, signal: AbortSignal): Promise<Made> => {
-    const realm = await readOn({ ...parts, seen }, { universe, realm: asked.realm, signal });
+    const realm = await readOn({ ...parts, seen, log: parts.loop.log }, { universe, realm: asked.realm, signal });
     if (realm === undefined) return { digested: { kind: "none" }, made: false };
     const before = cached(asked);
     // A digest whose reads are unchanged serves again at the new height; a none is made again (D193).
@@ -136,16 +136,13 @@ export function makeDigests(parts: Parts) {
   };
 }
 
-// What was read of a realm, as one hash: its page and its functions, each with its length, so no two reads give one.
-const sourceOf = ({ read }: RealmRead): string => {
-  const hash = createHash("sha256");
-  const parts = [read.texts[0]?.text ?? "", JSON.stringify(read.functions?.list ?? null)];
-  for (const part of parts) hash.update(`${String(Buffer.byteLength(part))}\0`).update(part);
-  return hash.digest("hex");
-};
+// What was read of a realm, as one hash: its page and its functions.
+const sourceOf = ({ read }: RealmRead): string =>
+  hashParts([read.texts[0]?.text ?? "", JSON.stringify(read.functions?.list ?? null)]);
 
-type Reading = Pick<Parts, "fetch"> & { readonly seen: Map<string, number> };
-// The realm's height, page and functions on its universe's node, that node's chain checked first; none when any fails.
+type Reading = Pick<Parts, "fetch"> & { readonly seen: Map<string, number>; readonly log: Log };
+// The realm's height, page and functions on its universe's node, that node's chain checked first; none when any fails,
+// logged by its step and its kind.
 async function readOn(
   at: Reading,
   { universe, realm, signal }: { universe: Universe; realm: string; signal: AbortSignal },
@@ -156,12 +153,16 @@ async function readOn(
     seen: at.seen,
     ...(at.fetch === undefined ? {} : { fetch: at.fetch }),
   };
+  const unread = (step: string, { failure }: { failure: { kind: string } }): RealmRead | undefined => {
+    at.log("jarvis_digest_unread", { reason: `${step}:${failure.kind}` });
+    return undefined;
+  };
   const height = await readHeight(universe.rpc, node);
-  if (!height.ok) return undefined;
+  if (!height.ok) return unread("height", height);
   const page = await readRender(universe.rpc, `${realm}:`, node);
-  if (!page.ok) return undefined;
+  if (!page.ok) return unread("page", page);
   const functions = await readFunctionList(universe.rpc, realm, node);
-  if (!functions.ok) return undefined;
+  if (!functions.ok) return unread("functions", functions);
   const block = height.value.height;
   const read = {
     realm,
@@ -177,7 +178,8 @@ function digestOf(parts: Parts, realm: RealmRead, signal: AbortSignal): Promise<
   const tools = realmCards(parts.cards.definitions, realm);
   const loop = makeLoop({
     ...parts.loop,
-    caps: { ...parts.loop.caps, toolResultBytes: BLOCK_BYTES },
+    // A digest of 50 blocks needs more than /ask's 4 turns and 1,000 tokens (D13985): its own caps, as before.
+    caps: { ...parts.loop.caps, turns: 8, outputTokens: 4_096, toolResultBytes: BLOCK_BYTES },
     skills: { index: [], digest: "" },
     system: SYSTEM,
     tools: { allowlist: allowlist(tools.definitions, parts.loop.log), run: (call, asked) => tools.run(call, asked) },

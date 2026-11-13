@@ -1,0 +1,11 @@
+/* The get-started dialog: its steps are a numbered list in the reading size. */
+@layer components {
+  .steps {
+    /* layout: a numbered list's items must stay its li children, which Stack cannot be */
+    display: grid;
+    /* layout: the space between the steps */
+    gap: var(--space-s);
+    padding-inline-start: var(--space-m);
+    font: var(--font-reading);
+  }
+}

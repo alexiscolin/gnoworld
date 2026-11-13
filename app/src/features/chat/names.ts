@@ -2,6 +2,8 @@
 import { firstGraphemes, worldRoute, type Line } from "@gnoworld/core";
 import { Address, shortAddress, type RoomList } from "@gnoworld/schemas";
 import type { AppState } from "../../store/index.ts";
+import { realmOfRoom } from "../../lib/roomRealms.ts";
+import { realmView, site } from "../../places.ts";
 import { withFull } from "./full.ts";
 
 /** Whether a nick is an account's: an address, which a guest's cannot be (Ergo gives a guest 32 characters). */
@@ -22,8 +24,25 @@ const EARTH = "earth";
 /** A room by its own name: #games for #bubble/games, the world's main room by the world, the Earth's the general chat. */
 export const roomLabel = (room: string): string => {
   const { world, name } = partsOf(room);
-  return `#${name ?? (world === EARTH ? "general" : world)}`;
+  // A realm's room, and a world named by a long id, end in ten hex of the path or the id (core's realmRoom): the label is the name alone.
+  // A world named by its owner's address, a namespace of one, says it short, as a sender's (Alexis, 2026-11-09).
+  const label = (name ?? (world === EARTH ? "general" : world)).replace(/-[0-9a-f]{10}$/, "");
+  return `#${isAccount(label) ? shortAddress(label) : label}`;
 };
+
+/** The labels of rooms shown side by side: each room's own, a realm's version after it (#golf v2) where two would read the same. */
+export function distinctLabels(rooms: readonly { room: string; realm?: string | undefined }[]): Map<string, string> {
+  const own = rooms.map(({ room }) => roomLabel(room));
+  const seen = new Map<string, number>();
+  for (const label of own) seen.set(label, (seen.get(label) ?? 0) + 1);
+  return new Map(
+    rooms.map(({ room, realm }, at) => {
+      const label = own[at] ?? "";
+      const version = /\/(v[0-9]+)$/.exec(realm ?? "")?.[1];
+      return [room, (seen.get(label) ?? 0) > 1 && version !== undefined ? `${label} ${version}` : label] as const;
+    }),
+  );
+}
 
 /** A sender as a list names it: an account by its short address, a guest by its nick. */
 export const whoIs = (by: string): string => (isAccount(by) ? shortAddress(by) : by);
@@ -31,10 +50,22 @@ export const whoIs = (by: string): string => (isAccount(by) ? shortAddress(by) :
 /** The world a room is in, by its slug: #bubble/games's is bubble. */
 export const roomWorld = (room: string): string => partsOf(room).world;
 
-/** A room's address on the site: its world's page, and ?room=<name> for one that is not the main room. */
-export function roomHref(room: string, full = false): string {
+// Whether a room's world has a page: the Earth's or a hub's. A realm's world (core's realmRoom) has none: its room lives on its realm's page.
+const hasPage = (room: string): boolean => {
   const { world } = partsOf(room);
-  return hrefOf(world, roomParams(room), full);
+  return world === EARTH || site.places.some((place) => place.kind === "world" && place.slug === world);
+};
+
+/** A room's address on the site: its world's page, and ?room=<name> for one that is not the main room; a realm's room, its realm's page
+ * once a rooms list has said which (/r/<path>, under /net/<universe> off the default one); none for a room with neither. */
+export function roomHref(room: string, full = false): string | undefined {
+  if (hasPage(room)) return hrefOf(partsOf(room).world, roomParams(room), full);
+  const realm = realmOfRoom(room);
+  if (realm === undefined) return undefined;
+  // A realm's room belongs to the default chain, whatever universe the viewer is in: another's realm of that path is another's.
+  const page = realmView(realm, site.universeAt("/"));
+  const search = withFull(new URLSearchParams(), full).toString();
+  return search === "" ? page : `${page}?${search}`;
 }
 
 // A world's page at `params`, the full chat asked for or not.
@@ -43,6 +74,9 @@ function hrefOf(world: string, params: URLSearchParams, full: boolean): string {
   const page = world === EARTH ? "/earth" : worldRoute(world);
   return search === "" ? page : `${page}?${search}`;
 }
+
+/** `href` as a link's prop, none when it has no address (exactOptionalPropertyTypes). */
+export const hrefProp = (href: string | undefined): { href?: string } => (href === undefined ? {} : { href });
 
 /** A direct message's address on the site: its world's page, and ?dm=<the partner's address> (4e). */
 export const dmHref = (world: string, partner: string, full = false): string => hrefOf(world, dmParams(partner), full);
@@ -73,8 +107,9 @@ export function shownRoom(world: string, sections: RoomList["sections"], asked: 
 
 /** The room `step` rooms from `room` in the list, Alt+Up and Alt+Down's; none past an end, or for a room not in it. */
 export function neighbour(rooms: readonly string[], room: string, step: number): string | undefined {
-  const at = rooms.indexOf(room);
-  return at === -1 ? undefined : rooms[at + step];
+  const paged = rooms.filter((each) => each === room || roomHref(each) !== undefined);
+  const at = paged.indexOf(room);
+  return at === -1 ? undefined : paged[at + step];
 }
 
 /** The accounts a mention completes to: the room's members that are addresses, each once, oneself left out. */
@@ -111,6 +146,24 @@ export const mentionable = (members: readonly string[], lines: readonly Line[]):
 /** The server's moderation bot (server/src/irc/lines.ts), in every room, never listed. */
 export const BOT = "gnoworld";
 
-/** How many are talking here: those in the room, the bot left out, once connected; none before (a count of none says nothing). */
-export const talkingOf = (members: readonly string[] | undefined, connected: boolean): number | undefined =>
+/** How long a person counts as talking after their last line (D374). */
+const TALKING_MS = 15 * 60_000;
+
+/** How many are talking here now (D374): the people whose lines the room holds from the last 15 minutes, the bot left out, once
+ * connected; none before (a count of none says nothing). "Here now" is the members, never this. */
+export const talkingOf = (
+  lines: readonly { from: string; account?: string | undefined; time: string }[],
+  now: number,
+  connected: boolean,
+): number | undefined =>
+  connected
+    ? new Set(
+        lines.flatMap(({ from, account, time }) =>
+          from !== BOT && now - Date.parse(time) <= TALKING_MS ? [account ?? `guest ${from}`] : [],
+        ),
+      ).size
+    : undefined;
+
+/** How many have the room open: its members, the bot left out, once connected. */
+export const hereOf = (members: readonly string[] | undefined, connected: boolean): number | undefined =>
   connected && members !== undefined ? members.filter((nick) => nick !== BOT).length : undefined;

@@ -1,11 +1,9 @@
 // The presence history (slice 7, 7c): the people present in each world, sampled by a caller, kept as the busiest sample of each hour
 // for 14 days, so a world can be compared with its own past ("rising", plan §9 question 6). It holds a world's id, an hour and a
-// count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store. The trends
-// keep their other counts in it too (7t3): each world's messages an hour, and its chain's transactions and addresses a window.
+// count, and no name of anyone. Who samples, and from which chat, belongs to the branch that labels (7h): this is the store.
 import { WorldId } from "@gnoworld/schemas/indexer";
-import { readFileSync } from "node:fs";
 import { z } from "zod";
-import { replaceFile } from "../replaceFile.ts";
+import { lastFile, replaceFile } from "../replaceFile.ts";
 
 export const PRESENCE_DAYS = 14;
 /** At most 500 worlds: a full 14 days of hours for all of them is about 5 MB of file. Past them a world enters in the seat of the one quiet
@@ -13,12 +11,6 @@ export const PRESENCE_DAYS = 14;
 export const PRESENCE_WORLDS_MAX = 500;
 const HOUR = 3_600_000;
 const PEOPLE_MAX = 1_000_000;
-
-/** A count now beside its usual hour of the world's last 14 days (core's usualOf): null when the history is too short to say (7t3). */
-export interface Signal {
-  readonly now: number;
-  readonly usual: number | null;
-}
 
 interface Slot {
   readonly at: number;
@@ -74,19 +66,14 @@ function quietsOf(worlds: ReadonlyMap<string, ReadonlyMap<number, number>>) {
   };
 }
 
-export function makePresence(options: { file: string; now: () => number }): Presence {
-  const { file, now } = options;
+/** `adds`: a sample is a count to add to its hour (lines said), not a level whose busiest is kept (people, a pace). */
+export function makePresence(options: { file: string; now: () => number; adds?: boolean }): Presence {
+  const { file, now, adds = false } = options;
   const worlds = new Map<string, Map<number, number>>();
 
-  try {
-    const parsed = File.safeParse(JSON.parse(readFileSync(file, "utf8")));
-    if (parsed.success) {
-      for (const [id, slots] of Object.entries(parsed.data).slice(0, PRESENCE_WORLDS_MAX)) {
-        worlds.set(id, new Map(slots.map(({ at, people }) => [at, people])));
-      }
-    }
-  } catch {
-    // No file, or one that is no JSON: the history starts empty.
+  // No file, or one that is no history: it starts empty.
+  for (const [id, slots] of Object.entries(lastFile(file, File) ?? {}).slice(0, PRESENCE_WORLDS_MAX)) {
+    worlds.set(id, new Map(slots.map(({ at, people }) => [at, people])));
   }
 
   const forget = (): void => {
@@ -119,7 +106,9 @@ export function makePresence(options: { file: string; now: () => number }): Pres
       // The sample's held worlds first, so none looks quiet to a newcomer listed before it; then the newcomers, a world nobody was in left out.
       for (const [id, count] of counted) {
         const slots = worlds.get(id);
-        if (slots !== undefined) slots.set(at, Math.max(slots.get(at) ?? 0, count));
+        if (slots === undefined) continue;
+        const held = slots.get(at) ?? 0;
+        slots.set(at, adds ? Math.min(PEOPLE_MAX, held + count) : Math.max(held, count));
       }
       const quiets = quietsOf(worlds);
       for (const [id, count] of counted) {

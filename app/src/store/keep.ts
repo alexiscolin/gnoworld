@@ -35,6 +35,8 @@ export interface KeepSlice {
      * message, "full" past SAVED_KEPT. */
     save: (room: string, line: Line) => "saved" | "full" | "none";
     unsave: (room: string, id: string) => void;
+    /** Unsaves every line the device holds for the account, in one write. */
+    clearSaved: () => void;
     /** Asks to go back to the line: its room's reading place is the time just before it. */
     markUnread: (room: string, line: Line) => void;
     /** The reader read to the end of a room opened with its place: it is forgotten. */
@@ -69,11 +71,8 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
   const fresh = () => {
     const { saved, unread } = get().keep;
     const read = { saved: device?.saved(), unread: device?.unread() };
-    return {
-      saved: read.saved ?? saved,
-      unread: read.unread ?? unread,
-      readable: read.saved !== undefined && read.unread !== undefined,
-    };
+    const readable = read.saved !== undefined && read.unread !== undefined;
+    return { saved: read.saved ?? saved, unread: read.unread ?? unread, readable };
   };
   // Takes a change: the same object when nothing changed; the device written when it may be, `write` saying whether it
   // took it (a device that refused, or could not be read, noted). The other field is the device's too (F1488); what the
@@ -122,6 +121,9 @@ export const keepSlice: StateCreator<KeepSlice> = (set, get) => {
       unsave: (room, id) => {
         const held = fresh();
         commitSaved(held.saved.filter(sameLine(room, id)), held);
+      },
+      clearSaved: () => {
+        commitSaved([], fresh());
       },
       markUnread: (room, line) => {
         const place = placeBefore(line.time);

@@ -32,7 +32,7 @@ export function Typists({ typing }: { typing: Typing | undefined }) {
   const whole = nicks.map((nick) => (isAccount(nick) ? nick : `${nick} (guest)`));
   const title = `${whole.length > 1 ? `${whole.slice(0, -1).join(", ")} and ` : ""}${whole.at(-1) ?? ""} ${verb} typing`;
   return (
-    <p className={styles["typing"]} title={nicks.length === 0 ? undefined : title}>
+    <p className={["meta", styles["typing"]].join(" ")} title={nicks.length === 0 ? undefined : title}>
       {nicks.length === 0 ? null : nicks.length > 3 ? (
         "Several people are typing"
       ) : (

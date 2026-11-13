@@ -1,7 +1,13 @@
 import { parseLine, type IrcMessage, type Line } from "@gnoworld/core";
 import { Address } from "@gnoworld/schemas";
 import { describe, expect, it } from "vitest";
-import { DEVICE_EMPTY, type Device, type DeviceField, type DeviceFields } from "../lib/keep/fields.ts";
+import {
+  DEFAULT_SETTINGS,
+  DEVICE_EMPTY,
+  type Device,
+  type DeviceField,
+  type DeviceFields,
+} from "../lib/keep/fields.ts";
 import { keep } from "../lib/keep/keep.ts";
 import { createAppStore } from "./index.ts";
 
@@ -614,12 +620,12 @@ describe("the device in the store", () => {
   it("reads every field at the start", () => {
     const { device, fields } = fake();
     fields.stamps = { "g:a": "2026-11-01" };
-    fields.settings = { quality: "low", calm: true, phone3d: false };
+    fields.settings = { ...DEFAULT_SETTINGS, quality: "low", calm: true };
     const store = createAppStore();
     store.getState().deviceActions.load(device);
     const { device: kept } = store.getState();
     expect(kept.stamps).toEqual({ "g:a": "2026-11-01" });
-    expect(kept.settings).toEqual({ quality: "low", calm: true, phone3d: false });
+    expect(kept.settings).toEqual({ ...DEFAULT_SETTINGS, quality: "low", calm: true });
     expect(kept.readable).toBe(true);
     expect(kept.notKept).toBe(false);
   });

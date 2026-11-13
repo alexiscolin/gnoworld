@@ -40,7 +40,7 @@ function held() {
 }
 
 // Every read the test made has answered and been counted: the reads' own promises, not a number of turns.
-const settled = () =>
+const readsAnswered = () =>
   act(async () => {
     await Promise.all(read.count.mock.results.map(({ value }) => value as unknown));
   });
@@ -49,15 +49,17 @@ const settled = () =>
 async function visit() {
   vi.resetModules();
   const count = await import("./worldsCount.ts");
-  const { worldsFile } = await import("./worldsFile.ts");
+  const { worldsFile } = await import("../../worldsFile.ts");
   const seen: (number | null | undefined)[] = [];
   const drawn: (number | undefined)[] = [];
   function Home({ wanted }: { wanted: boolean }) {
     seen.push(count.useWorldsCount(wanted));
     return null;
   }
+  // The hero's reader of the scene's count (useWorldsDrawn is the module's own: the hook says it through useWorldsCount, whose read of the
+  // count file never comes here).
   function Hero() {
-    drawn.push(count.useWorldsDrawn());
+    drawn.push(count.useWorldsCount(true) ?? undefined);
     return null;
   }
   const mounted = (element: ReactElement) => {
@@ -84,6 +86,7 @@ async function visit() {
   };
   const open = (wanted = true) => opened(wanted).leave;
   const hero = () => {
+    read.count.mockImplementationOnce(() => new Promise(() => undefined));
     const root = mounted(<Hero />);
     return () => {
       act(() => {
@@ -97,7 +100,7 @@ async function visit() {
       count.worldsDrawn(n);
     });
   };
-  const scene = (leaving = new AbortController().signal) => act(() => worldsFile(leaving));
+  const scene = () => act(() => worldsFile());
   return { open, opened, hero, seen, drawn, served, told, scene };
 }
 
@@ -134,7 +137,7 @@ describe("the hero's number, from the worlds' count", () => {
     const { open, seen } = await visit();
     const leave = open();
     expect(seen.at(-1)).toBeUndefined();
-    await settled();
+    await readsAnswered();
     expect(read.count).toHaveBeenCalledTimes(1);
     expect(read.count.mock.calls[0]?.[0]).toBe("/");
     expect(seen.at(-1)).toBe(534);
@@ -146,7 +149,7 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValue(counted(534));
     const { open, seen } = await visit();
     open(false)();
-    await settled();
+    await readsAnswered();
     expect(read.count).not.toHaveBeenCalled();
     expect(seen.at(-1)).toBeUndefined();
   });
@@ -156,7 +159,7 @@ describe("the hero's number, from the worlds' count", () => {
     const { open, seen } = await visit();
     const leave = open();
     expect(seen.at(-1)).toBeUndefined();
-    await settled();
+    await readsAnswered();
     expect(seen.at(-1)).toBeNull();
     expect(
       read.worlds,
@@ -169,9 +172,9 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValueOnce(undefined).mockResolvedValue(counted(534));
     const { open, seen } = await visit();
     open()();
-    await settled();
+    await readsAnswered();
     const leave = open();
-    await settled();
+    await readsAnswered();
     expect(read.count).toHaveBeenCalledTimes(2);
     expect(seen.at(-1)).toBe(534);
     expect(read.worlds).not.toHaveBeenCalled();
@@ -182,10 +185,10 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValue(counted(534));
     const { open, seen } = await visit();
     open()();
-    await settled();
+    await readsAnswered();
     const leave = open();
     expect(seen.at(-1)).toBe(534);
-    await settled();
+    await readsAnswered();
     expect(read.count).toHaveBeenCalledTimes(1);
     leave();
   });
@@ -197,7 +200,7 @@ describe("the hero's number, from the worlds' count", () => {
     const home = opened();
     home.to(true);
     answer(counted(534));
-    await settled();
+    await readsAnswered();
     expect(read.count).toHaveBeenCalledTimes(1);
     expect(seen.at(-1)).toBe(534);
     home.leave();
@@ -209,7 +212,7 @@ describe("the hero's number, from the worlds' count", () => {
     const first = opened();
     const second = opened();
     answer(undefined);
-    await settled();
+    await readsAnswered();
     expect(read.count).toHaveBeenCalledTimes(1);
     expect(seen.slice(-2)).toEqual([null, null]);
     first.leave();
@@ -220,10 +223,10 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValue(counted(534));
     const { opened, seen } = await visit();
     const home = opened(false);
-    await settled();
+    await readsAnswered();
     expect(read.count).not.toHaveBeenCalled();
     home.to(true);
-    await settled();
+    await readsAnswered();
     expect(read.count).toHaveBeenCalledTimes(1);
     expect(seen.at(-1)).toBe(534);
     home.to(false);
@@ -235,7 +238,7 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValue(counted(534));
     const { seen, served } = await visit();
     expect(served()).toBe("");
-    await settled();
+    await readsAnswered();
     expect(read.count).not.toHaveBeenCalled();
     expect(seen).toEqual([undefined]);
   });
@@ -245,7 +248,7 @@ describe("the hero's number, from the worlds' count", () => {
     told(534);
     const leave = open();
     expect(seen.at(-1)).toBe(534);
-    await settled();
+    await readsAnswered();
     expect(read.count).not.toHaveBeenCalled();
     leave();
   });
@@ -256,7 +259,7 @@ describe("the hero's number, from the worlds' count", () => {
     const leave = open();
     told(535);
     answer(counted(534));
-    await settled();
+    await readsAnswered();
     expect(seen.at(-1)).toBe(535);
     leave();
   });
@@ -265,7 +268,7 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValue(counted(534));
     const { open, seen, told } = await visit();
     const leave = open();
-    await settled();
+    await readsAnswered();
     told(535);
     expect(seen.at(-1)).toBe(535);
     leave();
@@ -275,7 +278,7 @@ describe("the hero's number, from the worlds' count", () => {
     read.count.mockResolvedValue(undefined);
     const { open, seen, told } = await visit();
     const leave = open();
-    await settled();
+    await readsAnswered();
     expect(seen.at(-1)).toBeNull();
     told(534);
     expect(seen.at(-1)).toBe(534);
@@ -284,15 +287,18 @@ describe("the hero's number, from the worlds' count", () => {
 });
 
 describe("the scene's read of the worlds' file", () => {
-  it("reads the file at the site's base with the scene's signal, and counts what it brings, each world once and the Earth", async () => {
+  it("reads the file at the site's base, and counts what it brings, each world once and the Earth", async () => {
     read.worlds.mockResolvedValue(fileOf());
     const { hero, drawn, scene } = await visit();
     const leave = hero();
-    const leaving = new AbortController();
-    expect((await scene(leaving.signal))?.worlds).toHaveLength(4);
-    expect(read.worlds).toHaveBeenCalledWith("/", { signal: leaving.signal });
+    expect((await scene())?.worlds).toHaveLength(4);
+    // One read for the page's life, shared by space and its rail: the query's own signal, cut only when no reader is left.
+    expect(read.worlds).toHaveBeenCalledWith("/", {
+      fetch: expect.any(Function) as unknown,
+      signal: expect.any(AbortSignal) as unknown,
+    });
     expect(drawn.at(-1)).toBe(3);
-    expect(read.count).not.toHaveBeenCalled();
+    expect(read.count, "the hero's own ask of the count file, none from the scene's read").toHaveBeenCalledTimes(1);
     leave();
   });
 
@@ -301,7 +307,7 @@ describe("the scene's read of the worlds' file", () => {
     read.worlds.mockResolvedValue(fileOf());
     const { open, seen, scene } = await visit();
     const leave = open();
-    await settled();
+    await readsAnswered();
     expect(seen.at(-1)).toBe(534);
     await scene();
     expect(seen.at(-1)).toBe(3);

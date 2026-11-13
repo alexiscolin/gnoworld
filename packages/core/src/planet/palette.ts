@@ -2,6 +2,7 @@
 // graded, turned by its system's hue, and given as linear sRGB, the space three draws in. Only + - * / reach a colour (look.ts): a power
 // and a cube root are fixed runs of Newton's steps, so every engine gives one palette. Tier 1 (docs/REVIEW.md).
 import type { Ramp, Rgb } from "./anchors.ts";
+import { clamp01 } from "../space/smooth.ts";
 
 export type Lab = readonly [number, number, number];
 type Trio<T> = readonly [T, T, T];
@@ -57,7 +58,6 @@ function decoded(channel: number): number {
 const curve = (value: number): number =>
   value > EDGE * EDGE * EDGE ? cubeRoot(value) : value / (3 * EDGE * EDGE) + 4 / 29;
 const uncurve = (value: number): number => (value > EDGE ? value * value * value : 3 * EDGE * EDGE * (value - 4 / 29));
-const clamped = (value: number): number => Math.min(1, Math.max(0, value));
 
 /** An sRGB colour, each channel in [0, 1], as CIE Lab under D65. */
 export function labOf([red, green, blue]: Rgb): Lab {
@@ -73,9 +73,9 @@ export function linearOf([l, a, b]: Lab): Rgb {
   const fy = (l + 16) / 116;
   const [x, y, z] = [WHITE[0] * uncurve(fy + a / 500), uncurve(fy), WHITE[2] * uncurve(fy - b / 200)];
   return [
-    clamped(3.2404542 * x - 1.5371385 * y - 0.4985314 * z),
-    clamped(-0.969266 * x + 1.8760108 * y + 0.041556 * z),
-    clamped(0.0556434 * x - 0.2040259 * y + 1.0572252 * z),
+    clamp01(3.2404542 * x - 1.5371385 * y - 0.4985314 * z),
+    clamp01(-0.969266 * x + 1.8760108 * y + 0.041556 * z),
+    clamp01(0.0556434 * x - 0.2040259 * y + 1.0572252 * z),
   ];
 }
 

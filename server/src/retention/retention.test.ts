@@ -18,6 +18,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
+import { GUEST_TABLES } from "../guest/guests.ts";
+import { ROOM_SAID } from "../rooms/earth.ts";
 import { LOGIN_TABLES, NONCE_HOST } from "../login/login.ts";
 import { TICKET_TABLES } from "../login/ticket.ts";
 import { PROGRESS_TABLES } from "../moderation/catchup.ts";
@@ -25,7 +27,7 @@ import { VERDICT_TABLES } from "../moderation/check.ts";
 import { MUTE_TABLES } from "../moderation/mute.ts";
 import { STRIKE_TABLES } from "../moderation/strikes.ts";
 import { PIN_TABLES } from "../pins/pins.ts";
-import { ROOM_STATE } from "../rooms/create.ts";
+import { REALM_PATH, REALM_TABLES, ROOM_STATE } from "../rooms/create.ts";
 import { ROOM_TABLES } from "../rooms/rooms.ts";
 import { makeRetention, sizeOf, startRetention } from "./retention.ts";
 
@@ -43,7 +45,11 @@ const TABLES = [
   MUTE_TABLES,
   STRIKE_TABLES,
   ROOM_STATE,
+  REALM_TABLES,
+  REALM_PATH,
   PIN_TABLES,
+  GUEST_TABLES,
+  ROOM_SAID,
 ];
 const opened: DatabaseSync[] = [];
 const folders: string[] = [];
@@ -638,5 +644,96 @@ describe("the retention's runs (3n)", () => {
       ),
       { numRuns: 100 },
     );
+  });
+});
+
+describe("the owned tables' retention", () => {
+  it("logs an owner's expiry that throws as the retention's failure, never the search's, and goes on to the next", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const lines: string[] = [];
+    const asked: number[] = [];
+    makeRetention(db, {
+      log: logger(PEPPER, (line) => lines.push(line)),
+      now: () => T0,
+      batch: 7,
+      cards: {
+        expire: () => {
+          throw new RangeError("full");
+        },
+      },
+      kept: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(lines.filter((line) => line.includes("cards_expire"))).toEqual([
+      expect.stringContaining('"event":"retention_failed"') as unknown,
+    ]);
+    expect(lines.join("")).not.toContain("search_failed");
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});
+
+describe("the translations' retention", () => {
+  it("asks the translations to expire, with the budget the earlier owners leave", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const asked: number[] = [];
+    const log = logger(PEPPER, () => undefined);
+    makeRetention(db, {
+      log,
+      now: () => T0,
+      batch: 7,
+      translations: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});
+
+describe("Jarvis's public answers' retention", () => {
+  it("asks the answers to expire, with the budget the earlier owners leave", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const asked: number[] = [];
+    makeRetention(db, {
+      log: logger(PEPPER, () => undefined),
+      now: () => T0,
+      batch: 7,
+      said: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(asked).toEqual([7]);
+    db.close();
+  });
+});
+
+describe("the unread places' retention", () => {
+  it("asks the unread places to expire, with the budget the earlier owners leave", () => {
+    const db = openDatabase(":memory:", [...TABLES]);
+    const asked: number[] = [];
+    makeRetention(db, {
+      log: logger(PEPPER, () => undefined),
+      now: () => T0,
+      batch: 7,
+      unread: {
+        expire: (limit) => {
+          asked.push(limit);
+          return 0;
+        },
+      },
+    }).tick();
+    expect(asked).toEqual([7]);
+    db.close();
   });
 });

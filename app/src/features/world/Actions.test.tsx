@@ -49,7 +49,9 @@ describe("a world's actions", () => {
     const el = draw();
     const chat = document.createElement("div");
     chat.id = "chat";
-    const composer = document.createElement("textarea");
+    const composer = document.createElement("div");
+    composer.setAttribute("role", "textbox");
+    composer.tabIndex = 0;
     chat.append(composer);
     document.body.append(chat);
     const link = el.querySelector("a");
@@ -170,5 +172,12 @@ describe("a world's main action, in a room nobody spoke in", () => {
   it("never asks to be the first with no room to read", async () => {
     const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} />);
     expect(box.querySelector("a[href='#chat']")?.textContent).toBe("Say hi in the chat");
+  });
+
+  it("leads where a place with no chat yet says (a realm's page, D375), and keeps no link to the chat", async () => {
+    const lead = { label: "Read its page", href: "#page" };
+    const { box } = await mountInStore(<Actions place={PLACE} follow={FOLLOW} lead={lead} />);
+    expect(box.querySelector("a[href='#page']")?.textContent).toBe("Read its page");
+    expect(box.querySelector("a[href='#chat']")).toBeNull();
   });
 });

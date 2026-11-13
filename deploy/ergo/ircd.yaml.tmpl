@@ -37,6 +37,13 @@ server:
     cidr-len-ipv4: 32
     cidr-len-ipv6: 64
     num-bits: 64
+  # The bot says a guest's line as anon/<name> (RELAYMSG, D430): a guest is no account, so no direct message reaches it
+  # (irc/handlers.go:2457) and none can take a nick with the separator (client_lookup_set.go:161). A room's operator
+  # may not relay: only the bot's class, below.
+  relaymsg:
+    enabled: true
+    separators: "/"
+    available-to-chanops: false
   # A line past the limits is refused (417), never cut short to a meaning its author did not send.
   compatibility:
     allow-truncation: false
@@ -93,8 +100,8 @@ oper-classes:
   server-admin:
     title: Server Admin
     # The bot's needs alone (slice 3's max review): rooms made (chanreg, with operator-only-creation), joined and
-    # set whatever their modes, their history read, unpaced.
-    capabilities: [sajoin, samode, chanreg, history, nofakelag]
+    # set whatever their modes, their history read, unpaced, and a guest's line relayed (D430).
+    capabilities: [sajoin, samode, chanreg, history, nofakelag, relaymsg]
 opers:
   admin:
     class: server-admin

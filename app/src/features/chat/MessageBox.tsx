@@ -1,14 +1,15 @@
-// The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the marks, the
-// field's words and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
+// The composer's one rounded box (the video's frame 23.58.01): the format bar, the field, and at its foot the quick actions' /, the
+// field's words, when it has some to say, and Send. Its grid places what the field draws itself, so its words sit in the foot's row.
 import { Cluster, Icon, IconButton, type IconName } from "@gnoworld/ui";
 import { Fragment, type ReactNode } from "react";
 import shared from "../../edge.module.css";
-import type { Format } from "./format.ts";
+import type { Format } from "./composer/kinds.ts";
+import { useFull } from "./full.ts";
 import styles from "./MessageBox.module.css";
 
 // The format bar's groups, a rule between each (frame 66: the marks, the code, the lists), the marks as frame 73 orders
 // them: B, I, U, S. Underline goes as `++` (8k).
-const BAR: readonly (readonly { format: Format; icon: IconName; label: string }[])[] = [
+const BAR: readonly (readonly { format: Format | "link"; icon: IconName; label: string }[])[] = [
   [
     { format: "bold", icon: "bold", label: "Bold" },
     { format: "italic", icon: "italic", label: "Italic" },
@@ -26,26 +27,43 @@ const BAR: readonly (readonly { format: Format; icon: IconName; label: string }[
   ],
 ];
 
+type LinkTool = (size: "xs" | "s") => ReactNode;
+
 // The format bar: each format of BAR, named, applied to the box's selection.
-function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
+function FormatBar({ onFormat, linkTool }: { onFormat: (format: Format) => void; linkTool: LinkTool | undefined }) {
+  // Larger in the full chat, the screen its own (Alexis, 2026-11-07).
+  const tools = useFull() ? "s" : "xs";
   return (
     <div role="group" aria-label="Format" className={styles["format"]}>
       <Cluster space="3xs">
         {BAR.map((group, at) => (
           <Fragment key={group[0]?.format}>
-            {at === 0 ? null : <span role="separator" aria-orientation="vertical" className={styles["rule"]} />}
-            {group.map((tool) => (
-              <IconButton
-                key={tool.format}
-                icon={tool.icon}
-                label={tool.label}
-                size="xs"
-                emphasis="plain"
-                onClick={() => {
-                  onFormat(tool.format);
-                }}
+            {at === 0 ? null : (
+              <span
+                role="separator"
+                aria-orientation="vertical"
+                className={styles["rule"]}
+                data-drops={at === BAR.length - 1 ? "" : undefined}
               />
-            ))}
+            )}
+            {group.map((tool) => {
+              const { format } = tool;
+              if (format === "link") return <Fragment key="link">{linkTool?.(tools)}</Fragment>;
+              return (
+                <IconButton
+                  key={format}
+                  icon={tool.icon}
+                  label={tool.label}
+                  size={tools}
+                  emphasis="plain"
+                  tool
+                  drops={at === BAR.length - 1}
+                  onClick={() => {
+                    onFormat(format);
+                  }}
+                />
+              );
+            })}
           </Fragment>
         ))}
       </Cluster>
@@ -53,46 +71,32 @@ function FormatBar({ onFormat }: { onFormat: (format: Format) => void }) {
   );
 }
 
-// The marks the box's foot puts in the draft: @ starts a mention (Tab completes it), / a command.
-const MARKS: readonly { mark: string; icon: IconName; label: string }[] = [
-  { mark: "@", icon: "at", label: "Mention someone" },
-  { mark: "/", icon: "slash", label: "Start a command" },
-];
-
-// The video's one rounded box: the format bar, the field (its children), and at its foot the marks, the field's words (the
-// field draws them, the box's grid places them) and Send.
+// The video's one rounded box: the format bar, the field (its children), and at its foot the room's quick actions, the field's words
+// (the field draws them, the box's grid places them) and Send. No @ nor / of its own: both are typed, and Tab completes them (Alexis, 2026-11-08).
 export function MessageBox({
   onFormat,
-  onInsert,
+  linkTool,
   send,
   goes,
+  quick,
   children,
 }: {
-  onFormat: (format: Format) => void;
-  onInsert: (mark: string) => void;
+  /** The format bar's tools; none, no bar: a guest's line is one plain line (D430). */
+  onFormat?: ((format: Format) => void) | undefined;
+  /** The bar's link tool, which is the composer's (a popover that asks for the address): it brings its own code. */
+  linkTool?: LinkTool | undefined;
   send: string;
   goes: boolean;
+  /** The room's quick actions, behind a / at the foot's start; none in a thread's box. */
+  quick?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div role="group" aria-label="Message box" className={[shared["edge"], styles["box"]].join(" ")}>
-      <FormatBar onFormat={onFormat} />
+      {onFormat === undefined ? null : <FormatBar onFormat={onFormat} linkTool={linkTool} />}
       <div className={styles["field"]}>{children}</div>
-      <div className={styles["marks"]}>
-        {MARKS.map((each) => (
-          <IconButton
-            key={each.mark}
-            icon={each.icon}
-            label={each.label}
-            size="s"
-            emphasis="plain"
-            onClick={() => {
-              onInsert(each.mark);
-            }}
-          />
-        ))}
-      </div>
-      <button type="submit" className={styles["send"]} disabled={!goes}>
+      {quick === undefined ? null : <div className={styles["acts"]}>{quick}</div>}
+      <button type="submit" className={`grid-center disc ${String(styles["send"])}`} disabled={!goes}>
         <Icon name="arrow" />
         <span className="visually-hidden">{send}</span>
       </button>

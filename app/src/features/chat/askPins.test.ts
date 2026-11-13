@@ -54,13 +54,13 @@ function setup({ answer = (room) => Promise.resolve(ok(list(room, ["m1"]))), vis
   };
   return { asker: { ...asker, show }, asked, told, state };
 }
-const settled = () => vi.advanceTimersByTimeAsync(0);
+const timersFlushed = () => vi.advanceTimersByTimeAsync(0);
 
 describe("the shown room's pins", () => {
   it("are asked as the room is shown, and handed to the store", async () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     expect(t.asked).toEqual(["pins #bubble"]);
     expect(t.told).toEqual([list("#bubble", ["m1"])]);
   });
@@ -81,16 +81,16 @@ describe("the shown room's pins", () => {
   it("are not asked while the page is hidden, and asked at once by a refresh once it shows", async () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     t.state.visible = false;
     await vi.advanceTimersByTimeAsync(3 * PINS_EVERY_MS);
     expect(t.asked).toHaveLength(1);
     t.asker.refresh();
-    await settled();
+    await timersFlushed();
     expect(t.asked).toHaveLength(1);
     t.state.visible = true;
     t.asker.refresh();
-    await settled();
+    await timersFlushed();
     expect(t.asked).toHaveLength(2);
     // The minute's turn comes again from that ask.
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS);
@@ -100,9 +100,9 @@ describe("the shown room's pins", () => {
   it("move to another room as it is shown, the old one asked no more", async () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     t.asker.show("#bubble/games", ALICE);
-    await settled();
+    await timersFlushed();
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS);
     expect(t.asked).toEqual(["pins #bubble", "pins #bubble/games", "pins #bubble/games"]);
   });
@@ -111,7 +111,7 @@ describe("the shown room's pins", () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     expect(t.asked).toEqual(["pins #bubble"]);
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS);
     expect(t.asked).toHaveLength(2);
@@ -131,7 +131,7 @@ describe("the shown room's pins", () => {
     await vi.advanceTimersByTimeAsync(3 * PINS_EVERY_MS);
     expect(t.asked).toHaveLength(1);
     release(ok(list("#bubble", ["m1"])));
-    await settled();
+    await timersFlushed();
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS);
     expect(t.asked).toHaveLength(2);
   });
@@ -142,7 +142,7 @@ describe("the shown room's pins", () => {
       answer: (room) => Promise.resolve(fail ? { ok: false, reason: "unavailable" } : ok(list(room, ["m1"]))),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     expect(t.told).toEqual([]);
     fail = false;
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS);
@@ -156,7 +156,7 @@ describe("the shown room's pins", () => {
         throws ? Promise.reject(new Error("the call broke")) : Promise.resolve(ok(list(room, ["m1"]))),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     throws = false;
     await vi.advanceTimersByTimeAsync(60_000);
     expect(t.told).toEqual([list("#bubble", ["m1"])]);
@@ -170,10 +170,10 @@ describe("the shown room's pins", () => {
     t.asker.show("#bubble", undefined);
     // The account's answer, late, says it may pin; the guest's own, which came later, is the one told.
     releases[0]?.(ok(list("#bubble", ["m1"], true)));
-    await settled();
+    await timersFlushed();
     expect(t.told).toEqual([]);
     releases[1]?.(ok(list("#bubble", ["m1"])));
-    await settled();
+    await timersFlushed();
     expect(t.told).toEqual([list("#bubble", ["m1"])]);
   });
 
@@ -185,7 +185,7 @@ describe("the shown room's pins", () => {
     t.asker.show("#bubble", ALICE);
     t.state.reader = undefined; // logged out: the room is not shown again yet
     release(ok(list("#bubble", ["m1"], true)));
-    await settled();
+    await timersFlushed();
     expect(t.told).toEqual([]);
   });
 
@@ -196,7 +196,7 @@ describe("the shown room's pins", () => {
         call === "pin" ? new Promise((resolve) => (release = resolve)) : Promise.resolve(ok(list(room, []))),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     const pinned = t.asker.pin("m2");
     t.state.reader = undefined;
     release(ok(list("#bubble", ["m2"], true)));
@@ -207,9 +207,9 @@ describe("the shown room's pins", () => {
   it("ask again for a reader who changed, at once", async () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     t.asker.show("#bubble", undefined);
-    await settled();
+    await timersFlushed();
     expect(t.asked).toEqual(["pins #bubble", "pins #bubble"]);
   });
 
@@ -229,7 +229,7 @@ describe("pinning and unpinning from the shown room", () => {
   it("send the room and the line's id, and hand the store the list the server answers", async () => {
     const t = setup({ answer: (room) => Promise.resolve(ok(list(room, ["m2", "m1"], true))) });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     expect(await t.asker.pin("m2")).toEqual({ ok: true });
     expect(t.asked.at(-1)).toBe("pin #bubble m2");
     expect(t.told.at(-1)).toEqual(list("#bubble", ["m2", "m1"], true));
@@ -257,7 +257,7 @@ describe("pinning and unpinning from the shown room", () => {
     t.asker.show("#bubble", ALICE);
     await t.asker[call]("m2");
     release(ok(list("#bubble", [...older], true)));
-    await settled();
+    await timersFlushed();
     expect(t.told.map(({ pins }) => pins.map(({ id }) => id))).toEqual([after, after]);
     expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(2);
   });
@@ -279,13 +279,13 @@ describe("pinning and unpinning from the shown room", () => {
       },
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     const pinned = t.asker.pin("m2");
     t.asker.refresh();
     releases.pin(ok(list("#bubble", ["m1", "m2"], true)));
     await pinned;
     releases.poll(ok(list("#bubble", ["m1"], true)));
-    await settled();
+    await timersFlushed();
     expect(t.told.map(({ pins }) => pins.map(({ id }) => id))).toEqual([["m1"], ["m1", "m2"], ["m1", "m2"]]);
     expect(t.asked.filter((each) => each.startsWith("pins "))).toHaveLength(3);
   });
@@ -293,7 +293,7 @@ describe("pinning and unpinning from the shown room", () => {
   it("say why the server refused, and change nothing", async () => {
     const t = setup({ answer: () => Promise.resolve({ ok: false, reason: "too_many" }) });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     expect(await t.asker.pin("m2")).toEqual({ ok: false, reason: "too_many" });
     expect(await t.asker.unpin("m2")).toEqual({ ok: false, reason: "too_many" });
     expect(t.told).toEqual([]);
@@ -313,9 +313,9 @@ describe("pinning and unpinning from the shown room", () => {
         },
       });
       t.asker.show("#bubble", ALICE);
-      await settled();
+      await timersFlushed();
       expect(await t.asker.unpin("m1")).toEqual({ ok: false, reason });
-      await settled();
+      await timersFlushed();
       expect(t.asked).toEqual(["pins #bubble", "unpin #bubble m1", "pins #bubble"]);
       expect(t.told.at(-1)).toEqual(list("#bubble", [], true));
     },
@@ -329,12 +329,12 @@ describe("pinning and unpinning from the shown room", () => {
         call === "unpin" ? new Promise((resolve) => (release = resolve)) : Promise.resolve(ok(list(room, ["m1"]))),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     const unpinned = t.asker.unpin("m1");
     t.state.reader = undefined;
     release({ ok: false, reason: "forbidden" });
     expect(await unpinned).toEqual({ ok: false, reason: "forbidden" });
-    await settled();
+    await timersFlushed();
     expect(t.asked).toEqual(["pins #bubble", "unpin #bubble m1"]);
   });
 
@@ -343,9 +343,9 @@ describe("pinning and unpinning from the shown room", () => {
       answer: (room, call) => Promise.resolve(call === "pins" ? ok(list(room, ["m1"])) : { ok: false, reason }),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     await t.asker.pin("m2");
-    await settled();
+    await timersFlushed();
     expect(t.asked).toEqual(["pins #bubble", "pin #bubble m2"]);
   });
 
@@ -359,7 +359,7 @@ describe("pinning and unpinning from the shown room", () => {
   it("restart the minute from the answer, so the next look is not at once", async () => {
     const t = setup();
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS - 1000);
     await t.asker.pin("m2");
     await vi.advanceTimersByTimeAsync(PINS_EVERY_MS - 1);
@@ -374,7 +374,7 @@ describe("pinning and unpinning from the shown room", () => {
       answer: (room, call) => Promise.resolve(ok(list(room, [`from-${call}`], call !== "pins"))),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     await t.asker.pin("m2");
     await t.asker.unpin("m2");
     expect(t.told).toEqual([
@@ -395,10 +395,10 @@ describe("pinning and unpinning from the shown room", () => {
           : Promise.resolve(ok(list(room, ["m1"]))),
     });
     t.asker.show("#bubble", ALICE);
-    await settled();
+    await timersFlushed();
     const pinned = t.asker.pin("m2");
     t.asker.show("#bubble", undefined);
-    await settled();
+    await timersFlushed();
     t.told.length = 0;
     release(ok(list("#bubble", ["m2"], true)));
     expect(await pinned).toEqual({ ok: true });

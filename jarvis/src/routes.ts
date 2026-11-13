@@ -5,12 +5,16 @@
 // /digest, a realm's digest, each answering off while jarvis is, once its body passed its schema.
 import {
   DOOR_CAPS,
+  EXPLAIN_VERSION,
   JARVIS_PATHS,
+  REALM_EXPLAIN_VERSION,
   JarvisAsk,
   JarvisBudget,
   JarvisDigestRequest,
+  JarvisExplainRequest,
+  type JarvisExplained,
   JarvisTranslate,
-  type JarvisAnswer,
+  type JarvisPaidAnswer,
   type JarvisBudgets,
   type JarvisMadeDigest,
   type JarvisTranslation,
@@ -19,6 +23,7 @@ import { isBlank } from "@gnoworld/core";
 import type { Log } from "@gnoworld/service/log";
 import type { Budget } from "./budget.ts";
 import type { Digested } from "./digest.ts";
+import type { Explained } from "./explainRealm.ts";
 import { refusal, type Reply, type Routes } from "./http.ts";
 import type { Question, Result } from "./loop.ts";
 import { DOLLAR } from "./prices.ts";
@@ -28,6 +33,12 @@ type Ask = (question: Question, signal: AbortSignal) => Promise<Result>;
 interface Parts {
   // The loop's ask, the translator's and the digests', or none while jarvis is off.
   readonly ask: Ask | undefined;
+  // The fast model's ask, for the fixed ask that catches a room up.
+  readonly catchUp?: Ask | undefined;
+  // A function's explanation, on the loop that reads the code of one chain alone (D13920): none for a chain it has no profile for.
+  readonly explain?: ((chain: string | undefined) => Ask | undefined) | undefined;
+  // A realm's explanation from its outline, on the fast model, or none while jarvis is off.
+  readonly explainRealm?: ((asked: JarvisExplainRequest, signal: AbortSignal) => Promise<Explained>) | undefined;
   readonly translate?: ((asked: JarvisTranslate, signal: AbortSignal) => Promise<Translated>) | undefined;
   readonly digest?:
     ((asked: JarvisDigestRequest, signal: AbortSignal, made?: () => void) => Promise<Digested>) | undefined;
@@ -35,10 +46,10 @@ interface Parts {
   readonly log: Log;
 }
 
-const answered = (answer: JarvisAnswer): Reply => ({ status: 200, body: answer });
+const answered = (answer: JarvisPaidAnswer): Reply => ({ status: 200, body: answer });
 
 /** The table of jarvis's routes: JARVIS_PATHS, and the methods the door calls on each. */
-export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Routes {
+export function jarvisRoutes({ ask, catchUp, explain, explainRealm, translate, digest, budget, log }: Parts): Routes {
   const budgets = (): Reply => {
     const caps = budget.caps();
     return {
@@ -46,9 +57,9 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
       body: { ask: caps.ask / DOLLAR, translate: caps.translate / DOLLAR } satisfies JarvisBudgets,
     };
   };
-  // A body its schema refuses, logged as this face's own refusals are (http.ts).
-  const refused = (route: string): Reply => {
-    log("jarvis_refused", { route, method: "POST", status: 400, error: "refused" });
+  // A body its schema refuses, logged as this face's own refusals are (http.ts); a reason for a body it holds but cannot serve.
+  const refused = (route: string, reason?: "no_chain"): Reply => {
+    log("jarvis_refused", { route, method: "POST", status: 400, error: "refused", ...(reason && { reason }) });
     return refusal("refused", 400);
   };
   return {
@@ -57,8 +68,24 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
         const asked = JarvisAsk.safeParse(body);
         if (!asked.success) return refused(JARVIS_PATHS.ask);
         if (ask === undefined) return answered({ status: "off" });
-        const { question, lines } = asked.data;
-        return replyOf(await ask({ text: question, room: lines.map(lineOf) }, signal), log);
+        const { question, run } = questionOf(asked.data);
+        // An explanation never falls back to the concierge's loop, whose tools read live state and the room.
+        const asking =
+          run === "explain"
+            ? explain?.("chain" in asked.data ? asked.data.chain : undefined)
+            : run === "fast" && catchUp !== undefined
+              ? catchUp
+              : ask;
+        if (asking === undefined) return refused(JARVIS_PATHS.ask, "no_chain");
+        return replyOf(await asking(question, signal), log);
+      },
+    },
+    [JARVIS_PATHS.explain]: {
+      async POST(body, signal) {
+        const asked = JarvisExplainRequest.safeParse(body);
+        if (!asked.success) return refused(JARVIS_PATHS.explain);
+        if (explainRealm === undefined) return { status: 200, body: { status: "off" } satisfies JarvisExplained };
+        return explainedOf(await explainRealm(asked.data, signal));
       },
     },
     [JARVIS_PATHS.translate]: {
@@ -94,22 +121,55 @@ export function jarvisRoutes({ ask, translate, digest, budget, log }: Parts): Ro
   };
 }
 
+// The fixed asks' words, Jarvis's own and constant (D13985): the page sets none of them. The place, and a function's
+// realm and name, go in as data blocks beside the room's lines.
+const HERE = "What can I do here, in this place? Say it briefly, with what the place's data tells.";
+const CATCH_UP = "Catch me up on this room: what was said, in a few short lines.";
+// An explanation is the same for every room, so it is written in English whatever the room says (D13920).
+const EXPLAIN =
+  "Explain the function in the function block, of the realm it names: what it does and how to call it, briefly, in English.";
+
+function questionOf(asked: JarvisAsk): { question: Question; run: "main" | "fast" | "explain" } {
+  const room = asked.lines.map(lineOf);
+  const place = { source: "place", text: asked.room };
+  if ("question" in asked) return { question: { text: asked.question, room, read: [place] }, run: "main" };
+  if (asked.ask === "catch-up") return { question: { text: CATCH_UP, room, read: [place] }, run: "fast" };
+  if (asked.ask === "here") return { question: { text: HERE, room, read: [place] }, run: "main" };
+  // The code alone: no line of the room and no room name, so the answer can be kept for every room.
+  const named = { source: "function", text: `${asked.realm} ${asked.function}` };
+  return {
+    question: { text: EXPLAIN, room: [], read: [named], finds: { realm: asked.realm, name: asked.function } },
+    run: "explain",
+  };
+}
+
 // A room's line as data: who said it (the asker, or the others by their number, D91), when, and its words, so its line
 // breaks and quotes pass for no other line (D176).
-const lineOf = ({ speaker, time, text }: JarvisAsk["lines"][number]): string =>
+const lineOf = ({ speaker, time, text }: { speaker: number; time?: string | undefined; text: string }): string =>
   JSON.stringify({ who: speaker === 0 ? "asker" : `#${String(speaker)}`, time, text });
 
 function replyOf(result: Result, log: Log): Reply {
   if (result.kind === "answer") {
     const markdown = cut(result.text, log);
-    // A text that draws nothing is no answer the wire can carry, nor one anybody could read.
+    // A text that draws nothing is no answer the wire can carry, but it was paid for.
     if (isBlank(markdown)) {
       log("jarvis_answer_empty");
-      return refusal("internal", 502);
+      return answered({ status: "failed", cost: result.cost });
     }
-    return answered({ status: "answered", markdown, buttons: result.cards.buttons.map(({ button }) => button) });
+    const buttons = result.cards.buttons.map(({ button }) => button);
+    return answered({
+      status: "answered",
+      markdown,
+      buttons,
+      cost: result.cost,
+      ...(result.keep === true ? { keep: true, version: EXPLAIN_VERSION } : {}),
+    });
   }
-  if (result.kind === "spent") return answered({ status: "spent" });
+  if (result.kind === "declined") return answered({ status: "declined", cost: result.cost });
+  if (result.kind === "spent")
+    return answered(result.cost === undefined ? { status: "spent" } : { status: "spent", cost: result.cost });
+  // Every other end that spent answers failed with its cost, which the door adds to the person's share (D13985).
+  if ("cost" in result) return answered({ status: "failed", cost: result.cost });
   return failureOf(result.kind);
 }
 
@@ -130,6 +190,27 @@ function cut(text: string, log: Log): string {
 function failureOf(kind: string): Reply {
   if (kind === "invalid") return refusal("refused", 400);
   return kind === "gone" ? refusal("not_ready", 503) : refusal("internal", 502);
+}
+
+// An explanation on the wire: the model's answer, its failure with what it cost, spent, or a reader gone.
+function explainedOf(result: Explained): Reply {
+  if (result.kind === "gone") return failureOf("gone");
+  if (result.kind === "spent") return { status: 200, body: { status: "spent" } satisfies JarvisExplained };
+  if (result.kind === "failed")
+    return { status: 200, body: { status: "failed", cost: result.cost } satisfies JarvisExplained };
+  const { sure, text, tags, model, cost } = result;
+  return {
+    status: 200,
+    body: {
+      status: "explained",
+      sure,
+      text,
+      tags,
+      model,
+      cost,
+      version: REALM_EXPLAIN_VERSION,
+    } satisfies JarvisExplained,
+  };
 }
 
 function translationOf(result: Translated): Reply {

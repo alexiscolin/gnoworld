@@ -21,8 +21,32 @@ function motion(allowed: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: query === "(prefers-reduced-motion: no-preference)" && allowed,
     media: query,
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
   }));
   vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout"] });
+}
+
+// The system's word changing while the page is open: the query's change event, as the browser sends it.
+function liveMotion() {
+  const heard = new Set<() => void>();
+  let allowed = true;
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    get matches() {
+      return query === "(prefers-reduced-motion: no-preference)" && allowed;
+    },
+    media: query,
+    addEventListener: (_: string, listener: () => void) => heard.add(listener),
+    removeEventListener: (_: string, listener: () => void) => heard.delete(listener),
+  }));
+  vi.useFakeTimers({ toFake: ["requestAnimationFrame", "cancelAnimationFrame", "performance", "setTimeout"] });
+  return {
+    reduce: () => {
+      allowed = false;
+      for (const listener of heard) listener();
+    },
+    heard,
+  };
 }
 
 function advance(ms: number) {
@@ -35,6 +59,65 @@ describe("Stat", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.useRealTimers();
+    delete document.documentElement.dataset["arrive"];
+    delete document.documentElement.dataset["motion"];
+  });
+
+  it("stops counting, standing at its value, when reduced motion is turned on mid-visit", async () => {
+    motion(true);
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(300);
+    expect(drawn(container)).not.toBe("21,480");
+    document.documentElement.dataset["motion"] = "reduce";
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(drawn(container)).toBe("21,480");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stops counting, standing at its value, when the system's word turns to reduced motion mid-visit, and stops listening when it goes", () => {
+    const system = liveMotion();
+    const { container, unmount } = render(<Stat value={21480} caption="Today" />);
+    advance(300);
+    expect(drawn(container)).not.toBe("21,480");
+    act(() => {
+      system.reduce();
+    });
+    expect(drawn(container)).toBe("21,480");
+    expect(vi.getTimerCount()).toBe(0);
+    unmount();
+    expect(system.heard.size).toBe(0);
+  });
+
+  it("reads the flight's mark as the count starts and when the page changes, never once a frame", () => {
+    motion(true);
+    const flight = document.body.appendChild(document.createElement("div"));
+    flight.dataset["flown"] = "flying";
+    const query = vi.spyOn(document, "querySelector");
+    try {
+      render(<Stat value={21480} caption="Today" />);
+      advance(2_000);
+      expect(query.mock.calls.filter(([selector]) => selector === "[data-flown='flying']").length).toBe(1);
+    } finally {
+      query.mockRestore();
+      flight.remove();
+    }
+  });
+
+  it("counts nothing, and asks for no frame, before the arrival's wait clears", async () => {
+    motion(true);
+    document.documentElement.dataset["arrive"] = "wait";
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(2_000);
+    expect(drawn(container)).toBe("0");
+    expect(vi.getTimerCount()).toBe(0);
+    delete document.documentElement.dataset["arrive"];
+    await act(async () => {
+      await Promise.resolve();
+    });
+    advance(1_300);
+    expect(drawn(container)).toBe("21,480");
   });
 
   it("writes its number in English's grouping, the app's one language, its unit and its caption", () => {
@@ -79,9 +162,44 @@ describe("Stat", () => {
       vi.advanceTimersByTime(60_000);
     });
     const { container } = render(<Stat value={21480} caption="Today" />);
-    advance(300);
+    advance(700);
     const now = Number((drawn(container) ?? "").replaceAll(",", ""));
     expect(now > 0 && now < 21480).toBe(true);
+  });
+
+  it("holds its count at nothing while a flight brings its page, and counts as it lands", () => {
+    motion(true);
+    const flight = document.body.appendChild(document.createElement("div"));
+    flight.dataset["flown"] = "flying";
+    const { container } = render(<Stat value={21480} caption="Today" />);
+    advance(2_000);
+    expect(drawn(container)).toBe("0");
+    document.body.replaceChildren();
+    advance(100);
+    advance(700);
+    expect(Number((drawn(container) ?? "").replaceAll(",", ""))).toBeGreaterThan(0);
+  });
+
+  it("counts from the value drawn to a new one that comes after, never swapping in one frame, and lands within 0.5 s", () => {
+    motion(true);
+    const { container, rerender } = render(<Stat value={100} caption="Today" />);
+    advance(1_300);
+    expect(drawn(container)).toBe("100");
+    rerender(<Stat value={200} caption="Today" />);
+    expect(drawn(container)).toBe("100");
+    advance(200);
+    const between = Number(drawn(container));
+    expect(between > 100 && between < 200).toBe(true);
+    advance(300);
+    expect(drawn(container)).toBe("200");
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("stands at a new value at once under reduced motion", () => {
+    motion(false);
+    const { container, rerender } = render(<Stat value={100} caption="Today" />);
+    rerender(<Stat value={200} caption="Today" />);
+    expect(drawn(container)).toBe("200");
   });
 
   it("stands at its value at once under reduced motion", () => {
@@ -130,6 +248,13 @@ describe("Stat", () => {
     expect(screen.queryByText("Hot")).toBeNull();
     rerender(<Stat value={214} caption="Here now" hot />);
     expect(screen.getByText("Hot")).toBeTruthy();
+  });
+
+  it("sticks a unit that starts with a slash to its figure, and spaces any other", () => {
+    const { container } = render(<Stat value={1} unit="/9" caption="Steps" />);
+    expect(container.querySelector("[data-of]")?.textContent).toBe("/9");
+    render(<Stat value={2} unit="calls" caption="Today" />);
+    expect(screen.getAllByText(/calls/)[0]?.textContent).toBe(" calls");
   });
 
   it("shows a unit and a caption made of markup, or very long, as text", () => {

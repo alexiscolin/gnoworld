@@ -1,7 +1,9 @@
-import { useId, useRef, type KeyboardEvent } from "react";
+import { useId, useRef, type KeyboardEvent, type ReactNode } from "react";
 import { Stack } from "../compositions/index.ts";
+import { Icon } from "../icons/Icon.tsx";
 import { ids } from "../ids.ts";
 import styles from "./Field.module.css";
+import { FieldWords } from "./FieldWords.tsx";
 
 export interface FieldProps {
   label: string;
@@ -22,8 +24,12 @@ export interface FieldProps {
   resizable?: boolean | undefined;
   /** The label is for assistive technology alone: the box says what it is for itself (a placeholder). */
   hideLabel?: boolean | undefined;
+  /** A pill on the space's own ground, a control's height: a list's filter. One line only. */
+  shape?: "pill" | undefined;
   /** The ids of what else on the page says what the box is about (a composer's reply bar), after its help. */
   describedBy?: string | undefined;
+  /** A search box that keeps the focus while arrows choose a row of the list it names: the list's id, and the id of the chosen row. */
+  combobox?: { controls: string | undefined; activedescendant: string | undefined } | undefined;
 }
 
 const TYPES = { text: "text", search: "search", date: "datetime-local" } as const;
@@ -39,7 +45,10 @@ function submitOnEnter(event: KeyboardEvent<HTMLTextAreaElement>, composing: boo
   event.currentTarget.form?.requestSubmit();
 }
 
-interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable"> {
+interface BoxProps extends Pick<
+  FieldProps,
+  "value" | "onChange" | "enterAddsLine" | "placeholder" | "resizable" | "shape" | "combobox"
+> {
   kind: NonNullable<FieldProps["kind"]>;
   id: string;
   invalid: boolean;
@@ -47,7 +56,19 @@ interface BoxProps extends Pick<FieldProps, "value" | "onChange" | "enterAddsLin
 }
 
 // The box itself: a line of text, or the lines of a message.
-function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, resizable, onChange }: BoxProps) {
+function Box({
+  kind,
+  id,
+  value,
+  invalid,
+  described,
+  enterAddsLine,
+  placeholder,
+  resizable,
+  shape,
+  combobox,
+  onChange,
+}: BoxProps) {
   const composingRef = useRef(false);
   const shared = {
     id,
@@ -57,6 +78,7 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, 
     "aria-invalid": invalid ? true : undefined,
     "aria-describedby": described,
     "data-fixed": resizable === false ? "" : undefined,
+    "data-shape": shape,
   };
   return kind === "lines" ? (
     <textarea
@@ -78,6 +100,14 @@ function Box({ kind, id, value, invalid, described, enterAddsLine, placeholder, 
   ) : (
     <input
       {...shared}
+      {...(combobox === undefined
+        ? {}
+        : {
+            role: "combobox",
+            "aria-expanded": combobox.controls !== undefined,
+            "aria-controls": combobox.controls,
+            "aria-activedescendant": combobox.activedescendant,
+          })}
       type={TYPES[kind]}
       onChange={(event) => {
         onChange(event.target.value);
@@ -95,6 +125,42 @@ function describing(
   return ids(...own.map((name) => `${id}-${name}`), parts.describedBy);
 }
 
+// The box in a frame with what stands before it: a search's magnifier (as Slack's and Discord's), a prefix that reads with it. A click
+// on either or the frame's padding is a click in the box.
+function Framed({
+  id,
+  prefix,
+  search,
+  box,
+}: {
+  id: string;
+  prefix: string | undefined;
+  search: boolean;
+  box: ReactNode;
+}) {
+  return (
+    <div
+      data-part="box"
+      className={styles["frame"]}
+      onClick={(event) => {
+        event.currentTarget.querySelector<HTMLElement>("input, textarea")?.focus();
+      }}
+    >
+      {search ? (
+        <span className={styles["prefix"]}>
+          <Icon name="search" />
+        </span>
+      ) : null}
+      {prefix === undefined ? null : (
+        <span id={`${id}-prefix`} className={styles["prefix"]}>
+          {prefix}
+        </span>
+      )}
+      {box}
+    </div>
+  );
+}
+
 /** A labelled box, described by its help and its error, which also marks it invalid. */
 export function Field({
   label,
@@ -106,9 +172,11 @@ export function Field({
   prefix,
   describedBy,
   hideLabel,
+  shape,
   resizable,
   enterAddsLine,
   placeholder,
+  combobox,
 }: FieldProps) {
   const id = useId();
   const described = describing(id, { prefix, help, error, describedBy });
@@ -122,6 +190,8 @@ export function Field({
       enterAddsLine={enterAddsLine}
       placeholder={placeholder}
       resizable={resizable}
+      shape={shape}
+      combobox={combobox}
       onChange={onChange}
     />
   );
@@ -130,38 +200,12 @@ export function Field({
       <label htmlFor={id} className={hideLabel === true ? "visually-hidden" : "label"}>
         {label}
       </label>
-      {prefix === undefined ? (
+      {prefix === undefined && kind !== "search" ? (
         box
       ) : (
-        // A click on the prefix or the frame's padding is a click in the box.
-        <div
-          data-part="box"
-          className={styles["frame"]}
-          onClick={(event) => {
-            event.currentTarget.querySelector<HTMLElement>("input, textarea")?.focus();
-          }}
-        >
-          <span id={`${id}-prefix`} className={styles["prefix"]}>
-            {prefix}
-          </span>
-          {box}
-        </div>
+        <Framed id={id} prefix={prefix} search={kind === "search"} box={box} />
       )}
-      {help === undefined ? null : (
-        <p id={`${id}-help`} className={styles["help"]}>
-          {help}
-        </p>
-      )}
-      {/* Shown, and described to the box; said by the region below with its field's name, waiting on the
-          page empty so the error is announced when it comes (F335, F356). */}
-      {error === undefined ? null : (
-        <p id={`${id}-error`} className={styles["error"]} aria-hidden="true">
-          {error}
-        </p>
-      )}
-      <span role="status" className="visually-hidden">
-        {error === undefined ? "" : `${label}: ${error}`}
-      </span>
+      <FieldWords id={id} label={label} help={help} error={error} />
     </Stack>
   );
 }

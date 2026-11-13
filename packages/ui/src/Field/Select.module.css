@@ -1,15 +1,36 @@
 /* The list: at the small control's height, beside the chips it is chosen among, on the resting fill. */
 @layer components {
-  .select {
+  .wrap {
+    /* layout: the arrow stands over the list's end */
+    position: relative;
+    /* layout: as wide as the list */
+    display: inline-flex;
     /* raw: the list never makes its place wider, whatever its longest row; not a bare 100%, which a Field's rule has too */
     max-inline-size: min(100%, 100vi);
+  }
+
+  .select {
+    appearance: none;
     min-block-size: var(--control-s);
-    padding-inline: var(--space-2xs);
+    /* a step before the words, and after them room for the arrow and a step each side of it */
+    padding-inline: var(--space-xs) calc(var(--space-xs) + var(--icon-s) + var(--space-2xs));
     border: var(--line-width) solid var(--color-line-strong);
     border-radius: var(--radius-s);
     background: var(--color-fill);
     font: var(--font-field);
     cursor: pointer;
+  }
+
+  .wrap > .select {
+    /* layout: a long row is cut by the list's own edge, never pushing its place wider */
+    min-inline-size: 0;
+  }
+
+  /* The arrow a step in from the list's end (the box-end utility centres it), letting the pointer through to the list. */
+  .arrow {
+    inset-inline-end: var(--space-xs);
+    pointer-events: none;
+    color: var(--color-text-muted);
   }
 
   .select:hover {

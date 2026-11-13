@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { Locator, PlaywrightWorkerArgs, PlaywrightWorkerOptions } from "@playwright/test";
+import { violations } from "./axe.ts";
 import { lineOf, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -163,7 +163,7 @@ test.describe("pins", () => {
     await expect.poll(held(page, "<img src=x onerror=alert(1)>")).toBe(1);
     await expect(pinBar(page).locator("img")).toHaveCount(0);
     await expect(pinBar(page).locator("a[href^='javascript']")).toHaveCount(0);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await violations(page)).toEqual([]);
     await unpin(page, address, text);
   });
 

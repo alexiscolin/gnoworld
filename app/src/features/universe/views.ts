@@ -1,83 +1,47 @@
-// How the reader looks at space, and where the scene's eye rests (part 7v; Alexis, 2026-11-03): Dynamic, space as it is, or the Plan, seen
-// from above with its orbits drawn, the same at every scale, as the header's two icons and V set it; and the system the eye rests at, as the
-// scene says, for the crumb back and the hero. No React state and no store's shape: the components read it as the universe reads the host.
+// What the GUI reads of where space is (D401): how many worlds the system the camera rests at holds (none at home or far out). The door
+// to space writes it; the home's hero and rail read it, the system itself from the page's address.
+import { EARTH } from "@gnoworld/core";
 import { useSyncExternalStore } from "react";
+import { useParams } from "react-router";
+import { HOME_NAMESPACES, isHome } from "../../cosmosAt.ts";
 import { Heard } from "../../lib/heard.ts";
 
-export type Seeing = "dynamic" | "plan";
+interface Where {
+  readonly system: string | undefined;
+  readonly worlds: number;
+}
+
+const FIRST: Where = { system: undefined, worlds: 0 };
 
 class Views {
-  #seeing: Seeing = "dynamic";
-  #system: string | undefined;
-  #worlds = 0;
+  #where = FIRST;
   readonly #heard = new Heard();
   readonly subscribe = this.#heard.subscribe;
 
-  /** How the reader looks: Dynamic by default. */
-  readonly seeing = (): Seeing => this.#seeing;
+  readonly where = (): Where => this.#where;
 
-  /** The system the scene's eye rests at, by its id; none at rest. */
-  readonly system = (): string | undefined => this.#system;
-
-  /** How many worlds the system the eye rests at holds; none at rest. */
-  readonly worlds = (): number => this.#worlds;
-
-  see(seeing: Seeing): void {
-    if (seeing === this.#seeing) return;
-    this.#seeing = seeing;
+  /** Writes where space is. */
+  set(change: Partial<Where>): void {
+    this.#where = { ...this.#where, ...change };
     this.#heard.tell();
   }
-
-  toggle(): void {
-    this.see(this.#seeing === "plan" ? "dynamic" : "plan");
-  }
-
-  readonly rest = (system: string | undefined, worlds = 0): void => {
-    if (system === this.#system && worlds === this.#worlds) return;
-    this.#system = system;
-    this.#worlds = worlds;
-    this.#heard.tell();
-  };
 }
 
-/** The page's one record of them. */
 export const views = new Views();
+/** The system the page shows, from its address (/s/<namespace>): none far out or at home. Known at the page's first render, before space
+ * says where it rests, so nothing shows the last place's words for a frame. */
+export const useResting = (): string | undefined => useParams()["system"];
+/** Whether the world `id` is one of `system`'s: a system is a namespace, its worlds' ids its own (layout.ts); the Earth's (D401, D501) holds
+ * the Earth and the worlds of every namespace that orbits it. */
+export const inSystem = (id: string, system: string): boolean =>
+  isHome(system)
+    ? id === EARTH || HOME_NAMESPACES.some((name) => id.startsWith(`${name}/`))
+    : id.startsWith(`${system}/`);
 
-/** Tells `scene` the reader's view, at once where it is the Plan, then at each change; what it returns stops the telling, the scene gone,
- * and no system rests then. */
-export function tellScene(scene: { see(plan: boolean): void }): () => void {
-  let told = false;
-  const tell = () => {
-    const plan = views.seeing() === "plan";
-    if (plan === told) return;
-    told = plan;
-    scene.see(plan);
-  };
-  tell();
-  const stop = views.subscribe(tell);
-  return () => {
-    stop();
-    views.rest(undefined);
-  };
-}
-
-/** What the scene says of where its eye rests, told to the page with how many worlds `count` gives that system (7v's card). */
-export const restsAt =
-  (count: (system: string) => number) =>
-  (system: string | undefined): void => {
-    views.rest(system, system === undefined ? 0 : count(system));
-  };
-
-const seenFirst = (): Seeing => "dynamic";
-const nowhere = () => undefined;
-
-/** How the reader looks, for a component. */
-export const useSeeing = (): Seeing => useSyncExternalStore(views.subscribe, views.seeing, seenFirst);
-
-/** The system the eye rests at, for a component; none on the server's page. */
-export const useResting = (): string | undefined => useSyncExternalStore(views.subscribe, views.system, nowhere);
-
-const none = () => 0;
-
-/** How many worlds the system the eye rests at holds, for a component. */
-export const useRestingWorlds = (): number => useSyncExternalStore(views.subscribe, views.worlds, none);
+/** How many worlds space's `system` holds, once space has laid it out there; none till then. */
+export const useRestingWorlds = (system: string | undefined): number | undefined =>
+  useSyncExternalStore(
+    views.subscribe,
+    () => (views.where().system === system ? views.where().worlds : undefined),
+    () => undefined,
+  );

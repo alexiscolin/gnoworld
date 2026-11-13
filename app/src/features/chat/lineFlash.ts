@@ -3,6 +3,7 @@
 import type { Line } from "@gnoworld/core";
 import type { FlashMessage } from "@gnoworld/ui";
 import { useState } from "react";
+import { copyText } from "../../lib/copy.ts";
 import { LINES_KEPT } from "../../store/chat.ts";
 import { roomHref } from "./names.ts";
 
@@ -18,21 +19,19 @@ export function useCopy() {
   const [said, setSaid] = useState<FlashMessage | null>(null);
   const copy = (line: Line, what: "text" | "link", room: string) => {
     setSaid(null);
-    const text = what === "text" ? line.text : new URL(roomHref(room), location.href).href;
-    // A page with no clipboard throws at once: inside a then, it fails as a refusal does.
-    Promise.resolve()
-      .then(() => navigator.clipboard.writeText(text))
-      .then(
-        () => {
-          setSaid({ title: what === "text" ? "Text copied." : "Link copied." });
-        },
-        () => {
-          setSaid({
-            title: what === "text" ? "Could not copy the text." : "Could not copy the link.",
-            line: "Your browser blocked the clipboard.",
-          });
-        },
-      );
+    const text = what === "text" ? line.text : new URL(roomHref(room) ?? "", location.href).href;
+    copyText(text)
+      .then((copied) => {
+        setSaid(
+          copied
+            ? { title: what === "text" ? "Text copied." : "Link copied." }
+            : {
+                title: what === "text" ? "Could not copy the text." : "Could not copy the link.",
+                line: "Your browser blocked the clipboard.",
+              },
+        );
+      })
+      .catch(reportError);
   };
   return { said, setSaid, copy };
 }

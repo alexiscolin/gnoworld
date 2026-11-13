@@ -60,12 +60,35 @@ describe("stationsRound", () => {
   });
 
   it("stands a station alone near the Earth: the nearest place that reads clear is taken first", () => {
-    const reach = Array.from({ length: 200 }, (_, n) => {
-      const [one] = stationsRound([{ seed: `alone ${String(n)}`, size: 0.5 }], ring).close;
-      return (one?.orbit.reach ?? Infinity) / EARTH_RADIUS;
-    });
-    // Measured: 3.90 Earth radii on average; the first clear place in the draws' own order stands at 5.60.
-    expect(reach.reduce((sum, one) => sum + one, 0) / reach.length).toBeLessThan(4.5);
+    const alone = Array.from(
+      { length: 200 },
+      (_, n) => stationsRound([{ seed: `alone ${String(n)}`, size: 0.5 }], ring).close[0],
+    );
+    const reach = alone.flatMap((one) => (one === undefined ? [] : [one.orbit.reach / EARTH_RADIUS]));
+    // With the Earth at x -12 (D459) 2 in 200 find no clear place and light the belt; the others stand at 4.34 Earth radii on average
+    // (measured 2026-11-09), where the first clear place in the draws' own order would stand near 5.6.
+    expect(alone.length - reach.length).toBeLessThanOrEqual(5);
+    expect(reach.reduce((sum, one) => sum + one, 0) / reach.length).toBeLessThan(4.8);
+  });
+
+  // D349: each station stands at the clear place farthest from those standing. On 40 random sets of four, the median least gap between
+  // two on the view at rest is 123 px; the nearest clear place instead gives 56 (measured 2026-11-07).
+  it("spreads the stations on the view at rest: the least gap between two, median over random sets, at 90 px or more", () => {
+    const [look] = looksFrom(earthCamera());
+    if (look === undefined) throw new Error("no screen");
+    const gaps = Array.from({ length: 40 }, (_, set) => {
+      const { close } = stationsRound(
+        Array.from({ length: 4 }, (_, n) => ({ seed: `spread ${String(set)} ${String(n)}`, size: 0.5 })),
+        ring,
+      );
+      const seen = close.map(({ place, radius }) => look.ball(place, radius));
+      return Math.min(
+        ...seen.flatMap((one, at) =>
+          seen.slice(at + 1).map((other) => Math.hypot(one.x - other.x, one.y - other.y) - one.radius - other.radius),
+        ),
+      );
+    }).toSorted((a, b) => a - b);
+    expect(gaps[20]).toBeGreaterThanOrEqual(90);
   });
 
   it("turns the bodies' orbits and their places on them all the way round", () => {
@@ -94,10 +117,10 @@ describe("stationsRound", () => {
       const seen = look.ball(place, radius);
       return Math.hypot(seen.x - earth.x, seen.y - earth.y) - seen.radius - earth.radius;
     };
-    expect(standsOn("edge 3", 0.05540347923023921, (one) => gap(one) === 0.4 * earth.radius + 24)).toBe(true);
-    expect(standsOn("edge 3", 0.6178026516015254, ({ place, radius }) => phone.ball(place, radius).right === 390)).toBe(
-      true,
-    );
+    expect(standsOn("edge 13", 0.26485211504642264, (one) => gap(one) === 0.4 * earth.radius + 24)).toBe(true);
+    expect(
+      standsOn("edge 11", 0.6977359369759794, ({ place, radius }) => phone.ball(place, radius).right === 390),
+    ).toBe(true);
   });
 
   // 7x: every rule a body stands by, on each of the video's screens, with what was placed before it: the files where each decides.

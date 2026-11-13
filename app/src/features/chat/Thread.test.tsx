@@ -192,7 +192,8 @@ describe("Thread", () => {
     const html = list(panel({ lines }), "In this thread");
     const [, guest = ""] = [...html.matchAll(/<li[^>]*>(.*?)<\/li>/gs)].map((found) => found[1] ?? "");
     expect(said(guest)).toContain("(guest)");
-    expect(guest).not.toContain("title=");
+    // No title on the guest's name (an account's address is its title); the time's full date is the one title (D13922).
+    expect(guest).not.toMatch(/<(?!time)[^>]* title=/);
     expect(said(items(html)[0] ?? "")).not.toContain("(guest)");
   });
 

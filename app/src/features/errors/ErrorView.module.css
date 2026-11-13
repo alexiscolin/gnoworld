@@ -1,0 +1,43 @@
+/* What a failure shows: the page's own star field in CSS, never the scene, which may be what failed. */
+@layer components {
+  .view {
+    position: relative;
+    padding-block: var(--space-m);
+    animation: arrive var(--motion-slow) var(--ease-standard) both;
+  }
+
+  .view[data-size="page"] {
+    /* raw: tall enough that the star field is a sky, not a strip */
+    min-block-size: 60vb;
+    padding-block: var(--space-2xl);
+    /* raw: a few stars of 1 to 2 px, scattered by hand */
+    background:
+      radial-gradient(circle at 12% 22%, var(--color-text-faint) 1px, transparent 1.5px),
+      radial-gradient(circle at 78% 14%, var(--color-text-muted) 1.5px, transparent 2px),
+      radial-gradient(circle at 90% 62%, var(--color-text-faint) 1px, transparent 1.5px),
+      radial-gradient(circle at 34% 80%, var(--color-text-muted) 1px, transparent 1.5px),
+      radial-gradient(circle at 60% 48%, var(--color-text-faint) 1.5px, transparent 2px),
+      radial-gradient(circle at 5% 70%, var(--color-text-faint) 1px, transparent 1.5px);
+  }
+
+  .line {
+    color: var(--color-text-muted);
+  }
+
+  .note {
+    font: var(--font-meta);
+    color: var(--color-text-faint);
+  }
+
+  .note pre {
+    overflow: auto;
+    white-space: pre-wrap;
+  }
+
+  /* Reduced motion keeps a short fade, never a cut. */
+  @keyframes arrive {
+    from {
+      opacity: 0;
+    }
+  }
+}

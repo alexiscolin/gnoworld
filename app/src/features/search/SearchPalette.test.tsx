@@ -5,37 +5,34 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { all, button, click, modals, nth, one, settled } from "../../../tests/mount.tsx";
 import { site } from "../../places.ts";
-import { visitKey } from "../../lib/visits.ts";
-import { SEARCH } from "../../scene/openEvent.ts";
-import { SearchPalette } from "./SearchPalette.tsx";
+import { SEARCH } from "../../space/openEvent.ts";
+import { SearchButton, SearchPalette } from "./SearchPalette.tsx";
 
-// The search drawer (slice 8's 8i; frames 98 to 100): opened by its button and by the chord, closed four ways, its passport block, its groups
-// and the row slice 11 fills. Where the browser's own focus, top layer and Esc are needed, the journeys walk it.
+// The search palette (D355): opened by its button, the chord, the slash and an event, closed four ways, its groups, ranking, prefixes,
+// chips, preview and keys. Where the browser's own focus, top layer and Esc are needed, the journeys walk it.
 vi.mock("../../topPill.tsx", () => import("../../../tests/pills.ts"));
 const seen = vi.hoisted(() => ({
-  count: vi.fn<() => number | null | undefined>(),
   file: vi.fn<() => unknown>(),
   here: vi.fn<() => Promise<unknown>>(),
   explore: vi.fn<() => Promise<string>>(),
-}));
-vi.mock("../universe/index.ts", async (original) => ({
-  ...(await original<object>()),
-  useWorldsCount: seen.count,
 }));
 vi.mock("../../worldsFile.ts", () => ({ useWorldsFile: seen.file }));
 vi.mock("../../lib/api/presence.ts", () => ({ pagePresenceApi: () => ({ read: seen.here }) }));
 vi.mock("../home/explore.ts", () => ({ exploreTo: seen.explore }));
 
+// What the file always gives a realm, which the Discover shelves read.
+const BARE = { functions: [], imports: [], deployerName: null, callers: 0, lastHeight: null };
 const universe = site.universeAt("/");
-const DAY = 86_400_000;
 
 function Page() {
-  const { pathname, hash } = useLocation();
+  const { pathname, hash, search } = useLocation();
   const navigate = useNavigate();
   return (
     <>
+      <SearchButton className="" emphasis="outline" />
       <SearchPalette universe={universe} />
       <output data-at="">{pathname + hash}</output>
+      <output data-search="">{search}</output>
       <button
         type="button"
         onClick={() => {
@@ -48,12 +45,16 @@ function Page() {
   );
 }
 
-const drawerOf = (box: HTMLElement) => box.querySelector<HTMLDialogElement>("dialog[data-side]");
+const drawerOf = (box: HTMLElement) => box.querySelector<HTMLDialogElement>("dialog");
 const isOpen = (box: HTMLElement) => drawerOf(box)?.open ?? false;
 const at = (box: HTMLElement) => one(box, "[data-at]").textContent;
-const field = (box: HTMLElement) => one(box, "input[role='combobox']");
-const labels = (box: HTMLElement) => all(box, "[role='option'] .truncate").map((each) => each.textContent);
+const searchOf = (box: HTMLElement) => one(box, "[data-search]").textContent;
+const field = (box: HTMLElement) => one(box, "input[type='search']");
+const rows = (box: HTMLElement) => all(box, "[role='option']");
+const labels = (box: HTMLElement) => rows(box).map((each) => each.querySelector("[class*='name']")?.textContent);
 const groups = (box: HTMLElement) => all(box, "[role='group'] .label").map((each) => each.textContent);
+const active = (box: HTMLElement) => rows(box).findIndex((each) => each.getAttribute("aria-selected") === "true");
+const preview = (box: HTMLElement) => one(box, "section[aria-label='Preview']");
 
 async function openIt(box: HTMLElement) {
   click(button(box, "Search"));
@@ -73,6 +74,13 @@ function type(input: HTMLElement, value: string) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
 }
+const press = (target: Element, key: string, over: KeyboardEventInit = {}) => {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...over });
+  act(() => {
+    target.dispatchEvent(event);
+  });
+  return event;
+};
 const chord = (over: KeyboardEventInit) => {
   const event = new KeyboardEvent("keydown", { key: "k", bubbles: true, cancelable: true, ...over });
   act(() => {
@@ -82,11 +90,13 @@ const chord = (over: KeyboardEventInit) => {
 };
 
 const reported = vi.fn();
-beforeAll(modals);
+beforeAll(() => {
+  modals();
+  Element.prototype.scrollIntoView = vi.fn();
+});
 beforeEach(() => {
   localStorage.clear();
   vi.stubGlobal("reportError", reported);
-  seen.count.mockReturnValue(undefined);
   seen.file.mockReturnValue(undefined);
   seen.here.mockResolvedValue({ ok: true, value: { worlds: [{ world: "bubble", here: 7 }] } });
 });
@@ -96,7 +106,7 @@ afterEach(() => {
   expect(reported).not.toHaveBeenCalled();
 });
 
-describe("opening the drawer", () => {
+describe("opening the palette", () => {
   it("is not drawn before it is asked: the first screen holds the button alone", async () => {
     const { box } = await mountInStore(<Page />);
     expect(drawerOf(box)).toBeNull();
@@ -127,6 +137,20 @@ describe("opening the drawer", () => {
     expect(drawerOf(box)).toBeNull();
   });
 
+  it("opens by the slash, but a slash typed in a field is a slash", async () => {
+    const { box } = await mountInStore(
+      <>
+        <Page />
+        <input aria-label="Elsewhere" />
+      </>,
+    );
+    const elsewhere = one(box, "input[aria-label='Elsewhere']");
+    expect(press(elsewhere, "/").defaultPrevented).toBe(false);
+    expect(drawerOf(box)).toBeNull();
+    expect(press(document.body, "/").defaultPrevented).toBe(true);
+    await settled(() => isOpen(box));
+  });
+
   it("keeps a dialog already open: the chord opens no second one", async () => {
     const { box } = await mountInStore(
       <>
@@ -135,11 +159,11 @@ describe("opening the drawer", () => {
       </>,
     );
     expect(chord({ metaKey: true }).defaultPrevented).toBe(true);
-    expect(drawerOf(box)).toBeNull();
+    expect(all(box, "dialog")).toHaveLength(1);
   });
 });
 
-describe("closing the drawer", () => {
+describe("closing the palette", () => {
   const cancel = (box: HTMLElement) => {
     const event = new Event("cancel", { cancelable: true });
     act(() => {
@@ -155,26 +179,18 @@ describe("closing the drawer", () => {
     expect(isOpen(box)).toBe(false);
   });
 
+  it("closes by Escape in the field, which holds words: the search field's own Escape would only clear them", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "zzz");
+    press(field(box), "Escape");
+    expect(isOpen(box)).toBe(false);
+  });
+
   it("closes by Close", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
     click(button(box, "Close"));
-    expect(isOpen(box)).toBe(false);
-  });
-
-  it("closes by a click beside it, and stays open for a click inside its box", async () => {
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    const dialog = drawerOf(box);
-    const press = (x: number) => {
-      act(() => {
-        dialog?.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: x, clientY: 0 }));
-      });
-    };
-    // jsdom lays nothing out: its box is empty at 0, 0, so a click at 0, 0 is inside it.
-    press(0);
-    expect(isOpen(box)).toBe(true);
-    press(500);
     expect(isOpen(box)).toBe(false);
   });
 
@@ -195,183 +211,103 @@ describe("closing the drawer", () => {
 });
 
 describe("the places", () => {
-  it("lists every place by kind in the order of the groups, each with its count", async () => {
+  it("opens on Discover, not on a list of places, and holds that list back till words are typed", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
-    const each = groups(box);
-    expect(each.map((label) => label.split(" · ")[0])).toEqual(
-      ["Ecosystems", "Hubs and DAOs", "Home", "Universes", "Stations"].filter((label) =>
-        each.some((got) => got.startsWith(label)),
-      ),
-    );
-    const total = each.reduce((sum, label) => sum + Number(label.split(" · ")[1]), 0);
-    expect(total).toBe(site.places.length);
+    expect(box.textContent).toContain("Reading the realms");
+    expect(rows(box)).toHaveLength(0);
+    expect(groups(box)).toEqual([]);
   });
 
-  it("narrows by the name typed, counts what is left, and Clear brings every place back", async () => {
+  it("ranks one list by the name typed, with a typo forgiven", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
-    const everything = labels(box).length;
     type(field(box), "bub");
-    expect(labels(box).length).toBeGreaterThan(0);
-    expect(labels(box).length).toBeLessThan(everything);
-    for (const label of labels(box)) expect(label.toLowerCase()).toContain("bub");
-    click(button(box, "Clear"));
-    expect(labels(box)).toHaveLength(everything);
-    expect(field(box)).toHaveProperty("value", "");
+    expect(labels(box)[0]).toBe("Bubble");
+    expect(groups(box)).toEqual([]);
+    type(field(box), "bubbel");
+    expect(labels(box)).toContain("Bubble");
   });
 
-  it("lists no place for a query none holds, and offers no Clear for an empty field", async () => {
+  it("says so for a query none holds, and for an address, which no page holds", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
-    expect(button(box, "Clear")).toBeUndefined();
     type(field(box), "zzzz-nothing");
-    expect(labels(box)).toEqual([]);
+    expect(rows(box)).toHaveLength(0);
+    expect(box.textContent).toContain("No place answers");
+    type(field(box), `g1${"q".repeat(38)}`);
+    expect(box.textContent).toContain("No page holds an address yet.");
   });
 
   it("shows the people in a world beside it, from the server's presence", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
-    const bubble = all(box, "[role='option']").find((each) => each.textContent.includes("Bubble"));
-    await settled(() => bubble?.textContent.endsWith("7") ?? false);
-    expect(bubble?.textContent.endsWith("7")).toBe(true);
+    type(field(box), "bub");
+    const bubble = rows(box).find((each) => each.textContent.includes("Bubble"));
+    await settled(() => bubble?.textContent.includes("7 here") ?? false);
+    expect(bubble?.textContent).toContain("7 here");
   });
 
   it("shows no count when the server says nothing", async () => {
     seen.here.mockResolvedValue({ ok: false });
     const { box } = await mountInStore(<Page />);
     await openIt(box);
+    type(field(box), "bub");
     await act(async () => {
       await Promise.resolve();
     });
-    const bubble = all(box, "[role='option']").find((each) => each.textContent.includes("Bubble"));
-    // Its name and its kind's tag (8p, frame 98), and no count.
-    expect(bubble?.textContent).toBe("BubbledApp");
+    expect(rows(box).find((each) => each.textContent.includes("Bubble"))?.textContent).not.toContain("here");
   });
 
-  it("goes to a place chosen and closes", async () => {
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    const bubble = all(box, "[role='option']").find((each) => each.textContent.includes("Bubble"));
-    click(bubble);
-    await settled(() => at(box) === "/w/bubble");
-    expect(isOpen(box)).toBe(false);
-  });
-});
-
-describe("the coming-soon row", () => {
-  it("is there while nothing is typed and while the query is part of its name", async () => {
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    expect(box.textContent).toContain("Satellites anyone can rent");
-    type(field(box), "satel");
-    expect(box.textContent).toContain("Satellites anyone can rent");
-  });
-
-  it("is gone for a query that is no part of its name, whatever the case", async () => {
+  it("goes to a place chosen by a click, closes, and keeps it as the recent one", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
     type(field(box), "bub");
-    expect(box.textContent).not.toContain("Satellites anyone can rent");
-    type(field(box), "  SPONSORED ");
-    expect(box.textContent).toContain("Satellites anyone can rent");
+    click(rows(box).find((each) => each.textContent.includes("Bubble")));
+    await settled(() => at(box) === "/w/bubble");
+    expect(isOpen(box)).toBe(false);
+    expect(localStorage.getItem("gnoworld:recent-places")).toBe("/w/bubble");
   });
 });
 
-describe("the passport block", () => {
-  const block = (box: HTMLElement) => one(box, "section[aria-label='Your passport']");
-
-  it("counts the worlds this device stamped in the universe, out of those listed", async () => {
-    localStorage.setItem(
-      "gnoworld:device:stamps",
-      JSON.stringify({
-        [`${universe.id}:a`]: "2026-11-01",
-        [`${universe.id}:b`]: "2026-11-02",
-        "other:c": "2026-11-02",
-      }),
-    );
-    seen.count.mockReturnValue(19);
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    await settled(() => block(box).textContent.includes("/ 19"));
-    expect(block(box).textContent).toContain("2 / 19");
-  });
-
-  it("shows the stamps alone while the listed count is unknown", async () => {
-    localStorage.setItem("gnoworld:device:stamps", JSON.stringify({ [`${universe.id}:a`]: "2026-11-01" }));
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    expect(block(box).textContent).toContain("1");
-    expect(block(box).textContent).not.toContain("/");
-  });
-
-  it("never lets the stamps pass the listed", async () => {
-    localStorage.setItem(
-      "gnoworld:device:stamps",
-      JSON.stringify({ [`${universe.id}:a`]: "2026-11-01", [`${universe.id}:b`]: "2026-11-02" }),
-    );
-    seen.count.mockReturnValue(1);
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    await settled(() => block(box).textContent.includes("/"));
-    expect(block(box).textContent).toContain("2 / 2");
-  });
-
-  const world = (id: string, seenAt: string | null) => ({ id, namespace: id, realms: [], seen: seenAt });
-  const signals = async (box: HTMLElement) => {
-    const left = () => all(block(box), "p").find((each) => each.textContent.includes("signal"));
-    await settled(() => left() !== undefined);
-    return left()?.textContent;
-  };
-
-  it("counts the signals left: worlds seen under a week ago that this reader has not visited", async () => {
-    const now = Date.now();
-    const ago = (days: number) => new Date(now - days * DAY).toISOString();
+describe("the prefixes", () => {
+  it("# finds a room and its place, @ a system and the realms of a namespace, /r/ a realm, from the worlds' file", async () => {
     seen.file.mockReturnValue([
-      world("new", ago(1)),
-      world("visited", ago(1)),
-      world("old", ago(30)),
-      world("unknown", null),
+      {
+        id: "gnoswap/router",
+        namespace: "gnoswap",
+        realms: [{ path: "gno.land/r/gnoswap/v1/router", ...BARE }],
+        seen: null,
+      },
     ]);
-    localStorage.setItem(visitKey(universe.id, "visited"), "1");
     const { box } = await mountInStore(<Page />);
     await openIt(box);
-    expect(await signals(box)).toBe("1 signal left to find");
+    type(field(box), "#bubb");
+    expect(rows(box).map((each) => each.textContent)).toEqual([expect.stringContaining("#bubble · room")]);
+    type(field(box), "@gnoswap");
+    expect(labels(box)).toEqual(["gnoswap", "gnoswap/v1/router"]);
+    type(field(box), "/r/gnoswap/v1/router");
+    expect(labels(box)).toEqual(["gnoswap/v1/router"]);
   });
 
-  it("says signals in the plural, and when none is left", async () => {
-    const recent = new Date(Date.now() - DAY).toISOString();
-    seen.file.mockReturnValue([world("a", recent), world("b", recent)]);
+  it("> lists the commands, and > earth goes to the Earth", async () => {
     const { box } = await mountInStore(<Page />);
     await openIt(box);
-    expect(await signals(box)).toBe("2 signals left to find");
-    click(button(box, "Close"));
-    seen.file.mockReturnValue([world("a", null)]);
-    click(button(box, "Search"));
-    await settled(() => isOpen(box));
-    expect(await signals(box)).toBe("No signal left to find");
-  });
-
-  it("says no signal until the worlds' file has come", async () => {
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    expect(block(box).textContent).not.toContain("signal");
-  });
-
-  it("opens the passport over the page and closes the drawer", async () => {
-    const { box } = await mountInStore(<Page />);
-    await openIt(box);
-    click(button(box, "Open your passport"));
+    type(field(box), ">");
+    expect(labels(box)).toEqual(["earth", "universe", "plan", "explore"]);
+    type(field(box), "> earth");
+    press(field(box), "Enter");
+    await settled(() => at(box) === universe.earth.path);
     expect(isOpen(box)).toBe(false);
-    expect(at(box)).toMatch(/#passport$/);
   });
 
-  it("goes explore from the drawer, to the world the server names, closing it with the page", async () => {
+  it("> explore goes where the server names", async () => {
     seen.explore.mockResolvedValue("/w/govdao");
     const { box } = await mountInStore(<Page />);
     await openIt(box);
+    type(field(box), "> explore");
     await act(async () => {
-      nth(all(block(box), "a"), 0).click();
+      press(field(box), "Enter");
       await vi.dynamicImportSettled();
     });
     await settled(() => at(box) === "/w/govdao");
@@ -379,36 +315,341 @@ describe("the passport block", () => {
   });
 });
 
-// The search drawer opened from outside the header (F5462, 8n): a full Plan's "+N" asks it, as an event, open on the namespace's words;
-// each ask starts from its own words, and its button and chord open on none (G3).
-describe("the search drawer asked from the page", () => {
+describe("a long list", () => {
+  const many = Array.from({ length: 60 }, (_, n) => ({
+    id: `big/realm${String(n)}`,
+    namespace: n < 30 ? "big" : "small",
+    realms: [{ path: `gno.land/r/big/realm${String(n)}`, calls: n, ...BARE }],
+    seen: null,
+  }));
+
+  it("draws the best 50 and says how many more answered", async () => {
+    seen.file.mockReturnValue(many);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "/r/realm");
+    expect(rows(box)).toHaveLength(50);
+    expect(box.textContent).toContain("10 more · refine");
+  });
+
+  it("narrows to a namespace by its chip, the busiest offered, and orders by the sort", async () => {
+    seen.file.mockReturnValue(many);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "@");
+    click(button(box, "@big"));
+    type(field(box), "/r/realm");
+    expect(rows(box)).toHaveLength(30);
+    expect(box.textContent).not.toContain("more · refine");
+    const sort = one(box, "select[aria-label='Sort by']") as HTMLSelectElement;
+    act(() => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")?.set?.call(sort, "name");
+      sort.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    expect(labels(box)[0]).toBe("big/realm0");
+  });
+});
+
+describe("Discover's Following shelf", () => {
+  it("counts the worlds followed, listed by the palette's rows, one world each, even with no realm in the file", async () => {
+    seen.file.mockReturnValue([
+      { id: "other", namespace: "oth", realms: [{ path: "gno.land/r/oth/thing", calls: 9, ...BARE }], seen: null },
+    ]);
+    const { box, store } = await mountInStore(<Page />);
+    act(() => {
+      store.getState().deviceActions.change("follows", (held) => ({ ...held, worlds: [`${universe.id}:bubble`] }));
+    });
+    await openIt(box);
+    const shelf = () => box.querySelector<HTMLElement>("[data-shelf='following']");
+    await settled(() => shelf() !== null);
+    expect(shelf()?.textContent).toBe("Following1");
+    click(shelf() ?? undefined);
+    const worlds = () => all(box, "[aria-label='Places'] [role='option']").map((each) => each.textContent);
+    await settled(() => worlds().length > 0);
+    expect(worlds()).toHaveLength(1);
+    expect(worlds()[0]).toContain("Bubble");
+    expect(box.textContent).toContain("1 world");
+    expect(box.textContent).toContain("No realm in the file yet");
+  });
+});
+
+describe("the namespace chips", () => {
+  const file = [
+    { id: "big/a", namespace: "big", realms: [{ path: "gno.land/r/big/a", calls: 5, ...BARE }], seen: null },
+  ];
+
+  it("show only while the field starts with @, where they help", async () => {
+    seen.file.mockReturnValue(file);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    expect(button(box, "@big")).toBeUndefined();
+    type(field(box), "gno");
+    expect(button(box, "@big")).toBeUndefined();
+    type(field(box), "@");
+    expect(button(box, "@big")).toBeDefined();
+  });
+});
+
+describe("the chips", () => {
+  it("narrow the list, one pressed at a time, and press again to clear", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "e");
+    const all_ = rows(box).length;
+    click(button(box, "People here"));
+    await settled(() => rows(box).some((each) => each.textContent.includes("Bubble")));
+    expect(rows(box).length).toBeLessThan(all_);
+    expect(button(box, "People here")?.getAttribute("aria-pressed")).toBe("true");
+    click(button(box, "People here"));
+    expect(rows(box)).toHaveLength(all_);
+  });
+});
+
+describe("the keys and the preview", () => {
+  it("the field is a combobox that names the chosen row, as a screen reader follows it", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "gno");
+    press(field(box), "ArrowDown");
+    const chosen = rows(box)[active(box)];
+    expect(field(box).getAttribute("role")).toBe("combobox");
+    expect(chosen?.id).toBeTruthy();
+    expect(field(box).getAttribute("aria-activedescendant")).toBe(chosen?.id);
+    expect(field(box).getAttribute("aria-controls")).toBe(chosen?.closest("[role='listbox']")?.id);
+  });
+
+  it("↑↓ choose round the ends, and the preview follows the chosen place", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bub");
+    expect(active(box)).toBe(0);
+    expect(preview(box).textContent).toContain("Bubble");
+    press(field(box), "ArrowUp");
+    expect(active(box)).toBe(rows(box).length - 1);
+    press(field(box), "ArrowDown");
+    expect(active(box)).toBe(0);
+  });
+
+  it("shows the preview's kind, description, rooms and actions", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bubble");
+    const shown = preview(box).textContent;
+    expect(shown).toContain("#bubble");
+    // The keys are for a screen reader (aria-keyshortcuts), never drawn on the buttons.
+    const keys = (name: string) => button(preview(box), name)?.getAttribute("aria-keyshortcuts");
+    expect(keys("Go")).toBe("Enter");
+    expect(keys("Chat")).toBe("Shift+Enter");
+    expect(shown).toContain("Copy link");
+  });
+
+  it("Enter goes to the chosen place", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bubble");
+    press(field(box), "Enter");
+    await settled(() => at(box) === "/w/bubble");
+    expect(isOpen(box)).toBe(false);
+  });
+
+  it("Shift+Enter goes to a world's own page, where its chat is docked, and from the universe to its Earth", async () => {
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bubble");
+    press(field(box), "Enter", { shiftKey: true });
+    await settled(() => at(box) === "/w/bubble");
+    click(button(box, "Leave"));
+    await openIt(box);
+    type(field(box), universe.name);
+    press(field(box), "Enter", { shiftKey: true });
+    await settled(() => at(box) === universe.earth.path);
+    expect(isOpen(box)).toBe(false);
+  });
+
+  it("⌘C copies the chosen place's link, but leaves a selection in the field alone", async () => {
+    const write = vi.fn(() => Promise.resolve());
+    vi.stubGlobal("navigator", { clipboard: { writeText: write } });
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bubble");
+    expect(press(field(box), "c", { metaKey: true }).defaultPrevented).toBe(true);
+    expect(write).toHaveBeenCalledWith(`${location.origin}/w/bubble`);
+    const input = field(box) as HTMLInputElement;
+    input.setSelectionRange(0, 3);
+    expect(press(input, "c", { metaKey: true }).defaultPrevented).toBe(false);
+  });
+});
+
+describe("the palette's copy that fails", () => {
+  it.each([
+    ["refused", { clipboard: { writeText: () => Promise.reject(new Error("denied")) } }],
+    ["with no clipboard, a page that is not secure", {}],
+  ])("says it could not copy where Copied shows, %s", async (_, navigator) => {
+    vi.stubGlobal("navigator", navigator);
+    const report = vi.fn();
+    vi.stubGlobal("reportError", report);
+    const { box } = await mountInStore(<Page />);
+    await openIt(box);
+    type(field(box), "bubble");
+    press(field(box), "c", { metaKey: true });
+    await settled(() => preview(box).textContent.includes("Could not copy"));
+    expect(preview(box).textContent).not.toContain("Copied");
+    expect(report).not.toHaveBeenCalled();
+  });
+});
+
+describe("the palette asked from the page", () => {
   const ask = (detail: unknown) => {
     act(() => {
       window.dispatchEvent(new CustomEvent(SEARCH, { detail }));
     });
   };
 
-  it("opens on the words it is asked, each time on its own", async () => {
+  it("opens on the namespace it is asked, each time on its own", async () => {
     const { box } = await mountInStore(<Page />);
     ask("gnoswap");
     await settled(() => isOpen(box));
-    expect(field(box)).toHaveProperty("value", "gnoswap");
+    expect(field(box)).toHaveProperty("value", "@gnoswap");
     ask("samcrew");
-    await settled(() => (field(box) as HTMLInputElement).value === "samcrew");
-    expect(field(box)).toHaveProperty("value", "samcrew");
+    await settled(() => (field(box) as HTMLInputElement).value === "@samcrew");
   });
 
-  it("takes no words that are not text", async () => {
+  it("opens on the empty field for the rail's tab, and for no words that are not text", async () => {
     const { box } = await mountInStore(<Page />);
-    ask({ evil: true });
+    ask("");
     await settled(() => isOpen(box));
+    expect(field(box)).toHaveProperty("value", "");
+    ask({ evil: true });
     expect(field(box)).toHaveProperty("value", "");
   });
 
   it("opens on no words from its button after a Plan asked it on its own", async () => {
     const { box } = await mountInStore(<Page />);
     ask("gnoswap");
-    await settled(() => (field(box) as HTMLInputElement).value === "gnoswap");
+    await settled(() => (field(box) as HTMLInputElement).value === "@gnoswap");
     expect(await reopened(box)).toHaveProperty("value", "");
+  });
+});
+
+// Where the buttons that open a chat lead (useGo.chat, SearchDialog's talk): a realm with a page of its own opens its own room, full; a
+// world, the Earth and the universe their pages; a room and a person their addresses; from the full chat the place's chat page, full.
+describe("the chat and fly buttons", () => {
+  const rowOf = (world: string, path: string) => ({ ...BARE, path, functions: ["Render"], calls: 5, world });
+  const fileOf = (id: string, path: string) => [{ id, namespace: id, realms: [rowOf(id, path)], seen: null }];
+  const ROOM = { lines: [], members: ["kai"], topic: undefined, refused: undefined, typing: {}, read: undefined };
+
+  // Each test mounts its own store and router, so follows, location and dialog start clean; the full chat's mark is the page's own, put back
+  // here. A wait that fails does so inside the test's 5 s, never as a loop left running into the next test.
+  afterEach(() => {
+    delete document.documentElement.dataset["chat"];
+  });
+  // Discover's detail of the one realm the file holds, open: the shelf of the unvisited, its card.
+  async function detailOf(file: ReturnType<typeof fileOf>) {
+    seen.file.mockReturnValue(file);
+    const mounted = await mountInStore(<Page />);
+    await openIt(mounted.box);
+    await settled(() => mounted.box.querySelector("[data-shelf='unseen']") !== null);
+    click(one(mounted.box, "[data-shelf='unseen']"));
+    await settled(() => mounted.box.querySelector("[data-card]") !== null);
+    click(one(mounted.box, "[data-card]"));
+    const detail = one(mounted.box, "section[aria-label='Realm detail']");
+    return { ...mounted, detail };
+  }
+
+  describe("in Discover's detail of a realm", () => {
+    it("Chat opens a realm with a page of its own in its own room, full: never the Earth's", async () => {
+      const { box, detail } = await detailOf(fileOf("bub", "gno.land/r/bub/pop"));
+      click(button(detail, "Chat"));
+      await settled(() => at(box) === "/r/bub/pop");
+      expect(searchOf(box)).toBe("?chat=full");
+      expect(isOpen(box)).toBe(false);
+    });
+
+    it("Fly there goes to the realm's page", async () => {
+      const { box, detail } = await detailOf(fileOf("bub", "gno.land/r/bub/pop"));
+      click(button(detail, "Fly there"));
+      await settled(() => at(box) === "/r/bub/pop");
+      expect(searchOf(box)).toBe("");
+    });
+
+    it("Follow follows the realm's world, and a second press stops", async () => {
+      const { store, detail } = await detailOf(fileOf("bub", "gno.land/r/bub/pop"));
+      const followed = () => store.getState().device.follows.worlds;
+      click(button(detail, "Follow"));
+      expect(followed()).toContain(`${universe.id}:bub`);
+      click(button(detail, "Following"));
+      expect(followed()).not.toContain(`${universe.id}:bub`);
+    });
+
+    it("Chat of a realm with no page of its own opens its world's chat where the world has a page, else the Earth's", async () => {
+      const own = await detailOf(fileOf("bubble", "other.chain/r/x"));
+      click(button(own.detail, "Chat"));
+      await settled(() => at(own.box) === "/w/bubble");
+      expect(searchOf(own.box)).toBe("");
+    });
+
+    it("Chat of a realm with no page and a world with none opens the Earth's", async () => {
+      const { box, detail } = await detailOf(fileOf("nowhere", "other.chain/r/x"));
+      click(button(detail, "Chat"));
+      await settled(() => at(box) === universe.earth.path);
+      expect(searchOf(box)).toBe("");
+    });
+  });
+
+  // Where Shift+Enter, and the preview's Chat where it has one, lead from `words`.
+  async function chatFrom(words: string, how: "keys" | "button") {
+    seen.file.mockReturnValue(fileOf("bub", "gno.land/r/bub/pop"));
+    const { box, store } = await mountInStore(<Page />);
+    act(() => {
+      store.setState({
+        chat: {
+          me: undefined,
+          rooms: { "#bubble/games": ROOM },
+          listed: [{ name: null, rooms: [{ room: "#bubble/games", type: "open" }] }],
+        },
+      });
+    });
+    await openIt(box);
+    type(field(box), words);
+    await settled(() => rows(box).length > 0);
+    if (how === "keys") press(field(box), "Enter", { shiftKey: true });
+    else click(button(box, "Chat"));
+    await settled(() => !isOpen(box));
+    return `${at(box)}${searchOf(box)}`;
+  }
+
+  describe("in the typed palette", () => {
+    const places = [
+      ["a realm", "pop", "/r/bub/pop?chat=full"],
+      ["a world", "bubble", "/w/bubble"],
+      ["the Earth", `Earth of ${universe.name}`, universe.earth.path],
+    ] as const;
+    for (const [what, words, to] of places) {
+      it(`Shift+Enter and the preview's Chat open ${what} at its own place`, async () => {
+        expect(await chatFrom(words, "keys")).toBe(to);
+        expect(await chatFrom(words, "button")).toBe(to);
+      });
+    }
+
+    it("Shift+Enter on a room and on a person goes to their own address", async () => {
+      expect(await chatFrom("#games", "keys")).toBe("/w/bubble?room=games");
+      expect(await chatFrom("kai", "keys")).toBe("/w/bubble?room=games");
+    });
+  });
+
+  describe("from inside the full chat", () => {
+    const full = [
+      ["a realm", "pop", "/r/bub/pop?chat=full"],
+      ["a world", "bubble", "/w/bubble?chat=full"],
+      ["the Earth", `Earth of ${universe.name}`, `${universe.earth.path}?chat=full`],
+      ["a room", "#games", "/w/bubble?room=games&chat=full"],
+      ["a person", "kai", "/w/bubble?room=games&chat=full"],
+    ] as const;
+    for (const [what, words, to] of full) {
+      it(`Shift+Enter on ${what} stays in the full chat, on its own place`, async () => {
+        document.documentElement.dataset["chat"] = "full";
+        expect(await chatFrom(words, "keys")).toBe(to);
+      });
+    }
   });
 });

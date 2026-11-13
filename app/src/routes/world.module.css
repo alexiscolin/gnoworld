@@ -1,30 +1,10 @@
-/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26); and the plate's actions, set
-   off the words over them as frame 26 sets them. */
+/* The world's chat slot, inside the dock: it fills it, so the chat keeps the dock's whole height (frame 26). The
+   plate's sections, its figures and its actions among them, are spaced by the plate itself (Panel.module.css, D470). */
 @layer components {
   .chat {
+    /* layout: the chat's skeleton stands over it while it comes (features/chat/DockCover.tsx) */
+    position: relative;
     /* layout: the chat takes the dock's height */
     block-size: 100%;
-  }
-
-  .realm {
-    /* raw: the realm card with its three facts and its source line, and the links out under it, as 8g draws them: a phone's column wraps
-       the card's lines, 219 px measured at 390 px */
-    min-block-size: 14rem;
-  }
-
-  /* raw: the plate's column beside the dock (Panel.module.css), where the card's lines hold on one line each: 181 px measured at 1728 px */
-  @media (min-width: 1280px) {
-    .realm {
-      /* raw: 181 px measured at 1728 px, its lines on one line each */
-      min-block-size: 11.5rem;
-    }
-  }
-
-  /* raw: the dock's breakpoint (ChatScreen.tsx, Panel.module.css) */
-  @media (min-width: 1280px) {
-    .actions {
-      /* layout: frame 26 stands its actions 30 px under the words' ink over them (544 to 574): the column's step and one more */
-      margin-block-start: var(--space-xs);
-    }
   }
 }

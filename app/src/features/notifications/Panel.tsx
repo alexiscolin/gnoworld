@@ -6,9 +6,9 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "re
 import { useLocation } from "react-router";
 import { createPortal } from "react-dom";
 import { FOLLOWS_KEPT } from "../../lib/keep/fields.ts";
+import { useHere } from "../../useHere.ts";
 import { useLeaving } from "../../leaving.tsx";
 import { useAppStore } from "../../storeContext.tsx";
-import { pagePresenceApi } from "../../lib/api/presence.ts";
 import { placeOf, universeAt } from "../events/index.ts";
 import { isUnread, type Item, type NoticeKind } from "./feed.ts";
 import { Head, Line, WorldChips } from "./PanelParts.tsx";
@@ -47,25 +47,6 @@ function useDismiss(panel: RefObject<HTMLElement | null>, onClose: () => void) {
   }, [panel, onClose]);
 }
 
-// Who is here now in each world, as the server counts it, read once as the panel opens: the followed worlds' activity. None until it
-// answers, or if it does not.
-function useHere(): ReadonlyMap<string, number> {
-  const [here, setHere] = useState<ReadonlyMap<string, number>>(() => new Map());
-  useEffect(() => {
-    let current = true;
-    pagePresenceApi()
-      .read()
-      .then((answer) => {
-        if (current && answer.ok)
-          setHere(new Map(answer.value.worlds.map(({ world, here: people }) => [world, people])));
-      }, reportError);
-    return () => {
-      current = false;
-    };
-  }, []);
-  return here;
-}
-
 // What marks lines read on this device: some by their ids, or all of them, every line up to now and by their ids the lines shown that
 // `through` misses (an event to come is later than now, a followed world's row has no time), the rooms' notices seen with them.
 function useMarkRead(now: number, shown: readonly Item[]) {
@@ -80,12 +61,44 @@ function useMarkRead(now: number, shown: readonly Item[]) {
   };
 }
 
-export function Panel({ onClose }: { onClose: () => void }) {
+// The panel shut, once it has left: hidePopover starts the exit (surface.module.css), and the animations it made are done when `onGone` is told.
+// A panel shown again while it leaves is not told.
+function useShown(panel: RefObject<HTMLElement | null>, open: boolean, onGone: (() => void) | undefined) {
+  const openRef = useRef(open);
+  const goneRef = useRef(onGone);
+  useEffect(() => {
+    goneRef.current = onGone;
+  });
+  useLayoutEffect(() => {
+    openRef.current = open;
+    const box = panel.current;
+    if (box === null) return;
+    box.togglePopover(open);
+    if (open) return;
+    const left = "getAnimations" in box ? box.getAnimations().map((animation) => animation.finished) : [];
+    Promise.allSettled(left)
+      .then(() => {
+        if (!openRef.current) goneRef.current?.();
+      })
+      .catch(reportError);
+  }, [panel, open]);
+}
+
+export function Panel({
+  onClose,
+  open: showing = true,
+  onGone,
+}: {
+  onClose: () => void;
+  /** False while it leaves: the bell keeps it mounted until `onGone`. */
+  open?: boolean;
+  onGone?: () => void;
+}) {
   const [now] = useState(Date.now);
   const panelRef = useRef<HTMLDivElement>(null);
   useDismiss(panelRef, onClose);
   const universe = universeAt(useLocation().pathname);
-  const { items, read } = useFeed(now, useHere());
+  const { items, read } = useFeed(now, useHere(true));
   const [kind, setKind] = useState<"all" | NoticeKind>("all");
   const [world, setWorld] = useState<string>();
   const leaving = useLeaving();
@@ -97,15 +110,13 @@ export function Panel({ onClose }: { onClose: () => void }) {
   );
   const open = (item: Item) => {
     markRead([item.id]);
-    if (item.external === true) leaving.ask(item.href);
+    if (item.external === true && item.href !== undefined) leaving.ask(item.href);
     else onClose();
   };
   // In the top layer, over the dock and its full chat alike; it closes itself (useDismiss), so the browser's light dismiss is not asked.
-  useLayoutEffect(() => {
-    panelRef.current?.showPopover();
-  }, []);
+  useShown(panelRef, showing, onGone);
   return createPortal(
-    <div ref={panelRef} className={styles["place"]} popover="manual">
+    <div ref={panelRef} className={styles["place"]} popover="manual" data-takes-escape="" inert={!showing}>
       <Surface label="Notifications" look="floating">
         <Head
           onMarkAll={() => {
@@ -130,7 +141,7 @@ export function Panel({ onClose }: { onClose: () => void }) {
         {shown.length === 0 ? (
           <EmptyState title="Nothing here" line="What you are told of comes here." level={3} />
         ) : (
-          <ol className={styles["list"]}>
+          <ol key={`${kind}:${world ?? ""}`} className={[styles["list"], "enter"].join(" ")}>
             {shown.map((item) => (
               <Line key={item.id} item={item} now={now} unread={isUnread(item, read)} onOpen={open} />
             ))}
@@ -140,7 +151,7 @@ export function Panel({ onClose }: { onClose: () => void }) {
         <ComingSoon name="New realms and proposals, from the chain">
           New realms and proposals, from the chain
         </ComingSoon>
-        <p className={styles["note"]}>What you have read is kept on this device alone.</p>
+        <p className="meta">What you have read is kept on this device alone.</p>
       </Surface>
       {leaving.dialog}
     </div>,

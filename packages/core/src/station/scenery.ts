@@ -4,6 +4,7 @@
 // gaps: Mars close to the eye and cut by the frame's foot, Venus in the middle distance, Jupiter, Saturn and its ring far, Neptune a speck.
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
+import { clamp01 } from "../space/smooth.ts";
 import { cameraTowards, DEGREE, eyeAt, focalOf, REST_SCREENS, type Camera } from "../frame/restLook.ts";
 
 export interface Scenery {
@@ -31,7 +32,7 @@ export function offEarthViews({ x, y, z }: Point): number {
   const way = { x: to.x - from.x, y: to.y - from.y, z: to.z - from.z };
   const along =
     ((x - from.x) * way.x + (y - from.y) * way.y + (z - from.z) * way.z) / (way.x ** 2 + way.y ** 2 + way.z ** 2);
-  const share = Math.min(1, Math.max(0, along));
+  const share = clamp01(along);
   return Math.hypot(x - from.x - way.x * share, y - from.y - way.y * share, z - from.z - way.z * share);
 }
 

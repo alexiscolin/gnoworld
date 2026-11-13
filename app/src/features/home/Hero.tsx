@@ -3,13 +3,16 @@
 // la vidéo"); where the server does not say (another universe, a server down), the number counts the worlds the page gives it, as before.
 // No sample: none while none is known.
 import type { PresencePeople } from "@gnoworld/schemas/indexer";
-import { Icon, Kicker } from "@gnoworld/ui";
-import type { ReactNode } from "react";
+import { Icon, Kicker, sightRef } from "@gnoworld/ui";
+import { useRef, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router";
 import type { UniverseView } from "../../places.ts";
 import { GoExplore } from "./GoExplore.tsx";
+import { Network } from "./Network.tsx";
 import styles from "./Hero.module.css";
-import { Live } from "./Live.tsx";
+import { Lenses } from "../../Lenses.tsx";
+import { useSwapped } from "../../swapped.ts";
+import { fullChatHref, leaveDock } from "../../fullChat.ts";
 
 // ADR-0003 §2, 2a: what a world is, after the count; nothing of it where the universe holds none.
 const TALK = ". Each one is a place to talk.";
@@ -17,18 +20,17 @@ const TALK = ". Each one is a place to talk.";
 // The line's count, its figure and its word: the figure's room kept while the number comes (7n). While it comes, a page read with no script
 // says "Worlds in", a sentence (F4641); the stylesheet draws the count's word.
 const WORLDS = { one: "world", many: "worlds", coming: "Worlds", data: "figure" } as const;
-const COUNTRIES = { one: "country", many: "countries", coming: "Countries", data: "countries" } as const;
 
-function Count({ count, words = WORLDS }: { count: number | undefined; words?: typeof WORLDS | typeof COUNTRIES }) {
+function Count({ count }: { count: number | undefined }) {
   return (
     <strong className={styles["count"]}>
-      <span className={styles["figure"]} data-hero={words.data}>
+      <span className={styles["figure"]} data-hero={WORLDS.data}>
         {count}
       </span>
       {count === undefined ? (
-        <span className={styles["coming"]}>{words.coming}</span>
+        <span className={styles["coming"]}>{WORLDS.coming}</span>
       ) : (
-        ` ${count === 1 ? words.one : words.many}`
+        ` ${count === 1 ? WORLDS.one : WORLDS.many}`
       )}
     </strong>
   );
@@ -37,20 +39,11 @@ function Count({ count, words = WORLDS }: { count: number | undefined; words?: t
 /** Who is online once the server said, or "coming" while it is asked. */
 export type People = PresencePeople | "coming";
 
-// The people's line (frame 6): "People in 31 countries, across 18 worlds."; the countries left out while nobody online shows one.
+// The people's line, which the number beside it begins (Alexis, 2026-11-09: short, read with the number): "3 people exploring 594 worlds."
 function PeopleLine({ people, worlds }: { people: PresencePeople; worlds: number | undefined }) {
-  const { countries } = people;
   return (
     <h1 className={styles["heading"]} tabIndex={-1}>
-      {countries === 0 ? (
-        "People"
-      ) : (
-        <>
-          {"People in "}
-          <Count count={countries} words={COUNTRIES} />
-        </>
-      )}
-      {", across "}
+      {people.online === 1 ? "person exploring " : "people exploring "}
       <Count count={worlds} />.
     </h1>
   );
@@ -75,66 +68,144 @@ function WorldsLine({ name, worlds, coming }: { name: string; worlds: number | u
   );
 }
 
-// The big number: the people online with "ONLINE" up its side (frame 6, drawn by the stylesheet, so the number's text stays the count), or
-// the worlds where no server counts people. A figure space keeps its line while none is known: the page does not jump when it comes.
+// The big number: the people online, "Online" its kicker, or the worlds where no server counts people. A figure space keeps its line while
+// none is known: the page does not jump when it comes.
 function Big({ people, worlds }: { people: People | undefined; worlds: number | undefined }) {
   const shown = people === undefined ? worlds : people === "coming" ? undefined : people.online;
   return (
-    <p className={styles["number"]} data-hero="number" data-online={typeof people === "object" ? "" : undefined}>
+    <p className={styles["number"]} data-hero="number">
       {shown ?? "\u2007"}
     </p>
   );
 }
 
-/** `coming`: no number yet, but one is on its way (the worlds' count is being read). `people`: who is online, none where no server counts
- * them. `newcomer`: the reader has entered no place yet, so the Earth's label says "Start here", the one filled call (ADR-0003 §3). */
-export function Hero({
-  universe,
-  worlds,
-  people,
-  coming = false,
-  newcomer = false,
-}: {
+/** A system space rests at (7v): its id, its name and how many worlds it holds. */
+interface Resting {
+  readonly id: string;
+  readonly name: string;
+  readonly worlds: number | undefined;
+}
+
+// A system's name where the number stands, as large as its letters let it be on the hero's width.
+function Named({ name }: { name: string }) {
+  return (
+    <h1
+      className={`${styles["name"] ?? ""} truncate`}
+      tabIndex={-1}
+      style={{ "--_chars": String(name.length) } as CSSProperties}
+    >
+      {name}
+    </h1>
+  );
+}
+
+// The line: the people online, the worlds where no server counts them, or a system's worlds.
+function Line({ universe, worlds, people, coming, system }: HeroProps & { coming: boolean }) {
+  if (system !== undefined)
+    return (
+      <>
+        <Count count={system.worlds} />
+        {`, a namespace on ${universe.name}.`}
+      </>
+    );
+  return typeof people === "object" ? (
+    <PeopleLine people={people} worlds={worlds} />
+  ) : (
+    <WorldsLine name={universe.name} worlds={worlds} coming={coming} />
+  );
+}
+
+// The video's pair (frame 4): Go explore filled, then Join the chat, the Earth's general room. A system has none: both lead elsewhere
+// (Alexis, 2026-11-09; its views are the header's, D433). The universe marks whether the cosmos stands beside them, where the Earth's label says "Start
+// here" to a newcomer.
+function Actions({ universe, system, newcomer }: Pick<HeroProps, "universe" | "system" | "newcomer">) {
+  if (system !== undefined) return null;
+  return (
+    <div
+      className={styles["actions"]}
+      data-hero="actions"
+      data-first={newcomer === true ? "" : undefined}
+      data-cosmos="none"
+    >
+      <GoExplore
+        places={{ earth: universe.earth.path, worlds: universe.worlds, universe: universe.id }}
+        className={styles["action"]}
+      />
+      {/* The chat's grow comes out of this button, as the header's Chat's (fullChat.ts). */}
+      <Link
+        to={fullChatHref(universe.earth.path)}
+        className={styles["action"]}
+        data-call="chat"
+        onClick={(event) => {
+          leaveDock(event.currentTarget);
+        }}
+      >
+        Join the chat
+        <Icon name="arrow" />
+      </Link>
+    </div>
+  );
+}
+
+// Over the number: who is here, "Online now" in mint with a dot that beats, where the number counts them (D434); else a system's kicker or
+// the universe's.
+function Lead({ universe, people, system }: HeroProps) {
+  return system === undefined && typeof people === "object" ? (
+    <p className={`inline-center caps ${String(styles["online"])}`}>
+      <i key={people.online} ref={sightRef} className={`disc ring ${String(styles["pulse"])}`} aria-hidden="true" />
+      Online now
+    </p>
+  ) : (
+    <Kicker dot={system === undefined ? "warm" : "world"}>
+      {system !== undefined ? "gno.land · system" : universe.isDefault ? "gno.land · live now" : universe.name}
+    </Kicker>
+  );
+}
+
+// At the number's right, at its foot, the line, large, over the two actions (Alexis, 2026-11-09: "au-dessus des boutons"); under a
+// system's name. The line keeps its figure's room while the number comes (7n); the page's heading is its count.
+function Beside(props: HeroProps & { coming: boolean }) {
+  return (
+    <div className={styles["beside"]}>
+      <div className={styles["line"]} data-hero="line">
+        <Line {...props} />
+      </div>
+      {/* The default universe's health, late: the server's pass reads that universe alone. */}
+      {props.system === undefined && props.universe.isDefault ? <Network name={props.universe.name} /> : null}
+      <Actions universe={props.universe} system={props.system} newcomer={props.newcomer} />
+    </div>
+  );
+}
+
+interface HeroProps {
   universe: UniverseView;
   worlds: number | undefined;
   people?: People | undefined;
   coming?: boolean;
-  newcomer?: boolean;
-}) {
+  newcomer?: boolean | undefined;
+  system?: Resting | undefined;
+}
+
+/** `coming`: no number yet, but one is on its way (the worlds' count is being read). `people`: who is online, none where no server counts
+ * them. `newcomer`: the reader has entered no place yet, so the Earth's label says "Start here", the one filled call (ADR-0003 §3).
+ * `system`: the system space rests at, whose name takes the number's place, its worlds the line's and the tags' (the plan space-simple). */
+export function Hero(given: HeroProps) {
+  const heroRef = useRef<HTMLDivElement>(null);
+  // A system that comes or goes: the hero's words, its actions and its tags fade out together, then the new ones fade in (D428).
+  const system = useSwapped(given.system?.id ?? "", given.system, heroRef);
+  const props = { ...given, system };
+  const { universe } = props;
   return (
-    // The opening's words over the dive take its place while they show (mock-up 1), which the opening marks (ADR-0003 §1).
-    <div className={styles["hero"]} data-clear="" data-yield="none">
-      <Kicker dot="warm">{universe.isDefault ? "gno.land · live now" : universe.name}</Kicker>
-      <Big people={people} worlds={worlds} />
-      <div className={styles["row"]}>
-        {/* The line keeps its figure's room while the number comes, so the actions beside it stay put (7n). The page's heading is its
-            count; what a world is follows it, on the same line. */}
-        <div className={styles["line"]} data-hero="line">
-          {typeof people === "object" ? (
-            <PeopleLine people={people} worlds={worlds} />
-          ) : (
-            <WorldsLine name={universe.name} worlds={worlds} coming={coming} />
-          )}
-        </div>
-        {/* The video's pair (frame 4): Go explore filled, then Join the chat, the Earth's general room. */}
-        {/* The universe marks whether the cosmos stands beside them, where the Earth's label says "Start here" to a newcomer. */}
-        <div
-          className={styles["actions"]}
-          data-hero="actions"
-          data-first={newcomer ? "" : undefined}
-          data-cosmos="none"
-        >
-          <GoExplore
-            places={{ earth: universe.earth.path, worlds: universe.worlds, universe: universe.id }}
-            className={styles["action"]}
-          />
-          <Link to={universe.earth.path} className={styles["action"]} data-call="chat">
-            Join the chat
-            <Icon name="arrow" />
-          </Link>
-        </div>
+    <div className={styles["hero"]} data-clear="" data-exit="" ref={heroRef}>
+      <Lead {...props} />
+      {/* The number, its line and actions at its right, under it where there is no room; or a system's name, its line under it. */}
+      <div className={styles["head"]}>
+        {system === undefined ? <Big people={props.people} worlds={props.worlds} /> : <Named name={system.name} />}
+        <Beside {...props} coming={props.coming ?? false} />
       </div>
-      <Live withBlock={universe.isDefault} />
+      {/* The tags that light space (D425), in place of the markets row. */}
+      {/* Space draws the default universe's worlds alone: another's hero has no tags to light them (the plan space-simple). */}
+      {universe.isDefault ? <Lenses universe={universe.id} system={system?.id} /> : null}
     </div>
   );
 }
@@ -143,7 +214,7 @@ export function Hero({
  * rail stands for them while it stands (7i), and marks them so. */
 export function Worlds({ children }: { children: ReactNode }) {
   return (
-    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none" data-yield="none">
+    <nav aria-label="Worlds" className={styles["worlds"]} data-rail="none" data-exit="">
       <Kicker>Worlds</Kicker>
       {children}
     </nav>

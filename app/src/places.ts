@@ -1,12 +1,14 @@
 // The places the app knows, from the data files (slice 5's 5c and 5d; the bundle holds a copy of app/data's lists, which
 // the build's config checked first: GNOWORLD_DATA names another directory, vite.config.ts). A page is found by its
 // request's path, exactly as written: the path's case is part of the address (F376), a trailing slash is not.
-import { placeAt, realmRoute, type Place, type PlaceKind } from "@gnoworld/core";
+import { placeAt, realmRoute, STATIONS_SHOWN, type Place, type PlaceKind } from "@gnoworld/core";
 import { data } from "react-router";
 import ecosystems from "../data/ecosystems.json" with { type: "json" };
 import genres from "../data/genres.json" with { type: "json" };
 import hubs from "../data/hubs.json" with { type: "json" };
 import universes from "../data/universes.json" with { type: "json" };
+import { cosmosAt, trimmed } from "./cosmosAt.ts";
+import { holdsChat } from "./fullChat.ts";
 import { placesFrom } from "./dataPlaces.ts";
 import type { PinnedRow } from "./pinned.ts";
 
@@ -109,13 +111,13 @@ export function siteOf(source: Source) {
     home: (each: Listed): UniverseView => get().home(each),
     /** The universe a path belongs to: /net/<id> names it, any other path (a page not found, an error) is the default's. */
     universeAt: (pathname: string): UniverseView => get().universeAt(pathname),
-    /** Which of the three views a path is of a universe, at its path or at its canonical address, or none. */
+    /** Which of the header's views a path is of a universe, at its path or at its canonical address, or none. */
     viewAt: (universe: UniverseView, pathname: string): View | undefined => viewAt(universe, pathname),
   };
 }
 
-/** The header's views: a universe's Earth and cosmos, and the one list of the site. */
-export type View = "earth" | "cosmos" | "list";
+/** The header's views: the whole cosmos far out (Galaxy), a system of it (System), a world, the Earth's or another's (World). */
+export type View = "universe" | "system" | "world";
 
 function universeAt(views: UniverseView[], pathname: string): UniverseView {
   const id = /^\/net\/([^/]+)/.exec(pathname)?.[1];
@@ -128,13 +130,13 @@ function viewAt(universe: UniverseView, pathname: string): View | undefined {
   const here = trimmed(pathname);
   const is = (at: { path: string; canonical: string }) =>
     [at.path, at.canonical].some((each) => trimmed(each) === here);
-  if (is(universe.earth)) return "earth";
-  if (is(universe.home)) return "cosmos";
-  return here === "/list" ? "list" : undefined;
+  if (is(universe.earth) || holdsChat(here)) return "world";
+  // The default universe's home is the Earth's first screen, no level of its own (D501); another universe's home is its system.
+  if (is(universe.home)) return universe.isDefault ? undefined : "system";
+  // The cosmos's own addresses are the default universe's alone: the scene shows its cosmos only.
+  if (universe.isDefault && cosmosAt(here) !== undefined) return cosmosAt(here)?.view;
+  return undefined;
 }
-
-// A path as the data spells it: a trailing slash is no part of the address.
-const trimmed = (pathname: string) => (pathname.length > 1 ? pathname.replace(/\/$/, "") : pathname);
 
 // A row of the data as the site lists it; its genre by the name genres.json gives it.
 function listedFrom(row: Row, testnet: boolean, at: { path: string; canonical: string }): Listed {
@@ -167,7 +169,9 @@ function build(source: Source) {
         : [listedFrom({ ...row, genre: genres.get(row.genre ?? "") }, testnets.has(universe), { path, canonical })];
     });
   };
-  const worlds = listed("world", source.hubs);
+  const everyWorld = listed("world", source.hubs);
+  // A station's page stays routable (everyWorld), but is offered as a place only while the switch is on.
+  const worlds = STATIONS_SHOWN ? everyWorld : everyWorld.filter(({ kind }) => kind !== "station");
   const ecosystemList = listed("ecosystem", source.ecosystems);
   const views = source.universes.map((universe): UniverseView => {
     const at = (kind: PlaceKind): Place => {
@@ -202,16 +206,12 @@ function build(source: Source) {
     if (place === undefined) throw data(null, { status: 404 });
     return place;
   }
-  const universeOf = (id: string): UniverseView => {
-    const view = views.find((each) => each.id === id);
-    if (view === undefined) throw data(null, { status: 404 });
-    return view;
+  const found = <T>(one: T | undefined): T => {
+    if (one === undefined) throw data(null, { status: 404 });
+    return one;
   };
-  const row = (place: Place, from: Listed[]): Listed => {
-    const found = from.find((each) => each.path === place.path);
-    if (found === undefined) throw data(null, { status: 404 });
-    return found;
-  };
+  const universeOf = (id: string): UniverseView => found(views.find((each) => each.id === id));
+  const row = (place: Place, from: Listed[]): Listed => found(from.find((each) => each.path === place.path));
 
   return {
     places,
@@ -220,7 +220,7 @@ function build(source: Source) {
     ecosystems: ecosystemList,
     genres: source.genres,
     /** The world a request names. */
-    world: (request: Request): World => row(find(request, "world"), worlds),
+    world: (request: Request): World => row(find(request, "world"), everyWorld),
     /** The ecosystem a request names. */
     ecosystem: (request: Request): Ecosystem => row(find(request, "ecosystem"), ecosystemList),
     /** The ecosystem a path names, or none: for a route with no loader, which a build with no ecosystem cannot pre-render. */
@@ -238,9 +238,16 @@ function build(source: Source) {
 
 export const site = siteOf({ universes, hubs, ecosystems, genres });
 
+/** Where a universe's pages stand on the site: at its root for the default one, under /net/<id> for another. */
+export const universePrefix = (universe: Pick<UniverseView, "id" | "isDefault">): string =>
+  universe.isDefault ? "" : `/net/${universe.id}`;
+
 /** A world's realm's view on the site: /r/<path> in the default universe, /net/<id>/r/<path> in another. */
 export const realmView = (realm: string, universe: Pick<UniverseView, "id" | "isDefault">): string =>
-  realmRoute(realm, universe.isDefault ? "" : `/net/${universe.id}`);
+  realmRoute(realm, universePrefix(universe));
+
+/** The Universe view's page: /universe in the default universe; the scene shows its cosmos alone, so another's Universe is its home. */
+export const universePath = (at: UniverseView): string => (at.isDefault ? "/universe" : at.home.path);
 
 // A realm's path on a site or on gnoweb, `gno.land/r/gov/dao` -> `/r/gov/dao`: the data's realms, which dataFiles.ts checks.
 export const realmPath = (realm: string): string => realmRoute(realm);

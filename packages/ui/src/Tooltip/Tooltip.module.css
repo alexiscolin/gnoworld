@@ -5,6 +5,13 @@
     display: inline-flex;
   }
 
+  /* raw: 18 rem, the width at which a bar's nine tools of 24 px no longer fit one row: the tools it goes without first go */
+  @container (inline-size < 18rem) {
+    .anchor[data-drops] {
+      display: none;
+    }
+  }
+
   .tip {
     max-inline-size: var(--column-s);
     padding-block: var(--space-3xs);

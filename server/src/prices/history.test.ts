@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { MARKETS_HISTORY_MOST, MarketsHistory } from "@gnoworld/schemas/indexer";
 import { afterAll, describe, expect, it } from "vitest";
-import { historyRoutes, makeHistory } from "./history.ts";
+import { historyRoutes, makeHistory, SEED_BELOW } from "./history.ts";
 
 // The prices' day (8i): each token's price at each read, 288 at most, kept in a file so a restart keeps the day.
 const T0 = Date.parse("2026-11-04T12:00:00.000Z");
@@ -108,6 +108,42 @@ describe("the prices' history", () => {
     const history = makeHistory(join(dir, "nowhere", "h.json"), () => T0);
     expect(history.add([token("GNOT", 1)], T0)).toBe(false);
     expect(lineOf(history, "GNOT")).toEqual([1]);
+  });
+});
+
+describe("the prices' history: seeded from a source's own past", () => {
+  const line = (n: number, from = 1) => Array.from({ length: n }, (_, i) => from + i);
+
+  it("is short with no day, and with any line under SEED_BELOW prices, and not once every line is past it", () => {
+    const history = makeHistory(fileOf(), () => T0);
+    expect(history.short()).toBe(true);
+    history.add([token("GNOT", 1)], T0);
+    expect(history.short()).toBe(true);
+    history.seed([{ symbol: "GNOT", usd: line(SEED_BELOW) }], T0);
+    expect(history.short()).toBe(false);
+  });
+
+  it("puts the seeded line in front of the reads that follow, oldest first, and keeps it in the file", () => {
+    const file = fileOf();
+    const history = makeHistory(file, () => T0);
+    expect(history.seed([{ symbol: "GNOT", usd: [1, 2, 3] }], T0)).toBe(true);
+    history.add([token("GNOT", 4)], T0 + STEP);
+    expect(lineOf(history, "GNOT")).toEqual([1, 2, 3, 4]);
+    expect(stored(file)).toEqual(history.current());
+  });
+
+  it("replaces a short line but never a line that is already long enough, and never goes past MARKETS_HISTORY_MOST", () => {
+    const history = makeHistory(fileOf(), () => T0);
+    history.seed([{ symbol: "BTC", usd: line(SEED_BELOW) }], T0);
+    history.seed(
+      [
+        { symbol: "BTC", usd: [9, 9] },
+        { symbol: "GNOT", usd: line(MARKETS_HISTORY_MOST + 50) },
+      ],
+      T0,
+    );
+    expect(lineOf(history, "BTC")).toEqual(line(SEED_BELOW));
+    expect(lineOf(history, "GNOT")).toEqual(line(MARKETS_HISTORY_MOST + 50).slice(-MARKETS_HISTORY_MOST));
   });
 });
 

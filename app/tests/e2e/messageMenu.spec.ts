@@ -1,8 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Locator, WebSocketRoute } from "@playwright/test";
-import { inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
+import { axeOf, violations } from "./axe.ts";
+import { beforeTheList, inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
+import { tabsTo } from "./talk.ts";
 import { MEMBER, scriptedErgo, type HistoryLine, type Scripted } from "./scripted.ts";
 
 // 4c's message menu (docs/decisions.md, 2026-10-26): a line's bar and its More menu, the Messages list one tab stop
@@ -48,6 +49,8 @@ async function room(
 const bars = (page: Page) => page.getByRole("toolbar", { name: "Actions on this message" });
 const barOf = (page: Page, at: number) => lines(page).nth(at).getByRole("toolbar", { name: "Actions on this message" });
 const moreOf = (page: Page, at: number) => barOf(page, at).getByRole("button", { name: "More actions" });
+// The bar holds several small controls before More, a count the layout may change: Tab until More has the focus.
+const tabToMore = (page: Page, at: number) => tabsTo(page, moreOf(page, at), 12);
 const focusedLines = (page: Page) => lines(page).and(page.locator(":focus"));
 const stops = (page: Page) => lines(page).and(page.locator("[tabindex='0']"));
 // The focused element's ring: its style, at least 2 px wide, and whether it lies whole inside its list's box.
@@ -104,7 +107,7 @@ test.describe("a line's actions", () => {
 
   test("reach the newest line by Tab, the others by the arrows, round the ends, Home and End", async ({ page }) => {
     await room(page);
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     await expect(lines(page).nth(2)).toBeFocused();
     await expect(focusedLines(page)).toHaveCount(1);
@@ -133,7 +136,7 @@ test.describe("a line's actions", () => {
         ["k3", T(2), "and https://gno.land/r/other too"],
       ],
     });
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     await expect(lines(page).nth(2)).toBeFocused();
     await page.keyboard.press("Tab");
@@ -183,7 +186,7 @@ test.describe("a line's actions", () => {
     await expect(lines(page)).toHaveCount(2);
     await expect(stops(page)).toHaveCount(1);
     await expect(lineOf(page, "the third line")).toHaveAttribute("tabindex", "0");
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     await expect(lineOf(page, "the third line")).toBeFocused();
   });
@@ -196,7 +199,7 @@ test.describe("a line's actions", () => {
     await page.keyboard.press("ArrowUp");
     await expect(stops(page)).toHaveCount(1);
     await expect(lines(page).nth(1)).toHaveAttribute("tabindex", "0");
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 1);
     await expect(moreOf(page, 1)).toBeFocused();
     await page.keyboard.press("Tab");
     await expect(focusedLines(page)).toHaveCount(0);
@@ -210,7 +213,7 @@ test.describe("a line's actions", () => {
   test("leave the arrows to the bar's button and to its open menu: the line keeps its place", async ({ page }) => {
     await room(page);
     await lines(page).nth(1).focus();
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 1);
     await page.keyboard.press("ArrowUp");
     await expect(moreOf(page, 1)).toBeFocused();
     await page.keyboard.press("Enter");
@@ -226,7 +229,7 @@ test.describe("a line's actions", () => {
   }) => {
     await room(page);
     await lines(page).nth(1).focus();
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 1);
     await page.keyboard.press("Enter");
     const menu = page.getByRole("menu", { name: "Message actions" });
     // Open thread (4d's threads) is the page's own item beside them: these are the copies a guest gets.
@@ -246,7 +249,7 @@ test.describe("a line's actions", () => {
     await room(page);
     await page.mouse.move(0, 0);
     await lines(page).nth(1).focus();
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 1);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menu", { name: "Message actions" })).toBeVisible();
     await page.keyboard.press("Escape");
@@ -296,7 +299,7 @@ test.describe("a line's actions", () => {
     await lines(page).nth(2).focus();
     await expect(barOf(page, 2)).toBeVisible();
     await expect(bars(page)).toHaveCount(1);
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 2);
     await expect(moreOf(page, 2)).toBeFocused();
     await page.keyboard.press("Enter");
     await page.mouse.move(0, 0);
@@ -372,7 +375,7 @@ test.describe("a line's actions", () => {
     await page.keyboard.press("End");
     await expect(lines(page).last()).toBeInViewport();
     expect(await barInside(page, 59)).toBe(true);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   // The green pass (G8): a line the arrows reach at the list's top edge, its bar rising past it; and the same
@@ -387,7 +390,7 @@ test.describe("a line's actions", () => {
     await page.keyboard.press("ArrowUp");
     await expect(lines(page).nth(30)).toBeFocused();
     expect(await barInside(page, 30)).toBe(true);
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await expect(focusedLines(page)).toHaveCount(0);
     await toTop(page, 30);
     await page.keyboard.press("Tab");
@@ -433,10 +436,10 @@ test.describe("a line's actions", () => {
   test("pass axe with a line's bar and its menu open", async ({ page }) => {
     await room(page);
     await lines(page).nth(1).focus();
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 1);
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menu")).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect(await violations(page)).toEqual([]);
   });
 
   // The red pass (M3): the tab stop never leaves the list while it holds a line.
@@ -492,7 +495,7 @@ test.describe("a line's actions", () => {
     page,
   }) => {
     await room(page);
-    await roomsNav(page).getByRole("link").last().focus();
+    await beforeTheList(page).focus();
     await page.keyboard.press("Tab");
     for (const [at, key] of [
       [2, undefined],
@@ -538,8 +541,8 @@ test.describe("a line's actions", () => {
   });
 
   // 4c's UX review (U2): the line keeps room at its end for the bar, so the bar covers no word, of its line or of the
-  // line above, at a computer's width and a phone's.
-  for (const width of [1280, 390]) {
+  // line above, at a computer's width; a phone's bar floats over its line as Slack's and Discord's do (D376).
+  for (const width of [1280]) {
     test(`cover no word of a long line or of the line above with the bar, at ${String(width)} px`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
       const long = "the quick brown fox jumps over the lazy dog ".repeat(6).trim();
@@ -582,7 +585,7 @@ test.describe("a line's actions", () => {
   test("draw More's focus ring inside its bar", async ({ page }) => {
     await room(page);
     await lines(page).nth(2).focus();
-    await page.keyboard.press("Tab");
+    await tabToMore(page, 2);
     await expect(moreOf(page, 2)).toBeFocused();
     const inside = await barOf(page, 2).evaluate((bar) => {
       const more = bar.querySelector("button");
@@ -633,13 +636,10 @@ test.describe("deleting a line", () => {
   }
   const deleteFrom = async (page: Page, at: number) => {
     await lines(page).nth(at).focus();
-    // Tab enters the bar at its first control: an account's three quick reactions and Reply come before More (4d).
+    // Tab enters the bar at its first control, the first quick reaction; More is its last stop (D376).
     await page.keyboard.press("Tab");
     await expect(barOf(page, at).getByRole("button", { name: "React with 👍" })).toBeFocused();
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
-    await page.keyboard.press("Tab");
+    await tabToMore(page, at);
     await expect(moreOf(page, at)).toBeFocused();
     await page.keyboard.press("Enter");
     await expect(page.getByRole("menuitem", { name: "Copy text" })).toBeFocused();

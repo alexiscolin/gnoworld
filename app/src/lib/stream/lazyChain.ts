@@ -17,14 +17,12 @@ export function lazyChain(load: () => Promise<ChainFeed>): ChainFeed {
       },
     );
   };
-  const forward = (name: "chain" | "realms") => (data: unknown) => {
-    then((loaded) => {
-      loaded[name](data);
-    });
-  };
   return {
-    chain: forward("chain"),
-    realms: forward("realms"),
+    chain: (data) => {
+      then((loaded) => {
+        loaded.chain(data);
+      });
+    },
     stop: () => {
       stopped = true;
       feed?.then((loaded) => {

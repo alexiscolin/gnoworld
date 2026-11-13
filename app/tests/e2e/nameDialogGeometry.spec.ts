@@ -1,7 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, test, type Page } from "./fixtures.ts";
 import { box, near, style, tokenColour } from "./geometry.ts";
 import { logIn } from "./namesChain.ts";
+import { axeOf } from "./axe.ts";
 
 // 9k (answer 9f-1): the name dialog at the video's size (1728 by 1080) against frames 9 to 15, read off the frames' pixels: the
 // dialog 489 px wide (619 to 1108), the kicker above the title, no Close button, the field's label in the mono caps muted style and
@@ -137,7 +137,7 @@ test.describe("the name dialog against the frames", () => {
 
   test("passes axe", async ({ page }) => {
     await opened(page, [1728, 1080]);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 

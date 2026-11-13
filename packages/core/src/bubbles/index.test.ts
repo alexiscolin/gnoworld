@@ -18,7 +18,8 @@ describe("@gnoworld/core/bubbles", () => {
       "isFarSide",
       "isPublicRoom",
       "pickBubbles",
-      "turnTo",
+      "regionAt",
+      "regionsOf",
     ]);
   });
 
@@ -37,16 +38,16 @@ describe("@gnoworld/core/bubbles", () => {
     const args: PickArgs = [[message], now, viewer, rules satisfies Rules, []];
     const out: Picked = bubbles.pickBubbles(...args);
     const shown: Bubble | undefined = out.bubbles[0];
-    const where: LatLon | undefined = bubbles.turnTo("JP");
+    const where: LatLon | undefined = bubbles.centreOf("JP");
     const counts: readonly Count[] = out.counts;
     expect(shown?.text).toBe("hello");
-    expect(where).toEqual(bubbles.centreOf("JP"));
+    expect(where).toEqual({ lat: 36.1, lon: 138.4 });
     expect(counts).toEqual([]);
     expect(bubbles.cutText("a".repeat(100), rules.maxChars)).toHaveLength(rules.maxChars);
     expect(bubbles.isFarSide({ lat: 0, lon: 170 }, { lat: 0, lon: -10 })).toBe(true);
   });
 
   it("leaves the main entry as it was: nothing of the bubbles in it", () => {
-    expect(Object.keys(core).filter((name) => /bubble|cutText|turnTo|isFarSide|centreOf/i.test(name))).toEqual([]);
+    expect(Object.keys(core).filter((name) => /bubble|cutText|isFarSide|centreOf/i.test(name))).toEqual([]);
   });
 });

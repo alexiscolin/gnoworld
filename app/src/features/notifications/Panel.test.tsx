@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act } from "react";
+import { act, useState } from "react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { all, modals, noMedia, popovers, settled } from "../../../tests/mount.tsx";
 import { mountInStore } from "../../../tests/inStore.tsx";
@@ -170,5 +170,67 @@ describe("the bell's panel", () => {
       all(page, "ol li")[0]?.dispatchEvent(new Event("pointerdown", { bubbles: true }));
     });
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe("the bell's panel leaving", () => {
+  afterEach(() => {
+    Reflect.deleteProperty(HTMLElement.prototype, "getAnimations");
+  });
+
+  // The panel with a button of its own to shut it, as the bell does, and the exit's animation held until `finish`.
+  async function leaving() {
+    let finish: () => void = () => undefined;
+    const finished = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    // jsdom has no animations: the box answers with the one exit that `finish` ends.
+    Object.defineProperty(HTMLElement.prototype, "getAnimations", { value: () => [{ finished }], configurable: true });
+    const gone = vi.fn();
+    function Shutting() {
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(!open);
+            }}
+          >
+            Toggle
+          </button>
+          <Panel open={open} onClose={() => undefined} onGone={gone} />
+        </>
+      );
+    }
+    await mountInStore(<Shutting />);
+    await settled(() => document.body.textContent.includes("a world you follow"));
+    return {
+      gone,
+      finish,
+      toggle: () => {
+        press(document.body, "Toggle");
+      },
+    };
+  }
+
+  it("is told it is gone only once its exit has finished, and stays drawn until then", async () => {
+    const { gone, finish, toggle } = await leaving();
+    toggle();
+    await act(() => Promise.resolve());
+    expect(gone).not.toHaveBeenCalled();
+    expect(document.body.textContent).toContain("Notifications");
+    finish();
+    await settled(() => gone.mock.calls.length > 0);
+    expect(gone).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not told when it was shown again during its exit", async () => {
+    const { gone, finish, toggle } = await leaving();
+    toggle();
+    toggle();
+    finish();
+    await act(() => new Promise((resolve) => setTimeout(resolve, 20)));
+    expect(gone).not.toHaveBeenCalled();
   });
 });

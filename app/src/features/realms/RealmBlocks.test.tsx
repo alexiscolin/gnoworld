@@ -7,12 +7,19 @@ import { drawing } from "../chat/index.ts";
 import { DRAW_LIMIT, INLINE_LIMIT, RealmBlocks } from "./RealmBlocks.tsx";
 
 const via = await drawing();
+const PAGE_MAX = 256 * 1024;
 const GNOWEB = "https://gno.land";
 
 function draw(source: string): string {
   const read: Page = page(source, { origin: GNOWEB });
   if (read.kind !== "page") throw new Error("too big");
   return renderToStaticMarkup(<RealmBlocks via={via} origin={GNOWEB} blocks={read.blocks} />);
+}
+
+function blocksOf(source: string) {
+  const read = page(source, { origin: GNOWEB });
+  if (read.kind !== "page") throw new Error("too big");
+  return read.blocks;
 }
 
 const textOf = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
@@ -151,11 +158,215 @@ describe("RealmBlocks: a realm page drawn from its tree", () => {
     }
   });
 
-  test("draws a quote, an alert too, as a blockquote", () => {
+  test("draws a quote as a blockquote, an alert's title and body in its notice", () => {
+    expect(draw("> quoted")).toMatch(/<blockquote[^>]*>/);
     const html = draw("> [!WARNING] Careful\n> body");
-    expect(html).toMatch(/<blockquote[^>]*>/);
+    expect(html).toMatch(/<aside[^>]*>/);
     expect(html).toContain("Careful");
     expect(html).toContain("body");
+  });
+});
+
+describe("RealmBlocks: rules, nested and task lists, images as cards (D382)", () => {
+  const count = (html: string, tag: string) => html.split(`<${tag}`).length - 1;
+
+  test("draws a rule as an hr, a setext title as a heading", () => {
+    const html = draw("a\n\n---\n\nTitle\n===");
+    expect(html).toMatch(/<hr\/?>/);
+    expect(html).toMatch(/<h1[^>]*>Title<\/h1>/);
+  });
+
+  test("draws a nested list as a list inside its item, an ordered one under a bullet", () => {
+    const html = draw("- a\n  - b\n  1. c\n- d");
+    expect(html).toMatch(
+      /<ul[^>]*><li[^>]*>a<ul[^>]*><li[^>]*>b<\/li><\/ul><ol[^>]*><li[^>]*>c<\/li><\/ol><\/li><li[^>]*>d<\/li><\/ul>/,
+    );
+    expect(draw("3. a\n   - b")).toMatch(/<ol[^>]*start="3"/);
+  });
+
+  test("draws a task as a read-only checkbox, checked when done, and nothing a click can change", () => {
+    const html = draw("- [ ] open\n- [x] done");
+    expect(count(html, "input")).toBe(2);
+    expect(
+      html.match(/<input[^>]*>/g)?.every((tag) => tag.includes('type="checkbox"') && tag.includes("disabled")),
+    ).toBe(true);
+    expect(html.match(/<input[^>]*checked/g)?.length).toBe(1);
+    expect(textOf(html)).toContain("open");
+    expect(html).not.toMatch(/<(form|button)\b/i);
+  });
+
+  test("draws an image as a card with its alt text and a way out, never as an img", () => {
+    const html = draw("![the logo](https://x.test/a.png) ![](https://x.test/b.png)");
+    expect(html).not.toMatch(/<img|<picture|<svg[^>]*src|srcset|src=/i);
+    expect(html).toContain("the logo");
+    expect(textOf(html)).toContain("Image");
+    expect(html).toContain('title="https://x.test/a.png"');
+    expect(html).toMatch(/data-image/);
+  });
+
+  test("sends an image off gnoweb through the warning button, never an anchor to that host", () => {
+    const html = draw("![a](https://evil.example/a.png)");
+    expect(html).toMatch(/<button/);
+    expect(html).not.toMatch(/href="https:\/\/evil/);
+  });
+
+  test("draws an image inside a mark as the link it is, with no picture loaded", () => {
+    const html = draw("**![a](https://x.test/a.png)** *![b](https://x.test/b.png)*");
+    expect(html).not.toMatch(/data-image|<img|src=/i);
+    expect(textOf(html)).toContain("a");
+  });
+
+  test("draws an image on gnoweb's own origin as an anchor that opens in a new tab, not loaded", () => {
+    const html = draw("![a](https://gno.land/static/a.png)");
+    expect(html).not.toMatch(/<img/i);
+    expect(html).toMatch(/<a [^>]*href="https:\/\/gno.land\/static\/a.png"[^>]*target="_blank"[^>]*rel="[^"]*noopener/);
+  });
+
+  test("draws an image in a list item, a cell and a heading as a card too", () => {
+    const html = draw(
+      "- ![a](https://x.test/a.png)\n  - ![b](https://x.test/b.png)\n\n|h|\n|-|\n|![c](https://x.test/c.png)|\n\n# ![d](https://x.test/d.png)",
+    );
+    expect(html.split("data-image").length - 1).toBe(4);
+  });
+
+  test("counts rules, tasks and cards against the limit", () => {
+    const rules = renderToStaticMarkup(<RealmBlocks via={via} blocks={blocksOf("---\n".repeat(DRAW_LIMIT + 500))} />);
+    expect(rules.split("<hr").length - 1).toBeLessThan(DRAW_LIMIT + 1);
+    expect(rules).toMatch(/not shown here/);
+    const tasks = renderToStaticMarkup(
+      <RealmBlocks via={via} blocks={blocksOf("- [ ] a\n".repeat(DRAW_LIMIT + 500))} />,
+    );
+    expect(tasks.split("<input").length - 1).toBeLessThan(DRAW_LIMIT);
+    expect(tasks).toMatch(/not shown here/);
+    const cards = renderToStaticMarkup(
+      <RealmBlocks via={via} blocks={blocksOf("![a](https://x.test/a.png)\n\n".repeat(DRAW_LIMIT + 500))} />,
+    );
+    expect(cards.split("data-image").length - 1).toBeLessThan(DRAW_LIMIT + 1);
+    expect(cards).toMatch(/not shown here/);
+  });
+
+  test("draws nothing of the items after one whose lists were cut", () => {
+    const html = renderToStaticMarkup(
+      <RealmBlocks via={via} blocks={blocksOf("- first\n" + "  - sub\n".repeat(DRAW_LIMIT + 5) + "- LATER")} />,
+    );
+    expect(html).toMatch(/not shown here/);
+    expect(html).not.toContain("LATER");
+  });
+
+  test("counts nested items against the limit", () => {
+    const html = renderToStaticMarkup(<RealmBlocks via={via} blocks={blocksOf("- a\n  - b\n".repeat(DRAW_LIMIT))} />);
+    expect(html.split("<li").length - 1).toBeLessThan(DRAW_LIMIT);
+    expect(html).toMatch(/not shown here/);
+  });
+
+  test("draws a hostile nested page as text", () => {
+    const html = draw("- <script>x</script>\n  - [a](javascript:alert(1))\n  - [ ] <img src=x onerror=1>");
+    expect(html).not.toMatch(/<script|<img|href="javascript:/i);
+  });
+});
+
+describe("RealmBlocks: columns side by side, forms drawn under the text (D382)", () => {
+  const FORM = '<gno-form exec="Vote">\n<gno-input name="who" type="text" />\n</gno-form>';
+
+  test("draws columns as one block of columns, each column its own blocks, in order", () => {
+    const html = draw("<gno-columns>\nleft\n<gno-columns-sep>\n# right\n</gno-columns>");
+    expect(html).toMatch(
+      /<div[^>]*data-block="columns"[^>]*><div[^>]*><p[^>]*>left<\/p><\/div><div[^>]*><h1[^>]*>right<\/h1><\/div><\/div>/,
+    );
+    expect(html).not.toMatch(/gno-columns/);
+  });
+
+  test("draws a column's lists, quotes and rules like the page's", () => {
+    const html = draw("<gno-columns>\n- a\n<gno-columns-sep>\n> q\n<gno-columns-sep>\n---\n</gno-columns>");
+    expect(html).toMatch(/<ul/);
+    expect(html).toMatch(/<blockquote/);
+    expect(html).toMatch(/<hr/);
+  });
+
+  test("counts a column's blocks against the limit, and draws none once it is spent", () => {
+    const html = draw(
+      "<gno-columns>\n" + "# a\n".repeat(DRAW_LIMIT + 10) + "<gno-columns-sep>\nZZLATER\n</gno-columns>",
+    );
+    expect(html.split("<h1").length - 1).toBeLessThan(DRAW_LIMIT);
+    expect(html).not.toContain("ZZLATER");
+    expect(html).toMatch(/not shown here/);
+  });
+
+  test("draws no column once the budget is spent, so thousands of columns are no thousands of divs", () => {
+    const html = draw("<gno-columns>\n" + "a\n<gno-columns-sep>\n".repeat(DRAW_LIMIT + 500) + "</gno-columns>");
+    expect(html.split("<div").length - 1).toBeLessThanOrEqual(DRAW_LIMIT + 1);
+    expect(html).toMatch(/not shown here/);
+  });
+
+  test("takes a form out of the text: a line that points to it where it stood, the form under the page's text", () => {
+    const html = draw(`before\n\n${FORM}\n\nafter`);
+    const [, line] = /<a href="#([^"]+)"[^>]*>Form: Vote[^<]*<\/a>/.exec(html) ?? [];
+    expect(line).toBeDefined();
+    expect(html).toMatch(new RegExp(`id="${String(line)}"`));
+    expect(html.indexOf("after")).toBeLessThan(html.indexOf("<figure"));
+    expect(html.indexOf("before")).toBeLessThan(html.indexOf("Form: Vote"));
+    expect(html.split("<figure").length - 1).toBe(1);
+  });
+
+  test("draws the forms in the order they stand, each with its own anchor, and none for a page with none", () => {
+    const html = draw(`${FORM}\n\ntext\n\n<gno-form exec="Send">\n<gno-input name="to" />\n</gno-form>`);
+    const hrefs = [...html.matchAll(/<a href="#([^"]+)"/g)].map((m) => m[1]);
+    expect(hrefs).toHaveLength(2);
+    expect(new Set(hrefs).size).toBe(2);
+    expect(html.lastIndexOf("Vote")).toBeLessThan(html.lastIndexOf("Send"));
+    expect(draw("# a\n\ntext")).not.toMatch(/aria-label="Forms"|<figure/);
+  });
+
+  test("takes out a form in a quote and in a column too, and keeps it read only", () => {
+    const html = draw(`> ${FORM.replaceAll("\n", "\n> ")}\n\n<gno-columns>\n${FORM}\n</gno-columns>`);
+    expect(html.split("<figure").length - 1).toBe(2);
+    expect(html).not.toMatch(/<(input|textarea|select|button|form)\b/i);
+  });
+
+  test("makes an anchor of nothing a page wrote: two forms of one function, a hostile function name, none", () => {
+    const form = (open: string) => `${open}\n<gno-input name="a" />\n</gno-form>\n\n`;
+    const html = draw(
+      form('<gno-form exec="Same">') +
+        form('<gno-form exec="Same">') +
+        form("<gno-form exec='main a b&quot;onload=x'>") +
+        form("<gno-form>"),
+    );
+    const ids = [...html.matchAll(/ id="([^"]*)"/g)].map((m) => m[1]);
+    const hrefs = [...html.matchAll(/<a href="#([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(hrefs).size).toBe(4);
+    expect(hrefs.every((href) => ids.includes(href))).toBe(true);
+    expect(/Same|main|onload/.exec([...ids, ...hrefs].join(""))).toBeNull();
+    expect(html).toMatch(/>Form \u2193<\/a>/);
+    expect(html).toMatch(/Form: Same \u2193<\/a>/);
+  });
+
+  test("counts forms against the limit: no more drawn than it allows, and no line points at one not drawn", () => {
+    const html = draw('<gno-form exec="F">\n<gno-input name="a" />\n</gno-form>\n\n'.repeat(DRAW_LIMIT + 500));
+    const figures = html.split("<figure").length - 1;
+    const hrefs = [...html.matchAll(/<a href="#([^"]+)"/g)].map((m) => m[1]);
+    expect(figures).toBeLessThanOrEqual(DRAW_LIMIT);
+    expect(hrefs).toHaveLength(figures);
+    expect(html).toMatch(/not shown here/);
+  });
+
+  test("draws no form once the text spent the budget, whatever column holds it", () => {
+    const html = draw(
+      "# a\n".repeat(DRAW_LIMIT) +
+        '<gno-columns>\n<gno-form exec="F">\n<gno-input name="a" />\n</gno-form>\n</gno-columns>',
+    );
+    expect(html).not.toMatch(/<figure|aria-label="Forms"/);
+  });
+
+  test("gives two pages in one document anchors that differ", () => {
+    const read = (source: string) => blocksOf(source);
+    const html = renderToStaticMarkup(
+      <>
+        <RealmBlocks via={via} blocks={read(FORM)} />
+        <RealmBlocks via={via} blocks={read(FORM)} />
+      </>,
+    );
+    const hrefs = [...html.matchAll(/<a href="#([^"]+)"/g)].map((m) => m[1]);
+    expect(new Set(hrefs).size).toBe(2);
   });
 });
 
@@ -229,7 +440,9 @@ describe("RealmBlocks: a link that leaves gnoweb is behind a warning (R-F4, S-F2
   test("draws a link off gnoweb's origin as a button, never as an anchor that goes there", () => {
     const html = draw(SOURCE);
     expect(html).not.toMatch(/<a\s[^>]*href="https:\/\/evil\.example/);
-    expect(html).toMatch(/<button[^>]*type="button"[^>]*>https:\/\/gno\.land\/r\/demo<\/button>/);
+    expect(html).toMatch(
+      /<button[^>]*type="button"[^>]*>(?:<span[^>]*>)?https:\/\/gno\.land\/r\/demo(?:<\/span>)?<\/button>/,
+    );
   });
 
   test("keeps a link on gnoweb's own origin, one written as a path included, an anchor", () => {
@@ -298,5 +511,153 @@ describe("RealmBlocks: once the budget is spent, nothing more is drawn (R-F5, S-
   test("says how many fields of a form are left out, inside the form (S-F5)", () => {
     const html = drawn("<gno-form>\n" + '<gno-input name="a" />\n'.repeat(DRAW_LIMIT + 10) + "</gno-form>");
     expect(textOf(html)).toMatch(/11 more fields are not shown here/);
+  });
+});
+
+describe("RealmBlocks: a table as a real table", () => {
+  const TABLE =
+    "| Question | Yes | Note |\n|:--|--:|:-:|\n| [Q1](https://gno.land/r/x) | 0.41 | **ok** |\n| Q2 | 0.59 |";
+
+  test("draws a header, a body, and each column's alignment from its delimiter", () => {
+    const html = draw(TABLE);
+    expect(html).toMatch(/<table[^>]*><thead><tr><th[^>]*scope="col"[^>]*>Question<\/th>/);
+    expect(html).toMatch(/<th[^>]*data-align="right"[^>]*>Yes<\/th>/);
+    expect(html).toMatch(/<th[^>]*data-align="center"[^>]*>Note<\/th>/);
+    expect(html).toMatch(/<td[^>]*data-align="right"[^>]*>0\.59<\/td>/);
+    expect(html).toMatch(/<tbody>.*<strong>ok<\/strong>.*<\/tbody>/);
+    expect(html).not.toContain("|");
+  });
+
+  test("draws a left column as left and an unaligned one with no alignment", () => {
+    const html = draw("| a | b |\n|:--|--|\n| 1 | 2 |");
+    expect(html).toMatch(/<th[^>]*data-align="left"[^>]*>a<\/th>/);
+    expect(html).not.toMatch(/<th[^>]*data-align="(?!left)[^>]*>b</);
+  });
+
+  test("draws an external link in a header cell and a body cell as a button, never an anchor off gnoweb", () => {
+    const html = draw("| [h](https://evil.example/h) |\n|--|\n| [b](https://evil.example/b) |");
+    expect(html).toMatch(/<th[^>]*><button/);
+    expect(html).toMatch(/<td[^>]*><button/);
+    expect(html).not.toMatch(/href="https:\/\/evil/);
+  });
+
+  test("draws a table that is not cut with no note, and what follows it", () => {
+    const html = draw("| a |\n|--|\n| 1 |\n\nAFTER");
+    expect(html).toContain("AFTER");
+    expect(html).not.toMatch(/not shown here/);
+  });
+
+  test("draws a short row padded to the header's width", () => {
+    const rows = draw(TABLE).split("<tr").slice(1);
+    expect(rows).toHaveLength(3);
+    for (const row of rows) expect(row.split("<td").length + row.split("<th").length - 2).toBe(3);
+  });
+
+  test("puts the table in a focusable, named region that scrolls on its own", () => {
+    expect(draw(TABLE)).toMatch(/<div[^>]*role="region"[^>]*aria-label="Table"[^>]*tabindex="0"/);
+  });
+
+  test("draws a link in a cell as the page's own link, and HTML in a cell as text", () => {
+    const html = draw("| <b>x</b> |\n|--|\n| [a](https://gno.land/r/x) |");
+    expect(html).toContain("&lt;b&gt;x&lt;/b&gt;");
+    expect(html).not.toMatch(/<b>/);
+    expect(html).toMatch(/<a[^>]*href="https:\/\/gno.land\/r\/x"/);
+  });
+
+  test("says a table cut at the caps was cut", () => {
+    const rows = Array.from({ length: 2005 }, (_, i) => `| r${String(i)} |`).join("\n");
+    const html = draw(`| a |\n|--|\n${rows}\n\nAFTER`);
+    expect(textOf(html)).toMatch(/rest of this table is not shown here/);
+    expect(html.match(/<tr/g)?.length).toBeGreaterThan(1000);
+  });
+
+  test("draws no more rows than the budget allows, and says so", () => {
+    const heavy = "| `a` ".repeat(60) + "|";
+    const head = "|--".repeat(60) + "|";
+    const html = draw(`${heavy}\n${head}\n${Array.from({ length: 300 }, () => heavy).join("\n")}\n\nAFTER`);
+    expect(html).not.toContain("AFTER");
+    expect(html).toMatch(/not shown here/);
+    const count = html.match(/<tr/g)?.length ?? 0;
+    expect(count).toBeGreaterThan(1);
+    expect(count).toBeLessThan(301);
+  });
+
+  test("charges a table's header: header-only tables of empty cells are cut by the budget", () => {
+    const table = `${"|".repeat(65)}\n${"|-".repeat(64)}|\n\n`;
+    const html = draw(table.repeat(Math.floor(PAGE_MAX / table.length)));
+    expect(html.match(/<th[ >]/g)?.length ?? 0).toBeLessThanOrEqual(INLINE_LIMIT);
+    expect(html).toMatch(/not shown here/);
+  });
+
+  test("draws no more cells than the budget allows when they are empty", () => {
+    const head = "|a".repeat(64) + "|";
+    const html = draw(`${head}\n${"|-".repeat(64)}|\n${Array.from({ length: 1999 }, () => "|".repeat(65)).join("\n")}`);
+    expect(html.match(/<t[dh]/g)?.length ?? 0).toBeLessThanOrEqual(INLINE_LIMIT + 64);
+  });
+
+  test("charges a short row the cells it is drawn with, so rows of one cell under a wide head stay within the budget", () => {
+    const head = "|a".repeat(64) + "|";
+    const html = draw(`${head}\n${"|-".repeat(64)}|\n${Array.from({ length: 1999 }, () => "a").join("\n")}`);
+    expect(html.match(/<t[dh]/g)?.length ?? 0).toBeLessThanOrEqual(INLINE_LIMIT + 64);
+  });
+});
+
+describe("RealmBlocks: gnoweb's alerts are the design system's notices", () => {
+  test("draws a note as a notice with the info icon and its title", () => {
+    const html = draw("> [!NOTE] Heads up\n> Body.");
+    expect(html).toMatch(/<aside[^>]*data-severity="notice"/);
+    expect(html).toContain('data-icon="info"');
+    expect(html).toContain("Heads up");
+    expect(html).toContain("Body.");
+    expect(html).not.toContain("<blockquote");
+  });
+
+  test("draws a warning as a caution with the warning icon", () => {
+    const html = draw("> [!WARNING]\n> Body.");
+    expect(html).toMatch(/<aside[^>]*data-severity="caution"/);
+    expect(html).toContain('data-icon="warning"');
+  });
+
+  test("draws a plain quote as a blockquote", () => {
+    expect(draw("> plain")).toMatch(/<blockquote/);
+  });
+});
+
+describe("RealmBlocks: the headings keep a small scale", () => {
+  test("draws all six levels as their own element", () => {
+    const html = draw("# 1\n\n## 2\n\n### 3\n\n#### 4\n\n##### 5\n\n###### 6");
+    for (const level of ["1", "2", "3", "4", "5", "6"])
+      expect(html).toMatch(new RegExp(`<h${level}[^>]*>${level}</h${level}>`));
+  });
+});
+
+describe("RealmBlocks: pages read from onyx-1 on 2026-11-07", () => {
+  test("draws the market's table, its escaped hash and its testnet note", () => {
+    const html = draw(
+      [
+        "# 67",
+        "| Question | Yes, GNOT | No, GNOT | Status |",
+        "| :--- | ---: | ---: | :--- |",
+        "| [Will Bitcoin outperform Gold in 2026?](/r/nym-sixseven067/markets:btc-vs-gold-2026) | 0.41 | 0.59 | Open until 31 December 2026 |",
+        "| [Will Morgan Wallen be the Billboard \\#1 top artist in 2026?](/r/nym-sixseven067/markets:billboard-wallen-2026) | 0.774 | 0.226 | Open |",
+        "",
+        "> [!NOTE] Testnet",
+        "> This is onyx-1, a test network: test GNOT has no value.",
+      ].join("\n"),
+    );
+    expect(html.match(/<tr/g)).toHaveLength(3);
+    expect(html).toContain("Billboard #1 top artist");
+    expect(html).toMatch(/<th[^>]*data-align="right"[^>]*>Yes, GNOT<\/th>/);
+    expect(html).toMatch(/<aside[^>]*data-severity="notice"/);
+    expect(html).not.toContain("|");
+  });
+
+  test("draws the leaderboard's headings and tables", () => {
+    const html = draw(
+      "# 🎧 Sonotone — Leaderboards\n\n## 🎵 Classic\n\n| # | Nickname |\n|---|--------|\n| 1 | John |",
+    );
+    expect(html).toMatch(/<h1[^>]*>🎧 Sonotone — Leaderboards<\/h1>/);
+    expect(html).toMatch(/<h2[^>]*>🎵 Classic<\/h2>/);
+    expect(html).toMatch(/<td[^>]*>John<\/td>/);
   });
 });

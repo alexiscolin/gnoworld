@@ -56,14 +56,14 @@ test.describe("a room's lines: Edit", () => {
     const { said } = await asMember(page);
     await startEdit(page, 0);
     await expect(editing(page)).toBeVisible();
-    await expect(field(page)).toHaveValue("my first words");
+    await expect(field(page)).toHaveText("my first words");
     await expect(field(page)).toBeFocused();
     await saveAs(page, "my first words, fixed");
     await expect(lines(page).nth(0)).toContainText("my first words, fixed");
     await expect(lines(page).nth(0)).toContainText(/^\S+( you)?( new here)? ?Edited \d{2}:\d{2}/);
     await expect(lines(page)).toHaveCount(2);
     await expect(editing(page)).toHaveCount(0);
-    await expect(field(page)).toHaveValue("");
+    await expect(field(page)).toHaveText("");
     expect(said()).toEqual([`@+gnoworld/edit=m1 PRIVMSG ${ROOM} :my first words, fixed`]);
   });
 
@@ -110,17 +110,17 @@ test.describe("a room's lines: Edit", () => {
     const { said } = await asMember(page);
     await field(page).fill("a draft in progress");
     await startEdit(page, 0);
-    await expect(field(page)).toHaveValue("my first words");
+    await expect(field(page)).toHaveText("my first words");
     await field(page).fill("typed in the edit");
     await field(page).press("Escape");
     await expect(editing(page)).toHaveCount(0);
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     await expect(field(page)).toBeFocused();
     await startEdit(page, 0);
     await field(page).fill("typed again");
     await page.getByRole("button", { name: "Cancel the edit" }).click();
     await expect(editing(page)).toHaveCount(0);
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     await expect(field(page)).toBeFocused();
     await expect(lines(page).nth(0)).toContainText("my first words");
     await expect(lines(page).nth(0)).not.toContainText("Edited");
@@ -135,7 +135,7 @@ test.describe("a room's lines: Edit", () => {
     await startEdit(page, 0);
     await saveAs(page, "my first words, fixed");
     await expect(lines(page).nth(0)).toContainText("my first words, fixed");
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     expect(said()).toEqual([`@+gnoworld/edit=m1 PRIVMSG ${ROOM} :my first words, fixed`]);
   });
 
@@ -154,14 +154,14 @@ test.describe("a room's lines: Edit", () => {
     await field(page).fill("a draft in progress");
     await expect.poll(kept).toEqual(["a draft in progress"]);
     await startEdit(page, 0);
-    await expect(field(page)).toHaveValue("my first words");
+    await expect(field(page)).toHaveText("my first words");
     await field(page).fill("my first words, changing");
     await expect.poll(typed).toContain(`@+typing=active TAGMSG ${ROOM}`);
     await expect.poll(kept).toEqual(["a draft in progress"]);
     await page.reload();
     await expect(lines(page)).toHaveCount(2);
     await expect(editing(page)).toHaveCount(0);
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     expect(said()).toEqual([]);
   });
 
@@ -173,7 +173,7 @@ test.describe("a room's lines: Edit", () => {
     await saveAs(page, "second words");
     await expect(lines(page).nth(0)).toContainText("second words");
     await startEdit(page, 0);
-    await expect(field(page)).toHaveValue("second words");
+    await expect(field(page)).toHaveText("second words");
     await saveAs(page, "third words");
     await expect(lines(page).nth(0)).toContainText("third words");
     await expect(lines(page)).toHaveCount(2);
@@ -252,7 +252,7 @@ test.describe("a room's lines: Edit", () => {
     await expect(lines(page).nth(0)).not.toContainText("Edited");
     await expect(lines(page)).toHaveCount(2);
     await startEdit(page, 0);
-    await expect(field(page)).toHaveValue("my first words");
+    await expect(field(page)).toHaveText("my first words");
   });
 
   test("ends an edit, the box back to the kept draft, when its line is hidden meanwhile", async ({ page }) => {
@@ -263,7 +263,7 @@ test.describe("a room's lines: Edit", () => {
     ergo().send(`:gnoworld!bot@h REDACT ${ROOM} m1 :a word this world bans`);
     await expect(lines(page)).toHaveCount(1);
     await expect(editing(page)).toHaveCount(0);
-    await expect(field(page)).toHaveValue("a draft in progress");
+    await expect(field(page)).toHaveText("a draft in progress");
     // The box says so (F2004) until the draft changes, across the remount of the writer (R4 of the second red pass).
     await expect(page.getByText("That message is gone.", { exact: true })).toBeVisible();
     await field(page).press("End");
@@ -308,7 +308,7 @@ test.describe("a room's lines: Edit", () => {
     await page.keyboard.press("Enter");
     await expect(editing(page)).toBeVisible();
     await expect(field(page)).toBeFocused();
-    await expect(field(page)).toHaveValue("my first words");
+    await expect(field(page)).toHaveText("my first words");
   });
 
   test("keeps the bar on one row on a phone's screen, Edit behind More, and fits the edit's bar, field and buttons", async ({
@@ -324,7 +324,7 @@ test.describe("a room's lines: Edit", () => {
     );
     await lines(page).nth(0).focus();
     const bar = barOf(page, 0);
-    await expect(bar.getByRole("button")).toHaveCount(3);
+    await expect(bar.getByRole("button")).toHaveCount(8);
     expect((await bar.boundingBox())?.height ?? Infinity).toBeLessThan(56);
     await startEdit(page, 0);
     await expect(editing(page)).toBeVisible();

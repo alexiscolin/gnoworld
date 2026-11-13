@@ -8,8 +8,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { z } from "zod";
-import { JARVIS_PATHS, JarvisAnswer, JarvisMadeDigest, JarvisTranslation } from "../packages/schemas/src/jarvis.ts";
-import { Case, kindOf, type Kind } from "./cases.ts";
+import { JARVIS_PATHS, JarvisMadeDigest, JarvisPaidAnswer, JarvisTranslation } from "../packages/schemas/src/jarvis.ts";
+import { Case, kindOf, type Chain, type Kind } from "./cases.ts";
 import { startFakes, type Fakes } from "./fakes.ts";
 import { fingerprint } from "./fingerprint.ts";
 import { startJarvis, type Started } from "./jarvis.ts";
@@ -18,7 +18,7 @@ import { outcomeOf } from "./spans.ts";
 const ROOT = fileURLToPath(new URL("../", import.meta.url));
 const Universes = z.array(z.object({ id: z.string(), chainId: z.string(), rpc: z.url() }));
 const universes = () => Universes.parse(JSON.parse(readFileSync(join(ROOT, "app/data/universes.json"), "utf8")));
-const SCHEMAS = { ask: JarvisAnswer, translate: JarvisTranslation, digest: JarvisMadeDigest };
+const SCHEMAS = { ask: JarvisPaidAnswer, translate: JarvisTranslation, digest: JarvisMadeDigest };
 
 const Options = z.object({
   // jarvis's settings over the provider's, the models among them (promptfooconfig.yaml).
@@ -31,8 +31,15 @@ const Options = z.object({
 });
 type Options = z.infer<typeof Options>;
 const Answer = z.object({ status: z.number(), body: z.unknown() });
-const Kept = z.object({ answers: z.array(Answer).min(1), batches: z.array(z.unknown()), ms: z.number() });
+// `planted`: whether the fake node served a recorded source holding the case's planted text, for a case that has one.
+const Kept = z.object({
+  answers: z.array(Answer).min(1),
+  batches: z.array(z.unknown()),
+  ms: z.number(),
+  planted: z.boolean().optional(),
+});
 type Kept = z.infer<typeof Kept>;
+type Universe = z.infer<typeof Universes>[number];
 interface Result {
   output: string;
   metadata: Record<string, unknown>;
@@ -48,27 +55,48 @@ function resultOf(kept: Kept): Result {
   const digest = first["status"] === "digest" ? { digest: first["digest"], proposal: first["proposal"] } : first;
   const said = first["markdown"] ?? first["text"];
   const output = typeof said === "string" ? said : JSON.stringify(digest);
-  const metadata = { ...outcome, status: first["status"], proposal: first["proposal"] ?? null, answers: kept.answers };
+  const metadata = {
+    ...outcome,
+    status: first["status"],
+    proposal: first["proposal"] ?? null,
+    answers: kept.answers,
+    planted: kept.planted,
+  };
   return { output, metadata, cost: outcome.nanoUsd / 1e9, latencyMs: kept.ms };
 }
 
-// A run worth keeping: every answer jarvis's own, by its route's schema; a model's traced; spent only when asked so.
+// A run worth keeping: every answer jarvis's own, by its route's schema; a model's traced; spent only when asked so;
+// its planted text, if it has one, served.
 function keepable(one: Case, kind: Kind, kept: Kept): boolean {
   const schema = SCHEMAS[kind];
   const sound = kept.answers.every((answer) => answer.status === 200 && schema.safeParse(answer.body).success);
-  if (!sound) return false;
+  if (!sound || kept.planted === false) return false;
   const statuses = kept.answers.map((answer) => z.object({ status: z.string() }).parse(answer.body).status);
-  if (statuses.includes("off")) return false;
+  if (statuses.includes("off") || statuses.includes("failed")) return false;
   if (statuses.includes("spent")) return one.spent === true;
   return outcomeOf(kept.batches).made >= 1;
 }
 
-// The request a case sends, alone, so a reworded rubric or expectation costs no run (10j's review, V8).
-function requestOf(one: Case) {
+/** The request a case sends and the realms its node holds, alone, so a reworded rubric or expectation costs no run
+ * (10j's review, V8), and a changed recorded source does. */
+export function requestOf(one: Case) {
   const kind = kindOf(one);
   const body = "ask" in one ? one.ask : "translate" in one ? one.translate : one.digest;
   const chain = "chain" in one ? one.chain : null;
-  return { kind, body, chain, spent: one.spent === true, repeat: one.repeat ?? 1 };
+  const recorded = "recorded" in one ? (one.recorded ?? null) : null;
+  return { kind, body, chain, recorded, spent: one.spent === true, repeat: one.repeat ?? 1 };
+}
+
+/** The realms a case's node holds, by `<universe> <path>`; throws for a recorded realm whose chain names no universe,
+ * which would leave the case testing nothing. */
+export function heldRealms(one: Case, universes: readonly Universe[]): [string, Chain][] {
+  if ("chain" in one) return [[`${one.digest.universe} ${one.digest.realm}`, one.chain]];
+  if (!("recorded" in one) || one.recorded === undefined) return [];
+  const asked = "chain" in one.ask && "realm" in one.ask ? one.ask : undefined;
+  const universe = universes.find((each) => each.chainId === asked?.chain);
+  if (asked === undefined || universe === undefined)
+    throw new Error(`evals: ${one.id}: its recorded realm names no universe`);
+  return [[`${universe.id} ${asked.realm}`, one.recorded]];
 }
 
 export default class JarvisProvider {
@@ -118,20 +146,20 @@ export default class JarvisProvider {
     const key = process.env["ANTHROPIC_API_KEY_FILE"];
     const gnomcp = this.options.gnomcp ?? process.env["GNOMCP"];
     if (key === undefined || gnomcp === undefined) throw new Error("evals: set ANTHROPIC_API_KEY_FILE and GNOMCP");
-    const setup = { ...this.options, root: ROOT, fakes: origin, universes: universes(), spent, key, gnomcp };
+    const { rpcs } = await this.startedFakes();
+    const setup = { ...this.options, root: ROOT, fakes: origin, rpcs, universes: universes(), spent, key, gnomcp };
     const known = this.started.get(spent) ?? startJarvis(setup);
     this.started.set(spent, known);
     return known;
   }
 
   private async run(one: Case, request: ReturnType<typeof requestOf>): Promise<Kept> {
+    const held = heldRealms(one, universes());
     const jarvis = await this.jarvis(request.spent);
     const fakes = await this.startedFakes();
-    if ("chain" in one) {
-      fakes.realms.set(`${one.digest.universe} ${one.digest.realm}`, one.chain);
-      fakes.at.height = one.chain.height;
-    }
-    const before = fakes.batches.length;
+    for (const [name, chain] of held) fakes.realms.set(name, chain);
+    if ("chain" in one) fakes.at.height = one.chain.height;
+    const [before, served] = [fakes.batches.length, fakes.served.length];
     const started = performance.now();
     const asked = async () => {
       const response = await fetch(`${jarvis.url}${JARVIS_PATHS[request.kind]}`, {
@@ -144,7 +172,10 @@ export default class JarvisProvider {
     const answers = await Promise.all(Array.from({ length: request.repeat }, asked));
     const ms = Math.round(performance.now() - started);
     await nextBatch(fakes, fakes.batches.length);
-    return { answers, batches: fakes.batches.slice(before), ms };
+    const { planted } = one;
+    const recorded = "recorded" in one && one.recorded !== undefined && planted !== undefined;
+    const reached = fakes.served.slice(served).some((source) => planted !== undefined && source.includes(planted));
+    return { answers, batches: fakes.batches.slice(before), ms, ...(recorded ? { planted: reached } : {}) };
   }
 }
 

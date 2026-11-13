@@ -95,3 +95,13 @@ export function listed(roles: Typed, room: string, who: string | undefined): boo
   if (!typeOf(roles, room).hidden) return mayRead(roles, room, who);
   return staffOf(roles, room, who);
 }
+
+/** Whether the file hides the room: only its world's moderators and the team see it in the lists. */
+export const hiddenRoom = (roles: Typed, room: string): boolean => typeOf(roles, room).hidden;
+
+/** A room whose lines the search index holds (D13924): any a reader may open that is not hidden, so open, announcement and
+ * accounts rooms; never a members room. Who reads a hit is asked again at query time (`mayRead`). */
+export const searchable = (roles: Typed, room: string): boolean => {
+  const { type, hidden } = typeOf(roles, room);
+  return !hidden && (type === "open" || type === "announcement" || type === "accounts");
+};

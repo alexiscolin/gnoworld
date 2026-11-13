@@ -3,6 +3,7 @@
 import { excerpt, type Line } from "@gnoworld/core";
 import { shortened } from "./shortened.ts";
 import { Person } from "./Person.tsx";
+import rules from "./markdownRules.module.css";
 import styles from "./RoomView.module.css";
 
 /** The line answered, as a reply shows it: its author, an account's or a guest's nick, and its text. */
@@ -44,7 +45,7 @@ export function Quote({ line, answers, known }: { line: Line; answers: Line | un
   if (line.reply === undefined) return null;
   const shortenable = new Set(known.split(" "));
   return (
-    <p className={styles["replying"]}>
+    <p className={[styles["replying"], rules["quote"]].join(" ")}>
       <Replying
         to={answers === undefined ? undefined : answeredOf(answers)}
         length={QUOTED}

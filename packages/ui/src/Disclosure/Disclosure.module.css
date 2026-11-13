@@ -1,0 +1,135 @@
+/* A row that opens in place (the proposal's .fn-row and .fn-body): 44 or 36 px, its hover fill reaching 8 px past the words, the chevron turned
+   down once open, the body grown from nothing to its height. */
+@layer components {
+  .disclosure {
+    min-inline-size: 0;
+  }
+
+  .row {
+    /* layout: a step between the lead, the words and what trails (icon-text-meta or text-meta, pointer) */
+    gap: var(--space-xs);
+    /* raw: the card's width and 8 px more each side's half, so the hover fill reaches past the words */
+    inline-size: calc(100% + var(--space-s));
+    min-block-size: var(--fn-row-h);
+    /* layout: this row's own arrangement */
+    margin-inline: calc(var(--space-2xs) * -1);
+    padding-inline: var(--space-2xs);
+    border: 0;
+    border-radius: var(--radius-s);
+    background: transparent;
+    color: inherit;
+    text-align: start;
+    transition: background-color var(--motion-fast) var(--ease-standard);
+  }
+
+  .row[data-size="s"] {
+    min-block-size: var(--row-h);
+  }
+
+  .row:hover {
+    background: var(--color-fill);
+  }
+
+  /* A section of a column: its name in the label's capitals, the chevron before it, the control at the end a sibling of the button. */
+  .head {
+    /* layout: the name and its control at the two ends */
+    display: flex;
+    /* layout: the name and the control share the line's middle */
+    align-items: center;
+    /* layout: the name and its control at the two ends */
+    justify-content: space-between;
+  }
+
+  .head h2 {
+    min-inline-size: 0;
+  }
+
+  .disclosure[data-look="section"] .head .row {
+    /* layout: the chevron first, then the name, the button no wider than they are */
+    display: flex;
+    /* layout: the chevron and the name a hair apart */
+    gap: var(--space-3xs);
+    inline-size: auto;
+    block-size: auto;
+    min-block-size: var(--control-xs);
+    /* layout: the section's button takes no negative margin, unlike a row's */
+    margin-inline: 0;
+    padding-inline: 0;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+  }
+
+  /* What trails is the chevron alone here: it stands before the name. */
+  .disclosure[data-look="section"] .head .trail {
+    display: contents;
+  }
+
+  .disclosure[data-look="section"] .head .chevron {
+    order: -1;
+  }
+
+  .disclosure[data-look="section"] .head .row:hover {
+    background: transparent;
+  }
+
+  .disclosure[data-look="section"] .body[data-open] .inner {
+    padding-block: var(--space-2xs) 0;
+  }
+
+  .trail {
+    /* layout: what trails and the chevron a step apart */
+    gap: var(--space-2xs);
+    white-space: nowrap;
+  }
+
+  .chevron {
+    display: block;
+    color: var(--color-text-muted);
+    /* The chevron points along the text at rest, down once open. */
+    rotate: -90deg;
+    transition: rotate var(--motion-base) var(--ease-standard);
+  }
+
+  .row[aria-expanded="true"] .chevron {
+    rotate: 0deg;
+  }
+
+  .body {
+    /* layout: this row's own arrangement */
+    display: grid;
+    /* layout: this row's own arrangement */
+    grid-template-rows: 0fr;
+    transition: grid-template-rows var(--motion-slow) var(--ease-standard);
+  }
+
+  .body[data-open] {
+    /* layout: this row's own arrangement */
+    grid-template-rows: 1fr;
+  }
+
+  /* A shut body is not laid out nor painted (it is inert already): a hundred rows keep their cards at no cost. It shows from the first frame of its
+     opening and hides after the last of its closing (content-visibility eases as a discrete value). Where it is not known, visibility hides it. */
+  .inner {
+    min-block-size: 0;
+    overflow: hidden;
+    visibility: hidden;
+    transition: visibility var(--motion-slow);
+  }
+
+  .body[data-open] .inner {
+    padding-block: var(--space-3xs) var(--space-s);
+    visibility: visible;
+  }
+
+  @supports (content-visibility: hidden) {
+    .inner {
+      transition: content-visibility var(--motion-slow) allow-discrete;
+    }
+
+    .body:not([data-open]) .inner {
+      content-visibility: hidden;
+    }
+  }
+}

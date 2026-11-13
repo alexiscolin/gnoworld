@@ -32,6 +32,8 @@
   (literal (string-append (param "MAIN") "/.env"))
   (literal (string-append (param "MAIN") "/.env.local"))
   (subpath "/Library/Tailscale"))
+; The one secret the backend may read: the moderation key WORKSHOP_OPENAI_KEY_FILE names, so guests may speak; none without it.
+(allow file-read* (literal (param "OPENAI_KEY")))
 ; The keychain's daemons, by the names their launchd plists give (securityd, the system keychain's, secd and its helpers), and the
 ; pasteboard: a copy of /usr/bin/security reaches none.
 (deny mach-lookup

@@ -1,5 +1,12 @@
 import type { Line } from "@gnoworld/core";
-import { Address, type LineVerdicts, type Signal, type StreamEvent } from "@gnoworld/schemas";
+import {
+  Address,
+  type CardEvent,
+  type LineCards,
+  type LineVerdicts,
+  type Signal,
+  type StreamEvent,
+} from "@gnoworld/schemas";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Result } from "../../lib/api/http.ts";
 import { linked } from "./linked.ts";
@@ -50,7 +57,7 @@ function server(answer: (ids: readonly string[]) => Promise<Result<LineVerdicts>
   return { ask, sent, heard, answers: () => answers, stop: asker.stop };
 }
 // The answers' turn: each request's promise settled, and what it does after.
-const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 const refusal = (reason: "refused" | "forbidden" | "malformed"): Promise<Result<LineVerdicts>> =>
   Promise.resolve({ ok: false, reason });
 
@@ -83,7 +90,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
   it("asks a line once while it stays in view, whatever comes after", async () => {
     const t = server();
     t.ask([line("a")]);
-    await settled();
+    await nextTask();
     t.ask([line("a"), line("b")]);
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a"], ["b"]]);
@@ -135,7 +142,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
       }),
     );
     t.ask([line("a"), line("b")]);
-    await settled();
+    await nextTask();
     expect(t.heard).toEqual([
       { msgid: "a", room: "#bubble", state: "hidden" },
       { msgid: "b", room: "#bubble", state: "checked" },
@@ -149,7 +156,7 @@ describe("verdictAsker: the server's verdicts of the lines in view", () => {
   it.each(["refused", "forbidden", "malformed"] as const)("never asks again a line the server %s", async (reason) => {
     const t = server(() => refusal(reason));
     t.ask([line("a")]);
-    await settled();
+    await nextTask();
     t.ask([line("a"), line("b")]);
     expect(t.sent).toEqual([["a"], ["b"]]);
     expect(t.heard).toEqual([]);
@@ -165,6 +172,8 @@ function told(clock = OPENED) {
   let said: ((time: number) => void) | undefined;
   let ended: (() => void) | undefined;
   let follows = 0;
+  const languages: (string | undefined)[] = [];
+  let stops = 0;
   // Not a literal, so a part the asker no longer takes (its clock) is still handed, as the page's was.
   const parts = {
     verdicts: (_room: string, ids: readonly string[]) => {
@@ -175,11 +184,14 @@ function told(clock = OPENED) {
     judgedAll: () => undefined,
     held: () => undefined,
     linked,
-    follow: (_room: string, on: { since: (time: number) => void; dead: () => void }) => {
+    follow: (_room: string, on: { since: (time: number) => void; dead: () => void }, language?: string) => {
       follows += 1;
+      languages.push(language);
       said = on.since;
       ended = on.dead;
-      return () => undefined;
+      return () => {
+        stops += 1;
+      };
     },
     now: () => clock,
   };
@@ -190,7 +202,7 @@ function told(clock = OPENED) {
   const end = () => {
     ended?.();
   };
-  return { asker, sent, say, end, follows: () => follows };
+  return { asker, sent, say, end, follows: () => follows, languages, stops: () => stops };
 }
 const HOUR = 3_600_000;
 
@@ -267,11 +279,21 @@ describe("verdictAsker, asking anew", () => {
     expect(t.sent).toEqual([["a"], ["a"]]);
   });
 
+  it("follows the room's stream again in a new language, the stream before closed", () => {
+    const t = told();
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice", language: "de" });
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice", language: "de" });
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice", language: "fr" });
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice" });
+    expect(t.languages).toEqual(["de", "fr", undefined]);
+    expect(t.stops()).toBe(2);
+  });
+
   it("follows the room's stream again for a new reader, and asks anew at its word", () => {
     const t = told();
     t.asker.show("#bubble", LINES.slice(0, 1));
     t.say(OPENED);
-    t.asker.show("#bubble", LINES.slice(0, 1), "g1alice");
+    t.asker.show("#bubble", LINES.slice(0, 1), { reader: "g1alice" });
     expect(t.follows()).toBe(2);
     t.say(OPENED);
     expect(t.sent).toEqual([["a"], ["a"]]);
@@ -310,6 +332,15 @@ describe("verdictAsker, when the stream ends for good", () => {
     expect(t.follows()).toBe(1);
     vi.advanceTimersByTime(1);
     expect(t.follows()).toBe(2);
+  });
+
+  it("follows the stream again in the reader's language after the route's minute", () => {
+    vi.useFakeTimers();
+    const t = told();
+    t.asker.show("#bubble", LINES, { reader: "g1alice", language: "fr" });
+    t.end();
+    vi.advanceTimersByTime(BUSY_REST_MS);
+    expect(t.languages).toEqual(["fr", "fr"]);
   });
 
   it.each([
@@ -426,7 +457,7 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
     kind: "message",
   });
 
-  it("names each line with a player, no verdict and not asked yet, in the lines' order", () => {
+  it("names each line with a player or a card's link, no verdict and not asked yet, in the lines' order", () => {
     const lines = [
       said("a", "https://youtu.be/dQw4w9WgXcQ"),
       said("b", "no link"),
@@ -435,8 +466,8 @@ describe("unjudged: the lines in view whose player waits on a verdict the page d
       said("e", "see https://gno.land"),
       said("f", "> https://youtu.be/dQw4w9WgXcQ"),
     ];
-    expect(unjudged(lines, { held: { c: "checked" }, asked: new Set(["d"]) }, linked)).toEqual(["a", "f"]);
-    expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["a", "c", "d", "f"]);
+    expect(unjudged(lines, { held: { c: "checked" }, asked: new Set(["d"]) }, linked)).toEqual(["a", "e", "f"]);
+    expect(unjudged(lines, { held: undefined, asked: new Set() }, linked)).toEqual(["a", "c", "d", "e", "f"]);
     expect(unjudged([], { held: undefined, asked: new Set() }, linked)).toEqual([]);
   });
 
@@ -482,5 +513,101 @@ describe("verdictAsker: the first signals on the room's one stream", () => {
     given?.(CHART);
     expect(heard).toEqual([CHART]);
     asker.stop();
+  });
+});
+
+// Link previews L4: the cards of the same lines are asked beside their verdicts (GET /api/cards), the answer into the store as a server's.
+describe("verdictAsker: the cards of the lines in view", () => {
+  const KEY = "a".repeat(64);
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+  function withCards(answer: (ids: readonly string[]) => Promise<Result<LineCards>>) {
+    const sent: string[][] = [];
+    const carded: CardEvent[][] = [];
+    const asker = verdictAsker({
+      verdicts: () => Promise.resolve(NONE),
+      judged: () => undefined,
+      judgedAll: () => undefined,
+      held: () => undefined,
+      linked,
+      follow: (_room, on) => {
+        on.since(OPENED);
+        return () => undefined;
+      },
+      cards: (_room, ids) => {
+        sent.push([...ids]);
+        return answer(ids);
+      },
+      carded: (events) => carded.push([...events]),
+    });
+    return { asker, sent, carded };
+  }
+  const page = (id: string): Line => ({ ...line(id), text: `${id} https://example.com/${id}` });
+
+  it("asks the cards of the lines it asks the verdicts of, and hands the answer on with the room", async () => {
+    const t = withCards(() =>
+      Promise.resolve({ ok: true, value: { room: "#bubble", cards: [{ msgid: "a", key: KEY }] } }),
+    );
+    t.asker.show("#bubble", [page("a"), page("b"), { ...line("n"), text: "no link" }]);
+    await nextTask();
+    expect(t.sent).toEqual([["a", "b"]]);
+    expect(t.carded).toEqual([[{ room: "#bubble", msgid: "a", key: KEY }]]);
+  });
+
+  it("asks nothing of the cards for a line from the stream's opening on, which the stream tells", async () => {
+    const t = withCards(() => Promise.resolve({ ok: true, value: { room: "#bubble", cards: [] } }));
+    t.asker.show("#bubble", [page("a"), { ...page("b"), time: "2026-10-26T12:05:00.000Z" }]);
+    await nextTask();
+    expect(t.sent).toEqual([["a"]]);
+  });
+
+  it.each([
+    ["unavailable", REST_MS],
+    ["too_many", BUSY_REST_MS],
+  ] as const)(
+    "asks the cards again after the verdicts' rest when the server answers %s, and holds nothing meanwhile",
+    async (reason, rest) => {
+      vi.useFakeTimers();
+      let answers = 0;
+      const t = withCards(() => {
+        answers += 1;
+        return Promise.resolve(
+          answers === 1
+            ? { ok: false, reason }
+            : { ok: true, value: { room: "#bubble", cards: [{ msgid: "a", key: KEY }] } },
+        );
+      });
+      t.asker.show("#bubble", [page("a")]);
+      await vi.advanceTimersByTimeAsync(rest - 1);
+      expect(t.sent).toEqual([["a"]]);
+      expect(t.carded).toEqual([]);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(t.sent).toEqual([["a"], ["a"]]);
+      expect(t.carded).toEqual([[{ room: "#bubble", msgid: "a", key: KEY }]]);
+    },
+  );
+
+  it("a network error of the cards is retried the same way", async () => {
+    vi.useFakeTimers();
+    let answers = 0;
+    const t = withCards(() => {
+      answers += 1;
+      return answers === 1
+        ? Promise.reject(new Error("down"))
+        : Promise.resolve({ ok: true, value: { room: "#bubble", cards: [] } });
+    });
+    t.asker.show("#bubble", [page("a")]);
+    await vi.advanceTimersByTimeAsync(REST_MS);
+    expect(t.sent).toEqual([["a"], ["a"]]);
+  });
+
+  it("never asks again what the server refuses (refused, forbidden, malformed)", async () => {
+    vi.useFakeTimers();
+    const t = withCards(() => Promise.resolve({ ok: false, reason: "malformed" }));
+    t.asker.show("#bubble", [page("a")]);
+    await vi.advanceTimersByTimeAsync(BUSY_REST_MS * 2);
+    expect(t.sent).toEqual([["a"]]);
+    expect(t.carded).toEqual([]);
   });
 });

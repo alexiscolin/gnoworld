@@ -1,42 +1,41 @@
-/* A line's bar (4c's message menu): over the line's end, astride its top edge as the prototype's is, so the newest
-   line's bar stays inside the list; a floating surface's look. In a narrow line (the column of a phone, which the
-   five controls would wrap in over the line's words) it stands in the flow under the line, on one row, the three
-   quick reactions behind one React menu (U1). */
+/* A line's bar (4c's message menu): over the line's end, astride its top edge as the prototype's and Slack's are, so the pointer
+   crosses into it inside the row and the newest line's bar stays inside the list; a floating surface's look, at every width, so no line moves as it comes. One compact row of 24 px icons, as Slack's
+   (D376). */
 @layer components {
   .bar {
     position: absolute;
+    /* astride the row's top edge, as Slack's: half over the row, so the pointer reaches it without leaving the row */
     inset-block-start: calc(-1 * var(--space-s));
-    inset-inline-end: var(--space-2xs);
+    /* layout: at the row's far end, as Slack's, over the line's time (Alexis, 2026-11-07: "tout à droite comme sur slack") */
+    inset-inline-end: var(--space-s);
     border: var(--line-width) solid var(--color-line-strong);
     /* room for More's focus ring inside the frame, which it would paint over (U16) */
     padding: var(--space-3xs);
     border-radius: var(--radius-m);
     background: var(--color-surface);
     box-shadow: var(--shadow-popover);
+    white-space: nowrap;
+    /* layout: one row of controls of one height, every icon and emoji centred the same way */
+    display: inline-flex;
+    /* layout: centred on one line */
+    align-items: center;
+  }
+
+  .bar button {
+    /* layout: an emoji is centred in its square as an icon is */
+    align-items: center;
+    /* layout: the same, across */
+    justify-content: center;
+  }
+
+  /* An emoji reaction draws at the icons' size, on a line of its own height, so it shares their baseline. */
+  .bar button > span[aria-hidden="true"] {
+    font-size: var(--icon-m);
+    line-height: 1;
   }
 
   /* Its line at the top of the list that scrolls: inside the line, never past the list's edge (U10). */
   .bar[data-inside] {
     inset-block-start: var(--space-3xs);
-  }
-
-  .react {
-    display: none;
-  }
-
-  /* raw: the width the bar's five controls and a few words of a line need side by side */
-  @container (inline-size < 24rem) {
-    .bar {
-      position: static;
-      inline-size: fit-content;
-    }
-
-    .quick {
-      display: none;
-    }
-
-    .react {
-      display: inline;
-    }
   }
 }

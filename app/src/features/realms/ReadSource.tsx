@@ -1,7 +1,6 @@
 // Where a read came from and when (5k): the source's host and its time, on every fact and every failure, so the page never shows
 // a number without its source and age. A failed read is a state with its next step (our sentence, never the answer's words).
 import { hostOf, type Failure, type Source } from "@gnoworld/chain/read";
-import styles from "./RealmView.module.css";
 
 /** The age of a read as it is shown: the minute it was asked, in UTC, as the time element's text. */
 const askedAt = (at: string): string => `${at.slice(0, 16).replace("T", " ")} UTC`;
@@ -9,7 +8,7 @@ const askedAt = (at: string): string => `${at.slice(0, 16).replace("T", " ")} UT
 /** `Read from <host> at <time>`. */
 export function ReadSource({ source }: { source: Source }) {
   return (
-    <p className={styles["meta"]}>
+    <p className={"meta"}>
       Read from <span dir="ltr">{hostOf(source.url)}</span> at <time dateTime={source.at}>{askedAt(source.at)}</time>
     </p>
   );

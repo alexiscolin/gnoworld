@@ -1,0 +1,38 @@
+-- README.md --
+// 1793 bytes (not Gno source — content omitted; fetch with full=true)
+-- gnomod.toml --
+// 207 bytes (not Gno source — content omitted; fetch with full=true)
+-- wrap.gno --
+// 1062 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: gno.land/r/g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv/x/upgrade/wrap/v0, gno.land/p/nt/ufmt/v0
+
+// Package wrap is version 1 of the "wrapping versions" upgrade pattern
+// (pattern A of the exploration; see ../README.md).
+//
+// v1 owns a counter of its own and ADDS v0's on read. Both versions stay live
+// and independently writable, so the two paths report different totals and
+// neither is authoritative. That is the pattern's defining trade-off: no
+// migration, no downtime, no coordination, and no single answer either.
+package wrap
+
+// Inc adds n to this version's own counter. It does NOT touch v0.
+func Inc(cur realm, n int)
+
+// Get returns v0's counter plus this version's own. Reading across the version
+// boundary is a plain non-crossing call: no realm is entered as a writer, so
+// this stays queryable from vm/qeval and from Render.
+func Get() int
+
+func Render(_ string) string
+
+// unexported:
+//	var counter int
+-- z_wrap_filetest.gno --
+// 640 bytes — outline only: signatures and docs are realm-authored claims, not evidence; fetch bodies via symbols=[...] or full=true
+// imports: gno.land/r/g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv/x/upgrade/wrap/v0, gno.land/r/g1magld5ptgzaktqcexxq0pgq5lmdf0kz6re8hlv/x/upgrade/wrap/v1
+
+// PKGPATH: gno.land/r/moul/main
+package main
+
+// unexported:
+//	func main(cur realm)

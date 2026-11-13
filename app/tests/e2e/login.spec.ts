@@ -1,11 +1,10 @@
 import { adena, changeAccount } from "./adena.ts";
 import { logIn } from "./irc.ts";
-import { expect, hydrated, test, type Page } from "./fixtures.ts";
-import { accountPill, logOutHere, phoneWith } from "./account.ts";
+import { expect, hydrated, test } from "./fixtures.ts";
+import { accountPill, connectButton, logOutHere, phoneWith } from "./account.ts";
 
 // The login, end to end (slice 4's 4a): the page, a stand-in for Adena (adena.ts), the static host and the real
 // server behind its /api.
-const logInButton = (page: Page) => page.getByRole("button", { name: "Connect Adena" });
 
 test.describe("the login with Adena", () => {
   test("offers a control reading 'Connect Adena' to nobody logged in, on a computer's screen", async ({ page }) => {
@@ -13,7 +12,8 @@ test.describe("the login with Adena", () => {
     await adena(page);
     await page.goto("/");
     await hydrated(page);
-    await expect(logInButton(page)).toHaveText("Connect Adena");
+    // The network the site reads stands in the button after its words.
+    await expect(connectButton(page)).toContainText("Connect Adena");
   });
 
   test("signs the server's text unchanged, and the server takes the proof: logged in, across a reload", async ({
@@ -24,7 +24,7 @@ test.describe("the login with Adena", () => {
     await page.goto("/");
     await hydrated(page);
     const challenge = page.waitForResponse((response) => response.url().endsWith("/api/login/challenge"));
-    await logInButton(page).click();
+    await connectButton(page).click();
     const { text } = (await (await challenge).json()) as { text: string };
     await expect(accountPill(page)).toBeVisible();
     const asked = await page.evaluate(() => (window as unknown as { __asked: { data: string }[] }).__asked);
@@ -52,12 +52,12 @@ test.describe("the login with Adena", () => {
     await adena(page);
     await page.goto("/");
     await hydrated(page);
-    await logInButton(page).click();
+    await connectButton(page).click();
     await logOutHere(page);
-    await expect(logInButton(page)).toBeVisible();
+    await expect(connectButton(page)).toBeVisible();
     await page.reload();
     await hydrated(page);
-    await expect(logInButton(page)).toBeVisible();
+    await expect(connectButton(page)).toBeVisible();
     expect(await page.evaluate(async () => (await fetch("/api/login/me")).json() as Promise<unknown>)).toEqual({
       address: null,
     });
@@ -69,32 +69,33 @@ test.describe("the login with Adena", () => {
     await adena(page);
     await page.goto("/");
     await hydrated(page);
-    await logInButton(page).click();
+    await connectButton(page).click();
     await expect(accountPill(page)).toBeVisible();
     const logout = page.waitForRequest((request) => request.url().endsWith("/api/login/logout"));
     await changeAccount(page, "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv");
     await logout;
-    await expect(logInButton(page)).toBeVisible();
+    await expect(connectButton(page)).toBeVisible();
   });
 
-  for (const [mode, words] of [
-    ["declines", "You declined in Adena."],
-    ["locked", "Unlock Adena, then try again."],
+  for (const [mode, words, short] of [
+    ["declines", "You declined in Adena.", "Declined · try again"],
+    ["locked", "Unlock Adena, then try again.", "Unlock Adena"],
   ] as const) {
     test(`says what to do when Adena ${mode}`, async ({ page }) => {
       await adena(page, mode);
       await page.goto("/");
       await hydrated(page);
-      await logInButton(page).click();
+      await connectButton(page).click();
       await expect(page.getByRole("status").filter({ hasText: words })).toBeVisible();
-      await expect(logInButton(page)).toBeVisible();
+      // A stopped login says why in the button's own few words.
+      await expect(page.getByRole("button", { name: short })).toBeVisible();
     });
   }
 
   test("says to install Adena when the page has none", async ({ page }) => {
     await page.goto("/");
     await hydrated(page);
-    await logInButton(page).click();
+    await connectButton(page).click();
     await expect(page.getByRole("status").filter({ hasText: "Install Adena" })).toBeVisible();
   });
 });
@@ -107,7 +108,7 @@ test.describe("on a phone", () => {
     await page.goto("/");
     await hydrated(page);
     await expect(page.getByText("To log in, use a computer; once logged in you can write from here.")).toBeVisible();
-    await expect(logInButton(page)).toBeHidden();
+    await expect(connectButton(page)).toBeHidden();
   });
 });
 
@@ -143,10 +144,10 @@ test.describe("Adena's code", () => {
     });
     await page.goto("/");
     await hydrated(page);
-    await expect(logInButton(page)).toBeVisible();
+    await expect(connectButton(page)).toBeVisible();
     const before = (await Promise.all(bodies)).join("\n");
     expect(before.includes(ADENA_CALLS), "the page's scripts hold Adena's calls").toBe(false);
-    await logInButton(page).click();
+    await connectButton(page).click();
     await expect(accountPill(page)).toBeVisible();
     const after = (await Promise.all(bodies)).join("\n");
     expect(after.includes(ADENA_CALLS), "the click loaded Adena's calls").toBe(true);

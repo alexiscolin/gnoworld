@@ -1,7 +1,9 @@
-# The hosts jarvis may reach (ADR-0002 §5: "its network reaches only the Anthropic API, the chain's nodes, the public
-# indexer and gnoscope"), through its own proxy (egress_jarvis, on 4751): Anthropic's API, each universe's node and
-# indexer of app/data/universes.json, and gnoscope, each by its full name, never its domain; jarvis/src/config.test.ts
-# holds the list to the data. A host is matched as the request names it, then resolved and refused if private.
+# The hosts jarvis may reach (ADR-0002 §5), through its own proxy (egress_jarvis, on 4751): Anthropic's API, each universe's
+# node of app/data/universes.json, which its own reads take (the digest's, and the buttons' vm/qfuncs, through
+# packages/chain), and gnoscope, each by its full name, never its domain. Not the indexers (10u-g2): only gnomcp
+# read them (gno_history, gno_activity: jarvis/src/gnomcpTools.ts, indexerReads), and gnomcp runs in the reader now, whose
+# way out is reader-acl.yaml. jarvis/src/config.test.ts holds the list to the data. A host is matched as the request names
+# it, then resolved and refused if private.
 version: v1
 services: []
 default:
@@ -10,7 +12,5 @@ default:
   allowed_domains:
     - api.anthropic.com
     - rpc.onyx.testnets.gno.land
-    - indexer.onyx.testnets.gno.land
     - rpc.gno.land
-    - indexer.gno.land
     - gnoscope.com

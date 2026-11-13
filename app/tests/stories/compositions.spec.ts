@@ -34,7 +34,8 @@ async function eachWidth(page: Page, id: string, check: () => Promise<void>) {
 
 test("a Cluster lines its children up from the start, the centre, both ends or the end", async ({ page }) => {
   await eachWidth(page, "compositions-compositions--justify", async () => {
-    const found = await boxes(page, "[data-justify]");
+    // The story's Stack carries a justify of its own: a Cluster is the box that also says how it wraps.
+    const found = await boxes(page, "[data-justify][data-wrap]");
     expect(found.map((b) => b.data["justify"]).sort()).toEqual(["between", "center", "end", "start"]);
     for (const { data, content, children } of found) {
       const first = children[0];
@@ -56,7 +57,7 @@ test("a Cluster lines its children up from the start, the centre, both ends or t
 test("a Grid holds as many columns as its minimum width allows", async ({ page }) => {
   await eachWidth(page, "compositions-compositions--columns", async () => {
     const found = await boxes(page, "[data-min]");
-    expect(found.map((b) => b.data["min"]).sort()).toEqual(["l", "m", "s"]);
+    expect(found.map((b) => b.data["min"]).sort()).toEqual(["m", "s"]);
     for (const { data, content, gap, children } of found) {
       const min = await token(page, `--column-${data["min"] ?? ""}`);
       const columns = new Set(children.map((c) => Math.round(c.left))).size;
@@ -111,7 +112,7 @@ test("a Switcher's children of mixed fonts share one row or each take their own,
   }
 });
 
-// Every Center of every story, so both widths are seen: the dialog's and the measure's.
+// Every Center of every story: the measure's width.
 test("a Center holds its width, in the middle of its room", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   const seen = new Set<string>();
@@ -120,9 +121,7 @@ test("a Center holds its width, in the middle of its room", async ({ page }) => 
     for (const { data, content } of await boxes(page, "[data-max]")) {
       const max = data["max"] ?? "";
       seen.add(max);
-      expect(content.width, `${id}, ${max}`).toBeLessThanOrEqual(
-        (await token(page, max === "dialog" ? "--dialog-w" : "--measure")) + 1,
-      );
+      expect(content.width, `${id}, ${max}`).toBeLessThanOrEqual((await token(page, "--measure")) + 1);
     }
     const margins = await page.evaluate(() =>
       [...document.querySelectorAll<HTMLElement>("#storybook-root [data-max]")].map((box) => {
@@ -135,5 +134,5 @@ test("a Center holds its width, in the middle of its room", async ({ page }) => 
     );
     for (const off of margins) expect(off, `${id}: off the middle`).toBeLessThan(1);
   }
-  expect([...seen].sort()).toEqual(["dialog", "measure"]);
+  expect([...seen].sort()).toEqual(["measure"]);
 });

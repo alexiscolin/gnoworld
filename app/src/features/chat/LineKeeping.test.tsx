@@ -84,18 +84,21 @@ describe("a line's Pin", () => {
 
   it("is a button of the bar, before More, for a reader who may pin, and no item of the menu", () => {
     const markup = draw({ keeping: keeping({ pin: pin(false) }) });
-    expect(barButtons(markup)).toEqual(["Pin message", "More actions"]);
+    expect(barButtons(markup).slice(-2)).toEqual(["Pin message", "More actions"]);
     expect(items(markup)).not.toContain("Pin message");
     expect(markup).toContain('data-icon="pin"');
   });
 
   it("says Unpin message on a line already pinned", () => {
-    expect(barButtons(draw({ keeping: keeping({ pin: pin(true) }) }))).toEqual(["Unpin message", "More actions"]);
+    expect(barButtons(draw({ keeping: keeping({ pin: pin(true) }) })).slice(-2)).toEqual([
+      "Unpin message",
+      "More actions",
+    ]);
   });
 
   it("is not offered to a reader who may not pin, an account that moderates nothing among them", () => {
-    expect(barButtons(draw({ keeping: keeping() }))).toEqual(["More actions"]);
-    expect(barButtons(draw())).toEqual(["More actions"]);
+    expect(barButtons(draw({ keeping: keeping() }))).not.toContain("Pin message");
+    expect(barButtons(draw())).not.toContain("Pin message");
   });
 
   it("is a button that submits nothing, named for what it does now", () => {
@@ -116,12 +119,12 @@ describe("what a line of another kind is offered", () => {
   ])("offers %s Mark unread alone: no Save, no Pin", (_, line) => {
     const markup = draw({ line, keeping: keeping({ pin }) });
     expect(own(markup)).toEqual(["Mark unread"]);
-    expect(barButtons(markup)).toEqual(["More actions"]);
+    expect(barButtons(markup)).not.toContain("Pin message");
   });
 
   it("offers a guest's line no Pin, the server pinning a line of an account's alone, but Save and Mark unread", () => {
     const markup = draw({ line: guest, keeping: keeping({ pin }) });
-    expect(barButtons(markup)).toEqual(["More actions"]);
+    expect(barButtons(markup)).not.toContain("Pin message");
     expect(own(markup)).toEqual(["Save message", "Mark unread"]);
   });
 });
@@ -142,7 +145,7 @@ describe("a line's keeping, bound to the room's", () => {
     const flashes: { title: string; line?: string }[] = [];
     return { flashes, say: (message: { title: string; line?: string }) => void flashes.push(message) };
   };
-  const settled = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const nextTask = () => new Promise((resolve) => setTimeout(resolve, 0));
 
   it("gives a guest, and a room with no keeping, none", () => {
     expect(lineKeeping(room(), undefined, none)(LINE)).toBeUndefined();
@@ -195,7 +198,7 @@ describe("a line's keeping, bound to the room's", () => {
     expect(kept?.pinned).toBe(true);
     kept?.onPin();
     kept?.onUnpin();
-    await settled();
+    await nextTask();
     expect(asked).toEqual(["pin AB12", "unpin AB12"]);
     expect(flashes).toEqual([{ title: "Could not unpin the message.", line: "It is not pinned any more." }]);
   });
@@ -204,7 +207,7 @@ describe("a line's keeping, bound to the room's", () => {
     const { flashes, say } = said();
     const pin = { pin: () => Promise.reject(new Error("broken")), unpin: () => Promise.reject(new Error("broken")) };
     lineKeeping(room({ pin }), BOB, say)(LINE)?.pin?.onPin();
-    await settled();
+    await nextTask();
     expect(flashes).toEqual([
       { title: "Could not pin the message.", line: "The chat server could not be reached. Try again in a moment." },
     ]);

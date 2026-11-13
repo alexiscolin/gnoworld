@@ -22,7 +22,7 @@ export interface Item {
   /** Its time, in ms: when it came, or for an event when it starts. */
   readonly at: number;
   /** Where a press goes: a page of the site, or an address off it, which the warning comes before. */
-  readonly href: string;
+  readonly href?: string | undefined;
   readonly external?: boolean;
 }
 
@@ -49,7 +49,12 @@ export interface Sources {
 
 /** How the page names and places what the sources hold. */
 export interface Naming {
-  readonly notice: (notice: Notice) => { text: string; where: string; world: string | undefined; href: string };
+  readonly notice: (notice: Notice) => {
+    text: string;
+    where: string;
+    world: string | undefined;
+    href: string | undefined;
+  };
   readonly place: (world: string) => { name: string; href: string } | undefined;
   readonly live: (event: CalendarEvent, now: number) => boolean;
 }
@@ -131,9 +136,17 @@ export function feedOf(sources: Sources, naming: Naming, now: number): Item[] {
   return [...followedItems(sources, naming), ...timed];
 }
 
+// The ids marked read as a Set, made once for each state of the device's field: a panel asks of every item at each render.
+const marked = new WeakMap<DeviceFields["notificationsRead"], ReadonlySet<string>>();
+const markedOf = (read: DeviceFields["notificationsRead"]): ReadonlySet<string> => {
+  const held = marked.get(read) ?? new Set(read.ids);
+  marked.set(read, held);
+  return held;
+};
+
 /** Whether `item` is still to read: not marked, and after the last "Mark all read". A world of the moment counts until marked. */
 export function isUnread(item: Item, read: DeviceFields["notificationsRead"]): boolean {
-  if (read.ids.includes(item.id)) return false;
+  if (markedOf(read).has(item.id)) return false;
   return read.through === null || Number.isNaN(item.at) || item.at > Date.parse(read.through);
 }
 

@@ -105,3 +105,43 @@ describe("keeps", () => {
     expect(keeps(`Bravo${char(0x200d)} 1,204.`, `Bravo${char(0x202e)} 1,204.`)).toBe(false);
   });
 });
+
+// Mentions are read as the server's moderation reads them: folded (compatibility forms, marks and invisible characters
+// gone, lower case) by core's fold, so a name folding to an original's is the same person and not an added one.
+describe("keeps: a mention by name (10u-g, G-jarvis point 6)", () => {
+  it.each([
+    ["a name the original lacks", "Thanks for the poll.", "Thanks for the poll. @alice"],
+    ["a name in a sentence", "Thanks for the poll.", "Merci @alice pour le sondage."],
+    ["a name beside the original's", "Hi @bob", "Salut @bob et @alice"],
+    ["a longer name", "Hi @bob", "Salut @bobby"],
+    ["a shorter name", "Hi @bobby", "Salut @bob"],
+    ["a name with a digit", "Hi", "Salut @name1"],
+    ["a name with an underscore and a digit", "Hi", "Salut @name_2"],
+    ["a fullwidth at sign, which the fold makes an at sign", "Hi", "Salut \uff20alice"],
+    ["a Cyrillic lookalike of a name", "Hi @alice", "Salut @\u0430lice"],
+    ["a Cyrillic lookalike with none in the original", "Hi", "Salut @\u0430lice"],
+    ["a hidden character inside a name", "Hi", "Salut @a\u200blice"],
+    ["an email turned into a mention by a space", "Mail a@example.org", "Mail a @example.org"],
+    ["a name after a new line", "Hi", "Salut\n@alice"],
+    ["a name after a parenthesis", "Hi", "Salut (@alice)"],
+    ["a name after a strong mark", "Hi", "Salut **@alice**"],
+    ["a name in a link's label", "Hi", "Salut [@alice](https://gno.land/r/demo/poll)"],
+  ])("drops a translation that adds %s", (_case, original, translation) => {
+    expect(keeps(original, translation)).toBe(false);
+  });
+
+  it("drops an @room the original names only in code, where it pings nobody", () => {
+    expect(keeps("Use `@room` to ping", "Use @room to ping")).toBe(false);
+  });
+
+  it.each([
+    ["the same names in another order and number", "Hi @bob, ask @alice", "Salut @bob, demande \u00e0 @alice, @bob"],
+    ["no name at all, one dropped", "Hi @bob", "Salut"],
+    ["a name in another case, which the fold makes the same", "Hi @alice", "Salut @ALICE"],
+    ["a name in fullwidth letters, which the fold makes the same", "Hi @alice", "Salut @\uff41lice"],
+    ["a name with its at sign fullwidth, the same once folded", "Hi @alice", "Salut \uff20alice"],
+    ["an email's at sign, no mention in either", "Write to a@example.org", "\u00c9crivez \u00e0 a@example.org"],
+  ])("keeps a translation with %s", (_case, original, translation) => {
+    expect(keeps(original, translation)).toBe(true);
+  });
+});

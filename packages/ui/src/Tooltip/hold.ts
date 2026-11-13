@@ -9,12 +9,13 @@ export function keyboardFocus(event: { target: EventTarget }): boolean {
 }
 
 /** While `listening`, Esc anywhere takes `onEscape`. When `swallow` (words are shown), that first Esc goes no further, so a
- * dialog or popover around the control is not asked to close with it (WCAG 1.4.13). */
+ * dialog or popover around the control, a card open alone or space, is not asked to close with it (WCAG 1.4.13): heard on the
+ * window in capture, before any listener of the document's. */
 export function useFirstEscape(listening: boolean, swallow: boolean, onEscape: () => void): void {
   useEffect(() => {
     if (!listening) return;
     const stop = new AbortController();
-    document.addEventListener(
+    window.addEventListener(
       "keydown",
       (event) => {
         if (event.key !== "Escape") return;

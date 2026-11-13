@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { buttonsOf, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -7,6 +6,7 @@ import { MEMBER, opened, scriptedErgo, type HistoryLine, type Scripted } from ".
 import { marks, sentBefore, tags } from "./scriptedRoom.ts";
 import { asAccount, barOf, field, GUEST, OTHER, ROOM, T, tabsTo, tagged, tagmsg } from "./talk.ts";
 import { chipOf, closeButton, inThread, panel, threadField, threadOf } from "./thread.ts";
+import { axeOf } from "./axe.ts";
 
 // 4d's threads (docs/plans/chat-features.md, M3): a reply chain found in the room's own lines; a chip under its root, or
 // a line's More menu, opens it beside the room; every reply from it is tagged +reply with the root's msgid (scripted.ts).
@@ -76,7 +76,7 @@ test.describe("threads", () => {
     expect(said()).toEqual([`@+reply=m1 PRIVMSG ${ROOM} :from the panel`]);
     await expect(chipOf(lines(page).first())).toHaveText(/^3 replies\b/);
     await expect(lines(page)).toHaveCount(5);
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     // After a send the focus stays in the field, for the next line (R14).
     await expect(threadField(page)).toBeFocused();
     // The room's own composer says its line plain: the panel's tag is the panel's.
@@ -96,6 +96,8 @@ test.describe("threads", () => {
     await lines(page).nth(1).hover();
     await barOf(page, 1).getByRole("button", { name: "Reply" }).click();
     await expect(page.getByRole("form", { name: "Write in #games" })).toContainText("Replying to");
+    // The pointed line's bar stands over the line above it: the pointer goes to the root first, as a reader's does.
+    await lines(page).first().hover();
     await chipOf(lines(page).first()).click();
     await threadField(page).fill("to the root");
     await threadField(page).press("Enter");
@@ -115,16 +117,16 @@ test.describe("threads", () => {
     const { address } = await open(page);
     await field(page).fill("keep me");
     await chipOf(lines(page).first()).click();
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     await threadField(page).fill("panel words, unsent");
     await closeButton(page).click();
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
     await chipOf(lines(page).first()).click();
     await threadField(page).fill("sent from the panel");
     await threadField(page).press("Enter");
     await expect(inThread(page)).toHaveCount(4);
     await closeButton(page).click();
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
     const kept = () =>
       page.evaluate(() =>
         Object.entries(localStorage)
@@ -135,7 +137,7 @@ test.describe("threads", () => {
     expect((await kept()).join()).toContain("keep me");
     await page.reload();
     await hydrated(page);
-    await expect(field(page)).toHaveValue("keep me");
+    await expect(field(page)).toHaveText("keep me");
   });
 
   // R4: a thread opened over another is a new panel: nothing typed for the first goes to the second.
@@ -147,7 +149,7 @@ test.describe("threads", () => {
     await threadField(page).fill("half a thought");
     await threadOf(lineOf(page, "an unrelated line"));
     await expect(inThread(page)).toHaveText([/an unrelated line/]);
-    await expect(threadField(page)).toHaveValue("");
+    await expect(threadField(page)).toHaveText("");
     await expect(threadField(page)).toBeFocused();
     await threadField(page).fill("for the second");
     await threadField(page).press("Enter");
@@ -248,8 +250,12 @@ test.describe("threads", () => {
   }) => {
     const { ergo } = await open(page);
     await chipOf(lines(page).first()).click();
+    // The panel is open, its field focused, when the line goes: a redaction while it opens is another case.
+    await expect(threadField(page)).toBeFocused();
     ergo().send(`:${MEMBER}!u@h REDACT ${ROOM} m1`);
     await expect(lines(page)).toHaveCount(3);
+    // The panel has taken the redaction in: its root is "an earlier message" now, and the field still holds the focus.
+    await expect(panel(page).getByRole("heading", { name: /an earlier message/ })).toBeVisible();
     await expect(threadField(page)).toBeFocused();
     // The room's own stop is its newest line, before the panel goes and after.
     await expect(lines(page).last()).toHaveAttribute("tabindex", "0");
@@ -273,7 +279,7 @@ test.describe("threads", () => {
     await open(page);
     await chipOf(lines(page).first()).click();
     await expect(panel(page)).toBeVisible();
-    await roomsNav(page).getByRole("link", { name: "#bubble" }).click();
+    await roomsNav(page).getByRole("link", { name: "bubble", exact: true }).click();
     await expect(panel(page)).toHaveCount(0);
   });
 
@@ -298,7 +304,8 @@ test.describe("threads", () => {
     await expect(threadField(page)).toBeFocused();
     await page.keyboard.press("Escape");
     await expect(root).toBeFocused();
-    expect(await tabsTo(page, chipOf(root), 10)).toBeLessThanOrEqual(10);
+    // The bar's reactions come first: the chip stands after them, a count the bar may change.
+    expect(await tabsTo(page, chipOf(root), 14)).toBeLessThanOrEqual(14);
     await page.keyboard.press("Enter");
     await expect(panel(page)).toBeVisible();
   });
@@ -353,14 +360,14 @@ test.describe("threads", () => {
     await expect(lines(page)).toHaveCount(4);
     const root = lines(page).first();
     await root.focus();
-    expect(await tabsTo(page, chipOf(root), 8)).toBeLessThanOrEqual(8);
+    expect(await tabsTo(page, chipOf(root), 12)).toBeLessThanOrEqual(12);
     await page.keyboard.press("Enter");
     await expect(closeButton(page)).toBeFocused();
     await page.keyboard.press("Escape");
     const reply = lines(page).nth(2);
     await reply.focus();
     const more = reply.getByRole("toolbar").getByRole("button", { name: "More actions", exact: true });
-    expect(await tabsTo(page, more, 4)).toBeLessThanOrEqual(4);
+    expect(await tabsTo(page, more, 12)).toBeLessThanOrEqual(12);
     await page.keyboard.press("Enter");
     await page.keyboard.press("ArrowDown");
     await page.keyboard.press("ArrowDown");
@@ -489,7 +496,7 @@ test.describe("threads", () => {
     await open(page);
     await chipOf(lines(page).first()).click();
     await expect(panel(page)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test.describe("on a phone's screen", () => {
@@ -511,7 +518,7 @@ test.describe("threads", () => {
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
       );
       expect(wide).toBe(false);
-      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      expect((await axeOf(page).analyze()).violations).toEqual([]);
       await closeButton(page).click();
       await expect(lines(page).first()).toBeVisible();
       await expect(form).toBeVisible();

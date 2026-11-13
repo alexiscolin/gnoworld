@@ -66,6 +66,10 @@ export function eachStory<T>(module: Record<string, unknown>, read: (container: 
   });
 }
 
+/** True when every story draws at least one element matching the selector. */
+export const eachStoryHas = (module: Record<string, unknown>, selector: string): boolean =>
+  eachStory(module, (container) => container.querySelectorAll(selector).length).every((n) => n > 0);
+
 /** The threat model's abuse cases: markup that would run if parsed, and a name of 10,000 letters. */
 export const ABUSE = ['<img src="x" onerror="alert(1)">', "nym-".padEnd(10_000, "a")];
 

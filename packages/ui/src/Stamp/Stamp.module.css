@@ -1,0 +1,36 @@
+/* The stamp: a world's mark in its own ink on the night, the caption under it in the muted grey; gold is the warm colour. */
+@layer components {
+  .stamp {
+    /* raw: a cell a little wider than the mark, and never more than a third of the sheet, so a phone holds three */
+    inline-size: min(112px, 30%);
+    text-align: center;
+  }
+
+  .mark {
+    display: block;
+    /* raw: the stamp's size */
+    max-inline-size: 104px;
+    block-size: auto;
+    /* layout: the mark centred in its cell */
+    margin-inline: auto;
+    transition: transform var(--motion-base) var(--ease-standard);
+  }
+
+  .mark[data-gold] {
+    color: var(--color-warm);
+  }
+
+  .stamp:hover .mark {
+    transform: scale(1.06);
+  }
+
+  .words {
+    fill: currentcolor;
+    stroke: none;
+    font-family: var(--family-mono);
+  }
+
+  .name {
+    display: block;
+  }
+}

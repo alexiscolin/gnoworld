@@ -9,9 +9,9 @@ import { TokensPage } from "./TokensPage.tsx";
 const preview = (name: string) => document.querySelector(`[data-preview="${name}"]`);
 
 describe("TokensPage", () => {
-  it("shows every token of the file, once, with its value", () => {
+  it("shows every token of the file, once, with its value, but the layout variables no group claims (tokens.test.ts names them)", () => {
     render(<TokensPage />);
-    for (const { name, value } of tokens()) {
+    for (const { name, value } of tokens().filter((token) => token.group !== "Other")) {
       expect(screen.getAllByText(name, { exact: true })).toHaveLength(1);
       expect(preview(name)?.textContent).toContain(value);
     }

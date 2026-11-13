@@ -1,0 +1,133 @@
+# The demo's conversation in six rooms: `room|line`, or `room|<reply, thread, react, vote or edit>|text` (crowd.mjs --script).
+# A room's lines keep their order; the rooms take turns. `\n` breaks a line; `@{prev}` mentions the room's last speaker with a key.
+earth|gm gno.land, first coffee and first block of the day
+govdao|gm, anyone reading the new GovDAO proposal?
+gnoswap|gm traders, anyone swapping on gnoswap today?
+/r/nym-alexiscolin000/gnogolf/golf/v2|gnogolf v2 is live, who is playing today?
+earth/builders|this room is for people building realms, share what you are working on
+earth/lisbon-meetup|who is coming to the gno meetup in Lisbon?
+earth|welcome to everyone who just landed here
+govdao|reply|reading it now, I like to know what it changes before the vote
+gnoswap|reply|just a small swap to test, it went through smoothly
+/r/nym-alexiscolin000/gnogolf/golf/v2|reply|me! first round done, the wind got me on the last hole
+earth/builders|react|👍
+earth/lisbon-meetup|reply|me! first time at a gno meetup
+earth|react|👍
+govdao|react|👍
+gnoswap|react|👍
+/r/nym-alexiscolin000/gnogolf/golf/v2|react|😂
+earth/builders|I am writing my first realm, any tips?
+earth/lisbon-meetup|react|👍
+earth|first time here, is every planet a project?
+govdao|how does voting work here, for someone new?
+gnoswap|remember these are testnet tokens, no real value
+/r/nym-alexiscolin000/gnogolf/golf/v2|how do you see the best scores?
+earth/builders|thread|run the tests locally before you deploy
+earth/lisbon-meetup|/poll Which evening works best? | Tuesday | Wednesday | Thursday
+earth|reply|yes, every world is a set of realms deployed on gno.land
+govdao|thread|only members' votes count, everyone else can read and follow along
+gnoswap|react|❤️
+/r/nym-alexiscolin000/gnogolf/golf/v2|reply|the realm keeps a leaderboard per course and per hole
+earth/builders|thread|and keep the state small, every byte is stored on chain
+earth/lisbon-meetup|vote|Wednesday
+earth|react|❤️
+govdao|thread|a member votes from the call card, signed in their own wallet
+gnoswap|how do you add liquidity to a pool?
+/r/nym-alexiscolin000/gnogolf/golf/v2|react|👍
+earth/builders|thread|@{prev} thanks, that helps a lot
+earth/lisbon-meetup|vote|Thursday
+earth|/poll What brings you to gno.land today? | building | learning | just looking
+govdao|thread|@{prev} clear, thank you
+gnoswap|thread|pick the pair, set the range, then sign in your wallet
+/r/nym-alexiscolin000/gnogolf/golf/v2|/poll Which hole is the hardest? | the long par 5 | the island green | the dogleg
+earth/builders|my steps to ship a realm:\n- write it\n- test it with `gno test`\n- deploy it to the testnet
+earth/lisbon-meetup|what to bring:\n- your laptop\n- a realm idea\n- questions
+earth|vote|learning
+govdao|what I check before a vote:\n- what the proposal changes\n- who proposed it\n- the discussion here
+gnoswap|thread|start small, a narrow range moves out of the price fast
+/r/nym-alexiscolin000/gnogolf/golf/v2|vote|the island green
+earth/builders|react|❤️
+earth/lisbon-meetup|react|❤️
+earth|vote|building
+govdao|react|❤️
+gnoswap|thread|@{prev} good point, I will start small
+/r/nym-alexiscolin000/gnogolf/golf/v2|vote|the long par 5
+earth/builders|is there a way to call a realm from an assistant?
+earth/lisbon-meetup|is there a talk planned?
+earth|the planet view is wild, click a world and it flies you there
+govdao|> read before you vote\nthe best advice in this room
+gnoswap|/market gnot
+/r/nym-alexiscolin000/gnogolf/golf/v2|you can simulate a round before playing it for real
+earth/builders|reply|gnomcp does it, and it writes only with a session you approve
+earth/lisbon-meetup|thread|a short demo of gnoworld, then open discussion
+earth|thread|and the Map shows the whole system from above
+govdao|react|😂
+gnoswap|anyone watching the GNOT price today?
+/r/nym-alexiscolin000/gnogolf/golf/v2|thread|nice, I will compare the simulation with my real round
+earth/builders|**today**: deployed a small counter realm, it renders!
+earth/lisbon-meetup|thread|and someone wants to show their golf realm
+earth|thread|@{prev} oh nice, I had not found the Map yet
+govdao|/proposals
+gnoswap|reply|the market card above has the day's line
+/r/nym-alexiscolin000/gnogolf/golf/v2|thread|tell us which one scores better
+earth/builders|my counter starts at 1 because I forgot about zero
+earth/lisbon-meetup|thread|@{prev} great, I will bring questions
+earth|things to try today:\n- open a world\n- call a function\n- say hi in its room
+govdao|the realm is `gno.land/r/gov/dao` if you want to read its code
+gnoswap|my checklist before a swap:\n- check the pair\n- check the slippage\n- sign only what I read
+/r/nym-alexiscolin000/gnogolf/golf/v2|thread|@{prev} will do
+earth/builders|react|😂
+earth/lisbon-meetup|**see you there**, the details will be posted here
+earth|react|👍
+govdao|reply|bookmarked, thanks
+gnoswap|my first try, I swapped the pair the wrong way round
+/r/nym-alexiscolin000/gnogolf/golf/v2|**new personal best** today, finally
+earth/builders|/poll What are you building? | a game | a tool | a DAO | still deciding
+earth/lisbon-meetup|last time we talked so long they turned the lights off
+earth|**reminder**: this is a testnet, the tokens have no value
+govdao|/poll Should we hold a weekly governance call? | yes | no | monthly is enough
+gnoswap|react|😂
+/r/nym-alexiscolin000/gnogolf/golf/v2|react|❤️
+earth/builders|vote|a tool
+earth/lisbon-meetup|react|😂
+earth|reply|good to repeat it for the newcomers
+govdao|vote|yes
+gnoswap|**careful** with the slippage on thin pools
+/r/nym-alexiscolin000/gnogolf/golf/v2|reply|congrats! which course?
+earth/builders|vote|a game
+earth/lisbon-meetup|> bring a realm idea\nI have three, is that too many?
+earth|/trending
+govdao|vote|monthly is enough
+gnoswap|/poll Which pair do you trade most? | GNOT/USDC | GNOT/ATONE | something else
+/r/nym-alexiscolin000/gnogolf/golf/v2|tips for windy days:\n- aim lower\n- play it safe near the green
+earth/builders|> keep the state small\nthe best advice I got this week
+earth/lisbon-meetup|reply|never too many
+earth|if you are lost, ask @jarvis what a realm is
+govdao|**tip**: open the realm's functions to see what a vote calls
+gnoswap|vote|GNOT/USDC
+/r/nym-alexiscolin000/gnogolf/golf/v2|> my ghost from yesterday beat me again\nsame here, every single time
+earth/builders|reply|agreed, it changed how I design
+earth/lisbon-meetup|I will post the adress the day before
+earth/lisbon-meetup|edit|I will post the address the day before
+earth|see you all in teh other rooms
+govdao|thanks all, good discusion today
+gnoswap|vote|something else
+/r/nym-alexiscolin000/gnogolf/golf/v2|is it a new period already?
+earth/builders|who wants to review each other's realms this week?
+earth/lisbon-meetup|see you in Lisbon!
+earth|edit|see you all in the other rooms
+govdao|edit|thanks all, good discussion today
+gnoswap|the gnoswap realms are all readable on gno.land, nice to learn form
+/r/nym-alexiscolin000/gnogolf/golf/v2|reply|yes, check the standings
+earth/builders|reply|me, send me the path
+earth/lisbon-meetup|/me books a train to Lisbon
+earth|react|😂
+govdao|ask @jarvis how to vote on GovDAO if you have never done it
+gnoswap|edit|the gnoswap realms are all readable on gno.land, nice to learn from
+/r/nym-alexiscolin000/gnogolf/golf/v2|see you on teh course!
+earth/builders|I wil post the path here once it is deployed
+earth|/me waves from Lisbon
+gnoswap|/me checks the pool again
+/r/nym-alexiscolin000/gnogolf/golf/v2|edit|see you on the course!
+earth/builders|edit|I will post the path here once it is deployed
+/r/nym-alexiscolin000/gnogolf/golf/v2|/me tees off

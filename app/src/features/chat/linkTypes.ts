@@ -6,7 +6,7 @@ import type { Keep } from "../../lib/keep/keep.ts";
 import type { NoticePrefs } from "../../lib/notices/prefs.ts";
 import type { DmDevice } from "../../store/dms.ts";
 import type { createAppStore } from "../../store/index.ts";
-import type { Composed, Reacting } from "@gnoworld/core";
+import type { Composed, IrcMessage, Reacting } from "@gnoworld/core";
 import type { Address } from "@gnoworld/schemas";
 
 /** What the composer hands its writer: the draft as composed, and as typed (which a refused direct message puts back). */
@@ -30,6 +30,9 @@ export interface LinkDeps {
   /** The same, asked for as an account connects, never for a guest: the page's, whose first screen does not hold it. */
   loadKit?: (() => Promise<MakeKit>) | undefined;
 }
+
+/** A reader of history pages ahead of the store: true when it took the page. */
+export type PageTap = (room: string, messages: readonly IrcMessage[]) => boolean;
 
 export interface ChatLink {
   /** The rooms the world lists, in its order, and among them those where a mention of the whole room counts (4f-n). */
@@ -67,6 +70,10 @@ export interface ChatLink {
   react: (room: string, reaction: Reacting) => boolean;
   /** Tells a room Ergo says it is in the account is typing, at most each 3 s, or done after (+typing); an account's. */
   typing: (room: string, state: "active" | "done") => void;
+  /** Puts a raw line to Ergo, for what a late chunk asks (the jump to a found message); whether it went. */
+  ask: (line: string) => boolean;
+  /** The late chunks' readers of each history page, ahead of the store: one that takes the page (true) keeps it from the room's window. */
+  taps: Set<PageTap>;
   /** Marks the room in view read to its line `id`, which the store holds, as Ergo's MARKREAD (draft/read-marker): an
    * account's alone, a line past the place Ergo gave; asked while away, it goes once Ergo says I am in the room. */
   read: (room: string, id: string) => void;

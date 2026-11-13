@@ -17,13 +17,21 @@ export const MarketToken = z.strictObject({
 });
 export type MarketToken = z.infer<typeof MarketToken>;
 
-/** The default universe's latest block as its RPC gave it (the server reads it with the prices): its height (1 to a trillion, a whole number), its own time and the host it was read from. */
+/** The default universe's latest block as its RPC gave it (the server reads it with the prices): its height (1 to a trillion, a whole number), its own time, the host it was read from and, when two reads gave it, the average seconds between blocks. */
 export const MarketBlock = z.strictObject({
   // Not z.int(): its class would sit in the store's chunk, which the first screen loads (F2976; indexer.ts).
   height: z.number().check(z.refine(Number.isSafeInteger, { message: "a whole number" }), z.gte(1), z.lte(1e12)),
   // At most 40 characters: RFC 3339 allows any run of fractional digits, and 20 KB of them would put the file past the browser's 16 KB.
   time: z.iso.datetime({ offset: true }).check(z.maxLength(40)),
   host: z.string().check(z.maxLength(253), z.regex(/^[a-z0-9-]+(?:\.[a-z0-9-]+)*$/)),
+  // (time2 - time1) / (height2 - height1) of two successive reads (server/src/prices/prices.ts), above zero and at most 600 s (10 min):
+  // a chain slower than that, or halted between the reads, has no "every ~N s" to show, and the server leaves the field out.
+  interval: z.optional(
+    z.number().check(
+      z.refine((seconds) => seconds > 0, { message: "above zero" }),
+      z.lte(600),
+    ),
+  ),
 });
 export type MarketBlock = z.infer<typeof MarketBlock>;
 

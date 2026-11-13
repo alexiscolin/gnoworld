@@ -9,7 +9,7 @@ import { BODY_LIMIT, makeApp } from "../app.ts";
 import { openDatabase } from "@gnoworld/service/db";
 import { logger } from "@gnoworld/service/log";
 import { wallet, type Wallet } from "../testing/signer.ts";
-import { LOGIN_TABLES, makeLogin, NONCE_ACTION, NONCE_HOST } from "./login.ts";
+import { LOGIN_TABLES, makeLogin, NONCE_ACTION, NONCE_LINK, NONCE_HOST } from "./login.ts";
 import { loginFrom, loginRoutes } from "./routes.ts";
 import { makeTickets, TICKET_TABLES } from "./ticket.ts";
 
@@ -32,7 +32,7 @@ afterEach(() => {
 });
 
 const setup = ({ newAccountsPerHour = 5, nonceCap = 100_000, origins = [ORIGIN] } = {}) => {
-  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+  const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
   opened.push(db);
   const clock = { now: T0 };
   const now = (): number => clock.now;
@@ -633,7 +633,7 @@ describe("the routes", () => {
 describe("the login from the settings", () => {
   const SETTINGS = { chains: ["onyx-1"], origins: [ORIGIN], trustedProxy: undefined, newAccountsPerHour: 5 };
   const mount = (settings: Partial<typeof SETTINGS> = {}, clock?: { now: number }) => {
-    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+    const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
     opened.push(db);
     const log = logger(PEPPER, () => true);
     const app = makeApp(log, () => true);
@@ -690,7 +690,7 @@ describe("the login from the settings", () => {
 
   it("gives the public site's session of 90 days by default, and the console's of an hour when asked (10g-7)", async () => {
     const maxAge = async (options: { log: ReturnType<typeof logger>; console?: boolean }) => {
-      const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION]);
+      const db = openDatabase(":memory:", [LOGIN_TABLES, TICKET_TABLES, NONCE_HOST, NONCE_ACTION, NONCE_LINK]);
       opened.push(db);
       const app = makeApp(options.log, () => true);
       app.route("/api/login", loginFrom(db, SETTINGS, options));

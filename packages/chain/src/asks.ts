@@ -1,6 +1,6 @@
 // What the server's jobs ask of a chain's node and its indexer (D113): the words of each request, written here and nowhere else.
 // A request is data (a path and its data, a query and its variables); the job sends it over its own way out.
-import { evalNameOf } from "@gnoworld/core";
+import { evalNameOf, evalOwner } from "@gnoworld/core";
 
 /** An abci_query: the route (it may carry `?limit=N`) and its data. */
 export interface AbciAsk {
@@ -26,6 +26,9 @@ export const pathsAsk = (prefix: string, limit: number): AbciAsk => ({
 /** A package's documentation. */
 export const docAsk = (path: string): AbciAsk => ({ path: "vm/qdoc", data: path });
 
+/** An account's coins and numbers: a read of the node's account store, no eval; `address` is a text the caller checked. */
+export const accountAsk = (address: string): AbciAsk => ({ path: `auth/accounts/${address}`, data: "" });
+
 /** A package's file. */
 export const fileAsk = (path: string): AbciAsk => ({ path: "vm/qfile", data: path });
 
@@ -35,27 +38,61 @@ export function nameAsk(address: string): AbciAsk | null {
   return expression === null ? null : { path: "vm/qeval", data: expression };
 }
 
+/** The expression that gives the address holding a namespace, or null for a text that is no name. */
+export function ownerAsk(namespace: string): AbciAsk | null {
+  const expression = evalOwner(namespace);
+  return expression === null ? null : { path: "vm/qeval", data: expression };
+}
+
 // A filter on a message's value reaches only the type it names and lets every other message through (onyx-1's auth sessions), so the
 // transactions are chosen by a call's type and a message that is no call is left out here. A negative bound answers nothing: the first page
 // has none.
-const FIELDS = "block_height messages { value { __typename ... on MsgCall { pkg_path caller } } }";
 const CALLS = 'messages: { typeUrl: { eq: "exec" } }';
 const ORDER = "order: { heightAndIndex: ASC }";
 
-/** The first `limit` transactions with a call, from the chain's start. */
-export const callsFirst = (limit: number): IndexerAsk => ({
-  query: `query($limit: Int!) { getTransactions(where: { ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`,
+// A call's success and function for the rollup (13a) alone: the worlds file's whole-chain read pays for neither (212 B a transaction with
+// them, 180 B without, on onyx-1).
+const fields = (rich: boolean): string =>
+  rich
+    ? "block_height success messages { value { __typename ... on MsgCall { pkg_path caller func } } }"
+    : "block_height messages { value { __typename ... on MsgCall { pkg_path caller } } }";
+
+/** The first `limit` transactions with a call, from the chain's start; `rich`, each call's success and function too. */
+export const callsFirst = (limit: number, rich = false): IndexerAsk => ({
+  query: `query($limit: Int!) { getTransactions(where: { ${CALLS} }, ${ORDER}, limit: $limit) { ${fields(rich)} } }`,
   variables: { limit },
 });
 
 /** The first `limit` transactions with a call above a height. */
-export const callsAbove = (above: number, limit: number): IndexerAsk => ({
-  query: `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, ${CALLS} }, ${ORDER}, limit: $limit) { ${FIELDS} } }`,
+export const callsAbove = (above: number, limit: number, rich = false): IndexerAsk => ({
+  query: `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above }, ${CALLS} }, ${ORDER}, limit: $limit) { ${fields(rich)} } }`,
   variables: { above, limit },
 });
 
 /** Every transaction with a call in one block. */
-export const callsInBlock = (height: number): IndexerAsk => ({
-  query: `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${FIELDS} } }`,
+export const callsInBlock = (height: number, rich = false): IndexerAsk => ({
+  query: `query($height: Int!) { getTransactions(where: { block_height: { eq: $height }, ${CALLS} }, ${ORDER}) { ${fields(rich)} } }`,
   variables: { height },
+});
+
+/** The time of each block of `heights`, one alias each, `b<i>` for the variable `h<i>` (the rollup's days, slice 13a). */
+export const blockTimes = (heights: readonly number[]): IndexerAsk => ({
+  query: `query(${heights.map((_, i) => `$h${String(i)}: Int!`).join(", ")}) { ${heights
+    .map((_, i) => `b${String(i)}: getBlocks(where: { height: { eq: $h${String(i)} } }) { height time }`)
+    .join(" ")} }`,
+  variables: Object.fromEntries(heights.map((height, i) => [`h${String(i)}`, height])),
+});
+
+/** The chain's last block height. */
+export const tipAsk = (): IndexerAsk => ({ query: "{ latestBlockHeight }", variables: {} });
+
+/** The address that asks `ask` of the indexer at `indexer` (its GraphQL endpoint) by GET, its variables as JSON. */
+export const indexerUrl = (indexer: string, { query, variables }: IndexerAsk): string =>
+  `${indexer}?query=${encodeURIComponent(query)}&variables=${encodeURIComponent(JSON.stringify(variables))}`;
+
+/** The first `limit` transactions above a height, whatever their messages: each one's block and its first message's sender
+ * (the network's line); no body, no events. */
+export const txsAbove = (above: number, limit: number): IndexerAsk => ({
+  query: `query($above: Int!, $limit: Int!) { getTransactions(where: { block_height: { gt: $above } }, ${ORDER}, limit: $limit) { block_height messages { value { __typename ... on MsgCall { caller } ... on MsgRun { caller } ... on MsgAddPackage { creator } ... on BankMsgSend { from_address } } } } }`,
+  variables: { above, limit },
 });

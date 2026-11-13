@@ -10,12 +10,13 @@ import { Dialog } from "../Dialog/Dialog.tsx";
 import { Field } from "../Field/Field.tsx";
 import { Icon } from "../icons/Icon.tsx";
 import { LinkProvider, type PageLinkProps } from "../link.tsx";
+import { Planet } from "../Planet/Planet.tsx";
 import { PlanetThumb } from "../PlanetThumb/PlanetThumb.tsx";
 import { Menu, Popover } from "../Popover/Popover.tsx";
 import { Row } from "../Row/Row.tsx";
 import { Stat } from "../Stat/Stat.tsx";
-import { Tabs } from "../Tabs/Tabs.tsx";
-import { Comboboxes } from "./Comboboxes.tsx";
+import { Switch } from "../Switch/Switch.tsx";
+import { FieldParts } from "./FieldParts.tsx";
 import { ADDRESS, disc, short } from "./samples.ts";
 
 export function Chips() {
@@ -36,34 +37,6 @@ export function Chips() {
       <Chip tone="warm">Live</Chip>
       <Chip tone="signal">Assistant</Chip>
     </Cluster>
-  );
-}
-
-export function TabRows() {
-  const [view, setView] = useState<string | null>("cosmos");
-  return (
-    <Stack>
-      <Tabs
-        label="Views"
-        tabs={[
-          { id: "earth", label: "Earth" },
-          { id: "cosmos", label: "Cosmos" },
-          { id: "list", label: "List", count: 12 },
-        ]}
-        selected={view}
-        onSelect={setView}
-      />
-      <Tabs
-        label="Library"
-        iconOnly
-        tabs={[
-          { id: "worlds", label: "Worlds", icon: "planet" },
-          { id: "people", label: "People", icon: "people" },
-        ]}
-        selected="worlds"
-        onSelect={() => undefined}
-      />
-    </Stack>
   );
 }
 
@@ -144,10 +117,12 @@ export function Rows() {
 }
 
 export function Fields() {
+  const [calm, setCalm] = useState(false);
   return (
     <Stack>
       <Field label="Name" prefix="@" help="Letters and digits, 6 at least" value="" onChange={() => undefined} />
-      <Comboboxes />
+      <FieldParts />
+      <Switch label="Reduce animations" description="Nothing flies or flares." checked={calm} onChange={setCalm} />
     </Stack>
   );
 }
@@ -164,6 +139,7 @@ export function Stats() {
 export function Planets() {
   return (
     <Cluster space="m">
+      <Planet name="Bubble" />
       <PlanetThumb src={disc("5cf2c8")} name="Bubble" />
       <PlanetThumb src={disc("ffc46b")} name="The sun" kind="star" />
       <PlanetThumb src={disc("b79cff")} name="An uncharted signal" kind="signal" magnify />

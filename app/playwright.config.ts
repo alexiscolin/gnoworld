@@ -15,9 +15,7 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
-    // The realism page goes beside the site for the journeys alone: the deployment's `react-router build` never sees it.
-    command:
-      "node_modules/.bin/react-router build && node_modules/.bin/vite build --config lab.config.ts && node tests/e2e/serve.mjs",
+    command: "node_modules/.bin/react-router build && node tests/e2e/serve.mjs",
     // A test build: `?test-gpu` lets the scene run on the software GPU these browsers have (features/universe/gpu.ts).
     env: { VITE_GNOWORLD_TEST_GPU: "1" },
     url: `${SITE}/`,

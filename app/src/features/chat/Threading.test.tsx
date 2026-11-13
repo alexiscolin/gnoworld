@@ -1,4 +1,7 @@
 // @vitest-environment jsdom
+import { getNearestEditorFromDOMNode } from "lexical";
+import { getMarkdown, setMarkdown } from "./composer/markdownEditor.ts";
+import { acting, rangesHaveNoGeometry } from "../../../tests/composer.tsx";
 import { Address } from "@gnoworld/schemas";
 import type { Line } from "@gnoworld/core";
 import { act } from "react";
@@ -72,7 +75,7 @@ const STATE = {
 const room = shownOf(dms(undefined), { id: "#bubble/games", state: STATE, acts }, PAGE);
 // The same room is in the store behind it, its lines answering one another as well.
 const dm = shownOf(dms(BOB), { id: "#bubble/games", state: STATE, acts }, PAGE);
-const chips = (html: string) => html.match(/\b\d+ repl(?:y|ies)\b/g) ?? [];
+const chips = (html: string) => [...html.matchAll(/>(\d+ repl(?:y|ies))</g)].map((found) => found[1] ?? "");
 
 beforeAll(async () => {
   // The lines view is a lazy chunk: asked once, so the drawings below hold its lines.
@@ -147,14 +150,23 @@ describe("useThreads: the open panel's focus and keys", () => {
     });
   };
   const thread = () => document.querySelector("aside[aria-label='Thread']");
-  const field = () => document.querySelector<HTMLInputElement>("aside input[type='text'], aside textarea");
+  const field = () => document.querySelector<HTMLElement>("aside [role='textbox']");
+  // What the field holds as Markdown, and a draft put in it as a hand would.
+  const editorOf = () => {
+    const box = field();
+    return box === null ? null : getNearestEditorFromDOMNode(box);
+  };
+  const held = () => {
+    const editor = editorOf();
+    return editor === null ? undefined : getMarkdown(editor);
+  };
   const active = () => {
     const now = document.activeElement;
     return now?.id === "outside" ? "outside" : (now?.getAttribute("data-line") ?? "");
   };
   // The panel and its lazy code come, then the composer's.
   const loaded = async (guest = false) => {
-    const ready = () => thread()?.querySelector("h3") !== null && (guest || field() !== null);
+    const ready = () => thread()?.querySelector("h2") !== null && (guest || field() !== null);
     for (let waits = 0; waits < 500 && !ready(); waits++)
       await act(async () => {
         await new Promise((done) => setTimeout(done, 10));
@@ -180,6 +192,7 @@ describe("useThreads: the open panel's focus and keys", () => {
   };
 
   beforeEach(() => {
+    rangesHaveNoGeometry();
     Object.assign(globalThis, { IS_REACT_ACT_ENVIRONMENT: true });
     // jsdom has no popover: a close button's tooltip toggles nothing.
     Object.assign(HTMLElement.prototype, { togglePopover: () => true });
@@ -202,7 +215,7 @@ describe("useThreads: the open panel's focus and keys", () => {
     act(() => {
       opens("root");
     });
-    expect(thread()?.querySelector("h3")).toBeNull();
+    expect(thread()?.querySelector("h2")).toBeNull();
     // A tooltip shown on Close takes the first Escape, as it does in the panel's own: the second closes.
     const standing = thread();
     if (standing === null) throw new Error("no stand-in");
@@ -293,12 +306,11 @@ describe("useThreads: the open panel's focus and keys", () => {
 
   // R1 (redpass2-4th): the words typed in a thread are the page's memory, and a logout is a fresh start: they are neither
   // handed to the next account nor kept for the same one.
-  const typeIn = (words: string) => {
-    const box = field();
-    if (box === null) throw new Error("no field");
-    act(() => {
-      Object.getOwnPropertyDescriptor(Object.getPrototypeOf(box), "value")?.set?.call(box, words);
-      box.dispatchEvent(new Event("input", { bubbles: true }));
+  const typeIn = async (words: string) => {
+    const editor = editorOf();
+    if (editor === null) throw new Error("no field");
+    await acting(() => {
+      setMarkdown(editor, words);
     });
   };
   const logOutIn = async (to: Reader) => {
@@ -316,12 +328,12 @@ describe("useThreads: the open panel's focus and keys", () => {
       opens("root");
     });
     await loaded();
-    typeIn("for alice's eyes");
-    expect(field()?.value).toBe("for alice's eyes");
+    await typeIn("for alice's eyes");
+    expect(held()).toBe("for alice's eyes");
     await logOutIn(OTHER);
-    expect(field()?.value).toBe("");
+    expect(held()).toBe("");
     await logOutIn(SESSION);
-    expect(field()?.value).toBe("");
+    expect(held()).toBe("");
   });
 
   // R3: the words sit under the line that opened the thread, so a chain that grows (a new root) leaves them where they were.
@@ -340,7 +352,7 @@ describe("useThreads: the open panel's focus and keys", () => {
       opens("c");
     });
     await loaded();
-    typeIn("half a thought");
+    await typeIn("half a thought");
     draw(room, SESSION, [at("a"), at("b", "a"), at("c", "b")]);
     await loaded();
     const box = field();
@@ -351,7 +363,7 @@ describe("useThreads: the open panel's focus and keys", () => {
       opens("c");
     });
     await loaded();
-    expect(field()?.value).toBe("half a thought");
+    expect(held()).toBe("half a thought");
   });
 
   it("keeps each account's words apart when the reader changes with no logout between", async () => {
@@ -360,7 +372,7 @@ describe("useThreads: the open panel's focus and keys", () => {
       opens("root");
     });
     await loaded();
-    typeIn("alice's");
+    await typeIn("alice's");
     const box = field();
     if (box === null) throw new Error("no field");
     press(box, { key: "Escape" });
@@ -369,6 +381,6 @@ describe("useThreads: the open panel's focus and keys", () => {
       opens("root");
     });
     await loaded();
-    expect(field()?.value).toBe("");
+    expect(held()).toBe("");
   });
 });

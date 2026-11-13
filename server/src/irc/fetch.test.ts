@@ -4,7 +4,7 @@ import { fakeErgo, PASSWORD, welcome, type Peer } from "../testing/fakeErgo.ts";
 import { lineFetches } from "./fetch.ts";
 import { ircLink, type Fetched, type Link, type Said } from "./link.ts";
 
-// Slice 4's 4d, pins: the link reads one line of a room by its id, as Ergo holds it (CHATHISTORY AROUND <room>
+// The link reads one line of a room by its id, as Ergo holds it (CHATHISTORY AROUND <room>
 // msgid=<id> 1 answers that line alone, an empty batch when it holds none: tried on v2.19.1), so a pin is never the
 // page's word; and it hears a REDACT, which takes the line from the room's pins.
 const links: Link[] = [];
@@ -67,7 +67,7 @@ describe("the link reads a line by its id", () => {
     });
   });
 
-  // Ergo's own answer that it holds no such line is not the same as no answer: only the first drops a pin (4d's R5, R7).
+  // Ergo's own answer that it holds no such line is not the same as no answer: only the first drops a pin.
   it("says the line is gone, at the batch's end, for a line Ergo does not hold", async () => {
     const { link, peer } = await ready({ lineMs: 60_000 });
     const answer = link.line("#bubble", "gone");
@@ -110,7 +110,7 @@ describe("the link reads a line by its id", () => {
     expect(peer.lines.filter((line) => line.startsWith("CHATHISTORY "))).toHaveLength(2);
   });
 
-  // The wait's own number: 5 s, under the 10 s a page waits on the server (4d's R13).
+  // The wait's own number: 5 s, under the 10 s a page waits on the server.
   it("waits five seconds for Ergo by default, not a moment less", async () => {
     const { link, peer } = await ready({});
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -122,7 +122,7 @@ describe("the link reads a line by its id", () => {
     expect(await answer).toBe("unanswered");
   });
 
-  // A question under way when the link ends is answered at once and holds neither timer nor place (4d's R14).
+  // A question under way when the link ends is answered at once and holds neither timer nor place.
   it("answers nothing, at once, for a question pending as the link stops, and holds no timer", async () => {
     const { link, peer } = await ready({ lineMs: 60_000 });
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
@@ -244,7 +244,7 @@ describe("a question and the catch-up pages of one connection", () => {
   });
 });
 
-// Ergo's FAIL of another command, and a batch of another kind, are no history's: neither takes a question's place (G6).
+// Ergo's FAIL of another command, and a batch of another kind, are no history's: neither takes a question's place.
 describe("what is no history request", () => {
   it("keeps the order of two questions of one room through a refused REDACT", async () => {
     const { link, peer } = await ready({ lineMs: 60_000 });
@@ -302,7 +302,7 @@ describe("what is no history request", () => {
   });
 });
 
-// The history requests unanswered are 1000 at most, so a link that is never answered holds a bounded queue (G4, G5).
+// The history requests unanswered are 1000 at most, so a link that is never answered holds a bounded queue.
 describe("the requests unanswered", () => {
   const write = () => undefined;
   it("answers nothing, and writes nothing, for the 1001st question", async () => {
@@ -317,11 +317,18 @@ describe("the requests unanswered", () => {
     expect(new Set(await Promise.all(waiting))).toEqual(new Set(["unanswered"]));
   });
 
-  it("holds no more than 1000 catch-up pages, so the question after them is the next batch's", async () => {
+  it("never drops a catch-up page, so the question after them is the next batch's; with 1000 waiting none is asked", async () => {
     const fetches = lineFetches(60_000);
-    for (let n = 0; n < 1001; n += 1) fetches.paged("#bubble");
-    for (let n = 0; n < 1000; n += 1) expect(fetches.opened(`b${String(n)}`, "#bubble")).toBe(false);
-    const answer = fetches.ask(write, "#bubble", "m1");
+    const written: string[] = [];
+    const keep = (_: string, params: readonly string[]) => written.push(params.join(" "));
+    for (let n = 0; n < 1000; n += 1) fetches.paged("#bubble");
+    expect(await fetches.ask(keep, "#bubble", "m1")).toBe("unanswered");
+    expect(written).toEqual([]);
+    fetches.opened("p", "#bubble"); // one page's batch: room for one question
+    const answer = fetches.ask(keep, "#bubble", "m2");
+    for (let n = 0; n < 998; n += 1) expect(fetches.opened(`b${String(n)}`, "#bubble")).toBe(false);
+    fetches.paged("#bubble");
+    expect(fetches.opened("last", "#bubble")).toBe(false);
     expect(fetches.opened("q", "#bubble")).toBe(true);
     fetches.drop();
     expect(await answer).toBe("unanswered");
@@ -392,7 +399,7 @@ describe("the link hears a line taken from a room", () => {
   });
 
   // The bot's own hide comes back to it as a REDACT from itself (Ergo tells each member, the sender too): the guard that
-  // leaves the bot's own lines out of what it hears must not leave this one out (4d's R1).
+  // leaves the bot's own lines out of what it hears must not leave this one out.
   it("hands on a REDACT of its own, a hide, as it does another's", async () => {
     const { peer, redacted } = await ready();
     peer.say(":gnoworld!u@h REDACT #bubble m3 :hate");
@@ -408,5 +415,53 @@ describe("the link hears a line taken from a room", () => {
     peer.say("PING :sync6");
     await peer.next(/^PONG sync6$/);
     expect(redacted).toEqual([]);
+  });
+});
+
+// the questions' book, on its own.
+const sayOf = (msgid: string): Said => ({
+  room: "#r",
+  account: "g1someone",
+  msgid,
+  text: "hi",
+  time: new Date(0).toISOString(),
+});
+
+afterEach(() => {
+  vi.useRealTimers();
+});
+
+describe("lineFetches", () => {
+  it("keeps a question asked again after one gave up: that one's late refusal does not cancel it", async () => {
+    vi.useFakeTimers();
+    const fetches = lineFetches(1000);
+    const write = vi.fn();
+    const first = fetches.ask(write, "#r", "m1");
+    vi.advanceTimersByTime(1000);
+    const second = fetches.ask(write, "#r", "m1");
+    expect(write).toHaveBeenCalledTimes(2);
+    fetches.failed(); // Ergo refuses the first request, the one that gave up
+    expect(fetches.ask(write, "#r", "m1")).toBe(second);
+    expect(write).toHaveBeenCalledTimes(2);
+    expect(await first).toBe("unanswered");
+  });
+
+  it("hears a line or a close of a batch that is no question's without a fault", () => {
+    const fetches = lineFetches(1000);
+    expect(() => {
+      fetches.line("unknown", sayOf("m1"));
+      fetches.line("unknown", undefined);
+      fetches.closed("unknown");
+    }).not.toThrow();
+  });
+
+  it("answers the line a question's batch held, and not another's", async () => {
+    const fetches = lineFetches(1000);
+    const found = fetches.ask(() => undefined, "#r", "m1");
+    expect(fetches.opened("b1", "#r")).toBe(true);
+    fetches.line("b1", sayOf("other"));
+    fetches.line("b1", sayOf("m1"));
+    fetches.closed("b1");
+    expect(await found).toEqual(sayOf("m1"));
   });
 });

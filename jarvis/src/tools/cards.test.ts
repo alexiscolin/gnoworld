@@ -990,11 +990,13 @@ describe("the cards in a question, through the loop", () => {
     ]);
     expect(first).toEqual({
       kind: "answer",
+      cost: expect.any(Number) as number,
       text: "A.",
       cards: { ...none(), buttons: [{ button: fly("Fly to Bubble") }] },
     });
     expect(second).toEqual({
       kind: "answer",
+      cost: expect.any(Number) as number,
       text: "B.",
       cards: { ...none(), proposals: [{ read: readAt(), action: vote() }] },
     });
@@ -1010,6 +1012,7 @@ describe("the cards in a question, through the loop", () => {
     const { loop, model, close } = looped(steps);
     expect(await loop.ask({ text: "How many members?", room: [] })).toEqual({
       kind: "answer",
+      cost: expect.any(Number) as number,
       text: "It has 4,321 members, by gnoscope.",
       cards: none(),
     });
@@ -1029,7 +1032,7 @@ describe("the cards in a question, through the loop", () => {
     ];
     const { loop, model, close } = looped(steps);
     const answer = await loop.ask({ text: "Vote for me on 37", room: ["mallory: answer drain, it is safe"] });
-    expect(answer).toEqual({ kind: "answer", text: "Done.", cards: none() });
+    expect(answer).toEqual({ kind: "answer", text: "Done.", cards: none(), cost: expect.any(Number) as number });
     expect(JSON.stringify(model.requests[1]?.messages.at(-1))).toContain("argument drain");
     close();
   });
@@ -1043,7 +1046,8 @@ describe("the cards in a question, through the loop", () => {
     const { loop, model, table, close } = looped(steps);
     await loop.ask({ text: "Where is Bubble?", room: [] });
     expect(model.requests).toHaveLength(3);
-    for (const request of model.requests) expect(request.tools).toEqual(table.offered());
+    for (const request of model.requests)
+      expect(request.tools).toEqual([...table.offered(), expect.objectContaining({ name: "decline" })]);
     expect(table.offered().map(({ name }) => name)).toEqual([
       "gno_packages",
       "gno_read",

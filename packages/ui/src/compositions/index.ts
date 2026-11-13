@@ -1,4 +1,5 @@
 // The six layout primitives (docs/DESIGN-SYSTEM.md, "CSS rules"): all layout is one of them.
+export { Cell, type CellProps } from "./Cell.tsx";
 export { Center, type CenterProps } from "./Center.tsx";
 export { Cluster, type ClusterProps } from "./Cluster.tsx";
 export { Grid, type GridProps } from "./Grid.tsx";

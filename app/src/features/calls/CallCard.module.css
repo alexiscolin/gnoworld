@@ -39,7 +39,7 @@
   .mark[data-mark="ring"] {
     border: var(--line-width) solid var(--color-mine-line);
     border-block-start-color: var(--color-mine);
-    animation: turn var(--motion-spin) linear infinite;
+    animation: turn calc(var(--motion-spin) * var(--motion-scale)) linear infinite;
   }
 
   .mark[data-mark="dot"] {
@@ -52,21 +52,12 @@
     }
   }
 
-  /* The frame's small note: 12 px, muted. */
-  .note {
-    font: var(--font-meta);
-    color: var(--color-text-muted);
-  }
-
   .lede {
     color: var(--color-text-muted);
     font: var(--font-reading);
   }
 
   .value {
-    /* layout: a value's own margin, which the browser gives a definition, taken off */
-    margin-inline-start: 0;
-    min-inline-size: 0;
     font: var(--font-data);
     /* layout: a realm's path or a long text breaks where it must, so the card never scrolls sideways */
     overflow-wrap: anywhere;
@@ -80,22 +71,5 @@
 
   .status:empty {
     display: none;
-  }
-
-  /* A phone reads and fills the card and signs on a computer (U6): a coarse pointer gets the words, a computer the button. */
-  .phone {
-    display: none;
-    font: var(--font-meta);
-    color: var(--color-text-muted);
-  }
-
-  @media (pointer: coarse) {
-    .phone {
-      display: block;
-    }
-
-    .computer {
-      display: none;
-    }
   }
 }

@@ -1,6 +1,6 @@
-import AxeBuilder from "@axe-core/playwright";
 import { controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
-import { accountPill } from "./account.ts";
+import { violations } from "./axe.ts";
+import { accountPill, connectButton } from "./account.ts";
 import { adena } from "./adena.ts";
 import { logIn } from "./irc.ts";
 import { UPDATING } from "./sites.ts";
@@ -23,15 +23,17 @@ const edgesOf = (page: Page) =>
     for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
       const text = (node.textContent ?? "").trim();
       const parent = node.parentElement;
-      if (text === "" || parent?.closest("script, style, [hidden], [data-ticker], [data-full]") !== null) continue;
+      // The bell's count overhangs its button's corner by design (the video's frames): the button, measured below, carries it.
+      if (text === "" || parent?.closest("script, style, [hidden], [data-full], [data-tone=new][aria-hidden]") !== null)
+        continue;
       if (getComputedStyle(parent).visibility === "hidden") continue;
       const range = document.createRange();
       range.selectNodeContents(node);
       for (const rect of range.getClientRects()) take(text.slice(0, 30), rect);
     }
-    // The ticker is a strip across the foot of the screen, edge to edge by design: homeLive.spec measures it.
+    // The full chat spans the screen, edge to edge by design.
     for (const control of document.querySelectorAll("a[href], button, input, textarea, select, [tabindex]"))
-      if (control.closest("[data-ticker], [data-full]") === null)
+      if (control.closest("[data-full]") === null)
         take(
           `<${control.tagName.toLowerCase()}> ${control.textContent.trim().slice(0, 30)}`,
           control.getBoundingClientRect(),
@@ -39,12 +41,10 @@ const edgesOf = (page: Page) =>
     return found;
   });
 
-// On a phone a world's chat takes the whole page once its code is in: the measure waits for that, so it is always of the same page.
+// On a phone a world's chat is a block under the plate, drawn once its code is in: the measure waits for that, so it is always of the same page.
 async function chatOpened(page: Page, path: string, width: number): Promise<void> {
   if (path !== "/w/bubble" || width >= 1280) return;
-  const screen = page.locator("[data-full][data-compact]");
-  await expect(screen).toBeVisible();
-  expect(await screen.boundingBox()).toMatchObject({ x: 0, width, y: 0, height: 844 });
+  await expect(page.locator("[data-chat-screen]").first()).toBeVisible();
 }
 
 for (const width of WIDTHS) {
@@ -86,7 +86,7 @@ for (const width of WIDTHS) {
         // views' bar's, at the screen's foot (the prototype's #hnav .views), not of this row.
         const row = [
           page.getByRole("link", { name: "gnoworld" }),
-          ...(width < 900 ? [] : [page.getByRole("button", { name: /^Search/ })]),
+          ...(width < 900 ? [] : [page.getByRole("banner").getByRole("button", { name: /^Search/ })]),
           account,
         ];
         const boxes = await Promise.all(
@@ -99,7 +99,7 @@ for (const width of WIDTHS) {
           }),
         );
         // The search control is the default control, 44 px (F5967).
-        const search = await page.getByRole("button", { name: /^Search/ }).boundingBox();
+        const search = await page.getByRole("button", { name: "Search", exact: true }).boundingBox();
         expect(search?.width).toBeGreaterThanOrEqual(44);
         expect(search?.height).toBeGreaterThanOrEqual(44);
         const middles = boxes.map(({ top, bottom }) => (top + bottom) / 2);
@@ -119,13 +119,13 @@ for (const width of WIDTHS) {
         await hydrated(page);
         // A page not found draws its title and heading once the router has matched nothing.
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+        expect(await violations(page)).toEqual([]);
         await logInAt(page);
         await page.goto(path);
         await hydrated(page);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
         await expect(accountPill(page)).toBeVisible();
-        expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+        expect(await violations(page)).toEqual([]);
       });
     }
 
@@ -144,7 +144,7 @@ for (const width of WIDTHS) {
           await adena(page);
           await page.reload();
           await hydrated(page);
-          await page.getByRole("button", { name: "Connect Adena" }).click();
+          await connectButton(page).click();
           await expect(accountPill(page)).toBeVisible();
           if (path !== "/") {
             await page.goto(`${UPDATING}${path}`);
@@ -177,20 +177,11 @@ for (const width of WIDTHS) {
       });
     }
 
-    // The home's live line says the clock time of each read, and its row's layout follows the words' width (F2975). Both
-    // times come after hydration (later on a loaded machine) and are set to one time; a phone's page has no line (900 px).
-    const fixTimes = async (page: Page) => {
-      await expect(page.locator("time")).toHaveCount(width >= 900 ? 2 : 0);
-      await page.locator("time").evaluateAll((times) => {
-        for (const time of times) time.textContent = "06:07 UTC";
-      });
-    };
     // The test wallet is drawn at each server's start: its address, as wide as its letters, is
     // replaced by one of the same length in letters of about the same width, so the header's row is one, as with the real one.
     test("the shell as it looks, logged out and logged in", async ({ page }) => {
       await page.goto("/");
       await hydrated(page);
-      await fixTimes(page);
       await expect(page).toHaveScreenshot(`shell-out-${String(width)}.png`);
       const address = await logInAt(page);
       await page.goto("/");
@@ -201,7 +192,6 @@ for (const width of WIDTHS) {
       // The face is drawn from the wallet's address, which differs at each server's start: its box stays, its nebula is masked.
       const face = page.getByRole("button", { name: /Your account/ }).locator("svg");
       await expect(face).toBeVisible();
-      await fixTimes(page);
       await expect(page).toHaveScreenshot(`shell-in-${String(width)}.png`, { mask: [face] });
     });
   });

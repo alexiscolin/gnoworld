@@ -79,3 +79,5 @@
 2026-11-06 823af51e708eb546c85145de9030e8ceb76425fe slice 9's reviewers on the MacBook; the chief's merge with main: default journeys and budgets green, two agents for the conflicts and the regressions
 2026-11-06 ccdb8cf5590047feb32d1db2bd238b9e9b62b04a security-reviewer (resolutions), security-reviewer (harness fixes); slice 9's reviewers on the MacBook
 2026-11-07 8f65da7c161c0038495719f9ed25bc722e9cd353 security-reviewer (resolutions), security-reviewer (harness fixes); slice 9's reviewers on the MacBook; recorded again on main's merge, the ledger rows F6093-F6095 having moved the print
+2026-11-13 d892fcaf4a7ac8826c7ef4ad8aea07ff6d3b6af4 reviewer x11 (lots A-K), counter-checks x12, security-reviewer x2, code-review max, test fixers; check.sh --merge, 1268 s
+2026-11-13 0909013bc212d6eb77dd9cd7d5b99c1af30281f2 reviewer x11 (lots A-K), counter-checks x12, security-reviewer x3, code-review max, test fixers; check.sh --merge, 1427 s

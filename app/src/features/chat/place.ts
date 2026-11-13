@@ -3,10 +3,18 @@
 import type { UniverseView } from "../../places.ts";
 import type { ChatPlace } from "./ChatScreen.tsx";
 
+/** A world of the chat's column: its page, which the full chat opens full (routerLink.tsx's FullChatLinks). */
+export interface ChatWorld {
+  slug: string;
+  name: string;
+  href: string;
+  realms?: readonly string[] | undefined;
+}
+
 /** What the chat's header, its column of worlds, its info panel and its pills say of a place in `universe`: `kicker` says
  * where it is; the place's own `earth` and `realms` choose its pills (Dock.tsx). */
 export const chatPlace = (
-  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage" | "earth" | "realms" | "pinned">,
+  place: Pick<ChatPlace, "slug" | "name" | "description" | "inPage" | "earth" | "realms" | "realm" | "room" | "pinned">,
   universe: UniverseView,
   kicker = `${universe.name} · ${place.name}`,
 ): ChatPlace => ({

@@ -224,7 +224,7 @@ if [ -n "$changed" ]; then
 		pnpm-lock.yaml) audit=true ;;
 		esac
 		case $path in
-		server/src/* | jarvis/src/* | packages/service/src/*) ts=true ;;
+		server/src/* | jarvis/src/* | link-reader/src/* | packages/service/src/*) ts=true ;;
 		app/src/*.test.ts | app/src/*.test.tsx) ts=true ;; # no page loads a test of the app: no build
 		app/tests/*) ts=true ;; # the journeys, their helpers and recordings: the merge check and --full walk them
 		app/src/*.ts | app/src/*.tsx | packages/ui/src/*.ts | packages/ui/src/*.tsx) ts=true app=true ;;
@@ -505,13 +505,13 @@ lane_ts() {
 		# the cheap ones: tier 1 (login, CSP, service worker, embeds, rooms, pins, composer, DMs, realm reads) and the critical flows. The rest
 		# (the display, pixel and picture specs and their snapshot folders) stay in the repository and run in `--everything`. Flights is
 		# trimmed to its two smoke tests (fly to a star, fly to a world), picked by title with --grep (no spec edited, no tag), in a second invocation.
-		journeys="app/tests/e2e/accountLater.spec.ts app/tests/e2e/budgets.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/chunks.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/edits.spec.ts app/tests/e2e/history.spec.ts app/tests/e2e/linesLater.spec.ts app/tests/e2e/login.spec.ts app/tests/e2e/places.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/country.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/dmBar.spec.ts app/tests/e2e/embeds.spec.ts app/tests/e2e/govdao.spec.ts app/tests/e2e/heroNumber.spec.ts app/tests/e2e/homeLive.spec.ts app/tests/e2e/messageMenu.spec.ts app/tests/e2e/multiline.spec.ts app/tests/e2e/pages.spec.ts app/tests/e2e/pins.spec.ts app/tests/e2e/placesPhone.spec.ts app/tests/e2e/previews.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmFunctions.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/roomEdit.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/search.spec.ts app/tests/e2e/stationPage.spec.ts app/tests/e2e/threads.spec.ts app/tests/e2e/worldPage.spec.ts app/tests/e2e/callCard.spec.ts app/tests/e2e/callsMore.spec.ts app/tests/e2e/chainEvents.spec.ts app/tests/e2e/names.spec.ts app/tests/e2e/pinnedActions.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/arrival.spec.ts"
+		journeys="app/tests/e2e/accountLater.spec.ts app/tests/e2e/budgets.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/chunks.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/edits.spec.ts app/tests/e2e/history.spec.ts app/tests/e2e/linesLater.spec.ts app/tests/e2e/login.spec.ts app/tests/e2e/places.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/country.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/dmBar.spec.ts app/tests/e2e/embeds.spec.ts app/tests/e2e/govdao.spec.ts app/tests/e2e/heroNumber.spec.ts app/tests/e2e/messageMenu.spec.ts app/tests/e2e/multiline.spec.ts app/tests/e2e/pages.spec.ts app/tests/e2e/pins.spec.ts app/tests/e2e/previews.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmFunctions.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/roomEdit.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/search.spec.ts app/tests/e2e/stationPage.spec.ts app/tests/e2e/threads.spec.ts app/tests/e2e/worldPage.spec.ts app/tests/e2e/callCard.spec.ts app/tests/e2e/callsMore.spec.ts app/tests/e2e/chainEvents.spec.ts app/tests/e2e/names.spec.ts app/tests/e2e/pinnedActions.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/arrival.spec.ts app/tests/e2e/searchChat.spec.ts app/tests/e2e/person.spec.ts"
 	fi
 	# shellcheck disable=SC2086 # the list is words
 	$playwright --reporter=dot,json $journeys >"$logs/playwright.out" 2>&1 ||
 		retry playwright "$PLAYWRIGHT_JSON_OUTPUT_NAME" "$logs/playwright.out" env -u PLAYWRIGHT_JSON_OUTPUT_NAME $playwright --reporter=dot
 	if ! $strict; then
-		env -u PLAYWRIGHT_JSON_OUTPUT_NAME $playwright --reporter=dot app/tests/e2e/flights.spec.ts --grep 'jumps to the star aimed at|flies from the cosmos to a world'
+		env -u PLAYWRIGHT_JSON_OUTPUT_NAME $playwright --reporter=dot app/tests/e2e/flights.spec.ts --grep 'flies to the system aimed at|flies from the cosmos to a world'
 	fi
 	[ "$(packages)" = "$installed" ] || { echo "check.sh: building the app changed package.json or the lockfile" >&2; exit 1; }
 }

@@ -45,6 +45,12 @@ describe("Markets", () => {
       expect(Markets.safeParse(GOOD).success).toBe(true);
     });
 
+    it("may carry the average seconds between blocks, above zero and at most 600", () => {
+      for (const interval of [1.94, 0.001, 600]) expect(Markets.safeParse(withBlock({ interval })).success).toBe(true);
+      for (const interval of [0, -2, 601, Number.NaN, "2"])
+        expect(Markets.safeParse(withBlock({ interval })).success).toBe(false);
+    });
+
     it.each([
       ["height 1", withBlock({ height: 1 })],
       ["a height of a trillion", withBlock({ height: 1e12 })],

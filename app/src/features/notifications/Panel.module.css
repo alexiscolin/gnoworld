@@ -1,5 +1,5 @@
 /* The bell's panel (frames 86, 87): a floating panel (ui's Panel) in the top layer, over the dock's column, from under the header to the
-   page's foot. */
+   page's foot; where the dock stands, on its very box. */
 @layer components {
   .place {
     /* raw: under the header's controls, where the dock's panel starts (frame 86: 88 px) */
@@ -10,6 +10,17 @@
     /* raw: the dock's width in frame 86 (360 px), less on a narrow screen */
     inline-size: min(360px, calc(100% - 2 * var(--space-s)));
     overflow: auto;
+    /* Shut, it leaves toward the bell: up 4 px, on the exit's curve in 70% of the enter's time; display and overlay
+       keep it drawn in the top layer until then. */
+    --_curve: var(--ease-in);
+
+    opacity: 0;
+    translate: 0 calc(var(--space-3xs) * -1);
+    transition:
+      opacity calc(var(--motion-base) * 0.7 * var(--motion-scale)) var(--_curve),
+      translate calc(var(--motion-base) * 0.7 * var(--motion-scale)) var(--_curve),
+      overlay calc(var(--motion-base) * 0.7 * var(--motion-scale)) allow-discrete,
+      display calc(var(--motion-base) * 0.7 * var(--motion-scale)) allow-discrete;
     /* The browser's popover frame and fill go: the panel inside is the surface. */
     border-style: none;
     background-color: transparent;
@@ -17,16 +28,39 @@
     padding: 0;
   }
 
-  /* Its panel fills it, the lines scrolling inside. */
-  .place > * {
+  .place:popover-open {
+    --_curve: var(--ease-standard);
+
+    opacity: 1;
+    translate: none;
+    transition-duration: calc(var(--motion-base) * var(--motion-scale));
+  }
+
+  @starting-style {
+    .place:popover-open {
+      opacity: 0;
+      translate: 0 calc(var(--space-3xs) * -1);
+    }
+  }
+
+  /* Where a dock stands, the panel takes the dock's own box, so it covers the chat whole, one edge, never a second beside it
+     (Alexis, 2026-11-09: "effet double largeur"): ui Panel.module.css's dock, its inset and its width at each size. */
+  @media (width >= 1280px) {
+    .place {
+      inset: var(--dock-top) var(--page-edge) var(--space-m) auto;
+      inline-size: var(--chat-dock-now);
+    }
+  }
+
+  /* Its panel fills it, the lines scrolling inside; the warning before a link off the site, a dialog drawn in it, keeps its own size. */
+  .place > :not(dialog) {
     /* layout: the panel takes the box's whole height */
     block-size: 100%;
   }
 
-  /* "MARK ALL READ" in the label style, a button with no frame (frame 86). */
+  /* "MARK ALL READ" in the label style, in a link-look button (frame 86). */
   .markAll {
     color: var(--color-text);
-    cursor: pointer;
   }
 
   .title {
@@ -53,10 +87,5 @@
 
   .mark[data-unread] {
     color: var(--color-mine);
-  }
-
-  .note {
-    color: var(--color-text-muted);
-    font: var(--font-meta);
   }
 }

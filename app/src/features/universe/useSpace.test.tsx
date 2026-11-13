@@ -2,72 +2,64 @@
 import { act } from "react";
 import { createRoot } from "react-dom/client";
 import { renderToString } from "react-dom/server";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Place } from "../../space/place.ts";
+import { useSpace, type WorldShown } from "./useSpace.ts";
 
-const universe = vi.hoisted(() => ({
-  draw: vi.fn<(shown: boolean | "earth" | "cosmos" | { world: string }, page?: unknown) => void>(),
-  mount: vi.fn(),
+// A page's hold on space (D401): what it asks of the door to space (space.ts, the test's own here), and its first screen's end. The door's
+// engine, its chunk and its failures are space.ts's.
+const door = vi.hoisted(() => ({
+  show: vi.fn<(place: Place | undefined, to: (href: string) => void) => void>(),
+  release: vi.fn(),
+  hold: vi.fn(),
+  flying: false,
+  drawn: false,
+  heard: new Set<() => void>(),
 }));
+vi.mock("./space.ts", () => ({
+  show: door.show,
+  release: door.release,
+  hold: door.hold,
+  flying: () => door.flying,
+  drawnYet: () => door.drawn,
+  onDrawn: (heard: () => void) => {
+    door.heard.add(heard);
+    return () => door.heard.delete(heard);
+  },
+}));
+const arrival = vi.hoisted(() => ({ enterPage: vi.fn(), newPage: vi.fn() }));
+vi.mock("./arrival.ts", () => arrival);
+vi.mock("./rise.ts", () => ({ ghost: vi.fn() }));
+vi.mock("../../useHere.ts", () => ({ useHere: vi.fn() }));
 
-vi.mock("./mountUniverse.tsx", () => ({ mountUniverse: universe.mount }));
+const FIRST_SCREEN_MS = 2_500;
+const seen: boolean[] = [];
 
-// The door keeps the page's one universe in its module: each test gets a fresh one.
-async function door() {
-  vi.resetModules();
-  const { useSpace } = await import("./useSpace.ts");
-  return function Cosmos() {
-    useSpace();
-    return null;
-  };
+function Page({ body }: { body: "earth" | "cosmos" | WorldShown | undefined }) {
+  seen.push(useSpace(body));
+  return null;
 }
-
-// The default universe's home: the same door, and its worlds to draw.
-async function worldsDoor() {
-  vi.resetModules();
-  const { useSpace } = await import("./useSpace.ts");
-  return function Worlds() {
-    useSpace("cosmos");
-    return null;
-  };
+function Where() {
+  return <output data-at={useLocation().pathname} />;
 }
-
-// The Earth's page: the same door, and the Earth to draw.
-async function earthDoor() {
-  vi.resetModules();
-  const { useSpace } = await import("./useSpace.ts");
-  return function Earth() {
-    useSpace("earth");
-    return null;
-  };
-}
+const routed = (body: "earth" | "cosmos" | WorldShown | undefined, path: string) => (
+  <MemoryRouter initialEntries={[path]}>
+    <Where />
+    <Routes>
+      <Route path="/s/:system" element={<Page body={body} />} />
+      <Route path="*" element={<Page body={body} />} />
+    </Routes>
+  </MemoryRouter>
+);
 
 const left: (() => void)[] = [];
-
-// The page on screen, the chunk still coming.
-function open(Cosmos: () => null) {
-  const root = createRoot(document.createElement("div"));
-  act(() => {
-    root.render(<Cosmos />);
-  });
-  return () => {
-    act(() => {
-      root.unmount();
-    });
-  };
-}
-
-const arrived = () =>
-  act(async () => {
-    await vi.dynamicImportSettled();
-  });
-
-// The page that shows space, on screen until `leave` is called.
-async function visit(Cosmos: () => null) {
+// The page on screen until `leave` is called.
+function visit(body?: "earth" | "cosmos" | WorldShown, path = "/") {
   const box = document.createElement("div");
   const root = createRoot(box);
-  await act(async () => {
-    root.render(<Cosmos />);
-    await vi.dynamicImportSettled();
+  act(() => {
+    root.render(routed(body, path));
   });
   let mounted = true;
   const leave = () => {
@@ -78,321 +70,152 @@ async function visit(Cosmos: () => null) {
     mounted = false;
   };
   left.push(leave);
-  return { leave };
-}
-
-// The door's chunk held back until the test calls what this returns.
-function heldDoor(): () => void {
-  let arrive: () => void = () => undefined;
-  const gate = new Promise<void>((resolve) => {
-    arrive = resolve;
-  });
-  vi.doMock("./mountUniverse.tsx", async () => {
-    await gate;
-    return { mountUniverse: universe.mount };
-  });
-  return () => {
-    arrive();
+  return {
+    leave,
+    again: (next: "earth" | "cosmos" | WorldShown | undefined) => {
+      act(() => {
+        root.render(routed(next, path));
+      });
+    },
+    box,
   };
 }
-
-// A first visit whose universe did not mount.
-async function failedOnce() {
-  universe.mount.mockImplementationOnce(() => {
-    throw new Error("the universe did not mount");
-  });
-  const Cosmos = await door();
-  return { Cosmos, ...(await visit(Cosmos)) };
-}
+const asked = () => door.show.mock.calls.map(([place]) => place);
 
 beforeEach(() => {
-  universe.mount.mockReturnValue(universe.draw);
+  seen.length = 0;
+  door.drawn = false;
+  door.flying = false;
+  vi.stubGlobal("reportError", vi.fn());
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      observe = vi.fn();
+      disconnect = vi.fn();
+    },
+  );
 });
 afterEach(() => {
   for (const leave of left.splice(0)) leave();
+  door.heard.clear();
   vi.clearAllMocks();
-  vi.doMock("./mountUniverse.tsx", () => ({ mountUniverse: universe.mount }));
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 // What the Earth's page holds back until its first screen is done: the chat, which budgets.spec.ts leaves out of it.
 describe("the end of the first screen", () => {
-  const readyState = (value: DocumentReadyState) => {
-    vi.spyOn(document, "readyState", "get").mockReturnValue(value);
-  };
-  let done = false;
-
-  async function pageThatWaits() {
-    vi.resetModules();
-    const { useSpace } = await import("./useSpace.ts");
-    return function Earth() {
-      done = useSpace("earth");
-      return null;
-    };
-  }
-
-  beforeEach(() => {
-    done = false;
-  });
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it("waits for space's first frame", () => {
+    visit("earth");
+    expect(seen.at(-1)).toBe(false);
+    act(() => {
+      door.drawn = true;
+      for (const heard of door.heard) heard();
+    });
+    expect(seen.at(-1)).toBe(true);
   });
 
-  it("waits for the page's load though the door has come", async () => {
-    readyState("loading");
-    await visit(await pageThatWaits());
-    expect(done).toBe(false);
-    await act(async () => {
-      window.dispatchEvent(new Event("load"));
-      await vi.dynamicImportSettled();
+  it("goes on 2.5 s after it is on screen when no frame comes: a held engine leaves no page without its chat (F4306)", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    visit("earth");
+    act(() => {
+      vi.advanceTimersByTime(FIRST_SCREEN_MS - 1);
     });
-    expect(done).toBe(true);
+    expect(seen.at(-1), "the 2.5 s are not over").toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(seen.at(-1)).toBe(true);
   });
 
-  it("waits for the door though the page has loaded: the two are the first screen", { timeout: 60_000 }, async () => {
-    readyState("complete");
-    const arrive = heldDoor();
-    const Earth = await pageThatWaits();
-    const box = document.createElement("div");
-    const root = createRoot(box);
-    left.push(() => {
-      act(() => {
-        root.unmount();
-      });
-    });
-    await act(async () => {
-      root.render(<Earth />);
-      await Promise.resolve();
-    });
-    expect(done).toBe(false);
-    await act(async () => {
-      arrive();
-      await vi.waitFor(() => {
-        expect(universe.mount).toHaveBeenCalled();
-      });
-      await Promise.resolve();
-    });
-    await vi.waitFor(() => {
-      expect(done).toBe(true);
-    });
+  it("is done at once on a move inside the site, space already drawn", () => {
+    door.drawn = true;
+    visit("earth");
+    expect(seen.at(0)).toBe(true);
   });
 
-  it("goes on when the door does not come: the page does not wait for what failed", async () => {
-    readyState("complete");
-    universe.mount.mockImplementationOnce(() => {
-      throw new Error("the universe did not mount");
-    });
-    await visit(await pageThatWaits());
-    expect(done).toBe(true);
-  });
-
-  it("goes on when the door's chunk cannot be fetched: the page does not wait for what failed", async () => {
-    readyState("complete");
-    vi.doMock("./mountUniverse.tsx", () => {
-      throw new Error("the door's chunk did not come");
-    });
-    await visit(await pageThatWaits());
-    expect(done).toBe(true);
-  });
-
-  it(
-    "goes on 2.5 s after it is on screen when the door never answers: a held chunk leaves no page without its chat (F4306)",
-    { timeout: 60_000 },
-    async () => {
-      readyState("complete");
-      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
-      const arrive = heldDoor();
-      try {
-        const Earth = await pageThatWaits();
-        const root = createRoot(document.createElement("div"));
-        left.push(() => {
-          act(() => {
-            root.unmount();
-          });
-        });
-        act(() => {
-          root.render(<Earth />);
-        });
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(2_499);
-        });
-        expect(done, "the door's 2.5 s are not over").toBe(false);
-        await act(async () => {
-          await vi.advanceTimersByTimeAsync(1);
-        });
-        expect(done).toBe(true);
-      } finally {
-        arrive();
-        vi.useRealTimers();
-      }
-    },
-  );
-
-  it("is done at once on a move inside the site, the door already there", async () => {
-    readyState("complete");
-    const Earth = await pageThatWaits();
-    const { leave } = await visit(Earth);
+  it("tells a page that has gone nothing", () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+    const { leave } = visit("earth");
     leave();
-    done = false;
-    await visit(Earth);
-    expect(done).toBe(true);
-  });
-
-  it("tells a page that has gone nothing", async () => {
-    readyState("loading");
-    const { leave } = await visit(await pageThatWaits());
-    leave();
-    window.dispatchEvent(new Event("load"));
-    await vi.dynamicImportSettled();
-    expect(done).toBe(false);
+    const told = seen.length;
+    act(() => {
+      door.drawn = true;
+      for (const heard of door.heard) heard();
+      vi.advanceTimersByTime(FIRST_SCREEN_MS);
+    });
+    expect(seen).toHaveLength(told);
+    expect(door.heard.size).toBe(0);
   });
 });
 
 describe("useSpace", () => {
-  it("hands the universe the page's store and router with the Earth, for the signs on the globe", async () => {
-    vi.resetModules();
-    const { useSpace } = await import("./useSpace.ts");
-    const page = { store: {}, open: vi.fn() } as never;
-    function Earth() {
-      useSpace("earth", page);
-      return null;
-    }
-    await visit(Earth);
-    expect(universe.draw).toHaveBeenLastCalledWith("earth", page);
+  it("asks no place of a page that shows none, so space is covered", () => {
+    visit();
+    expect(asked()).toEqual([undefined]);
   });
 
-  it("writes nothing into the pre-rendered page, and asks for nothing there", async () => {
-    const Cosmos = await door();
-    expect(renderToString(<Cosmos />)).toBe("");
-    await vi.dynamicImportSettled();
-    expect(universe.mount).not.toHaveBeenCalled();
+  it("asks the home for the cosmos' page, the universe at /universe and a system at /s/<namespace>", () => {
+    visit("cosmos");
+    visit("cosmos", "/universe");
+    visit("cosmos", "/s/games");
+    expect(asked()).toEqual([{ kind: "home" }, { kind: "universe" }, { kind: "system", id: "games" }]);
   });
 
-  it("brings the universe once the page is on screen, and shows it", async () => {
-    const Cosmos = await door();
-    await visit(Cosmos);
-    expect(universe.mount).toHaveBeenCalledTimes(1);
-    expect(universe.draw).toHaveBeenLastCalledWith(true);
+  it("asks the Earth's own system, /s/gnoland, for any namespace that orbits the Earth (D501)", () => {
+    visit("cosmos", "/s/gnoland");
+    expect(asked()).toEqual([{ kind: "system", id: "gnoland" }]);
   });
 
-  it("asks for the worlds where the page does", async () => {
-    await visit(await worldsDoor());
-    expect(universe.draw).toHaveBeenLastCalledWith("cosmos");
+  it("tells space the Earth is wanted", () => {
+    visit("earth");
+    expect(asked()).toEqual([{ kind: "world", id: "earth" }]);
   });
 
-  it("covers it when the page leaves, and keeps it", async () => {
-    const Cosmos = await door();
-    const { leave } = await visit(Cosmos);
+  it("tells space which world a world's page wants, by its id", () => {
+    visit({ world: "gov/dao", name: "GovDAO" });
+    expect(asked()).toEqual([{ kind: "world", id: "gov/dao" }]);
+  });
+
+  it("asks the world again only when the page names another: the same id is the same world", () => {
+    const { again } = visit({ world: "gov/dao" });
+    again({ world: "gov/dao", name: "GovDAO" });
+    expect(door.show).toHaveBeenCalledTimes(1);
+    again({ world: "games/go" });
+    expect(asked()).toEqual([
+      { kind: "world", id: "gov/dao" },
+      { kind: "world", id: "games/go" },
+    ]);
+  });
+
+  it("covers space when the page leaves, and keeps it", () => {
+    const { leave } = visit("earth");
+    expect(door.release).not.toHaveBeenCalled();
     leave();
-    expect(universe.draw).toHaveBeenLastCalledWith(false);
+    expect(door.release).toHaveBeenCalledTimes(1);
   });
 
-  it("shows the same universe on the way back: one mount", async () => {
-    const Cosmos = await door();
-    const { leave } = await visit(Cosmos);
-    leave();
-    await visit(Cosmos);
-    expect(universe.mount).toHaveBeenCalledTimes(1);
-    expect(universe.draw).toHaveBeenLastCalledWith(true);
-  });
-
-  it("covers it at once when the page left while it was coming", async () => {
-    const Cosmos = await door();
-    open(Cosmos)();
-    await arrived();
-    expect(universe.draw).toHaveBeenCalledExactlyOnceWith(false);
-  });
-
-  it("asks once when the page leaves and comes back while it is coming: one root, one canvas", async () => {
-    const Cosmos = await door();
-    open(Cosmos)();
-    const leave = open(Cosmos);
-    await arrived();
-    expect(universe.mount).toHaveBeenCalledTimes(1);
-    expect(universe.draw).toHaveBeenLastCalledWith(true);
-    leave();
-  });
-
-  it("asks for nothing on the way out of a failure: a page that leaves shows no space", async () => {
-    const { leave } = await failedOnce();
-    leave();
-    await vi.dynamicImportSettled();
-    expect(universe.mount).toHaveBeenCalledTimes(1);
-  });
-
-  it("leaves the page as it is when the chunk does not come", { timeout: 60_000 }, async () => {
-    vi.doMock("./mountUniverse.tsx", () => {
-      throw new TypeError("Failed to fetch dynamically imported module");
-    });
-    const Cosmos = await door();
-    await expect(visit(Cosmos)).resolves.toBeDefined();
-    expect(universe.mount).not.toHaveBeenCalled();
-  });
-
-  it("tells the universe which world a world's page wants, by its id", async () => {
-    vi.resetModules();
-    const { useSpace } = await import("./useSpace.ts");
-    const asked = { world: "gov/dao" };
-    await visit(function World() {
-      useSpace(asked);
-      return null;
-    });
-    expect(universe.draw).toHaveBeenLastCalledWith(asked);
-  });
-
-  it("asks the world again only when the page names another: the same id is the same world", async () => {
-    vi.resetModules();
-    const { useSpace } = await import("./useSpace.ts");
-    let id = "gov/dao";
-    const World = () => {
-      useSpace({ world: id });
-      return null;
-    };
-    const box = document.createElement("div");
-    const root = createRoot(box);
-    await act(async () => {
-      root.render(<World />);
-      await vi.dynamicImportSettled();
-    });
-    const drawn = universe.draw.mock.calls.length;
-    await act(async () => {
-      root.render(<World />);
-      await vi.dynamicImportSettled();
-    });
-    expect(universe.draw.mock.calls.length).toBe(drawn);
-    id = "bubble";
-    await act(async () => {
-      root.render(<World />);
-      await vi.dynamicImportSettled();
-    });
-    expect(universe.draw).toHaveBeenLastCalledWith({ world: "bubble" });
+  it("goes where space asks, through the page's router", () => {
+    const { box } = visit("cosmos");
+    const to = door.show.mock.calls.at(0)?.[1];
+    if (to === undefined) throw new Error("the page gave space no way to navigate");
     act(() => {
-      root.unmount();
+      to("/w/govdao");
     });
+    expect(box.querySelector("output")?.getAttribute("data-at")).toBe("/w/govdao");
   });
 
-  it("tells the universe the Earth is wanted", async () => {
-    await visit(await earthDoor());
-    expect(universe.draw).toHaveBeenLastCalledWith("earth");
+  it("lets the page's text in at once when no flight brings it, and leaves it to the flight when one does", () => {
+    visit("earth");
+    expect(arrival.enterPage).toHaveBeenCalledTimes(1);
+    door.flying = true;
+    visit({ world: "gov/dao" });
+    expect(arrival.enterPage).toHaveBeenCalledTimes(1);
   });
 
-  it("covers the Earth when its page leaves", async () => {
-    const { leave } = await visit(await earthDoor());
-    expect(universe.draw).toHaveBeenLastCalledWith("earth");
-    leave();
-    expect(universe.draw).toHaveBeenLastCalledWith(false);
-  });
-
-  it("remembers the Earth was wanted while the chunk came", async () => {
-    open(await earthDoor());
-    await arrived();
-    expect(universe.draw).toHaveBeenCalledExactlyOnceWith("earth");
-  });
-
-  it("asks again on the next page after a failure", async () => {
-    const { Cosmos, leave } = await failedOnce();
-    leave();
-    await visit(Cosmos);
-    expect(universe.mount).toHaveBeenCalledTimes(2);
-    expect(universe.draw).toHaveBeenLastCalledWith(true);
+  it("writes nothing into the pre-rendered page, and asks for nothing there", () => {
+    const html = renderToString(routed("earth", "/"));
+    expect(html).toBe('<output data-at="/"></output>');
+    expect(door.show).not.toHaveBeenCalled();
   });
 });

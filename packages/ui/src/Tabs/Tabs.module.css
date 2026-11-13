@@ -11,19 +11,40 @@
     background: var(--color-fill);
   }
 
+  .tabs[data-fill] {
+    /* layout: this row's own arrangement */
+    display: flex;
+    /* layout: this row's own arrangement */
+    flex-wrap: nowrap;
+  }
+
   .tab {
     --_h: var(--control-s);
     --_pad: var(--space-s);
     --_ink: var(--color-text-muted);
 
     min-inline-size: var(--control-s);
-    transition:
-      background-color var(--motion-base) var(--ease-standard),
-      color var(--motion-base) var(--ease-standard);
+  }
+
+  /* Only a hover eases. Selecting swaps the cream at once: eased, the old tab's cream fades out while the
+     new one's fades in, and the pill seems to blink. */
+  .tab:hover:not([aria-selected="true"]) {
+    transition: color var(--motion-base) var(--ease-standard);
   }
 
   .tabs[data-size="s"] .tab {
     --_pad: var(--space-2xs);
+  }
+
+  /* A list's sort: 24 px tabs in the chip's type. */
+  .tabs[data-size="xs"] .tab {
+    --_h: var(--control-xs);
+    --_pad: var(--space-xs);
+    --_font: var(--font-chip);
+
+    min-inline-size: 0;
+    /* The proposal's segment draws no edge: its pill is as wide as its words and 12 px each side. */
+    border-width: 0;
   }
 
   .tab:hover {
@@ -44,5 +65,17 @@
   .tab[aria-selected="true"] .count {
     background: var(--color-ink);
     color: var(--color-primary);
+  }
+
+  /* The proposal's count follows its word by a space, not a control's gap. */
+  .tabs .tab:has(.figure) {
+    /* layout: the count follows its word by a space */
+    gap: var(--space-3xs);
+  }
+
+  /* A count as a plain figure: the data type, a little quieter than the words. */
+  .figure {
+    font: var(--font-data);
+    opacity: 0.7;
   }
 }

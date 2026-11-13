@@ -1,59 +1,27 @@
-// What the page knows of the scene's flights (7g): where space showed last, so a page that moves from one place in space to another asks
-// the scene to fly there before it is told of the next, its flight copying what is still drawn; and what the flight panel shows, as the
-// scene says it, which it tells whoever the page has listening. No React: the panel reads it as the universe reads the host. A route's
-// change shows the next place at once, the one that left never saying it covers space (lot C's review): the place last shown is the one.
-import type { FlightGoal, FlightSaid } from "../../scene/flight/flights.ts";
-import type { Scene } from "../../scene/scene.ts";
-import { markFlown } from "./globe.ts";
+// Whether a flight to a page's planet is on, put on the planet's box (`data-flown`), which the page's parts follow (globe.module.css): a box that
+// mounts after the flight began (its route's chunk comes late) takes the state as it comes (`syncFlown`), never standing in view while the camera flies.
+import { EARTH } from "@gnoworld/core";
+import type { Place } from "../../space/place.ts";
+import { waitTags } from "./arrival.ts";
 
-// The Earth's page, the cosmos, or a world's, by its id and its name.
-type Place = "earth" | "cosmos" | { readonly world: string; readonly name?: string };
+let flightOn = false;
 
-// A world by its name, the Earth, the cosmos: where a flight goes, and what the panel calls it.
-const goalOf = (place: Place): FlightGoal =>
-  typeof place === "object"
-    ? { kind: "body", name: place.name ?? place.world }
-    : place === "earth"
-      ? { kind: "body", name: "Earth" }
-      : { kind: "cosmos", name: "Cosmos" };
+/** Puts the flight's state on the page's planet box, if one stands. */
+export const syncFlown = (): void =>
+  document.querySelector("[data-globe]")?.setAttribute("data-flown", flightOn ? "flying" : "landed");
 
-const same = (a: Place, b: Place) => (typeof a === "object" && typeof b === "object" ? a.world === b.world : a === b);
+/** A flight to the page's planet begins (`flying`) or ends. */
+export function markFlown(flying: boolean): void {
+  flightOn = flying;
+  syncFlown();
+  if (flying) waitTags();
+}
 
-export class Flown {
-  readonly #told: () => void;
-  #at: Place | undefined;
-  // Whether the flight under way is one this page asked, which brings the next page's body.
-  #asked = false;
-  #flight: FlightSaid | undefined;
-
-  /** `told`, each time what the panel shows changes. */
-  constructor(told: () => void) {
-    this.#told = told;
-  }
-
-  /** What the panel shows of a flight under way. */
-  readonly flight = () => this.#flight;
-
-  /** The scene says how its flight goes, ten times a second at most; nothing once it landed. */
-  readonly said = (flight: FlightSaid | undefined): void => {
-    this.#flight = flight === undefined ? undefined : { ...flight };
-    if (flight === undefined) this.#asked = false;
-    markFlown(this.paging);
-    this.#told();
-  };
-
-  /** The page shows `shown` next, on `scene` if it runs: from another place in space, a flight there; a page that covers space, or flies
-   * from nowhere, asks none. */
-  between(scene: Scene | undefined, shown: boolean | Place): void {
-    const [from, at] = [this.#at, typeof shown === "boolean" ? undefined : shown];
-    this.#at = at;
-    if (scene === undefined || from === undefined || at === undefined || same(from, at)) return;
-    this.#asked = true;
-    scene.fly(goalOf(at));
-  }
-
-  /** Whether a flight this page asked is under way and speaks: the next page's body is on its way. */
-  get paging(): boolean {
-    return this.#asked && this.#flight !== undefined;
-  }
+/** The page's box keeps its planet's room and opens the plate round it once it says the planet is drawn (globe.module.css); the home's first
+ * screen frames the Earth in its own. */
+export function markDrawn(place: Place): void {
+  const box = document.querySelector<HTMLElement>("[data-globe]");
+  if (box === null) return;
+  if (place.kind === "world") box.dataset[place.id === EARTH ? "earth" : "world"] = "drawn";
+  else if (place.kind === "home") box.dataset["arrival"] = "drawn";
 }

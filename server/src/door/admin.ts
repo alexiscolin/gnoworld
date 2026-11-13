@@ -13,9 +13,8 @@ import {
   type JarvisSettings,
 } from "@gnoworld/schemas";
 import { Hono, type Context } from "hono";
-import { getCookie } from "hono/cookie";
 import { z } from "zod";
-import { guard, json, type Guarded } from "../guard.ts";
+import { baseRefusals, guard, json, sessionOf, type Guarded } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import type { Log } from "@gnoworld/service/log";
 import type { Signed } from "../login/login.ts";
@@ -37,12 +36,8 @@ interface Options {
 type Status = 400 | 401 | 403 | 409 | 415 | 429 | 503;
 
 const refusals = {
-  origin: ["forbidden", 403],
-  type: ["unsupported", 415],
-  session: ["unauthenticated", 401],
+  ...baseRefusals,
   team: ["forbidden", 403],
-  limit: ["too_many", 429],
-  body: ["refused", 400],
   chain: ["refused", 400],
   full: ["too_many", 429],
   signer: ["refused", 400],
@@ -87,7 +82,7 @@ export function adminRoutes(options: Options): Hono<Guarded> {
   };
   // The team member who calls, checked before any work: a session, the team, the rate.
   const caller = (c: Context): Address | Response => {
-    const who = session(getCookie(c, "__Host-session"));
+    const who = sessionOf(c, session);
     if (who === undefined) return refuse(c, "session");
     if (!isTeam(who)) return refuse(c, "team", { account: who });
     return calls.take(who, now()) ? who : refuse(c, "limit", { account: who });

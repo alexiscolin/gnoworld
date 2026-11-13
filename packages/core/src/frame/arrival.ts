@@ -4,11 +4,10 @@
 // picks the slant and the turn the angles are tried in, so the same address gives the same view. Built on 7d3's postcards (7p's depth).
 import { ROOM, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import { nextState, textHash, unitOf, type Point } from "../space/cell.ts";
-import { SWAY_CORNERS } from "../space/drift.ts";
 import { onPlane } from "./disc.ts";
 import { glowsAt, HALO_FAR } from "./halo.ts";
-import { frames, leaned, LEANS, roomOf, seenOf, type Card, type LeanRoom } from "./framing.ts";
-import { postcardFrom, postcardWorlds, shapeOf, type Postcard } from "./postcard.ts";
+import { frames, seenOf, type Card } from "./framing.ts";
+import { PLAN_MOST, postcardFrom, postcardWorldsWith, shapeOf, type Postcard } from "./postcard.ts";
 import {
   along,
   away,
@@ -17,27 +16,20 @@ import {
   focalOf,
   looksFrom,
   STAR_HEART,
-  swayed,
   type Camera,
   type Look,
   type Seen,
 } from "./restLook.ts";
 
 /** Where the eye rests when it comes to a system, what it looks at (its star), both on the map, and the system as drawn there; a Plan's own
- * lens in degrees, plane's up and lean (7v): the home's lens, the map's up and a dynamic view's lean where none. */
+ * lens in degrees, plane's up (7v): the home's lens and the map's up where none. */
 export interface Arrival {
   readonly eye: Point;
   readonly look: Point;
   readonly postcard: Postcard;
   readonly lens?: number;
   readonly up?: Point;
-  readonly lean?: number;
-  /** How far a mouse may lean the eye each way across and up the stage, as shares of the view's lean (F4468): all where none. */
-  readonly room?: LeanRoom;
 }
-
-// The lean lives beside the mouse's, where the view at rest's eye reads it without this module.
-export { ARRIVAL_LEAN } from "../space/drift.ts";
 
 // Slants over the system's plane, in degrees: a postcard's plane is seen 30 degrees open at the least (postcard.ts), never face on.
 const SLANT_LEAST = 32;
@@ -59,7 +51,7 @@ const OUTSIDE = ROOM + 1;
 const NEAR = HALO_FAR + 2 * ROOM;
 // The most worlds a dynamic view draws: the mock-up's six (Alexis, 2026-11-03, the views page, 14:09), held still, where the home's
 // postcards keep frame 4's four.
-const MOST_WORLDS = 6;
+const MOST_WORLDS = PLAN_MOST;
 /** What an address picks: the slant and the turn the angles start from. */
 interface Chosen {
   readonly first: number;
@@ -96,21 +88,15 @@ function alone(look: Look, card: Card, near: readonly StarSystem[]): boolean {
 interface Asked {
   readonly pick: Chosen;
   readonly around: readonly StarSystem[];
-  readonly leaning: boolean;
   readonly cut: boolean;
 }
 
-// The eye outside every other room; at rest alone and framed; framed through the sway, and through a mouse's lean where `leaning`.
-function holds(camera: Camera, card: Card, { around, leaning, cut }: Asked) {
-  const { system } = card;
-  const looked = (moved: Camera, atRest: boolean) =>
-    looksFrom(moved).every((look) => frames(look, card, { atRest, cut }));
+// The eye outside every other room; alone and framed.
+function holds(camera: Camera, card: Card, { around, cut }: Asked) {
   return (
     around.every((other) => away(other.place, camera.eye) >= OUTSIDE) &&
     looksFrom(camera).every((look) => alone(look, card, around)) &&
-    looked(camera, true) &&
-    SWAY_CORNERS.every((sway) => looked(swayed(camera, sway, system.place), false)) &&
-    (!leaning || LEANS.every((lean) => looked(leaned(camera, lean, system.place), false)))
+    looksFrom(camera).every((look) => frames(look, card, cut))
   );
 }
 
@@ -150,7 +136,7 @@ function firstHolding(system: StarSystem, worlds: readonly Orbiter[], asked: Ask
       if (shape.worlds.length !== worlds.length || Math.abs(camera.ahead.y) > STEEP) continue;
       if (holds(camera, shape, asked)) {
         const postcard = postcardFrom(still, worlds, camera);
-        return { eye: camera.eye, look: system.place, postcard, room: roomOf(camera, shape) };
+        return { eye: camera.eye, look: system.place, postcard };
       }
     }
   return undefined;
@@ -166,18 +152,17 @@ function triesOf(most: number): (readonly [count: number, cut: boolean])[] {
 }
 
 /** `system`'s dynamic view among `systems`: the most of its postcard's worlds an angle reads as the view asks, its nearest cut where one
- * allows (`triesOf`), from the first angle its address gives that holds through a mouse's lean, else at rest and through the sway; a system
- * none reads well with, by its star and far belt alone, from its first angle that does not look down the map. */
-export function arrivalOf(system: StarSystem, systems: readonly StarSystem[]): Arrival {
+ * allows (`triesOf`), from the first angle its address gives that holds; a system none reads well with, by its star and far belt alone,
+ * from its first angle that does not look down the map. The world `must` is one of those it draws, where it can be. */
+export function arrivalOf(system: StarSystem, systems: readonly StarSystem[], must?: string): Arrival {
   const pick = chosenOf(system.id);
   // ponytail: one pass over the set an arrival, asked once a system and off the frame: 20,000 distances.
   const around = systems.filter((other) => other.id !== system.id && away(other.place, system.place) <= NEAR);
-  const most = postcardWorlds(system, MOST_WORLDS, true).length;
-  for (const [count, cut] of most === 0 ? [] : triesOf(most))
-    for (const leaning of [true, false]) {
-      const found = firstHolding(system, postcardWorlds(system, count, true), { pick, around, leaning, cut });
-      if (found !== undefined) return found;
-    }
+  const most = postcardWorldsWith(system, MOST_WORLDS, must).length;
+  for (const [count, cut] of most === 0 ? [] : triesOf(most)) {
+    const found = firstHolding(system, postcardWorldsWith(system, count, must), { pick, around, cut });
+    if (found !== undefined) return found;
+  }
   // Framed whole by its star and far belt, as 7d3 framed it: the ball's height a share of the screen's.
   const still = { ...system, spin: 0 };
   const reach = reachOf(system, []);

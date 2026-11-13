@@ -2,8 +2,9 @@
 // fields are strict; Adena's proof comes as the SDK types it.
 import { z } from "./zod.ts";
 import { Address } from "./address.ts";
+import { ChainId } from "./realmPath.ts";
 
-export const ChallengeRequest = z.strictObject({ chainId: z.string().check(z.minLength(1), z.maxLength(50)) });
+export const ChallengeRequest = z.strictObject({ chainId: ChainId });
 
 // The nonce as the server writes it, 128 random bits in base64url: one schema for the challenge and the proof (F673).
 export const Nonce = z.string().check(z.regex(/^[\w-]{22}$/));

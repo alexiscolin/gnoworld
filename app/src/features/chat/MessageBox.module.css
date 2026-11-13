@@ -5,10 +5,21 @@
   .box {
     /* layout: three rows on one grid, so the field's words, which the field draws itself, sit in the foot's row */
     display: grid;
-    /* layout: the marks, the words that take what is left, Send */
-    grid-template-columns: auto minmax(0, 1fr) auto;
+    /* layout: the box's own width says how much of the format bar fits */
+    container-type: inline-size;
+    /* layout: the words that take what is left, Send */
+    grid-template-columns: minmax(0, 1fr) auto;
     border-radius: var(--radius-box);
     background: var(--color-fill);
+    /* layout: the box's words' inset from its edge, 16 px, or what its dock gives (QuickActions.module.css), which also widens the box past the dock's inset */
+    --_in: var(--box-in);
+    /* layout: out past the column's inset by what the dock gives, none in a thread's */
+    margin-inline: calc(-1 * var(--box-bleed));
+  }
+
+  .box:has(.suggestions) {
+    /* layout: the box anchors the suggestions that stand above it, out of its rows */
+    position: relative;
   }
 
   /* The box carries the focus: one mint edge, as the video's (prototype .cbox:focus-within), the field's own ring and handle gone. */
@@ -16,36 +27,28 @@
     border-color: var(--color-mine);
   }
 
+  /* Forced colours repaint every edge alike: the focus takes a ring instead. */
+  @media (forced-colors: active) {
+    .box:focus-within {
+      outline: var(--focus-width) solid Highlight;
+    }
+  }
+
   /* The format bar: small, in a row of its own under a rule. */
   .format {
     /* layout: across the box's three columns, on its first row */
     grid-column: 1 / -1;
-    /* layout: inset from the box's edge, the rule between it and the field */
-    margin-inline: var(--space-2xs);
+    /* layout: the field's words' inset less the first tool's own, so the tools stand on the words' line, the rule between them and the field */
+    margin-inline: calc(var(--_in) - var(--space-2xs));
     padding-block: var(--space-3xs);
     border-block-end: var(--line-width) solid var(--color-line);
     color: var(--color-text-muted);
   }
 
-  /* The icons at the video's 62% of the muted grey and 13 px (prototype #fmtBar button, #fmtBar svg). */
-  .format button {
-    /* raw: the video's 62% of the muted grey (the prototype's #fmtBar button) */
-    --_ink: color-mix(in oklab, var(--color-text-muted) 62%, transparent);
-  }
-
-  .format svg {
-    /* raw: the video's 13 px icon of the format bar */
-    inline-size: 13px;
-    /* raw: the video's 13 px icon of the format bar */
-    block-size: 13px;
-  }
-
-  /* A rule between the groups of tools: 1 px by 12 px, a step either side (prototype #fmtBar .sep). */
+  /* A rule between the groups of tools, as high as their icons (prototype #fmtBar .sep). */
   .rule {
-    /* raw: the video's rule, 1 px wide and 12 px high */
-    inline-size: 1px;
-    /* raw: the video's rule is 12 px high */
-    block-size: 12px;
+    inline-size: var(--line-width);
+    block-size: var(--icon-m);
     background: var(--color-line);
   }
 
@@ -56,71 +59,67 @@
     display: contents;
   }
 
+  .box [role="textbox"],
+  .box [role="textbox"] + [aria-hidden="true"],
   .box textarea {
-    /* layout: across the box, on the second row, one line high until it grows */
+    /* layout: across the box, on the second row, two lines high until it grows (Alexis, 2026-11-08: a larger box) */
     grid-area: 2 / 1 / auto / -1;
-    min-block-size: calc(1lh + var(--space-s));
+    min-block-size: calc(2lh + var(--space-s));
     padding-block: var(--space-xs) var(--space-3xs);
-    padding-inline: var(--space-s);
+    padding-inline: var(--_in);
     border: 0;
     outline: none;
     background: none;
     font: var(--font-chat);
   }
 
-  /* What the field says of the draft, or why it cannot go, at the foot's end, before Send. */
-  .box p {
-    /* layout: in the foot's row, between the marks and Send, against Send */
-    grid-area: 3 / 2;
+  /* What the field says of the draft, or why it cannot go (the design system's FieldWords, in this wrapper), at the foot's end, before Send. */
+  .words {
+    /* layout: in the foot's row, against Send */
+    grid-area: 3 / 1;
     /* layout: against Send, level with it */
     place-self: center end;
-    /* layout: a step from the marks and from Send */
+    /* layout: a step from the box's edge and from Send */
     margin-inline: var(--space-2xs);
   }
 
-  /* The hint is muted and small; a refusal, which the field draws in the same place, keeps its own danger colour and size. */
-  .box p:not([aria-hidden]) {
-    color: var(--color-text-muted);
-    font: var(--font-hint);
+  /* The suggestions over the box, across it. Out of the grid's flow: as a grid item they took the first row, which pushed the format bar
+     under the foot and gave that row the list's height. */
+  .suggestions {
+    /* layout: above the box's top edge, a step from it, as wide as the box */
+    position: absolute;
+    inset-inline: 0;
+    inset-block-end: calc(100% + var(--space-2xs));
+    /* raw: above the field and its words, under the page's dialogs */
+    z-index: 2;
   }
 
-  .marks {
-    /* layout: the marks side by side at the foot's start */
-    display: flex;
-    /* layout: the foot's row, its first column */
+  /* The quick actions' / at the foot's start, level with Send. */
+  .acts {
+    /* layout: the foot's row, at its start, the field's words at its end */
     grid-area: 3 / 1;
-    padding: var(--space-3xs) var(--space-2xs);
+    /* layout: level with Send */
+    place-self: center start;
+    /* layout: the quick actions' / and the Jarvis button side by side */
+    display: flex;
+    /* layout: level with each other */
+    align-items: center;
+    /* layout: the field's words' inset less the button's own, so its / stands on the words' line */
+    margin: var(--space-3xs) 0 var(--space-2xs) calc(var(--_in) - var(--space-2xs));
   }
 
-  /* The marks at the video's 34 px and 18 px icons, in the lighter grey (prototype .ctools .tbtn). */
-  .marks button {
-    /* raw: the video's 34 px tool */
-    --_h: 34px;
-    /* raw: the prototype's .ctools .tbtn colour */
-    --_ink: #c8d0de;
-  }
-
-  .marks svg {
-    /* raw: the video's 18 px icon of the foot's tools */
-    inline-size: 18px;
-    /* raw: the video's 18 px icon of the foot's tools */
-    block-size: 18px;
+  .acts:empty {
+    display: none;
   }
 
   /* Send: a round button with an arrow up, on the cream fill, at the foot's end. */
   .send {
-    /* layout: the arrow in the middle of its circle */
-    display: grid;
     /* layout: the foot's row, its last column */
-    grid-area: 3 / 3;
-    /* layout: the arrow level with its circle's middle */
-    place-items: center;
+    grid-area: 3 / 2;
     /* layout: a step from the box's edge and from the words beside it */
     margin: var(--space-3xs) var(--space-2xs) var(--space-2xs) 0;
     inline-size: var(--control-s);
-    aspect-ratio: 1;
     border: 0;
-    border-radius: 50%;
     background: var(--color-primary);
     color: var(--color-ink);
     cursor: pointer;
@@ -134,5 +133,16 @@
   .send:disabled {
     cursor: not-allowed;
     opacity: var(--opacity-disabled);
+  }
+}
+
+/* A narrow box (a thread's column): the format bar keeps one row, its tools at the smallest size (ui's `tool`), then without its lists
+   (their `drops`) and the rule before them. */
+@layer components {
+  /* raw: 18 rem, the width at which the nine tools of 24 px no longer fit one row */
+  @container (inline-size < 18rem) {
+    .rule[data-drops] {
+      display: none;
+    }
   }
 }

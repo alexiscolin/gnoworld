@@ -38,10 +38,12 @@ describe("charting a world, from the browser", () => {
     expect(await server({ status: 401, json: { error: "unauthenticated" } }).api.chart("govdao")).toEqual({
       ok: false,
       reason: "unauthenticated",
+      body: { error: "unauthenticated" },
     });
     expect(await server({ status: 429, json: { error: "too_many" } }).api.chart("govdao")).toEqual({
       ok: false,
       reason: "too_many",
+      body: { error: "too_many" },
     });
   });
 

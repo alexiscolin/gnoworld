@@ -1,7 +1,15 @@
 // The keyboard and the pointer among a room's lines (4c's message menu, docs/decisions.md 2026-10-26): the list is one
 // tab stop, a line, the arrows moving among them; a line pointed at or holding the focus shows its bar.
 import type { Line } from "@gnoworld/core";
-import { useEffect, useRef, useState, type FocusEvent, type KeyboardEvent, type RefObject } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+  type RefObject,
+} from "react";
 import { nextLine } from "../../lib/nextLine.ts";
 
 // The list's lines: its items but the chain's cards (a room's thread holds them among its lines), which no key stops on.
@@ -45,6 +53,27 @@ function moveAmong(event: KeyboardEvent<HTMLOListElement>) {
   if (item instanceof HTMLElement) item.focus();
 }
 
+// Where a right-click, a long-press or the context-menu key asks for a line's menu, when it is on the line's own words: not on
+// a link, a control, or the bar and its menu, which keep the browser's menu or their own.
+const OWN = "a, button, input, textarea, [role='textbox'], [role='toolbar'], [role='menu'], [role='dialog']";
+
+/** The point a line's menu opens at: the pointer's, or the line's own corner when the key asked, which gives no pointer. */
+export const menuPoint = (
+  { clientX, clientY }: { clientX: number; clientY: number },
+  { left, top }: { left: number; top: number },
+): { x: number; y: number } => (clientX === 0 && clientY === 0 ? { x: left, y: top } : { x: clientX, y: clientY });
+
+/** A line's menu asked: which line, and the screen point. */
+export interface MenuAsk {
+  id: string;
+  x: number;
+  y: number;
+}
+
+// The menu asked, while the pointer or the focus is still on its line.
+const stays = (was: MenuAsk | undefined, id: string | undefined) =>
+  was !== undefined && was.id === id ? was : undefined;
+
 /** The list's one tab stop (`stopOf`, with `fresh` the line marked New); the lines whose bars are mounted; the focus
  * handed to a neighbour when a line goes. */
 export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOListElement | null>, fresh?: string) {
@@ -53,6 +82,8 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   const [pointed, setPointed] = useState<string>();
   // Whether the focus is in the focused line's bar (its More, its menu): that bar stays whatever the pointer does.
   const [held, setHeld] = useState(false);
+  // The line whose More menu was asked at a point (a right-click, the context-menu key): its bar is mounted to hold it.
+  const [asked, setAsked] = useState<MenuAsk>();
   const stop = stopOf(lines, chosen, fresh);
   // Whether the pointer is pressed in the list, off the bar: the focus it gives is no reason to move the list, which would carry the
   // line from under the pointer between the press and the release and lose the click (a chip, a link).
@@ -67,6 +98,7 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     onFocus: (event: { currentTarget: HTMLOListElement; target: EventTarget }) => {
       const line = lineAt(lines, event.currentTarget, event.target);
       setFocused(line?.id);
+      setAsked((was) => stays(was, line?.id));
       setHeld(event.target instanceof Element && event.target.closest("[role='toolbar']") !== null);
       // The focus moved: its line's bar shows until the pointer moves again (U11).
       setPointed(undefined);
@@ -86,7 +118,9 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
       });
     },
     onPointerOver: (event: { currentTarget: HTMLOListElement; target: EventTarget }) => {
-      setPointed(lineAt(lines, event.currentTarget, event.target)?.id);
+      const id = lineAt(lines, event.currentTarget, event.target)?.id;
+      setPointed(id);
+      setAsked((was) => stays(was, id));
     },
     onPointerLeave: () => {
       setPointed(undefined);
@@ -108,6 +142,16 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
     onKeyDown: (event: KeyboardEvent<HTMLOListElement>) => {
       moveAmong(event);
     },
+    onContextMenu: (event: MouseEvent<HTMLOListElement>) => {
+      const list = event.currentTarget;
+      if (event.target instanceof Element && event.target.closest(OWN) !== null) return;
+      const at = itemAt(list, event.target);
+      const line = lines[at];
+      const item = linesOf(list)[at];
+      if (line === undefined || item === undefined) return;
+      event.preventDefault();
+      setAsked({ id: line.id, ...menuPoint(event, item.getBoundingClientRect()) });
+    },
   };
   // A line about to go hands the tab stop and the focus to the one before it, else the one after.
   const leave = (id: string) => {
@@ -121,6 +165,6 @@ export function useLineFocus(lines: readonly Line[], listRef: RefObject<HTMLOLis
   };
   // One bar at a time: the pointed line's while the pointer is on the lines, else the focused line's; a bar holding
   // the focus stays beside it (U11).
-  const mounted = (id: string) => (held && id === focused) || id === (pointed ?? focused);
-  return { stop, mounted, on, leave };
+  const mounted = (id: string) => (held && id === focused) || id === (pointed ?? focused) || id === asked?.id;
+  return { stop, mounted, on, leave, asked };
 }

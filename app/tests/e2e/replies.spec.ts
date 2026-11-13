@@ -51,7 +51,7 @@ test.describe("replies", () => {
     await expect(cancel(page)).toHaveCount(0);
     await expect(form(page)).not.toContainText("Replying to");
     await expect(field(page)).toBeFocused();
-    await expect(field(page)).toHaveValue("half a thought");
+    await expect(field(page)).toHaveText("half a thought");
     await field(page).press("Enter");
     await expect(lineOf(page, "half a thought")).toBeVisible();
     expect(said()).toEqual([`PRIVMSG ${ROOM} :half a thought`]);
@@ -168,7 +168,7 @@ test.describe("replies", () => {
     await there.fill("elsewhere");
     await there.press("Enter");
     await expect(lineOf(page, "elsewhere")).toBeVisible();
-    await roomsNav(page).getByRole("link", { name: "#games" }).click();
+    await roomsNav(page).getByRole("link", { name: "games", exact: true }).click();
     await expect(field(page)).toBeVisible();
     await expect(cancel(page)).toHaveCount(0);
     expect(said()).toEqual(["PRIVMSG #bubble :elsewhere"]);
@@ -194,7 +194,7 @@ test.describe("replies", () => {
     await field(page).press("Enter");
     await expect(form(page)).toContainText("Not sent");
     await expect(form(page)).toContainText("Replying to g10gh7…3y5tv: the first line");
-    await expect(field(page)).toHaveValue("not now");
+    await expect(field(page)).toHaveText("not now");
     expect(said()).toEqual([]);
   });
 
@@ -211,7 +211,16 @@ test.describe("replies", () => {
   }) => {
     await asAccount(page);
     await lines(page).nth(1).focus();
-    for (const name of ["React with 👍", "React with ❤️", "React with 😂", "Reply", "More"]) {
+    for (const name of [
+      "React with 👍",
+      "React with ❤️",
+      "React with 😂",
+      "Add reaction",
+      "Reply",
+      "Open thread",
+      "Copy room link",
+      "More actions",
+    ]) {
       await page.keyboard.press("Tab");
       await expect(barOf(page, 1).getByRole("button", { name })).toBeFocused();
     }

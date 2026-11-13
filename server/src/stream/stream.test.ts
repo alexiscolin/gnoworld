@@ -1,4 +1,4 @@
-import { Address, StreamEvent } from "@gnoworld/schemas";
+import { Address, CardEvent, StreamEvent } from "@gnoworld/schemas";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { makeApp } from "../app.ts";
 import { logger } from "@gnoworld/service/log";
@@ -363,8 +363,180 @@ describe("the verdicts' stream, its green pass (3j)", () => {
     const open = [];
     for (let n = 0; n < 50; n += 1) open.push(await rooms("#bubble", { peer: `198.51.100.${String(n)}` }));
     expect(stream.size()).toMatchObject({ clients: 50, visitors: 50 });
+    expect(stream.watching()).toEqual({ guests: 50, accounts: new Set() });
     for (const client of open) await client.cancel();
     await expect.poll(() => stream.size()).toMatchObject({ clients: 0, visitors: 0 });
+    expect(stream.watching()).toEqual({ guests: 0, accounts: new Set() });
+  });
+});
+
+describe("who has the stream open (D352)", () => {
+  // The batch's review (2026-11-07): a guest's page opens two streams, the Earth's and its chat's, and counted as two people.
+  it("tells the guests by their count, one visitor once whatever its streams, and the signed-in by their account alone, one account once, gone when closed", async () => {
+    const stream = makeStream();
+    streams.push(stream);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true, session: (token) => token }));
+    const follow = (who: string | undefined, peer: string) =>
+      app.request(
+        "/api/stream?rooms=%23bubble",
+        { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+    await follow(undefined, "198.51.100.1");
+    await follow(undefined, "198.51.100.1");
+    await follow(undefined, "198.51.100.9");
+    const first = await follow("Ada", "198.51.100.2");
+    await follow("Ada", "198.51.100.3");
+    await expect.poll(() => stream.watching()).toEqual({ guests: 2, accounts: new Set(["ada"]) });
+    await first.body?.cancel();
+    expect(stream.watching().accounts).toEqual(new Set(["ada"]));
+    stream.close();
+    await expect.poll(() => stream.watching()).toEqual({ guests: 0, accounts: new Set() });
+  });
+});
+
+describe("who has a world open (D374)", () => {
+  it("tells each world's guests by distinct visitor keys and its accounts once, a guest on two worlds on each, gone when closed", async () => {
+    const stream = makeStream();
+    streams.push(stream);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible: () => true, session: (token) => token }));
+    const follow = (rooms: string, who: string | undefined, peer: string) =>
+      app.request(
+        `/api/stream?rooms=${encodeURIComponent(rooms)}`,
+        { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+    // One visitor's page: two streams on a world count one guest there, and the same visitor on a second world counts on that one too.
+    await follow("#bubble", undefined, "198.51.100.1");
+    await follow("#bubble,#bubble/games", undefined, "198.51.100.1");
+    await follow("#earth", undefined, "198.51.100.1");
+    await follow("#bubble", undefined, "198.51.100.9");
+    await follow("#bubble", "Ada", "198.51.100.2");
+    await follow("#bubble", "Ada", "198.51.100.3");
+    const guestsOf = (world: string) => stream.watchingIn().get(world)?.guests;
+    await expect.poll(() => guestsOf("bubble")).toBe(2);
+    expect(guestsOf("earth")).toBe(1);
+    expect(stream.watchingIn().get("bubble")?.accounts).toEqual(new Set(["ada"]));
+    expect(stream.watchingIn().get("earth")?.accounts).toEqual(new Set());
+    expect(stream.watchingIn().get("nowhere")).toBeUndefined();
+    stream.close();
+    await expect.poll(() => stream.watchingIn().size).toBe(0);
+  });
+});
+
+describe("who has a world open (D374): what the count leaves out", () => {
+  const counted = (visible: (room: string, who: string | undefined) => boolean = () => true) => {
+    const stream = makeStream();
+    streams.push(stream);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible, session: (token) => token }));
+    const follow = (query: string, who: string | undefined, peer: string) =>
+      app.request(
+        `/api/stream?${query}`,
+        { headers: who === undefined ? {} : { cookie: `__Host-session=${who}` } },
+        { incoming: { socket: { remoteAddress: peer } } },
+      );
+    return { stream, follow };
+  };
+
+  it("counts a page that follows the Earth's room for its ticker alone (presence=0) on the site, never on the Earth", async () => {
+    const { stream, follow } = counted();
+    await follow(`rooms=${encodeURIComponent("#earth")}&presence=0`, undefined, "198.51.100.1");
+    await follow(`rooms=${encodeURIComponent("#earth")}`, undefined, "198.51.100.2");
+    await expect.poll(() => stream.watching().guests).toBe(2);
+    expect(stream.watchingIn().get("earth")?.guests).toBe(1);
+  });
+
+  it("counts a member on a world by the rooms a guest may see there, never by a members-only room alone", async () => {
+    const { stream, follow } = counted((room, who) => room !== "#bubble/crew" || who === "member");
+    await follow(`rooms=${encodeURIComponent("#bubble/crew")}`, "member", "198.51.100.1");
+    await expect.poll(() => stream.watching().accounts).toEqual(new Set(["member"]));
+    expect(stream.watchingIn().get("bubble")).toBeUndefined();
+    await follow(`rooms=${encodeURIComponent("#bubble,#bubble/crew")}`, "member", "198.51.100.1");
+    await expect.poll(() => stream.watchingIn().get("bubble")?.accounts).toEqual(new Set(["member"]));
+  });
+
+  // The red pass's first finding: what is not counted is still sent.
+  const until = async (response: Response, pattern: RegExp): Promise<string> => {
+    const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader();
+    let text = "";
+    while (!pattern.test(text)) {
+      const chunk = await reader?.read();
+      if (chunk === undefined || chunk.done) break;
+      text += new TextDecoder().decode(chunk.value);
+    }
+    return text;
+  };
+  const chart = (world: string) => ({ kind: "chart", world, account: ALICE, at: "2026-11-05T12:00:00.000Z" }) as const;
+
+  it("still sends a presence=0 stream its room's verdicts and its world's signals", async () => {
+    const { stream, open } = setup();
+    const ticker = await open(`rooms=${encodeURIComponent("#earth")}&presence=0`);
+    stream.signal(chart("earth"));
+    stream.publish(event(1, "#earth"));
+    expect(msgids(await ticker.read(1))).toEqual(["m1"]);
+    expect(ticker.raw()).toContain("event: signal");
+  });
+
+  it("still sends a member on a members-only room alone its world's signals", async () => {
+    const { stream, follow } = counted((room, who) => room !== "#bubble/crew" || who === "member");
+    const member = await follow(`rooms=${encodeURIComponent("#bubble/crew")}`, "member", "198.51.100.1");
+    stream.signal(chart("bubble"));
+    expect(await until(member, /event: signal/)).toContain("event: signal");
+  });
+
+  it.each([["presence=1"], ["presence="], ["presence=false"], ["presence=0&presence=0"], ["presence=0&presence=1"]])(
+    "refuses a presence other than one 0 (%s) with 400, holding no slot",
+    async (presence) => {
+      const { stream, open } = setup();
+      const asked = await open(`rooms=${encodeURIComponent("#earth")}&${presence}`);
+      expect(await refusal(asked.response)).toEqual([400, JSON.stringify({ error: "refused" })]);
+      expect(stream.size().visitors).toBe(0);
+    },
+  );
+
+  it("refuses presence=0 with no rooms with 400", async () => {
+    const { open } = setup();
+    expect((await open("presence=0")).response.status).toBe(400);
+  });
+
+  it("lets a chat's stream go uncounted too (presence=0 hides, never adds): counted on the site, not on its world", async () => {
+    const { stream, follow } = counted();
+    await follow(`rooms=${encodeURIComponent("#bubble")}&presence=0`, undefined, "198.51.100.1");
+    await expect.poll(() => stream.watching().guests).toBe(1);
+    expect(stream.watchingIn().get("bubble")).toBeUndefined();
+  });
+
+  it("counts an account on presence=0 on the site alone, and on the Earth once it opens the Earth's room too", async () => {
+    const { stream, follow } = counted();
+    await follow(`rooms=${encodeURIComponent("#earth")}&presence=0`, "Ada", "198.51.100.1");
+    await expect.poll(() => stream.watching().accounts).toEqual(new Set(["ada"]));
+    expect(stream.watchingIn().get("earth")).toBeUndefined();
+    await follow(`rooms=${encodeURIComponent("#earth")}`, "Ada", "198.51.100.1");
+    await expect.poll(() => stream.watchingIn().get("earth")?.accounts).toEqual(new Set(["ada"]));
+    expect(stream.watching().accounts).toEqual(new Set(["ada"]));
+  });
+
+  it("counts one visitor on a presence=0 stream and a counted one once, on the site and on the Earth, and frees both on close", async () => {
+    const { stream, follow } = counted();
+    await follow(`rooms=${encodeURIComponent("#earth")}&presence=0`, undefined, "198.51.100.1");
+    await follow(`rooms=${encodeURIComponent("#earth")}`, undefined, "198.51.100.1");
+    await expect.poll(() => stream.watchingIn().get("earth")?.guests).toBe(1);
+    expect(stream.watching().guests).toBe(1);
+    stream.close();
+    await expect.poll(() => stream.watching().guests).toBe(0);
+    expect(stream.watchingIn().size).toBe(0);
   });
 });
 
@@ -430,6 +602,25 @@ describe("the verdicts' stream when the reader's session cannot be read (F653)",
     const back = await ask();
     expect(back.status).toBe(200);
     await back.body?.cancel();
+  });
+});
+
+describe("the verdicts' stream when a room's guest view cannot be read (the security review of D374's count)", () => {
+  it("answers 500 and holds no slot when the guest's check of a room throws, though the reader's own passed", async () => {
+    const stream = makeStream();
+    streams.push(stream);
+    const app = makeApp(
+      logger("a-pepper-of-forty-characters-0123456789", () => true),
+      () => true,
+    );
+    const visible = (_room: string, who: string | undefined): boolean => {
+      if (who === undefined) throw new Error("attempt to read a closed database");
+      return true;
+    };
+    app.route("/api/stream", stream.routes({ proxy: undefined, visible, session: () => "member" }));
+    const ask = () => app.request("/api/stream?rooms=%23bubble", {}, { incoming: { socket: { remoteAddress: PEER } } });
+    for (let i = 0; i < 5; i += 1) expect((await ask()).status).toBe(500);
+    expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
   });
 });
 
@@ -526,5 +717,127 @@ describe("the verdicts' stream, the max review", () => {
     expect(stream.size()).toMatchObject({ clients: 0, visitors: 0 });
     expect((await rooms("#bubble", { peer: "203.0.113.8" })).response.status).toBe(200);
     expect((await open("rooms=%23bubble", { peer: "203.0.113.9" })).response.status).toBe(429);
+  });
+});
+
+// Link cards (slice 13, L3): their events go on the verdicts' stream, in its sequence of ids and its rings.
+const KEY = "a".repeat(64);
+// L3 (docs/plans/link-previews.md §3 step 4 and 5, §7 "stream/stream.ts"): a card's event goes on the verdicts' stream, in the verdicts' own
+// sequence of ids, so a client that comes back after a drop is told the cards it missed, and a card of a room it cannot read never.
+
+const cardsSetup = (
+  options: Parameters<typeof makeStream>[0] = {},
+  visible: (room: string) => boolean = () => true,
+) => {
+  const stream = makeStream(options);
+  streams.push(stream);
+  const app = makeApp(
+    logger("a-pepper-of-forty-characters-0123456789", () => true),
+    () => true,
+  );
+  app.route("/api/stream", stream.routes({ proxy: undefined, visible }));
+  const open = async (rooms: string, last?: string) => {
+    const response = await app.request(
+      `/api/stream?rooms=${encodeURIComponent(rooms)}`,
+      { headers: last === undefined ? {} : { "last-event-id": last } },
+      { incoming: { socket: { remoteAddress: "203.0.113.7" } } },
+    );
+    const reader = response.body?.getReader();
+    let text = "";
+    // The frames read so far, as event name, id and data, reading on until there are `count` of that event or the stream ends.
+    const frames = async (event: string, count: number) => {
+      const all = (): { id: string; event: string; data: unknown }[] =>
+        [...text.matchAll(/id: (\d+)\nevent: (\w+)\ndata: (.*)\n\n/g)].map(([, id = "", name = "", data = ""]) => ({
+          id,
+          event: name,
+          data: JSON.parse(data) as unknown,
+        }));
+      for (;;) {
+        const found = all().filter((frame) => frame.event === event);
+        const chunk: { done: boolean; value?: Uint8Array } | undefined =
+          found.length >= count ? undefined : await reader?.read();
+        if (chunk === undefined || chunk.done) return found;
+        text += new TextDecoder().decode(chunk.value);
+      }
+    };
+    return { frames, raw: () => text, cancel: () => reader?.cancel() };
+  };
+  return { stream, open };
+};
+
+describe("the stream's card events", () => {
+  it("sends a card event to the readers of its room, named `card`, with its key, and never another room's", async () => {
+    const { stream, open } = cardsSetup();
+    const client = await open("#bubble,#earth");
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    stream.card({ msgid: "m2", room: "#elsewhere", key: KEY });
+    stream.card({ msgid: "m3", room: "#earth", key: null });
+    const frames = await client.frames("card", 2);
+    expect(frames.map(({ data }) => CardEvent.parse(data))).toEqual([
+      { msgid: "m1", room: "#bubble", key: KEY },
+      { msgid: "m3", room: "#earth", key: null },
+    ]);
+  });
+
+  it("sends nothing of a room the reader may not read, a card event included", async () => {
+    const { stream, open } = cardsSetup({}, (room) => room !== "#bubble/crew");
+    const client = await open("#bubble/crew,#bubble");
+    stream.card({ msgid: "m1", room: "#bubble/crew", key: KEY });
+    stream.card({ msgid: "m2", room: "#bubble", key: KEY });
+    const frames = await client.frames("card", 1);
+    expect(frames.map(({ data }) => (data as { msgid: string }).msgid)).toEqual(["m2"]);
+    expect(client.raw()).not.toContain("m1");
+  });
+
+  it("shares the verdicts' ids, in order, so one Last-Event-ID covers verdicts and cards alike", async () => {
+    const { stream, open } = cardsSetup();
+    const client = await open("#bubble");
+    stream.publish({ msgid: "m1", room: "#bubble", state: "checked" });
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    stream.publish({ msgid: "m2", room: "#bubble", state: "hidden" });
+    const [card] = await client.frames("card", 1);
+    const verdicts = await client.frames("verdict", 2);
+    const ids = [verdicts[0]?.id, card?.id, verdicts[1]?.id].map(Number);
+    expect(ids[0]).toBeLessThan(ids[1] ?? 0);
+    expect(ids[1]).toBeLessThan(ids[2] ?? 0);
+  });
+
+  it("replays the cards a client missed after a reconnect, and only those after its Last-Event-ID", async () => {
+    const { stream, open } = cardsSetup();
+    const first = await open("#bubble");
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    const [seen] = await first.frames("card", 1);
+    await first.cancel();
+    stream.card({ msgid: "m2", room: "#bubble", key: "b".repeat(64) });
+    stream.card({ msgid: "m3", room: "#bubble", key: null });
+    const back = await open("#bubble", seen?.id);
+    const frames = await back.frames("card", 2);
+    expect(frames.map(({ data }) => (data as { msgid: string }).msgid)).toEqual(["m2", "m3"]);
+  });
+
+  it("replays a new client the room's last cards with its last verdicts, a removal included, so a late reader hides a card taken away", async () => {
+    const { stream, open } = cardsSetup();
+    stream.card({ msgid: "m1", room: "#bubble", key: KEY });
+    stream.card({ msgid: "m1", room: "#bubble", key: null });
+    const client = await open("#bubble");
+    const frames = await client.frames("card", 2);
+    expect(frames.map(({ data }) => (data as { key: string | null }).key)).toEqual([KEY, null]);
+  });
+
+  it("keeps card events in the room's ring, which stays bounded: the oldest of more than the pending cap is gone", async () => {
+    const { stream, open } = cardsSetup({ pending: 4 });
+    for (let n = 0; n < 10; n += 1) stream.card({ msgid: `m${String(n)}`, room: "#bubble", key: KEY });
+    expect(stream.size().events).toBeLessThanOrEqual(4);
+    const client = await open("#bubble");
+    const frames = await client.frames("card", 4);
+    expect(frames.map(({ data }) => (data as { msgid: string }).msgid)).toEqual(["m6", "m7", "m8", "m9"]);
+  });
+
+  it("drops a client that leaves card events unread, as it does for verdicts", async () => {
+    const { stream, open } = cardsSetup({ pending: 2 });
+    const client = await open("#bubble");
+    for (let n = 0; n < 50; n += 1) stream.card({ msgid: `m${String(n)}`, room: "#bubble", key: KEY });
+    await client.cancel();
+    expect(stream.size().clients).toBeLessThanOrEqual(1);
   });
 });

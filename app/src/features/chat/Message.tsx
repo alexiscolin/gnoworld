@@ -6,11 +6,12 @@
 // to createElement one by one: a tree that never changes needs no keys.
 import { markdown, type Block, type Inline } from "@gnoworld/core";
 import { createElement, type ReactNode } from "react";
+import { NEW_TAB } from "../../lib/newTab.ts";
 import { isAccount, shortAddress } from "./names.ts";
 
 const MARKS = { strong: "strong", em: "em", strike: "s", underline: "u" } as const;
 // A link isolates its text left to right: an override before it cannot draw its address backwards (F786).
-const LINK = { dir: "ltr", target: "_blank", rel: "noopener noreferrer" } as const;
+export const LINK = { dir: "ltr", ...NEW_TAB } as const;
 
 // Who reads: the reader's address, none for a guest, and the room's members; whether the links take the Tab key.
 export interface Reader {

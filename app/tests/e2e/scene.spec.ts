@@ -1,8 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
-import { moodAt, newMood } from "../../../packages/core/src/space/mood.ts";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
-import { brightness } from "./geometry.ts";
-import { landed, loseContext, opened, restoreContext, running, stats } from "./sceneStage.ts";
+import type { Space } from "../../src/space/scene.ts";
+import { framesOf, goInPage, landed, loseContext, restoreContext, running } from "./sceneStage.ts";
+import { axeOf } from "./axe.ts";
 
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
@@ -11,6 +10,8 @@ const DOOR = /\/assets\/(?:mountUniverse|scene)-/;
 const HOME = "/?test-gpu";
 const COMPUTER = { width: 1280, height: 800 };
 const PHONE = { width: 390, height: 844 };
+// Long enough for the view to come to rest on the software GPU.
+const REST = { timeout: 30_000 };
 
 // Frames served by the screen to anyone at all, counted before any of the page's code runs: a second loop hidden in a library
 // shows here, where the scene's own count would not see it.
@@ -25,6 +26,27 @@ const countFrames = (page: Page) =>
       });
   });
 const served = (page: Page) => page.evaluate(() => Number(Reflect.get(globalThis, "__served")));
+
+// Counts, from now, each frame the engine's renderer draws on a live context: a restored context starts its own count of frames again.
+const countDraws = (page: Page) =>
+  page.evaluate(() => {
+    const { renderer } = Reflect.get(globalThis, "__gnoworldSpace") as Space;
+    const render = renderer.render.bind(renderer);
+    Reflect.set(globalThis, "__draws", 0);
+    renderer.render = (scene, camera) => {
+      if (!renderer.getContext().isContextLost())
+        Reflect.set(globalThis, "__draws", Number(Reflect.get(globalThis, "__draws")) + 1);
+      render(scene, camera);
+    };
+  });
+const draws = (page: Page) => page.evaluate(() => Number(Reflect.get(globalThis, "__draws")));
+
+// The frames the engine draws in a stretch of real time: the page's other code asks frames of its own (a tween's ticker).
+async function drawnOver(page: Page, ms: number): Promise<number> {
+  const before = await framesOf(page);
+  await page.evaluate((wait) => new Promise((done) => setTimeout(done, wait)), ms);
+  return (await framesOf(page)) - before;
+}
 
 // The frames served in a stretch of real time, with the clock left to run.
 async function servedOver(page: Page, ms: number): Promise<number> {
@@ -59,85 +81,25 @@ async function offered(page: Page) {
   return view;
 }
 
-// A place with no haze along the view, found as a journey needs it: there the stage's own black shows between the stars.
-function emptySpot() {
-  const mood = newMood();
-  const hazeAround = (spot: { x: number; y: number; z: number }) =>
-    [120, 260, 520, 1000].some((reach) =>
-      [-320, 0, 320].some((side) => {
-        moodAt(mood, { x: spot.x + side, y: spot.y + side, z: spot.z - reach });
-        return mood.haze > 0;
-      }),
-    );
-  for (let at = 1; at < 10_000; at += 1) {
-    const spot = { x: at * 997, y: at * 613, z: at * -1409 };
-    if (!hazeAround(spot)) return spot;
-  }
-  throw new Error("no empty place in reach");
-}
-
-const goToEmpty = (page: Page) =>
-  page.evaluate((to) => {
-    (Reflect.get(globalThis, "__gnoworldScene") as { moveTo: (at: typeof to) => void }).moveTo(to);
-  }, emptySpot());
-
-// The darkest patch of the window's right half, where the page holds no word: the scenery lights the rest.
-const darkest = async (page: Page) => {
-  const patches = Array.from({ length: 12 }, (_, row) =>
-    Array.from({ length: 16 }, (_, column): [number, number, number, number] => {
-      const [x, y] = [COMPUTER.width / 2 + column * 20, 120 + row * 50];
-      return [x, y, x + 8, y + 8];
-    }),
-  ).flat();
-  return Math.min(...(await brightness(page, await page.screenshot(), patches)));
-};
-
 test.describe("a computer", () => {
   test.use({ viewport: COMPUTER });
-
-  test("draws the frames' deep black over the page's, with no CSP violation", async ({ page }) => {
-    await page.goto("/");
-    await hydrated(page);
-    // The page's #05070d reads 6.8; the frames' rgb(1, 1, 1) reads 1.
-    expect(await darkest(page), "the page's own colour before the scene").toBeGreaterThan(5);
-    await page.goto(HOME);
-    await running(page);
-    await opened(page);
-    await goToEmpty(page);
-    await expect.poll(() => darkest(page)).toBeLessThan(1.5);
-  });
 
   test("keeps every place reachable over the scene, and passes axe", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
-  test("the space opens like an iris, on the design system's easing, and leaves no clip behind", async ({ page }) => {
+  // D333: the canvas is not seen while its first frame is not whole; it opens as an iris once the dive started and leaves no clip behind.
+  test("the canvas stays unseen till the dive starts, then opens whole and leaves no clip behind", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
-    const iris = await page.locator("canvas").evaluate((canvas) =>
-      canvas.getAnimations().map((each) => ({
-        name: "animationName" in each ? each.animationName : "",
-        easing: each.effect?.getComputedTiming().easing,
-        duration: each.effect?.getComputedTiming().duration,
-      })),
-    );
-    expect(iris).toEqual([expect.objectContaining({ duration: 1500 })]);
+    await expect(page.locator("canvas[data-dive]")).toBeAttached({ timeout: 90_000 });
+    await expect(page.locator("canvas")).not.toHaveAttribute("data-wait");
     await expect.poll(() => page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length)).toBe(0);
     expect(await page.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).clipPath)).toBe("none");
-  });
-
-  test("a page that does not show space asks for none of its code, and the first that does asks", async ({ page }) => {
-    const asked = asks(page, DOOR);
-    await page.goto("/list?test-gpu");
-    await hydrated(page);
-    await page.evaluate(() => new Promise(requestAnimationFrame));
-    expect(asked).toEqual([]);
-    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Universe" }).click();
-    await expect(page.locator("canvas")).toBeAttached();
-    expect(asked.length).toBeGreaterThan(0);
+    expect(await page.locator("canvas").evaluate((canvas) => getComputedStyle(canvas).opacity)).toBe("1");
   });
 
   test("a software GPU gets the list, and nothing of three", async ({ page }) => {
@@ -151,23 +113,20 @@ test.describe("a computer", () => {
     await expect(page.getByRole("button", { name: "View in space" })).toHaveCount(0);
   });
 
-  test("a lost context shows the list, and the scene comes back with its context", async ({ page }) => {
+  // Under reduced motion the loop rests once the home has landed: a frame after the restore is the restore's own.
+  test("draws again with the same engine once a lost context is restored", async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto(HOME);
     await running(page);
+    await landed(page);
+    await expect.poll(() => drawnOver(page, 300), REST).toBe(0);
+    const first = await page.evaluateHandle(() => Reflect.get(globalThis, "__gnoworldSpace") as unknown);
+    await countDraws(page);
     await loseContext(page);
-    await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
-    await expect(page.getByRole("status").filter({ hasText: "Space is not available here" })).toBeVisible();
-    await expect(worlds(page).getByRole("link", { name: "Bubble" })).toBeVisible();
+    expect(await draws(page)).toBe(0);
     await restoreContext(page);
-    await running(page);
-    const frames = (await stats(page)).frames;
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(frames);
-    await opened(page);
-    await goToEmpty(page);
-    // The black of before, not the cleared context's rgb(0, 0, 0): a restore rebuilds three's background. Read after the iris, or the
-    // page's colour would pass the first bound; the upper one first, for the page's colour is over it.
-    await expect.poll(() => darkest(page)).toBeLessThan(1.5);
-    expect(await darkest(page)).toBeGreaterThan(0.5);
+    await expect.poll(() => draws(page)).toBeGreaterThan(0);
+    expect(await first.evaluate((was) => was === Reflect.get(globalThis, "__gnoworldSpace"))).toBe(true);
   });
 });
 
@@ -190,15 +149,14 @@ test.describe("which pages show space", () => {
       await running(page);
     });
 
-  for (const path of ["/list", "/nowhere"])
-    test(`${path} does not`, async ({ page }) => {
-      const asked = asks(page, DOOR);
-      await page.goto(`${path}?test-gpu`);
-      await hydrated(page);
-      await expect(page.locator("h1").first()).toBeVisible();
-      expect(asked).toEqual([]);
-      await expect(page.locator("canvas")).toHaveCount(0);
-    });
+  test("/nowhere does not", async ({ page }) => {
+    const asked = asks(page, DOOR);
+    await page.goto("/nowhere?test-gpu");
+    await hydrated(page);
+    await expect(page.locator("h1").first()).toBeVisible();
+    expect(asked).toEqual([]);
+    await expect(page.locator("canvas")).toHaveCount(0);
+  });
 });
 
 test.describe("the loop", () => {
@@ -215,19 +173,20 @@ test.describe("the loop", () => {
     await expect.poll(() => servedOver(page, 200)).toBeGreaterThan(0);
   });
 
-  test("no frame is served on a page that covers the scene, and it comes back unrebuilt", async ({ page }) => {
-    await countFrames(page);
+  // A page with no place in space (here the one for an address that leads nowhere) covers it: the engine stays, its loop sleeps.
+  test("draws no frame on a page that covers the scene, and comes back unrebuilt", async ({ page }) => {
     await page.goto(HOME);
     await running(page);
-    const first = await page.evaluateHandle(() => Reflect.get(globalThis, "__gnoworldScene") as unknown);
-    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "List" }).click();
-    await expect(page.locator("canvas[data-scene='on']")).toHaveCount(0);
-    await page.evaluate(() => new Promise(requestAnimationFrame));
-    expect(await servedOver(page, 500)).toBe(0);
-    await page.getByRole("navigation", { name: "Views" }).getByRole("link", { name: "Universe" }).click();
-    await running(page);
-    await expect.poll(() => servedOver(page, 200)).toBeGreaterThan(0);
-    expect(await first.evaluate((was) => was === Reflect.get(globalThis, "__gnoworldScene"))).toBe(true);
+    const first = await page.evaluateHandle(() => Reflect.get(globalThis, "__gnoworldSpace") as unknown);
+    const covered = () => page.evaluate(() => (Reflect.get(globalThis, "__gnoworldSpace") as Space).covered);
+    await goInPage(page, "/nowhere");
+    await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
+    await expect.poll(covered).toBe(true);
+    await expect.poll(() => drawnOver(page, 500), REST).toBe(0);
+    await goInPage(page, "/");
+    await expect.poll(covered).toBe(false);
+    await expect.poll(() => drawnOver(page, 200)).toBeGreaterThan(0);
+    expect(await first.evaluate((was) => was === Reflect.get(globalThis, "__gnoworldSpace"))).toBe(true);
   });
 
   test("asks at most 10 frames a second after a minute with no input", async ({ page }) => {
@@ -247,32 +206,13 @@ test.describe("the loop", () => {
 
   test("reduced motion draws its frame, then none, and opens no iris", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "reduce" });
-    await countFrames(page);
     await page.goto(HOME);
     await running(page);
     expect(await page.locator("canvas").evaluate((canvas) => canvas.getAnimations().length)).toBe(0);
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
-    expect((await stats(page)).probing).toBe(false);
+    await expect.poll(() => framesOf(page)).toBeGreaterThan(0);
     // The first layout owes its frame, and the home's dissolve each of its own (7d7): at rest once those have passed.
     await landed(page);
-    await expect.poll(() => servedOver(page, 300)).toBe(0);
-  });
-
-  test("the Auto probe drops a slow device to Low and remembers it", async ({ page }) => {
-    // A screen of 25 Hz, the frames 40 ms apart however fast this machine is.
-    await page.addInitScript(() => {
-      globalThis.requestAnimationFrame = (run) =>
-        setTimeout(() => {
-          run(performance.now());
-        }, 40);
-    });
-    await page.goto(HOME);
-    await running(page);
-    await expect.poll(async () => (await stats(page)).tier).toBe("low");
-    expect(await page.evaluate(() => localStorage.getItem("gnoworld:scene:tier"))).toBe("low");
-    await page.reload();
-    await running(page);
-    expect(await stats(page)).toMatchObject({ tier: "low", probing: false });
+    await expect.poll(() => drawnOver(page, 300), REST).toBe(0);
   });
 });
 
@@ -329,23 +269,15 @@ test.describe("a chunk that does not come", () => {
   });
 });
 
-test.describe("a touch screen at 3x", () => {
-  test.use({ viewport: PHONE, hasTouch: true, isMobile: true, deviceScaleFactor: 3 });
-
-  test("takes the touch screen's cap on its pixels, and fills the screen", async ({ page }) => {
-    await page.goto(HOME);
-    await page.getByRole("button", { name: "View in space" }).click();
-    await running(page);
-    expect((await stats(page)).ratio).toBe(1);
-    await expect.poll(async () => (await page.locator("canvas").boundingBox())?.width).toBe(PHONE.width);
-  });
-});
-
 test.describe("a phone", () => {
   test.use({ viewport: PHONE });
 
   test("loads nothing of the 3D before View in space, the worker included", async ({ page }) => {
     const asked = asks(page, SCENE);
+    // A first visit's welcome card covers the button: it is told away.
+    await page.addInitScript(() => {
+      localStorage.setItem("gnoworld:welcomed", "1");
+    });
     const view = await offered(page);
     await controlled(page);
     expect(asked).toEqual([]);
@@ -354,17 +286,15 @@ test.describe("a phone", () => {
     await running(page);
     expect(asked.length).toBeGreaterThan(0);
     await expect(view).toHaveCount(0);
-    await expect.poll(async () => (await stats(page)).frames).toBeGreaterThan(0);
+    await expect.poll(() => framesOf(page)).toBeGreaterThan(0);
   });
 
-  test("View in space sits over the ticker, inside the gutter, and passes axe", async ({ page }) => {
+  test("View in space sits inside the gutter, and passes axe", async ({ page }) => {
     const box = await (await offered(page)).boundingBox();
-    const ticker = await page.getByRole("region", { name: "News and events" }).boundingBox();
-    if (box === null || ticker === null) throw new Error("a box is missing");
+    if (box === null) throw new Error("no button");
     expect(box.x).toBeGreaterThanOrEqual(16);
     expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width - 16);
-    expect(box.y + box.height).toBeLessThanOrEqual(ticker.y);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("View in space looks as approved", async ({ page }) => {

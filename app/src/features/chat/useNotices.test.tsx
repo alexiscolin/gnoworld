@@ -159,8 +159,6 @@ describe("useNotices", () => {
             world: "bubble",
             partners: [ALICE],
             current: undefined,
-            onlyKnown: false,
-            onOnlyKnown: () => undefined,
           },
         },
       }),

@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const FOLDERS = [
   "jarvis/src",
@@ -20,13 +21,31 @@ const EVALS = ["provider.ts", "fakes.ts", "jarvis.ts", "spans.ts", "budget.ts", 
 const kept = (path: string) => !/\.(test|bench)\.ts$/.test(path);
 
 export function fingerprint(root: string, settings: Readonly<Record<string, string>>): string {
+  return hashed(root, settings, { folders: FOLDERS, evals: EVALS });
+}
+
+/** What a result was judged on: what a kept answer depends on, the cases with their recorded chains, the grader's
+ * configuration and checks, and jarvis's dependencies (a bumped SDK answers otherwise). The gate that switches Jarvis on
+ * refuses a result of another (deploy/jarvis-evals-gate.py). */
+export function judged(root: string): string {
+  const folders = [...FOLDERS, "evals/cases", "evals/chains"];
+  const evals = [...EVALS, "tests.ts", "promptfooconfig.yaml"];
+  return hashed(root, {}, { folders, evals, more: ["pnpm-lock.yaml", "jarvis/package.json"] });
+}
+
+function hashed(
+  root: string,
+  settings: Readonly<Record<string, string>>,
+  { folders, evals, more = [] }: { folders: readonly string[]; evals: readonly string[]; more?: readonly string[] },
+): string {
   const hash = createHash("sha256");
-  const files = FOLDERS.flatMap((folder) =>
-    readdirSync(join(root, folder), { recursive: true, withFileTypes: true })
-      .filter((entry) => entry.isFile())
-      .map((entry) => join(entry.parentPath, entry.name).slice(root.length)),
-  )
-    .concat("deploy/jarvis/gnomcp.toml", ...EVALS.map((name) => `evals/${name}`))
+  const files = folders
+    .flatMap((folder) =>
+      readdirSync(join(root, folder), { recursive: true, withFileTypes: true })
+        .filter((entry) => entry.isFile())
+        .map((entry) => join(entry.parentPath, entry.name).slice(root.length)),
+    )
+    .concat("deploy/jarvis/gnomcp.toml", ...evals.map((name) => `evals/${name}`), ...more)
     .filter(kept)
     .sort();
   for (const path of files)
@@ -40,3 +59,7 @@ export function fingerprint(root: string, settings: Readonly<Record<string, stri
   hash.update(named.join("\n"));
   return hash.digest("hex");
 }
+
+// Run by itself, it prints what this checkout's result would be judged on: run.sh keeps it beside the result, and
+// deploy/jarvis-on.sh hands it to the gate.
+if (import.meta.main) process.stdout.write(`${judged(fileURLToPath(new URL("../", import.meta.url)))}\n`);

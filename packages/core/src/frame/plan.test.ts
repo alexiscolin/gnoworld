@@ -1,6 +1,6 @@
 import fc from "fast-check";
 import { describe, expect, it } from "vitest";
-import recorded from "../../../../app/lab/worlds.json" with { type: "json" };
+import recorded from "../../../../app/tests/recordedWorlds.json" with { type: "json" };
 import {
   GRAIN,
   systemsOf,
@@ -132,7 +132,7 @@ function plusClear(system: StarSystem, named: ReadonlySet<string>, host: string 
 
 describe("a system's Plan", () => {
   it.each(Object.keys(SETS) as SetName[])(
-    "centres each star of %s on both screens, its plane seen 30 degrees over",
+    "centres each star of %s on both screens, its plane seen straight over",
     (name) => {
       for (const system of bodied(name)) {
         const plan = planOf(system);
@@ -143,7 +143,7 @@ describe("a system's Plan", () => {
         }
         const way = minus(plan.eye, system.place);
         const over = dot(way, normalOf(system)) / Math.hypot(way.x, way.y, way.z);
-        expect(Math.asin(over) / DEGREE).toBeCloseTo(30, 6);
+        expect(Math.asin(Math.min(1, over)) / DEGREE).toBeCloseTo(90, 3);
       }
     },
   );
@@ -281,15 +281,15 @@ describe("a system's Plan", () => {
           ).toBe(false);
   });
 
-  // The mock-up's worlds stand 22 to 92 pixels in radius at 1,728 by 1,080: the most used of a Plan of six or fewer are 30 or more.
-  it("draws the largest world of a Plan of six or fewer 30 pixels in radius or more, on Onyx", () => {
+  // The mock-up's worlds stand 22 to 92 pixels in radius at 1,728 by 1,080: the most used of a Plan of six or fewer are 19 or more (the Plan is framed by its height now, SPAN_HEIGHT, D415).
+  it("draws the largest world of a Plan of six or fewer 19 pixels in radius or more, on Onyx", () => {
     const small = bodied("the recorded Onyx file").filter(
       ({ worlds }) => worlds.filter(({ radius }) => radius >= GRAIN).length <= 6,
     );
     expect(small.length).toBeGreaterThan(20);
     for (const system of small) {
       const [{ worlds }] = seenOn(system) as [ReturnType<typeof seenOn>[number]];
-      expect(Math.max(...worlds.map(({ seen }) => seen.radius))).toBeGreaterThanOrEqual(30);
+      expect(Math.max(...worlds.map(({ seen }) => seen.radius))).toBeGreaterThanOrEqual(19);
     }
   });
 
@@ -301,8 +301,9 @@ describe("a system's Plan", () => {
     const [template] = bodied("60 mixed systems").filter(({ worlds }) => worlds.length === 4);
     if (template === undefined) throw new Error("no system of four");
     const ways = Array.from({ length: 40 }, (_, at) => {
-      const { eye } = planOf({ ...template, id: `twin${String(at)}` });
-      return Math.round(Math.atan2(eye.x - template.place.x, eye.z - template.place.z) / (15 * DEGREE));
+      // Straight over its plane, the turn is where the screen's up points in it: the camera's up is that direction.
+      const { up = template.place } = planOf({ ...template, id: `twin${String(at)}` });
+      return Math.round(Math.atan2(up.x, up.z) / (15 * DEGREE));
     });
     expect(new Set(ways).size).toBeGreaterThanOrEqual(10);
   });
@@ -335,20 +336,23 @@ describe("a Plan's own lens", () => {
     return {
       star: look.seen(plan.look),
       centre: { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 },
-      roll: Math.atan2(2 * xy, xx - yy) / 2 / DEGREE,
+      // A plane seen straight over shows each orbit a circle: the spread across and up are one (a long axis has none to read).
+      round: Math.sqrt(xx / yy),
+      cross: xy / Math.sqrt(xx * yy),
     };
   };
   const round = (plan: Arrival) => {
     expect(plan.lens).toBe(7);
     for (const screen of SCREENS) {
-      const { star, centre, roll } = outerOn(plan, screen);
+      const { star, centre, round: aspect, cross } = outerOn(plan, screen);
       expect(Math.hypot(centre.x - star.x, centre.y - star.y)).toBeLessThan(20);
-      expect(Math.abs(roll)).toBeLessThan(1);
+      expect(Math.abs(aspect - 1)).toBeLessThan(0.02);
+      expect(Math.abs(cross)).toBeLessThan(0.02);
     }
   };
 
   it.each(Object.keys(SETS) as SetName[])(
-    "sits each outer orbit of %s round its star within 20 px, its plane level, through 7 degrees, at 1,728 and 1,280",
+    "sits each outer orbit of %s round its star within 20 px, its orbits circles, at 1,728 and 1,280",
     (name) => {
       for (const system of bodied(name)) round(planOf(system));
     },

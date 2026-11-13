@@ -233,12 +233,26 @@ describe("pageVerdicts: the page's own stream", () => {
       since: () => undefined,
       dead: () => undefined,
       chain: (data) => told.push(data),
-      realms: (data) => told.push(data),
     });
     sources.opened[1]?.emit("chain", { kind: "x" });
-    sources.opened[1]?.emit("realms", { count: 1 });
-    expect(sources.opened[1]?.heard()).toEqual(["chain", "error", "realms", "since", "verdict"]);
-    expect(told).toEqual(['{"kind":"x"}', '{"count":1}']);
+    expect(sources.opened[1]?.heard()).toEqual(["chain", "error", "since", "verdict"]);
+    expect(told).toEqual(['{"kind":"x"}']);
+  });
+
+  it("listens to `card` events only when the page has a handler, handing them on unread", () => {
+    const sources = fakeStream();
+    pageVerdicts(["#a"], { verdict: () => undefined, since: () => undefined, dead: () => undefined });
+    expect(sources.opened[0]?.heard()).not.toContain("card");
+    const told: unknown[] = [];
+    pageVerdicts(["#b"], {
+      verdict: () => undefined,
+      since: () => undefined,
+      dead: () => undefined,
+      card: (data) => told.push(data),
+    });
+    sources.opened[1]?.emit("card", { room: "#b", msgid: "m1", key: null });
+    expect(sources.opened[1]?.heard()).toContain("card");
+    expect(told).toEqual(['{"room":"#b","msgid":"m1","key":null}']);
   });
 
   it("reports a frame it does not know once, as an error of the page", () => {
@@ -250,5 +264,29 @@ describe("pageVerdicts: the page's own stream", () => {
     sources.opened[0]?.emit("verdict", { state: "gone" });
     expect(report).toHaveBeenCalledTimes(1);
     expect(String(report.mock.calls[0]?.[0])).toBe("Error: verdicts: verdict_unknown");
+  });
+});
+
+describe("pageVerdicts: the reader's language and the translations' events", () => {
+  it("asks the stream for the language, after the rooms, and for none when the page has none", () => {
+    const sources = fakeStream();
+    const base = { verdict: () => undefined, since: () => undefined, dead: () => undefined };
+    pageVerdicts(["#a"], { ...base, language: "fr" });
+    pageVerdicts(["#a"], base);
+    expect(sources.opened.map(({ url }) => url)).toEqual([
+      "/api/stream?rooms=%23a&language=fr",
+      "/api/stream?rooms=%23a",
+    ]);
+  });
+
+  it("listens to `translation` events only when the page has a handler, handing them on unread", () => {
+    const sources = fakeStream();
+    const base = { verdict: () => undefined, since: () => undefined, dead: () => undefined };
+    pageVerdicts(["#a"], base);
+    expect(sources.opened[0]?.heard()).not.toContain("translation");
+    const told: unknown[] = [];
+    pageVerdicts(["#b"], { ...base, translation: (data) => told.push(data) });
+    sources.opened[1]?.emit("translation", { room: "#b", msgid: "m1" });
+    expect(told).toEqual(['{"room":"#b","msgid":"m1"}']);
   });
 });

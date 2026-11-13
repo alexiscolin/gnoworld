@@ -1,12 +1,16 @@
 // What a realm's read functions need (5i): the list of names, once, from `vm/qfuncs`, and the result of each call a click
 // asks, from `vm/qeval` and the height it was read at. A read that fails is a state with its next step, never a blank.
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
 import type { Failure, ReadOptions } from "@gnoworld/chain/read";
 import { readHeight } from "@gnoworld/chain/node";
-import { readEval, readFunctions } from "../../lib/chain/rpc.ts";
+import { readEval, realmFunctions, toFunctions } from "../../lib/chain/rpc.ts";
+import { queryClient } from "../../lib/query/client.ts";
+import { listingOf } from "./useCallable.ts";
 import type { Height } from "./useRealm.ts";
 
-type Listing = { state: "loading" } | { state: "listed"; names: string[] } | { state: "failed"; next: string };
+type Listing =
+  { state: "loading"; retrying?: boolean } | { state: "listed"; names: string[] } | { state: "failed"; next: string };
 
 export type Result =
   | { state: "busy" }
@@ -26,27 +30,17 @@ export interface Functions {
   read: (name: string) => void;
 }
 
-/** The functions that take nothing and give something, and what a click on each read. A new realm or RPC is a new mount. */
-export function useFunctions(rpc: string, realm: string, options?: ReadOptions): Functions {
-  const [listing, setListing] = useState<Listing>({ state: "loading" });
-  const [results, setResults] = useState<Readonly<Record<string, Result>>>({});
+const namesOf = (read: { name: string; readable: boolean }[]) => ({
+  state: "listed" as const,
+  names: [...new Set(read.filter(({ readable }) => readable).map(({ name }) => name))],
+});
 
-  // The panel is a new mount for a new realm or chain (RealmFunctions' key), which drops what a late answer would bring: the
-  // effect has no flag of its own, and React ignores a state set after an unmount.
-  useEffect(() => {
-    readFunctions(rpc, realm, options)
-      .then((read) => {
-        setListing(
-          read.ok
-            ? {
-                state: "listed",
-                names: [...new Set(read.value.filter(({ readable }) => readable).map(({ name }) => name))],
-              }
-            : { state: "failed", next: read.failure.next },
-        );
-      })
-      .catch(report);
-  }, [rpc, realm, options]);
+/** The functions that take nothing and give something, and what a click on each read. The list is the realm's kept one at once, then the fresh
+ * one (a failed fresh read leaves the list already drawn); a new realm or RPC is a new key. */
+export function useFunctions(rpc: string, realm: string, options?: ReadOptions): Functions {
+  const query = useQuery({ ...realmFunctions(rpc, realm, options), select: toFunctions }, queryClient);
+  const listing: Listing = listingOf(query, namesOf);
+  const [results, setResults] = useState<Readonly<Record<string, Result>>>({});
 
   const settle = (name: string, result: Result) => {
     setResults((before) => ({ ...before, [name]: result }));

@@ -37,6 +37,21 @@ describe("Popover", () => {
     expect(screen.getByRole("dialog", { name: "Choose the network" }).contains(screen.getByText("Onyx"))).toBe(true);
   });
 
+  it("marks its panel wide only when asked", () => {
+    render(
+      <>
+        <Popover trigger="A" label="A card" wide>
+          <p>wide</p>
+        </Popover>
+        <Popover trigger="B" label="B card">
+          <p>narrow</p>
+        </Popover>
+      </>,
+    );
+    expect(screen.getByText("wide").closest("[popover]")?.hasAttribute("data-wide")).toBe(true);
+    expect(screen.getByText("narrow").closest("[popover]")?.hasAttribute("data-wide")).toBe(false);
+  });
+
   it("gives the focus back to its trigger when it closes with the focus inside it", async () => {
     (await focusedInside()).hidePopover();
     await toggled();
@@ -154,6 +169,22 @@ describe("Menu", () => {
     if (found === undefined) throw new Error(`no item ${String(at)}`);
     return found;
   }
+
+  it("says a greyed item is coming soon, or the reason it gives", async () => {
+    render(
+      <Menu
+        trigger="More"
+        label="Actions"
+        items={[
+          { label: "Play", soon: true },
+          { label: "Jarvis", soon: true, why: "Open a room to ask Jarvis" },
+        ]}
+      />,
+    );
+    await userEvent.click(screen.getByRole("button", { name: "More" }));
+    expect(screen.getByRole("menuitem", { name: "Play, coming soon" }).getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("menuitem", { name: "Jarvis, Open a room to ask Jarvis" })).toBeTruthy();
+  });
 
   // 4c's UX review (U3): the message bar's trigger is a toolbar's small control (docs/DESIGN-SYSTEM.md: "a toolbar's
   // small controls stay at 32").
@@ -346,4 +377,14 @@ describe("Menu", () => {
       unmount();
     }
   });
+});
+
+// The composer's link tool: its trigger a tool of the format bar, as the bar's other tools.
+it("draws an icon trigger as a bar's tool when its icon says so", () => {
+  render(
+    <Popover trigger={null} label="Link" icon={{ name: "link", size: "xs", tool: true }}>
+      <p>Address</p>
+    </Popover>,
+  );
+  expect(screen.getByRole("button", { name: "Link" }).hasAttribute("data-tool")).toBe(true);
 });

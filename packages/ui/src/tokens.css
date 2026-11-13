@@ -14,6 +14,12 @@
     --p-violet: #b79cff;
     --p-coral: #ff8a7a;
     --p-dusk: #6885d9;
+    /* What the frames draw that no mix of the base colours gives exactly: the outline's slate, the Earth's sky blue, a planet's lit side,
+       the soft grey of a line read under a figure. */
+    --p-slate: #2c313c;
+    --p-sky: #5eaafd;
+    --p-white: #ffffff;
+    --p-mist: #c8d0de;
 
     --color-space: var(--p-space);
     --color-text: var(--p-text);
@@ -39,22 +45,46 @@
     /* The world's own colour on its plate: a cool blue until the planet's colour comes with the scene (slice 7). At 16 % over the
        night it gives the frames' navy, #182033 sampled in frame 37 (amber at 16 % read brown). */
     --world: var(--p-dusk);
+    /* A link's ink on a page that sets one (a realm's page in its plate); the words' own ink otherwise. */
+    --color-link: currentcolor;
     --color-fill: color-mix(in oklab, var(--p-text) 5%, transparent);
+    /* The hub card of a places' list: the text at 3 %, 6 % under the pointer. */
+    --color-card: color-mix(in oklab, var(--p-text) 3%, transparent);
+    --color-card-hover: color-mix(in oklab, var(--p-text) 6%, transparent);
     --color-fill-hover: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-ink-hover: color-mix(in oklab, var(--p-space) 10%, transparent);
     --color-line: color-mix(in oklab, var(--p-text) 10%, transparent);
     --color-line-strong: color-mix(in oklab, var(--p-text) 20%, transparent);
     --color-surface: var(--p-night);
+    /* The one outline round the plate, the scene and the dock (the frames' and the prototype's). */
+    --color-outline: var(--p-slate);
+    /* The soft grey of a line read under a figure or a title: the hero's line, the info panel's words (the prototype's #hero .heroCap, #chatSide p). */
+    --color-text-soft: var(--p-mist);
+    /* The light on a planet's lit side, its stand-in's highlight. */
+    --color-lit: var(--p-white);
+    /* The Earth's own colour, the frames' blue over its plate (f0039). */
+    --world-earth: var(--p-sky);
     --color-scrim: color-mix(in oklab, var(--p-space) 70%, transparent);
+    /* The glass of a bubble over the scene: near-black, with no blur, which is not yet baseline. */
+    --color-bubble: color-mix(in oklab, var(--p-space) 94%, transparent);
+    /* The translucent pills over the scene and the globe (a space label, a country tag, the far side's count): one wash. */
+    --color-pill-glass: color-mix(in oklab, var(--color-surface) 72%, transparent);
 
     --family-sans: "Geist Variable", system-ui, -apple-system, "Segoe UI", sans-serif;
     --family-mono: "Geist Mono Variable", ui-monospace, Menlo, Consolas, monospace;
+    /* The two sizes under every text token, the frames' small mono (times, tags, counts, foot notes): one source for each. */
+    --text-2xs: 0.625rem;
+    --text-3xs: 0.5625rem;
     --font-label: 500 0.6875rem/1 var(--family-mono);
     --font-meta: 400 0.75rem/1.4 var(--family-sans);
     --font-data: 400 0.75rem/1.4 var(--family-mono);
+    /* A count beside its words (a chip's, a pin bar's, a section's): one face for every count. */
+    --font-count: var(--font-data);
     --font-ui: 500 0.8125rem/1 var(--family-sans);
     --font-reading: 400 0.8125rem/1.5 var(--family-sans);
     --font-chat: 400 0.84375rem/1.45 var(--family-sans);
+    /* A chat with room for it, the full chat's and the dock's on a computer (Alexis, 2026-11-07 and 2026-11-08): a step over the chat's. */
+    --font-chat-l: 400 0.9375rem/1.5 var(--family-sans);
     --font-hint: 400 0.65625rem/1.4 var(--family-sans);
     --font-body: 400 0.875rem/1.5 var(--family-sans);
     --font-field: var(--font-body);
@@ -64,8 +94,23 @@
     --font-title-m: 300 1.625rem/1 var(--family-sans);
     --font-title-l: 300 2.25rem/1 var(--family-sans);
     --font-figure: 500 2.75rem/1 var(--family-mono);
+    /* The figures band's value, a step under the stat's. */
+    --font-figure-m: 500 2.25rem/1 var(--family-mono);
+    /* A widget's value, a big mono one a step under the band's: the proposal names it and never defines it. */
+    --font-figure-s: 500 1.5rem/1 var(--family-mono);
+    /* A card's title, and the chart's axis labels. */
+    --font-card-title: 500 1.0625rem/1.15 var(--family-sans);
+    --font-tick: 400 0.6875rem/1 var(--family-mono);
+    /* A function's signature in its row. */
+    --font-mono-ui: 500 0.8125rem/1.2 var(--family-mono);
     --tracking-caps: 0.14em;
     --tracking-tight: -0.03em;
+    /* The plate's title: tight, over a 1.12 line. */
+    --tracking-hero: -0.045em;
+    /* The sentence under the title. */
+    --font-lead: 400 1.0625rem/1.5 var(--family-sans);
+    /* A chip's words in the plate's pills. */
+    --font-chip: 500 0.75rem/1 var(--family-sans);
 
     --space-3xs: 4px;
     --space-2xs: 8px;
@@ -78,22 +123,52 @@
 
     --control-xs: 24px;
     --control-s: 32px;
+    --control-chip: 27px;
     --control-m: 44px;
     --control-l: 56px;
+    /* A round icon control in a bar: a view link's height inside the pill; a bar may set it wider. */
+    --round-h: 34px;
+    /* A card's header row. */
+    --control-header: 28px;
+    --icon-s: 12px;
     --icon-m: 16px;
     --icon-l: 20px;
     --size-counter: 18px;
     --size-dot: 6px;
+    --size-dot-l: 8px;
+    /* A bar of controls: its pill's 44 px, a link's 34 and 4 around it (the prototype's #hnav .links). */
+    --size-bar: 44px;
     --column-s: 192px;
     --column-m: 288px;
     --column-l: 384px;
+    --column-2xs: 112px;
     --measure: 65ch;
     --switch-at: 38rem;
     --dialog-w: 490px;
     --dialog-wide: 760px;
     --popover-w: 300px;
+    --popover-wide: 440px;
     /* The plate of a world's page on a wide screen, its fade included (the video's frames 20, 37, 90). */
     --plate-w: 808px;
+    /* The plate's inner step, the step between its zones and the day chart's height (docs/plans/slice-realm-plate.md); a narrow plate sets the first two smaller. */
+    --plate-pad: var(--space-m);
+    --plate-zone: var(--space-xl);
+    --chart-h: 176px;
+    --chart-h-l: 216px;
+    /* A card open alone: the pane's height it fills (Room measures it) and the height its chart takes of it (Card). */
+    --plate-room: 0px;
+    --chart-open: 0px;
+    /* The plate's frame: the fade into space at its right edge, where its text column starts and stops (the proposal's section 7), its talk bar's height and the small line charts' (a figure's, who calls it). */
+    --plate-fade: 64px;
+    --plate-inset-start: 76px;
+    --plate-inset-end: var(--plate-fade);
+    --talk-h: 64px;
+    /* The realm's page window in the plate, taller when expanded or on a wide plate, shorter on a narrow one; a function's row and a list row (the proposal's sizes). */
+    --web-h: 360px;
+    --web-h-l: 440px;
+    --web-h-s: 300px;
+    --fn-row-h: 44px;
+    --row-h: 36px;
     --thumb-s: 32px;
     --thumb-m: 52px;
     --thumb-l: 64px;
@@ -104,11 +179,25 @@
     --chat-item: 38px;
     --chat-item-gap: 6px;
     --chat-worlds: 82px;
-    --chat-rooms: 158px;
-    --chat-info: 300px;
-    --chat-dock: 360px;
+    /* The rooms' column wide enough for its search field and a room's whole name (Alexis, 2026-11-07); the video's was 158 px. */
+    --chat-rooms: 232px;
+    /* The info panel as wide as the dock (Alexis, 2026-11-07: "plus large"); the video's was 300 px. */
+    --chat-info: var(--chat-dock);
+    /* Wider than the video's 360 px, its words and its box larger (Alexis, 2026-11-08: "un peu plus large le chat, plus convivial"). */
+    --chat-dock: 420px;
+    /* The dock under 1400 px. */
+    --chat-dock-s: 380px;
+    /* The dock's width at this screen: 380 px, 420 from 1400 px (D419). */
+    --chat-dock-now: var(--chat-dock-s);
+    /* The column of a room's times at the lines' end, which a line's bar keeps clear: "20:40" in 10 px mono and a step. */
+    --chat-times: 40px;
+    /* The inset of the info panel and of the thread's panel, which takes its place: the video's 20 px (the prototype's #chatSide padding). */
+    --chat-panel-inset: 20px;
     /* The inset of what the chat draws, set by the screen it is in: the video's 32 px; 24 in its dock, a phone's gutter. */
     --chat-inset: var(--space-l);
+    /* How far the composer's box goes out past its column's inset, and the inset of its words from its edge; the dock sets both (app's QuickActions.module.css). */
+    --box-bleed: 0px;
+    --box-in: var(--space-s);
     /* The room a flash that stays holds at the top of the screen; the flash sets it while it shows. */
     --flash-room: 0px;
     /* The top centre's slot (DESIGN-SYSTEM.md, Layout): the bottom of the header in view, the shell's or a full chat's, which sets
@@ -116,11 +205,13 @@
        and nothing moves when it comes: one row of the pill and a step (8b, 8j). */
     --banner-under: 96px;
     --banner-top: calc(var(--banner-under) + var(--space-s));
+    /* Where a dock, the rail and a world's outline start: the header's clearance of 96 and the 2 px the frame keeps under it (frames 4, 20, 26). */
+    --dock-top: 98px;
+    /* The page's side on a computer, one line for the header's ends, the rail, the dock, the plate and their outline (Alexis, 2026-11-09). */
+    --page-edge: var(--space-m);
+    /* Whether the plate's own fill shows: a page that draws a globe beside it sets `hidden`, its canvas painting the fill. */
+    --plate-fill: visible;
     --banner-room: calc(var(--control-s) + var(--space-2xs) * 2 + var(--space-s));
-    /* The circle a plate opens for a globe drawn under it, in the window's pixels: none until a page sets it. */
-    --globe-x: 0px;
-    --globe-y: 0px;
-    --globe-hole: 0px;
 
     --radius-s: 8px;
     --radius-item: 10px;
@@ -134,13 +225,69 @@
 
     --motion-fast: 120ms;
     --motion-base: 200ms;
+    --motion-slow: 360ms;
+    /* A label of the scene fading in or out. */
+    --motion-label: 400ms;
     --motion-wait: 300ms;
+    /* A page opened from its URL: its scene coming in from black, with the arrival's box. */
+    --motion-arrive: 1200ms;
     --motion-ambient: 3s;
+    /* The plate's entrance (the proposal's score): the delay a card waits to rise (--d), whether its parts' animations run (--play), a part's place in its row
+       (--n, --j), where the chart's peak label comes in (--pk) and when a line and its area draw (--spark-line, --spark-area). A card or a chart sets them. */
+    --d: 0s;
+    --play: running;
+    --n: 0;
+    --j: 0;
+    --pk: 0.9s;
+    --spark-line: 0.9s;
+    --spark-area: 1.2s;
     --motion-spin: 0.8s;
     --ease-standard: cubic-bezier(0.2, 0.7, 0.1, 1);
+    /* The arrival's curve, GSAP's power3.out (D401), for what the arrival does in CSS (the title's power4.out is the arrival's own). */
+    --ease-out-3: cubic-bezier(0.215, 0.61, 0.355, 1);
+    --ease-in: cubic-bezier(0.5, 0, 0.9, 0.4);
+    --ease-emphasized: cubic-bezier(0.7, 0, 0.2, 1);
+    /* 1 plays every duration; 0 stills them: a duration that wants to follow it is calc(var(--motion-x) * var(--motion-scale)) */
+    --motion-scale: 1;
+    /* A fill and an ink that ease as a control is pointed at or pressed. */
+    --transition-tint:
+      background-color calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard),
+      color calc(var(--motion-base) * var(--motion-scale)) var(--ease-standard);
+    /* A box fades in or out as its opacity changes. */
+    --transition-fade: opacity calc(var(--motion-slow) * var(--motion-scale)) var(--ease-standard);
     --opacity-disabled: 0.4;
     --shadow-float: 0 16px 40px color-mix(in oklab, var(--p-space) 45%, transparent);
     --shadow-popover: 0 12px 32px color-mix(in oklab, var(--p-space) 55%, transparent);
+    /* The inline axis's sign: 1 left to right, -1 right to left. A slide from the start, a fade at the end or a bar at a line's start
+       multiplies its physical value by it. */
+    --dir: 1;
+  }
+
+  [dir="rtl"] {
+    --dir: -1;
+  }
+
+  [dir="ltr"] {
+    --dir: 1;
+  }
+
+  /* What a world's colour gives. A token made of --world is computed where it is declared, so a box tinted by a world of its own (the
+     plate, a planet) carries `data-world` and has them computed again from its --world. */
+  :root,
+  [data-world] {
+    /* The world's colour lit, for its words and lines on the plate (the proposal: 62 % over white). */
+    --world-light: color-mix(in oklab, var(--world) 62%, var(--p-text));
+    /* The plate's fill, and the dock's beside it: the world's tint over the night. */
+    --color-plate: color-mix(in oklab, var(--world) 16%, var(--p-night));
+    /* The world's colour deep in space: a dot's fill, a planet's far side. */
+    --world-deep: color-mix(in oklab, var(--world) 30%, var(--p-space));
+  }
+
+  /* raw: the width where the dock widens (DESIGN-SYSTEM.md, Layout) */
+  @media (width >= 1400px) {
+    :root {
+      --chat-dock-now: var(--chat-dock);
+    }
   }
 
   @media (pointer: coarse) {
@@ -151,7 +298,7 @@
   }
 
   /* The phone layout's breakpoint (DESIGN-SYSTEM.md, Breakpoints), where the pill's actions wrap under its words: two rows. */
-  @media (max-width: 900px) {
+  @media (width < 900px) {
     :root {
       --banner-room: calc(var(--control-s) * 2 + var(--space-m) + var(--space-2xs) * 2 + var(--space-s));
     }
@@ -161,6 +308,9 @@
     :root {
       --motion-fast: 0s;
       --motion-base: 0s;
+      --motion-slow: 0s;
+      --motion-label: 0s;
+      --motion-scale: 0;
     }
   }
 
@@ -168,5 +318,8 @@
   :root[data-motion="reduce"] {
     --motion-fast: 0s;
     --motion-base: 0s;
+    --motion-slow: 0s;
+    --motion-label: 0s;
+    --motion-scale: 0;
   }
 }

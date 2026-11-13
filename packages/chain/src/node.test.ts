@@ -222,6 +222,65 @@ describe("a node read given its universe's chain", () => {
     }
   });
 
+  it("keeps one limit for status and query when the query waited at the gate", async () => {
+    vi.useFakeTimers();
+    try {
+      const fetch: ChainFetch = async (url, init) => {
+        if (url.endsWith("/status")) {
+          await new Promise((resolve) => setTimeout(resolve, 2900));
+          return Response.json(statusEnvelope(1204, "2026-11-04T03:34:18Z", "onyx-1"));
+        }
+        init?.onWait?.(true);
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        init?.onWait?.(false);
+        return new Promise(() => undefined);
+      };
+      let read: ChainRead<string> | undefined;
+      const settled = readEvaluated(RPC, "gno.land/r/demo/poll.Count()", {
+        fetch,
+        chainId: "onyx-1",
+        timeoutMs: 3000,
+      }).then((value) => {
+        read = value;
+      });
+      await vi.advanceTimersByTimeAsync(3999);
+      expect(read).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(read).toMatchObject({ ok: false, failure: { kind: "timeout" } });
+      await vi.advanceTimersByTimeAsync(10_000);
+      await settled;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops the guard's one time limit while a gate holds a request, and resumes it at the turn", async () => {
+    vi.useFakeTimers();
+    try {
+      const node = fakeNode({ network: "onyx-1" });
+      const queued: ChainFetch = async (url, init) => {
+        init?.onWait?.(true);
+        await new Promise((resolve) => setTimeout(resolve, url.endsWith("/status") ? 5000 : 4000));
+        init?.onWait?.(false);
+        return node.fetch(url, init);
+      };
+      let read: ChainRead<string> | undefined;
+      const settled = readEvaluated(RPC, "gno.land/r/demo/poll.Count()", {
+        fetch: queued,
+        chainId: "onyx-1",
+        timeoutMs: 3000,
+      }).then((value) => {
+        read = value;
+      });
+      await vi.advanceTimersByTimeAsync(9000);
+      await settled;
+      expect(read).toMatchObject({ ok: true });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("readFunctionList gives qfuncs' list as the node wrote it, with where it was read", async () => {
     const node = fakeNode({ network: "onyx-1" });
     const read = await readFunctionList(RPC, "gno.land/r/demo/poll", { fetch: node.fetch, chainId: "onyx-1" });

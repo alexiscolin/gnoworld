@@ -13,32 +13,39 @@ const read = vi.hoisted((): { value: unknown } => ({ value: undefined }));
 vi.mock("../../lib/chain/indexer.ts", () => ({ readRealmFacts: () => Promise.resolve(read.value) }));
 
 const SOURCE = { url: "https://indexer.example.test/graphql/query", at: "2026-11-05T06:00:00.000Z" };
-const VIEW = "/r/gnoland/wugnot";
-const REALM = "gno.land/r/gnoland/wugnot";
+// A realm of its own for each test: the facts of a realm are read once a session and kept (useRealmFacts's `held`, D530).
+let VIEW = "";
+let REALM = "";
+let runs = 0;
 const DEPLOYER = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
-const FILE: Worlds["worlds"] = [
+const fileOf = (path: string): Worlds["worlds"] => [
   {
     id: "gnoland/wugnot",
     namespace: "gnoland",
     realms: [
       {
-        path: REALM,
+        path,
         deployer: null,
         deployerName: "gnoland",
         functions: [],
         imports: [],
         calls: 1234,
         callers: null,
-        lastHeight: null,
+        lastHeight: 790123,
       },
     ],
   },
 ];
+let FILE: Worlds["worlds"] = [];
 const said = (value: ChainRead<unknown>) => {
   read.value = value;
 };
 
 beforeEach(() => {
+  runs += 1;
+  VIEW = `/r/gnoland/wugnot${String(runs)}`;
+  REALM = `gno.land${VIEW}`;
+  FILE = fileOf(REALM);
   noMedia();
 });
 afterEach(() => {
@@ -54,12 +61,14 @@ const label = (box: HTMLElement, name: string) =>
 const outs = (box: HTMLElement) => all(box, "a[target='_blank']").map((link) => link.getAttribute("href"));
 
 describe("a world's realm card", () => {
-  it("shows the deployer, the block and the calls with the read's source, and links the explorer", async () => {
+  it("shows the deployer, the block and the last call's block with the read's source, and links the explorer", async () => {
     said({ ok: true, value: { path: REALM, deployer: DEPLOYER, firstBlock: 786661 }, source: SOURCE });
     const box = await drawn(FILE, "Read from");
     expect(label(box, "Deployed by")).toBe("gnoland");
     expect(label(box, "Since block")).toBe((786661).toLocaleString("en-US"));
-    expect(label(box, "Calls · all time")).toBe((1234).toLocaleString("en-US"));
+    // The calls are the plate's figure now (D399), the card holds the block of the last one.
+    expect(label(box, "Last call at block")).toBe((790123).toLocaleString("en-US"));
+    expect(box.textContent).not.toContain("Calls · all time");
     expect(box.textContent).toContain("indexer.example.test");
     expect(outs(box)).toEqual([explorerLink("onyx-1", REALM), "https://docs.gno.land/"]);
   });
@@ -80,13 +89,14 @@ describe("a world's realm card", () => {
     expect(label(box, "Deployed by")).toBe(shortAddress(DEPLOYER));
   });
 
-  it("says a failed read as a status with its next step, and keeps the file's facts and the links", async () => {
+  // D534: the page's one error line is the Render card's, so a failed read says nothing in this card.
+  it("says nothing of a failed read, and keeps the file's facts and the links", async () => {
     const next = "The indexer did not answer; try again in a minute.";
     said({ ok: false, failure: { kind: "down", next }, source: SOURCE });
-    const box = await drawn(FILE, next);
-    expect(box.querySelector("[role='status']")?.textContent).toContain(next);
-    expect(box.querySelector("[role='alert']")).toBeNull();
-    expect(label(box, "Calls · all time")).toBe((1234).toLocaleString("en-US"));
+    const box = await drawn(FILE, "Last call at block");
+    expect(box.textContent).not.toContain(next);
+    expect(box.querySelector("[role='status'], [role='alert']")).toBeNull();
+    expect(label(box, "Last call at block")).toBe((790123).toLocaleString("en-US"));
     expect(outs(box)).toHaveLength(2);
   });
 

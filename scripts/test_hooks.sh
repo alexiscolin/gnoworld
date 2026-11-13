@@ -182,14 +182,14 @@ assert scripts["test:compiled"] == "vitest run --project compiled", scripts["tes
 assert "--project compiled" in scripts["test"], scripts["test"]
 PY
 # The type check builds incrementally, each project into its own .tsbuildinfo of TSC_CACHE (check.sh's; .claude/tmp/tsc when unset): the
-# graph a commit's lint reads (scripts/lint_scope.py). Seven projects, seven names, the cache's folder in each.
+# graph a commit's lint reads (scripts/lint_scope.py). Eight projects (the link reader the eighth, D13919), eight names, the cache's folder in each.
 python3 -I - "$here/.." <<'PY' || fail "package.json's typecheck does not build each project incrementally into a file of its own in TSC_CACHE"
 import json, os, sys
 scripts = json.load(open(os.path.join(sys.argv[1], "package.json")))["scripts"]
 projects = [c.split() for c in scripts["typecheck"].split(" && ")]
-assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json", "app/tsconfig.json", "packages/ui/tsconfig.json", "server/tsconfig.json", "packages/service/tsconfig.json", "packages/chain/tsconfig.json", "jarvis/tsconfig.json")], scripts["typecheck"]
+assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json", "app/tsconfig.json", "packages/ui/tsconfig.json", "server/tsconfig.json", "packages/service/tsconfig.json", "packages/chain/tsconfig.json", "jarvis/tsconfig.json", "link-reader/tsconfig.json")], scripts["typecheck"]
 assert all(len(c) == 6 and c[3:5] == ["--incremental", "--tsBuildInfoFile"] and c[5].startswith('"${TSC_CACHE:-.claude/tmp/tsc}/') for c in projects), scripts["typecheck"]
-assert len({c[5] for c in projects}) == 7, scripts["typecheck"]
+assert len({c[5] for c in projects}) == 8, scripts["typecheck"]
 PY
 # Alexis's install command, wherever it is given, reads the script itself, whatever a replace ref
 # shows (F132's class).
@@ -7086,6 +7086,17 @@ out=$(chk) || fail "check_nginx refused a burst of 6, twice the 3 files of the b
 sed 's#zone=visitors burst=640#zone=visitors burst=5#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 out=$(chk) && fail "check_nginx passed a burst of 5, under twice the 3 files of the build: $out"
 printf '%s\n' "$out" | grep -qi "burst" || fail "check_nginx did not name the burst of 5: $out"
+# The hashed files are counted under their own zone: two of them need a files' burst of 4, and 3 is refused by that zone's name.
+mkdir -p "$nc/app/build/client/assets" "$nc/app/build/client/textures"
+printf 'x\n' >"$nc/app/build/client/assets/a.js" && printf 'x\n' >"$nc/app/build/client/textures/b.webp"
+sed 's#zone=files burst=1024#zone=files burst=3#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+grep -q 'zone=files burst=3 ' "$nc/deploy/web/nginx.conf" || fail "the fixture did not plant a files' burst of 3"
+out=$(chk) && fail "check_nginx passed a files' burst of 3 for 2 hashed files, whose first load is 4 requests: $out"
+printf '%s\n' "$out" | grep -qi "files' burst" || fail "check_nginx did not name the files' burst that a first load overruns: $out"
+sed 's#zone=files burst=1024#zone=files burst=4#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
+out=$(chk) || fail "check_nginx refused a files' burst of 4, twice the 2 hashed files: $out"
+rm "$nc/app/build/client/assets/a.js" "$nc/app/build/client/textures/b.webp"
+rmdir "$nc/app/build/client/assets" "$nc/app/build/client/textures"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 chk >/dev/null || fail "check_nginx refused the image's burst for a build of 3 files"
 # The table the burst lives in (F3665, Alexis, 2026-11-02): the visitors' zone has two live lines, both at 640, and its rate is unchanged. Each
@@ -9564,6 +9575,20 @@ printf '%s\n' "$out" | grep -q "failed=1" && printf '%s\n' "$out" | grep -q "sur
 : >"$dm/env.log"
 out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deploy/test.sh's first run under --mutants failed under a stub that passes: $out"
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
+# Each down -v of its project takes every profile compose.yaml names (F13130): test-links.sh starts `links`, which a down of demo and
+# jarvis left up with its networks' fixed ranges, so --mutants' first run, a project of its own, could not start (2026-11-13).
+profiles=$(sed -n 's/^ *profiles: \[\(.*\)\]$/\1/p' "$here/../deploy/compose.yaml" | tr ',' '\n' | tr -d ' "' | sort -u)
+[ -n "$profiles" ] || fail "deploy/compose.yaml names no profile any more: update test_hooks.sh's deploy_stop"
+given=$(sed -n 's/^files=.*\(--profile [a-z_-]*\).*/\1/p' "$ds")
+[ -n "$given" ] || fail "deploy/test.sh's files= gives no profile any more: update test_hooks.sh's deploy_stop"
+grep 'docker compose -p "$project" $files .*down -v' "$ds" >"$t/ds.downs" || true
+[ "$(grep -c . "$t/ds.downs")" -ge 2 ] || fail "deploy/test.sh no longer has its start's and its cleanup's down -v: update test_hooks.sh's deploy_stop"
+while IFS= read -r line; do
+	for p in $profiles; do
+		case "$line $given " in *"--profile $p "*) ;; *) echo "$p" ;; esac
+	done
+done <"$t/ds.downs" >"$t/ds.unprofiled"
+[ ! -s "$t/ds.unprofiled" ] || fail "a down -v of deploy/test.sh leaves its profile(s) $(sort -u "$t/ds.unprofiled" | tr '\n' ' ')up (F13130)"
 fi
 
 if part deploy_checks; then
@@ -9799,12 +9824,12 @@ grep -qxF "node tests/e2e/workshopBackend.mjs $api_port $irc_port $ws_port http:
 	fail "workshop.sh did not start its backend on its ports, the app's origins allowed, from the app: $(cat "$w/log")"
 [ "$(grep -n '^ergo$' "$w/log" | cut -d: -f1)" -lt "$(grep -n '^node tests/e2e/workshopBackend.mjs ' "$w/log" | cut -d: -f1)" ] ||
 	fail "workshop.sh started its backend before scripts/ergo.sh built Ergo: $(cat "$w/log")"
-until_ 'grep -q "the worlds job and the prices. timer do not" "$w/one.out"' || fail "workshop.sh did not say what stays empty without the chain: $(cat "$w/one.out")"
+until_ 'grep -q "and so do the worlds job and the prices. timer" "$w/one.out"' || fail "workshop.sh did not say the worlds job and the prices' timer run on the backend: $(cat "$w/one.out")"
 # Each of its three processes, and ergo.sh's check of the Ergo binary, under the workshop's Seatbelt profile, its folders the profile's
 # parameters, each its real path: the home folder, what of it they read (the checkout, the one node_modules lead to, Node, the tools'
 # cache, GNOWORLD_TOOLS here), and what they write (lot 2's S1, F4962).
 for each in react-router vite node sh; do
-	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router" "$w/log.seatbelt" ||
+	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router OPENAI_KEY=/nonexistent" "$w/log.seatbelt" ||
 		fail "workshop.sh did not start $each under its profile with its folders: $(cat "$w/log.seatbelt" 2>/dev/null)"
 done
 order

@@ -4,6 +4,7 @@ import { useLocation } from "react-router";
 import { beforeEach, describe, expect, it } from "vitest";
 import { mountInStore } from "../../../tests/inStore.tsx";
 import { all, button, click, settled } from "../../../tests/mount.tsx";
+import { shortAddress } from "./names.ts";
 import { PersonCard, type PersonCardProps } from "./PersonCard.tsx";
 
 // A person's card (8d): Message and Follow only for an account the reader can name, never for a guest, oneself or a nick; Message goes to
@@ -24,14 +25,15 @@ async function opened(over: Partial<PersonCardProps>) {
       <Where />
     </>,
   );
-  const panel = all(box, "[popover]")[0];
-  expect(panel).toBeDefined();
   act(() => {
-    panel?.dispatchEvent(Object.assign(new Event("toggle"), { newState: "open" }));
+    all(box, "button")[0]?.click();
   });
   return box;
 }
-const actions = (box: HTMLElement) => all(box, "[popover] button").map((each) => each.textContent);
+const actions = (box: HTMLElement) =>
+  all(box, "dialog button:not([role='tab'])")
+    .map((each) => each.textContent)
+    .filter(Boolean);
 const follows = (): unknown => JSON.parse(localStorage.getItem("gnoworld:device:follows") ?? "null");
 
 beforeEach(() => {
@@ -48,6 +50,13 @@ describe("a person's card", () => {
   ])("has no Message and no Follow for %s", async (_who, over) => {
     const box = await opened(over);
     expect(actions(box)).toEqual([]);
+  });
+
+  it("names an account with no registered name by its short address once, never twice", async () => {
+    const box = await opened({});
+    await settled(() => actions(box).includes("Follow"));
+    const text = all(box, "dialog")[0]?.textContent ?? "";
+    expect(text.split(shortAddress(ALICE)).length - 1).toBe(1);
   });
 
   it("offers Message and Follow for another account", async () => {

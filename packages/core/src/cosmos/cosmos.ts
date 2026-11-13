@@ -3,8 +3,9 @@
 // consecutive ranks and near rays, one blob. Height comes from a smooth field of position, so no list of clusters. An arrival moves others
 // outward, a little, and what moved drifts there over a season. Only the sines differ between engines, in a last bit no cell depends on.
 import { cellHash, nextState, textHash, unitOf } from "../space/cell.ts";
+import { Draws } from "../station/draws.ts";
 import { heightField } from "../space/mood.ts";
-import { lerp, smoothstep } from "../space/smooth.ts";
+import { lerp } from "../space/smooth.ts";
 import { seatInRings, type Seat } from "./rings.ts";
 
 /** The unit of spacing, in scene units: two systems are never closer. */
@@ -96,11 +97,8 @@ function placeOf(seed: number, { ring, cell }: Seat): SystemPlace {
   const twist = unitOf(cellHash(RINGS, { x: ring, y: 0, z: 0 }));
   const angle = (TURN * (cell + twist)) / (6 * ring);
   // The stream's first number is the system's place in its wedge.
-  let state = nextState(seed);
-  const unit = (): number => {
-    state = nextState(state);
-    return unitOf(state);
-  };
+  const draws = new Draws(nextState(seed));
+  const unit = (): number => draws.unit();
   const away = TURN * unit();
   const reach = STRAY * Math.sqrt(unit());
   // A ring's cells take turns above and below the field, so two neighbours on a ring never share a side (7d6, a disc in 3D).
@@ -120,27 +118,6 @@ export function placeSystems(set: readonly SystemRef[]): Map<string, SystemPlace
     const seat = seats[rank];
     if (seat !== undefined) places.set(id, placeOf(seed, seat));
   });
-  return places;
-}
-
-/** Where systems stand `progress` through a season, 0 to 1 and eased, from last season's map to this one's (ADR-0002 §3). An arrival
- * stands at its place at once, for it has no other. On the way two may pass closer than a cell: the spacing is each map's (F3556). */
-export function driftedPlaces(
-  from: ReadonlyMap<string, SystemPlace>,
-  to: ReadonlyMap<string, SystemPlace>,
-  progress: number,
-): Map<string, SystemPlace> {
-  if (Number.isNaN(progress)) throw new RangeError("cosmos: a season's progress is a number");
-  const by = smoothstep(0, 1, progress);
-  const places = new Map<string, SystemPlace>();
-  for (const [id, place] of to) {
-    const before = from.get(id) ?? place;
-    places.set(id, {
-      x: lerp(before.x, place.x, by),
-      y: lerp(before.y, place.y, by),
-      z: lerp(before.z, place.z, by),
-    });
-  }
   return places;
 }
 

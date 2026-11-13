@@ -3,6 +3,7 @@
 // is on. Only what reaches the person: give_digest and propose_action wait for 10k, where their cards have a place
 // (Alexis, 10i-1, D170).
 import type { Log } from "@gnoworld/service/log";
+import { z } from "zod";
 import { allowlist } from "./allowlist.ts";
 import type { Gnomcp, Ran } from "./gnomcp.ts";
 import { gnomcpTools, type Profiles } from "./gnomcpTools.ts";
@@ -49,7 +50,18 @@ export function toolbox(box: Box) {
     ...button.map(({ name }) => [name, (call: Call, asked: Asked) => box.cards.run(call, asked)] as const),
     ...box.gnoscope.definitions.map(({ name }) => [name, scope] as const),
   ]);
-  return { allowlist: tools, run: (call: Call, asked: Asked) => runners.get(call.name)?.(call, asked) ?? refused() };
+  const run = (call: Call, asked: Asked) => runners.get(call.name)?.(call, asked) ?? refused();
+  // A function's explanation reads the code alone (D13920): gno_read on the one profile it is given, the skills, the places
+  // and the button; no render, eval, history, activity, packages nor gnoscope, which read live state.
+  const explain = (profile: string) => {
+    const source = gnomcpTools({ chains: [profile], indexed: [] }).filter(({ name }) => name === "gno_read");
+    // A button may name no chain but the one: its card would read the realm's live page on it.
+    const buttons = button.map((one) => ({ ...one, args: one.args.extend({ profile: z.enum([profile]).optional() }) }));
+    const own = allowlist([...source, box.skills.tool, box.places.definition, ...buttons], box.log);
+    const names = new Set(own.offered().map(({ name }) => name));
+    return { allowlist: own, run: (call: Call, asked: Asked) => (names.has(call.name) ? run(call, asked) : refused()) };
+  };
+  return { allowlist: tools, run, explain };
 }
 
 // A skill's text, its arguments parsed again by load_skill's own schema, as the cards parse theirs.

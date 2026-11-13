@@ -3,7 +3,7 @@
 @layer components {
   .trail {
     /* raw: the video's crumbs are 12 px sans, 0.08em apart, at 70% (the prototype's .kicker), set through the label style's own values */
-    --font-label: 500 12px/1 var(--family-sans);
+    --font-label: 500 0.75rem/1 var(--family-sans);
     --tracking-caps: 0.08em;
     --color-text-muted: color-mix(in oklab, var(--color-text) 70%, transparent);
 
@@ -34,15 +34,15 @@
   }
 
   .trail li + li::before {
-    /* raw: the chevron stands 8 px off each step, at 60% (the prototype's #fCrumbs span) */
     /* layout: the arrangement the prototype and the frames draw */
-    margin-inline: 8px;
+    margin-inline: var(--space-2xs);
     content: "\203a";
     opacity: 0.6;
   }
 
   /* A step is a target of 24 px at least, as every control (WCAG 2.5.8); one that acts is a button of the same look. */
   .trail :is(a, .back) {
+    transition: color var(--motion-fast) var(--ease-standard);
     /* layout: a step's words centred in its 24 px target */
     display: inline-flex;
     /* layout: a step's words centred in its 24 px target */

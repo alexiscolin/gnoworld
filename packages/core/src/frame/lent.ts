@@ -2,8 +2,8 @@
 // time, so that chunk imports nothing that lives only with the view at rest and the bundler splits nothing out of it.
 import { evenRow } from "./composition.ts";
 import { drawnOf } from "./postcard.ts";
-import { cameraTowards, focalOf, looksFrom, placeOf, swayed } from "./restLook.ts";
+import { cameraTowards, focalOf, looksFrom, placeOf } from "./restLook.ts";
 
 /** The view at rest's functions the rocks' chunk reads a view with. */
-export const LENT = { cameraTowards, drawnOf, evenRow, focalOf, looksFrom, placeOf, swayed };
+export const LENT = { cameraTowards, drawnOf, evenRow, focalOf, looksFrom, placeOf };
 export type Lent = typeof LENT;

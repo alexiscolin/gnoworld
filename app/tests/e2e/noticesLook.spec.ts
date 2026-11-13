@@ -4,12 +4,12 @@ import { logIn } from "./irc.ts";
 import { field, live, room, T } from "./scriptedRoom.ts";
 
 // How what an account has not seen looks (slice 4's 4f-n), on a computer's screen: the counts on the rooms' rows, the
-// list, the modes under the room's title, the composer's word on @room. A scripted Ergo, so the same each run; the header,
+// list, the composer's word on @room. A scripted Ergo, so the same each run; the header,
 // and who is here, which name the test wallet drawn at the server's start, are masked.
 test.describe("what an account has not seen, as it looks", () => {
   test.use({ timezoneId: "UTC", locale: "en-GB" });
 
-  test("counts on the rows, the list and the modes, on a computer's screen", async ({ page }) => {
+  test("counts on the rows and the list, on a computer's screen", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     const address = await logIn(page, word("notice-look"));
     const { ergo } = await room(page, {
@@ -23,7 +23,7 @@ test.describe("what an account has not seen, as it looks", () => {
     await expect(
       roomsNav(page)
         .getByRole("listitem")
-        .filter({ has: page.getByRole("link", { name: "#news", exact: true }) }),
+        .filter({ has: page.getByRole("link", { name: "news", exact: true }) }),
     ).toContainText("1 unread");
     await expect(page).toHaveScreenshot("notices-computer.png", {
       mask: [page.getByRole("banner"), page.getByRole("region", { name: "Who's here" })],

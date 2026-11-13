@@ -1,23 +1,27 @@
 // A wallet for the tests (decision 141): a secp256k1 key from Node's crypto signs the login text as
 // Adena's signArbitrary does, over the document the SDK's own makeArbitrarySignDoc builds. Nothing
 // proves Adena signs the same bytes: slice 4's first merge checks it against the real extension.
-import { createHash, generateKeyPairSync, sign } from "node:crypto";
+import { createHash, createPrivateKey, createPublicKey, generateKeyPairSync, sign } from "node:crypto";
 import { getArbitrarySignBytes, makeArbitrarySignDoc, type SignedArbitraryData } from "@adena-wallet/sdk";
 import { Address, toAddress } from "@gnoworld/schemas";
 
 // secp256k1's group order: a signature whose s is above half of it is refused (low-S, BIP-62).
-const ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+export const ORDER = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
 
 export interface Wallet {
   address: Address;
+  // The key, PKCS8, so a long-lived test account (the workshop's crowd) comes back as the same account (wallet(pem)).
+  pem: string;
   // signer: the address the document names, the key's own unless a test says otherwise.
   sign: (chainId: string, text: string, signer?: string) => SignedArbitraryData;
   // Any document, the canonical one changed included: the verifier, not the signature, must refuse it.
   signDoc: (signed: SignedArbitraryData["signed"]) => SignedArbitraryData;
 }
 
-export function wallet(): Wallet {
-  const { privateKey, publicKey } = generateKeyPairSync("ec", { namedCurve: "secp256k1" });
+export function wallet(pem?: string): Wallet {
+  const privateKey =
+    pem === undefined ? generateKeyPairSync("ec", { namedCurve: "secp256k1" }).privateKey : createPrivateKey(pem);
+  const publicKey = createPublicKey(privateKey);
   const { x = "", y = "" } = publicKey.export({ format: "jwk" });
   const parity = (Buffer.from(y, "base64url").at(-1) ?? 0) & 1;
   const compressed = Buffer.concat([Buffer.from([2 + parity]), Buffer.from(x, "base64url")]);
@@ -34,6 +38,7 @@ export function wallet(): Wallet {
   };
   return {
     address,
+    pem: privateKey.export({ format: "pem", type: "pkcs8" }).toString(),
     sign: (chainId, text, signer = address) => signDoc(makeArbitrarySignDoc(chainId, signer, text)),
     signDoc,
   };

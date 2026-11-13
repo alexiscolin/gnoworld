@@ -1,0 +1,13 @@
+/* What a panel says in place of a list or a button: a fact in a quiet box (the proposal's .nodata). */
+@layer components {
+  .box {
+    color: var(--color-text-muted);
+    font: var(--font-meta);
+    line-height: 1.5;
+  }
+
+  /* The proposal's heading of a box is the browser's bold, in the box's own colour. */
+  .box b {
+    font-weight: 700;
+  }
+}

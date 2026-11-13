@@ -25,7 +25,7 @@ export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log }: Part
     api: {
       pins,
       // The room's world's moderators and the team; everyone reads as the stream says.
-      mayPin: (room: string, who: string): boolean => staffOf(roles, room, who),
+      staff: (room: string, who: string): boolean => staffOf(roles, room, who),
       mayRead: (room: string, who: string | undefined): boolean => mayRead(roles, room, who),
     },
     // What the link hears, as its options take it: a line taken from a room (its author's delete, the bot's hide), and

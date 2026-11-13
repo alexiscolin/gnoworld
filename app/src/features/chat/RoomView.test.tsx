@@ -9,6 +9,8 @@ import { RoomView, type RoomViewProps } from "./RoomView.tsx";
 const ALICE = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
 const BOB = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const T0 = "2026-10-25T10:00:00.000Z";
+// Past the five minutes in which a line goes on its author's group.
+const LATER = new Date(Date.parse(T0) + 10 * 60_000).toISOString();
 const line = (over: Partial<Line> = {}): Line => ({
   id: "a",
   time: T0,
@@ -149,7 +151,8 @@ describe("RoomView", () => {
   it("names a guest's line by its nick and says it is a guest's, never by an account", () => {
     const html = part(view({ state: { ...ROOM, lines: [GUEST_LINE] } }), "Messages");
     expect(items(html)).toEqual([expect.stringMatching(/^guest-ab12cd \(guest\) \d{2}:\d{2} hello$/)]);
-    expect(html).not.toContain("title=");
+    // No title on the guest's name (an account's address is its title); the time's full date is the one title (D13922).
+    expect(html).not.toMatch(/<(?!time)[^>]* title=/);
   });
 
   // The account tag alone says who wrote: a nick is only a nick.
@@ -188,7 +191,7 @@ describe("RoomView", () => {
 
   // 4d: a line that mentions the reader, by a word as well as its colour (docs/DESIGN-SYSTEM.md, "about me").
   it("marks a line that mentions the reader, by a word and an attribute, and its mention apart", () => {
-    const lines = [line({ text: `ready, @${BOB}?` }), line({ id: "b", text: `and @${ALICE}` })];
+    const lines = [line({ text: `ready, @${BOB}?` }), line({ id: "b", time: LATER, text: `and @${ALICE}` })];
     const html = part(view({ me: BOB, state: { ...ROOM, lines } }), "Messages");
     const [first = "", second = ""] = items(html);
     expect(first).toContain("Mentions you");

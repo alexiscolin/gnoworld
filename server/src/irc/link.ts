@@ -10,7 +10,8 @@ import type { RoomState } from "../rooms/reconcile.ts";
 import { allowed, line, NICK, type Command } from "./lines.ts";
 import type { Fetched } from "./fetch.ts";
 import { reader, type Options } from "./reader.ts";
-import { forget, fresh, sentOn } from "./session.ts";
+import { relayer, RELAY_MS, type Relayed } from "./relay.ts";
+import { answering, forget, fresh, sentOn } from "./session.ts";
 
 export type { Fetched } from "./fetch.ts";
 export type { Said } from "./lines.ts";
@@ -23,6 +24,10 @@ export interface Link {
   // One line of a room by its id, as Ergo holds it now (4d, pins): "gone" when Ergo holds none, "unanswered" when it
   // could not be asked or did not answer in time.
   line: (room: string, msgid: string) => Promise<Fetched>;
+  // A guest's line said by the bot as anon/<name> (RELAYMSG, D430): whether Ergo took it.
+  relay: (room: string, nick: string, text: string) => Promise<Relayed>;
+  // The relays waiting for Ergo's word now.
+  relaying: () => number;
   stop: () => Promise<void>;
 }
 
@@ -62,6 +67,17 @@ function splitter(s: Socket, read: (s: Socket, message: IrcMessage) => void, log
   };
 }
 
+// The capabilities it asks, its nick and its user, the lines a connection opens with. multi-prefix: NAMES gives each person every power;
+// sasl: the bot logs in as its account; message-redaction: Ergo tells each REDACT, the bot's own too (irc/handlers.go:3010), for the pins;
+// draft/multiline: a message of several lines comes whole (several.ts); labeled-response: Ergo's answer to a relay carries its label (D430).
+function greet(s: Socket): void {
+  const caps =
+    "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline labeled-response";
+  s.write(line("CAP", ["REQ", caps]));
+  s.write(line("NICK", [NICK]));
+  s.write(line("USER", [NICK, "0", "*", "gno.world"]));
+}
+
 export function ircLink(options: Options): Link {
   const { host, port, log, retryMs = (attempt) => retryDelay(attempt), pingMs = 30_000 } = options;
   let socket: Socket | undefined;
@@ -70,7 +86,7 @@ export function ircLink(options: Options): Link {
   // The backoff starts again from a second only after a minute up: Ergo taking the link in, then
   // dropping it at once, keeps it waiting longer.
   const state = fresh(options.stateMs ?? 10_000, options.lineMs ?? LINE_MS);
-  const read = reader(options, state);
+  const read = answering(state, reader(options, state));
   const open = (): void => {
     const s = connect(port, host);
     socket = s;
@@ -81,17 +97,7 @@ export function ircLink(options: Options): Link {
       silent += 1;
     }, pingMs);
     s.on("connect", () => {
-      // multi-prefix: NAMES gives each person every power; sasl: the bot logs in as its account; message-redaction:
-      // Ergo tells each REDACT, the bot's own too (irc/handlers.go:3010), for the pins; draft/multiline: a message of
-      // several lines comes whole (several.ts).
-      s.write(
-        line("CAP", [
-          "REQ",
-          "message-tags account-tag batch draft/chathistory server-time multi-prefix sasl draft/message-redaction draft/multiline",
-        ]),
-      );
-      s.write(line("NICK", [NICK]));
-      s.write(line("USER", [NICK, "0", "*", "gno.world"]));
+      greet(s);
     });
     const take = splitter(s, read, log);
     s.on("data", (chunk: Buffer) => {
@@ -142,6 +148,8 @@ export function ircLink(options: Options): Link {
         return Promise.resolve("unanswered");
       return state.lines.ask((command, params) => s.write(line(command, params)), room, msgid);
     },
+    relay: relayer(state, () => socket, options.relayMs ?? RELAY_MS),
+    relaying: () => state.relays.size,
     stop: async () => {
       stopped = true;
       clearTimeout(retry);

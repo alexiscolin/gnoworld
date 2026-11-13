@@ -18,10 +18,22 @@ interface Options<T> {
   cap?: number;
   perAccount?: number;
   concurrency?: number;
+  // The name the queue's events carry: the lines' check's "moderation", the link cards' "card".
+  prefix?: string;
+  // What raises an alert, each a literal name (scripts/check_docs.py): the lines' check's own by default.
+  alerts?: { backlog: () => void; full: () => void };
 }
 
 export function makeQueue<T extends { account: string }>(options: Options<T>): Queue<T> {
-  const { run, log, now = Date.now, cap = 10_000, perAccount = 100, concurrency = 4 } = options;
+  const { run, log, now = Date.now, cap = 10_000, perAccount = 100, concurrency = 4, prefix = "moderation" } = options;
+  const alerts = options.alerts ?? {
+    backlog: () => {
+      log("alert", { error: "moderation_backlog" });
+    },
+    full: () => {
+      log("alert", { error: "moderation_queue_full" });
+    },
+  };
   // Each account's lines in order; the Map's order is the turn: an account served goes to the back.
   const waiting = new Map<string, { item: T; at: number }[]>();
   let [count, running, stopped] = [0, 0, false];
@@ -47,7 +59,7 @@ export function makeQueue<T extends { account: string }>(options: Options<T>): Q
       };
       // A check that fails frees its place: its name goes to the log, never the line.
       const failed = (error: unknown): void => {
-        log("moderation_failed", { error: error instanceof Error ? error.name : "unknown" });
+        log(`${prefix}_failed`, { error: error instanceof Error ? error.name : "unknown" });
         done();
       };
       run(next.item).then(done, failed);
@@ -57,18 +69,18 @@ export function makeQueue<T extends { account: string }>(options: Options<T>): Q
     if (count === 0) return;
     const oldest = Math.min(...[...waiting.values()].map(([first]) => first?.at ?? Infinity));
     const ms = now() - oldest;
-    log("moderation_backlog", { ms });
-    if (ms >= 120_000) log("alert", { error: "moderation_backlog" });
+    log(`${prefix}_backlog`, { ms });
+    if (ms >= 120_000) alerts.backlog();
   }, 30_000);
   return {
     push(item) {
       if (count >= cap) {
-        log("alert", { error: "moderation_queue_full" });
+        alerts.full();
         return false;
       }
       const lines = waiting.get(item.account) ?? [];
       if (lines.length >= perAccount) {
-        log("moderation_account_full", { account: item.account });
+        log(`${prefix}_account_full`, { account: item.account });
         return false;
       }
       lines.push({ item, at: now() });

@@ -18,3 +18,5 @@ type Story = StoryObj<typeof meta>;
 export const Full: Story = {};
 export const WithoutInfo: Story = { args: { info: undefined } };
 export const ThreadFirst: Story = { args: { infoFirst: true } };
+// The wide full chat's header: a band over the columns, under the page's own header, the columns from its foot.
+export const Band: Story = { args: { band: true } };

@@ -3,6 +3,7 @@
 // This site's own files are read here too (7n2): a module of their own, shared by the first screen and the scene's chunk, would be a
 // chunk that every lazy chunk names.
 import { cappedBytes } from "@gnoworld/core";
+import { jsonOfBytes } from "@gnoworld/schemas";
 import type * as z from "zod/mini";
 
 /** The time an answer has, its body read included. */
@@ -10,7 +11,17 @@ const CHAIN_TIMEOUT_MS = 8_000;
 /** The most bytes an answer may weigh; past it the read stops and the rest is not kept. */
 const CHAIN_MAX_BYTES = 1024 * 1024;
 
-export type ChainFetch = (url: string, init?: RequestInit) => Promise<Response>;
+/** A request's options: `onWait(true)` from a gate in front of the network when the request starts waiting its turn, `onWait(false)` when
+ * the turn comes. */
+export type ChainInit = RequestInit & { onWait?: (waiting: boolean) => void };
+export type ChainFetch = (url: string, init?: ChainInit) => Promise<Response>;
+
+/** A request's options for a way out with no gate in front of it (a server's own): the gate's hook left out. */
+export function requestInit(init: ChainInit = {}): RequestInit {
+  const plain: ChainInit = { ...init };
+  delete plain.onWait;
+  return plain;
+}
 
 export type FailureKind =
   | "refused"
@@ -72,13 +83,14 @@ interface Attempt {
   url: string;
   fetcher: ChainFetch;
   signal: AbortSignal;
+  onWait: (waiting: boolean) => void;
   credentials: NonNullable<RequestInit["credentials"]>;
   cache: RequestInit["cache"];
   maxBytes: number;
 }
 
 // The attempt, which never throws: whatever goes wrong is a kind.
-async function attempt({ url, fetcher, signal, credentials, cache, maxBytes }: Attempt): Promise<Fetched> {
+async function attempt({ url, fetcher, signal, onWait, credentials, cache, maxBytes }: Attempt): Promise<Fetched> {
   let response: Response;
   try {
     response = await fetcher(url, {
@@ -88,6 +100,7 @@ async function attempt({ url, fetcher, signal, credentials, cache, maxBytes }: A
       ...(cache === undefined ? {} : { cache }),
       headers: { accept: "application/json" },
       signal,
+      onWait,
     });
   } catch {
     return { kind: "down" };
@@ -102,23 +115,37 @@ async function attempt({ url, fetcher, signal, credentials, cache, maxBytes }: A
 
 /**
  * Work under one time limit and its caller's signal: the limit and the leaving win the race by themselves, so nothing relies on
- * a request honouring its signal, and the work's requests end through the signal it is given. No timer and no listener is
- * left behind.
+ * a request honouring its signal, and the work's requests end through the signal it is given. The limit pauses while the work says
+ * it waits its turn, and goes on from the turn with what it had left. No timer and no listener is left behind.
  */
 export async function withinTime<T>(
   { timeoutMs = CHAIN_TIMEOUT_MS, signal: outer }: Limits,
   ends: { timeout: T; left: T },
-  work: (signal: AbortSignal) => Promise<T>,
+  work: (signal: AbortSignal, onWait: (waiting: boolean) => void) => Promise<T>,
 ): Promise<T> {
   if (outer?.aborted === true) return ends.left;
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
+  let time: (running: boolean) => void = () => undefined;
   let leave: (() => void) | undefined;
+  // The time the limit has run, and since when it runs again (none while it is paused).
+  let ran = 0;
+  let since: number | undefined;
   const ended = new Promise<T>((resolve) => {
-    timer = setTimeout(() => {
-      controller.abort(new DOMException("the answer took too long", "TimeoutError"));
-      resolve(ends.timeout);
-    }, timeoutMs);
+    time = (running) => {
+      clearTimeout(timer);
+      if (since !== undefined) ran += Date.now() - since;
+      since = running ? Date.now() : undefined;
+      if (!running) return;
+      timer = setTimeout(
+        () => {
+          controller.abort(new DOMException("the answer took too long", "TimeoutError"));
+          resolve(ends.timeout);
+        },
+        Math.max(0, timeoutMs - ran),
+      );
+    };
+    time(true);
     leave = () => {
       controller.abort(outer?.reason);
       resolve(ends.left);
@@ -126,9 +153,16 @@ export async function withinTime<T>(
     outer?.addEventListener("abort", leave, { once: true });
   });
   try {
-    return await Promise.race([work(controller.signal), ended]);
+    // The requests of the work waiting their turn: the limit goes on once none waits.
+    let waiting = 0;
+    const onWait = (starts: boolean) => {
+      waiting = Math.max(0, waiting + (starts ? 1 : -1));
+      time(waiting === 0);
+    };
+    return await Promise.race([work(controller.signal, onWait), ended]);
   } finally {
     clearTimeout(timer);
+    time = () => undefined;
     if (leave !== undefined) outer?.removeEventListener("abort", leave);
   }
 }
@@ -137,14 +171,20 @@ export async function withinTime<T>(
 export function fetchBytes(url: string, options: Transport): Promise<Fetched> {
   const { fetch: fetcher = (address, init) => fetch(address, init), maxBytes = CHAIN_MAX_BYTES } = options;
   const { credentials, cache } = options;
-  return withinTime(options, { timeout: { kind: "timeout" }, left: { kind: "down" } }, (signal) =>
-    attempt({ url, fetcher, signal, credentials, cache, maxBytes }),
+  return withinTime(options, { timeout: { kind: "timeout" }, left: { kind: "down" } }, (signal, onWait) =>
+    attempt({ url, fetcher, signal, onWait, credentials, cache, maxBytes }),
   );
 }
 
 export interface SiteFileRead {
   fetch?: ChainFetch;
   signal?: AbortSignal;
+}
+
+/** The JSON `bytes` hold as `schema` reads it, or nothing: no valid UTF-8, no JSON, or a shape the schema refuses. */
+export function parseSiteBytes<T>(bytes: Uint8Array, schema: z.ZodMiniType<T>): T | undefined {
+  const value = jsonOfBytes(bytes);
+  return value === undefined ? undefined : schema.safeParse(value).data;
 }
 
 /** A file the server's jobs write from a chain, at this site's `url` (slice 7): its own credentials and cache, under `maxBytes`, as `schema`
@@ -160,10 +200,5 @@ export async function readSiteFile<T>(
     maxBytes,
     credentials: "same-origin",
   });
-  if ("kind" in answer) return undefined;
-  try {
-    return schema.safeParse(JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(answer.bytes))).data;
-  } catch {
-    return undefined;
-  }
+  return "kind" in answer ? undefined : parseSiteBytes(answer.bytes, schema);
 }

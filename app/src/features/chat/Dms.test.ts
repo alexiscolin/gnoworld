@@ -47,21 +47,14 @@ describe("the conversation a page shows", () => {
   };
   const ALL = { [BOB]: [LINE] };
 
-  it("shows a partner's lines while the account hears everyone, or hears it", () => {
-    expect(conversationOf(ALL, { onlyKnown: false, known: new Set() }, BOB).lines).toEqual([LINE]);
-    expect(conversationOf(ALL, { onlyKnown: true, known: new Set([BOB]) }, BOB).lines).toEqual([LINE]);
-  });
-
-  it("shows none of a stranger's while the account hears those it wrote to alone, and says they are not kept", () => {
-    const shown = conversationOf(ALL, { onlyKnown: true, known: new Set([CAROL]) }, BOB);
-    expect(shown.lines).toEqual([]);
-    expect(shown.empty).toMatch(/^Not kept: /);
+  it("shows a partner's lines, whether or not the account wrote to it", () => {
+    expect(conversationOf(ALL, BOB).lines).toEqual([LINE]);
   });
 
   // Decision C (U2): Ergo keeps no direct message, so "No messages yet." was false after a reload.
   it("shows nothing with no partner, and a conversation never heard as empty since the page opened", () => {
-    expect(conversationOf(ALL, { onlyKnown: false, known: new Set() }, undefined).lines).toEqual([]);
-    expect(conversationOf(ALL, { onlyKnown: false, known: new Set() }, CAROL)).toEqual({
+    expect(conversationOf(ALL, undefined).lines).toEqual([]);
+    expect(conversationOf(ALL, CAROL)).toEqual({
       lines: [],
       empty: "No messages since this page opened.",
     });

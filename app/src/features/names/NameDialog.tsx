@@ -1,7 +1,7 @@
 // The name dialog (9f, frames 9 to 15, "Pick a name and a face"): the kicker, the title, the line naming r/sys/namereg, the person's
 // nebula as the face (no planet, no upload: ADR-0002 section 1), the `nym-` field with its rule, "Register · 0 GNOT" and "Later".
 // It holds no state of the chain: its `phase` is the card's course, and a name shows as registered only in the phase `done`.
-import { Avatar, Button, Cluster, Dialog, Field, Stack } from "@gnoworld/ui";
+import { Avatar, Button, Cluster, Dialog, Field, grouped, Stack } from "@gnoworld/ui";
 import { useState, type SyntheticEvent } from "react";
 import { NOT_CHECKED, networkOf, publicForever } from "../calls/index.ts";
 import styles from "./NameDialog.module.css";
@@ -20,8 +20,6 @@ export interface NameDialogProps {
   onClose: () => void;
 }
 
-const COUNT = new Intl.NumberFormat("en-US");
-
 // What the network costs, in words: the registry's price is 0, the network fee is not.
 const feeWords = ({ name, real }: NameDialogProps["network"], fee: string) =>
   real
@@ -31,8 +29,10 @@ const feeWords = ({ name, real }: NameDialogProps["network"], fee: string) =>
 function State({ phase }: { phase: Phase }) {
   return (
     <p role="status" className={styles["state"]}>
-      {phase.kind === "working" || phase.kind === "failed" ? phase.text : null}
-      {phase.kind === "done" ? `${phase.name} is registered, in block ${COUNT.format(phase.height)}.` : null}
+      <span key={phase.kind} className="enter">
+        {phase.kind === "working" || phase.kind === "failed" ? phase.text : null}
+        {phase.kind === "done" ? `${phase.name} is registered, in block ${grouped(phase.height)}.` : null}
+      </span>
     </p>
   );
 }
@@ -68,7 +68,7 @@ export function NameDialog({ open, account, network, fee, phase, onRegister, onC
             ) : null}
             <Cluster>
               {form ? (
-                <span className={styles["computer"]}>
+                <span className="fine-only">
                   <Button emphasis="solid" type="submit" disabled={problem !== undefined}>
                     Register · 0 GNOT
                   </Button>
@@ -78,7 +78,7 @@ export function NameDialog({ open, account, network, fee, phase, onRegister, onC
             </Cluster>
             <State phase={phase} />
             <p className={styles["note"]}>{feeWords(network, fee)}</p>
-            <p className={[styles["phone"], styles["note"]].join(" ")}>To sign, use a computer.</p>
+            <p className={["coarse-only", styles["note"]].join(" ")}>To sign, use a computer.</p>
             <p className={styles["note"]}>
               {publicForever(NAMEREG)} {NOT_CHECKED}
             </p>

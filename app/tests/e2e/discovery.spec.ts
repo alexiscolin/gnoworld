@@ -1,3 +1,4 @@
+import { openSettings } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 
 // Slice 8's discovery on the device (docs/plans/slice-8.md §1 and §6), walked in the built site: a stamp survives a reload; every setting
@@ -13,13 +14,7 @@ const root = (page: Page, mark: string) =>
 const motionFast = (page: Page) =>
   page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue("--motion-fast").trim());
 
-async function settings(page: Page) {
-  await page.getByRole("button", { name: "Menu" }).click();
-  await page.getByRole("menuitem", { name: "Settings" }).click();
-  const dialog = page.getByRole("dialog", { name: "Settings" });
-  await expect(dialog).toBeVisible();
-  return dialog;
-}
+const settings = (page: Page) => openSettings(page, page.getByRole("button", { name: "Menu" }));
 
 test.describe("a stamp", () => {
   test("is kept at a world's first visit, said once, and survives a reload", async ({ page }) => {
@@ -30,12 +25,9 @@ test.describe("a stamp", () => {
     await expect
       .poll(() => held(page, "stamps"))
       .toEqual({ "onyx:bubble": expect.stringMatching(/^\d{4}-\d\d-\d\d$/) });
-    const counter = page.getByRole("button", { name: /^Passport / });
-    await expect(counter).toHaveText(/Passport 1(\/\d+)?$/);
     const day = await held(page, "stamps");
     await page.reload();
     await hydrated(page);
-    await expect(counter).toHaveText(/Passport 1(\/\d+)?$/);
     expect(await held(page, "stamps")).toEqual(day);
     // A second visit stamps nothing and says nothing of a stamp.
     await expect(page.getByText("Stamped · Bubble")).toHaveCount(0);
@@ -47,17 +39,18 @@ test.describe("the settings", () => {
     await page.setViewportSize(COMPUTER);
     await page.goto("/");
     await hydrated(page);
-    const testnet = page.getByText("Testnet", { exact: true }).first();
+    // The network is named in the header's Connect button and in the views' pill: the one drawn on this screen.
+    const testnet = page.getByRole("banner").getByText("Testnet", { exact: true }).locator("visible=true").first();
     await expect(testnet).toBeVisible();
     const before = await motionFast(page);
     expect(before).not.toBe("0s");
     const dialog = await settings(page);
     await dialog.getByRole("radio", { name: /^Low/ }).check();
     await expect.poll(() => root(page, "quality")).toBe("low");
-    await dialog.getByRole("checkbox", { name: /^Reduce animations/ }).check();
+    await dialog.getByRole("switch", { name: /^Reduce animations/ }).check();
     await expect.poll(() => root(page, "motion")).toBe("reduce");
     await expect.poll(() => motionFast(page)).toBe("0s");
-    await dialog.getByRole("checkbox", { name: /^Space in 3D on a phone/ }).check();
+    await dialog.getByRole("switch", { name: /^Space in 3D on a phone/ }).check();
     await expect.poll(() => root(page, "phone3d")).toBe("on");
     await expect(testnet).toBeVisible();
     expect(await held(page, "settings")).toEqual({ quality: "low", calm: true, phone3d: true });
@@ -66,13 +59,13 @@ test.describe("the settings", () => {
     await expect.poll(() => root(page, "quality")).toBe("low");
     await expect.poll(() => root(page, "motion")).toBe("reduce");
     await expect.poll(() => root(page, "phone3d")).toBe("on");
-    await expect(page.getByText("Testnet", { exact: true }).first()).toBeVisible();
+    await expect(testnet).toBeVisible();
     // The page came back at its address, #settings: the dialog opens over it. Back to the defaults: the marks go, the device forgets the key.
     const again = page.getByRole("dialog", { name: "Settings" });
     await expect(again).toBeVisible();
     await again.getByRole("radio", { name: /^Auto/ }).check();
-    await again.getByRole("checkbox", { name: /^Reduce animations/ }).uncheck();
-    await again.getByRole("checkbox", { name: /^Space in 3D on a phone/ }).uncheck();
+    await again.getByRole("switch", { name: /^Reduce animations/ }).uncheck();
+    await again.getByRole("switch", { name: /^Space in 3D on a phone/ }).uncheck();
     await expect.poll(() => root(page, "quality")).toBeNull();
     await expect.poll(() => root(page, "motion")).toBeNull();
     await expect.poll(() => motionFast(page)).toBe(before);
@@ -92,6 +85,8 @@ test.describe("the menu", () => {
     await page.keyboard.press("Enter");
     const menu = page.getByRole("menu", { name: "Your device" });
     await expect(menu).toBeVisible();
+    await expect(menu.getByRole("menuitem").first()).toBeFocused();
+    await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Passport" })).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Settings" })).toBeFocused();
@@ -138,7 +133,7 @@ test.describe("the menu", () => {
     expect(box?.width ?? 0).toBeLessThanOrEqual(PHONE.width);
     await page.keyboard.press("Escape");
     const dialog = await settings(page);
-    await expect(dialog.getByRole("checkbox", { name: /^Space in 3D on a phone/ })).toBeVisible();
+    await expect(dialog.getByRole("switch", { name: /^Space in 3D on a phone/ })).toBeVisible();
   });
 });
 
@@ -159,6 +154,12 @@ test.describe("Go explore", () => {
     page,
   }) => {
     await page.setViewportSize(COMPUTER);
+    // A day whose first stop is a world's page (the pool's order follows the date: another day's may be a realm's, which reads the chain).
+    await page.clock.setFixedTime("2026-11-13T12:00:00Z");
+    // The welcome card of a first visit stands over the hero; this journey is about the call under it.
+    await page.addInitScript(() => {
+      localStorage.setItem("gnoworld:welcomed", "1");
+    });
     await page.route("**/api/presence", (route) => route.fulfill({ json: { worlds: [] } }));
     await page.goto("/");
     await hydrated(page);

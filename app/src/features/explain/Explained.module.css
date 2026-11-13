@@ -1,0 +1,18 @@
+/* The mark Jarvis signs its line with, at the line's end, in Jarvis's violet and the meta's size. */
+@layer components {
+  .mark {
+    /* The assistant's colour: what a machine says (Jarvis's orb and its card) */
+    color: var(--color-signal);
+    font: var(--font-meta);
+    white-space: nowrap;
+    /* layout: a small step after the line's last word, more than a space */
+    margin-inline-start: var(--space-3xs);
+  }
+
+  .mark svg {
+    /* layout: the reset draws an svg as a block; inside the line's words the icon stays on the mark's line */
+    display: inline-block;
+    /* raw: the small icon's middle on the meta's middle, inside the line's words */
+    vertical-align: -0.125em;
+  }
+}

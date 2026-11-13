@@ -1,8 +1,8 @@
-import AxeBuilder from "@axe-core/playwright";
 import { inGames, lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import type { Scripted } from "./scripted.ts";
 import { asAccount, barOf, field, OTHER, T, tagged, tagmsg } from "./talk.ts";
+import { axeOf } from "./axe.ts";
 
 // 4d's reactions, replies and edits as they look and as a real Ergo keeps them (docs/decisions.md, 2026-10-26).
 const LOOK = (address: string): Scripted => ({
@@ -30,7 +30,7 @@ test.describe("reactions, replies and edits, as they look", () => {
     await asAccount(page, LOOK, 3);
     await lineOf(page, "count me in").hover();
     await expect(barOf(page, 2)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("look as the prototype's on a computer's screen", async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe("reactions, replies and edits, as they look", () => {
     await barOf(page, 0).getByRole("button", { name: "Reply" }).click();
     const form = page.getByRole("form", { name: "Write in #games" });
     await expect(form).toContainText("Replying to g10gh7…3y5tv: the first line");
-    expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("form").analyze()).violations).toEqual([]);
     await expect(form).toHaveScreenshot("reply-bar-computer.png");
   });
 
@@ -95,8 +95,8 @@ test.describe("reactions, replies and edits, as they look", () => {
       await page.getByRole("menuitem", { name: "Edit" }).click();
       const form = page.getByRole("form", { name: "Write in #games" });
       await expect(form).toContainText("Editing a message");
-      await expect(field(page)).toHaveValue("the first line");
-      expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
+      await expect(field(page)).toHaveText("the first line");
+      expect((await axeOf(page).include("form").analyze()).violations).toEqual([]);
       await expect(form).toHaveScreenshot(`edit-bar-${screen}.png`);
     });
 
@@ -131,7 +131,7 @@ test.describe("reactions, replies and edits, as they look", () => {
     ).toHaveCount(20);
     expect(await list.evaluate((box) => box.scrollWidth <= box.clientWidth)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
-    expect((await new AxeBuilder({ page }).include("main").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("main").analyze()).violations).toEqual([]);
     await expect(list).toHaveScreenshot("talk-phone.png");
   });
 });

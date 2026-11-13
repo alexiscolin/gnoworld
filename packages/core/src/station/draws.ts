@@ -1,11 +1,12 @@
-// A station's draws: one stream from its seed, read in a fixed order, so the same name always builds the same station.
+// One stream of draws from a seed, read in a fixed order, so the same seed always gives the same numbers: a station's, a world's regions',
+// the rocks' and the rounds' (a text is hashed whole; a number is already a state).
 import { nextState, textHash, unitOf } from "../space/cell.ts";
 
 export class Draws {
   #state: number;
 
-  constructor(seed: string) {
-    this.#state = textHash(`station ${seed}`);
+  constructor(seed: string | number) {
+    this.#state = typeof seed === "string" ? textHash(seed) : seed;
   }
 
   /** A number in [0, 1). */
@@ -32,6 +33,3 @@ export class Draws {
     return from[this.count(0, from.length - 1)] ?? from[0];
   }
 }
-
-/** `value` held between 0 and 1. */
-export const unitClamp = (value: number): number => Math.min(1, Math.max(0, value));

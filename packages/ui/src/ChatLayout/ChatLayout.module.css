@@ -1,10 +1,7 @@
 /* The full-screen chat: a header over a row of regions, filling the height its place gives it, each holding its own scroll, the page none (the video's frame
    23.58.01). The widths are the video's, measured at 1728 px. */
 @layer components {
-  /* The box the chat is given: its width, not the window's, says which regions are drawn (a dock beside a scene is narrow
-     inside a wide window). */
   .root {
-    container-type: inline-size;
     block-size: 100%;
     min-block-size: 0;
   }
@@ -16,6 +13,7 @@
     flex-flow: column;
     block-size: 100%;
     min-block-size: 0;
+    /* The surface, as opaque as the plate's (D13925). */
     background: var(--color-surface);
   }
 
@@ -62,6 +60,57 @@
     border-inline-start: var(--line-width) solid var(--color-line);
   }
 
+  /* The drag handle on a border: a zero-width item of the row, its hit area drawn across the border, a line in the design system's
+     colours while it is hovered, focused or dragged. */
+  .handle {
+    /* layout: it takes no width of the row; the separator hangs over the border */
+    position: relative;
+    /* layout: it keeps no width */
+    flex: none;
+    inline-size: 0;
+    /* raw: above the regions' scroll, which the separator overhangs */
+    z-index: 1;
+  }
+
+  .separator {
+    /* layout: the hit area straddles the border, the body's whole height, its line drawn in the middle */
+    position: absolute;
+    inset-block: 0;
+    inset-inline-start: calc(var(--space-2xs) * -1);
+    inline-size: var(--space-s);
+    cursor: col-resize;
+    touch-action: none;
+    outline: none;
+  }
+
+  .separator::after {
+    content: "";
+    /* layout: the line, centred in the hit area and as high */
+    position: absolute;
+    inset-block-start: 0;
+    block-size: 100%;
+    inset-inline-start: calc(50% - var(--line-width));
+    inline-size: calc(var(--line-width) * 2);
+    background: transparent;
+    transition: background-color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
+  }
+
+  .separator:hover::after {
+    background: var(--color-line-strong);
+  }
+
+  .separator:focus-visible::after,
+  .separator:active::after {
+    background: var(--color-mine-line);
+  }
+
+  /* Forced colours repaint the line's fill: the focus takes a ring instead. */
+  @media (forced-colors: active) {
+    .separator:focus-visible {
+      outline: var(--focus-width) solid Highlight;
+    }
+  }
+
   .conversation {
     /* layout: the conversation takes the width the other regions leave; a column of its own parts */
     display: flex;
@@ -74,16 +123,45 @@
     min-block-size: 0;
   }
 
-  /* raw: the design system's one breakpoint for the chat, a phone's layout (docs/DESIGN-SYSTEM.md), read from the box's
-     width: the conversation alone, the rooms behind a control */
-  @container (inline-size <= 900px) {
+  /* A band over the columns (`band`), from the page header's foot, out of their flow: its row on the lines' own edge, its controls alone
+     taking a click; the columns from its foot, under a rule across the window; the conversation's lines under its title. */
+  .frame[data-band] > .header {
+    /* layout: the band over the columns' top, out of their way */
+    position: absolute;
+    inset-block-start: var(--banner-under);
+    inset-inline: 0;
+    /* layout: the title on the lines' own edge (the app's room), past the band's padding */
+    /* raw: no inset where the chat sets none, the lines' 32 px then */
+    padding-inline-start: calc(var(--space-m) + max(var(--chat-inset, 0px), var(--space-l)));
+    border-block-end: 0;
+    pointer-events: none;
+  }
+
+  .frame[data-band] > .header :is(a, button) {
+    pointer-events: auto;
+  }
+
+  .frame[data-band] > .header + * {
+    /* layout: the columns under the page's header, the band out of their flow */
+    margin-block-start: var(--banner-under);
+    border-block-start: var(--line-width) solid var(--color-line);
+  }
+
+  .frame[data-band] .conversation {
+    /* layout: the conversation's lines under its title */
+    padding-block-start: var(--chat-head);
+  }
+
+  /* The app says the chat is compact (one measure, one breakpoint: the conversation alone, the rooms behind a control). */
+  .frame[data-compact] {
     .worlds,
-    .info {
+    .info,
+    .handle {
       display: none;
     }
 
     /* A thread, which the info slot holds, takes the whole width. */
-    [data-info-first] .info {
+    &[data-info-first] .info {
       display: block;
       /* layout: the thread takes the whole width */
       flex: 1;
@@ -91,7 +169,7 @@
       border-inline-start: 0;
     }
 
-    [data-info-first] .conversation {
+    &[data-info-first] .conversation {
       display: none;
     }
   }

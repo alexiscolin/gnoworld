@@ -1022,6 +1022,10 @@ describe("the web image's nginx", () => {
     expect(conf.match(/include \/etc\/nginx\/csp\.conf;/g)).toHaveLength(1);
   });
 
+  it("keeps the hashed textures and pictures a year, as it keeps the hashed assets", () => {
+    expect(conf).toMatch(/~\^\(200\|206\|304\)\/\(textures\|world-pictures\)\/ "public, max-age=31536000, immutable";/);
+  });
+
   it("copies the build's csp.conf where the include reads it", () => {
     expect(dockerfile).toContain("--from=build /repo/app/build/csp.conf /etc/nginx/csp.conf");
   });

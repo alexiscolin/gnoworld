@@ -1,9 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
 import { lines } from "./chat.ts";
 import { open } from "./chatScreenOpen.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { connectButton } from "./account.ts";
 import { calmed, pinFigures } from "./figures.ts";
 import { box, brightness, near, style } from "./geometry.ts";
+import { axeOf } from "./axe.ts";
 
 // Slice 5r (O1, O2, O4): header, plate, home hero and list measured at the video's size (1728 by 1080, scale 1) against
 // frames 1, 6, 20, 26, 37, 90 and 102 (docs/design/video-screens.md; frames in ~/.cache/gnoworld-tools/video-frames/). A box is
@@ -42,7 +43,7 @@ test.describe("at the video's size", () => {
       near(earth.y + earth.height / 2, 56, "the views' row's middle");
       near(logo.y + logo.height / 2, 56, "the logo's middle");
       // The header's right edge keeps the same 32 px, once the login has said whether a session is open.
-      await expect(page.getByRole("button", { name: "Connect Adena" })).toBeVisible();
+      await expect(connectButton(page)).toBeVisible();
       const right = await page.evaluate(() => {
         const items = [...document.querySelectorAll("header a, header button")].map(
           (el) => el.getBoundingClientRect().right,
@@ -131,12 +132,12 @@ test.describe("at the video's size", () => {
     page,
   }) => {
     await plateAt(page, "/w/bubble");
-    const fill = await page.locator("[data-look='plate']").evaluate((el) => {
+    const fill = await page.locator("[data-look='plate'] [data-fill]").evaluate((el) => {
       const canvas = document.createElement("canvas");
       canvas.width = canvas.height = 1;
       const context = canvas.getContext("2d");
       if (context === null) throw new Error("no canvas context");
-      context.fillStyle = getComputedStyle(el, "::before").backgroundColor;
+      context.fillStyle = getComputedStyle(el).backgroundColor;
       context.fillRect(0, 0, 1, 1);
       return [...context.getImageData(0, 0, 1, 1).data.slice(0, 3)];
     });
@@ -406,7 +407,7 @@ for (const width of [390, 1280, 1728] as const) {
         await page.goto(path);
         await hydrated(page);
         await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-        const { violations } = await new AxeBuilder({ page }).analyze();
+        const { violations } = await axeOf(page).analyze();
         expect(violations).toHaveLength(0);
         expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
         await expect(page.getByRole("banner").getByText("Testnet")).toBeVisible();

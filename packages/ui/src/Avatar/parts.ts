@@ -21,7 +21,7 @@ export const ORDERS = [
   [0, 1, 3, 2, 4],
 ] as const;
 
-// FNV-1a, 32 bits.
+// FNV-1a, 32 bits: core's `textHash` is its twin, which ui may not import (docs/ARCHITECTURE.md).
 function hash(text: string): number {
   let h = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 0x01000193);

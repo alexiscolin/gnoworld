@@ -5,6 +5,7 @@ import { SNAPSHOT_EVENT, SNAPSHOT_TAKEN } from "@gnoworld/core";
 import { Button, Cluster, Dialog, Stack } from "@gnoworld/ui";
 import { useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { copyText } from "../../lib/copy.ts";
 import { linkOf, type SharedPlace } from "./link.ts";
 import styles from "./ShareSheet.module.css";
 
@@ -29,9 +30,6 @@ const fileOf = (canvas: HTMLCanvasElement, name: string): Promise<File | undefin
       JPEG_QUALITY,
     );
   });
-
-// A page that is not secure has no clipboard, though it is typed as always there.
-const clipboard = (): Clipboard | undefined => navigator.clipboard;
 
 const waited = (ms: number) =>
   new Promise<undefined>((done) => {
@@ -110,28 +108,27 @@ function Sheet({ place, open, onClose }: { place: SharedPlace; open: boolean; on
       <Stack space="s">
         {picture === null ? null : (
           <figure className={styles["picture"]} data-waiting={picture === undefined || undefined}>
-            {picture === undefined ? null : <img src={picture.url} alt={`${place.name}, as the view shows it now`} />}
+            {picture === undefined ? null : (
+              <img className="enter" src={picture.url} alt={`${place.name}, as the view shows it now`} />
+            )}
             <figcaption className={styles["caption"]}>
               <span className="label">gnoworld</span>
               <span>{place.name}</span>
             </figcaption>
           </figure>
         )}
-        <p className={styles["link"]}>{link}</p>
+        <p className="data-text">{link}</p>
         <Cluster space="2xs">
           <Button
             emphasis="solid"
             icon="link"
             onClick={() => {
-              const board = clipboard();
-              (board === undefined ? Promise.reject(new Error("no clipboard")) : board.writeText(link)).then(
-                () => {
-                  setSaid("Link copied");
-                },
-                () => {
-                  setSaid("Could not copy: select the link above");
-                },
-              );
+              const said = (copied: boolean) => {
+                setSaid(copied ? "Link copied" : "Could not copy: select the link above");
+              };
+              copyText(link).then(said, () => {
+                said(false);
+              });
             }}
           >
             Copy link

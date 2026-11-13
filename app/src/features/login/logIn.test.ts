@@ -1,8 +1,8 @@
 import { Address, type Proof } from "@gnoworld/schemas";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createAppStore } from "../../store/index.ts";
 import { listen } from "../../lib/adena/events.ts";
-import { knowSession, logIn, logOut, readSession, type LoginDeps } from "./logIn.ts";
+import { knowSession, logIn, logOut, pageClock, readSession, type LoginDeps } from "./logIn.ts";
 import { endForAccount, watchAccount } from "./watch.ts";
 
 const ADDRESS = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
@@ -186,6 +186,345 @@ describe("knowSession", () => {
     await knowSession(t.parts, wait);
     expect(t.tries()).toBe(1);
     expect(t.store.getState().login.session).toEqual({ kind: "out" });
+  });
+
+  it("stops after 16 tries while the server cannot say: some five minutes, never forever (O3B)", async () => {
+    const t = failing(100);
+    await knowSession(t.parts, t.wait);
+    expect(t.tries()).toBe(16);
+    expect(t.waits).toEqual([1000, 2000, 4000, 8000, 16_000, ...Array.from({ length: 10 }, () => 30_000)]);
+    expect(t.store.getState().login.session).toEqual({ kind: "unknown" });
+  });
+
+  it("after its tries, rests until the next gesture or return, then asks again at once and every 30 s", async () => {
+    const t = failing(20);
+    let rests = 0;
+    const rest = () => {
+      rests += 1;
+      return Promise.resolve();
+    };
+    await knowSession(t.parts, t.wait, rest);
+    expect(rests).toBe(1);
+    expect(t.tries()).toBe(21);
+    expect(t.waits.slice(15)).toEqual([30_000, 30_000, 30_000, 30_000]);
+    expect(t.store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("rests not when the 16th try finds the session", async () => {
+    const t = failing(15);
+    let rests = 0;
+    const rest = () => {
+      rests += 1;
+      return Promise.resolve();
+    };
+    await knowSession(t.parts, t.wait, rest);
+    expect([rests, t.tries(), t.waits.length]).toEqual([0, 16, 15]);
+    expect(t.store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("rests after the 16th failed try alone; a later round asks every 30 s, no more often than the old endless loop", async () => {
+    const t = failing(40);
+    const restsAt: number[] = [];
+    const rest = () => {
+      restsAt.push(t.tries());
+      return Promise.resolve();
+    };
+    await knowSession(t.parts, t.wait, rest);
+    const later = (count: number) => Array.from({ length: count }, () => 30_000);
+    expect(restsAt).toEqual([16, 32]);
+    expect(t.tries()).toBe(41);
+    expect(t.waits).toEqual([1000, 2000, 4000, 8000, 16_000, ...later(10), ...later(15), ...later(8)]);
+    expect(t.store.getState().login.session).toEqual({ kind: "in", address: ADDRESS });
+  });
+
+  it("asks no more after its rest when a login knew the session meanwhile", async () => {
+    const t = failing(100);
+    const rest = () => {
+      t.store.getState().loginActions.signedOut();
+      return Promise.resolve();
+    };
+    await knowSession(t.parts, t.wait, rest);
+    expect(t.tries()).toBe(16);
+    expect(t.store.getState().login.session).toEqual({ kind: "out" });
+  });
+});
+
+describe("pageClock", () => {
+  // A page whose tab is shown or hidden as the test sets it, holding its live listeners as a Document does: a removal takes away only the
+  // entry of the same type, function and capture.
+  const page = (hidden: boolean) => {
+    const entries: { type: string; listener: () => void; capture: boolean }[] = [];
+    const captures = (options: boolean | EventListenerOptions | undefined) =>
+      typeof options === "boolean" ? options : options?.capture === true;
+    const at = (type: string, listener: () => void, capture: boolean) =>
+      entries.findIndex((entry) => entry.type === type && entry.listener === listener && entry.capture === capture);
+    return {
+      hidden,
+      addEventListener: (type: string, listener: () => void, options?: boolean | AddEventListenerOptions) => {
+        if (at(type, listener, captures(options)) < 0) entries.push({ type, listener, capture: captures(options) });
+      },
+      removeEventListener: (type: string, listener: () => void, options?: boolean | EventListenerOptions) => {
+        const found = at(type, listener, captures(options));
+        if (found >= 0) entries.splice(found, 1);
+      },
+      fire: (type: string) => {
+        for (const entry of entries.filter((each) => each.type === type)) entry.listener();
+      },
+      listening: () => entries.length,
+      allCapture: () => entries.every((entry) => entry.capture),
+    };
+  };
+  const isDone = (promise: Promise<void>) => {
+    let done = false;
+    promise.then(
+      () => {
+        done = true;
+      },
+      () => undefined,
+    );
+    return () => done;
+  };
+  const turn = () => vi.advanceTimersByTimeAsync(0);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("waits its time while the tab is shown, and listens to nothing", async () => {
+    const shown = page(false);
+    const done = isDone(pageClock(shown).wait(1000));
+    await vi.advanceTimersByTimeAsync(999);
+    expect(done()).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done()).toBe(true);
+    expect(shown.listening()).toBe(0);
+  });
+
+  it("asks nothing while the tab is hidden: a wait ended hidden lasts until the tab is shown", async () => {
+    const hidden = page(true);
+    const done = isDone(pageClock(hidden).wait(1000));
+    await vi.advanceTimersByTimeAsync(60_000);
+    hidden.fire("visibilitychange");
+    hidden.fire("pointerdown");
+    await turn();
+    expect(done()).toBe(false);
+    hidden.hidden = false;
+    hidden.fire("visibilitychange");
+    await turn();
+    expect(done()).toBe(true);
+    expect(hidden.listening()).toBe(0);
+  });
+
+  it("a wait whose tab was hidden in its middle lasts until the tab is shown", async () => {
+    const tab = page(false);
+    const done = isDone(pageClock(tab).wait(30_000));
+    await vi.advanceTimersByTimeAsync(5000);
+    tab.hidden = true;
+    tab.fire("visibilitychange");
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(done()).toBe(false);
+    tab.fire("visibilitychange");
+    await turn();
+    expect(done()).toBe(false);
+    tab.hidden = false;
+    tab.fire("visibilitychange");
+    await turn();
+    expect(done()).toBe(true);
+    expect(tab.listening()).toBe(0);
+  });
+
+  it("a tab hidden and shown again before the wait's end: the wait ends on time", async () => {
+    const tab = page(false);
+    const done = isDone(pageClock(tab).wait(30_000));
+    await vi.advanceTimersByTimeAsync(5000);
+    tab.hidden = true;
+    tab.fire("visibilitychange");
+    await vi.advanceTimersByTimeAsync(5000);
+    tab.hidden = false;
+    tab.fire("visibilitychange");
+    await vi.advanceTimersByTimeAsync(19_999);
+    expect(done()).toBe(false);
+    await vi.advanceTimersByTimeAsync(1);
+    expect(done()).toBe(true);
+  });
+
+  it.each(["pointerdown", "wheel", "keydown"])(
+    "rests until the next gesture (%s), heard in capture",
+    async (gesture) => {
+      const shown = page(false);
+      const done = isDone(pageClock(shown).rest());
+      expect(shown.listening()).toBeGreaterThan(0);
+      expect(shown.allCapture()).toBe(true);
+      await vi.advanceTimersByTimeAsync(600_000);
+      expect(done()).toBe(false);
+      shown.fire(gesture);
+      await turn();
+      expect(done()).toBe(true);
+      expect(shown.listening()).toBe(0);
+    },
+  );
+
+  it("rests until the tab comes back, never at its hiding", async () => {
+    const tab = page(false);
+    const done = isDone(pageClock(tab).rest());
+    tab.hidden = true;
+    tab.fire("visibilitychange");
+    await turn();
+    expect(done()).toBe(false);
+    tab.hidden = false;
+    tab.fire("visibilitychange");
+    await turn();
+    expect(done()).toBe(true);
+    expect(tab.listening()).toBe(0);
+  });
+
+  it("stopped, what was pending never settles and nothing listens, a hidden wait's listener included", async () => {
+    const tab = page(true);
+    const clock = pageClock(tab);
+    const waited = isDone(clock.wait(1000));
+    const rested = isDone(clock.rest());
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(tab.listening()).toBeGreaterThan(0);
+    const later = isDone(clock.wait(5000));
+    clock.stop();
+    expect(tab.listening()).toBe(0);
+    tab.hidden = false;
+    tab.fire("visibilitychange");
+    tab.fire("pointerdown");
+    await vi.advanceTimersByTimeAsync(10_000);
+    expect([waited(), rested(), later()]).toEqual([false, false, false]);
+  });
+
+  it("stop clears every timer, several waits pending", async () => {
+    const shown = page(false);
+    const clock = pageClock(shown);
+    const waits = [isDone(clock.wait(1000)), isDone(clock.wait(30_000)), isDone(clock.rest())];
+    clock.stop();
+    expect(vi.getTimerCount()).toBe(0);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(waits.map((done) => done())).toEqual([false, false, false]);
+  });
+
+  it("a wait or a rest asked after stop never settles, arms no timer, adds no listener (a read landing after the page left)", async () => {
+    const shown = page(false);
+    const clock = pageClock(shown);
+    clock.stop();
+    const waited = isDone(clock.wait(1000));
+    const rested = isDone(clock.rest());
+    expect(vi.getTimerCount()).toBe(0);
+    expect(shown.listening()).toBe(0);
+    await vi.advanceTimersByTimeAsync(600_000);
+    for (const type of ["pointerdown", "wheel", "keydown", "visibilitychange"]) shown.fire(type);
+    await turn();
+    expect([waited(), rested()]).toEqual([false, false]);
+  });
+
+  it("listens in capture and passive, and removes with the same options, so no handler up the tree hides a gesture or delays a scroll", () => {
+    const seen: { type: string; options: unknown }[] = [];
+    const recorded = {
+      hidden: false,
+      addEventListener: (type: string, _listener: () => void, options: AddEventListenerOptions) => {
+        seen.push({ type: `add ${type}`, options });
+      },
+      removeEventListener: (type: string, _listener: () => void, options: EventListenerOptions) => {
+        seen.push({ type: `remove ${type}`, options });
+      },
+    };
+    const clock = pageClock(recorded);
+    isDone(clock.rest());
+    clock.stop();
+    expect(seen).toHaveLength(8);
+    for (const entry of seen.filter((each) => each.type.startsWith("add"))) {
+      expect(entry.options).toEqual({ capture: true, passive: true });
+    }
+    for (const entry of seen.filter((each) => each.type.startsWith("remove"))) {
+      expect(entry.options).toMatchObject({ capture: true });
+    }
+  });
+
+  // Loaded afresh inside the test: the options are a constant of the module, which a planted change reaches only when it loads after.
+  it("hears in capture and passive whenever its module loads", async () => {
+    vi.resetModules();
+    const { pageClock: loaded } = await import("./logIn.ts");
+    const options: unknown[] = [];
+    const clock = loaded({
+      hidden: false,
+      addEventListener: (_type: string, _listener: () => void, given: AddEventListenerOptions) => {
+        options.push(given);
+      },
+      removeEventListener: () => undefined,
+    });
+    isDone(clock.rest());
+    clock.stop();
+    expect(options).toEqual(Array.from({ length: 4 }, () => ({ capture: true, passive: true })));
+  });
+
+  it("clears at stop the timers still pending alone, each once: not one that fired, nothing at a second stop", async () => {
+    const clock = pageClock(page(false));
+    isDone(clock.wait(1000));
+    await vi.advanceTimersByTimeAsync(1000);
+    isDone(clock.wait(5000));
+    const cleared = vi.spyOn(globalThis, "clearTimeout");
+    clock.stop();
+    clock.stop();
+    expect(cleared).toHaveBeenCalledTimes(1);
+    cleared.mockRestore();
+  });
+
+  describe("with knowSession, a server that never says: the asks it costs", () => {
+    const asking = (hidden: boolean) => {
+      const base = deps();
+      let tries = 0;
+      const made = deps({
+        api: {
+          ...base.parts.api,
+          me: () => {
+            tries += 1;
+            return Promise.resolve({ ok: false, reason: "network" });
+          },
+        },
+      });
+      const tab = page(hidden);
+      const clock = pageClock(tab);
+      const asked = knowSession(made.parts, clock.wait, clock.rest);
+      return { tab, clock, asked, tries: () => tries };
+    };
+
+    it("16 asks in an hour on a shown tab nobody touches, one rest listening", async () => {
+      const t = asking(false);
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      expect(t.tries()).toBe(16);
+      expect(t.tab.listening()).toBe(4);
+      t.clock.stop();
+    });
+
+    it("one ask in an hour on a tab hidden from the start; one more when it is shown", async () => {
+      const t = asking(true);
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      expect(t.tries()).toBe(1);
+      t.tab.hidden = false;
+      t.tab.fire("visibilitychange");
+      t.tab.fire("visibilitychange");
+      await turn();
+      expect(t.tries()).toBe(2);
+      t.clock.stop();
+    });
+
+    it("after the 16, a burst of gestures starts one round, never a burst of asks", async () => {
+      const t = asking(false);
+      await vi.advanceTimersByTimeAsync(3_600_000);
+      for (let i = 0; i < 3; i += 1) t.tab.fire("pointerdown");
+      await turn();
+      expect(t.tries()).toBe(17);
+      await vi.advanceTimersByTimeAsync(29_999);
+      expect(t.tries()).toBe(17);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(t.tries()).toBe(18);
+      t.clock.stop();
+    });
   });
 });
 

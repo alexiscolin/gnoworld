@@ -21,7 +21,7 @@
 
   .word {
     /* raw: 19 px, 300, -0.03em (the prototype's #hnav .brand) */
-    font: 300 19px/1 var(--family-sans);
+    font: 300 1.1875rem/1 var(--family-sans);
     letter-spacing: var(--tracking-tight);
   }
 
@@ -31,7 +31,7 @@
   }
 
   /* When narrow, the word drops before the mark (DESIGN-SYSTEM.md, Layout); the link around it keeps its name. */
-  @media (max-width: 600px) {
+  @media (width <= 600px) {
     .word {
       display: none;
     }

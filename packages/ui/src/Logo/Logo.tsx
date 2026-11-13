@@ -16,11 +16,11 @@ export function Logo({ wordmark = false }: LogoProps) {
         r="13.5"
         fill="none"
         stroke="currentColor"
-        strokeWidth="1.4"
+        strokeWidth={1.4}
         strokeDasharray="0.1 3.4"
         strokeLinecap="round"
       />
-      <circle cx="16" cy="16" r="8" fill="none" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="16" cy="16" r="8" fill="none" stroke="currentColor" strokeWidth={1.4} />
       <circle cx="16" cy="16" r="3.4" fill="currentColor" />
       <circle cx="24" cy="16" r="1.9" fill="currentColor" />
       <circle cx="6.9" cy="25.4" r="1.6" fill="currentColor" />

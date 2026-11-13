@@ -3,18 +3,17 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { closureOf as filesOf, DYNAMIC_IMPORT, HASHED, lateWeights, STATIC_IMPORT } from "./chunks.ts";
 import type { Request } from "@playwright/test";
-import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, test, type Page } from "./fixtures.ts";
+import { cacheContents, controlled, expect, hydrated, isWorld, PAGES, reactMark, test, type Page } from "./fixtures.ts";
 import { scriptedErgo } from "./scripted.ts";
 import { BUILD } from "./sites.ts";
 
-// ADR-0001 §12's budgets, as gzip sends them, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the
-// worker's precache; each raise in docs/decisions.md. 192,299 B once slice 9 met slice 8 (the Earth's page, the highest; the worlds'
-// pages 188,707), measured on that merge.
-const FIRST_SCREEN_JS = 192_299;
-// A page with no plate (the home, the list) keeps the cap Alexis gave the header (183,296 B), raised by his yeses of 2026-11-05: slice-7
-// Summed on the 8h+8p+8n merge (8n: +63, +3, +13 B for a full Plan's search), weighed on it (the chief, 2026-11-05; each raise in docs/decisions.md).
-// 189,695 B once slice 9 met slice 8 (the chain's deploys in the ticker, the Earth's room followed, the store's chain and signals), measured on that merge.
-const PLAIN_FIRST_SCREEN_JS = 189_695;
+// ADR-0001 §12's budgets, gzip, hashed names left out (7y): JavaScript before the first usable screen, 3 MB in all with the precache.
+// The Earth's or a world's page, exact: 265,038 B on 2026-11-12; 278,607 B measured after the review's fixes of 2026-11-13, a world's,
+// 256 B ahead (D13948, D13135, provisional till the hardening; its history D386 on).
+const FIRST_SCREEN_JS = 278_863;
+// A page with no plate (the home), exact: 262,551 B on 2026-11-12; 275,999 B measured after the review's fixes of 2026-11-13, 256 B ahead
+// (D13948, D13135, provisional till the hardening; its history D386 on).
+const PLAIN_FIRST_SCREEN_JS = 276_255;
 const firstScreenCap = (path: string) => (holdsDoor(path) ? FIRST_SCREEN_JS : PLAIN_FIRST_SCREEN_JS);
 const TOTAL = 3_135_286;
 
@@ -140,15 +139,14 @@ test(
 // A world's chat comes after hydration (Chat.tsx's boundary), its lines' view only once a room holds a line
 // (RoomView.tsx's): the first screen counts the chat, every run, and never the lines' view (F960, the green pass's G6).
 const CHAT = /\/assets\/ChatPanel-[\w-]+\.js$/;
-// A page that holds both the chat and the door to space, the Earth's and a world's: its chat waits for the load and the door (useSpace.ts), so
-// its chunk leaves the first screen here, by this name alone, and only once the page proves it came after them. The chief's calls, 2026-11-02,
-// for Alexis: 7f2's report for the Earth, 7e's for a world.
-const DOOR = /\/assets\/mountUniverse-[\w-]+\.js$/;
+// A page that holds the chat and space (the Earth's, a world's): its chat waits for space's first frame, or 2.5 s once the page is on screen
+// (useSpace.ts), so its chunk leaves the first screen by this name alone. The gate's browsers draw no space: the wait is the 2.5 s's, which
+// the old door's chunk (mountUniverse, D401) replaced.
 const holdsDoor = (path: string) => path.endsWith("/earth") || isWorld(path);
-// What leaves the first screen keeps a cap of its own, so a chat that grows behind the door is still measured (7e's red pass, 12), with
-// what it asks once open; slice-8's 25,167 B (its steps in docs/decisions.md), 25,880 B once slice 9 met slice 8 (the chain cards, the
-// pinned pills and their wrapping row).
-const LATE_CHAT_JS = 25_880;
+// What leaves the first screen keeps a cap of its own, with what it asks once open (7e's red pass, 12): 42,775 B on 2026-11-09; 45,824 B
+// with the realm plate's moved bytes (slice 13); 46,464 B on 2026-11-11, 46,208 B measured with the chat's move on Web Animations
+// (D13980), 256 B ahead; 50,032 B on 2026-11-12 (49,776 B measured, 256 B ahead; D13948); 54,797 B on 2026-11-13 (54,541 B measured).
+const LATE_CHAT_JS = 54_797;
 const LINES = /\/assets\/Lines-[\w-]+\.js$/;
 // A world with a realm reads its proposals from the chain once hydrated (world.tsx, F2977): their chunk, asked after the first screen, and
 // the scripts only it needs, under a cap of their own: 22,393 B with slice-8's realm page reader (Alexis, 2026-11-05, "oui"; was 21,521 B;
@@ -158,73 +156,49 @@ const PROPOSALS_JS = 35_631;
 // A world's pinned actions (9e-1, D271), on its plate and in its chat's bar, come in one chunk the proposals' code asks for after hydration, for a
 // world that pins one alone: weighed with the proposals.
 const PINNED = /\/assets\/Pinned-[\w-]+\.js$/;
-// A plate's blocks that wait for a read (8g, Alexis's "Charger avec leur donnée"): the realm card, the hours and their chart, each asked as its
-// read starts and capped at its size measured on 2026-11-04 and 256 B (the chief's call). The connected worlds wait for the worlds' file,
-// which the journeys' site does not serve: their chunk never loads here.
-const PLATE_LATE = /\/assets\/(FromExplorer|hours|Bars|ChartedBy)-[\w-]+\.js$/;
-const PLATE_LATE_JS: Record<string, number> = { FromExplorer: 6088, hours: 618, Bars: 3336, ChartedBy: 348 };
+// A plate's late chunks, each capped at its size and 256 B (8g, D386); EarthPlate 46,535 B and HubPlate 45,647 B with the card opened
+// alone's Room (D13979), the worlds file's reader and schema realms 694 B and worlds 870 B (D13973); the others as measured on the plate's
+// commit (Plate weighed once, in the plate's chunk); no RealmPlate cap, no journey reaches it.
+const PLATE_LATE =
+  /\/assets\/(EarthPlate|HubPlate|followEarth|people|FromExplorer|hours|Bars|ChartedBy|realms|worlds|BubbleWords|plain)-[\w-]+\.js$/;
+const PLATE_LATE_JS: Record<string, number> = {
+  EarthPlate: 60065, // 2026-11-13, after the review's fixes: 59,809 B measured, 256 B ahead (D13948, D13135)
+  HubPlate: 56518, // 2026-11-13, after the review's fixes: 56,262 B measured, 256 B ahead (D13948, D13135)
+  followEarth: 1728,
+  people: 405,
+  FromExplorer: 5853,
+  hours: 618,
+  Bars: 3336,
+  ChartedBy: 608,
+  realms: 8307, // D13948: two chunks share the name: the worlds reader (691 B) and, on /w/govdao alone, 8,051 B of realm code; hardening splits them
+  worlds: 1126,
+  // A bubble's words with the plain text they are cut from, asked once a bubble shows: 535 B on 2026-11-13, 256 B ahead.
+  BubbleWords: 791,
+  plain: 682,
+};
 // So does its page's capture on its plate (8f): a chunk of its own, asked after the first screen, capped at its size and 256 B (the chief).
 // It is weighed beyond the proposals' code, which the same page loads.
 const PREVIEW = /\/assets\/Preview-[\w-]+\.js$/;
 // 3,413 B once the realm page's drawing has a chunk of its own (8f's review), capped at its size and 256 B; 5,212 B in the timer-held
 // measure on slice-7's merge into slice-8, the realm page's drawing (RealmBlocks) and the chat's (Message) counted here, the capture
-// asking for both (Alexis, 2026-11-05, "oui pour l'aperçu à 5 203").
-const PREVIEW_JS = 5615;
+// asking for both (Alexis, 2026-11-05); 8,685 B with D382's tables and alerts, 256 B ahead (D386); 10,095 B on the ping-pong of 2026-11-09 (9,839 B measured), 256 B ahead (+1,410 B).
+const PREVIEW_JS = 10_437;
 // Its drawing is the chat's (Message), which its code asks for as it draws: late with it, and weighed with it.
 const DRAWING = /\/assets\/Message-[\w-]+\.js$/;
 // And the realm page's drawing (5h's RealmBlocks), a chunk of its own through its slot: the capture's three parts.
 const PAGE_DRAWING = /\/assets\/RealmBlocks-[\w-]+\.js$/;
 const CAPTURE_PARTS = [PREVIEW, DRAWING, PAGE_DRAWING];
 // three and the scene: a chunk of their own, asked after the text and never by a phone before View in space. `?test-gpu` lets the
-// gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames.
+// gate's software GPU through. The mark is a word of three's WebGLRenderer that no minifier renames. Three itself sits in the `earth` chunk
+// the scene imports (D401, D13952): the scene's and its three's, both hashed to eight characters.
 const SCENE = /\/assets\/scene-[\w-]+\.js$/;
-// The cosmos, a chunk of its own: only the home that shows worlds asks for it.
-const COSMOS = /\/assets\/cosmos-[\w-]+\.js$/;
-// A world's page's part of the scene, its own chunk: about 9.4 KB with the maps it shares with the cosmos (7e, 2026-11-02).
-// The whole cosmos, past a cluster's distance (7d5): its own chunk, asked once the eye leaves for it.
-const WHOLE = /\/assets\/web-[\w-]+\.js$/;
-// The view at rest's search and eye (7d6) with the home's dive and dissolve (7d7), and the nebulae (7d6): lazy chunks the home asks once
-// its cosmos shows, first capped a tenth or so over their weight (7d7: 6,771 B and 3,492 B). The view at rest's: 10 KiB since 7p's depth,
-// 10.5 KiB with 7v's views (Alexis, 2026-11-03, docs/decisions.md).
-const REST = /\/assets\/restSearch-[\w-]+\.js$/;
-const NEBULAE = /\/assets\/nebulae-[\w-]+\.js$/;
-// The cosmos's labels (7h): their own chunk, asked once the cosmos stands, so neither the scene's nor the cosmos's cap pays for them; first
-// the part's 5,960 B, 6 KiB once the rail shared their ranking, titles, reading and band (Alexis, 2026-11-03: two chunks of their own, the
-// price of sharing), 6.5 KiB with 7v's views, the Plan's loader and its chunk's preloads (Alexis, 2026-11-03).
-const LABELS = /\/assets\/labelled-[\w-]+\.js$/;
-// The flights (7g): camera-controls, the streaks and the veil, a chunk of their own the scene asks for once it runs, so neither the scene's
-// cap nor the cosmos's pays for them. Its first value is the part's: its size at the part's end and about a tenth. The mark is a word of
-// camera-controls' own warning, which no minifier renames.
-const FLIGHTS = /\/assets\/flights-[\w-]+\.js$/;
-const FLIGHTS_MARK = "camera-controls:";
-// The rail (7i) and its planets' portraits: chunks of their own, asked once the cosmos's worlds stand on a computer, outside the scene's and
-// the cosmos's caps. Their first caps are the part's (the chief, 2026-11-03): 6,408 B and 1,712 B measured, and about a tenth.
-const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
-const PORTRAITS = /\/assets\/portraits-[\w-]+\.js$/;
-const RECORDED_WORLDS = readFileSync(new URL("../../lab/worlds.json", import.meta.url), "utf8");
-// A system's arrival (7d3), its dynamic view (7v): a chunk the view at rest's asks the first time a system is, found by name from the scene's
-// chunk to the cosmos's to the view at rest's. 1,518 B, then 2 KiB with the dynamic view (Alexis, 2026-11-03); 2,070 B with the Earth's
-// views (7x2, the margin given ahead), 8 B of it for other chunks' hashed names.
-const COSMOS_NAMED = /\.\/(cosmos-[\w-]+\.js)/;
-const REST_NAMED = /\.\/(restSearch-[\w-]+\.js)/;
-const ARRIVAL_NAMED = /\.\/(restArrival-[\w-]+\.js)/;
-const LABELS_NAMED = /\.\/(labelled-[\w-]+\.js)/;
-const ROCKS_NAMED = /\.\/(rocks-[\w-]+\.js)/;
-const ROCKS_MARK = "aRock";
-// A system's Plan and the Earth's top view (7v, 7x2): a chunk the view at rest's names, weighed apart from the labels' too, whose names'
-// code it shares; the Plan's orbits and names, a chunk the labels' name. 2,248 B and 2,147 B (F4470); the orbits' 2,459 B once their
-// names' row was shared with the stations' (7x2, the margin given ahead).
-const PLAN_NAMED = /\.\/(restPlan-[\w-]+\.js)/;
-const ORBITS_NAMED = /\.\/(orbits-[\w-]+\.js)/;
-// A system's dynamic view's rocks (7v), laid in a chunk the view at rest's names, drawn by one the labels' name, their program in no
-// chunk loaded first (caps in chunks.ts); the depth, the home's far worlds, went with the Earth's view (7x2).
-const LAID_NAMED = /\.\/(restRocks-[\w-]+\.js)/;
-// The Earth's view (7x2): its stations, scenery, belt, names and caption, a chunk the cosmos's names once it shows (cap in chunks.ts).
-const EARTH_VIEW_NAMED = /\.\/(earthView-[\w-]+\.js)/;
-const WORLD_PART = /\/assets\/part-[\w-]+\.js$/;
+const SCENE_CHUNKS = /\/assets\/(?:scene|earth)-[\w-]{8}\.js$/;
 const THREE_MARK = "isWebGLRenderer";
-// Every world but the Earth (7b5): its program and its recipe, a chunk of its own the cosmos asks for with its worlds' maps, so neither
-// the scene's chunk nor the cosmos's pays for it. The mark is a uniform of its program that no minifier renames.
+// The rail (7i): a chunk of its own, on the home's first screen since the rebuild, outside the scene's cap.
+const RAIL = /\/assets\/Rail-[\w-]+\.js$/;
+const RECORDED_WORLDS = readFileSync(new URL("../recordedWorlds.json", import.meta.url), "utf8");
+// Every world but the Earth (7b5): its program and its recipe, a chunk of its own the scene imports with its worlds' maps, so neither
+// the scene's own file nor three's pays for it. The mark is a uniform of its program that no minifier renames.
 const GENERATED = /\/assets\/generated-[\w-]+\.js$/;
 const GENERATED_MARK = "minorShare";
 
@@ -347,9 +321,13 @@ function holdTimers() {
     for (const { go } of going) go();
   };
   // What a page puts off on purpose waits on: an idle callback, or a timer of a second or more (later.ts, the bell's watch). A frame and
-  // a shorter timer run, as React's own that shows a boundary's content once its code came.
+  // a shorter timer run, as React's own that shows a boundary's content once its code came. Not the 2,500 ms of useSpace.ts's
+  // FIRST_SCREEN_MS: the gate's browsers draw no space, so that wait is how the chat of a page that holds space is let in.
   Reflect.set(window, "__letShortGo", () => {
-    release((set, args) => set === "requestIdleCallback" || (set.startsWith("set") && Number(args[1] ?? 0) >= 1000));
+    release(
+      (set, args) =>
+        set === "requestIdleCallback" || (set.startsWith("set") && Number(args[1] ?? 0) >= 1000 && args[1] !== 2500),
+    );
   });
   Reflect.set(window, "__letTimersGo", () => {
     release(() => false);
@@ -373,7 +351,8 @@ async function settled(page: Page, seen: Seen): Promise<void> {
 async function firstScreenOf(page: Page, path: string, seen: Seen): Promise<string[]> {
   await page.addInitScript(holdTimers);
   await page.goto(path);
-  await hydrated(page);
+  // Hydrated, not past the home's loader: it leaves on a timer this run holds till the first screen is weighed.
+  await page.waitForFunction(reactMark);
   await settled(page, seen);
   const asked = [...seen.scripts];
   await page.evaluate(() => {
@@ -432,15 +411,8 @@ function weighed(url: string, chunk: string) {
   );
 }
 
-// The address of the late chunk a built file names in its dynamic imports, by `pattern`'s first group.
-async function namedIn(page: Page, url: string, pattern: RegExp): Promise<string> {
-  const name = pattern.exec(await (await page.request.get(url)).text())?.[1];
-  expect(name, `${url} names its late chunk`).toBeDefined();
-  return new URL(name ?? "", url).href;
-}
-
-// The chat of a page that holds the door, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load and
-// the door ended; open, its rooms read and its screen drawn, and settled, so what it asks once open, as a narrow chat's rooms, has come
+// The chat of a page that holds space, once it holds one: exactly one chunk of that name, named by no preload, and asked after the load
+// (space's wait, 2.5 s, ended); open, its rooms read and its screen drawn, and settled, so what it asks once open, as a narrow chat's rooms, has come
 // (F5410: RoomsDrawer asked as the guard read, at a load of 10 to 40).
 async function lateChat(page: Page, path: string, seen: Seen) {
   const { scripts } = seen;
@@ -451,8 +423,8 @@ async function lateChat(page: Page, path: string, seen: Seen) {
   });
   await settled(page, seen);
   expect(await (await page.request.get(path)).text(), "no preload names the chat").not.toContain("ChatPanel");
-  const { chunk, loaded, door } = await page.evaluate(
-    ([chat, gate]) => {
+  const { chunk, loaded } = await page.evaluate(
+    ([chat]) => {
       const [navigation] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
       const entry = (name: string) =>
         performance.getEntriesByType("resource").find((each) => new RegExp(name).test(each.name)) as
@@ -460,22 +432,23 @@ async function lateChat(page: Page, path: string, seen: Seen) {
       return {
         chunk: entry(chat)?.startTime ?? 0,
         loaded: navigation?.loadEventEnd ?? Infinity,
-        door: entry(gate)?.responseEnd ?? Infinity,
       };
     },
-    [CHAT.source, DOOR.source] as const,
+    [CHAT.source] as const,
   );
   expect(chunk, "the chat's chunk is asked after the load").toBeGreaterThanOrEqual(loaded);
-  expect(chunk, "the chat's chunk is asked after the door came").toBeGreaterThanOrEqual(door);
   return [...scripts].find((url) => CHAT.test(url));
 }
 
 // Each of a plate's late chunks, with what it alone brings, within its own cap; what they bring, for the count of every chunk.
 async function plateWithin(page: Page, late: readonly string[], firstScreen: readonly string[]): Promise<string[]> {
   const brought: string[] = [];
-  for (const url of late) {
-    const name = PLATE_LATE.exec(url)?.[1] ?? "";
-    const own = ownOf(url, firstScreen);
+  // In the caps' order, each beyond what the ones before it brought: the plate's own files are weighed once, whatever order they were asked in.
+  const order = Object.keys(PLATE_LATE_JS);
+  const nameOf = (url: string) => PLATE_LATE.exec(url)?.[1] ?? "";
+  for (const url of [...late].sort((a, b) => order.indexOf(nameOf(a)) - order.indexOf(nameOf(b)))) {
+    const name = nameOf(url);
+    const own = ownOf(url, [...firstScreen, ...brought]);
     brought.push(...own);
     expect(await compressed(page, own), `the plate's ${name} stays within its cap`).toBeLessThanOrEqual(
       PLATE_LATE_JS[name] ?? 0,
@@ -539,7 +512,9 @@ const expectPinned = (scripts: ReadonlySet<string>, path: string) => {
   );
 };
 
-for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [CHARTED, true] as const]) {
+// /list is the home with the palette open (D355): its scripts are the home's, weighed at /.
+const WEIGHED = PAGES.filter((each) => each !== "/list");
+for (const [path, charted] of [...WEIGHED.map((each) => [each, false] as const), [CHARTED, true] as const]) {
   test(`${path}${charted ? ", charted," : ""} stays within its budgets`, { tag: "@gate" }, async ({ page }) => {
     await chartedStream(page, charted);
     const seen = watch(page);
@@ -613,8 +588,8 @@ for (const [path, charted] of [...PAGES.map((each) => [each, false] as const), [
 
 // A page's capture under a chat line (8f), on a world with no realm, whose page loaded none of the realm view's code: what the capture
 // brings beyond everything else the page loaded (its first screen, the chat, the lines) stays within the capture's own cap (8f's review, 1).
-// 7,445 B before slice 9 (the capture's code, the realm page's reader and drawing, the warning before a link leaves); 8,122 B with it.
-const LINE_PREVIEW_JS = 8122;
+// 8,122 B with slice 9; 9,458 B on the ping-pong, 256 B ahead (D386); 11,024 B on 2026-11-09 (10,768 B measured), 256 B ahead (+1,566 B).
+const LINE_PREVIEW_JS = 11_024;
 test("a page's capture under a line, on a world with no realm, stays within its cap", async ({ page }) => {
   const scripts = new Set<string>();
   page.on("response", (response) => {
@@ -659,30 +634,7 @@ test("a page's capture under a line, on a world with no realm, stays within its 
   ).toBeLessThanOrEqual(LINE_PREVIEW_JS);
 });
 
-test("the cosmos's chunk stays within its cap, and the scene's holds none of it", async ({ page }) => {
-  const cosmos = page.waitForResponse((response) => COSMOS.test(response.url()));
-  await page.goto("/?test-gpu");
-  await hydrated(page);
-  weighed((await cosmos).url(), "cosmos");
-});
-
-test("the whole cosmos's chunk stays within its cap, apart from the cosmos's and the scene's", async ({ page }) => {
-  const whole = page.waitForResponse((response) => WHOLE.test(response.url()));
-  await page.goto("/?test-gpu");
-  await hydrated(page);
-  await page.locator("canvas[data-scene='on']").waitFor({ state: "attached" });
-  await page.evaluate(() => {
-    const view = Reflect.get(globalThis, "__gnoworldScene") as {
-      moveTo: (to: { x: number; y: number; z: number }) => void;
-      stats: () => { eye: { x: number; y: number; z: number } };
-    };
-    const { eye } = view.stats();
-    view.moveTo({ x: eye.x, y: eye.y, z: eye.z + 900 });
-  });
-  weighed((await whole).url(), "web");
-});
-
-// The home's scene chunk, once the page hydrated: each late chunk is found by name from it, chunk by chunk.
+// The scene's chunk, asked once the page is hydrated on a browser the test lets draw (`?test-gpu`): each late chunk is found by name from it.
 async function homeScene(page: Page): Promise<string> {
   const asked = page.waitForResponse((response) => SCENE.test(response.url()));
   await page.goto("/?test-gpu");
@@ -690,155 +642,63 @@ async function homeScene(page: Page): Promise<string> {
   return (await asked).url();
 }
 
-// A late chunk the view at rest's names by `named`, found by name from the scene's chunk to the cosmos's to the view at rest's, within its
-// cap apart from the chunks its row in chunks.ts names.
-async function restLateWithin(page: Page, { named, chunk }: { named: RegExp; chunk: string }): Promise<void> {
-  const cosmos = await namedIn(page, await homeScene(page), COSMOS_NAMED);
-  const rest = await namedIn(page, cosmos, REST_NAMED);
-  weighed(await namedIn(page, rest, named), chunk);
-}
-
-// The chunks the labels' names come after: the scene's, the cosmos's and the labels' own.
-async function labelsThere(page: Page) {
-  const scene = await homeScene(page);
-  return { scene, cosmos: await namedIn(page, scene, COSMOS_NAMED), labels: await namedIn(page, scene, LABELS_NAMED) };
-}
-
-test("a system's arrival's chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
-  page,
-}) => {
-  await restLateWithin(page, { named: ARRIVAL_NAMED, chunk: "restArrival" });
-});
-
-test("a system's view's rocks' laying chunk stays within its cap, apart from the view at rest's, the cosmos's and the scene's", async ({
-  page,
-}) => {
-  await restLateWithin(page, { named: LAID_NAMED, chunk: "restRocks" });
-});
-
-test("the Earth's view's chunk stays within its cap, apart from the cosmos's and the scene's", async ({ page }) => {
-  const cosmos = await namedIn(page, await homeScene(page), COSMOS_NAMED);
-  weighed(await namedIn(page, cosmos, EARTH_VIEW_NAMED), "earthView");
-});
-
-test("a Plan's chunk stays within its cap, apart from the view at rest's, the labels', the cosmos's and the scene's", async ({
-  page,
-}) => {
-  await restLateWithin(page, { named: PLAN_NAMED, chunk: "restPlan" });
-});
-
-test("the Plan's orbits' chunk stays within its cap, apart from the labels', the cosmos's and the scene's", async ({
-  page,
-}) => {
-  const { labels } = await labelsThere(page);
-  weighed(await namedIn(page, labels, ORBITS_NAMED), "orbits");
-});
-
-test("the rocks' chunk stays within its cap, apart from the labels', the cosmos's and the scene's, which hold none of it", async ({
-  page,
-}) => {
-  const { scene, cosmos, labels } = await labelsThere(page);
-  weighed(await namedIn(page, labels, ROCKS_NAMED), "rocks");
-  for (const url of [...closureOf(scene), ...closureOf(cosmos)])
-    expect(await (await page.request.get(url)).text(), url).not.toContain(ROCKS_MARK);
-});
-
-for (const [name, pattern, chunk] of [
-  ["view at rest's", REST, "restSearch"],
-  ["nebulae's", NEBULAE, "nebulae"],
-  ["labels'", LABELS, "labelled"],
-] as const)
-  test(`the ${name} chunk stays within its cap, apart from the cosmos's and the scene's`, async ({ page }) => {
-    const late = page.waitForResponse((response) => pattern.test(response.url()));
-    await page.goto("/?test-gpu");
-    await hydrated(page);
-    weighed((await late).url(), chunk);
-  });
-
-test("the rail's and its portraits' chunks come once the cosmos's worlds stand, each within its own cap, apart from the cosmos's and the scene's", async ({
+test("the rail's chunk comes with the home, within its own cap, apart from what the first screen holds", async ({
   page,
 }) => {
   await page.route("**/worlds.json", (route) =>
     route.fulfill({ body: RECORDED_WORLDS, contentType: "application/json" }),
   );
-  const asked = (chunk: RegExp) => page.waitForResponse((response) => chunk.test(response.url()));
-  const [rail, portraits] = [asked(RAIL), asked(PORTRAITS)];
+  const rail = page.waitForResponse((response) => RAIL.test(response.url()));
   await page.goto("/?test-gpu");
   await hydrated(page);
   weighed((await rail).url(), "Rail");
-  weighed((await portraits).url(), "portraits");
-});
-
-test("the flights' chunk holds camera-controls, comes once the scene runs, within its own cap, and the scene's holds none of it", async ({
-  page,
-}) => {
-  const flights = page.waitForResponse((response) => FLIGHTS.test(response.url()));
-  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
-  await page.goto("/?test-gpu");
-  await hydrated(page);
-  const [sceneUrl, flightsUrl] = [(await scene).url(), (await flights).url()];
-  expect(await (await page.request.get(flightsUrl)).text()).toContain(FLIGHTS_MARK);
-  for (const url of closureOf(sceneUrl)) expect(await (await page.request.get(url)).text()).not.toContain(FLIGHTS_MARK);
-  weighed(flightsUrl, "flights");
-});
-
-test("a world's part of the scene stays within its cap", async ({ page }) => {
-  const part = page.waitForResponse((response) => WORLD_PART.test(response.url()));
-  await page.goto("/w/bubble?test-gpu");
-  await hydrated(page);
-  weighed((await part).url(), "part");
 });
 
 // The shaders' spaces stripped at build (Alexis, 2026-11-03): three's own, which the scene's chunk ships, read as a compiler reads them, in the
-// site's build and the lab's beside it, which the journeys walk.
-test("ships the scene's shaders stripped of their spaces, in the site's build and the lab's", async ({ page }) => {
-  for (const [path, pattern] of [
-    ["/?test-gpu", SCENE],
-    ["/lab/realism.html?view=cosmos", /\/lab\/assets\/[\w-]+\.js$/],
-  ] as const) {
-    const texts: string[] = [];
-    page.on("response", (response) => {
-      if (pattern.test(response.url())) texts.push(response.url());
-    });
-    await page.goto(path);
-    await expect
-      .poll(
-        async () => {
-          const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
-          return bodies.some((text) => text.includes("gl_FragColor=vec4("));
-        },
-        { timeout: 60_000 },
-      )
-      .toBe(true);
-    const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
-    for (const text of bodies) expect(text).not.toMatch(/gl_FragColor = |\n[ \t]+(?:vec[234]|float|uniform|varying) /);
-  }
+// site's build.
+test("ships the scene's shaders stripped of their spaces, in the site's build", async ({ page }) => {
+  const texts: string[] = [];
+  page.on("response", (response) => {
+    if (SCENE_CHUNKS.test(response.url())) texts.push(response.url());
+  });
+  await page.goto("/?test-gpu");
+  await expect
+    .poll(
+      async () => {
+        const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
+        return bodies.some((text) => text.includes("gl_FragColor=vec4("));
+      },
+      { timeout: 60_000 },
+    )
+    .toBe(true);
+  const bodies = await Promise.all(texts.map(async (url) => (await page.request.get(url)).text()));
+  for (const text of bodies) expect(text).not.toMatch(/gl_FragColor = |\n[ \t]+(?:vec[234]|float|uniform|varying) /);
 });
 
-// The scene weighs its chunk and every chunk it imports statically that the door did not bring already: a part of three split into a chunk
-// of its own is still the scene's (7e: two lazy parts made rolldown split the scene's shared modules out of it).
-test("the scene's chunk holds three, and stays within its cap", async ({ page }) => {
-  const scene = page.waitForResponse((response) => SCENE.test(response.url()));
-  await page.goto("/?test-gpu");
-  await hydrated(page);
-  const url = (await scene).url();
-  expect(await (await page.request.get(url)).text()).toContain(THREE_MARK);
+// The scene weighs its chunk and every chunk it imports statically that the page's first screen did not bring already: three, in a chunk of
+// its own since D401's rebuild (`earth`), is still the scene's (7e: two lazy parts made rolldown split the scene's shared modules out of it).
+test("the scene's chunk brings three, and stays within its cap", async ({ page }) => {
+  const url = await homeScene(page);
+  const holding = await Promise.all(
+    closureOf(url).map(async (each) =>
+      (await (await page.request.get(each)).text()).includes(THREE_MARK) ? each : "",
+    ),
+  );
+  expect(
+    holding.filter((each) => each !== ""),
+    "three is in a chunk the scene imports",
+  ).not.toEqual([]);
   weighed(url, "scene");
 });
 
-test("the generated worlds' chunk comes with the cosmos's worlds, within its own cap, and no other chunk holds it", async ({
+test("the generated worlds' chunk comes with the scene, within its own cap, and the scene's own file holds none of it", async ({
   page,
 }) => {
-  const chunks = [SCENE, COSMOS, GENERATED].map((chunk) =>
-    page.waitForResponse((response) => chunk.test(response.url())),
-  );
+  const chunks = [SCENE, GENERATED].map((chunk) => page.waitForResponse((response) => chunk.test(response.url())));
   await page.goto("/?test-gpu");
   await hydrated(page);
-  const [sceneUrl = "", cosmosUrl = "", generatedUrl = ""] = await Promise.all(
-    chunks.map(async (response) => (await response).url()),
-  );
+  const [sceneUrl = "", generatedUrl = ""] = await Promise.all(chunks.map(async (response) => (await response).url()));
   expect(await (await page.request.get(generatedUrl)).text()).toContain(GENERATED_MARK);
-  for (const url of [sceneUrl, cosmosUrl])
-    expect(await (await page.request.get(url)).text()).not.toContain(GENERATED_MARK);
+  expect(await (await page.request.get(sceneUrl)).text()).not.toContain(GENERATED_MARK);
   weighed(generatedUrl, "generated");
 });
