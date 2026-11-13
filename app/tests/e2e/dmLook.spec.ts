@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
+import { axeOf } from "./axe.ts";
 
 // How a direct message looks (slice 4's 4e; its UX review, U20), on a computer's screen and a phone's: the page's
 // socket answered by a scripted Ergo (scripted.ts), the conversation's lines sent by the test, the same each run.
@@ -39,7 +39,7 @@ async function conversation(page: Page, width: number, partner: string): Promise
 // A direct message as Ergo relays it: `from`'s, to `to`, at 10:0`minute`.
 const dm = (id: string, { from, to, minute, text }: { from: string; to: string; minute: number; text: string }) =>
   `@msgid=${id};time=2026-10-25T10:0${String(minute)}:00.000Z;account=${from} :${from}!u@h PRIVMSG ${to} :${text}`;
-const axe = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
+const axe = async (page: Page) => (await axeOf(page).analyze()).violations;
 
 // A phone's chat header keeps two fixed rows (81bfec1c); a direct message's mark takes a third of its own, said at once, so the partner's
 // name keeps the room it needs beside the close control (F4309: the mark on the name's row cut the name to its first letter).

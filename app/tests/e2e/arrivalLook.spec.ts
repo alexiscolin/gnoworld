@@ -1,7 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { adena } from "./adena.ts";
 import { accountPill, connectButton } from "./account.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { axeOf } from "./axe.ts";
 
 // How the arrival banners look (slice 9h, frames 90 to 97), on a phone and a computer. No journey reaches first words (the
 // journeys' moderation has no key), so the page is handed the answers a server would give; the pictures are approved on the
@@ -41,7 +41,7 @@ test.describe("the arrival banners, as they look", () => {
       const banner = page.locator("[data-banner]");
       await expect(banner).toContainText("First to chart · Bubble");
       await expect(page.getByText(/^First charted by @g1/)).toBeVisible();
-      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      expect((await axeOf(page).analyze()).violations).toEqual([]);
       expect(
         await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth),
       ).toBe(0);

@@ -1,8 +1,8 @@
-import AxeBuilder from "@axe-core/playwright";
 import { inGames, lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { scriptedErgo, type HistoryLine } from "./scripted.ts";
+import { axeOf } from "./axe.ts";
 
 // A message of several lines (docs/decisions.md row 255, by Alexis: draft/multiline, Shift+Enter adds a line): the
 // composer's box holds lines and Enter sends them as one batch; a message of several lines shows as one line, its
@@ -192,7 +192,7 @@ test.describe("a message of several lines", () => {
   test("passes axe with a draft of several lines and a message of several lines shown", async ({ page }) => {
     await opened(page, [["m1", T(0), "- one\n- two"]]);
     await field(page).fill("first\nsecond");
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 

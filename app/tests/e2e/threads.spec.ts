@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { buttonsOf, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -7,6 +6,7 @@ import { MEMBER, opened, scriptedErgo, type HistoryLine, type Scripted } from ".
 import { marks, sentBefore, tags } from "./scriptedRoom.ts";
 import { asAccount, barOf, field, GUEST, OTHER, ROOM, T, tabsTo, tagged, tagmsg } from "./talk.ts";
 import { chipOf, closeButton, inThread, panel, threadField, threadOf } from "./thread.ts";
+import { axeOf } from "./axe.ts";
 
 // 4d's threads (docs/plans/chat-features.md, M3): a reply chain found in the room's own lines; a chip under its root, or
 // a line's More menu, opens it beside the room; every reply from it is tagged +reply with the root's msgid (scripted.ts).
@@ -496,7 +496,7 @@ test.describe("threads", () => {
     await open(page);
     await chipOf(lines(page).first()).click();
     await expect(panel(page)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test.describe("on a phone's screen", () => {
@@ -518,7 +518,7 @@ test.describe("threads", () => {
         () => document.documentElement.scrollWidth > document.documentElement.clientWidth,
       );
       expect(wide).toBe(false);
-      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      expect((await axeOf(page).analyze()).violations).toEqual([]);
       await closeButton(page).click();
       await expect(lines(page).first()).toBeVisible();
       await expect(form).toBeVisible();

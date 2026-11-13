@@ -1,6 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { BrowserContext, Locator, WebSocketRoute } from "@playwright/test";
-import { violations } from "./axe.ts";
+import { axeOf, violations } from "./axe.ts";
 import { beforeTheList, inGames, lineOf, lines, roomsNav, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
@@ -376,7 +375,7 @@ test.describe("a line's actions", () => {
     await page.keyboard.press("End");
     await expect(lines(page).last()).toBeInViewport();
     expect(await barInside(page, 59)).toBe(true);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   // The green pass (G8): a line the arrows reach at the list's top edge, its bar rising past it; and the same

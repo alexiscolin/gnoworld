@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { goInPage, labelsOf, landed, running, shownLabels } from "./sceneStage.ts";
+import { axeOf } from "./axe.ts";
 
 // The universe's names (D401, the demo's pills), read off the engine's own layer (`options.labels`): text, never an address; a door where
 // one shows and no pointer where none does; none over a page that frames its planet. On the software GPU, with the recorded worlds' file.
@@ -71,5 +71,5 @@ test("shows no label where the cosmos is covered: the Earth's page and a world's
 test("leaves the home's axe check clean with its labels standing, at 1280 px", async ({ page }) => {
   await arrived(page, LAPTOP);
   await settled(page);
-  expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+  expect((await axeOf(page).analyze()).violations).toEqual([]);
 });

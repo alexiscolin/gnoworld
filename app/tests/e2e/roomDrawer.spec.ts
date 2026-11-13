@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { lineOf, lines, roomsNav, word } from "./chat.ts";
 import type { Locator } from "@playwright/test";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
@@ -7,6 +6,7 @@ import type { HistoryLine } from "./scripted.ts";
 import { live, OTHER, room, T } from "./scriptedRoom.ts";
 import { barOf } from "./talk.ts";
 import { chipOf, threadField } from "./thread.ts";
+import { axeOf } from "./axe.ts";
 
 // Slice 5's 5b (U3, docs/plans/slice-5.md §1): from 900 px down the rooms sit behind the button "Rooms", which says its
 // unread count in its name while closed; the drawer is the dialog "Rooms". A scripted Ergo, the account's lines first.
@@ -276,10 +276,10 @@ test.describe("the rooms as a drawer, on a phone's screen", () => {
   test("passes axe at 390 px, closed and open", async ({ page }) => {
     await account(page, 390);
     await expect(control(page)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
     await control(page).click();
     await expect(drawer(page)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 
@@ -293,7 +293,7 @@ test.describe("the rooms beside the conversation, on a computer's screen", () =>
     await expect(page.getByRole("dialog")).toHaveCount(0);
     const rightOf = (item: Locator) => item.evaluate((element) => element.getBoundingClientRect().right);
     expect(await rightOf(roomsNav(page))).toBeLessThan(await rightOf(page.getByRole("list", { name: "Messages" })));
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("a screen of 900 px puts the rooms behind the control, one just over 900 px keeps them in view", async ({

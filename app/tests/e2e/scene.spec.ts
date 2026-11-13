@@ -1,7 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { cacheContents, controlled, expect, hydrated, test, type Page } from "./fixtures.ts";
 import type { Space } from "../../src/space/scene.ts";
 import { framesOf, goInPage, landed, loseContext, restoreContext, running } from "./sceneStage.ts";
+import { axeOf } from "./axe.ts";
 
 // The scene in a real browser, on the software GPU the gate has, under the page's real CSP (the fixtures fail a journey on any
 // violation). `?test-gpu` lets that GPU through in a test build only: dataFiles.test.ts holds a production build to it.
@@ -88,7 +88,7 @@ test.describe("a computer", () => {
     await page.goto(HOME);
     await running(page);
     await expect(worlds(page).getByRole("link", { name: "Bubble" })).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   // D333: the canvas is not seen while its first frame is not whole; it opens as an iris once the dive started and leaves no clip behind.
@@ -294,7 +294,7 @@ test.describe("a phone", () => {
     if (box === null) throw new Error("no button");
     expect(box.x).toBeGreaterThanOrEqual(16);
     expect(box.x + box.width).toBeLessThanOrEqual(PHONE.width - 16);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("View in space looks as approved", async ({ page }) => {

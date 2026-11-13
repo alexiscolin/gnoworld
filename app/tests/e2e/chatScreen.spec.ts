@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import { lines, pressWhoIsHere } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { open, PIN } from "./chatScreenOpen.ts";
 import { scriptedErgo } from "./scripted.ts";
+import { axeOf } from "./axe.ts";
 
 // 5q: the chat as the video shows it (frames 23.58.01 and 23.57.54 of .claude/tmp/slice-5/video-frames): worlds, rooms,
 // conversation and info panel at a computer's width, the conversation first at a phone's. Scripted Ergo, so each run draws
@@ -194,7 +194,7 @@ test.describe("the chat as the video shows it", () => {
   test("passes axe at a computer's width, an account's and a guest's", async ({ page }) => {
     await logIn(page, "screen-axe");
     await open(page, { width: 1280, as: ACCOUNT, pinned: true });
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("keeps the phone's layout, a guest's: the conversation first, no worlds, no side panel, axe clean", async ({
@@ -206,7 +206,7 @@ test.describe("the chat as the video shows it", () => {
     await expect(roomsButton(page)).toBeVisible();
     expect((await box(page.getByRole("list", { name: "Messages" }))).x).toBeLessThan(40);
     expect(await sideways(page)).toBe(0);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
     await expect(page).toHaveScreenshot("chat-screen-phone.png");
   });
 
@@ -222,7 +222,7 @@ test.describe("the chat as the video shows it", () => {
       expect(each.x + each.width).toBeLessThanOrEqual(390);
     }
     expect(await sideways(page)).toBe(0);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
     // The info panel has no room on a phone: Who's here opens the people, each with its Message button.
     await pressWhoIsHere(page);
     const dialog = page.getByRole("dialog", { name: "Who's here" });

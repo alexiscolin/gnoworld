@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import { lineOf, noticeStatus, roomsNav, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
 import { field, hiddenTab, HISTORY, live, OTHER, room, tab, T } from "./scriptedRoom.ts";
 import { MEMBER, type HistoryLine } from "./scripted.ts";
+import { axeOf } from "./axe.ts";
 
 // 4f-n (docs/decisions.md, 2026-10-26: "Notifications wait for a merge of their own"; docs/plans/slice-4.md §1): what the
 // account is told, on a scripted Ergo: a badge on each room's row and conversation's, the count in the tab's title, a
@@ -209,7 +209,7 @@ test.describe("notifications", () => {
     ergo().send(live("n1", T(31), { room: "#bubble", text: mentioned(address) }));
     await expect(noticeStatus(page)).toHaveText(`${SHORT} mentioned you in #bubble`);
     await expect(field(page)).toBeFocused();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   // R19: the button goes as the list empties, and so does the link followed from it: focus must land on a stable element,

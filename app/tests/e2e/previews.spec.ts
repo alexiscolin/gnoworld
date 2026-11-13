@@ -1,10 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
 import { readFileSync } from "node:fs";
 import type { WebSocketRoute } from "@playwright/test";
 import { lines } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { scriptedErgo } from "./scripted.ts";
 import { SITE } from "./sites.ts";
+import { axeOf } from "./axe.ts";
 
 // A page's preview (8f, slice 7's 7l): the capture the server's job wrote of a realm's home, on its world's plate (frame 26) and under a
 // chat line that links that page (frames 104, 107), once the line is checked. The page asks the site's own previews.json and nothing the
@@ -54,7 +54,7 @@ test.describe("on a world's plate", () => {
       heading.evaluate((element) => getComputedStyle(element).fontSize);
     expect(await size(dialog.locator("h1"))).toBe("20px");
     expect(await size(page.locator("[data-preview-thumb] h1"))).toBe("20px");
-    expect((await new AxeBuilder({ page }).include("dialog[open]").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("dialog[open]").analyze()).violations).toEqual([]);
     await page.keyboard.press("Escape");
     await expect(dialog).toBeHidden();
     await expect(preview).toBeFocused();

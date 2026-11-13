@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { realmType } from "@gnoworld/core";
 import { queryEnvelope, rpcErrorEnvelope, statusEnvelope } from "@gnoworld/chain/testing/envelopes";
 import { indexer } from "../chain/indexerRoute.ts";
@@ -7,6 +6,7 @@ import type { Browser, BrowserType, LaunchOptions } from "@playwright/test";
 import { accountPill, connectButton } from "./account.ts";
 import { calls, openCall, writeTab } from "./callRows.ts";
 import { expect, hydrated, type Page } from "./fixtures.ts";
+import { axeOf } from "./axe.ts";
 
 // The call card's journeys' world (9d): Adena's stand-in (adena.ts) given the calls a signature needs, with the recorded
 // answers (app/recording/adena-recording.json, onyx-1), and the chain's RPC answering as a browser would get it.
@@ -213,7 +213,7 @@ export async function violations(page: Page) {
       .filter((animation) => animation.effect?.getComputedTiming().iterations !== Infinity);
     await Promise.all(running.map((transition) => transition.finished.then(settled, settled)));
   });
-  return (await new AxeBuilder({ page }).analyze()).violations;
+  return (await axeOf(page).analyze()).violations;
 }
 
 /** A touch phone in a browser of its own, with the session of `page`'s login: a phone cannot log in (its pointer is coarse), but an

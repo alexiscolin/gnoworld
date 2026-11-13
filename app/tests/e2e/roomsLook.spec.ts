@@ -1,10 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
 import type { WebSocketRoute } from "@playwright/test";
 import { lineOf, lines } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { calmed } from "./figures.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
+import { axeOf } from "./axe.ts";
 
 // How a world's rooms look (slice 4's 4b, the composer 4c's), on a computer's screen and a phone's: the page's
 // socket answered by a scripted Ergo (scripted.ts), so its lines, topic and people are the same each run.
@@ -103,7 +103,7 @@ test.describe("a world's rooms, as they look", () => {
     expect(await shown.nth(1).getByText("Mentions you").evaluate(color)).toBe(amber);
     expect(await shown.nth(0).getByTitle(MEMBER).last().evaluate(color)).not.toBe(amber);
     await expect(shown.nth(1)).toHaveCSS("border-inline-start-color", amber);
-    expect((await new AxeBuilder({ page }).include("ol").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("ol").analyze()).violations).toEqual([]);
     // For the picture, the drawn address reads the same each run (its own text was checked above), so the amber
     // mention shows in it; the header, which names the wallet, masked.
     await mine.evaluate((element) => {

@@ -1,5 +1,5 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
+import { axeOf } from "./axe.ts";
 
 // Slice 9g (frames 20 to 35 and 90 to 97): a line in the GovDAO room with its block and none before its event. The page is handed the stream's frames a server would send and waits on the stream's own response.
 // Guests only: no journey but arrival.spec.ts may open /w/govdao logged in (D210).
@@ -21,7 +21,7 @@ const SIZES = [
   ["phone", 390, 844],
   ["computer", 1280, 800],
 ] as const;
-const violations = async (page: Page) => (await new AxeBuilder({ page }).analyze()).violations;
+const violations = async (page: Page) => (await axeOf(page).analyze()).violations;
 const sideways = (page: Page) =>
   page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
 const streamOf = (page: Page, body: string) =>

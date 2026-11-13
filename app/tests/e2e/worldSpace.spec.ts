@@ -1,7 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import type { Space } from "../../src/space/scene.ts";
 import { countShifts, keepsItsRoom, opened, shifted } from "./sceneStage.ts";
+import { axeOf } from "./axe.ts";
 
 // A world's page in space (frames 20 to 35, 90 to 107, 115 to 125) on the gate's software GPU, under the page's real CSP: the world's
 // planet in the circle the page keeps beside the plate, its rooms as moons clear of the plate, and the chat, which now comes after the load
@@ -83,7 +83,7 @@ test.describe("a computer", () => {
   test("passes axe with the world in space", async ({ page }) => {
     await visit(page, "/w/govdao?test-gpu");
     await drawn(page);
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 
@@ -201,6 +201,6 @@ for (const viewport of [COMPUTER, { width: 390, height: 844 }])
         await hydrated(page);
         await chatIn(page, slug);
         expect(await shifted(page)).toBeLessThan(0.05);
-        expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+        expect((await axeOf(page).analyze()).violations).toEqual([]);
       });
   });

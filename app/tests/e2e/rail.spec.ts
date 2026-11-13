@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { running, shownLabels } from "./sceneStage.ts";
+import { axeOf } from "./axe.ts";
 
 // The rail (frame 4 and 16, 7i): the Earth, the trends, the rising worlds and the seeds as planets with their names down the right edge,
 // 25 at most, ending on the last (8p); one stop in the tab order, the arrows among them; magnified like a dock under the pointer, never under reduced
@@ -317,7 +317,7 @@ for (const size of [
 
 test("passes axe where it stands", async ({ page }) => {
   await arrived(page);
-  const { violations } = await new AxeBuilder({ page }).include("nav[aria-label='Worlds']:not([data-rail])").analyze();
+  const { violations } = await axeOf(page).include("nav[aria-label='Worlds']:not([data-rail])").analyze();
   expect(violations).toEqual([]);
 });
 

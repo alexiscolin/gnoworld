@@ -1,10 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { phoneWith } from "./account.ts";
 import { logIn } from "./irc.ts";
 import type { HistoryLine } from "./scripted.ts";
 import { marks, room, ROOM, T } from "./scriptedRoom.ts";
+import { axeOf } from "./axe.ts";
 
 // 4d's mark unread and saved messages (docs/plans/slice-4.md §7; ADR-0002: "Mark unread: 0, on the device", "Saved
 // messages: Device"), on a scripted Ergo. Both are the device's: Ergo's MARKREAD only moves forward (irc/getters.go:552,
@@ -177,7 +177,7 @@ test.describe("saved messages", () => {
     await choose(page, 1, "Save message");
     await savedButton(page).click();
     await expect(savedDialog(page)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 

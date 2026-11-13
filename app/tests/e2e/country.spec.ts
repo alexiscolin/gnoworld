@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import { accountPill, connectButton, openSettings } from "./account.ts";
 import { lineOf, lines, word } from "./chat.ts";
 import { expect, test, type Page } from "./fixtures.ts";
 import { opened } from "./scripted.ts";
 import { asAccount, field, GUEST, HISTORY, OTHER, ROOM, tagged, twoInGames } from "./talk.ts";
+import { axeOf } from "./axe.ts";
 
 // The country tag, from the person's choice in Settings (Privacy) to another reader's screen, never finer than a country. Most journeys run
 // on a scripted Ergo, so the bytes the page sends are read; the last runs two accounts on the real one, which alone shows a client's tag
@@ -127,7 +127,7 @@ test.describe("the country tag", () => {
       expect(Math.abs(code.y + code.height / 2 - (face.y + face.height / 2))).toBeLessThanOrEqual(1);
       expect(Math.round(code.width)).toBe(22);
       expect(Math.round(code.height)).toBe(15);
-      expect((await new AxeBuilder({ page }).include("ol[aria-label='Messages']").analyze()).violations).toEqual([]);
+      expect((await axeOf(page).include("ol[aria-label='Messages']").analyze()).violations).toEqual([]);
       await expect(head).toHaveScreenshot(`country-line-${screen}.png`, { mask: [head.locator("time")] });
     });
 
@@ -138,7 +138,7 @@ test.describe("the country tag", () => {
       if (width < 600) await page.getByRole("button", { name: "Close the chat" }).click();
       const dialog = await openSettings(page);
       await expect(countryList(dialog)).toHaveValue("JP");
-      expect((await new AxeBuilder({ page }).include("#settings-privacy").analyze()).violations).toEqual([]);
+      expect((await axeOf(page).include("#settings-privacy").analyze()).violations).toEqual([]);
     });
   }
 });

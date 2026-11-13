@@ -1,4 +1,3 @@
-import AxeBuilder from "@axe-core/playwright";
 import { word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { box } from "./geometry.ts";
@@ -7,6 +6,7 @@ import { EARTH, INES, NIGHT, onEarth, raw, ROOMS, SLOW } from "./earthStage.ts";
 import { scriptedErgo } from "./scripted.ts";
 import { countShifts, running, shifted } from "./sceneStage.ts";
 import type { WebSocketRoute } from "@playwright/test";
+import { axeOf } from "./axe.ts";
 
 // The Earth's life (frames 43 to 55, 85): what people say, where they say it from, over the globe, on a scripted Ergo so every run shows the
 // same words. Each line declares its country as 7j's will: a tag on the wire. The hour is fixed: at 21:30 UTC, Europe is in the night.
@@ -207,7 +207,7 @@ test.describe("a computer, as the frames", () => {
     const socket = await parisSaid(page);
     socket().send(raw({ id: "m2", text: "evening from Sydney", country: "AU", from: "p2" }));
     await expect(page.getByText("Australia · 1, far side")).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 
   test("lets a bubble pop in with motion on", async ({ page }) => {
@@ -395,6 +395,6 @@ test.describe("a phone", () => {
     expect(found.x + found.width).toBeLessThanOrEqual(PHONE.width);
     expect(await onTop(page, found.x + found.width / 2, found.y + found.height / 2)).toBe(true);
     await page.getByRole("button", { name: "Credits", exact: true }).click({ trial: true });
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });

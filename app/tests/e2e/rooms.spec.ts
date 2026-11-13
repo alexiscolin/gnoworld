@@ -1,9 +1,9 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { connectButton, logOutHere } from "./account.ts";
 import { inGames, lineOf, roomsNav, whoIsHere, word } from "./chat.ts";
 import { logIn, talk, ticketOf, type Step } from "./irc.ts";
 import { SITE } from "./sites.ts";
+import { axeOf } from "./axe.ts";
 
 // A world's rooms (slice 4's 4b) on the real server and Ergo: api.mjs gives Bubble a section Talk (#games, then the
 // main room) and #news outside it. Each test logs in a wallet of its own (?as=), its tickets its own, and its account
@@ -242,7 +242,7 @@ test.describe("a world's rooms", () => {
     await hydrated(page);
     await expect(lineOf(page, seen)).toHaveCount(1);
     await expect(whoIsHere(page).getByTitle(address)).toBeVisible();
-    expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+    expect((await axeOf(page).analyze()).violations).toEqual([]);
   });
 });
 

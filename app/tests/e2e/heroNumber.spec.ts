@@ -167,7 +167,8 @@ test.describe("with the scene", () => {
     await expect.poll(() => file.worlds(), SLOW).toBe(1);
     expect(file.count()).toBe(0);
     await page.getByRole("link", { name: "gnoworld" }).click();
-    await expect(page).toHaveURL(/\/$/);
+    // The router moves once the home's data is in: 6.6 s measured with the scene in software GL on parallel workers.
+    await expect(page).toHaveURL(/\/$/, SLOW);
     await drawsTheFile(page);
     await expect(page.locator(NUMBER)).toHaveText(COUNT);
     expect(file.worlds()).toBe(1);

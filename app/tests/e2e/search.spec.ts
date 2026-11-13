@@ -1,7 +1,7 @@
-import AxeBuilder from "@axe-core/playwright";
 import { inGames, whoIsHere, word } from "./chat.ts";
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { logIn } from "./irc.ts";
+import { axeOf } from "./axe.ts";
 
 // The search palette (D355): ⌘K, Ctrl+K, the slash and the header's control open it over the universe's places;
 // typing sends no request (the places are in the page); arrows, Enter and Escape work, and the focus goes back to the opener.
@@ -191,7 +191,7 @@ test.describe("⌘K", () => {
       await control(page).click();
       await field(page).fill("b");
       await expect(choices(page).first()).toBeVisible();
-      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      expect((await axeOf(page).analyze()).violations).toEqual([]);
       // Every box the palette shows keeps 16 px from the viewport's sides (the shell's gutter).
       const outside = await palette(page).evaluate((dialog, gutter) => {
         const inner = [...dialog.querySelectorAll("input, [role='option'], button")];
@@ -202,11 +202,11 @@ test.describe("⌘K", () => {
       expect(outside).toBe(0);
       await field(page).fill("zzz");
       await expect(page.getByText(/no place/i)).toBeVisible();
-      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      expect((await axeOf(page).analyze()).violations).toEqual([]);
       await field(page).fill("");
       // A phone has the shelves out of the way: the styles' chips stand in for them (Discover's Controls).
       await expect(width > 900 ? shelves(page) : palette(page).getByRole("button", { name: "Games" })).toBeVisible();
-      expect((await new AxeBuilder({ page }).analyze()).violations).toEqual([]);
+      expect((await axeOf(page).analyze()).violations).toEqual([]);
     });
   }
 

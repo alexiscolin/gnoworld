@@ -1,10 +1,10 @@
-import AxeBuilder from "@axe-core/playwright";
 import { expect, hydrated, scriptsAsked, test, type Page } from "./fixtures.ts";
 import { logOutHere } from "./account.ts";
 import { inGames, lineOf, whoIsHere, word } from "./chat.ts";
 import { logIn } from "./irc.ts";
 import { MEMBER, scriptedErgo } from "./scripted.ts";
 import type { WebSocketRoute } from "@playwright/test";
+import { axeOf } from "./axe.ts";
 
 // The composer (slice 4's 4c) on the real server and Ergo: an account writes in #games, its line shown once Ergo
 // echoes it, its Markdown as marks; a guest is told to log in. Each test logs in a wallet of its own (?as=).
@@ -407,10 +407,10 @@ test.describe("the composer", () => {
     await inGames(page);
     await typed(page, "**see** [docs](https://gno.land/docs)");
     await expect(field(page).getByRole("link", { name: "docs" })).toBeVisible();
-    expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("form").analyze()).violations).toEqual([]);
     await field(page).fill("a".repeat(376));
     await expect(field(page)).toHaveAccessibleDescription(/bytes left/);
-    expect((await new AxeBuilder({ page }).include("form").analyze()).violations).toEqual([]);
+    expect((await axeOf(page).include("form").analyze()).violations).toEqual([]);
   });
 
   // Ergo scripted (scripted.ts): its first socket answers, then closes; the next ones never answer.
