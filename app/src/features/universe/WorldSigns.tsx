@@ -6,8 +6,17 @@ import { useAppStore } from "../../storeContext.tsx";
 
 // Asked as this module runs, not as the first render does: the plate's chunk, asked at the page's load, would hold the signs' code behind it
 // (the chat's budget counted it then, as the page's first screen no longer held it).
-const earth = import("../../EarthSigns.tsx");
-const Signs = lazy(async () => ({ default: (await earth).PageSigns }));
+// A failure is kept as a value and thrown at the first render, to the signs' error boundary: a rejection nobody awaits yet is an unhandled
+// one (`vitest list` failed on it, the module loaded and the run over before the chunk).
+const earth = import("../../EarthSigns.tsx").then(
+  (signs) => ({ signs }),
+  (cause: unknown) => ({ cause }),
+);
+const Signs = lazy(async () => {
+  const got = await earth;
+  if ("cause" in got) throw new Error("the Earth signs' chunk did not load", { cause: got.cause });
+  return { default: got.signs.PageSigns };
+});
 
 /** The newest words of the rooms the page follows as bubbles on the planet `world`, the page's; the Earth's, with none. */
 export function WorldSigns({ world }: { world?: string }) {
