@@ -127,14 +127,10 @@ def selectors(path, test):
 
 def prettier_cache_mutants():
     """Prettier's cache lives in the worktree's .claude/tmp, in a repository only, keyed by content (harness-c, speed-audit.md row 6)."""
-    check = "scripts/check.sh"
-    for find, replace, label in (
+    yield from swaps("scripts/check.sh", "check.sh", (
         ("--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache", "--cache-strategy content", "gives Prettier no cache"),
         ("--cache --cache-strategy content --cache-location", "--cache --cache-strategy metadata --cache-location", "keys Prettier's cache by modification time, not content"),
-    ):
-        yield from each(check, find, replace, "hooks", f"check.sh {label}")
-
-
+    ))
 
 
 def quick_mutants():
@@ -1041,6 +1037,8 @@ def mutants():
     yield from each("scripts/check_regressions.py", ".strip() in gone.get(current, set())", ".strip() in set()", "hooks", "check_regressions switched to fails")
     yield from each("scripts/check_regressions.py", 'elif path.endswith(("_test.gno", "_test.go")):', "elif False:", "hooks", "check_regressions gno and Go tests")
     yield from each("scripts/check_regressions.py", "ast.literal_eval(node.value)", "{}", "hooks", "check_regressions reads GAPS")
+    yield from each("scripts/check_regressions.py", "            if not run.stdout.strip():", "            if False:", "hooks", "check_regressions says what Playwright said when it listed nothing")
+    yield from each("scripts/check.sh", "lanes= # the lanes started, which the trap stops", ": # the lanes started, which the trap stops", "hooks", "check.sh's trap reads no caller's lanes")
     yield from each("scripts/check_regressions.py", 'if "ignore" in key.lower():', "if False:", "hooks", "check_regressions reads ignore lists")
     yield from each("scripts/check_regressions.py", 'elif key == "mutate":', "elif False:", "hooks", "check_regressions reads StrykerJS's negated globs")
     yield from each("scripts/check_regressions.py", "elif isinstance(value, dict):", "elif False:", "hooks", "check_regressions reads a workspace's ignore lists")

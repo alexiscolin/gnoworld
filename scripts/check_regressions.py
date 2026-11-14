@@ -278,7 +278,10 @@ def test_names(root):
             # Node, not pnpm's shim: the shim spells paths from $PWD, whose case can differ from the
             # directory's on macOS, and Playwright loaded under two spellings lists no test.
             command = ["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", config, "--list", "--reporter=json"]
-            names |= journeys(subprocess.run(command, cwd=root, capture_output=True, text=True).stdout, root)
+            run = subprocess.run(command, cwd=root, capture_output=True, text=True)
+            if not run.stdout.strip():  # no listing at all: Playwright stopped before it, and said why on stderr alone
+                sys.exit(f"check_regressions: Playwright could not list {config}'s journeys: {run.stderr.strip()[-600:] or 'it printed nothing'}")
+            names |= journeys(run.stdout, root)
     return names
 
 

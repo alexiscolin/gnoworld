@@ -21,9 +21,12 @@ started=$(date +%s)
 logs=$(mktemp -d "${TMPDIR:-/tmp}/check.XXXXXX")
 # A failing run ends on its own last line, which branch.js reads: `check.sh: FAILED at <lane>:<step>`, on every exit path, signals
 # included. bash 3.2, macOS's sh, exits 0 through an EXIT trap after an unbound variable: `finished`, set on the last line, tells a
-# run that reached its end from one that died on the way.
+# run that reached its end from one that died on the way. The lanes still running are stopped and waited for before their folder
+# goes (one writing in it while rm ran left it behind: gate run 43599405799, under dash): their subshells; a tool one started may
+# outlive it, so the race is narrowed, not closed.
 failed_at=main:start
-trap 'status=$?; rm -rf "${logs:?}" || :; [ "$status" = 0 ] && [ "${finished:-}" = 1 ] || echo "check.sh: FAILED at $failed_at" >&2; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
+lanes= # the lanes started, which the trap stops: set before it, so a caller's own `lanes` never reaches its eval
+trap 'status=$?; for l in $lanes; do eval "kill \"\${pid_$l}\"" 2>/dev/null || :; done; wait 2>/dev/null || :; rm -rf "${logs:?}" || :; [ "$status" = 0 ] && [ "${finished:-}" = 1 ] || echo "check.sh: FAILED at $failed_at" >&2; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM # so the EXIT trap also runs on Ctrl-C under dash
 cd "$(realpath "$(dirname "$0")/..")" # the folder's own case: a $PWD spelled otherwise loads a tool twice (F081)
 unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not steer the gate's git calls
@@ -219,7 +222,10 @@ start tests
 start gno
 failed=
 for l in $lanes; do
-	if eval "wait \"\$pid_$l\""; then
+	eval "p=\$pid_$l"
+	ok=true && { wait "$p" || ok=false; }
+	eval "pid_$l=" # reaped: the trap kills no pid the system may have given another process since
+	if $ok; then
 		if [ -e "$logs/$l.steps" ]; then echo "lane $l $(cat "$logs/$l.took") s: $(paste -sd ' ' "$logs/$l.steps")"; else echo "lane $l: nothing the change touches"; fi
 		continue
 	fi

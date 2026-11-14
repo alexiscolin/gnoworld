@@ -209,7 +209,7 @@ mkdir -p "$t/form/scripts" "$t/form/.githooks"
 ONLY=wiring sh "$t/form/scripts/test_hooks.sh" 2>&1 | grep -q "opened in a form the runner does not list" || fail "a section opened in another form would never run, unnoticed (F160)"
 # No caller hands check.sh an option, which it refuses since D13168: but pre-push's push of main, which 3b removes (D13164).
 callers=$(grep -rnE 'scripts/check\.sh +-' "$hooks" "$here"/*.sh "$here/../.claude" "$here/../package.json" "$here/../.github" 2>/dev/null |
-	grep -vE '^[^:]*/test_hooks\.sh:|^[^:]*:[0-9]+:[[:space:]]*#' | grep -vF "$hooks/pre-push:" || :)
+	grep -vE '^[^:]*/test_hooks\.sh:|^[^:]*:[0-9]+:[[:space:]]*#|^[^:]*/\.claude/tmp/' | grep -vF "$hooks/pre-push:" || :)
 [ -z "$callers" ] || fail "a caller hands check.sh an option it refuses: $callers"
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
@@ -3917,6 +3917,9 @@ mkdir -p "$t/oldnode" && printf '#!/bin/sh\necho v1.0.0\n' >"$t/oldnode/node" &&
 out=$(cd "$g" && env -u SANDBOX_RUNTIME -u GATE_CHANGED GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh 2>&1) &&
 	fail "check.sh ran on another Node than .node-version's"
 printf '%s\n' "$out" | grep -q "is needed (.node-version" && [ "$(last "$out")" = "check.sh: FAILED at main:start" ] || fail "check.sh did not refuse another Node, saying so: $out"
+# The trap stops the lanes started, by an eval of their names: a caller's own `lanes`, on a run that stops before any lane, runs nothing.
+(cd "$g" && env -u SANDBOX_RUNTIME -u GATE_CHANGED pid_a=999999 lanes='a}";touch${IFS}pwned;:"${pid_a' GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh) >/dev/null 2>&1 || :
+[ ! -e "$g/pwned" ] || fail "a caller's lanes ran as code in check.sh's trap"
 # A name that reads as shell code reaches Vitest's related command as one argument, run as nothing (related.py quotes it).
 printf 'x\n' >"$g/server/src/a'b.ts" && printf 'x\n' >"$g/server/src/\$(touch pwned).ts"
 gate >/dev/null || fail "check.sh failed on names that read as shell code"
@@ -5828,6 +5831,14 @@ printf 'const SKIP = new Set(["a", HIDDEN]);\n' >"$rx/scripts/check_comments.mjs
 out=$(regx) && fail "check_regressions passed a bare name in SKIP's list: $out"
 printf '%s\n' "$out" | grep -qF "HIDDEN" || fail "check_regressions did not name the unread entry HIDDEN: $out"
 nameback
+# A Playwright that lists nothing (a config that throws, a module a copy lacks) stops the check, saying what it said: GitHub's run
+# crashed on the empty listing, telling nothing of why (gate run 43599405799).
+mkdir -p "$rx/app/node_modules/@playwright/test" && printf 'export default {};\n' >"$rx/app/playwright.config.ts"
+printf 'process.stderr.write("boom: the config cannot load\\n");\nprocess.exit(1);\n' >"$rx/app/node_modules/@playwright/test/cli.js"
+git -C "$rx" add -A && git -C "$rx" commit -qm "a journeys' config"
+out=$(regx) && fail "check_regressions passed with a Playwright that listed nothing"
+printf '%s\n' "$out" | grep -qF "boom: the config cannot load" || fail "check_regressions did not say why Playwright listed nothing: $out"
+nameback && rm -rf "$rx/app"
 # What was read before is read still: a quoted entry named after the spread, and the spread of the defaults on its own.
 printf 'export default { test: { exclude: [...configDefaults.exclude, "a/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the defaults spread, nothing new"
 out=$(regx) || fail "check_regressions refused the spread of a tool's own defaults beside an entry the base had: $out"
