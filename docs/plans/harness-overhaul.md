@@ -63,9 +63,10 @@ run #31): one noted retry, never for a security test, each repaired. Next: deplo
    drafted the night of 11-13 with the core's share by day and the Actions history: 32 runs, none green, the full gate
    failing red on Linux), signed with two rows as context (D13155); T1-T5 not replayed, measured once at phase 3's exit
    (D13156); the dream (D13150). Exit: Alexis signs the table (done, 2026-11-13).
-2. GitHub judges main (4-6 days): the agent's account (Alexis creates and invites it); the push helper; gate.yml split into
-   jobs (`pull_request`, push on main, workflow_dispatch), `gate-ok`, zizmor, green on Linux, no pictures; nightly.yml; the
-   admin bypass and break-glass tested on a scratch repository; the ruleset on only after several green PRs. Exit: tests 1-15.
+2. GitHub judges main (4-6 days): the push helper (tools/agent-github, in Alexis's name: D13163, D13164); gate.yml split into
+   jobs (`pull_request`, push on main, workflow_dispatch), `gate-ok`, zizmor, green on Linux, no pictures; nightly.yml. No
+   ruleset and no agent account (D13164): Alexis merges on GitHub once gate-ok is green. Exit: the red team's tests 1-15 that
+   do not rest on a ruleset.
 3. Delete and lock (3-4 days): the deletion map's order (mind check_docs.py importing speeds.py, guard.py parsing
    records.sh); check.sh cut; guard.py to its vital bans; CLAUDE.md and the rules (overnight/docs/rules-diff.md);
    the registers frozen; hooks on main's copy, key stores unreadable, the workshop's env an allowlist; dream_due.sh weekly.
