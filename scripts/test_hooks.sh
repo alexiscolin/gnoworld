@@ -44,13 +44,21 @@ if [ "$(grep -c '^if part ' "$0")" != "$(printf '%s\n' "$sections" | grep -c .)"
 fi
 case ${ONLY:-,} in
 *,*)
-	pids=
+	pids= failed=
+	settle() { wait "${1%%:*}" || { cat "$t/${1#*:}.out" >&2; failed=1; }; }
 	for s in $(printf '%s' "${ONLY:-$(printf '%s\n' "$sections" | sort -u | paste -sd, -)}" | tr , ' '); do
 		ONLY=$s sh "$0" >"$t/$s.out" 2>&1 &
 		pids="$pids $!:$s"
+		# HOOKS_JOBS caps the sections run at once, the oldest settled first: on GitHub's four cores, all eighty at once timed out
+		# the sections bound by time (F13180). Unset, every section starts at once.
+		set -- $pids
+		if [ -n "${HOOKS_JOBS:-}" ] && [ "$#" -ge "$HOOKS_JOBS" ]; then
+			settle "$1"
+			shift
+			pids="$*"
+		fi
 	done
-	failed=
-	for p in $pids; do wait "${p%%:*}" || { cat "$t/${p#*:}.out" >&2; failed=1; }; done
+	for p in $pids; do settle "$p"; done
 	[ -z "$failed" ] || exit 1
 	echo "hooks: ok"
 	finished=1
@@ -6927,7 +6935,7 @@ sha=$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1],
 chk() {
 	case "${SHA:-}" in UNSET) shaenv="-u NGINX_SHA256" ;; EMPTY) shaenv="NGINX_SHA256=" ;; "") shaenv="NGINX_SHA256=$sha" ;; *) shaenv="NGINX_SHA256=$SHA" ;; esac
 	rm -f "$nc/stub.pid"
-	(cd "$nc" && env $shaenv GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" STUB_DOUBLE="${DOUBLE:-}" python3 -I "$here/check_nginx.py" 2>&1)
+	(cd "$nc" && env -u GNOWORLD_BUILD $shaenv ${BUILD:+GNOWORLD_BUILD="$BUILD"} GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" STUB_DOUBLE="${DOUBLE:-}" python3 -I "$here/check_nginx.py" 2>&1)
 }
 # What a failed check leaves running is a server per failed merge check: the nginx it started is dead, whatever failed.
 stopped() { # $1: what failed
@@ -7058,6 +7066,11 @@ mv "$nc/app/build/csp.conf" "$nc/csp.keep"
 out=$(chk) && fail "check_nginx passed with no build's table: $out"
 printf '%s\n' "$out" | grep -qi "csp.conf" || fail "check_nginx did not name the missing table: $out"
 mv "$nc/csp.keep" "$nc/app/build/csp.conf"
+# GitHub's build job builds into the folder GNOWORLD_BUILD names (app/build-gate/ci), and check_nginx reads it there (F13176).
+mv "$nc/app/build" "$nc/app/build-gate-ci"
+out=$(BUILD="$nc/app/build-gate-ci" chk) || fail "check_nginx did not read the build GNOWORLD_BUILD names: $out"
+out=$(chk) && fail "check_nginx passed with no build in app/build and no GNOWORLD_BUILD: $out"
+mv "$nc/app/build-gate-ci" "$nc/app/build"
 # The pinned binary is documented where Alexis sets the tools up, and the harness doc says how the lock works.
 grep -q "gnoworld-tools/nginx-1\.30\.6/nginx" "$here/../docs/DEVELOPMENT.md" && grep -q "scripts/nginx\.sha256" "$here/../docs/DEVELOPMENT.md" && grep -qi "sha256\|checksum" "$here/../docs/DEVELOPMENT.md" || fail "docs/DEVELOPMENT.md does not say how to get the pinned nginx 1.30.6 with its checksum"
 grep -qi "merge.lock\|one merge check at a time" "$here/../docs/HARNESS.md" || fail "docs/HARNESS.md does not say that merge checks take a lock, one at a time"

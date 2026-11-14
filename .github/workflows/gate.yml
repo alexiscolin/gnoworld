@@ -242,7 +242,7 @@ jobs:
           export STORIES_PORT
           node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --ignore-snapshots --reporter=dot --grep-invert 'a flash raised from a dialog shows above its scrim, at the top centre$' app/tests/stories/stories.spec.ts app/tests/stories/behaviours.spec.ts
 
-  # Ten critical journeys and the two flight smoke tests, no pictures; the other specs of the merge list run at night.
+  # Ten critical journeys, no pictures; the other specs of the merge list run at night.
   journeys:
     needs: [changes]
     if: needs.changes.outputs.app == 'true'
@@ -260,7 +260,6 @@ jobs:
           set -eu
           ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit (check.sh)
           node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --reporter=dot app/tests/e2e/login.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/search.spec.ts
-          node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --workers=1 --reporter=dot app/tests/e2e/flights.spec.ts --grep 'flies to the system aimed at|flies from the cosmos to a world'
       - name: Traces of a failed journey, kept a week
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -459,7 +458,9 @@ jobs:
       - *chromium
       - name: probe.py, the Mac's pictures left out (it plants faults in the tree, so alone)
         run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py
-      - name: test_hooks.sh
+      - name: test_hooks.sh, sixteen sections at once on the four cores
+        env:
+          HOOKS_JOBS: "16"
         run: sh scripts/test_hooks.sh
 
   # The one check main requires. It reads every result with the base's ci_gate_ok.py: a failed or cancelled job fails it, and so

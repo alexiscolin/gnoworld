@@ -1067,6 +1067,8 @@ def mutants():
     yield from each(g, '    if args[:1] in (["--version"], ["--help"]):', '    if any(w in ("--version", "--help") for w in args):', "hooks", "guard reads --version first alone")
     yield from each("scripts/review_pass.py", 'sys.exit(f"review_pass: no', 'print(f"review_pass: no', "hooks", "review_pass check")
     yield from each("scripts/patch_coverage.py", "    sys.exit(1)", "    pass", "hooks", "patch_coverage floor")
+    yield from each("scripts/check_nginx.py", 'pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build")', 'pathlib.Path("app/build")', "hooks", "check_nginx reads the build GNOWORLD_BUILD names (F13176)")
+    yield from each("scripts/check_nginx.py", 'pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build")', 'pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build-gate-ci")', "hooks", "check_nginx reads app/build by default")
     yield from each("scripts/patch_coverage.py", 'every = bool(os.environ.get("COVERAGE_ALL"))', "every = True", "hooks", "patch_coverage leaves the default coverage's outside alone (F13179)")
     yield from each("scripts/patch_coverage.py", "(every or not security or secure(", "(every or not security or False and secure(", "hooks", "patch_coverage refuses an unmeasured tier-1 file by default")
     yield from each("scripts/patch_coverage.py", "(every or not security or secure(", "(every or secure(", "hooks", "patch_coverage counts every file tier 1 with no table to read")
