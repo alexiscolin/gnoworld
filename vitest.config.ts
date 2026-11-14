@@ -119,7 +119,7 @@ export default defineConfig({
         test: { name: "display", include: DISPLAY, exclude: [...configDefaults.exclude, "packages/ui/**"] },
       },
       {
-        // The real Ergo's tests and the check's soak: the night runs them, the commit gate and GitHub's leave them.
+        // The real Ergo's tests and the check's soak: the night and GitHub's coverage job run them, the commit gate leaves them.
         extends: true,
         test: { name: "slow", include: SLOW },
       },

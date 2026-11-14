@@ -80,7 +80,7 @@ const FIXED = {
         required: ["id", "commit"],
       },
     },
-    // What the fixer could not reproduce, with its evidence: a claim, which stands only once a finding-verifier refutes the finding (F5542).
+    // What the fixer could not reproduce, with its evidence: a claim, which stands only once a fresh reviewer refutes the finding (F5542).
     rejected: {
       type: "array",
       items: {
@@ -116,28 +116,16 @@ const GATE = {
     tail: { type: "string" },
     lastLine: { type: "string" },
     exit: { type: "number" },
-    survivors: { type: "array", items: { type: "string" } },
     files: { type: "array", items: { type: "string" } },
     relaxations: { type: "array", items: { type: "string" } },
     seconds: { type: "number" },
     branch: BRANCH,
   },
-  required: [
-    "passed",
-    "failingLane",
-    "tail",
-    "lastLine",
-    "exit",
-    "survivors",
-    "files",
-    "relaxations",
-    "seconds",
-    "branch",
-  ],
+  required: ["passed", "failingLane", "tail", "lastLine", "exit", "files", "relaxations", "seconds", "branch"],
 };
 const commits = [];
 const low = [];
-const rejections = []; // the findings a fixer rejected and a finding-verifier refuted: the chief reads each with both evidences (F5542)
+const rejections = []; // the findings a fixer rejected and a fresh reviewer refuted: the chief reads each with both evidences (F5542)
 const judged = [];
 // The tier-1 paths of docs/REVIEW.md's table that exist: the harness, the realms, the relay's auth script, the CSP, the deploy folder, the markdown
 // scanner, Adena, the login (server and client), the admin API's rights, the worker. A check in scripts/test_hooks.sh (workflow_branch) fails when the
@@ -272,8 +260,8 @@ if (!red) return result("blocked at the red pass: the test-auditor gave no repor
 phase("Build");
 const built = await write(
   `${where("build", true)}. Save the red pass's findings to ${A.shared}/reports/${A.branch}-red-pass.md, then fix them in the tests: ` +
-    `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests (the fast gate runs at each ` +
-    "commit: a refused commit is fixed, never bypassed). A loosening of the net (a test gone, a floor lowered, a picture changed) needs its line, `Removed-test:`, `Lowered-floor:` or `Updated-baseline:`: GitHub's regressions job refuses the pull request without it.",
+    `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests, running ` +
+    "sh scripts/check.sh first, as pre-commit runs only the secret scan, Prettier and check_docs (D13173): a refused commit is fixed, never bypassed). A loosening of the net (a test gone, a floor lowered, a picture changed) needs its line, `Removed-test:`, `Lowered-floor:` or `Updated-baseline:`: GitHub's regressions job refuses the pull request without it.",
   { label: "build", schema: DONE },
 );
 if (!built) return result("blocked at the build");
@@ -309,7 +297,7 @@ for (let round = 1; ; round += 1) {
     [
       "reviewer",
       "reviewer",
-      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); the surviving mutants: ${JSON.stringify(gate.survivors)} (the merge check runs no StrykerJS since D13168: its survivors are in GitHub's risk job, F13184).` +
+      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); StrykerJS's survivors on the changed tier-1 lines are in GitHub's risk job, on the pull request (F13184).` +
         (gate.files.some(screen) && !gate.files.some(space)
           ? " Compare every screen it changes with the video's frames, by the steps of .claude/agents/design-reviewer.md, in this same pass."
           : ""),
@@ -376,19 +364,21 @@ for (let round = 1; ; round += 1) {
   const fixed = await write(
     `${where(`fix-${round}`, true)}. Fix these findings, each test first, its commit body naming its ledger row (\`Finding: F<n>\`), and mark the ` +
       `row fixed with its commit: ${JSON.stringify(urgent)}. No red pass of these tests: the gate and the mutation tester check them. ` +
-      "Return each finding's id with the commit that fixes it; one you cannot reproduce, a command or a test, mark `rejected` with your " +
-      "evidence and return it under `rejected`: a finding-verifier then checks that claim, and a rejection it does not refute stays open.",
+      "Return each finding's id with the commit that fixes it; one you cannot reproduce, a command or a test, leave `claimed` in the ledger with your " +
+      "evidence beside it and return it under `rejected`: a fresh reviewer then checks that claim, and a rejection it does not refute stays open.",
     { label: `fix round ${round}`, schema: FIXED },
   );
-  // A rejection is the fixer's word alone: it stands only when a fresh finding-verifier refutes the finding with evidence of its own (decision
-  // 684 left the verifier out for a reviewer's repro, never for a fixer's "could not reproduce", F5542). No report, or no refutation: open.
+  // A rejection is the fixer's word alone: it stands only when a fresh reviewer refutes the finding with evidence of its own (decision 684
+  // left the verifier out for a reviewer's repro, never for a fixer's "could not reproduce", F5542; the finding-verifier agent left on
+  // 2026-11-04, so the reviewer agent checks it). No report, or no refutation: open.
   const claimed = fixed && fixed.rejected ? fixed.rejected.filter((f) => urgent.some((u) => u.id === f.id)) : [];
   const ruling = claimed.length
     ? await agent(
         `${where(`verify-${round}`, false)}. The fixer says it cannot reproduce these findings: ${JSON.stringify(claimed)}. The findings as the review raised ` +
           `them: ${JSON.stringify(urgent.filter((f) => claimed.some((c) => c.id === f.id)))}. Reproduce each, or refute it with evidence of your own (a command ` +
-          "and its output, a file:line, never the fixer's word). `refuted` is true only for a finding you refuted. One verdict per finding.",
-        { agentType: "finding-verifier", phase: "Fix", label: `verify rejected ${round}`, schema: VERDICTS },
+          "and its output, a file:line, never the fixer's word): their ledger rows hold the fixer's evidence as the claim under test, not a ruling. " +
+          "`refuted` is true only for a finding you refuted. One verdict per finding.",
+        { agentType: "reviewer", phase: "Fix", label: `verify rejected ${round}`, schema: VERDICTS },
       )
     : null;
   const verdictOf = (id) => (ruling ? ruling.verdicts.find((v) => v.refuted && v.id === id) : undefined);
@@ -404,7 +394,7 @@ for (let round = 1; ; round += 1) {
     });
   }
   ruledOut = rejectedIds.size
-    ? ` The last round's fixer rejected these findings and a finding-verifier refuted them: ${JSON.stringify(rejections.filter((r) => rejectedIds.has(r.id)))}. Confirm each, or dispute it with new evidence of your own.`
+    ? ` The last round's fixer rejected these findings and a fresh reviewer refuted them: ${JSON.stringify(rejections.filter((r) => rejectedIds.has(r.id)))}. Confirm each, or dispute it with new evidence of your own.`
     : "";
   const fixedIds = new Set(fixed ? fixed.fixed.map((f) => f.id) : []);
   const open = urgent.filter((f) => !fixedIds.has(f.id) && !rejectedIds.has(f.id));

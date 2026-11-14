@@ -3,8 +3,8 @@
 ## Setup
 
 The README's "Install" lists what to install. `pnpm install` runs no script. The git hooks
-(no attribution lines, no secret; in Claude Code's sandbox the gate before each commit; in your
-own shell no gate runs, the hooks check the code it recorded, F076) live in `.git/hooks`, where
+(no attribution lines, no secret, no non-ASCII path; from Claude Code's sandbox no harness file, and Prettier and check_docs on
+what is staged; in your own shell nothing of the working tree runs, F076) live in `.git/hooks`, where
 no merge, checkout or sandboxed command writes, so no branch brings its own (F129). Install
 them, and again after a merge that changes them, from `main`, never from the working tree, and
 from the objects themselves, whatever a replace ref would show instead:
@@ -13,12 +13,10 @@ from the objects themselves, whatever a replace ref would show instead:
 git --no-replace-objects show main:scripts/install_hooks.sh | sh
 ```
 
-Merge a branch into `main` with `sh .git/hooks/merge.sh <branch>`: it shows each harness file
-the branch changes, with its diff, and merges once you type the branch's name. The install turns
-off fast-forward merges in this clone, which run no hook (`merge.ff false`; a pull stays a
-fast-forward, `pull.ff only`). A plain merge
-that changes the harness has written it before any hook runs, and its commit is refused; abort
-it at once (`git merge --abort`). Pushing `main` wants the hooks installed from it. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
+A branch reaches `main` as a pull request, merged on GitHub (D13165): `main` takes no push, and pre-push refuses one. The install
+turns off fast-forward merges in this clone, so a merge always makes a commit, which pre-merge-commit checks (`merge.ff false`; a pull
+stays a fast-forward, `pull.ff only`). A commit runs the secret scan, and from Claude Code's sandbox Prettier on the staged files and
+the docs check, a harness file refused (D241, D13173); `sh scripts/check.sh` is what you run before committing code. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
 has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
 first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
 The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten on an app change, the night 41 of the 109): `node app/node_modules/@playwright/test/cli.js install chromium`
@@ -116,7 +114,7 @@ of the commit's projects (node, ui, compiled) but the `timing` ones, which is a 
 tests, the journeys of its list, StrykerJS and the harness's mutants. By hand, as no gate runs them: the benches (`python3 -I scripts/bench.py`),
 the pictures and the flash's pixel test (`node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts
 app/tests/stories/behaviours.spec.ts` on the Mac). Design still being tried lives in the workshop (this file's "The workshop") and
-lands later, in one tested batch (REVIEW.md, "Keep it cheap"). `GNOWORLD_STRICT=1` gives a turn's end its gate.
+lands later, in one tested batch (REVIEW.md, "Keep it cheap"). At a turn's end the Stop hook only reaps stray processes (D13173).
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
 
@@ -155,16 +153,13 @@ off the tailnet, and so does any of them that stops; a second `pnpm workshop` in
 backend a run killed hard left included, and that run's names stay on the tailnet until the next one, or
 `tailnet-preview.sh down workshop-app` and `down workshop-lab`.
 
-**The ping-pong** (`pingpong` in `scripts/stop_gate.sh`; Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout,
-a turn of Claude's in it ends without the gate (as every turn does by default), so each retouch shows live in a couple of minutes; the gate, the tests and the
-review come once the batch is accepted, and pre-commit still gates every commit. The hook knows the workshop by its own shell,
-running this checkout's `scripts/workshop.sh` from it, in its terminal's foreground group and outside every sandbox: a session's
-sandboxed command cannot start one that counts. The code the workshop runs is outside Claude's sandbox, under a profile of its
+**The ping-pong** (Alexis, 2026-11-04): while your own `pnpm workshop` serves a checkout, each retouch of Claude's shows live in a
+couple of minutes; no gate runs at a turn's end, and a commit takes seconds (the secret scan, Prettier, the docs check: D13173); the
+gate, the tests and the review come once the batch is accepted. The code the workshop runs is outside Claude's sandbox, under a profile of its
 own (`scripts/workshop.sb`): it writes its own folders and caches alone, reads of the home folder the code alone it runs, reaches
 no keychain, no other app and no Unix socket but the system's. It cannot hold where that code listens, and its outbound network
 stays open (HARNESS.md's known limits, F204, F4977): the servers listen on 127.0.0.1 because their configs say so, and macOS's
-firewall is the wall against the LAN. Stop the workshop (Ctrl+C) when the ping-pong ends, as one left running keeps that
-checkout's turns gate-free.
+firewall is the wall against the LAN. Stop the workshop (Ctrl+C) when the ping-pong ends.
 
 Each dev server listens on 127.0.0.1 alone and answers only the names `WORKSHOP_HOSTS` lists, exactly. By path it serves the app,
 the packages and their store, never the repository's root, whose `deploy/` holds secrets (`app/vite.config.ts`'s `workshopServer`,

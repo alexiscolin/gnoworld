@@ -35,7 +35,7 @@ The applications sit at the root; the libraries they import sit under `packages/
 | | `demo.sh` | The demo's one script: it runs the stack from a checked copy of one commit, with its backup, wipe and restore ([docs/DEMO.md](docs/DEMO.md)) |
 | `lint/` | | The lint rules, one file per area |
 | `scripts/` | | The gate (`check.sh`), the workshop, and the harness that keeps the code honest: its checks, its probe, its mutation testers |
-| `.githooks/` | | The git hooks, installed from `main`, and `merge.sh` (until 3b: `main` takes pull requests, D13165) |
+| `.githooks/` | | The git hooks, installed from `main`: the secret scan, and from Claude Code's sandbox no harness file (D241) |
 | `.github/` | `workflows/` | The CI: GitHub's gate on each pull request and push to `main`, and the night |
 | `.claude/` | `rules/`, `agents/`, `commands/`, `workflows/` | Claude Code's rules per area, its review agents, `/slice-plan`, `/pre-merge` and `/dream`, and the branch workflow |
 | `docs/` | `plans/`, `design/`, `review/`, `prototype/` | How it is built, looks and is reviewed: the slices' plans, the approved designs, the findings ledger, the approved prototype |
@@ -100,7 +100,7 @@ of those, that is the protection working, not a bug.
 | `pnpm dev` | The site, on your machine, with hot reload (the PWA's worker is off in development); no Docker, no secret |
 | `pnpm workshop` | The app's screens with hot reload, the chat running with them (a local Ergo and the server), put on your tailnet to look from a laptop or a phone; run it in your own terminal ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "The workshop") |
 | `docker compose -f deploy/compose.yaml --profile demo up -d --build` | The demo, published through Tailscale: its secrets first ([docs/OPERATIONS.md](docs/OPERATIONS.md)) |
-| `./scripts/check.sh` | The commit gate, on what the change touches: Prettier and ESLint on its files, the types, the related unit tests of a tier-1 change, the realms; a tree with no change is checked whole. It runs before every commit (a Claude Code turn runs no gate by default); GitHub's gate (`.github/workflows/gate.yml`) judges each pull request by what it calls for |
+| `./scripts/check.sh` | The commit gate, on what the change touches: Prettier and ESLint on its files, the types, the related unit tests of a tier-1 change, the realms; a tree with no change is checked whole. Run it before committing code (pre-commit runs only the secret scan, Prettier and check_docs); GitHub's gate (`.github/workflows/gate.yml`) judges each pull request by what it calls for |
 | `pnpm run test` | The unit tests |
 | `pnpm run coverage` | The tests with coverage, under `coverage/` |
 | `pnpm run mutate` | Mutation testing, with its report in `reports/mutation/index.html` |

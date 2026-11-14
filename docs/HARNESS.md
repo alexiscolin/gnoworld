@@ -67,7 +67,7 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
   the review log, the ledger and the handoff (never transcripts) and proposes rule, memory, test
   and check changes, each with its evidence, prevalence and cost, standing on committed rows, and as
   many removals: a rule, a test or a check whose cost what it caught does not repay (Alexis, 2026-11-04). Alexis
-  accepts each, reading a memory's full text first; a rule or a check goes on a branch through `merge.sh`.
+  accepts each, reading a memory's full text first; a rule or a check goes on a branch, to `main` through a pull request.
 
 ## A change, from plan to merge
 
@@ -76,57 +76,38 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
    branch, never on a fixer's tests; the commit that brings the tests and their code carries
    `Red-pass: <findings fixed>`.
 3. **Code.** Before each Bash command, web fetch or edit, `scripts/guard.py` runs.
-4. **End of each turn.** By default the Stop hook only reaps stray processes (below); with `GNOWORLD_STRICT=1`, when code changed, it (`scripts/stop_gate.sh`) stops the turn
-   once unless the commit gate, which Claude runs in the sandbox, passed on exactly this tree. The
-   hook itself runs nothing from the repository. First, it stops what runs of this project left
-   behind, which the sandbox cannot see: a node process naming a folder `gnoworld/` whose parent
-   is gone for 30 minutes (2 hours while a gate runs), or a test tool's 3 hours old or more but a
-   dev or watch mode, each logged to `~/Library/Logs/gnoworld-reaped.log`, where the sandbox
-   cannot write. Its one exception is the ping-pong (`pingpong`; Alexis, 2026-11-04): while
-   Alexis's own `pnpm workshop` serves this checkout, the turn ends with no gate (docs/DEVELOPMENT.md,
-   "The workshop"). Its sign is one no sandboxed command plants: a shell running this checkout's
-   `scripts/workshop.sh` from its folder, its parent alive, that macOS's `sandbox_check` finds in no
-   sandbox, read with `/bin/ps`, `/usr/sbin/lsof` and `/usr/bin/python3 -I`; no file of the tree.
-   A workshop left running keeps every turn of that checkout gate-free; pre-commit still gates each
-   commit.
+4. **End of each turn.** The Stop hook (`scripts/stop_gate.sh`) only reaps, its opt-in gate and the ping-pong's exception gone
+   (D13173): it stops what runs of this project left behind, which the sandbox cannot see, a node process naming a folder `gnoworld/`
+   whose parent is gone for 30 minutes (2 hours while a gate runs), or a test tool's 3 hours old or more but a dev or watch mode, each
+   logged to `~/Library/Logs/gnoworld-reaped.log`, where the sandbox cannot write; it runs nothing from the repository and never
+   blocks a turn. A run killed on the way may leave a node process behind; `pgrep -fl gnoworld/` lists them.
 5. **Each commit.** The git hooks run from `.git/hooks`, installed from `main` with the scripts
    they run, where no merge, checkout or sandboxed command writes: no branch brings its own
-   (F129). `commit-msg` holds the subject's form, refuses attribution lines, scans the message for secrets, and, in Claude Code's sandbox only, refuses a hidden
-   character in it with the staged `scripts/hidden.py`, as pre-commit runs the staged scripts there (F5085, D36). `pre-commit`
-   scans what is staged for secrets, then, in Claude Code's sandbox, runs the commit gate on a copy
-   of what is staged, scoped to the commit's paths (`GATE_CHANGED`), and records the code it
-   passed; a staged code a green `check.sh` run already recorded runs no second gate (the harness
-   audit, 2026-11-04). In Alexis's shell it runs no gate: the staged code must be code the sandboxed gate
-   recorded green (`.githooks/records.sh`, F076). A harness file (`records.sh`'s list) is committed in his
-   Terminal alone: from the sandbox, told by `SANDBOX_RUNTIME` or, that unset, by the hook failing to open
-   itself for writing, which the sandbox forbids, pre-commit refuses it (D241). So a harness change reaches
-   a branch as a patch Alexis applies in his Terminal, the sandboxed gate passes on it and records it, and
-   he commits it there. pre-commit reaches `git commit` and `git merge` alone: cherry-pick, revert, rebase, am
-   and git's plumbing (`stash create` then `update-ref`, as F129's `commit-tree`) commit with no hook, so such a
-   commit meets its wall later, at pre-push's `Harness-changed:` lines and in `merge.sh`, which shows Alexis
-   every harness file before `main` (F129, F153).
-6. **A push of a work branch.** `pre-push` wants a gate that passed on its code, nothing
-   uncommitted, and scans the history for secrets.
+   (F129). `commit-msg` holds the subject's form, refuses attribution lines, scans the message for secrets, and, in Claude Code's sandbox only,
+   refuses a hidden character in it with the staged `scripts/hidden.py` (F5085, D36). `pre-commit` scans what is staged for secrets, prose
+   included, with the scan installed beside it. In Claude Code's sandbox, told by `SANDBOX_RUNTIME` or, that unset, by the hook failing to
+   open itself for writing, which the sandbox forbids, it first refuses a harness file (`.githooks/records.sh`'s list, and a path with a
+   non-ASCII character, F164: D241), then wants each staged file as it is on disk, and runs Prettier on them and `scripts/check_docs.py`
+   (D13173): seconds. It runs no gate: `sh scripts/check.sh` is what a session runs before committing code, and GitHub's gate judges each
+   pull request. In Alexis's shell it runs the scan alone, nothing of the working tree (F076). So a harness change reaches a branch as a
+   patch Alexis applies and commits in his Terminal. `pre-merge-commit` gives a merge commit the same checks, and a merge always makes one
+   (the install's `merge.ff false`). pre-commit reaches `git commit` and `git merge` alone: cherry-pick, revert, rebase, am and git's
+   plumbing (`stash create` then `update-ref`, as F129's `commit-tree`) commit with no hook, which guard.py refuses when typed, not when a
+   script file runs them; such a commit meets its wall on GitHub, whose changes job refuses a harness file no commit declares on a line
+   `Harness-changed: <path> - why` and a path this disk may read as another, and in Alexis's reading of the pull request (F129, F153).
+6. **A push.** `pre-push` refuses `main`, which takes pull requests alone (D13165), its deletion included, and scans the whole history
+   for secrets before anything leaves.
 7. **Before a merge.** `/pre-merge` (`docs/REVIEW.md`): `check.sh` on the committed tree, GitHub's gate, one combined review
    by the `reviewer` agent (with the `security-reviewer` for a tier-1 file or the harness, the
    `gno-auditor` for a realm), each finding reproduced, high and medium fixed,
-   low ones listed for Alexis, then a recorded review pass (`scripts/review_pass.py`).
+   low ones listed for Alexis.
 8. **Alexis reviews,** blind first, in revdiff, and runs `deploy/test.sh` once per branch, from a copy of the commit he reviewed
    whose commit and files hash to its name (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed"), never from a worktree. It takes a lock per Docker project
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
    command that removes it. `test_hooks.sh`'s section `deploy_lock` runs it against stubbed Docker.
-9. **Merge and push, by Alexis, in his own shell.** Through `.git/hooks/merge.sh`, onto the branch
-   checked out (`main`, or a part's), which shows each harness file the merge changes (git
-   merge-tree's tree, with HEAD's attributes), with its diff, before git writes it, and refuses
-   a harness file in conflict and a non-empty `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`; a merge
-   stopped on a conflict outside the harness (the ledgers, every time) it commits itself, with its
-   own message, once resolved, on Enter; then it undoes any commit that is not the merge shown
-   (its parents, its harness), with `git reset --hard` (it began on a clean tree). Pushing `main` (refused since D13168, which writes no full record; 3b removes this) wanted
-   the hooks installed from it, the full gate recorded green on that code, the committed review
-   pass for exactly that tree, and each harness file changed since the remote's `main` declared on
-   a line `Harness-changed: <path> - why`. Claude can do neither: the sandbox refuses the merge's
-   writes to the harness, and the push asks.
+9. **Merge, by Alexis, on GitHub.** A pull request whose `gate-ok` he reads green, merged with "Create a merge commit" (D13164,
+   D13165): `main` takes no push. Claude can neither: the push asks, and the ruleset refuses `main` any push.
 10. **The CI** on GitHub judges every pull request to main, every push to main and a run by hand: one job reads what the
     change calls for with the base commit's own detector, the checks run side by side, and `gate-ok`, the one check main
     will require, reads every result with the base commit's verdict; `nightly.yml` runs the long checks at night
@@ -134,17 +115,18 @@ From slice 5 (Alexis, 2026-10-28, `docs/decisions.md`):
 
 ## The gate
 
-Two gates since the harness overhaul (D13168): `scripts/check.sh` before each commit, on what the change touches, in seconds; GitHub's,
+Two gates since the harness overhaul (D13168): `scripts/check.sh`, which a session runs before committing code, on what the change
+touches, in seconds (pre-commit itself runs the secret scan, Prettier and check_docs alone, D13173); GitHub's,
 `.github/workflows/gate.yml`, on each pull request, by what the change calls for, its one verdict `gate-ok`. The night, `nightly.yml`, runs what both leave out.
 
-**The commit gate** (`sh scripts/check.sh`, which takes no option and takes seconds when no test runs, a minute or two when the tests or the whole tree run; pre-commit runs it on the staged copy, `GATE_CHANGED` listing the
-change there). Four lanes side by side: a lane stops at its first failure, every lane runs to its end, and the gate fails when one did,
+**The commit gate** (`sh scripts/check.sh`, which takes no option and takes seconds when no test runs, a minute or two when the tests or the whole tree run;
+it runs in a repository alone, its change git's). Four lanes side by side: a lane stops at its first failure, every lane runs to its end, and the gate fails when one did,
 shows its output and ends on `check.sh: FAILED at <lane>:<step>`; a pass ends on `all checks passed in N s`.
 
 | Lane | Steps | For a change of |
 |---|---|---|
 | lint | the harness's floor (`check_docs.py`, every `scripts/*.py` parsing, `sh -n` on each changed shell script, every `scripts/*.sh` and `.githooks/*` on a whole run), then Prettier (`--ignore-unknown`) and ESLint (`--no-warn-ignored`), each handed the change's files that exist, after `--` | the floor at every run; Prettier and ESLint for any file but prose and the realms |
-| types | `tsc`, incremental: the worktree's `.claude/tmp/tsc`, the staged copy a folder of the run's own | the TypeScript's sources and what they read: `app/src`, `app/tests`, `app/data`, `app/lab`, `app/public`, `server/src`, `jarvis/src`, `link-reader/src`, `packages/*/src` |
+| types | `tsc`, incremental: the worktree's `.claude/tmp/tsc` | the TypeScript's sources and what they read: `app/src`, `app/tests`, `app/data`, `app/lab`, `app/public`, `server/src`, `jarvis/src`, `link-reader/src`, `packages/*/src` |
 | tests | Ergo's build, then Vitest's `related` command on the paths `scripts/related.py` gives, the `timing` tests left out | a tier-1 path (docs/REVIEW.md's rows, `scripts/speeds.py --tier1`, any doubt tier 1) of the same areas, or of `deploy/`, whose files some tests read from disk (`server/src/prices/prices.test.ts`); every other change's tests run on GitHub's unit job when TypeScript or its config changed (node, ui, compiled, the `timing` ones apart), else at night (the speed plan's rule: a change of shared code runs some 450 test files, 100 s) |
 | gno | `gno lint` and `gno test` on `gno/...` | `gno/` |
 
@@ -154,8 +136,8 @@ cache, every test of the node, ui and compiled projects but the `timing` ones. T
 night: their suites are their own, `test_hooks.sh`, `probe.py` and `deploy/test.sh` on GitHub and by hand while the
 change is written (`ONLY=<section> sh scripts/test_hooks.sh`, `python3 -I scripts/probe.py`, with `.node-version`'s Node first on the
 PATH, `~/.nvm/versions/node/v<version>/bin`, which check.sh gave them until D13168), the evals and `tools/agent-github/test.sh` by hand. In a repository the gate first refuses git hooks taken from
-elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed (F129); it
-records the code it passed for the hooks outside the sandbox (`.githooks/records.sh`, F076). No commit's gate walks a journey: a session
+elsewhere than `.git/hooks`, and, in the sandbox, a `.git/hooks` or `.git/config` a command can write or a hook not installed (F129).
+It records nothing: no hook reads a record since D13173. No commit's gate walks a journey: a session
 that writes or changes one runs that spec itself before committing (`node app/node_modules/@playwright/test/cli.js test -c
 app/playwright.config.ts <spec>`).
 
@@ -186,7 +168,6 @@ the server, core or the schemas, as it runs the server as a child process, outsi
 from disk, found by a grep of `new URL(<place>, import.meta.url)`, of a path written from the repository's root and of `join("deploy",
 ...)`. A place named any other way (`__dirname`, `process.cwd()`, `import.meta.dirname`, `import.meta.url` outside `new URL(...)`, a
 resolve, `createRequire`) is refused, file and line, in a run of the related tests and, as `related.py --check`, in a run of every one.
-The staged copy gets the related tests too, from its list.
 
 **The timing tests** (Alexis, 2026-11-04): a test that reads a clock carries Vitest's tag `timing` (`{ tags: ["timing"] }`, defined in
 vitest.config.ts). The commit gate and GitHub's gate leave them out (`--tags-filter=!timing`); the night runs them. Run them alone:
@@ -231,23 +212,23 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
 - **Deny:** reading `.env`, `deploy/secrets/`, `~/.ssh`, `~/.config/gh`, `~/.npmrc`, `~/.aws`.
 - **Ask Alexis first:** only `git push` and every gnomcp write (`gno_addpkg`, `gno_call`,
   `gno_run`, `gno_key_send`, `gno_cla_sign`).
-- **Refused outright in the main checkout:** an edit of the harness (the guard, the Stop hook,
+- **Refused outright in the main checkout:** an edit of the harness (the guard,
   the git hooks, `.git/hooks` and `.git/config`, Claude Code's settings, agents, commands, skills,
   rules, workflows and hooks in `.claude/` but `.claude/tmp/`, the `package.json` files and what pnpm loads,
   `scripts/worktree.sh` and the scripts it runs, which leave the sandbox, every worktree's `.git`, and,
   from any session, the main checkout's `.git/hooks`, `.git/config`, `scripts/` and `.githooks/`), an edit of the
   instructions every session reads (`CLAUDE.md`, `CLAUDE.local.md`, `.claude`'s own `CLAUDE.md`: Alexis's from 7z on),
-  `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, where Alexis sees
-  each such file at `merge.sh`; a merge into a part's branch that changes the harness is his too,
+  `pnpm add` and `rm -rf`. A branch changes the harness in its own worktree, committed in Alexis's
+  Terminal (D241), and he sees each such file in the pull request; a merge into a part's branch that changes the harness is his too,
   in his terminal, never another session's (F5055, F5058). In his shell the hooks run nothing of
-  the repository but the records the sandboxed gate wrote (F076).
+  the repository but the secret scan installed from `main` (F076).
 - **The sandbox** around shell commands: they write only in the project, its worktrees and its
   caches, never in `.git/hooks` or `.git/config`, nor in a worktree's `.git` or `commondir` under `.git/worktrees` (so a stale worktree is pruned by Alexis: `git worktree prune`, F5095), nor in a harness path of
   `records.sh`'s list but `.claude/`, whose `tmp/` is the slices' shared folder and whose other parts Claude Code
   loads have their bans, a project CLAUDE.md in it included; no ban reaches StrykerJS's copy of the tree in `.stryker-tmp/`,
   which a merge check writes (a `wiring` case, read as the sandbox reads its paths; D242, F111); another
-  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). They reach
-  only the npm and Go registries and github.com. One command of the project's settings leaves the
+  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). Their network
+  list names the npm and Go registries and github.com alone, and does not hold in every session (F13199). One command of the project's settings leaves the
   sandbox, `sh scripts/worktree.sh *` (`excludedCommands`), which writes the trees it makes and
   removes, in its one root; the guard lets it run only alone, its words plain, from the project's
   root, and the file tools can edit neither it, nor the scripts it runs, nor a worktree's `.git`.
@@ -280,8 +261,8 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   name some places, never all (7w2's reviews found thirteen more). The working directories: the session's tree, and each running
   slice's `reports/` folder in the main checkout's `.claude/tmp/` (slice 7's and 8's), which the main checkout's local settings name
   (`settings.local.json` in its `.claude/`: a folder only a repository's settings name does not count, unless git tracks that file
-  not, and Alexis's global excludes hold it, F5326); never the whole `.claude/tmp/`, which holds the chief's gate records and the
-  briefs (the review's S1, R1). A part's state line goes in `reports/` too; a new slice's folder is a line Alexis adds there. That
+  not, and Alexis's global excludes hold it, F5326); never the whole `.claude/tmp/`, which holds the briefs and the
+  patches a part stages (the review's S1, R1). A part's state line goes in `reports/` too; a new slice's folder is a line Alexis adds there. That
   local file also closes the instruction files below the main checkout's root to every gnoworld session, the old folder's parts and
   the chief's included, whose trees lack 7w3's denies. Claude Code's own files stay open (the scratchpad, plan files, this project's
   auto memory). Settings files are refused everywhere, and
@@ -315,8 +296,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   forced push, no git pointed at folders of the command's own (`GIT_DIR`, `GIT_COMMON_DIR`,
   `GIT_WORK_TREE` given a value or exported, `--git-dir`, `--work-tree`, `core.worktree`: their hooks
   run, or none), no recursive delete of a path a variable may leave empty (only `${name:?}`), no
-  `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used, and no `worktree.sh` run but alone, as `sh scripts/worktree.sh` and plain
+  `gnokey` by its name, no raw call to a chain node (curl or wget, a scheme or none, an interpreter's words, a web
+  fetch; the sandbox's network list does not hold in every session), and no `worktree.sh` run but alone (the rule on a `.gno` file
+  written before the gno skill, which read the session's transcript, left: D13174), as `sh scripts/worktree.sh` and plain
   words, from the project's root: elsewhere those words would run a script the session can write,
   and behind anything else in the call, something else outside the sandbox (F5058); and no subagent's Edit or Write of a harness file (`agent_id` in the hook's input; `records.sh`'s list,
   in every tree above the file, its own included when it has no `.git`, so a planted `.git` hides nothing; its path
@@ -353,8 +335,8 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   body's substitutions unread; the reader that finds them ends at any form it cannot settle (a continued line, a
   `case`, a `<<` inside backticks, a mark it cannot read or never finds), what follows staying commands. If it
   crashes, the call is blocked.
-  `.githooks/pre-commit` drops a caller's `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY`, which served
-  the staged copy a planted object under a staged file's name (F4923).
+  `.githooks/pre-commit` drops a caller's `GIT_COMMON_DIR` and `GIT_OBJECT_DIRECTORY`, which once served the old staged copy a
+  planted object under a staged file's name (F4923); on git 2.53 no case can plant one (F13190).
 - **Alexis's user settings** (`~/.claude/settings.json`, every project; 7w2's `apply-7w2-user.sh`): the
   file tools, which the sandbox does not hold and bypass mode does not ask for, are denied the programs that
   run outside the sandbox with his rights: the folders on `PATH` he owns and where their links lead (`~/.local`,
@@ -365,8 +347,8 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   every project's settings under `~/Server`, and the main checkout's git config and hooks. A deny holds in every
   mode, bypass included.
 
-The guard and the hooks are a seatbelt, not a wall: what holds whatever happens is `main`
-protected with the CI required, which this repository's plan does not offer yet (below).
+The guard and the hooks are a seatbelt, not a wall: `main` takes pull requests alone (D13165), and what holds whatever happens
+is a required `gate-ok` and an owner's approval of the core, which wait for Alexis's ruleset (below).
 
 ## Plugins
 
@@ -395,7 +377,6 @@ costs context in every session.
 
 - **The server judges, it does not block yet.** `main` changes only through a pull request (D13165), but no check is required:
   Alexis merges by `gate-ok`'s verdict, and the local hooks can be skipped by someone who means to (F001, F009).
-- **A record of a green gate can be forged from the sandbox,** which writes it (F076).
 - **Claude's sandbox shares Alexis's `.git`** (one repository, Alexis 2026-10-18): it writes
   refs, objects and the index, so it could move or shadow `main` or plant a nested repository
   (F152, F153, F163). The boundary is `main` protected with the CI required.
@@ -448,16 +429,11 @@ costs context in every session.
   gnoworld session, to the sandbox too: their commands write each other's reports.
 - **Two commands leave the sandbox** by Alexis's user settings (`sandbox.excludedCommands`): his captures' `fetch.sh` and
   herdr's `open.sh`, each taking arguments it validates; what they write is theirs to keep in bounds.
-- **Only merge.sh shows a merge before git writes it** (F129). A plain merge that changes the
-  harness is refused at its commit, its files written already: undo it at once
-  (`git merge --abort`). A cherry-pick, a rebase or a checkout of Claude's branch runs no such
-  check (F153). pre-commit compares only the merge's harness files with git merge-tree's merge of
-  the commit merge.sh marked: one changed during the resolution, or in conflict, is refused; the
-  other files are resolved by hand and gated (9n), and so is a merge read through a non-empty
-  `.git/info/attributes`, `.git/info/grafts` or `.git/shallow`, which a sandboxed command can write. A mark anyone
-  types by hand for a clean merge merge.sh never showed still passes (a backlog row on
-  slice-9n, answer 9n-4): merge.sh never asks Alexis to type one.
-- **A merge refuses a path with a non-ASCII character** (F164).
+- **A commit no hook sees** (F129, F153): a cherry-pick, a rebase, git's plumbing, or a merge Alexis concludes on GitHub runs no
+  hook of this clone; guard.py refuses the first three typed in a command, never run from a script file (the security review of 3b, L4).
+  GitHub's changes job, from the base, is the wall: a harness file no commit declares, and a path this disk may read as another, are
+  refused there; his reading of the pull request is the rest.
+- **A merge's commit refuses, from the sandbox, a path with a non-ASCII character** (F164), as any commit's does.
 - **The install is not atomic** (F159), and a fresh clone has no hooks until its owner installs
   them from `main`.
 - **The history scan is defence in depth;** the staged scan is the barrier (F141 to F143).
@@ -468,21 +444,18 @@ costs context in every session.
   that runs code in a child process other than the server's (`app/src/dataFiles.test.ts` builds the app) runs for a change
   of code only when the graph holds it, and a read through a place built from another's (`join(APP, "..", "deploy")`) is seen
   as its base; a path built at run time from no literal the grep knows is not seen. Markdown is prose outside the sources only,
-  for the gate, `code_changed.sh` and the record's print alike (a recorded chain page under them is a fixture). A part's end
+  for the gate (a recorded chain page under them is a fixture). A part's end
   (`sh scripts/check.sh` on the committed tree) and GitHub's gate run every test of the fast projects, the night the rest.
-- **pre-commit trusts the record of a green gate** on the staged code instead of running the gate again (F076's record, which
-  the sandbox can forge); the CI keeps none.
+- **A commit runs no gate** (D13173): a session that commits without `sh scripts/check.sh` first meets its types, lint and tests at
+  GitHub's gate, on the pull request; pre-commit's Prettier and check_docs read the disk, so a staged file must be as it is there.
 - **Core's tests alone run on both engines,** Node's V8 and Chromium's (F816, F817).
 - **No script proves a fix's test failed before it** since `prove_fix.py` left with check.sh's old lanes (D13168): the reviewer reads it;
   a fix of the harness is proven by `harness_mutate.py`.
-- **Two caches every tree shares** (`~/.cache/gnoworld-tools`): StrykerJS's incremental file and the harness mutants'
-  verdicts. A verdict is reused when what it was keyed on is unchanged; StrykerJS does not see a test helper it neither
-  mutates nor counts as a test, and a harness verdict sees only the files its sections name. So a "killed" judged in
-  another branch's tree can stand in a local run. The CI keeps neither cache and judges everything on each push
+- **The harness mutants' verdicts are a cache every tree shares** (`~/.cache/gnoworld-tools`): a verdict is reused when what it
+  was keyed on is unchanged, and it sees only the files its sections name, so a "killed" judged in another branch's tree can stand in
+  a local run. StrykerJS's incremental file is each tree's own (its default), and GitHub's risk job keeps one of its run. The CI keeps neither cache and judges everything on each push
   (security-S7, review 8).
 - **The three-round limit is a written rule;** nothing counts the rounds.
-- **The review pass is recorded by the agent that ran the review;** the pre-push hook checks it
-  matches the tree, not who wrote it.
 - **Product files Claude writes run outside the sandbox** (F204): the compose file the demo starts
   from, and the app's code that `pnpm dev` runs in Alexis's shell; `deploy/test.sh` runs from a checked
   copy of the commit he reviewed, so what it runs is what he read. The workshop the same, and at once (lot 2's S1, F4962):
@@ -518,8 +491,7 @@ costs context in every session.
   `zmodload`, `python3 -c` calling git, a copy of git under another name), a commit no hook saw put on a branch
   by its hash (`git reset --soft <hash>`, F5369's S7-7), a subscript assembled character by character (S7-8),
   and a crafted `.git` found by discovery after a `cd` (F152's class) pass it. The guard is a speed bump, not the
-  wall: skipped hooks close with a record of each gated tree that no session can write (the chief's next part,
-  reports/slice-7w4.md). A heredoc's line that reads as a refused command is refused, a heredoc inside backticks
+  wall: a commit no hook saw meets GitHub's changes job, which refuses a harness file no commit declares (D13173). A heredoc's line that reads as a refused command is refused, a heredoc inside backticks
   too: a commit message goes in a file (`git commit -F`).
 
 ## Files
@@ -531,9 +503,9 @@ costs context in every session.
 | `.claude/agents/` | `test-auditor`, `reviewer`, `security-reviewer`, `design-reviewer`, `dreamer` |
 | `.claude/commands/` | `/slice-plan`, `/pre-merge`, `/dream` |
 | `.claude/workflows/` | `branch`, a branch's loop |
-| `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the prints and the harness list; `merge.sh`, the merge that shows the harness first |
+| `.githooks/` | `commit-msg`, `pre-commit`, `pre-merge-commit`, `pre-push`; `records.sh`, the harness list and the check of a path the disk may fold |
 | `scripts/install_hooks.sh` | puts `main`'s hooks and the scripts they run in `.git/hooks` |
-| `scripts/check.sh` | the commit gate |
+| `scripts/check.sh` | the commit gate, which a session runs before committing code |
 | `scripts/ergo.sh`, `scripts/workshop.sb`, `scripts/load.py` | the Ergo the server's tests start; the workshop's Seatbelt profile; the machine's load, for the benches |
 | `scripts/related.py` | the unit tests a commit's change asks for: the paths for Vitest's `related` command, `main.test.ts`, the readers of a place on disk |
 | `scripts/stryker_lines.py` | the code GitHub's StrykerJS mutates: the changed tier-1 lines |
@@ -543,15 +515,14 @@ costs context in every session.
 | `.github/CODEOWNERS` | the core, whose change needs an owner's approval once main's ruleset asks for it |
 | `scripts/ci_changes.sh`, `scripts/ci_gate_ok.py` | what a change calls for, and gate-ok's verdict, each run from the base commit |
 | `app/playwright.config.ts`, `app/tests/e2e/` | the app's journeys, against a real server and a real Ergo |
-| `scripts/guard.py`, `scripts/stop_gate.sh`, `scripts/dream_due.sh` | Claude Code's hooks (the last is SessionStart's: it says a dream is due when `main` has a merge after the `The dream of <sha>` rows of `docs/review-log.md`, on `main` and on the branches it has not got, for a row lands on the next slice's branch (F4063); it reads committed rows with read-only git and blocks nothing) |
+| `scripts/guard.py`, `scripts/stop_gate.sh` | Claude Code's hooks: the guard (PreToolUse) and the reaper (Stop) |
 | `scripts/speeds.py` | `--tier1`: whether a change holds a tier-1 path of docs/REVIEW.md, or one it cannot place (GitHub's detector, from the base) |
 | `scripts/scan_secrets.sh`, `scripts/gitleaks.toml`, `scripts/gitleaks-private.toml`, `scripts/.gitleaksignore`, `scripts/audit.py` | the secret scan and the dependency audit |
-| `scripts/code_changed.sh`, `scripts/repo_files.py` | what the hooks and scripts share |
+| `scripts/repo_files.py` | what the scripts share |
 | `scripts/check_css.py`, `scripts/check_comments.mjs`, `scripts/check_docs.py` | the style and docs checks |
 | `scripts/hidden.py` | the characters no text holds raw: check_docs's rule, in a file of its own to be shared |
 | `scripts/mutate.py` | the realms' mutation check |
 | `scripts/patch_coverage.py`, `scripts/check_regressions.py` | the no-regression net |
-| `scripts/review_pass.py` | records and checks a `/pre-merge` pass |
 | `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets, run by hand (F13182) |
 | `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |

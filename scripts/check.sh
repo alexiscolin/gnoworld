@@ -6,8 +6,8 @@
 # from disk), the others none: their suites are their own (test_hooks.sh, probe.py and deploy/test.sh run on GitHub; the evals and
 # tools/agent-github/test.sh by hand). GitHub's gate judges each pull request by what
 # it calls for (.github/workflows/gate.yml, the base's detector), and the night runs the rest (nightly.yml). Its steps run in lanes side by side: a lane stops at its first
-# failure, every lane runs to its end, and the gate fails when one did, showing each. It takes no option.
-# pre-commit runs it on the staged copy, which has no repository: GATE_CHANGED lists the change there, one path a line.
+# failure, every lane runs to its end, and the gate fails when one did, showing each. It takes no option, and runs in a repository:
+# the change is git's. A session runs it before committing code; pre-commit runs only the secret scan, Prettier and check_docs (D13173).
 # GNO_TOOLCHAIN is the folder holding a gno that matches the chain, and its gnohome (docs/DEVELOPMENT.md, "Toolchain"). Node comes
 # from .node-version, through nvm when the shell's own differs.
 set -eu
@@ -34,59 +34,51 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not s
 unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES
 unset COVERAGE_ALL CORE_CHROMIUM # vitest.config.ts's switches, which would change what its tests are
 
-# The code this run tests, printed before its first step and recorded after its last one, unless it changed meanwhile (F076, F133).
-tested=
-if git rev-parse --git-dir >/dev/null 2>&1; then # not in pre-commit's staged copy, which has no repository
-	# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
-	git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
-	runs_from=$(git rev-parse --path-format=absolute --git-path hooks)
-	if [ "$runs_from" != "$git_dir/hooks" ]; then
-		echo "check.sh: git runs hooks from $runs_from, not $git_dir/hooks; install them: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "check.sh: no repository: the change it checks is git's" >&2; exit 1; }
+# Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
+git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
+runs_from=$(git rev-parse --path-format=absolute --git-path hooks)
+if [ "$runs_from" != "$git_dir/hooks" ]; then
+	echo "check.sh: git runs hooks from $runs_from, not $git_dir/hooks; install them: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
+	exit 1
+fi
+if [ -n "${SANDBOX_RUNTIME:-}" ]; then
+	if (: >>"$git_dir/config") 2>/dev/null || { probe=$(mktemp "$git_dir/hooks/probe.XXXXXX" 2>/dev/null) && rm "$probe"; }; then
+		echo "check.sh: a command in the sandbox can write git's hooks or config; .claude/settings.json's sandbox must deny .git/hooks and .git/config" >&2
 		exit 1
 	fi
-	if [ -n "${SANDBOX_RUNTIME:-}" ]; then
-		if (: >>"$git_dir/config") 2>/dev/null || { probe=$(mktemp "$git_dir/hooks/probe.XXXXXX" 2>/dev/null) && rm "$probe"; }; then
-			echo "check.sh: a command in the sandbox can write git's hooks or config; .claude/settings.json's sandbox must deny .git/hooks and .git/config" >&2
+	for hook in commit-msg pre-commit pre-merge-commit pre-push; do
+		[ -x "$git_dir/hooks/$hook" ] || {
+			echo "check.sh: no $hook in $git_dir/hooks, so git checks no commit there; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
 			exit 1
-		fi
-		for hook in commit-msg pre-commit pre-merge-commit pre-push; do
-			[ -x "$git_dir/hooks/$hook" ] || {
-				echo "check.sh: no $hook in $git_dir/hooks, so git checks no commit there; install the hooks: git --no-replace-objects show main:scripts/install_hooks.sh | sh" >&2
-				exit 1
-			}
-		done
-	fi
-	. .githooks/records.sh && tested=$(worktree_print)
+		}
+	done
 fi
 
 want="v$(cat .node-version)"
 # A version and nothing else: anything more would put a folder of its choice first on PATH.
 printf '%s' "${want#v}" | grep -qxE '[0-9]+\.[0-9]+\.[0-9]+' || { echo "check.sh: .node-version must be a version such as 24.22.0" >&2; exit 1; }
 nvm_node="${NVM_DIR:-$HOME/.nvm}/versions/node/$want/bin"
-PATH="$nvm_node:$PWD/node_modules/.bin:$PATH" # node_modules/.bin, as `pnpm run` puts it, minus its install check, which fails in the staged copy
+PATH="$nvm_node:$PWD/node_modules/.bin:$PATH" # node_modules/.bin, as `pnpm run` puts it, minus its install check
 [ "$(node -v 2>/dev/null)" = "$want" ] || {
 	echo "check.sh: Node $want is needed (.node-version; docs/DEVELOPMENT.md, \"Setup\")" >&2
 	exit 1
 }
 
-# The change, against HEAD, untracked files included; in pre-commit's staged copy, what GATE_CHANGED lists. The borrowed node_modules
-# of a worktree is a link, which .gitignore's folder rule misses.
-if [ -n "$tested" ]; then
-	changed=$(
-		set -- . ':!docs' ':!adr' ':!node_modules'
-		git -c core.quotePath=false diff --no-renames --name-only HEAD -- "$@" &&
-			git -c core.quotePath=false ls-files --others --exclude-standard -- "$@"
-	)
-else
-	changed=${GATE_CHANGED:-}
-fi
+# The change, against HEAD, untracked files included. The borrowed node_modules of a worktree is a link, which .gitignore's folder
+# rule misses.
+changed=$(
+	set -- . ':!docs' ':!adr' ':!node_modules'
+	git -c core.quotePath=false diff --no-renames --name-only HEAD -- "$@" &&
+		git -c core.quotePath=false ls-files --others --exclude-standard -- "$@"
+)
 # whole: the whole repository, for every tool; ts, a change of the TypeScript's sources or what they read; tests, of a file a test may
-# read from disk, outside the sources; gno, of a realm. files: the
-# change's files that exist, one a line, which Prettier and ESLint read (each passes over a file that is not its own).
+# read from disk, outside the sources; gno, of a realm. files: the change's regular files, one a line, which Prettier and ESLint read
+# (each passes over a file that is not its own; Prettier refuses a link named on its line).
 whole=false ts=false tests=false gno=false code=false files=
 while IFS= read -r path; do
 	[ -n "$path" ] || continue
-	case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) ;; docs/* | adr/* | *.md) continue ;; esac # prose; a recorded page under the sources is a fixture (F4812)
+	case $path in app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) ;; *.md) continue ;; esac # prose; a recorded page under the sources is a fixture (F4812)
 	code=true
 	case $path in
 	app/src/* | app/tests/* | app/data/* | app/lab/* | app/public/* | server/src/* | jarvis/src/* | link-reader/src/* | packages/*/src/*) ts=true ;;
@@ -94,7 +86,7 @@ while IFS= read -r path; do
 	scripts/* | .githooks/* | .github/* | .claude/* | deploy/* | evals/* | tools/*) tests=true ;; # their own suites (the header)
 	*) whole=true ;; # a config, the lockfile, a path no area places
 	esac
-	[ ! -f "$path" ] || files="$files$path
+	[ ! -f "$path" ] || [ -L "$path" ] || files="$files$path
 "
 done <<EOF
 $changed
@@ -128,10 +120,9 @@ named() {
 	set +f
 	sh -c "${script% .} $options -- \"\$@\"" sh "$@"
 }
-# The type check builds incrementally (Alexis, 2026-11-04), from the worktree's own .claude/tmp/tsc; pre-commit's staged copy, which
-# does not hold that folder, from one of this run's own, gone at its end. TypeScript keys each file of its .tsbuildinfo on its text.
-TSC_CACHE=$logs/tsc
-[ -z "$tested" ] || TSC_CACHE=$PWD/.claude/tmp/tsc
+# The type check builds incrementally (Alexis, 2026-11-04), from the worktree's own .claude/tmp/tsc, whatever a caller's TSC_CACHE
+# says. TypeScript keys each file of its .tsbuildinfo on its text.
+TSC_CACHE=$PWD/.claude/tmp/tsc
 mkdir -p "$TSC_CACHE" && export TSC_CACHE
 
 # step <name>: the step its lane is at, which a failure names, and one more of the steps it ran.
@@ -151,8 +142,7 @@ start() {
 
 lane_lint() {
 	# The harness's floor, at every run: its docs name only files that exist, every script parses (F084: a broken one passed every
-	# commit), and a changed shell script reads as sh, every scripts/*.sh and .githooks/* on a whole run. Prettier and ESLint read none of them, and pre-commit
-	# outside the sandbox trusts the record of a harness commit (the security review of 3a, S1, S4).
+	# commit), and a changed shell script reads as sh, every scripts/*.sh and .githooks/* on a whole run: Prettier and ESLint read none of them.
 	step scripts
 	python3 -I scripts/check_docs.py
 	python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
@@ -163,10 +153,8 @@ lane_lint() {
 	fi
 	if $whole; then
 		step format
-		# Prettier's cache, in a repository alone, keys a file on its path and content: a rerun of an unchanged tree is 0.9 s of 7.5.
-		cache=
-		[ -z "$tested" ] || cache="--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
-		run format:check "$cache"
+		# Prettier's cache keys a file on its path and content: a rerun of an unchanged tree is 0.9 s of 7.5.
+		run format:check "--cache --cache-strategy content --cache-location=.claude/tmp/prettier-cache"
 		step lint
 		run lint # ESLint reads no cache: one keys a file on its own text, and its typed rules read the others' types
 		return 0
@@ -237,9 +225,5 @@ for l in $lanes; do
 done
 [ -z "$failed" ] || exit 1
 
-if [ -n "$tested" ]; then
-	mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green # what stop_gate.sh compares (GNOWORLD_STRICT=1)
-	gate_passed "$tested" false # for the hooks outside the sandbox, which run no gate (F076)
-fi
 echo "all checks passed in $(($(date +%s) - started)) s"
 finished=1

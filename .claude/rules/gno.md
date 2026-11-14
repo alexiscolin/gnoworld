@@ -8,9 +8,10 @@ paths:
 
 Everything about gno, realms and pure packages alike, goes through gnomcp: what exists on a
 chain (`gno_packages`), its source (`gno_read`), its state (`gno_render`, `gno_eval`), and every
-write (`gno_call`, `gno_addpkg`, sessions). `scripts/guard.py` holds it: no `.gno` file before
-a gnomcp call in the session, no `gnokey`, no raw RPC, no fetched realm page. Locally, `gno test`,
-`gno lint` and `gnodev` stay free.
+write (`gno_call`, `gno_addpkg`, sessions). `scripts/guard.py` refuses `gnokey` by its name (a copy under
+another name passes it: phase 3d locks the key stores), a raw call to a chain node (curl, wget, an interpreter's words) and a fetched
+realm page; the sandbox's network list does not hold in every session. Load the gno skill and read the chain before writing a `.gno` file: the guard no longer checks it, as it read
+text, not calls (D13174). Locally, `gno test`, `gno lint` and `gnodev` stay free.
 
 `.gno` looks like Go and is not: no goroutines, channels, `unsafe`, `net` or `os`; imports
 are `gno.land/p/...` or `gno.land/r/...`; the module file is `gnomod.toml`. Load the gno skill

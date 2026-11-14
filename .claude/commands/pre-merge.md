@@ -54,10 +54,7 @@ on the slice's last merge.
    items 1–3, 7 and 8 only, the findings held back until he has reviewed, per "Blind first");
    the findings, most severe first, each with its scenario and its tag (important, nit, or
    pre-existing: in the code before the branch); the low list; what was dropped, one line each.
-8. **Record the pass.** On the final committed code, run `sh scripts/check.sh`, then
-   `python3 -I scripts/review_pass.py record HEAD "<the agents that ran>"` (until 3b of the overhaul removes the pass, D13164).
+8. **Check the final code.** On the final committed code, run `sh scripts/check.sh`.
 9. **Log.** Append to `docs/review-log.md`: the date, the branch, its rounds, each finding with its
    agent and outcome, the tokens and hours the branch took, and what Alexis caught that the agents
-   missed. Commit it with `docs/review-passes.txt`, with a line `Harness-changed: <path> - why` for
-   each harness file the branch changes (`git diff --name-only main...HEAD` against `harness` in
-   `.githooks/records.sh`): pushing `main` is refused without them. That commit keeps the pass valid.
+   missed, and commit it. `main` takes the branch through its pull request, merged by Alexis on GitHub (D13165).
