@@ -6,9 +6,10 @@
   core.worktree): a commit pointed at another one runs that folder's hooks, or none;
 - no recursive delete (rm -r, find -delete or -exec rm) of a path from a variable that may be empty, which
   reaches / or the current folder: only ${name:?}, which stops the shell first;
-- gno only through gnomcp (.claude/rules/gno.md): no gnokey, no fetched realm page or RPC node,
-  and no .gno file written, by any tool, before the session loaded the gno skill and called a
-  gnomcp tool. Raw RPC from Bash is also stopped by the sandbox's network list;
+- gno only through gnomcp (.claude/rules/gno.md): no gnokey by its name (a copy under another name passes: the parser's canary,
+  phase 3d's lock of the key stores the wall), no fetched realm page or RPC node, no raw call to one from curl, wget (a scheme or none)
+  or an interpreter's words; the sandbox's network list does not hold in every session (D13174). Loading the gno skill before a .gno
+  file is written is a rule, no longer checked here (D13174);
 - a subagent's Edit or Write of a harness file (.githooks/records.sh's list, in the tree the file sits in, its path read
   through links, dots and the disk's case; .claude/tmp/, where reports go, is none): the sandbox stops a shell, never a file
   tool, and two agents wrote stryker.config.json with Edit after their shell was refused (D240). The session's own edits
@@ -41,14 +42,16 @@ SEPARATORS = {";", "&&", "||", "|", "&", "(", ")", ";;", "|&"}
 MARKS = re.compile(r"&>>?|[<>]&|>\||>>|&&|\|\||;;|\|&|[<>]\(|[;&|()<>]")
 TAKES_ARG = {"-u", "--unset", "-C", "--chdir", "-S", "-s", "-k", "-n", "-I", "-P", "-L", "-d", "-a"}  # wrappers' options (exec -a: S7-1)
 INTERPRETERS = {"python", "python3", "node", "perl", "ruby", "deno", "bun"}
-WRITERS = {"cp", "mv", "tee", "install", "rsync", "dd"}
 GIT_PLACES = {"GIT_DIR", "GIT_COMMON_DIR", "GIT_WORK_TREE"}  # where git reads its hooks, config and work tree
 CONFIG_HOMES = {"HOME", "XDG_CONFIG_HOME"}  # where git looks for its global config: one of the command's own can set a hooks folder (F5541)
 HOMED = []  # the VAR=value words that gave one of them a value, wherever the line has them
 SETTERS = {"export", "declare", "typeset", "readonly", "local"}  # builtins that give a variable a value or export it
 # git's global options whose argument may come as the next word (git 2.53), beside -c and -C; --git-dir and --work-tree are refused.
 GIT_TAKES_ARG = {"-c", "-C", "--namespace", "--config-env", "--attr-source", "--shallow-file"}
-CHAIN_URL = re.compile(r"https?://(rpc[\w.-]*\.gno\.land|([\w-]+\.)*gno\.land/[rp]/)", re.I)
+# A chain node or realm page as a word: a scheme or none (curl takes either); in an interpreter's words, a scheme or an RPC host's name,
+# so a realm's path alone (gno.land/r/x, an argument) is no call.
+CHAIN_URL = re.compile(r"(https?://)?(rpc[\w.-]*\.gno\.land|([\w-]+\.)*gno\.land/[rp]/)", re.I)
+CHAIN_TEXT = re.compile(r"https?://(rpc[\w.-]*\.gno\.land|([\w-]+\.)*gno\.land/[rp]/)|rpc[\w.-]*\.gno\.land", re.I)
 ASSIGNMENT = re.compile(r"[A-Za-z_]\w*\+?=.*", re.S)  # `+=` appends, and gives a value as `=` does; a value may hold a newline
 # A variable, a parameter or a command's output that may be empty: any but ${name:?...}.
 UNGUARDED = re.compile(r"\$(?:\{(?![A-Za-z_]\w*:\?)|[A-Za-z_\d@*#?$!(-]|$)|`")
@@ -598,16 +601,6 @@ def check_git(words, strict=True):
     return pushing
 
 
-def writes_gno(words, text):
-    """Whether a command writes a .gno file: by redirection, a copying or in-place tool, or an interpreter."""
-    targets = [words[i + 1] for i, w in enumerate(words[:-1]) if w in (">", ">>")]
-    targets += [w.lstrip(">") for w in words if w.startswith(">") and w.lstrip(">")]
-    program = os.path.basename(words[0])
-    if program in WRITERS or (program in ("sed", "perl") and any(w.startswith("-i") for w in words)):
-        targets += words[1:]
-    return any(t.endswith(".gno") for t in targets) or (program in INTERPRETERS and re.search(r"\.gno\b", text) is not None)
-
-
 def deletes_unguarded(words):
     """Whether rm -r, or find with -delete or -exec rm, takes a path from a variable that may be empty."""
     program = os.path.basename(words[0])
@@ -660,33 +653,6 @@ def harness_file(path, cwd):
                for name in names)
 
 
-def ready_for_gno(transcript):
-    """Whether the session loaded the gno skill and called a gnomcp tool; a mention in text counts for neither."""
-    found = set()
-
-    def visit(node):
-        if isinstance(node, dict):
-            name, given = str(node.get("name", "")), node.get("input")
-            if node.get("type") == "tool_use" and name.startswith(("mcp__gnomcp__", "mcp__plugin_gnomcp")):
-                found.add("gnomcp")
-            if node.get("type") == "tool_use" and name == "Skill" and isinstance(given, dict) and str(given.get("skill", "")).startswith("gnomcp:gno"):
-                found.add("skill")
-            for v in node.values():
-                visit(v)
-        elif isinstance(node, list):
-            for v in node:
-                visit(v)
-
-    try:
-        with open(transcript) as f:
-            for line in f:
-                if "gnomcp" in line:
-                    visit(json.loads(line))
-    except (OSError, ValueError):
-        return False
-    return found == {"gnomcp", "skill"}
-
-
 try:
     event = json.load(sys.stdin)
     tool, given = event["tool_name"], event["tool_input"]
@@ -695,7 +661,6 @@ try:
 except (ValueError, KeyError, TypeError):
     refuse("unreadable hook input")
 
-UNREAD = "no .gno before the gno skill is loaded and the chain read: the skill, then gno_packages or gno_read on a realm of the same shape"
 push = False
 try:
     harnessed = tool in ("Edit", "Write") and "agent_id" in event and harness_file(given.get("file_path"), event.get("cwd"))
@@ -703,10 +668,7 @@ except (OSError, ValueError):  # no list to read is no harness: a subagent's wri
     harnessed = True
 if harnessed:
     refuse("a subagent writes no harness file, by any tool: it reports the change it needs, and its session asks Alexis, whose Terminal applies it (D240)")
-if tool in ("Edit", "Write") and str(given.get("file_path", "")).endswith(".gno"):
-    if not ready_for_gno(event.get("transcript_path", "")):
-        refuse(UNREAD)
-elif tool == "WebFetch" and CHAIN_URL.match(str(given.get("url", ""))):
+if tool == "WebFetch" and CHAIN_URL.match(str(given.get("url", ""))):
     refuse("a realm page or an RPC node: read it with gno_render or gno_read")
 elif tool == "Bash":
     text = str(given.get("command", ""))
@@ -751,10 +713,9 @@ elif tool == "Bash":
                 refuse("gnokey: writes and keys go through gnomcp (gno_call, gno_addpkg, sessions); to search for the word, use the Grep tool")
             if deletes_unguarded(tail) or unseen and at == 0 and deletes_unguarded(["rm"] + words[1:]):
                 refuse("a recursive delete of a path a variable may leave empty, reaching / or this folder: write ${name:?}")
-            if (name in ("curl", "wget") or unseen and at == 0) and any(CHAIN_URL.match(w) for w in tail):
+            if ((name in ("curl", "wget") or unseen and at == 0) and any(CHAIN_URL.match(w) for w in tail)
+                    or name in INTERPRETERS and CHAIN_TEXT.search(" ".join(tail))):
                 refuse("a raw call to the chain: read it with gno_read, gno_render or gno_eval")
-            if writes_gno(tail, text) and not ready_for_gno(event.get("transcript_path", "")):
-                refuse(UNREAD)
         if runs_worktree_sh(words) and not (at_root and alone):
             refuse("worktree.sh runs alone, from the project's root, as `sh scripts/worktree.sh` and plain words: settings.json lets those "
                    "words out of the sandbox, and from a subfolder, or behind a cd, an assignment, a redirect or another command, they would "

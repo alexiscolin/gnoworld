@@ -296,8 +296,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   forced push, no git pointed at folders of the command's own (`GIT_DIR`, `GIT_COMMON_DIR`,
   `GIT_WORK_TREE` given a value or exported, `--git-dir`, `--work-tree`, `core.worktree`: their hooks
   run, or none), no recursive delete of a path a variable may leave empty (only `${name:?}`), no
-  `gnokey`, no raw call to the chain, and no `.gno` file written before the gno skill is loaded
-  and gnomcp was used, and no `worktree.sh` run but alone, as `sh scripts/worktree.sh` and plain
+  `gnokey` by its name, no raw call to a chain node (curl or wget, a scheme or none, an interpreter's words, a web
+  fetch; the sandbox's network list does not hold in every session), and no `worktree.sh` run but alone (the rule on a `.gno` file
+  written before the gno skill, which read the session's transcript, left: D13174), as `sh scripts/worktree.sh` and plain
   words, from the project's root: elsewhere those words would run a script the session can write,
   and behind anything else in the call, something else outside the sandbox (F5058); and no subagent's Edit or Write of a harness file (`agent_id` in the hook's input; `records.sh`'s list,
   in every tree above the file, its own included when it has no `.git`, so a planted `.git` hides nothing; its path

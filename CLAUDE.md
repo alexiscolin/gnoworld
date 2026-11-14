@@ -26,7 +26,7 @@ gnoworld: a social, on-chain, graphical hub for gno.land. The design is
 - Reuse and factor: before writing a helper, search `packages/`, `server/src` and `app/src/lib` for one that does the job; reuse it, or move both to one shared place in the same branch, in a refactor commit of its own. Two copies of one logic are a finding, whatever `jscpd` says: it sees near-identical text, not a rewrite.
 - Each area's rules are in `.claude/rules/`, loaded when its files are touched. Every review, `/code-review` included, also reads the tiers in `docs/REVIEW.md`.
 - Claude writes the realms, the server and any Go (who reviews what: docs/REVIEW.md).
-- Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC; `scripts/guard.py` refuses the rest (`.claude/rules/gno.md`).
+- Everything about gno (realms, pure packages, chain reads and writes) goes through gnomcp, never memory, `gnokey` or raw RPC: `scripts/guard.py` refuses `gnokey` and a raw call to a chain node; load the gno skill and read the chain before writing a `.gno` file (`.claude/rules/gno.md`).
 - Read a file before changing it; before changing an exported symbol, find every reference through the language server (`typescript-lsp`), not by text search.
 - Commits: conventional subjects, `type(scope): what` in 72 characters at most (`feat`, `fix`, `docs`, `test`, `refactor`, `perf`, `build`, `ci`, `chore`, `style`, `revert`; the commit-msg hook holds it); one behaviour each, and a refactor apart. Stage files by name, never everything at once.
 - A speed, size or score claim compares the same work before and after (same inputs, same counts), with both numbers shown.

@@ -595,15 +595,11 @@ def mutants():
     yield from each(hm, "    found = " "checked()\n", "    found = list(mutants())\n", "hooks", "harness_mutate --changed still checks every mutant")
     # The hooks and their scripts.
     yield from each("scripts/guard.py", ' refuse("', " " + OFF + '"', "hooks", "guard refusal")
-    yield from each("scripts/guard.py", " refuse(UNREAD)", " " + OFF + "UNREAD)", "hooks", "guard unread .gno")
     yield from each("scripts/guard.py", "                push |= check_git(", "                check_git(", "hooks", "guard asks before a push")
     yield from each("scripts/guard.py", "words, given = unwrap(raw)", "words, given = raw, []", "hooks", "guard sees through wrappers")
     yield from each("scripts/guard.py", '            elif c == "`":\n', "            elif False:\n", "hooks", "guard reads backticks")
     yield from each("scripts/guard.py", "elif words and words[0] in EVALS:", "elif False:", "hooks", "guard reads eval")
-    yield from each("scripts/guard.py", ' or (program in INTERPRETERS and re.search(r"\\.gno\\b", text) is not None)', "", "hooks", "guard sees interpreters write .gno")
-    yield from each("scripts/guard.py", 'r"\\.gno\\b"', 'r"\\.gno"', "hooks", "guard lets a name that only holds .gno pass")
     yield from each("scripts/guard.py", '"--no-verify".startswith(w)', 'w == "--no-verify"', "hooks", "guard refuses --no-verify's prefixes")
-    yield from each("scripts/guard.py", 'found == {"gnomcp", "skill"}', '"gnomcp" in found', "hooks", "guard wants the gno skill")
     yield from each("scripts/guard.py", 'text = text.replace("\\\\\\n", "")', "pass", "hooks", "guard joins continued lines")
     # A recursive delete of a path a variable may leave empty (wt-3e's folder): each part of the guard.
     yield from each("scripts/guard.py", '"-delete" in words or ', "", "hooks", "guard sees find's -delete")
@@ -652,11 +648,9 @@ def mutants():
     # read (S3-5); backticks and ${...} (S3-4); a heredoc's mark in quotes, a here-string (S3-3); a glob qualifier (S3-6).
     yield from each(g, "        for at, word in enumerate(words):\n", "        for at, word in list(enumerate(words))[:1]:\n", "hooks", "guard reads git wherever it stands, not first alone (lot 3, S3-1)")
     yield from each(g, 'name = os.path.basename(word).lstrip("=$")', "name = os.path.basename(word)", "hooks", "guard reads =git and $'git' as git")
-    # gnokey, a recursive delete, curl or wget to the chain and a .gno written, at any word too (the chief's next step).
+    # gnokey, a recursive delete, curl, wget or an interpreter to the chain, at any word too (the chief's next step).
     yield from each(g, '            if name == "gnokey":', '            if name == "gnokey" and at == 0:', "hooks", "guard refuses gnokey wherever it stands")
     yield from each(g, "            if deletes_unguarded(tail) or", "            if at == 0 and deletes_unguarded(tail) or", "hooks", "guard refuses an unguarded recursive delete wherever it stands")
-    yield from each(g, '            if (name in ("curl", "wget") or unseen and at == 0) and', '            if at == 0 and (name in ("curl", "wget") or unseen and at == 0) and', "hooks", "guard refuses curl and wget to the chain wherever they stand")
-    yield from each(g, "            if writes_gno(tail, text) and", "            if at == 0 and writes_gno(tail, text) and", "hooks", "guard refuses a .gno written wherever the writer stands")
     yield from each(g, "            tail = [name] + words[at + 1:]", "            tail = words[at:]", "hooks", "guard reads =rm and $'rm' as rm")
     yield from each(g, 'if name == "git" or name.startswith("git-") or unseen:', 'if name == "git" or unseen:', "hooks", "guard reads git-core's dashed programs as git (lot 3, S3-2)")
     yield from each(g, '([name[len("git-"):]] if name.startswith("git-") else [])', "[]", "hooks", "guard reads git-X as git X")
@@ -1426,6 +1420,7 @@ def mutants():
     yield from stryker_mutants()
     yield from nginx_mutants()
     yield from gate_mutants()
+    yield from guard_3c_mutants()
     yield from hooks_3b_mutants()
     yield from bench_load_mutants()
     yield from regressions_name_mutants()
@@ -1641,6 +1636,19 @@ def hooks_3b_mutants():
     yield from each(ck, '"$@" &&\n\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\tgit -c core.quotePath=false ls-files', h, "check.sh: a git that cannot list the change fails the gate")
     yield from each(ck, "TSC_CACHE=$PWD/.claude/tmp/tsc\n", "TSC_CACHE=${TSC_CACHE:-$logs/tsc}\n", h, "check.sh builds the types from the worktree's own cache, whatever a caller's TSC_CACHE says")
     yield from each("scripts/check_regressions.py", 'if len(sys.argv) != 2 or sys.argv[1].startswith("-"):', "if False:", h, "check_regressions refuses an option it has no more")
+
+
+def guard_3c_mutants():
+    """guard.py since D13174: a raw call to a chain node read from an interpreter's words and with no scheme; the hook's tools."""
+    g, h = "scripts/guard.py", "hooks"
+    for find, replace, label in (
+        ('                    or name in INTERPRETERS and CHAIN_TEXT.search(" ".join(tail))):', "                    or False):", "refuses an interpreter's call to a chain node"),
+        ('CHAIN_URL = re.compile(r"(https?://)?(rpc', 'CHAIN_URL = re.compile(r"(https?://)(rpc', "refuses a call to a chain node with no scheme"),
+        ("|([\\w-]+\\.)*gno\\.land/[rp]/)|rpc[\\w.-]*\\.gno\\.land\", re.I)", "|([\\w-]+\\.)*gno\\.land/[rp]/)\", re.I)", "refuses an interpreter's words naming an RPC host with no scheme"),
+        ('            if ((name in ("curl", "wget") or unseen and at == 0) and', '            if (at == 0 and (name in ("curl", "wget") or unseen and at == 0) and', "refuses curl and wget to the chain wherever they stand"),
+    ):
+        yield from each(g, find, replace, h, f"guard {label}")
+    yield from each(".claude/settings.json", '"matcher": "Bash|WebFetch|Edit|Write"', '"matcher": "Bash"', h, "the guard reads a web fetch and the file tools' writes (the security review of 3c)")
 
 
 def swaps(path, name, rows):

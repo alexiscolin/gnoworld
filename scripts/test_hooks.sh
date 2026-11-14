@@ -90,6 +90,9 @@ import json, sys
 s = json.load(open(sys.argv[1]))
 guard = [h for e in s["hooks"]["PreToolUse"] for h in e["hooks"] if "guard.py" in h["command"]]
 assert guard and all(h.get("onFailure") == "block" for h in guard), "guard does not block when it fails"
+# The tools its rules read (the security review of 3c, M2): Bash, a web fetch, the file tools' writes.
+matched = {t for e in s["hooks"]["PreToolUse"] if any("guard.py" in h["command"] for h in e["hooks"]) for t in e["matcher"].split("|")}
+assert matched == {"Bash", "WebFetch", "Edit", "Write"}, f"the guard reads other tools than its rules: {sorted(matched)}"
 box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
@@ -116,6 +119,7 @@ assert "~/Server/gnoworld-wt/*/.git" in box["filesystem"]["denyWrite"], "a sessi
 assert box.get("excludedCommands") == ["sh scripts/worktree.sh *"], "a command other than worktree.sh runs outside the sandbox"
 assert not [p for p in box["filesystem"]["allowWrite"] if "pnpm" in p], "a command can rewrite the pnpm that Alexis's install runs"
 assert not any("api.github.com" in d for d in box["network"]["allowedDomains"]), "the GitHub API is reachable"
+assert not any("gno.land" in d for d in box["network"]["allowedDomains"]), "the network list names a chain host (the security review of 3c, L3)"
 ask, deny = set(s["permissions"]["ask"]), set(s["permissions"]["deny"])
 # The file tools write the session's folders alone (7w3, Alexis's "Oui, pour gnoworld"): a deny list names some places, never all
 # (7w2's reviews found thirteen more), and Claude Code's blockWritesOutsideWorkingDirectories refuses Write, Edit and NotebookEdit
@@ -3632,25 +3636,20 @@ if problems:
 fi
 
 if part guard; then
-# guard: no git hook skipped, no forced push, gno only through gnomcp. Exit 2 blocks the call.
+# guard: no git hook skipped, no forced push, a push asks, no gnokey, no raw call to a chain node, no subagent's harness write, no
+# unguarded recursive delete, worktree.sh alone. Exit 2 blocks the call. The rule on a .gno file written before the gno skill, which
+# read the session's transcript, left (D13174).
 gd="$here"/guard.py
-printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Read","input":{}}]}}\n' >"$t/plain.jsonl"
-printf '{"type":"assistant","message":{"content":[{"type":"text","text":"I will call mcp__gnomcp__gno_read"}]}}\n' >"$t/says.jsonl"
-printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__gnomcp__gno_packages","input":{}}]}}\n' >"$t/asked.jsonl"
-printf '{"type":"assistant","message":{"content":[{"type":"tool_use","name":"mcp__plugin_gnomcp_gnomcp__gno_read","input":{}}]}}\n' >"$t/plugin.jsonl"
-skill='{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Skill","input":{"skill":"gnomcp:gno-build"}}]}}'
-{ cat "$t/asked.jsonl" && printf '%s\n' "$skill"; } >"$t/skilled.jsonl"
-{ cat "$t/plugin.jsonl" && printf '%s\n' "$skill"; } >"$t/plugin_skilled.jsonl"
 guarded() { # $1: the event as JSON, $2: the exit code expected, $3: what it is
 	code=0
 	printf '%s' "$1" | python3 -I "$gd" >/dev/null 2>&1 || code=$?
 	[ "$code" = "$2" ] || fail "guard gave $code, not $2, for $3"
 }
-sh_() { # $1: a shell command, $2: the exit code expected, $3: the transcript (default: no gnomcp call)
-	guarded "$(python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]},"transcript_path":sys.argv[2]}))' "$1" "${3:-$t/plain.jsonl}")" "$2" "Bash: $1"
+sh_() { # $1: a shell command, $2: the exit code expected
+	guarded "$(python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1")" "$2" "Bash: $1"
 }
-tool_() { # $1: the tool, $2: its input as JSON, $3: the transcript, $4: the exit code expected
-	guarded "{\"tool_name\":\"$1\",\"tool_input\":$2,\"transcript_path\":\"$3\"}" "$4" "$1 $2 with $(basename "$3")"
+tool_() { # $1: the tool, $2: its input as JSON, $3: the exit code expected
+	guarded "{\"tool_name\":\"$1\",\"tool_input\":$2}" "$3" "$1 $2"
 }
 sh_ "git commit --no-verify -m x" 2
 sh_ "git commit -nm x" 2
@@ -3681,28 +3680,31 @@ sh_ "curl -s https://rpc.gno.land:443/status" 2
 sh_ "curl -s HTTPS://GNO.LAND/r/gnoland/home" 2
 sh_ "rg 'https://rpc.gno.land' docs" 0
 sh_ "cd gno && gno test ./r/..." 0
+# A raw call to a chain node: from curl or wget, with or without a scheme; from an interpreter (node, python...), which only the
+# .gno rule caught, by accident (`.gno.land`: the security review of 3c); a realm path with no node, or the docs, pass.
+sh_ "curl -s rpc.onyx.testnets.gno.land:443/status" 2
+sh_ "node -e \"fetch('https://rpc.onyx.testnets.gno.land/status')\"" 2
+sh_ "python3 -c \"import urllib.request as u; u.urlopen('https://rpc.gno.land:443/status')\"" 2
+sh_ "python3 -c \"import urllib.request as u; u.urlopen('rpc.gno.land:443/status'.join(['https://', '']))\"" 2
+sh_ "node scripts/x.mjs gno.land/r/gnoworld/seal" 0
+sh_ "curl -s https://docs.gno.land/resources/gno-interrealm" 0
+# What the rule on a .gno file refused as text passes (D13174): a realm written, copied, edited in place, by a shell or the file tools,
+# a grep naming one; the skill and the chain's read stay CLAUDE.md's rule. Beside them, what no rule refused passes still: a realm
+# read, a TypeScript file written.
 sh_ "cat > gno/r/slot/slot.gno <<EOF
 package slot
-EOF" 2
-sh_ "cat > gno/r/slot/slot.gno <<EOF
-package slot
-EOF" 2 "$t/asked.jsonl"
-sh_ "cat > gno/r/slot/slot.gno <<EOF
-package slot
-EOF" 0 "$t/skilled.jsonl"
-sh_ "sed -i '' s/a/b/ gno/r/seal/seal.gno" 2
-sh_ "cp /tmp/x.gno gno/r/seal/seal.gno" 2
+EOF" 0
+sh_ "sed -i '' s/a/b/ gno/r/seal/seal.gno" 0
+sh_ "cp /tmp/x.gno gno/r/seal/seal.gno" 0
 sh_ "cat gno/r/seal/seal.gno" 0
-tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/plain.jsonl" 2
-tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' "$t/says.jsonl" 2
-tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/asked.jsonl" 2
-tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/skilled.jsonl" 0
-tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' "$t/plugin_skilled.jsonl" 0
-tool_ Write '{"file_path":"/x/packages/core/src/a.ts"}' "$t/plain.jsonl" 0
-tool_ WebFetch '{"url":"https://gno.land/r/gnoland/home"}' "$t/asked.jsonl" 2
-tool_ WebFetch '{"url":"https://GNO.LAND/r/gnoland/home"}' "$t/asked.jsonl" 2
-tool_ WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' "$t/asked.jsonl" 2
-tool_ WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' "$t/plain.jsonl" 0
+sh_ "python3 -I scripts/hits.py scripts/test_hooks.sh '\\.gno\\b'" 0
+tool_ Write '{"file_path":"/x/gno/r/slot/slot.gno"}' 0
+tool_ Edit '{"file_path":"/x/gno/p/util/util.gno"}' 0
+tool_ Write '{"file_path":"/x/packages/core/src/a.ts"}' 0
+tool_ WebFetch '{"url":"https://gno.land/r/gnoland/home"}' 2
+tool_ WebFetch '{"url":"https://GNO.LAND/r/gnoland/home"}' 2
+tool_ WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' 2
+tool_ WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' 0
 guarded 'not json' 2 "unreadable input"
 guarded '{"tool_name":"Bash","tool_input":null}' 2 "a null tool_input"
 # What a wrapper, an abbreviation or an environment variable used to slip past.
@@ -3720,14 +3722,8 @@ sh_ "command git commit -n -m x" 2
 sh_ 'echo $(gnokey list)' 2
 sh_ 'echo `gnokey list`' 2
 sh_ "git commit-tree HEAD^{tree} -m x" 2
-sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 2
-sh_ "node -e \"require('fs').writeFileSync('x.gno', '')\"" 2
-sh_ "node -e \"require('fs').writeFileSync(process.argv[1], '')\" x.gno" 2
 sh_ "node -e \"require('net').connect(6667, 'irc.gnoworld.test')\"" 0
-sh_ "node -e \"require('net').connect(6667, 'irc.gnoworld.test'); require('fs').writeFileSync('x.gno', '')\"" 2
-sh_ "python3 -c \"open('x.gno.bak','w')\"" 2
-sh_ "python3 -c \"open('x.gno_bak','w')\"" 0
-sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 0 "$t/skilled.jsonl"
+sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 0
 sh_ "git commit -m 'note: --no-verify is refused'" 0
 sh_ "GIT_PAGER=cat git log -n 3" 0
 sh_ "python3 -I scripts/probe.py" 0
@@ -3905,18 +3901,18 @@ b\" --no-verify" "echo 'git commit -n -m y' | sh" "sh <<< 'git commit -n -m y'" 
 	'printf x | zsh' '. <(echo x)' 'bash < /tmp/f.sh' "print -l *(e:'git commit -n -m y':)" "ls **/*(.e{'true'})" 'echo *(+myfunc)'; do
 	sh_ "$cmd" 2
 done
-# gnokey, a recursive delete of an unguarded path, curl or wget to the chain and a .gno written are read at any word too, failing
+# gnokey, a recursive delete of an unguarded path and curl, wget or an interpreter to the chain are read at any word too, failing
 # closed as git is (the chief, 2026-11-04): each behind a wrapper the guard knows, one it does not, and a spelling of its name.
 for cmd in 'caffeinate gnokey list' 'some-new-wrapper gnokey list' 'exec -a x gnokey list' '=gnokey list' "\$'gnokey' list" 'echo gnokey' \
 	'caffeinate rm -r "$d"' 'some-new-wrapper find "$d" -delete' 'exec -a x rm -rf $dir/*' '=rm -r "$d"' \
 	'caffeinate curl -s https://rpc.gno.land:443/status' 'some-new-wrapper wget https://gno.land/r/x' '=curl https://rpc.gno.land:443/status' \
-	'caffeinate cp /tmp/x.gno gno/r/x/x.gno' "some-new-wrapper sed -i '' s/a/b/ gno/r/x/x.gno" 'exec -a x tee gno/r/x/x.gno'; do
+	"caffeinate node -e \"fetch('https://rpc.gno.land')\""; do
 	sh_ "$cmd" 2
 done
-for cmd in 'some-new-wrapper rm -r "${d:?}"' 'echo rm -f x' 'some-new-wrapper curl https://github.com' 'echo curl'; do
+for cmd in 'some-new-wrapper rm -r "${d:?}"' 'echo rm -f x' 'some-new-wrapper curl https://github.com' 'echo curl' \
+	'caffeinate cp /tmp/x.gno gno/r/x/x.gno'; do
 	sh_ "$cmd" 0
 done
-sh_ 'caffeinate cp /tmp/x.gno gno/r/x/x.gno' 0 "$t/skilled.jsonl"
 # Every program now read at any word, these hold the split into commands to its job through what a command's start alone decides,
 # a shell's -c: after a keyword, in a function's body, past a process left open, past env's -u; and sh -s, and a substitution left
 # open on a heredoc's line.
@@ -4625,8 +4621,8 @@ file_ Edit "$root/scripts/check.sh" 0 ""
 file_ Edit "$root/scripts/check.sh" 0 ',"agent_type":"Explore"'
 file_ Edit "$root/scripts/check.sh" 2 ',"agent_id":""'
 guarded '{"tool_name":"Write","tool_input":{},"agent_id":"a1"}' 0 "a subagent's Write with no file_path"
-# A harness path ending in .gno, the gno skill loaded: still a harness file.
-guarded "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$root/scripts/x.gno\"},\"transcript_path\":\"$t/skilled.jsonl\",\"agent_id\":\"a1\"}" 2 "a subagent's Write of scripts/x.gno, the skill loaded"
+# A harness path ending in .gno: still a harness file.
+guarded "{\"tool_name\":\"Write\",\"tool_input\":{\"file_path\":\"$root/scripts/x.gno\"},\"agent_id\":\"a1\"}" 2 "a subagent's Write of scripts/x.gno"
 # A records.sh with no list it can read refuses every subagent's write: no list is no harness.
 mkdir -p "$t/guard-root/scripts" "$t/guard-root/.githooks" && cp "$gd" "$t/guard-root/scripts/" && git -C "$t/guard-root" init -q
 for listed in '' "harness() ( git diff \"\$@\" -- '' )"; do
