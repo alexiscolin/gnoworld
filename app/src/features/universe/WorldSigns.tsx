@@ -6,12 +6,11 @@ import { useAppStore } from "../../storeContext.tsx";
 
 // Asked as this module runs, not as the first render does: the plate's chunk, asked at the page's load, would hold the signs' code behind it
 // (the chat's budget counted it then, as the page's first screen no longer held it).
-// A failure is kept as a value and thrown at the first render, to the signs' error boundary: a rejection nobody awaits yet is an unhandled
-// one (`vitest list` failed on it, the module loaded and the run over before the chunk).
 const earth = import("../../EarthSigns.tsx").then(
   (signs) => ({ signs }),
   (cause: unknown) => ({ cause }),
 );
+// A failure is kept as a value and thrown here, at the first render: a rejection nobody awaits yet is unhandled (vitest list failed on it).
 const Signs = lazy(async () => {
   const got = await earth;
   if ("cause" in got) throw new Error("the Earth signs' chunk did not load", { cause: got.cause });
