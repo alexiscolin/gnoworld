@@ -2,7 +2,7 @@
 # worktree.sh <dir> <branch> <base>: a worktree of a new branch, ready for the gate, made from the tree it runs in,
 # whose packages are installed, and whose package files (lockfile, package.json) base must share: an install in the new tree
 # would write into this one's. Its root node_modules is a real folder of links, one per package: a whole-folder link
-# hides them from borrow_node_modules.sh, so pre-commit's staged copy would find none. A workspace's node_modules is
+# hides them from borrow_node_modules.sh, so a copy borrowing them (check_regressions.py's base tree) would find none. A workspace's node_modules is
 # copied as its links by borrow_node_modules.sh, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
 # own, each tree writing them.
 # worktree.sh remove <dir>: removes, from another tree, a worktree that holds no change, staged or untracked file, and keeps its
@@ -87,8 +87,8 @@ git worktree add -q -b "$branch" "$dir" "$base"
 # reached its end from one that died on the way (bash 3.2's EXIT trap exits 0 after an unbound variable, as in check.sh).
 trap 'status=$?; { [ "$status" = 0 ] && [ "${finished:-}" = 1 ]; } || { git worktree remove --force "$dir" >/dev/null 2>&1; git branch -D -q "$branch" >/dev/null 2>&1; }; [ "$status" != 0 ] || [ "${finished:-}" = 1 ] || status=1; exit "$status"' EXIT
 trap 'exit 1' HUP INT TERM
-# The workspaces' node_modules are copied as their links by the helper pre-commit's staged copy uses; its link of the root's
-# is replaced by the folder of per-package links below.
+# The workspaces' node_modules are copied as their links by borrow_node_modules.sh; its link of the root's is replaced by the
+# folder of per-package links below.
 sh "$(dirname "$0")/borrow_node_modules.sh" "$dir"
 rm "${dir:?}/node_modules"
 mkdir "$dir/node_modules" "$dir/node_modules/.vite" "$dir/node_modules/.vite-temp"

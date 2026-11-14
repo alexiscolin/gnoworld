@@ -272,8 +272,8 @@ if (!red) return result("blocked at the red pass: the test-auditor gave no repor
 phase("Build");
 const built = await write(
   `${where("build", true)}. Save the red pass's findings to ${A.shared}/reports/${A.branch}-red-pass.md, then fix them in the tests: ` +
-    `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests (the fast gate runs at each ` +
-    "commit: a refused commit is fixed, never bypassed). A loosening of the net (a test gone, a floor lowered, a picture changed) needs its line, `Removed-test:`, `Lowered-floor:` or `Updated-baseline:`: GitHub's regressions job refuses the pull request without it.",
+    `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests, running ` +
+    "sh scripts/check.sh first, as pre-commit runs only the secret scan, Prettier and check_docs (D13173): a refused commit is fixed, never bypassed). A loosening of the net (a test gone, a floor lowered, a picture changed) needs its line, `Removed-test:`, `Lowered-floor:` or `Updated-baseline:`: GitHub's regressions job refuses the pull request without it.",
   { label: "build", schema: DONE },
 );
 if (!built) return result("blocked at the build");

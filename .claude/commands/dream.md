@@ -19,7 +19,7 @@ Alexis decides, then Claude applies what he accepted.
 4. **Apply what he accepts,** each in its own place:
    - a memory: show him its full text, as a diff against the copy of step 1, and write it once he has read it; one file
      each, and MEMORY.md's index line;
-   - a rule, a test or a check: on a branch of its own, test first for a check, through `/pre-merge` and `merge.sh` like any
+   - a rule, a test or a check: on a branch of its own, test first for a check, through `/pre-merge` and a pull request like any
      harness change;
    - a decision: a row of `docs/decisions.md`, with its reason.
 5. **Measure the dream itself** in `docs/review-log.md`: its tokens, proposals made, accepted, and those that later

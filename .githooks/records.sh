@@ -1,42 +1,11 @@
-# records.sh: what the sandboxed gate records and the hooks check, defined once (F076). Sourced
-# by the hooks and by check.sh; it runs nothing but git. A record is one code print per line, in
-# .claude/tmp/green-fast, or green-full for the full gate, which writes both. Each function runs in
-# a subshell, so it leaves no variable behind in the shell that sources this file.
+# records.sh: the harness list, and the check of a path this disk may fold, defined once: sourced by pre-commit, worktree.sh and
+# GitHub's detector (scripts/ci_changes.sh, the base's copy), read by guard.py. It runs nothing but git. Each function runs in a
+# subshell, so it leaves no variable behind in the shell that sources this file.
 # Git shows each object itself, whatever a replace ref would show instead (F132).
 export GIT_NO_REPLACE_OBJECTS=1
-# A tree's code: every file but prose (docs/, adr/, *.md but under the sources, where a recorded page is a fixture, F4827), as
-# scripts/code_changed.sh leaves it out; names unquoted, so an accented one is matched as code_changed.sh matches it.
-code_print() ( printf '%s' "$(git -c core.quotePath=false ls-tree -r "$1" | grep -v -e '	docs/' -e '	adr/' -e '\.md$'
-	git -c core.quotePath=false ls-tree -r "$1" | grep -E '	(app/(src|tests)|server/src|packages/[^/]+/src)/.*[.]md$' || :)" | git hash-object --stdin )
-# The working tree's code print, untracked files included, read through a throwaway index.
-worktree_print() (
-	set -e
-	dir=$(mktemp -d "${TMPDIR:-/tmp}/records.XXXXXX")
-	tree=$(GIT_INDEX_FILE="$dir/index" git add -A && GIT_INDEX_FILE="$dir/index" git write-tree)
-	rm -r "$dir"
-	code_print "$tree"
-)
-# A tree without the review's own files, as scripts/review_pass.py prints it.
-review_print() ( printf '%s' "$(git ls-tree -r "$1" | grep -v -e '	docs/review-log\.md$' -e '	docs/review-passes\.txt$')" | git hash-object --stdin )
-# Appends the print $1 to the record $2 (fast or full), once.
-put() ( mkdir -p .claude/tmp && { grep -qxF "$1" ".claude/tmp/green-$2" 2>/dev/null || printf '%s\n' "$1" >>".claude/tmp/green-$2"; } )
-# A gate passed on the code printed $1, the full gate when $2 is true: recorded, unless that code
-# changed while the gate ran.
-gate_passed() (
-	if [ "$(worktree_print)" != "$1" ]; then
-		echo "records: the code changed while the gate ran; nothing recorded" >&2
-		exit 0
-	fi
-	put "$1" fast
-	[ "$2" != true ] || put "$1" full
-)
-# Whether a gate recorded the code of $1 in the record $2 (fast or full).
-green() ( grep -qxF "$(code_print "$1")" ".claude/tmp/green-$2" 2>/dev/null )
-# Whether $1 holds a committed review pass for itself.
-reviewed() ( git show "$1:docs/review-passes.txt" 2>/dev/null | cut -d' ' -f2 | grep -qxF "$(review_print "$1")" )
 # The harness: the files that make the gate and Claude's limits, or that run at Alexis's install
-# or in Claude Code outside the sandbox. A branch declares each one it changes (pre-push, F089),
-# the night mutates them (harness_mutate.py), and a merge shows them first (merge.sh, F129).
+# or in Claude Code outside the sandbox. None is committed from the sandbox (pre-commit, D241),
+# GitHub's gate runs the harness's own tests when one changes, and the night mutates them (harness_mutate.py).
 # Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151), and read as globs whatever a caller's
 # GIT_*_PATHSPECS say (one let a commit's hook read its * as a name, 9j's review). $@: git diff's options and commits.
 harness() ( env -u GIT_NOGLOB_PATHSPECS -u GIT_GLOB_PATHSPECS -u GIT_LITERAL_PATHSPECS GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
@@ -49,20 +18,3 @@ foreign() (
 	paths=$(git -c core.quotePath=false diff --name-only "$@") || exit 0
 	printf '%s\n' "$paths" | LC_ALL=C grep -q '[^ -~]'
 )
-# The merge of HEAD and the commit $1 as git merges it: its tree on the first line, then the harness files git merge-tree
-# names in conflict (git-merge-tree(1), git 2.50, OUTPUT). It reads HEAD's attributes, not a .gitattributes git merge has
-# written since (9n's /pre-merge), and merges over every merge base, as git merge does. Nothing when $1 names no commit:
-# git 2.50 then writes nothing and exits 1, as for a conflict, though its manual says otherwise. A grep that fails fails it.
-merge_of() (
-	set -e
-	merged=$(git --attr-source=HEAD -c core.quotePath=false merge-tree --write-tree --name-only --no-messages HEAD "$1" 2>/dev/null) || :
-	tree=$(printf '%s\n' "$merged" | sed -n 1p)
-	git rev-parse -q --verify "$tree^{tree}" >/dev/null || exit 0
-	ours=$(harness --name-only "$(git hash-object -t tree /dev/null)" "$tree")
-	printf '%s\n' "$tree"
-	# -e: a harness path may start with - (*.config.ts)
-	printf '%s\n' "$merged" | sed 1d | grep -xF -e "$ours" || [ $? = 1 ]
-)
-# The files of .git that change how git merges whatever the trees hold, and that Claude's sandbox can write: info/attributes
-# (merge drivers, union), info/grafts and shallow (other parents, other merge bases) (9n's /pre-merge). Each one that holds anything.
-rewired() ( for f in info/attributes info/grafts shallow; do [ ! -s "$(git rev-parse --git-path "$f")" ] || echo ".git/$f"; done )

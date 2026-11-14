@@ -135,15 +135,10 @@ A way to game a display's ranking or count (a ticker, a trend) is a low, kept fo
 
 ## Before a push
 
-Each merge lives on its branch. Pushing a work branch wants a gate that passed on its code, and
-scans the history for secrets (`.githooks/pre-push`); pushing `main` (refused since D13168, which writes no full record: `main` takes pull requests, D13165; 3b removes this) wanted the full gate's
-record of exactly that code and a committed `/pre-merge` pass whose fingerprint matches it
-(`scripts/review_pass.py`): a change after the review voids both, the review's own record does
-not. In Alexis's shell the hooks run no gate, only these checks (F076); the CI runs the full
-gate again, and blocks nothing until `main` is protected. A merge made on GitHub skips the
-hooks, so merges happen locally after `/pre-merge`, through `sh .git/hooks/merge.sh <branch>`,
-which shows each harness file the branch changes before git writes it (F129); then `main` is
-pushed, with the hooks installed from it.
+Each merge lives on its branch. A push scans the whole history for secrets, and `main` is refused: it takes pull requests alone,
+merged by Alexis on GitHub once `gate-ok` is green (`.githooks/pre-push`, D13165). In Alexis's shell the hooks run nothing of the
+repository but that scan (F076); GitHub's gate runs the checks again on the pull request, from the base's scripts, and its changes
+job refuses a harness file no commit declares on a line `Harness-changed: <path> - why` (D13173).
 
 ## Blind first
 

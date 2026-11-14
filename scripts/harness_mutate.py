@@ -30,12 +30,14 @@ import types
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import changed_lines, git, last_reviewed, worktree
+from repo_files import changed_lines, git, worktree
 from suite_parts import code, parts, select
 
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
 GAPS = {  # label -> why no test can notice it yet
+    "pre-commit reads git's own objects, never a caller's (F4923) #1": "no case can plant it: git 2.53 checks a loose object's hash, so no planted object stands for another; a forged pack would, which no test builds",
+    "pre-commit reads git's own common folder, never a caller's (F4923) #1": "no case can plant it: on git 2.53 HEAD resolves from the worktree's own refs whatever GIT_COMMON_DIR says, and its objects are the case above",
     "workshop.sh takes a Node that is the user's own file #1": "no second user to own a file in a test: the check needs a file of another owner",
     "workshop.sh waits for the last run's script to end before it serves #1": "a timing: the old script's cleanup races the new run's by under a second, and no stub makes it slower",
     "check.sh: a git that cannot list the change fails the gate #1": "equivalent: under sh, set -e already holds inside the command substitution, so the && only says it",
@@ -63,13 +65,13 @@ SECTIONS = {
     "package.json": {"probe": "react_warn,react_tsc,ui_tsc,jarvis,service,chain", "hooks": "wiring"}, "pnpm-workspace.yaml": {"hooks": "wiring,regressions"},
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
-    "scripts/guard.py": "guard", "scripts/review_pass.py": "review_pass", "scripts/patch_coverage.py": "patch_coverage",
+    "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
-    ".githooks/pre-push": "pre_push,wiring,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
-    ".githooks/records.sh": "outside,installed,wiring,worktree_script,pre_commit",".githooks/pre-merge-commit": "outside,installed", ".githooks/merge.sh": "installed",
-    "scripts/install_hooks.sh": "installed,outside", "scripts/code_changed.sh": "pre_commit,stop_gate", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
-    "scripts/stop_gate.sh": "stop_gate,stop_gate_pingpong,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/dream_due.sh": "dream_due", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
+    ".githooks/pre-push": "pre_push,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
+    ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
+    "scripts/install_hooks.sh": "installed,outside", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
+    "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
     "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
 }
@@ -133,33 +135,8 @@ def prettier_cache_mutants():
     ))
 
 
-def quick_mutants():
-    """check_regressions --quick, per commit (F2579): the hook and the fast gate ask for it, and it lists only what the change touches."""
-    yield from each(".githooks/pre-commit", '--quick "$base"', '"$base"', "hooks", "pre-commit lists every test of the base and the tree per commit")
-    c, h = "scripts/check_regressions.py", "hooks"
-    yield from each(c, 'if n.split(" > ", 1)[0] not in touched}', "if True}", h, "check_regressions.py keeps the base's tests of the files the change touches")
-    yield from each(c, "or any(SPEC_FILE.search(p) for p in paths)", "or any(not VITEST_FILE.search(p) for p in paths)", h, "check_regressions.py lists the tree whole for a change beside the test files")
-    yield from each(c, "or any(SPEC_FILE.search(p) for p in paths)", "or False", h, "check_regressions.py lists only the touched files for a Playwright spec")
-    yield from each(c, "os.replace(f.name, path)", "pass", h, "check_regressions.py keeps the base's listing in the cache")
-    yield from each(c, 'git("ls-files", "--others", "--exclude-standard").splitlines()', "[]", h, "check_regressions.py lists the touched files without the new ones")
-    yield from each(c, "        return set(json.load(f))\n", "        raise OSError\n", h, "check_regressions.py reads the base's listing from the cache")
 
 
-def checks_mutants():
-    """pre-commit runs check_regressions under GNOWORLD_STRICT=1 when a commit touches a test (slice-5 harness-b)."""
-    hook = ".githooks/pre-commit"
-    for find, replace, label in (
-        ('[ "$merge" = 0 ] && [ -n "$tests" ]', '[ -n "$tests" ]', "leaves check_regressions to a merge's full gate"),
-        ('[ -n "$tests" ] && base=', "base=", "runs check_regressions only when a test is staged"),
-        ("git merge-base HEAD origin/main 2>/dev/null || ", "", "compares with where the branch left main"),
-        (r"\.(test|bench)\.tsx?$|", "", "runs check_regressions on a test and a bench"),
-        (r"\.spec\.ts$|", "", "runs check_regressions on a journey"),
-        (r"_test\.(gno|go)$|", "", "runs check_regressions on a gno or Go test"),
-        (r"-snapshots/.*\.png$|", "", "runs check_regressions on an approved picture"),
-        (r"|__screenshots__/.*\.png$", "", "runs check_regressions on a story's picture"),
-        ('python3 -I "$s/check_regressions.py" --quick "$base"', ":", "runs check_regressions"),
-    ):
-        yield from each(hook, find, replace, "hooks", f"pre-commit {label}")
 
 
 def stryker_mutants():
@@ -467,7 +444,6 @@ def mutants():
     yield from each(rf, "(start, start + 1)" " if removals", "(start + 1,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line before it")
     # A commit's lint: its change and the files that import it, from the type check's own graph, in a folder of the run's or the worktree's.
     ck = "scripts/check.sh"
-    yield from each(ck, "|| TSC_CACHE=$PWD/.claude/tmp/tsc", "|| TSC_CACHE=$logs/tsc", "hooks", "check.sh builds a repository's types from the worktree's own cache")
     yield from each(ck, "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "\n: GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "hooks", "check.sh reads git's own folders, never a caller's (lot 1, S5)")
     # Every gate step's time, kept.
     sl = "scripts/stryker_lines.py"
@@ -481,20 +457,6 @@ def mutants():
     yield from each(sl, '    config["mutate"] = [', '    config = {}\n    config["mutate"] = [', "hooks", "stryker_lines.py keeps every other key of the config")
     yield from each(sl, "{n for first, last in spans[p] if any(first <= at <= last for at in found) for n in range(first, last + 1)}", "found", "hooks", "stryker_lines.py widens a changed line to its top-level statement (F4857)")
     yield from each(sl, "if not isinstance(patterns, list) or not patterns or not all(isinstance(p, str) for p in patterns):", "if not patterns:", "hooks", "stryker_lines.py refuses a mutate that is no list of patterns")
-    # The ping-pong (stop_gate.sh's pingpong): the one exception to the gate at a turn's end, its sign one no sandboxed command plants.
-    sg = "scripts/stop_gate.sh"
-    yield from each(sg, "pingpong && exit 0 # its record", ": && exit 0 # its record", "hooks", "stop_gate.sh ends a turn without the gate during a ping-pong")
-    yield from each(sg, "reap || : # set -e is off", "pingpong && exit 0; reap || : # set -e is off", "hooks", "stop_gate.sh reaps at a ping-pong's end too (F4852)")
-    yield from each(sg, "$2 != 1 && $3 == $4 && ", "$3 == $4 && ", "hooks", "stop_gate.sh's ping-pong takes no workshop.sh whose parent is gone (F4852)")
-    yield from each(sg, " && $3 == $4 && NF == 7 && ", " && NF == 7 && ", "hooks", "stop_gate.sh's ping-pong takes its terminal's foreground group alone (F4962)")
-    yield from each(sg, " && $3 == $4 && NF == 7 && ", " && $3 == $4 && ", "hooks", "stop_gate.sh's ping-pong takes no workshop.sh run with an argument")
-    yield from each(sg, "shell ~ /^(sh|bash|dash|zsh)$/ && ", "", "hooks", "stop_gate.sh's ping-pong takes a shell's workshop.sh alone")
-    yield from each(sg, '$7 == here "/scripts/workshop.sh"', 'index($7, "/scripts/workshop.sh")', "hooks", "stop_gate.sh's ping-pong takes this checkout's workshop.sh alone")
-    yield from each(sg, '/usr/sbin/lsof -a -p "$pid" -d cwd', "/usr/sbin/lsof -d cwd", "hooks", "stop_gate.sh's ping-pong reads each workshop's own folder (F4851)")
-    yield from each(sg, '/usr/bin/sed -n \'s/^n//p\')" = "$here" ] || continue', '/usr/bin/sed -n \'s/^n//p\' | /usr/bin/cut -c1-${#here})" = "$here" ] || continue', "hooks", "stop_gate.sh's ping-pong takes this checkout's folder, not one it begins (F4851)")
-    yield from each(sg, "/usr/bin/python3 -Ic 'import ctypes", "/usr/bin/python3 -c 'import ctypes", "hooks", "stop_gate.sh's ping-pong runs Python isolated from the folder (F4850)")
-    yield from each(sg, "check(int(sys.argv[1]), None, 0)", "check(__import__(\"os\").getpid(), None, 0)", "hooks", "stop_gate.sh's ping-pong asks the sandbox of the workshop's process, not its own")
-    yield from each(sg, "sys.exit(0 if check(", "sys.exit(0 if 1 or check(", "hooks", "stop_gate.sh's ping-pong wants the workshop out of every sandbox")
     # The workshop: the app's screens and the lab's, each on its server and its tailnet name, by one function.
     ws = "scripts/workshop.sh"
     yield from each(ws, '\tlsof -nP -iTCP:"$1" -sTCP:LISTEN >/dev/null 2>&1 || return 0\n', "\treturn 0\n", "hooks", "workshop.sh never takes a port another process holds")
@@ -616,13 +578,9 @@ def mutants():
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "return killed and (label not in GAPS or " "run(tree", "return killed and (True or run(tree", "hooks", "harness_mutate judges a known gap that a run killed once more (F1832)")
     yield from each(hm, "pool.submit(run, *c): c for c in " "controls}", "pool.submit(run, *c): c for c in controls[:1]}", "hooks", "harness_mutate's control runs in every tree")
-    yield from each(hm, "        since = last_reviewed" "(base)\n", "        since = base\n", "hooks", "harness_mutate --changed judges the guard files changed since the last /pre-merge pass, not since base")
-    yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except ZeroDivisionError as e:", "hooks", "harness_mutate --changed refuses a passes file it cannot read, never judging fewer mutants")
-    yield from each(hm, "    except (OSError, ValueError)" " as e:", "    except OSError as e:", "hooks", "harness_mutate --changed refuses a passes file that is malformed or no UTF-8, with a message (F1432)")
     yield from each(hm, "        if changed is None" ":  # a full run", "        if False:  # a full run", "hooks", "harness_mutate with no argument refuses to pass with no mutant to judge (F1431)")
     yield from each(hm, '"--no-renames", ' '"--name-only"', '"--name-only"', "hooks", "harness_mutate --changed counts a renamed guard file under its old name too (F1434)")
     yield from each(hm, '"--name-only", ' '"-z"', '"--name-only"', "hooks", "harness_mutate --changed reads a guard file's name git would quote (F1434)")
-    yield from each(hm, "        base, changed = since, " "changed_since(since)\n", "        base = since\n", "hooks", "harness_mutate --changed reads the files changed since the pass, not since base")
     yield from each(hm, "    if not found" ":  # nothing to judge", "    if False:  # nothing to judge", "hooks", "harness_mutate --changed runs no control when it judges no mutant")
     yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
     yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
@@ -952,7 +910,6 @@ def mutants():
     yield from each(g, '    if args[:1] in (["--version"], ["--help"]):', "    if False:", "hooks", "guard lets bash --version pass (7w4)")
     yield from each(g, '    if args[:1] in (["--version"], ["--help"]):', '    if args[:1] in (["--version"],):', "hooks", "guard lets zsh --help pass")
     yield from each(g, '    if args[:1] in (["--version"], ["--help"]):', '    if any(w in ("--version", "--help") for w in args):', "hooks", "guard reads --version first alone")
-    yield from each("scripts/review_pass.py", 'sys.exit(f"review_pass: no', 'print(f"review_pass: no', "hooks", "review_pass check")
     yield from each("scripts/patch_coverage.py", "    sys.exit(1)", "    pass", "hooks", "patch_coverage floor")
     yield from each("scripts/check_nginx.py", 'pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build")', 'pathlib.Path("app/build")', "hooks", "check_nginx reads the build GNOWORLD_BUILD names (F13176)")
     yield from each("scripts/check_nginx.py", 'pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build")', 'pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build-gate-ci")', "hooks", "check_nginx reads app/build by default")
@@ -1058,10 +1015,6 @@ def mutants():
     yield from each("scripts/check_regressions.py", "if after.get(name) != old and", "if False and", "hooks", "check_regressions watches a check's settings")
     yield from each(".githooks/commit-msg", "exit 1", ":", "hooks", "commit-msg refusal")
     yield from each(".githooks/pre-push", "exit 1", ":", "hooks", "pre-push refusal")
-    yield from each(".githooks/pre-push", 'python3 -I scripts/review_pass.py check "$local_sha"', ":", "hooks", "pre-push review check")
-    yield from each(".githooks/pre-push", "sh scripts/check.sh --full </dev/null", ":", "hooks", "pre-push gate")
-    yield from each(".githooks/pre-push", "		sh scripts/check.sh </dev/null", "		:", "hooks", "pre-push fast gate")
-    yield from each(".githooks/pre-push", '"Harness-changed: $1 - "?*', "*", "hooks", "pre-push wants each harness change declared with its reason")
     yield from each(".githooks/commit-msg", "if ! printf '%s\\n' \"$msg\" | gitleaks stdin", "if false && printf '%s\\n' \"$msg\" | gitleaks stdin", "hooks", "commit-msg scans the message for private names")
     yield from each(".githooks/commit-msg", " --ignore-gitleaks-allow", "", "hooks", "commit-msg ignores gitleaks:allow (F113)")
     yield from each(".githooks/commit-msg", "|^claude-session:", "", "hooks", "commit-msg refuses a Claude-Session line (F591)")
@@ -1076,22 +1029,13 @@ def mutants():
     yield from each("scripts/gitleaks-private.toml", r"(?:^|[^\w./~]|file://)(", "(", "hooks", "the private scan lets a users folder inside a path pass (F117)")
     yield from each("scripts/gitleaks-private.toml", "/[a-z_][", r"/[\w][", "hooks", "the private scan lets a route's number pass (F117)")
     yield from each("scripts/gitleaks-private.toml", "(?i)^/home/runner$", "(?i)/home/runner", "hooks", "the private scan lets only the CI runner's folder pass")
-    yield from each(".githooks/pre-push", 'changed=$(harness --name-only "$remote_sha" "$local_sha")', "changed=$(:)", "hooks", "pre-push lists the harness files main gets")
-    yield from each(".githooks/pre-push", '"$local_sha") || refuse "fetch main first', '"$local_sha" || :) || refuse "fetch main first', "hooks", "pre-push refuses a main it cannot compare (F116)")
     yield from each(".githooks/records.sh", " app/tsconfig.json", "", "hooks", "the harness list holds every file harness_mutate guards (F124)")
     yield from each(".githooks/records.sh", " .mcp.json", "", "hooks", "the harness list holds what Claude Code starts (F129)")
-    yield from each(".githooks/pre-push", 'if [ "$remote_sha" != "$zero" ]; then', "if false; then", "hooks", "pre-push compares main with the remote's")
-    yield from each(".githooks/pre-push", '! $gated || sh "$(dirname "$0")/scan_secrets.sh"', ":", "hooks", "pre-push scans the history it sends")
-    yield from each(".githooks/pre-push", '! $gated || sh "$(dirname "$0")/scan_secrets.sh"', "! $gated || sh scripts/scan_secrets.sh", "hooks", "pre-push scans with its own scan, not the working tree's (F129)")
     # F129: the hooks live in .git/hooks, installed from main with the scripts they run.
     ih = "scripts/install_hooks.sh"
     yield from each(ih, 'git cat-file -e "$ref:.githooks/$hook" 2>/dev/null ||', "true ||", "hooks", "install_hooks refuses a commit missing a hook")
     yield from each(ih, "git ls-tree --full-tree ", "git ls-tree ", "hooks", "install_hooks reads the commit from any folder")
     yield from each(ih, '[ -z "$twice" ] ||', "true ||", "hooks", "install_hooks refuses two files under one name")
-    yield from each(ih, '[ -z "$others" ] ||', "true ||", "hooks", "install_hooks --check refuses a hook the commit does not hold")
-    yield from each(ih, '[ ! -L "$to" ] && ', "", "hooks", "install_hooks --check refuses a link")
-    yield from each(ih, '[ -x "$to" ] && ', "", "hooks", "install_hooks --check refuses a hook git would skip")
-    yield from each(ih, 'git show "$ref:$f" | cmp -s - "$to" ||', "true ||", "hooks", "install_hooks --check wants each file the commit's")
     yield from each(ih, '[ -z "$f" ] || rm -rf -- "${hooks:?}/$f"', ":", "hooks", "install_hooks removes a hook the commit does not hold")
     yield from each(ih, '	rm -f "$to" # a link there', "	: # a link there", "hooks", "install_hooks writes in place of a link, not through it")
     yield from each(ih, '	git show "$ref:$f" >"$to"', '	cp "$f" "$to"', "hooks", "install_hooks installs the commit's files, not the working tree's")
@@ -1100,81 +1044,19 @@ def mutants():
     yield from each(ih, "git config --unset-all core.hooksPath || [ $? = 5 ]", ":", "hooks", "install_hooks takes git off the repository's hooks")
     yield from each(ih, "git config merge.ff false", ":", "hooks", "install_hooks turns off fast-forwards, which run no hook")
     yield from each(ih, '[ "$(git rev-parse --path-format=absolute --git-path hooks)" = "$hooks" ] ||', "true ||", "hooks", "install_hooks fails while git takes hooks from elsewhere")
-    ms = ".githooks/merge.sh"
-    yield from each(ms, 'cd "$(git rev-parse --show-toplevel)"', ":", "hooks", "merge.sh reads the harness from the root, from any folder")
-    yield from each(ms, '|| { echo "merge.sh: check out the branch', '|| : || { echo "merge.sh: check out the branch', "hooks", "merge.sh merges onto a branch, never onto no branch (9n-3)")
-    yield from each(ms, '[ -z "$(git status --porcelain)" ] ||', "true ||", "hooks", "merge.sh merges onto a clean tree only")
-    yield from each(ms, "if [ -n \"$changed\" ]; then", "if false; then", "hooks", "merge.sh shows the harness a branch changes")
-    yield from each(ms, 'shown=$(harness --text ', "shown=$(harness ", "hooks", "merge.sh shows a file as text, whatever git takes it for (F132)")
-    yield from each(ms, ' | cat -v', "", "hooks", "merge.sh shows control bytes, which could hide a line")
-    yield from each(ms, '[ "$answer" = "$branch" ] ||', "true ||", "hooks", "merge.sh wants the branch's name typed")
-    yield from each(ms, "GNOWORLD_MERGE=$tip ", "", "hooks", "merge.sh marks the merge it showed")
-    yield from each(".githooks/pre-commit", '[ "${1:-}" = --merge ] || ', "", "hooks", "pre-commit checks a merge pre-merge-commit hands it (F129)")
-    yield from each(".githooks/pre-commit", " || git rev-parse -q --verify MERGE_HEAD >/dev/null", "", "hooks", "pre-commit checks a merge concluded by hand (F129)")
-    yield from each(".githooks/pre-commit", "GATE_MERGE=$merge ", "", "hooks", "pre-commit tells the staged gate whether it commits a merge: a caller's value counts for nothing")
-    yield from each(".githooks/pre-commit", "merge=0\n{", "merge=1\n{", "hooks", "pre-commit gives a work commit its time budget")
-    yield from each(".githooks/pre-commit", '{ [ "${1:-}" = --merge ] || git', "{ false || git", "hooks", "pre-commit tells the staged gate of pre-merge-commit's merge")
-    yield from each(".githooks/pre-commit", "|| git rev-parse -q --verify MERGE_HEAD >/dev/null 2>&1; } && merge=1", "|| false; } && merge=1", "hooks", "pre-commit tells the staged gate of a merge in progress")
     pc, rs = ".githooks/pre-commit", ".githooks/records.sh"
-    yield from each(pc, '\t\tif [ -n "$changed" ]; then\n\t\t\t# Each harness file', '\t\tif true; then\n\t\t\t# Each harness file', "hooks", "pre-commit wants merge.sh only for a merge that changes the harness")
-    yield from each(pc, 'if [ -n "$rewiring" ]; then', "if false; then", "hooks", "pre-commit refuses a merge of the harness read through .git/info (9n's /pre-merge)")
-    yield from each(pc, 'elif [ -z "$tree" ]; then', "elif false; then", "hooks", "pre-commit wants merge.sh's mark to name a commit (F129)")
-    yield from each(pc, 'elif [ -n "$clash" ]; then', "elif false; then", "hooks", "pre-commit refuses a harness file in conflict, whatever the resolution keeps (9n)")
-    yield from each(pc, '[ -z "$drift" ] ||', "true ||", "hooks", "pre-commit wants every harness file as merge.sh's merge holds it (9n)")
-    yield from each(pc, 'drift=$(harness --cached ', 'drift=$(harness ', "hooks", "pre-commit compares the harness in the index, what is committed (9n)")
-    yield from each(pc, 'if [ -n "$why" ]; then', "if false; then", "hooks", "pre-commit refuses a merge merge.sh did not show (F129)")
-    yield from each(pc, 'sh .git/hooks/merge.sh <branch>" >&2\n\t\t\t\texit 1', 'sh .git/hooks/merge.sh <branch>" >&2', "hooks", "pre-commit stops a merge merge.sh did not show")
-    yield from each(rs, "git --attr-source=HEAD ", "git ", "hooks", "a merge is read with HEAD's attributes, not a .gitattributes the merge wrote (9n's /pre-merge)")
-    yield from each(rs, "merge-tree --write-tree --name-only ", "merge-tree --write-tree ", "hooks", "merge-tree's conflicts are read by their names (9n)")
-    yield from each(rs, 'grep -xF -e "$ours"', 'grep -xF "$ours"', "hooks", "a harness path that starts with - is a name, not an option (9n's review)")
-    yield from each(rs, ' || [ $? = 1 ]\n)', '\n)', "hooks", "a merge with no harness file in conflict is no failure (9n)")
-    yield from each(rs, 'git rev-parse -q --verify "$tree^{tree}" >/dev/null || exit 0', ":", "hooks", "a mark that names no commit merges nothing (F129)")
-    rewiring = ("info/attributes", "info/grafts", "shallow")
-    for f in rewiring:
-        yield from each(rs, f"for f in {' '.join(rewiring)}; do", f"for f in {' '.join(g for g in rewiring if g != f)}; do", "hooks", f"the hooks refuse a merge read through .git/{f} (9n's /pre-merge)")
-    yield from each(".githooks/pre-commit", '	sh "$(dirname "$0")/code_changed.sh" --staged', "	sh scripts/code_changed.sh --staged", "hooks", "pre-commit runs its own code_changed.sh, not the working tree's (F129)")
-    yield from each(".githooks/pre-commit", '	sh "$(dirname "$0")/scan_secrets.sh" --staged', "	sh scripts/scan_secrets.sh --staged", "hooks", "pre-commit runs its own scan, not the working tree's (F129)")
-    yield from each(".githooks/pre-merge-commit", " --merge", "", "hooks", "pre-merge-commit tells pre-commit it is a merge (F129)")
-    yield from each(".githooks/pre-commit", ' || [ -e "$(git rev-parse --git-path SQUASH_MSG)" ]', "", "hooks", "pre-commit checks a squash merge (F129)")
-    yield from each(".githooks/pre-commit", "harness --cached --name-only HEAD", "harness --name-only HEAD", "hooks", "pre-commit reads the merge in the index, what is committed")
-    for hook in (".githooks/pre-commit", ".githooks/pre-push", ".githooks/merge.sh"):
-        yield from each(hook, '. "$(dirname "$0")/records.sh"', ". .githooks/records.sh", "hooks", f"{hook} loads its own records, not the working tree's (F129)")
     yield from each(".githooks/records.sh", "export GIT_NO_REPLACE_OBJECTS=1", ":", "hooks", "the hooks read the objects, past a replace ref (F132)")
     yield from each(ih, "export GIT_NO_REPLACE_OBJECTS=1", ":", "hooks", "install_hooks reads the objects, past a replace ref (F132)")
     yield from each(ih, "grep -vxF", "grep -vF", "hooks", "install_hooks takes a hook's whole name, not a part of it")
     yield from each(ih, "git config pull.ff only", ":", "hooks", "install_hooks keeps a pull a fast-forward")
-    yield from each(ih, '$check || mkdir -p "$hooks"', ":", "hooks", "install_hooks makes a missing hooks folder")
-    yield from each(ms, ' "$tip"; then\n\tkept', ' "$branch"; then\n\tkept', "hooks", "merge.sh merges the commit it showed, not where the branch is now")
-    yield from each(ms, '[ -z "$rewiring" ] ||', "true ||", "hooks", "merge.sh refuses to merge through .git/info (9n's /pre-merge)")
-    yield from each(ms, 'if [ -n "$clash" ]; then', "if false; then", "hooks", "merge.sh refuses a harness file that would be in conflict (9n's review)")
-    yield from each(ms, 'changed=$(harness --name-only HEAD "$shown_tree")', 'changed=$(harness --name-only HEAD..."$tip")', "hooks", "merge.sh lists what the merge does to the harness, not what the branch changed (9n's /pre-merge)")
-    yield from each(ms, '--color=never HEAD "$shown_tree")', '--color=never HEAD..."$tip")', "hooks", "merge.sh shows what the merge does to the harness, not what the branch changed (9n's /pre-merge)")
-    yield from each(ms, 'git commit -m "$message"', 'git commit --no-edit', "hooks", "merge.sh commits with its own message, not .git/MERGE_MSG (9n's /pre-merge)")
-    yield from each(ms, '[ "$(git rev-parse -q --verify HEAD^1)" = "$start" ] &&', "true &&", "hooks", "merge.sh undoes a merge onto a branch moved while it was made (9n's /pre-merge)")
-    yield from each(ms, '[ "$(git rev-parse -q --verify HEAD^2)" = "$tip" ] &&', "true &&", "hooks", "merge.sh undoes a merge of another commit than the one shown (9n's /pre-merge)")
-    yield from each(ms, '! git rev-parse -q --verify HEAD^3 >/dev/null &&', "true &&", "hooks", "merge.sh undoes a merge with a third parent (9n's /pre-merge)")
-    yield from each(ms, '[ -z "$(harness --name-only "$shown_tree" HEAD)" ] &&', "true &&", "hooks", "merge.sh undoes a merge whose harness changed after the hooks (9n's /pre-merge)")
-    yield from each(ms, 'git reset -q --hard "$start" ||', ': ||', "hooks", "merge.sh puts the branch back when it undoes a merge (9n's /pre-merge)")
-    yield from each(ms, 'git reset -q --hard "$start" ||', 'git reset -q --keep "$start" ||', "hooks", "merge.sh undoes even a commit whose index alone was swapped (9n's /pre-merge, round 2)")
-    yield from each(ms, 'is back at $start" >&2\n\texit 1', 'is back at $start" >&2\n\texit 0', "hooks", "merge.sh fails when it undoes a merge (9n's /pre-merge)")
-    yield from each(ms, '[ -n "$(git diff --name-only --diff-filter=U)" ] || exit 1', "true || exit 1", "hooks", "merge.sh waits only on a merge in conflict (9n)")
-    yield from each(ms, "while read -r _; do", "while false; do", "hooks", "merge.sh commits a merge in conflict itself, once resolved (9n's review)")
-    yield from each(ms, 'git merge --abort" >&2\nexit 1', 'git merge --abort" >&2\nexit 0', "hooks", "merge.sh fails when nothing was committed (9n)")
     ck = "scripts/check.sh"
     hooks = ("commit-msg", "pre-commit", "pre-merge-commit", "pre-push")
     for hook in hooks:
         for path in (ih, ck):
             yield from each(path, f"for hook in {' '.join(hooks)}; do", f"for hook in {' '.join(h for h in hooks if h != hook)}; do",
                             "hooks", f"{path} wants {hook} (F129)")
-    yield from each(".githooks/pre-push", '--check "$local_sha"', "--check", "hooks", "pre-push checks the hooks of the main it pushes, not the local main's (F129)")
     # Round 1 of F129's review.
     yield from each(".githooks/records.sh", "GIT_ICASE_PATHSPECS=1 ", "", "hooks", "the harness list is case-blind, as the disk is (F151)")
-    yield from each(ms, 'if foreign HEAD..."$tip"; then', "if false; then", "hooks", "merge.sh refuses a path the disk may fold (F164)")
-    yield from each(".githooks/pre-commit", "if foreign --cached HEAD; then", "if false; then", "hooks", "pre-commit refuses a merged path the disk may fold (F164)")
-    yield from each(".githooks/pre-commit", ", or git reset --hard after a squash", "", "hooks", "pre-commit tells how to undo a squash (F154)")
-    yield from each(ih, '[ "$(git config merge.ff)" = false ] ||', "true ||", "hooks", "install_hooks --check wants fast-forward merges off (F159)")
-    for flag in ("--no-ext-diff ", "--no-textconv ", "--color=never "):
-        yield from each(ms, flag, "", "hooks", f"merge.sh shows the text itself: {flag.strip()} (F156)")
     for path in (".git/commondir", ".mcp.json"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of Claude's file tools (F150, F158)")
     yield from each(".claude/settings.json", '        ".git/commondir",\n', "", "hooks", "the sandbox keeps commands out of git's commondir (F150)")
@@ -1258,9 +1140,7 @@ def mutants():
     yield from each("scripts/test_hooks.sh", "export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n", "GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null\n",
                     "hooks", "the hook suite exports its git config files to git, which a plain assignment never reaches (F5021)")
     yield from each(".githooks/commit-msg", '--config "$(dirname "$0")/$config"', '--config "scripts/$config"', "hooks", "commit-msg scans with its own rules, not the working tree's (F129)")
-    yield from each(".githooks/pre-push", 'sh "$(dirname "$0")/install_hooks.sh" --check "$local_sha" ||', "true ||", "hooks", "pre-push wants the hooks of the main it pushes installed (F129)")
     yield from each(ck, 'if [ "$runs_from" != "$git_dir/hooks" ]; then', "if false; then", "hooks", "check.sh refuses hooks taken from elsewhere (F129)")
-    yield from each(ck, 'if [ -n "${SANDBOX_RUNTIME:-}" ]; then\n\t\tif (', "if true; then\n\t\tif (", "hooks", "check.sh probes the sandbox only in it")
     yield from each(ck, '(: >>"$git_dir/config") 2>/dev/null || ', "", "hooks", "check.sh probes git's config (F129)")
     yield from each(ck, ' || { probe=$(mktemp "$git_dir/hooks/probe.XXXXXX" 2>/dev/null) && rm "$probe"; }', "", "hooks", "check.sh probes git's hooks folder (F129)")
     yield from each(ck, ' && rm "$probe"', "", "hooks", "check.sh leaves no probe behind")
@@ -1271,28 +1151,11 @@ def mutants():
     yield from each(".claude/settings.json", '        ".git/config",\n', "", "hooks", "the sandbox keeps commands out of git's config (F129)")
     yield from each("package.json", ' --project slow"', ' --project slow --project compiled"', "hooks", "the coverage leaves the compiled project's memo checks out of its branches (F1350)")
     yield from each("package.json", '  "scripts": {\n', '  "scripts": {\n    "postinstall": "true",\n', "hooks", "pnpm install runs no script (F129)")
-    # F076: outside the sandbox the hooks run no repository code, and check the gate's records.
-    rec = ".githooks/records.sh"
-    for part in (" -e '\tdocs/'", " -e '\tadr/'", " -e '\\.md$'", " -e '\tdocs/review-log\\.md$'", " -e '\tdocs/review-passes\\.txt$'"):
-        yield from each(rec, part, "", "hooks", f"records.sh leaves{part} out of its print")
-    yield from each(rec, "git -c core.quotePath=false ls-tree", "git ls-tree", "hooks", "records.sh reads an accented name as code_changed.sh does (F133)")
-    yield from each(rec, "git add -A", "git add -u", "hooks", "records.sh prints untracked code too (F133)")
-    yield from each(rec, 'if [ "$(worktree_print)" != "$1" ]; then', "if false; then", "hooks", "records.sh records no code that changed while its gate ran (F133)")
-    yield from each(rec, '[ "$2" != true ] || put "$1" full', ":", "hooks", "records.sh records a full gate as full")
-    yield from each(rec, 'grep -qxF "$1" ".claude/tmp/green-$2" 2>/dev/null || ', "", "hooks", "records.sh records a print once")
-    yield from each(rec, 'grep -qxF "$1"', 'grep -qF "$1"', "hooks", "records.sh writes a print beside a longer line")
-    green_line = 'green() ( grep -qxF "$(code_print "$1")" ".claude/tmp/green-$2" 2>/dev/null )'
-    yield from each(rec, green_line, green_line.replace("-qxF", "-qF"), "hooks", "records.sh wants a whole record line")
-    yield from each(rec, green_line, "green() ( true )", "hooks", "records.sh wants the code recorded")
-    yield from each(rec, green_line, 'green() { p=leaked f=leaked; grep -qxF "$(code_print "$1")" ".claude/tmp/green-$2" 2>/dev/null; }', "hooks", "records.sh leaves no variable behind (F133)")
-    yield from each(rec, 'grep -qxF "$(review_print "$1")"', "grep -q .", "hooks", "records.sh wants the review pass of this tree")
     pc = ".githooks/pre-commit"
-    yield from each(pc, 'if [ -z "${SANDBOX_RUNTIME:-}" ]; then', "if false; then", "hooks", "pre-commit runs no gate outside the sandbox")
     yield from each(pc, 'if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0") 2>/dev/null; then', 'if ! (: >>"$0") 2>/dev/null; then', "hooks", "pre-commit refuses a harness file in the sandbox, its hook writable or not (D241)")
     yield from each(pc, 'if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0") 2>/dev/null; then', 'if [ -n "${SANDBOX_RUNTIME:-}" ]; then', "hooks", "pre-commit refuses a harness file with SANDBOX_RUNTIME unset in the sandbox (D241)")
     yield from each(pc, "held=$(harness --cached --name-only) || {", "held=$(harness --cached --name-only) || true || {", "hooks", "pre-commit refuses when git cannot list the staged harness files (D241)")
     yield from each(pc, "held=$(harness --cached --name-only) ||", "held=$(git diff --cached --name-only -- scripts) ||", "hooks", "pre-commit reads the whole harness list, blind to case (D241)")
-    yield from each(pc, '(F164)}" >&2\n\t\texit 1', '(F164)}" >&2', "hooks", "pre-commit refuses a staged harness file outside Alexis's Terminal (D241)")
     yield from each("scripts/guard.py", '"agent_id" in event and ', "", "hooks", "guard lets the session edit the harness, a subagent never (D240)")
     yield from each("scripts/guard.py", '"agent_id" in event and ', 'event.get("agent_id") and ', "hooks", "guard refuses a subagent whose agent_id is empty (D240)")
     yield from each("scripts/guard.py", "os.path.realpath(os.path.join(", "os.path.abspath(os.path.join(", "hooks", "guard reads a harness path through links and dots (D240)")
@@ -1307,29 +1170,11 @@ def mutants():
     yield from each("scripts/guard.py", "return any(not name.isascii() or ", "return any(", "hooks", "guard takes a path with a folded letter for a harness file (F164, D240)")
     yield from each("scripts/guard.py", '    if not specs:\n        raise ValueError("no harness list")\n', "", "hooks", "guard refuses a subagent's write with no harness list to read (D240)")
     yield from each("scripts/guard.py", "    harnessed = True\n", "    harnessed = False\n", "hooks", "guard refuses a subagent's write when records.sh cannot be read (D240)")
-    yield from each(pc, " || foreign --cached; then", "; then", "hooks", "pre-commit refuses a path with a folded letter in the sandbox (F164, D241)")
     for path in ("app/tsconfig.json", "packages/*/tsconfig.json", "app/*.config.ts", "lint/*.config.ts", ".claude/CLAUDE.md", "app/tests/stories/pictures.spec.ts", "deploy/test.sh"):
         yield from each(".claude/settings.json", f'        "{path}",\n', "", "hooks", f"settings keep a shell from writing {path} (D242)")
     yield from each(".claude/settings.json", '"lint/*.config.ts"', '"**/*.config.ts"', "hooks", "settings ban no StrykerJS copy of a config file, which a merge check writes (F111, D242)")
     for name in ("GIT_NOGLOB_PATHSPECS", "GIT_GLOB_PATHSPECS"):
         yield from each(".githooks/records.sh", f"-u {name} ", "", "hooks", f"the harness list is read as globs whatever {name} says (D241)")
-    yield from each(pc, '	sh "$(dirname "$0")/scan_secrets.sh" --staged', "	:", "hooks", "pre-commit scans outside the sandbox")
-    yield from each(pc, '[ "$prose" -le 1 ] ||', "true ||", "hooks", "pre-commit refuses a failing code_changed.sh (F133)")
-    yield from each(pc, 'if [ "$prose" = 0 ] && ! green "$(git write-tree)" fast; then', "if false; then", "hooks", "pre-commit wants recorded code outside the sandbox")
-    yield from each(pc, 'or let Claude commit it there" >&2\n\t\texit 1', 'or let Claude commit it there" >&2', "hooks", "pre-commit refuses unrecorded code outside the sandbox")
-    yield from each(pc, "\texit 0\nfi\nstaged=", "fi\nstaged=", "hooks", "pre-commit ends outside the sandbox before any gate")
-    gate_line, rec_line = 'env -u GIT_INDEX_FILE -u GIT_DIR -u GIT_WORK_TREE GATE_CHANGED="$changed" GATE_MERGE=$merge sh "$s/check.sh"\n', 'put "$(code_print "$(git write-tree)")" fast'
-    yield from each(pc, rec_line, "true", "hooks", "pre-commit records the code it passed")
-    yield from each(pc, gate_line + rec_line, rec_line + "\n" + gate_line.rstrip("\n"), "hooks", "pre-commit records only after its gate passed")
-    pp = ".githooks/pre-push"
-    yield from each(pp, '[ -n "${SANDBOX_RUNTIME:-}" ] || outside=true', ":", "hooks", "pre-push runs no gate outside the sandbox")
-    yield from each(pp, 'green "$local_sha" full ||', "true ||", "hooks", "pre-push wants main's full gate recorded")
-    yield from each(pp, 'reviewed "$local_sha" ||', "true ||", "hooks", "pre-push wants main's review pass")
-    yield from each(pp, 'green "$local_sha" fast ||', "true ||", "hooks", "pre-push wants a branch's gate recorded")
-    yield from each(pp, "\t\tgated=true\n", "\n", "hooks", "pre-push scans what each kind of push sends")
-    yield from each(pp, '. "$(dirname "$0")/records.sh"', ":", "hooks", "pre-push loads the records")
-    yield from each(".githooks/pre-merge-commit", 'exec "$(dirname "$0")/pre-commit" --merge', "exit 0", "hooks", "pre-merge-commit gates a merge")
-    yield from each("scripts/check.sh", ". .githooks/records.sh && tested=$(worktree_print)", ": && tested=", "hooks", "check.sh prints the code it tests (F133)")
     for rule in ("scan_secrets.sh", "gitleaks.toml", "gitleaks-private.toml", ".gitleaksignore", "install_hooks.sh", "worktree.sh", "borrow_node_modules.sh"):
         yield from each(".claude/settings.json", f'      "Edit(/scripts/{rule})",\n', "", "hooks", f"settings keep {rule} out of Claude's edits")
     yield from each("scripts/check_docs.py", '"intended", "moot", "asked"}', '"asked"}', "hooks", "check_docs knows Anthropic's outcomes")
@@ -1351,16 +1196,9 @@ def mutants():
     yield from each("scripts/scan_secrets.sh", '. || found=1', ". || :", "hooks", "scan_secrets fails on what any rule set found")
     yield from each("scripts/scan_secrets.sh", '. || found=1', ".", "hooks", "scan_secrets runs both rule sets (F120)")
     yield from each("scripts/scan_secrets.sh", "if [ -e .gitleaksignore ]; then", "if false; then", "hooks", "scan_secrets refuses a root .gitleaksignore")
-    yield from each(".githooks/pre-commit", 'sh "$s/check.sh"', "true", "hooks", "pre-commit gate")
     yield from each(".githooks/pre-commit", "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY\n", "\nunset GIT_OBJECT_DIRECTORY\n", "hooks", "pre-commit reads git's own common folder, never a caller's (F4923)")
     yield from each(".githooks/pre-commit", "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY\n", "\nunset GIT_COMMON_DIR\n", "hooks", "pre-commit reads git's own objects, never a caller's (F4923)")
-    yield from each(".githooks/pre-commit", 'GATE_CHANGED="$changed" ', "", "hooks", "pre-commit hands the gate the commit's paths")
-    yield from each(".githooks/pre-commit", "diff --cached --no-renames --name-only HEAD", "diff --cached --name-only HEAD", "hooks", "pre-commit lists a rename's two paths")
-    yield from each(".githooks/pre-commit", "diff --cached --no-renames --name-only HEAD", "diff --no-renames --name-only HEAD", "hooks", "pre-commit lists what is staged only")
-    yield from each(".githooks/pre-commit", 'sh "$s/scan_secrets.sh" --staged', ":", "hooks", "pre-commit secret scan")
-    yield from each(".githooks/pre-commit", 'sh "$s/borrow_node_modules.sh" "$staged"', 'sh scripts/borrow_node_modules.sh "$staged"', "hooks", "pre-commit runs the staged helpers")
     yield from each("scripts/borrow_node_modules.sh", 'else cp -RP "$m" "$copy/$m"; fi', 'else ln -s "$PWD/$m" "$copy/$m"; fi', "hooks", "a copy reads its own workspace packages (F344)")
-    yield from each(".githooks/pre-commit", 'if [ -n "$differ" ]; then', "if false; then", "hooks", "pre-commit refuses a staged harness unlike the working tree")
     yield from each(".githooks/pre-commit", "--name-only -z --", "--name-only --", "hooks", "pre-commit keeps a harness file's name whole")
     yield from each("scripts/guard.py", 'if sub in ("send-pack", "http-push", "receive-pack") or', "if False or", "hooks", "guard refuses send-pack")
     yield from each("scripts/guard.py", 'w.lower().startswith("alias.") or', "False or", "hooks", "guard refuses git aliases")
@@ -1371,16 +1209,6 @@ def mutants():
     yield from each("scripts/guard.py", "isinstance(cwd, str) and ", "", "hooks", "guard reads an event with no folder (F5058)")
     yield from each("scripts/guard.py", 'return bool(words) and os.path.basename(words[0]) == "worktree.sh"', "return False", "hooks", "guard sees a run of worktree.sh (F5058)")
     yield from each("scripts/guard.py", 'words = [w for w in words[1:] if not w.startswith("-")]', "words = words[1:]", "hooks", "guard sees worktree.sh past a shell's options (F5058)")
-    yield from each("scripts/code_changed.sh", "! git diff --cached", "git diff --cached", "hooks", "code_changed staged")
-    yield from each("scripts/code_changed.sh", '[ -n "$(git status', '[ -z "$(git status', "hooks", "code_changed working tree")
-    yield from each("scripts/code_changed.sh", 'git ls-files -s -- "$@"; git diff --binary -- "$@";', "git rev-parse HEAD; git diff HEAD --binary;", "hooks", "code_changed state leaves prose out")
-    yield from each("scripts/code_changed.sh", ' git diff --binary -- "$@";', "", "hooks", "code_changed state holds unstaged changes")
-    yield from each("scripts/stop_gate.sh", "exit 2", "exit 0", "hooks", "stop_gate block")
-    yield from each("scripts/stop_gate.sh", 'gate-green 2>/dev/null)" = "$state"', 'gate-green 2>/dev/null)" != "x"', "hooks", "stop_gate compares the state the gate passed")
-    yield from each("scripts/stop_gate.sh", 'gate-blocked 2>/dev/null)" = "$state"', 'gate-blocked 2>/dev/null)" != "x"', "hooks", "stop_gate passes only the tree it blocked")
-    yield from each("scripts/stop_gate.sh", 'mv -f "$tmp" .claude/tmp/gate-blocked', 'rm -f "$tmp"', "hooks", "stop_gate records the tree it blocked")
-    yield from each("scripts/stop_gate.sh", "[ ! -L .claude/tmp ] && ", "", "hooks", "stop_gate writes nothing through a planted .claude/tmp (security-S2)")
-    yield from each("scripts/stop_gate.sh", "[ ! -d .claude/tmp/gate-blocked ] && ", "", "hooks", "stop_gate moves nothing into a folder at its record")
     yield from each("scripts/stop_gate.sh", "if ($2 != 1 && ", "if (1 && ", "hooks", "stop_gate takes no orphaned check.sh for a live gate")
     yield from each("scripts/stop_gate.sh", 'prog[i] != "node" || ', "", "hooks", "stop_gate stops node processes alone, never an editor (security-S4)")
     yield from each("scripts/stop_gate.sh", 'log="$HOME/Library/Logs/gnoworld-reaped.log"', 'log=.claude/tmp/reaped.log', "hooks", "stop_gate logs where the sandbox cannot plant a link (security-S1)")
@@ -1496,11 +1324,6 @@ def mutants():
     yield from each("scripts/suite_parts.py", "while tail < shared - head and ", "while tail < shared and ", "hooks", "suite_parts: a line added among its like counts from one end only")
     yield from each("scripts/suite_parts.py", "range(head + 1, len(before) - tail + 1)", "range(head + 1, len(before) + 1)", "hooks", "suite_parts: a mutant's lines end where its text does")
     rf = "scripts/repo_files.py"
-    yield from each(rf, "if fingerprint(commit) in reviewed", "if False", "hooks", "last_reviewed counts from the last reviewed commit, as harness_mutate --changed does")
-    yield from each(rf, "    if not os.path.exists(PASSES):", "    if False:", "hooks", "last_reviewed reads the passes file")
-    yield from each(rf, 'git("rev-list", f"{base}..HEAD")', 'git("rev-list", "--reverse", f"{base}..HEAD")', "hooks", "last_reviewed takes the newest record of the range, not the oldest (F1430)")
-    yield from each(rf, 'git("rev-list", f"{base}..HEAD")', 'git("rev-list", "HEAD")', "hooks", "last_reviewed looks only at base..HEAD, not at the history before the base (F1430)")
-    yield from each(rf, "                if len(fields) < 2:", "                if False:", "hooks", "last_reviewed refuses a record line with no fingerprint (F1432)")
     yield from each("scripts/load.py", "print(round(os.getloadavg()[0] * 10), (os.cpu_count() or 1) * 10)", "print((os.cpu_count() or 1) * 10, round(os.getloadavg()[0] * 10))", "hooks", "load.py prints the load, then the cores")
     yield from each("scripts/load.py", "getloadavg()[0]", "getloadavg()[2]", "hooks", "load.py reads the 1-minute average, not the 15-minute one")
     yield from each("scripts/load.py", "[0] * 10)", "[0] * 1000)", "hooks", "load.py scales the load to tenths")
@@ -1592,21 +1415,18 @@ def mutants():
         yield from each("scripts/probe.py", find, replace, "hooks", label)
     # The lanes and the scope of a fast run (Alexis, 2026-10-25: a check's cost follows the change).
     for find, replace, label in (
-        ('"$@" &&\n\t\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\t\tgit -c core.quotePath=false ls-files', "a git that cannot list the change fails the gate"),
         ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),
         ("--no-renames --name-only HEAD --", "--no-renames --name-only --", "what is staged counts"),
         ("':!node_modules'", "':!nothing'", "a linked node_modules is no change"),
-        (";; docs/* | adr/* | *.md) continue", ";; docs/nothing) continue", "prose in pre-commit's list is no change"),
     ):
         yield from each("scripts/check.sh", find, replace, "hooks", f"check.sh: {label}")
     # The gate: each step dropped.
     yield from lines("scripts/check.sh", r"^(\s*)((?:run |python3 -I |sh scripts/|gitleaks |go vet |go run |\(cd gno |\$full \|\| run ).*)$", r"\1:", "hooks", "check.sh drops")
     yield from prettier_cache_mutants()
-    yield from quick_mutants()
-    yield from checks_mutants()
     yield from stryker_mutants()
     yield from nginx_mutants()
     yield from gate_mutants()
+    yield from hooks_3b_mutants()
     yield from bench_load_mutants()
     yield from regressions_name_mutants()
     yield from design_mutants()
@@ -1650,22 +1470,6 @@ def seven_mutants():
     yield from swaps(d, "check_docs.py", (
         ("            if len(cells) != 7:", "            if False:", "refuses a ledger row of other than seven cells"),
         ("if line.lstrip().startswith(\"|\") and re.fullmatch", "if re.fullmatch", "reads a sentence as a ledger row"),
-    ))
-    u = "scripts/dream_due.sh"
-    yield from swaps(u, "dream_due.sh", (
-        ("|| cannot \"the last dream's commit is not on main\"", "|| :", "says it could not tell for a commit main does not contain"),
-        ("[ \"$count\" -gt 0 ]", "[ \"$count\" -ge 0 ]", "says a dream is due only after a merge"),
-        ("log=$(read_log refs/heads/main)", "log=$(cat \"$dir/docs/review-log.md\" 2>/dev/null)", "reads main's log, never the work tree's"),
-        ("\t[ \"$size\" -le 4194304 ] 2>/dev/null || return 1\n", "", "reads no log past 4 MB"),
-        ("--count=20 ", "", "reads the 20 newest branches, no more"),
-        ("--sort=-committerdate ", "", "reads the newest branches by date, not by name"),
-        ("--not $known", "--not $oid", "counts the merges after the newest dream, whatever the order of its rows"),
-        ("\tprintf '%s\\n' \"$sha\" | grep -Eqx '[0-9a-f]{7,40}' || continue\n", "", "reads an older row's word as a commit only when it is hexadecimal"),
-        ("\tgit -C \"$dir\" merge-base --is-ancestor \"$oid\" \"refs/heads/main\" 2>/dev/null || continue\n", "", "lets an older row cover only a commit main contains"),
-        (" | tail -n 20)", ")", "reads the last twenty rows of the log, no more"),
-        ("known=$(printf '%s\\n%s\\n' \"$rows\" \"$others\" |", "known=$(printf '%s\\n' \"$rows\" |", "counts the rows of a branch main has not got (F4063)"),
-        ("\t[ -n \"$ref\" ] || continue\n", "", "reads no index for want of a branch"),
-        ("|| cannot \"git could not list the branches\"", "|| :", "says it could not tell with branches it cannot list"),
     ))
     t = "deploy/test.sh"
     yield from swaps(t, "deploy/test.sh", (
@@ -1722,17 +1526,11 @@ def gate_mutants():
         ("related=$(printf '%s\\n' \"$changed\" | python3", "related=$(printf '%s\\n' \"$files\" | python3", "asks for a deleted file's related tests"),
         ('[ "$status" = 0 ] && [ "${finished:-}" = 1 ] || echo "check.sh: FAILED at $failed_at" >&2; ', "", "ends a failed run on its FAILED line (F2638)"),
         ("unset COVERAGE_ALL CORE_CHROMIUM", ":", "leaves vitest.config.ts's switches unset"),
-        ("\t\t\tgit -c core.quotePath=false ls-files --others --exclude-standard -- \"$@\"\n", "\t\t\t:\n", "reads an untracked file as part of the change"),
-        ('if [ -n "$tested" ]; then\n\tchanged=$(', 'if false; then\n\tchanged=$(', "reads a repository's change from git, never from GATE_CHANGED"),
-        ("app/src/*.md | app/tests/*.md | server/src/*.md | packages/*/src/*.md) ;; docs/*", "docs/*", "reads a page under the sources as a fixture, not prose (F4812)"),
-        ("docs/* | adr/* | *.md) continue ;;", "docs/* | adr/*) continue ;;", "reads Markdown as prose"),
-        ("docs/* | adr/* | *.md) continue ;;", "*.md) continue ;;", "reads docs/ and adr/ as prose"),
         ("\tcode=true\n", "\t:\n", "scopes a change of code"),
         ("$code || whole=true", ":", "checks no change, or prose alone, whole"),
         ("gno/*) gno=true && continue ;;", "gno/*) gno=true ;;", "hands neither Prettier nor ESLint a realm"),
         ("gno/*) gno=true && continue ;;", "gno/*) continue ;;", "runs gno on a realm's change"),
         ("*) whole=true ;; # a config", "*) ;; # a config", "checks a config, the lockfile or a path no area places whole"),
-        ('[ ! -f "$path" ] || files=', "files=", "hands the tools only the files that exist"),
         ("\tset -f\n", "\t:\n", "expands no glob in a file's name"),
         ("\tIFS='\n'\n", "\t:\n", "splits the files at line ends alone"),
         ('sh -c "${script% .} $options -- \\"\\$@\\"" sh "$@"', 'sh -c "${script% .} $options \\"\\$@\\"" sh "$@"', "hands the files after --"),
@@ -1740,8 +1538,6 @@ def gate_mutants():
         ('\tcase $tests in "vitest run "*) ;; *)\n', "\tcase $tests in *) ;; *)\n", "refuses a test script that is not vitest run"),
         ("named format:check --ignore-unknown", "named format:check", "lets Prettier pass over a file not its own"),
         ("named lint --no-warn-ignored", "named lint", "lets ESLint pass over a file of no config"),
-        ('\t\t[ -z "$tested" ] || cache=', "\t\tcache=", "keeps Prettier's cache in a repository alone"),
-        ('\t\t[ -z "$tested" ] || cache=', "\t\t: || cache=", "gives Prettier the worktree's cache"),
         ('\t[ -n "$files" ] || return 0\n', "", "runs neither tool with no file"),
         ("\t$whole || $ts || return 0\n\tstep typecheck", "\t$whole || return 0\n\tstep typecheck", "checks the types of a TypeScript change"),
         ("\t$whole || $ts || return 0\n\tstep typecheck", "\ttrue || return 0\n\tstep typecheck", "checks no types for a realm's change"),
@@ -1758,8 +1554,6 @@ def gate_mutants():
         ('sh -c "$tests --tags-filter=!timing"', 'sh -c "$tests"', "leaves the timing tests out of a whole run"),
         ("--passWithNoTests ${tests#vitest run } --tags-filter=!timing $related", "--passWithNoTests ${tests#vitest run } $related", "leaves the timing tests out of a change's run"),
         ("--passWithNoTests ${tests#vitest run } --tags-filter=!timing $related", "--passWithNoTests --tags-filter=!timing $related", "keeps the test script's projects in a change's run"),
-        ('TSC_CACHE=$logs/tsc\n[ -z "$tested" ] || TSC_CACHE=$PWD/.claude/tmp/tsc', "TSC_CACHE=$PWD/.claude/tmp/tsc", "builds a staged copy's types in a cache of the run's own"),
-        ('[ -z "$tested" ] || TSC_CACHE=$PWD/.claude/tmp/tsc', ":", "builds a repository's types from the worktree's cache"),
         ('[ -x "$GNO" ] || {', "true || {", "refuses a missing gno"),
         ('\t[ -n "$failed" ] || failed_at=$at\n', "\tfailed_at=$at\n", "names the first failure on its last line"),
         ('[ -z "$failed" ] || exit 1', ":", "fails when a lane did"),
@@ -1771,9 +1565,6 @@ def gate_mutants():
         ('\t\tfor f in scripts/*.sh .githooks/*; do sh -n "$f"; done\n', "\t\t:\n", "reads every shell script as sh on a whole run"),
         ("grep -E '\\.sh$|^\\.githooks/[^/]+$'", "grep -E '\\.sh$'", "reads a changed hook as sh"),
         ("grep -E '\\.sh$|^\\.githooks/[^/]+$'", "grep -E '^\\.githooks/[^/]+$'", "reads a changed .sh as sh"),
-        ('mkdir -p .claude/tmp && sh scripts/code_changed.sh --state >.claude/tmp/gate-green', ":", "writes the state stop_gate.sh compares"),
-        ('gate_passed "$tested" false', ":", "records the code it passed"),
-        ('if [ -n "$tested" ]; then\n\tmkdir -p .claude/tmp', "if true; then\n\tmkdir -p .claude/tmp", "records nothing outside a repository"),
         ("echo \"lane $l $(cat \"$logs/$l.took\") s: $(paste -sd ' ' \"$logs/$l.steps\")\"", ":", "prints each lane's time and steps"),
     ))
     sp = "scripts/speeds.py"
@@ -1790,6 +1581,66 @@ def gate_mutants():
     ))
     yield from each(".claude/workflows/branch.js", "Run \\`sh scripts/check.sh\\` with nothing uncommitted", "Run \\`sh scripts/check.sh --merge\\` with nothing uncommitted", "hooks",
                     "the merge check runs check.sh, which takes no option (D13168)")
+
+
+def hooks_3b_mutants():
+    """The hooks since D13173: pre-commit's secret scan everywhere and, from the sandbox, D241's refusal, the staged files as on disk,
+    Prettier and check_docs; pre-push's refusal of main and its scan; pre-merge-commit's checks."""
+    pc, pp, h = ".githooks/pre-commit", ".githooks/pre-push", "hooks"
+    for find, replace, label in (
+        ('if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0")', 'if ! (: >>"$0")', "takes SANDBOX_RUNTIME for the sandbox"),
+        ("sandboxed=true; fi", "sandboxed=false; fi", "knows the sandbox"),
+        ('	if [ -n "$held" ]; then', "	if false; then", "refuses a staged harness file from the sandbox (D241)"),
+        ("if foreign --cached; then", "if false; then", "refuses a path the disk may fold, everywhere (F164)"),
+        ('xargs -0 -r sh -c "${format% .} --ignore-unknown', 'xargs -0 -r sh -c "${format% .}', "lets Prettier pass a file it does not know"),
+        ('case $format in *" .") ;; *)', 'case $format in *) ;; *)', "refuses a format:check it cannot name the files in"),
+        ('in (b"100644", b"100755")', 'in (b"100644", b"100755", b"120000")', "hands Prettier no link"),
+        ("' >\"$files\"", "' >\"$files\" || :", "refuses when it cannot list the staged regular files"),
+        ("held=$(harness --cached --name-only) || {", "held=$(harness --cached --name-only || :) || {", "refuses when git cannot list the staged harness files"),
+        ('sh "$(dirname "$0")/scan_secrets.sh" --staged', ":", "scans what is staged for secrets"),
+        ('sh "$(dirname "$0")/scan_secrets.sh" --staged', "sh scripts/scan_secrets.sh --staged", "scans with the scan installed beside it, not the working tree's"),
+        ("$sandboxed || exit 0", "exit 0", "checks the staged files from the sandbox"),
+        ("$sandboxed || exit 0", ":", "runs nothing of the working tree outside the sandbox (F076)"),
+        ('git diff --cached --name-only -z --diff-filter=d >"$list"', 'git diff --cached --name-only -z --diff-filter=d >"$list" || :', "refuses when git cannot list the staged files"),
+        ('differ=$(xargs -0 -r git -c core.quotePath=false --literal-pathspecs diff --name-only -- <"$list")', 'differ=$(xargs -0 -r git -c core.quotePath=false --literal-pathspecs diff --name-only -- <"$list" || :)', "refuses when git cannot compare the staged files with the disk"),
+        (" --literal-pathspecs diff --name-only -- ", " diff --name-only -- ", "reads a staged name as a name, never a pathspec"),
+        ('[ -z "$differ" ] ||', "true ||", "refuses a staged file unlike the disk"),
+        ('PATH="$PWD/node_modules/.bin:$PATH" xargs -0 -r sh -c', 'PATH="$PWD/node_modules/.bin:$PATH" : xargs -0 -r sh -c', "runs Prettier"),
+        ('PATH="$PWD/node_modules/.bin:$PATH" xargs -0 -r sh -c', 'PATH="$PWD/node_modules/.bin:$PATH" xargs -r sh -c', "hands Prettier each name whole"),
+        ("\npython3 -I scripts/check_docs.py\n", "\n:\n", "runs check_docs"),
+        ('. "$(dirname "$0")/records.sh"', ". .githooks/records.sh", "loads its own records.sh, not the working tree's"),
+    ):
+        yield from each(pc, find, replace, h, f"pre-commit {label}")
+    for find, replace, label in (
+        ('if [ "$remote_ref" = refs/heads/main ]; then', "if false; then", "refuses main (D13165)"),
+        ("		exit 1\n	fi\n", "	fi\n", "stops at main"),
+        ('[ "$local_sha" = "$zero" ] || sending=true', ":", "scans what a push sends"),
+        ('! $sending || sh "$(dirname "$0")/scan_secrets.sh"', ":", "scans the history it sends"),
+        ('! $sending || sh "$(dirname "$0")/scan_secrets.sh"', "! $sending || sh scripts/scan_secrets.sh", "scans with the scan installed beside it, not the working tree's"),
+    ):
+        yield from each(pp, find, replace, h, f"pre-push {label}")
+    yield from each(".githooks/pre-merge-commit", 'exec "$(dirname "$0")/pre-commit"', "exit 0", h, "pre-merge-commit gives a merge pre-commit's checks")
+    cc = "scripts/ci_changes.sh"
+    for find, replace, label in (
+        ('[ -z "$folded" ] ||', "true ||", "refuses a path this disk may read as another (F151, F164)"),
+        ("    if any(b > 0x7e for b in p):", "    if False:", "refuses a byte outside ASCII (F164)"),
+        ("    if len(names) > 1:", "    if False:", "refuses names equal but for case (F151)"),
+        ("[:i]).lower(), set())", "[:i]), set())", "compares names blind to case (F151)"),
+        ('case $line in "Harness-changed: $1 - "?*) return 0', "case $line in *) return 0", "wants each harness file declared with its reason (F089)"),
+        ('[ -z "$undeclared" ] ||', "true ||", "refuses a harness file no commit declares (F089)"),
+        ('if [ "$all" = false ]; then\n\tlisted=', 'if false; then\n\tlisted=', "checks the declarations of a pull request and a push"),
+        ('harness --name-only "$base" HEAD) || {', 'harness --name-only "$base" HEAD || :) || {', "refuses when the base's harness list cannot be read"),
+    ):
+        yield from each(cc, find, replace, h, f"ci_changes.sh {label}")
+    yield from each("scripts/install_hooks.sh", 'ref=$(git rev-parse --verify --quiet "${1:-main}^{commit}")', "ref=${1:-main}", h, "install_hooks reads its commit once (L3)")
+    yield from each("scripts/stop_gate.sh", "\nexit 0\n", "\nexit 2\n", h, "stop_gate never blocks a turn (D13173)")
+    ck = "scripts/check.sh"
+    yield from each(ck, 'git rev-parse --git-dir >/dev/null 2>&1 || {', "true || {", h, "check.sh refuses to run outside a repository")
+    # The change and the type cache, their text moved when the staged copy's branches left (D13173).
+    yield from each(ck, '\t\tgit -c core.quotePath=false ls-files --others --exclude-standard -- "$@"\n', "\t\t:\n", h, "check.sh: reads an untracked file as part of the change")
+    yield from each(ck, '"$@" &&\n\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\tgit -c core.quotePath=false ls-files', h, "check.sh: a git that cannot list the change fails the gate")
+    yield from each(ck, "TSC_CACHE=$PWD/.claude/tmp/tsc\n", "TSC_CACHE=${TSC_CACHE:-$logs/tsc}\n", h, "check.sh builds the types from the worktree's own cache, whatever a caller's TSC_CACHE says")
+    yield from each("scripts/check_regressions.py", 'if len(sys.argv) != 2 or sys.argv[1].startswith("-"):', "if False:", h, "check_regressions refuses an option it has no more")
 
 
 def swaps(path, name, rows):
@@ -2273,13 +2124,6 @@ if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
     if base.startswith("-"):  # git would read it as an option
         sys.exit(f"harness_mutate: --changed {base}: a base is a commit, not an option")
     changed = changed_since(base)
-    try:  # the last /pre-merge pass already judged what came before it, as last_reviewed reads it
-        since = last_reviewed(base)
-    except (OSError, ValueError) as e:  # never fewer mutants than the pass allows: a file that cannot be read or parsed is no pass
-        sys.exit(f"harness_mutate: --changed {base}: cannot read the passes file ({e}); fix it first")
-    if since != base:
-        print(f"harness_mutate: the last /pre-merge pass is {since[:12]}: the guard files changed since it, not since {base}")
-        base, changed = since, changed_since(since)
 elif sys.argv[1:]:
     sys.exit("usage: harness_mutate.py [--dry | --changed <base>]")
 shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
