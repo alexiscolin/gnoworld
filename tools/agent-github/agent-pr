@@ -139,7 +139,7 @@ def env(work, **more):
 
 def run(argv, environ, what, ok=(0,), given=None):
     try:
-        p = subprocess.run(argv, env=environ, cwd=environ["HOME"], capture_output=True, text=True,
+        p = subprocess.run(argv, env=environ, cwd=environ["HOME"], capture_output=True, text=True, errors="replace",
                            **({"input": given} if given is not None else {"stdin": subprocess.DEVNULL}))
     except FileNotFoundError:
         raise Failed(f"{argv[0]} is missing from {TOOLS}") from None
@@ -237,7 +237,7 @@ def push(repo_arg, bundle_arg, work):
         base = git(work, token, "-C", cache, "rev-parse", "--verify", f"refs/remotes/origin/{default}^{{commit}}").stdout.strip()
         names = git(work, token, "-C", cache, "log", "-m", "--format=", "--name-only", f"{base}..{tip}").stdout.splitlines()
         # A link at .github/workflows itself is its bare name: the folder's own name counts too.
-        runs = sorted({n for n in names if any(("/" + n + "/").startswith(r) for r in RUNS)})
+        runs = sorted({n for n in names if n == ".github" or any(("/" + n + "/").startswith(r) for r in RUNS)})
         if runs:
             raise Refused(f"what runs on GitHub is a person's to push, not the agent's: {', '.join(runs)}")
         scan(work, cache, base, tip, token)

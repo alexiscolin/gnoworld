@@ -272,6 +272,10 @@ leak agent/wf-action "mkdir -p .github/actions/a && printf 'runs: {}\n' >.github
 leak agent/wf-later "echo a >w1.txt && g add w1.txt && g commit -qm a && mkdir -p .github/workflows && printf x >.github/workflows/y.yml && g add .github && g commit -qm wf && g rm -q .github/workflows/y.yml && g commit -qm gone"
 # 8d. A link standing at .github/workflows, and a secret in a commit's own header (none of author, committer, message).
 leak agent/wf-link "mkdir -p .github && ln -s ../ci .github/workflows && g add .github && g commit -qm link"
+leak agent/gh-link "mkdir -p x/workflows && printf 'on: push\n' >x/workflows/w.yml && ln -s x .github && g add x .github && g commit -qm ghlink"
+g -C "$t/s" checkout -q -b agent/latin origin/main && echo l >"$t/s/l.txt" && g -C "$t/s" add l.txt && printf 'caf\351\n' | g -C "$t/s" -c i18n.commitEncoding=ISO-8859-1 commit -q -F -
+g -C "$t/s" bundle create -q "$t/space/latin.bundle" agent/latin
+run push alexis/proj "$t/space/latin.bundle" || fail "a commit message not in UTF-8 stopped the helper: $(cat "$t/out")"
 g -C "$t/s" checkout -q -b agent/header main
 hdr=$("$GIT" -C "$t/s" cat-file commit HEAD | python3 -I -c 'import sys; c = sys.stdin.read(); h, b = c.split("\n\n", 1); print(h + "\nx-note " + sys.argv[1] + "\n\n" + b, end="")' "$SECRET" | "$GIT" -C "$t/s" hash-object -t commit -w --stdin)
 g -C "$t/s" update-ref refs/heads/agent/header "$hdr" && g -C "$t/s" bundle create -q "$t/space/header.bundle" agent/header
@@ -425,8 +429,11 @@ fh="$t/fakehome" && mkdir -p "$fh/.claude" "$fh/.claude-work" "$t/raw/a/b/012345
 cp "$here/agent-pr" "$here/agent_pr_guard.py" "$here/SKILL.md" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/"
 echo '{"permissions": {"deny": ["Edit(~/.zshrc)"]}, "sandbox": {"excludedCommands": ["x *"]}}' >"$fh/.claude/settings.json"
 echo '{"theme": "dark"}' >"$fh/.claude-work/settings.json"
-inst() { HOME="$fh" AGENT_PR_RAW="file://$t/raw" sh "$here/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
-inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj alexis/other:agent || fail "the installer failed: $(cat "$t/inst.out")"
+sed -e "s|^raw=.*|raw=file://$t/raw|" -e "s|^api=.*|api=file://$t/api|" -e "s|--proto '=https'|--proto '=https,file'|" "$here/install.sh" >"$t/install.sh"
+mkdir -p "$t/api/repos/a/b/compare" && echo '{"status": "behind"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
+echo '{"status": "identical"}' >"$t/api/repos/a/b/compare/main...0123456"
+inst() { HOME="$fh" sh "$t/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj alexis/other:agent || fail "the installer failed: $(cat "$t/inst.out")"
 python3 -I - "$fh" <<'PY' || fail "the installer left a profile without its protections"
 import json, sys
 home = sys.argv[1]
@@ -445,17 +452,25 @@ PY
 cmp -s "$fh/.local/bin/agent-pr" "$here/agent-pr" || fail "the helper installed is not the commit's"
 grep -q "@HELPER@" "$fh/.claude-work/skills/agent-github/SKILL.md" && fail "the skill still names no helper"
 [ ! -e "$fh/.local/share/agent-github/token" ] || fail "a token was written with no terminal to ask it"
-inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
 [ "$(grep -c agent_pr_guard "$fh/.claude/settings.json")" = 1 ] || fail "a second install added the hook twice"
+[ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/other agent\nalexis/proj')" ] || fail "a second install did not keep one line per repository"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/other
+grep -qx "alexis/other agent" "$fh/.local/share/agent-github/repos.allow" && fail "a repository named again kept its earlier token"
+grep -q "Edit(~/.zshrc)" "$fh/.claude-work/settings.json" || fail "the work profile did not get the default profile's own denies"
+grep -q "warning: .*runs 'x \*' outside the sandbox" "$t/inst.out" || fail "the installer did not warn of an exclusion found through PATH"
+echo '{"status": "diverged"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a commit that is not on the branch named"
+echo '{"status": "behind"}' >"$t/api/repos/a/b/compare/main...0123456789abcdef0123456789abcdef01234567"
 echo '{"disableAllHooks": true}' >"$fh/.claude-work/settings.json"
-inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile with hooks off"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile with hooks off"
 echo '{"permissions": {"allow": ["Read(~/.local/share/agent-github/**)"]}}' >"$fh/.claude-work/settings.json"
-inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile granting the state folder"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile granting the state folder"
 echo '{}' >"$fh/.claude-work/settings.json"
 mkdir -p "$t/raw/a/b/0123456/tools" && cp -R "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github" "$t/raw/a/b/0123456/tools/"
-inst a/b 0123456 alexis/proj && fail "the installer took a short commit id"
-inst a/b 0123456789abcdef0123456789abcdef01234567 ../x && fail "the installer took a malformed repository"
-inst a/b ffffffffffffffffffffffffffffffffffffffff alexis/proj && fail "the installer installed from a commit that holds nothing"
+inst a/b main 0123456 alexis/proj && fail "the installer took a short commit id"
+inst a/b main 0123456789abcdef0123456789abcdef01234567 ../x && fail "the installer took a malformed repository"
+inst a/b main ffffffffffffffffffffffffffffffffffffffff alexis/proj && fail "the installer installed from a commit that holds nothing"
 
 # 12. Its usage, and the token never in anything it printed.
 run && fail "no arguments passed"
