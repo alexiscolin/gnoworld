@@ -7,7 +7,8 @@ The design: the final page (claude.ai/artifact/AkkvNY33kRnmB4fhNDR38V, v24) and 
 - Ping-pong: a commit's gate is the secrets scan and the format, in seconds; the related tests run in the background.
 - "pose" lands only what Alexis named, as PRs of about 600 product lines, each through 30 min of checks at most.
 - GitHub judges main: one required check (`gate-ok`) over parallel jobs of 15 min at most; deploy/test.sh when deploy/ changes,
-  with its own budget; green PRs merge alone; a core change waits for an admin's approval; break-glass written and tested.
+  with its own budget, required and failing closed until its two Linux reds are fixed (D13161, F13163); green PRs merge alone;
+  a core change waits for an admin's approval; break-glass written and tested.
 - The agent's own account (write, no admin) pushes agent/** through a core helper whose token no session reads.
 - The night on GitHub: full Stryker, every journey, the harness's self-tests, the history scan; a night red goes first.
 - Attack tests 1 to 23 pass, and they are the harness's own tests (plan-review-3.md: no second system beside them).
