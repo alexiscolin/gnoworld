@@ -2553,9 +2553,9 @@ c="$t/tests/cov" # under a folder named tests: only paths inside the repository 
 mkdir -p "$c/src" "$c/coverage"
 git -C "$c" init -q && printf 'one\n' >"$c/src/a.ts" && git -C "$c" add -A && git -C "$c" commit -qm base
 printf 'one\ntwo\nthree\nfour\n' >"$c/src/a.ts"
-cover() { # $1: hit count of line 3's statement
+cover() { # $1: hit count of line 3's statement; COVERAGE_ALL=1 (check.sh --everything) unless all= is set empty
 	printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2}},"1":{"start":{"line":3}},"2":{"start":{"line":4}}},"s":{"0":1,"1":%s,"2":1}}}' "$c" "$1" >"$c/coverage/coverage-final.json"
-	(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
+	(cd "$c" && COVERAGE_ALL="${all-1}" python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
 }
 unmeasured() { # each file, alone in the patch, must be measured
 	for f; do
@@ -2568,6 +2568,24 @@ cover 1 || fail "patch_coverage refused a patch whose lines are all run"
 cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
 printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
 cover 1 && fail "patch_coverage accepted a changed file the coverage report does not measure"
+# A tier-1 file, by docs/REVIEW.md as this script's own tree holds it (the base's on GitHub), is refused unmeasured under the
+# default coverage too; with no table to read, every file is tier 1 (D13166's security review).
+all=
+lone="$t/lone" && mkdir -p "$lone/scripts" && cp "$patch" "$here/repo_files.py" "$here/speeds.py" "$lone/scripts/"
+(cd "$c" && COVERAGE_ALL= python3 -I "$lone/scripts/patch_coverage.py" HEAD 85 >/dev/null 2>&1) &&
+	fail "patch_coverage, with no docs/REVIEW.md beside it, let an unmeasured file through: no table is no tier 1"
+git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
+mkdir -p "$c/server/src/login" && printf 'export const t = 1;\n' >"$c/server/src/login/t.ts" && git -C "$c" add server/src/login/t.ts
+cover 1 && fail "patch_coverage accepted a changed tier-1 file the default coverage does not measure"
+git -C "$c" rm -q --cached server/src/login/t.ts && rm "$c/server/src/login/t.ts"
+printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
+unset all
+# The default coverage measures tier 1 alone, whose paths check_docs.py holds in its include: a file it leaves out is not refused,
+# and the floor still holds beside it (F13179).
+all=
+cover 1 || fail "patch_coverage refused a changed file the default coverage leaves out, which measures tier 1 alone (F13179)"
+cover 0 && fail "patch_coverage accepted a patch at 67% beside a file the default coverage leaves out"
+unset all
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
@@ -2782,6 +2800,10 @@ echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
 outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$rh/pre-commit" 2>&1 >/dev/null); }
 chmod a-w "$rh/pre-commit"
 outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
+# Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence (F13177).
+command -v dash >/dev/null || fail "no dash to run pre-commit under, as Linux's sh does (F13177)"
+(cd "$c2" && env -u SANDBOX_RUNTIME dash "$rh/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+	fail "pre-commit under dash, Linux's sh, ended in silence when it could not write itself (F13177)"
 chmod u+w "$rh/pre-commit"
 outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal, its gate recorded"
 outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"

@@ -100,6 +100,8 @@ sets up another does the same:
 4. Its checksum is in `scripts/nginx.sha256` (one line: `shasum -a 256 ~/.cache/gnoworld-tools/nginx-1.30.6/nginx`), committed
    with a line `Harness-changed: scripts/nginx.sha256 - why`. Recorded: `ad773dcb709c8cb21a0fecd1b50bac4511d1847d4e20fa68247967ac84897a68`.
    The check runs the binary only when its SHA-256 is the pinned one; a rebuilt binary has another and needs a new pin.
+5. GitHub's build job builds its own from the same release, the tarball checked against its SHA-256 (`3cf46f5e…`, signed by the
+   key above, checked 2026-11-14), with Ubuntu's pcre2 and zlib, and hands check_nginx.py that binary's checksum (F13176).
 
 The step passes on the real binary with no warning (the build's table is sized, F2454). Its logs go to a file of its own folder, not
 `/dev/stderr`, which the real `nginx -t` cannot open under the sandbox. F2459's and F2460's faults, planted by hand on a scratch copy,

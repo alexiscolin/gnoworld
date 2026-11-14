@@ -12,7 +12,7 @@ nginx refused to start) and F2460 (a slashed address got the bare policy). Docke
    index.html), answers 200 with the policy of its own rule in _headers, not the bare one.
 
 What it cannot do fails, never skips: no binary, a checksum that is not the pin's, no build. NGINX_SHA256 and NGINX_START_TIMEOUT are
-the tests' switches, which check.sh drops. Usage: check_nginx.py, from the repository root; GNOWORLD_TOOLS is the tools' cache
+the tests' switches, which check.sh drops; GitHub's build job sets NGINX_SHA256 to the binary it built from the checked tarball. Usage: check_nginx.py, from the repository root; GNOWORLD_TOOLS is the tools' cache
 (~/.cache/gnoworld-tools by default); the pin is scripts/nginx.sha256 (docs/DEVELOPMENT.md, "The pinned nginx")."""
 import hashlib
 import http.client

@@ -260,7 +260,7 @@ jobs:
           set -eu
           ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit (check.sh)
           node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --reporter=dot app/tests/e2e/login.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/search.spec.ts
-          node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --reporter=dot app/tests/e2e/flights.spec.ts --grep 'flies to the system aimed at|flies from the cosmos to a world'
+          node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --workers=1 --reporter=dot app/tests/e2e/flights.spec.ts --grep 'flies to the system aimed at|flies from the cosmos to a world'
       - name: Traces of a failed journey, kept a week
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -294,9 +294,26 @@ jobs:
           set -eu
           ulimit -S -n 10240
           GNOWORLD_BUILD="$PWD/app/build-gate/ci" node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate
+      # The Mac's pin (scripts/nginx.sha256) is its own build's binary: the runner builds the same release, its tarball checked.
+      - name: nginx 1.30.6, the image's, built from nginx.org's source
+        if: needs.changes.outputs.nginx == 'true'
+        run: |
+          set -eu
+          curl --fail --retry 3 -sSLo "$RUNNER_TEMP/nginx.tar.gz" https://nginx.org/download/nginx-1.30.6.tar.gz
+          echo "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8  $RUNNER_TEMP/nginx.tar.gz" | sha256sum -c
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libpcre2-dev zlib1g-dev
+          tar -xzf "$RUNNER_TEMP/nginx.tar.gz" -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/nginx-1.30.6"
+          ./configure --prefix="$RUNNER_TEMP/tools/nginx-1.30.6" >/dev/null
+          make -j"$(nproc)" >/dev/null
+          make install >/dev/null
+          cp objs/nginx "$RUNNER_TEMP/tools/nginx-1.30.6/nginx"
       - name: nginx accepts the image's config and answers each page its own policy
         if: needs.changes.outputs.nginx == 'true'
-        run: GNOWORLD_BUILD="$PWD/app/build-gate/ci" python3 -I scripts/check_nginx.py
+        run: |
+          set -eu
+          exe="$RUNNER_TEMP/tools/nginx-1.30.6/nginx"
+          GNOWORLD_TOOLS="$RUNNER_TEMP/tools" NGINX_SHA256="$(sha256sum "$exe" | cut -d ' ' -f 1)" GNOWORLD_BUILD="$PWD/app/build-gate/ci" python3 -I scripts/check_nginx.py
 
   # Realms and Go tools: gno lint and test, the realms' guard mutants (mutate.py), gofmt, vet and the seal vectors.
   gno-go:

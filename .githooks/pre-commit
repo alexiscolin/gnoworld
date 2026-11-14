@@ -11,8 +11,8 @@ unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY
 # A harness file is committed in Alexis's Terminal alone, never from Claude Code's sandbox (D241): the sandbox stops a shell's
 # writes, not the file tools', and an agent's Edit of stryker.config.json passed its commit (f792bf47). A sandboxed command can
 # unset SANDBOX_RUNTIME, never the sandbox's ban on writing the installed hooks: a hook that cannot open itself for writing runs
-# in the sandbox too.
-if [ -n "${SANDBOX_RUNTIME:-}" ] || ! { : >>"$0"; } 2>/dev/null; then
+# in the sandbox too. In a subshell: under dash, Linux's sh, a redirection `:` cannot open ends the whole shell (F13177).
+if [ -n "${SANDBOX_RUNTIME:-}" ] || ! (: >>"$0") 2>/dev/null; then
 	held=$(harness --cached --name-only) || { echo "pre-commit: git could not list the staged harness files; nothing is committed unchecked" >&2; exit 1; }
 	# A letter the disk folds names a harness file no list can match (ſ is s on APFS): a path with one is refused too (F164).
 	if [ -n "$held" ] || foreign --cached; then
