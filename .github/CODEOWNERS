@@ -1,0 +1,52 @@
+# The core (docs/plans/harness-overhaul.md, section 3): what judges a change, what runs outside the sandbox, the deploy, the
+# dependencies, Claude's settings and rules. Once main's ruleset asks for code owners' review (phase 2), a change to any of it
+# enters main only with an owner's approval. Every path of the harness list (.githooks/records.sh) is here, and so are the tier
+# table, the deploy folder, the CSP, Jarvis's allowlist and every package, TypeScript and pnpm file git tracks: scripts/test_hooks.sh,
+# section ci, holds it. The security reviewer rechecks this list before phase 3. GitHub reads this file from the pull request's
+# base branch, its patterns follow most of .gitignore's rules, and the last matching line wins (docs.github.com, about-code-owners).
+/.github/ @alexiscolin
+/scripts/ @alexiscolin
+/.githooks/ @alexiscolin
+/.claude/ @alexiscolin
+/.mcp.json @alexiscolin
+/CLAUDE.md @alexiscolin
+/docs/REVIEW.md @alexiscolin
+/deploy/ @alexiscolin
+/package.json @alexiscolin
+/app/package.json @alexiscolin
+/server/package.json @alexiscolin
+/server/tsconfig.json @alexiscolin
+/jarvis/package.json @alexiscolin
+/jarvis/tsconfig.json @alexiscolin
+/jarvis/src/allowlist.ts @alexiscolin
+/link-reader/package.json @alexiscolin
+/link-reader/tsconfig.json @alexiscolin
+/evals/package.json @alexiscolin
+/evals/pnpm-lock.yaml @alexiscolin
+/evals/pnpm-workspace.yaml @alexiscolin
+/evals/tsconfig.json @alexiscolin
+/packages/*/package.json @alexiscolin
+/packages/*/tsconfig.json @alexiscolin
+/pnpm-workspace.yaml @alexiscolin
+/pnpm-lock.yaml @alexiscolin
+/.pnpmfile.cjs @alexiscolin
+/.pnpmfile.mjs @alexiscolin
+/.node-version @alexiscolin
+/.nvmrc @alexiscolin
+/.npmrc @alexiscolin
+*.config.ts @alexiscolin
+/tsconfig.json @alexiscolin
+/tsconfig.base.json @alexiscolin
+/app/tsconfig.json @alexiscolin
+/stryker.config.json @alexiscolin
+/stryker.all.config.json @alexiscolin
+/knip.json @alexiscolin
+/.jscpd.json @alexiscolin
+/.prettierrc.json @alexiscolin
+/.prettierignore @alexiscolin
+/.gitignore @alexiscolin
+/.gitattributes @alexiscolin
+/app/tests/stories/pictures.spec.ts @alexiscolin
+/app/src/csp.ts @alexiscolin
+/app/src/cspOrigins.ts @alexiscolin
+/app/src/cspForms.ts @alexiscolin

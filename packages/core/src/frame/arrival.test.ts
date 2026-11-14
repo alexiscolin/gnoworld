@@ -501,16 +501,20 @@ describe("a system's arrival: a good angle", () => {
   // 7v's design review (F4468; the chief: as the mock-up Alexis approved, the views page at 14:09, about six worlds): a dynamic view drew
   // three of gnoswap's thirteen bodies, bound by the home's four and by the room its worlds keep to turn apart. Held still, they need only
   // stand apart in space, each at its own size under its crowd's cap, the nearest 1.5 times every other's at rest.
-  it("draws up to twelve of a system's worlds in its dynamic view, gnoswap's five or more on Onyx, while the home's postcards keep four", () => {
-    const systems = onyxSystems();
-    const counts = systems.map((system) => arrivalOf(system, systems).postcard.worlds.length);
-    expect(Math.max(...counts)).toBeLessThanOrEqual(PLAN_MOST);
-    expect(Math.max(...counts)).toBe(8); // past the six the mock-up had: the Plan's twelve (D415 era), the most Onyx's file lets stand
-    expect(counts.filter((count) => count >= 5).length).toBeGreaterThanOrEqual(5);
-    const gnoswap = systems.find(({ id }) => id === "gnoswap");
-    expect(gnoswap === undefined ? 0 : arrivalOf(gnoswap, systems).postcard.worlds.length).toBeGreaterThanOrEqual(5);
-    for (const system of systems) expect(postcardOf(system, EARTH_PLACE).worlds.length).toBeLessThanOrEqual(4);
-  });
+  it(
+    "draws up to twelve of a system's worlds in its dynamic view, gnoswap's five or more on Onyx, while the home's postcards keep four",
+    () => {
+      const systems = onyxSystems();
+      const counts = systems.map((system) => arrivalOf(system, systems).postcard.worlds.length);
+      expect(Math.max(...counts)).toBeLessThanOrEqual(PLAN_MOST);
+      expect(Math.max(...counts)).toBe(8); // past the six the mock-up had: the Plan's twelve (D415 era), the most Onyx's file lets stand
+      expect(counts.filter((count) => count >= 5).length).toBeGreaterThanOrEqual(5);
+      const gnoswap = systems.find(({ id }) => id === "gnoswap");
+      expect(gnoswap === undefined ? 0 : arrivalOf(gnoswap, systems).postcard.worlds.length).toBeGreaterThanOrEqual(5);
+      for (const system of systems) expect(postcardOf(system, EARTH_PLACE).worlds.length).toBeLessThanOrEqual(4);
+    },
+    WHOLE_SEARCHES,
+  );
 
   // The system's card at the top left (7v, the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
   // screen): g1magld5's ringed giant stood over it. No world of a dynamic view stands in its room, a fourth across and a fifth down.

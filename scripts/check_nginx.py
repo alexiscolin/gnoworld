@@ -12,7 +12,8 @@ nginx refused to start) and F2460 (a slashed address got the bare policy). Docke
    index.html), answers 200 with the policy of its own rule in _headers, not the bare one.
 
 What it cannot do fails, never skips: no binary, a checksum that is not the pin's, no build. NGINX_SHA256 and NGINX_START_TIMEOUT are
-the tests' switches, which check.sh drops. Usage: check_nginx.py, from the repository root; GNOWORLD_TOOLS is the tools' cache
+the tests' switches, which check.sh drops; GitHub's build job sets NGINX_SHA256 to the binary it built from the checked tarball,
+and GNOWORLD_BUILD to the folder it built the app in (app/build by default; check.sh drops it too). Usage: check_nginx.py, from the repository root; GNOWORLD_TOOLS is the tools' cache
 (~/.cache/gnoworld-tools by default); the pin is scripts/nginx.sha256 (docs/DEVELOPMENT.md, "The pinned nginx")."""
 import hashlib
 import http.client
@@ -185,7 +186,7 @@ def ask(port, path):
 def main():
     tools = pathlib.Path(os.environ.get("GNOWORLD_TOOLS") or os.path.join(os.path.expanduser("~"), ".cache", "gnoworld-tools"))
     exe, mime = binary(tools)
-    build = pathlib.Path("app/build")
+    build = pathlib.Path(os.environ.get("GNOWORLD_BUILD") or "app/build")  # GitHub's build job builds into a folder of its own
     client, table, headers = build / "client", build / "csp.conf", build / "client" / "_headers"
     for needed in (table, headers, pathlib.Path("deploy/web/nginx.conf")):
         if not needed.is_file():

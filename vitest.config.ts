@@ -1,4 +1,5 @@
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { playwright } from "@vitest/browser-playwright";
 import { configDefaults, defineConfig, type TestProjectInlineConfiguration } from "vitest/config";
 import { BENCHES } from "./lint/shared.config.ts";
@@ -62,7 +63,14 @@ const CORE_CHROMIUM: TestProjectInlineConfiguration = {
   },
 };
 
+// A tree that borrows its node_modules (a worktree, check_regressions.py's base tree: borrow_node_modules.sh) reaches the packages
+// through a link, and Vite denies a file whose real path leaves the root ("Denied ID", the fonts' ?url): the real store is allowed too.
+const STORE = new URL("node_modules/.pnpm", import.meta.url);
+
 export default defineConfig({
+  server: {
+    fs: { allow: [fileURLToPath(new URL(".", import.meta.url)), ...(existsSync(STORE) ? [realpathSync(STORE)] : [])] },
+  },
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },

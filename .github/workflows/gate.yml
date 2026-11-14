@@ -1,52 +1,337 @@
-# The gate on GitHub's machines: every push of a branch runs scripts/check.sh --full, as
-# /pre-merge and the pre-push hook do on the maintainer's machine (docs/HARNESS.md). It reads the
-# repository and nothing more, needs no secret, pins its actions, gitleaks and gno by commit or
-# checksum (scripts/test_hooks.sh holds it). On this plan it reports a failure; it cannot block a merge.
+# The gate on GitHub's machines (the harness overhaul, phase 2: docs/plans/harness-overhaul.md). One job, `changes`, reads what
+# the change calls for with the base commit's own detector (scripts/ci_changes.sh); the checks run side by side, each 15 minutes
+# at most but deploy/test.sh's; `gate-ok`, the one check main requires, reads every result with the base commit's
+# scripts/ci_gate_ok.py. It reads the repository and nothing more, holds no secret, pins every action and download, and runs on a
+# pull request to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only
+# token and no secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
+# The first run after this file lands judges against a base that has no ci_gate_ok.py: gate-ok fails it, by design; a run by
+# hand then judges against the base that has it.
 name: gate
 on:
+  pull_request:
+    branches: [main]
   push:
-    branches: ["**"] # branches only: merges are made locally, so no pull request runs it twice
+    branches: [main]
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: gate-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }} # every merge on main gets its report
+  # A pull request's new push replaces its run; each push to main is a group of its own, never cancelled nor left pending; runs
+  # by hand share one group per ref, so a loop of them cannot fill the plan's concurrent jobs.
+  group: gate-${{ github.event.pull_request.number || (github.event_name == 'push' && github.run_id) || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+env:
+  NODE_OPTIONS: --max-old-space-size=8192 # check.sh's heap, for every node of the gate
+  GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
+  GNOROOT: /home/runner/.cache/gno-toolchain/src
+  GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
 jobs:
-  gate:
+  # The only job that reads the change. A failure here fails every job that needs it, and gate-ok: closed.
+  changes:
     runs-on: ubuntu-24.04
-    timeout-minutes: 180 # GitHub's machines take far longer than a workstation; tuned once measured
-    env:
-      GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
-      GNOROOT: /home/runner/.cache/gno-toolchain/src
-      GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
+    timeout-minutes: 5
+    outputs:
+      base: ${{ steps.diff.outputs.base }}
+      product: ${{ steps.diff.outputs.product }}
+      ts: ${{ steps.diff.outputs.ts }}
+      app: ${{ steps.diff.outputs.app }}
+      gno: ${{ steps.diff.outputs.gno }}
+      deploy: ${{ steps.diff.outputs.deploy }}
+      ui: ${{ steps.diff.outputs.ui }}
+      nginx: ${{ steps.diff.outputs.nginx }}
+      migrations: ${{ steps.diff.outputs.migrations }}
+      harness: ${{ steps.diff.outputs.harness }}
+      tier1: ${{ steps.diff.outputs.tier1 }}
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - &checkout-history
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 0 # the full gate compares the branch with where it left main
+          fetch-depth: 0 # the base commit and its history are read
           persist-credentials: false
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+      - name: The base, then what the change calls for, by the base commit's own detector
+        id: diff
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          set -eu
+          case $EVENT in
+          pull_request) BASE=$(git merge-base "origin/$BASE_REF" HEAD) ;;
+          # The commit main pointed to before this push (the push event's `before`), or the tip's first parent when git lacks it.
+          push) if git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then BASE=$BEFORE; else BASE=$(git rev-parse HEAD^1); fi ;;
+          # By hand: where the ref left main, so a branch is never judged against itself (on main, main's tip: every job runs).
+          *) BASE=$(git merge-base origin/main HEAD) ;;
+          esac
+          mkdir -p "$RUNNER_TEMP/base"
+          git archive "$BASE" scripts docs/REVIEW.md .githooks | tar -x -C "$RUNNER_TEMP/base"
+          if [ -f "$RUNNER_TEMP/base/scripts/ci_changes.sh" ]; then
+            sh "$RUNNER_TEMP/base/scripts/ci_changes.sh" "$EVENT" "$BASE" "$RUNNER_TEMP/base" >"$RUNNER_TEMP/flags"
+          else
+            # A base from before the detector: every job runs.
+            { echo "base=$BASE"; for f in product ts app gno deploy ui nginx migrations harness tier1; do echo "$f=true"; done; } >"$RUNNER_TEMP/flags"
+          fi
+          cat "$RUNNER_TEMP/flags" >>"$GITHUB_OUTPUT"
+          { echo "### What the change calls for"; sed 's/^/- /' "$RUNNER_TEMP/flags"; } >>"$GITHUB_STEP_SUMMARY"
+
+  # tsc over the root and the app (ESLint is in lint).
+  types:
+    needs: [changes]
+    if: needs.changes.outputs.ts == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - &checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - &node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .node-version
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: "1.26"
-          cache: false # its key is a root go.mod, which this repository has not
-      - name: pnpm 12.14.0, then the locked dependencies (no package's install script runs)
-        run: npm install --global --ignore-scripts pnpm@12.14.0 && pnpm install --frozen-lockfile
-      - name: Chromium for the app's journeys, the build the locked Playwright names
-        run: node app/node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium
-      - name: gitleaks 8.30.1, checked against the checksum it published
+      - &pnpm
+        name: pnpm's Linux binary, checked against the hash npm published, then the locked dependencies
         run: |
+          set -eu
+          curl --fail --retry 3 -sSLo "$RUNNER_TEMP/pnpm.tgz" https://registry.npmjs.org/@pnpm/exe.linux-x64/-/exe.linux-x64-12.14.0.tgz
+          echo "17a2bc7bf8d6c62b84609690b514541bdca70524c41dafadecb7fce8c2ae38ee5403b59554c6e2fa807c9d8ea2296fbe9dc592db21ba4fd7da5d91b1a8db1fa1  $RUNNER_TEMP/pnpm.tgz" | sha512sum -c
+          mkdir -p "$RUNNER_TEMP/pnpm" && tar -xzf "$RUNNER_TEMP/pnpm.tgz" -C "$RUNNER_TEMP/pnpm" --strip-components=1 package/pnpm
+          echo "$RUNNER_TEMP/pnpm" >>"$GITHUB_PATH"
+          "$RUNNER_TEMP/pnpm/pnpm" install --frozen-lockfile
+      - name: The type check
+        run: mkdir -p "$RUNNER_TEMP/tsc" && TSC_CACHE="$RUNNER_TEMP/tsc" pnpm run typecheck
+
+  # Format, ESLint, knip, jscpd, CSS, comments, the docs, the scripts' syntax, the audit, gitleaks over the change.
+  lint:
+    needs: [changes]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - *checkout-history
+      - *node
+      - *pnpm
+      - &gitleaks
+        name: gitleaks 8.30.1, checked against the checksum it published
+        run: |
+          set -eu
           curl --fail --retry 3 -sSLo "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
           echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c
           mkdir -p "$RUNNER_TEMP/bin" && tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/bin" gitleaks
-          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+      - &base
+        name: The base commit's scripts, tier table and hooks (the judge comes from the base, never from the change)
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: mkdir -p "$RUNNER_TEMP/base" && git archive "$BASE" scripts docs/REVIEW.md .githooks | tar -x -C "$RUNNER_TEMP/base"
+      - name: Prettier
+        run: pnpm run format:check
+      - name: ESLint, no warning
+        run: pnpm run lint
+      - name: knip (unused files, exports, dependencies)
+        run: pnpm run unused
+      - name: jscpd (copies)
+        run: pnpm run copies
+      - name: The CSS rules
+        run: python3 -I scripts/check_css.py
+      - name: The comments' rules
+        run: pnpm run comments
+      - name: The harness docs name only files that exist
+        run: python3 -I scripts/check_docs.py
+      - name: Every script parses
+        run: python3 -I -c 'import ast, sys; [ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py
+      - name: No locked dependency has a known advisory (npm's database)
+        run: python3 -I scripts/audit.py
+      - name: gitleaks over the change, by the base's rules, both sets, no allow comment honoured
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: |
+          set -eu
+          export GIT_NO_REPLACE_OBJECTS=1
+          [ ! -e .gitleaksignore ] || { echo "a .gitleaksignore at the root would hide secrets" >&2; exit 1; }
+          text="--text --no-ext-diff --no-textconv"
+          binaries=":(exclude,icase)*.png :(exclude,icase)*.jpg :(exclude,icase)*.jpeg :(exclude,icase)*.gif :(exclude,icase)*.webp :(exclude,icase)*.avif :(exclude,icase)*.ico :(exclude,icase)*.woff :(exclude,icase)*.woff2 :(exclude,icase)*.ktx2"
+          found=0
+          for config in gitleaks.toml gitleaks-private.toml; do
+            paths=""
+            [ "$config" = gitleaks.toml ] || paths="-- . $binaries"
+            opts="--full-history $BASE..HEAD --diff-filter=tuxdb $text${paths:+ $paths}"
+            (set -f && git log -1 $opts >/dev/null) || { echo "git cannot read the range with $opts" >&2; exit 1; }
+            gitleaks git --no-banner --redact --config "$RUNNER_TEMP/base/scripts/$config" --gitleaks-ignore-path "$RUNNER_TEMP/base/scripts" --ignore-gitleaks-allow --log-opts="$opts" . || found=1
+          done
+          exit "$found"
+
+  # zizmor over the workflows (D13144), after proving it refuses what it must: the red team's test 13.
+  zizmor:
+    needs: [changes]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - *checkout
+      - name: zizmor 1.32.0 (released 2026-11-02), installed by its wheel's hash alone
+        run: |
+          set -eu
+          python3 -m venv "$RUNNER_TEMP/zizmor"
+          echo "zizmor==1.32.0 --hash=sha256:84a6acb975accc13408786a2bd274b572537ca19c933ebbc13e78f3988562071" >"$RUNNER_TEMP/zizmor.txt"
+          $RUNNER_TEMP/zizmor/bin/pip install --no-deps --require-hashes -r "$RUNNER_TEMP/zizmor.txt"
+      - name: zizmor refuses a pull_request_target, an issue_comment with a write, and a workflow with no permissions (excessive)
+        run: |
+          set -eu
+          f="$RUNNER_TEMP/planted"
+          mkdir -p "$f/pull_request_target" "$f/issue_comment" "$f/excessive"
+          printf 'name: p\non:\n  pull_request_target:\npermissions:\n  contents: read\njobs:\n  p:\n    name: p\n    runs-on: ubuntu-24.04\n    steps:\n      - run: echo p\n' >"$f/pull_request_target/w.yml"
+          printf 'name: i\non:\n  issue_comment:\npermissions:\n  contents: read\n  issues: write\njobs:\n  i:\n    name: i\n    runs-on: ubuntu-24.04\n    steps:\n      - run: echo i\n' >"$f/issue_comment/w.yml"
+          printf 'name: e\non:\n  push:\njobs:\n  e:\n    name: e\n    runs-on: ubuntu-24.04\n    steps:\n      - run: echo e\n' >"$f/excessive/w.yml"
+          for planted in pull_request_target:dangerous-triggers issue_comment:dangerous-triggers excessive:excessive-permissions; do
+            if $RUNNER_TEMP/zizmor/bin/zizmor --offline --no-progress "$f/${planted%%:*}/w.yml" >"$f/out" 2>&1; then
+              echo "zizmor let ${planted%%:*} through" >&2; exit 1
+            fi
+            grep -q "${planted#*:}" "$f/out" || { echo "zizmor refused ${planted%%:*} for another reason: $(cat "$f/out")" >&2; exit 1; }
+          done
+      - name: zizmor over every workflow
+        run: $RUNNER_TEMP/zizmor/bin/zizmor --offline --no-progress .github/workflows
+
+  # Vitest's node, ui and compiled projects in three shards; the `timing` tests wait for the night.
+  unit:
+    needs: [changes]
+    if: needs.changes.outputs.ts == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3]
+    steps:
+      - *checkout
+      - &go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache: false # its key is a root go.mod, which this repository has not
+      - *node
+      - *pnpm
+      - &ergo
+        name: Ergo, the one the tests start (built from deploy/ergo/VERSION)
+        run: sh scripts/ergo.sh
+      - name: Vitest, a third of the files, one retry
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: pnpm exec vitest run --project node --project ui --project compiled --tags-filter='!timing' --shard="$SHARD/3" --retry=1
+
+  # core's tests in Chromium, and the design system's stories (no pictures) when packages/ui or the harness changed.
+  unit-browser:
+    needs: [changes]
+    if: needs.changes.outputs.ts == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout
+      - *node
+      - *pnpm
+      - &chromium
+        name: Chromium, the build the locked Playwright names
+        run: node app/node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium
+      - name: core's tests in Chromium
+        run: CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium
+      # The flash's test compares two renders pixel for pixel, which Linux's software rendering does not keep equal (F13161):
+      # it runs on the Mac, in check.sh --full.
+      - name: The stories' invariants and behaviours (axe, CSS), never pictures
+        if: needs.changes.outputs.ui == 'true' || needs.changes.outputs.harness == 'true'
+        run: |
+          set -eu
+          STORIES_PORT=$(python3 -Ic 'import socket; s=socket.socket(); s.bind(("127.0.0.1", 0)); print(s.getsockname()[1])')
+          export STORIES_PORT
+          node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --ignore-snapshots --reporter=dot --grep-invert 'a flash raised from a dialog shows above its scrim, at the top centre$' app/tests/stories/stories.spec.ts app/tests/stories/behaviours.spec.ts
+
+  # Ten critical journeys, no pictures; the other specs of the merge list run at night.
+  journeys:
+    needs: [changes]
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout
+      - *go
+      - *node
+      - *pnpm
+      - *chromium
+      - *ergo
+      - name: The journeys, no picture compared, one retry
+        run: |
+          set -eu
+          ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit (check.sh)
+          node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --reporter=dot app/tests/e2e/login.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/search.spec.ts
+      - name: Traces of a failed journey, kept a week
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: journeys-traces
+          path: app/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The build, the first screen's budget and the late chunks' weights (the @gate tests), and nginx on the built pages.
+  build:
+    needs: [changes]
+    if: needs.changes.outputs.app == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout
+      - *go
+      - *node
+      - *pnpm
+      - *chromium
+      - *ergo
+      - name: Build into a folder of its own, then check the build changed no package file
+        run: |
+          set -eu
+          before=$(cat package.json app/package.json pnpm-lock.yaml | cksum)
+          GNOWORLD_BUILD="$PWD/app/build-gate/ci" pnpm run build:app
+          [ "$(cat package.json app/package.json pnpm-lock.yaml | cksum)" = "$before" ] || { echo "building the app changed package.json or the lockfile" >&2; exit 1; }
+      - name: The budgets (the browser's gzip), @gate tests only
+        run: |
+          set -eu
+          ulimit -S -n 10240
+          GNOWORLD_BUILD="$PWD/app/build-gate/ci" node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --reporter=dot app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate
+      # The Mac's pin (scripts/nginx.sha256) is its own build's binary: the runner builds the same release, its tarball checked.
+      - name: nginx 1.30.6, the image's, built from nginx.org's source
+        if: needs.changes.outputs.nginx == 'true'
+        run: |
+          set -eu
+          curl --fail --retry 3 -sSLo "$RUNNER_TEMP/nginx.tar.gz" https://nginx.org/download/nginx-1.30.6.tar.gz
+          echo "3cf46f5ed7504d460125866b7bea99fb357f31d887e2e63b35503310e9b8b6c8  $RUNNER_TEMP/nginx.tar.gz" | sha256sum -c
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends libpcre2-dev zlib1g-dev
+          tar -xzf "$RUNNER_TEMP/nginx.tar.gz" -C "$RUNNER_TEMP"
+          cd "$RUNNER_TEMP/nginx-1.30.6"
+          ./configure --prefix="$RUNNER_TEMP/tools/nginx-1.30.6" >/dev/null
+          make -j"$(nproc)" >/dev/null
+          make install >/dev/null
+          cp objs/nginx "$RUNNER_TEMP/tools/nginx-1.30.6/nginx"
+      - name: nginx accepts the image's config and answers each page its own policy
+        if: needs.changes.outputs.nginx == 'true'
+        run: |
+          set -eu
+          exe="$RUNNER_TEMP/tools/nginx-1.30.6/nginx"
+          GNOWORLD_TOOLS="$RUNNER_TEMP/tools" NGINX_SHA256="$(sha256sum "$exe" | cut -d ' ' -f 1)" GNOWORLD_BUILD="$PWD/app/build-gate/ci" python3 -I scripts/check_nginx.py
+
+  # Realms and Go tools: gno lint and test, the realms' guard mutants (mutate.py), gofmt, vet and the seal vectors.
+  gno-go:
+    needs: [changes]
+    if: needs.changes.outputs.gno == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout
+      - *go
+      - &gno-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ env.GNO_TOOLCHAIN }}
           key: gno-${{ runner.os }}-go1.26-${{ env.GNO_COMMIT }} # a new Go or runner builds gno again
-      - name: The gno toolchain at GNO_COMMIT, unless the cache holds it
+      - &gno
+        name: The gno toolchain at GNO_COMMIT, unless the cache holds it
         run: |
+          set -eu
           T="$GNO_TOOLCHAIN"
           if [ ! -x "$T/gno" ]; then
             git init -q "$T/src"
@@ -54,15 +339,156 @@ jobs:
             git -C "$T/src" checkout -q FETCH_HEAD
             (cd "$T/src" && go build -o "$T/gno" ./gnovm/cmd/gno)
           fi
-      - name: The full gate
-        run: sh scripts/check.sh --full
-      # When the gate fails on stories Linux has no approved picture of, Playwright has written one:
-      # the pictures are kept a week, for Alexis to approve and commit (docs/plans/slice-2.md).
-      - name: Linux's pictures of the stories, written where none was approved
-        if: failure()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: stories-pictures-linux
-          path: app/tests/stories/__screenshots__/linux/
-          if-no-files-found: ignore
-          retention-days: 7
+          mkdir -p "$T/gnohome"
+          { echo "GNO=$T/gno"; echo "GNOHOME=$T/gnohome"; } >>"$GITHUB_ENV"
+      - name: gno lint and test
+        run: cd gno && "$GNO" lint ./... && "$GNO" test ./...
+      - name: Every guard removed must fail a test (mutate.py)
+        run: cd gno && python3 -I ../scripts/mutate.py
+      - name: gofmt, vet, and the seal vectors they generate
+        run: |
+          set -eu
+          cd gno
+          test -z "$(gofmt -l tools)" || { gofmt -l tools >&2; exit 1; }
+          go vet ./tools/...
+          go run ./tools/sealvec | cmp -s - r/seal/vectors_test.gno || { echo "gno/r/seal/vectors_test.gno differs from: go run ./tools/sealvec" >&2; exit 1; }
+
+  # Tier-1 coverage floors and the change's own coverage, when a tier-1 path changed; it runs the `slow` project (real Ergo).
+  coverage:
+    needs: [changes]
+    if: needs.changes.outputs.tier1 == 'true' && needs.changes.outputs.product == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout-history
+      - *go
+      - *node
+      - *pnpm
+      - *base
+      - *ergo
+      - name: Coverage (the floors in vitest.config.ts), one retry
+        run: pnpm run coverage --retry=1
+      - name: 85% of the lines this change added or changed
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: python3 -I "$RUNNER_TEMP/base/scripts/patch_coverage.py" "$BASE"
+
+  # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate); a cap
+  # reached fails the job.
+  risk:
+    needs: [changes]
+    if: needs.changes.outputs.tier1 == 'true' && needs.changes.outputs.product == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout-history
+      - *go
+      - *node
+      - *pnpm
+      - *base
+      - *ergo
+      - name: The mutants of the changed lines
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: |
+          set -eu
+          rc=0
+          python3 -I "$RUNNER_TEMP/base/scripts/stryker_lines.py" "$BASE" "$RUNNER_TEMP/stryker.json" || rc=$?
+          case $rc in
+          0) config="$RUNNER_TEMP/stryker.json" ;;
+          3) echo "no tier-1 line StrykerJS mutates changed since $BASE"; exit 0 ;;
+          *) echo "stryker_lines.py failed: StrykerJS mutates the whole of tier 1"; config=stryker.config.json ;;
+          esac
+          pnpm exec stryker run "$config" --concurrency "$(nproc)" --incrementalFile "$RUNNER_TEMP/stryker-incremental.json"
+
+  # The net never shrinks: check_regressions.py and check_migrations.py taken from the base, with every script they import.
+  regressions:
+    needs: [changes]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout-history
+      - *go
+      - *node
+      - *pnpm
+      - *gno-cache
+      - *gno
+      - *base
+      - name: "A test gone, a floor lowered, a gap or an ignore added: refused unless a commit says why"
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+          GNOWORLD_TOOLS: ${{ runner.temp }}/tools
+        run: PATH="$GNO_TOOLCHAIN:$PATH" python3 -I "$RUNNER_TEMP/base/scripts/check_regressions.py" "$BASE"
+      - name: A migration main has keeps its text and its place
+        if: needs.changes.outputs.migrations == 'true'
+        env:
+          BASE: ${{ needs.changes.outputs.base }}
+        run: python3 -I "$RUNNER_TEMP/base/scripts/check_migrations.py" "$BASE"
+
+  # deploy/test.sh, the demo's proofs, when deploy/ changes: its own budget (18 to 30 minutes on the Mac), never counted in the 15.
+  # Two of its checks fail on GitHub's Linux runner today (F13163): a deploy/ change waits for their fix or an admin.
+  deploy-stack:
+    needs: [changes]
+    if: needs.changes.outputs.deploy == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - *checkout
+      - name: The Docker the runner has (test.sh needs Engine 28 or later)
+        run: docker version && docker compose version
+      - name: htpasswd, which test.sh needs and the runner lacks
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends apache2-utils
+      - name: deploy/test.sh
+        run: sh deploy/test.sh
+
+  # The harness's own tests when the harness changes: probe.py and test_hooks.sh. Its mutants run whole at night (nightly.yml).
+  harness-selftest:
+    needs: [changes]
+    if: needs.changes.outputs.harness == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - *checkout-history
+      - *go
+      - *node
+      - *pnpm
+      - *gno-cache
+      - *gno
+      - *gitleaks
+      - *chromium
+      - name: probe.py, the Mac's pictures left out (it plants faults in the tree, so alone)
+        run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py
+      - name: test_hooks.sh, sixteen sections at once on the four cores
+        env:
+          HOOKS_JOBS: "16"
+        run: sh scripts/test_hooks.sh
+
+  # The one check main requires. It reads every result with the base's ci_gate_ok.py: a failed or cancelled job fails it, and so
+  # does a skipped one the change called for; deploy/ and gno/ are read again from git, apart from `changes`.
+  gate-ok:
+    needs:
+      - changes
+      - types
+      - lint
+      - zizmor
+      - unit
+      - unit-browser
+      - journeys
+      - build
+      - gno-go
+      - coverage
+      - risk
+      - regressions
+      - deploy-stack
+      - harness-selftest
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - *checkout-history
+      - *base
+      - name: Every job passed, or was skipped because the change did not call for it
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          EVENT: ${{ github.event_name }}
+        run: python3 -I "$RUNNER_TEMP/base/scripts/ci_gate_ok.py" "$EVENT"

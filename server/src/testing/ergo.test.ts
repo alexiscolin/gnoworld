@@ -1349,10 +1349,7 @@ describe("the template's limits and privacy (slice 3's max review)", { timeout: 
     for (let n = 0; n < 16; n++) await registered(e, "203.0.113.7", `crowd${String(n)}`);
     const last = await visitor(e, "203.0.113.7");
     if (last === undefined) throw new Error("the 17th WebSocket did not open");
-    const c = wsRaw(last);
-    c.send("NICK crowd16");
-    c.send("USER u 0 * :crowd16");
-    expect(await c.expect(/^ERROR /)).toContain("Too many clients from your network");
+    expect(await wsRaw(last).expect(/^ERROR /)).toContain("Too many clients from your network");
     await registered(e, "203.0.113.8", "elsewhere");
   });
 

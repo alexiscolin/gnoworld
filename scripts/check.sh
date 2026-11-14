@@ -4,7 +4,7 @@
 # - Fast, by default: every commit (the pre-commit hook) and every turn of Claude Code (the Stop
 #   hook) run it. In a repository it checks only the areas its change touches (below); it prints
 #   each lane's and each step's time, and logs a run past its budget for /pre-merge.
-# - `--full` adds what the slice's last /pre-merge and CI run: the harness's own probe, coverage
+# - `--full` adds what the slice's last /pre-merge runs: the harness's own probe, coverage
 #   and patch coverage, mutations, and the scan of the whole history for secrets. It checks
 #   everything, and its record lets main take the code (pre-push).
 # - `--merge`, a merge's own /pre-merge: the same, but the harness mutants of the lines the

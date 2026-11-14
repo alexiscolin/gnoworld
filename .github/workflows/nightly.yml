@@ -1,0 +1,206 @@
+# The night on GitHub's machines (the harness overhaul, phase 2): what the gate leaves out, whole. It runs on main only (a
+# schedule runs on the default branch: docs.github.com, events-that-trigger-workflows) or by hand, reads the repository and holds
+# no secret; one job, report, may open an issue, and it runs none of the repository's code. A red night opens or updates one issue,
+# "Nightly red": the next landing waits for it. scripts/test_hooks.sh, section ci, holds each promise.
+name: nightly
+on:
+  schedule:
+    - cron: "17 2 * * *" # 02:17 UTC, an off-peak minute; a schedule can be delayed under load
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+env:
+  NODE_OPTIONS: --max-old-space-size=8192 # check.sh's heap, for every node of the night
+  GNO_TOOLCHAIN: /home/runner/.cache/gno-toolchain
+  GNOROOT: /home/runner/.cache/gno-toolchain/src
+  GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
+jobs:
+  # Every journey of check.sh's merge list, flights whole, in four shards; no pictures (the pixel specs stay on the Mac).
+  journeys-all:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - &checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - &go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: "1.26"
+          cache: false # its key is a root go.mod, which this repository has not
+      - &node
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .node-version
+      - &pnpm
+        name: pnpm's Linux binary, checked against the hash npm published, then the locked dependencies
+        run: |
+          set -eu
+          curl --fail --retry 3 -sSLo "$RUNNER_TEMP/pnpm.tgz" https://registry.npmjs.org/@pnpm/exe.linux-x64/-/exe.linux-x64-12.14.0.tgz
+          echo "17a2bc7bf8d6c62b84609690b514541bdca70524c41dafadecb7fce8c2ae38ee5403b59554c6e2fa807c9d8ea2296fbe9dc592db21ba4fd7da5d91b1a8db1fa1  $RUNNER_TEMP/pnpm.tgz" | sha512sum -c
+          mkdir -p "$RUNNER_TEMP/pnpm" && tar -xzf "$RUNNER_TEMP/pnpm.tgz" -C "$RUNNER_TEMP/pnpm" --strip-components=1 package/pnpm
+          echo "$RUNNER_TEMP/pnpm" >>"$GITHUB_PATH"
+          "$RUNNER_TEMP/pnpm/pnpm" install --frozen-lockfile
+      - &chromium
+        name: Chromium, the build the locked Playwright names
+        run: node app/node_modules/@playwright/test/cli.js install --with-deps --only-shell chromium
+      - &ergo
+        name: Ergo, the one the tests start (built from deploy/ergo/VERSION)
+        run: sh scripts/ergo.sh
+      - name: The journeys, one retry
+        env:
+          SHARD: ${{ matrix.shard }}
+        run: |
+          set -eu
+          ulimit -S -n 10240
+          node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --shard="$SHARD/4" --reporter=dot app/tests/e2e/accountLater.spec.ts app/tests/e2e/budgets.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/chunks.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/edits.spec.ts app/tests/e2e/history.spec.ts app/tests/e2e/linesLater.spec.ts app/tests/e2e/login.spec.ts app/tests/e2e/places.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/country.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/dmBar.spec.ts app/tests/e2e/embeds.spec.ts app/tests/e2e/govdao.spec.ts app/tests/e2e/heroNumber.spec.ts app/tests/e2e/messageMenu.spec.ts app/tests/e2e/multiline.spec.ts app/tests/e2e/pages.spec.ts app/tests/e2e/pins.spec.ts app/tests/e2e/previews.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmFunctions.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/roomEdit.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/search.spec.ts app/tests/e2e/stationPage.spec.ts app/tests/e2e/threads.spec.ts app/tests/e2e/worldPage.spec.ts app/tests/e2e/callCard.spec.ts app/tests/e2e/callsMore.spec.ts app/tests/e2e/chainEvents.spec.ts app/tests/e2e/names.spec.ts app/tests/e2e/pinnedActions.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/arrival.spec.ts app/tests/e2e/searchChat.spec.ts app/tests/e2e/person.spec.ts app/tests/e2e/flights.spec.ts
+
+  # What the gate leaves out of Vitest: the `timing` tests, the display projects and the real-Ergo `slow` project.
+  vitest-everything:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - *checkout
+      - *go
+      - *node
+      - *pnpm
+      - *ergo
+      - name: The timing tests (wall-clock bounds)
+        run: pnpm exec vitest run --project node --project ui --project compiled --tags-filter=timing
+      - name: The display and display_ui projects, and slow
+        run: COVERAGE_ALL=1 pnpm exec vitest run --project display --project display_ui --project slow
+
+  # StrykerJS over the whole of tier 1 (stryker.config.json): 52 min on 16 cores (plan-review-3.md); split it once a night passes 6 h.
+  stryker:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    steps:
+      - *checkout
+      - *go
+      - *node
+      - *pnpm
+      - *ergo
+      - name: StrykerJS, tier 1 whole
+        run: pnpm exec stryker run --concurrency "$(nproc)"
+
+  # The whole harness: every mutant of harness_mutate.py, test_hooks.sh and probe.py.
+  harness-nightly:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # harness_mutate and test_hooks read the history
+          persist-credentials: false
+      - *go
+      - *node
+      - *pnpm
+      - &gno-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.GNO_TOOLCHAIN }}
+          key: gno-${{ runner.os }}-go1.26-${{ env.GNO_COMMIT }} # a new Go or runner builds gno again
+      - &gno
+        name: The gno toolchain at GNO_COMMIT, unless the cache holds it
+        run: |
+          set -eu
+          T="$GNO_TOOLCHAIN"
+          if [ ! -x "$T/gno" ]; then
+            git init -q "$T/src"
+            git -C "$T/src" fetch -q --depth 1 https://github.com/gnolang/gno "$GNO_COMMIT"
+            git -C "$T/src" checkout -q FETCH_HEAD
+            (cd "$T/src" && go build -o "$T/gno" ./gnovm/cmd/gno)
+          fi
+          mkdir -p "$T/gnohome"
+          { echo "GNO=$T/gno"; echo "GNOHOME=$T/gnohome"; } >>"$GITHUB_ENV"
+      - &gitleaks
+        name: gitleaks 8.30.1, checked against the checksum it published
+        run: |
+          set -eu
+          curl --fail --retry 3 -sSLo "$RUNNER_TEMP/gitleaks.tgz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
+          echo "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  $RUNNER_TEMP/gitleaks.tgz" | sha256sum -c
+          mkdir -p "$RUNNER_TEMP/bin" && tar -xzf "$RUNNER_TEMP/gitleaks.tgz" -C "$RUNNER_TEMP/bin" gitleaks
+          echo "$RUNNER_TEMP/bin" >>"$GITHUB_PATH"
+      - *chromium
+      - name: harness_mutate.py, whole
+        run: python3 -I scripts/harness_mutate.py
+      - name: test_hooks.sh, sixteen sections at once on the four cores
+        env:
+          HOOKS_JOBS: "16"
+        run: sh scripts/test_hooks.sh
+      - name: probe.py, the Mac's pictures left out
+        run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py
+
+  # gitleaks over the whole history, both rule sets (scan_secrets.sh as it is), and the dependencies' advisories.
+  secrets-history:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # the whole history is scanned
+          persist-credentials: false
+      - *gitleaks
+      - name: The secrets scan over every commit
+        run: sh scripts/scan_secrets.sh
+      - name: No locked dependency has a known advisory
+        run: python3 -I scripts/audit.py
+
+  # The realms' guards removed one at a time, whole (mutate.py).
+  gno-mutants:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - *checkout
+      - *go
+      - *gno-cache
+      - *gno
+      - name: gno test, then every guard removed must fail a test
+        run: cd gno && "$GNO" test ./... && python3 -I ../scripts/mutate.py
+
+  # deploy/test.sh --mutants: the stack passes as it is first, then each planted fault must fail its own check (STOP_AT). Its plain
+  # run fails on Linux today (F13163), and stops the mutants: red each night till then.
+  deploy-mutants:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 355
+    steps:
+      - *checkout
+      - name: The Docker the runner has
+        run: docker version && docker compose version
+      - name: htpasswd, which test.sh needs and the runner lacks
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends apache2-utils
+      - name: The faults planted one at a time
+        run: sh deploy/test.sh --mutants
+
+  # One issue for the night, its own bot's (another account's issue of that title is not it): opened on the first red, commented on
+  # the next. The only job that writes; it runs no code of the repository.
+  report:
+    needs: [journeys-all, vitest-everything, stryker, harness-nightly, secrets-history, gno-mutants, deploy-mutants]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - name: Open or update the issue when a job is not green
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          bad=$(python3 -I -c 'import json, os; r = json.loads(os.environ["RESULTS"]); print(", ".join(k + ": " + v["result"] for k, v in r.items() if v["result"] != "success"))')
+          [ -n "$bad" ] || { echo "the night is green"; exit 0; }
+          body="Nightly red: $bad. Run: $RUN_URL"
+          n=$(gh issue list --repo "$REPO" --state open --app github-actions --search 'in:title "Nightly red"' --json number --jq '.[0].number // empty')
+          if [ -n "$n" ]; then gh issue comment "$n" --repo "$REPO" --body "$body"; else gh issue create --repo "$REPO" --title "Nightly red" --body "$body"; fi

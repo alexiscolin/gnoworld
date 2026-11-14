@@ -157,7 +157,10 @@ def plant(files, where=HERE):
 failures = []
 # ONLY=<block>[,<block>...] runs only those blocks: harness_mutate runs the one a guard belongs to.
 ONLY = set(filter(None, os.environ.get("ONLY", "").split(",")))
+# SKIP=<block>[,<block>...] leaves those out, said at the end: GitHub's Linux runner holds none of the Mac's pictures (gate.yml).
+SKIP = set(filter(None, os.environ.get("SKIP", "").split(",")))
 ran = set()
+seen = set()
 
 
 # What vitest.config.ts reads to load, copied into a probe's copy: one list, so a file the config comes to read
@@ -174,6 +177,9 @@ def vitest_config(copy):
 def part(name):
     """Whether this block runs: all of them, unless ONLY names some. With ONLY, the first failure
     ends the run: harness_mutate needs one failing block to count a mutant killed."""
+    seen.add(name)
+    if name in SKIP:
+        return False
     if ONLY and failures:
         ran.add(name)
         return False
@@ -1335,6 +1341,10 @@ finally:
     shutil.rmtree("link-reader/src/__probe__", ignore_errors=True)
     shutil.rmtree(".vitest-attachments", ignore_errors=True)  # a browser test's screenshots, should a guard fail
 
+if SKIP:
+    print(f"probe: left out by SKIP: {', '.join(sorted(SKIP))}")
+if SKIP - seen:
+    failures.append(f"SKIP names no block: {', '.join(sorted(SKIP - seen))}")
 if ONLY - ran:
     failures.append(f"ONLY names no block: {', '.join(sorted(ONLY - ran))}")
 if failures:
