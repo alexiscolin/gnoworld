@@ -8,13 +8,13 @@ import sys
 import tempfile
 
 here = pathlib.Path(__file__).resolve().parent
-H, G = "agent-pr", "agent_pr_guard.py"
+H, G, I = "agent-pr", "agent_pr_guard.py", "install.sh"
 MUTANTS = [
     (H, [("#!/usr/bin/env -S -i LC_ALL=C", "#!/usr/bin/env -S LC_ALL=C")], "the environment is emptied"),
     (H, [("    if not (OWNER.fullmatch(owner) and NAME.fullmatch(name)) or name.endswith(\".git\") or \"..\" in name:", "    if not owner or not name:")], "the repository is owner/name"),
     (H, [("or name.endswith(\".git\") or", "or")], "no name ending .git"),
-    (H, [("    if arg not in allowed:", "    if False:")], "only a repository on the allow list"),
-    (H, [("        raise Refused(f\"no allow list at {STATE}/repos.allow: no repository is allowed\") from None", "        return owner, name")], "no allow list, no repository"),
+    (H, [("    if arg not in tokens:", "    tokens.setdefault(arg, \"token\")\n    if False:")], "only a repository on the allow list"),
+    (H, [("        raise Refused(f\"no allow list at {STATE}/repos.allow: no repository is allowed\") from None", "        return owner, name, \"token\"")], "no allow list, no repository"),
     (H, [("    return (2 <= len(parts) <= 9 and parts[0] == \"agent\"", "    return True or (2 <= len(parts) <= 9 and parts[0] == \"agent\"")], "only agent/** branches"),
     (H, [("    if not path.startswith(SPACE) or", "    if False or")], "files from the space only"),
     (H, [("flags = os.O_RDONLY | os.O_NOFOLLOW |", "flags = os.O_RDONLY |")], "no link followed"),
@@ -45,6 +45,17 @@ MUTANTS = [
     (H, [("\"GIT_CONFIG_NOSYSTEM\": \"1\",\n            \"GIT_CONFIG_GLOBAL\": os.devnull, ", "")], "no system or global git config"),
     (H, [("[ \"$l\" = host=github.com ] && ok=1", "ok=1")], "the token for github.com alone"),
     (H, [("echo \"password=$AGENT_TOKEN\"", "echo \"password=x\"")], "the token through the environment (a control)"),
+    (H, [("or st.st_nlink != 1 or", "or")], "no file of two names (a hard link)"),
+    (H, [('any(("/" + n + "/").startswith(r) for r in RUNS)', 'any(("/" + n).startswith(r) for r in RUNS)')], "a link at .github/workflows is refused"),
+    (H, [('meta = whole + "\\n".join(names)', 'meta = "\\n".join(names)')], "each commit's own headers are scanned"),
+    (H, [('"token" if m.group(2) is None else f"token.{m.group(2)}"', '"token"')], "a repository's own token is its"),
+    (G, [("/tmp/claude-{uid}/agent-pr/(?:", "/tmp/claude-{uid}/(?:")], "the guard: the drop folder alone"),
+    (I, [('sandbox["enabled"] = True\n', "")], "the installer: the sandbox on in every profile"),
+    (I, [('"Edit(//opt/homebrew/**)",', "")], "the installer: the helper's tools kept from every profile"),
+    (I, [("for p in everyone:\n", "for p in []:\n")], "the installer: every profile's configuration kept from every profile"),
+    (I, [('    if s.get("disableAllHooks") is True:\n', "    if False:\n")], "the installer: no profile with hooks off"),
+    (I, [("        if any(k in str(g) for k in", "        if False and any(k in str(g) for k in")], "the installer: no profile granting what it guards"),
+    (I, [("grep -Eqx '[0-9a-f]{40}|[0-9a-f]{64}'", "grep -Eqx '[0-9a-f]+'")], "the installer: a full commit id"),
     (G, [("if tool in READERS and", "if False and")], "the guard: no reader names the state folder"),
     (G, [("        if not CALL.fullmatch(command):", "        if False:")], "the guard: one form of call"),
     (G, [("    if \".local/bin/agent-pr\" in command or helper in command:", "    if helper in command:")], "the guard: the helper under any spelling"),
@@ -55,7 +66,7 @@ survived = []
 MUTANTS = [m for m in MUTANTS if all(w in m[2] for w in sys.argv[1:])]
 for name, pairs, label in MUTANTS:
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as d:
-        for f in (H, G, "test.sh"):
+        for f in (H, G, I, "SKILL.md", "test.sh"):
             shutil.copy(here / f, pathlib.Path(d) / f)
         target = pathlib.Path(d) / name
         text = target.read_text()

@@ -19,21 +19,23 @@ g() { "$GIT" -c user.name=t -c user.email=t@t -c init.defaultBranch=main -c core
 grep -qx 'GITHUB = "https://github.com"' "$helper" || fail "the shipped helper does not push to https://github.com"
 grep -qx 'TOOLS = "/opt/homebrew/bin:/usr/bin:/bin"' "$helper" || fail "the shipped helper's PATH is not the fixed one"
 grep -qx 'STATE = os.path.join(pwd.getpwuid(os.getuid()).pw_dir, ".local/share/agent-github")' "$helper" || fail "the shipped helper's state does not come from the password database"
-grep -qx 'SPACE = f"/private/tmp/claude-{os.getuid()}/"' "$helper" || fail "the shipped helper's space is not the caller's by uid"
+grep -qx 'SPACE = f"/private/tmp/claude-{os.getuid()}/agent-pr/"' "$helper" || fail "the shipped helper's space is not the caller's drop folder"
 head -1 "$helper" | grep -qx '#!/usr/bin/env -S -i LC_ALL=C /opt/homebrew/bin/python3 -I' || fail "the shipped helper does not start from an empty environment"
 grep -nE 'os\.environ|getenv|expanduser|expandvars|\$HOME' "$helper" && fail "the helper reads its caller's environment"
 
 # GitHub's stand-in: alexis/proj with main, and decoys a name check must keep it from: ../proj, proj.git.git, -alexis.
 mkdir -p "$t/github/alexis" "$t/github/-alexis" "$t/state" "$t/space" "$t/outside" "$t/bin" "$t/nogl" "$t/glbad" "$t/glzero" "$t/evilbin" "$t/evilhome"
 g init -q "$t/seed" && echo one >"$t/seed/a.txt" && g -C "$t/seed" add a.txt && g -C "$t/seed" commit -qm one
-for r in github/alexis/proj.git proj.git github/alexis/proj.git.git github/-alexis/proj.git github/alexis/x.git; do
+for r in github/alexis/proj.git proj.git github/alexis/proj.git.git github/-alexis/proj.git github/alexis/x.git github/alexis/other.git; do
 	g init -q --bare "$t/$r" && g -C "$t/seed" push -q "$t/$r" main
 done
 g clone -q "$t/github/alexis/proj.git" "$t/s"
 g -C "$t/s" checkout -qb agent/feat && echo two >"$t/s/b.txt" && g -C "$t/s" add b.txt && g -C "$t/s" commit -qm two
 g -C "$t/s" bundle create -q "$t/space/feat.bundle" agent/feat
 printf '%s\n' "$TOKEN" >"$t/state/token" && chmod 600 "$t/state/token"
-printf 'alexis/proj\nalexis/empty\nalexis/missing\n' >"$t/state/repos.allow"
+printf 'alexis/proj\nalexis/empty\nalexis/missing\nalexis/other agent\n' >"$t/state/repos.allow"
+AGENT=ghp_$(printf '%036d' 9)
+printf '%s\n' "$AGENT" >"$t/state/token.agent" && chmod 600 "$t/state/token.agent"
 
 # A recording git (argv and environment per call) first on the helper's PATH; a fake gh that keeps its arguments, environment
 # and the body as it was when gh ran; gitleaks failing (2) and gitleaks scanning nothing (0, no output).
@@ -201,6 +203,8 @@ for bad in "$t/outside/out.bundle" "$t/space/link.bundle" "$t/space/dirlink/out.
 	run push alexis/proj "$bad" && fail "a bundle outside the space was read: $bad"
 done
 [ "$(remote agent/outside)" = none ] || fail "a bundle from outside the space reached the remote"
+ln "$t/outside/out.bundle" "$t/space/hard.bundle"
+run push alexis/proj "$t/space/hard.bundle" && fail "a hard link to a file outside the space was read"
 printf 'not a bundle\n' >"$t/space/junk.bundle"
 run push alexis/proj "$t/space/junk.bundle" && fail "a file that is no bundle was taken"
 cp "$t/outside/out.bundle" "$t/space/out.bundle"
@@ -266,6 +270,13 @@ leak "agent/$S" "echo m >m3.txt && g add m3.txt && g commit -qm branch"
 leak agent/wf-add "mkdir -p .github/workflows && printf 'on: push\n' >.github/workflows/x.yml && g add .github && g commit -qm wf"
 leak agent/wf-action "mkdir -p .github/actions/a && printf 'runs: {}\n' >.github/actions/a/action.yml && g add .github && g commit -qm act"
 leak agent/wf-later "echo a >w1.txt && g add w1.txt && g commit -qm a && mkdir -p .github/workflows && printf x >.github/workflows/y.yml && g add .github && g commit -qm wf && g rm -q .github/workflows/y.yml && g commit -qm gone"
+# 8d. A link standing at .github/workflows, and a secret in a commit's own header (none of author, committer, message).
+leak agent/wf-link "mkdir -p .github && ln -s ../ci .github/workflows && g add .github && g commit -qm link"
+g -C "$t/s" checkout -q -b agent/header main
+hdr=$("$GIT" -C "$t/s" cat-file commit HEAD | python3 -I -c 'import sys; c = sys.stdin.read(); h, b = c.split("\n\n", 1); print(h + "\nx-note " + sys.argv[1] + "\n\n" + b, end="")' "$SECRET" | "$GIT" -C "$t/s" hash-object -t commit -w --stdin)
+g -C "$t/s" update-ref refs/heads/agent/header "$hdr" && g -C "$t/s" bundle create -q "$t/space/header.bundle" agent/header
+run push alexis/proj "$t/space/header.bundle" && fail "a secret in a commit's own header went out"
+[ "$(remote agent/header)" = none ] || fail "agent/header reached the remote"
 # 9. gitleaks missing, failing, or scanning nothing: nothing is pushed. With only git and gitleaks on its PATH it works.
 g -C "$t/s" checkout -q -b agent/gl origin/main && echo gl >"$t/s/gl.txt" && g -C "$t/s" add gl.txt && g -C "$t/s" commit -qm gl
 g -C "$t/s" bundle create -q "$t/space/gl.bundle" agent/gl
@@ -292,6 +303,23 @@ run push alexis/proj "$t/space/cache.bundle" && fail "it pushed through a clean 
 rm "$cache/objects/info/alternates"
 run push alexis/proj "$t/space/cache.bundle" || fail "the clean copy restored, the push failed: $(cat "$t/out")"
 
+# 9c. A repository its allow list names with a token of its own (the agent account's) uses that one, for git and for gh.
+g -C "$t/s" checkout -q -b agent/other origin/main && echo ot >"$t/s/ot.txt" && g -C "$t/s" add ot.txt && g -C "$t/s" commit -qm other
+g -C "$t/s" bundle create -q "$t/space/other.bundle" agent/other
+rm -f "$t/git.log"
+run push alexis/other "$t/space/other.bundle" || fail "a push with the named token failed: $(cat "$t/out")"
+[ "$(remote agent/other "$t/github/alexis/other.git")" != none ] || fail "the push with the named token did not land"
+grep -qx "AGENT_TOKEN=$AGENT" "$t/git.log" && ! grep -q "AGENT_TOKEN=$TOKEN" "$t/git.log" || fail "git did not get the repository's own token"
+printf 'T\n\nb\n' >"$t/space/pro.md"
+run open alexis/other agent/other "$t/space/pro.md" || fail "open with the named token failed: $(cat "$t/out")"
+grep -qx "GH_TOKEN=$AGENT" "$t/gh.env" || fail "gh did not get the repository's own token"
+rm -f "$t/gh.args"
+mv "$t/state/token.agent" "$t/agent.bak"
+run push alexis/other "$t/space/other.bundle" && fail "it pushed with the repository's own token missing"
+mv "$t/agent.bak" "$t/state/token.agent"
+printf 'alexis/proj ../x\n' >"$t/state/repos.bad" && cp "$t/state/repos.allow" "$t/repos.keep" && cp "$t/state/repos.bad" "$t/state/repos.allow"
+run push alexis/proj "$t/space/other.bundle" && fail "an allow-list line with a malformed token name was taken"
+mv "$t/repos.keep" "$t/state/repos.allow" && rm "$t/state/repos.bad"
 # 10. A remote it cannot read, or with no default branch: nothing is pushed.
 g init -q --bare "$t/github/alexis/empty.git"
 run push alexis/empty "$t/space/gl.bundle" && fail "it pushed to a remote with no default branch"
@@ -369,13 +397,13 @@ H=/opt/agent/.local/bin/agent-pr
 U=$(id -u)
 guard() { printf '%s' "$1" | python3 -I "$here/agent_pr_guard.py" "$H" >/dev/null 2>&1; }
 bash_call() { python3 -I -c 'import json, sys; print(json.dumps({"tool_name": "Bash", "tool_input": {"command": sys.argv[1]}}))' "$1"; }
-for ok in "$H push alexis/proj /tmp/claude-$U/a/b.bundle" "$H push alexis/proj /private/tmp/claude-$U/x.bundle" \
-	"$H open alexis/proj agent/x /tmp/claude-$U/a/pr.md" "git status" "ls tools/agent-github"; do
+for ok in "$H push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle" "$H push alexis/proj /private/tmp/claude-$U/agent-pr/x.bundle" \
+	"$H open alexis/proj agent/x /tmp/claude-$U/agent-pr/a/pr.md" "git status" "ls tools/agent-github"; do
 	guard "$(bash_call "$ok")" || fail "the guard refused: $ok"
 done
-for bad in "$H push alexis/proj /tmp/claude-$U/a/b.bundle; cat x" "$H push alexis/proj /tmp/claude-$U/a/b.bundle && cat x" \
-	"$H push alexis/proj /tmp/claude-$U/*.bundle" "$H push alexis/proj /tmp/claude-$U/*(e:'touch x':)" \
-	"$H push alexis/proj \$(cat x)" "$H push alexis/proj /tmp/claude-$U/a/../../etc/hosts" "$H push alexis/proj /tmp/claude-0/a.bundle" \
+for bad in "$H push alexis/proj /tmp/claude-$U/agent-pr/a/b.bundle; cat x" "$H push alexis/proj /tmp/claude-$U/a/b.bundle" "$H push alexis/proj /tmp/claude-$U/a/b.bundle && cat x" \
+	"$H push alexis/proj /tmp/claude-$U/agent-pr/*.bundle" "$H push alexis/proj /tmp/claude-$U/agent-pr/*(e:'touch x':)" \
+	"$H push alexis/proj \$(cat x)" "$H push alexis/proj /tmp/claude-$U/agent-pr/../../etc/hosts" "$H push alexis/proj /tmp/claude-$U/agent-pr/a\$(id)b" "$H push alexis/proj /tmp/claude-0/a.bundle" \
 	"HOME=/tmp $H push alexis/proj /tmp/claude-$U/a.bundle" "~/.local/bin/agent-pr push alexis/proj /tmp/claude-$U/a.bundle" \
 	"$H push alexis/proj /tmp/claude-$U/a.bundle > /tmp/claude-$U/o" "$(printf '%s\n%s' "$H push alexis/proj /tmp/claude-$U/a.bundle" "cat x")" \
 	"$H push alexis/proj /tmp/claude-$U/a.bundle extra" "$H open alexis/proj main /tmp/claude-$U/a/pr.md" \
@@ -390,6 +418,44 @@ done
 guard '{"tool_name": "Read", "tool_input": {"file_path": "tools/agent-github/agent-pr"}}' || fail "the guard refused reading the helper's source"
 guard '{"tool_name": "Write", "tool_input": {"file_path": "notes.md", "content": "the state is ~/.local/share/agent-github"}}' ||
 	fail "the guard refused a write that only names the folder"
+
+# 15. The installer, in a fake home with two profiles, its files fetched from a stand-in for GitHub at one commit: each profile
+# gets the denies of every profile, the sandbox on, the exclusion and the hook; a profile that turns hooks off is refused.
+fh="$t/fakehome" && mkdir -p "$fh/.claude" "$fh/.claude-work" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github"
+cp "$here/agent-pr" "$here/agent_pr_guard.py" "$here/SKILL.md" "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github/"
+echo '{"permissions": {"deny": ["Edit(~/.zshrc)"]}, "sandbox": {"excludedCommands": ["x *"]}}' >"$fh/.claude/settings.json"
+echo '{"theme": "dark"}' >"$fh/.claude-work/settings.json"
+inst() { HOME="$fh" AGENT_PR_RAW="file://$t/raw" sh "$here/install.sh" "$@" </dev/null >"$t/inst.out" 2>&1; }
+inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj alexis/other:agent || fail "the installer failed: $(cat "$t/inst.out")"
+python3 -I - "$fh" <<'PY' || fail "the installer left a profile without its protections"
+import json, sys
+home = sys.argv[1]
+for profile in (".claude", ".claude-work"):
+    s = json.load(open(f"{home}/{profile}/settings.json"))
+    deny, sb = s["permissions"]["deny"], s["sandbox"]
+    for rule in ("Read(~/.local/share/agent-github/**)", "Edit(~/.local/**)", "Edit(//opt/homebrew/**)", "Edit(~/.claude/settings.json)",
+                 "Edit(~/.claude-work/settings.json)", "Edit(~/.claude-work/skills/**)", "Edit(~/.claude/hooks/**)"):
+        assert rule in deny, (profile, rule)
+    assert sb["enabled"] is True and sb["allowUnsandboxedCommands"] is False, profile
+    assert f"{home}/.local/bin/agent-pr *" in sb["excludedCommands"] and "~/.local/share/agent-github" in sb["filesystem"]["denyRead"], profile
+    assert any("agent_pr_guard.py" in h["command"] for e in s["hooks"]["PreToolUse"] for h in e["hooks"]), profile
+assert "Edit(~/.zshrc)" in json.load(open(f"{home}/.claude/settings.json"))["permissions"]["deny"]
+PY
+[ "$(cat "$fh/.local/share/agent-github/repos.allow")" = "$(printf 'alexis/proj\nalexis/other agent')" ] || fail "the allow list is not the repositories given"
+cmp -s "$fh/.local/bin/agent-pr" "$here/agent-pr" || fail "the helper installed is not the commit's"
+grep -q "@HELPER@" "$fh/.claude-work/skills/agent-github/SKILL.md" && fail "the skill still names no helper"
+[ ! -e "$fh/.local/share/agent-github/token" ] || fail "a token was written with no terminal to ask it"
+inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj || fail "a second install failed"
+[ "$(grep -c agent_pr_guard "$fh/.claude/settings.json")" = 1 ] || fail "a second install added the hook twice"
+echo '{"disableAllHooks": true}' >"$fh/.claude-work/settings.json"
+inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile with hooks off"
+echo '{"permissions": {"allow": ["Read(~/.local/share/agent-github/**)"]}}' >"$fh/.claude-work/settings.json"
+inst a/b 0123456789abcdef0123456789abcdef01234567 alexis/proj && fail "the installer took a profile granting the state folder"
+echo '{}' >"$fh/.claude-work/settings.json"
+mkdir -p "$t/raw/a/b/0123456/tools" && cp -R "$t/raw/a/b/0123456789abcdef0123456789abcdef01234567/tools/agent-github" "$t/raw/a/b/0123456/tools/"
+inst a/b 0123456 alexis/proj && fail "the installer took a short commit id"
+inst a/b 0123456789abcdef0123456789abcdef01234567 ../x && fail "the installer took a malformed repository"
+inst a/b ffffffffffffffffffffffffffffffffffffffff alexis/proj && fail "the installer installed from a commit that holds nothing"
 
 # 12. Its usage, and the token never in anything it printed.
 run && fail "no arguments passed"
