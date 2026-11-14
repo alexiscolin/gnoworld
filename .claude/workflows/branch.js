@@ -8,7 +8,7 @@ export const meta = {
     { title: "Tests", detail: "the failing tests, seen failing" },
     { title: "Red pass", detail: "the test-auditor, once per branch, for tier-1 and harness tests alone" },
     { title: "Build", detail: "the red pass's findings, then the code, a commit per behaviour" },
-    { title: "Merge check", detail: "check.sh --merge, the failing lane alone until it passes" },
+    { title: "Merge check", detail: "check.sh on the committed tree, the failing lane alone until it passes" },
     {
       title: "Review",
       detail:
@@ -239,13 +239,12 @@ const proven = (g) => {
 const gateCheck = async () =>
   proven(
     await write(
-      `${where("merge-check", true)}. Run \`sh scripts/check.sh --merge${BASE === "main" ? "" : ` --base ${BASE}`}\` (minutes) and time it. Wait for it to end: a run killed, timed out or left in the background is not a pass. Report whether it passed, the failing lane, the ` +
-        "tail of its output, `lastLine`, the literal last line of its output (a pass is the line `all checks passed in N s`; a failure ends on `check.sh: FAILED at <lane>:<step>`; anything else is a failure whatever you think, and the script reads this line itself), `exit`, check.sh's exit code, read with `echo $?` right after it ended (run it with its output to a file, never into a pipe, whose exit code is another's; anything but 0 is a failure), the surviving mutants it printed, pass or fail (every line that starts with `survivor: `, StrykerJS's and harness_mutate's: " +
-        `copy each whole, one string each, and the line \`survivors not listed: \` if it prints one: the survivors of files this branch did not change), the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
-        `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`, \`Batch-size:\`, \`No-test:\`), which ` +
+      `${where("merge-check", true)}. Run \`sh scripts/check.sh\` with nothing uncommitted (minutes: on a tree with no change it runs Prettier, ESLint, the types, gno and every test of the node, ui and compiled projects but the timing ones; it takes no option; GitHub's gate judges the rest on the pull request) and time it. Wait for it to end: a run killed, timed out or left in the background is not a pass. Report whether it passed, the failing lane, the ` +
+        "tail of its output, `lastLine`, the literal last line of its output (a pass is the line `all checks passed in N s`; a failure ends on `check.sh: FAILED at <lane>:<step>`; anything else is a failure whatever you think, and the script reads this line itself), `exit`, check.sh's exit code, read with `echo $?` right after it ended (run it with its output to a file, never into a pipe, whose exit code is another's; anything but 0 is a failure), " +
+        `the files changed since ${BASE} as \`git diff --name-only ${BASE}...HEAD\` prints them (nothing else: not the files you write), and every line of ` +
+        `\`git log ${BASE}..HEAD\` that loosens the net (\`Removed-test:\`, \`Lowered-floor:\`, \`Updated-baseline:\`), which ` +
         `the chief and Alexis read. Write the diff since ${BASE} ` +
-        "to .claude/tmp/diff.patch. Read .claude/tmp/unsteady.log: give each file named a ledger row (docs/review/findings.md) and a line in the " +
-        `learnings, delete the log, and commit the rows (\`docs(review): unsteady ...\`), numbered within ${A.ids}. Change no code.`,
+        "to .claude/tmp/diff.patch. Change no code.",
       // An agent that runs a command and waits for it: the cheaper model, little reasoning.
       { phase: "Merge check", label: "merge check", schema: GATE, model: "sonnet", effort: "low" },
     ),
@@ -274,7 +273,7 @@ phase("Build");
 const built = await write(
   `${where("build", true)}. Save the red pass's findings to ${A.shared}/reports/${A.branch}-red-pass.md, then fix them in the tests: ` +
     `${JSON.stringify(red.findings)}. Then write the code until they pass. Commit each behaviour with its tests (the fast gate runs at each ` +
-    "commit: a refused commit is fixed, never bypassed). No declaration line is needed in a message by default.",
+    "commit: a refused commit is fixed, never bypassed). A loosening of the net (a test gone, a floor lowered, a picture changed) needs its line, `Removed-test:`, `Lowered-floor:` or `Updated-baseline:`: GitHub's regressions job refuses the pull request without it.",
   { label: "build", schema: DONE },
 );
 if (!built) return result("blocked at the build");
@@ -310,7 +309,7 @@ for (let round = 1; ; round += 1) {
     [
       "reviewer",
       "reviewer",
-      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); the surviving mutants: ${JSON.stringify(gate.survivors)}.` +
+      `Review the branch's diff since ${since} (.claude/tmp/diff.patch holds the diff since ${BASE}); the surviving mutants: ${JSON.stringify(gate.survivors)} (the merge check runs no StrykerJS since D13168: its survivors are in GitHub's risk job, F13184).` +
         (gate.files.some(screen) && !gate.files.some(space)
           ? " Compare every screen it changes with the video's frames, by the steps of .claude/agents/design-reviewer.md, in this same pass."
           : ""),

@@ -34,8 +34,8 @@ and the deployment live in one repository, with one lockfile and one gate:
   they import under `packages/`;
 - a workspace imports another only through its `package.json` name (`@gnoworld/core`,
   `@gnoworld/schemas`), never by a relative path across folders;
-- no build orchestrator: each workspace has its own scripts, and `scripts/check.sh` runs
-  them all, with the realms and the Go reference client;
+- no build orchestrator: each workspace has its own scripts, which `scripts/check.sh` runs for what a commit touches
+  and GitHub's gate (`.github/workflows/gate.yml`) for a pull request, with the realms and the Go reference client;
 - a change that spans the client and the server lands in one commit, tested together;
 - the admin console (`admin/`, not built yet) will stay in the monorepo; it is hidden on the network, never by splitting the repo
   (ADR-0002 §6);

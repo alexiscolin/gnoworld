@@ -1,4 +1,4 @@
-// The chat's budgets (docs/plans/slice-4.md §4), measured by scripts/bench.py in the full gate: each bench names its
+// The chat's budgets (docs/plans/slice-4.md §4), measured by scripts/bench.py, run by hand: each bench names its
 // budget in brackets, and the mean of its runs must stay under it. Out of src, so coverage never counts them.
 import { markdown, mentions, parseLine, type Line } from "@gnoworld/core";
 import type { RoomList } from "@gnoworld/schemas";

@@ -27,20 +27,6 @@ if printf '%s\n' "$msg" | grep -qiE '^(co-authored|assisted)-by:|^claude-session
 	echo "commit-msg: co-author / attribution lines are not allowed in this repo." >&2
 	exit 1
 fi
-# Only with GNOWORLD_STRICT=1 (the speed plan, 2026-11-06: by default no declaration check runs; scripts/test_hooks.sh runs it on).
-# A fix of the product proves itself with a test that fails without it (prove_fix.py, in the full
-# gate): one that changes product code with no test, and no line `No-test: <why>`, is refused here,
-# at once, as prove_fix.py would refuse it later. What is staged is what the commit holds.
-if [ "${GNOWORLD_STRICT:-}" = 1 ] && printf '%s\n' "$subject" | grep -qE '^fix(\(.+\))?!?:'; then
-	staged=$(git diff --cached --name-only --diff-filter=AMDT) || { echo "commit-msg: git cannot list what is staged" >&2; exit 1; }
-	tests='(\.test\.tsx?|\.spec\.ts|_test\.gno|_filetest\.gno|_test\.go)$'
-	product=$(printf '%s\n' "$staged" | grep -E '^(packages|gno|app|admin|server)/') || :
-	kept=$(git diff --cached --name-only --diff-filter=AM | grep -E '^(packages|gno|app|admin|server)/' | grep -E "$tests") || :
-	if printf '%s\n' "$product" | grep -qvE "$tests|^$" && [ -z "$kept" ] && ! printf '%s\n' "$msg" | grep -qE '^No-test: [^ ]'; then
-		echo "commit-msg: a fix of the product comes with the test that shows its bug, or a line 'No-test: <why>' (prove_fix.py)." >&2
-		exit 1
-	fi
-fi
 # The repository will be public, messages included: gitleaks scans files, so the message here,
 # with both rule sets and no `gitleaks:allow` way out (F090, F113).
 command -v gitleaks >/dev/null || { echo "commit-msg: gitleaks is not installed (docs/DEVELOPMENT.md)" >&2; exit 1; }

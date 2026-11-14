@@ -1,7 +1,7 @@
 // The chain events' budget (docs/plans/slice-9.md §4): 1,000 events a minute into 100 rooms keeps the store's update under 2 ms a
 // batch with the CPU slowed 4×; the stream's coalescing sends 4 events a second a room, so a batch is a second's worth, at
 // most 17 here (1,000 a minute) and 400 at the cap. Measured on this machine's CPU as it runs, so the budget is a
-// quarter of the plan's: 0.5 ms here is 2 ms slowed 4×. Measured by scripts/bench.py in the full gate.
+// quarter of the plan's: 0.5 ms here is 2 ms slowed 4×. Measured by scripts/bench.py, run by hand.
 import type { ChainEvent } from "@gnoworld/schemas";
 import { Address } from "@gnoworld/schemas";
 import { bench, describe } from "vitest";

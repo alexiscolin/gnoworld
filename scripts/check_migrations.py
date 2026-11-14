@@ -5,7 +5,7 @@ reaches a database made before it. Each migration server/src/main.ts lists at th
 working tree (what the gate tests) in the same place (main.ts's list, or the one it imports from
 server/src/migrations.ts), its text the same; new ones may follow. What it cannot
 read (the list in another shape, a migration not a plain template literal) is refused, never passed over.
-Usage: check_migrations.py <base>, from the repository root (check.sh --full)."""
+Usage: check_migrations.py <base>, from the repository root (GitHub's regressions job, from the base)."""
 import pathlib
 import re
 import subprocess

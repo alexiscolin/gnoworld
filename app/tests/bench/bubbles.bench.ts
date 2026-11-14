@@ -1,6 +1,6 @@
 // The bubbles' budget (docs/plans/slice-6.md §4): the pick runs when a message arrives and once a second, over the newest
 // readLast messages alone, so 125, 500 and 2000 messages cost what the cap holds. The budgets are the plan's proposal,
-// to be set from the first measure. Measured by scripts/bench.py in the full gate.
+// to be set from the first measure. Measured by scripts/bench.py, run by hand.
 import { bench, describe } from "vitest";
 import rules from "../../data/bubbles.json" with { type: "json" };
 import { cutText } from "../../../packages/core/src/bubbles/cut.ts";

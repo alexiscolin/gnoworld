@@ -1,4 +1,4 @@
-"""ci_gate_ok.py: the verdict of gate.yml's `gate-ok` job, the one check main requires. GitHub reports a job skipped by its
+"""ci_gate_ok.py: the verdict of gate.yml's `gate-ok` job, the one check main will require (D13165). GitHub reports a job skipped by its
 condition as a success, and skips a job whose needed job failed (docs.github.com, troubleshooting-required-status-checks), so this
 reads every job's result: a failed or cancelled job fails the gate, and so does a skipped one the change called for. The job runs
 the base commit's copy, so a change cannot loosen its own verdict; it also reads deploy/ and gno/ from git on its own, so a

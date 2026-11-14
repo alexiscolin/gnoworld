@@ -36,7 +36,7 @@ green() ( grep -qxF "$(code_print "$1")" ".claude/tmp/green-$2" 2>/dev/null )
 reviewed() ( git show "$1:docs/review-passes.txt" 2>/dev/null | cut -d' ' -f2 | grep -qxF "$(review_print "$1")" )
 # The harness: the files that make the gate and Claude's limits, or that run at Alexis's install
 # or in Claude Code outside the sandbox. A branch declares each one it changes (pre-push, F089),
-# the full gate mutates them (check.sh), and a merge shows them first (merge.sh, F129).
+# the night mutates them (harness_mutate.py), and a merge shows them first (merge.sh, F129).
 # Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151), and read as globs whatever a caller's
 # GIT_*_PATHSPECS say (one let a commit's hook read its * as a name, 9j's review). $@: git diff's options and commits.
 harness() ( env -u GIT_NOGLOB_PATHSPECS -u GIT_GLOB_PATHSPECS -u GIT_LITERAL_PATHSPECS GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \

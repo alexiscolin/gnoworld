@@ -1,4 +1,4 @@
-"""check_nginx.py: nginx accepts the image's config, and the built pages are served with their own policy (harness-c; the merge check).
+"""check_nginx.py: nginx accepts the image's config, and the built pages are served with their own policy (harness-c; GitHub's build job).
 
 5f's two high findings passed the gate and the review's first read, and only Alexis's Mac saw them: F2459 (a second map_hash_max_size,
 nginx refused to start) and F2460 (a slashed address got the bare policy). Docker is refused in the sandbox, so this runs a pinned nginx
@@ -12,8 +12,8 @@ nginx refused to start) and F2460 (a slashed address got the bare policy). Docke
    index.html), answers 200 with the policy of its own rule in _headers, not the bare one.
 
 What it cannot do fails, never skips: no binary, a checksum that is not the pin's, no build. NGINX_SHA256 and NGINX_START_TIMEOUT are
-the tests' switches, which check.sh drops; GitHub's build job sets NGINX_SHA256 to the binary it built from the checked tarball,
-and GNOWORLD_BUILD to the folder it built the app in (app/build by default; check.sh drops it too). Usage: check_nginx.py, from the repository root; GNOWORLD_TOOLS is the tools' cache
+the tests' switches; GitHub's build job sets NGINX_SHA256 to the binary it built from the checked tarball,
+and GNOWORLD_BUILD to the folder it built the app in (app/build by default). Usage: check_nginx.py, from the repository root; GNOWORLD_TOOLS is the tools' cache
 (~/.cache/gnoworld-tools by default); the pin is scripts/nginx.sha256 (docs/DEVELOPMENT.md, "The pinned nginx")."""
 import hashlib
 import http.client
@@ -55,7 +55,7 @@ def binary(tools):
     folder = tools / f"nginx-{VERSION}"
     exe, mime = folder / "nginx", folder / "conf" / "mime.types"
     if not exe.is_file() or not os.access(exe, os.X_OK) or not mime.is_file():
-        fail(f"no nginx {VERSION} at {exe} (and {mime}): build it as docs/DEVELOPMENT.md says (\"The pinned nginx\"); a merge check does not skip nginx")
+        fail(f"no nginx {VERSION} at {exe} (and {mime}): build it as docs/DEVELOPMENT.md says (\"The pinned nginx\"); a run does not skip nginx")
     actual = hashlib.sha256(exe.read_bytes()).hexdigest()
     want = pinned()
     if actual != want:
@@ -190,7 +190,7 @@ def main():
     client, table, headers = build / "client", build / "csp.conf", build / "client" / "_headers"
     for needed in (table, headers, pathlib.Path("deploy/web/nginx.conf")):
         if not needed.is_file():
-            fail(f"{needed} is missing: the merge check builds the app first (app/react-router.config.ts writes csp.conf and _headers)")
+            fail(f"{needed} is missing: build the app first (app/react-router.config.ts writes csp.conf and _headers)")
     bare = re.search(r'default\s+"([^"]*)"', table.read_text())
     bare = bare.group(1) if bare else None
     by_path = rules(headers.read_text())
@@ -215,7 +215,7 @@ def main():
             fail("nginx -t refused deploy/web/nginx.conf with the build's table:", said)
         warnings = [line for line in said.splitlines() if "[warn]" in line]
         if warnings:
-            fail("nginx -t warned (a warning fails the merge check):", *warnings)
+            fail("nginx -t warned (a warning fails the check):", *warnings)
         print(f"check_nginx.py: nginx {VERSION} -t accepts deploy/web/nginx.conf with the build's table")
 
         proc = serve(exe, conf, where, ports[0])

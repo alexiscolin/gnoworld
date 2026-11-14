@@ -1,7 +1,7 @@
 # The night on GitHub's machines (the harness overhaul, phase 2): what the gate leaves out, whole. It runs on main only (a
 # schedule runs on the default branch: docs.github.com, events-that-trigger-workflows) or by hand, reads the repository and holds
 # no secret; one job, report, may open an issue, and it runs none of the repository's code. A red night opens or updates one issue,
-# "Nightly red": the next landing waits for it. scripts/test_hooks.sh, section ci, holds each promise.
+# "Nightly red": the next landing should wait for it. scripts/test_hooks.sh, section ci, holds each promise.
 name: nightly
 on:
   schedule:
@@ -18,7 +18,7 @@ env:
   GNOROOT: /home/runner/.cache/gno-toolchain/src
   GNO_COMMIT: 07e44776c26187830b7dcbd2454991b5a1960378 # v1.5.1, the local toolchain; onyx runs v1.5.1-rc.1 (F062)
 jobs:
-  # Every journey of check.sh's merge list, flights whole, in four shards; no pictures (the pixel specs stay on the Mac).
+  # Every journey of the gate's and the old merge list, flights whole, in four shards; no pictures (the pixel specs stay on the Mac).
   journeys-all:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -136,8 +136,8 @@ jobs:
         env:
           HOOKS_JOBS: "16"
         run: sh scripts/test_hooks.sh
-      - name: probe.py, the Mac's pictures left out
-        run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py
+      - name: probe.py
+        run: python3 -I scripts/probe.py
 
   # gitleaks over the whole history, both rule sets (scan_secrets.sh as it is), and the dependencies' advisories.
   secrets-history:

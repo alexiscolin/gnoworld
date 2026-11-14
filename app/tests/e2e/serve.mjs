@@ -14,7 +14,7 @@ import { originsOf } from "../../src/cspOrigins.ts";
 import { dropSockets, relay, relayUpgrade, startBackend, walletAnswer } from "./api.mjs";
 import { headerRules } from "./cspFiles.mjs";
 
-// GNOWORLD_BUILD names another build folder (the commit's gate reads the first screen's budget from its own, react-router.config.ts).
+// GNOWORLD_BUILD names another build folder (GitHub's build job reads the first screen's budget from its own, react-router.config.ts).
 const built = process.env.GNOWORLD_BUILD;
 const root =
   built === undefined ? fileURLToPath(new URL("../../build/client/", import.meta.url)) : join(built, "client", "/");

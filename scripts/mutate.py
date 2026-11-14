@@ -26,7 +26,7 @@ a guard's is `<file>: <line>` (its branch, for one `||` branch), a flip's
 of the same text comes k times in the file. A key that names more than one
 mutant (the same guard line twice in a file) fails: one gap, one mutant. A flip
 that loops forever times the whole run out, and no gap can hold it: bound its loop.
-Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (scripts/check.sh does this)."""
+Usage: GNO=<gno binary> ../scripts/mutate.py, from gno/ (GitHub's gno-go job and the night do this)."""
 import glob
 import math
 import os

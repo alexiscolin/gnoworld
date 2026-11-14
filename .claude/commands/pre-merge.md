@@ -1,5 +1,5 @@
 ---
-description: The review before a merge, cheapest first — the merge's gate and mutations (no tokens), then one combined review agent, sized up by risk. Never merges.
+description: The review before a merge, cheapest first — check.sh and GitHub's gate (no tokens), then one combined review agent, sized up by risk. Never merges.
 ---
 
 Run the review before merging the current branch (base: $ARGUMENTS, or `main` if empty).
@@ -11,14 +11,12 @@ lines that loosen the net and its tokens; the branch session then runs steps 2 a
 on the slice's last merge.
 
 0. **The speed plan (2026-11-06).** One review per slice, at its last merge, not per branch; the `security-reviewer` and `gno-auditor` only on a
-   tier-1 or harness change (docs/REVIEW.md); no `finding-verifier`; StrykerJS by hand (`pnpm run mutate`; `--merge` runs it on the changed tier-1
-   lines alone). `sh scripts/ship.sh` runs steps 1, 8 and 9 in one command and prints Alexis's merge and push commands: use it at the slice's end.
-   `pnpm run test:all` (`check.sh --everything`) is the old full gate, every lane, on demand.
-1. **No tokens first.** Run `scripts/check.sh --merge` (the slim full gate, with StrykerJS on the changed tier-1 lines and the harness
-   mutants of the guard files the branch changed). If it fails, run the failing lane alone, fix,
-   and run it again; stop and report if it still fails. Read `.claude/tmp/unsteady.log` (test files
-   the fast gate ran twice: failed once, then passed; docs/HARNESS.md): a file that passed on its
-   second run is no ledger row, one named again and again is a test to fix; then delete the log. Write the diff to `.claude/tmp/diff.patch` and pass
+   tier-1 or harness change (docs/REVIEW.md); no `finding-verifier`; StrykerJS by hand (`pnpm run mutate`; GitHub's gate runs it on the changed
+   tier-1 lines alone, failing on no survivor yet: F13184). Since D13168 GitHub's gate judges the pull request; check.sh is the commit gate.
+1. **No tokens first.** Run `sh scripts/check.sh` on the committed tree (Prettier, ESLint, the types, gno and the node, ui and compiled projects' tests
+   but the `timing` ones; knip, jscpd, the journeys and the rest are GitHub's), and read
+   GitHub's gate on the pull request once it is pushed (`gate-ok`). If one fails, run the failing lane or job's command alone, fix,
+   and run it again; stop and report if it still fails. Write the diff to `.claude/tmp/diff.patch` and pass
    agents its path, never its content. Past the size `docs/REVIEW.md` allows (about 400 lines of
    product code with a tier-1 file, 600 otherwise), say so and propose a split before reviewing.
    A branch that changes `deploy/` also runs semgrep's Dockerfile and Compose rules
@@ -42,7 +40,7 @@ on the slice's last merge.
 5. **Fix high and medium.** Each test first, its commit body naming its finding (`Finding: F012`).
    Low findings, and any finding beyond the plan, go to one list for Alexis with a recommendation
    (fix now, a backlog row, or moot), never to a fixer by default. A fixer's tests get no red pass:
-   the gate and the mutation tester re-check them. A second review round runs only for a high
+   check.sh and GitHub's gate re-check them. A second review round runs only for a high
    finding fixed in a tier-1 file, and only its lens, on the diff since the first; the
    `design-reviewer` runs again only on the screens of a high finding of its own that a fix changed.
    A fourth round does not run: stop and reconsider with Alexis.
@@ -56,10 +54,8 @@ on the slice's last merge.
    items 1–3, 7 and 8 only, the findings held back until he has reviewed, per "Blind first");
    the findings, most severe first, each with its scenario and its tag (important, nit, or
    pre-existing: in the code before the branch); the low list; what was dropped, one line each.
-8. **Record the pass.** On the final committed code, run `scripts/check.sh --merge`; on the
-   slice's last merge, the tip pushed to `main`, `scripts/check.sh --full` instead (pushing `main`
-   wants its record). Then `python3 -I scripts/review_pass.py record HEAD "<the agents that ran>"`.
-   Without both, the pre-push hook refuses `main`.
+8. **Record the pass.** On the final committed code, run `sh scripts/check.sh`, then
+   `python3 -I scripts/review_pass.py record HEAD "<the agents that ran>"` (until 3b of the overhaul removes the pass, D13164).
 9. **Log.** Append to `docs/review-log.md`: the date, the branch, its rounds, each finding with its
    agent and outcome, the tokens and hours the branch took, and what Alexis caught that the agents
    missed. Commit it with `docs/review-passes.txt`, with a line `Harness-changed: <path> - why` for

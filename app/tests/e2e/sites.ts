@@ -1,5 +1,5 @@
-// The journeys' hosts (serve.mjs): E2E_PORT's base, 4173 when unset, and the next two. check.sh picks a
-// free base for each run, so the gates of several worktrees run at once.
+// The journeys' hosts (serve.mjs): E2E_PORT's base, 4173 when unset, and the next two. A run by hand
+// may pick another, so the journeys of several worktrees run at once.
 declare const process: { env: Record<string, string | undefined> };
 
 const port = Number(process.env["E2E_PORT"] ?? 4173);

@@ -5,7 +5,7 @@ import { expect, open, stories, tagged, test } from "./storybook.ts";
 
 declare const process: { env: Record<string, string | undefined> };
 
-// PICTURES_OF=<id prefix> compares the stories of that prefix alone (the fast gate's tokens story: "tokens--").
+// PICTURES_OF=<id prefix> compares the stories of that prefix alone, by hand ("tokens--": the tokens story).
 const only = process.env["PICTURES_OF"] ?? "";
 
 for (const width of [1280, 768, 320]) {

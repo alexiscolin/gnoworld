@@ -103,7 +103,7 @@ def alive(pid):
 
 def clear_dead():
     """Removes the copies a killed run left in $TMPDIR: each run's folder holds its pid in `owner`, and a folder
-    whose pid is gone is a dead run's. Never a live run's (two merge checks may run at once), nor one no run marked."""
+    whose pid is gone is a dead run's. Never a live run's (two runs may overlap), nor one no run marked."""
     root = os.path.realpath(tempfile.gettempdir())
     for line in git("worktree", "list", "--porcelain").splitlines():
         tree = os.path.realpath(line.removeprefix("worktree ")) if line.startswith("worktree ") else ""
