@@ -5401,6 +5401,12 @@ for o in --quick --whatever; do
 	printf '%s\n' "$out" | grep -q "usage: check_regressions.py <base>" || fail "check_regressions refused $o without its usage: $out"
 done
 back
+# F13189: the app's journeys, listed as check_regressions lists them, are JSON alone. crowd.test.mjs, a node:test file under
+# tests/e2e, matched Playwright's default testMatch: the listing loaded it, its tests printed before the JSON, and GitHub's
+# regressions job crashed on main and on every pull request from 2026-11-10.
+listing=$(cd "$here/.." && node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --list --reporter=json 2>/dev/null)
+printf '%s' "$listing" | python3 -I -c 'import json, sys; r = json.load(sys.stdin); sys.exit(1 if r["errors"] or not r["suites"] else 0)' 2>/dev/null ||
+	fail "Playwright's listing of the app's journeys is not JSON alone, which check_regressions reads (F13189): $(printf '%.120s' "$listing")"
 fi
 
 if part ergo; then

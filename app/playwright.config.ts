@@ -5,6 +5,8 @@ import { SITE } from "./tests/e2e/sites.ts";
 // host serves it (tests/e2e/serve.mjs), with a real server and a real Ergo behind it.
 export default defineConfig({
   testDir: "tests/e2e",
+  // The journeys alone: crowd.test.mjs is node:test's, and listed here it printed before the JSON check_regressions reads (F13189).
+  testMatch: "**/*.spec.ts",
   forbidOnly: true,
   fullyParallel: true,
   use: {

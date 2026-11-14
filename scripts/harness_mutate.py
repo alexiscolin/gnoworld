@@ -66,7 +66,7 @@ SECTIONS = {
     "scripts/check_css.py": "css", "scripts/check_comments.mjs": "comments",
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
-    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/check_migrations.py": "migrations",
+    "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
     "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
@@ -1421,6 +1421,8 @@ def mutants():
     yield from nginx_mutants()
     yield from gate_mutants()
     yield from cleanup_3e_mutants()
+    # F13189: Playwright takes the journeys alone, or node:test's output comes before the JSON check_regressions reads.
+    yield from each("app/playwright.config.ts", '  testMatch: "**/*.spec.ts",\n', "", "hooks", "playwright lists the journeys alone (F13189)")
     yield from guard_3c_mutants()
     yield from hooks_3b_mutants()
     yield from bench_load_mutants()
