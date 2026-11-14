@@ -16,7 +16,8 @@ Read first: the rows of `docs/review/findings.md` that name your diff's files or
 found with `grep`, never the whole file (raise a `rejected` finding again only with new evidence, and a
 `fixed` one that comes back as a regression), the slice plan in `docs/plans/` (its "Done when" and
 threat model), `docs/REVIEW.md`, and the `.claude/rules/` files for the areas the change touches. Then
-the diff at the path you are given, the surviving mutants you are given, and the code around each hunk.
+the diff at the path you are given, the surviving mutants you are given (GitHub's risk job prints StrykerJS's on the changed tier-1
+lines of a pull request, F13184; a branch with none yet has none), and the code around each hunk.
 
 Read it once, for all of these:
 1. **The tests (green pass).** Each surviving mutant is a missing or weak test: name the mutation and

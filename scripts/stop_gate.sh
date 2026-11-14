@@ -8,8 +8,8 @@ set -eu
 # `gnoworld/` whose parent is gone for 30 minutes or more (2 hours while a gate runs; a session's server started a moment
 # ago is spared), or a test tool's, not in a dev or watch mode, 3 hours old or more.
 # TERM, then KILL a second later. It writes nothing the sandbox could have planted a link at: no temporary file, and its
-# log, `<pid> <seconds> <command>` a line, under ~/Library/Logs (security-S1, S3). A cleanup that fails never costs the
-# block below.
+# log, `<pid> <seconds> <command>` a line, under ~/Library/Logs (security-S1, S3). A cleanup that fails never fails the
+# turn.
 reap() {
 	list=$(ps -Ao pid=,ppid=,etime=,command= | awk -v self=$$ '
 		function age(t, d, n, p) {

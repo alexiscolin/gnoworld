@@ -146,6 +146,7 @@ outside = {"Edit(/scripts/guard.py)", "Edit(/scripts/stop_gate.sh)", "Edit(/.git
            "Edit(/.claude/skills/**)", "Edit(/.claude/rules/**)", "Edit(/.claude/hooks/**)", "Edit(/.claude/workflows/**)",
            "Edit(/package.json)", "Edit(/app/package.json)", "Edit(/packages/*/package.json)",
            "Edit(/server/package.json)", "Edit(/packages/schemas/package.json)", "Edit(/jarvis/package.json)", "Edit(/evals/package.json)",
+           "Edit(/link-reader/package.json)", "Edit(/evals/pnpm-workspace.yaml)", "Edit(/evals/.pnpmfile.cjs)", "Edit(/evals/.pnpmfile.mjs)",
            "Edit(/.npmrc)", "Edit(/pnpm-workspace.yaml)", "Edit(/.pnpmfile.cjs)", "Edit(/.pnpmfile.mjs)",
            "Edit(/scripts/worktree.sh)", "Edit(/scripts/borrow_node_modules.sh)", "Edit(~/Server/gnoworld-wt/*/.git)",
            "Edit(~/Server/gnoworld/.git/hooks/**)", "Edit(~/Server/gnoworld/.git/config)", "Edit(~/Server/gnoworld/scripts/**)", "Edit(~/Server/gnoworld/.githooks/**)"}
@@ -234,6 +235,29 @@ assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a 
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
 assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
+# Every workspace pnpm installs (pnpm-workspace.yaml's packages): its package.json, which pnpm reads at Alexis's install, and its
+# tsconfig.json, which judges its types, are harness files (the coherence pass of phase 3: link-reader's were not).
+import glob, os
+top = os.path.dirname(os.path.dirname(os.path.realpath(sys.argv[8])))
+spaces = re.search(r"^packages:\n((?:[ \t]+.*\n|\n)*)", open(os.path.join(top, "pnpm-workspace.yaml")).read(), re.M).group(1)
+for line in spaces.splitlines():
+    assert not line.strip() or re.match(r"[ \t]+(- \S+|#.*)$", line), f"pnpm-workspace.yaml's packages hold a line the scan cannot read: {line!r}"
+inside = lambda f: any(f == x or f.startswith(x + "/") or fnmatch.fnmatchcase(f, x) for x in listed)
+for pattern in [p.strip("'\"") for p in re.findall(r"- (\S+)", spaces)]:
+    folders = glob.glob(os.path.join(top, pattern))
+    assert folders, f"pnpm-workspace.yaml's entry {pattern} names no folder: the scan would check nothing (the security review of 3e, L4)"
+    for folder in folders:
+        for name in ("package.json", "tsconfig.json"):
+            f = os.path.relpath(os.path.join(folder, name), top)
+            assert not os.path.exists(os.path.join(top, f)) or inside(f), f"the harness list leaves out {f}, a workspace's"
+assert {"*.gitattributes", "stryker.all.config.json"} <= set(listed) and inside("app/.gitattributes"), "the harness list leaves out a .gitattributes, in any folder, or StrykerJS's whole run (the security review of 3e, M1)"
+# Every other root pnpm installs in Alexis's shell (a folder with a pnpm-workspace.yaml of its own: evals/): its package files, its
+# lockfile, its workspace file and its pnpmfiles are harness files (the security review of 3e, M2).
+for root_file in glob.glob(os.path.join(top, "*", "pnpm-workspace.yaml")):
+    here_ = os.path.relpath(os.path.dirname(root_file), top)
+    for name in ("package.json", "pnpm-workspace.yaml", "pnpm-lock.yaml", "tsconfig.json", ".pnpmfile.cjs", ".pnpmfile.mjs"):
+        f = f"{here_}/{name}"
+        assert (not os.path.exists(os.path.join(top, f)) and name.startswith(("tsconfig", "pnpm-lock"))) or inside(f), f"the harness list leaves out {f}, of a root pnpm installs"
 tree = ast.parse(text(5))
 guarded = next(ast.literal_eval(n.value) for n in tree.body if isinstance(n, ast.Assign) and getattr(n.targets[0], "id", "") == "SECTIONS")
 missed = [p for p in guarded if not any(fnmatch.fnmatch(p, s) or p.startswith(s + "/") for s in listed)]
@@ -3522,6 +3546,7 @@ fi
 python3 -I - "$here" "$here/.." "$t/stryker_lines.mirror" "$t/tracked" >"$t/by_git" <<'PY' || fail "stryker_lines.py's pathspecs could not be read on the repository's config"
 import json, os, subprocess, sys
 sys.path.insert(0, sys.argv[1])
+sys.dont_write_bytecode = True
 from stryker_lines import pathspecs
 specs = pathspecs(json.load(open(os.path.join(sys.argv[2], "stryker.config.json")))["mutate"])
 mirror = sys.argv[3]
@@ -5843,7 +5868,7 @@ printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: " || fail "bench.py did not na
 # bench in such a folder went unseen (CR5). Every listing of repo_files.git (ls-files, ls-tree, diff) prints names as they are.
 mkdir -p "$b/app/tests/bench/café" && printf 'bench("a café bench [1 ms]", f);\n' >"$b/app/tests/bench/café/d.bench.ts"
 git -C "$b" init -q && printf 'node_modules/\n' >"$b/.gitignore"
-out=$(cd "$b" && python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); from repo_files import git; print(git("ls-files", "--others", "--exclude-standard"))' "$here")
+out=$(cd "$b" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import git; print(git("ls-files", "--others", "--exclude-standard"))' "$here")
 printf '%s\n' "$out" | grep -qF "app/tests/bench/café/d.bench.ts" || fail "repo_files.git printed a path with an accent quoted: $out"
 report "a line [0.2 ms]" 0.05 "a room [100 ms]" 14.5
 out=$(bench) && fail "bench.py passed with a bench of a folder git quotes (café) missing from its report: $out"
@@ -5922,19 +5947,31 @@ if part workflow_branch; then
 # round's fix stops for Alexis; a second round re-runs only the lens whose high tier-1 finding was fixed.
 command -v node >/dev/null || fail "node is needed to run the Workflow branch's cases"
 node - "$here/../.claude/workflows/branch.js" <<'JS' || fail "the Workflow branch broke a promise (above)"
-const { readFileSync } = require("node:fs");
+const { readFileSync, existsSync } = require("node:fs");
+const { dirname, join } = require("node:path");
 const src = readFileSync(process.argv[2], "utf8").replace("export const meta", "const meta");
+// The agents the repository holds: a call to another fails or answers nothing at run time, which no stub would show (the coherence pass of
+// phase 3: the finding-verifier, gone since 2026-11-04, still called). A plugin's agent is named `plugin:agent`.
+const agents = join(dirname(process.argv[2]), "..", "agents");
 const body = new Function("agent", "parallel", "phase", "log", "args", "budget", `return (async () => {${src}\n})();`);
 const ok = (cond, why) => { if (!cond) { console.error("workflow_branch: " + why); process.exit(1); } };
 const finding = (severity, file) => ({ severity, file, scenario: "s", evidence: "e", fix: "f", beyondPlan: false });
 async function run(answer, extra = {}) {
   const calls = [];
-  const agent = async (prompt, o) => { calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema }); return answer(o.label, prompt, o); };
+  // Statically too: every agent type the script names, a lens's first word included, is one the repository holds or a plugin's known agent
+  // (a run reaches only the lenses its stubs call; the security review of 3e, L3).
+  const named = [...src.matchAll(/agentType: "([^"]+)"/g), ...src.matchAll(/\[\s*"([a-z][\w:-]*)",\s*"[^"]*",\s*`/g)].map((m) => m[1]);
+  for (const a of named) ok(["gnomcp:gno-auditor"].includes(a) || existsSync(join(agents, `${a}.md`)), `branch.js names an agent the repository lacks: ${a}`);
+  const agent = async (prompt, o) => {
+    ok(!o.agentType || o.agentType.includes(":") || existsSync(join(agents, `${o.agentType}.md`)), `the workflow calls an agent the repository lacks: ${o.agentType}`);
+    calls.push({ label: o.label, prompt, agentType: o.agentType, schema: o.schema });
+    return answer(o.label, prompt, o);
+  };
   const parallel = async (ts) => Promise.all(ts.map((t) => t().catch(() => null)));
   const r = await body(agent, parallel, () => {}, () => {}, { branch: "b", worktree: "w", plan: "p", brief: "x", shared: "s", ids: "F9000-F9049", ...extra }, { spent: () => 0 });
   return { r, labels: calls.map((c) => c.label), calls };
 }
-const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", lastLine: "all checks passed in 412 s (budget 120 s)", exit: 0, survivors: [], files, relaxations: [], seconds: 1, branch: "b" });
+const gateOf = (files) => ({ passed: true, failingLane: "", tail: "", lastLine: "all checks passed in 412 s (budget 120 s)", exit: 0, files, relaxations: [], seconds: 1, branch: "b" });
 const base = (files) => (l) =>
   l === "tests" ? { files: ["t"], seenFailing: true, notes: "" }
   : l === "red pass" ? { findings: [] }
@@ -5998,7 +6035,7 @@ const base = (files) => (l) =>
   ok(t.r.status.startsWith("reconsider with Alexis"), `three rounds of high tier-1 findings ended as ${t.r.status}`);
   ok(t.labels.filter((l) => l === "reviewer").length === 1, `round 2 ran the reviewer again: ${t.labels}`);
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read the diff since its first fix");
-  // A fixer's "could not reproduce" is its word alone (F5542, H5): it stands only when a finding-verifier refutes the finding with evidence of
+  // A fixer's "could not reproduce" is its word alone (F5542, H5): it stands only when a fresh reviewer refutes the finding with evidence of
   // its own; one it does not refute is still open; a rejected high finding on a tier-1 file still gets its second security round; the
   // result lists every rejection that stood, with both evidences.
   let v;
@@ -6012,8 +6049,13 @@ const base = (files) => (l) =>
   };
   v = await rejects({ verdicts: [{ id: "security-1-1", refuted: true, evidence: "scripts/a.sh:3 checks it" }] });
   ok(v.r.status === "ready for the chief", `a rejection the verifier refuted did not stand: ${v.r.status}`);
-  const verifier = v.calls.find((c) => c.agentType === "finding-verifier");
-  ok(verifier && verifier.prompt.includes("write nothing") && verifier.prompt.includes("security-1-1") && !verifier.prompt.includes("security-1-2"), `the finding-verifier was not asked about the rejected finding alone, writing nothing: ${verifier && verifier.prompt}`);
+  const verifier = v.calls.find((c) => (c.label || "").startsWith("verify rejected"));
+  ok(verifier && verifier.agentType === "reviewer", `a rejection was checked by another agent than a fresh reviewer: ${verifier && verifier.agentType}`);
+  // The fixer's word is no ruling (F5542, the combined review of 3e): its row stays `claimed`, and the reviewer reads it as the claim under test.
+  const fixPrompt = (v.calls.find((c) => (c.label || "").startsWith("fix round")) || {}).prompt || "";
+  ok(!fixPrompt.includes("mark `rejected`") && fixPrompt.includes("`claimed`"), `the fixer was told to mark its own rejection rejected in the ledger: ${fixPrompt}`);
+  ok(verifier && verifier.prompt.includes("claim under test"), `the reviewer checking a rejection was not told the ledger's row is the claim under test: ${verifier && verifier.prompt}`);
+  ok(verifier && verifier.prompt.includes("write nothing") && verifier.prompt.includes("security-1-1") && !verifier.prompt.includes("security-1-2"), `the reviewer checking the rejection was not asked about the rejected finding alone, writing nothing: ${verifier && verifier.prompt}`);
   ok(v.labels.filter((l) => l === "security").length === 2, `a rejected high finding on a tier-1 file got no second security round: ${v.labels}`);
   ok(v.r.rejected && v.r.rejected.length === 1 && v.r.rejected[0].id === "security-1-1" && v.r.rejected[0].verifier === "scripts/a.sh:3 checks it" && v.r.rejected[0].fixer === "cannot reproduce", `the result did not list the rejection with both evidences: ${JSON.stringify(v.r.rejected)}`);
   for (const verdicts of [{ verdicts: [{ id: "security-1-1", refuted: false, evidence: "it reproduces" }] }, { verdicts: [] }, null, { verdicts: [{ id: "security-1-2", refuted: true, evidence: "x" }] }]) {
@@ -6172,12 +6214,10 @@ const base = (files) => (l) =>
   // A round 2 still reads since its first fix, whatever the base.
   t = await highEveryRound({ base: "slice-5-p2" });
   ok(t.calls.some((c) => c.label === "security" && c.prompt.includes("since f1^")), "round 2 did not read since its first fix when a base was given");
-  // The survivors a merge check reports reach the reviewer, an empty list included.
-  const gs = { ...gateOf(["app/src/a.ts"]), survivors: ["survivor: app/src/a.ts: line 3:5 [Survived] ConditionalExpression"] };
-  t = await run((l, p) => (l === "merge check" ? gs : base(["app/src/a.ts"])(l, p)));
-  ok(promptOf(t, "reviewer").includes("app/src/a.ts: line 3:5 [Survived] ConditionalExpression"), "a surviving mutant of a passing merge check did not reach the reviewer's brief");
+  // The merge check runs no StrykerJS since D13168: no survivors are asked of it, and the reviewer is pointed at GitHub's risk job (F13184).
   t = await run(base(["app/src/a.ts"]));
-  ok(promptOf(t, "reviewer").includes("surviving mutants: []"), "a merge check with no survivor did not hand the reviewer an empty list");
+  ok(!t.calls.some((c) => c.label === "merge check" && c.schema && "survivors" in c.schema.properties), "the merge check is still asked for survivors it never has");
+  ok(promptOf(t, "reviewer").includes("risk job") && !promptOf(t, "reviewer").includes("surviving mutants:"), "the reviewer was handed a survivors list, not GitHub's risk job");
 })();
 JS
 fi

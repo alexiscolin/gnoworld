@@ -227,8 +227,8 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   `records.sh`'s list but `.claude/`, whose `tmp/` is the slices' shared folder and whose other parts Claude Code
   loads have their bans, a project CLAUDE.md in it included; no ban reaches StrykerJS's copy of the tree in `.stryker-tmp/`,
   which a merge check writes (a `wiring` case, read as the sandbox reads its paths; D242, F111); another
-  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). They reach
-  only the npm and Go registries and github.com. One command of the project's settings leaves the
+  worktree is no folder of theirs, as every one sits in `~/Server/gnoworld-wt/` (F5058). Their network
+  list names the npm and Go registries and github.com alone, and does not hold in every session (F13199). One command of the project's settings leaves the
   sandbox, `sh scripts/worktree.sh *` (`excludedCommands`), which writes the trees it makes and
   removes, in its one root; the guard lets it run only alone, its words plain, from the project's
   root, and the file tools can edit neither it, nor the scripts it runs, nor a worktree's `.git`.
@@ -261,8 +261,8 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   name some places, never all (7w2's reviews found thirteen more). The working directories: the session's tree, and each running
   slice's `reports/` folder in the main checkout's `.claude/tmp/` (slice 7's and 8's), which the main checkout's local settings name
   (`settings.local.json` in its `.claude/`: a folder only a repository's settings name does not count, unless git tracks that file
-  not, and Alexis's global excludes hold it, F5326); never the whole `.claude/tmp/`, which holds the chief's gate records and the
-  briefs (the review's S1, R1). A part's state line goes in `reports/` too; a new slice's folder is a line Alexis adds there. That
+  not, and Alexis's global excludes hold it, F5326); never the whole `.claude/tmp/`, which holds the briefs and the
+  patches a part stages (the review's S1, R1). A part's state line goes in `reports/` too; a new slice's folder is a line Alexis adds there. That
   local file also closes the instruction files below the main checkout's root to every gnoworld session, the old folder's parts and
   the chief's included, whose trees lack 7w3's denies. Claude Code's own files stay open (the scratchpad, plan files, this project's
   auto memory). Settings files are refused everywhere, and
@@ -347,8 +347,8 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   every project's settings under `~/Server`, and the main checkout's git config and hooks. A deny holds in every
   mode, bypass included.
 
-The guard and the hooks are a seatbelt, not a wall: what holds whatever happens is `main`
-protected with the CI required, which this repository's plan does not offer yet (below).
+The guard and the hooks are a seatbelt, not a wall: `main` takes pull requests alone (D13165), and what holds whatever happens
+is a required `gate-ok` and an owner's approval of the core, which wait for Alexis's ruleset (below).
 
 ## Plugins
 
@@ -377,7 +377,6 @@ costs context in every session.
 
 - **The server judges, it does not block yet.** `main` changes only through a pull request (D13165), but no check is required:
   Alexis merges by `gate-ok`'s verdict, and the local hooks can be skipped by someone who means to (F001, F009).
-- **A record of a green gate can be forged from the sandbox,** which writes it (F076).
 - **Claude's sandbox shares Alexis's `.git`** (one repository, Alexis 2026-10-18): it writes
   refs, objects and the index, so it could move or shadow `main` or plant a nested repository
   (F152, F153, F163). The boundary is `main` protected with the CI required.
@@ -452,10 +451,9 @@ costs context in every session.
 - **Core's tests alone run on both engines,** Node's V8 and Chromium's (F816, F817).
 - **No script proves a fix's test failed before it** since `prove_fix.py` left with check.sh's old lanes (D13168): the reviewer reads it;
   a fix of the harness is proven by `harness_mutate.py`.
-- **Two caches every tree shares** (`~/.cache/gnoworld-tools`): StrykerJS's incremental file and the harness mutants'
-  verdicts. A verdict is reused when what it was keyed on is unchanged; StrykerJS does not see a test helper it neither
-  mutates nor counts as a test, and a harness verdict sees only the files its sections name. So a "killed" judged in
-  another branch's tree can stand in a local run. The CI keeps neither cache and judges everything on each push
+- **The harness mutants' verdicts are a cache every tree shares** (`~/.cache/gnoworld-tools`): a verdict is reused when what it
+  was keyed on is unchanged, and it sees only the files its sections name, so a "killed" judged in another branch's tree can stand in
+  a local run. StrykerJS's incremental file is each tree's own (its default), and GitHub's risk job keeps one of its run. The CI keeps neither cache and judges everything on each push
   (security-S7, review 8).
 - **The three-round limit is a written rule;** nothing counts the rounds.
 - **Product files Claude writes run outside the sandbox** (F204): the compose file the demo starts
@@ -493,8 +491,7 @@ costs context in every session.
   `zmodload`, `python3 -c` calling git, a copy of git under another name), a commit no hook saw put on a branch
   by its hash (`git reset --soft <hash>`, F5369's S7-7), a subscript assembled character by character (S7-8),
   and a crafted `.git` found by discovery after a `cd` (F152's class) pass it. The guard is a speed bump, not the
-  wall: skipped hooks close with a record of each gated tree that no session can write (the chief's next part,
-  reports/slice-7w4.md). A heredoc's line that reads as a refused command is refused, a heredoc inside backticks
+  wall: a commit no hook saw meets GitHub's changes job, which refuses a harness file no commit declares (D13173). A heredoc's line that reads as a refused command is refused, a heredoc inside backticks
   too: a commit message goes in a file (`git commit -F`).
 
 ## Files

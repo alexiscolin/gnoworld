@@ -34,7 +34,7 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a hook's git environment must not s
 unset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_ALTERNATE_OBJECT_DIRECTORIES GIT_CEILING_DIRECTORIES
 unset COVERAGE_ALL CORE_CHROMIUM # vitest.config.ts's switches, which would change what its tests are
 
-git rev-parse --git-dir >/dev/null 2>&1 || { echo "check.sh: no repository: the change it checks is git's (pre-commit's staged copy left, D13173)" >&2; exit 1; }
+git rev-parse --git-dir >/dev/null 2>&1 || { echo "check.sh: no repository: the change it checks is git's" >&2; exit 1; }
 # Git runs the hooks of its own folder, which no branch writes and the sandbox cannot (F129).
 git_dir=$(git rev-parse --path-format=absolute --git-common-dir)
 runs_from=$(git rev-parse --path-format=absolute --git-path hooks)

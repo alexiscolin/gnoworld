@@ -537,7 +537,7 @@ def mutants():
     yield from each(".claude/workflows/branch.js", "claimed.filter((f) => verdictOf(f.id))", "(ruling ? ruling.verdicts : []).filter((f) => f.refuted)", "hooks", "the branch loop rules out only what the fixer rejected (F5542)")
     yield from each(".claude/workflows/branch.js", 'f.severity === "high" && tier1(f.file));', 'f.severity === "high" && tier1(f.file) && !rejectedIds.has(f.id));', "hooks", "a rejected high finding on tier 1 still gets its second round (F5542)")
     yield from each(".claude/workflows/branch.js", "  rejected: rejections,\n", "", "hooks", "the branch loop's result lists the rejections (F5542)")
-    yield from each(".claude/workflows/branch.js", "    : null;\n  const verdictOf", "    : { verdicts: claimed.map((f) => ({ id: f.id, refuted: true, evidence: f.evidence })) };\n  const verdictOf", "hooks", "the branch loop asks the verifier before it rules a rejection out (F5542)")
+    yield from each(".claude/workflows/branch.js", "  const ruling = claimed.length\n    ? await agent(", "  const ruling = claimed.length\n    ? { verdicts: claimed.map((f) => ({ id: f.id, refuted: true, evidence: f.evidence })) } : false\n    ? await agent(", "hooks", "the branch loop asks the verifier before it rules a rejection out (F5542)")
     yield from each(".claude/workflows/branch.js", 'const TIER1 = [\n  "scripts/",\n  ".githooks/",\n  ".github/",\n  ".claude/",\n  "gno/",\n', "const TIER1 = [\n", "hooks", "the harness and realms bring the security review whatever the arguments")
     for entry in ("app/src/csp.ts", "app/src/cspOrigins.ts", "app/src/cspForms.ts", "app/src/lib/chain/evalCall.ts", "deploy/", "packages/core/src/markdown/", "packages/core/src/args/", "app/src/lib/adena/", "server/src/login/", "server/src/roles/", "server/roles.json", "app/src/sw/", "packages/service/src/net.ts", "packages/service/src/settings.ts", "server/src/ergo/", "app/src/features/login/", "app/src/lib/api/login.ts", "app/src/lib/ergo/"):
         yield from each(".claude/workflows/branch.js", f'  "{entry}",\n', "", "hooks", f"{entry} brings the security review by itself")
@@ -1420,6 +1420,7 @@ def mutants():
     yield from stryker_mutants()
     yield from nginx_mutants()
     yield from gate_mutants()
+    yield from cleanup_3e_mutants()
     yield from guard_3c_mutants()
     yield from hooks_3b_mutants()
     yield from bench_load_mutants()
@@ -1649,6 +1650,18 @@ def guard_3c_mutants():
     ):
         yield from each(g, find, replace, h, f"guard {label}")
     yield from each(".claude/settings.json", '"matcher": "Bash|WebFetch|Edit|Write"', '"matcher": "Bash"', h, "the guard reads a web fetch and the file tools' writes (the security review of 3c)")
+
+
+def cleanup_3e_mutants():
+    """Phase 3's last cleanup: a fixer's rejection checked by an agent the repository holds; the harness list's workspaces and files that
+    change how git merges; link-reader's package.json out of the file tools' reach."""
+    h = "hooks"
+    yield from each(".claude/workflows/branch.js", 'agentType: "reviewer", phase: "Fix"', 'agentType: "finding-verifier", phase: "Fix"', h, "the branch loop checks a rejection with an agent the repository holds")
+    for name in (" link-reader/package.json", " link-reader/tsconfig.json", " stryker.all.config.json", " '*.gitattributes'", " evals/package.json",
+                 " evals/pnpm-workspace.yaml", " evals/.pnpmfile.cjs"):
+        yield from each(".githooks/records.sh", name, "", h, f"the harness list holds{name}")
+    yield from each(".claude/settings.json", '      "Edit(/link-reader/package.json)",\n', "", h, "settings keep link-reader's package.json out of Claude's edits")
+    yield from each(".claude/settings.json", '      "Edit(/evals/pnpm-workspace.yaml)",\n', "", h, "settings keep evals' workspace file out of Claude's edits")
 
 
 def swaps(path, name, rows):

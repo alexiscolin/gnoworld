@@ -3,8 +3,8 @@
 ## Setup
 
 The README's "Install" lists what to install. `pnpm install` runs no script. The git hooks
-(no attribution lines, no secret; in Claude Code's sandbox the gate before each commit; in your
-own shell no gate runs, the hooks check the code it recorded, F076) live in `.git/hooks`, where
+(no attribution lines, no secret, no non-ASCII path; from Claude Code's sandbox no harness file, and Prettier and check_docs on
+what is staged; in your own shell nothing of the working tree runs, F076) live in `.git/hooks`, where
 no merge, checkout or sandboxed command writes, so no branch brings its own (F129). Install
 them, and again after a merge that changes them, from `main`, never from the working tree, and
 from the objects themselves, whatever a replace ref would show instead:

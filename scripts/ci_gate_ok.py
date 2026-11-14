@@ -51,7 +51,7 @@ def verdict(needs, event, changed):
             continue
         if result == "skipped" and not wanted:
             continue
-        why = {"skipped": ", but the change calls for it", "missing": ": gate-ok does not wait for it (removing a job takes an admin's bypass, D13142)"}
+        why = {"skipped": ", but the change calls for it", "missing": ": gate-ok does not wait for it (removing a job is a core change, which Alexis reads)"}
         bad.append(f"{name}: {result}{why.get(result, '')}")
     for name in sorted(set(needs) - set(REQUIRED) - {"changes"}):
         if needs[name].get("result") not in ("success", "skipped"):

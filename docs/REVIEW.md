@@ -81,7 +81,7 @@ branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub
    (DORA's small batches; Alexis, 2026-10-22).
 4. **Reproduced before it is fixed:** a command, or a test seen failing, by the session (no agent
    verifies the reviewers' findings: the `finding-verifier` gave 5 ledger rows in November, none high,
-   Alexis 2026-11-04). One nobody could reproduce stays `claimed`; a false positive
+   Alexis 2026-11-04; a fixer's rejection excepted, which a fresh reviewer checks, F5542). One nobody could reproduce stays `claimed`; a false positive
    is `rejected`, a true one whose behaviour is wanted `intended`, a true one of no matter `moot`,
    each with its reason. A speed claim names the call it timed, its input, Node's version and what
    the call answered. A fix of the product proves itself: its tests, run on the commit before it,

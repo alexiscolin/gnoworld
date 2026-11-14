@@ -25,6 +25,8 @@
 /evals/pnpm-lock.yaml @alexiscolin
 /evals/pnpm-workspace.yaml @alexiscolin
 /evals/tsconfig.json @alexiscolin
+/evals/.pnpmfile.cjs @alexiscolin
+/evals/.pnpmfile.mjs @alexiscolin
 /packages/*/package.json @alexiscolin
 /packages/*/tsconfig.json @alexiscolin
 /pnpm-workspace.yaml @alexiscolin
@@ -45,7 +47,7 @@
 /.prettierrc.json @alexiscolin
 /.prettierignore @alexiscolin
 /.gitignore @alexiscolin
-/.gitattributes @alexiscolin
+*.gitattributes @alexiscolin
 /app/tests/stories/pictures.spec.ts @alexiscolin
 /app/src/csp.ts @alexiscolin
 /app/src/cspOrigins.ts @alexiscolin
