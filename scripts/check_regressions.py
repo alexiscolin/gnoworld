@@ -8,9 +8,9 @@ so on a line of its own, `Key: <item> - why`, which Alexis reads in review:
   (`bench("<name> [<n> ms]"`, named `bench <name>`): `Lowered-floor:`;
 - an approved screenshot changed or deleted: `Updated-baseline:`.
 Usage: check_regressions.py [--quick] <base>, from the repository root; --self-test checks the rules.
---quick (the hook and the fast gate, per commit: F2579) keeps the base's listing of tests in the tools' cache, one per base
+--quick (pre-commit under GNOWORLD_STRICT=1, per commit: F2579) keeps the base's listing of tests in the tools' cache, one per base
 commit, and lists only the Vitest files the change touches, whatever else it changes, unless it touches a Playwright spec (then
-it lists the tree whole). A source file that renames a generated test is seen by the whole run only. The merge check runs without it, whole and with no cache."""
+it lists the tree whole). A source file that renames a generated test is seen by the whole run only. GitHub's regressions job runs without it, whole and with no cache."""
 import ast
 import hashlib
 import json
@@ -278,7 +278,10 @@ def test_names(root):
             # Node, not pnpm's shim: the shim spells paths from $PWD, whose case can differ from the
             # directory's on macOS, and Playwright loaded under two spellings lists no test.
             command = ["node", "app/node_modules/@playwright/test/cli.js", "test", "-c", config, "--list", "--reporter=json"]
-            names |= journeys(subprocess.run(command, cwd=root, capture_output=True, text=True).stdout, root)
+            run = subprocess.run(command, cwd=root, capture_output=True, text=True)
+            if not run.stdout.strip():  # no listing at all: Playwright stopped before it, and said why on stderr alone
+                sys.exit(f"check_regressions: Playwright could not list {config}'s journeys: {run.stderr.strip()[-600:] or 'it printed nothing'}")
+            names |= journeys(run.stdout, root)
     return names
 
 
@@ -478,7 +481,7 @@ problems += [f"a bench is gone or its budget longer: {b}" for b in looser_benche
 problems += [f"a known gap is added: {g}" for g in weakened(gaps(lambda p: show(base, p)), gaps(here), floors_ok, "gap")]
 problems += [f"an ignore is added: {i}" for i in weakened(ignores(lambda p: show(base, p)), ignores(here), floors_ok, "ignore")]
 problems += [f"a check's setting changed: {s}" for s in changed_settings(settings(lambda p: show(base, p)), settings(here), floors_ok)]
-# The tree, not base..HEAD: the hook and the fast gate run this before the commit exists (F2574), as the line for the tests above.
+# The tree, not base..HEAD: pre-commit runs this before the commit exists (F2574), as the line for the tests above.
 problems += [f"an approved screenshot changed: {p}" for p in changed_baselines(git("diff", "--name-status", base), shots_ok)]
 if problems:
     print("check_regressions: the safety net shrank. Undo it, or say why on a line of a commit, `Key: <item> - why`"

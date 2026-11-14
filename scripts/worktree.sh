@@ -4,7 +4,7 @@
 # would write into this one's. Its root node_modules is a real folder of links, one per package: a whole-folder link
 # hides them from borrow_node_modules.sh, so pre-commit's staged copy would find none. A workspace's node_modules is
 # copied as its links by borrow_node_modules.sh, so its @gnoworld links (relative) lead into the new tree, never this one's. Vite's caches are its
-# own, each tree writing them. StrykerJS's incremental file is the one the gate's every run shares (check.sh).
+# own, each tree writing them.
 # worktree.sh remove <dir>: removes, from another tree, a worktree that holds no change, staged or untracked file, and keeps its
 # branch.
 set -eu

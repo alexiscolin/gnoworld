@@ -1,5 +1,5 @@
 // ⌘K's budget (docs/plans/slice-5.md §4): a keystroke, under 16 ms
-// at 1k, 10k and 100k places, whatever the data files hold today. Measured by scripts/bench.py in the full gate.
+// at 1k, 10k and 100k places, whatever the data files hold today. Measured by scripts/bench.py, run by hand.
 import { bench, describe } from "vitest";
 import { groupResults } from "../../src/features/search/groups.ts";
 import { searchPlaces } from "../../src/features/search/search.ts";

@@ -1,4 +1,4 @@
-// The realm page reader's budget (docs/plans/slice-5-part-2.md §4), measured by scripts/bench.py in the full gate: linear in
+// The realm page reader's budget (docs/plans/slice-5-part-2.md §4), measured by scripts/bench.py, run by hand: linear in
 // bytes, under 50 ms at the 256 KB cap, timed at 16, 64 and 256 KB so a quadratic step shows as a ratio, not a lucky page.
 import { page, PAGE_MAX_BYTES } from "@gnoworld/core";
 import { renderToStaticMarkup } from "react-dom/server";

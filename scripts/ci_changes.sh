@@ -16,7 +16,7 @@ git cat-file -e "$base^{commit}" || { echo "ci_changes.sh: no commit $base to ju
 changed=$(git diff -z --no-renames --name-only "$base" HEAD | tr '\0' '\n')
 has() { [ "$all" = true ] || printf '%s\n' "$changed" | grep -Eq "$1"; }
 flag() { if "$@"; then echo true; else echo false; fi; }
-# Code, as check.sh's `product`: anything but prose, the harness and the linters' configs; a page under the sources is code.
+# Code: anything but prose, the harness and the linters' configs; a page under the sources is code.
 code() {
 	[ "$all" = true ] && return 0
 	has '^(app/src|app/tests|server/src|packages/[^/]+/src)/.*\.md$' && return 0

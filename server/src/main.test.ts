@@ -312,9 +312,10 @@ describe("the server's process", { timeout: 30_000 }, () => {
     await left;
   });
 
+  // Two minutes: under the coverage's instrumentation on GitHub's four cores it ran past one, twice (gate run 43599405799).
   it(
     "never mutes the roles file's team, mutes another hidden three times, and keeps the strikes' index (3k)",
-    { timeout: 60_000 },
+    { timeout: 120_000 },
     async () => {
       const ergo = await fakeErgo();
       const env = settings();

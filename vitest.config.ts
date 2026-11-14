@@ -12,13 +12,13 @@ if (process.version !== PINNED)
   throw new Error(`Vitest runs on Node ${PINNED} (.node-version), not ${process.version}`);
 
 // A StrykerJS run cut short leaves its sandboxes here, and a bench measured them (5n: Cmd-K at 27 to 41 ms, not 2 to 4).
-// Only a bench can reach the folder: the projects' includes are anchored at the root. check.sh empties it too.
+// Only a bench can reach the folder: the projects' includes are anchored at the root.
 const STRYKER_TMP = "**/.stryker-tmp/**";
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
 // The tests the inventory (.claude/tmp/slice-8/reports/inventory-tests.md) marks display-only: props, classes, variants, markup, the look
 // of a world, small view components. They stay in the repository, and run in the `display` and `display_ui` projects, on demand
-// (`vitest run --project display --project display_ui`) and in `check.sh --everything`, not in the default `test` and `coverage` runs.
+// (`vitest run --project display --project display_ui`) and at night (nightly.yml), not in the default `test` and `coverage` runs.
 const DISPLAY_UI = [
   "packages/ui/src/{Avatar,Breadcrumb,Button,Card,ChatLayout,Chip,EmptyState,Kicker,Logo,NavItem,Overview,Panel,PlanetThumb,Row,Skeleton,Sparkline,Stat,TokensPage,compositions,icons}/**/*.test.{ts,tsx}",
   "packages/ui/src/tokens.test.ts",
@@ -74,12 +74,12 @@ export default defineConfig({
   test: {
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
-    // A bound in wall-clock time, or a test whose timeout holds one: a commit's gate leaves it, the merge check and --full run it
-    // (Alexis, 2026-11-04, "Oui, les deux": other gates' load failed them for nothing; check.sh, docs/HARNESS.md).
+    // A bound in wall-clock time, or a test whose timeout holds one: the commit gate and GitHub's leave it, the night runs it
+    // (Alexis, 2026-11-04, "Oui, les deux": other gates' load failed them for nothing; docs/HARNESS.md).
     tags: [
       {
         name: "timing",
-        description: "a bound in wall-clock time: the merge check and --full run it, a commit's gate does not",
+        description: "a bound in wall-clock time: the night runs it, the commit gate and GitHub's do not",
       },
     ],
     // The `beforeAll` that draws a RoomView once, to load its lazy lines' view, takes under a second alone and past Vitest's
@@ -119,7 +119,7 @@ export default defineConfig({
         test: { name: "display", include: DISPLAY, exclude: [...configDefaults.exclude, "packages/ui/**"] },
       },
       {
-        // The real Ergo's tests and the check's soak: the full gate runs them, the fast gate leaves them.
+        // The real Ergo's tests and the check's soak: the night runs them, the commit gate and GitHub's leave them.
         extends: true,
         test: { name: "slow", include: SLOW },
       },
@@ -147,12 +147,12 @@ export default defineConfig({
           css: { include: [/tokens\.css/] },
         },
       },
-      // Only when CORE_CHROMIUM is set, as the full gate's step does.
+      // Only when CORE_CHROMIUM is set, as GitHub's unit-browser job does.
       ...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),
     ],
     coverage: {
       // By default (the speed plan, Alexis 2026-11-06): tier 1 of docs/REVIEW.md, core and jarvis, whose floors below hold.
-      // `check.sh --everything` sets COVERAGE_ALL: every source file, tested or not (an untested one shows 0%), but the document
+      // COVERAGE_ALL, set by hand: every source file, tested or not (an untested one shows 0%), but the document
       // shell, the server entry and Storybook's pages, which the journeys walk; the display-only tests run too.
       include: process.env["COVERAGE_ALL"]
         ? [

@@ -1,30 +1,24 @@
-"""speeds.py --tier1 <root>: `tier1` or `other` for a change (check.sh's slim gate and its coverage); speeds.py <root>: the merge check's two speeds (slice 7, question 21); speeds.py --light <root>, the radical mode's light gate.
+"""speeds.py --tier1 <root>: `tier1` or `other` for a change, by docs/REVIEW.md's tier-1 rows (GitHub's detector, scripts/ci_changes.sh,
+run from the base; check_docs.py and patch_coverage.py read the table through rows and secure).
 
-Reads the paths of a change on stdin, one a line (check.sh's own `$changes`), and prints `interface` or `full`; it always exits 0.
-`interface` is for a change of the interface alone: one review and no StrykerJS. Everything else runs the full control, and so does
-any doubt: every path must be on the interface list, or the answer is `full`. `speeds.py --light <root> <main's table>` prints `light`
-when every path is on the interface list of both tables and none is a security path of either, `full` otherwise: the radical mode's
-light gate (Alexis, 2026-11-04: the interface alone), whose harness files check.sh judges itself.
-
-What counts as security, and what counts as interface, is one place: the tables of <root>/docs/REVIEW.md. Tier 1's backticked paths
-are the security paths (keys, the CSP, chain reads, login, roles, the worker, deployment); tier 3's are the interface. A path under
-both is security (app/src/features/login/ sits under app/src/features/). A table it cannot read, or a list it reads empty, is `full`.
-An interface path is a folder written with its slash, compared exactly; a security path is compared in NFC and with its case
-folded, as a Mac's disk reads names (F164). A path it cannot place, which is to say a quoted, absolute, rewritten (`..`, `.`, `//`,
-a backslash), padded or control-character name, a name that is not UTF-8, a link or a path through one, is `full`."""
+Reads the paths of a change on stdin, one a line, and prints `tier1` when one is a tier-1 path or one it cannot place, `other` when none
+is; it always exits 0. Tier 1's backticked paths are the security paths (keys, the CSP, chain reads, login, roles, the worker,
+deployment), compared in NFC and with their case folded, as a Mac's disk reads names (F164); a folder is written with its slash. A table
+it cannot read, a list it reads empty, a path it cannot place (quoted, absolute, rewritten: `..`, `.`, `//`, a backslash; padded, a
+control character, not UTF-8, a link or a path through one), and any other call (the merge check's two speeds and the radical mode's
+light gate left with check.sh's old lanes, D13168) are `tier1`."""
 import os
 import re
 import sys
 import unicodedata
 
-FULL, INTERFACE, LIGHT = "full", "interface", "light"
 CELLS = re.compile(r"`([^`]+)`")
 
 
-def rows(root, table=None):
-    """({tier: [backticked paths of the cell that names what the tier holds]}) of docs/REVIEW.md's table, or of the file `table`."""
-    found = {"1": [], "3": []}
-    with open(table or os.path.join(root, "docs", "REVIEW.md"), encoding="utf-8") as f:
+def rows(root):
+    """{"1": [the backticked paths of the cell that names what tier 1 holds]} of docs/REVIEW.md's table."""
+    found = {"1": []}
+    with open(os.path.join(root, "docs", "REVIEW.md"), encoding="utf-8") as f:
         for line in f:
             cells = [c.strip() for c in line.strip().strip("|").split("|")]
             if line.lstrip().startswith("|") and len(cells) >= 2 and cells[0] in found:
@@ -60,53 +54,19 @@ def secure(root, path, security):
     return not plain(path) or linked(root, path) or any(n == s or (s.endswith("/") and n.startswith(s)) for s in security)
 
 
-def folders(table):
-    """The tier-3 folders of a table: each written with its slash, spelled as a plain path, two levels down at least."""
-    return [p for p in table["3"] if p.endswith("/") and plain(p[:-1]) and p.count("/") >= 2]
-
-
-def within(root, paths, security, interface):
-    """Whether every path is under an interface folder and none is a security path, or one this script cannot place; never with no
-    security path, no folder or no path to compare."""
-    return bool(security and interface and paths) and all(
-        not secure(root, path, security) and any(path.startswith(i) for i in interface) for path in paths
-    )
-
-
-def speed(root, paths):
-    table = rows(root)
-    return INTERFACE if within(root, paths, [folded(p) for p in table["1"]], folders(table)) else FULL
-
-
 def tier1(root, paths):
     """`tier1` when a path is a tier-1 path, or one this script cannot place, or the table or the change is empty; `other` when none is
-    (the slim fast gate and the full gate's coverage, check.sh, speed plan 2026-11-06). Every doubt is `tier1`."""
+    (GitHub's detector, ci_changes.sh). Every doubt is `tier1`."""
     security = [folded(p) for p in rows(root)["1"]]
     return "other" if security and paths and not any(secure(root, path, security) for path in paths) else "tier1"
 
 
-def light(root, main_table, paths):
-    """`light` when every path is under a tier-3 folder of both tables, the tree's and main's, and none is a tier-1 path of either (the
-    radical mode's light gate, check.sh; the interface alone, F4909's (a)): a tier-1 row the change drops stays main's, and a tier-3
-    folder it adds is none until main names it. `full` otherwise, or when either table holds no tier-1 row, or with nothing to read."""
-    tree, main = rows(root), rows(root, main_table)
-    if not tree["1"] or not main["1"]:
-        return FULL
-    interface = [folder for folder in folders(tree) if folder in folders(main)]
-    return LIGHT if within(root, paths, [folded(p) for p in tree["1"] + main["1"]], interface) else FULL
-
-
 def main(argv):
     try:
-        text = sys.stdin.buffer.read().decode("utf-8")
-        paths = [p for p in text.split("\n") if p]
-        if argv[1:2] == ["--tier1"]:
-            return tier1(argv[2], paths) if len(argv) == 3 else "tier1"
-        if argv[1:2] == ["--light"]:
-            return light(argv[2], argv[3], paths) if len(argv) == 4 else FULL
-        return speed(argv[1], paths) if len(argv) == 2 else FULL
+        paths = [p for p in sys.stdin.buffer.read().decode("utf-8").split("\n") if p]
+        return tier1(argv[2], paths) if argv[1:2] == ["--tier1"] and len(argv) == 3 else "tier1"
     except (OSError, ValueError):  # a table or a name it cannot read, bytes that are not text
-        return "tier1" if argv[1:2] == ["--tier1"] else FULL
+        return "tier1"
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ It sends every package and version of pnpm-lock.yaml to npm's advisory database,
 `pnpm audit` asks, and fails on a moderate, high or critical advisory, or when it gets no
 readable answer. It exists because pnpm cannot run inside Claude Code's sandbox (findings
 F027). AUDIT_ANSWER names a file read instead of the network, for tests; the request is
-written beside it. Usage: audit.py, from the repository root (check.sh --full)."""
+written beside it. Usage: audit.py, from the repository root (GitHub's lint job and the night)."""
 import json
 import os
 import re

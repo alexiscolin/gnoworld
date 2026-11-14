@@ -21,7 +21,7 @@ that changes the harness has written it before any hook runs, and its commit is 
 it at once (`git merge --abort`). Pushing `main` wants the hooks installed from it. The gate needs Node 24.22.0 (from `.node-version`, found through nvm when the shell
 has another; in a shell, `nvm use` picks it, since `.nvmrc` links to `.node-version`; nvm must be loaded
 first, by `source ~/.nvm/nvm.sh` or the shell's profile), pnpm, Go 1.26, Python 3, gitleaks, and a gno toolchain that matches the chain.
-The app's journeys need Playwright's Chromium, once per Playwright version (a commit's gate walks none: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; the merge check and `--full` walk them all): `node app/node_modules/@playwright/test/cli.js install chromium`
+The app's journeys need Playwright's Chromium, once per Playwright version (no commit's gate walks one: run the spec you write or change yourself, `node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts <spec>`; GitHub's gate walks ten on an app change, the night 41 of the 109): `node app/node_modules/@playwright/test/cli.js install chromium`
 (the CI adds `--with-deps` for Linux's libraries), and Ergo's binary, which `sh scripts/ergo.sh` builds from the pin (the gate does).
 
 Start Claude Code in this folder, so it reads the project's settings, hooks and sandbox, and
@@ -47,8 +47,7 @@ outside the sandbox and must touch no other (F5058), and a base whose harness,
 one or plants one (7w3, F4893); the chief's session writes the folder by `--add-dir` (docs/HARNESS.md, "Who does
 what"). It makes the branch, links the main tree's
 installed packages one by one (one store), and copies each workspace's `node_modules` with its
-relative links and a `.bin` of its own, through no link it did not make; the gate's StrykerJS reads
-one incremental file every tree shares (`~/.cache/gnoworld-tools/stryker-incremental.json`). Hand-made
+relative links and a `.bin` of its own, through no link it did not make. Hand-made
 links loaded React twice in Storybook and let the probe delete main's own `.bin/storybook` (F2127).
 `sh scripts/worktree.sh remove <name>`, from another tree,
 removes a worktree of that root that holds no change, staged file or untracked file (git's own
@@ -84,11 +83,11 @@ GNO_TOOLCHAIN=$T GNOROOT=$T/src ./scripts/check.sh   # the first run downloads p
 
 ## The pinned nginx
 
-The merge check (`check.sh --merge`) runs `nginx -t` on the image's `deploy/web/nginx.conf` with the build's table, then serves the
-built pages and asks each at its slashed, bare and `index.html` addresses (`scripts/check_nginx.py`; HARNESS.md). Docker is refused in
-the sandbox, so it needs an nginx at the image's version, 1.30.6 (`deploy/web/Dockerfile`), in the tools' cache, and a merge check
-without it fails: it never skips. It was set up once on the machine that runs the merge checks (the chief, 2026-10-31); anyone who
-sets up another does the same:
+`scripts/check_nginx.py` (GitHub's build job; on the Mac by hand, `python3 -I scripts/check_nginx.py` once the app is built) runs
+`nginx -t` on the image's `deploy/web/nginx.conf` with the build's table, then serves the built pages and asks each at its slashed, bare
+and `index.html` addresses (HARNESS.md); on GitHub, for an app change alone (F13186). Docker is refused in the sandbox, so on the Mac it needs an nginx at the image's version, 1.30.6
+(`deploy/web/Dockerfile`), in the tools' cache, and a run without it fails: it never skips. It was set up once on the Mac (the chief,
+2026-10-31); anyone who sets up another does the same:
 
 1. Build nginx 1.30.6 from nginx.org's source release, its signature checked (`gpg --verify` of `nginx-1.30.6.tar.gz.asc` against the
    key `D6786CE303D9A9022998DC6CC8464D549AF75C0A`, from `https://nginx.org/keys/pluknet.key`; the tarball was good). The prefix is the
@@ -110,18 +109,19 @@ each fail it on the real binary (`.claude/tmp/slice-5/reports/slice-5-harness-c-
 
 ## The gate and the harness
 
-`./scripts/check.sh` is the gate, and `./scripts/check.sh --full` the one `/pre-merge` runs.
-A commit's gate runs the unit tests related to its change (HARNESS.md, "The related tests"); before a part's report,
-`./scripts/check.sh --tests-all` runs every test of the commit's projects (node, ui, compiled); the slow ones (the real Ergo,
-the soak) and core's in Chromium run at the merge check and in `--full`. Design still being tried lives in the workshop
-(this file's "The workshop") and lands later, in one tested batch (REVIEW.md, "Keep it cheap").
-`pnpm run test:all` (`check.sh --everything`) runs every lane, test, picture, journey and check; `GNOWORLD_STRICT=1` gives a turn's end its gate.
-`--merge` takes a lock shared by every worktree and waits for it: one merge check at a time on the machine (HARNESS.md).
+`./scripts/check.sh` is the commit gate (D13168): Prettier and ESLint on the change's files, the types, the unit tests related to a
+tier-1 change (HARNESS.md, "The related tests") and gno, on what the change touches; on a tree with no change, every tool and every test
+of the commit's projects (node, ui, compiled) but the `timing` ones, which is a part's last check before its report. GitHub's gate
+(`.github/workflows/gate.yml`) judges each pull request by what it calls for, and the night (`nightly.yml`) runs the slow, display and `timing`
+tests, the journeys of its list, StrykerJS and the harness's mutants. By hand, as no gate runs them: the benches (`python3 -I scripts/bench.py`),
+the pictures and the flash's pixel test (`node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts
+app/tests/stories/behaviours.spec.ts` on the Mac). Design still being tried lives in the workshop (this file's "The workshop") and
+lands later, in one tested batch (REVIEW.md, "Keep it cheap"). `GNOWORLD_STRICT=1` gives a turn's end its gate.
 What each step catches, the hooks, the permissions, the reviews and how the harness proves
 itself: [HARNESS.md](HARNESS.md).
 
 To mutate only your own files with StrykerJS, from the repository root and on the pinned Node (the
-`PATH` check.sh sets): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
+`PATH` check.sh sets, `~/.nvm`'s `.node-version` Node first): `node_modules/.bin/stryker run --mutate 'a.ts,b.tsx'`, one comma-separated
 value. It replaces the config's `mutate` list (its log says `Found 2 of 935 file(s)`), keeps the
 incremental file whole and takes no `--`. Two forms fail: `pnpm run mutate -- --mutate a.ts` hands
 StrykerJS a literal `--` (`too many arguments for 'run'`, pnpm's own help: every later token reaches

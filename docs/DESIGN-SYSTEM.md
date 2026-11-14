@@ -302,15 +302,14 @@ small function of ours until CSS anchor positioning (Baseline 2026) is widely av
 Storybook, plus the journeys; no extra service. The component tests render each story through a
 helper of ours, not Storybook's `composeStories`, whose runtime brings an `expect` of its own that
 stops Vitest counting assertions. The stories' journeys (`app/tests/stories`) build Storybook and
-walk every story in Chromium, in the full gate.
-- **Lint and types,** in the fast gate: `@eslint/css`, `check_css.py`, typed modules (`tsc`),
-  jscpd.
+walk every story in Chromium, in GitHub's gate for a change of the design system or the harness.
+- **Lint and types,** `@eslint/css` and typed modules (`tsc`) in the commit gate; `check_css.py` and jscpd in GitHub's.
 - **Pictures:** every story, at three container widths and with reduced motion, screenshotted
   by Playwright and compared with the approved images (the browser and its platform: slice 2's
   plan). A new baseline is its own commit, which Alexis reviews; changing or deleting an
   approved one fails the push unless the commit says why (`Updated-baseline:`,
   `scripts/check_regressions.py`). Since the speed plan (2026-11-06) the default runs compare none: the pictures spec stays in the repository and
-  runs in `check.sh --everything`; the approved video is the reference, compared by eye, and the design is decided live.
+  runs by hand; the approved video is the reference, compared by eye, and the design is decided live.
 - **Invariants,** measured in the browser on every story and the journeys:
   - nothing overlaps: the point at the centre of each control hits that control;
   - every target is at least 24 px, the default control 44 px;

@@ -54,7 +54,7 @@ kept() {
 # write for a merge merge.sh never showed (9n's review), and with its own message, not .git/MERGE_MSG, which any session
 # can write (9n's /pre-merge).
 # An advisory report, never a refusal (the speed plan, 2026-11-06): the tests the branch removes or renames, and the floors (coverage,
-# mutation) its diff lowers, for Alexis to read before he merges. check_regressions.py still judges them under `check.sh --everything`.
+# mutation) its diff lowers, for Alexis to read before he merges. check_regressions.py judges them on GitHub (gate.yml, regressions).
 gone=$(git -c core.quotePath=false diff -M --diff-filter=DR --name-status HEAD..."$tip" | grep -E '\.(test|bench)\.tsx?|\.spec\.ts|_test\.(gno|go)' || :)
 floors=$(git diff HEAD..."$tip" -- vitest.config.ts stryker.config.json scripts/mutate.py | grep -E '^-[^-].*(lines|functions|branches|statements|high|low|GAPS)' || :)
 printf 'merge.sh (advisory): %s test file(s) removed or renamed, %s floor line(s) lowered or removed\n' "$(printf '%s' "$gone" | grep -c . || :)" "$(printf '%s' "$floors" | grep -c . || :)"

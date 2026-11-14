@@ -1,6 +1,6 @@
 # The gate on GitHub's machines (the harness overhaul, phase 2: docs/plans/harness-overhaul.md). One job, `changes`, reads what
 # the change calls for with the base commit's own detector (scripts/ci_changes.sh); the checks run side by side, each 15 minutes
-# at most but deploy/test.sh's; `gate-ok`, the one check main requires, reads every result with the base commit's
+# at most but deploy/test.sh's; `gate-ok`, the one check main will require (D13165), reads every result with the base commit's
 # scripts/ci_gate_ok.py. It reads the repository and nothing more, holds no secret, pins every action and download, and runs on a
 # pull request to main, a push to main or by hand, never on a fork's privileged events: a pull request's run gets a read-only
 # token and no secret (docs.github.com, events-that-trigger-workflows). scripts/test_hooks.sh, section ci, holds each promise.
@@ -233,7 +233,7 @@ jobs:
       - name: core's tests in Chromium
         run: CORE_CHROMIUM=1 node node_modules/vitest/vitest.mjs run --project core_chromium
       # The flash's test compares two renders pixel for pixel, which Linux's software rendering does not keep equal (F13161):
-      # it runs on the Mac, in check.sh --full.
+      # it runs by hand on the Mac (docs/DEVELOPMENT.md, "The gate").
       - name: The stories' invariants and behaviours (axe, CSS), never pictures
         if: needs.changes.outputs.ui == 'true' || needs.changes.outputs.harness == 'true'
         run: |
@@ -242,7 +242,7 @@ jobs:
           export STORIES_PORT
           node app/node_modules/@playwright/test/cli.js test -c app/playwright.stories.config.ts --ignore-snapshots --reporter=dot --grep-invert 'a flash raised from a dialog shows above its scrim, at the top centre$' app/tests/stories/stories.spec.ts app/tests/stories/behaviours.spec.ts
 
-  # Ten critical journeys, no pictures; the other specs of the merge list run at night.
+  # Ten critical journeys, no pictures; every other spec runs at night.
   journeys:
     needs: [changes]
     if: needs.changes.outputs.app == 'true'
@@ -258,7 +258,7 @@ jobs:
       - name: The journeys, no picture compared, one retry
         run: |
           set -eu
-          ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit (check.sh)
+          ulimit -S -n 10240 # the e2e web server dies of EMFILE under a low limit (F2543)
           node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --ignore-snapshots --retries=1 --reporter=dot app/tests/e2e/login.spec.ts app/tests/e2e/csp.spec.ts app/tests/e2e/chat.spec.ts app/tests/e2e/composer.spec.ts app/tests/e2e/dm.spec.ts app/tests/e2e/rooms.spec.ts app/tests/e2e/pwa.spec.ts app/tests/e2e/realmView.spec.ts app/tests/e2e/relay.spec.ts app/tests/e2e/search.spec.ts
       - name: Traces of a failed journey, kept a week
         if: failure()
@@ -456,8 +456,8 @@ jobs:
       - *gno
       - *gitleaks
       - *chromium
-      - name: probe.py, the Mac's pictures left out (it plants faults in the tree, so alone)
-        run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py
+      - name: probe.py (it plants faults in the tree, so alone)
+        run: python3 -I scripts/probe.py
       - name: test_hooks.sh, sixteen sections at once on the four cores
         env:
           HOOKS_JOBS: "16"

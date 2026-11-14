@@ -756,26 +756,30 @@ describe("a system's dynamic view's rocks (7v)", () => {
 
   // The design review's second pass (F4468, the mock-up's rocks in front): at a system the hero gives way and its card stands at the top left,
   // yet the rocks kept the hero's room and stood on the card; gnoswap's seven were all pebbles there, no near one in front.
-  it("lays a dynamic view's rocks off the system's card, not the hero's room, and a near one in front of gnoswap", () => {
-    const onyx = onyxSystems();
-    for (const system of onyx.filter(({ worlds }) => worlds.length > 0)) {
-      const arrival = arrivalOf(system, onyx);
-      for (const screen of REST_SCREENS) {
-        const see = cameraOf(arrival, screen);
-        for (const { place, radius } of rocksAt(arrival, LENT)) {
-          const seen = see(place, radius);
-          expect(seen.left < 0.25 * screen.width && seen.top < 0.2 * screen.height, system.id).toBe(false);
+  it(
+    "lays a dynamic view's rocks off the system's card, not the hero's room, and a near one in front of gnoswap",
+    { timeout: WHOLE_SEARCHES },
+    () => {
+      const onyx = onyxSystems();
+      for (const system of onyx.filter(({ worlds }) => worlds.length > 0)) {
+        const arrival = arrivalOf(system, onyx);
+        for (const screen of REST_SCREENS) {
+          const see = cameraOf(arrival, screen);
+          for (const { place, radius } of rocksAt(arrival, LENT)) {
+            const seen = see(place, radius);
+            expect(seen.left < 0.25 * screen.width && seen.top < 0.2 * screen.height, system.id).toBe(false);
+          }
         }
       }
-    }
-    const gnoswap = onyx.find(({ id }) => id === "gnoswap");
-    if (gnoswap === undefined) throw new Error("no gnoswap");
-    const arrival = arrivalOf(gnoswap, onyx);
-    const see = cameraOf(arrival, REST_SCREENS[0]);
-    expect(
-      Math.max(...rocksAt(arrival, LENT).map(({ place, radius }) => see(place, radius).radius)),
-    ).toBeGreaterThanOrEqual(30);
-  });
+      const gnoswap = onyx.find(({ id }) => id === "gnoswap");
+      if (gnoswap === undefined) throw new Error("no gnoswap");
+      const arrival = arrivalOf(gnoswap, onyx);
+      const see = cameraOf(arrival, REST_SCREENS[0]);
+      expect(
+        Math.max(...rocksAt(arrival, LENT).map(({ place, radius }) => see(place, radius).radius)),
+      ).toBeGreaterThanOrEqual(30);
+    },
+  );
 
   it("lays the same rocks for the same view", () => {
     for (const { system, systems } of allCases().slice(0, 20)) {

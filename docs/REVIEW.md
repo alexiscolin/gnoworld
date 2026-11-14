@@ -15,11 +15,11 @@ Review by risk, not line by line everywhere.
 | 2 | Go (the seal reference client) | Claude | Behaviour and tests |
 | 3 | Interface, 3D, motion: `app/src/features/errors/`, `app/src/features/home/`, `app/src/features/list/`, `app/src/features/search/`, `app/src/features/update/`, `app/src/features/world/`, and the design system's folders `packages/ui/src/ActivityChart/`, `packages/ui/src/Avatar/`, `packages/ui/src/Breadcrumb/`, `packages/ui/src/Button/`, `packages/ui/src/Card/`, `packages/ui/src/ChatLayout/`, `packages/ui/src/Chip/`, `packages/ui/src/compositions/`, `packages/ui/src/Dialog/`, `packages/ui/src/EmptyState/`, `packages/ui/src/Field/`, `packages/ui/src/Flash/`, `packages/ui/src/icons/`, `packages/ui/src/Kicker/`, `packages/ui/src/Logo/`, `packages/ui/src/NavItem/`, `packages/ui/src/Overview/`, `packages/ui/src/Panel/`, `packages/ui/src/PlanetThumb/`, `packages/ui/src/Popover/`, `packages/ui/src/Row/`, `packages/ui/src/Skeleton/`, `packages/ui/src/Stat/`, `packages/ui/src/Tabs/`, `packages/ui/src/TokensPage/`, `packages/ui/src/Tooltip/`, each named one by one | Either | Run it; read the budgets the gate prints |
 
-The backticked paths of this table are read by machines: the tier-1 ones by `.claude/workflows/branch.js` (its security lens) and by
-`scripts/speeds.py`, the tier-3 ones by `scripts/speeds.py` alone. A merge check whose every path is under a tier-3 folder, and none a tier-1
-path, runs no StrykerJS; any other path, or a table it cannot read, runs the whole control. Tier 3 fails closed, folder by folder: a feature
+The backticked tier-1 paths of this table are read by machines: by `.claude/workflows/branch.js` (its security lens), by
+`scripts/speeds.py --tier1`, which GitHub's detector runs from the base (a change with none of them skips the tier-1 jobs), and by
+`scripts/check_docs.py`. The tier-3 row is the reader's (since D13168 no machine reads it): it fails closed, folder by folder: a feature
 or design-system folder is interface only once this row names it, so a folder added tomorrow, and the files in `packages/ui/src/`'s own root,
-take the whole control. The `chat` and `realms` features are not listed: the guards they hold or use are tier-1 rows (the embed host list and
+are read as tier 2. The `chat` and `realms` features are not listed: the guards they hold or use are tier-1 rows (the embed host list and
 its frame's sandbox, the warning before a realm page's link leaves, the link that stops `//host`), and the rest of them is read as
 tier 2 (state, queries, views) with the rest of the TypeScript this row does not list. A state or query file in a listed folder is tier 3 for the
 mutation check and is still read by its tests first. A folder is written with its slash. Add a security path here and both follow.
@@ -58,11 +58,11 @@ Use [Conventional Comments](https://conventionalcomments.org): `issue:` (blocks 
 
 Code written by an agent gets the same reading as anyone's, plus this. `/pre-merge`
 (`.claude/commands/pre-merge.md`) runs it, with the agents of `.claude/agents/`; from slice 5 a
-branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); `sh scripts/ship.sh` runs its gate, pass and log row in one
-command at a slice's end (`docs/HARNESS.md`, "The speed plan"):
+branch's Workflow loop runs it (Alexis, 2026-10-28, `docs/decisions.md`); GitHub's gate judges the pull request (`docs/HARNESS.md`,
+"The gate"):
 
-1. **No tokens first.** The merge's gate, then the mutation tester on the changed code: a
-   surviving mutant is a missing test, found without a model.
+1. **No tokens first.** check.sh on the committed tree, then GitHub's gate, StrykerJS on the changed tier-1 lines among
+   its jobs: a surviving mutant is a missing test, found without a model (in its job's log until F13184).
 2. **The red pass, once per branch.** Before any code, the `test-auditor` reviews the branch's
    failing tests against the plan: complete, relevant, riskiest paths first, the threat model's
    abuse cases present. Tier-1 and harness code alone (the speed plan, 2026-11-06). A fixer's tests get none.
@@ -85,7 +85,7 @@ command at a slice's end (`docs/HARNESS.md`, "The speed plan"):
    is `rejected`, a true one whose behaviour is wanted `intended`, a true one of no matter `moot`,
    each with its reason. A speed claim names the call it timed, its input, Node's version and what
    the call answered. A fix of the product proves itself: its tests, run on the commit before it,
-   must fail (`scripts/prove_fix.py`, run by `check.sh --everything`, not by default).
+   must fail (F345; the reviewer reads it, since `prove_fix.py` left with check.sh's old lanes, D13168).
 5. **High and medium fixed, low listed.** High and medium findings are fixed, test first. Low ones
    and anything beyond the plan go to one list for Alexis with a recommendation (fix now, a backlog
    row, or moot). A second round runs only for a high finding fixed in a tier-1 file, only its
@@ -96,7 +96,7 @@ command at a slice's end (`docs/HARNESS.md`, "The speed plan"):
    part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
    rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
    evidence, and a fixed one that comes back filed as a regression. A flaky test that passed on its
-   second run is no ledger row: `.claude/tmp/unsteady.log` keeps it. What Alexis caught and missed
+   second run is no ledger row; nothing records one that GitHub's retry passed (D13168). What Alexis caught and missed
    goes into the review log, with each branch's rounds, tokens and hours (measured against slice
    4's). At each slice's end, the dream (`CLAUDE.md`) reads the agents' reports, the learnings, the
    log and the ledger, and proposes the rules and memories a repeated miss calls for, and the
@@ -107,11 +107,11 @@ command at a slice's end (`docs/HARNESS.md`, "The speed plan"):
    that keeps leaking is replaced by a boundary the system enforces (the sandbox, a server
    check), or removed.
 8. **Keep it cheap.** Each branch runs in a new session of its own, in its own worktree, two at
-   most at once; the chief session plans, integrates and runs the full gate. Agents are fresh,
+   most at once; the chief session plans, integrates and reads GitHub's gate. Agents are fresh,
    briefed from files, four at most at once, each asked for a short report: its findings, one row
    each with its evidence. A workspace is reviewed whole once per slice, at its true last merge.
-   A commit's gate runs the unit tests related to its change, the whole suite at a part's end
-   (`check.sh --tests-all`) and at every merge (`docs/HARNESS.md`, "The gate"). A fix of about 20
+   A commit's gate runs the unit tests related to a tier-1 change, the whole suite at a part's end
+   (`sh scripts/check.sh` on the committed tree) and on every pull request (`docs/HARNESS.md`, "The gate"). A fix of about 20
    product lines or fewer that touches no tier-1 or harness file takes the fast lane: its test seen
    failing, the gate, the journeys that watch what it changes and one `reviewer`; no red pass and no
    design pass unless it moves an approved picture. Design still being tried goes to the workshop
@@ -136,7 +136,7 @@ A way to game a display's ranking or count (a ticker, a trend) is a low, kept fo
 ## Before a push
 
 Each merge lives on its branch. Pushing a work branch wants a gate that passed on its code, and
-scans the history for secrets (`.githooks/pre-push`); pushing `main` wants the full gate's
+scans the history for secrets (`.githooks/pre-push`); pushing `main` (refused since D13168, which writes no full record: `main` takes pull requests, D13165; 3b removes this) wanted the full gate's
 record of exactly that code and a committed `/pre-merge` pass whose fingerprint matches it
 (`scripts/review_pass.py`): a change after the review voids both, the review's own record does
 not. In Alexis's shell the hooks run no gate, only these checks (F076); the CI runs the full

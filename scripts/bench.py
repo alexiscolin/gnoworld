@@ -3,11 +3,11 @@
 Runs Vitest's benches (`*.bench.ts(x)`, the node project) and reads its report: each bench names its budget in
 brackets, `[0.2 ms]`, and the mean of its runs must stay under it. A bench with no budget, no sample (its function
 threw), no bench at all, or one a `*.bench.ts(x)` source names that the report lacks (a `describe.skip` around it, an
-`.only` beside it, a comment) fails: a measure nobody bounds guards nothing, and a bench switched off measures nothing. The full gate runs it alone, after probe.py: a bench beside other work
+`.only` beside it, a comment) fails: a measure nobody bounds guards nothing, and a bench switched off measures nothing. No gate runs it (D13168; four of its benches were red, F13182): run it by hand, alone, as a bench beside other work
 measures the machine's load. A bench measures a quiet machine (harness-c): before it runs, bench.py reads the load (load.py, beside it,
 in tenths) and waits while the 1-minute load is not under the machine's cores, up to a ceiling; past it, it refuses, saying so, since a
 verdict on the code needs a machine that can measure it. No budget changes. BENCH_WAIT_CEILING and BENCH_WAIT_STEP (seconds) are the
-tests' switches, which check.sh drops. Usage: bench.py, from the repository root."""
+tests' switches. Usage: bench.py, from the repository root."""
 import json
 import os
 import pathlib

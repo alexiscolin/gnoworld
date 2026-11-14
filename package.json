@@ -15,14 +15,12 @@
     "typecheck": "tsc -p tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/root.tsbuildinfo\" && tsc -p app/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/app.tsbuildinfo\" && tsc -p packages/ui/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/ui.tsbuildinfo\" && tsc -p server/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/server.tsbuildinfo\" && tsc -p packages/service/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/service.tsbuildinfo\" && tsc -p packages/chain/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/chain.tsbuildinfo\" && tsc -p jarvis/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/jarvis.tsbuildinfo\" && tsc -p link-reader/tsconfig.json --incremental --tsBuildInfoFile \"${TSC_CACHE:-.claude/tmp/tsc}/link-reader.tsbuildinfo\"",
     "lint": "eslint --max-warnings 0 .",
     "test": "vitest run --project node --project ui --project compiled",
-    "test:compiled": "vitest run --project compiled",
     "coverage": "vitest run --coverage --project node --project ui --project slow",
     "mutate": "stryker run",
     "unused": "knip --no-progress",
     "copies": "jscpd .",
     "comments": "node scripts/check_comments.mjs",
-    "mutate:all": "stryker run stryker.all.config.json",
-    "test:all": "sh scripts/check.sh --everything"
+    "mutate:all": "stryker run stryker.all.config.json"
   },
   "devDependencies": {
     "@eslint-react/eslint-plugin": "5.28.0",
