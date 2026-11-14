@@ -121,17 +121,7 @@ const GATE = {
     seconds: { type: "number" },
     branch: BRANCH,
   },
-  required: [
-    "passed",
-    "failingLane",
-    "tail",
-    "lastLine",
-    "exit",
-    "files",
-    "relaxations",
-    "seconds",
-    "branch",
-  ],
+  required: ["passed", "failingLane", "tail", "lastLine", "exit", "files", "relaxations", "seconds", "branch"],
 };
 const commits = [];
 const low = [];
