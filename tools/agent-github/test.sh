@@ -49,7 +49,7 @@ env >"$t/gh.env"
 for a in "\$@"; do case \$a in --body-file=*) cat "\${a#--body-file=}" >"$t/gh.body" ;; esac; done
 echo https://github.com/alexis/proj/pull/7
 EOF
-printf '#!/bin/sh\necho "INF 1 commits scanned."\nexit 2\n' >"$t/glbad/gitleaks"
+printf '#!/bin/sh\ncase $1 in git) echo "INF 1 commits scanned."; exit 2 ;; esac\nexit 0\n' >"$t/glbad/gitleaks"
 printf '#!/bin/sh\nexit 0\n' >"$t/glzero/gitleaks"
 for f in "$t/bin/git" "$t/bin/gh" "$t/glbad/gitleaks" "$t/glzero/gitleaks"; do chmod +x "$f"; done
 ln -s "$t/bin/git" "$t/nogl/git" && ln -s "$t/bin/gh" "$t/nogl/gh"
@@ -173,8 +173,21 @@ done
 # A repository it can reach but its allow list does not name is refused; with no allow list, every one is.
 run push alexis/x "$t/space/feat.bundle" && fail "a repository off the allow list was taken"
 [ "$(remote agent/feat "$t/github/alexis/x.git")" = none ] || fail "a push reached a repository off the allow list"
+g -C "$t/s" checkout -q -b agent/noallow origin/main && echo na >"$t/s/na.txt" && g -C "$t/s" add na.txt && g -C "$t/s" commit -qm na
+g -C "$t/s" bundle create -q "$t/space/noallow.bundle" agent/noallow
 mv "$t/state/repos.allow" "$t/repos.bak"
-run push alexis/proj "$t/space/feat.bundle" && fail "it pushed with no allow list"
+run push alexis/proj "$t/space/noallow.bundle" && fail "it pushed with no allow list"
+mv "$t/repos.bak" "$t/state/repos.allow"
+[ "$(remote agent/noallow)" = none ] || fail "a push went out with no allow list"
+# A name the allow list holds by mistake is still refused when it is not owner/name: the list is no way around the check.
+cp "$t/state/repos.allow" "$t/repos.bak"
+printf '../proj\nalexis/proj.git\n-alexis/proj\n' >>"$t/state/repos.allow"
+for bad in "../proj" "alexis/proj.git" "-alexis/proj"; do
+	run push "$bad" "$t/space/noallow.bundle" && fail "a malformed name on the allow list was taken: $bad"
+done
+for decoy in proj.git github/alexis/proj.git.git github/-alexis/proj.git; do
+	[ "$(remote agent/noallow "$t/$decoy")" = none ] || fail "a malformed name on the allow list reached $decoy"
+done
 mv "$t/repos.bak" "$t/state/repos.allow"
 
 # 6. Files are read from the caller's space only, following no link at any step, and only a real bundle is taken. The

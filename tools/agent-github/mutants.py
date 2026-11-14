@@ -51,6 +51,8 @@ MUTANTS = [
     (G, [("(?:[A-Za-z0-9_][A-Za-z0-9._-]*/)*[A-Za-z0-9_][A-Za-z0-9._-]*\"", "\\S+\"")], "the guard: plain file paths"),
 ]
 survived = []
+# python3 -I mutants.py [<words of a label>...]: those mutants alone.
+MUTANTS = [m for m in MUTANTS if all(w in m[2] for w in sys.argv[1:])]
 for name, pairs, label in MUTANTS:
     with tempfile.TemporaryDirectory(dir=os.environ.get("TMPDIR")) as d:
         for f in (H, G, "test.sh"):
