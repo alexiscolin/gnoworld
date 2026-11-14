@@ -35,7 +35,9 @@ const NodeWebSocket = (globalThis as unknown as { WebSocket: WsConstructor }).We
 
 const ergos: Ergo[] = [];
 const clients: Raw[] = [];
-const sockets: Ws[] = [];
+// Each WebSocket with what it said since it was made: Ergo may speak in the same read as the handshake (its ip-limits ERROR), before
+// wsRaw listens, and Linux's loopback delivers both at once.
+const sockets: { ws: Ws; said: string[] }[] = [];
 let pings = 0;
 
 export const kept: string[] = [];
@@ -49,7 +51,7 @@ export const keptFolder = (): string => {
 export const stops: (() => Promise<void>)[] = [];
 export const cleanUp = async (): Promise<void> => {
   for (const stop of stops.splice(0)) await stop();
-  for (const ws of sockets.splice(0)) ws.close();
+  for (const { ws } of sockets.splice(0)) ws.close();
   await Promise.all(clients.splice(0).map((c) => c.close()));
   await Promise.all(ergos.splice(0).map((e) => e.stop()));
   for (const dir of kept.splice(0)) rmSync(dir, { recursive: true, force: true });
@@ -67,10 +69,18 @@ export const open = async (e: Ergo): Promise<Raw> => {
   return c;
 };
 
+const hear = (ws: Ws): string[] => {
+  const said: string[] = [];
+  ws.addEventListener("message", (event) => {
+    if (typeof event.data === "string") said.push(event.data);
+  });
+  return said;
+};
+
 export const wsConnect = (port: number, options?: WsOptions): Promise<Ws | undefined> =>
   new Promise((resolve) => {
     const ws = new NodeWebSocket(`ws://127.0.0.1:${String(port)}/`, options);
-    sockets.push(ws);
+    sockets.push({ ws, said: hear(ws) });
     ws.addEventListener("open", () => {
       resolve(ws);
     });
@@ -84,11 +94,8 @@ export const wsConnect = (port: number, options?: WsOptions): Promise<Ws | undef
 
 // The same interface as rawClient, over a WebSocket: one IRC line per message.
 export const wsRaw = (ws: Ws): Raw => {
-  const all: string[] = [];
+  const all = sockets.find((s) => s.ws === ws)?.said ?? hear(ws);
   let next = 0;
-  ws.addEventListener("message", (event) => {
-    if (typeof event.data === "string") all.push(event.data);
-  });
   return {
     send: (line) => {
       ws.send(line);
