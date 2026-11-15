@@ -20,3 +20,11 @@ regex = '''(?i)\b[a-z]:\\{1,2}users\\{1,2}\w[\w.-]*'''
 id = "host-service"
 description = "A service of the demo's host"
 regex = '''(?i)\bn[8]n\b''' # a class, so the rule does not match itself
+
+# No answer a wallet gave is ever kept. Adena's extension ends each success with a message the app never reads and no
+# test needs (its own words for an account or a network, not its SDK's), and a JSON answer quotes its keys where the tests'
+# TypeScript does not: either in a file marks an answer kept as it came.
+[[rules]]
+id = "adena-answer"
+description = "An answer Adena's extension gave, kept as it came"
+regex = '''(?i)\b(?:get (?:account|network) informatio[n]|transaction has been successfully execute[d])\.|"type"\s*:\s*"(?:GET_ACCOUNT|GET_NETWORK|CONNECTION_SUCCESS|SWITCH_NETWORK_SUCCESS|ADD_NETWORK_SUCCESS|SIGN_ARBITRARY|TRANSACTION_SUCCESS)"''' # classes and escapes, so the rule does not match itself

@@ -4785,6 +4785,20 @@ for line in 'p = "/home/runner/.cache"' 'q = "~/x"' 'r = "/api/user/1"' 'import 
 	'r = "GET /api/users/42"' 'r = "GET /users/42"' 'r = "/users/:id"'; do
 	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && { scan || fail "scan_secrets refused: $line"; }
 done
+# No answer a wallet gave is kept: a success message of Adena's extension, which no test needs, marks one recorded.
+for line in '"message": "Get Acc''ount Information.",' "message: 'Get Net""work Information.'" \
+	'{"message":"Transaction has been successfully exec''uted."}' '"MESSAGE": "get acc''ount information."' \
+	'{"status":"success","type":"SIGN_ARBI''TRARY","data":{}}' '"type": "SWITCH_NETWORK_SUC''CESS",' '"type" : "GET_ACC''OUNT"'; do # split, so this file holds none
+	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && scan && fail "scan_secrets let through: $line"
+done
+printf '[{"label":"account","call":"GetAccount","answer":{"status":"success","data":{"address":"g1x","chainId":"onyx-1"},\n"code":0,"message":"","type":"GET_ACC''OUNT"}}]\n' >"$sc/answers.json"
+git -C "$sc" rm -qf --cached private.py && git -C "$sc" add answers.json && scan && fail "scan_secrets let through a recorded Adena answer"
+git -C "$sc" rm -qf --cached answers.json && rm "$sc/answers.json"
+# What the tests write in Adena's shapes passes: a key not quoted, a list of types, an empty message, the SDK's failure messages.
+for line in '{ status: "success", type: "GET_ACC''OUNT", code: 0, message: "", data: {} }' '["GetAccount", ["GET_ACC''OUNT"]],' \
+	'TRANSACTION_REJECTED: "The transaction has been rejected by the user.",' '"message": "Unable to change to the current network."'; do
+	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && { scan || fail "scan_secrets refused: $line"; }
+done
 # A secret found does not hide a private name beside it: both rule sets run, then the scan fails (F120).
 printf 'aws = "%s"\n' "$key" >"$sc/leak.py" && printf 'p = "/Us''ers/alice/x"\n' >"$sc/private.py" && git -C "$sc" add leak.py private.py
 both=$(cd "$sc" && sh scripts/scan_secrets.sh --staged 2>&1) && fail "scan_secrets passed a key and a home folder"

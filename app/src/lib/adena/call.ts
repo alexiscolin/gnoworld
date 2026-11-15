@@ -105,7 +105,7 @@ async function switchTo(need: Need, { chainId, name, rpc }: Universe): Promise<F
 }
 
 /** What DoContract is given: the request's one MsgCall, no coins, no memo; pinned to the universe's chain and node. */
-export const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
+const transaction = (request: CallRequest, { chainId, rpc }: Universe) => ({
   messages: [
     {
       type: "/vm.m_call",
@@ -133,7 +133,7 @@ const maybeSent = (failure: Failed): Failed => {
   return failure.reason === "declined" ? { ...failure, reason: "declined-maybe-sent" } : failure;
 };
 /** DoContract's options: no result screen, so the popup closes itself once sent and no cross can close it then (F5747). */
-export const CONTRACT_OPTIONS = { isVisibleResult: false } as const;
+const CONTRACT_OPTIONS = { isVisibleResult: false } as const;
 
 async function send(
   doContract: (...args: unknown[]) => unknown,
