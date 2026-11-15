@@ -1,4 +1,4 @@
-// The reader's answer for a URL (docs/plans/link-previews.md §3 step 3): the page's head through the guarded fetch, its picture through
+// The reader's answer for a URL: the page's head through the guarded fetch, its picture through
 // the same guard, one `ReaderCard`. A picture that fails gives a card with none; a page with no title, a refused URL or a failed page
 // gives a `Refused`.
 import { ReaderCard } from "@gnoworld/schemas";
@@ -11,7 +11,7 @@ import type { Codecs, Fault } from "./picture.ts";
 /** The most a card takes, page and picture together: the server's client gives up at 8 s. */
 export const CARD_MS = 7000;
 
-export interface CardDeps extends Deps {
+interface CardDeps extends Deps {
   /** Runs a picture's work alone, one at a time (the container's memory holds one decode, not two). */
   hold?: <T>(job: () => Promise<T>) => Promise<T>;
   /** One line when a picture is left out: the kind of its fetch's refusal or of its fault, never the URL. */

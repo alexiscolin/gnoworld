@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-// The link reader in the stack (docs/plans/link-previews.md §4, "A compromised reader", "The open way out leaking"): deploy/compose.yaml, the
+// The link reader in the stack: deploy/compose.yaml, the
 // way out's list, the guard's rules and the image, read as text. Docker is refused in the sandbox: deploy/test-links.sh proves each by a request.
 const read = (path: string) => readFileSync(new URL(`../../${path}`, import.meta.url), "utf8");
 
@@ -85,7 +85,7 @@ describe("the link reader's container", () => {
     expect(block(service("server"), 4, "secrets")).not.toContain("link");
   });
 
-  // The reader asks no key on POST /card: it holds no secret by design, and the network is its gate (L9). Only the server may be on it.
+  // The reader asks no key on POST /card: it holds no secret by design, and the network is its gate. Only the server may be on it.
   it("is gated by its network alone: no other service joins `links`, and no secret exists to ask a key with", () => {
     const joined = keysOf(block(compose(), 0, "services"), 2).filter((name) => networksOf(name).includes("links"));
     expect(joined.sort()).toEqual(["link_reader", "server"]);

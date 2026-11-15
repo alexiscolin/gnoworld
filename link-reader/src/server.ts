@@ -1,4 +1,4 @@
-// The reader's HTTP side (docs/plans/link-previews.md §3 step 3): `POST /card {url}` answers a `ReaderCard`, or 422 `{error: kind}`;
+// The reader's HTTP side: `POST /card {url}` answers a `ReaderCard`, or 422 `{error: kind}`;
 // at most `max` reads at once, else 503; `GET /health` for the container's check. Nothing else.
 import { createServer } from "node:http";
 import type { IncomingMessage, Server, ServerResponse } from "node:http";

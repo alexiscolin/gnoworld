@@ -265,8 +265,8 @@ describe("the byte caps", () => {
     expect(got.bytes.length).toBeLessThanOrEqual(LIMITS.page.bytes);
   });
 
-  // A deviation from the plan's table (a Content-Length over the cap refused, for the page): most real pages are over 256 KB and only their
-  // head is read, so a page's length is not a reason; a picture's is (reported as F13950).
+  // A Content-Length over the cap is not a refusal for a page: most real pages are over 256 KB and only their
+  // head is read, so a page's length is not a reason; a picture's is.
   it("reads a page whose declared length is past the cap, since only its head is read", async () => {
     const { deps } = stack([
       reply(200, { ...HTML, "content-length": "5000000" }, "<html><head><title>x</title></head>"),
@@ -358,7 +358,7 @@ describe("the time cap, for the whole call, body included", () => {
   });
 });
 
-// What the plan says, as numbers written out (not read from LIMITS, which the code could change with its tests).
+// The limits as numbers written out (not read from LIMITS, which the code could change with its tests).
 describe("the plan's numbers", () => {
   it("are 256 KiB and 5 s for a page, 1 MiB and 5 s for a picture", () => {
     expect(LIMITS).toEqual({ page: { bytes: 262_144, ms: 5_000 }, picture: { bytes: 1_048_576, ms: 5_000 } });

@@ -1,4 +1,4 @@
-// The head of a page, read as data (docs/plans/link-previews.md §4, "Malicious text in og fields"): title, description, site and picture
+// The head of a page, read as data, never trusted: title, description, site and picture
 // address from Open Graph (falling back to `<title>` and `name=description`), entities decoded once, Cc and Cf removed by the shared rule
 // (packages/schemas/src/hidden.ts), the caps of CARD_CAPS; nothing from a `<script>`, a comment or past the head.
 
@@ -6,7 +6,7 @@ import { CARD_CAPS, stripHidden } from "@gnoworld/schemas";
 import { Parser } from "htmlparser2";
 import { readableUrl } from "./url.ts";
 
-export interface Head {
+interface Head {
   title: string;
   description: string;
   site: string;

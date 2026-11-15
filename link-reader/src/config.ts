@@ -3,7 +3,7 @@
 import { z } from "zod";
 import { hostPort, parseSettings, whole } from "@gnoworld/service/settings";
 
-export interface Settings {
+interface Settings {
   host: string;
   port: number;
   proxy: { host: string; port: number } | undefined;

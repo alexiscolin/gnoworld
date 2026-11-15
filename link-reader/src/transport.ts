@@ -1,4 +1,4 @@
-// The two ways to connect (docs/plans/link-previews.md §4): through the link way out (an HTTP CONNECT to `LINKS_PROXY`, whose rules
+// The two ways to connect: through the link way out (an HTTP CONNECT to `LINKS_PROXY`, whose rules
 // refuse every private address after resolving), or, with no proxy, straight to the address the guard checked, refusing a private one at
 // connect time as `net.Dialer.Control` would.
 import { connect } from "node:net";
@@ -14,7 +14,7 @@ const HEAD_MAX = 16 * 1024;
 const END = Buffer.from("\r\n\r\n");
 const STATUS = /^HTTP\/1\.[01] ([0-9]{3})/;
 
-export interface Options {
+interface Options {
   /** Extra trusted CA (PEM), for a test's own; the system's roots otherwise, and always the name checked. */
   ca?: string;
   /** The port to connect to, for a test's own; 443 otherwise. */
@@ -101,7 +101,7 @@ const secured = ({ socket, at, call, ca }: Secure): Promise<TLSSocket> =>
   });
 
 /** Where the link way out listens. */
-export interface Endpoint {
+interface Endpoint {
   host: string;
   port: number;
 }
