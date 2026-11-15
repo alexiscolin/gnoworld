@@ -15,7 +15,7 @@ export const REACT_PROPERTIES = [
   ...["innerHTML", "outerHTML", "insertAdjacentHTML"].map((property) => ({ property, message: HTML })),
   { object: "document", property: "write", message: HTML },
 ];
-// A link drawn in JSX or by createElement, or a form, which navigates too (F360).
+// A link drawn in JSX or by createElement, or a form, which navigates too.
 const RAW_ANCHOR = {
   selector:
     "JSXOpeningElement[name.name=/^(a|form)$/], CallExpression[callee.name='createElement'][arguments.0.value='a'], CallExpression[callee.property.name='createElement'][arguments.0.value='a']",
@@ -60,7 +60,7 @@ export default defineConfig(
   },
   {
     // A link in ui is an Anchor (link.tsx), so the site's own paths go through the page's link and
-    // never reload the app (F259, F317). Its stories, its tests and the overview's prose draw plain ones.
+    // never reload the app. Its stories, its tests and the overview's prose draw plain ones.
     files: ["packages/ui/src/**/*.tsx"],
     ignores: ["packages/ui/src/link.tsx", "packages/ui/src/Overview/**", "**/*.stories.tsx", ...TESTS],
     rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, RAW_ANCHOR, MODULE_STATE] },

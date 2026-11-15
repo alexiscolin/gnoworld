@@ -21,9 +21,9 @@ export const meta = {
   ],
 };
 
-// args: { branch, worktree, plan, brief, shared, ids, base, tier1 }: base, the branch the work is cut from and reviewed against (main when absent: an integration branch for part 2 of a slice); ids, the F numbers the chief gives the branch; shared, the slice's folder the chief makes (.claude/tmp/slice-<n>);
+// args: { branch, worktree, plan, brief, shared, ids, base, tier1 }: base, the branch the work is cut from and reviewed against (main when absent: an integration branch); ids, the F numbers the chief gives the branch; shared, the slice's folder the chief makes (.claude/tmp/slice-<n>);
 // tier1, path prefixes of tier-1 files (docs/REVIEW.md) added to the harness's and the realms', which no argument can
-// leave out (security review of slice-5-loop, 2).
+// leave out.
 const A = args;
 const start = budget.spent();
 const SEVERITY = { type: "string", enum: ["high", "medium", "low"] };
@@ -80,7 +80,7 @@ const FIXED = {
         required: ["id", "commit"],
       },
     },
-    // What the fixer could not reproduce, with its evidence: a claim, which stands only once a fresh reviewer refutes the finding (F5542).
+    // What the fixer could not reproduce, with its evidence: a claim, which stands only once a fresh reviewer refutes the finding.
     rejected: {
       type: "array",
       items: {
@@ -125,7 +125,7 @@ const GATE = {
 };
 const commits = [];
 const low = [];
-const rejections = []; // the findings a fixer rejected and a fresh reviewer refuted: the chief reads each with both evidences (F5542)
+const rejections = []; // the findings a fixer rejected and a fresh reviewer refuted: the chief reads each with both evidences
 const judged = [];
 // The tier-1 paths of docs/REVIEW.md's table that exist: the harness, the realms, the relay's auth script, the CSP, the deploy folder, the markdown
 // scanner, Adena, the login (server and client), the admin API's rights, the worker. A check in scripts/test_hooks.sh (workflow_branch) fails when the
@@ -169,14 +169,14 @@ const TIER1 = [
 const BASE = A.base || "main";
 const tier1 = (file) => TIER1.some((prefix) => file === prefix || file.startsWith(prefix));
 const realm = (file) => file.startsWith("gno/r/") || file.startsWith("gno/p/");
-// A screen: the app's own source and the design system's (Alexis, 2026-10-31), which the reviewer compares with the video's frames; how
-// space looks (the scene, the planets, the cosmos) brings the design-reviewer apart (Alexis, 2026-11-04: one combined review).
+// A screen: the app's own source and the design system's, which the reviewer compares with the video's frames; how
+// space looks (the scene, the planets, the cosmos) brings the design-reviewer apart.
 const screen = (file) => file.startsWith("app/src/") || file.startsWith("packages/ui/src/");
 const space = (file) =>
   ["app/src/scene/", "packages/core/src/planet/", "packages/core/src/cosmos/", "packages/core/src/space/"].some((p) =>
     file.startsWith(p),
   );
-// A writer that committed on another branch than its own (slice-5a's commit on main) counts as no report, and the loop
+// A writer that committed on another branch than its own counts as no report, and the loop
 // stops there, its status naming the branch; so does a list of files holding the agent's own rather than git's.
 const strays = [];
 const write = async (prompt, opts) => {
@@ -208,8 +208,8 @@ const where = (step, writes) =>
       `When you finish, append one line to ${A.shared}/${A.branch}.state.md (the step, what it did, its commits) and save your report to ${A.shared}/reports/${A.branch}-${step}.md.`
     : "You are read-only: report, write nothing.");
 
-// A merge check passed only when check.sh printed its pass line as the last line of its output. The agent's word is not the proof (reviewer-1-2,
-// F2617: a run killed before its probe lane was declared PASSED): the script reads `lastLine` itself, and a run killed, timed out or left in
+// A merge check passed only when check.sh printed its pass line as the last line of its output. The agent's word is not the proof:
+// a run killed before its probe lane was declared passed, so the script reads `lastLine` itself, and a run killed, timed out or left in
 // the background has none.
 const PASS_LINE = /^all checks passed in \d+ s/;
 const proven = (g) => {
@@ -247,7 +247,7 @@ const tests = await agent(
 if (!tests || !tests.seenFailing) return result("blocked at the tests", { tests });
 
 phase("Red pass");
-// The red pass is for tier-1 and harness code alone (the speed plan, 2026-11-06): tests of other code go to the build as they are.
+// The red pass is for tier-1 and harness code alone: tests of other code go to the build as they are.
 const red = tests.files.some(tier1)
   ? await agent(`Red pass. ${where("red-pass", false)}. The failing tests, uncommitted: ${tests.files.join(", ")}.`, {
       agentType: "test-auditor",
@@ -368,9 +368,8 @@ for (let round = 1; ; round += 1) {
       "evidence beside it and return it under `rejected`: a fresh reviewer then checks that claim, and a rejection it does not refute stays open.",
     { label: `fix round ${round}`, schema: FIXED },
   );
-  // A rejection is the fixer's word alone: it stands only when a fresh reviewer refutes the finding with evidence of its own (decision 684
-  // left the verifier out for a reviewer's repro, never for a fixer's "could not reproduce", F5542; the finding-verifier agent left on
-  // 2026-11-04, so the reviewer agent checks it). No report, or no refutation: open.
+  // A rejection is the fixer's word alone: it stands only when a fresh reviewer refutes the finding with evidence of its own, never on
+  // a fixer's "could not reproduce"; the reviewer agent checks it. No report, or no refutation: open.
   const claimed = fixed && fixed.rejected ? fixed.rejected.filter((f) => urgent.some((u) => u.id === f.id)) : [];
   const ruling = claimed.length
     ? await agent(
@@ -406,7 +405,7 @@ for (let round = 1; ; round += 1) {
   commits.push(...fixed.fixed.map((f) => f.commit));
   // A second round only for a high finding fixed in a tier-1 file, and only its lens, on the diff since its first fix
   // (docs/REVIEW.md); otherwise one last merge check.
-  // A rejection that stood is no end of it: a high finding on tier 1 gets its second round, its lens told (F5542).
+  // A rejection that stood is no end of it: a high finding on tier 1 gets its second round, its lens told.
   const highOnTier1 = urgent.filter((f) => f.severity === "high" && tier1(f.file));
   if (!highOnTier1.length) {
     gate = await gateCheck();

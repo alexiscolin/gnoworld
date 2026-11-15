@@ -17,8 +17,8 @@ import { BENCHES, CLASS_AT_END, MODULE_STATE, SWALLOWED, SWITCHED_OFF, TESTS } f
 const BASELINE_ALSO = { allowAtRules: ["starting-style"], allowSelectors: ["popover-open"] };
 const BOX = { ...BASELINE_ALSO, allowProperties: ["field-sizing", "resize"] };
 const FACE = { ...BASELINE_ALSO, allowProperties: ["forced-color-adjust"] };
-// No scroll bar anywhere (D379): the base styles hide them with scrollbar-width, everywhere a browser has it since 2024. No blue under a
-// drag (Alexis, 2026-11-08): user-select, which a browser without it ignores.
+// No scroll bar anywhere: the base styles hide them with scrollbar-width, everywhere a browser has it since 2024. No blue under a
+// drag: user-select, which a browser without it ignores.
 const BARS = { ...BASELINE_ALSO, allowProperties: ["scrollbar-width", "user-select"] };
 
 export default defineConfig(
@@ -89,7 +89,7 @@ export default defineConfig(
   },
   core,
   {
-    // A bench is switched off like a test (security-S1). Last, since a later no-restricted-syntax replaces an earlier
+    // A bench is switched off like a test. Last, since a later no-restricted-syntax replaces an earlier
     // one's: the list every other file of the app has, and no bench of core, the server or the design system exists.
     files: BENCHES,
     rules: { "no-restricted-syntax": ["error", ...SWALLOWED, CLASS_AT_END, SWITCHED_OFF] },
@@ -110,17 +110,17 @@ export default defineConfig(
     },
   },
   // And forced-color-adjust, which only a picture takes, where forced colours exist: the avatar's face,
-  // never a control (Alexis, F319; F349).
+  // never a control.
   { files: ["packages/ui/src/Avatar/**/*.css"], rules: { "css/use-baseline": ["error", FACE] } },
-  // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone (F1729).
+  // And field-sizing and resize, which the box of lines grows and limits its handle by, in Field's folder alone.
   { files: ["packages/ui/src/Field/**/*.css"], rules: { "css/use-baseline": ["error", BOX] } },
   { files: ["packages/ui/src/base.css"], rules: { "css/use-baseline": ["error", BARS] } },
   {
     // A module of the app, the services or the packages is TypeScript: one in another extension would pass the walls and
-    // gnoworld/chain-read unread, which read .ts and .tsx (D123, F5277). Last, so no later list replaces it.
+    // gnoworld/chain-read unread, which read .ts and .tsx. Last, so no later list replaces it.
     files: [
       "{app/src,server,jarvis,link-reader,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",
-      // The services hold no JSX: a .tsx there would pass their walls unread (F5281).
+      // The services hold no JSX: a .tsx there would pass their walls unread.
       "{server,jarvis,link-reader,packages/service}/**/*.tsx",
     ],
     languageOptions: { parser: tseslint.parser },

@@ -1,8 +1,8 @@
-# The core (docs/plans/harness-overhaul.md, section 3): what judges a change, what runs outside the sandbox, the deploy, the
-# dependencies, Claude's settings and rules. Once main's ruleset asks for code owners' review (phase 2), a change to any of it
+# The core: what judges a change, what runs outside the sandbox, the deploy, the
+# dependencies, Claude's settings and rules. Once main's ruleset asks for code owners' review, a change to any of it
 # enters main only with an owner's approval. Every path of the harness list (.githooks/records.sh) is here, and so are the tier
 # table, the deploy folder, the CSP, Jarvis's allowlist and every package, TypeScript and pnpm file git tracks: scripts/test_hooks.sh,
-# section ci, holds it. The security reviewer rechecks this list before phase 3. GitHub reads this file from the pull request's
+# section ci, holds it. The security reviewer rechecks this list. GitHub reads this file from the pull request's
 # base branch, its patterns follow most of .gitignore's rules, and the last matching line wins (docs.github.com, about-code-owners).
 /.github/ @alexiscolin
 /scripts/ @alexiscolin

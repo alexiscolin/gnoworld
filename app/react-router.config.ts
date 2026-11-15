@@ -10,10 +10,10 @@ import { prerenderPaths } from "./src/prerender.ts";
 import { robotsTxt, sitemapXml } from "./src/sitemap.ts";
 
 // The data files are checked before anything builds: a malformed one throws here and stops the build, naming the file
-// and the field (slice 5's 5c). GNOWORLD_DATA names another directory, for the tests.
+// and the field. GNOWORLD_DATA names another directory, for the tests.
 const data = loadData(process.env["GNOWORLD_DATA"] ?? fileURLToPath(new URL("./data", import.meta.url)));
 
-// The origins connect-src names beside 'self' (5g, 5k): the universes' https RPC and their chains' public indexers, from the data.
+// The origins connect-src names beside 'self': the universes' https RPC and their chains' public indexers, from the data.
 // Read here, before anything builds, so an http:, wildcard or odd RPC stops the build before any page is written.
 const origins = connectOrigins(data.universes);
 
@@ -22,11 +22,11 @@ export default {
   appDirectory: "src",
   ssr: false,
   // app/build, which the journeys build and serve. GitHub's build job builds into a folder of its own (GNOWORLD_BUILD, an absolute path):
-  // a build empties its folder, and one into the journeys' would empty the site they are served from mid-run (F4249).
+  // a build empties its folder, and one into the journeys' would empty the site they are served from mid-run.
   buildDirectory: process.env["GNOWORLD_BUILD"] ?? "build",
   prerender: prerenderPaths(placesFrom(data)),
   // After the pages are written (React Router's buildEnd follows the prerender): a policy for each page, holding its own
-  // scripts' hashes, for a host that reads _headers, for nginx, and for the test host (5f).
+  // scripts' hashes, for a host that reads _headers, for nginx, and for the test host.
   async buildEnd({ reactRouterConfig: { buildDirectory } }) {
     const client = join(buildDirectory, "client");
     const files = (await readdir(client, { recursive: true })).filter((file) => file.endsWith(".html"));
@@ -34,9 +34,9 @@ export default {
       await Promise.all(files.map(async (file) => [file, await readFile(join(client, file), "utf8")] as const)),
     );
     // The service worker's script runs under the policy of its own answer: a _headers host gives it the bare one. Vite's post
-    // hook writes sw.js after this runs (F2458), so the build does not look for it: a rule for a file never written is harmless.
+    // hook writes sw.js after this runs, so the build does not look for it: a rule for a file never written is harmless.
     const { headers, nginx } = outputs(await pagePolicies(pages, origins), ["sw.js"]);
-    // What connect-src names, printed at every build so a data file adding a host shows (the plan's §3).
+    // What connect-src names, printed at every build so a data file adding a host shows.
     console.info(`csp: ${connectSrc(origins)}`);
     await writeFile(join(client, "_headers"), headers);
     await writeFile(join(buildDirectory, "csp.conf"), nginx);

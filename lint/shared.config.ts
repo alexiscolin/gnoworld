@@ -29,7 +29,7 @@ export const SWALLOWED = [
   },
 ];
 // No character class right before `$` in a `u` regex: V8 14.6 (Chromium 156, Node 26) misses a character past the
-// BMP there while Node 24's reads it, so the page and the server would disagree unseen (F816, F821).
+// BMP there while Node 24's reads it, so the page and the server would disagree unseen.
 export const CLASS_AT_END = {
   selector: "Literal[regex.flags=/u/][regex.pattern=/\\](\\{1\\})?\\$/]",
   message:
@@ -43,7 +43,7 @@ export const SWITCHED_OFF = {
   message: "A test is never switched off or focused: fix it, or remove it with `Removed-test:` in the commit.",
 };
 // No Map, WeakMap or Set made at a module's top in a workspace's source, nor inside what a top-level name holds:
-// it lives as long as the process, every test shares it, and StrykerJS ignores the code that builds it (F412).
+// it lives as long as the process, every test shares it, and StrykerJS ignores the code that builds it.
 // Kept by name: two constant tables, FORMS and DIRECTIONAL, and lookups, one entry per database.
 const KEPT = "FORMS|DIRECTIONAL|lookups";
 const NAMED = `VariableDeclaration > VariableDeclarator[id.name!=/^(${KEPT})$/]`;
@@ -53,7 +53,7 @@ export const MODULE_STATE = {
   message:
     "A Map, WeakMap or Set at a module's top lives as long as the process, shared by every test: make it in a function (F412).",
 };
-// What runs on a frame makes nothing (ADR-0002 §9, backlog row 7): a collector's pause is a dropped frame. By name, the loop's and what
+// What runs on a frame makes nothing (ADR-0002 §9): a collector's pause is a dropped frame. By name, the loop's and what
 // it calls, in the scene and in core; a function a frame reaches joins this list as it is written. Three's own render is not held here.
 const FRAME_NAMES =
   "tick|pose|orbitPlace|toScene|toMap|focusOf|glideAt|sideOf|clearOf|spreadAt|angleAt|wake|reschedule|cancel|readRate|draw|sample|advance|follow|march|visit|cellIn|write|light|unit|moodAt|lattice|field|side|ringAt|tintOf|densityAt|driftAt|turnAt|wrapTo|nearestCell|cellHash|salted|mix|settle|nextState|unitOf|clamp01|lerp|smoothstep|smootherstep|frameRate|isDue|carryOver|frameWait|judgeFrames|nebulaLight|nebulaShare|sheetOf|focusDistance|diveAt|dived|onWay|sayOn|fadeVeil|homeIfBack|broughtTo|wayAt|figuresOf|phaseOf";

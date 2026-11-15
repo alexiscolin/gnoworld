@@ -5,18 +5,18 @@ import { configDefaults, defineConfig, type TestProjectInlineConfiguration } fro
 import { BENCHES } from "./lint/shared.config.ts";
 
 // Every Vitest run reads this file, so every run is on the Node .node-version pins: another V8 reads some regexes
-// otherwise (F816: StrykerJS on Homebrew's Node 26), and its results would be of a toolchain nobody ships. Probed in
+// otherwise (StrykerJS on Homebrew's Node 26 reads one differently), and its results would be of a toolchain nobody ships. Probed in
 // scripts/probe.py (pinned_node), with the pin as process.version writes it: v24.22.0.
 const PINNED = `v${readFileSync(new URL(".node-version", import.meta.url), "utf8").trim()}`;
 if (process.version !== PINNED)
   throw new Error(`Vitest runs on Node ${PINNED} (.node-version), not ${process.version}`);
 
-// A StrykerJS run cut short leaves its sandboxes here, and a bench measured them (5n: Cmd-K at 27 to 41 ms, not 2 to 4).
+// A StrykerJS run cut short leaves its sandboxes here, and a bench measured them.
 // Only a bench can reach the folder: the projects' includes are anchored at the root.
 const STRYKER_TMP = "**/.stryker-tmp/**";
 const SLOW = ["server/src/testing/ergo*.test.ts", "server/src/testing/soak.test.ts"];
 
-// The tests the inventory (.claude/tmp/slice-8/reports/inventory-tests.md) marks display-only: props, classes, variants, markup, the look
+// The tests marked display-only: props, classes, variants, markup, the look
 // of a world, small view components. They stay in the repository, and run in the `display` and `display_ui` projects, on demand
 // (`vitest run --project display --project display_ui`) and at night (nightly.yml), not in the default `test` and `coverage` runs.
 const DISPLAY_UI = [
@@ -40,7 +40,7 @@ const DISPLAY = [
 ];
 
 // core's tests a second time, in Playwright's Chromium: the browser's engine reads some regexes and Unicode otherwise
-// than Node's (F816, F817). The project exists only when CORE_CHROMIUM is set, so the coverage,
+// than Node's. The project exists only when CORE_CHROMIUM is set, so the coverage,
 // StrykerJS, `vitest list` and a file run alone never open a browser.
 const CORE_CHROMIUM: TestProjectInlineConfiguration = {
   extends: true,
@@ -75,7 +75,7 @@ export default defineConfig({
     // A test that asserts nothing passes whatever the code does.
     expect: { requireAssertions: true },
     // A bound in wall-clock time, or a test whose timeout holds one: the commit gate and GitHub's leave it, the night runs it
-    // (Alexis, 2026-11-04, "Oui, les deux": other gates' load failed them for nothing; docs/HARNESS.md).
+    // (other gates' load failed them for nothing; docs/HARNESS.md).
     tags: [
       {
         name: "timing",
@@ -83,10 +83,10 @@ export default defineConfig({
       },
     ],
     // The `beforeAll` that draws a RoomView once, to load its lazy lines' view, takes under a second alone and past Vitest's
-    // 10 s on a machine at load 50 to 120, where the files' first transforms queue (F3200): a hook gets a minute.
+    // 10 s on a machine at load 50 to 120, where the files' first transforms queue: a hook gets a minute.
     hookTimeout: 60_000,
     // The benches are the files ESLint's BENCHES and scripts/repo_files.py's BENCH_FILE read, `*.bench.ts(x)`: Vitest's own
-    // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (CR3; probe bench_files).
+    // default, `*.{bench,benchmark}.?(c|m)[jt]s?(x)`, ran files no guard names, switched off or not (probe bench_files).
     benchmark: { include: BENCHES, exclude: [...configDefaults.exclude, STRYKER_TMP] },
     projects: [
       // The app's components compiled, which count their renders (app/vitest.compiled.config.ts).
@@ -151,7 +151,7 @@ export default defineConfig({
       ...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),
     ],
     coverage: {
-      // By default (the speed plan, Alexis 2026-11-06): tier 1 of docs/REVIEW.md, core and jarvis, whose floors below hold.
+      // By default: tier 1 of docs/REVIEW.md, core and jarvis, whose floors below hold.
       // COVERAGE_ALL, set by hand: every source file, tested or not (an untested one shows 0%), but the document
       // shell, the server entry and Storybook's pages, which the journeys walk; the display-only tests run too.
       include: process.env["COVERAGE_ALL"]
@@ -180,9 +180,9 @@ export default defineConfig({
         "link-reader/src/main.ts",
       ],
       reporter: ["text-summary", "json"],
-      // 85% everywhere (Alexis, 2026-10-17). Core at what slices 7 and 8's hardening measured, never under 90 (Alexis, 2026-11-05);
+      // 85% everywhere. Core at what its hardening measured, never under 90;
       // docs/REVIEW.md's tier-1 files at 100% of lines, functions and statements, their branches as measured (the rest are `??` no
-      // input reaches: 8n's and 8r's lists). A glob's thresholds hold its files together, so 100 there is 100 for each file.
+      // input reaches). A glob's thresholds hold its files together, so 100 there is 100 for each file.
       thresholds: {
         lines: 85,
         functions: 85,

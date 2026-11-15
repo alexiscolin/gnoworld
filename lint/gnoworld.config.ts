@@ -1,7 +1,7 @@
 // Our own lint rules, as no rule of ESLint's reads a string's words across literals, templates and sums: no module outside
-// packages/chain holds a chain read's words (gnoworld/chain-read, D113, D124), none of the product imports a test helper
+// packages/chain holds a chain read's words (gnoworld/chain-read), none of the product imports a test helper
 // (test-helpers) or the one expression sender but its two builders (chain-eval), and an import at run time names its module
-// (named-import, D123). A part of the lint config, which eslint.config.ts composes; the read's words are words.config.ts's.
+// (named-import). A part of the lint config, which eslint.config.ts composes; the read's words are words.config.ts's.
 import type { Rule } from "eslint";
 import { defineConfig } from "eslint/config";
 import { BENCHES, TESTS } from "./shared.config.ts";
@@ -26,7 +26,7 @@ interface Part {
 }
 
 // A string's text as a request would send it: a literal's value, a template's with `${}` for each value, a sum of both
-// joined the same way, `+=` a sum whose left side is a value (V4); nothing for any other node.
+// joined the same way, `+=` a sum whose left side is a value; nothing for any other node.
 function textOf(node: Part): string | undefined {
   if (node.type === "Literal") return typeof node.value === "string" ? node.value : undefined;
   if (node.type === "TemplateLiteral")
@@ -94,7 +94,7 @@ const chainRead: Rule.RuleModule = {
   },
 };
 
-// A test helper imported by product code (D124): a path through a `testing/` folder, by any import or re-export. The helpers
+// A test helper imported by product code: a path through a `testing/` folder, by any import or re-export. The helpers
 // are free of the chain-read rule only while no module of the product reaches them.
 const testHelpers: Rule.RuleModule = {
   meta: {
@@ -118,7 +118,7 @@ const testHelpers: Rule.RuleModule = {
   },
 };
 
-// The one expression sender (D124): readEvaluated sends any expression it is given, so it is imported where a tier-1 or a
+// The one expression sender: readEvaluated sends any expression it is given, so it is imported where a tier-1 or a
 // fixed builder makes it alone; a namespace or a run-time import of its module would reach it too.
 const chainEval: Rule.RuleModule = {
   meta: {
@@ -149,7 +149,7 @@ const chainEval: Rule.RuleModule = {
   },
 };
 
-// An import made at run time names its module plainly, so the walls can read it (D123, F5282): a computed one could reach
+// An import made at run time names its module plainly, so the walls can read it: a computed one could reach
 // any folder, the server's from Jarvis included.
 const namedImport: Rule.RuleModule = {
   meta: {
@@ -182,7 +182,7 @@ export default defineConfig(
   },
   {
     files: PRODUCT,
-    // The two builders of a qeval expression alone (D114): evalCall.ts's in the app, the door's fixed one over a parsed address.
+    // The two builders of a qeval expression alone: evalCall.ts's in the app, the door's fixed one over a parsed address.
     ignores: ["app/src/lib/chain/rpc.ts", "server/src/door/names.ts"],
     plugins: { gnoworld: GNOWORLD },
     rules: { "gnoworld/chain-eval": "error" },
