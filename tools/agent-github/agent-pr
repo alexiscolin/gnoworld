@@ -1,5 +1,5 @@
 #!/usr/bin/env -S -i LC_ALL=C /opt/homebrew/bin/python3 -I
-"""agent-pr: publish with the token this machine holds for a repository (gnoworld's D13159-D13163: the owner's own, or the agent
+"""agent-pr: publish with the token this machine holds for a repository (the owner's own, or the agent
 account's): push one agent/** branch from a git bundle, or open a pull request, to a repository its allow list names. It runs outside the sandbox (a Claude Code
 excluded command), so it trusts nothing of its caller's: the shebang empties the environment; it never runs git in the
 caller's repository (the bundle carries the commits); it reads no file but under the caller's temporary space, following no
