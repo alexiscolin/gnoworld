@@ -96,6 +96,46 @@ describe("one realm path for every schema that names a realm (gno's grammar, mem
   });
 });
 
+describe("isRealmPath alone, gno's grammar for a realm's path (mempackage.go:49-54,67-70,81-90)", () => {
+  it.each([
+    "gno.land/r/gnoland/wugnot",
+    "gno.land/r/sys/users/init",
+    "gno.land/r/demo/foo-bar",
+    "my-sub.example.com/r/demo/x",
+    "a.b.example.com/r/demo/x",
+    `gno.${"l".repeat(63)}/r/demo/x`,
+    "gno.la/r/x",
+  ])("takes %s", (path) => {
+    expect(isRealmPath(path)).toBe(true);
+  });
+
+  it.each([
+    ["a name ending in _test", "gno.land/r/demo/foo_test"],
+    ["a dot after the realm, the expression's cut", "gno.land/r/demo/x.Foo()"],
+    ["a leading newline", "\ngno.land/r/demo/x"],
+    ["a trailing slash", "gno.land/r/demo/x/"],
+    ["a double underscore", "gno.land/r/demo/foo__bar"],
+    ["a space", "gno.land/r/demo/x y"],
+    ["a scheme", "https://gno.land/r/demo/x"],
+    ["an upper-case domain", "Gno.land/r/demo/x"],
+    ["a domain with no dot", "gno/r/demo/x"],
+    ["a full-width letter", "gno.land/r/demo/ｘ"],
+    ["a parenthesis", "gno.land/r/demo/x()"],
+    ["a quote", 'gno.land/r/demo/x"'],
+    ["a one-letter TLD", "gno.l/r/x"],
+    ["a 64-letter TLD", `gno.${"l".repeat(64)}/r/demo/x`],
+    ["an upper-case TLD", "gno.LAND/r/demo/x"],
+    ["a TLD with a digit", "gno.l4nd/r/demo/x"],
+    ...Array.from(";+,#?%\\`$:=*&|<>!@~^'{}[]", (char): [string, string] => [
+      `${char} in a segment`,
+      `gno.land/r/demo/a${char}b`,
+    ]),
+    ["a path of 200 KB near a valid one", `gno.land/r/${"a_".repeat(100_000)}!`],
+  ])("refuses %s", (_name, path) => {
+    expect(isRealmPath(path)).toBe(false);
+  });
+});
+
 // Every schema that names a chain by its id, and the universes' file that names each chain.
 const chainTakers = (): [string, (chain: string) => boolean][] => [
   ["ChainId", (chain) => ChainId.safeParse(chain).success],

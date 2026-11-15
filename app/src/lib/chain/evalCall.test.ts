@@ -2,7 +2,6 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { ANY_EXPRESSION_RUNS, REFUSALS, WUGNOT } from "../../../tests/chain/chainFixture.ts";
 import { realmType } from "@gnoworld/core";
-import { isRealmPath } from "@gnoworld/schemas";
 import { evalCall, evalNameOf, isAddress, userCall } from "./evalCall.ts";
 
 // Tier 1: the app's one place a `vm/qeval` expression is built. The chain runs ANY expression it is sent
@@ -24,62 +23,6 @@ function parseQueryEvalData(data: string): { pkgPath: string; expr: string } | n
   pkgPath += rest.slice(0, dot);
   return { pkgPath, expr: rest.slice(dot + 1) };
 }
-
-describe("isRealmPath, gno's grammar for a realm's path (mempackage.go:49-54,67-70,81-90)", () => {
-  it.each([
-    WUGNOT,
-    "gno.land/r/gnoland/blog",
-    "gno.land/r/sys/users/init",
-    "gno.land/r/demo/foo_bar",
-    "gno.land/r/demo/foo-bar",
-    "gno.land/r/demo/a1/b2",
-    "gno.land/r/demo/atest",
-    "gno.land/r/demo/test",
-    "gno.land/r/demo",
-    "my-sub.example.com/r/demo/x",
-    "a.b.example.com/r/demo/x",
-    `gno.${"l".repeat(63)}/r/demo/x`,
-    "gno.la/r/x",
-  ])("takes %s", (path) => {
-    expect(isRealmPath(path)).toBe(true);
-  });
-
-  it.each([
-    ["empty", ""],
-    ["a pure package", "gno.land/p/demo/avl"],
-    ["no name after /r/", "gno.land/r/"],
-    ["a name ending in _test", "gno.land/r/demo/foo_test"],
-    ["an upper-case name", "gno.land/r/Demo/x"],
-    ["a name starting with a digit", "gno.land/r/demo/1x"],
-    ["a dot past the first slash", "gno.land/r/demo/x.y"],
-    ["a dot after the realm, the expression's cut", "gno.land/r/demo/x.Foo()"],
-    ["a colon (qrender's cut)", "gno.land/r/demo:x"],
-    ["a trailing newline", "gno.land/r/demo/x\n"],
-    ["a leading newline", "\ngno.land/r/demo/x"],
-    ["an empty segment", "gno.land/r/demo//x"],
-    ["a trailing slash", "gno.land/r/demo/x/"],
-    ["a double underscore", "gno.land/r/demo/foo__bar"],
-    ["a trailing dash", "gno.land/r/demo/foo-"],
-    ["a space", "gno.land/r/demo/x y"],
-    ["a scheme", "https://gno.land/r/demo/x"],
-    ["an upper-case domain", "Gno.land/r/demo/x"],
-    ["a domain with no dot", "gno/r/demo/x"],
-    ["a full-width letter", "gno.land/r/demo/ｘ"],
-    ["a parenthesis", "gno.land/r/demo/x()"],
-    ["a quote", 'gno.land/r/demo/x"'],
-    ["a one-letter TLD", "gno.l/r/x"],
-    ["a 64-letter TLD", `gno.${"l".repeat(64)}/r/demo/x`],
-    ["an upper-case TLD", "gno.LAND/r/demo/x"],
-    ["a TLD with a digit", "gno.l4nd/r/demo/x"],
-    ...Array.from(";+,#?%\\`$:=*&|<>!@~^'{}[]", (char): [string, string] => [
-      `${char} in a segment`,
-      `gno.land/r/demo/a${char}b`,
-    ]),
-    ["a path of 200 KB near a valid one", `gno.land/r/${"a_".repeat(100_000)}!`],
-  ])("refuses %s", (_name, path) => {
-    expect(isRealmPath(path)).toBe(false);
-  });
-});
 
 describe("evalCall, one call of one exported name or nothing", () => {
   it.each(["TotalSupply", "A", "X1", "Foo_bar", "IsEnabled", "ResolveName"])("builds the call of %s", (name) => {
