@@ -1,8 +1,11 @@
 #!/bin/sh
 # The only way out. This container holds the network the egress proxies share, and loads its rules before anything
 # else runs there: each proxy's port, open from its own network alone (smokescreen listens here on 4750 for the
-# internal network, 4751 for jarvis's, 4753 for the reader's, 4754 for the link reader's; each network gets nothing else in
-# and nothing out but its replies, to connections it opened); the DNS servers Docker forwards to from this network; then
+# internal network, 4751 for jarvis's, 4753 for the reader's, 4754 for the link reader's). In: each proxy's port is refused
+# from every other interface, and jarvis's, the reader's and the link reader's networks get nothing else in; the internal
+# network and the outside bridge are not walled, INPUT's policy being ACCEPT, so any other port the guard held a listener
+# on would be open to them (none is). Out, from each proxy's port: replies to connections it opened, nothing else. The DNS servers
+# Docker forwards to from this network; then
 # every private, local, carrier and reserved address refused, so the host, its LAN and any VPN stay out of reach; then
 # public TCP 80 and 443, and nothing else: no UDP, no other port. Nothing in this network starts a connection to web
 # or to any container of the stack. IPv6 is closed. deploy/test.sh proves each line.
