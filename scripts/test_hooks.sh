@@ -327,11 +327,11 @@ grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no lo
 fi
 
 if part siblings; then
-# No session writes another worktree's closed files (7z, F4890). The worktrees live in the per-user temp folder, which the sandbox
-# lets every command write, and a relative entry of settings.json guards the session's own tree alone; hooks run outside the
+# No session writes another worktree's closed files (7z, F4890). A relative entry of settings.json guards the session's own tree
+# alone, and the file tools reach every worktree; hooks run outside the
 # sandbox, and Claude Code reloads a settings file it sees change. So each relative denyWrite entry has its twin under the worktrees'
-# folder, and each relative Read or Edit deny its twins there, by both spellings of the temp folder (macOS's /tmp is a link the
-# file tools may not follow), and in the main checkout, which the file tools reach from every worktree (F4892); a linked worktree's
+# folder (~/Server/gnoworld-wt, beside the main checkout: no command writes there), and each relative Read or Edit deny its twins
+# there and in the main checkout, which the file tools reach from every worktree (F4892); a linked worktree's
 # .git, the file that names git's folder, is closed there too (F150's class, F4891). What a session must write stays open: its own
 # docs and ledger, the gate's state, git's shared folder, the throwaway trees in $TMPDIR. The rules are read as Claude Code reads
 # them: a Read or Edit rule as a gitignore pattern (its permissions page: * within one segment, ** across), the sandbox's by
@@ -339,17 +339,18 @@ if part siblings; then
 python3 -I - "$here/../.claude/settings.json" <<'PY' || fail "a sibling worktree's closed files are open to this session (F4890, F4891, F4892)"
 import functools, json, os, re, sys
 
-WT, TMP_WT, MAIN = "/private/tmp/claude-501/gnoworld-wt", "/tmp/claude-501/gnoworld-wt", "~/Server/gnoworld"
+MAIN = "~/Server/gnoworld"
 # The next parts' worktrees (7w3, F4893's remedy a): beside the main checkout, out of the temp folder, so no part's command writes
 # there at all; the chief's alone, by --add-dir. Its twins hold the closed files against the chief's commands and every file tool,
-# by one spelling (no link on its way). WT's stay while a part runs there.
+# by one spelling (no link on its way). The temp folder's worktrees are gone: nothing is written there for them (the sandbox half below
+# still looks, and fails on one that stands).
 NEW = "~/Server/gnoworld-wt"
 HOME, ROOT = os.path.expanduser("~"), "/own"  # ROOT: the session's own tree, for its relative rules, apart from every sibling
 NEW_HOME = HOME + NEW[1:]
 # The instructions Claude Code reads in every folder above a session's (its memory page: CLAUDE.md and CLAUDE.local.md "from your
 # current working directory and every directory above it"; .claude/CLAUDE.md and .claude/rules by its source), closed in the folders
 # above a worktree, which the sandbox writes from the temp folder down, and above the main checkout, which the file tools reach (S4).
-ABOVE, ABOVE_MAIN = ("/private/tmp", "/private/tmp/claude-501", WT), ("~", "~/Server")
+ABOVE, ABOVE_MAIN = ("/private/tmp", "/private/tmp/claude-501"), ("~", "~/Server")
 # AGENTS.md too (7w3, F5323, the red pass's T7): read above a session's folder when no CLAUDE.md stands there, or when the settings ask
 # for both kinds (the memory page).
 INSTRUCTIONS = ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md", ".claude/rules", "AGENTS.md", ".claude/AGENTS.md")
@@ -371,7 +372,7 @@ twin_writes = sorted(KEPT)
 own_rules = [(k, p) for k, p in rules if p.startswith("/") and not p.startswith("//")]
 # The twins, derived from the tree's own rules, and the folders above: nothing more is closed, nothing less.
 rule_of = lambda n: f"{n}/**" if n == ".claude/rules" else n
-want_writes = {f"{WT}/*/{w}" for w in twin_writes} | {f"{WT}/*/.git"} | {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
+want_writes = {f"{p}/{n}" for p in ABOVE[1:] for n in INSTRUCTIONS}
 want_writes |= {f"{NEW}/*/{w}" for w in twin_writes} | {f"{NEW}/*/.git"} | {f"{NEW}/{n}" for n in INSTRUCTIONS}
 # The next parts' folder's own .claude, whole: the chief's --add-dir of it loads its skills, commands and agents (Claude Code 2.1.318's
 # loaders read an added folder's; lot 2's S2-2), and no tree lives there.
@@ -380,10 +381,9 @@ want_writes |= {f"{NEW}/.claude"}
 OPENED = {"/.githooks/**", "/.claude/agents/**", "/.claude/commands/**", "/.claude/workflows/**", "/.claude/rules/**", "/**/.claude/rules/**",
           "/scripts/stop_gate.sh", "/scripts/borrow_node_modules.sh"}
 twin_rules = [(k, p) for k, p in own_rules if p not in OPENED] + [("Edit", f"/.githooks/{h}") for h in ("pre-commit", "pre-push", "records.sh")]
-want_rules = {f"{k}(/{w}/*{p})" for k, p in twin_rules for w in (WT, TMP_WT)} | {f"{k}({MAIN}{p})" for k, p in own_rules}
+want_rules = {f"{k}({MAIN}{p})" for k, p in own_rules}
 want_rules |= {f"{k}({NEW}/*{p})" for k, p in twin_rules} | {f"Edit({NEW}/*/.git)"}
 want_rules |= {f"Edit({MAIN}/scripts/**)"}  # 10a (F5058): the main checkout's scripts, out of every worktree session's file tools
-want_rules |= {f"Edit(/{w}/*/.git)" for w in (WT, TMP_WT)}
 want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) for n in INSTRUCTIONS}
 want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN + (NEW,) for n in INSTRUCTIONS} | {f"Edit({NEW}/.claude/**)"}
 got_writes = {w for w in writes if w.startswith(("/", "~"))}
@@ -472,11 +472,11 @@ def denied(kind, path):
 
 one = lambda p: p.replace("**", "x").replace("*", "core")  # a path a rule names, each glob made one name
 # The two the brief names, narrowed by the unlock: a sibling's hook that guards main, and an edit of a sibling's guard.
-for tree in (f"{WT}/slice-7", f"{TMP_WT}/slice-7", f"{WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
+for tree in (f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
     assert refused(f"{tree}/.githooks/pre-push"), f"a command can write {tree}/.githooks/pre-push"
     assert denied("Edit", f"{tree}/scripts/guard.py"), f"the file tools can edit {tree}/scripts/guard.py"
 # Every closed path of a sibling, an existing one or one made tomorrow, by both spellings; and the main checkout's, to the file tools.
-for tree in (f"{WT}/slice-7", f"{WT}/tomorrow", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
+for tree in (f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
     for w in twin_writes + [".git"]:
         assert refused(f"{tree}/{one(w)}"), f"a command can write {tree}/{w}"
     for k, p in twin_rules + [("Edit", "/.git")]:
@@ -486,7 +486,7 @@ for k, p in own_rules:
     assert k == "Read" or refused(f"{HOME}/Server/gnoworld{one(p)}"), f"a command can write the main checkout's {p}"
 # An instruction file below a tree's root, at any depth, the session's own tree or a sibling's (7w3, S2-3): to commands and the file
 # tools alike, in the main checkout too. A name that only holds one of theirs stays open.
-for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{HOME}/Server/gnoworld"):
+for tree in (ROOT, f"{NEW_HOME}/slice-7", f"{HOME}/Server/gnoworld"):
     for p in ("app/CLAUDE.md", "docs/plans/CLAUDE.local.md", "packages/core/AGENTS.md", "app/.claude/CLAUDE.md", "app/.claude/AGENTS.md",
               "server/src/.claude/rules/x.md", "app/.claude/skills/s/SKILL.md", "CLAUDE.md", "AGENTS.md"):
         # A sibling's rules are open since the unlock (2026-11-06), and its other instructions to the file tools alone.
@@ -506,16 +506,16 @@ for p in ABOVE + tuple(HOME + a[1:] for a in ABOVE_MAIN + (NEW,)):
         for spelt in {path, tmp(path) if path.startswith("/private/tmp") else path}:
             assert denied("Edit", spelt), f"the file tools can write {spelt}, which Claude Code reads above every session in it"
         assert p not in ABOVE[1:] + (NEW_HOME,) or refused(path), f"a command can write {path}, which Claude Code reads above every worktree session"
-for p in (f"{WT}/csp.diff", "/private/tmp/claude-501/notes.md", f"{HOME}/Server/notes.md", f"{NEW_HOME}/csp.diff"):
+for p in ("/private/tmp/claude-501/notes.md", f"{HOME}/Server/notes.md", f"{NEW_HOME}/csp.diff"):
     assert not refused(p) and not denied("Edit", p), f"{p} is closed, and no session reads it as instructions"
 # What every session writes: its own tree's open files, a sibling's (the chief's docs and ledger in the integration worktree), the
 # gate's state and StrykerJS's copies, git's shared folder, the shared reports, the throwaway trees in $TMPDIR.
-for tree in (ROOT, f"{WT}/slice-7", f"{TMP_WT}/tomorrow", f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
+for tree in (ROOT, f"{NEW_HOME}/slice-7", f"{NEW_HOME}/tomorrow"):
     for p in ("docs/review/findings.md", "docs/decisions.md", "docs/review-log.md", "adr/0003-x.md", "app/src/main.tsx", ".claude/tmp/tsc/root.tsbuildinfo",
               ".stryker-tmp/sandbox-x/app/package.json", ".stryker-tmp/sandbox-x/packages/core/package.json", "node_modules/.vite/x"):
         assert not refused(f"{tree}/{p}") and not denied("Edit", f"{tree}/{p}"), f"{tree}/{p} is closed"
 # A worktree's own folder stays open, to its making and to a rename: a glob holds no folder at its `*` (F4893, asked).
-assert not refused(f"{WT}/tomorrow") and not refused(f"{NEW_HOME}/tomorrow"), "a new worktree's folder is closed"
+assert not refused(f"{NEW_HOME}/tomorrow"), "a new worktree's folder is closed"
 for p in (".git/worktrees/tomorrow/index", ".git/worktrees/tomorrow/HEAD", ".git/worktrees/tomorrow/COMMIT_EDITMSG", ".git/worktrees/tomorrow/MERGE_HEAD",
           ".git/worktrees/tomorrow/MERGE_MSG", ".git/worktrees/tomorrow/ORIG_HEAD", ".git/objects/ab/cdef", ".git/refs/heads/slice-9", ".git/packed-refs",
           ".git/info/exclude", ".git/index", ".git/logs/HEAD", ".claude/tmp/slice-7/reports/slice-7z.md"):

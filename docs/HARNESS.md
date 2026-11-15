@@ -236,10 +236,9 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   removes, in its one root; the guard lets it run only alone, its words plain, from the project's
   root, and the file tools can edit neither it, nor the scripts it runs, nor a worktree's `.git`.
 - **Every worktree's closed files, to every session** (7z, F4890 to F4892). A relative rule guards the session's own tree alone,
-  and every worktree lives in the temp folder every command may write, so each closed path has twins: each relative `denyWrite`
-  entry again under `/private/tmp/claude-501/gnoworld-wt/*/`, each relative `Read` and `Edit` deny again there by both spellings
-  of the temp folder (`//private/tmp/…` and `//tmp/…`, a link the file tools may not follow) and in the main checkout
-  (`~/Server/gnoworld/…`), which the file tools reach from every worktree; and a linked worktree's `.git`, the file that names
+  and the file tools reach every worktree, so each closed path has twins: each relative `denyWrite`
+  entry again under `~/Server/gnoworld-wt/*/`, each relative `Read` and `Edit` deny again there and in the main checkout
+  (`~/Server/gnoworld/…`); and a linked worktree's `.git`, the file that names
   git's folder (F150's class). `*` is one folder's name, so a worktree made tomorrow is covered, and the sandbox matches the
   real path, so `/tmp` and a link reach the same refusal. `test_hooks.sh`'s section `siblings` reads the rules as Claude Code
   does and, in its sandbox, writes into a sibling to see each write refused. A session carries the twins once its own
@@ -248,7 +247,7 @@ checkout's local settings (`settings.local.json` in its `.claude/`) when there a
   local settings, which every session of the repository reads.
 - **The instructions at a tree's root and above it** (7z, S4): Claude Code reads `CLAUDE.md` and `CLAUDE.local.md` in every
   folder above the one it starts in (its memory page), and `.claude`'s own `CLAUDE.md` and `.claude/rules/` there by its source.
-  Closed: to commands in `/private/tmp/claude-501/` and `gnoworld-wt/`, the folders above every worktree a command may write; to
+  Closed: to commands in `/private/tmp/claude-501/`, the folder above the temp folder's throwaway trees; to
   the file tools there, in `/private/tmp/` (by both spellings), in `~` and in `~/Server/`, and above the next parts' trees in
   `~/Server/gnoworld-wt/` (7w3); `AGENTS.md` and `.claude`'s own beside them everywhere (7w3, F5323: read there where no
   `CLAUDE.md` stands, or when the settings ask for both kinds). Not closed: the memory and the imports (Known limits).
