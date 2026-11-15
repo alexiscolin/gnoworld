@@ -75,7 +75,9 @@ echo "product=$(flag code)"
 echo "ts=$(flag has '^(app|server|jarvis|link-reader|packages)/|^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|tsconfig[^/]*\.json|vitest\.config\.ts|eslint\.config\.ts)$')"
 echo "app=$(flag has '^(app|packages)/|^(package\.json|pnpm-lock\.yaml)$')"
 echo "gno=$(flag has '^gno/')"
-echo "deploy=$(flag has '^deploy/')"
+# The services' images build from deploy/ and from what their Dockerfiles copy that can change their isolation (the web image is static
+# files: app/src, packages/ui and packages/core, which holds no I/O, are not it).
+echo "deploy=$(flag has '^(deploy/|server/|jarvis/|link-reader/|packages/(service|chain|schemas)/|app/data/)|^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$')"
 echo "ui=$(flag has '^packages/ui/')"
 echo "nginx=$(flag has '^(deploy/web/|app/|packages/)|^(scripts/check_nginx\.py|scripts/nginx\.sha256|pnpm-lock\.yaml)$')"
 echo "migrations=$(flag has '^server/src/|^scripts/check_migrations\.py$')"

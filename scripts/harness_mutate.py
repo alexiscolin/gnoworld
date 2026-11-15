@@ -1462,7 +1462,7 @@ def mutants():
         ("diff -z --no-renames --name-only \"$base\" HEAD | tr", "diff --no-renames --name-only \"$base\" HEAD | tr", "a name git quotes is read whole"),
         ('git cat-file -e "$base^{commit}" ||', ": ||", "a base git does not have fails the detector"),
         ('|| ! (. "$root/.githooks/records.sh"', '|| (. "$root/.githooks/records.sh"', "the harness flag says a harness change"),
-        ("has \'^deploy/\'", "has \'^deploy/x/\'", "a deploy/ change calls for deploy-stack"),
+        ("has \'^(deploy/|", "has \'^(deploy/x/|", "a deploy/ change calls for deploy-stack"),
         ("has \'^gno/\'", "has \'^gnox/\'", "a gno/ change calls for gno-go"),
         ("!= other ]", '!= "other " ]', "a change of no tier-1 path is no tier-1 change"),
         ("|^(package\\.json|pnpm-lock\\.yaml|pnpm-workspace", "|^(package\\.json|pnpm-workspace", "a lockfile change is TypeScript's"),
@@ -1720,6 +1720,12 @@ def hooks_3b_mutants():
         ('[ -z "$undeclared" ] ||', "true ||", "refuses a harness file no commit declares (F089)"),
         ('if [ "$all" = false ]; then\n\tlisted=', 'if false; then\n\tlisted=', "checks the declarations of a pull request and a push"),
         ('harness --name-only "$base" HEAD) || {', 'harness --name-only "$base" HEAD || :) || {', "refuses when the base's harness list cannot be read"),
+        ("^(deploy/|server/|", "^(deploy/|", "calls deploy-stack for a change of the server"),
+        ("|jarvis/|", "|", "calls deploy-stack for a change of Jarvis"),
+        ("|link-reader/|", "|", "calls deploy-stack for a change of the link reader"),
+        ("packages/(service|chain|schemas)/|", "", "calls deploy-stack for a change of the packages the services use"),
+        ("|app/data/)", ")", "calls deploy-stack for a change of the data the server and Jarvis read"),
+        (r"|^(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml)$')", "')", "calls deploy-stack for a change of the root's package files"),
     ):
         yield from each(cc, find, replace, h, f"ci_changes.sh {label}")
     yield from each("scripts/install_hooks.sh", 'ref=$(git rev-parse --verify --quiet "${1:-main}^{commit}")', "ref=${1:-main}", h, "install_hooks reads its commit once (L3)")

@@ -8178,6 +8178,49 @@ for case in 'deploy/x:deploy=true gno=false' 'gno/r/x:gno=true deploy=false' 'sc
 	judge pull_request "$base" "$c/base"
 	for want in ${case#*:}; do is "$want" "a change of $path"; done
 done
+# What the services' images build from can change their isolation, so deploy-stack runs on it: the server's, Jarvis's and the link
+# reader's folders, the packages they use that do I/O (service, chain, schemas), the data the server and Jarvis read, and the root's
+# package files. packages/core holds no I/O and the scene's code, packages/ui and app/src are the web image's static files: an app or
+# ui change alone does not pay deploy-stack's 40 minutes. Look-alikes of a name are not it.
+for case in 'server/src/m.ts:deploy=true' 'server/package.json:deploy=true' 'jarvis/src/j.ts:deploy=true' 'link-reader/src/r.ts:deploy=true' \
+	'packages/service/src/s.ts:deploy=true' 'packages/schemas/src/c.ts:deploy=true' 'packages/chain/src/c.ts:deploy=true' \
+	'app/data/hubs.json:deploy=true' 'package.json:deploy=true' 'pnpm-lock.yaml:deploy=true' 'pnpm-workspace.yaml:deploy=true' \
+	'packages/core/src/c.ts:deploy=false' 'packages/ui/src/x.ts:deploy=false' 'app/src/b.ts:deploy=false' 'docs/x.md:deploy=false' \
+	'serverless/x.ts:deploy=false' 'jarvis-notes.md:deploy=false' 'packages/service2/x.ts:deploy=false' 'app/database/x.ts:deploy=false' \
+	'link-readers/x.ts:deploy=false' 'app/data2/x.json:deploy=false'; do
+	path=${case%%:*}
+	change "mkdir -p '$(dirname "$path")' && printf 'y\n' >'$path'"
+	judge pull_request "$base" "$c/base"
+	for want in ${case#*:}; do is "$want" "a change of $path, for deploy"; done
+done
+# Every source a service's Dockerfile copies from the repository (deploy/ itself apart) calls for deploy-stack, except the web image's
+# own inputs and packages/core: a COPY added tomorrow is judged by its name.
+python3 -I - "$here/.." >"$c/copies" <<'PY'
+import glob, os, re, sys
+root = sys.argv[1]
+web_only = ("packages/core", "packages/ui", "app", "tsconfig.base.json")
+seen = set()
+for dockerfile in sorted(glob.glob(os.path.join(root, "deploy/*/Dockerfile"))):
+    for line in open(dockerfile).read().replace("\\\n", " ").splitlines():
+        words = line.split()
+        if not words or words[0] != "COPY" or any(w.startswith("--from=") for w in words):
+            continue
+        for source in [w for w in words[1:-1] if not w.startswith("--")]:
+            source = source.rstrip("/")
+            if source.startswith("deploy/") or source in seen:
+                continue
+            seen.add(source)
+            excluded = any(source == w or source.startswith(w + "/") for w in web_only) and not source.startswith("app/data")
+            path = source + "/x" if os.path.isdir(os.path.join(root, source)) else source
+            print(f"{path}:deploy={'false' if excluded else 'true'}")
+PY
+[ -s "$c/copies" ] || fail "no COPY source was read from the services' Dockerfiles"
+while IFS= read -r case; do
+	path=${case%%:*}
+	change "mkdir -p '$(dirname "$path")' && printf 'y\n' >'$path'"
+	judge pull_request "$base" "$c/base"
+	is "${case#*:}" "a change of $path, which a Dockerfile copies, for deploy"
+done <"$c/copies"
 change 'mkdir -p gno/r deploy/web && printf "y\n" >"$(printf "gno/r/a\tb")" && printf "y\n" >"$(printf "deploy/web/x\ty")"'
 judge pull_request "$base" "$c/base" && is gno=true "a gno/ name git quotes" && is deploy=true "a deploy/ name git quotes"
 change 'printf "y\n" >server/src/guard.ts'
