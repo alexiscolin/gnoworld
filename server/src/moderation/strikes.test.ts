@@ -24,18 +24,36 @@ const setup = () => {
     account: string,
     room: string,
     { action, at, reason = null }: { action: string; at: number; reason?: string | null },
-  ) => {
+  ): string => {
     n += 1;
+    const msgid = `m${String(n)}`;
     db.prepare("INSERT INTO verdicts (msgid, room, account, action, reason, at) VALUES (?, ?, ?, ?, ?, ?)").run(
-      `m${String(n)}`,
+      msgid,
       room,
       accountKey(PEPPER, account),
       action,
       reason,
       at,
     );
+    return msgid;
   };
   return { db, verdict, strikes: makeStrikes(db, PEPPER) };
+};
+
+// The mutes a strike asks for, as "<account> <world>".
+const recorded = (): { muted: string[]; mutes: Mutes } => {
+  const muted: string[] = [];
+  const mutes: Mutes = {
+    muteKeeping: () => "muted",
+    mute: (account, world) => {
+      muted.push(`${account} ${world}`);
+      return true;
+    },
+    tick: () => undefined,
+    reapply: () => undefined,
+    putOn: () => undefined,
+  };
+  return { muted, mutes };
 };
 
 describe("an account's strikes", () => {
@@ -78,17 +96,7 @@ describe("an account's mute, its hides settled out of order (the max review)", (
   // Each hide's verdict written as its check settles, then the strike counted; long after, as a slow check.
   const settle = (offsets: readonly number[]): string[] => {
     const { db, verdict } = setup();
-    const muted: string[] = [];
-    const mutes: Mutes = {
-      muteKeeping: () => "muted",
-      mute: (account, world) => {
-        muted.push(`${account} ${world}`);
-        return true;
-      },
-      tick: () => undefined,
-      reapply: () => undefined,
-      putOn: () => undefined,
-    };
+    const { muted, mutes } = recorded();
     const strike = makeStrike(db, {
       pepper: PEPPER,
       now: () => T0 + 60 * MINUTE,
@@ -97,11 +105,11 @@ describe("an account's mute, its hides settled out of order (the max review)", (
       spared: () => false,
     });
     for (const n of offsets) {
-      verdict("g1a", "#bubble", { action: "hide", at: T0 + n });
+      const msgid = verdict("g1a", "#bubble", { action: "hide", at: T0 + n });
       strike({
         room: "#bubble",
         account: "g1a",
-        msgid: `m${String(n)}`,
+        msgid,
         text: "x",
         time: new Date(T0 + n).toISOString(),
       });
@@ -132,28 +140,40 @@ describe("an account's mute, its hides settled out of order (the max review)", (
   // millisecond later, fell past the run's last hide, and nothing was ever muted.
   it("mutes a line with no time of its own, however far the clock moved since its hide was written", () => {
     const { db, verdict } = setup();
-    const muted: string[] = [];
+    const { muted, mutes } = recorded();
     let clock = T0;
     const strike = makeStrike(db, {
       pepper: PEPPER,
       now: () => (clock += 1),
       mute: { strikes: 3, windowMinutes: 10 },
-      mutes: {
-        muteKeeping: () => "muted",
-        mute: (account, world) => {
-          muted.push(`${account} ${world}`);
-          return true;
-        },
-        tick: () => undefined,
-        reapply: () => undefined,
-        putOn: () => undefined,
-      },
+      mutes,
       spared: () => false,
     });
     for (let n = 1; n <= 3; n += 1) {
-      verdict("g1a", "#bubble", { action: "hide", at: (clock += 1) });
-      strike({ room: "#bubble", account: "g1a", msgid: `m${String(n)}`, text: "x" });
+      const msgid = verdict("g1a", "#bubble", { action: "hide", at: (clock += 1) });
+      strike({ room: "#bubble", account: "g1a", msgid, text: "x" });
     }
+    expect(muted).toEqual(["g1a bubble"]);
+  });
+
+  it("times a line whose hide is not stored by its own server-time", () => {
+    const { db, verdict } = setup();
+    const { muted, mutes } = recorded();
+    const strike = makeStrike(db, {
+      pepper: PEPPER,
+      now: () => T0 + 60 * MINUTE,
+      mute: { strikes: 3, windowMinutes: 10 },
+      mutes,
+      spared: () => false,
+    });
+    for (const n of [0, 5, 10]) verdict("g1a", "#bubble", { action: "hide", at: T0 + n * MINUTE });
+    strike({
+      room: "#bubble",
+      account: "g1a",
+      msgid: "unstored",
+      text: "x",
+      time: new Date(T0 + 10 * MINUTE).toISOString(),
+    });
     expect(muted).toEqual(["g1a bubble"]);
   });
 
