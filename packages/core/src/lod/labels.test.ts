@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { chooseLabels, FAR_MOST, LABELS_MOST, labelName, NAME_MOST, type LabelAsk, type Signals } from "./labels.ts";
 
-// The labels of a view (ADR-0002 §1, level of detail; plan §9, question 11): eight at most, the Earth first, the worlds the view draws, then a
+// The labels of a view (ADR-0002 §1, level of detail): eight at most, the Earth first, the worlds the view draws, then a
 // few far ones among the most popular and the new, each from real data; never an address; a count and a badge only from data.
 const ADDRESS = "g1um2pwwnx3gn8p3ryfdert8mhpu4u4up49sc9ru";
 const OTHER = "g1magld5xlz9u8mv9wl2qe0ccalz7mlrp7prwfn7";

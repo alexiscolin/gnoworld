@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { textHash } from "../space/cell.ts";
 import { seatInRings, type Seat } from "./rings.ts";
 
-// core/cosmos's cells (slice 7, 7d1; ADR-0002 §10; F3520): ring r holds 6r cells, each system has a ray from the centre, and by rank
+// core/cosmos's cells (ADR-0002 §10): ring r holds 6r cells, each system has a ray from the centre, and by rank
 // each takes the first cell free along its ray. `walked` is that sentence as plain code, a ring at a time for each ray in turn: it costs
 // n^1.5 steps and the real one must not, so it is the oracle here and never the product.
 const cellOn = (turn: number, ring: number): number => Math.floor(turn * (6 * ring));
@@ -195,8 +195,8 @@ describe("seatInRings, for any rays", () => {
   });
 });
 
-// The worst rays a walk can meet. No clock here, for two bounds on one failed at load 20 and 34 (F3551): the test's own timeout is the
-// bound, so n^2 must never fit it: with `nextFrom`'s links left uncompressed, 120,000 rays fitted (3.8 s), 250,000 took 54 s (F3559).
+// The worst rays a walk can meet. No clock here, for two bounds on one failed at load 20 and 34: the test's own timeout is the
+// bound, so n^2 must never fit it: with `nextFrom`'s links left uncompressed, 120,000 rays fitted (3.8 s), 250,000 took 54 s.
 describe("its cost: n log n at most, whatever the rays", () => {
   it("seats 250,000 rays that are one ray, a ring each", () => {
     expect(seatInRings(new Array<number>(250_000).fill(0.25)).at(-1)?.ring).toBe(250_000);

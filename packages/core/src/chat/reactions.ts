@@ -1,6 +1,6 @@
-// A line's reactions (slice 4's 4d): a TAGMSG naming the line it answers, +draft/react to add and +draft/unreact to
+// A line's reactions: a TAGMSG naming the line it answers, +draft/react to add and +draft/unreact to
 // take back (IRCv3 draft/react), which Ergo relays, stores and replays. Anyone in a room may send one, so each part is
-// checked here by hand (docs/decisions.md, 2026-10-26): one emoji of Unicode's RGI set, a msgid of one word, an
+// checked here by hand: one emoji of Unicode's RGI set, a msgid of one word, an
 // account Ergo vouches for.
 import type { IrcMessage } from "../irc/irc.ts";
 import { first, isTagMsgid, redactAfter, REPLY, sameName, stamp } from "./room.ts";
@@ -81,8 +81,7 @@ function sharesOf(reactions: readonly Reaction[], share: number): readonly React
 }
 
 /** How much of a room's window one account's reactions fill at most: a fifth, so five accounts each reacting to all of
- * a window's 200 lines are kept (R2), and one account's reactions to lines no one sees fill no one else's place (the
- * security review's S3). */
+ * a window's 200 lines are kept, and one account's reactions to lines no one sees fill no one else's place. */
 const SHARE = 5;
 
 /** The room's reactions with these added: the newest of an account to a line with an emoji, a take-back included, so
@@ -120,7 +119,7 @@ function tally(line: Map<string, Shown>, emoji: string, mine: boolean): void {
 }
 
 /** What each line shows, by its msgid: each emoji added and not taken back, counted once an account, mine said; the
- * most reacted first, then in the order first reacted (the security review's S4: one account's lone emoji put no
+ * most reacted first, then in the order first reacted (so one account's lone emoji puts no
  * shared one out of sight). `lineOf` names the line a reaction's msgid belongs to, a folded edit's own to its line. */
 export function reactionsOn(
   reactions: readonly Reaction[],
@@ -128,7 +127,7 @@ export function reactionsOn(
   lineOf: (id: string) => string = (id) => id,
 ): ReadonlyMap<string, readonly Shown[]> {
   const lines = new Map<string, Map<string, Shown>>();
-  // Once an account on a line with an emoji, whichever msgid of the line it named (a folded edit's, CR5).
+  // Once an account on a line with an emoji, whichever msgid of the line it named (a folded edit's).
   const counted = new Set<string>();
   for (const { to: named, emoji, who, on } of reactions) {
     const to = lineOf(named);

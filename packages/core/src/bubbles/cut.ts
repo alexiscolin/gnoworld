@@ -1,4 +1,4 @@
-// The text of a bubble: plain text, cut by grapheme (docs/plans/slice-6.md §1 and §3). A control or format character
+// The text of a bubble: plain text, cut by grapheme. A control or format character
 // (Cc, Cf: bidi marks, zero-width and tag characters), a lone surrogate and a joiner that joins nothing are removed; a
 // line break or a tab becomes a space; a cluster over CLUSTER_UNITS is dropped whole. The relay takes 4096 bytes a line and
 // a UTF-16 unit is at least a byte, so a head of as many units holds any line: a megabyte costs what the head costs.

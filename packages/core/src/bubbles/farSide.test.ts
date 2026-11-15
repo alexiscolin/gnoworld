@@ -6,7 +6,7 @@ import { isFarSide, type LatLon } from "./farSide.ts";
 import { pickBubbles, type BubbleMessage, type Viewer } from "./pickBubbles.ts";
 import type { Rules } from "./rules.ts";
 
-// Slice 6's 6b: the far side of the globe (ADR-0001 §7: "countries on the far side show only as counts at its edge").
+// The far side of the globe (ADR-0001 §7: "countries on the far side show only as counts at its edge").
 // A point is on the far side when it is more than a quarter of the way round (90 degrees of arc) from the facing; the
 // rim itself, at 90 degrees, shows. Degrees in, a yes or no out.
 const at = (lat: number, lon: number): LatLon => ({ lat, lon });

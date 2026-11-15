@@ -6,8 +6,8 @@ import { DIVE, diveAt } from "./dive.ts";
 import { earthEye } from "../station/scenery.ts";
 import { cameraOf, DEGREE, eyeAt, Look } from "./restLook.ts";
 
-// The home's dive (7d7; Alexis, 2026-11-02): from the whole cosmos down to the view at rest's eye, in a few seconds, the Earth ahead all
-// the way. A pure path from the rest it ends on, so the same rest gives the same dive and a flight can take it (7g).
+// The home's dive: from the whole cosmos down to the view at rest's eye, in a few seconds, the Earth ahead all
+// the way. A pure path from the rest it ends on, so the same rest gives the same dive and a flight can take it.
 const FRAMES = 60;
 const STEPS = 400;
 
@@ -70,7 +70,7 @@ describe("the dive's path", () => {
       const rest = restOf(terms);
       const { distance, slant } = polar(at(rest, 0));
       expect(wholeShare(distance)).toBe(1);
-      // No farther than it must (the design review of 7d7): a sixth nearer, the whole cosmos would start to give the view up.
+      // No farther than it must: a sixth nearer, the whole cosmos would start to give the view up.
       expect(wholeShare((5 / 6) * distance)).toBeLessThan(1);
       expect(slant).toBeGreaterThanOrEqual(25 * DEGREE - 1e-12);
       // A still start, wherever the dive waits for what it shows; a clock it cannot read keeps it there.
@@ -103,7 +103,7 @@ describe("the dive's path", () => {
     },
   );
 
-  // The red pass (8): its distance falls in its log, so the Earth grows at an even pace, half of it half way, never more than twice as fast
+  // Its distance falls in its log, so the Earth grows at an even pace, half of it half way, never more than twice as fast
   // as on average; it swings round a little, one way, to the rest's turn.
   it.each(RESTS)(
     "comes in at an even pace in its distance's log, and turns a little, one way: %f, %f, %f",
@@ -140,8 +140,8 @@ describe("the dive's path", () => {
 });
 
 describe("the stars as the eye comes in", () => {
-  // Not a planetarium (Alexis, 2026-11-02): the stars as the eye comes in keep their natural spread, never a lattice. A lattice's nearest
-  // gaps are all alike (spread 0); Onyx's read 0.55 to 0.74 and these sets 0.58 or more along the dive (the part's probe, 2026-11-03).
+  // Not a planetarium: the stars as the eye comes in keep their natural spread, never a lattice. A lattice's nearest
+  // gaps are all alike (spread 0); Onyx's read 0.55 to 0.74 and these sets 0.58 or more along the dive.
   it.each(SETS)("shows the stars in no lattice as the eye comes in, on %s", (_, file) => {
     const systems = systemsOf(file());
     const rest = earthEye();

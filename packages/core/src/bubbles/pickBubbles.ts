@@ -1,4 +1,4 @@
-// Which messages the Earth shows as bubbles (ADR-0001 §7, docs/plans/slice-6.md): a pure function of the messages, the
+// Which messages the Earth shows as bubbles (ADR-0001 §7): a pure function of the messages, the
 // time, the viewer, the rules and what is already on screen. No clock, no chance, nothing it is given is changed.
 import { casemap } from "../chat/room.ts";
 import { isBlank } from "../markdown/nodes.ts";
@@ -58,13 +58,13 @@ function far(run: Run, country: string): boolean {
   return run.viewer.facing !== undefined && centre !== undefined && isFarSide(centre, run.viewer.facing);
 }
 
-/** The one rule of what a bubble may be made of, for a new one and one on screen (F3366): a bubble stands for its line. */
+/** The one rule of what a bubble may be made of, for a new one and one on screen: a bubble stands for its line. */
 function allowed(run: Run, m: BubbleMessage): boolean {
   return isOpen(m) && !run.blocked.has(casemap(m.account));
 }
 
 /** Whether a bubble of the state may stay on screen: its line is still listed, allowed and says what it said (a correction
- * takes the old words back); yours shows whatever the far side (§1, question 4), the rest not. */
+ * takes the old words back); yours shows whatever the far side, the rest not. */
 function visible(run: Run, s: Bubble): boolean {
   const line = run.window.get(s.id);
   return (
@@ -86,7 +86,7 @@ function open(run: Run, m: BubbleMessage): boolean {
 }
 
 /** Whether a text draws nothing once cleaned: what the cut would remove (controls, lone surrogates), then the shared
- * check of the line reader. It never segments, so a line that is not placed is not cut (F3363). A text the cut would
+ * check of the line reader. It never segments, so a line that is not placed is not cut. A text the cut would
  * empty only for its clusters over the limit passes here and is dropped when placed. */
 const blank = (text: string): boolean => isBlank(text.replace(/[\p{Cc}\p{Cs}]/gu, ""));
 
@@ -139,7 +139,7 @@ function oldestOfOthers(screen: readonly Bubble[]): Bubble | undefined {
 }
 
 /** Keeps a line of yours that was not shown because a newer one of its country was, so no later call takes it for a new
- * one and ends the newer bubble for it (F3361). It is in the state and on no screen. */
+ * one and ends the newer bubble for it. It is in the state and on no screen. */
 function spend(run: Run, c: Candidate): void {
   const { message } = c;
   run.state.set(message.id, {
@@ -188,7 +188,7 @@ function placeOther(run: Run, c: Candidate): void {
 
 /** The screen from the state, which keeps every rule at every call: a bubble that stops being allowed (its country went
  * to the far side, its speaker was muted, its line hidden or gone) ends for good, so it cannot come back past the caps;
- * and a smaller `maxOnScreen` takes the oldest bubbles off (F3360). */
+ * and a smaller `maxOnScreen` takes the oldest bubbles off. */
 function settle(run: Run): void {
   run.screen = [];
   for (const s of [...run.state.values()]) {

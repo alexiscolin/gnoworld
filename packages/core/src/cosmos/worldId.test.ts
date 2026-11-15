@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { hubWorldOf, worldIdOf } from "./worldId.ts";
 
-// A world is a product (decision of 2026-11-01, 11): the server's job groups realms by this id, and a world's page draws the planet of the same
+// A world is a product: the server's job groups realms by this id, and a world's page draws the planet of the same
 // id, so both read one rule.
 describe("worldIdOf", () => {
   it.each([

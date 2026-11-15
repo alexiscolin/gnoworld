@@ -11,7 +11,7 @@ import { asciiBytes } from "../text/bytes.ts";
 
 export { anchorOf, ANCHORS, asciiBytes, MAPS, natureOf, type Anchor, type MapName, type Nature, type RealmFunctions };
 
-/** Above this the warp smears a map's real detail (Alexis's review of the mock-up, 2026-11-01). */
+/** Above this the warp smears a map's real detail. */
 export const MAX_WARP_FREQUENCY = 2.4;
 const MIN_WARP_FREQUENCY = 0.9;
 const TURN = Math.PI * 2;
@@ -71,7 +71,7 @@ const mixed = (from: Rgb, to: Rgb, share: number): Rgb => [
 
 // Words 0 to 5 turn and offset the map, word 6 mixes the palette; each byte from 14 on is one value of its own, in [0, 1]. Byte 13 serves
 // word 6 and the lean, bytes 0 and 1 the spin and the light, byte 15 the recipe's minor share, and 18, 20 and 22 the minor's offset: all
-// 32 are taken (F3476), and what comes after reads `moreSeed`.
+// 32 are taken, and what comes after reads `moreSeed`.
 const reader = (seed: Uint8Array) => ({
   word: (index: number): number => ((seed[index * 2] ?? 0) * 256 + (seed[index * 2 + 1] ?? 0)) / 65535,
   byte: (index: number): number => seedShare(seed, index),

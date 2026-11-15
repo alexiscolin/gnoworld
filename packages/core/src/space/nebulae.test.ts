@@ -25,8 +25,8 @@ const point = fc.record({ x: coordinate, y: coordinate, z: coordinate });
 const WIDTH = 1728;
 const HEIGHT = 1080;
 const FOCAL = HEIGHT / 2 / Math.tan((25 * Math.PI) / 180);
-// The fill a frame pays for, in whole screens: every drawn sheet's quad on screen, each at most once. The budget this part records:
-// first 8 screens of rounds, the same as 10 of the quads the GPU draws (8 / (π / 4) = 10.2).
+// The fill a frame pays for, in whole screens: every drawn sheet's quad on screen, each at most once. The budget:
+// 8 screens of rounds, the same as 10 of the quads the GPU draws (8 / (π / 4) = 10.2).
 const COVER_MOST = 10;
 const EARTH_RADIUS = 1.457;
 const CLUSTER_WIDTH = 340;
@@ -439,8 +439,8 @@ describe("the hand-over to the whole cosmos", () => {
   });
 });
 
-// Frame 16's teal, top right (f0016.jpg, its pixels read with ffmpeg on 2026-11-02): mean sRGB (10, 44, 50), hue 190, its pixels' hues
-// 182 to 193 from the tenth to the ninetieth part. A cool nebula takes it, dark and discreet as there (Alexis, 2026-11-02).
+// Frame 16's teal, top right (f0016.jpg, its pixels read with ffmpeg): mean sRGB (10, 44, 50), hue 190, its pixels' hues
+// 182 to 193 from the tenth to the ninetieth part. A cool nebula takes it, dark and discreet as there.
 const FRAME_TEAL = { least: 182, most: 194 };
 const FRAME_MEAN = [10, 44, 50] as const;
 const encoded = (linear: number) => (linear <= 0.0031308 ? 12.92 * linear : 1.055 * linear ** (1 / 2.4) - 0.055);

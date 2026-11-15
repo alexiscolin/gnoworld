@@ -4,7 +4,7 @@ import type { Orbiter, StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { HOME } from "../space/drift.ts";
 
-/** How far the eye rests from the Earth, in world units (7d6). */
+/** How far the eye rests from the Earth, in world units. */
 export const REST_DISTANCE = 30;
 /** How far the disc leans from facing the eye's way, in radians: seen from 15 degrees above it, the rest's plain slant. */
 export const DISC_TILT = 0.2617993877991494;

@@ -1,4 +1,4 @@
-// The regions of a world that has no countries, drawn from its id as the Earth's countries are given (D13996): centres on the sphere, a
+// The regions of a world that has no countries, drawn from its id as the Earth's countries are given: centres on the sphere, a
 // point belonging to the nearest one (a spherical Voronoi), each named from letters and syllables, never from a list of finished names.
 import { Draws } from "../station/draws.ts";
 

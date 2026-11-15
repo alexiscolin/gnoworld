@@ -1,17 +1,17 @@
-// What the view at rest's bodies must read as on the screen (slice 7d6, Alexis's "trop collés et en amas" and "de la profondeur"):
+// What the view at rest's bodies must read as on the screen (not crowded, with depth):
 // no group denser than frame 4's, no body on another, no line of bodies, and, with a close world, sizes and distances far apart.
 import type { Seen } from "./restLook.ts";
 
-// Frame 4's densest group, measured by the chief at 1728 by 1080: four bodies in about 200 by 120 pixels.
+// Frame 4's densest group, measured at 1728 by 1080: four bodies in about 200 by 120 pixels.
 const GROUP = { across: 200, up: 120, most: 4 };
 // The spread across the best line through what stands on the screen against the spread along it, at the least, for three or more; a
-// view with a close world and a lit Earth stands low over the disc: a tenth (the chief, 2026-11-02). A row that recedes, its sizes
-// falling `RECEDES` times or more from near to far, is depth, not a row (Alexis's references).
+// view with a close world and a lit Earth stands low over the disc: a tenth. A row that recedes, its sizes
+// falling `RECEDES` times or more from near to far, is depth, not a row.
 const ACROSS_LINE = 0.2;
 const ACROSS_LOW = 0.1;
 const LINE_LEAST = 3;
 // Three bodies, or three glowing stars, a tenth or less off a line read as laid out for show when their two gaps are alike within this
-// share; at unequal gaps they read as depth (the chief, 2026-11-03). A mix is not judged: a world, its star and another stand so as they turn.
+// share; at unequal gaps they read as depth. A mix is not judged: a world, its star and another stand so as they turn.
 const EVEN = 0.15;
 const RECEDES = 2;
 const SIZES_APART = 4;
@@ -56,7 +56,7 @@ const crowded = (spots: readonly Seen[]) =>
   );
 
 // Two bodies at a like distance keep a third of the smaller one's width between them; one this much nearer may cover a farther one, by half
-// of it at most: that is depth (the chief, 2026-11-02, after Alexis).
+// of it at most: that is depth.
 const LIKE = 1.5;
 const AIR = 2 / 3;
 const COVERED_MOST = 0.5;
@@ -136,8 +136,7 @@ function aRow(all: readonly Seen[], { deep, lights, width, height }: Frame): boo
   return lined || evenRow(shown) || evenRow(stars);
 }
 
-// Two neighbours stand at one height under a tenth of the screen's height apart and under 40 degrees off level (the chief's reading of
-// Alexis's rule, 2026-11-03: a far postcard's bodies stand nearer than a tenth of the height, and read apart by their slant).
+// Two neighbours stand at one height under a tenth of the screen's height apart and under 40 degrees off level (a far postcard's bodies stand nearer than a tenth of the height, and read apart by their slant).
 const ONE_HEIGHT = 0.1;
 const LEVEL = Math.tan((40 * Math.PI) / 180);
 
@@ -151,7 +150,7 @@ export const atOneHeight = (
   return up < ONE_HEIGHT * height && up < LEVEL * Math.abs(one.x - other.x);
 };
 
-/** Whether two places stand one over the other on a screen, 40 degrees off the upright at most: a column (7p). */
+/** Whether two places stand one over the other on a screen, 40 degrees off the upright at most: a column. */
 export const upright = (one: { x: number; y: number }, other: { x: number; y: number }): boolean =>
   Math.abs(one.x - other.x) < LEVEL * Math.abs(one.y - other.y);
 

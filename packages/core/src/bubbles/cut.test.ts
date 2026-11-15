@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { MULTILINE_BYTES } from "../irc/multiline.ts";
 import { cutText } from "./cut.ts";
 
-// Slice 6's 6a: the text of a bubble (docs/plans/slice-6.md §1, §3): plain text, cut at `max` graphemes, no Cc or Cf
+// The text of a bubble: plain text, cut at `max` graphemes, no Cc or Cf
 // character but a joiner between two emoji, no lone surrogate, no cluster over CLUSTER units (it is dropped whole).
 const MAX = 80;
 const CLUSTER = 32;
@@ -14,7 +14,7 @@ const FAMILY = `👨${ZWJ}👩${ZWJ}👧${ZWJ}👦`;
 const FLAG = "🇯🇵";
 const BAD = /[\p{Cc}\p{Cf}]/u;
 const JOINS = /(?<=[\p{Extended_Pictographic}\u{FE0F}\p{Emoji_Modifier}])\u{200D}(?=\p{Extended_Pictographic})/gu;
-/** No Cc or Cf character at all, but a joiner that sits between two emoji: a stray U+200D is not hidden any more. */
+/** No Cc or Cf character at all, but a joiner that sits between two emoji: a stray U+200D fails it. */
 const clean = (text: string): boolean => !BAD.test(text.replace(JOINS, ""));
 const stack = (marks: number): string => `e${MARK.repeat(marks)}`;
 
@@ -215,7 +215,7 @@ describe("cutText: plain text", () => {
 });
 
 describe("cutText: its cost", () => {
-  // "é" is not printable ASCII, so it reaches the segmenter: the check proves a bound, not an empty list of calls (F3369).
+  // "é" is not printable ASCII, so it reaches the segmenter: the check proves a bound, not an empty list of calls.
   it("segments a head of the text, never a megabyte of it", () => {
     const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");
     const out = cutText("é".repeat(1024 * 1024), MAX);
@@ -226,7 +226,7 @@ describe("cutText: its cost", () => {
     expect(longest).toBeLessThanOrEqual(4096);
   });
 
-  // F3368: the relay takes 4096 bytes a line (deploy/ergo/ircd.yaml.tmpl, MULTILINE_BYTES), so a text is one head, and a text
+  // The relay takes 4096 bytes a line (deploy/ergo/ircd.yaml.tmpl, MULTILINE_BYTES), so a text is one head, and a text
   // past it is not a line: a megabyte of anything costs what the head costs.
   it("reads one head of a megabyte that is one cluster, and keeps none of it", () => {
     const segment = vi.spyOn(Intl.Segmenter.prototype, "segment");

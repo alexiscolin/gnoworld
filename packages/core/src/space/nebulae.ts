@@ -199,7 +199,7 @@ export function nebulaLight(nebula: Nebula, eye: Point): number {
   return light < LEAST ? 0 : light;
 }
 
-// How much of them the whole cosmos takes: 55% stays behind its mass, its warm haze (7u; Alexis, 2026-11-04 night, "va pour tes reco").
+// How much of them the whole cosmos takes: 55% stays behind its mass, its warm haze.
 const WHOLE_TAKES = 0.45;
 
 /** How much of the nebulae shows with the eye `distance` from what it looks at: none near a world, a third at a system's distance, all at
@@ -209,14 +209,14 @@ export const nebulaShare = (distance: number): number =>
   (SYSTEM_SHARE + (1 - SYSTEM_SHARE) * smoothstep(ARRIVAL, CLUSTER_VIEW, distance)) *
   (1 - WHOLE_TAKES * wholeShare(distance));
 
-// Frame 16's teal, top right (f0016.jpg, read on 2026-11-02): its mean, sRGB (10, 44, 50), in linear light, its brightest channel at 1.
+// Frame 16's teal, top right (f0016.jpg): its mean, sRGB (10, 44, 50), in linear light, its brightest channel at 1.
 const TEAL = { red: 0.09516135842160993, green: 0.7896549257303476, blue: 1 };
 // How much bluer than red a mood is before its nebula is all teal: rose and mauve stay the mood's.
 const COOL_FROM = 0.1;
 const COOL_TO = 0.5;
 
 /** A nebula's colour, its brightest channel at 1: the mood's where it is warm, frame 16's teal where it is cool, never the grey-blue between
- * the mood's cool hues (Alexis, 2026-11-02). */
+ * the mood's cool hues. */
 export function nebulaTint(
   { red, green, blue }: Pick<Nebula, "red" | "green" | "blue">,
   out: { red: number; green: number; blue: number },

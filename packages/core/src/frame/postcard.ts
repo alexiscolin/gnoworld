@@ -1,4 +1,4 @@
-// A postcard's worlds at display (slice 7d6; the chief, 2026-11-02, on postcards clumped round their star, then on a ring "pas naturel"):
+// A postcard's worlds at display:
 // each world keeps its own phase and size, its orbit widened as its system's others are, till no two meet as the system turns, all at its one
 // spin, with a third of the smaller one's width between them; never past its own cell, and never a regular figure. A plane seen near its
 // edge is opened towards the eye, at display only.
@@ -8,7 +8,7 @@ import type { Point } from "../space/cell.ts";
 import { depthOf, levelled, normalOf, withNormal } from "./depth.ts";
 import { cameraTowards, type Camera } from "./restLook.ts";
 
-// Frame 4's densest group is four bodies, a postcard's at the home; a view may ask more (a system's dynamic view, 7v), chosen among its
+// Frame 4's densest group is four bodies, a postcard's at the home; a view may ask more (a system's dynamic view), chosen among its
 // twelve largest, the Plan's own (plan.ts draws the same twelve).
 const POSTCARD_BODIES = 4;
 export const PLAN_MOST = 12;
@@ -25,16 +25,16 @@ const ROUNDING = 1e-9;
 // Of three bodies or more, no two gaps alike within this share: a regular figure reads as drawn on purpose.
 const ALIKE = 0.15;
 // A speck at its own orbit while the bodies are widened: within a body's width of its ground, half a unit at the least, it reads as that
-// world's debris (Alexis's pebbles, 2026-11-03); nor does grain stand on a body's path, its drawn width each side of its orbit, which the
-// planet cleared ("Poussière fine", F3594). The system turns as one, so what stands clear at rest stays clear.
+// world's debris; nor does grain stand on a body's path, its drawn width each side of its orbit, which the
+// planet cleared. The system turns as one, so what stands clear at rest stays clear.
 const SPECK_CLEAR = 0.5;
 // The bodies a postcard draws are brought down to this share of their size, a tenth at a time, before one is left out.
 const FIT_LEAST = 0.3;
 const FIT_STEP = 0.9;
 
 /** A postcard as drawn: its system, its plane opened towards the eye if need be and turned about the eye's line so no two neighbours stand
- * at one height, the worlds it draws as bodies, the share of its size each is drawn at by its nearness (7p), and those of its specks it
- * leaves out, for they would stand on a body's ground (7d3). */
+ * at one height, the worlds it draws as bodies, the share of its size each is drawn at by its nearness, and those of its specks it
+ * leaves out, for they would stand on a body's ground. */
 export interface Postcard {
   readonly system: StarSystem;
   readonly worlds: readonly Orbiter[];
@@ -66,7 +66,7 @@ const placeIn = ({ orbit, phase }: Pick<Orbiter, "orbit" | "phase">, spread: num
 });
 
 // How much `worlds` widen their orbits so no two meet, seen at the least open: their places in the plane, apart enough when foreshortened,
-// or, held `still` (a system's dynamic view, 7v), apart in space, a near one free to cover a far one; and each off its star, its centre
+// or, held `still` (a system's dynamic view), apart in space, a near one free to cover a far one; and each off its star, its centre
 // `OFF_STAR` of its radii from it (f0004's worlds stand 3 to 4 of theirs from their star), or as far as its `room` lets it.
 function spreadOf(worlds: readonly Orbiter[], room: number, still: boolean): number {
   const off = ({ orbit, radius }: Orbiter) => Math.min(OFF_STAR * radius, room - radius) / Math.max(orbit, 1e-9);
@@ -103,7 +103,7 @@ const groupsOf = (choice: readonly Orbiter[], count: number): Orbiter[][] =>
     : choice.flatMap((world, at) => groupsOf(choice.slice(at + 1), count - 1).map((rest) => [world, ...rest]));
 
 /** The worlds a postcard of `system` draws as bodies, `most` at most, the home's four unless said, widened round its star: the most, then the
- * largest, that stand apart in its cell, inside its far belt if it has one (7d3: never among its rocks), and read as no figure; held
+ * largest, that stand apart in its cell, inside its far belt if it has one (never among its rocks), and read as no figure; held
  * `still`, each at its own size, its largest at its crowd's cap. Its others are specks. */
 export const postcardWorlds = (system: StarSystem, most = POSTCARD_BODIES, still = false): Orbiter[] =>
   worldsOf(system, { most, still });
@@ -129,7 +129,7 @@ function worldsOf(
   { most, still, must }: { most: number; still: boolean; must?: string | undefined },
 ): Orbiter[] {
   const bodies = system.worlds.filter(({ radius }) => radius >= GRAIN);
-  // A crowd's cap as one scale on its worlds' own sizes, not a clamp: gnoswap's 16 stood at one size (7v's design review, F4468).
+  // A crowd's cap as one scale on its worlds' own sizes, not a clamp: gnoswap's 16 stood at one size.
   const scale =
     Math.max(...bodies.map(({ radius }) => radius)) / Math.max(...bodies.map(({ radius, own }) => own ?? radius));
   const choice = bodies
@@ -192,7 +192,7 @@ export const drawnOf = ({ worlds, depth }: Pick<Postcard, "worlds" | "depth">, l
   worlds.map((world, at) => ({ ...world, radius: world.radius * Math.max(least, depth[at] ?? 1) }));
 
 /** `postcard`, drawn from `own`, eased `share` of the way back to it: its plane's normal and each world's share of its size, so the view at
- * rest's drawing turns into the ladder's as the eye leaves it (7p's review). */
+ * rest's drawing turns into the ladder's as the eye leaves it. */
 export function easedOf(postcard: Postcard, own: StarSystem, share: number): Postcard {
   const [from, to] = [normalOf(postcard.system), normalOf(own)];
   const normal = {

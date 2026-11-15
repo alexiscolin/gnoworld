@@ -1,4 +1,4 @@
-// A guest's name (D351, D430): two words and four base32 characters from bytes the caller drew, so the
+// A guest's name: two words and four base32 characters from bytes the caller drew, so the
 // pure rule holds no chance. The relayed nick is "anon/" and the name, 32 characters at most (Ergo's nicklen).
 export const GUEST_NAME_BYTES = 8;
 export const GUEST_PREFIX = "anon/";

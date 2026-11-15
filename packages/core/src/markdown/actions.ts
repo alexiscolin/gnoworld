@@ -1,4 +1,4 @@
-// Tier 1 (docs/REVIEW.md). A realm page's links to its own functions as actions (slice 13, D13300): on the page of a realm, a link to
+// Tier 1 (docs/REVIEW.md). A realm page's links to its own functions as actions: on the page of a realm, a link to
 // that realm's `$help&func=` under gnoweb's origin, as gno's txlink writes it, is its call (core's helpCall), never an address; one
 // that is no call shows its label alone. A pass over the page's tree, apart from its reader, which the chat's drawing and the first
 // screens share: only the realm's view loads it.

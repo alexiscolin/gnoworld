@@ -105,7 +105,7 @@ const STATED: Record<Anchor, Row> = {
     relief: [0.02, 0.032],
     glow: [0.3, 0.6],
   },
-  // The twelve more (7b4) draw, until 7b5, on a kept anchor's row in their own colours: these are those rows, a few values moved.
+  // The twelve more draw on a base anchor's row in their own colours: these are those rows, a few values moved.
   "nitrogen ice": {
     maps: ["eris"],
     warp: [0.04, 0.14],

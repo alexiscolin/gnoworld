@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { jsonOf, placeIn } from "./json.ts";
 
-// The one JSON-or-nothing reader (D121), which the boundaries' near-copies share: a value, or undefined for text that is no JSON.
+// The one JSON-or-nothing reader, which the boundaries' near-copies share: a value, or undefined for text that is no JSON.
 describe("jsonOf", () => {
   it.each([
     ['{"a":[1,"b",null]}', { a: [1, "b", null] }],
@@ -53,7 +53,7 @@ describe("jsonOf", () => {
   });
 });
 
-// Where a fault sits in a data file (D122): the app's build and Jarvis's places name it the same way, never by its value.
+// Where a fault sits in a data file: the app's build and Jarvis's places name it the same way, never by its value.
 describe("placeIn", () => {
   it.each([
     [[], "(file)"],

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { neighboursOf, type LinkedWorld } from "./links.ts";
 
-// core/cosmos/links (slice 8's 8g): a plate's "Connected worlds", from the realms the file says import one another.
+// core/cosmos/links: a plate's "Connected worlds", from the realms the file says import one another.
 
 const r = (name: string) => `gno.land/r/${name}`;
 const world = (id: string, realms: LinkedWorld["realms"]): LinkedWorld => ({ id, realms });

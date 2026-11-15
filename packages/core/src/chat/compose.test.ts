@@ -90,7 +90,7 @@ describe("compose", () => {
     expect(compose(ROOM, "😀", NICK)).toStrictEqual(sent("PRIVMSG #bubble/games :😀", 442 - 27));
   });
 
-  // F1717: the connection refuses a line holding half of an emoji, which the box used to call "not ready yet".
+  // The connection refuses a line holding half of an emoji.
   test("refuses a draft holding a lone surrogate, one line or several, an action too", () => {
     for (const draft of ["\ud800", "a\udc00b", "x\n\ud800", "/me \ud83d", "😀"]) {
       expect(compose(ROOM, draft, NICK).kind).toBe(draft === "😀" ? "line" : "malformed");
@@ -130,7 +130,7 @@ describe("compose", () => {
   });
 });
 
-// draft/multiline (docs/decisions.md row 255): a draft of several lines is one message, each line a PRIVMSG within
+// draft/multiline: a draft of several lines is one message, each line a PRIVMSG within
 // one IRC line, the message within Ergo's caps (deploy/ergo/ircd.yaml.tmpl, held to by server/src/testing/
 // ergo.test.ts). A line over its budget is long, as one line alone is, and named.
 describe("compose: a draft of several lines", () => {
@@ -152,8 +152,8 @@ describe("compose: a draft of several lines", () => {
     });
   });
 
-  // F1603: the composer runs compose at each key, so a paste past the caps is refused by counting its breaks, with no
-  // line split, trimmed or built (1,000,000 lines took 176 ms a call before, 30 ms after, load 12).
+  // The composer runs compose at each key, so a paste past the caps is refused by counting its breaks, with no
+  // line split, trimmed or built.
   test("refuses a draft of a million lines by counting its breaks, splitting and trimming none", () => {
     const paste = Array.from({ length: 1_000_000 }, () => "abcdefghi").join("\n");
     const split = vi.spyOn(String.prototype, "split");
@@ -243,7 +243,7 @@ describe("compose: a draft of several lines", () => {
     expect(compose(ROOM, `${full}a`, NICK)).toStrictEqual({ kind: "tooBig", unit: "bytes", over: 1 });
   });
 
-  // The red pass (R9): compose's boundaries.
+  // compose's boundaries.
   test("reads a command on the first line alone: an unknown one sends nothing, // a slash, a later one is text", () => {
     expect(compose(ROOM, "/nick bob\nhello", NICK)).toStrictEqual({ kind: "unknown", command: "/nick" });
     expect(compose(ROOM, "//etc\nhello", NICK)).toMatchObject({ kind: "lines", lines: [to("/etc"), to("hello")] });

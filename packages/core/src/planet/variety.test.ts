@@ -1,4 +1,4 @@
-// Variety is measured, not counted (slice 7, 7b4; ADR-0002 §3): each world has a feature vector, its class, its minor class, the
+// Variety is measured, not counted (ADR-0002 §3): each world has a feature vector, its class, its minor class, the
 // palette's centre in Lab, what its surface shows and its rings and air, and two worlds are alike when a glance would take one for the
 // other. The bound on alike neighbours in a view is the golden in server/src/worlds/group.test.ts, on the recorded list and ten times it.
 // What a still shows: a cloud's drift and an octave's ratio do not.
@@ -124,7 +124,7 @@ describe("alike", () => {
     expect(alike(withMinor(0.3, "ice"), withMinor(0.3 + 0.4 * SAME_SHAPE * 1.1, "ice"))).toBe(false);
   });
 
-  // F4218: what is drawn, not only the recipe: a real map lends its detail, so two worlds on two maps are two worlds.
+  // What is drawn, not only the recipe: a real map lends its detail, so two worlds on two maps are two worlds.
   it("parts two worlds that lend their detail from two real maps, the dominant's or the minor's", () => {
     const [map, minorMap] = desert().maps;
     expect(alike(desert(), { ...desert(), maps: [map === "mars" ? "ceres" : "mars", minorMap] })).toBe(false);
@@ -139,7 +139,7 @@ describe("alike", () => {
     expect(alike(under, { ...under, maps: [map, otherMinor] })).toBe(true);
   });
 
-  // The reviewer's R1 (7b8): a world of continents shows its gather, and its minor is its bare ground, laid by its climate in BARE's
+  // A world of continents shows its gather, and its minor is its bare ground, laid by its climate in BARE's
   // colours: the minor class's name and map are drawn nowhere on it, so they part nothing.
   it("parts two worlds of continents by their gather, and never by a minor class or map they do not draw", () => {
     const path = asciiBytes("gno.land/r/gov/temperate");

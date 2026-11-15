@@ -1,4 +1,4 @@
-// The rail (ADR-0002 §1's row and §10; plan §9, question 7): the Earth first, then the worlds the reader follows (slice 8), then the trends, the most people here now and then, as
+// The rail (ADR-0002 §1's row and §10): the Earth first, then the worlds the reader follows, then the trends, the most people here now and then, as
 // who is here names hubs alone, the most callers; the rising worlds, against their own 14 days; the seeds, new worlds nobody here visited;
 // each world once, 25 at most. Its order holds: a world moves above one shown above it only once it is clearly ahead.
 import { mostPopular, titleOf, type LabelAsk } from "./labels.ts";
@@ -38,7 +38,7 @@ interface Held {
 }
 
 // A world's section: a seed shows as one whatever else it does, a rising world among the rising though people are here, and a trend is a
-// world with people here or, since who is here names hubs alone, callers the worlds' file counts.
+// world with people here or, as who is here names hubs alone, callers the worlds' file counts.
 function sectionOf({ kind, signals = {} }: RailAsk): RailSection | null {
   if (kind === "earth") return "earth";
   if (signals.uncharted === true) return "seed";
@@ -101,7 +101,7 @@ function sectionsOf(asks: readonly RailAsk[]): Map<RailSection, RailAsk[]> {
 }
 
 // The first `most` of `ranked` that have a title, in its order: a world only an address names is left out, and none is titled once `most`
-// are kept. ponytail: till then each is tried, so a file of 20,000 worlds only addresses name tries them all, about 40 ms (measured, 7i),
+// are kept. ponytail: till then each is tried, so a file of 20,000 worlds only addresses name tries them all, about 40 ms measured,
 // once a minute at most.
 function kept(ranked: readonly RailAsk[], section: RailSection, most: number): Held[] {
   const held: Held[] = [];

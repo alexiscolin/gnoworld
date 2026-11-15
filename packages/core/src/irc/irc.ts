@@ -1,6 +1,5 @@
 // IRCv3 lines: tags, source, command and parameters (modern.ircdocs.horse, "Message Format";
 // ircv3.net/specs/extensions/message-tags). Over WebSocket, one message is one line.
-// Written by Claude against the pairing's tests, Alexis away (docs/decisions.md, 2026-10-22).
 import { utf8Bytes } from "../text/utf8.ts";
 
 /** ASCII letters in upper case, or a three-digit numeric: made only by toIrcCommand and parseLine. */
@@ -88,7 +87,7 @@ function readParams(text: string): string[] {
 }
 
 // The rest of a line once its tags and their one space are read: source, command, parameters. It counts
-// whole, the spaces before its command too (F667); a source is never empty, as formatLine writes none (F669).
+// whole, the spaces before its command too; a source is never empty, as formatLine writes none.
 function readBody(whole: string, tags: Map<string, string>): IrcParsed {
   if (utf8Bytes(whole) > LINE_BYTES) return { ok: false, error: "body-too-long" };
   const body = whole.replace(/^ +/, "");

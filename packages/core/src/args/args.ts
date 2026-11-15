@@ -24,8 +24,8 @@ export type Args =
   | { ok: true; args: string[] }
   | { ok: false; why: "read" | "gnoweb" }
   | { ok: false; why: "fields"; problems: (Problem | undefined)[] };
-export type ReadFields = { ok: true; fields: CallField[] } | { ok: false; why: "write" | "gnoweb" };
-export type ReadArgs =
+type ReadFields = { ok: true; fields: CallField[] } | { ok: false; why: "write" | "gnoweb" };
+type ReadArgs =
   | { ok: true; literals: string[] }
   | { ok: false; why: "write" | "gnoweb" }
   | { ok: false; why: "fields"; problems: (Problem | undefined)[] };
@@ -114,11 +114,11 @@ function bytesProblem(text: string, length: number | undefined): Problem | undef
 }
 
 /** The hidden characters but newline and tab (bidi overrides, zero-width, escapes, the Hangul fillers): a card would draw text
- * unlike the signed bytes (D231). */
+ * unlike the signed bytes. */
 export const HIDDEN = new RegExp(`(?![\\n\\t])[${HIDDEN_CLASS}]`, "u");
 
 /** What a CallRequest refuses of any argument, whatever its field: a hidden character, an ill-formed text, or past 8,192 bytes.
- * `callArgs` does not: the request does, and a card asks both (packages/schemas/src/call.ts, D203, D231). */
+ * `callArgs` does not: the request does, and a card asks both (packages/schemas/src/call.ts). */
 export function textProblem(text: string): Problem | undefined {
   if (!text.isWellFormed() || hasHidden(text, "\n\t")) return "malformed";
   return utf8Bytes(text, 8192) > 8192 ? "long" : undefined;
@@ -158,7 +158,7 @@ function fieldsOf(params: readonly Param[], takes: (shape: Shape) => boolean): S
 
 function resolve(params: Params): Resolved {
   if (params?.[0]?.Type !== realmType()) return { ok: false, why: "read" };
-  // `...byte` is written `[]uint8` too, and the chain would refuse its call once signed and paid (answer 9c-1).
+  // `...byte` is written `[]uint8` too, and the chain would refuse its call once signed and paid.
   if (params.at(-1)?.Type === "[]uint8") return { ok: false, why: "gnoweb" };
   const fields = fieldsOf(params.slice(1), () => true);
   return fields === undefined ? { ok: false, why: "gnoweb" } : { ok: true, fields };
@@ -182,7 +182,7 @@ export function callArgs(params: Params, texts: readonly string[]): Args {
     : { ok: false, why: "fields", problems };
 }
 
-/** The most UTF-8 bytes a read's string argument holds: a read is a GET, its expression in hex in the address (D13301). */
+/** The most UTF-8 bytes a read's string argument holds: a read is a GET, its expression in hex in the address. */
 export const READ_STRING_MAX_BYTES = 256;
 
 type ReadResolved = { ok: true; fields: Shaped } | { ok: false; why: "write" | "gnoweb" };

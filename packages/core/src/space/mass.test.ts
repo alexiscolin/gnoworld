@@ -145,7 +145,7 @@ describe("massOf", () => {
     expect(size("a/mid") / size("a/quiet")).toBeCloseTo(1 + Math.log2(16) / 4, 6);
   });
 
-  // A golden, worked out once by this code (8n, after the push of the less used alone): any change to the layout's rule shows here.
+  // A golden, worked out once by this code: any change to the layout's rule shows here.
   it("lays a small cosmos where it always has", () => {
     const mass = massOf([
       space("gnoland", [world("gnoland/home", 90), world("gnoland/blog", 20)], ["gno.land/p/gnoland/ui"]),
@@ -240,7 +240,7 @@ describe("massOf", () => {
   });
 });
 
-// 8r: where StrykerJS found massOf loose (8n's run, 2026-11-05). The survivors no input tells apart are in the ledger, F5518.
+// Where StrykerJS found massOf loose; the survivors no input tells apart are left.
 describe("massOf's particles: their spread, sizes, tones and pushes", () => {
   // A particle's place, size and tone, by its key, read through byKey.
   const particlesOf = (mass: Mass) => {
@@ -348,7 +348,7 @@ describe("massOf's particles: their spread, sizes, tones and pushes", () => {
     expect(apart / (first.radius + second.radius)).toBeCloseTo(MASS.gap, 9);
   });
 
-  // Goldens, worked out once by this code (8r): the places a normal law's sign or angle gives, and a seventh pass, change no rule above.
+  // Goldens, worked out once by this code: the places a normal law's sign or angle gives, and a seventh pass, change no rule above.
   // A retune of MASS or of the walks moves them: work them out again, and say why in the commit.
   it("lays a small cosmos's particles where they always have stood", () => {
     const mass = massOf([

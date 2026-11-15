@@ -18,7 +18,7 @@ const KEPT = [
   "dark carbon",
   "shattered",
 ] as const;
-// Each a real body or a documented kind of planet (Alexis, 2026-11-02); the references are in more.ts.
+// Each a real body or a documented kind of planet; the references are in more.ts.
 const MORE = [
   "nitrogen ice",
   "grooved ice",
@@ -38,7 +38,7 @@ export type Anchor = (typeof ANCHORS)[number];
 export type KeptAnchor = (typeof KEPT)[number];
 export type MoreAnchor = (typeof MORE)[number];
 
-/** The small set of real maps every world takes its fine detail from; the Earth's is the Earth's alone (F4223). */
+/** The small set of real maps every world takes its fine detail from; the Earth's is the Earth's alone. */
 export const MAPS = ["mars", "moon", "venus", "jupiter", "ceres", "eris", "neptune", "haze"] as const;
 export type MapName = (typeof MAPS)[number];
 

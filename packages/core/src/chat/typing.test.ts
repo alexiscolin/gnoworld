@@ -40,7 +40,7 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     expect(typingAt(again, NOW + 10_000)).toEqual([ALICE]);
   });
 
-  // The red pass (R12): an active after a paused counts from the active, never the later of the two ends.
+  // An active after a paused counts from the active, never the later of the two ends.
   test("gives an active after a paused its own 6 s, the paused's 30 s gone", () => {
     const paused = after(undefined, typing(ALICE, "paused"));
     const active = after(paused, typing(ALICE, "active"), NOW + 1_000);
@@ -48,7 +48,7 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     expect(typingAt(active, NOW + 7_000)).toEqual([]);
   });
 
-  // The red pass (R6): the page's clock, never the server's time tag, which a skewed clock would misread.
+  // The page's clock, never the server's time tag, which a skewed clock would misread.
   test.each([
     ["an hour before", "2026-10-25T09:00:00.000Z"],
     ["an hour after", "2026-10-25T11:00:00.000Z"],
@@ -63,7 +63,7 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     });
   });
 
-  // The red pass (R7): a guest's line has no account tag; the source's nick is who types, an account tag aside.
+  // A guest's line has no account tag; the source's nick is who types, an account tag aside.
   test("shows a guest typing, its TAGMSG with no account tag", () => {
     expect(typingAt(after(undefined, read("@+typing=active :guest-ab12cd!u@h TAGMSG #bubble")), NOW)).toEqual([
       "guest-ab12cd",
@@ -88,7 +88,7 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     expect(typingAt(after(both, message), NOW)).toEqual([BOB]);
   });
 
-  // The red pass (R19): my own PART or KICK leaves the room, its typists with it, as Who's here empties.
+  // My own PART or KICK leaves the room, its typists with it, as Who's here empties.
   test.each([
     ["my PART", read(`:${ME}!u@h PART #bubble`)],
     ["my KICK", read(`:gnoworld!u@h KICK #bubble ${ME} :out`)],
@@ -111,7 +111,7 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     ["a TAGMSG to a nick", typing(ALICE, "active", ME)],
     ["another room's line", read(`@msgid=a;time=${T0} :${ALICE}!u@h PRIVMSG #garden :hi`)],
     ["a PART of another room", read(`:${ALICE}!u@h PART #garden`)],
-    // The red pass (R18): a replayed line of the typist's is history, not news of it.
+    // A replayed line of the typist's is history, not news of it.
     ["its line replayed", read(`@batch=h1;msgid=a;time=${T0} :${ALICE}!u@h PRIVMSG #bubble :hi`)],
     ["its PART replayed", read(`@batch=h1 :${ALICE}!u@h PART #bubble`)],
     ["its QUIT replayed", read(`@batch=h1 :${ALICE}!u@h QUIT :gone`)],
@@ -137,7 +137,7 @@ describe("typingAfter: who is typing in a room, from IRCv3's +typing", () => {
     expect(after(both, typing(BOB, "done"), NOW + TYPING_ACTIVE_MS)).toBeUndefined();
   });
 
-  // The red pass (R8): a nick is any word, the names of Object's own keys among them.
+  // A nick is any word, the names of Object's own keys among them.
   test("holds a typist named __proto__ as its own key, and lets it go on its done", () => {
     const held = after(undefined, typing("__proto__", "active"));
     expect(Object.keys(held ?? {})).toEqual(["__proto__"]);

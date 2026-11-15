@@ -1,6 +1,6 @@
-// The home's dive (7d7; Alexis, 2026-11-02): from the whole cosmos down to the view at rest in a few seconds, the Earth ahead all the way.
+// The home's dive: from the whole cosmos down to the view at rest in a few seconds, the Earth ahead all the way.
 // A pure path from the eye it ends on: its distance eased in its log, so the Earth grows at an even pace and lands with no snap, its slant
-// and its turn eased with it. A flight can take it too (7g).
+// and its turn eased with it. A flight can take it too.
 import { EARTH_PLACE } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
 import { lerp, smootherstep } from "../space/smooth.ts";
@@ -8,12 +8,12 @@ import { DEGREE, eyeInto } from "./restLook.ts";
 
 /** Its timings, in seconds: the whole cosmos fading in, the way down; under reduced motion the cosmos held still, then its dissolve; and
  * how long the canvas stays unseen, a loader in its place, for all the first frame draws before the dive starts with what is ready
- * (Alexis, 2026-11-07: the loading lasts 2 to 3 s at most). */
+ * (the loading lasts 2 to 3 s at most). */
 export const DIVE = { fade: 0.8, seconds: 5.5, hold: 1.6, dissolve: 1.2, wait: 2.5 } as const;
 
 // Where it starts: as near as the whole cosmos still holds the view (680) when its fade-in ends; over the disc; round from where it ends,
-// its turn done half way. On Onyx it opens on no ray of the systems' seats (the design review of 7d7): from the Earth's fixed eye (7x2),
-// -59 degrees round, where -55 opened on one; a few degrees off, one shows: the seats' lattice is 7d1's (7d8).
+// its turn done half way. On Onyx it opens on no ray of the systems' seats: from the Earth's fixed eye,
+// -59 degrees round, where -55 opened on one; a few degrees off, one shows: the seats lie on a lattice.
 const FROM = 760;
 const SLANT = 34 * DEGREE;
 const TURN = -59 * DEGREE;

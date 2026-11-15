@@ -19,7 +19,7 @@ import {
 
 const cur = () => ({ Name: "cur", Type: realmType() });
 const param = (type: string, name = "x") => ({ Name: name, Type: type });
-// A last `[]uint8` may be `...byte` (answer 9c-1): each kind is judged before a last bool.
+// A last `[]uint8` may be `...byte`: each kind is judged before a last bool.
 const call = (type: string, text: string) => {
   const done = callArgs([cur(), param(type), param("bool", "end")], [text, "true"]);
   return done.ok ? { ok: true as const, args: done.args.slice(0, -1) } : done;
@@ -727,9 +727,9 @@ describe("the index", () => {
   });
 });
 
-// Slice 13, B (plan §3): a read's arguments enter a `vm/qeval` expression the chain runs whatever it says, so they are written as Go
+// A read's arguments enter a `vm/qeval` expression the chain runs whatever it says, so they are written as Go
 // literals alone. A first `realm` parameter is a write: qeval injects `cur` (gno v1.5.0 keeper.go:1924) and runs it on a store thrown
-// away. onyx-1, gnomcp, 2026-11-10, in r/gnoland/wugnot: `len("a\tb\n\"\\é")` is `(8 int)`; see the integers for the rest.
+// away. Read on onyx-1, in r/gnoland/wugnot: `len("a\tb\n\"\\é")` is `(8 int)`; see the integers for the rest.
 
 const READ_PROPERTY = { seed: 20261110, numRuns: 400 };
 const literal = (type: string, text: string) => {
@@ -947,7 +947,7 @@ describe("readArgs: bool and integers, their canonical text alone", () => {
     expect(problem(type, text)).toBe(why);
   });
 
-  // onyx-1, gnomcp, 2026-11-10, r/gnoland/wugnot: `int64(-9223372036854775808)` and `uint64(18446744073709551615)` read as written;
+  // Read on onyx-1, r/gnoland/wugnot: `int64(-9223372036854775808)` and `uint64(18446744073709551615)` read as written;
   // `BalanceOf("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5")` is `(0 int64)`, a quoted string into an `address` (qfuncs writes `string`).
   it("property: an integer in its width's range is written as its decimal text, one out of it is refused", () => {
     const widths: [string, bigint, bigint][] = [

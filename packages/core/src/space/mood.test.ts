@@ -221,7 +221,7 @@ describe("heightField, a smooth field of position", () => {
     expect(new Set(samples.map((h) => h.toFixed(3))).size).toBeGreaterThan(1_000);
   });
 
-  // Alexis, 2026-11-02, "l'espace n'est pas en 2D": the noise is no longer cubed, so the clusters stand clear of the plane, not near it.
+  // The noise is not cubed, so the clusters stand clear of the plane, not near it.
   it("lifts the clusters clear of the plane: most of the way a system's height is a cell's fifth or more", () => {
     const samples = Array.from({ length: 10_000 }, (_, i) =>
       Math.abs(heightField((i % 100) * CELL * 4, Math.floor(i / 100) * CELL * 4)),

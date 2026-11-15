@@ -1,4 +1,4 @@
-// The dive's one move (D401): van Wijk and Nuij's smooth zoom ("Smooth and efficient zooming and panning", 2003), the path between
+// The dive's one move: van Wijk and Nuij's smooth zoom ("Smooth and efficient zooming and panning", 2003), the path between
 // two views that keeps the speed the eye perceives steady. It goes in a straight line and rises (widens the view) only when the two
 // are far apart for their sizes, so what it goes to never drifts off the screen and comes back. A view is what it looks at and how
 // wide it sees: here the camera's distance to what it looks at.
@@ -6,7 +6,7 @@
 /** How much the path prefers rising to panning: √2 is the paper's; the demo's feel is 1.42. */
 export const ZOOM_RHO = 1.42;
 
-/** A flight's seconds by its path's length: from 1.3 to 3.4 s (the demo Alexis validated, 2026-11-08). */
+/** A flight's seconds by its path's length: from 1.3 to 3.4 s. */
 export const zoomSeconds = (length: number): number => Math.min(3.4, Math.max(1.3, 1.15 + length * 0.42));
 
 /** The path from a view `from` wide to one `to` wide whose centres are `apart`: its length, and what `glideAt` reads it by. */

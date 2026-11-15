@@ -4,8 +4,8 @@ import { describe, expect, it } from "vitest";
 import type { Bubble, BubbleMessage, Count, LatLon, PickArgs, Picked, Rules, Viewer } from "@gnoworld/core/bubbles";
 import rules from "../../../../app/data/bubbles.json" with { type: "json" };
 
-// Slice 6's F3371: slices 7j and 7f start from 6a's types, so the package exposes them as a subpath, the way schemas
-// exposes `proposal` and `indexer`. The main entry stays as it is: the first screen's bytes do not carry the bubbles.
+// The package exposes the bubbles as a subpath, the way schemas exposes `proposal` and `indexer`. The main entry does not
+// carry them: the first screen's bytes.
 describe("@gnoworld/core/bubbles", () => {
   it("gives the pick, the cut, the turn, the far side and the table's lookup", () => {
     expect(Object.keys(bubbles).sort()).toEqual([

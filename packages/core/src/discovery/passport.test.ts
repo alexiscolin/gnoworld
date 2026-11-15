@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { constellationsOf, markFirst, passportCount, stampedIn, stampKey } from "./passport.ts";
 
-// The passport (slice 8; ADR-0002 §1 and §3): a stamp per world, keyed "universe:world"; progress per constellation, each world once; the
+// The passport (ADR-0002 §1 and §3): a stamp per world, keyed "universe:world"; progress per constellation, each world once; the
 // header's counter out of the worlds the reader's view lists.
 describe("the passport's stamps", () => {
   it("keys a world by its universe and its id", () => {

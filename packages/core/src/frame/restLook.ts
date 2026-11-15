@@ -1,4 +1,4 @@
-// How the view at rest is seen (slice 7d6): a camera at an eye on the map looking at the Earth, the disc's up kept up, and what a body
+// How the view at rest is seen: a camera at an eye on the map looking at the Earth, the disc's up kept up, and what a body
 // covers on the screens the view is composed for. Plain numbers, for the search reads thousands of them.
 import { EARTH_PLACE, EARTH_RADIUS, type Orbiter, type StarSystem } from "../cosmos/system.ts";
 import type { Point } from "../space/cell.ts";
@@ -7,7 +7,7 @@ import { orbitPlace } from "./disc.ts";
 import { outlineOf, type Outline } from "./outline.ts";
 
 /** The home's lens, in degrees, up and down, which the scene's camera takes while the cosmos shows: 1.2 times the scene's 50 degrees'
- * magnification (Alexis, 2026-11-03, "tout pourrait être un peu plus gros"; 1.25 left Onyx no view with its close world and two
+ * magnification (1.25 left Onyx no view with its close world and two
  * postcards). Every other page keeps 50 degrees. A number: a call at a module's top stays in every chunk that imports core. */
 export const FIELD_OF_VIEW = 42.47122885453438;
 /** The screens the view is composed for, in the page's pixels: the video's, and a 16:9 window of its height. */
@@ -17,7 +17,7 @@ export const REST_SCREENS = [
 ] as const;
 /** The hero's room, as shares of the screen: left of `right`, under `top`. */
 export const HERO_ZONE = { right: 0.45, top: 0.58 } as const;
-/** A system's card's room at its views (7v, the GUI board's option B: 104 to 195 px down, its name 370 px across at most, on the video's
+/** A system's card's room at its views (104 to 195 px down, its name 370 px across at most, on the video's
  * screen), as shares of the screen: left of `right`, over `bottom`. */
 export const CARD_ZONE = { right: 0.25, bottom: 0.2 } as const;
 /** The great star's heart, in pixels: no body stands on it. */
@@ -83,7 +83,7 @@ export const eyeAt = (distance: number, slant: number, turn: number): Point => {
 
 const MAP_UP: Point = { x: 0, y: 1, z: 0 };
 
-/** A camera at `eye`, on the map, looking at `target`, `upright` kept up: the disc's, or a Plan's own plane's (7v). */
+/** A camera at `eye`, on the map, looking at `target`, `upright` kept up: the disc's, or a Plan's own plane's. */
 export function cameraTowards(eye: Point, target: Point, upright: Point = MAP_UP): Camera {
   const ahead = direction(minus(target, eye));
   const right = direction({
@@ -125,7 +125,7 @@ export class Look {
   readonly star: Seen;
   readonly #focal: number;
 
-  /** Through `fieldOfView` degrees, the home's lens unless the view has one of its own (a Plan's, 7v). */
+  /** Through `fieldOfView` degrees, the home's lens unless the view has one of its own (a Plan's). */
   constructor(camera: Camera, { width, height }: Screen, fieldOfView = FIELD_OF_VIEW) {
     this.camera = camera;
     this.width = width;
@@ -159,7 +159,7 @@ export class Look {
   }
 
   /** Whether a body there, `margin` pixels round, leaves clear the Earth from in front, the great star's heart and the page's text: the
-   * hero, or at a system's view, where the hero gives way, its card (7v). */
+   * hero, or at a system's view, where the hero gives way, its card. */
   clear(at: Seen, margin: number, page: "hero" | "card" = "hero"): boolean {
     if (at.depth <= 0) return true;
     const { earth, star, width, height } = this;

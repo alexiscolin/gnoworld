@@ -23,7 +23,7 @@ const DOTS_A_STAR = 1024;
 const DOTS_FLOOR = BOUNDS.dots / BOUNDS.stars;
 /** A body under this many pixels of radius is a point: its bound goes to what the eye can tell is a world. */
 export const BODY_PIXELS = 6;
-/** The least radius the view at rest draws a world at, in pixels (7p): 1.5 times a body's, so it is a body still on a screen a third
+/** The least radius the view at rest draws a world at, in pixels: 1.5 times a body's, so it is a body still on a screen a third
  * smaller. */
 export const DRAWN_LEAST = 1.5 * BODY_PIXELS;
 // A point's radius in pixels never falls under this: a pixel across, and it goes out by `MIDDLE`.
@@ -172,7 +172,7 @@ export class Ladder {
     }
   }
 
-  // Two passes by star, nearest first (F3568, F3577): each its floor, then a share each of what is left, so no crowd, nor four, starve a near world.
+  // Two passes by star, nearest first: each its floor, then a share each of what is left, so no crowd, nor four, starve a near world.
   #addDots(drawn: Drawn): void {
     for (let index = 0; index < drawn.starCount; index += 1) {
       const at = drawn.stars[index] ?? 0;

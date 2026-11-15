@@ -1,4 +1,4 @@
-// Layer 2 of ADR-0002 §3 as data: each surface value, its unit and its whole span, the one place 7b5 reads its uniforms' names from,
+// Layer 2 of ADR-0002 §3 as data: each surface value, its unit and its whole span, the one place its uniforms' names are read from,
 // and each anchor's span of it. A value no class of a kind can show is a point at 0: craters on a gas, bands on a ground. Tier 1.
 import type { Anchor } from "./anchors.ts";
 import { ROWS } from "./rows.ts";
@@ -44,7 +44,7 @@ const GAS: Spans = { bands: [8, 24], turbulence: [0.2, 0.8], storms: [0, 0.6] };
 
 const SPANS: Record<Anchor, Spans> = {
   rocky: { craters: [0.55, 1], erosion: [0, 0.25], rifts: [0, 0.2] },
-  // Rougher, so its coasts break; from an archipelago to one supercontinent; its ice at the poles alone to past 50 degrees (Alexis, 7b8).
+  // Rougher, so its coasts break; from an archipelago to one supercontinent; its ice at the poles alone to past 50 degrees.
   temperate: {
     sea: [0.45, 0.65],
     erosion: [0.4, 0.9],

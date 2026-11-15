@@ -1,5 +1,4 @@
-// The links the worlds' file holds between worlds (ADR-0002 §10): a realm of one importing a realm of another. The whole cosmos was to draw them as
-// lines (7u2, put off), a plate lists a world's (8g); a link means an import the file holds and nothing else.
+// The links the worlds' file holds between worlds (ADR-0002 §10): a realm of one importing a realm of another. A plate lists a world's; a link means an import the file holds and nothing else.
 
 /** A world of the file, as its links read it: its realms' paths and what each imports. */
 export interface LinkedWorld {
@@ -37,7 +36,7 @@ export interface Neighbour {
   readonly called: boolean;
 }
 
-/** The worlds the file links to world `id` (a plate's "Connected worlds", 8g): each once, the ones that call it first, then by id. */
+/** The worlds the file links to world `id` (a plate's "Connected worlds"): each once, the ones that call it first, then by id. */
 export function neighboursOf(worlds: readonly LinkedWorld[], id: string): Neighbour[] {
   const held = holders(worlds);
   const at = worlds.findIndex((world) => world.id === id);

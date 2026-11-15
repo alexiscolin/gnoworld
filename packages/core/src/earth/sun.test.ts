@@ -58,7 +58,7 @@ describe("subSolarPoint", () => {
   });
 });
 
-// Worked out apart from this code: Kepler's equation on JPL's mean elements, with the true pole (the review's script, 2026-11-02). The code's
+// Worked out apart from this code: Kepler's equation on JPL's mean elements, with the true pole. The code's
 // longitude stands 0.34° east of it, by design: that is the precession between the Earth Rotation Angle and the sidereal time in 2026.
 const PRECESSION = 0.34;
 const NEAR = 0.02;

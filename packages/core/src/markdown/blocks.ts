@@ -1,4 +1,4 @@
-// The block reader (slice 4's 4c), shared by the chat and a realm's page (5h): lines read into blocks, a quote's inside
+// The block reader, shared by the chat and a realm's page: lines read into blocks, a quote's inside
 // read again one level deeper. A dialect (`Grammar`) adds what only a page knows: the blocks of its own, the head of an
 // alert, a line's marks; the chat's has none, so the chat's page of rules is unchanged. Linear in the lines.
 import { inline } from "./inline.ts";
@@ -13,7 +13,7 @@ const FENCE = /^(`{3,})[^`]*$/;
 const ITEM = /^(?:[-*+]|(\d{1,9})\.) (.*)$/s;
 
 // A list's item, its number if any and its text; none for an item with nothing in it, which stays text, as an empty
-// quote does (F782).
+// quote does.
 function itemOf(body: string): { number: string | undefined; text: string } | undefined {
   const item = ITEM.exec(body);
   const text = (item?.[2] ?? "").trim();
@@ -153,7 +153,7 @@ export class Blocks<Extra> {
   // A list's items, one a line, each led by a mark of the first one's kind (a bullet, any of three, or a number); a
   // line that is not ends it.
   #list(at: number): Read<Extra> {
-    // An ordered list counts from its first number, the sender's own (F780).
+    // An ordered list counts from its first number, the sender's own.
     const first = itemOf(this.#body(at))?.number;
     const ordered = first !== undefined;
     const items: Inline[][] = [];

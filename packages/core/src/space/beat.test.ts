@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { BLOCK_MS } from "../planet/activity.ts";
 import { beatAt } from "./beat.ts";
 
-// The sun's beat (ADR-0001 §7, "gno.land as the sun, pulsing on each block"; plan answer 11): the great star swells once a block, at the
+// The sun's beat (ADR-0001 §7, "gno.land as the sun, pulsing on each block"): the great star swells once a block, at the
 // chain's pace from the time the worlds' file was written, and rests between. A sign: a file read more than an hour from its writing (the
 // job missed two passes) tells no pace, so it gives none; one read fresh keeps beating as long as the page stays.
 const HOUR = 3_600_000;

@@ -24,8 +24,8 @@ const guest = (id: string, minute: number, text: string): Line => ({
 });
 const texts = (lines: readonly Line[]) => lines.map(({ id, text }) => `${id}:${text}`);
 
-// 4d: an edit names the line it corrects (+gnoworld/edit); the room shows the correction in its line's place, marked
-// edited, when the same account wrote both, the edit after its line, in the same room (F664); any other stays a line of
+// An edit names the line it corrects (+gnoworld/edit); the room shows the correction in its line's place, marked
+// edited, when the same account wrote both, the edit after its line, in the same room; any other stays a line of
 // its own. A line no edit corrects is shown as it is held.
 describe("shownLines: a room's lines as shown, each edit in its line's place", () => {
   test("shows an edit by the line's own account in its place, marked edited, and not as a line of its own", () => {
@@ -111,7 +111,7 @@ describe("shownLines: a room's lines as shown, each edit in its line's place", (
     expect(texts(shownLines(lines))).toEqual(["__proto__:uno", "constructor:dos", "e3:tres"]);
   });
 
-  // The code review (CR5): what a plain client answers or reacts to by the edit's own msgid reaches the line.
+  // What a plain client answers or reacts to by the edit's own msgid reaches the line.
   test("names each folded edit's line by the edit's msgid, and no edit kept a line of its own", () => {
     const lines = [
       line("a", 0, "helo"),
@@ -131,7 +131,7 @@ describe("shownLines: a room's lines as shown, each edit in its line's place", (
   });
 });
 
-// F1181 (the simplify pass's A2): the room's lines as shown and each folded edit's line come from one fold, which the
+// The room's lines as shown and each folded edit's line come from one fold, which the
 // room's lines view and its reply lookup each ask once.
 describe("foldEdits: the shown lines and the folded edits together", () => {
   const lines = [line("a", 0, "helo"), line("b", 1, "next"), { ...line("e", 2, "hello"), ...{ edits: "a" } }];
@@ -151,7 +151,7 @@ describe("foldEdits: the shown lines and the folded edits together", () => {
   });
 });
 
-// slice-4-room-edit, security: a corrected line shows its newest edit's words under its own msgid, and what is checked of
+// Security: a corrected line shows its newest edit's words under its own msgid, and what is checked of
 // a line (the moderation's verdict) is checked by msgid: the reader needs the edit's msgid, to wait on the edit's verdict.
 describe("foldEdits: the newest edit each corrected line shows", () => {
   test("names, by the line's msgid, the newest edit folded into it", () => {
@@ -180,7 +180,7 @@ describe("foldEdits: the newest edit each corrected line shows", () => {
   });
 });
 
-// The room edit's red pass (R1): a REDACT of a line takes with it the corrections shown in its place, and one of a
+// A REDACT of a line takes with it the corrections shown in its place, and one of a
 // correction alone is held back while its line is held.
 describe("redactedLines: a REDACT of a line and of its corrections", () => {
   const read = (text: string): IrcMessage => {
@@ -248,7 +248,7 @@ describe("redactedLines: a REDACT of a line and of its corrections", () => {
   });
 });
 
-// CR5 of the room edit: one rule for the menu's Edit and the composer's, which each held a part of it.
+// One rule for the menu's Edit and the composer's, which each held a part of it.
 describe("canEdit", () => {
   const mine = line("a", 1, "mine");
   test("is true for a message of the reader's own", () => {
@@ -267,8 +267,8 @@ describe("canEdit", () => {
   });
 });
 
-// The composer asks for one line as shown, which a fold of the whole conversation answered on each render while a reply or an
-// edit was open (the complexity review of the room edit): one pass answers the same.
+// The composer asks for one line as shown, which a fold of the whole conversation would answer on each render while a reply or an
+// edit is open: one pass answers the same.
 describe("shownLine: one line as shownLines shows it", () => {
   // A correction of `of` by the account of the line, at `minute`; `over` changes its other fields.
   const edit = ([id, minute]: [string, number], of: string, over: Partial<Line> = {}): Line => ({

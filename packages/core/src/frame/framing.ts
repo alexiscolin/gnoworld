@@ -1,4 +1,4 @@
-// A system's dynamic view's framing (part 7v), each screen it is judged on: its nearest world cut by the frame and the largest, or whole as
+// A system's dynamic view's framing, each screen it is judged on: its nearest world cut by the frame and the largest, or whole as
 // the others, the others whole under the header, all off the star's heart and in no crowd, pile or row. Apart from the search
 // for the angle (arrival.ts), which reads it.
 import { composed, upright } from "./composition.ts";
@@ -7,7 +7,7 @@ import { BANDS } from "./bands.ts";
 import { CARD_ZONE, placeOf, STAR_HEART, type Look, type Seen } from "./restLook.ts";
 
 // The near world shows this share of itself each way, and stands 1.5 times every other's size or more (the depth's own, depth.ts); a tenth
-// of the height across at the least, for worlds under their crowd's cap stand smaller than at it (F4468), half the height at most.
+// of the height across at the least, for worlds under their crowd's cap stand smaller than at it, half the height at most.
 const SHOWN = 0.3;
 const NEAR_OVER = 1.5;
 const [NEAR_LEAST, NEAR_MOST] = [0.1, 0.5];
@@ -34,7 +34,7 @@ const cutByFrame = (look: Look, at: Seen, least: number) =>
   (at.left < 0 || at.right > look.width || at.bottom > look.height) && leastShown(look, at) >= least;
 
 // Three worlds or more whose spread across stands within 40 degrees of their spread up, a column: g1magld5's blog, streak and agents on one
-// side of their star (the design review's second pass, F4468), as the home's columns.
+// side of their star, as the home's columns.
 const columned = (worlds: readonly Seen[]) => {
   const [across, up] = [worlds.map(({ x }) => x), worlds.map(({ y }) => y)];
   const corner = (pick: (...values: number[]) => number) => ({ x: pick(...across), y: pick(...up) });
@@ -42,13 +42,12 @@ const columned = (worlds: readonly Seen[]) => {
 };
 
 const offHeart = (spot: Seen, star: Seen) => Math.hypot(spot.x - star.x, spot.y - star.y) - spot.radius >= STAR_HEART;
-// Off the system's card at the top left, which a ringed giant stood over in g1magld5's view (the design review's second pass, F4472).
+// Off the system's card at the top left, which a ringed giant stood over in g1magld5's view.
 const offCard = (look: Look, spot: Seen) =>
   spot.left >= CARD_ZONE.right * look.width || spot.top >= CARD_ZONE.bottom * look.height;
 
 /** On one screen: the nearest world cut by the frame, half the height across at most, 1.5 times every other's size or more, or where `cut`
- * is not asked whole as the others; off the star's heart; the others whole under the header and off it; in no crowd, pile or row (7d6's
- * rules). */
+ * is not asked whole as the others; off the star's heart; the others whole under the header and off it; in no crowd, pile or row. */
 export function frames(look: Look, card: Card, cut: boolean): boolean {
   const { star, worlds } = seenOf(look, card);
   const [near, ...others] = worlds;

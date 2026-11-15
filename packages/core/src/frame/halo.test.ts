@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { systemsOf, type StarSystem } from "../cosmos/system.ts";
 import { glowsAt, HALO_FAR, haloAt, mainSizeOf, OTHER_SUN, pointReach, sunReach } from "./halo.ts";
 
-// A star's halo by its distance from the eye (7d6, 7d3), and a sun's size on the screen: whole near, a point far, and no two suns at
+// A star's halo by its distance from the eye, and a sun's size on the screen: whole near, a point far, and no two suns at
 // different distances one size, the nearer the larger, every other under half the main light's (the not-a-planetarium rule).
 const system = (namespace: string, worlds = 3) =>
   systemsOf(
@@ -70,7 +70,7 @@ describe("a sun's size", () => {
   });
 });
 
-// 8r: halo.ts's numbers, pinned where StrykerJS found them loose (8n's run, 2026-11-05). A star of size 4 reaches 7.5 * 2 + 2 = 17 on
+// halo.ts's numbers, pinned where StrykerJS found them loose. A star of size 4 reaches 7.5 * 2 + 2 = 17 on
 // the map; a point is 10 pixels of radius; the main light's halo is 320 pixels at its widest.
 describe("a sun's reach in numbers", () => {
   const sized = (star: number): StarSystem => ({

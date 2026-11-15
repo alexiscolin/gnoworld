@@ -6,8 +6,8 @@ import { Look, looksFrom, type Seen } from "../frame/restLook.ts";
 import { onOrbit, stationsRound, type Placed } from "./round.ts";
 import { earthCamera, sceneryOf } from "./scenery.ts";
 
-// Where the stations stand, pinned where StrykerJS found round.ts loose (8n's run, 2026-11-05): the rules on inputs where each decides,
-// found by running every survivor on many asked files. The survivors no input tells apart are in the ledger, F5518.
+// Where the stations stand, pinned where mutation testing found round.ts loose: the rules on inputs where each decides, found by
+// running every survivor on many asked files.
 const ring: MoonRing = { reach: 2.2, tilt: 0.3, roll: 0.2, moon: 0.27, rest: 1 };
 const TURN = 2 * Math.PI;
 
@@ -65,14 +65,14 @@ describe("stationsRound", () => {
       (_, n) => stationsRound([{ seed: `alone ${String(n)}`, size: 0.5 }], ring).close[0],
     );
     const reach = alone.flatMap((one) => (one === undefined ? [] : [one.orbit.reach / EARTH_RADIUS]));
-    // With the Earth at x -12 (D459) 2 in 200 find no clear place and light the belt; the others stand at 4.34 Earth radii on average
-    // (measured 2026-11-09), where the first clear place in the draws' own order would stand near 5.6.
+    // With the Earth at x -12, 2 in 200 find no clear place and light the belt; the others stand at 4.34 Earth radii on average,
+    // where the first clear place in the draws' own order would stand near 5.6.
     expect(alone.length - reach.length).toBeLessThanOrEqual(5);
     expect(reach.reduce((sum, one) => sum + one, 0) / reach.length).toBeLessThan(4.8);
   });
 
-  // D349: each station stands at the clear place farthest from those standing. On 40 random sets of four, the median least gap between
-  // two on the view at rest is 123 px; the nearest clear place instead gives 56 (measured 2026-11-07).
+  // Each station stands at the clear place farthest from those standing. On 40 random sets of four, the median least gap between
+  // two on the view at rest is 123 px; the nearest clear place instead gives 56.
   it("spreads the stations on the view at rest: the least gap between two, median over random sets, at 90 px or more", () => {
     const [look] = looksFrom(earthCamera());
     if (look === undefined) throw new Error("no screen");
@@ -123,7 +123,7 @@ describe("stationsRound", () => {
     ).toBe(true);
   });
 
-  // 7x: every rule a body stands by, on each of the video's screens, with what was placed before it: the files where each decides.
+  // Every rule a body stands by, on each of the video's screens, with what was placed before it: the files where each decides.
   it("stands every body off the Earth, the page, the Moon's path and the planets, and composed with those before it, on every screen", () => {
     const planets = sceneryOf();
     for (const asked of files(10, 16)) {

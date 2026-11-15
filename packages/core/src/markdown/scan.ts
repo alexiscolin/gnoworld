@@ -1,4 +1,4 @@
-// What the line reader looks at around a place (slice 4's 4c): runs of one character, the characters on either
+// What the line reader looks at around a place: runs of one character, the characters on either
 // side of a run, whole, the word bounds a mark's run opens and closes at, and the line's runs of backticks.
 
 const SPACE = /\s/u;

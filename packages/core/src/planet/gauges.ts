@@ -31,7 +31,7 @@ export const scaleOf = (count: number, top: number): number =>
 const rung = (count: number, busiest: number) => scaleOf(count, Math.max(busiest, QUIET_TOP));
 
 // The universe of the day is read at a high rank, not at its busiest world: one world of a thousand sybil callers would halve every other's
-// use (F4111). Nearest rank, each half apart.
+// use. Nearest rank, each half apart.
 const RANK = 0.95;
 
 const rankOf = (values: readonly number[]) => {

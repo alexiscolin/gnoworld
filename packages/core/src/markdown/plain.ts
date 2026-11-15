@@ -1,4 +1,4 @@
-// A message's words in one line (slice 4's 4d): what a reply's quote and the composer's reply bar show of the line
+// A message's words in one line: what a reply's quote and the composer's reply bar show of the line
 // answered, read as the room reads it (markdown.ts), its marks gone, its parts joined by a space, so what the room
 // shows as text stays text; and those words cut to a length, between two graphemes.
 import { firstGraphemes } from "./graphemes.ts";

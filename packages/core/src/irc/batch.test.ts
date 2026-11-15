@@ -216,7 +216,7 @@ describe("BatchReader: Ergo's batches, each handed on whole at its end", () => {
   });
 });
 
-// draft/multiline (slice 4, docs/decisions.md row 255): a message of several lines is a batch whose opening line
+// draft/multiline: a message of several lines is a batch whose opening line
 // carries its id, time and account (Ergo's composeMultilineBatch, irc/client.go, v2.19.1); inside a history page it
 // sits as a batch of its own in its place (irc/responsebuffer.go, AddSplitMessageFromClient's nested batch).
 describe("BatchReader: a message of several lines (draft/multiline)", () => {
@@ -248,7 +248,7 @@ describe("BatchReader: a message of several lines (draft/multiline)", () => {
     expect(page.kind === "done" ? page.batch.messages[1]?.tags.get("msgid") : undefined).toBe("m2");
   });
 
-  // The red pass (R2, R3): the relay is untrusted, a nested multiline batch held to the reader's bounds.
+  // The relay is untrusted, a nested multiline batch held to the reader's bounds.
   const nested = (ref: string, parent = "h1") => `@batch=${parent};${OPENED.slice(1).replace("+ml", `+${ref}`)}`;
   const partOf = (ref: string, text: string) => read(`@batch=${ref} :a!u@h PRIVMSG #bubble :${text}`);
   const pageOf = (done: Batched) => (done.kind === "done" ? texts(done.batch.messages) : ["not done"]);
@@ -308,7 +308,7 @@ describe("BatchReader: a message of several lines (draft/multiline)", () => {
     expect(page.at(-1)).toBe(`${String(BATCH_LINES - 1)}\nx`);
   });
 
-  // F1724 (C2): foldMultiline refuses a message of more than 40 parts, so a multiline batch holds 41 and no more.
+  // foldMultiline refuses a message of more than 40 parts, so a multiline batch holds 41 and no more.
   test(`holds ${String(MULTILINE_LINES + 1)} parts of a multiline batch at most, past which none is read`, () => {
     const reader = new BatchReader();
     reader.read(read("BATCH +h1 chathistory #bubble"));

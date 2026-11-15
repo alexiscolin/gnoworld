@@ -7,8 +7,8 @@ import { sha256 } from "./sha256.ts";
 import { spanOf, SURFACE, type SurfaceName } from "./spans.ts";
 import { FINEST } from "./surface.ts";
 
-// Layer 2 (slice 7, 7b4; ADR-0002 §3): a world's surface is generated, its structure as much as its colours, from the second hash's
-// bytes past its class, its nudge and its lights' form. Each parameter is a uniform 7b5 draws, named and given its unit in SURFACE, and
+// Layer 2 (ADR-0002 §3): a world's surface is generated, its structure as much as its colours, from the second hash's
+// bytes past its class, its nudge and its lights' form. Each parameter is a uniform the scene draws, named and given its unit in SURFACE, and
 // read inside its anchor's span. Which byte feeds which value is stated here apart from the code: a changed index re-rolls every world.
 const BYTE: Record<SurfaceName, number> = {
   scale: 9,
@@ -163,7 +163,7 @@ describe("a class's structure", () => {
 
   it("reads as its class: a rock is cratered, an Earth has seas, a giant has bands, a Europa has rifts", () => {
     expect(spanOf("rocky", "craters")[0]).toBeGreaterThanOrEqual(0.5);
-    // More land than the Earth's, never the Earth (Alexis, 2026-11-03, 16:4x): a sea of 0.45 to 0.65.
+    // More land than the Earth's, never the Earth: a sea of 0.45 to 0.65.
     expect(spanOf("temperate", "sea")[0]).toBeGreaterThanOrEqual(0.45);
     expect(spanOf("temperate", "sea")[1]).toBeLessThanOrEqual(0.65);
     expect(spanOf("ocean", "sea")[0]).toBeGreaterThanOrEqual(0.8);
@@ -185,7 +185,7 @@ describe("a class's structure", () => {
     expect(spanOf("sub-Neptune", "bands")[1]).toBeLessThan(spanOf("gas giant", "bands")[0]);
   });
 
-  // Temperate worlds varied (7b8; Alexis, 2026-11-03): one supercontinent, several continents or an archipelago from the same sea, and
+  // Temperate worlds varied: one supercontinent, several continents or an archipelago from the same sea, and
   // a world colder or milder, its ice from the poles alone (the Earth's, about 0.07 of its surface) to past 50 degrees (0.23).
   it("gathers a temperate world's land from an archipelago to one supercontinent, its seed's, and lets it run cold", () => {
     expect(spanOf("temperate", "gather")).toEqual([0, 1]);
@@ -261,7 +261,7 @@ describe("a world's mix of two classes (ADR-0002 §3)", () => {
 
   it("gives every pair its chance: every minor under a dominant, over a few thousand worlds", () => {
     const minors = new Set(paths(3000, "pair").map((path) => planetRecipe(path, "volcanic").minor));
-    // A dark rock takes a rock's colours only (Alexis, 2026-11-03, 16:4x): no gas, no sea world, nothing green, no saturated blue.
+    // A dark rock takes a rock's colours only: no gas, no sea world, nothing green, no saturated blue.
     const rocks = [
       "rocky",
       "desert",

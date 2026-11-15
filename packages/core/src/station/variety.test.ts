@@ -3,7 +3,7 @@ import { at, PART_KINDS, UP, type Part, type PartKind } from "./parts.ts";
 import type { Station } from "./station.ts";
 import { alikeStations, lookOf } from "./variety.ts";
 
-// A station's look read from parts set by hand, so each number of it has one answer (8n's StrykerJS run, 2026-11-05).
+// A station's look read from parts set by hand, so each number of it has one answer (mutation testing found it loose).
 const part = (kind: PartKind, centre: Part["at"], across: number): Part => ({
   kind,
   finish: "hull",

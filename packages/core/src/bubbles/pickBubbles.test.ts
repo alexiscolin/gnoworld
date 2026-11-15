@@ -8,7 +8,7 @@ import { isFarSide, type LatLon } from "./farSide.ts";
 import { pickBubbles, type Bubble, type BubbleMessage, type Viewer } from "./pickBubbles.ts";
 import type { Rules } from "./rules.ts";
 
-// Slice 6's 6a: the rules of ADR-0001 §7 (docs/plans/slice-6.md §1), as one pure function. Every number is read from
+// The rules of ADR-0001 §7, as one pure function. Every number is read from
 // app/data/bubbles.json, so tuning that file never breaks a test. Time is a parameter, in milliseconds.
 const RULES: Rules = data;
 const SHOW = RULES.showSeconds * 1000;
@@ -742,7 +742,7 @@ describe("it is a function", () => {
   });
 });
 
-// One rule (F3360, F3361, F3362): a bubble kept in the state keeps every invariant at every call, whatever the globe did
+// One rule: a bubble kept in the state keeps every invariant at every call, whatever the globe did
 // between two calls. A bubble that stops being allowed leaves for good; one message is never refused in one call and
 // taken in the next.
 describe("a bubble in the state at every call", () => {
@@ -837,7 +837,7 @@ describe("a bubble in the state at every call", () => {
   });
 });
 
-// F3366, by Alexis: a bubble stands for its line. What takes the line from the viewer takes the bubble at the next call,
+// A bubble stands for its line. What takes the line from the viewer takes the bubble at the next call,
 // whatever is left of its five seconds, and the line is not shown again.
 describe("a bubble leaves with its line (F3366)", () => {
   const line = (over: Partial<BubbleMessage> = {}): BubbleMessage => msg(1, { country: "JP", ...over });

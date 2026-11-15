@@ -1,4 +1,4 @@
-// The store of realms (D373): styles, families, rows, shelves and Today, one door for the barrel.
+// The store of realms: styles, families, rows, shelves and Today, one door for the barrel.
 export { familyOf, nameOf, realmName } from "./families.ts";
 export { STYLES, styleOf, type StyleId, type Styled } from "./styles.ts";
 export { DAY_BLOCKS, storeOf, WEEK_BLOCKS, type Store, type StoreRealm, type StoreRow } from "./rows.ts";

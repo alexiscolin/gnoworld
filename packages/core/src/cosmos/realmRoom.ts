@@ -1,4 +1,4 @@
-// A realm's chat room (D389), from its path alone, so the server that makes it and the page that asks for it never differ. A realm that
+// A realm's chat room, from its path alone, so the server that makes it and the page that asks for it never differ. A realm that
 // is its world's root (alone in its namespace, or the one the world is named for) takes the world's main room, #<world>; any other is
 // #<world>/<tail>-<10 hex of its path's SHA-256>, which fits the 64 characters of a room however long the path. A world that is a hub's is
 // the hub's slug; any other is its id as a slug, with ten hex of the id unless the id is a plain word no hub is named and not the Earth's, so no realm

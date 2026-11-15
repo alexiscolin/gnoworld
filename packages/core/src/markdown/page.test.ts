@@ -160,7 +160,7 @@ function leafAllowed(node: Inline, inLink: boolean): boolean {
   if (node.type === "mention") return !inLink && ACCOUNT.test(node.address);
   return node.type === "break";
 }
-// A `$help` action (slice 13): an exported function, its arguments by name each once, never a send, and no address.
+// A `$help` action: an exported function, its arguments by name each once, never a send, and no address.
 const actionAllowed = (node: Extract<Inline, { type: "action" }>): boolean =>
   /^[A-Z][A-Za-z0-9_]{0,127}$/.test(node.func) &&
   node.args.length <= 31 &&
@@ -249,7 +249,7 @@ const BLOCKS: Readonly<Record<string, (block: PageBlock) => boolean>> = {
 const blockAllowed = (block: PageBlock): boolean => keysAllowed(block) && (BLOCKS[block.type]?.(block) ?? false);
 
 /** Every node of the tree is on the allowlist, with its own keys alone, and every link is a plain https address that is
- * never inside a link: the property the plan's threat model asks of the reader (docs/plans/slice-5-part-2.md §3). */
+ * never inside a link: the property the reader's threat model asks of it. */
 function expectAllowlisted(blocks: readonly PageBlock[]): void {
   expect(blocks.every(blockAllowed)).toBe(true);
 }
@@ -298,7 +298,7 @@ describe("page: the blocks a realm's Markdown reads into", () => {
   });
 });
 
-// 8k: the chat's underline is the chat's alone. gnoweb reads no `++` (goldmark with GFM's extensions), so a page shows it
+// The chat's underline is the chat's alone. gnoweb reads no `++` (goldmark with GFM's extensions), so a page shows it
 // as written, and a bare address keeps GFM's bounds: a `+` neither starts one nor is left out of its end.
 describe("page: no underline, as gnoweb", () => {
   test("keeps `++` as text, in a heading and a list too", () => {
@@ -1376,7 +1376,7 @@ describe("page: nested, mixed and task lists", () => {
     reads("- a\nmore", { type: "list", ordered: false, items: [[text("a")]] }, paragraph(text("more")));
   });
 
-  // F13951: the continuation's nodes are kept whole and in order, however many: a fix that cut them would pass the hostile row alone.
+  // The continuation's nodes are kept whole and in order, however many: a fix that cut them would pass the hostile row alone.
   test("keeps every node of a continuation of 5,000 code spans, in order", () => {
     const spans = Array.from({ length: 5000 }, (_, n) => `\`${String(n)}\``).join(" ");
     const [list] = blocksOf(`- a\n  ${spans}`);
@@ -1483,9 +1483,9 @@ describe("page: nested, mixed and task lists", () => {
   });
 });
 
-// Slice 13, B (docs/plans/slice-realm-plate.md §3): a realm's page links to its own functions as gnoweb's help page does,
-// `/r/<path>$help&func=<Name>&<arg>=<value>…` (gno.land/p/moul/txlink/v0, read on onyx-1 on 2026-11-10). On the page of that realm the
-// link is an action, its call read by core's args (help.ts), never an address; any other link reads as it did.
+// A realm's page links to its own functions as gnoweb's help page does,
+// `/r/<path>$help&func=<Name>&<arg>=<value>…` (gno.land/p/moul/txlink/v0, read on onyx-1). On the page of that realm the
+// link is an action, its call read by core's args (help.ts), never an address; any other link is a plain link.
 describe("page: a `$help` link to the page's own realm is an action, never an address", () => {
   const DAO = "gno.land/r/gov/dao";
   const ORIGIN = "https://gno.land";
@@ -1546,7 +1546,7 @@ describe("page: a `$help` link to the page's own realm is an action, never an ad
     ]);
   });
 
-  // R1 of the red pass: the realm's path on another host, or spelled whole, reads as it did: never an in-place card.
+  // The realm's path on another host, or spelled whole, is a plain link: never an in-place card.
   test.each([
     ["another host", "https://evil.example/r/gov/dao$help&func=Transfer&to=g1evil"],
     ["gnoweb's host with its port", "https://gno.land:443/r/gov/dao$help&func=F"],
@@ -1614,7 +1614,7 @@ describe("page: a `$help` link to the page's own realm is an action, never an ad
     expect(blocksOf(source, ORIGIN, "")).toStrictEqual(blocksOf(source, ORIGIN));
   });
 
-  // R2 of the review (F13319): the pass reaches a link wherever the page holds words, however deep.
+  // The pass reaches a link wherever the page holds words, however deep.
   test.each([
     ["a quote", "> [v](/r/gov/dao$help&func=F)"],
     ["marks", "**[v](/r/gov/dao$help&func=F)**"],
@@ -1690,7 +1690,7 @@ describe("page: a `$help` link to the page's own realm is an action, never an ad
     expect(Date.now() - start).toBeLessThan(5000);
   });
 
-  // The hostile shapes of a page that reads its `$help` links (R11): its time grows with its size, not its square.
+  // The hostile shapes of a page that reads its `$help` links: its time grows with its size, not its square.
   test.each([
     ["links never closed", (n: number) => fill_("[v](/r/gov/dao$help&func=A&a=1", n)],
     ["links of 31 pairs", (n: number) => fill_(`[v](/r/gov/dao$help&func=A${"&a=1".repeat(31)}) `, n)],
@@ -1817,7 +1817,7 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     ],
     ["tasks", (n) => fill("- [ ] a\n", n)],
     ["items with continuations", (n) => fill("- a\n  b\n", n)],
-    // F13951: a continuation's nodes were spread into one `push`, past the engine's arguments at ~62,000 spans: a RangeError.
+    // A continuation's nodes spread into one `push` pass the engine's arguments at ~62,000 spans: a RangeError.
     ["an item continued by a line of code spans", (n) => "- a\n  " + fill("`a` ", n - 6)],
     ["ordered items nested", (n) => fill("1. a\n   1. b\n", n)],
     ["a list of rules", (n) => fill("- a\n---\n", n)],
@@ -1837,7 +1837,7 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
     ["a fence's line of blanks and a mark (R-F1)", (n) => "```" + " ".repeat(n) + "!"],
     ["a fence's line of tabs and a mark (R-F1)", (n) => "```" + "\t".repeat(n) + "!"],
     // Every line start a page reads, then blanks and a mark nothing reads: a regex with two `\s*` round an optional
-    // middle is quadratic on this and nothing else (F1711, R-F1).
+    // middle is quadratic on this and nothing else.
     ...BLANKS_THEN_MARK,
   ];
 
@@ -1854,7 +1854,7 @@ describe("page: linear in bytes (a guard against quadratic input; the bench meas
   };
 
   // StrykerJS's instrumented code (its `__stryker__` global) times nothing of the algorithm: there the comparison gives
-  // way, and runs in the gate and the coverage run, on the code itself (F831, as markdown.test.ts).
+  // way, and runs in the gate and the coverage run, on the code itself (as markdown.test.ts).
   const instrumented = "__stryker__" in globalThis;
   // 8 times the bytes may take 32 times as long, for noise and the engine's tiers (coverage's counters double it), never
   // the 64 times of a quadratic reader; no growth is read under 300 ms, where a quadratic one takes seconds. A noisy
@@ -2101,7 +2101,7 @@ describe("originOf: the origin a page's links resolve against", () => {
   });
 });
 
-// Slice 13's mutation pass: each case kills a StrykerJS survivor the tests above let live.
+// Each case kills a StrykerJS survivor the tests above let live.
 describe("page: the edges StrykerJS found in the page reader", () => {
   const countColumns = (blocks: readonly PageBlock[]): number =>
     [...blocksIn(blocks)].filter((block) => block.type === "columns").length;

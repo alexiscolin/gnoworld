@@ -1,5 +1,5 @@
 // What the Earth's signs and the chat import of the bubbles: `@gnoworld/core/bubbles`, a subpath beside the main entry, so the first
-// screen does not carry them (docs/plans/slice-6.md §7).
+// screen does not carry them.
 export { centreOf, COUNTRIES, countryName } from "./countries.ts";
 export { regionAt, regionsOf, type Region } from "./regions.ts";
 export { cutText } from "./cut.ts";

@@ -14,9 +14,9 @@ import {
   type WorldState,
 } from "./signs.ts";
 
-// A world's stages and the signs that show them (slice 7, 7b2; ADR-0002 §10): a stage reads the same on every class, each in its
+// A world's stages and the signs that show them (ADR-0002 §10): a stage reads the same on every class, each in its
 // own form, and a sign keeps what it means, where it shows and how it grows. A world at rest with nobody here carries no sign at all: it
-// is the render Alexis approved, drawn as the lab draws it.
+// is the approved render, drawn as the lab draws it.
 const seedOf = (path: string) => planetSeed(asciiBytes(path));
 const DAO = seedOf("gno.land/r/gov/dao");
 const AT_REST: WorldState = { vitality: 0.1, present: 0, fresh: false };
@@ -196,7 +196,7 @@ describe("a world at rest", () => {
     expect(awake.lights).toEqual(beacon.lights);
   });
 
-  // F4110 (Alexis, 2026-11-02): night lights mean people here now and nothing else; a stage shows through its size.
+  // Night lights mean people here now and nothing else; a stage shows through its size.
   it("lights a night side with the people here alone: a vitality moves neither how far nor how bright", () => {
     fc.assert(
       fc.property(fc.tuple(unit, unit, unit, anyAnchor), ([vitality, other, present, anchor]) => {
@@ -247,7 +247,7 @@ describe("a stage reads the same on every class", () => {
     expect(new Set(Object.values(WAY).map(({ kind }) => kind))).toEqual(new Set(LIGHT_KINDS));
   });
 
-  // Its lights are the people's (F4110), held by their own tests: AT's crowds grow with the stages and would hold them for nothing here.
+  // Its lights are the people's, held by their own tests: AT's crowds grow with the stages and would hold them for nothing here.
   it("grows stage by stage on every class: matter, never a step back", () => {
     for (const anchor of ANCHORS) {
       const climb = (["rest", "living", "inhabited", "busy", "beacon"] as const).map((stage) =>
@@ -424,7 +424,7 @@ describe("a sign keeps its meaning and varies its form", () => {
 describe("what the signs are worth", () => {
   const at = (vitality: number, present: number, fresh = false) => worldSigns(DAO, "ice", { vitality, present, fresh });
 
-  // F4110: with nobody here, no vitality lights any of a world's surface.
+  // With nobody here, no vitality lights any of a world's surface.
   it.each([
     [0.3, 1, 0],
     [0.4, 1 + 0.6 / 7, 0],
@@ -478,7 +478,7 @@ describe("a seed", () => {
     expect(crowded?.signal).toBeGreaterThan(quiet?.signal ?? 1);
   });
 
-  // docs/decisions.md: a seed's end is an event, for the world wakes, on its first visit or at its seventh day (7e's wake): no ramp hides it.
+  // docs/decisions.md: a seed's end is an event, for the world wakes, on its first visit or at its seventh day: no ramp hides it.
   it("ends in one step, the wake's: the last day of a seed and the first of a world", () => {
     const seed = worldSigns(DAO, "rocky", { vitality: 0.2, present: 0, fresh: true });
     const woken = worldSigns(DAO, "rocky", { vitality: 0.2, present: 0, fresh: false });

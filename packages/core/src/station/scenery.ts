@@ -1,5 +1,4 @@
-// The Earth's view and its scenery (part 7x; Alexis, 2026-11-04, "comme ça pas besoin de se faire chier avec la place des mondes, c'est
-// statique et on a la profondeur"): the eye at rest, fixed, and the real Solar System's planets round the Earth, still, with no label and no
+// The Earth's view and its scenery: the eye at rest, fixed, and the real Solar System's planets round the Earth, still, with no label and no
 // click, drawn as their maps came. Set by hand where the video's screen shows them and how deep, never in the Sun's order, a row or equal
 // gaps: Mars close to the eye and cut by the frame's foot, Venus in the middle distance, Jupiter, Saturn and its ring far, Neptune a speck.
 import { EARTH_PLACE, EARTH_RADIUS } from "../cosmos/system.ts";
@@ -22,7 +21,7 @@ export interface Scenery {
 /** The Earth's view at rest: the eye 26 units from the Earth, 15 degrees over the disc, the great star at the Earth's right. */
 export const earthEye = (): Point => eyeAt(26, 15 * DEGREE, 0);
 export const earthCamera = (): Camera => cameraTowards(earthEye(), EARTH_PLACE);
-/** The Earth's top view (Alexis, 2026-11-04): the eye 30 units from the Earth, 1.25 radians over the disc, on the view at rest's side, the
+/** The Earth's top view: the eye 30 units from the Earth, 1.25 radians over the disc, on the view at rest's side, the
  * Earth, its Moon, the stations and their orbits in the frame, the scenery out of it. */
 export const earthTopEye = (): Point => eyeAt(30, 1.25, 0);
 

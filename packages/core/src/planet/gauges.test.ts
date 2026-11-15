@@ -2,7 +2,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { callersIn, nextVitality, presenceOf, referenceOf, scaleOf, useOf } from "./gauges.ts";
 
-// A world's two gauges (slice 7, 7b2; ADR-0002 §10): a vitality that remembers and moves a few percent a day, and the people present.
+// A world's two gauges (ADR-0002 §10): a vitality that remembers and moves a few percent a day, and the people present.
 const RISE = 0.03;
 const FALL = 0.01;
 const unit = fc.double({ min: 0, max: 1, noNaN: true });

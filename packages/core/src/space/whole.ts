@@ -1,5 +1,5 @@
-// Where the whole cosmos takes the view (ADR-0002 §10; Alexis, 2026-11-02), apart from the nebulae: the cosmos's chunk hands the view over,
-// and the nebulae's code comes in a chunk of its own (7d6), which this keeps out of it.
+// Where the whole cosmos takes the view (ADR-0002 §10), apart from the nebulae: the cosmos's chunk hands the view over, and the
+// nebulae's code comes in a chunk of its own, which this keeps out of it.
 import { MOOD_SCALE } from "./mood.ts";
 import { smoothstep } from "./smooth.ts";
 

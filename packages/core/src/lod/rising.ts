@@ -1,4 +1,4 @@
-// A world rising against its own last 14 days (plan §9, question 6; ADR-0002 §10): its people now beside its usual hour, the middle of the
+// A world rising against its own last 14 days (ADR-0002 §10): its people now beside its usual hour, the middle of the
 // hours its history holds, so a small world can stand out where the universe's busiest would drown it. An hour the history never kept is
 // no zero: the job keeps the hours it sampled.
 

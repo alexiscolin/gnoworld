@@ -50,7 +50,7 @@ function answersNothingElse(lines: readonly Threaded[], { rootOf }: Found) {
   }
 }
 
-// A reply chain is a thread (docs/plans/chat-features.md, M3): the root is the line at the top of the chain, a reply
+// A reply chain is a thread: the root is the line at the top of the chain, a reply
 // to a reply stays in it, and the lines are the window's own, so a root it no longer holds is named by its msgid.
 describe("threadsOf: the threads of a room's lines", () => {
   test("finds no thread in no line, nor in lines that answer none", () => {
@@ -133,9 +133,9 @@ describe("threadsOf: the threads of a room's lines", () => {
     expect(repliesOf.has("b")).toBe(false);
   });
 
-  // CR8 (F1768), restated after F773: the room's order is time, lines of one millisecond in the order they came. A reply
+  // The room's order is time, lines of one millisecond in the order they came. A reply
   // stamped in the very millisecond of the line it answers, which came after it, follows it whatever its msgid sorts
-  // like, so it is a reply. (Before F773 the msgid broke ties and held such a reply first, no reply.)
+  // like, so it is a reply.
   test("keeps a reply stamped the same millisecond as its root, which came first, a reply, whatever the msgids", () => {
     const at = (id: string, over: Partial<Line> = {}): Line => ({
       id,
@@ -160,7 +160,7 @@ describe("threadsOf: the threads of a room's lines", () => {
     expect(repliesOf.size).toBe(1);
   });
 
-  // The maps are keyed by msgids Ergo gives and a sender chooses (R19): a plain object keyed on one would lose a thread
+  // The maps are keyed by msgids Ergo gives and a sender chooses: a plain object keyed on one would lose a thread
   // to `__proto__`, or read `constructor` as a root that was never a line.
   test.each(["__proto__", "constructor", "hasOwnProperty", "toString"])(
     "threads a line named %s like any other, as a root and as a root the window lacks",

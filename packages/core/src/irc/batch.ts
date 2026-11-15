@@ -75,7 +75,7 @@ export class BatchReader {
 }
 
 // A line held in its batch, the first BATCH_LINES kept; a message of several lines keeps one more than Ergo's 40, which
-// foldMultiline refuses whatever follows (F1724).
+// foldMultiline refuses whatever follows.
 function hold({ batch }: Open, message: IrcMessage): void {
   const cap = batch.type === MULTILINE ? MULTILINE_LINES + 1 : BATCH_LINES;
   if (batch.messages.length < cap) batch.messages.push(message);

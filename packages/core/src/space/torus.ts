@@ -1,4 +1,4 @@
-// A box of cells that follows a moving centre, with no list and no end (slice-7 §5): each cell is held in the slot its coordinates wrap
+// A box of cells that follows a moving centre, with no list and no end: each cell is held in the slot its coordinates wrap
 // to, so a step writes only the cells that entered, a shader finds any of them by the same wrap, and the box costs the same anywhere.
 import type { Point } from "./cell.ts";
 

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { cardLinkOf, normalisedUrl } from "./cardLink.ts";
 
-// L2 (docs/plans/link-previews.md §3 step 1, §4): the link a line's card is for. The page and the server call this one function, and
+// The link a line's card is for. The page and the server call this one function, and
 // the Markdown's own reading of the line decides what a link is (markdown/inline.ts), so a card never exists for a link the line does not show.
 const LONG = (length: number): string => `https://example.com/${"a".repeat(length - "https://example.com/".length)}`;
 

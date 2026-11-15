@@ -1,4 +1,4 @@
-// The labels of a view (ADR-0002 §1, level of detail; plan §9, question 11): eight at most, the Earth first, then the worlds the view draws,
+// The labels of a view (ADR-0002 §1, level of detail): eight at most, the Earth first, then the worlds the view draws,
 // then a few far ones among the most popular and the new. Signs mean real data (ADR-0002 §10): a far world nothing names gets no label, and
 // a count or a badge shows only what the data says. A name is plain text and never an address; a new world nobody here visited is an
 // uncharted signal, unnamed till charted.
@@ -11,8 +11,8 @@ export const LABELS_MOST = 8;
 export const FAR_MOST = 3;
 export const NAME_MOST = 24;
 
-/** The page's rail (7i), at the window's right edge from 900 px wide: its footprint, from that edge to its own left edge (frame 4: x 1,585
- * at 1,728 px, 7h2's measure). The labels keep it and their air clear; the rail takes its width from it. */
+/** The page's rail, at the window's right edge from 900 px wide: its footprint, from that edge to its own left edge (frame 4: x 1,585
+ * at 1,728 px). The labels keep it and their air clear; the rail takes its width from it. */
 export const RAIL = { from: 900, footprint: 143 } as const;
 
 const UNCHARTED = "Uncharted signal";
@@ -30,7 +30,7 @@ export interface Signals {
   readonly uncharted?: boolean;
   /** The world's next event within the day, as its chip says it ("AMA in 11 h", frames 4 and 6). */
   readonly event?: string;
-  /** A person the reader follows who is in one of its rooms, as its chip says it ("noor is here", decision 714). */
+  /** A person the reader follows who is in one of its rooms, as its chip says it ("noor is here"). */
   readonly person?: string;
 }
 
@@ -116,7 +116,7 @@ function ranked([a, one]: Weighed, [b, other]: Weighed): number {
   return a.id < b.id ? -1 : 1;
 }
 /** The most popular first: the most rise, then the most people here, then the most callers; a tie by id. The labels' far worlds and the
- * rail's trends and rising worlds alike (7i). */
+ * rail's trends and rising worlds alike. */
 export const mostPopular = <Ask extends LabelAsk>(asks: readonly Ask[]): Ask[] =>
   asks
     .map((ask) => [ask, weighed(ask)[1]] as const)

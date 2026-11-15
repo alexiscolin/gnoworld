@@ -1,4 +1,4 @@
-// Discover's first page, Today (D373): a few rows of realms, each a rule over the shelves, and the three next stops of a realm.
+// Discover's first page, Today: a few rows of realms, each a rule over the shelves, and the three next stops of a realm.
 import type { Store, StoreRow } from "./rows.ts";
 import type { StyleId } from "./styles.ts";
 import { shelfRows, sortRows, type Ground, type ShelfId, type SortId, type View } from "./shelves.ts";

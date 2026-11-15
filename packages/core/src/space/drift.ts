@@ -4,8 +4,7 @@ import type { Point } from "./cell.ts";
 /** Where the eye rests on arrival: of the spots tried, an amber cloud right of the middle, and near-black under the hero. */
 export const HOME: Point = { x: 3300, y: 4100, z: -2200 };
 
-// The pace the worlds turn at among the stars, a share of their spin: slow, so the near worlds slide past the far ones more than any turns
-// (7d6).
+// The pace the worlds turn at among the stars, a share of their spin: slow, so the near worlds slide past the far ones more than any turns.
 const ORBIT_PACE = 0.2;
 
 /** The clock every world turns by, bodies and points alike, `seconds` after the arrival: one place, so a world that becomes a body keeps

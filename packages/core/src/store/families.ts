@@ -12,7 +12,7 @@ export function nameOf(path: string): string {
   return bare.slice(bare.lastIndexOf("/") + 1);
 }
 
-/** A realm's short name for a title, a crumb and a card (D375), and the namespace it stands under: one name wherever it is shown. */
+/** A realm's short name for a title, a crumb and a card, and the namespace it stands under: one name wherever it is shown. */
 export function realmName(path: string): { namespace: string; name: string } {
   return { namespace: path.slice(REALM_PREFIX.length).split("/")[0] ?? "", name: nameOf(path) };
 }

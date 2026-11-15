@@ -1,5 +1,5 @@
-// A room as Ergo's lines make it (slice 4's 4b): its lines, in time order, each once and the newest kept;
-// who is here; its description, which is its IRC topic (docs/decisions.md, 2026-10-25). Each function
+// A room as Ergo's lines make it: its lines, in time order, each once and the newest kept;
+// who is here; its description, which is its IRC topic. Each function
 // gives back what it was given when a line changes nothing, so a view need not draw again.
 import type { IrcMessage } from "../irc/irc.ts";
 
@@ -15,9 +15,9 @@ export interface Line {
   readonly account?: string;
   readonly text: string;
   readonly kind: "message" | "notice" | "action";
-  /** The msgid of the line it answers (4d's replies), a msgid a tag carries; none for a line that answers none. */
+  /** The msgid of the line it answers a msgid a tag carries; none for a line that answers none. */
   readonly reply?: string;
-  /** The msgid of the line it corrects (4d's edits shown, +gnoworld/edit), a msgid a tag carries; none for the rest. */
+  /** The msgid of the line it corrects (+gnoworld/edit), a msgid a tag carries; none for the rest. */
   readonly edits?: string;
   /** The country its speaker declares (+gnoworld/country, two capitals), never guessed; none for a speaker who declares none. */
   readonly country?: string;
@@ -78,9 +78,9 @@ function said(command: string, text: string): Pick<Line, "kind" | "text"> | unde
 export function isTagMsgid(value: string): boolean {
   return /^[^\s,:;\\\p{Cc}][^\s,;\\\p{Cc}]{0,63}$/u.test(value);
 }
-/** The line a message answers: +reply, ratified in 2026, before its draft name. */
+/** The line a message answers: +reply, before its draft name. */
 export const REPLY = ["+reply", "+draft/reply"];
-// The line a message corrects: our own tag, no IRCv3 one existing (docs/decisions.md, 2026-10-21).
+// The line a message corrects: our own tag, no IRCv3 one existing.
 const EDIT = ["+gnoworld/edit"];
 // The speaker's country, a client's tag (ADR-0001 §7): any client may write anything there, so it is two capitals or none.
 const COUNTRY = ["+gnoworld/country"];
@@ -132,7 +132,7 @@ export function lineOf(message: IrcMessage, room: string): Line | undefined {
   return { ...marks, from, ...(account === "" ? {} : { account }), ...body, ...marked(message.tags) };
 }
 
-// By time alone: JS sorts stably, so lines of one millisecond keep the order they came in (F773).
+// By time alone: JS sorts stably, so lines of one millisecond keep the order they came in.
 const byTime = (one: Line, other: Line): number => compare(one.time, other.time);
 
 // A live line, the usual case: one line after every line held, and not one of them, is only appended.

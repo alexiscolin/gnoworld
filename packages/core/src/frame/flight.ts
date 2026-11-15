@@ -1,6 +1,6 @@
-// A flight's pure part (7g; ADR-0001 §7, "travel like a ship"; docs/DESIGN-SYSTEM.md, "Motion"): how long it takes by its distance, the
+// A flight's pure part (ADR-0001 §7, "travel like a ship"; docs/DESIGN-SYSTEM.md, "Motion"): how long it takes by its distance, the
 // phases the panel names and the panel's instruments. The scene drives the way, eased by smootherstep: slowly out of orbit, across, slowly
-// into the next. A flight to a star lands on its system's arrival, which core composes (arrival.ts, 7g2).
+// into the next. A flight to a star lands on its system's arrival, which core composes (arrival.ts).
 import { smootherstep, smoothstep } from "../space/smooth.ts";
 
 /** Its timings, in seconds: the shortest and the longest flights (`--motion-scene`), and under reduced motion its crossfade (`--motion-base`). */

@@ -1,4 +1,4 @@
-// Markdown, the chat's subset (ADR-0001 §3, slice 4's 4c): a message read into a tree of the nodes a renderer draws,
+// Markdown, the chat's subset (ADR-0001 §3): a message read into a tree of the nodes a renderer draws,
 // never HTML. Within a line, marks at word bounds and links to https alone (inline.ts); of blocks, paragraphs,
 // fenced code, quotes 4 deep at most and flat lists, none of them lazy (blocks.ts). No heading, image, HTML, rule,
 // table or entity: what would be one stays text, as does a fence never closed and a quote holding nothing, so a

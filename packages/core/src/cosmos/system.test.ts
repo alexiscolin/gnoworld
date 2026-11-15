@@ -22,7 +22,7 @@ import { starWarmth } from "./warmth.ts";
 import { screenRadius } from "../lod/ladder.ts";
 
 // A namespace's worlds around its star (ADR-0002 §3 and §10): the same file gives the same systems on every device, each stays in the room
-// its cell leaves it, and a namespace of hundreds keeps its worlds apart, with the same cell as one of one (F3563).
+// its cell leaves it, and a namespace of hundreds keeps its worlds apart, with the same cell as one of one.
 const held = (namespace: string, count: number, use = 1): WorldHeld[] =>
   Array.from({ length: count }, (_, at) => ({ id: `${namespace}/w${String(at)}`, namespace, use }));
 const named = (systems: readonly StarSystem[], id: string) => {
@@ -134,7 +134,7 @@ describe("systemsOf", () => {
     const spread = Math.sqrt(sectors.reduce((sum, count) => sum + (count - mean) ** 2, 0) / 24);
     expect(spread / mean).toBeGreaterThan(0.4);
     const orbits = new Set(grain.map(({ orbit }) => orbit.toFixed(3)));
-    // The innermost orbit now stands clear of the star's glow (INNER_LEAST), so a crowd's belt is narrower and its jitter clamps at the edge more often.
+    // The innermost orbit stands clear of the star's glow (INNER_LEAST), so a crowd's belt is narrower and its jitter clamps at the edge more often.
     expect(orbits.size).toBeGreaterThan(grain.length * 0.4);
   });
 
@@ -173,7 +173,7 @@ describe("systemsOf", () => {
     expect(named(systemsOf([...held("a", 3), ...held("a", 3)]), "a").worlds).toHaveLength(3);
   });
 
-  // 7d6: the hero's number is what the cosmos draws, counted as `systemsOf` holds the worlds, and the Earth beside them.
+  // The hero's number is what the cosmos draws, counted as `systemsOf` holds the worlds, and the Earth beside them.
   it("counts the worlds the cosmos draws as its systems hold them, and the Earth", () => {
     for (const file of [[], held("a", 3), [...held("a", 3), ...held("a", 3), ...held("b", 2)], mixedUse("c", 127)]) {
       const held_ = systemsOf(file).reduce((sum, { worlds }) => sum + worlds.length, 0);
@@ -219,7 +219,7 @@ describe("systemsOf", () => {
     expect(new Set(systems.map(({ warmth }) => warmth)).size).toBeGreaterThan(250);
   });
 
-  // Alexis, 2026-11-02, "l'espace n'est pas en 2D": no two postcards lie in one plane. Real systems lie at any angle to their galaxy's
+  // No two postcards lie in one plane. Real systems lie at any angle to their galaxy's
   // disc; here 15 to 45 degrees, so none lies in the disc's plane and none stands face on to the arrival's 15-degree slant.
   it("tilts each system's plane by its name, 15 to 45 degrees, about a line of nodes of its own", () => {
     const systems = systemsOf(Array.from({ length: 400 }, (_, at) => held(`n${String(at)}`, 2)).flat()).filter(
@@ -402,7 +402,7 @@ describe("the disc on the stage", () => {
     expect(far.z).toBeLessThan(near.z);
   });
 
-  // The study's arrival (D459) stands the Earth off the eye's axis: its x is -12, where frame 4 had it dead ahead at -6.73.
+  // The study's arrival stands the Earth off the eye's axis: its x is -12, where frame 4 had it dead ahead at -6.73.
   const AHEAD_X = -6.73;
   it("stands the Earth the rest's distance away, 5.27 units left of where the eye rests looking ahead, the disc 15 degrees below the eye's height", () => {
     const earth = spot();
@@ -423,14 +423,14 @@ describe("the disc on the stage", () => {
 
   it("stands the Earth, its ring and its Moon clear of the great star and of ring 1's rooms", () => {
     const fromCentre = Math.hypot(EARTH_PLACE.x, EARTH_PLACE.z);
-    // The Earth's x of -12 (D459) puts its ring past ring 1's nearest room edge (10.5), though still short of that system's centre.
+    // The Earth's x of -12 puts its ring past ring 1's nearest room edge (10.5), though still short of that system's centre.
     const nearestCentre = 2 * CELL - 0.45 * CELL;
     expect(fromCentre - EARTH_RADIUS * 1.3).toBeGreaterThan(starSize(1024) / 2);
     expect(fromCentre + EARTH_RADIUS * 1.3).toBeLessThanOrEqual(nearestCentre);
   });
 });
 
-// 7b9: one star's warmth, read by its system's light and by its worlds' plants (recipe.ts) from warmth.ts alone: the two never part.
+// One star's warmth, read by its system's light and by its worlds' plants (recipe.ts) from warmth.ts alone: the two never part.
 describe("a star's warmth", () => {
   it("is the one its worlds' plants read, for gno.land's star and any namespace's", () => {
     fc.assert(

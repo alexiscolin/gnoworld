@@ -7,7 +7,7 @@ export interface Point {
   readonly z: number;
 }
 
-/** How far apart two places are: the straight distance, the one way the ladder, the disc and the nebulae measure it (F3580). */
+/** How far apart two places are: the straight distance, the one way the ladder, the disc and the nebulae measure it. */
 export const distanceOf = (a: Point, b: Point): number => Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
 
 const PRIME = 0x01000193;

@@ -86,7 +86,7 @@ describe("foldMultiline: a message of several lines, as one", () => {
     // A CTCP is one line (an /me included, which the composer keeps on one): none in a message of several.
     ["a part holding a CTCP's mark", batch([part("\u0001ACTION waves\u0001"), part("hello")])],
     ["a part holding a CTCP's mark within", batch([part("one"), part("t\u0001wo")])],
-    // An opening and its parts from one source, both given or both absent (the red pass's R5).
+    // An opening and its parts from one source, both given or both absent.
     ["an opening with no source, its parts with one", sourceless([part("one"), part("two")])],
     [
       "an opening with a source, its parts with none",

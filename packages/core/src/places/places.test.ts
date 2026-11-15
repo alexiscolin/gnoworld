@@ -3,8 +3,7 @@ import { describe, expect, it } from "vitest";
 import { placeAt, placesOf, type PlaceSource } from "./places.ts";
 import { realmRoute, worldRoute } from "./route.ts";
 
-// Slice 5's 5c: the places of the data files and their canonical URLs (docs/plans/slice-5.md §1, decisions 2026-10-29:
-// Onyx the build's default, `/net/onyx/` canonical). A place has the path its page lives at (the default universe's
+// The places of the data files and their canonical URLs (Onyx the build's default, `/net/onyx/` canonical). A place has the path its page lives at (the default universe's
 // are unprefixed) and one canonical address, always under `/net/<universe>`.
 const SOURCE: PlaceSource = {
   defaultUniverse: "onyx",
@@ -193,7 +192,7 @@ describe("the places, as properties", () => {
   });
 });
 
-// Slice 5's plan §4: a place by its path is a Map built once, O(1) a navigation (ADR-0002 §9). Counted, not timed: the
+// A place by its path is a Map built once, O(1) a navigation (ADR-0002 §9). Counted, not timed: the
 // places are read through getters, and what a lookup reads is the same at n, 4n and 16n.
 describe("the cost of the places, at n, 4n and 16n", () => {
   const sourceOf = (n: number, reads: { count: number }): PlaceSource => {
@@ -251,7 +250,7 @@ describe("the cost of the places, at n, 4n and 16n", () => {
   });
 });
 
-// 7v2 (F4474, F4475): one spelling of a world's page and of a realm's view, the default universe's and another's.
+// One spelling of a world's page and of a realm's view, the default universe's and another's.
 describe("the routes", () => {
   it("spells a world's page by its slug and a realm's view by its path under its universe", () => {
     expect(worldRoute("adena")).toBe("/w/adena");

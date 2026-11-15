@@ -2,8 +2,8 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { middleOf, RISE, riseFrom, riseOf, usualOf, type PresenceSlot } from "./rising.ts";
 
-// A world rises against its own last 14 days (plan §9, question 6; ADR-0002 §10): its people now beside its usual hour, so a small world can
-// stand out where a busy one would drown it. The history is 7c's: the busiest sample of each hour, kept 14 days.
+// A world rises against its own last 14 days (ADR-0002 §10): its people now beside its usual hour, so a small world can
+// stand out where a busy one would drown it. The history is the busiest sample of each hour, kept 14 days.
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 const NOW = Date.UTC(2026, 10, 3, 12, 30);
@@ -103,7 +103,7 @@ describe("a world against its own 14 days", () => {
   });
 });
 
-// 7t3's score reads each signal against its usual hour through these: the middle, the usual hour, the rise (the review of 7t3, its 5).
+// The score reads each signal against its usual hour through these: the middle, the usual hour, the rise.
 describe("the usual hour and its rise", () => {
   it("is the middle of the hours before the one `now` falls in: an hour of now's counts for nothing, past 24 or short of them", () => {
     expect(usualOf(history(RISE.hours, 4), NOW)).toBe(4);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { glideAt, zoomPath, zoomSeconds, type ZoomStep } from "./zoomPath.ts";
 
-// The flights of the demo Alexis validated: from the universe to a planet, between systems, between planets far apart, and back up.
+// The flights of the demo: from the universe to a planet, between systems, between planets far apart, and back up.
 const TRIPS = [
   ["the universe to a planet", 700, 6200, 6],
   ["the universe to a far system", 2400, 6200, 140],

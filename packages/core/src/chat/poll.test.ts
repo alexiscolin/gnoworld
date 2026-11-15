@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { pollAsked, pollOf, pollText, POLL_KEYS, revote, votesOn, type Poll } from "./poll.ts";
 import type { Reaction } from "./reactions.ts";
 
-// core/chat/poll (slice 8's 8d): a poll is a line any client reads, its votes the keycap reactions on it.
+// core/chat/poll: a poll is a line any client reads, its votes the keycap reactions on it.
 
 const poll: Poll = { question: "Lunch?", answers: ["Pizza", "Sushi", "Soup"] };
 const vote = (who: string, emoji: string, over: Partial<Reaction> = {}): Reaction => ({

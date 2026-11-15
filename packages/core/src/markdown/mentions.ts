@@ -1,4 +1,4 @@
-// Mentions (slice 4's 4d): where a line holds one, and the accounts a message's tree names. A mention is one the
+// Mentions: where a line holds one, and the accounts a message's tree names. A mention is one the
 // server counts (server/src/moderation/rules.ts, which folds a line with chat/fold.ts first): `@` after what folds
 // to no letter, digit or `_`, then an account's address, g1 and 38 of bech32's characters, a word whole; its form
 // alone, the checksum unread. None in code, nor in a link's label. So the per-message cap holds for each one shown.
@@ -9,8 +9,8 @@ import { before } from "./scan.ts";
 import type { Block, Inline } from "./types.ts";
 
 // What ends in a letter, a digit or `_`, its last character whole, or in one this engine's Unicode has not assigned,
-// which the server's newer tables may know as a letter (F817). No character class before `$`: V8 14.6 (Chromium
-// 156, Node 26) misses a letter past the BMP there (F816).
+// which the server's newer tables may know as a letter. No character class before `$`: V8 14.6 (Chromium
+// 156, Node 26) misses a letter past the BMP there.
 const WORDLY_END = /(?:\p{L}|\p{N}|_|\p{Cn})$/u;
 
 /** The account a mention at `at` (an `@`) names, or none: none after what folds to a letter, a digit, `_` or nothing
@@ -41,7 +41,7 @@ export function mentions(blocks: readonly Block[]): string[] {
   return [...found];
 }
 
-// `@room`, the one word a line may name a whole room by (4f-n): after what folds to no letter, a digit, `_` or nothing,
+// `@room`, the one word a line may name a whole room by: after what folds to no letter, a digit, `_` or nothing,
 // before none, on the line as the server folds it (rules.ts counts `@\w+` the same way). `prior` is the folded text
 // before each piece, the raw source's closing marks standing for code, labels and marks, which hold no letter.
 const ROOM_MENTION = /@room(?![\p{L}\p{N}_\p{Cn}])/gu;

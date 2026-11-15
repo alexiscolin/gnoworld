@@ -1,4 +1,4 @@
-// The link a chat line's card is for (docs/plans/link-previews.md §3, §4): the page's own reading of the line, so the server and the
+// The link a chat line's card is for: the page's own reading of the line, so the server and the
 // page agree. The Markdown decides what a link is (https only, no userinfo, no look-alike letter, none in code); the first link decides.
 import { isPublicOrigin } from "../chain/origin.ts";
 import { markdown } from "../markdown/markdown.ts";
