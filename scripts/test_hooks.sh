@@ -2492,7 +2492,7 @@ w="$t/push"
 ph="$t/push-hooks" && mkdir -p "$ph" && cp "$hooks"/* "$ph/" && secrets_into "$ph/"
 mkdir -p "$w/scripts" "$t/pushbin"
 printf '#!/bin/sh\n: >"%s/ran"\n' "$w" >"$w/scripts/check.sh" && chmod +x "$w/scripts/check.sh" # what no hook may run
-printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
+printf '#!/bin/sh\necho scanned >>"%s/leaks.log"\necho "INF 1 commits scanned." >&2\nexit "${LEAKS:-0}"\n' "$w" >"$t/pushbin/gitleaks" && chmod +x "$t/pushbin/gitleaks"
 printf 'leaks.log\nran\n' >"$w/.gitignore"
 git -C "$w" init -q && echo x >"$w/a.ts" && git -C "$w" add -A && git -C "$w" commit -qm base
 head=$(git -C "$w" rev-parse HEAD)
@@ -4793,6 +4793,56 @@ for args in "" "^$top" "--output=$t/out $top" "--all" "$top --not" "--not $top" 
 	refused $args || fail "scan_secrets --range did not refuse: --range $args"
 done
 [ ! -e "$t/out" ] || fail "scan_secrets --range let an option write a file"
+# gitleaks takes a history git wrote to stderr for no history, scans 0 commits and exits 0: a trace on the push (GIT_TRACE=1 reaches
+# the hook), a config that changes what git log prints (colour, no diff for a root commit), a corrupt commit-graph. The scan gives git
+# none of the first two, and refuses what it cannot make silent; what it reads of gitleaks it checks. (-c on git push reaches the hook as
+# GIT_CONFIG_PARAMETERS; the repository's own config is read too.)
+held=$(git -C "$pr" rev-parse refs/remotes/origin/published) && fk=$(git -C "$pr" rev-parse fresh) && tk=$(git -C "$pr" rev-parse trunk)
+kr="$t/pushrange-key" && git init -q "$kr" && git -C "$kr" checkout -q -b trunk && printf 'aws = "%s"\n' "$key" >"$kr/k.txt" && git -C "$kr" add k.txt && git -C "$kr" commit -qm key
+krs=$(git -C "$kr" rev-parse trunk)
+for trace in GIT_TRACE=1 GIT_TRACE_SETUP=1 GIT_TRACE_PERFORMANCE=1; do
+	(export "$trace"; sr "$fk" "^$held") && fail "scan_secrets --range let a key through with $trace set"
+	(export "$trace"; cd "$kr" && sh "$rh/scan_secrets.sh" >/dev/null 2>&1) && fail "scan_secrets let a key through, over the whole history, with $trace set"
+	(export "$trace"; pushed fresh) && fail "pre-push let a key through with $trace set"
+	(export "$trace"; sr "$tk" "^$held") || fail "scan_secrets --range refused a clean range with $trace set"
+	(export "$trace"; pushed trunk) || fail "pre-push refused a clean push with $trace set"
+done
+for config in color.ui=always; do
+	(export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="${config%%=*}" GIT_CONFIG_VALUE_0="${config#*=}"; sr "$fk" "^$held") && fail "scan_secrets --range let a key through with $config on the command line"
+	(export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="${config%%=*}" GIT_CONFIG_VALUE_0="${config#*=}"; pushed fresh) && fail "pre-push let a key through with $config on the command line"
+	git -C "$pr" config "${config%%=*}" "${config#*=}"
+	sr "$fk" "^$held" && fail "scan_secrets --range let a key through with $config in the repository's config"
+	sr "$tk" "^$held" || fail "scan_secrets --range refused a clean range with $config in the repository's config"
+	git -C "$pr" config --unset "${config%%=*}"
+done
+(export GIT_CONFIG_PARAMETERS="'color.ui=always'"; sr "$fk" "^$held") && fail "scan_secrets --range let a key through with a -c color.ui=always of the push's"
+(export GIT_CONFIG_PARAMETERS="'color.ui=always'"; pushed fresh) && fail "pre-push let a key through with a -c color.ui=always of the push's"
+git -C "$kr" config log.showRoot false
+(cd "$kr" && sh "$rh/scan_secrets.sh" >/dev/null 2>&1) && fail "scan_secrets let a key in a root commit through, over the whole history, with log.showRoot false"
+(cd "$kr" && sh "$rh/scan_secrets.sh" --range "$krs" >/dev/null 2>&1) && fail "scan_secrets --range let a key in a root commit through with log.showRoot false"
+git -C "$kr" config --unset log.showRoot
+# A git that writes to stderr whatever is given it (a corrupt commit-graph) is refused, the clean range with the rest.
+printf 'CGPH not a commit-graph file at all, but long enough\n' >"$pr/.git/objects/info/commit-graph"
+sr "$tk" "^$held" && fail "scan_secrets --range ran while git wrote to its stderr"
+out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --range "$tk" "^$held" 2>&1) || :
+printf '%s\n' "$out" | grep -q "scan_secrets: git writes to its stderr" || fail "scan_secrets --range refused git's stderr without saying why: $out"
+rm "$pr/.git/objects/info/commit-graph"
+sr "$tk" "^$held" || fail "scan_secrets --range refused a clean range once the commit-graph was gone"
+# What it reads of gitleaks: a stand-in that logs git's stderr as not empty, one that scans nothing, one that scans a commit.
+stub="$t/gl-stub" && mkdir -p "$stub"
+stubbed() { # $1: what the stand-in's `git` mode prints on stderr; the rest: the scan's words
+	printf '#!/bin/sh\ncase $1 in git) echo "%s" >&2 ;; *) cat >/dev/null ;; esac\nexit 0\n' "$1" >"$stub/gitleaks" && chmod +x "$stub/gitleaks"
+	shift && out=$(cd "$pr" && PATH="$stub:$PATH" sh "$rh/scan_secrets.sh" "$@" 2>&1)
+}
+stubbed 'INF 3 commits scanned.' --range "$tk" "^$held" || fail "scan_secrets --range refused a gitleaks that scanned commits"
+stubbed 'ERR error="stderr is not empty" INF 3 commits scanned.' --range "$tk" "^$held" && fail "scan_secrets --range took gitleaks's stderr not empty for a scan"
+printf '%s\n' "$out" | grep -q "scan_secrets: gitleaks found git's stderr not empty" || fail "scan_secrets --range refused gitleaks's stderr not empty without saying why: $out"
+stubbed 'INF 0 commits scanned.' --range "$tk" "^$held" && fail "scan_secrets --range took a scan of no commit, of a history that has changes, for a pass"
+printf '%s\n' "$out" | grep -q "scan_secrets: gitleaks scanned no commit" || fail "scan_secrets --range refused a scan of no commit without saying why: $out"
+# A history of commits that change nothing scans none, and that is no failure.
+git -C "$pr" commit -q --allow-empty -m empty && es=$(git -C "$pr" rev-parse HEAD)
+stubbed 'INF 0 commits scanned.' --range "$es" "^$tk" || fail "scan_secrets --range refused a range of an empty commit"
+git -C "$pr" reset -q --hard "$tk"
 out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --stagd 2>&1) && fail "scan_secrets took an unknown option for a whole-history scan"
 printf '%s\n' "$out" | grep -q "usage: scan_secrets.sh" || fail "scan_secrets refused an unknown option without its usage: $out"
 fi

@@ -1190,15 +1190,15 @@ def mutants():
     yield from each("scripts/scan_secrets.sh", '[ "$config" = gitleaks.toml ] || paths="-- . $binaries"', ":", "hooks", "scan_secrets keeps images from the private rules (F139)")
     yield from each("scripts/scan_secrets.sh", '[ "$config" = gitleaks.toml ] || paths=', "paths=", "hooks", "scan_secrets reads images for secrets (F139)")
     yield from each("scripts/scan_secrets.sh", ':(exclude,icase)*.png ', "", "hooks", "scan_secrets keeps a PNG from the private rules (F139)")
-    yield from each("scripts/scan_secrets.sh", "(set -f && git log -1 $opts >/dev/null) ||", "true ||", "hooks", "scan_secrets refuses a history git cannot read (F140)")
+    yield from each("scripts/scan_secrets.sh", "git log -1 $opts 2>&1 >/dev/null) ||", "git log -1 $opts 2>&1 >/dev/null || :) ||", "hooks", "scan_secrets refuses a history git cannot read (F140)")
     yield from each("scripts/scan_secrets.sh", "staged=$(set -f && git diff --cached -U0 $text $paths)", "staged=$(set -f && git diff --cached -U0 $text $paths || :)", "hooks", "scan_secrets refuses a staged diff git cannot read (F140)")
     yield from each("scripts/scan_secrets.sh", "--ignore-gitleaks-allow || found=1", "--ignore-gitleaks-allow || :", "hooks", "scan_secrets fails on what the staged scan found")
     yield from each("scripts/scan_secrets.sh", "--ignore-gitleaks-allow || found=1", "--ignore-gitleaks-allow", "hooks", "scan_secrets runs both rule sets on what is staged (F120)")
     yield from each("scripts/scan_secrets.sh", "--config \"$here/$config\" ", "", "hooks", "scan_secrets imposes its rules")
     yield from each("scripts/scan_secrets.sh", "gitleaks.toml gitleaks-private.toml; do", "gitleaks.toml; do", "hooks", "scan_secrets keeps private names out")
     yield from each("scripts/scan_secrets.sh", " --ignore-gitleaks-allow", "", "hooks", "scan_secrets ignores gitleaks:allow")
-    yield from each("scripts/scan_secrets.sh", '. || found=1', ". || :", "hooks", "scan_secrets fails on what any rule set found")
-    yield from each("scripts/scan_secrets.sh", '. || found=1', ".", "hooks", "scan_secrets runs both rule sets (F120)")
+    yield from each("scripts/scan_secrets.sh", '[ "$rc" = 0 ] || found=1', '[ "$rc" = 0 ] || :', "hooks", "scan_secrets fails on what any rule set found")
+    yield from each("scripts/scan_secrets.sh", '[ "$rc" = 0 ] || found=1', '[ "$rc" = 0 ] || exit 1', "hooks", "scan_secrets runs both rule sets (F120)")
     yield from each("scripts/scan_secrets.sh", "if [ -e .gitleaksignore ]; then", "if false; then", "hooks", "scan_secrets refuses a root .gitleaksignore")
     # D13184: --range takes commits alone, one to scan at least, and scans no more than them.
     for find, replace, label in (
@@ -1209,6 +1209,15 @@ def mutants():
         ('[ "$mode" = all ] || opts=', ': || opts=', "scans the range alone"),
     ):
         yield from each("scripts/scan_secrets.sh", find, replace, "hooks", f"scan_secrets --range {label}")
+    # git's stderr makes gitleaks read no history, and pass: the scan hides none, and refuses what it cannot hide.
+    yield from each("scripts/scan_secrets.sh", 'unset "$var"; done', 'true; done', "hooks", 'scan_secrets gives git no trace to write to stderr')
+    yield from each("scripts/scan_secrets.sh", "sed -n 's/^\\(GIT_TRACE", "sed -n 's/^\\(NOT_TRACE", "hooks", 'scan_secrets looks for every GIT_TRACE variable')
+    yield from each("scripts/scan_secrets.sh", 'GIT_CONFIG_VALUE_0=never', 'GIT_CONFIG_VALUE_0=always', "hooks", 'scan_secrets gives git no colour')
+    yield from each("scripts/scan_secrets.sh", 'GIT_CONFIG_VALUE_1=true', 'GIT_CONFIG_VALUE_1=false', "hooks", 'scan_secrets gives git a diff for a root commit')
+    yield from each("scripts/scan_secrets.sh", 'export GIT_CONFIG_COUNT=2', 'export GIT_CONFIG_COUNT=0', "hooks", 'scan_secrets gives git its own config')
+    yield from each("scripts/scan_secrets.sh", '[ -z "$err" ] ||', 'true ||', "hooks", 'scan_secrets refuses a history git writes to stderr over')
+    yield from each("scripts/scan_secrets.sh", 'grep -q "stderr is not empty" &&', 'grep -q "never in the output" &&', "hooks", "scan_secrets refuses gitleaks's stderr not empty")
+    yield from each("scripts/scan_secrets.sh", '[ "${scanned:-0}" = 0 ] &&', 'false &&', "hooks", 'scan_secrets refuses a scan of no commit of a history with changes')
     yield from each(".githooks/pre-commit", "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY\n", "\nunset GIT_OBJECT_DIRECTORY\n", "hooks", "pre-commit reads git's own common folder, never a caller's (F4923)")
     yield from each(".githooks/pre-commit", "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY\n", "\nunset GIT_COMMON_DIR\n", "hooks", "pre-commit reads git's own objects, never a caller's (F4923)")
     yield from each("scripts/borrow_node_modules.sh", 'else cp -RP "$m" "$copy/$m"; fi', 'else ln -s "$PWD/$m" "$copy/$m"; fi', "hooks", "a copy reads its own workspace packages (F344)")
