@@ -2,7 +2,7 @@
 
 Alexis's "go" (2026-11-08) on the proposal page's simple version (https://claude.ai/artifact/LnRHmz7848Qa7wQ6asmMoH, sections
 "La version simple" to "À trancher"; D424, D425). Built in the workshop, part by part, each seen live before the next; tests at the end
-(the radical mode, CLAUDE.md), tier-1 files excepted.
+(the radical mode, withdrawn by D13183; the hardening slice owes its tests, D13918), tier-1 files excepted.
 
 ## Rules for every part
 

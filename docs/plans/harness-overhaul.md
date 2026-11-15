@@ -12,8 +12,8 @@ The design: the final page (claude.ai/artifact/AkkvNY33kRnmB4fhNDR38V, v24) and 
 - The agent's own account (write, no admin) pushes agent/** through a core helper whose token no session reads.
 - The night on GitHub: full Stryker, every journey, the harness's self-tests, the history scan; a night red goes first.
 - Attack tests 1 to 23 pass, and they are the harness's own tests (plan-review-3.md: no second system beside them).
-- scripts/ about half its 19,391 lines; guard.py at its vital bans; check.sh cut; CLAUDE.md about 3 KB; no relic.
-- Registers frozen; docs/decisions/, docs/findings/open/ and docs/log/ in use; the dream due weekly, run alone.
+- scripts/ about half its 19,391 lines; guard.py at its vital bans, its shell parser kept (about 720 lines, D13188); check.sh cut; CLAUDE.md about 3 KB; no relic.
+- Registers frozen; docs/decisions/, docs/findings/open/ and docs/log/ in use; the dream at a slice's end (D13182).
 - The cleanup: knip clean per package (not gno/, not Jarvis: D13153), a README per main folder, comments; screen unchanged.
 - The five tasks (T1 to T5), measured once on the new process, faster than the "before" table's medians, with the same
   protections (not replayed before: D13156, `docs/plans/harness-overhaul-before.md`); the docs and docs/harness.png
@@ -69,7 +69,7 @@ run #31): one noted retry, never for a security test, each repaired. Next: deplo
    do not rest on a ruleset.
 3. Delete and lock (3-4 days): the deletion map's order (mind check_docs.py importing speeds.py, guard.py parsing
    records.sh); check.sh cut; guard.py to its vital bans; CLAUDE.md and the rules (overnight/docs/rules-diff.md);
-   the registers frozen; hooks on main's copy, key stores unreadable, the workshop's env an allowlist; dream_due.sh weekly.
+   the registers frozen; hooks on main's copy, key stores unreadable, the workshop's env an allowlist; the dream at a slice's end (D13182).
    The security reviewer rechecks the core's list first. Exit: tests 16-23; T1-T5 measured, faster than the table's medians.
 4. The pose and the cleanup (~3 days): /pose; knip per package; READMEs (overnight/readmes/); comments; the stale
    worktrees (15) and branches (133); the docs and docs/harness.png (overnight/harness-proposed.png). Exit: a day of

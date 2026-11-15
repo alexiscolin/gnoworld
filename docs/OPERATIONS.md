@@ -152,9 +152,10 @@ tailnet; keep it so.
 | Stop, with the link reader too when the cards are on | `docker compose -f deploy/compose.yaml --profile links --profile demo --profile jarvis down` |
 | Remove it all | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down -v`, then delete the machine in the admin console (with the cards on: `--profile links` first, as above) |
 
-Run `sh deploy/test.sh` after every change to `deploy/`, and when the app changes what it serves
-(a new kind of file, many more files on a first load); `--mutants` in `/pre-merge` of a branch
-that changes `deploy/`. App code alone needs neither: GitHub's journeys test it.
+GitHub's deploy-stack job runs `deploy/test.sh` on a pull request that changes `deploy/` (D13180); run it by hand to debug, and
+after a change to the link reader or what it fetches, which deploy-stack does not see yet (F13210). Until F13163 is fixed, a
+pull request that changes `deploy/` also gets this hand run and its `--mutants`, from the reviewed commit (D13191). App code
+alone needs neither: GitHub's journeys test it.
 
 The tests run on the host (macOS or Linux), outside Claude Code's sandbox, which refuses Docker's
 socket. Their output names the host's addresses and ports: never commit it, nor paste it in public.
