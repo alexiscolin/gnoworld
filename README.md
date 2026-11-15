@@ -18,7 +18,6 @@ a live count of who is here.
   calls, which the visitor signs in the Adena wallet. Jarvis never signs for anyone.
 - Logs in with Adena, links accounts, and collects stamps and challenges on a passport.
 - Owners of a world's namespace moderate its rooms: hide, mute and pin.
-- Rents a satellite, a short text shown beside a world, from an on-chain realm.
 
 ## Run it locally
 
