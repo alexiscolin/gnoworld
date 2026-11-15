@@ -153,12 +153,12 @@ def mutants():
         yield from each(SERVER, name, "", "probe", f"eslint the server refuses {name.strip('|')} by name")
     yield from each(SERVER, 'target: "./server"', 'target: "./nowhere"', "probe", "eslint the server reaches no path out of its folder")
     # Not "./node_modules": this worktree borrows the repository's, outside it, so the zone never sees a
-    # package here (F385); in the repository the gate's own lint fails without that exception.
+    # package here; in the repository the gate's own lint fails without that exception.
     for name in ("./server", "./packages/core", "./packages/schemas", "./packages/service", "./packages/chain"):
         yield from each(SERVER, f'"{name}"', '"./nowhere"', "probe", f"eslint the server imports from {name}")
     yield from each(SERVER, '"packages/service/src/net.ts", ', "", "probe", "eslint net.ts calls fetch")
     yield from each(SERVER, '"packages/service/**/*.ts"', '"packages/service/**/*.nothing"', "probe", "eslint reaches the service package's files")
-    # The walls (decision-isolation.md, D110 to D112): each folder's bans by name, the service package's zone; the zones'
+    # The walls (decision-isolation.md): each folder's bans by name, the service package's zone; the zones'
     # exceptions are the names loop's above.
     yield from each(SERVER, 'banned("jarvis|link-reader", SERVER)', 'banned("never", SERVER)', "probe", "eslint the server refuses Jarvis by name")
     yield from each(SERVER, 'banned("server|link-reader", JARVIS)', 'banned("never", JARVIS)', "probe", "eslint Jarvis refuses the server by name")
@@ -166,7 +166,7 @@ def mutants():
     for name in ("server|", "jarvis|", "app|", "|chain"):
         yield from each(SERVER, listed, listed.replace(name, "", 1), "probe", f"eslint the service package refuses {name.strip('|')} by name")
     yield from each(SERVER, 'target: "./packages/service"', 'target: "./nowhere"', "probe", "eslint the service package reaches no path out of its folder")
-    # A module in another extension, and a require made by hand (D123): each pattern and each module name.
+    # A module in another extension, and a require made by hand: each pattern and each module name.
     yield from each("eslint.config.ts", '"{app/src,server,jarvis,link-reader,packages/*/src}/**/*.{mts,cts,js,mjs,cjs,jsx}",', '"nowhere/**",', "probe", "eslint refuses a module of the product in another extension")
     yield from each("eslint.config.ts", '"{server,jarvis,link-reader,packages/service}/**/*.tsx",', '"nowhere/**",', "probe", "eslint refuses a .tsx under the services")
     yield from each(SERVER, '["node:module", "module"]', '["module"]', "probe", "eslint the services refuse createRequire from node:module")
@@ -176,7 +176,7 @@ def mutants():
         yield from each(CHAIN, name, '"./nowhere"', "probe", f"eslint the chain package imports from {name}")
     for name in ("server|", "jarvis|", "app|", "|service"):
         yield from each(CHAIN, "server|jarvis|app|service", "server|jarvis|app|service".replace(name, "", 1), "probe", f"eslint the chain package refuses {name.strip('|')} by name")
-    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md, D113, D123, D124): a read's words outside the chain package
+    # Our own rules (lint/gnoworld.config.ts; decision-onchain.md): a read's words outside the chain package
     # (lint/words.config.ts), each word and each way a string is read; a test helper or the expression sender imported by
     # product code; an import at run time of a computed name; the files each reaches or leaves free.
     for find, replace, label in (
@@ -195,7 +195,7 @@ def mutants():
         ("(?:query|subscription|mutation)", "(?:query|mutation)", "a GraphQL subscription"),
         (r"|\{\s*[A-Za-z_]\w*\s*[({])/", ")/", "GraphQL's shorthand"),
         (r"/^@gnoworld\/chain\/testing(?:\/|$)/", "/(?!)/", "the chain package's fake node"),
-        # Each word's every alternative and edge (10h's review, V5): one case of the probe's chain_words block must fail.
+        # Each word's every alternative and edge: one case of the probe's chain_words block must fail.
         ("abci_(?:query|info)", "abci_(?:info)", "the abci_query query"),
         ("abci_(?:query|info)", "abci_(?:query)", "the abci_info query"),
         (r"vm(?:\/|%2[Ff])q", r"vm(?:%2[Ff])q", "an ABCI path with its slash"),
@@ -254,7 +254,7 @@ def mutants():
         (' || text.includes("${}")', "", "a templated import"),
     ):
         yield from each(RULES, find, replace, "probe", f"eslint our rules refuse {label}")
-    # The chain package (D112): each browser package by name, the store, the files the block reaches, its tests left free.
+    # The chain package: each browser package by name, the store, the files the block reaches, its tests left free.
     for name in ("react|", "react-dom|", "react-router|", "|@gnoworld/ui"):
         yield from each(CHAIN, name, "", "probe", f"eslint the chain package refuses {name.strip('|')} by name")
     yield from each(CHAIN, '"^zustand(/|$)"', '"^never_zustand(/|$)"', "probe", "eslint the chain package refuses the store by name")
@@ -262,17 +262,17 @@ def mutants():
     yield from each(CHAIN, "ignores: TESTS,", "", "probe", "eslint leaves the chain package's tests free")
     yield from each(SERVER, "...TESTS", "", "probe", "eslint a server test calls the server it started")
     yield from each(SERVER, '"server/**/*.ts"', '"server/**/*.nothing"', "probe", "eslint reaches the server's files")
-    # Jarvis's folder (D110): the same rules, its own zone, the files each block reaches.
+    # Jarvis's folder: the same rules, its own zone, the files each block reaches.
     yield from each(SERVER, 'target: "./jarvis"', 'target: "./nowhere"', "probe", "eslint Jarvis reaches no path out of its folder")
     yield from each(SERVER, '"./jarvis"', '"./nowhere"', "probe", "eslint Jarvis imports from its own folder")
     yield from each(SERVER, '"jarvis/**/*.ts"', '"jarvis/**/*.nothing"', "probe", "eslint reaches Jarvis's files")
-    # A bench is switched off like a test (security-S1): its files, both extensions, and the selector the block holds.
+    # A bench is switched off like a test: its files, both extensions, and the selector the block holds.
     yield from each("eslint.config.ts", "files: BENCHES,", 'files: ["**/*.nothing"],', "probe", "eslint a bench is never switched off")
     yield from each("lint/shared.config.ts", '"**/*.bench.ts", ', "", "probe", "eslint a .ts bench is never switched off")
     yield from each("lint/shared.config.ts", "|fixme|fails)$/]", "|fixme)$/]", "probe", "eslint refuses a test marked fails, in core too")
     yield from each("lint/shared.config.ts", ', "**/*.bench.tsx"', "", "probe", "eslint a .tsx bench is never switched off")
     yield from each("eslint.config.ts", 'CLASS_AT_END, SWITCHED_OFF] },\n  },\n  {\n    files: ["**/*.css"]', 'CLASS_AT_END] },\n  },\n  {\n    files: ["**/*.css"]', "probe", "eslint the bench block holds the switched-off selector")
-    # No state at a module's top (F412): the block for every workspace's source, core's and ui's own lists, the selector's parts.
+    # No state at a module's top: the block for every workspace's source, core's and ui's own lists, the selector's parts.
     both = '"server/src/**/*.ts", "jarvis/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"'
     yield from each("eslint.config.ts", both, '"jarvis/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a server module's top")
     yield from each("eslint.config.ts", both, '"server/src/**/*.ts", "link-reader/src/**/*.ts", "packages/*/src/**/*.{ts,tsx}"', "probe", "eslint keeps no state at a Jarvis module's top")
@@ -310,7 +310,7 @@ def mutants():
         yield from each("lint/core.config.ts", '"packages/core/src/{frame,space}/**/*.ts"', f'"packages/core/src/{folder}/**/*.ts"', "probe", f"eslint a frame's rule reaches {folder} in core")
     yield from each("lint/core.config.ts", '"packages/core/src/{frame,space}/**/*.ts"', '"packages/core/src/**/*.ts"', "probe", "eslint a frame's rule leaves the rest of core alone")
     yield from each("server/tsconfig.json", '"types": ["node"]', '"types": []', "probe", "the server compiles with Node's types")
-    # The Ergo the tests start (slice 3b): each refusal of the pin, each check of the cache, each refusal of a build.
+    # The Ergo the tests start: each refusal of the pin, each check of the cache, each refusal of a build.
     yield from lines("scripts/ergo.sh", r"^case .*refuse .*$", ":", "hooks", "ergo.sh checks the pin")
     yield from lines("scripts/ergo.sh", r'^\[ \$\{#commit\}.*$', ":", "hooks", "ergo.sh checks the pin's length")
     yield from each("scripts/ergo.sh", '[ "$("$bin" --version 2>/dev/null || :)" = "ergo-$tag" ] && ', "", "hooks", "ergo.sh checks the cached binary's version")
@@ -322,14 +322,14 @@ def mutants():
     yield from each("scripts/ergo.sh", " sqlite\"", "\"", "hooks", "ergo.sh builds with sqlite")
     yield from each("vitest.config.ts", '            "server/src/**/*.test.ts",\n', "", "probe", "the server's tests are found")
     yield from each("vitest.config.ts", '            "jarvis/src/**/*.test.ts",\n', "", "probe", "Jarvis's tests are found")
-    # Core's tests again in Chromium (F816), only when asked, so no other Vitest run opens a browser.
+    # Core's tests again in Chromium, only when asked, so no other Vitest run opens a browser.
     yield from each("vitest.config.ts", '...(process.env["CORE_CHROMIUM"] ? [CORE_CHROMIUM] : []),', "CORE_CHROMIUM,", "probe", "core_chromium exists only when CORE_CHROMIUM asks")
     yield from each("vitest.config.ts", 'include: ["packages/core/src/**/*.test.ts"],', 'include: ["packages/core/sr/**/*.test.ts"],', "probe", "core_chromium finds core's tests")
     yield from each("vitest.config.ts", "enabled: true,\n      headless: true,", "enabled: false,\n      headless: true,", "probe", "core_chromium runs in a browser")
     yield from each("vitest.config.ts", "fileParallelism: false,", "", "probe", "core_chromium runs its files one after another")
     yield from each("vitest.config.ts", "screenshotFailures: false,", "", "probe", "core_chromium writes no screenshot beside the code")
     yield from each("vitest.config.ts", 'args: process.env["SANDBOX_RUNTIME"] ? ["--single-process"] : []', "args: []", "probe", "core_chromium's Chromium runs in one process in the sandbox")
-    # Every Vitest run on the pinned Node (F816 came from StrykerJS on Homebrew's Node 26): the config refuses another.
+    # Every Vitest run on the pinned Node (never StrykerJS's, on Homebrew's Node 26): the config refuses another.
     yield from each("vitest.config.ts", "if (process.version !== PINNED)", "if (false)", "probe", "vitest.config.ts holds every run to the pinned Node")
     yield from each("vitest.config.ts", '.trim()', "", "probe", "the pinned Node is read without its newline")
     yield from each("vitest.config.ts", "benchmark: { include: BENCHES, exclude: [...configDefaults.exclude, STRYKER_TMP] },", "", "probe", "vitest runs the benches in the form the guards read (CR3)")
@@ -337,13 +337,13 @@ def mutants():
     yield from each("scripts/repo_files.py", '["git", "-c", "core.quotePath=false", *args]', '["git", *args]', "hooks", "repo_files.git prints a path with an accent as it is (CR5)")
     yield from each("scripts/repo_files.py", 'BENCH_FILE = re.compile(r"\\.bench\\.tsx?$")', 'BENCH_FILE = re.compile(r"\\.bench(mark)?\\.tsx?$")', "probe", "BENCH_FILE reads the form Vitest runs (CR3)")
     yield from each("vitest.config.ts", 'new URL(".node-version", import.meta.url)', 'new URL("../.node-version", import.meta.url)', "probe", "the pin is read from the root's own .node-version")
-    # The app's folders (F378): each name of the network and storage, each owner, each folder's path,
+    # The app's folders: each name of the network and storage, each owner, each folder's path,
     # each exception, and React's bans kept there, alone.
     for name in ("fetch", "XMLHttpRequest", "WebSocket", "EventSource", "localStorage", "sessionStorage", "indexedDB", "caches", "cookieStore", "window", "globalThis", "self"):
         yield from each(APP, f'"{name}"', '"_"', "probe", f"eslint app reaches {name} only from lib and sw")
     yield from each(APP, "${SRC}/", "${SRC}/nowhere-", "probe", "eslint app folder path")
     yield from each(APP, 'from: "./",\n              except: [`${SRC}/sw`],', 'from: SRC,\n              except: ["./sw"],', "probe", "eslint the worker reaches no path out of sw")
-    # The worker's packages, refused by name (F385): a scoped one and node: too, and its catches still read.
+    # The worker's packages, refused by name: a scoped one and node: too, and its catches still read.
     yield from each(APP, 'regex: "^[^.]"', 'regex: "^[a-z]"', "probe", "eslint the worker imports no package, scoped or node: (G2)")
     yield from each(APP, "...SWALLOWED, ", "", "probe", "eslint the worker's catches are read")
     yield from each(APP, "...reaching(REACHES.filter(", "...reaching([].filter(", "probe", "eslint the worker's folder keeps fetch and caches only (F395)")
@@ -358,7 +358,7 @@ def mutants():
     yield from each(REACT, ', eslintReact.configs["strict-type-checked"]', "", "probe", "eslint @eslint-react preset")
     yield from each(REACT, '{ name: "react", importNames: MEMOS, message: MEMO }', "", "probe", "eslint no hand-written memo")
     yield from each(REACT, "...MEMOS.map(", "...[].map(", "probe", "eslint no React.useMemo")
-    for name in ("memo", "useMemo", "useCallback", "innerHTML", "outerHTML", "insertAdjacentHTML"):  # each banned name, alone (F118)
+    for name in ("memo", "useMemo", "useCallback", "innerHTML", "outerHTML", "insertAdjacentHTML"):  # each banned name, alone
         yield from each(REACT, f'"{name}"', '"_"', "probe", f"eslint bans {name}")
     yield from each(REACT, 'name: "DataWithResponseInit"', 'name: "Nothing"', "probe", "eslint lets a route throw data()")
     yield from each("eslint.config.ts", 'files: ["packages/ui/src/Avatar/**/*.css"]', 'files: ["**/*.css"]', "probe", "eslint keeps forced-color-adjust to the avatar (F349)")
@@ -395,7 +395,7 @@ def mutants():
     yield from each(".jscpd.json", '"similarity": 0.8', '"similarity": 1', "probe", "jscpd similarity")
     yield from each(".jscpd.json", '    "**/.git/**",\n', "", "probe", "jscpd reads no file of git's own folder (F129)")
     yield from each("tsconfig.base.json", '"lib": ["es2024"],', "", "probe", "tsconfig lib")
-    # The migrations main has (F466), and harness_mutate's own dry check.
+    # The migrations main has, and harness_mutate's own dry check.
     mig = "scripts/check_migrations.py"
     yield from each(mig, " if i >= len(after) or after[i][1] != text]", " if False]", "hooks", "check_migrations keeps main's migrations")
     yield from each(mig, " if i >= len(after) or ", " if ", "hooks", "check_migrations sees main's list cut short")
@@ -483,7 +483,7 @@ def mutants():
     yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards - 1)]", "worktree(\"HEAD\")) for _ in range(0)]", "hooks", "harness_mutate makes a worktree a shard")
     yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
     yield from each(hm, "ThreadPoolExecutor(" "CONTROLS_AT_ONCE)", "ThreadPoolExecutor(len(controls))", "hooks", "harness_mutate runs its controls two at a time (F2138)")
-    # F2526: a run cut short keeps no verdict. The finds are split so that these lines hold none of them.
+    # A run cut short keeps no verdict. The finds are split so that these lines hold none of them.
     yield from each(hm, "if code < 0 or " "code in CUT_BY_SIGNAL:", "if code in CUT_BY_SIGNAL:", "hooks", "harness_mutate takes a suite ended by a signal for no verdict (F2526)")
     for kept in ("137, 143", "130, 143", "130, 137"):
         yield from each(hm, "CUT_BY_SIGNAL = (" "130, 137, 143)", f"CUT_BY_SIGNAL = ({kept})", "hooks", f"harness_mutate takes the code of a shell's signal for no verdict, without {({'137, 143': '130', '130, 143': '137', '130, 137': '143'})[kept]} (F2526)")
@@ -522,7 +522,7 @@ def mutants():
     yield from each("deploy/test.sh", "grep -E '^gnoworld-demo-mutant-[0-9]+$'", "grep -E '.'", "hooks", "deploy/test.sh names only a mutant project as a leftover")
     yield from each("deploy/test.sh", "grep -vx \"$project\" |", "", "hooks", "deploy/test.sh does not take its own project for a leftover")
     yield from each("deploy/test.sh", 'if [ "${1:-}" != --demo ]; then\n	mkdir -p "$lock_dir"', 'if true; then\n	mkdir -p "$lock_dir"', "hooks", "deploy/test.sh --demo takes no lock")
-    # F2528: each guard of the lock the first round left with no proof.
+    # Each guard of the lock.
     yield from each("deploy/test.sh", "docker compose ls --all --format json 2>/dev/null |", "true |", "hooks", "deploy/test.sh finds a leftover project through docker compose ls")
     yield from each("deploy/test.sh", "docker network ls --format '{{.Name}}' 2>/dev/null | sed", "true | sed", "hooks", "deploy/test.sh finds a leftover project through its network, which outlives its containers (5f)")
     yield from each("deploy/test.sh", "trap 'exit 130' INT\n", "", "hooks", "deploy/test.sh releases its lock when it is stopped by Ctrl+C")
@@ -564,7 +564,7 @@ def mutants():
     yield from each("scripts/guard.py", '"xargs", "sudo", "doas"}', '"xargs"}', "hooks", "guard reads past sudo")
     yield from each("scripts/guard.py", 'given |= w.startswith("-") and "c" in w', 'given |= w == "-c"', "hooks", "guard reads bash -lc")
     yield from each("scripts/guard.py", "                if part in SEPARATORS or part", "                if False or part", "hooks", "guard splits at the shell's separators")
-    # git's own folders, never a command's (F4924), the global options that take their argument apart (F4920), a function's body (F4922).
+    # git's own folders, never a command's, the global options that take their argument apart, a function's body.
     g = "scripts/guard.py"
     yield from each(g, 'GIT_PLACES = {"GIT_DIR", ', "GIT_PLACES = {", "hooks", "guard refuses GIT_DIR given")
     yield from each(g, '"GIT_COMMON_DIR", "GIT_WORK_TREE"}', '"GIT_WORK_TREE"}', "hooks", "guard refuses GIT_COMMON_DIR given")
@@ -600,11 +600,11 @@ def mutants():
     yield from each(g, "        if end is not None:  #", "        if False:  #", "hooks", "guard keeps a substitution one word (lot 2, S2-6)")
     yield from each(g, "    for at, inner in dict.fromkeys(found):\n", "    for at, inner in []:\n", "hooks", "guard reads the commands of a substitution")
     yield from each(g, '    lines += [(at, line) for at, line in zip(itertools.accumulate([0] + [len(line) + 1 for line in whole]), whole) if SHIELDED["\\n"] in line]\n', "", "hooks", "guard reads a command whose quotes hold a newline whole (lot 2, S2-7)")
-    # git wherever it stands, its dashed programs, its helpers and subtree's push (lot 3, S3-1, S3-2); the shells, their -c, what they
-    # read (S3-5); backticks and ${...} (S3-4); a heredoc's mark in quotes, a here-string (S3-3); a glob qualifier (S3-6).
+    # git wherever it stands, its dashed programs, its helpers and subtree's push; the shells, their -c, what they
+    # read; backticks and ${...}; a heredoc's mark in quotes, a here-string; a glob qualifier.
     yield from each(g, "        for at, word in enumerate(words):\n", "        for at, word in list(enumerate(words))[:1]:\n", "hooks", "guard reads git wherever it stands, not first alone (lot 3, S3-1)")
     yield from each(g, 'name = os.path.basename(word).lstrip("=$")', "name = os.path.basename(word)", "hooks", "guard reads =git and $'git' as git")
-    # gnokey, a recursive delete, curl, wget or an interpreter to the chain, at any word too (the chief's next step).
+    # gnokey, a recursive delete, curl, wget or an interpreter to the chain, at any word too.
     yield from each(g, '            if name == "gnokey":', '            if name == "gnokey" and at == 0:', "hooks", "guard refuses gnokey wherever it stands")
     yield from each(g, "            if deletes_unguarded(tail) or", "            if at == 0 and deletes_unguarded(tail) or", "hooks", "guard refuses an unguarded recursive delete wherever it stands")
     yield from each(g, "            tail = [name] + words[at + 1:]", "            tail = words[at:]", "hooks", "guard reads =rm and $'rm' as rm")
@@ -647,10 +647,10 @@ def mutants():
     yield from each(g, r'-[0iv]*S(.+)', r'-[A-Za-z]*?S(.+)', "hooks", "guard reads -u NAME as -u, not as -S (lot 2, S2-2)")
     yield from each(g, r"[<>]&|>\||>>", r"[<>]&|>>", "hooks", "guard keeps a clobbering >| one redirection")
     yield from each(g, ', "include.path", "includeif.")', ")", "hooks", "guard refuses a config file included")
-    # 7w4 (reports/slice-7w2-security-4.md, slice-7w4-red-pass.md): a raw word bare (S4-1); a qualifier after any word, zsh's ways of
-    # running a value (S4-2); a program a variable, a substitution or a glob names, a value read, an alias (S4-3); what may hide git's
-    # flags, a shell's -c line wherever it stands (S4-4); a heredoc's body and a quote's text no shell globs (S4-7), and each turn of
-    # the reader that finds them; then the chief's three: builtins that run a string, commits no pre-commit sees, --version.
+    # A raw word bare; a qualifier after any word, zsh's ways of
+    # running a value; a program a variable, a substitution or a glob names, a value read, an alias; what may hide git's
+    # flags, a shell's -c line wherever it stands; a heredoc's body and a quote's text no shell globs, and each turn of
+    # the reader that finds them; builtins that run a string, commits no pre-commit sees, --version.
     yield from each(g, "tokens = [bare(w) for w in ", "tokens = [w for w in ", "hooks", "guard reads a comment's raw words bare (7w4, S4-1)")
     yield from each(g, r'''r"[\\'\"]"''', r'''r"[\\']"''', "hooks", "guard strips a raw word's double quotes")
     yield from each(g, r'''r"[\\'\"]"''', r'''r"[\\\"]"''', "hooks", "guard strips a raw word's single quotes")
@@ -769,7 +769,7 @@ def mutants():
         yield from each(g, '("reset", "branch", "checkout", "switch", "merge", "push",', repr(tuple(s for s in ("reset", "branch", "checkout", "switch", "merge", "push") if s != sub))[:-1] + ",", "hooks", f"guard refuses git {sub} naming the stash")
     yield from each(g, r'r"-[a-zA-Z]*[mF].|--(message|file)="', r'r"-[a-zA-Z]*[mF]."', "hooks", "guard lets --file='s value be a variable")
     yield from each(g, r're.compile(r"-([a-zA-Z]*?)(?:[mFcCt]|$)")', r're.compile(r"-([a-zA-Z]*?)$")', "hooks", "guard sees -n joined to -m's value")
-    # The reader of bodies and quotes (S4-7, R5 to R7).
+    # The reader of bodies and quotes.
     yield from each(g, "    kept = bodies(text)\n", "    kept = []\n", "hooks", "guard keeps a heredoc's body from the qualifiers (7w4, S4-7)")
     yield from each(g, '        fresh = lambda: [":"] if any(', '        fresh = lambda: [":"] if False and any(', "hooks", "guard reads a body's line as words, not a command")
     yield from each(g, 'a <= at < b if kind != "text" else a < at < b', "a <= at < b", "hooks", "guard reads a line that opens a quote as a command")
@@ -819,7 +819,7 @@ def mutants():
     yield from each(g, "            waiting, i, stack[-1][2] = [], at, at\n", "            waiting, i = [], at\n", "hooks", "guard starts a command after a body")
     yield from each(g, '        elif c in ";&|\\n":\n            stack[-1][2] = i + 1\n', '        elif False:\n            stack[-1][2] = i + 1\n', "hooks", "guard starts a command after a separator")
     yield from each(g, '        elif c in ";&|\\n":\n            stack[-1][2] = i + 1\n', '        elif c in ";&|\\n":\n            stack[-1][2] = i + 2\n', "hooks", "guard starts a command just after a separator (R6)")
-    # The chief's three, folded into 7w4: a builtin that runs a string later, zsh's tables, commits no pre-commit sees, --version.
+    # A builtin that runs a string later, zsh's tables, commits no pre-commit sees, --version.
     evals = 'EVALS = {"eval", "trap", "sched", "zpty", "let", "bind", "complete", "compgen", "parallel", "zstyle"}'
     for name in ("trap", "sched", "zpty", "let", "bind", "complete", "compgen", "parallel", "zstyle"):
         yield from each(g, evals, evals.replace(f', "{name}"', ""), "hooks", f"guard reads {name}'s words as eval's")
@@ -843,7 +843,7 @@ def mutants():
         yield from each(g, "sub in (" + ", ".join(f'"{s}"' for s in replays) + ")", "sub in " + repr(tuple(s for s in replays if s != sub)), "hooks", f"guard refuses git {sub}")
     yield from each(g, '        elif c == "#" and ends == "()" and k > at and text[k - 1] in " \\t\\n;&|()":  # a command', "        elif False:  # a command", "hooks", "guard reads a substitution past a comment's apostrophe (after round 3)")
     yield from each(g, ' and ends == "()" and k > at and', " and k > at and", "hooks", "guard reads no comment inside ${...}")
-    # The second round's (reports/slice-7w4-security.md): each line's substitutions, the reader's backticks and quotes, =(...).
+    # Each line's substitutions, the reader's backticks and quotes, =(...).
     yield from each(g, "        for reading in (line, re.sub(\"['\\\"]\", \" \", line)):\n", "        for reading in ():\n", "hooks", "guard reads each line's substitutions (S5-1)")
     yield from each(g, "        for reading in (line, re.sub(\"['\\\"]\", \" \", line)):\n", "        for reading in (line,):\n", "hooks", "guard reads an unquoted body's substitutions past an apostrophe")
     yield from each(g, '            if any(context[1] == "`" for context in stack):\n                return found', "            if False:\n                return found", "hooks", "guard keeps no body inside backticks (S5-2)")
@@ -884,7 +884,7 @@ def mutants():
     yield from each("scripts/patch_coverage.py", "(root|entry\\.server)", ".+", "hooks", "patch_coverage measures the app's routes")
     yield from each("scripts/check_docs.py", "    sys.exit(1)", "    pass", "hooks", "check_docs")
     yield from each("scripts/check_docs.py", "if status not in STATUSES:", "if False:", "hooks", "ledger: a known status")
-    # docs/REVIEW.md's tier 1 against the workflow's TIER1, on every commit (F4928).
+    # docs/REVIEW.md's tier 1 against the workflow's TIER1, on every commit.
     cd = "scripts/check_docs.py"
     yield from each(cd, "or lost or rules or drift or globs:", "or lost or rules or globs:", "hooks", "check_docs fails a tier 1 the workflow does not hold")
     yield from each(cd, "or lost or rules or drift or globs:", "or lost or rules or drift:", "hooks", "check_docs fails a coverage glob that differs from tier 1 (F5543)")
@@ -991,12 +991,12 @@ def mutants():
         ('      "Read(~/.local/share/gnomcp/**)",\n', "the Read tool cannot open gnomcp's key store"),
     ):
         yield from each(".claude/settings.json", find, "]" if find.endswith('"]') else "", "hooks", f"settings: {label}")
-    # What runs outside the sandbox or at Alexis's hand, and what that runs, is out of the file tools' reach (the walk in `wiring`), its
+    # What runs outside the sandbox or by hand, and what that runs, is out of the file tools' reach (the walk in `wiring`), its
     # twins in the main checkout beside it.
     for name in ("check.sh", "check_docs.py", "ergo.sh", "hidden.py", "related.py", "speeds.py", "workshop.sb", "workshop.sh"):
         yield from each(".claude/settings.json", f'      "Edit(/scripts/{name})",\n', "", "hooks", f"settings keep scripts/{name}, which runs outside the sandbox, out of the file tools")
         yield from each(".claude/settings.json", f'      "Edit(~/Server/gnoworld/scripts/{name})",\n', "", "hooks", f"settings keep the main checkout's scripts/{name} out of the file tools")
-    # F129: the hooks live in .git/hooks, installed from main with the scripts they run.
+    # The hooks live in .git/hooks, installed from main with the scripts they run.
     ih = "scripts/install_hooks.sh"
     yield from each(ih, 'git cat-file -e "$ref:.githooks/$hook" 2>/dev/null ||', "true ||", "hooks", "install_hooks refuses a commit missing a hook")
     yield from each(ih, "git ls-tree --full-tree ", "git ls-tree ", "hooks", "install_hooks reads the commit from any folder")
@@ -1020,21 +1020,20 @@ def mutants():
         for path in (ih, ck):
             yield from each(path, f"for hook in {' '.join(hooks)}; do", f"for hook in {' '.join(h for h in hooks if h != hook)}; do",
                             "hooks", f"{path} wants {hook} (F129)")
-    # Round 1 of F129's review.
     yield from each(".githooks/records.sh", "GIT_ICASE_PATHSPECS=1 ", "", "hooks", "the harness list is case-blind, as the disk is (F151)")
     for path in (".git/commondir", ".mcp.json"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of Claude's file tools (F150, F158)")
     yield from each(".claude/settings.json", '        ".git/commondir",\n', "", "hooks", "the sandbox keeps commands out of git's commondir (F150)")
     yield from each(".claude/settings.json", '        ".mcp.json",\n', "", "hooks", "the sandbox keeps commands out of .mcp.json (F158)")
-    # 7z: no session writes another worktree's closed files; each twin's kind switched off (its path made another, so the file
-    # stays JSON: a line cut last in its list would leave a comma, and the run fail on that, the red pass's T2), narrowed to one
-    # tree or widened past the worktrees' folder (F4890, F4891, F4892).
+    # No session writes another worktree's closed files; each twin's kind switched off (its path made another, so the file
+    # stays JSON: a line cut last in its list would leave a comma, and the run fail on that), narrowed to one
+    # tree or widened past the worktrees' folder.
     new = "~/Server/gnoworld-wt"
     for rule, why in (("Edit(~/Server/gnoworld/scripts/stop_gate.sh)", "the main checkout's Stop hook (F4890)"), ("Edit(~/Server/gnoworld/.git/config)", "the main checkout's git config (F4890)"),
                       (f"Edit({new}/*/.claude/settings.json)", "a sibling's settings, which its session reloads (F4890)"),
                       ("Read(~/Server/gnoworld/deploy/secrets/**)", "the main checkout's secrets (F4892)")):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {why} out of the file tools")
-    # The instructions every session reads: its own tree's, to commands and to the file tools (S4, R4), and those of the folders above.
+    # The instructions every session reads: its own tree's, to commands and to the file tools, and those of the folders above.
     for path in ("CLAUDE.md", "CLAUDE.local.md", ".claude/CLAUDE.md"):
         yield from each(".claude/settings.json", f'      "Edit(/{path})",\n', "", "hooks", f"settings keep {path} out of the file tools (7z, R4, S4)")
     for path in ("CLAUDE.local.md", ".claude/CLAUDE.md"):
@@ -1046,8 +1045,8 @@ def mutants():
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep the instructions {why} out of the file tools (7z, S4)")
     yield from each(".claude/settings.json", f'"{new}/*/package.json"', '"~/Server/**/package.json"', "hooks", "no twin closes a throwaway tree outside the worktrees' folder (F4890)")
     yield from each(".claude/settings.json", f'"Edit({new}/*/.githooks/pre-commit)"', f'"Edit({new}/**)"', "hooks", "no twin closes a sibling's open files (F4890)")
-    # 7w3: the file tools write the session's folders alone; the next parts' folder's twins and the instructions above them; the
-    # instructions below a tree's root (S2-3), and StrykerJS's copies left out of what those close.
+    # The file tools write the session's folders alone; the next parts' folder's twins and the instructions above them; the
+    # instructions below a tree's root, and StrykerJS's copies left out of what those close.
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true', '"blockWritesOutsideWorkingDirectories": false', "hooks",
                     "settings keep the file tools in the session's folders (7w3)")
     for entry, why in ((".githooks/pre-commit", "a pre-commit hook of the next parts' folder"), (".git", "a .git of the next parts' folder"), ("**/CLAUDE.local.md", "a nested CLAUDE.local.md there")):
@@ -1066,7 +1065,7 @@ def mutants():
     for name in ("CLAUDE.md", "CLAUDE.local.md", "AGENTS.md"):
         yield from each("stryker.config.json", f',\n    "{name}"', "", "hooks", f"StrykerJS copies no {name} the sandbox refuses it to write (7w3)")
     yield from each("stryker.config.json", '".claude",\n    "coverage"', '"coverage"', "hooks", "StrykerJS copies no .claude folder, whose rules and skills the sandbox closes at any depth (7w3)")
-    # No write root reaches the next parts' folder (F5322, the red pass's T2), and AGENTS.md is closed above the trees (T7).
+    # No write root reaches the next parts' folder, and AGENTS.md is closed above the trees.
     yield from each(".claude/settings.json", '        "~/go/pkg/mod"\n', '        "~/go/pkg/mod",\n        "~/Server"\n', "hooks", "no allowWrite gives every part's command the next parts' folder (7w3)")
     yield from each(".claude/settings.json", '"blockWritesOutsideWorkingDirectories": true,\n', '"blockWritesOutsideWorkingDirectories": true,\n    "additionalDirectories": ["~/Server/gnoworld-wt/slice-8"],\n', "hooks",
                     "no additionalDirectories gives every part a sibling of the next parts' folder (7w3)")
@@ -1075,7 +1074,7 @@ def mutants():
     yield from each(".claude/settings.json", f'"{new}/.claude"', f'"{new}/.claude-off"', "hooks", "the sandbox keeps the chief's commands out of the next parts' folder's .claude, which --add-dir loads (7w3, S2-2)")
     for rule in ("Edit(~/Server/AGENTS.md)", f"Edit({new}/.claude/**)"):
         yield from each(".claude/settings.json", f'"{rule}"', f'"{rule[:-1]}-off)"', "hooks", f"settings keep {rule[5:-1]}, read above the trees, out of the file tools (7w3)")
-    # 7w3: check_docs refuses an instruction file below the root at every commit (S2-3), each part of its reading.
+    # check_docs refuses an instruction file below the root at every commit, each part of its reading.
     cd = "scripts/check_docs.py"
     for find, replace, why in (('if ".claude" in parts[1:]:', "if False:", "a .claude below the root"), ('if ".claude" in parts[1:]:', 'if ".claude" in parts[2:]:', "a .claude one folder below the root"),
                                ("elif parts[-1] in INSTRUCTIONS and parts not in ROOT_OWN:", "elif False:", "an instruction file by its name"),
@@ -1156,7 +1155,7 @@ def mutants():
     yield from each("scripts/scan_secrets.sh", '[ "$rc" = 0 ] || found=1', '[ "$rc" = 0 ] || :', "hooks", "scan_secrets fails on what any rule set found")
     yield from each("scripts/scan_secrets.sh", '[ "$rc" = 0 ] || found=1', '[ "$rc" = 0 ] || exit 1', "hooks", "scan_secrets runs both rule sets (F120)")
     yield from each("scripts/scan_secrets.sh", "if [ -e .gitleaksignore ]; then", "if false; then", "hooks", "scan_secrets refuses a root .gitleaksignore")
-    # D13184: --range takes commits alone, one to scan at least, and scans no more than them.
+    # --range takes commits alone, one to scan at least, and scans no more than them.
     for find, replace, label in (
         ("grep -Eqvx '\\^[0-9a-f]{40}' || refuse", "true || refuse", "takes a range with a commit to scan"),
         ('[ "$count" = 0 ] || refuse', ': || refuse', "takes commits, ^commits and A..B alone"),
@@ -1266,7 +1265,7 @@ def mutants():
     yield from each("scripts/worktree.sh", 'else ln -s "$entry"', 'else cp -R "$entry"', "hooks", "worktree.sh links each package, never copies it")
     yield from each("scripts/worktree.sh", 'sh "$(dirname "$0")/borrow_node_modules.sh" "$dir"', ":", "hooks", "worktree.sh keeps a workspace's @gnoworld links in the new tree")
     yield from each("scripts/worktree.sh", 'rm "${dir:?}/node_modules"\n', "", "hooks", "worktree.sh's root node_modules is a folder of links, not one link")
-    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY"):  # 7w3's T9, kept over 10a's worktree.sh
+    for var in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY"):
         yield from each("scripts/worktree.sh", "unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY\n", "unset " + " ".join(v for v in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY") if v != var) + "\n", "hooks", f"worktree.sh refuses a caller's {var} (7w3)")
     yield from each("scripts/worktree.sh", 'harness --ignore-submodules=all --name-only "$base" && ', "", "hooks", "worktree.sh compares a base's harness and package files with this tree's (security-S5, F5098)")
     yield from each("scripts/worktree.sh", "--ignore-submodules=all ", "", "hooks", "worktree.sh enters no nested repository, whose config would run outside the sandbox (F5097)")
@@ -1286,7 +1285,7 @@ def mutants():
     yield from each("scripts/borrow_node_modules.sh", "in */node_modules/.bin) ;;", "in *) ;;", "hooks", "borrow_node_modules.sh copies a linked .bin from a node_modules/.bin alone (F5099)")
     yield from each("scripts/worktree.sh", ' && git diff --name-only "$base" -- CLAUDE.md', "", "hooks", "worktree.sh refuses a base whose CLAUDE.md is not this tree's (F5098)")
     yield from each("scripts/worktree.sh", "&& pwd -P) || parent=", "&& pwd -P)", "hooks", "worktree.sh says why it refuses a folder whose parent does not exist")
-    # F5058: it may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
+    # It may run outside the sandbox, so it makes and removes the folders of one root alone. The name's letters have no
     # mutant to `[a-z]`: under dash, Linux's sh, that range is ASCII already, so the CI would see it survive.
     yield from each("scripts/worktree.sh", '[ "$parent" = "$root" ] ||', "true ||", "hooks", "worktree.sh makes and removes the folders of its root alone (F5058)")
     yield from each("scripts/worktree.sh", "root=$HOME/Server/gnoworld-wt", "root=$HOME/Server", "hooks", "worktree.sh's root is $HOME/Server/gnoworld-wt (F5058)")
@@ -1325,9 +1324,9 @@ def mutants():
     yield from each("scripts/audit.py", 'if a.get("severity") in SEVERE]', "if False]", "hooks", "audit fails on an advisory")
     yield from each("scripts/audit.py", "locked.setdefault(name, set()).add(version)", "pass", "hooks", "audit asks about every package")
     yield from each("scripts/audit.py", '''sys.exit(f"audit: no readable answer from npm's advisory database: {e}")''', "answer = {}", "hooks", "audit fails without an answer")
-    # GitHub judges main (the harness overhaul, phase 2): each promise of the two workflows and the two scripts, switched off.
+    # GitHub judges main: each promise of the two workflows and the two scripts, switched off.
     ci = ".github/workflows/gate.yml"
-    # D13177, D13179: gate-ok's last step, its rights, and the script that writes the annotations.
+    # gate-ok's last step, its rights, and the script that writes the annotations.
     yield from each(ci, "        if: failure()\n        env:\n          GH_TOKEN", "        env:\n          GH_TOKEN", "hooks", "the token reaches the annotating step after a failure alone")
     yield from each(ci, "      contents: read\n      actions: read\n", "      contents: read\n      actions: write\n", "hooks", "gate-ok only reads its run")
     yield from each(ci, ' || rm -f "$out/$id.log"', "", "hooks", "a download that failed leaves no log")
@@ -1425,7 +1424,7 @@ def mutants():
         ("if SKIP:\n    print(", "if False:\n    print(", "probe.py says what SKIP left out"),
     ):
         yield from each("scripts/probe.py", find, replace, "hooks", label)
-    # The lanes and the scope of a fast run (Alexis, 2026-10-25: a check's cost follows the change).
+    # The lanes and the scope of a fast run (a check's cost follows the change).
     for find, replace, label in (
         ("--no-renames --name-only HEAD", "--name-only HEAD", "a rename keeps where it came from"),
         ("--no-renames --name-only HEAD --", "--no-renames --name-only --", "what is staged counts"),
@@ -1439,7 +1438,7 @@ def mutants():
     yield from nginx_mutants()
     yield from gate_mutants()
     yield from cleanup_3e_mutants()
-    # F13189: Playwright takes the journeys alone, or node:test's output comes before the JSON check_regressions reads.
+    # Playwright takes the journeys alone, or node:test's output comes before the JSON check_regressions reads.
     yield from each("app/playwright.config.ts", '  testMatch: "**/*.spec.ts",\n', "", "hooks", "playwright lists the journeys alone (F13189)")
     yield from guard_3c_mutants()
     yield from hooks_3b_mutants()
@@ -1486,7 +1485,7 @@ def seven_mutants():
         ("*\"$STOP_AT\"*) exit 1 ;;", "*) exit 1 ;;", "ends a mutant's run at its expected check only"),
         ("\t\tSTOP_AT=$wanted TEST_PROJECT=", "\t\tTEST_PROJECT=", "tells a mutant's run the check that must catch it"),
         ("\tSTOP_AT= TEST_PROJECT=gnoworld-demo-mutant-$$", "\tTEST_PROJECT=gnoworld-demo-mutant-$$", "lets the first run of --mutants go through every check"),
-        # The two checks a loaded host failed (F5486, part 8q): test_hooks.sh's deploy_checks runs them on planted answers.
+        # The two checks a loaded host failed: test_hooks.sh's deploy_checks runs them on planted answers.
         ("setTimeout(ask, 6000);", "setTimeout(ask, 4000);", "waits up to 6 s for the 640 WebSockets to settle before the 641st"),
         ("  if (asked) return;\n  settled += 1;", "  settled += 1;", "counts only the 101s that came before the 641st was asked"),
         ("  if (settled < crowd) others.set(\"unanswered after 6 s\", crowd - settled);\n", "", "prints the WebSockets still waiting at 6 s"),
@@ -1667,7 +1666,7 @@ def hooks_3b_mutants():
     yield from each("scripts/stop_gate.sh", "\nexit 0\n", "\nexit 2\n", h, "stop_gate never blocks a turn (D13173)")
     ck = "scripts/check.sh"
     yield from each(ck, 'git rev-parse --git-dir >/dev/null 2>&1 || {', "true || {", h, "check.sh refuses to run outside a repository")
-    # The change and the type cache, their text moved when the staged copy's branches left (D13173).
+    # The change and the type cache.
     yield from each(ck, '\t\tgit -c core.quotePath=false ls-files --others --exclude-standard -- "$@"\n', "\t\t:\n", h, "check.sh: reads an untracked file as part of the change")
     yield from each(ck, '"$@" &&\n\t\tgit -c core.quotePath=false ls-files', '"$@"\n\t\tgit -c core.quotePath=false ls-files', h, "check.sh: a git that cannot list the change fails the gate")
     yield from each(ck, "TSC_CACHE=$PWD/.claude/tmp/tsc\n", "TSC_CACHE=${TSC_CACHE:-$logs/tsc}\n", h, "check.sh builds the types from the worktree's own cache, whatever a caller's TSC_CACHE says")
@@ -1926,7 +1925,7 @@ STOP = threading.Event()  # set when the run is interrupted: no shard starts a m
 CUT_BY_SIGNAL = (130, 137, 143)  # a shell's INT, KILL, TERM; a suite run by Python or sh itself ends with a negative code
 
 
-LIMIT = 600  # s: a suite past it is a caught mutant (F3382); a control past it fails the run
+LIMIT = 600  # s: a suite past it is a caught mutant; a control past it fails the run
 GRACE = 5  # s a hung suite has to end on TERM before KILL
 LIVE = set()  # the suites in flight, each a group of its own, so that stopping one stops its children and no other
 TIMED = set()  # the mutants caught by time alone: the load can do that
@@ -2037,15 +2036,15 @@ signal.signal(signal.SIGTERM, signal.default_int_handler)  # a TERM ends this ru
 if sys.argv[1:]:
     sys.exit("usage: harness_mutate.py [--dry]")
 shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
-CONTROLS_AT_ONCE = 2  # every tree's suites at once overran their 600 s limit beside a coverage run (F2138)
+CONTROLS_AT_ONCE = 2  # every tree's suites at once overran their 600 s limit beside a coverage run
 failures = []
 with contextlib.ExitStack() as stack:
-    trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left (CR9)
+    trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left
     WORKTREE = trees[0]
     found = checked()
     if not found:  # a harness that lost its mutants is not a green run, and the controls would only cost minutes
         sys.exit("harness_mutate: no mutant to judge: every mutant is gone from this script")
-    # No more trees than mutants, and a control only of the suites they run: one mutant took 4 trees and 8 suite runs (C4).
+    # No more trees than mutants, and a control only of the suites they run: one mutant took 4 trees and 8 suite runs.
     shards = min(shards, len(found))
     trees += [stack.enter_context(worktree("HEAD")) for _ in range(shards - 1)]
     suites = [test for test in TESTS if any(m[3] == test for m in found)]
@@ -2056,7 +2055,7 @@ with contextlib.ExitStack() as stack:
             waiting = {pool.submit(run, *c): c for c in controls}
             for future in concurrent.futures.as_completed(waiting):  # in the order they end: a failure is not kept waiting behind a slow one
                 (tree, test), code = waiting[future], future.result()
-                if code is None:  # a hung control is no pass: it proves nothing about the mutants (F3382)
+                if code is None:  # a hung control is no pass: it proves nothing about the mutants
                     sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first")
                 if code != 0:
                     sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
