@@ -31,6 +31,12 @@ export interface Link {
   stop: () => Promise<void>;
 }
 
+/** The read of one line through the chat's link: "unanswered" while it has none (Ergo not set, or the link not made yet). */
+export const lineOf =
+  (link: () => Link | undefined) =>
+  (room: string, msgid: string): Promise<Fetched> =>
+    link()?.line(room, msgid) ?? Promise.resolve("unanswered");
+
 // How long a line asked for by its id may take: under the 10 s a page waits on the server (lib/api/http.ts).
 const LINE_MS = 5000;
 

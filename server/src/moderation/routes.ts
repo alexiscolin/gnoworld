@@ -9,7 +9,7 @@ import { z } from "zod";
 import { baseRefusals, guard, json, refuserOf, sessionOf, type Guarded, type Refusals } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { asOf, type Right } from "../roles/mayModerate.ts";
-import type { Fetched } from "../irc/link.ts";
+import { isLineOf, type Fetched } from "../irc/fetch.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { visitorOf } from "../visitor.ts";
 
@@ -86,9 +86,8 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
     // that room as Ergo holds it, or an owner of one room would take out the lines of any other.
     const held = await Promise.all(body.msgids.map((msgid) => line(body.room, msgid)));
     if (held.includes("unanswered")) return refuse(c, "unavailable", { room: body.room });
-    const ofRoom = (got: Fetched, msgid: string): boolean =>
-      got !== "gone" && got !== "unanswered" && got.room === body.room && got.msgid === msgid;
-    if (!held.every((got, i) => ofRoom(got, body.msgids[i] ?? ""))) return refuse(c, "not_found", { room: body.room });
+    if (!held.every((got, i) => isLineOf(got, body.room, body.msgids[i] ?? "")))
+      return refuse(c, "not_found", { room: body.room });
     // Every id is sent, whatever the first said: one answer for the pair.
     const sent = body.msgids.map((msgid) => hide(body.room, msgid));
     if (!sent.every(Boolean)) return refuse(c, "unavailable", { room: body.room });

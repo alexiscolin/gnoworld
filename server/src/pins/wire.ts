@@ -2,7 +2,7 @@
 // and read them, and what the link tells that ends a pin with its line (docs/decisions.md, 2026-10-27).
 import type { DatabaseSync } from "node:sqlite";
 import { PINS_MAX } from "@gnoworld/schemas";
-import type { Link, Said } from "../irc/link.ts";
+import { lineOf, type Link, type Said } from "../irc/link.ts";
 import type { Log } from "@gnoworld/service/log";
 import { mayRead, staffOf, type Typed } from "../rooms/types.ts";
 import { makePins, type Pins } from "./pins.ts";
@@ -17,7 +17,7 @@ interface Parts {
 export function pinsFor(db: DatabaseSync, roles: Typed, { link, now, log }: Parts) {
   const pins: Pins = makePins({
     db,
-    fetch: (room, msgid) => link()?.line(room, msgid) ?? Promise.resolve("unanswered"),
+    fetch: lineOf(link),
     now,
     max: PINS_MAX,
   });
