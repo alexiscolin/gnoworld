@@ -36,17 +36,9 @@ import subprocess
 import sys
 import tempfile
 
-GAPS = {
-    "r/seal/seal.gno: mustStrong(b)": "no test seals with a weak key as b: seal-store slice",
-    "r/seal/seal.gno: mustBeCurrent(kb)": "no test seals with a rotated key as b (needs vectors): seal-store slice",
-    "r/seal/seal.gno: if v := owner.Get(k); v != nil && v.(address) != caller {": "no test binds one key to a second address (needs vectors): seal-store slice",
-    "r/seal/seal.gno: if _, _, _, isSession := runtime.GetSessionInfo(); isSession {": "gno test cannot fake a session: phase 2, on onyx",
-    "r/seal/seal.gno: !ed25519.Verify(b[:], msg, sigB[:])": "no test pairs a valid sigA with a bad sigB: seal-store slice",
-    "r/seal/seal.gno: height, _ = strconv.ParseInt(f[1], 10, 64) [64 -> 63]": "equivalent: a block height stays below 2^62, where a 63-bit parse reads it alike",
-}
+GAPS = {}
 # Mutations that are not guards: (file, text found exactly once, replacement).
-EXTRA = [("r/seal/seal.gno", ' + string(a[:]) + string(b[:]) + "|"', ' + "|"'),
-         # A guard that panics inside its call (F5056), switched off where its import stays used.
+EXTRA = [# A guard that panics inside its call (F5056), switched off where its import stays used.
          ("r/satellite/satellite.gno", "\truntime.AssertOriginCall()\n", "\tif false {\n\t\truntime.AssertOriginCall()\n\t}\n")]
 # A run's time limit, a copy's share of it (F5051, docs/decisions.md D30): 60 s at least. A fixed 60 s failed the slot
 # realm's 227 copies in a gate of every lane, though none loops; runs of 40 copies, 60 s each, failed there too.
@@ -54,7 +46,7 @@ SECONDS_A_COPY = 1.5
 LEAST = 60
 # gno's timer starts once it has loaded the copies (gnovm/cmd/gno/test.go at chain/onyx, Load before the timer): a run
 # still going GRACE seconds past its limit has hung where no timer counts, and is stopped with no verdict (F5084). 60 s
-# is more than loading takes: 200 seal copies took 6.81 s to load and test, alone.
+# is more than loading takes: 200 copies of the seal realm (removed since, D13197) took 6.81 s to load and test, alone.
 GRACE = 60
 
 MUST = re.compile(r"^\s*must[A-Z]\w*\(.*\)\s*$")

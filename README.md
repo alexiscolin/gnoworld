@@ -27,8 +27,7 @@ The applications sit at the root; the libraries they import sit under `packages/
 | | `chain/` | Every read of a chain and its indexer, in one place (a lint rule holds it) |
 | | `service/` | What the server and Jarvis share: HTTP, the network's guards, settings, the database, the logs |
 | | `ui/` | The design system: tokens, CSS layers, compositions, components and icons, and its Storybook |
-| `gno/` | `r/` | The realms, in gno: `seal` and `satellite` (a world's sign in space, rented by the day) |
-| | `tools/` | Go tools around the chain (today `sealvec`, which writes the seal realm's test vectors) |
+| `gno/` | `r/` | The realm, in gno: `satellite` (a world's sign in space, rented by the day); the seal realm is out for now (D13197) |
 | `deploy/` | `web/`, `server/`, `jarvis/`, `jarvis-reader/`, `link-reader/`, `ergo/` | The demo's images: the app served by nginx, the server, Jarvis and its gnomcp reader, the link reader and the chat's IRC server |
 | | `guard/`, `egress/`, `tailscale/` | The demo's network: a guard that lets out only what it must, the ways out (one list per service: the server's, Jarvis's, its reader's, the link reader's), and Tailscale, which publishes the demo |
 | | `k6/`, `probe/`, `test.sh` | The load test, the health probe the images without a shell use, and `test.sh`, which starts the stack and checks it (with its mutants), with `test-jarvis.sh` and `test-links.sh` for the two services that sit behind a profile |

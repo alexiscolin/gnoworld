@@ -35,7 +35,7 @@ and the deployment live in one repository, with one lockfile and one gate:
 - a workspace imports another only through its `package.json` name (`@gnoworld/core`,
   `@gnoworld/schemas`), never by a relative path across folders;
 - no build orchestrator: each workspace has its own scripts, which `scripts/check.sh` runs for what a commit touches
-  and GitHub's gate (`.github/workflows/gate.yml`) for a pull request, with the realms and the Go reference client;
+  and GitHub's gate (`.github/workflows/gate.yml`) for a pull request, with the realms;
 - a change that spans the client and the server lands in one commit, tested together;
 - the admin console (`admin/`, not built yet) will stay in the monorepo; it is hidden on the network, never by splitting the repo
   (ADR-0002 §6);
@@ -98,8 +98,7 @@ deploy/                      compose.yaml (the demo stack, the reference wiring 
                              and gnomcp's read-only profiles, jarvis-reader/ gnomcp's container, link-reader/ the reader's image,
                              egress/ one smokescreen list per way out (the server's, jarvis's, its reader's, the link reader's)
 admin/                       not built yet: the admin console, on its own origin (ADR-0002 §6), reusing ui and lib
-gno/r/                       the realms: `seal` and `satellite` (the slot realm); hubs and profiles come later (ADR-0001 §14)
-gno/tools/                   Go tools around the chain (`sealvec`)
+gno/r/                       the realms: `satellite` (the slot realm); the seal out for now (D13197), hubs and profiles later (ADR-0001 §14)
 ```
 
 Inside a feature:

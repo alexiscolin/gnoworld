@@ -140,7 +140,7 @@ comes with the slice that brings what it needs.
 Users sign their own calls in Adena, on a computer. gnoworld's only write of its own is the
 slot realm, on Onyx (ADR-0002 §8, row 11). Phones log in on a computer only; once logged in, a phone writes (docs/decisions.md, 2026-10-28).
 
-**Where it stands:** slices 0 to 11 are built and in `main` (its tree holds `jarvis/`, `evals/`, `gno/r/seal` and `gno/r/satellite`), except 4b (images
+**Where it stands:** slices 0 to 11 are built and in `main` (its tree holds `jarvis/`, `evals/` and `gno/r/satellite`; `gno/r/seal` is out for now, D13197), except 4b (images
 and files) and 4d (the Discord bridge), which have no code in `server/src` or `app/src`. Slice 12
 is not started: there is no `admin/` and no PostHog in the code (the server's admin API, `server/src/door/admin.ts`, holds Jarvis's
 settings only). What came after slice 9, on `pingpong` and not yet in `main`, is slice 13 below.
