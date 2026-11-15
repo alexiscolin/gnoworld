@@ -1,23 +1,24 @@
 # Operations
 
-The runbook (ADR-0002 §7). It holds the demo: the client behind a password, published through
-Tailscale Funnel from one Docker host, with Ergo (the chat), `server` (the login, the rooms, the bot, the search, the chain's jobs)
-and, in the demo, a way out to the hosts of `deploy/egress/acl.yaml` alone (slice 3, 3e); `jarvis` (with its `jarvis_reader`) and the
-link reader (`link_reader`), each off by default and under a profile of its own (10j-4; slice 13), and Grafana later (`docs/decisions.md:151`).
-Running the demo from one Mac, step by step, is [DEMO.md](DEMO.md). Everything is in `deploy/`; nothing outside it is touched,
-and no port of the host is opened. It runs on any Docker host: Linux with Docker Engine 28 or
-later, Docker Desktop, or OrbStack. Every setting, secret and switch is listed in [CONFIGURATION.md](CONFIGURATION.md).
+The runbook (ADR-0002 §7). It holds the stack: the client behind a password on one Docker host, with Ergo (the chat), `server` (the login,
+the rooms, the bot, the search, the chain's jobs) and a way out to the hosts of `deploy/egress/acl.yaml` alone (`guard` and `egress`, started with
+the rest); `jarvis` (with its `jarvis_reader`) and the link reader (`link_reader`), each off by default and under a profile of its own, and Grafana
+later (`docs/decisions.md:151`). Nothing publishes the stack yet: `web` listens on `inside`, a network with no way out, and no port of the host is
+opened. The public front, a TLS front (Caddy) on a VM of its own with the refusal of the VM's own public address and the PROXY protocol's
+one connection a visitor, comes with the automatic deploy's part (D13172), which builds the VM and proves it there. Until then the stack runs for
+its tests and for a developer who looks from a container of its network. Running it for a few testers is [DEMO.md](DEMO.md). Everything is in
+`deploy/`; nothing outside it is touched. It runs on any Docker host: Linux with Docker Engine 28 or later, Docker Desktop, or OrbStack. Every
+setting, secret and switch is listed in [CONFIGURATION.md](CONFIGURATION.md).
 
 ## The services
 
 | Service | Image | Listens | Health | Limits | State | Secret |
 |---|---|---|---|---|---|---|
 | `web` | built from `deploy/web/Dockerfile`: the client, on `nginx-unprivileged` 1.30.6, by digest | 8080, PROXY protocol, on `inside` only | `127.0.0.1:8081/health`, inside the container | 0.5 core, 128 MB, 64 processes | none | `demo_htpasswd` |
-| `guard` (profile `demo`) | `tailscale/tailscale` v1.104.1, by digest, running `deploy/guard/guard.sh` | nothing | its rules loaded | 0.1 core, 32 MB, 16 processes | none | none |
-| `tailscale` (profile `demo`) | the same image | Funnel on 443, forwarded to `web:8080` | `127.0.0.1:9002/healthz`, inside its network | 0.5 core, 256 MB, 128 processes | the `tailscale` volume (its node key) | `ts_authkey` |
+| `guard` | `tailscale/tailscale` v1.104.1, by digest (it carries iptables-nft), running `deploy/guard/guard.sh` | nothing | its rules loaded | 0.1 core, 32 MB, 16 processes | none | none |
 | `ergo` | built from `deploy/ergo/Dockerfile`: Ergo's own image v2.19.1, by digest, with `render.sh` and a probe for its health; its auth script is the server's socket | 6667 (the bot) and 8097 (WebSocket, web's `/ws`), on `inside` only | its 6667 answers | 0.4 core, 512 MB, 1,024 processes (Go's threads count) | the `ergo` volume (accounts, history) | `ergo_oper_password` |
 | `server` | built from `deploy/server/Dockerfile`: distroless Node 24, by digest | 8080 (web's `/api/`) on its own address of `inside` (`SERVER_ADDRESS`); the `auth` volume's socket | `SERVER_ADDRESS:8080/health` | 0.4 core, 512 MB, 128 processes | the `server` volume (its SQLite) | `log_pepper`, `ergo_oper_password`, `openai_api_key` |
-| `egress` (profile `demo`) | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
+| `egress` | built from `deploy/egress/Dockerfile`: smokescreen v0.1.0 from its source, on distroless static | 4750 in `guard`'s network, reached from `inside` alone | its 4750 answers | 0.1 core, 64 MB, 64 processes | none | none |
 | `jarvis` (profile `jarvis`) | built from `deploy/jarvis/Dockerfile`: its package and the packages it imports, on distroless Node 24; no gnomcp (the reader's) | 8081 on its address of `jarvis` (`JARVIS_ADDRESS`), the network it shares with the server alone | `GET /budgets`, by the name `jarvis` | 0.3 core, 384 MB, 128 processes | the `jarvis` volume (its budgets, its caches) | `anthropic_api_key`, read only when on; `jarvis_door_key` |
 | `egress_jarvis` (profile `jarvis`) | the same image as `egress` | 4751 in `guard`'s network, reached from `jarvis_out` alone | its 4751 answers | 0.1 core, 64 MB, 64 processes | none | none |
 | `jarvis_reader` (profile `jarvis`) | built from `deploy/jarvis-reader/Dockerfile`: gnomcp 0.11.0 (its release image, by digest), a bridge and a relay in Go (standard library alone) | 8083 on its address of `reader` (`READER_ADDRESS`), the network it shares with jarvis alone | its 8083 answers | 0.2 core, 160 MB, 48 processes | none, a 32 MB tmpfs | none |
@@ -25,23 +26,22 @@ later, Docker Desktop, or OrbStack. Every setting, secret and switch is listed i
 | `link_reader` (profile `links`) | built from `deploy/link-reader/Dockerfile`: its package and the two it imports, on distroless Node 24 | 8084 on its address of `links` (`LINK_READER_ADDRESS`), the network it shares with the server alone | `GET /health` on its address | 0.2 core, 256 MB, 48 processes | none | none |
 | `egress_links` (profile `links`) | the same image as `egress` | 4754 in `guard`'s network, reached from `links_out` alone | its 4754 answers | 0.1 core, 48 MB, 32 processes | none | none |
 
-All twelve have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
+All eleven have a read-only root with `/tmp` in memory, no new privilege, logs rotated at 3 × 10 MB,
 and every capability dropped, except `guard`'s `NET_ADMIN`; `ergo`, `server`, `egress` and `egress_jarvis` run as
 65532 (`egress_reader` and `egress_links` too), the user the auth socket's volume belongs to, `jarvis` as 65533, `jarvis_reader` as 65531
 and `link_reader` as 65530, users of their own.
 
 - `web` sits on `inside`, an internal network with no way out and no gateway, so it reaches no
   address of the host either.
-- `guard` holds the only network that lets out, and `tailscale` shares it. Before anything else
-  runs there, it loads its rules: web's port, Docker's DNS, then every private, local, carrier
-  and reserved address refused, so neither reaches the host, its LAN or a tailnet; then public
-  TCP 80 and 443 and UDP, which Tailscale needs. IPv6 is closed. When Compose restarts `guard`,
-  `tailscale` restarts with it; when Docker restarts `guard` on its own, `tailscale` keeps a
-  network with nothing in it, which fails closed, until `docker compose ... restart tailscale`.
-- Funnel hides the host's address: the public name leads to Tailscale's relays, never to the host.
+- `guard` holds the only network that lets out, and the proxies (`egress` and the others) share it. Before anything else runs there, it loads its
+  rules: each proxy's port, open from its own network alone, Docker's DNS, then every private, local, carrier and reserved address refused, so
+  nothing there reaches the host, its LAN or a VPN; then public TCP 80 and 443, and no UDP, no other port, no connection to `web` or any
+  container of the stack. IPv6 is closed. `guard` waits for `web`, whose name it reads once to find the internal network. When Compose restarts
+  `guard`, the proxies restart with it; when Docker restarts `guard` on its own, they keep a network with nothing in it, which fails closed,
+  until `docker compose ... restart egress` (and the others that run).
 - `web` holds a fixed address on `inside` (`WEB_ADDRESS`, in `INSIDE_SUBNET`), the only one Ergo
   (`proxy-allowed-from`) and `server` (`TRUSTED_PROXY`) believe about a visitor's address; it sends
-  the PROXY protocol's address on, overwriting the client's, and never the demo's password.
+  the PROXY protocol's address on, overwriting the client's, and never the visitor's password.
 - `egress` (smokescreen) lets the server reach `api.openai.com`, `api.coingecko.com` and each universe's RPC and indexer host (`deploy/egress/acl.yaml`, one
   file the test reads too; the hosts are `app/data/universes.json`'s, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
@@ -49,10 +49,8 @@ and `link_reader` as 65530, users of their own.
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (D120).
 - `jarvis` (10j) is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
   serves its budgets and answers `off`, reads no key and reaches no gnomcp. It, `jarvis_reader` and the two ways out sit in the profile
-  `jarvis`, out of the demo's (10j-4): started only with Jarvis switched on, `--profile demo --profile jarvis`. Ops, who
-  run the file without the demo's profile, start it by its name, `docker compose up -d jarvis`, which switches its
-  profile on, with their own way out in `JARVIS_EGRESS_PROXY`; `--profile jarvis` alone is refused, as `egress_jarvis`
-  needs the guard. Switching it on has an order (below, "Switching Jarvis on"): the door's key, the evals, then `JARVIS=on`.
+  `jarvis`, out of the default services (10j-4): started only with Jarvis switched on, `--profile jarvis`, or by its name,
+  `docker compose up -d jarvis`, which switches its profile on; `JARVIS_EGRESS_PROXY` names another way out. Switching it on has an order (below, "Switching Jarvis on"): the door's key, the evals, then `JARVIS=on`.
   It listens on its fixed address of
   `jarvis` (`JARVIS_ADDRESS`, in `JARVIS_SUBNET`), a network it shares with the server alone; its `/ask` and
   `/budgets` ask no session, so that network is their wall (10i). It goes out through `egress_jarvis` alone, a
@@ -75,51 +73,34 @@ and `link_reader` as 65530, users of their own.
   reader's `READER_HOSTS` and its `extra_hosts`; `jarvis/src/config.test.ts` derives the hosts from
   `app/data/universes.json` and fails when one of them differs. The reader's caps (0.2 core, 160 MB, 48 processes; its
   way out 0.1 core, 48 MB, 32 processes) are a ceiling chosen for two gnomcp, not measured on a running stack:
-  `deploy/test.sh --demo` checks the four containers of Jarvis together under 656 MiB and 0.7 core.
+  `deploy/test.sh` (`test-jarvis.sh`) checks the four containers of Jarvis together under 656 MiB and 0.7 core.
 - `link_reader` (slice 13, D13919) fetches a public page's head and picture for a chat line's card, so it holds nothing worth taking:
   no secret, no volume, a read-only root, a user of its own, and two networks, `links` (shared with the server alone, which asks it
   `POST /card`) and `links_out` (its way out). It has no DNS: it goes out through `egress_links`, a smokescreen on 4754 in `guard`'s network
   that takes 4754 from `links_out` alone, lets any public https host out (`deploy/egress/links-acl.yaml`, `action: open`) and refuses
   every private answer; `guard`'s rules refuse every private range on each packet too, and the reader refuses a non-global address itself
   (`link-reader/src/address.ts`). The server joins `links` to ask it, but its API listens on its address of `inside` alone, so the reader reaches no port of it. The reader serves 2 pages at once (`LINKS_MAX`), decodes one picture at a time, and its 256 MB is measured (210 MiB at the
-  2,000,000-pixel cap, `link-reader/src/memory.test.ts`). It is in a profile of its own, out of the demo's cap, as Jarvis: its 0.3 core
+  2,000,000-pixel cap, `link-reader/src/memory.test.ts`). It is in a profile of its own, out of the default services' cap, as Jarvis: its 0.3 core
   and 304 MB (reader and way out) come on top. "Switching the link cards on", below.
 - The server's API listens on 8080 at its own address of `inside` alone (`SERVER_ADDRESS`, in `INSIDE_SUBNET`), so
   jarvis's network reaches no port of the server's (10j's review, V12); web and the tests ask it as `server:8080`.
   The guard finds `jarvis_out` by its own address there (`GUARD_JARVIS_ADDRESS`, in `JARVIS_OUT_SUBNET`) and waits for
-  no jarvis: without it, the demo runs, and the door answers `off` while Jarvis is off, never asking jarvis; switched
+  no jarvis: without it, the stack runs, and the door answers `off` while Jarvis is off, never asking jarvis; switched
   on without jarvis's profile, or with a jarvis that fails to start, the door answers `not_ready` (503) (10l-1).
 - The admin API (10g) listens on 8082 at the server's address of `admin` (`ADMIN_ADDRESS`, in `ADMIN_SUBNET`), a
   network nobody else joins: the admin console joins it (slice 12); its sites are `ADMIN_ORIGINS`.
 
 ## Before the first start (once)
 
-1. A tailnet made for the demo, with MagicDNS and HTTPS certificates on (Funnel needs both).
-   Funnel's certificate publishes the machine's and the tailnet's names in public certificate
-   logs, so a tailnet of its own keeps every other name out of them; and the demo is alone there.
-2. In that tailnet's policy file, the tag, Funnel for it, and nothing it may reach:
-
-   ```json
-   "tagOwners": { "tag:gnoworld-demo": ["autogroup:admin"] },
-   "nodeAttrs": [{ "target": ["tag:gnoworld-demo"], "attr": ["funnel"] }]
-   ```
-
-   A new tailnet's policy lets every device reach every other: replace its default rule with
-   `"acls": []`, an empty list (with no `acls` section at all, Tailscale allows everything), and
-   let no grant name the tag as a source or a destination, nor `*`, which would let the demo
-   reach every device.
-3. `mkdir -m 700 deploy/secrets` (a fresh clone has none). A single-use auth key with that tag
-   (Settings, Keys), into `deploy/secrets/ts_authkey`, then `chmod 644` it: on Linux, Tailscale's
-   root, with every capability dropped, cannot read a file another user owns; the folder keeps
-   the host's other users out, and the key is spent at the first login.
-4. The demo's password: make a strong one (`openssl rand -base64 24`), then
+1. `mkdir -m 700 deploy/secrets` (a fresh clone has none).
+2. The password: make a strong one (`openssl rand -base64 24`), then
    `htpasswd -cB deploy/secrets/demo_htpasswd team` (`htpasswd` comes with macOS, and with
    `apache2-utils` or `httpd-tools` on Linux), then `chmod 644 deploy/secrets/demo_htpasswd`:
    nginx reads it as its own user, and it holds a hash, not the password.
-5. `cp deploy/.env.example deploy/.env` and set `ORIGINS` to the app's own origin,
-   `https://<machine>.<tailnet>.ts.net` (required: Ergo refuses a WebSocket from any other site,
-   and the server any POST); the machine's name and the internal network's addresses may change there.
-6. Slice 3's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
+3. `cp deploy/.env.example deploy/.env` and set `ORIGINS` to the app's own https origin, the address visitors will
+   type (required: Ergo refuses a WebSocket from any other site, and the server any POST); the internal
+   network's addresses may change there.
+4. Slice 3's secrets, each with `chmod 644`: `openssl rand -hex 24 > deploy/secrets/ergo_oper_password`
    (the bot's operator password: 48 characters, Ergo takes it on any listener), `openssl rand -hex 32 >
    deploy/secrets/log_pepper` (the logs' hashing key), and OpenAI's key, one line, in
    `deploy/secrets/openai_api_key`.
@@ -129,28 +110,24 @@ and `link_reader` as 65530, users of their own.
    then `chmod 644 deploy/secrets/jarvis_door_key`. Make it before the next `up`, Jarvis off or on: the server and jarvis read
    the file whenever Compose names it, which is always, and refuse to start on no file or a key under 32 bytes. A
    placeholder line like Anthropic's key's stops the whole stack, the server included.
-7. On Linux, a clone made with a umask of 077 leaves `deploy/guard` and `deploy/tailscale`
-   unreadable to the containers: `chmod -R a+rX deploy/guard deploy/tailscale`.
+5. On Linux, a clone made with a umask of 077 leaves `deploy/guard` unreadable to the container: `chmod -R a+rX deploy/guard`.
 
 `deploy/secrets/` is ignored by git, left out of every build (`.dockerignore`) and closed to
-Claude Code (`.claude/settings.json`). Nothing in the repository names a host, an address or a
-tailnet; keep it so.
+Claude Code (`.claude/settings.json`). Nothing in the repository names a host or an address;
+keep it so.
 
 ## Run, test, stop
 
 | What | Command, from the repository's root |
 |---|---|
-| Start, or rebuild after a merge | `docker compose -f deploy/compose.yaml --profile demo up -d --build` |
-| The same with Jarvis switched on (`JARVIS=on`) | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis up -d --build` |
-| The same with the link cards switched on (`LINK_CARDS=1`, "Switching the link cards on") | `docker compose -f deploy/compose.yaml --profile demo --profile links up -d --build` |
+| Start, or rebuild after a merge: `web`, `ergo`, `server`, the guard and the server's way out | `docker compose -f deploy/compose.yaml up -d --build` |
+| The same with Jarvis switched on (`JARVIS=on`) | `docker compose -f deploy/compose.yaml --profile jarvis up -d --build` |
+| The same with the link cards switched on (`LINK_CARDS=1`, "Switching the link cards on") | `docker compose -f deploy/compose.yaml --profile links up -d --build` |
 | Test the stack: web, the guard, Ergo, the server and the way out (no secret needed) | `sh deploy/test.sh`, from the commit you reviewed (below) |
 | Test that each check catches its fault | `sh deploy/test.sh --mutants`, from the commit you reviewed (below) |
-| Test the running demo | `sh deploy/test.sh --demo`, which asks for the password |
-| Run the demo from a checked copy of one commit: prepare, up, status, logs, restart, down, backup, wipe, restore, tester add and remove, test, keys forget | `sh deploy/demo.sh <subcommand>`, in your own Terminal ([DEMO.md](DEMO.md)) |
-| Its logs, jarvis's with them if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis --profile links logs -f` |
-| Stop, jarvis with it if it runs | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down` |
-| Stop, with the link reader too when the cards are on | `docker compose -f deploy/compose.yaml --profile links --profile demo --profile jarvis down` |
-| Remove it all | `docker compose -f deploy/compose.yaml --profile demo --profile jarvis down -v`, then delete the machine in the admin console (with the cards on: `--profile links` first, as above) |
+| Its logs, jarvis's and the link reader's with them if they run | `docker compose -f deploy/compose.yaml --profile jarvis --profile links logs -f` |
+| Stop, with the profiles it ran with, so none outlives it | `docker compose -f deploy/compose.yaml --profile jarvis --profile links down` |
+| Remove it all, its volumes included | `docker compose -f deploy/compose.yaml --profile jarvis --profile links down -v` |
 
 GitHub's deploy-stack job runs `deploy/test.sh` on a pull request that changes `deploy/` (D13180); run it by hand to debug, and
 after a change to the link reader or what it fetches, which deploy-stack does not see yet (F13210). Until F13163 is fixed, a
@@ -191,44 +168,39 @@ to every session's file tools, as they close the programs test.sh calls (docker 
 python3's user site, sh's startup files); the sandbox closes it to commands. Without those settings,
 anything on `PATH` outside `/usr/bin` and `/bin` is the sessions' to rewrite.
 
-## When something goes wrong: cut the public URL
+## When something goes wrong
 
-A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (2
-cores and 1,504 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
+A flood meets the password, a limit per visitor (429 after a burst) and the containers' caps (1.5
+cores and 1,248 MB in all, under the 2 cores and 2 GB the test holds as a ceiling: Docker stops a container at its
 cap, not the host). Jarvis, under its own profile, is out of that cap (10j-4): 0.7 core and 656 MB more when on (jarvis, its
 reader and their two ways out). The
 limit lets one address 640 requests at once and 20 a second after that (F3665), and 1,024 more of the hashed files (assets,
 textures, world pictures) in a zone of their own, 5 a second after that, which a first visit asks for twice (D13127); `auth_basic` runs after it, so a
-burst with a wrong password costs about 640 password checks, 1,664 at most with the hashed files', at the name in the file, before the 429s begin. To cut the public URL at once:
-
-| Where | How | Back |
-|---|---|---|
-| On the host, in seconds | `docker compose -f deploy/compose.yaml --profile demo stop tailscale` | `... start tailscale` |
-| From anywhere, a phone included | The admin console, Machines, the demo, Remove: its node key is revoked at once | A new auth key, then the table's Remove it all and Start, above |
+burst with a wrong password costs about 640 password checks, 1,664 at most with the hashed files', at the name in the file, before the 429s begin.
+To stop serving visitors at once, on the host and in seconds: `docker compose -f deploy/compose.yaml stop web` (back with `start web`). The public
+front that comes with the deploy part (D13172) adds its own switch beside it.
 
 ## On another host
 
-Nothing lives only on the host: the repository holds everything but the two secrets, which take
-two minutes to make again. Clone it, write a new password file, make a new auth key (the old one
-was used once, and the old machine's identity stayed in its `tailscale` volume), remove the old
-machine in the admin console, so the new one keeps the name, then start it and test it.
+Nothing lives only on the host: the repository holds everything but the secrets, which take a few minutes to make again, and the
+volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it, write the secrets, start it and test it.
 
 ## Known limits
 
 Alexis, 2026-10-19: written here, each with its backlog row, not fixed in 1c.
 
 - **A host whose own public address serves something.** The guard refuses private addresses,
-  then lets out TCP 80 and 443 and UDP to the rest: on a host with a public address on an
-  interface (a rented server), Tailscale's network would reach that address's services.
-  `sh deploy/test.sh` fails there for TCP, and probes no UDP. Run the demo on a host behind a
-  router, as at home or in an office (F202).
-- **A restart of the whole host, or of Docker.** Docker restarts the three containers itself,
-  without Compose's order: for a moment, Tailscale may run before the guard's rules are in, and
-  if `web` is not up yet the guard stops, leaving Tailscale on a network with nothing in it.
-  After such a restart, Compose's order again: `docker compose -f deploy/compose.yaml --profile demo
-  --profile jarvis down`, then `up -d` with the profiles it ran with (the node key stays in its volume) (F203).
+  then lets out TCP 80 and 443 to the rest: on a host with a public address on an
+  interface (a rented server), the proxies' network would reach that address's services.
+  `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office, until
+  the deploy part (D13172) builds the VM and refuses its own public address, proven on it (F202).
+- **A restart of the whole host, or of Docker.** Docker restarts the containers itself,
+  without Compose's order: for a moment, a proxy may run before the guard's rules are in, and
+  if `web` is not up yet the guard stops, leaving the proxies on a network with nothing in it.
+  After such a restart, Compose's order again: `docker compose -f deploy/compose.yaml --profile jarvis --profile links
+  down`, then `up -d` with the profiles it ran with (F203).
 - **DNS through the router.** On a host whose resolver is its router or a LAN server, the guard
-  lets that server's port 53 out, for Tailscale's name lookups: an exception to "every private
+  lets that server's port 53 out, for the proxies' name lookups: an exception to "every private
   address refused" (F205).
 - **Open connections.** A visitor holds 32 requests at once, a WebSocket and a stream counting while
   they last, and a team behind one address shares them; `web` holds 4,096 connections, two for each
@@ -513,7 +485,7 @@ Slice 3, the server's retention (3n):
   its indexer and keeps it by hash: a visitor's browser never asks a chain. All of them go out through the same way out as the worlds job, so no
   host is added; without `UNIVERSES_FILE` the call and people routes are not mounted and the token route answers 404 for every realm.
 - **The load runs** are the operator's: `sh deploy/k6/run.sh` (Docker) builds a stack of its own, in the
-  project `gnoworld-load`, and refuses to start while the demo runs on the host. From inside its network,
+  project `gnoworld-load`, and refuses to start while the stack runs on the host. From inside its network,
   each scenario's numbers: every account logging in at once (`ACCOUNTS`, 200), guests in a world's room
   (`CROWD`, 2,000), the rooms' streams (`STREAMS`, 1,000), the accounts' lines every 5 s (with
   `OPENAI_API_KEY_FILE`, OpenAI's checks of them); the containers' peak memory, processes and CPU, their
@@ -552,15 +524,10 @@ Slice 3, the stack (3e):
 - **The way out has no port rule.** smokescreen v0.1.0 matches a host, not a port: plain HTTP to
   `api.openai.com` on port 80 is let out too, and meets OpenAI's redirect alone.
 - **A restart of `ergo` or `server` by Compose restarts `web`**, which reads its upstreams' addresses
-  once: the public URL answers nothing for those seconds. One Docker makes itself, after a crash, does
+  once: the site answers nothing for those seconds. One Docker makes itself, after a crash, does
   not, nor does `egress` follow `guard` then: if `/ws` or `/api/` answer 502, or the checks stop
   reaching OpenAI, `docker compose ... restart web egress` (F622, beside F203).
-- **The tailnet's policy stays closed.** In userspace mode, Tailscale hands a device's connection to
-  the demo machine's own address on to `127.0.0.1`, so a device the policy let in would reach both ways
-  out, the server's on 4750 (its six hosts, `acl.yaml`), jarvis's on 4751 (its four, `jarvis-acl.yaml`) and the reader's
-  on 4753 (its four, `reader-acl.yaml`).
-  `"acls": []` keeps every device out (F619; 10j's review, S8).
-- **No backup in the demo** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
+- **No backup** (ADR-0002): Ergo's accounts and history live in the `ergo` volume and the
   server's records in `server`; `down -v` removes both. To upgrade Ergo, change its tag and digest in
   `deploy/ergo/Dockerfile` and `VERSION`, then `sh deploy/test.sh` from the commit you reviewed (in "Run, test, stop") before
   `up -d --build`.
@@ -610,15 +577,15 @@ Jarvis is off until all three steps are done, in this order (10u-g2, D13987):
    `ground` suite's `on-topic-*` cases in 10. Only files named by their UTC time are read; a result it cannot read, one
    that lacks a case of those suites, or none at all is a refusal.
 3. **`sh deploy/jarvis-on.sh`**, which runs that gate and writes `JARVIS=on` in `deploy/.env` only when it passes. Never
-   write that line by hand. Then `--profile jarvis` beside `--profile demo` (the table above).
+   write that line by hand. Then `--profile jarvis` (the table above).
 
 A green `deploy/test.sh` with its `skip  jarvis switched on is not started` line does not prove Jarvis on: those proofs (its
 start checks over the reader, the 401 when on) run only once the gate passes, and nothing but `jarvis-on.sh` and your own care
 stop `JARVIS=on` being written without it.
 
 The door's key changes by writing a new file and recreating the two that read it, the server and jarvis, together:
-`openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then `docker compose -f deploy/compose.yaml --profile demo --profile
-jarvis up -d --force-recreate server jarvis`. Between the two restarts the door's requests may meet a 401 (not checked: how the door answers one is the code's, 10u-g2's G2-code);
+`openssl rand -hex 32 > deploy/secrets/jarvis_door_key`, then `docker compose -f deploy/compose.yaml --profile jarvis up -d
+--force-recreate server jarvis`. Between the two restarts the door's requests may meet a 401 (not checked: how the door answers one is the code's, 10u-g2's G2-code);
 `web` restarts with the server (F622). Nothing else holds it. A key that leaked is changed the same way at
 once: it opens jarvis's routes to anyone who can also reach jarvis's network, which is the server's alone.
 
@@ -677,7 +644,7 @@ The link cards (a card under a chat line that links a public page, slice 13, D13
    its controls, `example.com`); add `--mutants` when `deploy/` changed. Docker is needed, so the build sandbox cannot run it.
 2. **`LINK_CARDS=1`** in `deploy/.env` (`deploy/.env.example` names it, commented). It is the kill switch: `0` or unset, the server asks the reader
    nothing and no card shows. The server stops at start with it on and no `LINK_READER_URL` (compose always sets it).
-3. **`--profile links`** beside `--profile demo`: `docker compose -f deploy/compose.yaml --profile demo --profile links up -d --build`. The
+3. **`--profile links`**: `docker compose -f deploy/compose.yaml --profile links up -d --build`. The
    reader and its way out are in that profile alone, so without it the cards are on and the reader is not there: a page the server cannot
    reach the reader for is believed down for an hour, and no card shows for it.
 
@@ -692,8 +659,6 @@ addresses an identity). A person unlinks an address with their own session, or r
 ## Secrets: rotation and revocation
 
 - **The password:** write a new file with `htpasswd -cB`, then `docker compose ... restart web`.
-- **The auth key:** used once, at the first login; the node key then lives in the `tailscale`
-  volume. Revoking the key does not remove the machine: remove the machine to revoke the demo.
 - **The operator's password:** write a new file, then `docker compose ... restart ergo server`: Ergo
   hashes it at its start, and the bot logs in with it.
 - **OpenAI's key:** write the new one, `restart server`, then revoke the old one at OpenAI.

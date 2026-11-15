@@ -202,11 +202,10 @@ cannot reach the clipboard there; select the list instead.
 (`.claude/commands/pose.md`) lands them alone: tests by risk, the gate's jobs run once, one review a pull request, pull requests of
 about 600 product lines, and a one-line push script each for the owner (D13192).
 
-## The demo
+## The stack
 
-The demo's stack runs from a checked copy of one commit with `sh deploy/demo.sh` (prepare, up, status, logs, backup, wipe, restore, test);
-its evening script is [DEMO.md](DEMO.md), the stack's runbook [OPERATIONS.md](OPERATIONS.md) and every setting
-[CONFIGURATION.md](CONFIGURATION.md). `deploy/test.sh` starts the stack and checks it.
+The stack runs on a Docker host with `docker compose -f deploy/compose.yaml up -d --build`; its runbook is [OPERATIONS.md](OPERATIONS.md), running it
+for testers [DEMO.md](DEMO.md) and every setting [CONFIGURATION.md](CONFIGURATION.md). `deploy/test.sh` starts the stack and checks it.
 
 ## Probes and tools worth knowing
 

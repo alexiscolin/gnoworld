@@ -36,6 +36,7 @@ Other commands:
 | Command | What it does |
 |---|---|
 | `pnpm workshop` | The app with the chat and a local backend running ([docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), "The workshop") |
+| `docker compose -f deploy/compose.yaml up -d --build` | The whole stack on a Docker host, its secrets first ([docs/OPERATIONS.md](docs/OPERATIONS.md)) |
 | `./scripts/check.sh` | The commit gate, on what a change touches: format, lint, types, related tests, realms |
 | `pnpm run test` | The unit tests |
 | `pnpm run typecheck` | The types of every workspace |

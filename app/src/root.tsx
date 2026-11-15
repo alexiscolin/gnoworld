@@ -23,7 +23,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        {/* With credentials: the demo asks for a password, and Chromium sends none for a manifest otherwise. */}
+        {/* With credentials: the site asks for a password, and Chromium sends none for a manifest otherwise. */}
         <link rel="manifest" href="/manifest.webmanifest" crossOrigin="use-credentials" />
         <link rel="icon" type="image/svg+xml" href="/icon.svg" />
         {/* First of the sheets: the layers rank by first mention, so the order is never left to the chunks. */}

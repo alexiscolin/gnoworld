@@ -843,18 +843,20 @@ describe("the demo's ceiling", () => {
     expect(runbook).not.toMatch(/2\.4 cores|1,952 MB/);
     expect(runbook).toContain("`egress_jarvis` (profile `jarvis`)");
     expect(runbook).toContain("`jarvis` (profile `jarvis`)");
-    // Started with Jarvis switched on, and taken by every stop, so no jarvis outlives the demo.
-    for (const command of ["up -d --build", "down", "down -v"])
+    // Started with Jarvis switched on, and taken by every stop, so no jarvis, nor link reader, outlives the stack.
+    expect(runbook).toContain("`docker compose -f deploy/compose.yaml --profile jarvis up -d --build`");
+    for (const command of ["down", "down -v"])
       expect(runbook, command).toContain(
-        `docker compose -f deploy/compose.yaml --profile demo --profile jarvis ${command}\``,
+        `docker compose -f deploy/compose.yaml --profile jarvis --profile links ${command}\``,
       );
     const env = read("deploy/.env.example");
     expect(env.slice(env.indexOf("# Jarvis"), env.indexOf("# JARVIS=on"))).toContain("--profile jarvis");
-    // Ops, without the demo's profile, start jarvis by its name, which switches its profile on.
+    // A start by its name switches its profile on.
     expect(runbook).toContain("`docker compose up -d jarvis`");
     expect(env.slice(env.indexOf("# Jarvis"), env.indexOf("# JARVIS=on"))).toContain("up -d jarvis");
-    // No stop or restart of the demo's alone, which leaves a running jarvis up.
-    expect(runbook).not.toMatch(/--profile demo\s+(down|restart)/);
+    // No profile named demo, no stop or restart of the default services alone, which leaves a running jarvis up.
+    expect(runbook).not.toMatch(/--profile demo/);
+    expect(runbook).not.toMatch(/docker compose -f deploy\/compose\.yaml (down|restart)/);
     expect(runbook).not.toContain("then `down -v` and `up`");
     // What the door answers without jarvis: off when switched off, not ready when on without it.
     expect(runbook).not.toMatch(/door answering internal/);
