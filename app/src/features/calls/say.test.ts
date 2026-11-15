@@ -67,7 +67,7 @@ describe("sayFailure: each failure's next step", () => {
   });
 
   it("names the hash of a call that was sent and never seen in a block, so it can be looked up", () => {
-    const hash = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+    const hash = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
     expect(sayFailure({ reason: "unseen", hash })).toContain(hash);
   });
 

@@ -7,8 +7,8 @@ import { readTransaction } from "./tx.ts";
 // NOT recorded. A hash the node has not stored is a -32603 "Internal error" whose `data` is `Could not find tx result for hash
 // #<UPPER HEX>` (state/errors.go:84); every other fault of the read (core/tx.go) comes the same way.
 const RPC = "https://rpc.onyx.testnets.gno.land:443";
-const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
-const BASE64_HASH = "eFwYnlgr7KfDvMsmr6ntZ5vCoe/JcHLddE0pzi+D0Fg=";
+const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+const BASE64_HASH = "ASNFZ4mrze8BI0VniavN7wEjRWeJq83vASNFZ4mrze8=";
 const base64Of = (text: string) =>
   btoa(Array.from(new TextEncoder().encode(text), (byte) => String.fromCharCode(byte)).join(""));
 const notFound = (hash: string) =>
@@ -24,7 +24,7 @@ function landed(
     raw?: string;
   } = {},
 ) {
-  const { height = "55414", error = null, data = "(42 int)", log = "ok", hash = BASE64_HASH } = over;
+  const { height = "4242", error = null, data = "(42 int)", log = "ok", hash = BASE64_HASH } = over;
   return {
     jsonrpc: "2.0",
     id: "",
@@ -59,7 +59,7 @@ describe("readTransaction", () => {
   it("reads the block's height, the returned value and the log of a call that landed, in one tx read of the hash", async () => {
     const fetch = node(landed());
     const read = await readTransaction(RPC, HASH, { chainId: "onyx-1", fetch });
-    expect(read).toMatchObject({ ok: true, value: { height: 55414, failed: false, data: "(42 int)", log: "ok" } });
+    expect(read).toMatchObject({ ok: true, value: { height: 4242, failed: false, data: "(42 int)", log: "ok" } });
     const tx = asked(fetch).filter((url) => !url.includes("/status"));
     expect(tx).toHaveLength(1);
     expect(tx[0]).toBe(`${RPC}/tx?hash=0x${HASH}`);
@@ -69,7 +69,7 @@ describe("readTransaction", () => {
     const fetch = node(landed({ error: { "@type": "/vm.AbciError", value: "boom" }, data: null, log: "panic: boom" }));
     expect(await readTransaction(RPC, HASH, { chainId: "onyx-1", fetch })).toMatchObject({
       ok: true,
-      value: { height: 55414, failed: true, data: "", log: "panic: boom" },
+      value: { height: 4242, failed: true, data: "", log: "panic: boom" },
     });
   });
 
@@ -82,7 +82,7 @@ describe("readTransaction", () => {
 
   it.each([
     ["unable to load block results, no such height"],
-    ["block not found for height 55414"],
+    ["block not found for height 4242"],
     ["Could not find tx result for hash #ABCDEF"],
     ["not found"],
   ])("is not 'not landed' for another internal error (%s): the chain refused the read", async (text) => {
@@ -101,7 +101,7 @@ describe("readTransaction", () => {
     ["no result", () => ({ jsonrpc: "2.0", id: "", result: {} })],
     ["a data text that is not base64", () => landed({ raw: "***" })],
     ["a data text that is not UTF-8", () => landed({ raw: "/w==" })],
-    ["no transaction result", () => ({ jsonrpc: "2.0", id: "", result: { hash: BASE64_HASH, height: "55414" } })],
+    ["no transaction result", () => ({ jsonrpc: "2.0", id: "", result: { hash: BASE64_HASH, height: "4242" } })],
     ["a hash that is another transaction's", () => landed({ hash: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=" })],
     ["a hash that is no 32 bytes", () => landed({ hash: "AA==" })],
     ["no hash", () => landed({ hash: "" })],
@@ -123,7 +123,7 @@ describe("readTransaction", () => {
   it("reads a hash Adena may send in upper case, and finds its answer the same", async () => {
     const fetch = node(landed());
     const read = await readTransaction(RPC, HASH.toUpperCase(), { chainId: "onyx-1", fetch });
-    expect(read).toMatchObject({ ok: true, value: { height: 55414 } });
+    expect(read).toMatchObject({ ok: true, value: { height: 4242 } });
     const [url] = asked(fetch).filter((each) => !each.includes("/status"));
     expect(url?.toLowerCase()).toBe(`${RPC}/tx?hash=0x${HASH}`);
   });

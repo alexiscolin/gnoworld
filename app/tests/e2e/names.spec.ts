@@ -93,7 +93,7 @@ test.describe("the name dialog", () => {
     await page.getByRole("textbox", { name: "Name" }).fill("alexis042");
     await dialog(page).getByRole("button", { name: "Register · 0 GNOT" }).click();
     await expect(dialog(page)).toContainText(/is registered/i);
-    await expect(dialog(page)).toContainText("55,414");
+    await expect(dialog(page)).toContainText("4,242");
     const sent = await page.evaluate(() => JSON.stringify((Reflect.get(window, "__done") as unknown[])[0]));
     expect(sent).toContain('"func":"Register"');
     expect(sent).toContain(`"args":["${NAME}"]`);

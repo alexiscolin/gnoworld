@@ -6,12 +6,12 @@ import { callContract } from "../../lib/adena/call.ts";
 import { queryClient } from "../../lib/query/client.ts";
 import { keys } from "../../lib/query/keys.ts";
 import { createAppStore } from "../../store/index.ts";
-import { recordedAdena, SIGNED_HASH } from "../../../tests/recordedAdena.ts";
+import { fakeAdena, SIGNED_HASH } from "../../../tests/fakeAdena.ts";
 import { signCall, type SignDeps } from "./signCall.ts";
 import { ensureCalls, type CallsStore } from "./slice.ts";
 
-// 9d: the card's course, through the real callContract and a stand-in for Adena built from the recording
-// (app/tests/recordedAdena.ts): preview, "Sign in Adena", landing in a block, the result. Done only from the chain's answer.
+// 9d: the card's course, through the real callContract and a stand-in for Adena
+// (app/tests/fakeAdena.ts): preview, "Sign in Adena", landing in a block, the result. Done only from the chain's answer.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
 const PARAMS = [
@@ -20,7 +20,7 @@ const PARAMS = [
 ];
 const NEW = { id: "SetBio", chainId: "onyx-1", realm: "gno.land/r/demo/profile", func: "SetBio", params: PARAMS };
 const source = { url: ONYX.rpc, at: "2026-11-05T05:00:00.000Z" };
-const LANDED = { height: 55414, failed: false, data: "(42 int)", log: "ok" };
+const LANDED = { height: 4242, failed: false, data: "(42 int)", log: "ok" };
 const found = (value: typeof LANDED): ChainRead<typeof LANDED> => ({ ok: true, value, source });
 const missing: ChainRead<typeof LANDED> = {
   ok: false,
@@ -43,7 +43,7 @@ function setup({ text = "hello", session = "in", adena, read, call }: Setup = {}
   store.getState().callsActions.edit("SetBio", 0, text);
   const log: string[] = [];
   const waits: number[] = [];
-  const wallet = recordedAdena({ account: CALLER });
+  const wallet = fakeAdena({ account: CALLER });
   const deps: SignDeps = {
     store,
     adena: adena ?? wallet.adena,
@@ -67,7 +67,7 @@ describe("signCall: the card's course", () => {
     const read = vi.fn(() => Promise.resolve(found(LANDED)));
     const { store, deps, wallet } = setup({ read });
     await signCall("SetBio", deps);
-    expect(stateOf(store)).toEqual({ kind: "done", hash: SIGNED_HASH, height: 55414, value: "(42 int)" });
+    expect(stateOf(store)).toEqual({ kind: "done", hash: SIGNED_HASH, height: 4242, value: "(42 int)" });
     expect(read).toHaveBeenCalledWith(SIGNED_HASH);
     const sent = wallet.asked.find((a) => a.call === "DoContract")?.arg as {
       messages: { value: Record<string, unknown> }[];
@@ -115,7 +115,7 @@ describe("signCall: the card's course", () => {
 
   it("is signing while Adena's popup is open, and asks the chain nothing before the hash", async () => {
     const gate = Promise.withResolvers<unknown>();
-    const wallet = recordedAdena({ account: CALLER, doContract: () => gate.promise });
+    const wallet = fakeAdena({ account: CALLER, doContract: () => gate.promise });
     const read = vi.fn(() => Promise.resolve(found(LANDED)));
     const { store, deps } = setup({ adena: wallet.adena, read });
     const running = signCall("SetBio", deps);
@@ -138,7 +138,7 @@ describe("signCall: the card's course", () => {
   });
 
   it("follows the hash by the chain when Adena says signed with an error set: it is the chain that says what became of the call (F5728)", async () => {
-    const wallet = recordedAdena({
+    const wallet = fakeAdena({
       account: CALLER,
       doContract: () =>
         Promise.resolve({
@@ -157,7 +157,7 @@ describe("signCall: the card's course", () => {
   });
 
   it("is failed maybe-sent, with no way back and no read, when DoContract failed after the popup with no hash (F5728)", async () => {
-    const wallet = recordedAdena({
+    const wallet = fakeAdena({
       account: CALLER,
       doContract: () => Promise.resolve({ status: "failure", type: "TRANSACTION_FAILED", message: "", data: {} }),
     });
@@ -171,7 +171,7 @@ describe("signCall: the card's course", () => {
   });
 
   it("follows the hash of a refusal that names one, never offering Try again: it was signed (F5750)", async () => {
-    const wallet = recordedAdena({
+    const wallet = fakeAdena({
       account: CALLER,
       doContract: () =>
         Promise.resolve({
@@ -191,7 +191,7 @@ describe("signCall: the card's course", () => {
 
   describe("a call Adena says failed after it named the hash (F5749)", () => {
     const refused = () => {
-      const wallet = recordedAdena({
+      const wallet = fakeAdena({
         account: CALLER,
         doContract: () =>
           Promise.resolve({
@@ -344,7 +344,7 @@ describe("signCall: what stops it before Adena signs", () => {
   });
 
   it("stops a call on the wrong network before signing: Adena on another chain that will not move is failed 'wrong-network', and DoContract is never asked", async () => {
-    const wallet = recordedAdena({ account: CALLER, chain: "gnoland-1", stuck: true });
+    const wallet = fakeAdena({ account: CALLER, chain: "gnoland-1", stuck: true });
     const { store, deps } = setup({ adena: wallet.adena });
     await signCall("SetBio", deps);
     expect(stateOf(store)).toEqual({ kind: "failed", reason: "wrong-network" });
@@ -352,7 +352,7 @@ describe("signCall: what stops it before Adena signs", () => {
   });
 
   it("moves Adena to the universe's chain first when it is on another and lets it, then signs", async () => {
-    const wallet = recordedAdena({ account: CALLER, chain: "gnoland-1" });
+    const wallet = fakeAdena({ account: CALLER, chain: "gnoland-1" });
     const { store, deps } = setup({ adena: wallet.adena });
     await signCall("SetBio", deps);
     const names = wallet.asked.map((a) => a.call);
@@ -361,7 +361,7 @@ describe("signCall: what stops it before Adena signs", () => {
   });
 
   it("stops a call for an account that is not the logged-in one: failed 'wrong-account', DoContract never asked", async () => {
-    const wallet = recordedAdena({ account: "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv" });
+    const wallet = fakeAdena({ account: "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv" });
     const { store, deps } = setup({ adena: wallet.adena });
     await signCall("SetBio", deps);
     expect(stateOf(store)).toEqual({ kind: "failed", reason: "wrong-account" });
@@ -401,7 +401,7 @@ describe("signCall: a second request waits for the first", () => {
   it("asks Adena for the second card's call only once the first is answered, and the second shows 'signing' meanwhile", async () => {
     const gate = Promise.withResolvers<unknown>();
     let signed = 0;
-    const wallet = recordedAdena({
+    const wallet = fakeAdena({
       account: CALLER,
       doContract: () => {
         signed += 1;
@@ -439,7 +439,7 @@ describe("signCall: a second request waits for the first", () => {
 describe("signCall: the account watch (F5651)", () => {
   it("starts the watch of Adena's account on the card's first gesture, with the page's Adena, before Adena is asked to sign", async () => {
     const order: string[] = [];
-    const wallet = recordedAdena({
+    const wallet = fakeAdena({
       account: CALLER,
       doContract: () => {
         order.push("sign");

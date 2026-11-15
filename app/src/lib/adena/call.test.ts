@@ -3,7 +3,7 @@ import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { connect, signLogin } from "./adena.ts";
 import { callContract } from "./call.ts";
-import recording from "../../../recording/adena-recording.json" with { type: "json" };
+import { ANSWERS, FAKE_ACCOUNT } from "../../../tests/fakeAdena.ts";
 
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const OTHER = "g10gh7yq7swv77efwfcqy2znp37cmeughxx3y5tv";
@@ -58,17 +58,15 @@ const MESSAGES: Record<string, string> = {
 const no = (type: string, message = MESSAGES[type] ?? "") =>
   Promise.resolve({ code: CODES[type] ?? 4001, status: "failure", type, message, data: {} });
 
-// DoContract's success as Adena answered Alexis on Onyx (app/recording/adena-recording.json, D209): a hex hash and
-// the realm's Log, no height, no check_tx or deliver_tx, whatever the SDK's types say. By place: 3 is the signed
-// call, 4 was signed by mistake under the label "call, rejected", 5 is the refusal.
+// DoContract's success as Adena's extension answers: a hex hash and the realm's Log, no height, no check_tx or
+// deliver_tx, whatever the SDK's types say.
 const SENT = {
   error: null,
   data: null,
   Log: "counter is 1",
-  hash: "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058",
+  hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 };
 const SIGNED = { ok: true, hash: SENT.hash, log: "counter is 1" };
-const recorded = (at: number) => recording[at]?.answer;
 
 type Method = ((...args: unknown[]) => unknown) | undefined;
 // An extension with state: the chain it is on, the networks it knows, the account. It records what it was asked.
@@ -472,25 +470,26 @@ describe("callContract: every failure is a state with its next step", () => {
     });
   });
 
-  it("reads DoContract's two answers as Adena recorded them on Onyx: the signed call, and the refusal (D209)", async () => {
-    const signed = new Fake({ DoContract: () => Promise.resolve(recorded(3)) });
+  it("reads DoContract's two answers in the extension's shape: the signed call, and the refusal", async () => {
+    const signed = new Fake({ DoContract: () => Promise.resolve(ANSWERS.signed) });
     expect(await callContract(signed, REQUEST, ONYX)).toEqual({
       ok: true,
-      hash: "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058",
+      hash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       log: "",
     });
-    const refused = new Fake({ DoContract: () => Promise.resolve(recorded(5)) });
+    const refused = new Fake({ DoContract: () => Promise.resolve(ANSWERS.refused) });
     expect(await callContract(refused, REQUEST, ONYX)).toStrictEqual({ ok: false, reason: "declined-maybe-sent" });
   });
 
-  it("reads GetAccount, GetNetwork and a switch to the chain it is on as Adena recorded them (D209)", async () => {
-    const caller = Address.parse("g15wmukt79xymnnu6c4de32trnufudqum60yrxu8");
+  it("reads GetAccount, GetNetwork and a switch to the chain it is on in the extension's shape", async () => {
+    const caller = Address.parse(FAKE_ACCOUNT);
     let reads = 0;
     const adena = new Fake({
-      GetAccount: () => Promise.resolve(recorded(0)),
-      // First on another chain, so the recorded "already there" answer to the switch is read; then Onyx as recorded.
-      GetNetwork: () => (++reads === 1 ? ok("GET_NETWORK", { chainId: "gnoland-1" }) : Promise.resolve(recorded(1))),
-      SwitchNetwork: () => Promise.resolve(recorded(2)),
+      GetAccount: () => Promise.resolve(ANSWERS.account),
+      // First on another chain, so the "already there" answer to the switch is read; then Onyx.
+      GetNetwork: () =>
+        ++reads === 1 ? ok("GET_NETWORK", { chainId: "gnoland-1" }) : Promise.resolve(ANSWERS.network),
+      SwitchNetwork: () => Promise.resolve(ANSWERS.sameChain),
     });
     expect(await callContract(adena, { ...REQUEST, caller }, ONYX)).toStrictEqual(SIGNED);
     expect(adena.names).toEqual(["GetAccount", "GetNetwork", "SwitchNetwork", "GetNetwork", "DoContract"]);

@@ -5,7 +5,7 @@ import { Address } from "@gnoworld/schemas";
 import { act, useEffect, useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mount } from "../../../tests/mount.tsx";
-import { recordedAdena } from "../../../tests/recordedAdena.ts";
+import { fakeAdena } from "../../../tests/fakeAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
 import { StoreProvider, useAppStore } from "../../storeContext.tsx";
 import { feeText, type Parts } from "../calls/index.ts";
@@ -51,7 +51,7 @@ function Signed() {
   return null;
 }
 
-const partsOf = (wallet: ReturnType<typeof recordedAdena>): Parts => ({
+const partsOf = (wallet: ReturnType<typeof fakeAdena>): Parts => ({
   adena: wallet.adena,
   call: callContract,
   read: () => Promise.resolve({ ok: true, value: LANDED, source }),
@@ -61,7 +61,7 @@ const partsOf = (wallet: ReturnType<typeof recordedAdena>): Parts => ({
 
 // The flow as a page holds it: its props change under it.
 function flow(over: Partial<RegisterFlowProps> = {}) {
-  const wallet = recordedAdena({ account: ACCOUNT });
+  const wallet = fakeAdena({ account: ACCOUNT });
   const parts = partsOf(wallet);
   const onSettled = vi.fn();
   const handle: { change: (next: Partial<RegisterFlowProps>) => void } = { change: () => undefined };
@@ -190,7 +190,7 @@ describe("RegisterFlow: what the dialog is told of a registration", () => {
   });
 
   it("takes the parts the page loads when a test gives none", async () => {
-    hoisted.load = () => Promise.resolve(partsOf(recordedAdena({ account: ACCOUNT })));
+    hoisted.load = () => Promise.resolve(partsOf(fakeAdena({ account: ACCOUNT })));
     flow({ deps: undefined });
     props().onRegister("alexis042");
     await vi.waitFor(() => {
@@ -212,7 +212,7 @@ describe("RegisterFlow: what the dialog is told of a registration", () => {
 
   it("keeps saying the card's own wait when a second press was refused while Adena signs", async () => {
     const gate = Promise.withResolvers<unknown>();
-    const wallet = recordedAdena({ account: ACCOUNT, doContract: () => gate.promise });
+    const wallet = fakeAdena({ account: ACCOUNT, doContract: () => gate.promise });
     flow({ deps: partsOf(wallet) });
     props().onRegister("alexis042");
     await vi.waitFor(() => {

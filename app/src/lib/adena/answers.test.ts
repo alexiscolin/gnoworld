@@ -23,7 +23,7 @@ describe("SUCCESSES: what each Adena method answers when it succeeds", () => {
     ["DoContract", ["TRANSACTION_SUCCESS"]],
   ];
 
-  it("names exactly these methods and these types: Adena answers GET_NETWORK (app/recording/adena-recording.json, entry 1), never GET_NETWORK_SUCCESS (D230)", () => {
+  it("names exactly these methods and these types: Adena answers GET_NETWORK, never GET_NETWORK_SUCCESS", () => {
     expect(Object.fromEntries(Object.entries(SUCCESSES))).toEqual(Object.fromEntries(table));
   });
 
@@ -35,7 +35,7 @@ describe("SUCCESSES: what each Adena method answers when it succeeds", () => {
     },
   );
 
-  it("refuses GET_NETWORK_SUCCESS: the recording shows Adena never sends it", async () => {
+  it("refuses GET_NETWORK_SUCCESS, which Adena's extension never sends", async () => {
     expect(await ask(() => answer("success", "GET_NETWORK_SUCCESS"), "GetNetwork")).toStrictEqual({
       ok: false,
       reason: "malformed",

@@ -23,8 +23,8 @@ const MAX_LOG = 2048;
 export const SITE = "gnoworld";
 
 /**
- * Each Adena method's success types, once, for the login and for a call. Adena answers GET_NETWORK
- * (app/recording/adena-recording.json, entry 1), so GET_NETWORK_SUCCESS is not taken (D230).
+ * Each Adena method's success types, once, for the login and for a call. The extension answers GET_NETWORK, whatever
+ * the SDK's table says, so GET_NETWORK_SUCCESS is not taken.
  */
 export const SUCCESSES = {
   AddEstablish: ["CONNECTION_SUCCESS", "ALREADY_CONNECTED"],

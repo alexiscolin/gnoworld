@@ -6,7 +6,7 @@ import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { all, button, click, follows, markup, mount } from "../../../tests/mount.tsx";
 import { MEMBERS_ONLY, warnsMembers } from "../../../tests/callFixtures.ts";
-import { recordedAdena } from "../../../tests/recordedAdena.ts";
+import { fakeAdena } from "../../../tests/fakeAdena.ts";
 import { callContract } from "../../lib/adena/call.ts";
 import type { CallCard as Card } from "../../lib/calls.ts";
 import { createAppStore } from "../../store/index.ts";
@@ -17,7 +17,7 @@ import { ensureCalls } from "./slice.ts";
 // 9d: the card in the thread, never a modal (ADR-0002 section 4, frames 31 to 33 and 108 to 114): the kicker, the title, the
 // REALM / FUNCTION / ARGUMENTS / NETWORK / FEE block, the warnings, then "Sign in Adena" and "Cancel" and, once signed, the
 // wait and the result (a hash short as an address is: six, "…", five, D13015). Every state is words, and the result says done only from the chain's answer.
-const HASH = "785c189e582beca7c3bccb26afa9ed679bc2a1efc97072dd744d29ce2f83d058";
+const HASH = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
 const REALM = "gno.land/r/demo/profile";
 const PARAMS = [
   { Name: "cur", Type: realmType() },
@@ -198,23 +198,23 @@ describe("CallCard, the states after the click", () => {
   it("says it is landing in a block, with the hash, once it is sent: nothing yet says done", () => {
     const box = withState({ kind: "landing", hash: HASH });
     expect(said(box)).toMatch(/landing in a block/i);
-    expect(said(box)).toContain("tx 785c18…3d058");
+    expect(said(box)).toContain("tx 012345…bcdef");
     expect(said(box)).not.toMatch(/signed ·|done/i);
     expectWaiting(box);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
   });
 
   it("is done, 'Signed · tx …', with the block's height and the returned value, only from the chain's answer", () => {
-    const box = withState({ kind: "done", hash: HASH, height: 55414, value: "(42 int)" });
-    expect(said(box)).toMatch(/Signed · tx 785c18…3d058/);
-    expect(said(box)).toContain("55,414");
+    const box = withState({ kind: "done", hash: HASH, height: 4242, value: "(42 int)" });
+    expect(said(box)).toMatch(/Signed · tx 012345…bcdef/);
+    expect(said(box)).toContain("4,242");
     expect(said(box)).toContain("(42 int)");
     expect(buttons(box)).toEqual(["Close"]);
     expect(box.querySelector(`[title="${HASH}"]`)).not.toBeNull();
   });
 
   it("is done with no value line for a call that returned nothing", () => {
-    const box = withState({ kind: "done", hash: HASH, height: 55414, value: "" });
+    const box = withState({ kind: "done", hash: HASH, height: 4242, value: "" });
     expect(said(box)).toContain("Signed · tx");
     expect(said(box)).not.toMatch(/returned/i);
   });
@@ -240,7 +240,7 @@ describe("CallCard, the states after the click", () => {
   it("says a failure after the hash with the hash and the chain's log, and only 'Close'", () => {
     const box = withState({ kind: "failed", reason: "chain", log: "panic: name taken", hash: HASH });
     expect(said(box)).toContain("panic: name taken");
-    expect(said(box)).toContain("tx 785c18…3d058");
+    expect(said(box)).toContain("tx 012345…bcdef");
     expect(said(box)).not.toMatch(/Signed · tx/);
     expect(buttons(box)).toEqual(["Close"]);
   });
@@ -343,7 +343,7 @@ describe("CallCard, its buttons and fields call their handlers", () => {
 });
 
 // F5723: what the card draws is what Adena is sent. The card is drawn as the page draws it, from the store's card, and the same
-// card is signed through signCall with the recording's stand-in for Adena: the drawn fields and network are compared with
+// card is signed through signCall with a stand-in for Adena: the drawn fields and network are compared with
 // DoContract's message, not with a helper only a test calls.
 const CALLER = Address.parse("g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5");
 const ONYX = { chainId: "onyx-1", name: "Onyx", rpc: "https://rpc.onyx.testnets.gno.land:443" };
@@ -373,7 +373,7 @@ async function drawnAndSent(texts: string[]) {
     edit("a", index, text);
   });
   const box = mount(<CallCard card={store.getState().calls["a"] ?? preview} network={ONYX} fee="x" {...NOTHING} />);
-  const wallet = recordedAdena({ account: CALLER });
+  const wallet = fakeAdena({ account: CALLER });
   await signCall("a", {
     store,
     adena: wallet.adena,

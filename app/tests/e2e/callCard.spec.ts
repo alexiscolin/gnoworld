@@ -20,8 +20,8 @@ import {
 import { expect, hydrated, test, type Page } from "./fixtures.ts";
 import { connectButton } from "./account.ts";
 
-// 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena built from the
-// recording, the hash followed to its block. Nothing shows as done before the chain's answer.
+// 9d's journey: a realm's write function, the card under its row, the signature in a stand-in for Adena (../fakeAdena.ts),
+// the hash followed to its block. Nothing shows as done before the chain's answer.
 const card = (page: Page) => calls(page).getByRole("article");
 interface World {
   landing?: "now" | "never" | "later";
@@ -61,7 +61,7 @@ test.describe("a write function's call card", () => {
     chain.release();
     // The hash is short as an address is: its first six and last five.
     await expect(card(page)).toContainText(`Signed · tx ${shortAddress(HASH)}`);
-    await expect(card(page)).toContainText("55,414");
+    await expect(card(page)).toContainText("4,242");
     await expect(card(page)).toContainText("(42 int)");
     const sent = await page.evaluate(() => JSON.stringify((Reflect.get(window, "__done") as unknown[])[0]));
     expect(sent).toContain('"func":"SetBio"');

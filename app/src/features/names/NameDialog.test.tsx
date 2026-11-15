@@ -12,7 +12,7 @@ import { NYM_PREFIX } from "./nym.ts";
 const ACCOUNT = "g1jg8mtutu9khhfwc4nxmuhcpftf0pajdhfvsqf5";
 const ONYX = { name: "Onyx", chainId: "onyx-1", real: false };
 const MAINNET = { name: "gno.land", chainId: "gnoland-1", real: true };
-const FEE = "≈ 0.048 GNOT, an estimate from calls up to block 55,414";
+const FEE = "≈ 0.048 GNOT, an estimate from calls up to block 4,242";
 
 const said = (box: Element) => box.textContent.replaceAll(/\s+/g, " ").trim();
 function view(over: Partial<NameDialogProps> = {}) {
@@ -153,7 +153,7 @@ describe("NameDialog: the design system's own parts", () => {
     ["working", { kind: "working", text: "Waiting for Adena" }],
     ["failed, the form stays", { kind: "failed", text: "Refused", again: true }],
     ["failed, no second try", { kind: "failed", text: "Refused", again: false }],
-    ["done", { kind: "done", name: "nym-alex042", height: 55414 }],
+    ["done", { kind: "done", name: "nym-alex042", height: 4242 }],
   ])("draws no Close button while %s: Later or Done is the way out", (_, phase) => {
     const { box } = view({ phase });
     expect(button(box, "Close")).toBeUndefined();
@@ -218,13 +218,13 @@ describe("NameDialog: nothing is registered until the chain says so", () => {
   });
 
   it("says the name registered, with its block, once the chain gave its answer, and the dialog's way out is then Done", () => {
-    const { box, onClose } = view({ phase: { kind: "done", name: "nym-alexis042", height: 55414 } });
+    const { box, onClose } = view({ phase: { kind: "done", name: "nym-alexis042", height: 4242 } });
     expect(button(box, "Later")).toBeUndefined();
     click(button(box, "Done"));
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(said(one(box, "dialog"))).toContain("nym-alexis042");
     expect(said(one(box, "dialog"))).toMatch(/registered/i);
-    expect(said(one(box, "dialog"))).toContain("55,414");
+    expect(said(one(box, "dialog"))).toContain("4,242");
   });
 
   it("says why it failed and offers Register again when nothing was sent", () => {

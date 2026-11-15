@@ -140,8 +140,8 @@ async function send(
   request: CallRequest,
   universe: Universe,
 ): Promise<CallResult | Failed> {
-  // As Adena answered on Onyx (app/recording/adena-recording.json, D209), not as the SDK's types say: a hex hash
-  // and the realm's Log, with no height and no check_tx or deliver_tx.
+  // As Adena's extension answers, not as the SDK's types say: a hex hash and the realm's Log, with no height and no
+  // check_tx or deliver_tx.
   const Sent = z.object({ hash: z.string().check(z.regex(/^[0-9a-f]{64}$/i)), Log: z.string(), error: z.unknown() });
   // Reading the answer can throw too (a hostile getter): once asked, any throw is maybe-sent, never a call to try again (F5747).
   const done = await read(() => doContract(transaction(request, universe), CONTRACT_OPTIONS), "DoContract", Sent).catch(
