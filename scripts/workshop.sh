@@ -39,9 +39,14 @@ case "$home/" in "$main"/*) echo "workshop: $main is the home folder or holds it
 pnpm=$(cd -P "$root/node_modules/.pnpm" 2>/dev/null && pwd -P) || { echo "workshop: no node_modules here: pnpm install first" >&2; exit 1; }
 case $pnpm in "$main"/node_modules/*) ;; *) echo "workshop: node_modules/.pnpm leads outside $main/node_modules: pnpm install here" >&2; exit 1 ;; esac
 tools=${GNOWORLD_TOOLS:-$HOME/.cache/gnoworld-tools} && mkdir -p "$tools" && tools=$(cd "$tools" && pwd -P)
-# boxed <command...>: the command exec'd under the profile, from a subshell of its caller's.
+# boxed <command...>: the command exec'd under the profile, from a subshell of its caller's, with an environment of its own: the profile
+# guards files, not variables, and the caller's (a key, a token, a loader such as NODE_OPTIONS) would reach code a session writes. Only
+# these are passed: where to find things (PATH, HOME, TMPDIR, the tools' cache), the backend's knobs (the tailnet's names, the team, the
+# stand-in jarvis, the moderation key's file) and the tests' log; an unset knob is passed empty, which each reader takes as unset.
 boxed() {
-	exec /usr/bin/sandbox-exec -f "$seatbelt" -D HOME="$home" -D ROOT="$root" -D MAIN="$main" -D NODE="$node_dir" -D TOOLS="$tools" \
+	exec env -i PATH="$PATH" HOME="$HOME" TMPDIR="$scratch" GNOWORLD_TOOLS="${GNOWORLD_TOOLS-}" WORKSHOP_HOSTS="${WORKSHOP_HOSTS-}" \
+		WORKSHOP_TEAM="${WORKSHOP_TEAM-}" WORKSHOP_JARVIS="${WORKSHOP_JARVIS-}" WORKSHOP_OPENAI_KEY_FILE="${WORKSHOP_OPENAI_KEY_FILE-}" W_LOG="${W_LOG-}" \
+		/usr/bin/sandbox-exec -f "$seatbelt" -D HOME="$home" -D ROOT="$root" -D MAIN="$main" -D NODE="$node_dir" -D TOOLS="$tools" \
 		-D TMP="$scratch" -D CHECKOUT_TMP="$root/.claude/tmp" -D VITE_CACHE="$root/app/node_modules/.vite" \
 		-D VITE_TEMP="$root/app/node_modules/.vite-temp" -D ROUTER_TYPES="$root/app/.react-router" \
 		-D OPENAI_KEY="${WORKSHOP_OPENAI_KEY_FILE:-/nonexistent}" "$@"

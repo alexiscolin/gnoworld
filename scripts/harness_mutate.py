@@ -472,6 +472,7 @@ def mutants():
     yield from each(ws, "python3 -I -c 'import sys, json", "python3 -c 'import sys, json", "hooks", "workshop.sh's Python imports no json.py planted in the checkout (F4962)")
     yield from each(ws, '\tfor pid in $servers; do kill "${pid%%:*}" 2>/dev/null || :; done\n', "", "hooks", "workshop.sh stops its processes at its end")
     yield from each(ws, '[ "$(head -n 1 "$pidfile" 2>/dev/null | cut -d\' \' -f1)" != "$$" ] || rm -f', "rm -f", "hooks", "workshop.sh leaves a later run's pid file")
+    yield from each(ws, "\texec env -i PATH=", "\texec env PATH=", "hooks", "workshop.sh gives its boxed processes an environment of its own, not its caller's")
     yield from each(ws, "trap 'exit 130' HUP INT TERM", "trap 'exit 130' INT TERM", "hooks", "workshop.sh ends on a closed terminal as on Ctrl+C")
     yield from each(ws, '|| { echo "workshop: $(what "${each#*:}") stopped" >&2; exit 1; }', "|| :", "hooks", "workshop.sh ends when any of its processes stops")
     yield from each(ws, '\t\tkill -0 "$pid" 2>/dev/null || { echo "workshop: $(what "$name") stopped before it listened" >&2; exit 1; }\n', "", "hooks", "workshop.sh ends on a process that stops before it listens")

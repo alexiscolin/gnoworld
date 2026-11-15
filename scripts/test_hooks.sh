@@ -7469,8 +7469,9 @@ chmod +x "$w/bin/sandbox-exec"
 root=$(cd "$w/root" && pwd -P) scratch=$(cd "${TMPDIR:-/tmp}" && pwd -P)
 cat >"$w/server" <<'SH'
 #!/bin/sh
+env >>"$W_LOG.env"
 echo "$(basename "$0") $* hosts=${WORKSHOP_HOSTS-unset} api=${WORKSHOP_API_PORT-unset} ws=${WORKSHOP_WS_PORT-unset} cwd=$(pwd -P)" >>"$W_LOG"
-[ "${DIE:-}" != "$(basename "$0")" ] || exit 1
+[ "$(cat "$W_LOG.DIE" 2>/dev/null)" != "$(basename "$0")" ] || exit 1
 port= prev=
 for a in "$@"; do [ "$prev" != --port ] || port=$a; prev=$a; done
 exec python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "$port"
@@ -7481,14 +7482,15 @@ cp "$w/server" "$w/root/app/node_modules/.bin/react-router" && cp "$w/server" "$
 cat >"$w/nvm/versions/node/$want/bin/node" <<SH
 #!/bin/sh
 [ "\$1" != -v ] || { echo $want; exit 0; }
+env >>"\$W_LOG.env"
 echo "node \$* cwd=\$(pwd -P)" >>"\$W_LOG"
-[ "\${DIE:-}" != backend ] || exit 1
+[ "\$(cat "\$W_LOG.DIE" 2>/dev/null)" != backend ] || exit 1
 python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", int(sys.argv[1])), http.server.BaseHTTPRequestHandler).serve_forever()' "\$2" &
 child=\$!
 trap 'kill \$child; exit 0' TERM INT HUP
 wait \$child
 SH
-printf '#!/bin/sh\necho ergo >>"$W_LOG"\n[ -z "${ERGO_FAILS:-}" ] || exit 1\n' >"$w/root/scripts/ergo.sh"
+printf '#!/bin/sh\nenv >>"$W_LOG.env"\necho ergo >>"$W_LOG"\n[ ! -e "$W_LOG.ERGO_FAILS" ] || exit 1\n' >"$w/root/scripts/ergo.sh"
 printf '#!/bin/sh\ncase "$1" in status) echo %s ;; ip) echo 100.64.0.1 ;; *) exit 1 ;; esac\n' "'{\"BackendState\": \"Running\", \"Self\": {\"DNSName\": \"box.tail.ts.net.\"}}'" >"$w/bin/tailscale"
 preview="$w/home/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
 printf '#!/bin/sh\necho "$*" >>"$W_LOG.preview" && pwd -P >>"$W_LOG.preview-cwd"\n[ "$1" != up ] || [ "$2" != "${FAIL_UP:-}" ] || exit 1\n[ "$1" != up ] || echo "  https://box.tail.ts.net:$(($3 + 1000))  ->  127.0.0.1:$3"\n' >"$preview"
@@ -7515,6 +7517,9 @@ else:
 port=$(free_ports 5) && app_port=$port && lab_port=$((port + 1)) && api_port=$((port + 2)) && irc_port=$((port + 3)) && ws_port=$((port + 4))
 shop() { # $1: the run's name; in the background, its pid in $shop; GNOWORLD_TOOLS, $tools_at when set
 	(cd "$t" && unset GNOWORLD_TOOLS && { [ -z "${tools_at-}" ] || export GNOWORLD_TOOLS="$tools_at"; } &&
+		ZZ_ARBITRARY_ONE=1 WORKSHOP_PLANTED_KEY=sk-planted-1 OPENAI_API_KEY=sk-planted-2 GH_TOKEN=ghp_planted3 NODE_OPTIONS=--require=/planted.js \
+		BASH_ENV=/planted.sh SSH_AUTH_SOCK=/planted.sock AWS_SECRET_ACCESS_KEY=planted ANTHROPIC_API_KEY=sk-ant-planted DYLD_INSERT_LIBRARIES= \
+		PYTHONPATH=/planted NODE_PATH=/planted npm_config_x=planted ENV=/planted.sh GOFLAGS=-planted \
 		W_LOG="$w/log" HOME="$w/home-link" NVM_DIR="$w/nvm-link" PATH="$w/bin:$PATH" WORKSHOP_APP_PORT=$app_port WORKSHOP_LAB_PORT=$lab_port \
 		WORKSHOP_API_PORT=$api_port WORKSHOP_IRC_PORT=$irc_port WORKSHOP_WS_PORT=$ws_port exec "${under:-sh}" "$root/scripts/workshop.sh") >"$w/$1.out" 2>&1 &
 	shop=$!
@@ -7558,6 +7563,24 @@ for each in react-router vite node sh; do
 	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router OPENAI_KEY=/nonexistent" "$w/log.seatbelt" ||
 		fail "workshop.sh did not start $each under its profile with its folders: $(cat "$w/log.seatbelt" 2>/dev/null)"
 done
+# What each of them is started with is an allowlist: a key, a token or a loader the caller's environment holds (a session's, or Alexis's shell's)
+# is not passed into a box whose code a session writes (the profile guards files, not the environment). They still get what they run on.
+until_ '[ "$(grep -c "^HOME=" "$w/log.env" 2>/dev/null)" -ge 4 ]' || fail "workshop.sh's four processes did not log their environment: $(cat "$w/log.env" 2>/dev/null)"
+grep -q planted "$w/log.env" && fail "workshop.sh passed a planted value into the workshop's sandbox: $(grep planted "$w/log.env" | sort -u)"
+# The names a process sees are a subset of this set, whatever the caller held: what the processes read (HOME and PATH, TMPDIR, the
+# tools' cache, the backend's knobs WORKSHOP_HOSTS, _TEAM, _JARVIS and _OPENAI_KEY_FILE, the tests' W_LOG), the ports and data folder
+# the `env` before each command sets, and what a shell adds itself. A denylist of names would let any other through.
+seen=$(sed -n 's/^\([A-Za-z_][A-Za-z0-9_]*\)=.*/\1/p' "$w/log.env" | sort -u)
+for each in $seen; do
+	case $each in
+	HOME | PATH | TMPDIR | W_LOG | GNOWORLD_TOOLS | WORKSHOP_HOSTS | WORKSHOP_TEAM | WORKSHOP_JARVIS | WORKSHOP_OPENAI_KEY_FILE) ;;
+	WORKSHOP_API_PORT | WORKSHOP_WS_PORT | WORKSHOP_DATA_DIR | PWD | OLDPWD | SHLVL | _) ;;
+	*) fail "workshop.sh passed $each, a name outside its allowlist, into the workshop's sandbox: $(sort -u "$w/log.env")" ;;
+	esac
+done
+homes=$(grep -c "^HOME=" "$w/log.env")
+[ "$(grep -c "^W_LOG=" "$w/log.env")" = "$homes" ] && [ "$(grep -c "^PATH=.*/versions/node/$want/bin" "$w/log.env")" = "$homes" ] ||
+	fail "workshop.sh's processes were not all given W_LOG (the tests') and a PATH with Node's folder: $(sort -u "$w/log.env")"
 order
 grep -q "^workshop-app: .*https://box.tail.ts.net:$((app_port + 1000)) " "$w/one.out" && grep -q "^workshop-lab: .*https://box.tail.ts.net:$((lab_port + 1000)) " "$w/one.out" ||
 	fail "workshop.sh did not say each tailnet link beside the name it opens: $(cat "$w/one.out")"
@@ -7644,17 +7667,17 @@ rm "$w/nvm/versions/node/$want/bin/node" && mv "$w/node.away" "$w/nvm/versions/n
 mv "$w/nv.away" "$root/.node-version"
 # A backend that dies before it listens, or an Ergo that does not build, ends the run, saying so, and stops the servers.
 for fault in DIE=backend ERGO_FAILS=1; do
-	: >"$w/log.preview" && export "${fault?}" && shop faulty && faulty=$shop
+	: >"$w/log.preview" && printf '%s\n' "${fault#*=}" >"$w/log.${fault%%=*}" && shop faulty && faulty=$shop
 	ended "$faulty" || fail "workshop.sh lived on, or left a process, with $fault"
-	unset "${fault%%=*}"
+	rm -f "$w/log.${fault%%=*}"
 	wait "$faulty" && fail "workshop.sh exited 0 with $fault"
 	case $fault in DIE=*) said="the backend (the server and Ergo) stopped before it listened" ;; *) said="no Ergo built for the chat; a gate builds it (scripts/check.sh)" ;; esac
 	grep -qF "$said" "$w/faulty.out" || fail "workshop.sh did not say, with $fault: $said: $(cat "$w/faulty.out")"
 done
 # A server that dies before it listens (a config it cannot load) ends the run, saying which, and puts nothing on the tailnet for it.
-: >"$w/log.preview" && export DIE=vite && shop dies && dies=$shop
+: >"$w/log.preview" && echo vite >"$w/log.DIE" && shop dies && dies=$shop
 ended "$dies" || fail "workshop.sh lived on after its lab's server died before it listened"
-unset DIE
+rm -f "$w/log.DIE"
 grep -q "the lab's dev server stopped before it listened" "$w/dies.out" || fail "workshop.sh did not say its lab's server died before it listened: $(cat "$w/dies.out")"
 grep -q "^up workshop-lab" "$w/log.preview" && fail "workshop.sh put a server that never listened on the tailnet"
 # Ctrl+C (TERM here) and a closed terminal (HUP) end it alike; HUP under dash, which macOS can make its sh (/private/var/select/sh): bash
