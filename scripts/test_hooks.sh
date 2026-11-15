@@ -2594,7 +2594,9 @@ for f in 'scripts/my file.sh' Scripts/tool.sh .githooks/pre-push .github/workflo
 	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts CLAUDE.md; do
 	mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add -f "$f"
 	[ "$(git -C "$c2" diff --cached --name-only | wc -l | tr -d ' ')" = 1 ] || fail "the case of $f staged other than one path"
-	harnessed || fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
+	# A disk that keeps case holds Scripts/ as a folder of its own, which the fold check refuses first, as equal but for case to scripts/.
+	harnessed || { case $f in Scripts/*) said "a path this disk may read as another" ;; *) false ;; esac; } ||
+		fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
 	git -C "$c2" reset -q && rm "$c2/$f" # by the index's spelling, which may not be $f's (Scripts/)
 done
 fresh
