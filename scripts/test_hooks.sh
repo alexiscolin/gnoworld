@@ -96,6 +96,11 @@ assert matched == {"Bash", "WebFetch", "Edit", "Write"}, f"the guard reads other
 box = s["sandbox"]
 assert box["enabled"] is True and box["allowUnsandboxedCommands"] is False, "the sandbox can be left"
 assert {"~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"} <= set(box["filesystem"]["denyRead"]), "a credential is readable"
+# The key stores of the chain tools and of Claude Code itself: unreadable from this project's settings too, never only from the user's own,
+# which a teammate's checkout does not carry. Written with ~, a home folder's absolute path being a person's name.
+stores = {"~/.local/share/gnomcp", "~/Library/Application Support/gno", "~/.claude.json"}
+assert stores <= set(box["filesystem"]["denyRead"]), "a key store (gnomcp's, gno's, Claude Code's own) is readable by a sandboxed command"
+assert {"Read(~/.local/share/gnomcp/**)", "Read(~/Library/Application Support/gno/**)", "Read(~/.claude.json)"} <= set(s["permissions"]["deny"]), "the Read tool can open a key store"
 assert {"scripts", ".githooks", ".github", "package.json", ".node-version", "pnpm-lock.yaml", ".gitignore", "CLAUDE.md", ".claude/rules"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite the harness, the lockfile or the rules"
 assert {"pnpm-workspace.yaml", ".pnpmfile.cjs", ".pnpmfile.mjs"} <= set(box["filesystem"]["denyWrite"]), "a command can plant what pnpm runs (F087)"
 assert {".git/hooks", ".git/config", ".git/commondir"} <= set(box["filesystem"]["denyWrite"]), "a command can rewrite git's hooks or point git at others (F129, F150)"
@@ -383,7 +388,8 @@ want_rules |= {f"Edit(/{q}/{rule_of(n)})" for p in ABOVE for q in (p, tmp(p)) fo
 want_rules |= {f"Edit({p}/{rule_of(n)})" for p in ABOVE_MAIN + (NEW,) for n in INSTRUCTIONS} | {f"Edit({NEW}/.claude/**)"}
 got_writes = {w for w in writes if w.startswith(("/", "~"))}
 assert got_writes == want_writes, ("denyWrite's twins", sorted(want_writes - got_writes)[:4], sorted(got_writes - want_writes)[:4])
-credentials = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)"}  # the wiring section's
+credentials = {"Read(~/.ssh/**)", "Read(~/.config/gh/**)", "Read(~/.npmrc)", "Read(~/.aws/**)", "Read(~/.local/share/gnomcp/**)",
+               "Read(~/Library/Application Support/gno/**)", "Read(~/.claude.json)"}  # the wiring section's
 got_rules = {f"{k}({p})" for k, p in rules if p.startswith(("//", "~/"))} - credentials
 assert got_rules == want_rules, ("the Read and Edit twins", sorted(want_rules - got_rules)[:4], sorted(got_rules - want_rules)[:4])
 # No part's command writes the next parts' folder (F5322, the red pass's T2): these settings give the sandbox no write root at it, above

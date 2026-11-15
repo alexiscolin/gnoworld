@@ -1035,6 +1035,15 @@ def mutants():
     yield from each("scripts/gitleaks-private.toml", "(?i)^/home/runner$", "(?i)/home/runner", "hooks", "the private scan lets only the CI runner's folder pass")
     yield from each(".githooks/records.sh", " app/tsconfig.json", "", "hooks", "the harness list holds every file harness_mutate guards (F124)")
     yield from each(".githooks/records.sh", " .mcp.json", "", "hooks", "the harness list holds what Claude Code starts (F129)")
+    for find, label in (
+        (',\n        "~/.claude.json"', "a shell cannot read Claude Code's own config, which holds its tokens"),
+        ('        "~/Library/Application Support/gno",\n', "a shell cannot read gno's key store"),
+        ('        "~/.local/share/gnomcp",\n', "a shell cannot read gnomcp's key store"),
+        ('      "Read(~/.claude.json)",\n', "the Read tool cannot open Claude Code's own config"),
+        ('      "Read(~/Library/Application Support/gno/**)",\n', "the Read tool cannot open gno's key store"),
+        ('      "Read(~/.local/share/gnomcp/**)",\n', "the Read tool cannot open gnomcp's key store"),
+    ):
+        yield from each(".claude/settings.json", find, "]" if find.endswith('"]') else "", "hooks", f"settings: {label}")
     # F129: the hooks live in .git/hooks, installed from main with the scripts they run.
     ih = "scripts/install_hooks.sh"
     yield from each(ih, 'git cat-file -e "$ref:.githooks/$hook" 2>/dev/null ||', "true ||", "hooks", "install_hooks refuses a commit missing a hook")
@@ -1271,7 +1280,7 @@ def mutants():
     yield from each("scripts/check.sh", "printf '%s' \"${want#v}\" | grep -qxE", "true || printf '%s' \"${want#v}\" | grep -qxE", "hooks", "check.sh refuses a .node-version that is not a version")
     yield from each(".claude/settings.json", '"onFailure": "block"', '"onFailure": "ignore"', "hooks", "settings: guard blocks on a crash")
     yield from each(".claude/settings.json", '"allowUnsandboxedCommands": false', '"allowUnsandboxedCommands": true', "hooks", "settings: no unsandboxed retry")
-    yield from each(".claude/settings.json", '"denyRead": ["~/.ssh"', '"denyRead": ["~/.nothing"', "hooks", "settings: credentials unreadable")
+    yield from each(".claude/settings.json", '"denyRead": [\n        "~/.ssh"', '"denyRead": [\n        "~/.nothing"', "hooks", "settings: credentials unreadable")
     yield from each(".claude/settings.json", '"scripts",\n', '"nothing",\n', "hooks", "settings: harness unwritable")
     yield from each(".claude/settings.json", '"Bash(pnpm add *)"', '"Bash(nothing)"', "hooks", "settings: Claude adds no dependency")
     yield from each(".claude/settings.json", '"Edit(/scripts/guard.py)"', '"Edit(/nothing)"', "hooks", "settings: an edit of a hook's script is refused")

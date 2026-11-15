@@ -16,6 +16,9 @@
       "Read(~/.config/gh/**)",
       "Read(~/.npmrc)",
       "Read(~/.aws/**)",
+      "Read(~/.local/share/gnomcp/**)",
+      "Read(~/Library/Application Support/gno/**)",
+      "Read(~/.claude.json)",
       "Bash(pnpm add *)",
       "Bash(rm -rf *)",
       "Edit(/scripts/guard.py)",
@@ -487,7 +490,15 @@
         "~/Server/gnoworld-wt/*/.githooks/pre-push",
         "~/Server/gnoworld-wt/*/.githooks/records.sh"
       ],
-      "denyRead": ["~/.ssh", "~/.config/gh", "~/.npmrc", "~/.aws"]
+      "denyRead": [
+        "~/.ssh",
+        "~/.config/gh",
+        "~/.npmrc",
+        "~/.aws",
+        "~/.local/share/gnomcp",
+        "~/Library/Application Support/gno",
+        "~/.claude.json"
+      ]
     }
   }
 }
