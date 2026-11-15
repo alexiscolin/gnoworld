@@ -355,12 +355,12 @@ jobs:
         run: python3 -I "$RUNNER_TEMP/base/scripts/patch_coverage.py" "$BASE"
 
   # StrykerJS on the changed tier-1 lines alone (the base's stryker_lines.py, which ends the job when none is to mutate); a cap
-  # reached fails the job.
+  # reached fails the job. 120 minutes: a branch of many changed tier-1 lines runs past an hour on GitHub's four cores (D13206).
   risk:
     needs: [changes]
     if: needs.changes.outputs.tier1 == 'true' && needs.changes.outputs.product == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 120
     steps:
       - *checkout-history
       - *go

@@ -7555,7 +7555,7 @@ for name in names:
     for job, text in jobs(ci).items():
         assert re.search(r"^    runs-on: ubuntu-24\.04$", text, re.M), f"{name}: {job} runs on a machine it does not name"
         t = re.search(r"^    timeout-minutes: (\d+)$", text, re.M)
-        budget = 355 if name == "nightly.yml" else 40 if job == "deploy-stack" else 15
+        budget = 355 if name == "nightly.yml" else 40 if job == "deploy-stack" else 120 if job == "risk" else 15
         assert t and int(t.group(1)) <= budget, f"{name}: {job} has no time limit, or one past its {budget} min"
 gate = strip((wf / "gate.yml").read_text())
 J = jobs(gate)
