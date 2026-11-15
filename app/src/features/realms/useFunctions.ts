@@ -8,6 +8,7 @@ import { readHeight } from "@gnoworld/chain/node";
 import type { Read } from "../../lib/chain/evalCall.ts";
 import { readEval, realmFunctions, toFunctions } from "../../lib/chain/rpc.ts";
 import { queryClient } from "../../lib/query/client.ts";
+import { pageFetch } from "../../lib/query/policy.ts";
 import { listingOf } from "./useCallable.ts";
 import type { Height } from "./useRealm.ts";
 
@@ -76,7 +77,11 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
     call: Read | undefined,
     { signal, latest }: { signal: AbortSignal; latest: () => boolean },
   ) => {
-    readEval(rpc, { realm, name, ...call }, { ...options, timeoutMs: 10_000, maxBytes: 64 * 1024, signal })
+    readEval(
+      rpc,
+      { realm, name, ...call },
+      { fetch: pageFetch, ...options, timeoutMs: 10_000, maxBytes: 64 * 1024, signal },
+    )
       .then((text) => {
         if (!latest()) return undefined;
         if (!text.ok) {
@@ -85,7 +90,7 @@ export function useFunctions(rpc: string, realm: string, options?: ReadOptions):
         }
         const shown: Result = { state: "read", text: text.value, height: undefined };
         settle(name, shown);
-        return readHeight(rpc, { ...options, chainId: null }).then((height) => {
+        return readHeight(rpc, { fetch: pageFetch, ...options, chainId: null, signal }).then((height) => {
           setResults((before) =>
             before[name] === shown
               ? { ...before, [name]: { ...shown, height: height.ok ? height.value : height.failure } }
