@@ -9,7 +9,7 @@ import (
 
 const maxPrice = math.MaxInt64 / longest // ugnot a day: the longest rental's cost still fits an int
 
-var pending address // the proposed owner, until it accepts (D14)
+var pending address // the proposed owner, until it accepts
 
 // mustOwner refuses anyone but the owner, the operator included.
 func mustOwner(caller address) {
@@ -61,8 +61,8 @@ func Unpause(cur realm) {
 	chain.Emit("Unpause")
 }
 
-// ProposeOwner names the next owner, who takes over by calling AcceptOwner
-// (D14); a new proposal replaces the last. The owner only.
+// ProposeOwner names the next owner, who takes over by calling AcceptOwner;
+// a new proposal replaces the last. The owner only.
 func ProposeOwner(cur realm, next address) {
 	mustOwner(cur.Previous().Address())
 	mustAddress(next)
@@ -82,7 +82,7 @@ func AcceptOwner(cur realm) {
 }
 
 // Withdraw sends amount ugnot to to, out of the realm's balance minus the
-// payments of rentals not closed, which takedowns may refund (D13). The owner only.
+// payments of rentals not closed, which takedowns may refund. The owner only.
 func Withdraw(cur realm, to address, amount int) {
 	mustOwner(cur.Previous().Address())
 	mustAddress(to)

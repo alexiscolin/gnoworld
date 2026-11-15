@@ -1,6 +1,6 @@
 // Package satellite rents each world's satellite slot by the day: anyone rents
 // a free slot by paying, the owner or its operator takes a satellite down after
-// a report and refunds its days not begun. Design: docs/plans/slice-11.md.
+// a report and refunds its days not begun.
 package satellite
 
 import (
@@ -19,22 +19,22 @@ import (
 
 const (
 	denom      = "ugnot"
-	day        = 86400       // seconds of block time in a rental's day (D11)
+	day        = 86400       // seconds of block time in a rental's day
 	longest    = 7           // days, the longest rental
-	perPayer   = 3           // live satellites one address holds at most (D5)
-	maxWorld   = 40          // bytes in a world's id (D2)
+	perPayer   = 3           // live satellites one address holds at most
+	maxWorld   = 40          // bytes in a world's id
 	maxReport  = 64          // bytes in a report's id
-	maxText    = 40          // code points in a satellite's text (D7)
-	startPrice = 2000000     // ugnot a day at deploy (D3)
+	maxText    = 40          // code points in a satellite's text
+	startPrice = 2000000     // ugnot a day at deploy
 	daysText   = "1, 3 or 7" // the days a rental lasts, as Rent checks them
 	blank      = 0x2800      // the Braille blank: a symbol that shows nothing
 )
 
 // Strings, not structs: storage is billed per object (A1:801-804).
 var (
-	rentals  avl.Tree // world -> "payer start days price until text", until the rental is closed (D2)
+	rentals  avl.Tree // world -> "payer start days price until text", until the rental is closed
 	payers   avl.Tree // payer -> its rentals' worlds, space-separated: three live at most
-	held     int      // ugnot paid for rentals not closed, which a takedown may refund (D13)
+	held     int      // ugnot paid for rentals not closed, which a takedown may refund
 	price    = startPrice
 	paused   = true
 	owner    address
@@ -66,7 +66,7 @@ func (r rental) liveAt(now int) bool { return now < r.end() }
 // heldFrom reports whether the rental may not be closed by by at now: by anyone
 // while it is live; once taken down, by all but its payer until the end it was
 // paid for, so the one taking it down cannot free its bytes first and take its
-// payer's storage deposit (F5057). No rental holds a world from anyone.
+// payer's storage deposit. No rental holds a world from anyone.
 func (r rental) heldFrom(by address, now int) bool {
 	return r.liveAt(now) || now < r.until && by != r.payer
 }
@@ -137,7 +137,7 @@ func Rent(cur realm, world, text string, days int) {
 	}
 	now := clock()
 	payer := cur.Previous().Address()
-	// A world taken down stays empty until its paid end, its payer included (G1).
+	// A world taken down stays empty until its paid end, its payer included.
 	if r, _ := get(world); r.liveAt(now) || now < r.until {
 		panic("this world has a satellite")
 	}
@@ -148,7 +148,7 @@ func Rent(cur realm, world, text string, days int) {
 	cost := price * days
 	mustPay(cost)
 	// The message's own call, so its coins came to this realm, not to one holding
-	// Rent in a variable (F5056); called here, as it counts the calls above it.
+	// Rent in a variable; called here, as it counts the calls above it.
 	runtime.AssertOriginCall()
 
 	for _, w := range ended {
@@ -178,7 +178,7 @@ func countLive(payer address, now int) (live int, ended []string) {
 	return live, ended
 }
 
-// mustPay refuses a call that does not send exactly cost ugnot in one coin (D4).
+// mustPay refuses a call that does not send exactly cost ugnot in one coin.
 func mustPay(cost int) {
 	sent := unsafe.OriginSend()
 	if len(sent) != 1 || sent[0].Denom != denom || sent[0].Amount != int64(cost) {
@@ -186,9 +186,9 @@ func mustPay(cost int) {
 	}
 }
 
-// Close clears a world's ended rental, so storage holds live rentals only (D2):
+// Close clears a world's ended rental, so storage holds live rentals only:
 // anyone may, and gets its storage deposit back; a taken-down one, only its payer
-// until the end it was paid for (F5057).
+// until the end it was paid for.
 func Close(cur realm, world string) {
 	r, ok := get(world)
 	if !ok {
@@ -218,12 +218,11 @@ func closeEnded(world string, r rental) {
 
 // Takedown ends a live satellite now, after the report it answers, and refunds
 // its payer the whole days not yet begun, at the price that rental paid; the
-// day under way counts as begun (D12), so a rental's last day refunds nothing.
+// day under way counts as begun, so a rental's last day refunds nothing.
 // The rental stays, ended, for the days begun: until the end it was paid for, no
-// one rents its world, its payer included (G1), and only its payer may close it,
-// and so get its storage deposit back, never the one taking it down (F5042,
-// F5057); then anyone, as for any ended rental (D28). The owner or the operator
-// only.
+// one rents its world, its payer included, and only its payer may close it,
+// and so get its storage deposit back, never the one taking it down; then
+// anyone, as for any ended rental. The owner or the operator only.
 func Takedown(cur realm, world, report string) {
 	by := cur.Previous().Address()
 	if by != owner && by != operator {
@@ -279,7 +278,7 @@ func isSlug(s string, limit int) bool {
 // printable (a letter, mark, number, punctuation, symbol or the ASCII space) and
 // not default-ignorable, so nothing steers or hides what shows (a bidi mark, a
 // zero-width, a tag, a filler), and one at least shows: not a space, a mark or the
-// Braille blank (D7, widened by D27: F5040, F5041). Code points, as the app counts.
+// Braille blank. Code points, as the app counts.
 func isText(s string) bool {
 	if !utf8.ValidString(s) {
 		return false

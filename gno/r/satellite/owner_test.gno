@@ -105,7 +105,7 @@ func TestOwnerActionsRefusedToOthers(cur realm, t *testing.T) {
 
 func TestSetPrice(cur realm, t *testing.T) {
 	fresh()
-	uassert.Equal(t, 2000000, Price()) // D3, at deploy
+	uassert.Equal(t, 2000000, Price()) // at deploy
 	testing.SetRealm(testing.NewUserRealm(adm))
 	for _, p := range []int{0, -1, -p0, topPrice + 1} {
 		uassert.AbortsWithMessage(t, cur, "a price is 1 to 1317624576693539401 ugnot a day", func() { SetPrice(cross(cur), p) })
@@ -156,7 +156,7 @@ func TestSetOperator(cur realm, t *testing.T) {
 	uassert.False(t, ok)
 }
 
-// D14: the owner proposes, and only the proposed address takes over.
+// The owner proposes, and only the proposed address takes over.
 func TestOwnershipMovesInTwoSteps(cur realm, t *testing.T) {
 	fresh()
 	testing.SetRealm(testing.NewUserRealm(adm))
@@ -184,7 +184,7 @@ func TestOwnershipMovesInTwoSteps(cur realm, t *testing.T) {
 	uassert.Equal(t, 2*p0, Price())
 }
 
-// D13: the owner withdraws the realm's balance minus the payments of rentals
+// The owner withdraws the realm's balance minus the payments of rentals
 // not closed, so every takedown can still refund.
 func TestWithdrawNeverTakesHeldPayments(cur realm, t *testing.T) {
 	fresh()
