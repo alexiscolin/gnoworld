@@ -11,11 +11,11 @@ A setting is read once at start: change it, then recreate the service (`docker c
 In this order (details: `docs/OPERATIONS.md`, "Before the first start"):
 
 1. `mkdir -m 700 deploy/secrets`, then the secret files of section 2 (each `chmod 644`).
-2. `cp deploy/.env.example deploy/.env`, and set `ORIGINS` to the app's own https origin (required: compose refuses to start without it, `compose.yaml` lines 72 and 114).
+2. `cp deploy/.env.example deploy/.env`, and set `ORIGINS` to the app's own https origin (required: compose refuses to start without it, the `ORIGINS` entry of the `server` and `ergo` services' `environment:` in `compose.yaml`).
 3. `docker compose -f deploy/compose.yaml up -d --build`. Add `--profile links` with `LINK_CARDS=1`, and `--profile jarvis` with `JARVIS=on` (section 4). The public front (Caddy, a TLS front) comes with the automatic deploy's part: until then nothing publishes `web` (`docs/OPERATIONS.md`).
 4. `sh deploy/test.sh` from the commit you reviewed.
 
-## 2. Secrets (files in `deploy/secrets/`, declared in `compose.yaml` lines 593 to 608)
+## 2. Secrets (files in `deploy/secrets/`, declared in `compose.yaml`'s top-level `secrets:`)
 
 A secret is only ever read from a file; `.env` holds the file's path, never its value. Every file below must exist before `up`, even for a feature that is off.
 
@@ -42,7 +42,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 | `ORIGINS` | none, required | The app's own https origin: Ergo's WebSocket and the server's POSTs accept it alone |
 | `SERVER_NAME` | `irc.gnoworld.example` | Ergo's name for itself, a name nobody resolves |
 | `DEMO_HTPASSWD_FILE`, `ERGO_OPER_PASSWORD_FILE`, `LOG_PEPPER_FILE`, `OPENAI_API_KEY_FILE`, `ANTHROPIC_API_KEY_FILE`, `JARVIS_DOOR_KEY_FILE` | `./secrets/<name>` | Where each secret file is |
-| `EGRESS_PROXY` | `http://guard:4750` | The server's way out (ops names its own) |
+| `EGRESS_PROXY` | `http://guard:4750` | The server's way out (another proxy than the guard's) |
 | `JARVIS_EGRESS_PROXY` | `http://guard:4751` | Jarvis's way out |
 | `ERGO_DATA_MB` | `1024` | Megabytes Ergo's volume may fill before the server's alert at 80% |
 | `WEB_ADDRESS`, `SERVER_ADDRESS`, `JARVIS_ADDRESS`, `READER_ADDRESS`, `LINK_READER_ADDRESS`, `ADMIN_ADDRESS` | `172.30.89.10`, `.89.11`, `172.30.91.10`, `172.30.97.10`, `172.30.101.10`, `172.30.92.10` | Fixed addresses of the services on their networks |
@@ -57,7 +57,7 @@ Where each file lives is overridable by `*_FILE` in `.env` (section 3, "Compose"
 
 ### `server` (`server/src/config.ts`, `cards/settings.ts`, `door/settings.ts`)
 
-The server's own defaults apply to what `compose.yaml` does not set. Compose forwards only the names in its `server` block (lines 110 to 157): a variable absent there (`CHAINS`, `NEW_ACCOUNTS_PER_HOUR`, `FIRST_TO_CHART_WORLDS`, `MODERATION_THRESHOLDS`, `NEW_ACCOUNT_HOURS`, `MUTE_*`, `JARVIS_QUOTA*`, `JARVIS_UNLIMITED`, `JARVIS_TIMEOUT_S`, `JARVIS_QUESTION_CHARS`, `JARVIS_NAMES_*`, `EXPLAIN_SEED_FILE`, `EXPLAIN_PER_DAY`, `HUBS_FILE`, `ROLES_FILE`) cannot be set from `deploy/.env`; add it to that block first. The same holds for jarvis's block (lines 202 to 225).
+The server's own defaults apply to what `compose.yaml` does not set. Compose forwards only the names in its `server` service's `environment:`: a variable absent there (`CHAINS`, `NEW_ACCOUNTS_PER_HOUR`, `FIRST_TO_CHART_WORLDS`, `MODERATION_THRESHOLDS`, `NEW_ACCOUNT_HOURS`, `MUTE_*`, `JARVIS_QUOTA*`, `JARVIS_UNLIMITED`, `JARVIS_TIMEOUT_S`, `JARVIS_QUESTION_CHARS`, `JARVIS_NAMES_*`, `EXPLAIN_SEED_FILE`, `EXPLAIN_PER_DAY`, `HUBS_FILE`, `ROLES_FILE`) cannot be set from `deploy/.env`; add it to that block first. The same holds for the `jarvis` service's `environment:`.
 
 | Name | Default | Allowed | Effect, and when missing |
 |---|---|---|---|
@@ -140,14 +140,14 @@ Read when on alone:
 | `LINKS_DIRECT` | unset | `1` | Development only: no proxy, and `LINKS_PROXY` must then be unset |
 | `LINKS_MAX` | `2` | 1 to 16 | Pages served at once |
 
-### `jarvis_reader` (`deploy/jarvis-reader/main.go` line 43; compose lines 268 to 276)
+### `jarvis_reader` (`deploy/jarvis-reader/main.go` line 43; the `jarvis_reader` service's `environment:` in compose)
 
 All required: `READER_LISTEN` (`host:port`), `READER_PROXY` (`guard:4753`), `READER_HOSTS` (comma list, the four chain hosts), `READER_GNOMCP` (the binary), `READER_CONFIG` (its profiles file), `READER_MAX` (whole number, 1 at least; `2`). Without one the reader stops.
 
 ### `ergo`, `guard`, app tooling
 
-- `ergo` (compose lines 70 to 75): `SERVER_NAME`, `ORIGINS`, `PROXY_FROM` (web's address), `INSIDE_SUBNET`, `AUTH_SOCKET`.
-- `guard` (lines 348 to 355): `JARVIS_OUT_ADDRESS`, `READER_OUT_ADDRESS`, `LINKS_OUT_ADDRESS` (it stops without them), `XTABLES_LOCKFILE`.
+- `ergo` (its `environment:` in compose): `SERVER_NAME`, `ORIGINS`, `PROXY_FROM` (web's address), `INSIDE_SUBNET`, `AUTH_SOCKET`.
+- `guard` (its `environment:`): `JARVIS_OUT_ADDRESS`, `READER_OUT_ADDRESS`, `LINKS_OUT_ADDRESS` (it stops without them), `XTABLES_LOCKFILE`.
 - Development and tests only: `GNOWORLD_DATA`, `GNOWORLD_BUILD`, `WORKSHOP_HOSTS`, `WORKSHOP_API_PORT`, `WORKSHOP_WS_PORT`, `WORKSHOP_DATA_DIR`, `GNOWORLD_TOOLS`, `VITE_GNOWORLD_TEST_GPU`, `JARVIS_TEST_OUTBOUND`, `LEAK` (section 7 and the files named there).
 
 ## 4. Feature switches and their profiles
@@ -173,22 +173,22 @@ The evals gate is `deploy/jarvis-evals-gate.py` (`python3 -I deploy/jarvis-evals
 | Jarvis | question, answer, buttons, quota, dollars, unlimited accounts (ceilings) | 8000, 8000, 5, 1000, 500, 1000 | `packages/schemas/src/jarvis.ts` line 81 |
 | Jarvis | the door's and the page's wait | 900 s, 910 s | same, line 93 |
 | Jarvis | room lines carried to a question | 30 lines, 8192 bytes | same, line 96 |
-| Jarvis | memory | 384 MiB, heap 268 MiB (70%), 128 processes | `compose.yaml` lines 231 and 232; `deploy/jarvis/Dockerfile` line 32 |
+| Jarvis | memory | 384 MiB, heap 268 MiB (70%), 128 processes | the `jarvis` service's `mem_limit` and `pids_limit` in `compose.yaml`; `deploy/jarvis/Dockerfile` line 32 |
 | Cards | title, description, site, host, picture, side | 200, 500, 100, 253 characters; 16384 bytes; 160 px | `packages/schemas/src/cards.ts` line 10 |
 | Link reader | a page, a picture (bytes, time) | 256 KiB and 5 s, 1 MiB and 5 s | `link-reader/src/fetch.ts` line 41 |
 | Link reader | a picture's side, pixels | 64 to 4096 px, 2,000,000 px at most (D13943) | `link-reader/src/picture.ts` lines 34 to 36 |
-| Link reader | memory | 256 MiB, 48 processes, measured peak 210 MiB | `compose.yaml` lines 304 to 322 |
+| Link reader | memory | 256 MiB, 48 processes, measured peak 210 MiB | the `link_reader` service's `mem_limit` and `pids_limit` in `compose.yaml` |
 | Link way out | tunnels | 32 (smokescreen's `max_concurrent_connect_tunnels`) | `deploy/egress/config.yaml` |
 | Search | lines kept per room, rows in all, edits per line | 2048, 400000, 50 | `server/src/search/index.ts` lines 15 to 18 |
 | Search | requests a minute per visitor, per account; a second in all | 20, 60, 10 | `server/src/search/routes.ts` lines 19 to 22 |
 | Search | words, results counted, matches | 8, 1000, 5000 | `server/src/search/query.ts` lines 29 to 32 |
 | Guest | a line's length | 280 characters, 400 bytes | `server/src/guest/rules.ts` |
-| nginx | requests a visitor | 20 a second, burst 640 | `deploy/web/nginx.conf` lines 45 and 102 |
-| nginx | hashed files a visitor (assets, textures, world pictures) | 5 a second, burst 1,024, a zone of its own (D13127) | `deploy/web/nginx.conf` lines 49 and 125 |
-| nginx | login | 1 a second, burst 20, besides the server's 10 a minute | lines 51 and 202 |
-| nginx | connections a visitor, per worker | 32; 4096 | lines 103 and 12 |
-| nginx | API body | 16 KiB | line 195 |
-| nginx | timeouts | header and body 10 s, keep-alive 15 s; API stream and `/ws` 1 h | lines 57 to 59, 181 to 182, 197 |
+| nginx | requests a visitor | 20 a second, burst 640 | `deploy/web/nginx.conf`: `limit_req_zone … zone=visitors`, and `limit_req zone=visitors` in the `server` block |
+| nginx | hashed files a visitor (assets, textures, world pictures) | 5 a second, burst 1,024, a zone of its own (D13127) | `deploy/web/nginx.conf`: `limit_req_zone … zone=files`, and `limit_req zone=files` |
+| nginx | login | 1 a second, burst 20, besides the server's 10 a minute | `nginx.conf`: `zone=login` in `limit_req_zone` and `limit_req` |
+| nginx | connections a visitor, per worker | 32; 4096 | `nginx.conf`: `limit_conn open`, `worker_connections` |
+| nginx | API body | 16 KiB | `nginx.conf`: `client_max_body_size` |
+| nginx | timeouts | header and body 10 s, keep-alive 15 s; API stream and `/ws` 1 h | `nginx.conf`: `client_header_timeout`, `client_body_timeout`, `keepalive_timeout`, `proxy_read_timeout` |
 | Egress | connect, idle | 10 s, 60 s; 32 tunnels and requests | `deploy/egress/config.yaml` |
 | Containers | cpus, memory, processes | web 0.5, 128m, 64; ergo 0.4, 512m, 1024; server 0.4, 512m, 128; jarvis 0.3, 384m, 128; reader 0.2, 160m, 48; links 0.2, 256m, 48; guard 0.1, 32m, 16; egress 0.1, 64m, 64; egress_reader and egress_links 0.1, 48m, 32 | `compose.yaml` |
 
@@ -221,15 +221,15 @@ The app reads no `VITE_*` setting for production. What it reads:
 | What people look for | Where it is fixed |
 |---|---|
 | The CSP of each page | built from the app: `app/src/csp.ts`, `/etc/nginx/csp.conf` |
-| Security headers (`noindex`, `nosniff`, `no-referrer`) | `deploy/web/nginx.conf` lines 106 to 112 |
-| Cache lifetimes (hashed files a year; the data files a minute) | `nginx.conf` lines 76 to 95 |
+| Security headers (`noindex`, `nosniff`, `no-referrer`) | `deploy/web/nginx.conf`: the `add_header … always` lines of the `server` block |
+| Cache lifetimes (hashed files a year; the data files a minute) | `nginx.conf`: the `map $status$uri $cache_control` |
 | The link reader's URL rule (https, 443, three redirects) | `link-reader/src/url.ts`, `fetch.ts` |
 | Jarvis's price table and its allowed models | `jarvis/src/prices.ts` |
 | The password's name `team` | `docs/OPERATIONS.md` |
 | The ports 8080, 8081, 8082, 8083, 8084, 4750 to 4754, 6667, 8097 | `deploy/compose.yaml`, `nginx.conf`, `deploy/guard/guard.sh`, `deploy/egress/` |
 | The retention of Jarvis's kept answers (a function's explanation 7 days, a "what can be done here" answer 1 hour), of the link cards' pages (30 days) and of the search index (90 days) | `server/src/door/kept.ts` lines 15 and 16; `server/src/cards/expire.ts` line 6; `server/src/search/index.ts` lines 10 and 154 |
 | Ergo's own configuration | rendered at its start from the variables above: `deploy/ergo/` |
-| Whether the container is read-only, capabilities, restart | `x-locked` in `compose.yaml` (lines 9 to 17) |
+| Whether the container is read-only, capabilities, restart | `x-locked` in `compose.yaml` |
 
 ## Not verified here
 

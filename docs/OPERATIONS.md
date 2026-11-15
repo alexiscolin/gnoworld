@@ -45,7 +45,7 @@ and `link_reader` as 65530, users of their own.
 - `egress` (smokescreen) lets the server reach `api.openai.com`, `api.coingecko.com` and each universe's RPC and indexer host (`deploy/egress/acl.yaml`, one
   file the test reads too; the hosts are `app/data/universes.json`'s, and `server/src/prices/universes.test.ts` fails when they differ) and refuses an address that resolves to a private one; it sits in
   `guard`'s network, so the kernel's rules hold whatever it resolves. The server finds it by
-  `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; ops, with no `guard`, names its own in `EGRESS_PROXY`. The list also
+  `HTTPS_PROXY` and `NODE_USE_ENV_PROXY`; `EGRESS_PROXY` names another proxy than the guard's. The list also
   holds the mainnet's node, `rpc.gno.land`, where the door reads an account's name (D120).
 - `jarvis` is off unless `JARVIS=on` in `deploy/.env`, the one setting the server's door reads too: off, it
   serves its budgets and answers `off`, reads no key and reaches no gnomcp. It, `jarvis_reader` and the two ways out sit in the profile
@@ -587,10 +587,10 @@ once: it opens jarvis's routes to anyone who can also reach jarvis's network, wh
 A function's explanation is kept 7 days in the server's database, in the table `jarvis_kept`; its key holds the explain prompt's
 version, so a new prompt never serves an old row. To drop rows by hand (a wrong answer, a realm whose source changed on a chain that
 was reset), stop nothing and run, on the host, against the `server` volume's file (its folder is `docker volume inspect -f
-'{{.Mountpoint}}' <project>_server`; `<project>` is the compose project's name, `deploy` by default):
+'{{.Mountpoint}}' <project>_server`; `<project>` is the compose project's name, `gnoworld-demo`, from `name:` in `deploy/compose.yaml`):
 
 ```sh
-DB="$(docker volume inspect -f '{{.Mountpoint}}' deploy_server)/gnoworld.db"
+DB="$(docker volume inspect -f '{{.Mountpoint}}' gnoworld-demo_server)/gnoworld.db"
 sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%';"                          # every explanation
 sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%,\"gnoland-1\",%';"        # one chain
 sqlite3 "$DB" "DELETE FROM jarvis_kept WHERE key LIKE '[\"explain\",%,\"gno.land/r/gov/dao\",%';" # one realm
