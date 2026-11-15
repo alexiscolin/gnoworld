@@ -43,6 +43,8 @@ interface Options {
   lineRooms?: Record<string, string>;
   // The link's word on every line instead: it did not answer.
   unanswered?: boolean;
+  // The id the link's line comes back under; by default the one asked.
+  answeredId?: string;
   muted?: "muted" | "already" | "full";
   // A world's rooms; the default is the one room of REALM's world.
   rooms?: Record<string, string[]>;
@@ -58,6 +60,7 @@ function setup({
   hidden = true,
   lineRooms,
   unanswered = false,
+  answeredId,
   muted = "muted",
   rooms = {},
   linked = [],
@@ -80,7 +83,8 @@ function setup({
         looked.push(`${room} ${msgid}`);
         if (unanswered) return Promise.resolve("unanswered");
         const at = lineRooms === undefined ? room : lineRooms[msgid];
-        return Promise.resolve(at === undefined ? "gone" : { room: at, msgid, time: "t", account: "bob", text: "hi" });
+        const line = { room: at ?? room, msgid: answeredId ?? msgid, time: "t", account: "bob", text: "hi" };
+        return Promise.resolve(at === undefined ? "gone" : line);
       },
       hide: (room, msgid) => {
         sent.push(`hide ${room} ${msgid}`);
@@ -308,6 +312,12 @@ describe("hiding a line", () => {
   it("refuses the pair whole when one of its ids is a line of another room, none sent", async () => {
     const t = setup({ lineRooms: { m1: REALM, m2: "#govdao" } });
     expect((await t.hide({ room: REALM, msgids: ["m1", "m2"] }, { who: "owner" })).status).toBe(404);
+    expect(t.sent).toEqual([]);
+  });
+
+  it("refuses a line the link gives under another id, nothing sent", async () => {
+    const t = setup({ answeredId: "m9" });
+    expect((await t.hide({ room: REALM, msgids: ["m1"] }, { who: "owner" })).status).toBe(404);
     expect(t.sent).toEqual([]);
   });
 
