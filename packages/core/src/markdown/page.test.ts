@@ -1628,6 +1628,15 @@ describe("page: a `$help` link to the page's own realm is an action, never an ad
     expect(read).not.toContain("$help");
   });
 
+  // A block of no words (code, a rule, a form) comes back as it was: only a paragraph's, a list's or an outline's words are walked.
+  test("keeps code, a rule and a form as they are, beside an action", () => {
+    const form = '<gno-form>\n<gno-input name="a" />\n</gno-form>';
+    const source = `\`\`\`\n[v](/r/gov/dao$help&func=F)\n\`\`\`\n\n---\n\n${form}\n\n[v](/r/gov/dao$help&func=F)`;
+    const plain = blocksOf(source, ORIGIN);
+    expect(plain.map(({ type }) => type)).toStrictEqual(["codeBlock", "rule", "form", "paragraph"]);
+    expect(own(source, ORIGIN)).toStrictEqual([...plain.slice(0, 3), paragraph(action("F", [], text("v")))]);
+  });
+
   test("keeps an image a link to its address, never an action", () => {
     expect(own("![v](/r/gov/dao$help&func=F)", ORIGIN)).toStrictEqual([
       paragraph(picture("https://gno.land/r/gov/dao$help&func=F", "v")),
