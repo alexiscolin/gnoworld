@@ -9,10 +9,13 @@ import { z } from "zod";
 import { baseRefusals, guard, json, refuserOf, sessionOf, type Guarded, type Refusals } from "../guard.ts";
 import { limiter } from "../limit.ts";
 import { asOf, type Right } from "../roles/mayModerate.ts";
+import { isLineOf, type Fetched } from "../irc/fetch.ts";
 import { worldOf } from "../rooms/rooms.ts";
 import { visitorOf } from "../visitor.ts";
 
 export interface ModerationOptions {
+  /** One line of a room by its id, as Ergo holds it now (the link's line, as the pins read it). */
+  line: (room: string, msgid: string) => Promise<Fetched>;
   /** The link's REDACT of a line, the words the server's own; false when not sent. */
   hide: (room: string, msgid: string) => boolean;
   /** The mute of an owner: the automatic mute's table and SAMODE, never ending a live mute to make room: "full" instead. */
@@ -48,12 +51,14 @@ const refusals = {
   ...baseRefusals,
   forbidden: ["forbidden", 403],
   refused: ["refused", 400],
+  not_found: ["not_found", 404],
   full: ["full", 409],
   unavailable: ["not_ready", 503],
 } as const satisfies Refusals;
 
 export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
-  const { hide, mute, roomsOf, mayModerate, judge, identityOf, spared, session, origins, proxy, log, now } = options;
+  const { line, hide, mute, roomsOf, mayModerate, judge, identityOf, spared, session, origins, proxy, log, now } =
+    options;
   const requests = limiter({ max: 30, windowMs: 60_000, keys: 100_000 });
   const refuse = refuserOf(log, "moderation_refused", refusals);
   // A POST's account, body and right: the guard has run; the session, the body, the right and the limit come in that order.
@@ -77,6 +82,12 @@ export function moderationRoutes(options: ModerationOptions): Hono<Guarded> {
     const asked = await request(c, Hide);
     if (asked instanceof Response) return asked;
     const { who, right, body } = asked;
+    // The right is for the room of the body, and the link's REDACT takes a line by its id alone: each id must be a line of
+    // that room as Ergo holds it, or an owner of one room would take out the lines of any other.
+    const held = await Promise.all(body.msgids.map((msgid) => line(body.room, msgid)));
+    if (held.includes("unanswered")) return refuse(c, "unavailable", { room: body.room });
+    if (!held.every((got, i) => isLineOf(got, body.room, body.msgids[i] ?? "")))
+      return refuse(c, "not_found", { room: body.room });
     // Every id is sent, whatever the first said: one answer for the pair.
     const sent = body.msgids.map((msgid) => hide(body.room, msgid));
     if (!sent.every(Boolean)) return refuse(c, "unavailable", { room: body.room });

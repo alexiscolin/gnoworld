@@ -39,6 +39,12 @@ const right = (room: string, who: string): Right | false => {
 interface Options {
   mayModerate?: (room: string, who: string, visitor: string) => Promise<Right | false>;
   hidden?: boolean;
+  // Where each line is, by its id: a line not listed is gone. By default every id is a line of the room asked.
+  lineRooms?: Record<string, string>;
+  // The link's word on every line instead: it did not answer.
+  unanswered?: boolean;
+  // The id the link's line comes back under; by default the one asked.
+  answeredId?: string;
   muted?: "muted" | "already" | "full";
   // A world's rooms; the default is the one room of REALM's world.
   rooms?: Record<string, string[]>;
@@ -52,6 +58,9 @@ interface Options {
 function setup({
   mayModerate,
   hidden = true,
+  lineRooms,
+  unanswered = false,
+  answeredId,
   muted = "muted",
   rooms = {},
   linked = [],
@@ -62,6 +71,7 @@ function setup({
     linked.includes(Address.parse(who)) && room.startsWith("#acme") ? { as: "owner", owner: OWNER } : right(room, who);
   const sent: string[] = [];
   const asked: string[] = [];
+  const looked: string[] = [];
   const lines: string[] = [];
   const log = logger("a-pepper-of-forty-characters-0123456789", (line) => lines.push(line));
   const clock = { now: T0 };
@@ -69,6 +79,13 @@ function setup({
   app.route(
     "/api/moderation",
     moderationRoutes({
+      line: (room, msgid) => {
+        looked.push(`${room} ${msgid}`);
+        if (unanswered) return Promise.resolve("unanswered");
+        const at = lineRooms === undefined ? room : lineRooms[msgid];
+        const line = { room: at ?? room, msgid: answeredId ?? msgid, time: "t", account: "bob", text: "hi" };
+        return Promise.resolve(at === undefined ? "gone" : line);
+      },
       hide: (room, msgid) => {
         sent.push(`hide ${room} ${msgid}`);
         return hidden;
@@ -122,6 +139,7 @@ function setup({
   return {
     sent,
     asked,
+    looked,
     clock,
     lines,
     events,
@@ -280,6 +298,45 @@ describe("hiding a line", () => {
   it("refuses the old one-id body, `msgid`", async () => {
     const t = setup();
     expect((await t.hide({ room: REALM, msgid: "m1" }, { who: "owner" })).status).toBe(400);
+  });
+
+  // The attack: the right is checked for the room of the body, so a maker of its own room named another room's line.
+  it("refuses a line of another room, nothing sent: a right in one room is not one over another's lines", async () => {
+    const t = setup({ lineRooms: { govdao1: "#govdao" } });
+    const response = await t.hide({ room: "#earth/mine", msgids: ["govdao1"] }, { who: "maker" });
+    expect([response.status, await response.json()]).toEqual([404, { error: "not_found" }]);
+    expect(t.sent).toEqual([]);
+    expect(t.events("line_hidden")).toEqual([]);
+  });
+
+  it("refuses the pair whole when one of its ids is a line of another room, none sent", async () => {
+    const t = setup({ lineRooms: { m1: REALM, m2: "#govdao" } });
+    expect((await t.hide({ room: REALM, msgids: ["m1", "m2"] }, { who: "owner" })).status).toBe(404);
+    expect(t.sent).toEqual([]);
+  });
+
+  it("refuses a line the link gives under another id, nothing sent", async () => {
+    const t = setup({ answeredId: "m9" });
+    expect((await t.hide({ room: REALM, msgids: ["m1"] }, { who: "owner" })).status).toBe(404);
+    expect(t.sent).toEqual([]);
+  });
+
+  it("refuses a line Ergo no longer holds, nothing sent", async () => {
+    const t = setup({ lineRooms: {} });
+    expect((await t.hide({ room: REALM, msgids: ["m1"] }, { who: "owner" })).status).toBe(404);
+    expect(t.sent).toEqual([]);
+  });
+
+  it("says the server is not ready, nothing sent, when Ergo did not answer for the line", async () => {
+    const t = setup({ unanswered: true });
+    expect((await t.hide({ room: REALM, msgids: ["m1"] }, { who: "owner" })).status).toBe(503);
+    expect(t.sent).toEqual([]);
+  });
+
+  it("reads each line in the room the body names, before any REDACT", async () => {
+    const t = setup();
+    await t.hide({ room: REALM, msgids: ["m1", "m2"] }, { who: "owner" });
+    expect(t.looked).toEqual([`${REALM} m1`, `${REALM} m2`]);
   });
 
   it("says the server is not ready, and logs no hide, when the link did not send it", async () => {

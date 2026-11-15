@@ -5,7 +5,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { PinnedLine } from "@gnoworld/schemas";
 import { z } from "zod";
-import type { Fetched } from "../irc/link.ts";
+import { isLineOf, type Fetched } from "../irc/fetch.ts";
 import { remember } from "../remember.ts";
 
 export const PIN_TABLES = `
@@ -68,7 +68,7 @@ const Ids = z.array(z.object({ msgid: z.string() }));
 // plain message (no CTCP, an /me among them) of an account, with its time.
 function pinFrom(room: string, msgid: string, got: Fetched): PinnedLine | "not_found" | "refused" | "unavailable" {
   if (got === "unanswered") return "unavailable";
-  if (got === "gone" || got.room !== room || got.msgid !== msgid) return "not_found";
+  if (!isLineOf(got, room, msgid)) return "not_found";
   const pin = PinnedLine.safeParse({ id: got.msgid, time: got.time, account: got.account, text: got.text });
   return pin.success && !got.text.startsWith("\u0001") ? pin.data : "refused";
 }

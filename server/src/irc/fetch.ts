@@ -8,6 +8,10 @@ import type { Said } from "./lines.ts";
  * that is no room or id, a wait that ran out): a pin is dropped only for the second. */
 export type Fetched = Said | "gone" | "unanswered";
 
+/** Whether Ergo's answer is that line of that room: an id of another room, read in this one, is none of it (F13332). */
+export const isLineOf = (got: Fetched, room: string, msgid: string): got is Said =>
+  got !== "gone" && got !== "unanswered" && got.room === room && got.msgid === msgid;
+
 // Ergo's own ids are 26 characters; one word of 128 at most, no comma or control character, as the pins' schema says.
 const MSGID = /^[^\s,\0-\x1f\x7f]{1,128}$/;
 // The history requests unanswered at most, those of a question that gave up among them; past it, none is asked.
