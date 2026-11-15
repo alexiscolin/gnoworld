@@ -5,13 +5,13 @@ unset GIT_INDEX_FILE GIT_DIR GIT_WORK_TREE # a `commit -a` hands its own index d
 # A `git merge` hands its hooks GIT_REFLOG_ACTION: left set, it renames every reflog entry, and `checkout -` finds no
 # branch before (pathspec '-').
 unset GIT_REFLOG_ACTION
-# records.sh exports it for the hooks: left set by a caller, it would hide a hook that does not (F144).
+# records.sh exports it for the hooks: left set by a caller, it would hide a hook that does not.
 unset GIT_NO_REPLACE_OBJECTS
-# The hooks run as they do in Claude Code's sandbox, the CI included; the sections `outside` and `installed` run them as in Alexis's
-# shell (F076, F129).
+# The hooks run as they do in Claude Code's sandbox, the CI included; the sections `outside` and `installed` run them as in a person's
+# shell.
 export SANDBOX_RUNTIME="${SANDBOX_RUNTIME:-test_hooks}"
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t
-# No git config from around this file reaches its throwaway repositories (F5012, F5022, section `unsigned`): Alexis's global
+# No git config from around this file reaches its throwaway repositories (section `unsigned`): a person's global
 # one signs every commit with a key the sandbox cannot read; a system file, what `git -c` hands a hook, or a template folder
 # could as well, and GIT_CONFIG would send `git config` out of the repository.
 export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
@@ -46,7 +46,7 @@ case ${ONLY:-,} in
 		ONLY=$s sh "$0" >"$t/$s.out" 2>&1 &
 		pids="$pids $!:$s"
 		# HOOKS_JOBS caps the sections run at once, the oldest settled first: on GitHub's four cores, all eighty at once timed out
-		# the sections bound by time (F13180). Unset, every section starts at once.
+		# the sections bound by time. Unset, every section starts at once.
 		set -- $pids
 		if [ -n "${HOOKS_JOBS:-}" ] && [ "$#" -ge "$HOOKS_JOBS" ]; then
 			settle "$1"
@@ -62,7 +62,7 @@ case ${ONLY:-,} in
 	;;
 esac
 part() { case ",$ONLY," in *",$1,"*) ran=1 && return 0 ;; *) return 1 ;; esac; }
-# The rules the review depends on are required of every root (CR2): the four agents' briefs, each saying the git-index
+# The rules the review depends on are required of every root: the four agents' briefs, each saying the git-index
 # rule, and CLAUDE.md's review card, its item 8; good_rules gives a fixture its own.
 agents="design-reviewer reviewer security-reviewer test-auditor"
 good_rules() {
@@ -176,8 +176,8 @@ assert not [r for r in deny if any(w in r for w in ("dist", "coverage", "reports
 market = s.get("extraKnownMarketplaces", {}).get("gnoverse", {}).get("source", {})
 assert market.get("repo") == "gnoverse/gno-mcp", "a teammate's Claude Code cannot find gnomcp's marketplace"
 PY
-# pnpm runs no pnpmfile (F087), and no script at Alexis's install: one pointed git at the
-# repository's hooks, which a branch can change (F129).
+# pnpm runs no pnpmfile, and no script at a person's install: one pointed git at the
+# repository's hooks, which a branch can change.
 grep -qx 'ignorePnpmfile: true' "$here/../pnpm-workspace.yaml" || fail "pnpm may run a pnpmfile"
 python3 -I - "$here/.." <<'PY' || fail "pnpm install runs a package.json script (F087, F129)"
 import glob, json, os, sys
@@ -189,7 +189,7 @@ for p in [os.path.join(root, "package.json"), *glob.glob(os.path.join(root, "*/p
     assert not run, (p, run)
 PY
 # The coverage's Vitest runs the plain projects: the compiled one (React Compiler's memo cache checks) adds a branch
-# to every component it renders, never all taken, and drowned the app's branches under 85% (F1350). The compiled
+# to every component it renders, never all taken, and drowned the app's branches under 85%. The compiled
 # project's own tests run through `test`, in the commit gate and on GitHub.
 python3 -I - "$here/.." <<'PY' || fail "the coverage's Vitest counts the compiled project's branches, or no gate runs the compiled project (F1350)"
 import json, os, sys
@@ -199,7 +199,7 @@ assert {w for n, w in enumerate(words) if words[n - 1] == "--project"} == {"node
 assert "--project compiled" in scripts["test"], scripts["test"]
 PY
 # The type check builds incrementally, each project into its own .tsbuildinfo of TSC_CACHE (check.sh's; .claude/tmp/tsc when unset): the
-# graph the next run starts from. Eight projects (the link reader the eighth, D13919), eight names, the cache's folder in each.
+# graph the next run starts from. Eight projects, eight names, the cache's folder in each.
 python3 -I - "$here/.." <<'PY' || fail "package.json's typecheck does not build each project incrementally into a file of its own in TSC_CACHE"
 import json, os, sys
 scripts = json.load(open(os.path.join(sys.argv[1], "package.json")))["scripts"]
@@ -208,16 +208,16 @@ assert [c[:3] for c in projects] == [["tsc", "-p", p] for p in ("tsconfig.json",
 assert all(len(c) == 6 and c[3:5] == ["--incremental", "--tsBuildInfoFile"] and c[5].startswith('"${TSC_CACHE:-.claude/tmp/tsc}/') for c in projects), scripts["typecheck"]
 assert len({c[5] for c in projects}) == 8, scripts["typecheck"]
 PY
-# Alexis's install command, wherever it is given, reads the script itself, whatever a replace ref
-# shows (F132's class).
+# a person's install command, wherever it is given, reads the script itself, whatever a replace ref
+# shows.
 if grep -rn --exclude=test_hooks.sh --exclude-dir=review 'git show main:scripts/install_hooks' "$hooks" "$here" "$here/../docs"; then
 	fail "the install command is given without --no-replace-objects"
 fi
-# A section opened in another form would never run in the default run: the runner refuses it (F160).
+# A section opened in another form would never run in the default run: the runner refuses it.
 mkdir -p "$t/form/scripts" "$t/form/.githooks"
 { cat "$0"; printf 'if part Regress2 ; then\nfi\n'; } >"$t/form/scripts/test_hooks.sh"
 ONLY=wiring sh "$t/form/scripts/test_hooks.sh" 2>&1 | grep -q "opened in a form the runner does not list" || fail "a section opened in another form would never run, unnoticed (F160)"
-# No caller hands check.sh an option, which it refuses since D13168.
+# No caller hands check.sh an option, which it refuses .
 callers=$(grep -rnE 'scripts/check\.sh +-' "$hooks" "$here"/*.sh "$here/../.claude" "$here/../package.json" "$here/../.github" 2>/dev/null |
 	grep -vE '^[^:]*/test_hooks\.sh:|^[^:]*:[0-9]+:[[:space:]]*#|^[^:]*/\.claude/tmp/' || :)
 [ -z "$callers" ] || fail "a caller hands check.sh an option it refuses: $callers"
@@ -230,8 +230,8 @@ for step in "run format:check" "named format:check --ignore-unknown" "run lint" 
 	"python3 -I scripts/check_docs.py" "ast.parse(open(f).read(), f) for f in sys.argv[1:]]' scripts/*.py" 'do sh -n "$f"; done'; do
 	grep -v '^[[:space:]]*#' "$gate_file" | grep -qF -- "$step" || fail "check.sh no longer runs: $step"
 done
-# One harness list, records.sh's: the night's harness_mutate judges each file of it, pre-commit refuses each in the sandbox (D241),
-# worktree.sh checks out none other than its own tree's (F5098); every file harness_mutate guards is in it (F112, F114, F124), and
+# One harness list, records.sh's: the night's harness_mutate judges each file of it, pre-commit refuses each in the sandbox,
+# worktree.sh checks out none other than its own tree's; every file harness_mutate guards is in it, and
 # what Claude Code starts, .mcp.json's servers.
 python3 -I - "$gate_file" "$hooks/pre-commit" "$hooks/pre-push" "$hooks/records.sh" "$here/harness_mutate.py" "$here/worktree.sh" "$here/guard.py" "$here/../.claude/settings.json" <<'PY' || fail "a harness list other than records.sh's, or one missing a file harness_mutate guards"
 import ast, fnmatch, json, re, sys
@@ -300,7 +300,7 @@ ignored = lambda f: any(fnmatch.fnmatchcase(f, s[1:]) if s.startswith("/") else 
 copies = [f for f in harnessed if not ignored(f) and any(b.match(".stryker-tmp/sandbox-x/" + f) for b in bans)]
 assert not copies, f"a write ban reaches StrykerJS's copies of {copies}, which a StrykerJS run writes (F111)"
 PY
-# What runs outside the sandbox or at Alexis's hand, and what that runs in turn (an `sh`, `bash`, `zsh`, a dot or `source`, `exec`,
+# What runs outside the sandbox or at a person's hand, and what that runs in turn (an `sh`, `bash`, `zsh`, a dot or `source`, `exec`,
 # `env`, `python`, `python3`, `node` or `sandbox-exec -f` with its options, a path run itself, or a `git show <rev>:<file>` of a
 # script) is a file a shell cannot write (denyWrite) and the file tools cannot either (an Edit deny of the project settings): the
 # next run of one a session wrote runs the session's code. Only shell is read for what it runs; a Python file reached is judged, its
@@ -523,7 +523,7 @@ done
 nv="$t/nodeversion" && mkdir -p "$nv/scripts" && cp "$gate_file" "$nv/scripts/check.sh" && git -C "$nv" init -q
 printf '24.22.0/../../../../evil\n' >"$nv/.node-version"
 env -u SANDBOX_RUNTIME sh "$nv/scripts/check.sh" 2>&1 | grep -q ".node-version must be a version" || fail "check.sh accepted a .node-version that is a path"
-# What left with D13173 stays gone, and no live file of the harness names it: a relic would run, or be read, as if it were there.
+# No live file of the harness names a removed part: a relic would run, or be read, as if it were there.
 for f in .githooks/merge.sh scripts/review_pass.py scripts/code_changed.sh scripts/dream_due.sh docs/review-passes.txt; do
 	[ ! -e "$here/../$f" ] || fail "$f is back, which D13173 removed"
 done
@@ -537,12 +537,12 @@ grep -qF 'glob.glob("**/gnomod.toml"' "$here/mutate.py" || fail "mutate.py no lo
 fi
 
 if part siblings; then
-# No session writes another worktree's closed files (7z, F4890). A relative entry of settings.json guards the session's own tree
+# No session writes another worktree's closed files. A relative entry of settings.json guards the session's own tree
 # alone, and the file tools reach every worktree; hooks run outside the
 # sandbox, and Claude Code reloads a settings file it sees change. So each relative denyWrite entry has its twin under the worktrees'
 # folder (~/Server/gnoworld-wt, beside the main checkout: no command writes there), and each relative Read or Edit deny its twins
-# there and in the main checkout, which the file tools reach from every worktree (F4892); a linked worktree's
-# .git, the file that names git's folder, is closed there too (F150's class, F4891). What a session must write stays open: its own
+# there and in the main checkout, which the file tools reach from every worktree; a linked worktree's
+# .git, the file that names git's folder, is closed there too. What a session must write stays open: its own
 # docs and ledger, the gate's state, git's shared folder, the throwaway trees in $TMPDIR. The rules are read as Claude Code reads
 # them: a Read or Edit rule as a gitignore pattern (its permissions page: * within one segment, ** across), the sandbox's by
 # Claude Code 2.1.318's own source (* is [^/]*, ** is .*, a deny covers its path and all under it, a link resolved).
@@ -737,17 +737,17 @@ for w in own_writes + ["scripts/guard.py", ".claude/settings.json", ".git"]:
         assert not refused(f"{throwaway}/{one(w)}"), f"a twin closes {throwaway}/{w}, a tree outside the worktrees' folder"
 PY
 # The sandbox itself, from this command, when it runs in Claude Code's (SANDBOX_RUNTIME=1) with this tree's own rules: a fresh file
-# under this tree's .githooks is refused, or the session's rules are another folder's (the chief's, whose project is the main
+# under this tree's .githooks is refused, or the session's rules are another folder's (the main
 # checkout; harness_mutate's throwaway tree) and it is SKIPPED, by name, as each part it cannot judge is. Then no write of a sibling
 # may pass: under an existing sibling's .githooks, by /tmp and through a link; its Stop hook's script and its settings.json, which
 # Claude Code reloads, opened to append nothing, and its Stop hook's script hard-linked; in a worktree made after the session
 # started, its .githooks, scripts and .git, and what only an Edit rule closes (.claude's settings, hooks and agents, app's
 # package.json), the folders .claude and app themselves staying open. No read either of the main checkout's secrets or a sibling's,
-# a folder listed or a file opened, nothing of it read (R3); no CLAUDE.md made above the worktrees, and none there already (S4). Only
+# a folder listed or a file opened, nothing of it read; no CLAUDE.md made above the worktrees, and none there already. Only
 # the sandbox's own refusal counts (EPERM), so a probe that cannot run fails. That folder's move out of the worktrees' folder and back
-# is printed, F4893's known gap, never failed on (the red pass, T1, T4 to T6). In the next parts' folder (7w3) no folder is made
-# but by the chief, a sibling's closed files and nested CLAUDE.md are refused, and in this tree no instruction file is made below
-# its root; a folder carrying one moved in is printed, F5325's known gap. This half cannot be mutated (the sandbox's rules are the
+# is printed, a known gap, never failed on. In the next worktrees' folder no folder is made
+# but by the main checkout's session, a sibling's closed files and nested CLAUDE.md are refused, and in this tree no instruction file is made below
+# its root; a folder carrying one moved in is printed, a known gap. This half cannot be mutated (the sandbox's rules are the
 # session's): the static half above is what harness_mutate judges.
 if [ "$SANDBOX_RUNTIME" = 1 ]; then
 	python3 -I - "$here/.." "$t" <<'PY' || fail "the sandbox's probe of the sibling worktrees found a write, or could not run (above): a write means this session's settings lack 7z's or 7w3's rules or predate them; restart it once apply-7w3.sh has run (F4890, F5322)"
@@ -1111,7 +1111,7 @@ assert mutate.verdict("FAIL    ./m1 \t0.00s\n", 1) == "killed"
 PY
 # Then the check, on a planted workspace and the real gno: a package whose every mutant is killed or a known gap passes,
 # printing each verdict and the flips that do not compile; a guard's printed line and verdicts stay what they were before the
-# flips, and its key is that line, which names its file as a flip's does (F5018).
+# flips, and its key is that line, which names its file as a flip's does.
 for w in a b; do
 	mkdir -p "$mu/$w/r/planted" && : >"$mu/$w/gnowork.toml"
 	printf 'module = "gno.land/r/test/planted"\ngno = "0.9"\n' >"$mu/$w/r/planted/gnomod.toml"
@@ -1242,7 +1242,7 @@ $out"
 done
 # No count is printed for a package that drops no flip (r/broken's all compile; planted's one is in GAPS).
 printf '%s\n' "$out" | grep -q "flips do not compile" && fail "mutate.py dropped a flip GAPS lists: $out"
-# The command it runs failing (F116): a gno whose every mutant fails to compile cannot pass the check by dropping them all,
+# The command it runs failing: a gno whose every mutant fails to compile cannot pass the check by dropping them all,
 # as a comparison or a logic flip always compiles; a gno that stops before a mutant's result, fails the untouched copy, or
 # times out on a mutant that loops forever (gno's -timeout ends the whole run, and no GAPS entry can hold such a flip),
 # fails it. Like gno, the fake exits 1 when a package fails, which each of its modes has.
@@ -1284,13 +1284,13 @@ out=$(checked a GNO="$mu/fakegno" FAKE=timeout) && fail "mutate.py passed when g
 printf '%s\n' "$out" | grep -qxF "FAIL  no result: $P: return 1 [1 -> 0] (expected killed)" || fail "mutate.py did not fail the mutant gno timed out on: $out"
 printf '%s\n' "$out" | grep -q "^FAIL  gno test timed out: " || fail "mutate.py did not say gno timed out, so a mutant loops forever: $out"
 # A gno that never ends, its own timer passed or never started (it counts from after the copies are loaded), is stopped
-# GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale (F5084).
+# GRACE seconds past its limit and fails by name, never as a traceback, with no verdict and no GAPS key called stale.
 # The constants are made small so it is stopped in 2 s.
 printf '#!/bin/sh\nexec sleep 30\n' >"$mu/hanggno" && chmod +x "$mu/hanggno"
 out=$(cd "$mu/a" && GNO="$mu/hanggno" python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a gno that never ended: $out"
 [ "$out" = "FAIL  gno test did not end 1 s past its own time limit of 1 s, and was stopped: in r/planted, no mutant has a verdict" ] ||
 	fail "mutate.py did not fail by name, alone, a gno that never ended (F5084): $out"
-# The run's time limit grows with its copies, 1.5 s each and 60 s at least (F5051, D30): a busy machine slows a big package's
+# The run's time limit grows with its copies, 1.5 s each and 60 s at least: a busy machine slows a big package's
 # one run without failing it, and a slow mutant takes the time the fast ones leave. 40 copies have 60 s, 41 have 62 (61.5
 # rounded up), 80 have 120, each package in one run.
 mkdir -p "$mu/d/r/many" && : >"$mu/d/gnowork.toml" && printf 'module = "gno.land/r/test/many"\ngno = "0.9"\n' >"$mu/d/r/many/gnomod.toml"
@@ -1303,7 +1303,7 @@ for copies in 40:60 41:62 80:120; do
 	[ "$(grep -c '' "$mu/fakegno.runs")" = 1 ] && [ "$(cut -d' ' -f1-3 "$mu/fakegno.runs")" = "test -timeout ${copies#*:}s" ] ||
 		fail "mutate.py's ${copies%:*} copies are not one run of ${copies#*:} s: $(cut -d' ' -f1-3 "$mu/fakegno.runs")"
 done
-# One GAPS key excuses one mutant of one file (F5014, F5018): a gap given for r/one's untested guard never excuses the same
+# One GAPS key excuses one mutant of one file: a gap given for r/one's untested guard never excuses the same
 # line in r/two, and the same guard line twice in one file cannot hide both behind one gap.
 for p in one two; do
 	mkdir -p "$mu/c/r/$p" && printf 'module = "gno.land/r/test/%s"\ngno = "0.9"\n' "$p" >"$mu/c/r/$p/gnomod.toml"
@@ -1316,14 +1316,14 @@ gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one"}'
 out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let a gap given for r/one excuse the same guard in r/two: $out"
 printf '%s\n' "$out" | grep -qxF "ok    survives: r/one/one.gno: if bad {  (known gap: one gap, given for r/one)" || fail "mutate.py did not keep r/one's gap: $out"
 [ "$(printf '%s\n' "$out" | grep -cxF "FAIL  survives: r/two/two.gno: if bad { (expected killed)")" = 2 ] || fail "mutate.py did not fail r/two's two untested guards: $out"
-# A survivor GAPS does not list is judged again alone (F5050, below): r/two's two, each in a run of its own, never r/one's gap.
+# A survivor GAPS does not list is judged again alone: r/two's two, each in a run of its own, never r/one's gap.
 [ "$(grep -c '' "$mu/fakegno.runs")" = 4 ] && [ "$(grep -c ' \./m0$' "$mu/fakegno.runs")" = 2 ] ||
 	fail "mutate.py did not judge again alone each survivor GAPS does not list, and only those: $(cat "$mu/fakegno.runs")"
 gapped "$mu/check.py" '{"r/one/one.gno: if bad {": "one gap, given for r/one", "r/two/two.gno: if bad {": "one gap, for two guards"}'
 out=$(checked c GNO="$mu/fakegno" FAKE=survive) && fail "mutate.py let one GAPS key excuse two guards of one file: $out"
 printf '%s\n' "$out" | grep -qxF "FAIL  GAPS key names 2 mutants, one only: r/two/two.gno: if bad {" || fail "mutate.py did not name the key that excuses two mutants: $out"
 # In the run of every copy, a test in the package runs against its own copy, but a filetest against the first copy of its
-# module in the workspace, the untouched m0 (F5050). So a mutant that run lets survive, GAPS not listing it, is judged again
+# module in the workspace, the untouched m0. So a mutant that run lets survive, GAPS not listing it, is judged again
 # alone, in a workspace of its own copy: the guard of a package with no unit test, which only its filetest catches, is
 # killed. A gap is not judged again, and a run alone that never ends is said by name.
 mkdir -p "$mu/f/r/only" && : >"$mu/f/gnowork.toml" && printf 'module = "gno.land/r/test/only"\ngno = "0.9"\n' >"$mu/f/r/only/gnomod.toml"
@@ -1339,17 +1339,17 @@ gapped "$mu/check.py" '{}'
 out=$(cd "$mu/f" && GNO="$mu/fakegno" FAKE=hangalone python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); import check; check.LEAST, check.SECONDS_A_COPY, check.GRACE = 1, 0.01, 1; sys.exit(check.main())' "$mu" 2>&1) && fail "mutate.py passed a survivor whose run alone never ended: $out"
 [ "$out" = "FAIL  stopped: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not name the survivor whose run alone never ended: $out"
 # gno's output may hold bytes that are no UTF-8, a failing test printing them: mutate.py reads them as U+FFFD and judges on,
-# never stopping on a traceback (F5062).
+# never stopping on a traceback.
 out=$(checked f GNO="$mu/fakegno" FAKE=binary) && fail "mutate.py passed the survivor of a run whose output is no UTF-8: $out"
 [ "$out" = "FAIL  survives: r/only/only.gno: if bad { (expected killed)" ] || fail "mutate.py did not read gno's output that is no UTF-8 (F5062): $out"
-# The tool it needs missing (F125): no gno, or none where GNO points, fails the check.
+# The tool it needs missing: no gno, or none where GNO points, fails the check.
 out=$(checked a -u GNO) && fail "mutate.py passed with no GNO: $out"
 out=$(checked a GNO="$mu/no-such-gno") && fail "mutate.py passed with no gno at GNO: $out"
 fi
 
 if part commit_msg; then
 # commit-msg: a conventional subject of 72 characters at most, or git's own merge and revert
-# subjects; no attribution line. It runs as installed, beside its rule files (F129).
+# subjects; no attribution line. It runs as installed, beside its rule files.
 cm="$t/commit-msg"
 mkdir "$cm"
 cp "$hooks/commit-msg" "$cm/"
@@ -1373,12 +1373,12 @@ Generated by Claude Code" || fail "'Generated by Claude' was accepted"
 refused "fix: x
 
 Assisted-by: Claude" || fail "'Assisted-by' was accepted"
-# A session's link is an attribution too (F591): refused as a line, kept inside a sentence.
+# A session's link is an attribution too: refused as a line, kept inside a sentence.
 refused "fix: x
 
 Claude-Session: https://claude.ai/code/session_0123" || fail "a Claude-Session line was accepted (F591)"
 refused "docs: the hook refuses Claude-Session lines" && fail "a mention of Claude-Session inside a sentence was refused"
-# gitleaks reads files, not messages: a message holds no home folder either (F090).
+# gitleaks reads files, not messages: a message holds no home folder either.
 refused "fix: x
 
 Seen in /Us""ers/alice/notes." || fail "a message naming a home folder was accepted"
@@ -1410,12 +1410,12 @@ refused "feat: $(printf 'a%.0s' $(seq 1 66))" && fail "a 72-character subject wa
 # Characters, not bytes, whatever the locale: 66 characters, 78 bytes.
 printf '%s\n' "docs(review): café résumé naïve déjà vu — été, hiver, février, déc" >"$t/msg"
 (cd "$cmr" && LC_ALL=C "$cm/commit-msg" "$t/msg") 2>/dev/null || fail "commit-msg counted bytes, not characters, under the C locale"
-# A python3 that cannot count is no count (F5080): `[ "" -gt 72 ]` errs, and an 86-character subject passed.
+# A python3 that cannot count is no count: `[ "" -gt 72 ]` errs, and an 86-character subject passed.
 mkdir -p "$t/badpy" && printf '#!/bin/sh\nexit 1\n' >"$t/badpy/python3" && chmod +x "$t/badpy/python3"
 printf 'feat: %s\n' "$(printf 'a%.0s' $(seq 1 80))" >"$t/msg"
 (cd "$cmr" && env -u SANDBOX_RUNTIME PATH="$t/badpy:$PATH" "$cm/commit-msg" "$t/msg") 2>"$t/err" && fail "commit-msg passed a long subject python3 could not count (F5080)"
 grep -qF "python3 cannot count the subject's characters" "$t/err" || fail "commit-msg did not say python3 cannot count: $(cat "$t/err")"
-# A hidden character in the message (F5085): in the sandbox, the staged scripts/hidden.py reads each message as it is
+# A hidden character in the message: in the sandbox, the staged scripts/hidden.py reads each message as it is
 # written, a merge's and an amend's too, as pre-commit runs the staged scripts there; an emoji's look selector passes. With
 # no staged rule, or a python3 that fails, nothing proves the message clean: it refuses.
 refused "$(printf 'test: x\n\nRemoved-test: a\342\200\256b - why')" || fail "commit-msg accepted a hidden character in the message (F5085)"
@@ -1435,7 +1435,7 @@ grep -qF "scripts/hidden.py could not read it" "$t/err" || fail "commit-msg did 
 fi
 
 if part unsigned; then
-# No git config from around this file reaches its throwaway repositories (F5012, F5022): Alexis's global one signs every
+# No git config from around this file reaches its throwaway repositories: a person's global one signs every
 # commit with a key Claude Code's sandbox cannot read, which failed 36 sections there. Planted: one config whose signer always
 # fails, reaching git by each way there is: a global or a system file, a HOME's or an XDG folder's, what `git -c` hands a hook
 # in either of its forms, and a template folder, which `git init` copies into each repository; and GIT_CONFIG, which sends
@@ -1473,18 +1473,17 @@ out=$(env HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" GIT_CONFIG_GLOBAL="$us/signs
 	ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) || fail "a throwaway repository took the git config around test_hooks.sh (F5012, F5022): $out"
 [ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of the git config around test_hooks.sh (F5012, F5022)"
 [ ! -e "$us/elsewhere" ] || fail "a throwaway repository's git config went to the GIT_CONFIG file around test_hooks.sh (F5022)"
-# Then with neither file variable around it, as in Alexis's shell: a value this file sets but does not export would never reach
-# git, and HOME's .gitconfig would sign again (F5021).
+# Then with neither file variable around it, as in a person's shell: a value this file sets but does not export would never reach
+# git, and HOME's .gitconfig would sign again.
 out=$(env -u GIT_CONFIG_GLOBAL -u GIT_CONFIG_SYSTEM HOME="$us/home" XDG_CONFIG_HOME="$us/xdg" ONLY=commits sh "$us/scripts/test_hooks.sh" 2>&1) ||
 	fail "a throwaway repository took the git config of HOME around test_hooks.sh, which signs (F5021): $out"
 [ ! -e "$us/signed" ] || fail "a throwaway repository called the signer of HOME's git config (F5021)"
 fi
 
 if part stop_gate; then
-# stop_gate.sh, the Stop hook, only reaps since D13173: it runs outside the sandbox, so it runs nothing a sandboxed command could
-# write, and it never blocks a turn, whatever changed and whatever GNOWORLD_STRICT says (the turn's gate left).
-# It stops what runs of this project left behind, at the end of every turn (Alexis, 2026-10-29: six StrykerJS workers whose run was
-# killed spun at 75% of a core each for 31 hours, a vitest for 6 days; 18 reaped from 2026-10-29 to 11-13). The sandbox refuses ps;
+# stop_gate.sh, the Stop hook, only reaps: it runs outside the sandbox, so it runs nothing a sandboxed command could
+# write, and it never blocks a turn, whatever changed and whatever GNOWORLD_STRICT says.
+# It stops what runs of this project left behind, at the end of every turn (orphaned StrykerJS workers and test runs spin on for hours or days). The sandbox refuses ps;
 # this hook runs outside it. A process of this project names a folder `gnoworld/` (any case: the checkout, a session's scratchpad)
 # in its command, run by node. It is stopped when its parent is gone (PPID 1) and it is 30 minutes old or more (a session's server
 # started a moment ago is spared), 2 hours while a gate runs (sh, bash or ./ running scripts/check.sh, with a parent); or when it is a
@@ -1532,7 +1531,7 @@ fakeps() { # $1: its exit status; then table's argument
 }
 reap() { printf '{"stop_hook_active":true}' | HOME="$t/home" PATH="$t/fakeps:$PATH" CLAUDE_PROJECT_DIR="$r" sh "$gate" 2>/dev/null || fail "stop_gate failed while stopping what runs left behind"; }
 reaped="$t/home/Library/Logs/gnoworld-reaped.log"
-# What the sandbox can plant, the hook never writes through (security-S1): a link at the log's old place, to a file outside it.
+# What the sandbox can plant, the hook never writes through: a link planted at the log's path, to a file outside it.
 printf 'mine\n' >"$t/victim" && ln -s "$t/victim" "$r/.claude/tmp/reaped.log"
 fakeps 0 "bash /srv/gnoworld/scripts/check.sh" && reap
 for z in "$z2" "$z7" "$z11" "$z12"; do gone "$z" || fail "stop_gate left $(grep "^ *$z " "$t/fakeps/table")"; done
@@ -1571,8 +1570,8 @@ rm "$d/.claude/rules/x.md"
 git -C "$d" init -q && printf '.claude/tmp/\n' >"$d/.gitignore" && mkdir -p "$d/.claude/tmp/copy"
 printf 'Run `scripts/gone.sh`.\n' >"$d/.claude/tmp/copy/x.md"
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a doc in a folder git ignores"
-# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways, on every commit, prose alone included (F4928;
-# workflow_branch held it, which a commit of the table alone never ran: 7y's c160019e). A row added without the workflow, an entry no
+# docs/REVIEW.md's tier-1 rows and the workflow's TIER1 name the same paths, both ways, on every commit, prose alone included.
+# A row added without the workflow, an entry no
 # row names, and no TIER1 to compare with each fail; a row of another tier, the harness's folders and the realms' two do not count.
 v="$t/tiers-root" && mkdir -p "$v/docs" "$v/.claude/workflows" && : >"$v/CLAUDE.md" && good_rules "$v"
 { printf 'const TIER1 = [\n'; for p in scripts .githooks .github .claude gno; do printf '  "%s/",\n' "$p"; done
@@ -1591,7 +1590,7 @@ printf '%s' "$out" | grep -qF "TIER1 holds src/j/" || fail "check_docs did not n
 cp "$t/tiers.md" "$v/docs/REVIEW.md" && rm "$v/.claude/workflows/branch.js"
 out=$(tiers) && fail "check_docs accepted a tier-1 table with no TIER1 to compare with"
 # The table as speeds.py reads it, a row spelled `|1|` too; the harness's own folders required in TIER1; an entry in a comment no
-# entry (7w2's second lot, S2-10, S2-9, S2-12).
+# entry.
 cp "$t/branch.js" "$v/.claude/workflows/branch.js" && printf '|1| The relay (`src/relay/`) |\n' >>"$v/docs/REVIEW.md"
 out=$(tiers) && fail "check_docs accepted a tier-1 row spelled |1|, which speeds.py reads as tier 1"
 cp "$t/tiers.md" "$v/docs/REVIEW.md" && grep -v '"scripts/"' "$t/branch.js" >"$v/.claude/workflows/branch.js"
@@ -1600,7 +1599,7 @@ printf '%s' "$out" | grep -qF "TIER1 lacks scripts/" || fail "check_docs did not
 { printf 'const TIER1 = [\n  /*\n  "src/k/",\n  */\n'; tail -n +2 "$t/branch.js"; } >"$v/.claude/workflows/branch.js" && printf '| 1 | The k (`src/k/`) |\n' >>"$v/docs/REVIEW.md"
 out=$(tiers) && fail "check_docs took an entry in a comment of TIER1 for an entry"
 cp "$t/branch.js" "$v/.claude/workflows/branch.js" && cp "$t/tiers.md" "$v/docs/REVIEW.md"
-# The coverage globs held at 100% are docs/REVIEW.md's tier-1 TypeScript paths, never a hand copy (F5543): a tier-1 path under app/, server/
+# The coverage globs held at 100% are docs/REVIEW.md's tier-1 TypeScript paths, never a hand copy: a tier-1 path under app/, server/
 # or packages/ no glob holds, and a glob that matches no file (a rename leaves it measuring nothing), each fail and are named.
 c="$t/cov-root" && mkdir -p "$c/docs" "$c/.claude/workflows" "$c/server/src/q" && : >"$c/CLAUDE.md" && good_rules "$c"
 printf 'export const q = 1;\n' >"$c/server/src/q/q.ts" && printf 'export const r = 1;\n' >"$c/server/src/r.ts"
@@ -1620,7 +1619,7 @@ printf '%s' "$out" | grep -qF "server/src/q/" || fail "check_docs did not name t
 printf 'thresholds: {\n  lines: 85,\n  "{server/src/q}/**": { lines: 99.9 },\n  "{server/src/r.ts}": { lines: 100 },\n}\n' >"$c/vitest.config.ts"
 out=$(cov) && fail "check_docs took a glob under 100% for one that holds a tier-1 folder (F5543)"
 # The rules the review depends on, which no other check reads: each of the four agents' briefs says the git-index rule,
-# in its full sentence, and the review card keeps its item 8 (G12); a missing file, folder or sentence fails (CR2).
+# in its full sentence, and the review card keeps its item 8; a missing file, folder or sentence fails.
 r="$t/rules-root" && mkdir -p "$r" && : >"$r/CLAUDE.md" && good_rules "$r"
 rules() { python3 -I "$docs" "$r" 2>&1; }
 rules >/dev/null || fail "check_docs refused four agents with the git-index rule and a review card with its item 8"
@@ -1668,12 +1667,12 @@ row "| F001 | 2026-10-17 | a | x.py:1 | a bug | intended | — |" && fail "check
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | moot | — |" && fail "check_docs accepted a moot finding with no reason"
 row "| F001 | 2026-10-17 | a | x.py:1 | a | claimed | — |
 | F001 | 2026-10-17 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted an id used twice"
-# A four-digit id is a row too: the ledger passed F1000 on, unread (F1212).
+# A four-digit id is a row too, never passed over.
 row "| F1001 | 2026-10-27 | a | x.py:1 | a bug | fixed | \`0badc0de\` |" && fail "check_docs did not read a row whose id has four digits"
 row "| F1001 | 2026-10-27 | a | x.py:1 | a | claimed | — |
 | F1001 | 2026-10-27 | b | y.py:1 | b | claimed | — |" && fail "check_docs accepted a four-digit id used twice"
 row "| F1001 | 2026-10-27 | a | x.py:1 | a bug | fixed | \`$sha\`, its test |" || fail "check_docs refused a fixed finding of four digits naming its commit"
-# Every commit a row cites is one, whatever its status (slice 3 read a fix's first only); outside a repository,
+# Every commit a row cites is one, whatever its status; outside a repository,
 # a copy of the tracked files, none can be checked.
 blob=$(git -C "$d" rev-parse --short HEAD:scripts/real.sh) && full=$(git -C "$d" rev-parse HEAD)
 row "| F001 | 2026-10-17 | a | x.py:1 | a bug | rejected | as \`$sha\` shows |" || fail "check_docs refused a rejected finding citing a commit of the repo"
@@ -1704,10 +1703,10 @@ touch "$d/.stryker-tmp/x/app/src/orphan.test.ts" "$d/app/src/routes/__snapshots_
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs read a folder git ignores, or a snapshot, as tests"
 rm -r "$d/.stryker-tmp" "$d/app/src/routes/__snapshots__" "$d/app/src/routes/home.test.data.ts"
 rm -r "$d/app" "$d/packages"
-# The alerts the server logs are the runbook's list of alerts, which ops matches, both ways (slice 3's plan, 3n;
-# F646): a test's ignored, each quoted in the list's own bullet, a name quoted elsewhere not counting.
+# The alerts the server logs are the runbook's list of alerts, which ops matches, both ways:
+# a test's ignored, each quoted in the list's own bullet, a name quoted elsewhere not counting.
 mkdir -p "$d/server/src"
-# The known limits slice 3's plan has the runbook say (its section 8; 3M-19), each by a phrase of its line; list
+# The known limits the runbook must state (its section 8), each by a phrase of its line; list
 # leaves out the one its third argument names.
 known="evaded with a new address
 a connection already open lasts until it drops
@@ -1748,13 +1747,13 @@ list '`rows_near_cap`, and disk_full unquoted'
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert the list names unquoted"
 list '`disk_full`, `rows_near_cap`, `gone_now`'
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted a listed alert the server no longer logs"
-# Each spelling Prettier and people write (F637): across lines, the name after another key, single quotes.
+# Each spelling Prettier and people write: across lines, the name after another key, single quotes.
 printf 'log(\n  "alert",\n  { room, error: "split_name" },\n);\nlog('"'"'alert'"'"', { error: '"'"'quoted_name'"'"' });\n' >"$d/server/src/job.ts"
 list '`split_name`, `quoted_name`'
 python3 -I "$docs" "$d" >/dev/null 2>&1 || fail "check_docs refused alerts written across lines or in single quotes"
 list '`quoted_name`'
 python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert written across lines the list leaves out"
-# An alert it cannot read is refused rather than passed over (F646): a name in a variable, the event as a
+# An alert it cannot read is refused rather than passed over: a name in a variable, the event as a
 # template or a constant.
 list none
 for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log(`alert`, { error: "tpl_name" });' \
@@ -1763,7 +1762,7 @@ for call in 'const which = "hidden_name";\nlog("alert", { error: which });' 'log
 	python3 -I "$docs" "$d" >/dev/null 2>&1 && fail "check_docs accepted an alert it cannot read: $call"
 done
 rm -r "$d/server" "$d/docs/OPERATIONS.md"
-# A hidden character (F5053), a format character of Unicode's (Cf: a bidi control, a zero-width one, a BOM, a tag), in any
+# A hidden character, a format character of Unicode's (Cf: a bidi control, a zero-width one, a BOM, a tag), in any
 # file git tracks or would, prose and the prototype's docs included, fails, named by its file, line, column and code point;
 # no comment allows it. Written as an escape it passes, as an accent or an emoji does; an image is no text, and what git
 # ignores is not read. printf writes each from its UTF-8 bytes, so this file holds none.
@@ -1772,7 +1771,7 @@ git -C "$h" init -q && printf 'ignored/\nnode_modules/\n' >"$h/.gitignore"
 hidden() { python3 -I "$docs" "$h" 2>&1; }
 printf 'const x = "caf\303\251 \360\237\230\200";\n' >"$h/src/fine.ts"
 printf 'const x = "\\u202e";\n' >"$h/src/escaped.ts"
-# An image is known by its suffix and its format's first bytes, as each real one starts (F5082).
+# An image is known by its suffix and its format's first bytes, as each real one starts.
 printf '\211PNG\r\n\032\n\342\200\256' >"$h/shot.png" && printf '\377\330\377\342\200\256' >"$h/shot.jpg"
 # A file deleted from the work tree but still in the index is not read.
 printf 'gone\n' >"$h/gone.txt" && git -C "$h" add gone.txt && git -C "$h" commit -qm gone && rm "$h/gone.txt"
@@ -1783,7 +1782,7 @@ hidden >/dev/null || fail "check_docs refused a root whose characters all show (
 : >"$h/src/locked.ts" && chmod 000 "$h/src/locked.ts"
 hidden >/dev/null && fail "check_docs passed a file it cannot read"
 chmod 644 "$h/src/locked.ts"
-# What is hidden is a table, not the Python's Unicode (F5083): Default_Ignorable_Code_Point, Cf, Zl and Zp as the pinned
+# What is hidden is a table, not the Python's Unicode: Default_Ignorable_Code_Point, Cf, Zl and Zp as the pinned
 # Node's ICU gives them, range by range, and the version hidden.py names.
 node -e '
 const set = /^[\p{Default_Ignorable_Code_Point}\p{Cf}\p{Zl}\p{Zp}]$/u;
@@ -1800,7 +1799,7 @@ $(cat "$h/diff")"
 rm "$h/table.node" "$h/table.py"
 # Each end of the table's ranges and a point inside some (an unassigned tag, a variation selector) after a letter, and none
 # of their neighbours. U+FE0E and U+FE0F, which pick an emoji's look, pass right after a character that shows and is no
-# ASCII, or in a keycap; after a letter, alone, twice in a row, or any other selector, they hide bits (F5086).
+# ASCII, or in a keycap; after a letter, alone, twice in a row, or any other selector, they hide bits.
 python3 -I - "$h/table.txt" "$h/sel.txt" "$h/table.want" "$here" <<'PY'
 import sys
 sys.dont_write_bytecode = True
@@ -1833,7 +1832,7 @@ printf '\330\234 a mark\n' >"$h/notes.txt"
 printf 'Read this.\363\240\201\201\n' >"$h/.claude/rules/x.md"
 printf '# co\302\255de\n' >"$h/a.py"
 # What is no UTF-8 text is refused whole, from its first byte that is a NUL or no UTF-8: its characters cannot be read, as
-# UTF-16 writes U+202E as `2E 20` (F5088), and a binary cannot write one as an escape (F5082). So is a text named as an
+# UTF-16 writes U+202E as `2E 20`, and a binary cannot write one as an escape. So is a text named as an
 # image, which Vite's `?raw` reads.
 printf '\000\342\200\256\n' >"$h/blob.txt"
 printf 'caf\351 \342\200\256\n' >"$h/latin.txt"
@@ -1874,7 +1873,7 @@ printf '%s\n' "$out" | grep -q '^  font\.woff2: no UTF-8 text, from its byte [0-
 printf '%s\n' "$out" | grep -E '^  (table|sel|start)\.txt:' | sed 's/^\(  [^ ]* U+[0-9A-F]*\) .*/\1/' | LC_ALL=C sort >"$h/table.got"
 diff "$h/table.want" "$h/table.got" >"$h/diff" || fail "check_docs's hidden characters, one a line, against the wanted ones (<):
 $(cat "$h/diff")"
-# The tool it needs missing (F125), or the command it runs failing (F116): with no git, or a git that fails, it reads every
+# The tool it needs missing, or the command it runs failing: with no git, or a git that fails, it reads every
 # file of the folder but git's own and the installed packages', and still refuses.
 mkdir -p "$t/nogit" "$t/badgit" && printf '#!/bin/sh\nexit 1\n' >"$t/badgit/git" && chmod +x "$t/badgit/git"
 printf '\342\200\256\n' >"$h/.git/planted"
@@ -1886,7 +1885,7 @@ for path in "$t/nogit" "$t/badgit:$PATH"; do
 	printf '%s\n' "$out" | grep -qF "node_modules/" && fail "check_docs, with PATH=$path, read the installed packages: $out"
 done
 # A commit message is text the repository keeps too, which scripts parse (a `Removed-test:` line shown as one name, read as
-# another): each message since the branch left origin/main is read, named by its commit (F5079); a message main holds
+# another): each message since the branch left origin/main is read, named by its commit; a message main holds
 # already is not, nor any with no origin/main to compare with. With no git, or a git that fails, nothing proves the messages
 # clean: it fails, never takes the failure for a branch with no origin/main.
 m="$t/messages" && mkdir -p "$m" && good_rules "$m" && git -C "$m" init -q && git -C "$m" add -A
@@ -1896,7 +1895,7 @@ messages >/dev/null || fail "check_docs read a message main holds already"
 git -C "$m" commit -q --allow-empty -m "$(printf 'test: the branch\n\nRemoved-test: a\342\200\256b - why')"
 out=$(messages) && fail "check_docs accepted a commit message holding a hidden character: $out"
 printf '%s\n' "$out" | grep -qxF "  commit $(git -C "$m" rev-parse --short HEAD):3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the message's hidden character: $out"
-# Every message of the branch, not its newest only (F5081): a clean commit on top hides nothing.
+# Every message of the branch, not its newest only: a clean commit on top hides nothing.
 older=$(git -C "$m" rev-parse --short HEAD) && git -C "$m" commit -q --allow-empty -m "test: a clean top"
 out=$(messages) && fail "check_docs accepted a hidden character in a message under a clean one (F5081): $out"
 printf '%s\n' "$out" | grep -qxF "  commit $older:3:16: U+202E RIGHT-TO-LEFT OVERRIDE" || fail "check_docs did not name the older message's hidden character: $out"
@@ -1906,10 +1905,10 @@ out=$(PATH="$t/badgit:$PATH" "$py" -I "$docs" "$m" 2>&1) && fail "check_docs pas
 printf '%s\n' "$out" | grep -qF "git cannot read the branch's commit messages" || fail "check_docs did not say a git that fails cannot read the messages: $out"
 git -C "$m" update-ref -d refs/remotes/origin/main
 messages >/dev/null || fail "check_docs read messages with no origin/main to say where the branch starts"
-# What a commit takes is the index's copy (F5087): a hidden character staged under a clean work tree's copy is named, and
+# What a commit takes is the index's copy: a hidden character staged under a clean work tree's copy is named, and
 # one in the work tree's copy under a clean staged one, as `(work tree)`. A `.gitattributes` encoding keeps the work tree in
-# another text than the one git stores (F5088): UTF-7 writes U+202E as `+IC4-`, plain ASCII. A name and a link's target are
-# text too, a link deleted or pointing nowhere included (F5089); a gitlink (a submodule) holds none.
+# another text than the one git stores: UTF-7 writes U+202E as `+IC4-`, plain ASCII. A name and a link's target are
+# text too, a link deleted or pointing nowhere included; a gitlink (a submodule) holds none.
 x="$t/staged" && mkdir -p "$x/docs" && good_rules "$x" && git -C "$x" init -q
 staged() { python3 -I "$docs" "$x" 2>&1; }
 printf 'a\342\200\256b\n' >"$x/docs/s.md" && git -C "$x" add docs/s.md && printf 'ab\n' >"$x/docs/s.md"
@@ -1938,7 +1937,7 @@ printf '%s\n' "$out" | grep -qF "git cannot read the index" || fail "check_docs 
 fi
 
 if part instructions; then
-# No instruction file below a tree's root reaches a commit (7w3, S2-3): Claude Code loads a subfolder's CLAUDE.md and CLAUDE.local.md,
+# No instruction file below a tree's root reaches a commit: Claude Code loads a subfolder's CLAUDE.md and CLAUDE.local.md,
 # an AGENTS.md where no CLAUDE.md stands, and a subfolder's .claude/rules and .claude/skills, once it reads a file there (its memory
 # and skills pages), so one committed there instructs every session reading that folder, past the root's closed CLAUDE.md. check_docs,
 # which every commit runs, refuses each, by its name as macOS's disk reads it (case folded), a link counted by its name whether it
@@ -1946,7 +1945,7 @@ if part instructions; then
 # AGENTS.md (read in place of CLAUDE.md) too. The root's CLAUDE.md, .claude/CLAUDE.md, rules and skills stay, and what git ignores
 # (the gate's state, StrykerJS's copies) is not read.
 docs="$here"/check_docs.py
-# git's global and system excludes are this machine's, not the case's (the red pass's T6): a home of the section's own.
+# git's global and system excludes are this machine's, not the case's: a home of the section's own.
 mkdir -p "$t/nested-home/.config"
 docs_at() { env HOME="$t/nested-home" XDG_CONFIG_HOME="$t/nested-home/.config" GIT_CONFIG_NOSYSTEM=1 python3 -I "$docs" "$1" 2>&1; }
 n="$t/nested" && mkdir -p "$n/.claude/rules" "$n/.claude/skills/s" "$n/.claude/agents" && : >"$n/CLAUDE.md" && good_rules "$n"
@@ -1954,7 +1953,7 @@ git -C "$n" init -q && printf '.claude/tmp/\n.stryker-tmp/\n' >"$n/.gitignore"
 printf 'Rules.\n' >"$n/.claude/rules/x.md" && printf 'A skill.\n' >"$n/.claude/skills/s/SKILL.md" && printf 'More.\n' >"$n/.claude/CLAUDE.md"
 mkdir -p "$n/.claude/tmp/copy" "$n/.stryker-tmp/sandbox-1/app" && printf 'x\n' >"$n/.claude/tmp/copy/CLAUDE.md" && printf 'x\n' >"$n/.stryker-tmp/sandbox-1/app/CLAUDE.md"
 out=$(docs_at "$n") || fail "check_docs refused the root's own instructions, or read what git ignores: $out"
-# A name that only holds one of theirs is no instruction file (the red pass's T4).
+# A name that only holds one of theirs is no instruction file.
 mkdir -p "$n/docs" "$n/app/src" "$n/app/.claude-x" && for p in docs/notes-CLAUDE.md docs/CLAUDE.md.orig app/src/agents.ts app/.claude-x/a.md; do printf 'x\n' >"$n/$p"; done
 out=$(docs_at "$n") || fail "check_docs refused a name that only holds an instruction file's: $out"
 rm -r "${n:?}/docs" "${n:?}/app"
@@ -1979,7 +1978,7 @@ for p in app/CLAUDE.md app/.claude; do
 	docs_at "$n" >/dev/null && fail "check_docs accepted a link at $p that leads to a folder (S2-3)"
 	rm "$n/$p"
 done
-# Every name the settings close below the root, check_docs refuses at a commit too (the review's R7): one added to the denies alone
+# Every name the settings close below the root, check_docs refuses at a commit too: one added to the denies alone
 # stops here, the two lists read from the files themselves.
 python3 -I -c 'import json, sys; print("\n".join(w[3:] for w in json.load(open(sys.argv[1]))["sandbox"]["filesystem"]["denyWrite"] if w.startswith("**/")))' \
 	"$here/../.claude/settings.json" >"$t/nested-kin"
@@ -1990,7 +1989,7 @@ while IFS= read -r kin; do
 	docs_at "$n" >/dev/null && fail "check_docs accepted $p, which the settings close below the root (R7)"
 	rm -r "${n:?}/app"
 done <"$t/nested-kin"
-# What the commit holds (the red pass's T3): one staged and on disk, one committed, one the index holds and the disk lost.
+# What the commit holds: one staged and on disk, one committed, one the index holds and the disk lost.
 mkdir -p "$n/app" && printf 'x\n' >"$n/app/CLAUDE.md" && git -C "$n" add app/CLAUDE.md
 out=$(docs_at "$n") && fail "check_docs accepted an instruction file staged"
 printf '%s' "$out" | grep -qF "app/CLAUDE.md" || fail "check_docs did not name the staged app/CLAUDE.md: $out"
@@ -1998,13 +1997,13 @@ git -C "$n" commit -qm nested && docs_at "$n" >/dev/null && fail "check_docs acc
 rm "$n/app/CLAUDE.md" && docs_at "$n" >/dev/null && fail "check_docs accepted an instruction file the index holds and the disk lost"
 git -C "$n" rm -q --cached app/CLAUDE.md
 out=$(docs_at "$n") || fail "check_docs refused a tree with no instruction file below its root, after one left the index: $out"
-# What git ignores is not read, a CLAUDE.local.md as the repository's .gitignore ignores it at any depth; one added by force is (T6).
+# What git ignores is not read, a CLAUDE.local.md as the repository's .gitignore ignores it at any depth; one added by force is.
 printf 'CLAUDE.local.md\n' >>"$n/.gitignore" && printf 'x\n' >"$n/app/CLAUDE.local.md"
 out=$(docs_at "$n") || fail "check_docs read a CLAUDE.local.md git ignores, which no commit holds: $out"
 git -C "$n" add -f app/CLAUDE.local.md && docs_at "$n" >/dev/null && fail "check_docs accepted a CLAUDE.local.md git ignores, added by force"
 git -C "$n" rm -q --cached app/CLAUDE.local.md
 # Outside a repository (a copy that holds the tracked files alone): the same, every file read but node_modules',
-# at any depth, which the copy borrows (an installed package's AGENTS.md is no committed file; T4).
+# at any depth, which the copy borrows (an installed package's AGENTS.md is no committed file).
 c="$t/nested-copy" && mkdir -p "$c/node_modules/@cosmjs/math" "$c/app/node_modules/p" "$c/packages/core/node_modules/p" && : >"$c/CLAUDE.md" && good_rules "$c"
 printf 'x\n' >"$c/node_modules/@cosmjs/math/AGENTS.md" && printf 'x\n' >"$c/app/node_modules/p/AGENTS.md" && printf 'x\n' >"$c/packages/core/node_modules/p/CLAUDE.md"
 out=$(docs_at "$c") || fail "check_docs read a package's instruction file in a copy's borrowed node_modules: $out"
@@ -2015,7 +2014,7 @@ fi
 
 if part harness_mutate; then
 # harness_mutate --dry: each mutant still finds its text, each guard file has its sections and
-# each section exists; the full gate saw a stale one 35 minutes in (3n-b). On a copy whose worktree stops it and
+# each section exists; the full gate saw a stale one 35 minutes in. On a copy whose worktree stops it and
 # whose run() leaves a mark, since a fall-through to the real run takes hours.
 m="$t/mutate" && mkdir -p "$m"
 dry() { # $1: a mutant planted at the end of its list, $2: an entry planted in SECTIONS
@@ -2068,7 +2067,7 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'	fi' \
 	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
-# probe.py's block y reads k.txt (a mutant of k.txt is a probe block's, G5); ONLY names the blocks to run, none for all.
+# probe.py's block y reads k.txt (a mutant of k.txt is a probe block's); ONLY names the blocks to run, none for all.
 printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
 printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt"
 cp "$here/harness_mutate.py" "$hs/repo/"
@@ -2175,11 +2174,11 @@ for suite in hooks probe; do
 	[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind after a failed control"
 done
 # One mutant to judge needs one tree, and the control of the one suite it belongs to: no more worktrees than mutants, no
-# control of a suite none of the mutants runs (CR9, C4; 4 trees and 8 suite runs took 601 s at load 30 to 50 for one mutant).
+# control of a suite none of the mutants runs (4 trees and 8 suite runs took 601 s at load 30 to 50 for one mutant).
 out=$(shards 12) && fail "harness_mutate passed with surviving mutants on 12 shards: $out"
 [ "$(count made)" = 7 ] || fail "harness_mutate made $(count made) worktrees for 7 mutants and 12 shards: $out"
 [ "$(count controls)" = 7 ] && [ "$(count probe_controls)" = 0 ] || fail "harness_mutate ran $(count controls) hooks and $(count probe_controls) probe controls for 7 hooks mutants"
-# The run judges every mutant: none to judge is a harness that lost its mutants, not a green run (F1431, H2).
+# The run judges every mutant: none to judge is a harness that lost its mutants, not a green run.
 out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge: $out"
 printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
 [ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
@@ -2190,7 +2189,7 @@ for args in "--changed HEAD" "--changed" "--dry --changed x" "--bogus"; do
 	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
 done
 # The controls run two at a time, never every tree's suites at once: beside a coverage run, eight at once
-# overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
+# overran their 600 s limit where they take 96 s alone. Each control still runs, in every tree; each fake control
 # waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
 CONTROLS_SLOW=1 shards 4 >/dev/null || : # the planted survivors fail the run; only its controls are read here
 [ "$(count controls)" = 4 ] || fail "harness_mutate did not run the control in each of its 4 trees: $(count controls)"
@@ -2214,8 +2213,8 @@ done
 # verdict after it (the suite of the survivor goes on to pass; four mutants had run, never the seven).
 out=$(INTR=ppid GROUPED=1 shards 1) && fail "harness_mutate passed after an interrupt: $out"
 [ "$(count ran)" = 4 ] || fail "harness_mutate went on judging after its interrupt: $(count ran) of 7 mutants ran"
-# Each suite is a process group of its own now (F3382, so that a hung one is stopped with its children and nothing else): a signal to the
-# run no longer reaches them with it, so the run stops them itself. A suite that would run 30 s more is dead when the run is, on an INT
+# Each suite is a process group of its own (so that a hung one is stopped with its children and nothing else): a signal to the
+# run does not reach them with it, so the run stops them itself. A suite that would run 30 s more is dead when the run is, on an INT
 # (well before it could end by itself) and on a TERM, which would otherwise end the run alone and leave its suites behind.
 for sig in ppidlong termlong; do
 	rm -f "$hs/suite.pid"
@@ -2225,7 +2224,7 @@ for sig in ppidlong termlong; do
 	[ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for the suite to end by itself after a $sig signal"
 	for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a suite running after a $sig signal"; }; done
 done
-# The same in the controls, run two at a time before any mutant (round 1, reviewer-1-3): the run waited for the two in flight to end by
+# The same in the controls, run two at a time before any mutant: the run waited for the two in flight to end by
 # themselves, up to the limit of 600 s, with check.sh gone and its merge lock free. An INT or a TERM stops them; so does a control that fails
 # or hangs, for the one beside it.
 for sig in INT TERM; do
@@ -2246,8 +2245,8 @@ for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2
 fi
 
 if part migrations; then
-# check_migrations: a migration main has keeps its text and its place, since the server applies them by index
-# (packages/service/src/db.ts); F466's, edited in place, never reached a file made before. It reads the working tree, as
+# check_migrations: a migration main has keeps its text and its place, because the server applies them by index
+# (packages/service/src/db.ts); one edited in place never reaches a file made before. It reads the working tree, as
 # the gate does; what it cannot read is refused, never passed over.
 mig="$here"/check_migrations.py
 r="$t/migrations"
@@ -2295,7 +2294,7 @@ printf 'export const ROOM_TABLES = `\n  CREATE TABLE \\`r\\` (x TEXT) STRICT;\n`
 git -C "$r" add -A && git -C "$r" commit -qm escaped && escaped=$(git -C "$r" rev-parse HEAD)
 printf 'export const ROOM_TABLES = `\n  CREATE TABLE \\`r\\` (y TEXT) STRICT;\n`;\n' >"$r/server/src/ROOM_TABLES.ts"
 refuses "a migration with an escape, changed past it" ROOM_TABLES "$escaped"
-# The list main.ts imports from server/src/migrations.ts (SV2), read there; main's own may still be in main.ts.
+# The list main.ts imports from server/src/migrations.ts, read there; main's own may still be in main.ts.
 table ROOM_TABLES
 held() { printf 'export const migrations: readonly string[] = [\n  %s,\n];\n' "$1" >"$r/server/src/migrations.ts"; }
 named() { printf 'import { migrations } from "%s";\nconst db = openDatabase(config.database, migrations);\n' "${1:-./migrations.ts}" >"$r/server/src/main.ts"; }
@@ -2311,7 +2310,7 @@ if part patch_coverage; then
 # patch_coverage: the share of changed lines that the tests run, like a pull request's
 # patch coverage, from Vitest's JSON report and git's diff.
 patch="$here"/patch_coverage.py
-c="$t/tests/cov" # under a folder named tests: only paths inside the repository count (F098)
+c="$t/tests/cov" # under a folder named tests: only paths inside the repository count
 mkdir -p "$c/src" "$c/coverage"
 git -C "$c" init -q && printf 'one\n' >"$c/src/a.ts" && git -C "$c" add -A && git -C "$c" commit -qm base
 printf 'one\ntwo\nthree\nfour\n' >"$c/src/a.ts"
@@ -2331,7 +2330,7 @@ cover 0 && fail "patch_coverage accepted a patch at 67%, under 85%"
 printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
 cover 1 && fail "patch_coverage accepted a changed file the coverage report does not measure"
 # A tier-1 file, by docs/REVIEW.md as this script's own tree holds it (the base's on GitHub), is refused unmeasured under the
-# default coverage too; with no table to read, every file is tier 1 (D13166's security review).
+# default coverage too; with no table to read, every file is tier 1.
 all=
 lone="$t/lone" && mkdir -p "$lone/scripts" && cp "$patch" "$here/repo_files.py" "$here/speeds.py" "$lone/scripts/"
 (cd "$c" && COVERAGE_ALL= python3 -I "$lone/scripts/patch_coverage.py" HEAD 85 >/dev/null 2>&1) &&
@@ -2343,7 +2342,7 @@ git -C "$c" rm -q --cached server/src/login/t.ts && rm "$c/server/src/login/t.ts
 printf 'export const b = 1;\n' >"$c/src/b.ts" && git -C "$c" add src/b.ts
 unset all
 # The default coverage measures tier 1 alone, whose paths check_docs.py holds in its include: a file it leaves out is not refused,
-# and the floor still holds beside it (F13179).
+# and the floor still holds beside it.
 all=
 cover 1 || fail "patch_coverage refused a changed file the default coverage leaves out, which measures tier 1 alone (F13179)"
 cover 0 && fail "patch_coverage accepted a patch at 67% beside a file the default coverage leaves out"
@@ -2366,7 +2365,7 @@ cover 1 || fail "patch_coverage asked coverage of the server's entry, which runs
 git -C "$c" rm -rq --cached server && rm "$c/server/src/main.ts"
 unmeasured server/src/app.ts
 rm -r "$c/server"
-# jarvis's entry runs in child processes as the server's (10i), and evals/ is installed and tested apart (10j); jarvis's
+# jarvis's entry runs in child processes as the server's, and evals/ is installed and tested apart; jarvis's
 # other files are measured.
 mkdir -p "$c/jarvis/src" "$c/evals"
 printf 'x\n' >"$c/jarvis/src/main.ts" && git -C "$c" add jarvis
@@ -2403,8 +2402,8 @@ printf '%s\n' "$out" | grep -q Traceback && fail "patch_coverage ended on a trac
 fi
 
 if part pre_push; then
-# pre-push (D13173): every push is scanned for secrets, its whole history, by the scan installed beside the hook; main takes pull
-# requests alone (D13165), so a push of it is refused, its deletion too. Nothing of the working tree runs (F076). A fake gitleaks
+# pre-push: every push is scanned for secrets, its whole history, by the scan installed beside the hook; main takes pull
+# requests alone, so a push of it is refused, its deletion too. Nothing of the working tree runs. A fake gitleaks
 # and a throwaway repository stand in; $ph holds the hooks as installed.
 w="$t/push"
 ph="$t/push-hooks" && mkdir -p "$ph" && cp "$hooks"/* "$ph/" && secrets_into "$ph/"
@@ -2420,7 +2419,7 @@ hook() { (cd "$w" && PATH="$t/pushbin:$PATH" sh "$ph/pre-push" origin url >/dev/
 push() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "${3:-$head}" "$1" "${2:-$zero}" | hook; }
 push slice-1a || fail "pre-push refused a work branch with no secret"
 grep -q scanned "$w/leaks.log" || fail "pre-push did not scan a work branch for secrets"
-# In a subshell: sh keeps a variable set before a function call, which made every later push fail (F127).
+# In a subshell: sh keeps a variable set before a function call, which made every later push fail.
 (LEAKS=1 push slice-1a) && fail "pre-push let a work branch through with a secret found"
 : >"$w/leaks.log"
 printf 'refs/tags/v1 %s refs/tags/v1 %s\n' "$head" "$zero" | hook || fail "pre-push refused a tag with no secret"
@@ -2439,21 +2438,21 @@ printf 'refs/heads/x %s refs/heads/x %s\nrefs/heads/main %s refs/heads/main %s\n
 printf 'refs/heads/main %s refs/heads/main %s\n' "$head" "$zero" | (cd "$w" && PATH="$t/pushbin:$PATH" sh "$ph/pre-push" origin url 2>&1 >/dev/null) |
 	grep -qF "main takes pull requests alone" || fail "pre-push refused main without saying why"
 # main is the remote's ref: a branch pushed as main (`git push origin feature:main`, `HEAD:main`) is refused, a local main pushed as
-# another branch, or a tag named main, is not (the red pass, M2).
+# another branch, or a tag named main, is not.
 printf 'refs/heads/feature %s refs/heads/main %s\n' "$head" "$zero" | hook && fail "pre-push let a branch through pushed as main (D13165)"
 printf 'refs/heads/main %s refs/heads/other %s\n' "$head" "$zero" | hook || fail "pre-push refused a local main pushed as another branch"
 printf 'refs/tags/main %s refs/tags/main %s\n' "$head" "$zero" | hook || fail "pre-push refused a tag named main"
-# A branch's deletion sends nothing to scan, and is no refusal: a scan that would find a secret is not run (L1).
+# A branch's deletion sends nothing to scan, and is no refusal: a scan that would find a secret is not run.
 printf 'refs/heads/old %s refs/heads/old %s\n' "$zero" "$head" | hook || fail "pre-push refused a branch's deletion"
 (printf 'refs/heads/old %s refs/heads/old %s\n' "$zero" "$head" | LEAKS=1 hook) || fail "pre-push scanned a push that sends nothing"
-# A tree with uncommitted or untracked files pushes its commits as they are: no gate reads the tree since D13173 (L3).
+# A tree with uncommitted or untracked files pushes its commits as they are: no gate reads the tree .
 echo dirty >>"$w/a.ts" && touch "$w/stray.ts"
 push slice-1a || fail "pre-push refused a push from a tree with uncommitted files"
 git -C "$w" checkout -q -- a.ts && rm "$w/stray.ts"
 # With no gitleaks to run, nothing leaves unscanned.
 printf 'refs/heads/slice-1a %s refs/heads/slice-1a %s\n' "$head" "$zero" | (cd "$w" && PATH=/usr/bin:/bin sh "$ph/pre-push" origin url >/dev/null 2>&1) &&
 	fail "pre-push let a branch through with no gitleaks to scan it"
-# With no scan beside the hook, nothing leaves unscanned (F113).
+# With no scan beside the hook, nothing leaves unscanned.
 mv "$ph/scan_secrets.sh" "$t/push-scan.away"
 push slice-1a && fail "pre-push let a branch through with no scan_secrets.sh beside it"
 mv "$t/push-scan.away" "$ph/scan_secrets.sh"
@@ -2461,7 +2460,7 @@ mv "$t/push-scan.away" "$ph/scan_secrets.sh"
 fi
 
 if part pre_commit; then
-# pre-commit (D13173): no secret enters a commit, prose included; in Claude Code's sandbox no harness file either (D241), the staged
+# pre-commit: no secret enters a commit, prose included; in Claude Code's sandbox no harness file either, the staged
 # files are formatted (Prettier) and the docs checked (check_docs.py). It runs from git's hooks folder, beside the scripts it runs, as
 # installed: here $hk, a copy of the hooks and the secret scan.
 c2="$t/precommit"
@@ -2493,18 +2492,18 @@ git -C "$c2" commit -qm a && fresh
 echo unformatted >>"$c2/a.ts" && git -C "$c2" add a.ts
 precommit && fail "pre-commit let an unformatted file through"
 fresh
-# A name with a space reaches Prettier whole (an accent is refused: F164, below); a deleted file is not handed.
+# A name with a space reaches Prettier whole (an accent is refused, below); a deleted file is not handed.
 mkdir -p "$c2/sub dir" && echo x >"$c2/my file.ts" && echo x >"$c2/sub dir/a b.ts" && git -C "$c2" add "my file.ts" "sub dir/a b.ts" && git -C "$c2" rm -q a.ts
 precommit || fail "pre-commit refused files named with a space"
 [ "$(prettier_handed | LC_ALL=C sort | paste -sd'|' -)" = "my file.ts|sub dir/a b.ts" ] ||
 	fail "pre-commit did not hand Prettier the staged names whole, deletions left out: $(prettier_handed)"
 fresh
-# A staged link is handed to no Prettier, which refuses a link named on its line (the combined review, R3).
+# A staged link is handed to no Prettier, which refuses a link named on its line.
 fresh && ln -s a.ts "$c2/l.ts" && git -C "$c2" add l.ts && echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
 precommit || fail "pre-commit refused a staged link, handing it to Prettier"
 [ "$(prettier_handed)" = a.ts ] || fail "pre-commit handed Prettier a link: $(prettier_handed)"
 fresh
-# Prettier runs as package.json's format:check says, the one place its command is written (R7): a flag added there reaches it; a
+# Prettier runs as package.json's format:check says, the one place its command is written: a flag added there reaches it; a
 # command that does not end on the whole repository, or a package.json node cannot read, refuses.
 cp "$c2/package.json" "$t/package.json"
 printf '{"scripts": {"format:check": "prettier --check --log-level warn --no-config ."}}\n' >"$c2/package.json" && echo more >>"$c2/a.ts" && git -C "$c2" add a.ts
@@ -2530,7 +2529,7 @@ said "stage them as they are on disk" || fail "pre-commit checked a staged file 
 fresh && mkdir -p "$c2/sub dir" && echo staged >"$c2/sub dir/a b.ts" && git -C "$c2" add "sub dir/a b.ts" && echo unformatted >>"$c2/sub dir/a b.ts"
 said "stage them as they are on disk" || fail "pre-commit checked a staged file named with a space whose disk copy differs"
 # A staged name is a name, never a pathspec: one that reads as git's magic (`:(exclude)a.ts`, `*.ts`) took a.ts out of the
-# comparison, and a.ts, staged unformatted under a formatted disk copy, passed (the red pass, M3).
+# comparison, and a.ts, staged unformatted under a formatted disk copy, passed.
 for name in ':(exclude)a.ts' '*.ts'; do
 	fresh && echo unformatted >>"$c2/a.ts" && git -C "$c2" add a.ts && git -C "$c2" show HEAD:a.ts >"$c2/a.ts"
 	echo x >"$c2/$name" && git -C "$c2" --literal-pathspecs add -- "$name"
@@ -2557,9 +2556,9 @@ rm -f "$t/prettier-ran"
 (cd "$c2" && PATH="$t/nomktemp:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed though mktemp failed"
 [ ! -e "$t/prettier-ran" ] || fail "pre-commit ran Prettier after mktemp failed"
 fresh
-# The docs are checked, a docs-only commit too: a hidden character stops it (F5053); a check_docs.py that fails, whatever the docs.
+# The docs are checked, a docs-only commit too: a hidden character stops it; a check_docs.py that fails, whatever the docs.
 # check_docs reads the tree as check.sh's floor does, untracked files included: an untracked doc with a hidden character stops a
-# commit too (the red pass, M5: what check.sh would refuse, the commit does); a doc naming a file the commit deletes, as well (M6).
+# commit too (what check.sh would refuse, the commit does); a doc naming a file the commit deletes, as well.
 echo prose >"$c2/docs/a.md" && git -C "$c2" add docs/a.md
 precommit || fail "pre-commit stopped a docs-only commit with no secret"
 printf 'a\342\200\256b\n' >"$c2/docs/hidden.md" && git -C "$c2" add docs/hidden.md
@@ -2576,7 +2575,7 @@ cp "$c2/scripts/check_docs.py" "$t/check_docs.py" && printf 'raise SystemExit(3)
 precommit && fail "pre-commit passed with a check_docs.py that fails"
 cp "$t/check_docs.py" "$c2/scripts/check_docs.py"
 # A secret in what is staged stops the commit, prose included; with no gitleaks to run, or no scan beside the hook, nothing passes
-# unscanned (F113, F116).
+# unscanned.
 printf 'aws = "%s"\n' "$key" >"$c2/docs/leak.md" && git -C "$c2" add docs/leak.md
 said "leaks found: 1" || fail "pre-commit let a key in prose through"
 fresh && printf 'aws = "%s"\n' "$key" >"$c2/leak.ts" && git -C "$c2" add leak.ts
@@ -2587,8 +2586,8 @@ mv "$hk/scan_secrets.sh" "$t/scan_secrets.away"
 precommit && fail "pre-commit passed with no scan_secrets.sh beside it"
 mv "$t/scan_secrets.away" "$hk/scan_secrets.sh"
 fresh
-# A staged harness file is committed in Alexis's Terminal alone, never in the sandbox (D241): every file of .githooks/records.sh's list,
-# by name and as it is on disk, its name in any case (F151), with a space or an accent; a path that only looks like one is not.
+# A staged harness file is committed in a person's Terminal alone, never in the sandbox: every file of .githooks/records.sh's list,
+# by name and as it is on disk, its name in any case, with a space or an accent; a path that only looks like one is not.
 harnessed() { said "is committed in Alexis's Terminal alone"; }
 for f in 'scripts/my file.sh' Scripts/tool.sh .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
 	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
@@ -2600,7 +2599,7 @@ for f in 'scripts/my file.sh' Scripts/tool.sh .githooks/pre-push .github/workflo
 done
 fresh
 # A variable that makes git read pathspecs otherwise leaves the list whole: GIT_NOGLOB_PATHSPECS made its globs literal names,
-# GIT_GLOB_PATHSPECS kept their * from crossing a folder, and a commit with either took a harness file (9j's review).
+# GIT_GLOB_PATHSPECS kept their * from crossing a folder, and a commit with either took a harness file.
 for v in GIT_NOGLOB_PATHSPECS GIT_GLOB_PATHSPECS; do
 	for f in packages/core/package.json app/vite.config.ts; do
 		mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add "$f"
@@ -2610,7 +2609,7 @@ for v in GIT_NOGLOB_PATHSPECS GIT_GLOB_PATHSPECS; do
 	done
 done
 # A name the index holds in another case than the disk's (git update-index takes any), which this case-blind disk reads as the
-# harness file it names (F151).
+# harness file it names.
 blob=$(echo planted | git -C "$c2" hash-object -w --stdin)
 # (Scripts/guard.py, .Claude/settings.json and claude.md are equal but for case to a tracked path: the fold check refuses them before the list is
 # read, as the cases above.)
@@ -2629,7 +2628,7 @@ fresh
 printf '# being edited\n' >>"$c2/scripts/check_docs.py" && echo again >>"$c2/a.ts" && git -C "$c2" add a.ts
 precommit || fail "pre-commit refused a commit for a harness edit it does not hold"
 fresh
-# A letter the disk folds (ſ is s on APFS) names a harness file no list can match (F164): a staged path with a non-ASCII
+# A letter the disk folds (ſ is s on APFS) names a harness file no list can match: a staged path with a non-ASCII
 # character is refused too. A harness file deleted or moved out is a harness change, and so is one a merge brings.
 fold=$(printf '\305\277') && printf 'x\n' >"$c2/${fold}cripts-tool.sh" && git -C "$c2" add -- "${fold}cripts-tool.sh"
 said "non-ASCII" || fail "pre-commit let a staged path with a folded letter through in the sandbox (F164)"
@@ -2658,13 +2657,13 @@ fresh && echo x >"$c2/scripts/merged.sh" && git -C "$c2" add scripts/merged.sh
 (cd "$c2" && sh "$hk/pre-merge-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
 	fail "pre-merge-commit let a merge bring a harness file in the sandbox (D241)"
 fresh
-# SANDBOX_RUNTIME unset is no way out (D241): the sandbox cannot open the hook for writing, whatever its environment says, and
-# Alexis's Terminal can; with SANDBOX_RUNTIME set, a hook that can be written is still the sandbox.
+# SANDBOX_RUNTIME unset is no way out: the sandbox cannot open the hook for writing, whatever its environment says, and
+# a person's Terminal can; with SANDBOX_RUNTIME set, a hook that can be written is still the sandbox.
 echo x >"$c2/scripts/tool.sh" && git -C "$c2" add scripts/tool.sh
 outside_() { (cd "$c2" && env -u SANDBOX_RUNTIME "$@" sh "$hk/pre-commit" 2>&1 >/dev/null); }
 chmod a-w "$hk/pre-commit"
 outside_ | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit took a sandboxed commit of a harness file once SANDBOX_RUNTIME was unset (D241)"
-# Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence (F13177).
+# Under dash, Linux's sh, a redirection a special builtin cannot open ends the whole shell: the hook ended in silence.
 command -v dash >/dev/null || fail "no dash to run pre-commit under, as Linux's sh does (F13177)"
 (cd "$c2" && env -u SANDBOX_RUNTIME dash "$hk/pre-commit" 2>&1 >/dev/null) | grep -qF "is committed in Alexis's Terminal alone" ||
 	fail "pre-commit under dash, Linux's sh, ended in silence when it could not write itself (F13177)"
@@ -2672,7 +2671,7 @@ chmod u+w "$hk/pre-commit"
 outside_ >/dev/null || fail "pre-commit refused a harness file in Alexis's Terminal"
 outside_ SANDBOX_RUNTIME=1 | grep -qF "is committed in Alexis's Terminal alone" || fail "pre-commit let a harness file through with SANDBOX_RUNTIME set, its hook writable (D241)"
 fresh
-# Through git itself, which hands its hooks GIT_INDEX_FILE for `commit -a` and `commit -- <path>` (the red pass, M8): the same
+# Through git itself, which hands its hooks GIT_INDEX_FILE for `commit -a` and `commit -- <path>`: the same
 # checks, on what that commit holds; an empty commit checks nothing and passes.
 gc() { (cd "$c2" && git -c core.hooksPath="$hk" commit -q "$@" >/dev/null 2>&1); }
 fresh && echo more >>"$c2/a.ts"
@@ -2680,7 +2679,7 @@ gc -am "fix: a formatted change" || fail "git commit -a, through the hooks, refu
 echo unformatted >>"$c2/a.ts"
 gc -am "fix: an unformatted change" && fail "git commit -a, through the hooks, let an unformatted file through"
 # `commit -- a.ts` checks what that commit holds, git's own index for it: an unformatted b.ts staged beside it stops nothing, and an
-# unformatted a.ts stops it (the combined review, R5).
+# unformatted a.ts stops it.
 git -C "$c2" checkout -q -- a.ts && echo unformatted >"$c2/b.ts" && git -C "$c2" add b.ts && echo more >>"$c2/a.ts"
 gc -m "fix: a path alone" -- a.ts || fail "git commit -- <path>, through the hooks, refused a formatted path for a file staged beside it"
 [ "$(git -C "$c2" show --name-only --format= HEAD)" = a.ts ] || fail "git commit -- <path> committed other than its path"
@@ -2702,14 +2701,14 @@ echo x >>"$c2/a.ts" && git -C "$c2" add a.ts
 	fail "pre-commit went on when git could not list the staged harness files (D241)"
 (cd "$c2" && PATH="$t/diffless:$PATH" sh "$hk/pre-commit" >/dev/null 2>&1) && fail "pre-commit passed when git could list nothing staged"
 fresh
-# A caller's object folder or common folder answers no read of the hook's (F4923's class), unset: on git 2.53 no case plants one
+# A caller's object folder or common folder answers no read of the hook's, unset: on git 2.53 no case plants one
 # that changes what it reads (a loose object's hash is checked, and HEAD resolves from the worktree's own refs), so harness_mutate
 # lists both mutants as gaps. A replace ref, which a sandboxed command can write under .git/refs, does change it.
 c3="$t/precommit-store"
 mkdir -p "$c3" && git -C "$c3" init -q -b main && echo x >"$c3/a.ts" && git -C "$c3" add a.ts && git -C "$c3" commit -qm base
 mkdir -p "$c3/scripts" && echo 'echo planted' >"$c3/scripts/tool.sh" && git -C "$c3" add scripts/tool.sh
 head=$(git -C "$c3" rev-parse HEAD) && staged_tree=$(git -C "$c3" write-tree)
-# A replace ref showing HEAD as a commit that already holds the staged harness file would hide it from the list (F132's class).
+# A replace ref showing HEAD as a commit that already holds the staged harness file would hide it from the list.
 fake=$(git -C "$c3" commit-tree -m planted "$staged_tree")
 [ -n "$(git -C "$c3" diff --cached --name-only)" ] || fail "the replace ref's case staged nothing"
 git -C "$c3" replace "$head" "$fake"
@@ -2720,9 +2719,9 @@ git -C "$c3" replace -d "$head" >/dev/null
 fi
 
 if part outside; then
-# Outside the sandbox, in Alexis's shell, a hook runs only its own lines, git, gitleaks and the scripts installed beside it, never
-# the working tree's (F076): the secret scan at a commit, a merge and a push, and main refused at a push; no harness refusal (D241
-# is the sandbox's), no Prettier, no docs check (D13173).
+# Outside the sandbox, in a person's shell, a hook runs only its own lines, git, gitleaks and the scripts installed beside it, never
+# the working tree's: the secret scan at a commit, a merge and a push, and main refused at a push; no harness refusal (that
+# is the sandbox's), no Prettier, no docs check.
 o="$t/outside"
 mkdir -p "$o/scripts" "$o/.githooks" "$o/docs" "$o/node_modules/.bin"
 cp "$hooks"/* "$here/install_hooks.sh" "$o/.githooks/" && secrets_into "$o/.githooks/"
@@ -2731,7 +2730,7 @@ for f in scripts/check.sh scripts/borrow_node_modules.sh node_modules/.bin/prett
 for f in check_docs.py repo_files.py hidden.py; do printf 'open("%s/ran", "w")\n' "$o" >"$o/scripts/$f"; done
 printf 'ran\nnode_modules\n' >"$o/.gitignore" && echo one >"$o/a.ts"
 git -C "$o" init -q && git -C "$o" add -A && git -C "$o" commit -qm base
-# Installed as Alexis does; the section runs each hook itself, so git, pointed at an empty folder, runs none at a commit.
+# Installed as a person does; the section runs each hook itself, so git, pointed at an empty folder, runs none at a commit.
 (cd "$o" && sh .githooks/install_hooks.sh HEAD >/dev/null)
 mkdir "$t/no-hooks" && git -C "$o" config core.hooksPath "$t/no-hooks"
 out() { (cd "$o" && env -u SANDBOX_RUNTIME "$@" >/dev/null 2>&1); }
@@ -2752,7 +2751,7 @@ printf 'aws = "%s"\n' "$key" >"$o/docs/leak.md" && git -C "$o" add docs/leak.md
 out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a key in prose through"
 git -C "$o" rm -qf --cached docs/leak.md && rm "$o/docs/leak.md"
 # A path with a byte outside ASCII, which this disk may read as another (packageſ/ as packages/, a workspace pnpm installs), is
-# refused in Alexis's shell too, a merge's included: GitHub's merge refuses it on its side (the security review of 3b, M1, F164).
+# refused in a person's shell too, a merge's included: GitHub's merge refuses it on its side.
 fold=$(printf '\305\277') && mkdir -p "$o/package$fold" && printf '{}\n' >"$o/package$fold/x.json" && git -C "$o" add -- "package$fold/x.json"
 (cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-commit 2>&1 >/dev/null) | grep -qF "non-ASCII" || fail "pre-commit outside the sandbox took a path this disk may fold (F164)"
 (cd "$o" && env -u SANDBOX_RUNTIME sh .githooks/pre-merge-commit 2>&1 >/dev/null) | grep -qF "non-ASCII" || fail "pre-merge-commit outside the sandbox took a path this disk may fold (F164)"
@@ -2769,7 +2768,7 @@ out sh .githooks/pre-commit && fail "pre-commit outside the sandbox let a home f
 git -C "$o" rm -qf --cached private.py && rm "$o/private.py"
 printf 'fix: x\n\nSeen in /Us''ers/alice/notes\n' >"$t/outside-msg"
 out sh .githooks/commit-msg "$t/outside-msg" && fail "commit-msg outside the sandbox let a home folder's path through"
-# Outside, commit-msg runs no scripts/hidden.py, staged or not: the branch's messages are read at the next gate (F5085).
+# Outside, commit-msg runs no scripts/hidden.py, staged or not: the branch's messages are read at the next gate.
 printf 'docs: x\n' >"$t/outside-msg"
 out sh .githooks/commit-msg "$t/outside-msg" || fail "commit-msg outside the sandbox refused a clean message"
 git -C "$o" commit -qm two
@@ -2786,7 +2785,7 @@ fi
 
 if part installed; then
 # The hooks live in .git/hooks, where no merge, checkout or sandboxed command writes, installed
-# from main with the scripts they run: no branch brings its own into Alexis's shell (F129).
+# from main with the scripts they run: no branch brings its own into a person's shell.
 i="$t/installed"
 mkdir -p "$i/scripts" "$i/.githooks" "$i/docs"
 cp "$hooks"/* "$i/.githooks/"
@@ -2833,7 +2832,7 @@ for h in $hook_names; do
 	git -C "$i" commit -qm "no $h"
 done
 git -C "$i" checkout -q main
-# As in Alexis's shell, with, as everywhere in this file, no git config of his own (no hooks path): from the root, or from a folder below it.
+# As in a person's shell, with, as everywhere in this file, no git config of its own (no hooks path): from the root, or from a folder below it.
 alexis() { env -u SANDBOX_RUNTIME GIT_MERGE_AUTOEDIT=no "$@"; }
 in_i() { (cd "$i" && alexis "$@"); }
 in_docs() { (cd "$i/docs" && alexis "$@"); }
@@ -2850,7 +2849,7 @@ installed() {
 }
 install() { in_i sh scripts/install_hooks.sh "$@" >/dev/null 2>&1; }
 reinstall() { install && installed || fail "install_hooks.sh did not put main's hooks back"; }
-# Alexis's own command, from a branch other than main and a folder below the root: main's hooks
+# a person's own command, from a branch other than main and a folder below the root: main's hooks
 # and scripts land in .git/hooks, executable, and git is taken off the repository's hooks, as
 # prepare had pointed it, however many times; merges stop fast-forwarding, which runs no hook.
 git -C "$i" config core.hooksPath .githooks
@@ -2876,7 +2875,7 @@ rm -r "$t/hooks-away"
 printf '[core]\n\thooksPath = /elsewhere\n' >"$t/global-config"
 in_i env GIT_CONFIG_GLOBAL="$t/global-config" sh scripts/install_hooks.sh >/dev/null 2>&1 && fail "install_hooks.sh passed with git's hooks still taken from elsewhere"
 # The install puts back what changed there, and removes what main does not hold: a hook git would run, prepare-commit-msg too,
-# whose name holds commit-msg's; a file left from an older install (merge.sh, D13173).
+# whose name holds commit-msg's; a file left from an older install (merge.sh).
 echo '# changed' >>"$i/.git/hooks/scan_secrets.sh"
 rm "$i/.git/hooks/gitleaks-private.toml"
 chmod a-x "$i/.git/hooks/pre-commit"
@@ -2902,8 +2901,8 @@ for h in $hook_names; do
 done
 install shadow && fail "install_hooks.sh installed two files under one name"
 installed || fail "install_hooks.sh changed the hooks before refusing a commit"
-# The commit is read once: a branch moved while the install runs (a session can move a work branch's ref) changes nothing it writes
-# (the security review of 3b, L3). A git that moves tweak to planted at the install's first `show`.
+# The commit is read once: a branch moved while the install runs (a session can move a work branch's ref) changes nothing it writes.
+# A git that moves tweak to planted at the install's first `show`.
 real_git=$(command -v git) && mkdir -p "$t/moving"
 printf '#!/bin/sh\n[ "$1" != show ] || [ -e "%s/moved" ] || { : >"%s/moved"; "%s" branch -f tweak planted; }\nexec "%s" "$@"\n' "$t" "$t" "$real_git" "$real_git" >"$t/moving/git"
 chmod +x "$t/moving/git"
@@ -2914,7 +2913,7 @@ installed "$tweaked" || fail "install_hooks.sh installed from a branch moved whi
 ran "install_hooks.sh, its branch moved"
 git -C "$i" branch -f tweak "$tweaked"
 reinstall
-# A replace ref makes git show other bytes for an object: the install and Alexis's command read the objects themselves (F132's class).
+# A replace ref makes git show other bytes for an object: the install and a person's command read the objects themselves.
 evil=$(printf '#!/bin/sh\n: >"%s/ran"\n' "$i" | git -C "$i" hash-object -w --stdin)
 for f in .githooks/pre-commit scripts/install_hooks.sh; do git -C "$i" replace "$(git -C "$i" rev-parse "main:$f")" "$evil"; done
 install
@@ -2947,7 +2946,7 @@ grep -q 'the message holds' "$t/out" || fail "commit-msg refused the key for ano
 ran "pre-commit or commit-msg"
 git -C "$i" checkout -q main
 # A merge always makes a commit, fast-forwards being off, and pre-merge-commit scans it with main's rules: the planted branch merges,
-# its planted hooks and scripts running nowhere (the red pass, M8); a key a branch brings is refused, main left where it was; a
+# its planted hooks and scripts running nowhere; a key a branch brings is refused, main left where it was; a
 # clean branch merges.
 in_i git merge -q planted >/dev/null 2>&1 || fail "the merge of the planted branch, with no secret, was refused"
 [ "$(git -C "$i" rev-parse HEAD^2)" = "$(git -C "$i" rev-parse planted)" ] || fail "the merge of the planted branch made no merge commit"
@@ -2965,7 +2964,7 @@ fi
 if part check_hooks; then
 # check.sh refuses git's hooks taken from elsewhere than .git/hooks; in the sandbox, a .git/hooks
 # or a .git/config a command may write, and hooks not installed; a linked worktree's are the
-# common folder's (F129).
+# common folder's.
 ck="$t/checkhooks"
 mkdir -p "$ck/scripts"
 cp "$here/check.sh" "$ck/scripts/"
@@ -3013,7 +3012,7 @@ cp "$here/check.sh" "$t/ckwt/scripts/"
 outer "$t/ckwt" | refused_any && fail "check.sh refused a linked worktree, whose hooks are the common folder's"
 fi
 
-# check.sh, the commit gate (D13168): what the change touches, in four lanes side by side. On a copy whose every tool is a stub that
+# check.sh, the commit gate: what the change touches, in four lanes side by side. On a copy whose every tool is a stub that
 # logs its name and arguments: gate_fixture builds it in $g, gate runs its check.sh, ran tells whether a step ran.
 gate_fixture() { # $1: its folder's name, one a section: the sections run side by side
 g="$t/$1"
@@ -3022,7 +3021,7 @@ mkdir -p "$g/scripts" "$g/.githooks" "$g/bin" "$g/toolchain" "$g/gno/r" "$g/app/
 cp "$here/check.sh" "$here/related.py" "$here/speeds.py" "$g/scripts/" && cp "$hooks/records.sh" "$g/.githooks/" && cp "$here/../.node-version" "$here/../.gitignore" "$g/"
 step="$g/bin/step"
 # The one stub: it logs its name and arguments on a line; Prettier's and ESLint's arguments one a line too (a path with a space stays
-# whole, F4853); the type check's cache, and the switches the tests saw. It takes 2 s when SLOW_STEP names it, fails when FAIL does,
+# whole); the type check's cache, and the switches the tests saw. It takes 2 s when SLOW_STEP names it, fails when FAIL does,
 # and waits for each step MEET names to start too (30 s at most): steps run one after another never meet. FAIL=<step>:<first
 # argument> fails that call alone (gno:lint); HANG=<step> holds that step 3 s, its start marked.
 cat >"$step" <<'SH'
@@ -3079,7 +3078,7 @@ for f in server/src/a.ts server/src/b.ts app/src/a.tsx packages/core/src/a.ts gn
 	printf 'x\n' >"$g/$f"
 done
 git -C "$g" init -q && git -C "$g" add -A && git -C "$g" commit -qm x
-real=$(cd "$g" && pwd -P) # check.sh runs from the folder's own spelling (F081)
+real=$(cd "$g" && pwd -P) # check.sh runs from the folder's own spelling
 }
 gate() { : >"$log" && rm -f "$log".* && (cd "$g" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh "$@" 2>&1); }
 ran() { grep -q "^$1\( \|$\)" "$log"; }
@@ -3169,7 +3168,7 @@ for f in app/src/b.css app/tests/a.spec.ts app/data/a.json app/lab/a.ts app/publ
 	ran gno && fail "check.sh ran gno on a change of $f"
 	reset
 done
-# Prose beside a change leaves it scoped; a page in Markdown under the sources is a fixture its reader's tests read, not prose (F4812).
+# Prose beside a change leaves it scoped; a page in Markdown under the sources is a fixture its reader's tests read, not prose.
 printf 'x\n' >>"$g/README.md" && printf 'y\n' >>"$g/server/src/a.ts"
 gate >/dev/null || fail "check.sh failed on a server change beside prose"
 [ "$(handed lint)" = server/src/a.ts ] || fail "check.sh did not keep a server change beside prose scoped: $(grep '^lint' "$log")"
@@ -3200,7 +3199,7 @@ for f in scripts/x.py .githooks/h .github/w.yml .claude/w.js deploy/a.conf evals
 	for s in typecheck gno; do ran "$s" && fail "check.sh ran $s on a change of $f"; done
 	reset
 done
-# The tests run at a commit for a tier-1 path alone (the speed plan, kept by D13168): docs/REVIEW.md's tier-1 rows, read by speeds.py,
+# The tests run at a commit for a tier-1 path alone: docs/REVIEW.md's tier-1 rows, read by speeds.py,
 # any doubt (no table: the fixture's own state above; a speeds.py that fails or is gone) being tier 1. The types and the lint stay.
 mkdir -p "$g/docs" && printf '| Tier | What | Who | How |\n|---|---|---|---|\n| 1 | Login (`server/src/login/`), deploy (`deploy/`) | Claude | Alexis |\n' >"$g/docs/REVIEW.md"
 git -C "$g" add -A && git -C "$g" commit -qm table
@@ -3231,7 +3230,7 @@ for f in lint/a.ts vitest.config.ts tsconfig.json pnpm-lock.yaml server/roles.js
 	whole "a change of $f"
 	reset
 done
-# A caller's git folders steer no git call of the gate (lot 1's security review, S5): a common folder or an object store of its own
+# A caller's git folders steer no git call of the gate: a common folder or an object store of its own
 # would hold hooks of its choice, or objects the repository has not.
 mkdir -p "$t/elsewhere/objects"
 (GIT_COMMON_DIR="$t/elsewhere" gate) >/dev/null || fail "check.sh let a caller's GIT_COMMON_DIR steer its git calls"
@@ -3275,13 +3274,13 @@ reset
 # vitest.config.ts's switches are the gate's to leave unset: a caller's would change what the tests are.
 (COVERAGE_ALL=1 CORE_CHROMIUM=1 gate) >/dev/null || fail "check.sh failed with vitest.config.ts's switches set"
 grep -qx 'coverage=unset chromium=unset' "$log.env" || fail "check.sh let a caller's switches reach Vitest: $(cat "$log.env")"
-# An option, any of the old modes, is refused before any step.
+# An option is refused before any step.
 for o in --full --merge --tests-all --everything --whatever; do
 	out=$(gate "$o") && fail "check.sh took $o"
 	printf '%s\n' "$out" | grep -q "no option since D13168" || fail "check.sh refused $o without saying why: $out"
 	[ ! -s "$log" ] || fail "check.sh ran a step before refusing $o: $(cat "$log")"
 done
-# Outside a repository there is no change to read: refused, saying so, before any step (a copy of the tracked files left, D13173).
+# Outside a repository there is no change to read: refused, saying so, before any step.
 cp -R "$g" "$g-copy" && rm -rf "$g-copy/.git"
 out=$(: >"$log" && cd "$g-copy" && env -u SANDBOX_RUNTIME GATE_LOG="$log" GNO_TOOLCHAIN="$g/toolchain" NVM_DIR="${NVM_DIR:-$HOME/.nvm}" HOME="$g.home" sh scripts/check.sh 2>&1) &&
 	fail "check.sh passed outside a repository"
@@ -3301,7 +3300,7 @@ for lane in lint types tests gno; do
 	printf '%s\n' "$out" | grep -qE "^lane $lane [0-9]+ s: [a-z]" || fail "check.sh did not print lane $lane's time and steps: $out"
 done
 # Two lanes fail: the gate fails, names both and shows what each printed; a lane stops at its first failure, the others run to their
-# end; the last line names the first failure, whatever a lane's tail ended on (F2638).
+# end; the last line names the first failure, whatever a lane's tail ended on.
 out=$(FAIL=format:check,gno gate) && fail "check.sh passed with two failing steps"
 for s in format:check gno; do printf '%s\n' "$out" | grep -q "^$s failed here" || fail "check.sh hid $s's failure: $out"; done
 printf '%s\n' "$out" | grep -q "^check.sh: lane lint failed at lint:format:" || fail "check.sh did not name the failed lane lint and its step: $out"
@@ -3326,7 +3325,7 @@ for case in py:check_docs=lint:scripts format:check=lint:format lint=lint:lint t
 	out=$(FAIL=$s gate) && fail "check.sh passed with $s failing"
 	[ "$(last "$out")" = "check.sh: FAILED at $at" ] || fail "check.sh did not name $at when $s failed: $(last "$out")"
 done
-# The harness's floor (the security review of 3a, S1): a changed shell script that sh cannot read, a hook too, and any script that does
+# The harness's floor: a changed shell script that sh cannot read, a hook too, and any script that does
 # not parse, fail the lint lane at its first step, as on a whole run every shell script that sh cannot read; a good one passes.
 for bad in 'scripts/bad.sh:if then' '.githooks/bad:case in' 'scripts/bad.py:def (:'; do
 	printf '%s\n' "${bad#*:}" >"$g/${bad%%:*}"
@@ -3532,11 +3531,10 @@ grep -q "stale" "$vt/bench.json" && fail "vitest bench measured a bench a Stryke
 :
 fi
 
-# F2414: the staged copy's lint once reported "14683 problems" and passed on retry; its first output was not kept. The one
-# cause found by reading: borrow_node_modules.sh copies every node_modules folder it finds, those of a StrykerJS sandbox
-# in .stryker-tmp too. This is hygiene, NOT the cause's proof: planted in such a copy, a sandbox's node_modules did not make
-# `eslint --max-warnings 0 .` report anything (eslint.config.ts includes .gitignore, which names .stryker-tmp/). The ledger
-# row stays `asked`; no test here reproduces "14683 problems".
+# borrow_node_modules.sh copies every node_modules folder it finds, those of a StrykerJS sandbox
+# in .stryker-tmp too. This is hygiene, NOT proof of a cause: planted in such a copy, a sandbox's node_modules did not make
+# `eslint --max-warnings 0 .` report anything (eslint.config.ts includes .gitignore, which names .stryker-tmp/); no test here
+# reproduces the lint noise a staged copy once showed.
 if part borrow; then
 b="$t/borrow" && mkdir -p "$b/src/node_modules/pkg" "$b/src/app/node_modules/@x" "$b/src/.stryker-tmp/sandbox-1/node_modules/pkg" "$b/src/.stryker-tmp/sandbox-1/app/node_modules/@x" "$b/copy"
 printf 'x\n' >"$b/src/node_modules/pkg/i.js" && printf 'x\n' >"$b/src/.stryker-tmp/sandbox-1/node_modules/pkg/i.js"
@@ -3545,8 +3543,8 @@ printf 'x\n' >"$b/src/node_modules/pkg/i.js" && printf 'x\n' >"$b/src/.stryker-t
 [ ! -e "$b/copy/.stryker-tmp" ] || fail "borrow_node_modules.sh copied a StrykerJS sandbox into the staged copy (F2414): $(find "$b/copy/.stryker-tmp" -maxdepth 2 | head -5)"
 fi
 
-# The heavy sections are split (the brief, item 5): a change of harness_mutate.py rejudges its ~90 own mutants, each running
-# its sections; one of 400 lines made each run the whole. No section of this family is past 150 lines, the family
+# The heavy sections are split: a change of harness_mutate.py rejudges its ~90 own mutants, each running
+# its sections; one 400-line section would make each run the whole. No section of this family is past 150 lines, the family
 # holds more than one, and harness_mutate.py's SECTIONS (read as the data it is, not as text) names every section of this
 # file for the guard files that matter to it: a mention in a comment proves nothing. A file lists a proper part of a split family
 # unless it guards the whole of it, which `whole` lists.
@@ -3605,7 +3603,7 @@ fi
 if part guard; then
 # guard: no git hook skipped, no forced push, a push asks, no gnokey, no raw call to a chain node, no subagent's harness write, no
 # unguarded recursive delete, worktree.sh alone. Exit 2 blocks the call. The rule on a .gno file written before the gno skill, which
-# read the session's transcript, left (D13174).
+# read the session's transcript, left.
 gd="$here"/guard.py
 guarded() { # $1: the event as JSON, $2: the exit code expected, $3: what it is
 	code=0
@@ -3641,21 +3639,21 @@ sh_ "cd gno && gnokey list" 2
 sh_ "/usr/local/bin/gnokey list" 2
 sh_ '"$GNO_TOOLCHAIN/gnokey" list' 2
 sh_ "sh -c 'gnokey list'" 2
-sh_ "grep -rn gnokey docs" 2 # 7w2's third lot: gnokey is refused at any word, failing closed; the Grep tool reads it
+sh_ "grep -rn gnokey docs" 2 # gnokey is refused at any word, failing closed; the Grep tool reads it
 sh_ "git commit -m 'docs: never call gnokey'" 0
 sh_ "curl -s https://rpc.gno.land:443/status" 2
 sh_ "curl -s HTTPS://GNO.LAND/r/gnoland/home" 2
 sh_ "rg 'https://rpc.gno.land' docs" 0
 sh_ "cd gno && gno test ./r/..." 0
 # A raw call to a chain node: from curl or wget, with or without a scheme; from an interpreter (node, python...), which only the
-# .gno rule caught, by accident (`.gno.land`: the security review of 3c); a realm path with no node, or the docs, pass.
+# .gno rule caught, by accident (`.gno.land`); a realm path with no node, or the docs, pass.
 sh_ "curl -s rpc.onyx.testnets.gno.land:443/status" 2
 sh_ "node -e \"fetch('https://rpc.onyx.testnets.gno.land/status')\"" 2
 sh_ "python3 -c \"import urllib.request as u; u.urlopen('https://rpc.gno.land:443/status')\"" 2
 sh_ "python3 -c \"import urllib.request as u; u.urlopen('rpc.gno.land:443/status'.join(['https://', '']))\"" 2
 sh_ "node scripts/x.mjs gno.land/r/gnoworld/seal" 0
 sh_ "curl -s https://docs.gno.land/resources/gno-interrealm" 0
-# What the rule on a .gno file refused as text passes (D13174): a realm written, copied, edited in place, by a shell or the file tools,
+# What the rule on a .gno file refused as text passes: a realm written, copied, edited in place, by a shell or the file tools,
 # a grep naming one; the skill and the chain's read stay CLAUDE.md's rule. Beside them, what no rule refused passes still: a realm
 # read, a TypeScript file written.
 sh_ "cat > gno/r/slot/slot.gno <<EOF
@@ -3674,7 +3672,7 @@ tool_ WebFetch '{"url":"https://rpc.onyx.testnets.gno.land/status"}' 2
 tool_ WebFetch '{"url":"https://docs.gno.land/resources/gno-interrealm"}' 0
 guarded 'not json' 2 "unreadable input"
 guarded '{"tool_name":"Bash","tool_input":null}' 2 "a null tool_input"
-# What a wrapper, an abbreviation or an environment variable used to slip past.
+# What a wrapper, an abbreviation or an environment variable could slip past.
 sh_ "git commit --no-veri -m x" 2
 sh_ "HUSKY=0 git commit --no-verify -m x" 2
 sh_ "git -c core.hookspath=/dev/null commit -m x" 2
@@ -3694,7 +3692,7 @@ sh_ "python3 -c \"open('gno/r/x/x.gno','w').write('package x')\"" 0
 sh_ "git commit -m 'note: --no-verify is refused'" 0
 sh_ "GIT_PAGER=cat git log -n 3" 0
 sh_ "python3 -I scripts/probe.py" 0
-# Ordinary multi-line shell, which an agent writes without meaning to evade (findings F032, F036).
+# Ordinary multi-line shell, which an agent writes without meaning to evade.
 sh_ "git commit -m x \\
   --no-verify" 2
 sh_ "git push origin main \\
@@ -3711,7 +3709,7 @@ sh_ "(git push --force origin main)" 2
 sh_ 'git commit -m "does -n; whatever"' 0
 sh_ 'git commit -m "feat(core): a (b) {c}"' 0
 sh_ "git log --oneline -n 3 2>&1 | head" 0
-# An alias can carry any flag past the checks; send-pack pushes with no pre-push (finding F042).
+# An alias can carry any flag past the checks; send-pack pushes with no pre-push.
 sh_ "git -c alias.ci='commit --no-verify' ci -m x" 2
 sh_ "git -c alias.p='push --force' p origin HEAD:main" 2
 sh_ "git config alias.c 'commit -n'" 2
@@ -3719,7 +3717,7 @@ sh_ "git config --global alias.c 'commit -n'" 2
 sh_ "git send-pack https://github.com/x/y.git HEAD:refs/heads/x" 2
 sh_ "git http-push https://example.org/y.git main" 2
 sh_ "git config --get user.name" 0
-# git's own folders, never a command's (7y's lot 1, S5; F4924): a commit pointed at another common folder, git folder or work tree
+# git's own folders, never a command's: a commit pointed at another common folder, git folder or work tree
 # runs that folder's hooks, or none (GIT_COMMON_DIR=... git commit ran no hook). Given before the program, through env, exported or
 # declared, inside sh -c, eval, $(...) or a function, or as git's own options: each is refused. Removing one and reading one pass.
 for cmd in 'GIT_COMMON_DIR=/tmp/f git commit -m x' 'GIT_DIR=/tmp/f git commit -m x' 'GIT_WORK_TREE=/tmp/f git commit -m x' \
@@ -3743,7 +3741,7 @@ for cmd in 'unset GIT_DIR GIT_COMMON_DIR GIT_WORK_TREE' 'env -u GIT_DIR -u GIT_C
 	'grep -rn GIT_COMMON_DIR= scripts' 'echo GIT_DIR=x'; do
 	sh_ "$cmd" 0
 done
-# git's global config, which a command may place (F5541, H3): HOME or XDG_CONFIG_HOME given a value on a line that runs git makes git read a
+# git's global config, which a command may place: HOME or XDG_CONFIG_HOME given a value on a line that runs git makes git read a
 # config of the command's own, whose hooks folder skips every hook (`HOME=/tmp/h git commit` ran none, here and on main). Given before the
 # program, through env, exported, declared, bare, inside sh -c or a subshell, or before a program a variable names: each is refused, whatever
 # git command it reaches. Reading them, a line with no git, and the other variables the tools take (XDG_CACHE_HOME) pass.
@@ -3798,8 +3796,8 @@ for cmd in 'printf %s PATH; git push origin x' 'read line <<< x; git push origin
 	'export FOO=1; git push origin x'; do
 	sh_ "$cmd" 0
 done
-# A global option whose argument came as the next word was taken for the subcommand (F4920): `commit -n` and a forced push passed,
-# and a push got no ask. git 2.53 takes --namespace, --config-env, --attr-source and --shallow-file so, as -c and -C.
+# A global option whose argument comes as the next word is not the subcommand, or `commit -n` and a forced push would pass,
+# and a push would get no ask. git 2.53 takes --namespace, --config-env, --attr-source and --shallow-file so, as -c and -C.
 sh_ 'git --namespace x commit -n -m y' 2
 sh_ 'git --config-env user.name=HOME commit -n -m y' 2
 sh_ 'git --attr-source HEAD commit -n -m y' 2
@@ -3807,7 +3805,7 @@ sh_ 'git --shallow-file /tmp/f commit -n -m y' 2
 sh_ 'git --namespace x push --force origin main' 2
 sh_ 'git --namespace=x commit -m y' 0
 # A function's body, a subshell or a process written against its separator, an env -S line and a `+=` before the program are commands
-# like any other (F4922, F4924): each hid every call in it from the checks.
+# like any other: each hid every call in it from the checks.
 sh_ 'f() { git commit --no-verify -m x; }; f' 2
 sh_ 'f(){ git push --force origin main; }; f' 2
 sh_ 'function f { git commit -n -m x; }; f' 2
@@ -3822,8 +3820,8 @@ sh_ "env -S 'git commit --no-verify -m x'" 2
 sh_ "env -u HOME -S 'git commit -n -m x'" 2
 sh_ "env --split-string='git commit -n -m x'" 2
 sh_ 'X+=1 git commit --no-verify -m x' 2
-# Read so, a clobbering >| stays one redirection, and -S among env's short options is still -S (7w2's review, S8, S9); a config file
-# included sets hooksPath as -c would (S10).
+# Read so, a clobbering >| stays one redirection, and -S among env's short options is still -S; a config file
+# included sets hooksPath as -c would.
 sh_ 'git commit >|/dev/null -n -m x' 2
 sh_ 'git push >|/tmp/log --force origin main' 2
 sh_ "env -iS 'git commit --no-verify -m x'" 2
@@ -3833,16 +3831,16 @@ sh_ 'git -c includeIf.gitdir:/tmp/.path=/tmp/x.cfg commit -m x' 2
 sh_ 'git --config-env include.path=HOME commit -m x' 2
 sh_ "env --split-string 'git commit -n -m x'" 2
 sh_ "env -S 'FOO=1 GIT_CONFIG_COUNT=1 git commit -m x'" 2
-# A mark in quotes is a word, never a separator (7w2's review, R1): `-m '{' -n` and `-m ';' -n` split the commit in two, its -n unread.
+# A mark in quotes is a word, never a separator: `-m '{' -n` and `-m ';' -n` split the commit in two, its -n unread.
 for cmd in "git commit -m '{' -n" "git commit -m '<(' -n" "git commit -m x ';(' -n" "git commit -m '(' -n" "git commit -m ';' -n" \
 	"git commit -m '&&' --no-verify" 'git commit -m "|" --no-verify' 'git commit -m \; -n'; do
 	sh_ "$cmd" 2
 done
 sh_ "git commit -m 'a; b (c) {d} <e> && f'" 0
 sh_ "echo '\\;' \"a|b\" && git status" 0
-# 7w2's second lot: `{` opens a command only where one starts (S2-1); -S among env's options that take no argument alone (S2-2); a `#`
-# inside a word (S2-5); a substitution used as an argument, nested too, closed or not (S2-6); a newline in quotes (S2-7), a heredoc's
-# body read line by line; env -S's escapes and variables (S2-8); $'...' (S2-11).
+# Forms: `{` opens a command only where one starts; -S among env's options that take no argument alone; a `#`
+# inside a word; a substitution used as an argument, nested too, closed or not; a newline in quotes, a heredoc's
+# body read line by line; env -S's escapes and variables; $'...'.
 for cmd in 'git commit -m { -n' 'git commit -m x { -n' 'git commit -m { --no-verify' 'env -uSHELL git commit -n -m x' \
 	'env -CSdir git commit -n -m x' 'echo a#; git commit -n -m x' 'git commit -m x#y -n' 'git commit -F <(echo x) -n' \
 	'git commit -m $(echo x) -n' 'git commit -m "$(echo x)" -n' 'echo $(echo $(git commit -n -m x))' 'cat <(cat <(gnokey list))' \
@@ -3872,9 +3870,9 @@ git status" "git log --format='%h #1'" 'echo "$(git rev-parse HEAD)"' 'echo x # 
 body'" "echo '\$((1+2))' && git status"; do
 	sh_ "$cmd" 0
 done
-# 7w2's third lot: git is read wherever it stands, not only first (S3-1: a wrapper the guard does not know ran it; S3-2: git-core's
+# Git is read wherever it stands, not only first (a wrapper the guard does not know ran it; git-core's
 # dashed programs, `git-push`), so the guard fails closed: `echo git commit -n` is refused and `echo git push` asks. Each form the
-# lot found, then one of each class it did not list, so the next form of a class fails a case.
+# guard knows, then one of each class it did not list, so the next form of a class fails a case.
 for cmd in 'exec -a x git push --force origin main' 'repeat 1 { git push --force origin main; }' 'nocorrect git commit -n -m y' \
 	'stdbuf -o L git commit -n -m y' 'echo | xargs -E eof git commit -n -m y' 'xargs -J % git commit -n -m y' 'arch -arm64 git commit -n -m y' \
 	'script -q /dev/null git commit -n -m y' 'coproc git commit -n -m y' '{ true; } always { git commit -n -m y; }' \
@@ -3887,9 +3885,9 @@ for cmd in 'exec -a x git push --force origin main' 'repeat 1 { git push --force
 done
 sh_ 'git remote -v' 0
 sh_ 'ls /opt/homebrew/opt/git/libexec/git-core' 0
-# A heredoc's mark in quotes is no heredoc, and a here-string is none (S3-3); backticks and ${...} hold their separators (S3-4); the
+# A heredoc's mark in quotes is no heredoc, and a here-string is none; backticks and ${...} hold their separators; the
 # shells the guard did not read, -c anywhere among a shell's options, a shell or source reading a pipe, a here-string or a process
-# (S3-5); zsh's glob qualifiers, which run code (S3-6). Each form, then one of each class unlisted.
+# substitution; zsh's glob qualifiers, which run code. Each form, then one of each class unlisted.
 for cmd in 'git commit -m "<<E
 b" --no-verify' "echo '<<E'; git commit -m \"a
 b\" --no-verify" ': <<E; git commit -m "a
@@ -3909,7 +3907,7 @@ b\" --no-verify" "echo 'git commit -n -m y' | sh" "sh <<< 'git commit -n -m y'" 
 	sh_ "$cmd" 2
 done
 # gnokey, a recursive delete of an unguarded path and curl, wget or an interpreter to the chain are read at any word too, failing
-# closed as git is (the chief, 2026-11-04): each behind a wrapper the guard knows, one it does not, and a spelling of its name.
+# closed as git is: each behind a wrapper the guard knows, one it does not, and a spelling of its name.
 for cmd in 'caffeinate gnokey list' 'some-new-wrapper gnokey list' 'exec -a x gnokey list' '=gnokey list' "\$'gnokey' list" 'echo gnokey' \
 	'caffeinate rm -r "$d"' 'some-new-wrapper find "$d" -delete' 'exec -a x rm -rf $dir/*' '=rm -r "$d"' \
 	'caffeinate curl -s https://rpc.gno.land:443/status' 'some-new-wrapper wget https://gno.land/r/x' '=curl https://rpc.gno.land:443/status' \
@@ -3920,7 +3918,7 @@ for cmd in 'some-new-wrapper rm -r "${d:?}"' 'echo rm -f x' 'some-new-wrapper cu
 	'caffeinate cp /tmp/x.gno gno/r/x/x.gno'; do
 	sh_ "$cmd" 0
 done
-# Every program now read at any word, these hold the split into commands to its job through what a command's start alone decides,
+# Every program read at any word, these hold the split into commands to its job through what a command's start alone decides,
 # a shell's -c: after a keyword, in a function's body, past a process left open, past env's -u; and sh -s, and a substitution left
 # open on a heredoc's line.
 for cmd in "if true; then sh -c 'gnokey list'; fi" "function f { sh -c 'gnokey list'; }; f" "cat <(sh -c 'gnokey list'" \
@@ -3939,7 +3937,7 @@ done
 sh_ 'f() { git status; }; f' 0
 sh_ 'git status >>/tmp/log 2>&1 && ls &>/dev/null' 0
 sh_ 'echo x >|/tmp/f && git status' 0
-# A recursive delete takes no path from a variable that may be empty (wt-3e's folder, emptied by a find -delete
+# A recursive delete takes no path from a variable that may be empty (a folder emptied by a find -delete
 # whose variable was unset): ${name:?} stops the shell first. BSD's and GNU's options before find's paths, a
 # wrapper, or a :? in a comment or another command change nothing.
 for cmd in 'find $dir -delete' 'find "$dir" -type f -delete' 'find -L "${dir}/x" -delete' 'find "$dir" -exec rm -f {} +' \
@@ -3959,7 +3957,7 @@ for cmd in 'find "${dir:?}" -delete' 'rm -r "${dir:?no dir}/x"' 'find . -name "$
 	'find "$d" -exec cat {} \;' 'rm -- -r "$d"' 'find "${d:?}" -exec rm -r {} +'; do
 	sh_ "$cmd" 0
 done
-# A push, in any form, waits for Alexis: the guard asks, since a rule cannot see every form.
+# A push, in any form, waits for a person: the guard asks, since a rule cannot see every form.
 asks() { # $1: a shell command
 	python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]}}))' "$1" | python3 -I "$gd" 2>/dev/null | grep -q '"permissionDecision": "ask"' || fail "guard did not ask before: $1"
 }
@@ -3971,14 +3969,14 @@ asks "git --namespace x push origin slice-1a"
 asks "git --config-env user.name=HOME push origin slice-1a"
 asks "git --attr-source HEAD push origin slice-1a"
 asks "git --shallow-file /tmp/f push origin slice-1a"
-# Wherever git stands, a push asks (7w2's third lot, S3-1, S3-2): each form the lot found, then a wrapper nobody listed, and a mention.
+# Wherever git stands, a push asks: each form known, then a wrapper nobody listed, and a mention.
 for cmd in "find . -maxdepth 0 -exec git push origin main ';'" 'caffeinate git push origin main' '- git push origin main' \
 	'=git push origin main' "\$'git' push origin main" 'git subtree push --prefix=app origin main' 'git-push origin main' \
 	'some-new-wrapper git push origin main' 'echo git push'; do
 	asks "$cmd"
 done
 python3 -I -c 'import json; print(json.dumps({"tool_name":"Bash","tool_input":{"command":"git status"}}))' | python3 -I "$gd" | grep -q . && fail "guard printed a decision for git status"
-# 7w2's fourth lot (7w4; reports/slice-7w2-security-4.md, S4-1 to S4-7): each form the pass found, then one of each class it did not
+# Each form known, then one of each class it did not
 # list, the everyday commands of its two lists and the heredocs a session writes, which must pass. A line: the answer (0, 2, or ask:
 # exit 0 and an ask), a tab, the command, `⏎` a newline and `␀` a NUL byte. Every wrong answer is shown, not the first alone.
 cat >"$t/lot4" <<'CASES'
@@ -4550,7 +4548,7 @@ PY
 # worktree.sh leaves the sandbox (settings.json's excludedCommands, `sh scripts/worktree.sh *`), so it runs alone, its words plain,
 # from the project's root: from a subfolder those words run a script there, which the session can write, and behind a cd, an
 # assignment, a redirect or another command they would run something else outside the sandbox, whatever Claude Code's matcher
-# makes of them (F5058). No folder is no root.
+# makes of them. No folder is no root.
 root=$(cd "$here/.." && pwd -P)
 at_() { # $1: the folder, $2: a shell command, $3: the exit code expected
 	guarded "$(python3 -I -c 'import json,sys; print(json.dumps({"tool_name":"Bash","tool_input":{"command":sys.argv[1]},"cwd":sys.argv[2]}))' "$2" "$1")" "$3" "Bash in $1: $2"
@@ -4574,10 +4572,10 @@ sh scripts/worktree.sh u v w; true"; do
 	at_ "$root" "$cmd" 2
 done
 sh_ "sh scripts/worktree.sh x y z" 2
-# A subagent edits no harness file with Edit or Write (D240): the sandbox stops a shell's writes, never the file tools', and two
-# agents of slice 9 changed stryker.config.json with Edit after their shell was refused (f792bf47, 359e8040). The harness is
+# A subagent edits no harness file with Edit or Write: the sandbox stops a shell's writes, never the file tools', so a subagent refused in a shell could still rewrite
+# stryker.config.json with Edit. The harness is
 # .githooks/records.sh's list, in the tree the file sits in, however its path is written; the session itself, with no agent_id
-# in the hook's input, is not refused here (pre-commit is the wall, D241).
+# in the hook's input, is not refused here (pre-commit is the wall).
 agent=',"agent_id":"a1","agent_type":"reviewer"'
 file_() { # $1: the tool, $2: the file's path, $3: the exit code expected, $4: the event's agent fields (default: a subagent's), $5: its folder
 	guarded "{\"tool_name\":\"$1\",\"tool_input\":{\"file_path\":$(python3 -I -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$2")},\"cwd\":\"${5:-$root}\"${4-$agent}}" "$3" "$1 of $2 with {${4-$agent}} in ${5:-$root}"
@@ -4598,13 +4596,13 @@ for f in "$root/./scripts/../scripts/check.sh" "$root/SCRIPTS/check.sh" "$root/S
 done
 file_ Edit scripts/check.sh 2
 file_ Edit ../scripts/guard.py 2 "$agent" "$root/docs"
-# The guard's own tree with no .git, as pre-commit's copy of the staged files: still the tree its files sit in (D240).
+# The guard's own tree with no .git, as pre-commit's copy of the staged files: still the tree its files sit in.
 mkdir -p "$t/guard-bare/scripts" "$t/guard-bare/.githooks" && cp "$gd" "$t/guard-bare/scripts/" && cp "$root/.githooks/records.sh" "$t/guard-bare/.githooks/"
 kept=$gd && gd=$t/guard-bare/scripts/guard.py
 file_ Edit "$t/guard-bare/scripts/check.sh" 2 "$agent" "$t/guard-bare"
 file_ Edit "$t/guard-bare/docs/a.md" 0 "$agent" "$t/guard-bare"
 # An empty .git a shell plants in a folder of the tree makes no other tree of it: the guard's own tree, and every tree above a
-# file, names its harness files (9j's review: deploy/.git let deploy/test.sh through).
+# file, names its harness files (deploy/.git must not let deploy/test.sh through).
 mkdir -p "$t/guard-bare/deploy" "$t/guard-bare/packages/core" && : >"$t/guard-bare/deploy/.git" && : >"$t/guard-bare/packages/.git"
 file_ Write "$t/guard-bare/deploy/test.sh" 2 "$agent" "$t/guard-bare"
 file_ Write "$t/guard-bare/packages/core/tsconfig.json" 2 "$agent" "$t/guard-bare"
@@ -4656,7 +4654,7 @@ audit '{}' && fail "audit passed on a lockfile it read no package from"
 fi
 
 if part push_range; then
-# D13184: pre-push scans what the push sends: the commits of the refs it pushes that the remote, asked itself (git ls-remote),
+# pre-push scans what the push sends: the commits of the refs it pushes that the remote, asked itself (git ls-remote),
 # does not hold. A remote-tracking ref, which a session can write, hides nothing; a remote it cannot ask scans the refs' whole
 # history. The real gitleaks, a throwaway repository and a bare remote; the hooks as installed.
 pr="$t/pushrange" && rh="$t/pushrange-hooks" && rr="$t/pushrange-remote.git"
@@ -4690,16 +4688,16 @@ pushed fresh && fail "pre-push let a key through while the remote holds a commit
 git -C "$pr" update-ref refs/remotes/origin/fake fresh
 pushed fresh && fail "pre-push took a remote-tracking ref for the remote, and sent a key unscanned"
 git -C "$pr" update-ref -d refs/remotes/origin/fake
-# A replace ref turning a tag the remote holds into one of the key's commit hides nothing (the review of D13184, #1): a tag's
+# A replace ref turning a tag the remote holds into one of the key's commit hides nothing: a tag's
 # peel follows the replacement, a commit's name does not.
 git -C "$pr" tag -a v1 -m v1 trunk && plain refs/tags/v1 && git -C "$pr" tag -a v1fake -m fake fresh
 git -C "$pr" replace -f "$(git -C "$pr" rev-parse v1)" "$(git -C "$pr" rev-parse v1fake)"
 pushed fresh && fail "pre-push read the remote's tag through a replace ref, and sent a key unscanned"
 git -C "$pr" replace -d "$(git -C "$pr" rev-parse v1)" && git -C "$pr" tag -d v1fake >/dev/null
 # An ssh command of the push's sends ls-remote to a decoy holding the key's commit while the URL reads back unchanged: by the
-# environment, then by -c core.sshCommand (#2 and the security review).
+# environment, then by -c core.sshCommand.
 printf '#!/bin/sh\nexec git upload-pack "%s"\n' "$t/pushrange-decoy.git" >"$t/fakessh" && chmod +x "$t/fakessh"
-# An insteadOf that makes ls-remote ask another repository, holding the key's commit, than the push writes to (#2): on the
+# An insteadOf that makes ls-remote ask another repository, holding the key's commit, than the push writes to: on the
 # command line, then in the repository's config.
 decoy="$t/pushrange-decoy.git" && git clone -q --bare "$pr" "$decoy" && git -C "$decoy" update-ref refs/heads/k "$(git -C "$pr" rev-parse fresh)"
 (GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$decoy.insteadOf" GIT_CONFIG_VALUE_0="$rr" pushed fresh) && fail "pre-push asked the repository an insteadOf on the command line named, and sent a key unscanned"
@@ -4709,7 +4707,7 @@ git -C "$pr" config --unset "url.$decoy.insteadOf"
 pushed trunk || fail "pre-push refused a clean push once the insteadOf left"
 (GIT_SSH_COMMAND="$t/fakessh" pushed fresh "$zero" "ssh://pushrange.invalid/r.git") && fail "pre-push asked the remote through the push's GIT_SSH_COMMAND, and sent a key unscanned"
 (GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="$t/fakessh" pushed fresh "$zero" "ssh://pushrange.invalid/r.git") && fail "pre-push asked the remote through a -c core.sshCommand, and sent a key unscanned"
-# A blob pushed as a tag is sent and walked by no log: refused (#6).
+# A blob pushed as a tag is sent and walked by no log: refused.
 blob=$(printf 'aws = "%s"\n' "$key" | git -C "$pr" hash-object -w --stdin)
 printf 'refs/tags/b %s refs/tags/b %s\n' "$blob" "$zero" | (cd "$pr" && sh "$rh/pre-push" origin "$rr" >/dev/null 2>&1) && fail "pre-push let a blob through, which no scan reads"
 # A remote it cannot ask: the refs' whole history, the key the real remote holds included.
@@ -4923,13 +4921,13 @@ rm "$sc/.gitleaksignore"
 printf 'aws = "%s" # gitleaks:allow\n' "$key" >"$sc/leak.py" && git -C "$sc" add leak.py && scan && fail "scan_secrets obeyed a gitleaks:allow comment"
 # The repository will be public: no home folder's path, no service of the demo's host.
 git -C "$sc" rm -qf --cached leak.py
-# Each form a home folder takes, whatever the case, with or without what follows (F090).
+# Each form a home folder takes, whatever the case, with or without what follows.
 for line in 'p = "/Us''ers/alice/x"' 'p = "/ho''me/alice/x"' 'host = "N''8N"' 'p = "/Us''ers/alice"' 'cd /Us''ers/alice' \
 	"p = '/ho""me/alice'" 'p = "/us''ers/alice/x"' 'p = "/Us''ers/_alice/x"' 'p = "C:\\Us''ers\\alice"' 'p = "/ho''me/runner-alice/x"' \
 	'u = "file:///Us''ers/alice/x"' 'PATH=/bin:/Us''ers/alice/bin'; do # split, so this file holds none
 	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && scan && fail "scan_secrets let through: $line"
 done
-# A users folder inside a path or a route is no one's home: gno's name registry, an API (F117).
+# A users folder inside a path or a route is no one's home: gno's name registry, an API.
 for line in 'p = "/home/runner/.cache"' 'q = "~/x"' 'r = "/api/user/1"' 'import "gno.land/r/gnoland/users/v1"' \
 	'r = "GET /api/users/42"' 'r = "GET /users/42"' 'r = "/users/:id"'; do
 	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && { scan || fail "scan_secrets refused: $line"; }
@@ -4948,11 +4946,11 @@ for line in '{ status: "success", type: "GET_ACC''OUNT", code: 0, message: "", d
 	'TRANSACTION_REJECTED: "The transaction has been rejected by the user.",' '"message": "Unable to change to the current network."'; do
 	printf '%s\n' "$line" >"$sc/private.py" && git -C "$sc" add private.py && { scan || fail "scan_secrets refused: $line"; }
 done
-# A secret found does not hide a private name beside it: both rule sets run, then the scan fails (F120).
+# A secret found does not hide a private name beside it: both rule sets run, then the scan fails.
 printf 'aws = "%s"\n' "$key" >"$sc/leak.py" && printf 'p = "/Us''ers/alice/x"\n' >"$sc/private.py" && git -C "$sc" add leak.py private.py
 both=$(cd "$sc" && sh scripts/scan_secrets.sh --staged 2>&1) && fail "scan_secrets passed a key and a home folder"
 [ "$(printf '%s\n' "$both" | grep -c 'leaks found')" = 2 ] || fail "scan_secrets stopped at the first rule set that found something"
-# An attribute that makes git print a file as binary hides it from gitleaks: any is refused (F130).
+# An attribute that makes git print a file as binary hides it from gitleaks: any is refused.
 git -C "$sc" rm -qf --cached private.py && rm "$sc/private.py"
 for where in .gitattributes sub/.gitattributes; do
 	mkdir -p "$sc/sub" && printf '* -diff\n' >"$sc/$where"
@@ -4968,7 +4966,7 @@ git -C "$sc" rm -qf --cached leak.py && rm "$sc/leak.py" && : >"$info/attributes
 scan || fail "scan_secrets refused an empty .git/info/attributes"
 # Git hands gitleaks every change as text: no NUL byte, attributes file, diff driver, external
 # diff or replace ref hides a key, staged or committed, on any branch; a lawful attributes file
-# stops nothing (F132, F133).
+# stops nothing.
 tx="$t/text"
 mkdir -p "$tx/scripts" && git -C "$tx" init -q && secrets_into "$tx/scripts/"
 git -C "$tx" add scripts && git -C "$tx" commit -qm base
@@ -5005,7 +5003,7 @@ git -C "$tx" checkout -q -b side && leak x.py && git -C "$tx" commit -qm side &&
 printf '*.png binary\n' >"$tx/.gitattributes" && git -C "$tx" add .gitattributes
 (cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) || fail "scan_secrets refused a lawful .gitattributes"
 # Names live in text: an image whose bytes spell a host's service by chance passes the private
-# rules, staged and committed; a key in a staged image is still found (F139).
+# rules, staged and committed; a key in a staged image is still found.
 git -C "$tx" reset -q --hard "$base" && git -C "$tx" branch -qD side
 printf 'x %s8%s x\n' n n >"$tx/img.png" && git -C "$tx" add img.png
 (cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) || fail "scan_secrets read an image's bytes for a name (F139)"
@@ -5014,7 +5012,7 @@ git -C "$tx" commit -qm image
 leak img.png # gitleaks's own rules skip images in the history; the staged scan reads them
 (cd "$tx" && sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets missed a key in a staged image (F139)"
 git -C "$tx" reset -q --hard "$base"
-# gitleaks scans nothing, and passes, when git cannot read: the scan fails instead (F140).
+# gitleaks scans nothing, and passes, when git cannot read: the scan fails instead.
 mkdir -p "$t/badgit" && printf '#!/bin/sh\ncase " $* " in *" log "*|*" diff "*) exit 128 ;; esac\nexec "%s" "$@"\n' "$(command -v git)" >"$t/badgit/git" && chmod +x "$t/badgit/git"
 (cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh >/dev/null 2>&1) && fail "scan_secrets passed a history git could not read (F140)"
 (cd "$tx" && PATH="$t/badgit:$PATH" sh scripts/scan_secrets.sh --staged >/dev/null 2>&1) && fail "scan_secrets passed a staged diff git could not read (F140)"
@@ -5024,10 +5022,10 @@ if part nginx_check; then
 # scripts/check_nginx.py, in the merge check: the pinned nginx (1.30.6, the image's) from the tools' cache with its checksum
 # checked, `nginx -t` on the image's deploy/web/nginx.conf with the build's table (app/build/csp.conf), then the build served on a
 # free port, each page asked at its slashed, bare and index.html forms, each answering with its own policy (the build's _headers
-# rule), never the bare one. 5f's two high findings passed the gate and the first read of the review: F2459 (a second
-# map_hash_max_size, nginx refuses to start) and F2460 (a slashed address got the bare policy). The binary here is a stub that
+# rule), never the bare one. The faults it must catch: a second
+# map_hash_max_size (nginx refuses to start) and a slashed address that gets the bare policy. The binary here is a stub that
 # models what those faults hit: nginx's duplicate directive, its missing include, the map keyed by $uri after try_files joined
-# without merging slashes. Docker stays refused in the sandbox (deploy/test.sh is Alexis's).
+# without merging slashes. Docker stays refused in the sandbox (deploy/test.sh is a person's).
 nc="$t/nginxchk"
 mkdir -p "$nc/scripts" "$nc/deploy/web" "$nc/app/build/client/w/bubble" "$nc/tools/nginx-1.30.6/conf"
 cp "$here/../deploy/web/nginx.conf" "$nc/deploy/web/nginx.conf"
@@ -5143,7 +5141,7 @@ rm -f "$nc/stub.log" "$nc/stub.pid"
 out=$(chk) || fail "check_nginx refused the image's config with a good table, every page answering its own policy: $out"
 grep -q "^test " "$nc/stub.log" || fail "check_nginx ran no nginx -t"
 grep -q "^serve " "$nc/stub.log" || fail "check_nginx did not serve the build after nginx -t"
-# Whole lines: `/index.html` is a part of `/w/bubble/index.html`, and a substring said it asked an address it never did (F2619).
+# Whole lines: `/index.html` is a part of `/w/bubble/index.html`, and a substring said it asked an address it never did.
 for form in "/" "/index.html" "/w/bubble/" "/w/bubble" "/w/bubble/index.html"; do
 	printf '%s\n' "$out" | grep -q "^ok    GET $form -> 200, " || fail "check_nginx did not say it asked $form: $out"
 done
@@ -5155,7 +5153,7 @@ printf '%s\n' "$conf_tested" | grep -qF "/etc/nginx/csp.conf" && fail "check_ngi
 conf_served=$(sed -n '/^serve /,/^===$/p' "$nc/stub.log")
 printf '%s\n' "$conf_served" | grep -qE "^ *(listen +8080|listen .*proxy_protocol|auth_basic)" && fail "check_nginx served the config as the image has it (a fixed port, the PROXY protocol, the password file): a plain request cannot reach it"
 if [ -s "$nc/stub.pid" ]; then kill -0 "$(cat "$nc/stub.pid")" 2>/dev/null && { kill "$(cat "$nc/stub.pid")"; fail "check_nginx left the nginx it started running"; }; fi
-# F2460: a table with no row for the slashed address (try_files' $uri/index.html joins without merging slashes): the page gets
+# A table with no row for the slashed address (try_files' $uri/index.html joins without merging slashes): the page gets
 # the bare policy at /w/bubble/, and the check says so.
 grep -v '//index.html' "$nc/app/build/csp.conf" >"$nc/c" && mv "$nc/c" "$nc/app/build/csp.conf"
 out=$(chk) && fail "check_nginx passed a table with no row for a slashed address (F2460): $out"
@@ -5167,7 +5165,7 @@ out=$(chk) && fail "check_nginx passed a page answering another page's policy: $
 printf '%s\n' "$out" | grep -qF "/w/bubble" || fail "check_nginx did not name the page that got another's policy: $out"
 stopped "a page that got another's policy"
 table
-# F2619: the three address forms of a page come from the page files, not from _headers. A _headers that holds only a page's bare row
+# The three address forms of a page come from the page files, not from _headers. A _headers that holds only a page's bare row
 # (or only its slashed row) still has every form asked: a home that loses /index.html, or a page its slashed address, goes unseen
 # when _headers names the address itself.
 cp "$nc/app/build/client/_headers" "$nc/headers.good"
@@ -5224,7 +5222,7 @@ sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "proxy_pass +http://(ergo|s
 # The image logs to /dev/stderr and /dev/stdout, which a real nginx -t cannot open under the sandbox: the check tests a config that logs
 # to a file of its own folder (the stub refuses the device paths as nginx does).
 sed -n '/^test /,/^===$/p' "$nc/stub.log" | grep -qE "^ *(error|access)_log +/dev/std" && fail "check_nginx left the image's /dev/stderr or /dev/stdout log in the config it tested"
-# F2459: a second map_hash_max_size in the config nginx refuses; the check shows nginx's own words and serves nothing.
+# A second map_hash_max_size in the config nginx refuses; the check shows nginx's own words and serves nothing.
 cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
 python3 -I -c 'import re, sys; t = open(sys.argv[1]).read(); open(sys.argv[2], "w").write(re.sub(r"^( *)(include /etc/nginx/csp\.conf;)", r"\1map_hash_max_size 4096;\n\1\2", t, flags=re.M))' "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 [ "$(grep -c '^ *map_hash_max_size' "$nc/deploy/web/nginx.conf")" = 1 ] || fail "the fixture did not plant F2459's fault"
@@ -5233,7 +5231,7 @@ out=$(chk) && fail "check_nginx passed a config nginx refuses to start with (F24
 printf '%s\n' "$out" | grep -qF '"map_hash_max_size" directive is duplicate' || fail "check_nginx did not show nginx's own error for F2459: $out"
 grep -q "^serve " "$nc/stub.log" && fail "check_nginx served a build after nginx -t failed"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
-# A warning fails, the hash table's included: csp-fixes (F2454) sized the table, and nginx 1.30.6 builds it with none.
+# A warning fails, the hash table's included: csp-fixes sized the table, and nginx 1.30.6 builds it with none.
 out=$(WARN='could not build optimal map_hash, you should increase either map_hash_max_size: 2048 or map_hash_bucket_size: 64' chk) && fail "check_nginx passed the hash table's warning, which csp-fixes' sizes removed (F2625): $out"
 printf '%s\n' "$out" | grep -qF 'could not build optimal map_hash' || fail "check_nginx did not show the hash table's warning that failed it: $out"
 out=$(WARN='the "user" directive makes sense only if the master process runs with super-user privileges, ignored' chk) && fail "check_nginx passed an unknown warning: $out"
@@ -5263,22 +5261,22 @@ mv "$nc/app/build/csp.conf" "$nc/csp.keep"
 out=$(chk) && fail "check_nginx passed with no build's table: $out"
 printf '%s\n' "$out" | grep -qi "csp.conf" || fail "check_nginx did not name the missing table: $out"
 mv "$nc/csp.keep" "$nc/app/build/csp.conf"
-# GitHub's build job builds into the folder GNOWORLD_BUILD names (app/build-gate/ci), and check_nginx reads it there (F13176).
+# GitHub's build job builds into the folder GNOWORLD_BUILD names (app/build-gate/ci), and check_nginx reads it there.
 mv "$nc/app/build" "$nc/app/build-gate-ci"
 out=$(BUILD="$nc/app/build-gate-ci" chk) || fail "check_nginx did not read the build GNOWORLD_BUILD names: $out"
 out=$(chk) && fail "check_nginx passed with no build in app/build and no GNOWORLD_BUILD: $out"
 mv "$nc/app/build-gate-ci" "$nc/app/build"
-# The pinned binary is documented where Alexis sets the tools up.
+# The pinned binary is documented where a person sets the tools up.
 grep -q "gnoworld-tools/nginx-1\.30\.6/nginx" "$here/../docs/DEVELOPMENT.md" && grep -q "scripts/nginx\.sha256" "$here/../docs/DEVELOPMENT.md" && grep -qi "sha256\|checksum" "$here/../docs/DEVELOPMENT.md" || fail "docs/DEVELOPMENT.md does not say how to get the pinned nginx 1.30.6 with its checksum"
-# Its switches are the tests' and GitHub's build job's, which hands it its own binary's checksum (F13176).
+# Its switches are the tests' and GitHub's build job's, which hands it its own binary's checksum.
 # A visitor's first load is twice its files at once (deploy/test.sh asks every file of the build twice): the burst of the visitors' zone must
-# hold twice the build's files, or a first visit gets a 429 (F3385: 44 of 220 requests at a burst of 160). Docker is not needed to see it.
+# hold twice the build's files, or a first visit gets a 429 (44 of 220 requests at a burst of 160). Docker is not needed to see it.
 cp "$nc/deploy/web/nginx.conf" "$nc/nginx.good"
 sed 's#zone=visitors burst=640#zone=visitors burst=4#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 grep -q 'zone=visitors burst=4 ' "$nc/deploy/web/nginx.conf" || fail "the fixture did not plant a burst of 4"
 out=$(chk) && fail "check_nginx passed a burst of 4 for a build of 3 files, whose first load is 6 requests: $out"
 printf '%s\n' "$out" | grep -qi "burst" || fail "check_nginx did not name the burst that a first load overruns: $out"
-# The boundary (the red pass, finding 12): exactly twice the files holds, one under does not.
+# The boundary: exactly twice the files holds, one under does not.
 sed 's#zone=visitors burst=640#zone=visitors burst=6#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
 out=$(chk) || fail "check_nginx refused a burst of 6, twice the 3 files of the build: $out"
 sed 's#zone=visitors burst=640#zone=visitors burst=5#' "$nc/nginx.good" >"$nc/deploy/web/nginx.conf"
@@ -5297,8 +5295,8 @@ rm "$nc/app/build/client/assets/a.js" "$nc/app/build/client/textures/b.webp"
 rmdir "$nc/app/build/client/assets" "$nc/app/build/client/textures"
 cp "$nc/nginx.good" "$nc/deploy/web/nginx.conf"
 chk >/dev/null || fail "check_nginx refused the image's burst for a build of 3 files"
-# The table the burst lives in (F3665, Alexis, 2026-11-02): the visitors' zone has two live lines, both at 640, and its rate is unchanged. Each
-# line is read from its start, for a comment proves nothing: the faults under it are what a loose grep passed (7d1's security review).
+# The table the burst lives in: the visitors' zone has two live lines, both at 640, and its rate is unchanged. Each
+# line is read from its start, for a comment proves nothing: the faults under it are what a loose grep passed.
 burst_table() {
 	[ "$(grep -Ec '^[[:space:]]*limit_req zone=visitors ' "$1")" = 2 ] &&
 		[ "$(grep -Ec '^[[:space:]]*limit_req zone=visitors burst=640 nodelay;$' "$1")" = 2 ] &&
@@ -5320,7 +5318,7 @@ rm "$nc/table.conf"
 fi
 
 if part bench_load; then
-# bench.py measures a quiet machine (harness-c, 4b): before it runs the benches it reads the load (scripts/load.py: tenths, "170 160"
+# bench.py measures a quiet machine: before it runs the benches it reads the load (scripts/load.py: tenths, "170 160"
 # is a load of 17.0 on 16 cores) and waits, up to a ceiling, for it to fall under the cores; it prints what it waited and the load,
 # and refuses, saying so, when the ceiling passes. No budget changes: an over-budget bench at a quiet load still fails. The tests' load
 # is scripts/load.py's stub, a line a read; BENCH_WAIT_CEILING and BENCH_WAIT_STEP (seconds) are theirs.
@@ -5359,11 +5357,11 @@ out=$(CEILING=1 bload "900 160") && fail "bench.py gave a verdict on a machine t
 printf '%s\n' "$out" | grep -qF "needs a machine that can measure it" || fail "bench.py did not say why it refused (a machine that can measure): $out"
 printf '%s\n' "$out" | grep -qF "90.0" || fail "bench.py did not print the load it gave up at: $out"
 [ ! -e "$bl/ran" ] || fail "bench.py ran the benches on a machine past its ceiling"
-# The pause between two reads is the step (F2620): over a 2 s ceiling with a step of 1 s the load is read a few times, not in a loop.
+# The pause between two reads is the step: over a 2 s ceiling with a step of 1 s the load is read a few times, not in a loop.
 out=$(CEILING=2 STEP=1 bload "900 160") && fail "bench.py gave a verdict on a machine that never fell quiet (step 1 s): $out"
 [ "$(cat "$bl/load.n")" -le 5 ] || fail "bench.py read the load $(cat "$bl/load.n") times in 2 s with a step of 1 s: it does not pause between two reads (F2620)"
 [ "$(cat "$bl/load.n")" -ge 2 ] || fail "bench.py read the load once in 2 s with a step of 1 s: it did not read again"
-# The defaults, with no switch: a ceiling of 60 s said (the harness audit, 2026-11-04: 600 s at loads of 48 to 142 ended on a refusal
+# The defaults, with no switch: a ceiling of 60 s said (600 s at loads of 48 to 142 ended on a refusal
 # all the same), and a step of 10 s (one read in the first seconds). It is stopped once seen.
 rm -f "$bl/ran" "$bl/load.n" && printf '900 160\n' >"$bl/seq"
 (cd "$bl" && env -u BENCH_WAIT_CEILING -u BENCH_WAIT_STEP BENCH_FIXTURE="$bl/report.json" BENCH_RAN="$bl/ran" LOAD_SEQ="$bl/seq" LOAD_N="$bl/load.n" python3 -I scripts/bench.py >"$bl/dflt.out" 2>&1 & echo $! >"$bl/dflt.pid")
@@ -5395,7 +5393,7 @@ printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "mean
 out=$(bload "10 160") && fail "bench.py passed a bench over its budget at a quiet load: $out"
 printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: 0.2500 ms, over its 0.2 ms" || fail "bench.py did not name the bench over its budget at a quiet load: $out"
 # load.py reads the machine itself: its 1-minute load (the first of getloadavg's three) and its cores, in tenths.
-# Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart (G4).
+# Run on a machine of known numbers, so the minute's average, the 5- and 15-minute ones and the scale each tell apart.
 loaded() { # $1: the cores os.cpu_count gives
 	python3 -I -c 'import os, runpy, sys; os.getloadavg = lambda: (1.7, 5.0, 9.0); os.cpu_count = lambda: int(sys.argv[1]); runpy.run_path(sys.argv[2], run_name="__main__")' "$1" "$here/load.py"
 }
@@ -5408,9 +5406,9 @@ fi
 if part regressions; then
 # check_regressions: its rules on small cases (the real run needs a base branch and Vitest).
 python3 -I "$here/check_regressions.py" --self-test >/dev/null || fail "check_regressions's rules do not hold"
-# F2523: an exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` added an ignore that
-# ignores() never saw (it read only the quoted strings), so no `Lowered-floor:` line was asked for. A bare name in these lists is
-# refused as an unread entry; a quoted entry is seen as before, and the spread of a tool's own defaults alone stays.
+# An exclusion written with a name is read. `exclude: [...configDefaults.exclude, STRYKER_TMP]` adds an ignore that
+# ignores() would miss if it read only the quoted strings, so no `Lowered-floor:` line would be asked for. A bare name in these lists is
+# refused as an unread entry; a quoted entry is seen as any other, and the spread of a tool's own defaults alone stays.
 rx="$t/regrname" && mkdir -p "$rx/scripts"
 cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rx/scripts/"
 git -C "$rx" init -q && printf 'node_modules/\n' >"$rx/.gitignore"
@@ -5450,7 +5448,7 @@ git -C "$rx" add -A && git -C "$rx" commit -qm "a journeys' config"
 out=$(regx) && fail "check_regressions passed with a Playwright that listed nothing"
 printf '%s\n' "$out" | grep -qF "boom: the config cannot load" || fail "check_regressions did not say why Playwright listed nothing: $out"
 nameback && rm -rf "$rx/app"
-# What was read before is read still: a quoted entry named after the spread, and the spread of the defaults on its own.
+# Still read: a quoted entry named after the spread, and the spread of the defaults on its own.
 printf 'export default { test: { exclude: [...configDefaults.exclude, "a/**"] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the defaults spread, nothing new"
 out=$(regx) || fail "check_regressions refused the spread of a tool's own defaults beside an entry the base had: $out"
 nameback
@@ -5458,7 +5456,7 @@ printf 'export default { test: { exclude: [...configDefaults.exclude, "b/**"] } 
 out=$(regx) && fail "check_regressions passed a quoted exclusion added beside the spread of the defaults: $out"
 printf '%s\n' "$out" | grep -qF "b/**" || fail "check_regressions did not name the quoted exclusion b/**: $out"
 nameback
-# Other shapes the reader could not see are refused too: a single-quoted entry is read (and named), a list passed by name with no
+# Other shapes the reader cannot see are refused too: a single-quoted entry is read (and named), a list passed by name with no
 # bracket, a list with a method on it (`.concat`), a template literal.
 printf "export default { test: { exclude: ['a/**', 'c/**'] } };\n" >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "a single-quoted entry"
 out=$(regx) && fail "check_regressions passed a single-quoted exclusion added to a list: $out"
@@ -5499,7 +5497,7 @@ nameback
 printf 'export default { test: { exclude: [...configDefaults.exclude] } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "the name taken away"
 out=$(regx) || fail "check_regressions refused a name taken away: $out"
 nameback
-# F2622: a name stands for its value. A const the file holds behind a name or a spread is read: its value is the entry, so widening
+# A name stands for its value. A const the file holds behind a name or a spread is read: its value is the entry, so widening
 # `STRYKER_TMP` to "**/*.test.ts", or adding to `SLOW`, shows though the list names the same words. Only the tool's own
 # `...configDefaults.exclude` is the tool's: a lookalike (`...myConfigDefaults.list`) is an entry.
 printf 'const STRYKER_TMP = "**/.stryker-tmp/**";\nconst SLOW = ["s/**"];\nexport default { test: { exclude: [...configDefaults.exclude, STRYKER_TMP, ...SLOW] } };\n' >"$rx/vitest.config.ts"
@@ -5522,7 +5520,7 @@ printf 'const myConfigDefaults = { list: ["server/**"] };\nexport default { test
 out=$(regx) && fail "check_regressions passed a spread that only looks like the tool's defaults (F2627): $out"
 printf '%s\n' "$out" | grep -qF 'myConfigDefaults.list' || fail "check_regressions did not name the lookalike spread: $out"
 nameback
-# F2627: the other forms of the same exclusion: shorthand (`{ exclude }`), a quoted key, and the list on the next line, as Prettier
+# The other forms of the same exclusion: shorthand (`{ exclude }`), a quoted key, and the list on the next line, as Prettier
 # breaks a call of two arguments.
 printf 'const exclude = ["z/**"];\nexport default { test: { exclude } };\n' >"$rx/vitest.config.ts" && git -C "$rx" commit -qam "shorthand"
 out=$(regx) && fail "check_regressions passed an exclusion written as the shorthand { exclude } (F2627): $out"
@@ -5536,8 +5534,8 @@ printf 'export default [globalIgnores(\n  ["docs/", "server/**"],\n  "name",\n),
 out=$(regx) && fail "check_regressions passed a globalIgnores list that starts on the next line (F2627): $out"
 printf '%s\n' "$out" | grep -qF 'server/**' || fail "check_regressions did not name the entry on the next line: $out"
 nameback
-# F2623: a comment in a list is no entry. An apostrophe in one opened a string that ran across the list (the real vitest.config.ts has
-# `// The server's entry`), so raising a floor was refused as an ignore added; a `]` in one ended the list early.
+# A comment in a list is no entry. An apostrophe in one could open a string that runs across the list (the real vitest.config.ts has
+# `// The server's entry`), so raising a floor would be refused as an ignore added; a `]` in one could end the list early.
 printf 'export default { test: { exclude: [\n  "a/**",\n  // The server'"'"'s entry, see [1]\n  "b/**",\n], coverage: { thresholds: { lines: 85 } } } };\n' >"$rx/vitest.config.ts"
 git -C "$rx" commit -qam "a base with a comment in the list" && xbase=$(git -C "$rx" rev-parse HEAD)
 sed 's/lines: 85/lines: 90/' "$rx/vitest.config.ts" >"$rx/v.tmp" && mv "$rx/v.tmp" "$rx/vitest.config.ts" && git -C "$rx" commit -qam "a floor raised"
@@ -5550,7 +5548,7 @@ sed 's|^  "b/\*\*",|  "b/**",\n  "c/**",|' "$rx/vitest.config.ts" >"$rx/v.tmp" &
 out=$(regx) && fail "check_regressions passed an entry added after a comment holding a bracket (F2623): $out"
 printf '%s\n' "$out" | grep -qF 'c/**' || fail "check_regressions did not name c/** added after a comment: $out"
 nameback
-# The benches' budgets (G6), through the whole script on a small repository, which has no Vitest to list: a bench gone
+# The benches' budgets, through the whole script on a small repository, which has no Vitest to list: a bench gone
 # or given a longer budget fails unless a commit names it on a `Lowered-floor: bench <name> - why` line.
 rg="$t/regr" && mkdir -p "$rg/scripts" "$rg/app/tests/bench" "$rg/app/src"
 cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rg/scripts/"
@@ -5569,7 +5567,7 @@ out=$(reg) && fail "check_regressions passed a bench gone: $out"
 printf '%s\n' "$out" | grep -qF "a room 100 ms -> gone" || fail "check_regressions did not name the bench gone: $out"
 git -C "$rg" reset -q --hard "$base" && printf 'bench("a line [0.2 ms]", f);\nbench("a room [10 ms]", f);\nbench("a new one [5 ms]", f);\n' >"$rg/app/tests/bench/a.bench.ts" && git -C "$rg" rm -q app/src/x.ts && git -C "$rg" commit -qam "a shorter budget and a new bench"
 out=$(reg) || fail "check_regressions refused a shorter budget and a new bench: $out"
-# A gap whose key holds ` - ` (a flip of `a - b`) is named by its line all the same (F5000): every cut before a ` - ` that a
+# A gap whose key holds ` - ` (a flip of `a - b`) is named by its line all the same: every cut before a ` - ` that a
 # reason follows is read as an item, not the first alone.
 git -C "$rg" reset -q --hard "$base" && printf 'GAPS = {\n    "r/x.gno: d := a - b [- -> +]": "equivalent",\n}\n' >"$rg/scripts/mutate.py"
 git -C "$rg" add scripts/mutate.py && git -C "$rg" commit -qm "a gap on a - b"
@@ -5577,7 +5575,7 @@ out=$(reg) && fail "check_regressions passed a gap no commit names: $out"
 git -C "$rg" commit -q --allow-empty -m "says why" -m "Lowered-floor: gap scripts/mutate.py r/x.gno: d := a - b [- -> +] - d is never read"
 out=$(reg) || fail "check_regressions refused a gap holding ' - ' that a commit names (F5000): $out"
 # An approved picture changed or deleted in the index or the working tree, not yet committed, is judged too: the hook and the fast
-# gate run this before the commit exists, so a diff of base..HEAD alone saw nothing (F2574). A picture the base never had is new.
+# gate run this before the commit exists, so a diff of base..HEAD alone saw nothing. A picture the base never had is new.
 git -C "$rg" reset -q --hard "$base"
 mkdir -p "$rg/app/tests/e2e/home.spec.ts-snapshots" && printf 'one\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/a.png" && printf 'two\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/b.png"
 git -C "$rg" add -A && git -C "$rg" commit -qm "two pictures" && base=$(git -C "$rg" rev-parse HEAD)
@@ -5592,8 +5590,8 @@ out=$(reg) && fail "check_regressions passed an approved picture changed in the 
 git -C "$rg" reset -q --hard "$base" && printf 'new\n' >"$rg/app/tests/e2e/home.spec.ts-snapshots/c.png" && git -C "$rg" add -A
 out=$(reg) || fail "check_regressions refused a new approved picture: $out"
 git -C "$rg" reset -q --hard "$base"
-# The base and the tree are listed whole, a vitest that logs its calls standing for the real one (F2579's cases, its --quick gone with
-# its one caller, pre-commit under GNOWORLD_STRICT=1: D13173): a test gone, beside another change or with its file; one a non-test
+# The base and the tree are listed whole, a vitest that logs its calls standing for the real one:
+# a test gone, beside another change or with its file; one a non-test
 # file renames; a new, untracked test file read.
 rq="$t/regq" && mkdir -p "$rq/scripts" "$rq/node_modules/.bin" "$rq/app/src"
 cp "$here/check_regressions.py" "$here/repo_files.py" "$here/hidden.py" "$here/borrow_node_modules.sh" "$rq/scripts/"
@@ -5648,9 +5646,9 @@ for o in --quick --whatever; do
 	printf '%s\n' "$out" | grep -q "usage: check_regressions.py <base>" || fail "check_regressions refused $o without its usage: $out"
 done
 back
-# F13189: the app's journeys, listed as check_regressions lists them, are JSON alone. crowd.test.mjs, a node:test file under
-# tests/e2e, matched Playwright's default testMatch: the listing loaded it, its tests printed before the JSON, and GitHub's
-# regressions job crashed on main and on every pull request from 2026-11-10.
+# The app's journeys, listed as check_regressions lists them, are JSON alone. crowd.test.mjs, a node:test file under
+# tests/e2e, would match Playwright's default testMatch: the listing would load it, its tests print before the JSON, and GitHub's
+# regressions job would crash.
 listing=$(cd "$here/.." && node app/node_modules/@playwright/test/cli.js test -c app/playwright.config.ts --list --reporter=json 2>/dev/null)
 printf '%s' "$listing" | python3 -I -c 'import json, sys; r = json.load(sys.stdin); sys.exit(1 if r["errors"] or not r["suites"] else 0)' 2>/dev/null ||
 	fail "Playwright's listing of the app's journeys is not JSON alone, which check_regressions reads (F13189): $(printf '%.120s' "$listing")"
@@ -5658,7 +5656,7 @@ fi
 
 if part ergo; then
 # ergo.sh builds the pinned Ergo once into the tools' cache, checks what it finds there, and refuses
-# what it cannot build (slice 3b). Stubs stand for git and go; each logs its call.
+# what it cannot build. Stubs stand for git and go; each logs its call.
 e="$t/ergo" && mkdir -p "$e/repo/deploy/ergo" "$e/bin" "$e/nogo"
 pin=0123456789abcdef0123456789abcdef01234567
 printf 'v9.9.9 %s\n' "$pin" >"$e/repo/deploy/ergo/VERSION"
@@ -5680,7 +5678,7 @@ chmod +x "$e/bin/git" "$e/bin/go" && cp "$e/bin/git" "$e/nogo/git"
 ergo_sh() { (cd "$e/repo" && GNOWORLD_TOOLS="$e/tools" STUB_LOG="$e/log" STUB_COMMIT="${commit:-$pin}" STUB_GO_FAILS="${go_fails:-}" PATH="${path:-$e/bin:$PATH}" /bin/sh "$here/ergo.sh" 2>"$e/err"); }
 builds() { : >"$e/log" && out=$(ergo_sh) && grep -q '^go CGO_ENABLED=[^ ]* build ' "$e/log" && [ "$out" = "$e/tools/ergo-$1/ergo" ]; }
 builds v9.9.9 || fail "ergo.sh did not build the pinned Ergo when none was cached: $(cat "$e/err")"
-# The flags the spike found: static, paths trimmed, and the sqlite tag persistent history needs.
+# The flags it needs: static, paths trimmed, and the sqlite tag persistent history needs.
 grep -q '^go CGO_ENABLED=0 build -trimpath -tags i18n mysql postgresql sqlite ' "$e/log" || fail "ergo.sh built without its flags: $(cat "$e/log")"
 : >"$e/log" && [ "$(ergo_sh)" = "$e/tools/ergo-v9.9.9/ergo" ] && ! grep -q '^go' "$e/log" || fail "ergo.sh built again an Ergo it had"
 printf '\n' >>"$e/tools/ergo-v9.9.9/ergo"
@@ -5735,8 +5733,8 @@ done
 kill -9 "$victim"
 wait "$victim" 2>/dev/null || :
 [ "$(ls "$tmp" | grep -vc '^\(dead\|live\|other\)$')" = 1 ] || fail "the killed run left no copy to clear: $(ls "$tmp")"
-# Two copies held at once, beside a dead run's `tree` entry: two names, and none is `tree` (F1191: from 2026-10-27
-# the sandbox refuses to create exactly `.git/worktrees/tree`, so a copy named so failed every run).
+# Two copies held at once, beside a dead run's `tree` entry: two names, and none is `tree` (
+# the sandbox refuses to create exactly `.git/worktrees/tree`, so a copy named so would fail every run).
 (cd "$w/repo" && TMPDIR="$tmp" python3 -I -c 'import os, sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import worktree
 with worktree("HEAD") as a, worktree("HEAD") as b: print(a); print(b); print(*os.listdir(".git/worktrees"))' "$here" >"$w/out" 2>&1) || fail "repo_files.worktree failed beside a dead run's copy: $(cat "$w/out")"
 [ "$(basename "$(sed -n 1p "$w/out")")" != "$(basename "$(sed -n 2p "$w/out")")" ] || fail "two copies held at once got one name: $(cat "$w/out")"
@@ -5764,7 +5762,7 @@ git -C "$ws/src" add -A && git -C "$ws/src" commit -qm x
 echo pkg >"$ws/src/node_modules/pkg/index.js" && echo stale >"$ws/src/node_modules/.vite/deps/x"
 ln -s ../../../packages/core "$ws/src/app/node_modules/@gnoworld/core"
 # It runs outside the sandbox, so it makes and removes the folders of one root alone, $HOME/Server/gnoworld-wt, where no session
-# writes but its own folder (Alexis, 2026-11-04). With this user's own home it refuses a folder anywhere else, naming that root,
+# writes but its own folder. With this user's own home it refuses a folder anywhere else, naming that root,
 # and makes nothing; the other cases give it a home of this run's ($home). The base is no commit, so a fence switched off (a
 # harness mutant) stops there, never making a tree in the real root, and still fails on the message.
 out=$(cd "$ws/src" && sh "$here/worktree.sh" "$ws/th-out-$$" outbranch nosuchbase 2>&1) && fail "worktree.sh made a tree outside \$HOME/Server/gnoworld-wt: $out"
@@ -5828,7 +5826,7 @@ wt "../home/Server/gnoworld-wt/rel" rel HEAD >"$ws/out" 2>&1 || fail "worktree.s
 git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/rel" || fail "worktree.sh did not make the folder a relative path resolves to"
 # remove <dir>: a clean worktree of this repository under the root, from another tree; its files deleted, ignored ones included,
 # never what a link in it leads to; its branch kept; and no other tree's record touched, not even one whose folder is gone, which
-# git worktree prune would take: a session can point another tree's record at nothing (reviewer, second review, item 4).
+# git worktree prune would take: a session can point another tree's record at nothing.
 wt remove "$wr/../gnoworld-wt/rel" >"$ws/out" 2>&1 || fail "worktree.sh refused to remove a clean worktree: $(cat "$ws/out")"
 [ ! -e "$wr/rel" ] || fail "worktree.sh left the folder it removed"
 wt "$wr/stale" stale HEAD >/dev/null 2>&1 && rm -r "$wr/stale" || fail "the stale worktree of this case could not be made"
@@ -5848,8 +5846,8 @@ for change in "echo m >>packages/core/a.ts" "echo s >staged.txt && git add stage
 	[ -d "$wr/unclean" ] && git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/unclean" || fail "worktree.sh's refused remove touched the tree ($change)"
 	git -C "$wr/unclean" reset -q --hard && git -C "$wr/unclean" clean -qfd
 done
-# Its clean check enters no nested repository: git's own ran git status in one its index staged at that moment, which the tree's
-# session can flip between git's two reads, so that its fsmonitor ran outside the sandbox (security-reviewer, third review). Here
+# Its clean check enters no nested repository: git's own would run git status in one its index staged at that moment, which the tree's
+# session can flip between git's two reads, so that its fsmonitor would run outside the sandbox. Here
 # the nested repository's own clean filter, which git status runs to read a file changed at its size, and no setting of the script
 # turns off.
 wt "$wr/subm" subm HEAD >/dev/null 2>&1 || fail "the subm worktree of this case could not be made"
@@ -5885,7 +5883,7 @@ code=0 && out=$(wt remove -x 2>&1) || code=$?
 code=0 && out=$(wt remove "$wr/rm3" HEAD 2>&1) || code=$?
 [ "$code" = 2 ] && printf '%s\n' "$out" | grep -qF "usage:" && [ ! -e "$wr/remove" ] || fail "worktree.sh took remove and two words for a call ($code): $out"
 # A worktree's commondir, which Claude Code protects only for the trees that stood when the session started, leads git at no
-# other config when worktree.sh runs it outside the sandbox: there an fsmonitor of that config would run (reviewer, F5097).
+# other config when worktree.sh runs it outside the sandbox: there an fsmonitor of that config would run.
 wt "$wr/redirected" redirected HEAD >/dev/null 2>&1 || fail "the redirected worktree of this case could not be made"
 admin=$(sed 's/^gitdir: //' "$wr/redirected/.git")
 cp -R "$ws/src/.git" "$ws/evilgit" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/pwned" >"$ws/fsmonitor" && chmod +x "$ws/fsmonitor"
@@ -5893,9 +5891,9 @@ git --git-dir="$ws/evilgit" config core.fsmonitor "$ws/fsmonitor" && echo "$ws/e
 wt remove "$wr/redirected" >"$ws/out" 2>&1 || :
 [ ! -e "$ws/pwned" ] || fail "worktree.sh ran git with the config a worktree's commondir led to: its fsmonitor ran (F5097): $(cat "$ws/out")"
 [ ! -d "$admin" ] || echo ../.. >"$admin/commondir"
-# Run from a worktree, as a part is cut from the chief's, it makes and removes trees of this repository; and when that worktree's
+# Run from a linked worktree, it makes and removes trees of this repository; and when that worktree's
 # own commondir leads elsewhere, it still reads this repository's config: the common folder comes from the tree's .git, which the
-# settings deny every session, never from the commondir git would read (F5097). So from a worktree made with relative paths.
+# settings deny every session, never from the commondir git would read. So from a worktree made with relative paths.
 git -C "$ws/src" worktree add -q -b fromwt "$ws/fromwt" HEAD && mkdir "$ws/fromwt/node_modules"
 git -C "$ws/src" worktree add -q -b fromrel "$ws/fromrel" HEAD && mkdir "$ws/fromrel/node_modules" && echo "gitdir: ../src/.git/worktrees/fromrel" >"$ws/fromrel/.git"
 admin=$(sed 's/^gitdir: //' "$ws/fromwt/.git")
@@ -5915,8 +5913,8 @@ rm "$ws/src/.git/commondir"
 # Its fsmonitor is off whatever the config says, so the planted folder shows only where git recorded the tree: in this one.
 git -C "$ws/src" worktree list --porcelain | grep -qxF "worktree $wr/frommain" ||
 	fail "worktree.sh, run from the main checkout beside a planted commondir, recorded its tree in the folder that commondir names (F5097): $out"
-# Nor does it run a hook or an fsmonitor of this repository's common folder, which the file tools can still write (F5095): a
-# post-checkout hook ran when the tree was made, an fsmonitor when the base was compared (security-reviewer, third review).
+# Nor does it run a hook or an fsmonitor of this repository's common folder, which the file tools can still write: a
+# post-checkout hook would run when the tree is made, an fsmonitor when the base is compared.
 printf '#!/bin/sh\ntouch "%s"\n' "$ws/hookran" >"$ws/src/.git/hooks/post-checkout" && chmod +x "$ws/src/.git/hooks/post-checkout"
 git -C "$ws/src" config core.fsmonitor "$ws/fsmonitor"
 out=$(wt hooked hooked HEAD 2>&1) || :
@@ -5924,7 +5922,7 @@ rm "$ws/src/.git/hooks/post-checkout" && git -C "$ws/src" config --unset core.fs
 [ ! -e "$ws/hookran" ] && [ ! -e "$ws/pwned" ] || fail "worktree.sh ran a hook or an fsmonitor of the common folder: $out"
 [ -d "$wr/hooked" ] || fail "worktree.sh made no tree beside a planted hook and fsmonitor: $out"
 # A nested repository staged in this tree, under a harness path the base check reads, is never entered when worktree.sh compares
-# a base outside the sandbox: git would run its fsmonitor there (security-reviewer, F5097).
+# a base outside the sandbox: git would run its fsmonitor there.
 git init -q "$ws/src/.claude/nested" && echo n >"$ws/src/.claude/nested/n" && git -C "$ws/src/.claude/nested" add n
 git -C "$ws/src/.claude/nested" commit -qm n && git -C "$ws/src/.claude/nested" config core.fsmonitor "$ws/fsmonitor"
 git -C "$ws/src" add .claude/nested 2>/dev/null
@@ -5936,8 +5934,8 @@ git -C "$ws/src" rm -q -f --cached .claude/nested && rm -r "$ws/src/.claude/nest
 wt bare bare HEAD >"$ws/out" 2>&1 && [ -d "$wr/bare" ] || fail "worktree.sh made no tree of a bare name in its root: $(cat "$ws/out")"
 wt remove bare >"$ws/out" 2>&1 && [ ! -e "$wr/bare" ] || fail "worktree.sh removed no tree of a bare name: $(cat "$ws/out")"
 # A folder name holding a newline is a name like another as node_modules are borrowed, outside the sandbox: read line by line it
-# split, and a folder `a<newline>..` led a copy into another tree's scripts/ (security-reviewer, F5099), under the top or under a
-# folder the borrowing leaves out only at the top (app/.claude, the reviewer's second review). The tree is made, nothing outside.
+# split, and a folder `a<newline>..` led a copy into another tree's scripts/, under the top or under a
+# folder the borrowing leaves out only at the top (app/.claude). The tree is made, nothing outside.
 n=0
 for at in . app/.claude app/.git app/.stryker-tmp; do
 	n=$((n + 1))
@@ -5949,8 +5947,8 @@ for at in . app/.claude app/.git app/.stryker-tmp; do
 .." "$ws/src/$at/a"
 done
 # Outside the sandbox, the borrowing follows no link it did not make: a link the base checks out on the way to a node_modules it
-# copies (reviewer, second review, item 1b; security-reviewer, A), a node_modules the base tracks as a link (item 1c), or a
-# workspace's .bin leading elsewhere than a node_modules/.bin, whose files it would copy where the session reads them (item 1a).
+# copies, a node_modules the base tracks as a link, or a
+# workspace's .bin leading elsewhere than a node_modules/.bin, whose files it would copy where the session reads them.
 # Each is refused, its tree undone, what the link leads to untouched.
 mkdir -p "$ws/outside" "$ws/outside2" "$ws/secret" && echo key >"$ws/secret/id"
 installed=$(git -C "$ws/src" rev-parse HEAD)
@@ -5969,9 +5967,9 @@ out=$(wt "$wr/exf" exf HEAD 2>&1) && fail "worktree.sh copied a .bin that leads 
 [ ! -e "$wr/exf" ] || fail "worktree.sh left the tree of a .bin that leads elsewhere"
 rm "$ws/src/packages/core/node_modules/.bin"
 # The packages are the source tree's, linked: a base whose lockfile or package files are not this tree's would run the gate on
-# packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install (security-S5).
+# packages its own lockfile does not name, and a `pnpm install` there would write into this tree's install.
 # Its harness (records.sh's list) is this tree's too: worktree.sh may run outside the sandbox, so a base a session wrote by
-# plumbing would check its own settings and hooks out into a tree a session is later started in (F5098).
+# plumbing would check its own settings and hooks out into a tree a session is later started in.
 # It is refused, whichever such file differs, and makes nothing: no folder, no branch. A base git cannot read refuses too.
 mkdir -p "$ws/src/.claude" "$ws/src/scripts"
 for f in pnpm-lock.yaml pnpm-workspace.yaml .pnpmfile.cjs .pnpmfile.mjs .npmrc package.json app/package.json packages/core/package.json .claude/settings.json scripts/guard.py CLAUDE.md; do
@@ -5986,8 +5984,8 @@ out=$(wt "$wr/dirty" dirty HEAD 2>&1) && fail "worktree.sh made a tree beside a 
 git -C "$ws/src" checkout -q -- app/package.json
 out=$(wt "$wr/gone" gone nosuchbase 2>&1) && fail "worktree.sh made a tree of a base git cannot read: $out"
 [ ! -e "$wr/gone" ] || fail "worktree.sh made a folder for a base git cannot read"
-# An argument that starts with - is an option for git, never a name: a base `--output=<file>` made git diff truncate a file
-# outside the scratch copy (CR6); a branch or a folder so named is as wrong. Each is refused, and makes nothing.
+# An argument that starts with - is an option for git, never a name: a base `--output=<file>` would make git diff truncate a file
+# outside the scratch copy; a branch or a folder so named is as wrong. Each is refused, and makes nothing.
 echo victim >"$ws/victim"
 for args in "$wr/opt1 optbranch --output=$ws/victim" "$wr/opt2 --optbranch HEAD" "-optdir optbranch2 HEAD"; do
 	set -- $args
@@ -5998,7 +5996,7 @@ done
 [ ! -e "$wr/opt1" ] && [ ! -e "$wr/opt2" ] && [ ! -e "$ws/src/-optdir" ] || fail "worktree.sh made a folder for an argument that starts with a dash"
 for b in optbranch --optbranch optbranch2; do ! git -C "$ws/src" rev-parse -q --verify "refs/heads/$b" >/dev/null || fail "worktree.sh made the branch $b for a refused call"; done
 # A base that is no commit (a blob, a tree) is refused before anything is made; so is a root node_modules that is one link,
-# which the script could not take apart once the tree stood (CR6).
+# which the script could not take apart once the tree stood.
 out=$(wt "$wr/blob" blobbranch HEAD:package.json 2>&1) && fail "worktree.sh made a tree of a base that is a blob: $out"
 printf '%s\n' "$out" | grep -qF "is no commit" || fail "worktree.sh did not say a base is no commit: $out"
 [ ! -e "$wr/blob" ] && ! git -C "$ws/src" rev-parse -q --verify blobbranch >/dev/null || fail "worktree.sh made a folder or a branch for a base that is no commit"
@@ -6007,14 +6005,14 @@ out=$(wt "$wr/linked" linkedbranch HEAD 2>&1) && fail "worktree.sh made a tree o
 printf '%s\n' "$out" | grep -qF "node_modules is a link" || fail "worktree.sh did not say the root node_modules is a link: $out"
 [ ! -e "$wr/linked" ] && ! git -C "$ws/src" rev-parse -q --verify linkedbranch >/dev/null || fail "worktree.sh made a folder or a branch beside a node_modules that is one link"
 rm "$ws/src/node_modules" && mv "$ws/src/real_modules" "$ws/src/node_modules"
-# A step that fails once the tree stands undoes the tree and the branch: the next run names the same folder (CR6).
+# A step that fails once the tree stands undoes the tree and the branch: the next run names the same folder.
 mkdir "$ws/scripts" && cp "$here/worktree.sh" "$ws/scripts/" && printf '#!/bin/sh\ntouch "%s"\nexit 1\n' "$ws/ran-half" >"$ws/scripts/borrow_node_modules.sh"
 out=$(cd "$ws/src" && HOME="$home" sh "$ws/scripts/worktree.sh" "$wr/half" halfbranch HEAD 2>&1) && fail "worktree.sh went on after a step failed: $out"
 [ -e "$ws/ran-half" ] || fail "the half-made case never reached the step that fails: $out"
 [ ! -e "$wr/half" ] || fail "worktree.sh left the folder of a tree that failed half-made"
 ! git -C "$ws/src" rev-parse -q --verify halfbranch >/dev/null || fail "worktree.sh left the branch of a tree that failed half-made"
 git -C "$ws/src" worktree list | grep -qF "$wr/half" && fail "worktree.sh left $wr/half registered"
-# So does a signal that stops it once the tree stands (R6): the borrow step, here, sends its parent each in turn. In bash (macOS's sh)
+# So does a signal that stops it once the tree stands: the borrow step, here, sends its parent each in turn. In bash (macOS's sh)
 # the EXIT trap runs even when a signal kills the shell, in dash (Linux's sh) only the trap on the signals makes it run: both are tried.
 # SIGINT is ignored by a script started in the background, as this suite's sections are: python resets it to its default first.
 for shell in sh dash; do
@@ -6032,7 +6030,7 @@ sys.exit(subprocess.run(sys.argv[1:]).returncode)' "$shell" "$ws/scripts/worktre
 	done
 done
 wt "$wr/same" same HEAD >/dev/null 2>&1 || fail "worktree.sh refused a base whose package files are this tree's"
-# The rest of git's folders a caller may set, each dropped (7w3's red pass, T9): a git dir or a work tree, an index or an object folder
+# The rest of git's folders a caller may set, each dropped: a git dir or a work tree, an index or an object folder
 # elsewhere would send `git worktree add` to another repository, fill another folder or find no commit. The tree is made in this one.
 git init -q "$ws/other" && git -C "$ws/other" commit -q --allow-empty -m other
 for var in GIT_DIR GIT_COMMON_DIR; do
@@ -6047,8 +6045,8 @@ mkdir "$ws/stray-tree" && (cd "$ws/src" && env HOME="$home" GIT_WORK_TREE="$ws/s
 [ -z "$(ls -A "$ws/stray-tree")" ] && [ -f "$wr/bytree/packages/core/a.ts" ] || fail "worktree.sh filled the work tree a caller's GIT_WORK_TREE named, not its own"
 mkdir "$ws/no-objects" && (cd "$ws/src" && env HOME="$home" GIT_OBJECT_DIRECTORY="$ws/no-objects" sh "$here/worktree.sh" "$wr/byobjects" byobjects HEAD) >"$ws/out" 2>&1 || fail "worktree.sh followed a caller's GIT_OBJECT_DIRECTORY, where no commit is: $(cat "$ws/out")"
 # A workspace's .bin reached through a link (a tree whose packages were linked by hand, into another tree's node_modules/.bin)
-# is borrowed as a folder of its own: the probe deletes a tool in its copy, which went through the link and deleted the main
-# tree's (F2127).
+# is borrowed as a folder of its own: the probe deletes a tool in its copy, which would go through the link and delete the main
+# tree's.
 mkdir -p "$ws/bins/node_modules/.bin" "$ws/src/packages/core/node_modules" "$ws/borrowed" && echo tool >"$ws/bins/node_modules/.bin/storybook"
 ln -s "$ws/bins/node_modules/.bin" "$ws/src/packages/core/node_modules/.bin"
 (cd "$ws/src" && sh "$here/borrow_node_modules.sh" "$ws/borrowed") >"$ws/out" 2>&1 || fail "borrow_node_modules.sh failed on a linked .bin: $(cat "$ws/out")"
@@ -6093,14 +6091,14 @@ report
 (bench) >/dev/null && fail "bench.py passed a run with no bench"
 report "a line [0.2 ms]" 0.05
 (BENCH_EXIT=1 bench) >/dev/null && fail "bench.py passed a Vitest run that failed"
-# A bench whose function throws stays in Vitest's report with no sample and no mean, and the run ends 0 (F1213): the
+# A bench whose function throws stays in Vitest's report with no sample and no mean, and the run ends 0: the
 # gate fails, saying so, not with a traceback.
 printf '{"files": [{"groups": [{"benchmarks": [{"name": "a line [0.2 ms]", "samples": []}, {"name": "a room [100 ms]", "mean": 14.5}]}]}]}\n' >"$b/report.json"
 out=$(bench) && fail "bench.py passed a bench that took no sample: $out"
 printf '%s\n' "$out" | grep -q "a line \[0.2 ms\]: took no sample" || fail "bench.py did not say which bench took no sample: $out"
 printf '%s\n' "$out" | grep -q "Traceback" && fail "bench.py crashed on a bench with no mean: $out"
 # A bench the sources name that the report lacks was switched off: `describe.skip(...)` around it, or `.only` on a
-# neighbour, leaves it out of Vitest's report and the run ends 0 (security-S1). Each bench a `*.bench.ts(x)` source
+# neighbour, leaves it out of Vitest's report and the run ends 0. Each bench a `*.bench.ts(x)` source
 # names must be in the report, whatever its folder; a file in node_modules is no source of the repository's.
 mkdir -p "$b/app/tests/bench" "$b/node_modules/pkg"
 printf 'bench("a line [0.2 ms]", f);\n' >"$b/app/tests/bench/a.bench.ts"
@@ -6118,7 +6116,7 @@ report "a room [100 ms]" 14.5
 out=$(bench) && fail "bench.py passed with a bench of the sources (the one a .only left out) missing from its report: $out"
 printf '%s\n' "$out" | grep -qF "a line [0.2 ms]: " || fail "bench.py did not name the bench a .only left out: $out"
 # A path git prints quoted, "caf\303\251/d.bench.ts", is no file: the list read it as one it could not open, and a switched-off
-# bench in such a folder went unseen (CR5). Every listing of repo_files.git (ls-files, ls-tree, diff) prints names as they are.
+# bench in such a folder went unseen. Every listing of repo_files.git (ls-files, ls-tree, diff) prints names as they are.
 mkdir -p "$b/app/tests/bench/café" && printf 'bench("a café bench [1 ms]", f);\n' >"$b/app/tests/bench/café/d.bench.ts"
 git -C "$b" init -q && printf 'node_modules/\n' >"$b/.gitignore"
 out=$(cd "$b" && python3 -I -c 'import sys; sys.dont_write_bytecode = True; sys.path.insert(0, sys.argv[1]); from repo_files import git; print(git("ls-files", "--others", "--exclude-standard"))' "$here")
@@ -6131,9 +6129,9 @@ fi
 
 if part workflow_branch; then
 # The Workflow branch (.claude/workflows/branch.js), run by Node with its globals stubbed: each agent answers as the case
-# says, and the loop's verdict must follow (the reviews of slice-5-loop). An agent that dies blocks the loop, never counts as
+# says, and the loop's verdict must follow. An agent that dies blocks the loop, never counts as
 # a clean report; the harness and realms bring their lenses whatever the arguments; the script numbers the findings; a third
-# round's fix stops for Alexis; a second round re-runs only the lens whose high tier-1 finding was fixed.
+# round's fix stops for a person; a second round re-runs only the lens whose high tier-1 finding was fixed.
 command -v node >/dev/null || fail "node is needed to run the Workflow branch's cases"
 node - "$here/../.claude/workflows/branch.js" <<'JS' || fail "the Workflow branch broke a promise (above)"
 const { readFileSync, existsSync } = require("node:fs");
@@ -6412,8 +6410,8 @@ JS
 fi
 
 if part deploy_lock; then
-# deploy/test.sh takes a lock (harness list item 10): two runs at once share the Docker project gnoworld-demo-test and each one's
-# start removes the other's containers (2026-10-30: `FAIL ... No such container`). It needs Docker, which the sandbox refuses, so
+# deploy/test.sh takes a lock: two runs at once share the Docker project gnoworld-demo-test and each one's
+# start removes the other's containers (`FAIL ... No such container`). It needs Docker, which the sandbox refuses, so
 # the tools it calls are stubs on PATH; the first run is held at its first `docker run` while a second starts beside it.
 # Every process a run starts is recorded by pid (the stubs write them), killed by pid, and checked dead at the end: no pkill, which
 # the sandbox refuses.
@@ -6510,7 +6508,7 @@ soon ended killed || { stop_all; fail "a run killed hard still runs"; }
 deploy_run after "$p1"
 reached after || { stop_all; fail "a run was refused by the lock of a run that is dead: $(cat "$d/after.out")"; }
 stop_all
-# A holder another sandbox owns (its pid refuses a signal, EPERM, F2616) is alive: pid 1 holds the lock, and the run is refused.
+# A holder another sandbox owns (its pid refuses a signal, EPERM) is alive: pid 1 holds the lock, and the run is refused.
 mkdir -p "$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock" && printf '1\n' >"$d/home/.cache/gnoworld-tools/deploy-test-$p1.lock/pid"
 deploy_run eperm "$p1"
 refused eperm || { stop_all; fail "deploy/test.sh took over the lock of a live holder it was not allowed to signal (F2616): $(cat "$d/eperm.out")"; }
@@ -6530,7 +6528,7 @@ soon ended quit || { stop_all; fail "a run stopped by TERM never ended"; }
 deploy_run again "$p1"
 reached again || { stop_all; fail "a run was refused by the lock of a run that was stopped: $(cat "$d/again.out")"; }
 stop_all
-# A run left by a Ctrl+C (5f's gnoworld-demo-mutant-18219, whose network held the test's 172.30.90.0/24) is named in the refusal
+# A run left by a Ctrl+C (a gnoworld-demo-mutant-<pid>, whose network holds the test's 172.30.90.0/24) is named in the refusal
 # with the command that removes it; nothing is started beside it.
 left=gnoworld-demo-mutant-77777777
 deploy_run left "gnoworld-lock-c-$$" LOCK_LEFTOVER="$left"
@@ -6538,7 +6536,7 @@ refused left || { stop_all; fail "deploy/test.sh started beside a mutant project
 grep -q "docker compose -p $left down -v" "$d/left.out" || { stop_all; fail "the refusal did not give the command that removes $left: $(cat "$d/left.out")"; }
 grep -q '^run ' "$d/left.docker" && { stop_all; fail "deploy/test.sh went on after finding $left up"; }
 stop_all
-# Each source of a leftover is read alone (F2528: the stub printed it through both, so either guard passed without the other),
+# Each source of a leftover is read alone (the stub prints it through both, or either guard could pass without the other),
 # and a refusal on a leftover releases the lock it took.
 for via in compose network; do
 	deploy_run "via$via" "gnoworld-lock-$via-$$" LOCK_LEFTOVER="$left" LOCK_LEFTOVER_VIA=$via
@@ -6647,7 +6645,7 @@ for p in app/src/csp.ts app/src/lib/chain/evalCall.ts app/src/features/login/For
 done
 [ "$(tier gno/r/x/realm app/src/features/chat/realm)" = tier1 ] || fail "speeds.py --tier1: a realm file renamed into another folder was other"
 # A doubt is tier1: nothing to judge, a path git quotes, an absolute or a rewritten path, a padded one or one with a control character, a link
-# or a path through one, a name that is not text, a tier-1 folder in another case (a Mac's disk reads them as one, F164).
+# or a path through one, a name that is not text, a tier-1 folder in another case (a Mac's disk reads them as one).
 [ "$(printf '' | python3 -I "$sp" --tier1 "$r")" = tier1 ] || fail "speeds.py --tier1: an empty change was not tier1"
 [ "$(printf '\n\n' | python3 -I "$sp" --tier1 "$r")" = tier1 ] || fail "speeds.py --tier1: blank lines were not tier1"
 for p in '"app/src/features/chat/\303\251.tsx"' /app/src/features/chat/Bubble.tsx ./app/src/features/chat/Bubble.tsx app/src/features/chat/../../lib/x.ts \
@@ -6689,7 +6687,7 @@ is tier1 "packages/ui/src/Button/Button.tsx"
 is other "packages/ui/src/Other.tsx"
 cp "$t/speeds.review" "$r/docs/REVIEW.md"
 is other "packages/ui/src/Button/Button.tsx"
-# `--tier1` and the root, nothing else: another count, or another mode (the old merge check's speeds and the radical mode's light gate), is
+# `--tier1` and the root, nothing else: another count, or another mode (a merge check's speeds, a light gate), is
 # a doubt, whatever the path.
 for args in "--tier1" "--tier1 $r extra" "$r" "--light $r" "--light $r $t/speeds.review"; do
 	# shellcheck disable=SC2086 # the arguments are words
@@ -6715,7 +6713,7 @@ fi
 
 if part harness_timeout; then
 shards_fixture
-# F3382: a suite past its limit (600 s) counts as a caught mutant and its process group is stopped, TERM then KILL; the verdict won by time
+# A suite past its limit (600 s) counts as a caught mutant and its process group is stopped, TERM then KILL; the verdict won by time
 # is printed as such (the load can cause it); a control past the limit still fails the run, with a word and no traceback.
 # The copy's limit is 2 s. The suite hangs on a mutant of KEEP1 (a child that outlives its parent, pid recorded) and on its control with HANG_CONTROL.
 python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
@@ -6767,8 +6765,8 @@ reap
 fi
 
 if part check_docs_cells; then
-# The findings ledger keeps seven cells a row (the dream of 2026-11-01, 3): a row of F<nnn> with six cells, or eight, was skipped by the checks
-# that read it (1,992 rows read, 95 with more cells and 14 with fewer were not). A pipe in a cell is escaped, `\|`, as the splitter reads it.
+# The findings ledger keeps seven cells a row: a row of F<nnn> with six cells, or eight, would be skipped by the checks
+# that read it. A pipe in a cell is escaped, `\|`, as the splitter reads it.
 docs="$here"/check_docs.py
 c="$t/cells-root"
 mkdir -p "$c/docs/review"
@@ -6788,7 +6786,7 @@ python3 -I "$docs" "$c" >/dev/null 2>&1 || fail "check_docs read a sentence with
 fi
 
 if part deploy_stop; then
-# deploy/test.sh --mutants: a mutant stops at its expected check (the dream of 2026-11-01, 7). Each mutant is told the check that must catch it
+# deploy/test.sh --mutants: a mutant stops at its expected check. Each mutant is told the check that must catch it
 # (STOP_AT), and the run ends at that check's FAIL, with the other checks' failures shown before it; every check after it, hours of the full
 # stack, is not run. The functions are read from the script, and run with no Docker. Not measured here: docker is refused in the sandbox.
 ds="$here/../deploy/test.sh"
@@ -6810,7 +6808,7 @@ stop_case "" 'fail "the wanted check: x"' 'echo after-wanted'
 [ "$code" = 0 ] && printf '%s\n' "$out" | grep -q "after-wanted" || fail "deploy/test.sh's fail stopped with no STOP_AT, as a plain run must go through every check: $out"
 stop_case "the wanted check" 'pass "the wanted check: ok"' 'echo after-pass'
 [ "$code" = 0 ] && printf '%s\n' "$out" | grep -q "after-pass" || fail "deploy/test.sh's pass stopped the run: $out"
-# Run, not read (the red pass, finding 12): mutant() and the first run of --mutants, taken from the script, with a `sh` that records the
+# Run, not read: mutant() and the first run of --mutants, taken from the script, with a `sh` that records the
 # environment it is given in place of the stack's own run, which needs Docker.
 dm="$t/deploy_mutant" && mkdir -p "$dm/bin"
 printf '#!/bin/sh\nprintf "STOP_AT=[%%s] TEST_OVERRIDE=[%%s]\\n" "${STOP_AT-unset}" "${TEST_OVERRIDE-unset}" >>"%s/env.log"\necho "FAIL  an other check: x"\necho "FAIL  the wanted check: y"\nexit "${SH_EXIT:-1}"\n' "$dm" >"$dm/bin/sh"
@@ -6832,8 +6830,8 @@ printf '%s\n' "$out" | grep -q "failed=1" && printf '%s\n' "$out" | grep -q "sur
 : >"$dm/env.log"
 out=$(PATH="$dm/bin:$PATH" SH_EXIT=0 /bin/sh "$dm/first.sh" 2>&1) || fail "deploy/test.sh's first run under --mutants failed under a stub that passes: $out"
 [ "$(sed -n 1p "$dm/env.log")" = "STOP_AT=[] TEST_OVERRIDE=[unset]" ] || fail "deploy/test.sh gave STOP_AT to the first run, which must pass with no fault planted and go through every check: $(cat "$dm/env.log")"
-# Each down -v of its project takes every profile compose.yaml names (F13130): test-links.sh starts `links`, which a down of demo and
-# jarvis left up with its networks' fixed ranges, so --mutants' first run, a project of its own, could not start (2026-11-13).
+# Each down -v of its project takes every profile compose.yaml names: test-links.sh starts `links`, which a down of demo and
+# jarvis left up with its networks' fixed ranges, so --mutants' first run, a project of its own, could not start.
 profiles=$(sed -n 's/^ *profiles: \[\(.*\)\]$/\1/p' "$here/../deploy/compose.yaml" | tr ',' '\n' | tr -d ' "' | sort -u)
 [ -n "$profiles" ] || fail "deploy/compose.yaml names no profile any more: update test_hooks.sh's deploy_stop"
 given=$(sed -n 's/^files=.*\(--profile [a-z_-]*\).*/\1/p' "$ds")
@@ -6849,7 +6847,7 @@ done <"$t/ds.downs" >"$t/ds.unprofiled"
 fi
 
 if part deploy_checks; then
-# Two checks of deploy/test.sh that a loaded host failed (F5486, part 8q; Alexis, 2026-11-05), each run here on planted answers, with no
+# Two checks of deploy/test.sh that a loaded host can fail, each run here on planted answers, with no
 # Docker. The crowd's script, read from deploy/test.sh and run by this Node against a web of its own on 127.0.0.1: the 641st request waits
 # until each of the 640 WebSockets has settled, 6 s at most, and counts only the 101s that came before it; every other answer is printed by
 # its status, every error by its code, every socket still waiting by their number. And closes(), read with its three calls: nginx's 15 s
@@ -6862,10 +6860,10 @@ awk -v q="'" '/^\tcrowded=\$\(docker run / { on = 1; next }
 	on { print }' "$ds" >"$dc/crowd.js"
 [ "$(grep -c 'net\.connect(8080, "web"' "$dc/crowd.js")" = 2 ] ||
 	fail "deploy/test.sh's crowd is no longer the script after crowded=\$(docker run, with two connections to web's 8080: update test_hooks.sh's deploy_checks"
-# web's place: each WebSocket, in the order they come, answers as the plan says (late: a 101 at 3.5 s, past the old fixed 3 s; slow: a
+# web's place: each WebSocket, in the order they come, answers as the plan says (late: a 101 at 3.5 s, past a fixed 3 s; slow: a
 # 101 at 5 s, under the 6 s cap; closing: a 101 then a close, as Ergo past 16 a visitor; 503; reset; closed with no answer; silent: never;
 # verylate: a 101 at 7 s, after the 641st request went), the others a 101 at once; the first other request a 200, `other` ms later,
-# any after it a 500 at once (a second 641st). Each margin is a second or more, against a loaded host (F2503's class). It ends itself
+# any after it a 500 at once (a second 641st). Each margin is a second or more, against a loaded host. It ends itself
 # after a minute, should the suite be stopped mid-case.
 cat >"$dc/web.js" <<'JS'
 const net = require("node:net");
@@ -6920,7 +6918,7 @@ stop_web() { kill "$web" 2>/dev/null || :; wait "$web" 2>/dev/null || :; }
 crowd() { # $1 an edit of the script (sed), if any
 	out=$(node -e "$(sed -e "s/net\.connect(8080, \"web\"/net.connect($port, \"127.0.0.1\"/" ${1:+-e "$1"} "$dc/crowd.js")" user http://gnoworld.test 2>&1) || :
 }
-# Three 101s closed at once count as no WebSocket held (F2137's way); a second 641st would get web's 500 before the first's 200.
+# Three 101s closed at once count as no WebSocket held; a second 641st would get web's 500 before the first's 200.
 start_web late=1,slow=1,closing=3,other=2000
 crowd
 stop_web
@@ -6934,7 +6932,7 @@ stop_web
 tallied=$(printf '%s' "${out#* (}" | tr -d ')' | tr ',' '\n' | sed 's/^ *//' | LC_ALL=C sort | paste -sd, -)
 [ "$tallied" = "1 closed before an answer,2 ECONNRESET,2 answered 503,2 unanswered after 6 s" ] ||
 	fail "deploy/test.sh's crowd did not print each other answer by its status, each error by its code and the sockets still waiting (F5486): [$out]"
-# web's port closed: every socket settles at once with its error's code (macOS gives a few EINVAL among them under load, F5501), so the
+# web's port closed: every socket settles at once with its error's code (macOS gives a few EINVAL among them under load), so the
 # 641st goes then, not at the cap, set here to 30 s for a verdict no loaded host can blur.
 grep -q 'setTimeout(ask, 6000);' "$dc/crowd.js" || fail "deploy/test.sh's crowd has no 6 s cap for deploy_checks to raise: update test_hooks.sh's deploy_checks"
 start_web ""
@@ -6978,29 +6976,29 @@ fi
 if part workshop; then
 # pnpm workshop (scripts/workshop.sh) serves the app's screens and the lab's pages, each on its dev server at 127.0.0.1, both put on the
 # tailnet through the tailnet-preview skill's script under a name each (workshop-app, workshop-lab), each link said beside its name
-# (Alexis, 2026-11-04: "il me faudra une adresse tailscale aussi pour regarder à distance"). One function starts each: a port held by
+# so a person can look from afar. One function starts each: a port held by
 # another process is said and never taken, its pid and port go to .claude/tmp/workshop.pid, the last run of this checkout is stopped first
 # (killed hard too), what it left on the tailnet taken down; its end, Ctrl+C, a closed terminal or either server stopping, takes both off
-# the tailnet and stops them. The script itself stays in the checkout's folder. The chat runs with them (Alexis, 2026-11-04: "avec le chat
-# dedans et toute l'UI"): the backend, a local Ergo and the server, on ports of their own the app's dev server alone is given to proxy,
+# the tailnet and stops them. The script itself stays in the checkout's folder. The chat runs with them:
+# the backend, a local Ergo and the server, on ports of their own the app's dev server alone is given to proxy,
 # started once the app's tailnet links are known, as the origins it allows. Here the servers are Python's, the backend's too.
 w="$t/workshop" && want="v$(cat "$here/../.node-version")"
 mkdir -p "$w/root/scripts" "$w/root/app/node_modules/.bin" "$w/home/.claude/skills/tailnet-preview/scripts" "$w/bin" "$w/nvm/versions/node/$want/bin" \
 	"$w/main/node_modules/.pnpm" "$w/root/node_modules" "$w/tools"
 # The profile is given real paths, the home folder's, Node's, the tools' cache's and the checkout a worktree's node_modules lead to: each
-# reached here through a link. A json.py planted in the checkout says whether a Python of the script imported it (F4962).
+# reached here through a link. A json.py planted in the checkout says whether a Python of the script imported it.
 ln -s "$w/main/node_modules/.pnpm" "$w/root/node_modules/.pnpm" && ln -s home "$w/home-link" && ln -s nvm "$w/nvm-link" && ln -s tools "$w/tools-link"
 mkdir -p "$w/main/.git/worktrees/root" "$w/main/scripts" && : >"$w/main/scripts/workshop.sb" && printf 'gitdir: %s/main/.git/worktrees/root\n' "$w" >"$w/root/.git"
 w_home=$(cd "$w/home" && pwd -P) w_main=$(cd "$w/main" && pwd -P) w_node=$(cd "$w/nvm/versions/node/$want" && pwd -P) w_tools=$(cd "$w/tools" && pwd -P)
 printf 'import os\nopen(os.environ["W_LOG"] + ".planted", "w").write("ran")\n' >"$w/root/json.py"
 # The script as it is but for the system's sandbox-exec, which cannot nest in Claude Code's sandbox: a stub that says how it was asked and
-# runs the command, refusing as the real one with no profile (the profile itself is proven in Alexis's Terminal: test-7y-seatbelt.sh).
+# runs the command, refusing as the real one with no profile (the profile itself is proven in a person's Terminal: test-7y-seatbelt.sh).
 grep -qF '/usr/bin/sandbox-exec -f "$seatbelt"' "$here/workshop.sh" || fail "workshop.sh starts its processes under no /usr/bin/sandbox-exec (F4962)"
 sed "s|/usr/bin/sandbox-exec |$w/bin/sandbox-exec |" "$here/workshop.sh" >"$w/root/scripts/workshop.sh"
 cp "$here/workshop.sb" "$w/root/scripts/" && cp "$here/../.node-version" "$w/root/"
 # The profile holds no rule on where its processes listen, which would read as a wall and be none: Seatbelt names no host but * and
 # localhost, and a bind or inbound rule on a local localhost lets a listener on 0.0.0.0, :: or the LAN's address through as on 127.0.0.1
-# (F4977, the probe's table). They listen on 127.0.0.1 as their configs say; macOS's firewall is the wall against the LAN.
+#. They listen on 127.0.0.1 as their configs say; macOS's firewall is the wall against the LAN.
 sed 's/;.*//' "$here/workshop.sb" | tr '\n' ' ' | awk '{ n = split($0, rule, /[(](allow|deny)[ \t]+/)
 	for (i = 2; i <= n; i++) if (rule[i] ~ /^[^(]*network(-bind|-inbound|[*])/ && rule[i] ~ /[(]local[ \t][^)]*localhost/) exit 1 }' ||
 	fail "workshop.sb holds a bind or inbound rule on a local localhost, which lets a listener on every address through (F4977)"
@@ -7027,7 +7025,7 @@ exec python3 -Ic 'import http.server, sys; http.server.HTTPServer(("127.0.0.1", 
 SH
 cp "$w/server" "$w/root/app/node_modules/.bin/react-router" && cp "$w/server" "$w/root/app/node_modules/.bin/vite"
 # Node: its version, or the backend's entry, which, as workshopBackend.mjs, listens on the server's port given first through a child of its
-# own, stopped with it on TERM; killed hard, it leaves the child listening (F4961).
+# own, stopped with it on TERM; killed hard, it leaves the child listening.
 cat >"$w/nvm/versions/node/$want/bin/node" <<SH
 #!/bin/sh
 [ "\$1" != -v ] || { echo $want; exit 0; }
@@ -7044,7 +7042,7 @@ printf '#!/bin/sh\ncase "$1" in status) echo %s ;; ip) echo 100.64.0.1 ;; *) exi
 preview="$w/home/.claude/skills/tailnet-preview/scripts/tailnet-preview.sh"
 printf '#!/bin/sh\necho "$*" >>"$W_LOG.preview" && pwd -P >>"$W_LOG.preview-cwd"\n[ "$1" != up ] || [ "$2" != "${FAIL_UP:-}" ] || exit 1\n[ "$1" != up ] || echo "  https://box.tail.ts.net:$(($3 + 1000))  ->  127.0.0.1:$3"\n' >"$preview"
 chmod +x "$w/nvm/versions/node/$want/bin/node" "$w/root/app/node_modules/.bin/react-router" "$w/root/app/node_modules/.bin/vite" "$w/bin/tailscale" "$preview"
-# Five free ports in a row from a base picked at random (check.sh's free_ports until D13168, workshop's own since).
+# Five free ports in a row from a base picked at random.
 free_ports() {
 	python3 -Ic 'import random, socket, sys
 for _ in range(200):
@@ -7074,7 +7072,7 @@ shop() { # $1: the run's name; in the background, its pid in $shop; GNOWORLD_TOO
 	shop=$!
 }
 serving() { lsof -nP -iTCP:"$1" -sTCP:LISTEN -t 2>/dev/null; } # the pid that listens on port $1
-# Two minutes at most, as the script gives each server one to listen: at a load of 60 the lab's Python server took past 30 s (F4918).
+# Two minutes at most, as the script gives each server one to listen: at a load of 60 the lab's Python server took past 30 s.
 until_() { n=0; until eval "$1"; do n=$((n + 1)); [ "$n" -lt 600 ] || return 1; sleep 0.2; done; }
 up() { until_ 'grep -q "^up workshop-lab " "$w/log.preview" 2>/dev/null && [ -n "$(serving "$api_port")" ]'; } # both servers and the backend up
 ended() { gone=$1 && until_ '! kill -0 "$gone" 2>/dev/null' && until_ '[ -z "$(serving "$app_port")$(serving "$lab_port")$(serving "$api_port")" ]'; } # $1, the run, and all it ran gone
@@ -7107,12 +7105,12 @@ grep -qxF "node tests/e2e/workshopBackend.mjs $api_port $irc_port $ws_port http:
 until_ 'grep -q "and so do the worlds job and the prices. timer" "$w/one.out"' || fail "workshop.sh did not say the worlds job and the prices' timer run on the backend: $(cat "$w/one.out")"
 # Each of its three processes, and ergo.sh's check of the Ergo binary, under the workshop's Seatbelt profile, its folders the profile's
 # parameters, each its real path: the home folder, what of it they read (the checkout, the one node_modules lead to, Node, the tools'
-# cache, GNOWORLD_TOOLS here), and what they write (lot 2's S1, F4962).
+# cache, GNOWORLD_TOOLS here), and what they write.
 for each in react-router vite node sh; do
 	grep -qxF "seatbelt $each HOME=$w_home ROOT=$root MAIN=$w_main NODE=$w_node TOOLS=$w_tools TMP=$scratch CHECKOUT_TMP=$root/.claude/tmp VITE_CACHE=$root/app/node_modules/.vite VITE_TEMP=$root/app/node_modules/.vite-temp ROUTER_TYPES=$root/app/.react-router OPENAI_KEY=/nonexistent" "$w/log.seatbelt" ||
 		fail "workshop.sh did not start $each under its profile with its folders: $(cat "$w/log.seatbelt" 2>/dev/null)"
 done
-# What each of them is started with is an allowlist: a key, a token or a loader the caller's environment holds (a session's, or Alexis's shell's)
+# What each of them is started with is an allowlist: a key, a token or a loader the caller's environment holds (a session's, or a person's shell's)
 # is not passed into a box whose code a session writes (the profile guards files, not the environment). They still get what they run on.
 until_ '[ "$(grep -c "^HOME=" "$w/log.env" 2>/dev/null)" -ge 4 ]' || fail "workshop.sh's four processes did not log their environment: $(cat "$w/log.env" 2>/dev/null)"
 grep -q planted "$w/log.env" && fail "workshop.sh passed a planted value into the workshop's sandbox: $(grep planted "$w/log.env" | sort -u)"
@@ -7156,7 +7154,7 @@ for which in app lab api; do
 	grep -qx "down workshop-app" "$w/log.preview" && grep -qx "down workshop-lab" "$w/log.preview" || fail "workshop.sh did not take both off the tailnet at its end: $(cat "$w/log.preview")"
 	[ ! -e "$root/.claude/tmp/workshop.pid" ] || fail "workshop.sh left its pid file at its end"
 done
-# The pid file is any session's to write, and its first pid, the script's, is never killed (H9): a line naming an unrelated process as the script
+# The pid file is any session's to write, and its first pid, the script's, is never killed: a line naming an unrelated process as the script
 # and a listener of this checkout's app as the server stops that listener alone, and the new run serves in its place.
 sleep 300 & victim=$!
 listener=$(cd "$root/app" && listen_on "$app_port" && echo $!)
@@ -7178,9 +7176,9 @@ until_ '! kill -0 "$nomodules" 2>/dev/null' || fail "workshop.sh waited with no 
 mv "$w/pnpm.away" "$root/node_modules/.pnpm"
 grep -q "no node_modules here: pnpm install first" "$w/nomodules.out" || fail "workshop.sh did not say node_modules are missing: $(cat "$w/nomodules.out")"
 [ -z "$(serving "$app_port")" ] || fail "workshop.sh started a server with no node_modules"
-# The checkout the profile may read is git's (F5539): the parent of the common folder this tree names, never where node_modules/.pnpm leads,
-# a link any session writes. A link planted to a folder two levels under the home folder, or under /, made the profile's MAIN the home
-# folder or /, which holds the keys; a .node-version that is more than a version led PATH to a planted Node, run out of the sandbox (F5540).
+# The checkout the profile may read is git's: the parent of the common folder this tree names, never where node_modules/.pnpm leads,
+# a link any session writes. A link planted to a folder two levels under the home folder, or under /, would make the profile's MAIN the home
+# folder or /, which holds the keys; a .node-version that is more than a version would lead PATH to a planted Node, run out of the sandbox.
 refused() { # $1: what was planted, $2: the words the run must say; no server starts, and it exits 1
 	: >"$w/log.preview" && shop "refused" && refused_=$shop
 	until_ '! kill -0 "$refused_" 2>/dev/null' || { kill "$refused_" 2>/dev/null; fail "workshop.sh waited, and served, with $1"; }
@@ -7199,7 +7197,7 @@ refused "a tree whose common git folder is the home folder's" "the home folder"
 printf 'gitdir: /nowhere\n' >"$root/.git"
 refused "a .git that names no folder" "no git checkout"
 mv "$w/git.away" "$root/.git"
-# A main checkout, its .git a folder of its own (R2-4): its node_modules must lead into its own, not into another checkout's.
+# A main checkout, its .git a folder of its own: its node_modules must lead into its own, not into another checkout's.
 mv "$root/.git" "$w/git.away" && mkdir "$root/.git"
 refused "a main checkout whose node_modules/.pnpm leads to another checkout's" "leads outside"
 rmdir "$root/.git" && mv "$w/git.away" "$root/.git"
@@ -7277,7 +7275,7 @@ for held in api ws; do
 	[ -z "$(serving "$app_port")$(serving "$lab_port")" ] || fail "workshop.sh started a server though its backend's $held port was held"
 	kill "$other" && until_ "[ -z \"\$(serving \"\$${held}_port\")\" ]" || fail "the test's own server did not stop"
 done
-# The tailnet refusing one name half way (F4759): the run goes on, that server here alone, and both names come down at its end.
+# The tailnet refusing one name half way: the run goes on, that server here alone, and both names come down at its end.
 : >"$w/log.preview" && export FAIL_UP=workshop-lab && shop refused && refused=$shop
 until_ 'grep -q "the tailnet refused the lab" "$w/refused.out" && [ -n "$(serving "$api_port")" ]' || fail "workshop.sh did not say the tailnet refused its lab: $(cat "$w/refused.out")"
 unset FAIL_UP
@@ -7295,13 +7293,13 @@ grep -qxF "node tests/e2e/workshopBackend.mjs $api_port $irc_port $ws_port http:
 kill "$five" && ended "$five" || fail "workshop.sh lived through TERM"
 # With no GNOWORLD_TOOLS, the tools' cache ergo.sh keeps by default, made and given as its real path.
 grep -qF " TOOLS=$w_home/.cache/gnoworld-tools TMP=" "$w/log.seatbelt" || fail "workshop.sh gave the profile another tools' cache than ergo.sh's: $(tail -n 1 "$w/log.seatbelt")"
-# Every call of the tailnet-preview script, up and down, from /: its python3 -c imports first from the folder it runs from (F4962).
+# Every call of the tailnet-preview script, up and down, from /: its python3 -c imports first from the folder it runs from.
 [ -s "$w/log.preview-cwd" ] && [ -z "$(grep -vx / "$w/log.preview-cwd")" ] ||
 	fail "workshop.sh ran the tailnet-preview script from another folder than /: $(sort -u "$w/log.preview-cwd" 2>/dev/null)"
 fi
 
 if part ci_annotate; then
-# D13177: each failed job's end becomes an annotation of gate-ok, which Claude reads through the public check-runs API with no login.
+# Each failed job's end becomes an annotation of gate-ok, which Claude reads through the public check-runs API with no login.
 # From a folder as gate-ok's last step leaves it: jobs.json, GitHub's list of the run's jobs, and <id>.log a failed job's log.
 an="$t/annotate" && mkdir -p "$an"
 python3 -I - "$an" <<'PY'
@@ -7426,11 +7424,11 @@ out=$(laststep "$tools" 3) && fail "gate-ok's last step passed with no gh: $out"
 fi
 
 if part ci; then
-# GitHub judges main (the harness overhaul, phase 2): the two workflows read the repository and nothing more, pin every action and
+# GitHub judges main: the two workflows read the repository and nothing more, pin every action and
 # download, run on a pull request, a push to main or by hand and never on a fork's privileged events, and hand their verdict to one
-# job, gate-ok, the one check main requires. What judges a change comes from the commit it is judged against (the red team's tests 9
-# and 10), and CODEOWNERS holds the core. The checker reads the promises without comments and the bans with them; each bypass the
-# red pass found is planted in a copy and must be refused.
+# job, gate-ok, the one check main requires. What judges a change comes from the commit it is judged against,
+# and CODEOWNERS holds the core. The checker reads the promises without comments and the bans with them; each known bypass
+# is planted in a copy and must be refused.
 cat >"$t/ci_static.py" <<'PY'
 import ast, json, pathlib, re, subprocess, sys
 root = pathlib.Path(sys.argv[1])
@@ -7756,7 +7754,7 @@ git archive "$base" scripts docs/REVIEW.md .githooks | (mkdir -p "$c/base" && ta
 changes() { (cd "$c/repo" && sh "$c/base/scripts/ci_changes.sh" "$@") >"$c/out" 2>"$c/err"; }
 judge() { changes "$@" || fail "ci_changes.sh failed on $*: $(cat "$c/err")"; [ -z "$(cd "$c/repo" && git status --porcelain)" ] || fail "ci_changes.sh wrote in the checkout"; }
 is() { grep -qx "$1" "$c/out" || fail "ci_changes.sh: $2: no $1 in $(tr '\n' ' ' <"$c/out") $(cat "$c/err")"; }
-# change: a commit of the change, every path declared (D13173); undeclared: the same, declaring none.
+# change: a commit of the change, every path declared; undeclared: the same, declaring none.
 change() { (cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change && eval "$1" && git add -A &&
 	git commit -qm change -m "$(git -c core.quotePath=false diff --cached --name-only | sed 's/^/Harness-changed: /; s/$/ - a test/')"); }
 undeclared() { (cd "$c/repo" && git checkout -qf "$base" && git checkout -qf -B change && eval "$1" && git add -A && git commit -qm change); }
@@ -7835,7 +7833,7 @@ for event in workflow_dispatch pull_request_target; do
 	judge "$event" "$base" "$c/base"
 	for f in $flags; do is "$f=true" "an event of $event"; done
 done
-# What the base lacks, or a script of it that fails, calls for the job (F113, F116, F125).
+# What the base lacks, or a script of it that fails, calls for the job.
 mv "$c/base/.githooks/records.sh" "$c/records.sh"
 changes pull_request "$base" "$c/base" && fail "ci_changes.sh passed a change it could not read the base's harness list for"
 grep -q "harness list" "$c/err" || fail "ci_changes.sh refused a base with no harness list without saying so: $(cat "$c/err")"
@@ -7850,7 +7848,7 @@ judge pull_request "$base" "$c/base" && is tier1=true "a base with no tier table
 mv "$c/REVIEW.md" "$c/base/docs/REVIEW.md"
 changes pull_request 0000000000000000000000000000000000000000 "$c/base" && fail "ci_changes.sh judged a change against a base git does not have"
 grep -q "no commit 0000000000000000000000000000000000000000" "$c/err" || fail "ci_changes.sh refused a base git does not have for another reason: $(cat "$c/err")"
-# What reaches main by GitHub's merge met no hook of a clone (D13173, the security review of 3b). A harness file no commit declares,
+# What reaches main by GitHub's merge met no hook of a clone. A harness file no commit declares,
 # or declares with no reason, is refused, named, on a pull request and on a push; declared, it passes. A path outside the list needs
 # no line; a manual run judges no declaration (every job runs).
 undeclared 'printf "y\n" >scripts/new.py'
@@ -7865,7 +7863,7 @@ undeclared 'printf "y\n" >app/src/c.ts && printf "y\n" >docs/z.md'
 judge pull_request "$base" "$c/base"
 undeclared 'printf "y\n" >scripts/other.py'
 judge workflow_dispatch "$base" "$c/base"
-# A path this disk may read as another, a byte outside ASCII (F164) or a name equal but for case to another (F151), written to the
+# A path this disk may read as another, a byte outside ASCII or a name equal but for case to another, written to the
 # index as it is (this disk folds the names it writes), is refused whatever the event, declared or not.
 for name in "$(printf 'packages\305\277/evil/package.json')" Server/src/evil.ts SCRIPTS/x.py; do
 	printf 'y\n' >"$c/blob"
