@@ -8,30 +8,19 @@ with their reason; a gap that gets killed must leave the list. Usage: scripts/ha
 from the repository root; it takes minutes, so the night runs it whole (nightly.yml).
 `--dry` builds every mutant on the working tree and checks its text and sections, no test run: test_hooks.sh's
 section harness_mutate. The mutants are judged over HARNESS_SHARDS worktrees side by side
-(4 by default); `--changed <base>`, a branch's merge check, judges only those that rewrite a line committed since base
-(suite_parts.py: a change to a suite's section, or to a guard file's other lines, asks for none) and, when this script
-changed, those it defines anew or otherwise than base's (sections a mutant only gained are no other definition); past MOST left to judge after the cache it stops before
-judging any, and the way on is a run with no argument, the night's. With no argument, what main requires, every mutant is judged.
-A killed mutant whose verdict's key holds (verdict_key, which blank lines do not move) is taken from the cache in
-~/.cache/gnoworld-tools, a survivor is always judged again; the CI keeps no cache, so it judges every one."""
-import collections
+(4 by default); every mutant is judged on every run, which is what main requires."""
 import concurrent.futures
 import contextlib
-import hashlib
-import inspect
-import json
 import os
 import re
 import signal
 import subprocess
 import sys
 import threading
-import types
 
 sys.dont_write_bytecode = True  # -I ignores PYTHONDONTWRITEBYTECODE; leave no __pycache__
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves this folder off the path
-from repo_files import changed_lines, git, worktree
-from suite_parts import code, parts, select
+from repo_files import worktree
 
 WORKTREE = ""  # the throwaway worktree of HEAD, set by the run below
 OFF = "(lambda *a: None)("
@@ -67,13 +56,13 @@ SECTIONS = {
     ".jscpd.json": "jscpd", "tsconfig.base.json": "tsc", "vitest.config.ts": {"probe": "vitest,vitest_ui,server,jarvis,core_chromium,pinned_node,bench_files", "hooks": "vitest_stryker"},
     "scripts/guard.py": "guard", "scripts/patch_coverage.py": "patch_coverage",
     "scripts/check_docs.py": "check_docs,check_docs_cells,instructions", "scripts/hidden.py": "check_docs", "stryker.config.json": "wiring", "scripts/check_regressions.py": "regressions", "scripts/ci_annotate.py": "ci_annotate", "app/playwright.config.ts": "regressions", "scripts/check_migrations.py": "migrations",
-    "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_named_in,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", ".githooks/commit-msg": "commit_msg,installed,outside",
+    "scripts/harness_mutate.py": "harness_mutate,harness_timeout,harness_shards,harness_shards_signal", ".githooks/commit-msg": "commit_msg,installed,outside",
     ".githooks/pre-push": "pre_push,push_range,outside,installed", ".githooks/pre-commit": "pre_commit,wiring,outside,installed",
     ".githooks/records.sh": "pre_commit,wiring,worktree_script", ".githooks/pre-merge-commit": "pre_commit,outside,installed",
     "scripts/install_hooks.sh": "installed,outside", "scripts/borrow_node_modules.sh": "worktree_script,borrow",
     "scripts/stop_gate.sh": "stop_gate,wiring", ".claude/workflows/branch.js": "workflow_branch", "deploy/test.sh": "deploy_lock,deploy_stop,deploy_checks", "scripts/speeds.py": "speeds,ci", "scripts/workshop.sh": "workshop", ".claude/settings.json": "wiring,siblings", "scripts/test_hooks.sh": "wiring,unsigned",
     "scripts/check.sh": "wiring,check_hooks,gate,gate_lanes", "scripts/stryker_lines.py": "stryker_lines", "scripts/check_nginx.py": "nginx_check", "scripts/mutate.py": "wiring,mutate",
-    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/suite_parts.py": "mutant_scope,harness_shards,harness_shards_records,harness_shards_changed,harness_shards_cache,harness_shards_signal,harness_shards_text", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci,ci_annotate", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
+    "scripts/repo_files.py": {"hooks": "worktrees,instructions,check_docs,regressions,patch_coverage,stryker_lines,harness_shards,harness_shards_signal,bench", "probe": "bench_files"}, "scripts/worktree.sh": "worktree_script", "scripts/bench.py": "bench,bench_load", "scripts/load.py": "bench_load", "scripts/audit.py": "audit", "scripts/scan_secrets.sh": "secrets,push_range", "scripts/gitleaks-private.toml": "secrets", ".github/workflows/gate.yml": "ci,ci_annotate", ".github/workflows/nightly.yml": "ci", "scripts/ci_changes.sh": "ci", "scripts/ci_gate_ok.py": "ci", "scripts/probe.py": "ci",
 }
 
 
@@ -424,24 +413,6 @@ def mutants():
     yield from each("scripts/harness_mutate.py", "        if unknown:\n", "        if False:\n", "hooks", "harness_mutate --dry sees a section its suite lacks")
     yield from each("scripts/harness_mutate.py", '    WORKTREE = "."\n    checked()\n', '    WORKTREE = "."\n', "hooks", "harness_mutate --dry checks the mutants")
     hm = "scripts/harness_mutate.py"
-    yield from each(hm, "{id(m) for m in select" "(found, lines, read)} | ", "", "hooks", "harness_mutate --changed judges the mutants of the changed lines")
-    yield from each(hm, "if changed is not None" " and len(found) > MOST:", "if len(found) > MOST:", "hooks", "harness_mutate with no argument judges every mutant, past the limit of --changed")
-    yield from each(hm, "and len(found)" " > MOST:", "and len(found) >= MOST:", "hooks", "harness_mutate --changed judges 100 mutants, and stops at 101")
-    yield from each(hm, "and len(found)" " > MOST:", "and len(keys) > MOST:", "hooks", "harness_mutate --changed counts what is left after the cache against its limit")
-    yield from each(hm, "and len(found)" " > MOST:", "and False:", "hooks", "harness_mutate --changed stops before judging past its limit")
-    yield from each(hm, "MOST = 100" "  # what", "MOST = 101  # what", "hooks", "harness_mutate --changed stops past 100 mutants")
-    yield from each(hm, 'collections.Counter(m[1]' ' for m in found)', 'collections.Counter(m[0] for m in found)', "hooks", "harness_mutate --changed says which files its mutants come from")
-    yield from each(hm, "context = code(" "outside", "context = (outside", "hooks", "a cached verdict does not stand on a suite's blank lines")
-    yield from each(hm, "sha256(code(" "mutated)", "sha256((mutated)", "hooks", "a cached verdict does not stand on its file's blank lines")
-    rf = "scripts/repo_files.py"  # the hunks harness_mutate --changed reads, as patch_coverage and the merge check's StrykerJS do
-    yield from each(rf, '"-U0", "--no-color"' ', "--no-ext-diff"', '"-U0", "--no-ext-diff"', "hooks", "harness_mutate --changed reads the hunks whatever git's colours")
-    yield from each(rf, '"--no-color", "--no-ext-diff"' ', "--text"', '"--no-color", "--text"', "hooks", "harness_mutate --changed reads the hunks whatever git's external diff")
-    yield from each(rf, '"--no-ext-diff", "--text"' ', "--no-textconv"', '"--no-ext-diff", "--no-textconv"', "hooks", "harness_mutate --changed reads a file marked -diff as text, not as Binary files differ (F2537)")
-    yield from each(rf, '"--text", "--no-textconv"' ", *args", '"--text", *args', "hooks", "harness_mutate --changed reads the hunks whatever a textconv (F2537)")
-    yield from each(rf, "int(hunk.group(2)" " or 1)", "int(hunk.group(2) or 0)", "hooks", "harness_mutate --changed reads a hunk of one line, which git writes with no count")
-    yield from each(rf, "(start, start + 1)" " if removals", "() if removals", "hooks", "harness_mutate --changed: a removed line touches the two beside it")
-    yield from each(rf, "(start, start + 1)" " if removals", "(start,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line after it")
-    yield from each(rf, "(start, start + 1)" " if removals", "(start + 1,) if removals", "hooks", "harness_mutate --changed: a removed line touches the line before it")
     # A commit's lint: its change and the files that import it, from the type check's own graph, in a folder of the run's or the worktree's.
     ck = "scripts/check.sh"
     yield from each(ck, "\nunset GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "\n: GIT_COMMON_DIR GIT_OBJECT_DIRECTORY", "hooks", "check.sh reads git's own folders, never a caller's (lot 1, S5)")
@@ -508,10 +479,6 @@ def mutants():
     yield from each(ws, "unset WORKSHOP_APP_PORT WORKSHOP_LAB_PORT WORKSHOP_API_PORT WORKSHOP_IRC_PORT WORKSHOP_WS_PORT #", ": #", "hooks", "workshop.sh gives the lab's dev server no backend to proxy")
     yield from each(ws, ' $(printf \'%s\\n\' "$shown" | grep -oE \'https?://[^ ]+\' | tr \'\\n\' \' \')"', '"', "hooks", "workshop.sh's backend allows the app's tailnet links")
     yield from each(ws, '(boxed sh scripts/ergo.sh) >/dev/null || { echo "workshop: no Ergo built for the chat; a gate builds it (scripts/check.sh)" >&2; exit 1; }', ":", "hooks", "workshop.sh checks Ergo before its backend, and stops when there is none")
-    yield from each(hm, '"probe": "scripts/' 'probe.py"}', '"probe": "scripts/nowhere.py"}', "hooks", "a cached verdict reads probe.py as test_hooks.sh (G5)")
-    # The find is split in two, so that this line holds it nowhere itself: a spot of its own would be a mutant of no guard.
-    yield from each(hm, 'SUITE_OF = {"hooks": "scripts/test_hooks.sh' '", ', 'SUITE_OF = {', "hooks", "a cached verdict reads both suites (G5)")
-    yield from each(hm, "    if diff.returncode != 0:\n", "    if False:\n", "hooks", "harness_mutate --changed wants a base git can compare with")
     yield from each(hm, "killed = verdicts[i % " "shards][i // shards]", "killed = verdicts[0][0]", "hooks", "harness_mutate reads each mutant's own verdict")
     yield from each(hm, "worktree(\"HEAD\")) for _ in range(shards - 1)]", "worktree(\"HEAD\")) for _ in range(0)]", "hooks", "harness_mutate makes a worktree a shard")
     yield from each(hm, "ThreadPoolExecutor(" "shards) as pool", "ThreadPoolExecutor(1) as pool", "hooks", "harness_mutate's shards run side by side")
@@ -520,8 +487,7 @@ def mutants():
     yield from each(hm, "if code < 0 or " "code in CUT_BY_SIGNAL:", "if code in CUT_BY_SIGNAL:", "hooks", "harness_mutate takes a suite ended by a signal for no verdict (F2526)")
     for kept in ("137, 143", "130, 143", "130, 137"):
         yield from each(hm, "CUT_BY_SIGNAL = (" "130, 137, 143)", f"CUT_BY_SIGNAL = ({kept})", "hooks", f"harness_mutate takes the code of a shell's signal for no verdict, without {({'137, 143': '130', '130, 143': '137', '130, 137': '143'})[kept]} (F2526)")
-    yield from each(hm, '                if STOP.is_set' '():\n                    raise Cut("the run was stopped")\n                killed = judged(', "                killed = judged(", "hooks", "harness_mutate's shards start no mutant once the run is stopped (F2526)")
-    yield from each(hm, '                    if STOP.is_set' '():\n                        raise Cut("the run was stopped")\n                    if killed !=', "                    if killed !=", "hooks", "harness_mutate keeps no verdict once the run is stopped (F2526)")
+    yield from each(hm, '            if STOP.is_set' '():\n                raise Cut("the run was stopped")\n            return judged(', "            return judged(", "hooks", "harness_mutate's shards start no mutant once the run is stopped (F2526)")
     yield from each(hm, "    STOP.set" "()\n", "", "hooks", "harness_mutate stops its shards when it is interrupted (F2526)")
     yield from each(hm, "except BaseException " "as e:", "except Cut as e:", "hooks", "harness_mutate stops its shards on an interrupt of its main thread (F2526)")
     yield from each(".claude/workflows/branch.js", "if (!red) return", "if (false) return", "hooks", "the branch loop stops on a red pass that gave no report")
@@ -566,34 +532,13 @@ def mutants():
     yield from each("deploy/test.sh", 'mkdir "$lock" 2>/dev/null || missing "another run took the project $project at this very moment"', 'mkdir "$lock" 2>/dev/null || true', "hooks", "deploy/test.sh refuses when another run takes the lock it removed")
     yield from each("deploy/test.sh", "--profile jarvis --profile links down -v >", "--profile jarvis down -v >", "hooks", "deploy/test.sh's downs take the links profile, which test-links.sh starts (F13130)")
     yield from each("scripts/borrow_node_modules.sh", '[ -L "$copy/$m/.bin" ]', "false", "hooks", "a borrowed workspace's linked .bin becomes a folder of its own (F2127)")
-    yield from each(hm, "        if rel not in (path, suite," " SELF):", "        if False:", "hooks", "a cached verdict stands on the files its sections name")
-    yield from each(hm, "for n in names if n" ' != ".git"]', "for n in names]", "hooks", "a cached verdict never stands on a worktree's .git file")
-    yield from each(hm, "remember({keys[id(m)]: " '"killed" if killed else "survives"})', "pass", "hooks", "a verdict is kept as soon as it is judged, for a run cut short")
-    yield from each(hm, "if f in ALWAYS or " "(os.path.basename(f) in words", "if (os.path.basename(f) in words", "hooks", "a cached verdict stands on the tools' lockfile")
-    yield from each(hm, "context = code(outside" " + ", "context = code(", "hooks", "a cached verdict stands on its suite's text outside its sections")
-    yield from each(hm, "identity(mutant, sections, GAPS), context," " RUNNER]", "identity(mutant, sections, GAPS), context]", "hooks", "a cached verdict stands on the runner that judged it")
-    yield from each(hm, 'learned[keys[id(found[i])]] = "kill' 'ed"', "pass", "hooks", "a killed mutant's verdict is cached")
-    yield from each(hm, "    remember(" "learned)\n", "    pass\n", "hooks", "the run's verdicts reach the cache")
-    yield from each(hm, "except (OSError," " ValueError):", "except OSError:", "hooks", "a cache it cannot read is no cache")
     yield from each(hm, "    finally:\n        with open(target, \"w\") as f:\n            f.write(original)\n", "    finally:\n        pass\n", "hooks", "harness_mutate puts each mutant's file back")
     yield from each(hm, "            if code " "!= 0:\n", "            if False:\n", "hooks", "harness_mutate stops on a failed control")
     yield from each(hm, "return killed and (label not in GAPS or " "run(tree", "return killed and (True or run(tree", "hooks", "harness_mutate judges a known gap that a run killed once more (F1832)")
     yield from each(hm, "pool.submit(run, *c): c for c in " "controls}", "pool.submit(run, *c): c for c in controls[:1]}", "hooks", "harness_mutate's control runs in every tree")
-    yield from each(hm, "        if changed is None" ":  # a full run", "        if False:  # a full run", "hooks", "harness_mutate with no argument refuses to pass with no mutant to judge (F1431)")
-    yield from each(hm, '"--no-renames", ' '"--name-only"', '"--name-only"', "hooks", "harness_mutate --changed counts a renamed guard file under its old name too (F1434)")
-    yield from each(hm, '"--name-only", ' '"-z"', '"--name-only"', "hooks", "harness_mutate --changed reads a guard file's name git would quote (F1434)")
-    yield from each(hm, "    if not found" ":  # nothing to judge", "    if False:  # nothing to judge", "hooks", "harness_mutate --changed runs no control when it judges no mutant")
-    yield from each(hm, "elif sys.argv[1:]" ":\n", "elif False:\n", "hooks", "harness_mutate refuses an unknown argument")
-    yield from each(hm, "    if base.startswith" "(\"-\"):", "    if False:", "hooks", "harness_mutate --changed takes no option for its base")
-    yield from each(hm, 'sys.modules["suite_parts"]' " = theirs", "theirs", "hooks", "harness_mutate --changed reads base's script with base's helper")
-    yield from each(hm, "    if before is" " None:", "    if False:", "hooks", "harness_mutate --changed judges every mutant against a base script it cannot read")
-    yield from each(hm, "and not alike" "(m, before)}", "and False}", "hooks", "harness_mutate --changed judges the mutants it defines anew or otherwise")
-    yield from each(hm, 'set(theirs.split(","))' " <= set(", 'set(theirs.split(",")) == set(', "hooks", "harness_mutate --changed does not ask again for a mutant whose sections only grew")
-    yield from each(hm, 'theirs is not None and set(theirs.split(","))' ' <= set(mine[3].split(","))', "theirs is not None", "hooks", "harness_mutate --changed asks again for a mutant that lost a section")
-    yield from each(hm, "return label, path, test, judged_by, label" " in gaps, None", "return label, path, test, None, False, None", "hooks", "harness_mutate --changed tells a mutant by its sections and its place in GAPS")
-    yield from each(hm, "else hashlib.sha256(" "code(mutated).encode()).hexdigest()", 'else ""', "hooks", "harness_mutate --changed tells a mutant by the text it writes")
-    yield from each(hm, "if failures" ":\n    sys.exit", "if failures and changed is None:\n    sys.exit", "hooks", "a survivor fails harness_mutate --changed")
-    yield from each(hm, "    found = " "checked()\n", "    found = list(mutants())\n", "hooks", "harness_mutate --changed still checks every mutant")
+    yield from each(hm, "    if not found" ":  # a harness that lost", "    if False:  # a harness that lost", "hooks", "harness_mutate with no argument refuses to pass with no mutant to judge (F1431)")
+    yield from each(hm, "if sys.argv[1:]" ":\n    sys.exit(\"usage", "if False:\n    sys.exit(\"usage", "hooks", "harness_mutate refuses an unknown argument")
+    yield from each(hm, "if failures" ":\n    sys.exit", "if False:\n    sys.exit", "hooks", "a survivor fails harness_mutate")
     # The hooks and their scripts.
     yield from each("scripts/guard.py", ' refuse("', " " + OFF + '"', "hooks", "guard refusal")
     yield from each("scripts/guard.py", "                push |= check_git(", "                check_git(", "hooks", "guard asks before a push")
@@ -1366,16 +1311,6 @@ def mutants():
     yield from each("scripts/bench.py", ' - {m["name"] for m in measures}', ' - {m["name"] for m in measures} - named', "hooks", "bench.py fails a bench the sources name that the report lacks (security-S1)")
     yield from each("scripts/bench.py", "if BENCH_FILE.search(p.name)", "if True", "hooks", "bench.py reads the sources of the benches' files alone (security-S1)")
     yield from each("scripts/bench.py", '{".ts", ".tsx"}', '{".ts"}', "hooks", "bench.py reads a .tsx bench's source too (security-S1)")
-    yield from each("scripts/suite_parts.py", "            depth += 1", "            depth += 0", "hooks", "suite_parts: a nested if's fi does not end its section")
-    yield from each("scripts/suite_parts.py", ' and not re.search(r"\\bfi$", bare)', "", "hooks", "suite_parts: a one-line if at the margin opens no section")
-    yield from each("scripts/suite_parts.py", "len(bare.lstrip()) <= depth", "len(bare.lstrip()) < depth", "hooks", "suite_parts: a probe block ends at the next as little indented")
-    yield from each("scripts/suite_parts.py", "return path in changed and (", "return (", "hooks", "suite_parts: a file no change reaches asks for nothing")
-    yield from each("scripts/suite_parts.py", "mutated is None or bool(", "bool(", "hooks", "suite_parts: a mutant with no text to place is asked when its file changed")
-    yield from each("scripts/suite_parts.py", "mutated) & changed[path])", "mutated))", "hooks", "suite_parts: a changed file asks only for the mutants of its changed lines")
-    yield from each("scripts/suite_parts.py", " if line.strip())", ")", "hooks", "suite_parts: a blank line runs nothing")
-    yield from each("scripts/suite_parts.py", " or {head, head + 1}", "", "hooks", "suite_parts: a line only added touches the two beside it")
-    yield from each("scripts/suite_parts.py", "while tail < shared - head and ", "while tail < shared and ", "hooks", "suite_parts: a line added among its like counts from one end only")
-    yield from each("scripts/suite_parts.py", "range(head + 1, len(before) - tail + 1)", "range(head + 1, len(before) + 1)", "hooks", "suite_parts: a mutant's lines end where its text does")
     rf = "scripts/repo_files.py"
     yield from each("scripts/load.py", "print(round(os.getloadavg()[0] * 10), (os.cpu_count() or 1) * 10)", "print((os.cpu_count() or 1) * 10, round(os.getloadavg()[0] * 10))", "hooks", "load.py prints the load, then the cores")
     yield from each("scripts/load.py", "getloadavg()[0]", "getloadavg()[2]", "hooks", "load.py reads the 1-minute average, not the 15-minute one")
@@ -1533,19 +1468,13 @@ def seven_mutants():
     yield from each("scripts/patch_coverage.py", "except OSError as e:", "except ZeroDivisionError as e:", "hooks", "patch_coverage says plainly that the coverage left no report")
     yield from swaps(hm, "harness_mutate.py", (
         ("            TIMED.add" "(label)\n", "            pass\n", "says a suite past its limit won by time (F3382)"),
-        ("            if label not in " "TIMED:\n                learned", "            if True:\n                learned", "keeps no verdict won by time in the cache (F3382)"),
-        (" and m[0] not in " "TIMED:", ":", "keeps no verdict won by time as it is judged (F3382)"),
         ("                if code is " "None:  #", "                if False:  #", "fails a control past its limit (F3382)"),
         ("((signal.SIGTERM, GRACE), (signal.SIGKILL" ", None))", "((signal.SIGTERM, GRACE),)", "kills a suite that ignores TERM (F3382)"),
         (", start_new_session" "=True)", ")", "gives each suite a group of its own (F3382)"),
         ("    for proc in list(" "LIVE):  # the suites are groups of their own now: a signal to this run no longer reaches them\n        stop(proc)\n", "", "stops the suites in flight when the run is interrupted"),
         ("signal.signal(signal.SIGTERM, " "signal.default_int_handler)", "pass", "stops the suites in flight when the run is terminated"),
-        ("                stopped(e, pool)\n                raise\n        # Each shard", "                pass\n                raise\n        # Each shard", "stops the controls in flight when the run ends"),
+        ("            stopped(e, pool)\n            raise\n    # Each shard", "            pass\n            raise\n    # Each shard", "stops the controls in flight when the run ends"),
         ("concurrent.futures.as_completed(" "waiting)", "waiting", "reads a control failing without waiting for the slower ones before it"),
-        ("{word, word.rstrip(\".\"), " "word.lstrip(\"-\"), word.lstrip(\"-\").rstrip(\".\")}", "{word}", "names a file beside a full stop or an option's dash (F3383)"),
-        (" else bounded(context, " "os.path.basename(f))", " else False", "names a file whose name has a space or a bracket (F3383)"),
-        ("if not ONE.match(" "before) and", "if", "names no file inside a longer name (F3383)"),
-        ("(after[0] == \".\" and not " "ONE.match(after[1:]))", "False", "names a file that ends a sentence (F3383)"),
     ))
     d = "scripts/check_docs.py"
     yield from swaps(d, "check_docs.py", (
@@ -1993,14 +1922,14 @@ class Cut(Exception):
     """A suite ended by a signal, or a run asked to stop: no verdict."""
 
 
-STOP = threading.Event()  # set when the run is interrupted: no shard starts a mutant or keeps a verdict after it
+STOP = threading.Event()  # set when the run is interrupted: no shard starts a mutant after it
 CUT_BY_SIGNAL = (130, 137, 143)  # a shell's INT, KILL, TERM; a suite run by Python or sh itself ends with a negative code
 
 
 LIMIT = 600  # s: a suite past it is a caught mutant (F3382); a control past it fails the run
 GRACE = 5  # s a hung suite has to end on TERM before KILL
 LIVE = set()  # the suites in flight, each a group of its own, so that stopping one stops its children and no other
-TIMED = set()  # the mutants caught by time alone: the load can do that, so their verdicts are not kept
+TIMED = set()  # the mutants caught by time alone: the load can do that
 
 
 def stop(proc):
@@ -2044,7 +1973,7 @@ def run(tree, test, only=""):
 
 def stopped(e, pool):
     """The run is ending on `e` (an interrupt, a failed control, a suite cut short) inside `pool`: nothing queued starts, no shard
-    starts a mutant or keeps a verdict, and the suites in flight are stopped, before the pool's `with` waits for them to end by
+    starts a mutant, and the suites in flight are stopped, before the pool's `with` waits for them to end by
     themselves, up to LIMIT, with check.sh gone and its lock free."""
     pool.shutdown(wait=False, cancel_futures=True)
     STOP.set()
@@ -2105,154 +2034,8 @@ if sys.argv[1:] == ["--dry"]:
     checked()
     sys.exit(0)
 signal.signal(signal.SIGTERM, signal.default_int_handler)  # a TERM ends this run as an INT does: its suites are groups of their own and would outlive it
-SUITE_OF = {"hooks": "scripts/test_hooks.sh", "probe": "scripts/probe.py"}
-# The verdicts' cache (Alexis, 2026-10-29): a killed mutant whose key holds is not judged again, a survivor always is. The CI
-# starts with none, so it judges every mutant on every push.
-CACHE = os.path.join(os.path.expanduser("~"), ".cache", "gnoworld-tools", "harness-verdicts.json")
-RUNNER = hashlib.sha256((inspect.getsource(run) + inspect.getsource(judged) + json.dumps(TESTS)).encode()).hexdigest()
-ALWAYS = ("pnpm-lock.yaml", ".node-version")  # the tools' versions, which no section names
-MOST = 100  # what --changed judges at most: no variable or flag moves it (Alexis, 2026-10-30), a run with no argument has no such limit
-
-
-NAME_CHAR = r"\w.$\[\]@+%~-"  # what a file's name is made of, besides the folder's slash: `$id.tsx` and `[slug].tsx` (React Router) are names
-NAME_WORDS = re.compile(f"[{NAME_CHAR}]+")
-ONE =re.compile(f"[{NAME_CHAR}]")
-
-
-def bounded(context, name):
-    """Whether `name` stands in the context as a name of its own, not inside a longer one: what comes before it is no name
-    character, and what comes after is none, or a full stop that ends a sentence (a name that ends in a full stop is none)."""
-    at = context.find(name)
-    while at != -1:
-        end = at + len(name)
-        before, after = context[at - 1:at], context[end:end + 2]
-        if not ONE.match(before) and (not after or not ONE.match(after[0]) or (after[0] == "." and not ONE.match(after[1:]))):
-            return True
-        at = context.find(name, at + 1)
-    return False
-
-
-def named_in(context, memo={}):
-    """The files of the tree whose name the context holds, the tools' versions with them: what a verdict may depend on.
-    A name is a file's own (check.sh), so a short one matches more than it needs to, never less: `vitest.config.ts` is no
-    `config.ts`, `data.ts` is no `a.ts`, and a name with a space or a `$` is still found. The context is cut into words once."""
-    if context not in memo:
-        files = []
-        for top, dirs, names in os.walk(WORKTREE):
-            dirs[:] = [d for d in dirs if d not in (".git", "node_modules")]
-            # A worktree's .git is a file naming its copy, another each run: read, it made every key new.
-            files += [os.path.relpath(os.path.join(top, n), WORKTREE) for n in names if n != ".git"]
-        words = set()
-        for word in NAME_WORDS.findall(context):  # a full stop that ends a sentence, a dash that opens an option: the word without them too
-            words |= {word, word.rstrip("."), word.lstrip("-"), word.lstrip("-").rstrip(".")}
-        # A basename of name characters alone is a word of the context; any other (a space, a bracket pair, a quote) is searched for.
-        memo[context] = sorted(f for f in files if f in ALWAYS or (os.path.basename(f) in words if NAME_WORDS.fullmatch(os.path.basename(f)) else bounded(context, os.path.basename(f))))
-    return memo[context]
-
-
-def verdict_key(mutant, digests={}):
-    """What a cached verdict stands on: the mutant, the sections that judge it and its suite's text outside them, every
-    file of the tree that text names (not the mutated file, the suite or this script, which the rest covers), and the
-    runner; a change of any is another key."""
-    label, path, mutated, test = mutant
-    suite = SUITE_OF[test]
-    found, outside = parts(suite, read(suite))
-    context = code(outside + "".join(found.get(name, "") for name in sections(path, test).split(",")))
-    h = hashlib.sha256(json.dumps([identity(mutant, sections, GAPS), context, RUNNER]).encode())
-    for rel in named_in(context):
-        if rel not in (path, suite, SELF):
-            if rel not in digests:
-                with open(os.path.join(WORKTREE, rel), "rb") as f:
-                    digests[rel] = hashlib.sha256(f.read()).hexdigest()
-            h.update(f"{rel}\0{digests[rel]}\0".encode())
-    return h.hexdigest()
-
-
-def cached_verdicts():
-    """The cache as it is on disk; one it cannot read is none."""
-    try:
-        with open(CACHE) as f:
-            held = json.load(f)
-        return held if isinstance(held, dict) else {}
-    except (OSError, ValueError):
-        return {}
-
-
-def remember(verdicts):
-    """Adds these verdicts to the cache on disk, written whole and then moved into place, so a reader never meets half a
-    file; a cache it cannot write costs the next run its time, not a verdict."""
-    held = {**cached_verdicts(), **verdicts}
-    # ponytail: past 50,000 keys only this run's are kept; an age per key if the cache must hold many branches' trees.
-    if len(held) > 50_000:
-        held = dict(verdicts)
-    try:
-        os.makedirs(os.path.dirname(CACHE), exist_ok=True)
-        with open(CACHE + f".{os.getpid()}", "w") as f:
-            json.dump(held, f)
-        os.replace(CACHE + f".{os.getpid()}", CACHE)
-    except OSError as e:
-        print(f"harness_mutate: the verdicts' cache could not be written ({e})")
-SELF = os.path.relpath(os.path.abspath(__file__))  # this script, from the repository's root, where it runs
-
-
-DRY = re.compile(r'^if sys\.argv\[1:\] == \["--dry"\]:$', re.M)  # where this script's definitions end
-
-
-def identity(mutant, sections_of, gaps):
-    """A mutant as its label, file, suite, the sections that judge it, its place in GAPS and the text it writes, hashed:
-    two scripts that define it alike agree; a section it cannot name is None, which no readable one equals."""
-    label, path, mutated, test = mutant
-    try:
-        judged_by = sections_of(path, test)
-    except Exception:  # base's tables may not know a file this tree's do
-        judged_by = None
-    return label, path, test, judged_by, label in gaps, None if mutated is None else hashlib.sha256(code(mutated).encode()).hexdigest()
-
-
-def defined_at(base):
-    """The mutants base's script defines, built on this tree's files, each identity with its sections apart, which alike()
-    reads; None when it cannot say (no such file, no `--dry` line to cut its definitions at, its code failing here): then
-    every mutant is judged. Its helper is base's too: a name this tree's dropped would otherwise fail its import, and every
-    mutant look new."""
-    shown, helper = (subprocess.run(["git", "show", f"{base}:{path}"], capture_output=True, text=True).stdout for path in (SELF, os.path.join(os.path.dirname(SELF), "suite_parts.py")))
-    space = {"__name__": "harness_mutate_at_base", "__file__": os.path.abspath(__file__)}
-    theirs = types.ModuleType("suite_parts")
-    try:  # base's own code, whatever it raises: judging every mutant is the safe side
-        exec(compile(helper, f"{base}:suite_parts.py", "exec"), theirs.__dict__)
-        sys.modules["suite_parts"] = theirs  # this script bound its own names when it started
-        exec(compile(shown[: DRY.search(shown).start()], f"{base}:{SELF}", "exec"), space)
-        space["WORKTREE"] = WORKTREE
-        return {i[:3] + i[4:]: i[3] for i in (identity(m, space["sections"], space["GAPS"]) for m in space["mutants"]())}
-    except BaseException as e:  # a sys.exit in base's code too (security-S6)
-        print(f"harness_mutate: {base}'s {SELF} cannot say its mutants here ({e!r})")
-        return None
-
-
-def alike(mutant, before):
-    """Whether `before`, what defined_at(base) says, defines this mutant as this script does. Sections it only gained change
-    nothing here, though the cache's key does move with them: a mutant S kills, S and T kill. One it lost is another mutant."""
-    mine = identity(mutant, sections, GAPS)
-    theirs = before.get(mine[:3] + mine[4:])
-    return theirs is not None and set(theirs.split(",")) <= set(mine[3].split(","))
-
-
-def changed_since(base):
-    """The files committed since base, a renamed one under both names and a name git would quote as it is; a base git
-    cannot compare with stops the run."""
-    diff = subprocess.run(["git", "diff", "--no-renames", "--name-only", "-z", base, "HEAD", "--"], capture_output=True, text=True)
-    if diff.returncode != 0:
-        sys.exit(f"harness_mutate: --changed {base}: git cannot compare with it: {diff.stderr.strip()}")
-    return set(diff.stdout.split("\0")) - {""}
-
-
-changed = None
-if sys.argv[1:2] == ["--changed"] and len(sys.argv) == 3:
-    base = sys.argv[2]
-    if base.startswith("-"):  # git would read it as an option
-        sys.exit(f"harness_mutate: --changed {base}: a base is a commit, not an option")
-    changed = changed_since(base)
-elif sys.argv[1:]:
-    sys.exit("usage: harness_mutate.py [--dry | --changed <base>]")
+if sys.argv[1:]:
+    sys.exit("usage: harness_mutate.py [--dry]")
 shards = max(1, int(os.environ.get("HARNESS_SHARDS", "4")))
 CONTROLS_AT_ONCE = 2  # every tree's suites at once overran their 600 s limit beside a coverage run (F2138)
 failures = []
@@ -2260,91 +2043,52 @@ with contextlib.ExitStack() as stack:
     trees = [stack.enter_context(worktree("HEAD"))]  # one tree to build and select with: the others only if a mutant is left (CR9)
     WORKTREE = trees[0]
     found = checked()
-    before = defined_at(base) if changed is not None and SELF in changed else {}
-    if before is None:
-        print(f"harness_mutate: {SELF} changed since {base}, whose mutants it cannot read: every mutant")
-    elif changed is not None:
-        total = len(found)
-        # The lines of HEAD's files that changed since base; a hunk that only removes touches the two beside it.
-        lines = {path: changed_lines("--no-renames", base, "HEAD", "--", path, removals=True).get(path, set()) for path in {m[1] for m in found} & changed}
-        # The lines a change rewrites ask for their mutants; when this script changed, those it does not define alike too.
-        kept = {id(m) for m in select(found, lines, read)} | {id(m) for m in found if SELF in changed and not alike(m, before)}
-        found = [m for m in found if id(m) in kept]
-        print(f"harness_mutate: the lines and the mutants changed since {base}: {len(found)} of {total} mutants")
-    if not found:  # nothing to judge: the controls would only cost minutes (8 suite runs, 601 s at load 30 to 50)
-        if changed is None:  # a full run with no mutant is a harness that lost them, not a green run
-            sys.exit("harness_mutate: no mutant to judge: every mutant is gone from this script")
-        print("harness_mutate: no mutant to judge")
-        sys.exit(0)
-    cache, keys = cached_verdicts(), {id(m): verdict_key(m) for m in found}
-    held = [m for m in found if cache.get(keys[id(m)]) == ("survives" if m[0] in GAPS else "killed")]
-    for label, path, mutated, test in held:
-        print(f"ok    survives (cached): {label}  (known gap: {GAPS[label]})" if label in GAPS else f"ok    killed (cached): {label}")
-    found = [m for m in found if m not in held]
-    print(f"harness_mutate: {len(held)} verdicts from the cache, {len(found)} to judge")
-    if changed is not None and len(found) > MOST:
-        files = ", ".join(f"{path} {n}" for path, n in collections.Counter(m[1] for m in found).most_common())
-        sys.exit(f"harness_mutate: --changed stops before judging {len(found)} mutants, past the {MOST} a branch judges ({files}); the way on is a run with no argument, the night's")
-    if found:
-        # No more trees than mutants, and a control only of the suites they run: one mutant took 4 trees and 8 suite runs (C4).
-        shards = min(shards, len(found))
-        trees += [stack.enter_context(worktree("HEAD")) for _ in range(shards - 1)]
-        suites = [test for test in TESTS if any(m[3] == test for m in found)]
-        controls = [(tr, te) for tr in trees for te in suites]
-        with concurrent.futures.ThreadPoolExecutor(CONTROLS_AT_ONCE) as pool:
-            # The control: an untouched copy passes, so a failure means the mutant.
-            try:
-                waiting = {pool.submit(run, *c): c for c in controls}
-                for future in concurrent.futures.as_completed(waiting):  # in the order they end: a failure is not kept waiting behind a slow one
-                    (tree, test), code = waiting[future], future.result()
-                    if code is None:  # a hung control is no pass: it proves nothing about the mutants (F3382)
-                        sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first")
-                    if code != 0:
-                        sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
-            except BaseException as e:  # an interrupt, or a control that failed or hung: the one beside it is stopped, not waited for
-                stopped(e, pool)
-                raise
-        # Each shard judges every shards-th mutant, one at a time in its own worktree; the verdicts come back in order.
-        with concurrent.futures.ThreadPoolExecutor(shards) as pool:
-            keep = threading.Lock()
+    if not found:  # a harness that lost its mutants is not a green run, and the controls would only cost minutes
+        sys.exit("harness_mutate: no mutant to judge: every mutant is gone from this script")
+    # No more trees than mutants, and a control only of the suites they run: one mutant took 4 trees and 8 suite runs (C4).
+    shards = min(shards, len(found))
+    trees += [stack.enter_context(worktree("HEAD")) for _ in range(shards - 1)]
+    suites = [test for test in TESTS if any(m[3] == test for m in found)]
+    controls = [(tr, te) for tr in trees for te in suites]
+    with concurrent.futures.ThreadPoolExecutor(CONTROLS_AT_ONCE) as pool:
+        # The control: an untouched copy passes, so a failure means the mutant.
+        try:
+            waiting = {pool.submit(run, *c): c for c in controls}
+            for future in concurrent.futures.as_completed(waiting):  # in the order they end: a failure is not kept waiting behind a slow one
+                (tree, test), code = waiting[future], future.result()
+                if code is None:  # a hung control is no pass: it proves nothing about the mutants (F3382)
+                    sys.exit(f"harness_mutate: {test} on the untouched copy {tree} ran past its {LIMIT} s limit; fix that first")
+                if code != 0:
+                    sys.exit(f"harness_mutate: {test} fails on the untouched copy {tree}; fix that first")
+        except BaseException as e:  # an interrupt, or a control that failed or hung: the one beside it is stopped, not waited for
+            stopped(e, pool)
+            raise
+    # Each shard judges every shards-th mutant, one at a time in its own worktree; the verdicts come back in order.
+    with concurrent.futures.ThreadPoolExecutor(shards) as pool:
 
-            def judge(tree, m):
-                """One verdict, kept in the cache as soon as it is known: a run cut short (a time limit, a Ctrl+C) leaves the
-                verdicts it reached, as a run of 700 mutants cut at 100 minutes judged all of them again (2026-10-30). A run
-                that is stopping keeps none: its suites died of the signal, not of the mutant (F2526)."""
-                if STOP.is_set():
-                    raise Cut("the run was stopped")
-                killed = judged(tree, *m)
-                with keep:
-                    if STOP.is_set():
-                        raise Cut("the run was stopped")
-                    if killed != (m[0] in GAPS) and m[0] not in TIMED:
-                        remember({keys[id(m)]: "killed" if killed else "survives"})
-                return killed
+        def judge(tree, m):
+            """One verdict. A run that is stopping judges none: its suites died of the signal, not of the mutant (F2526)."""
+            if STOP.is_set():
+                raise Cut("the run was stopped")
+            return judged(tree, *m)
 
-            try:
-                verdicts = list(pool.map(lambda n: [judge(trees[n], m) for m in found[n::shards]], range(shards)))
-            except BaseException as e:  # the main thread's Ctrl+C, or a shard's suite cut short: the others stop at their next step
-                stopped(e, pool)
-                raise
-learned = {}
-if found:
-    for i, (label, path, mutated, test) in enumerate(found):
-        killed = verdicts[i % shards][i // shards]
-        if killed and label in GAPS:
-            print(f"FAIL  killed, yet listed in GAPS: {label}\n      → delete its line from GAPS")
-            failures.append(label)
-        elif killed:
-            print(f"ok    killed: {label}" + (f"  (won by time: its suite ran past the {LIMIT} s limit; not kept, the load can do that)" if label in TIMED else ""))
-            if label not in TIMED:
-                learned[keys[id(found[i])]] = "killed"
-        elif label in GAPS:
-            print(f"ok    survives: {label}  (known gap: {GAPS[label]})")
-            learned[keys[id(found[i])]] = "survives"
-        else:
-            print(f"FAIL  survives: {label}\n      → {proposal(test, path)}")
-            failures.append(label)
-    remember(learned)
+        try:
+            verdicts = list(pool.map(lambda n: [judge(trees[n], m) for m in found[n::shards]], range(shards)))
+        except BaseException as e:  # the main thread's Ctrl+C, or a shard's suite cut short: the others stop at their next step
+            stopped(e, pool)
+            raise
+for i, (label, path, mutated, test) in enumerate(found):
+    killed = verdicts[i % shards][i // shards]
+    if killed and label in GAPS:
+        print(f"FAIL  killed, yet listed in GAPS: {label}\n      → delete its line from GAPS")
+        failures.append(label)
+    elif killed:
+        print(f"ok    killed: {label}" + (f"  (won by time: its suite ran past the {LIMIT} s limit; the load can do that)" if label in TIMED else ""))
+    elif label in GAPS:
+        print(f"ok    survives: {label}  (known gap: {GAPS[label]})")
+    else:
+        print(f"FAIL  survives: {label}\n      → {proposal(test, path)}")
+        failures.append(label)
 if failures:
     sys.exit(f"harness_mutate: {len(failures)} guards are not proven by a test")
 print("harness_mutate: removing any guard fails a test")

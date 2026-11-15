@@ -453,10 +453,7 @@ costs context in every session.
 - **Core's tests alone run on both engines,** Node's V8 and Chromium's (F816, F817).
 - **No script proves a fix's test failed before it** since `prove_fix.py` left with check.sh's old lanes (D13168): the reviewer reads it;
   a fix of the harness is proven by `harness_mutate.py`.
-- **The harness mutants' verdicts are a cache every tree shares** (`~/.cache/gnoworld-tools`): a verdict is reused when what it
-  was keyed on is unchanged, and it sees only the files its sections name, so a "killed" judged in another branch's tree can stand in
-  a local run. StrykerJS's incremental file is each tree's own (its default), and GitHub's risk job keeps one of its run. The CI keeps neither cache and judges everything on each push
-  (security-S7, review 8).
+- **StrykerJS's incremental file is each tree's own** (its default), and GitHub's risk job keeps one of its run.
 - **The three-round limit is a written rule;** nothing counts the rounds.
 - **Product files Claude writes run outside the sandbox** (F204): the compose file the demo starts
   from, and the app's code that `pnpm dev` runs in Alexis's shell; `deploy/test.sh` runs from a checked
@@ -526,7 +523,7 @@ costs context in every session.
 | `scripts/hidden.py` | the characters no text holds raw: check_docs's rule, in a file of its own to be shared |
 | `scripts/mutate.py` | the realms' mutation check |
 | `scripts/patch_coverage.py`, `scripts/check_regressions.py` | the no-regression net |
-| `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py`, `scripts/suite_parts.py` | the harness's own tests |
+| `scripts/probe.py`, `scripts/test_hooks.sh`, `scripts/harness_mutate.py` | the harness's own tests |
 | `scripts/bench.py`, `app/tests/bench/` | the benches and their budgets, run by hand (F13182) |
 | `scripts/workshop.sh` | `pnpm workshop`: the app's and the lab's dev servers on the tailnet, the chat's backend behind the app's (DEVELOPMENT.md, "The workshop") |
 | `scripts/check_nginx.py`, `scripts/nginx.sha256` | `nginx -t` and the served build's policies, in GitHub's build job; the Mac's pinned binary's checksum |

@@ -2019,7 +2019,7 @@ if part harness_mutate; then
 # whose run() leaves a mark, since a fall-through to the real run takes hours.
 m="$t/mutate" && mkdir -p "$m"
 dry() { # $1: a mutant planted at the end of its list, $2: an entry planted in SECTIONS
-	cp "$here/harness_mutate.py" "$here/suite_parts.py" "$m/"
+	cp "$here/harness_mutate.py" "$m/"
 	cp "$here/repo_files.py" "$m/repo_files.py" # the real helpers, then a worktree that stops the run (the later definition wins)
 	printf '\n\ndef worktree(rev):\n    raise SystemExit("harness_mutate --dry made a worktree")\n' >>"$m/repo_files.py"
 	python3 -I - "$m/harness_mutate.py" "$m/ran" "${1:-}" "${2:-}" <<'PY'
@@ -2058,7 +2058,6 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'[ -n "$ONLY" ] || { echo . >>"$SHARD_ROOT/controls"; [ -z "${CINTR:-}" ] || { echo $$ >>"$SHARD_ROOT/suite.pid"; ! mkdir "$SHARD_ROOT/sig.lock" 2>/dev/null || kill -$CINTR "$PPID"; sleep 30; }; [ -z "${CFAIL:-}" ] || { n=0; until [ -s "$SHARD_ROOT/suite.pid" ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; exit 1; };[ -z "${CONTROLS_SLOW:-}" ] || { : >"$SHARD_ROOT/live.$$"; n=0; until [ "$(ls "$SHARD_ROOT" | grep -c "^live\.")" -ge 2 ] || [ "$n" -ge 50 ]; do n=$((n + 1)); sleep 0.1; done; sleep 0.3; ls "$SHARD_ROOT" | grep -c "^live\." >>"$SHARD_ROOT/overlap"; rm -f "$SHARD_ROOT/live.$$"; }; [ ! -e BROKEN_hooks ]; exit; }' \
 	'if part x; then' \
 	'	pwd >>"$SHARD_ROOT/ran"' \
-	'	[ -n "${CUT:-}" ] && [ -n "$ONLY" ] && ! grep -q KEEP3 g.txt && kill -9 "$PPID"' \
 	'	if [ -n "${INTR:-}" ] && ! grep -q " SPARE" g.txt; then' \
 	'		case $INTR in group) kill -INT 0; sleep 5 ;; ppid) kill -INT "$PPID"; sleep 1 ;; ppidlong) echo $$ >>"$SHARD_ROOT/suite.pid"; kill -INT "$PPID"; sleep 30 ;; termlong) echo $$ >>"$SHARD_ROOT/suite.pid"; kill -TERM "$PPID"; sleep 30 ;; *) exit "$INTR" ;; esac' \
 	'	fi' \
@@ -2067,13 +2066,12 @@ printf '%s\n' '# Each section reads the tree, never its .git file.' 'part() { ca
 	'		: >"$SHARD_ROOT/met.${PWD##*/}" && n=0' \
 	'		until [ "$(ls "$SHARD_ROOT" | grep -c "^met\.")" -ge "$SHARDS_MEET" ]; do n=$((n + 1)); [ "$n" -lt 100 ] || { : >"$SHARD_ROOT/lonely"; break; }; sleep 0.1; done' \
 	'	fi' \
-	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt && grep -q KEEP8 "$(printf "\303\251").txt" && grep -q LINE1 m.txt && grep -q LINE2 m.txt' \
+	'	grep -q KEEP1 g.txt && grep -q KEEP2 g.txt && grep -q KEEP3 g.txt && grep -q KEEP4 h.txt && grep -q KEEP5 i.txt' \
 	'fi' >"$hs/src/scripts/test_hooks.sh"
 # probe.py's block y reads k.txt (a mutant of k.txt is a probe block's, G5); ONLY names the blocks to run, none for all.
 printf 'import os, sys, time\n\n\ndef part(name):\n    return name in os.environ.get("ONLY", "").split(",")\n\n\nif part("y"):\n    if "KEEP7" not in open("k.txt").read():\n        sys.exit(1)\nif not os.environ.get("ONLY"):\n    open(os.environ["SHARD_ROOT"] + "/probe_controls", "a").write(".\\n")\n    if os.environ.get("CSLEEP"):\n        open(os.environ["SHARD_ROOT"] + "/suite.pid", "a").write(str(os.getpid()) + "\\n")\n        time.sleep(30)\nsys.exit(os.path.exists("BROKEN_probe"))\n' >"$hs/src/scripts/probe.py"
-printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt" && ac=$(printf '\303\251').txt && printf 'KEEP8\n' >"$hs/src/$ac"
-printf 'LINE1\nLINE2\n' >"$hs/src/m.txt"
-cp "$here/harness_mutate.py" "$here/suite_parts.py" "$hs/repo/"
+printf 'KEEP1 KEEP2 KEEP3 SPARE\n' >"$hs/src/g.txt" && printf 'KEEP4 SPARE2\n' >"$hs/src/h.txt" && printf 'KEEP5\n' >"$hs/src/i.txt" && printf 'KEEP7\n' >"$hs/src/k.txt"
+cp "$here/harness_mutate.py" "$hs/repo/"
 # The worktrees: copies, logged when made and when removed; BREAK_SECOND=<suite> breaks the second one. Beside
 # the real repo_files.py: the stub's worktree is the later definition.
 cp "$here/repo_files.py" "$hs/repo/repo_files.py"
@@ -2117,17 +2115,8 @@ planted = '''def mutants():
     yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")
     if os.environ.get("STALE"):
         yield from each("g.txt", "NOWHERE", "", "hooks", "planted stale")
-    if os.environ.get("SCOPED"):
-        yield from each("j.txt", "KEEP6", "", "hooks", "planted keep6")
-    if os.environ.get("SPACED"):
-        yield from each("\\u00e9.txt", "KEEP8", "", "hooks", "planted keep8")
     if os.environ.get("PROBED"):
         yield from each("k.txt", "KEEP7", "", "probe", "planted keep7")
-    if os.environ.get("LINED"):
-        yield from each("m.txt", "LINE1", "", "hooks", "planted line1")
-        yield from each("m.txt", "LINE2", "", "hooks", "planted line2")
-    for n in range(int(os.environ.get("MANY", "0"))):
-        yield from each("g.txt", "KEEP1", "", "hooks", f"planted many{n}")
 
 
 def every_mutant():'''
@@ -2135,43 +2124,24 @@ gaps = '''GAPS = {
     **({"planted spare #1": "planted gap"} if os.environ.get("GAPPED") else {}),
     **({"planted keep1 #1": "planted gap"} if os.environ.get("GAPPED_KEEP") else {}),
 '''
-for a, b in (("def mutants():", planted), ("GAPS = {  # label -> why no test can notice it yet\n", gaps), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "j.txt": "z", "m.txt": "x", "k.txt": "y", "\\u00e9.txt": "x",\n')):
+for a, b in (("def mutants():", planted), ("GAPS = {  # label -> why no test can notice it yet\n", gaps), ("SECTIONS = {\n", 'SECTIONS = {\n    "g.txt": "x", "h.txt": "x", "i.txt": "x", "k.txt": "y",\n')):
     assert s.count(a) == 1, f"harness_mutate.py no longer holds {a!r}: update test_hooks.sh's harness_shards"
     s = s.replace(a, b)
 open(p, "w").write(s)
 PY
-cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/src/m.txt" "$hs/src/$ac" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/src/scripts/probe.py" "$hs/repo/scripts/"
+cp "$hs/src/g.txt" "$hs/src/h.txt" "$hs/src/i.txt" "$hs/src/k.txt" "$hs/repo/" && cp "$hs/src/scripts/test_hooks.sh" "$hs/src/scripts/probe.py" "$hs/repo/scripts/"
 git -C "$hs/repo" init -q && git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm x
 shards() { # $1: the shards; then harness_mutate's arguments
 	n=$1 && shift
 	rm -f "$hs/made" "$hs/removed" "$hs/ran" "$hs/controls" "$hs/probe_controls" "$hs/lonely" "$hs/flaked" "$hs"/met.* "$hs"/live.* "$hs/overlap"
-	[ -n "${WARM:-}" ] || rm -rf "${hs:?}/home" # each run with no cache of verdicts, unless WARM keeps the last run's
-	(cd "${HR:-$hs/repo}" && HOME="$hs/home" SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n ${GROUPED:+python3 -I "$hs/group.py"} python3 -I harness_mutate.py "$@" 2>&1)
+	(cd "${HR:-$hs/repo}" && SHARD_ROOT="$hs" SHARD_SRC="$hs/src" HARNESS_SHARDS=$n ${GROUPED:+python3 -I "$hs/group.py"} python3 -I harness_mutate.py "$@" 2>&1)
 }
 count() { [ -e "$hs/$1" ] && wc -l <"$hs/$1" | tr -d ' ' || echo 0; }
 verdicts() { printf '%s\n' "$1" | grep -c "killed: \|survives: " || :; }
 }
-# The four sections run apart, so a change of harness_mutate.py reruns the one that holds its case.
-# A new mutant and one whose text changed, planted in the copy's harness_mutate.py and committed.
-plant_new_mutants() {
-python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
-import sys
-p = sys.argv[1]
-s = open(p).read()
-keep5 = '    yield from each("i.txt", "KEEP5", "", "hooks", "planted keep5")\n'
-spare2 = 'each("h.txt", " SPARE2", "", "hooks", "planted spare2")'
-assert s.count(keep5) == 1 and s.count(spare2) == 1, "the planted mutants changed: update test_hooks.sh's harness_shards"
-s = s.replace(keep5, keep5 + '    yield from each("k.txt", "KEEP7", "", "probe", "planted keep7 again")\n')
-s = s.replace(spare2, 'each("h.txt", " SPARE2", " SPARE3", "hooks", "planted spare2")')
-open(p, "w").write(s)
-PY
-git -C "$hs/repo" commit -qam "a new mutant, a changed one"
-}
 if part harness_shards; then
 # harness_mutate judges its mutants over HARNESS_SHARDS worktrees side by side, each mutant once and in
-# a tree put back after each one, after a control run of each suite in every tree; with --changed
-# <base>, only the mutants that rewrite a line committed since base (a merge's own) and those harness_mutate defines
-# anew or otherwise, and never past 100; a survivor fails the run either way, and the worktrees go.
+# a tree put back after each one, after a control run of each suite in every tree; a survivor fails the run, and the worktrees go.
 # On a copy whose worktrees are copies of a small tree, and whose mutants are planted.
 shards_fixture
 # Three shards at once: every mutant judged once, in its order; the survivor behind another file's
@@ -2187,14 +2157,6 @@ for k in spare spare2; do printf '%s\n' "$out" | grep -q "^FAIL  survives: plant
 [ "$(sort -u "$hs/ran" | wc -l | tr -d ' ')" = 3 ] || fail "harness_mutate did not spread its mutants over its 3 shards"
 [ ! -e "$hs/lonely" ] || fail "harness_mutate's shards did not run side by side"
 [ "$(count removed)" = 3 ] || fail "harness_mutate left worktrees behind"
-# A run cut short (the merge check's own time limit, a Ctrl+C) keeps the verdicts it reached: harness_mutate used to remember them
-# only at its end, so a run of 700 mutants cut at 100 minutes judged all of them again at the next (2026-10-30, slice-5-harness-a:
-# the lane "stalled" twice, 100 minutes of verdicts lost each time). One shard, killed hard while it judges the third mutant.
-out=$(CUT=1 shards 1) && fail "harness_mutate lived through the death of its process: $out"
-out=$(WARM=1 shards 1) && fail "harness_mutate passed with surviving mutants after a cut run"
-for k in keep1 keep2; do
-	printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted $k #1$" || fail "harness_mutate lost the verdict of planted $k when its run was cut short: $out"
-done
 # No shard asked for: one.
 out=$(shards 0) && fail "harness_mutate passed with surviving mutants on one shard"
 [ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for HARNESS_SHARDS=0"
@@ -2212,71 +2174,21 @@ for suite in hooks probe; do
 	[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate judged mutants after a failed control: $out"
 	[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind after a failed control"
 done
-# --changed: the committed changes since base; only i.txt changed, so only its mutant runs, and passes.
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf 'KEEP5 changed\n' >"$hs/repo/i.txt" && git -C "$hs/repo" commit -qam i
-out=$(shards 2 --changed "$base") || fail "harness_mutate --changed failed on the mutant of the one changed file: $out"
-printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_mutate --changed skipped the changed file's mutant: $out"
-[ "$(verdicts "$out")" = 1 ] || fail "harness_mutate --changed judged a mutant of a file that did not change: $out"
-printf '%s\n' "$out" | grep -q "1 of 7 mutants" || fail "harness_mutate --changed did not say how many it kept: $out"
 # One mutant to judge needs one tree, and the control of the one suite it belongs to: no more worktrees than mutants, no
 # control of a suite none of the mutants runs (CR9, C4; 4 trees and 8 suite runs took 601 s at load 30 to 50 for one mutant).
-[ "$(count made)" = 1 ] || fail "harness_mutate made $(count made) worktrees for 1 mutant and 2 shards: $out"
-[ "$(count controls)" = 1 ] && [ "$(count probe_controls)" = 0 ] || fail "harness_mutate ran $(count controls) hooks and $(count probe_controls) probe controls for one hooks mutant"
-# A survivor among the changed files fails the run.
-printf 'KEEP4 SPARE2 changed\n' >"$hs/repo/h.txt" && git -C "$hs/repo" commit -qam h
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with a survivor: $out"
-printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed hid its survivor: $out"
-# Every mutant is still built: a stale one of a file that did not change stops the run.
-out=$(STALE=1 shards 2 --changed "$base") && fail "harness_mutate --changed passed with a stale mutant: $out"
-printf '%s\n' "$out" | grep -q "planted stale: nothing to mutate" || fail "harness_mutate --changed did not check every mutant: $out"
-[ "$(verdicts "$out")" = 0 ] || fail "harness_mutate --changed judged mutants beside a stale one: $out"
-# Two blank lines in a suite ask for nothing (on harness-a, 704 mutants of 951); the run with no argument, which main
-# requires, still judges every mutant --changed skipped: a test a branch weakens is seen there (Alexis, 2026-10-30).
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf '\n\n' >>"$hs/repo/scripts/test_hooks.sh" && git -C "$hs/repo" commit -qam suite
-out=$(shards 2 --changed "$base") || fail "harness_mutate --changed failed on two blank lines in a suite: $out"
-[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 7 mutants" || fail "harness_mutate --changed asked for mutants for two blank lines in a suite: $out"
-out=$(shards 2) && fail "harness_mutate passed with survivors, with no argument: $out"
-[ "$(verdicts "$out")" = 7 ] || fail "harness_mutate with no argument did not judge every mutant --changed skipped: $out"
-# A changed line asks for the mutants that rewrite it, not for the rest of its file's, whatever git's colours or external
-# diff; a line removed touches the two beside it, in HEAD's numbers.
-printf 'LINE1\nGONE\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -qam "three lines"
-git -C "$hs/repo" config color.ui always && git -C "$hs/repo" config diff.external false
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf 'LINE1\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -qam "a line removed"
-out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a removed line: $out"
-[ "$(verdicts "$out")" = 2 ] && printf '%s\n' "$out" | grep -q " 2 of 9 mutants" || fail "harness_mutate --changed did not ask for the two lines beside a removed one: $out"
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf 'LINE1 changed\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" commit -qam "a line changed"
-out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed line: $out"
-printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line's mutant: $out"
-[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed asked for more than the changed line's mutant: $out"
-git -C "$hs/repo" config --unset color.ui && git -C "$hs/repo" config --unset diff.external
-# More than 100 to judge: --changed stops before any tree beyond the first, any control, any verdict, and says how many,
-# from where, and the way on. A control that fails proves a run got past the limit with nothing judged: 100 goes on, and
-# so does a run with no argument, and what the cache holds does not count.
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf 'KEEP1 KEEP2 KEEP3 SPARE many\n' >"$hs/repo/g.txt" && git -C "$hs/repo" commit -qam many
-out=$(MANY=97 shards 2 --changed "$base") && fail "harness_mutate --changed went on with 101 mutants to judge: $out"
-printf '%s\n' "$out" | grep -q "stops before judging 101 mutants" || fail "harness_mutate --changed did not say how many it stopped at: $out"
-printf '%s\n' "$out" | grep -q "g.txt 101" || fail "harness_mutate --changed did not say which files they come from: $out"
-printf '%s\n' "$out" | grep -q "a run with no argument" || fail "harness_mutate --changed did not name the way on: $out"
-[ "$(verdicts "$out")" = 0 ] && [ ! -e "$hs/controls" ] && [ "$(count made)" = 1 ] && [ "$(count removed)" = 1 ] || fail "harness_mutate --changed did work past its limit: $out"
-past() { printf '%s\n' "$1" | grep -q "fails on the untouched copy"; }
-out=$(MANY=96 BREAK_SECOND=hooks shards 2 --changed "$base") || :
-past "$out" || fail "harness_mutate --changed stopped at 100 mutants to judge: $out"
-out=$(MANY=97 BREAK_SECOND=hooks shards 2) || :
-past "$out" || fail "harness_mutate with no argument stopped at its limit: $out"
-shards 1 >/dev/null || : # keep1 to keep3 cached, with many0 next
-out=$(WARM=1 MANY=1 shards 1) || :
-out=$(WARM=1 MANY=97 BREAK_SECOND=hooks shards 2 --changed "$base") || :
-past "$out" || fail "harness_mutate --changed counted the verdicts of its cache against its limit: $out"
-# Nothing changed since its base, so no mutant to judge: it says so and runs no control either.
-out=$(shards 2 --changed "$(git -C "$hs/repo" rev-parse HEAD)") || fail "harness_mutate --changed failed with no mutant to judge: $out"
-printf '%s\n' "$out" | grep -q "0 of 7 mutants" || fail "harness_mutate --changed did not say it kept none: $out"
-[ ! -e "$hs/controls" ] && [ ! -e "$hs/probe_controls" ] || fail "harness_mutate --changed ran a control for no mutant: $out"
-[ "$(count made)" = 1 ] || fail "harness_mutate --changed made $(count made) worktrees for no mutant to judge, two shards asked: $out"
+out=$(shards 12) && fail "harness_mutate passed with surviving mutants on 12 shards: $out"
+[ "$(count made)" = 7 ] || fail "harness_mutate made $(count made) worktrees for 7 mutants and 12 shards: $out"
+[ "$(count controls)" = 7 ] && [ "$(count probe_controls)" = 0 ] || fail "harness_mutate ran $(count controls) hooks and $(count probe_controls) probe controls for 7 hooks mutants"
+# The run judges every mutant: none to judge is a harness that lost its mutants, not a green run (F1431, H2).
+out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge: $out"
+printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
+[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
+# Any argument is refused, before any worktree: the run takes none but --dry.
+for args in "--changed HEAD" "--changed" "--dry --changed x" "--bogus"; do
+	out=$(shards 2 $args) && fail "harness_mutate took the arguments $args"
+	printf '%s\n' "$out" | grep -q "usage" || fail "harness_mutate did not say why it refused $args: $out"
+	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
+done
 # The controls run two at a time, never every tree's suites at once: beside a coverage run, eight at once
 # overran their 600 s limit where they take 96 s alone (F2138). Each control still runs, in every tree; each fake control
 # waits for a second one beside it (5 s at most), so a serial run shows as one at once, not as a pass.
@@ -2287,15 +2199,11 @@ fi
 
 if part harness_shards_signal; then
 shards_fixture
-# A Ctrl+C reaches the suite of every mutant in flight, which dies of the signal: that is no verdict, and none is kept. The run
-# was reading it as "killed" and writing it to the cache, where the next run, --full too, passed with the survivor (F2526, from
-# 2ca90ff6). The run is a group of its own, signalled from inside its surviving mutant's suite; the next run still fails on it.
+# A Ctrl+C reaches the suite of every mutant in flight, which dies of the signal: that is no verdict, never a kill. The run is a
+# group of its own, signalled from inside its surviving mutant's suite.
 printf 'import signal, subprocess, sys\nsignal.signal(signal.SIGINT, lambda *_: None)  # this section runs in the background, whose shell ignores INT: the run below must not\nsys.exit(subprocess.run(sys.argv[1:], start_new_session=True).returncode)\n' >"$hs/group.py"
 out=$(INTR=group GROUPED=1 shards 1) && fail "harness_mutate passed after a signal cut its suite short: $out"
 printf '%s\n' "$out" | grep -q "^ok    killed: planted spare #1$" && fail "harness_mutate read the signal that cut a suite short as a kill: $out"
-out=$(WARM=1 shards 1) && fail "harness_mutate passed with a survivor after a run cut by a signal: $out"
-printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted spare #1$" && fail "harness_mutate cached the signal that cut a suite short as a kill: $out"
-printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare #1$" || fail "harness_mutate lost its survivor after a run cut by a signal: $out"
 # The codes a shell gives a suite it ends by a signal are no verdict either (INT, KILL, TERM).
 for c in 130 137 143; do
 	out=$(INTR=$c shards 1) && fail "harness_mutate passed after a suite ended with $c: $out"
@@ -2306,7 +2214,6 @@ done
 # verdict after it (the suite of the survivor goes on to pass; four mutants had run, never the seven).
 out=$(INTR=ppid GROUPED=1 shards 1) && fail "harness_mutate passed after an interrupt: $out"
 [ "$(count ran)" = 4 ] || fail "harness_mutate went on judging after its interrupt: $(count ran) of 7 mutants ran"
-grep -q survives "$hs"/home/.cache/gnoworld-tools/* 2>/dev/null && fail "harness_mutate kept the verdict of a mutant judged after its interrupt"
 # Each suite is a process group of its own now (F3382, so that a hung one is stopped with its children and nothing else): a signal to the
 # run no longer reaches them with it, so the run stops them itself. A suite that would run 30 s more is dead when the run is, on an INT
 # (well before it could end by itself) and on a TERM, which would otherwise end the run alone and leave its suites behind.
@@ -2336,212 +2243,6 @@ out=$(CFAIL=1 CSLEEP=1 PROBED=1 shards 2) && fail "harness_mutate passed with a 
 printf '%s\n' "$out" | grep -q "fails on the untouched copy" || fail "harness_mutate did not say which control failed: $out"
 [ $(($(date +%s) - began)) -lt 20 ] || fail "harness_mutate waited for the control beside a failed one to end by itself ($(($(date +%s) - began)) s): $out"
 for p in $(cat "$hs/suite.pid"); do kill -0 "$p" 2>/dev/null && { kill -9 "$p" 2>/dev/null; fail "harness_mutate left a control running after another failed"; }; done
-fi
-
-if part harness_shards_text; then
-shards_fixture
-# A file the branch marks `-diff` in .gitattributes (or one with a NUL byte) makes git print "Binary files differ", and a textconv
-# can turn its text into another: the changed lines are read as text, as the file is (F2537; scan_secrets.sh does too).
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf '* -diff\n' >"$hs/repo/.gitattributes" && printf 'LINE1 again\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" add .gitattributes && git -C "$hs/repo" commit -qam "a line changed, diff off"
-out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file marked -diff: $out"
-printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file marked -diff: $out"
-[ "$(verdicts "$out")" = 1 ] && printf '%s\n' "$out" | grep -q " 1 of 9 mutants" || fail "harness_mutate --changed did not ask for the one changed line of a file marked -diff: $out"
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf 'm.txt diff=nc\n' >"$hs/repo/.gitattributes" && printf 'LINE1 once more\nLINE2\n' >"$hs/repo/m.txt" && git -C "$hs/repo" config diff.nc.textconv true && git -C "$hs/repo" commit -qam "a line changed, textconv"
-out=$(LINED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a file with a textconv: $out"
-printf '%s\n' "$out" | grep -q "killed: planted line1 #1$" || fail "harness_mutate --changed skipped the changed line of a file with a textconv: $out"
-git -C "$hs/repo" config --unset diff.nc.textconv && git -C "$hs/repo" rm -q .gitattributes && git -C "$hs/repo" commit -qm "no attributes"
-fi
-
-if part harness_shards_records; then
-shards_fixture
-# --changed on scratch clones of the first commit (F1433, F1434): what changed since its base is judged.
-HR=$hs/r2 && git clone -q "$hs/repo" "$HR" && C0=$(git -C "$HR" rev-list --max-parents=0 HEAD) && main_b=$(git -C "$HR" branch --show-current)
-fresh() { git -C "$HR" checkout -q "$main_b" && git -C "$HR" reset -q --hard "$C0" && git -C "$HR" branch -q -D side 2>/dev/null || :; }
-edit() { printf '%s\n' "$2" >"$HR/$1" && git -C "$HR" commit -qam "$1: $2"; }
-judges() { # $1: the guard files' mutants it must judge, as "<verdicts> <of 7>"; the rest of $out is read by the caller
-	[ "$(verdicts "$out")" = "$1" ] || fail "harness_mutate --changed judged $(verdicts "$out") mutants, not $1: $out"
-	printf '%s\n' "$out" | grep -q " $2 of ${3:-7} mutants" || fail "harness_mutate --changed did not say $2 of ${3:-7}: $out"
-}
-# A guard file renamed away counts as changed: git shows only the new name by default, and the old guard file's
-# mutants must still be judged (H5).
-fresh && git -C "$HR" mv i.txt i2.txt && git -C "$HR" commit -qm rename
-out=$(shards 2 --changed "$C0") || fail "harness_mutate --changed failed on a renamed guard file: $out"
-judges 1 1
-printf '%s\n' "$out" | grep -q "killed: planted keep5 #1$" || fail "harness_mutate --changed left out the guard file that was renamed: $out"
-# A guard file whose name git quotes (non-ASCII) is found: a line-split name-only is "\303\251.txt" with quotes (H9).
-fresh && edit "$ac" "KEEP8 z"
-out=$(SPACED=1 shards 2 --changed "$C0") || fail "harness_mutate --changed failed on a guard file with a quoted name: $out"
-judges 1 1 8
-printf '%s\n' "$out" | grep -q "killed: planted keep8 #1$" || fail "harness_mutate --changed missed a guard file whose name git quotes: $out"
-# The full run (no argument) judges every mutant: none to judge there is a harness that lost its mutants, not a
-# green run (F1431, H2). With --changed, none selected is nothing changed since its base.
-out=$(NONE=1 shards 2) && fail "harness_mutate passed with no mutant to judge and no --changed: $out"
-printf '%s\n' "$out" | grep -q "no mutant" || fail "harness_mutate did not say it had no mutant: $out"
-[ "$(count removed)" = "$(count made)" ] || fail "harness_mutate left worktrees behind with no mutant"
-unset HR
-fi
-
-if part harness_shards_changed; then
-shards_fixture
-# (Before the section z below: its if, last in the suite, would give every x mutant a passing exit.)
-# A change inside one section of a suite asks for no mutant: only the lines a mutant rewrites do.
-printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
-cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
-printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
-git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm z
-base=$(git -C "$hs/repo" rev-parse HEAD)
-for f in "$hs/src/scripts/test_hooks.sh" "$hs/repo/scripts/test_hooks.sh"; do
-	sed 's|^	grep -q KEEP6 j.txt$|	grep -q KEEP6 j.txt \&\& :|' "$f" >"$f.new" && mv "$f.new" "$f"
-done
-git -C "$hs/repo" commit -qam "z's line"
-out=$(SCOPED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed section: $out"
-[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed asked for mutants for a changed section: $out"
-# A change inside one block of probe.py likewise: probe.py is a suite as test_hooks.sh is (G5).
-base=$(git -C "$hs/repo" rev-parse HEAD)
-for f in "$hs/src/scripts/probe.py" "$hs/repo/scripts/probe.py"; do
-	sed 's|^        sys.exit(1)$|        sys.exit(2)|' "$f" >"$f.new" && mv "$f.new" "$f"
-done
-git -C "$hs/repo" commit -qam "y's line"
-out=$(PROBED=1 shards 2 --changed "$base") || fail "harness_mutate --changed failed on a changed probe block: $out"
-[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed asked for mutants for a changed probe block: $out"
-# harness_mutate.py itself changed: the mutants it defines anew or otherwise than base's script (a label, a text, a
-# suite) are judged, with those of the lines changed, not every mutant (Alexis, 2026-10-29: ~700 judged
-# for two new ones, 32 minutes). Its own guards are mutants of a file it changed, so they are judged. A comment alone:
-base=$(git -C "$hs/repo" rev-parse HEAD)
-printf '\n# a change of its own\n' >>"$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam itself
-out=$(shards 2 --changed "$base") || fail "harness_mutate --changed judged mutants after a comment of its own: $out"
-[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 7 mutants" || fail "harness_mutate --changed judged unchanged mutants after it changed itself: $out"
-# A new mutant, and one whose text changed: those two alone. (Section z makes every x mutant survive, as above: the new
-# one is a probe block's, which can be killed.)
-plant_new_mutants
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with the survivor it defined otherwise: $out"
-[ "$(verdicts "$out")" = 2 ] || fail "harness_mutate --changed did not judge only its new and changed mutants: $out"
-printf '%s\n' "$out" | grep -q "killed: planted keep7 again #1$" || fail "harness_mutate --changed skipped a mutant it defined anew: $out"
-printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" || fail "harness_mutate --changed skipped a mutant whose text it changed: $out"
-printf '%s\n' "$out" | grep -q " 2 of 8 mutants" || fail "harness_mutate --changed did not say 2 of 8 mutants: $out"
-# A mutant is also told by its label alone, by a section it lost and by its place in GAPS: one change each. Sections it only
-# gained are no other definition: a mutant S kills, S and T kill. A branch that splits a section would otherwise ask for every
-# mutant of the file (harness-a: 158 of check.sh's for one section added; harness-b, past 256).
-for edit in label grown lost regrown gaps; do
-	base=$(git -C "$hs/repo" rev-parse HEAD)
-	python3 -I - "$hs/repo/harness_mutate.py" "$edit" <<'PY'
-import sys
-p, edit = sys.argv[1], sys.argv[2]
-s = open(p).read()
-old, new = {
-    "label": ('"hooks", "planted keep4")', '"hooks", "planted keep4 renamed")'),
-    "grown": ('"i.txt": "x",', '"i.txt": "x,z",'),
-    "lost": ('"i.txt": "x,z",', '"i.txt": "z",'),
-    "regrown": ('"i.txt": "z",', '"i.txt": "x,z",'),
-    "gaps": ("GAPS = {\n", 'GAPS = {\n    "planted keep2 #1": "a planted gap",\n'),
-}[edit]
-assert s.count(old) == 1, f"the planted {edit} changed: update test_hooks.sh's harness_shards"
-open(p, "w").write(s.replace(old, new))
-PY
-	git -C "$hs/repo" commit -qam "$edit alone"
-	out=$(shards 2 --changed "$base") || :
-	case $edit in grown | regrown) want=0 ;; *) want=1 ;; esac
-	[ "$(verdicts "$out")" = "$want" ] && printf '%s\n' "$out" | grep -q " $want of 8 mutants" || fail "harness_mutate --changed did not judge $want mutant after its $edit alone: $out"
-done
-# A base script that does not run (a syntax error before its --dry line): every mutant.
-cp "$hs/repo/harness_mutate.py" "$hs/hm.keep"
-python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("\nif sys.argv[1:] == [\"--dry\"]:", "\ndef (:\nif sys.argv[1:] == [\"--dry\"]:", 1))' "$hs/repo/harness_mutate.py"
-git -C "$hs/repo" commit -qam "a syntax error" && base=$(git -C "$hs/repo" rev-parse HEAD)
-cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam "it runs again"
-out=$(shards 2 --changed "$base") || :
-[ "$(verdicts "$out")" = 8 ] || fail "harness_mutate --changed did not judge every mutant against a base script that does not run: $out"
-# A base whose script it cannot read as definitions (no `--dry` line to cut it at): every mutant, as before.
-cp "$hs/repo/harness_mutate.py" "$hs/hm.keep"
-sed 's|^if sys.argv\[1:\] == \["--dry"\]:$|if ["--dry"] == sys.argv[1:]:|' "$hs/hm.keep" >"$hs/repo/harness_mutate.py"
-git -C "$hs/repo" commit -qam "no dry line" && base=$(git -C "$hs/repo" rev-parse HEAD)
-cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && git -C "$hs/repo" commit -qam "the dry line back"
-out=$(shards 2 --changed "$base") && fail "harness_mutate --changed passed with survivors after a base it could not read: $out"
-[ "$(verdicts "$out")" = 8 ] || fail "harness_mutate --changed did not judge every mutant against a base script it could not read: $out"
-# A name base's script imports that this tree's suite_parts.py dropped: base's script reads base's helper, and still says its
-# mutants (touched(), gone with the rule by lines, made all 973 of harness-a's look new, which only --full could then pass).
-cp "$hs/repo/harness_mutate.py" "$hs/hm.keep" && cp "$hs/repo/suite_parts.py" "$hs/sp.keep"
-printf '\n\ndef dropped():\n    pass\n' >>"$hs/repo/suite_parts.py"
-sed 's|^from suite_parts import code, parts, select$|from suite_parts import code, dropped, parts, select|' "$hs/hm.keep" >"$hs/repo/harness_mutate.py"
-git -C "$hs/repo" commit -qam "a helper base has" && base=$(git -C "$hs/repo" rev-parse HEAD)
-cp "$hs/hm.keep" "$hs/repo/harness_mutate.py" && cp "$hs/sp.keep" "$hs/repo/suite_parts.py" && git -C "$hs/repo" commit -qam "the helper dropped"
-out=$(shards 2 --changed "$base") || :
-[ "$(verdicts "$out")" = 0 ] && printf '%s\n' "$out" | grep -q " 0 of 8 mutants" || fail "harness_mutate --changed took every mutant for new when base's helper had a name this tree's lacks: $out"
-# What it refuses, before any worktree: a base git cannot compare with, one read as an option, any
-# other argument.
-out=$(shards 2 --changed no-such-base) && fail "harness_mutate --changed took a base that is no commit: $out"
-out=$(shards 2 --changed "--output=$hs/written") && fail "harness_mutate --changed took an option for its base: $out"
-[ ! -e "$hs/written" ] || fail "harness_mutate --changed let git write a file"
-for args in "--changed" "--changed a b" "--dry --changed x" "--bogus"; do
-	out=$(shards 2 $args) && fail "harness_mutate took the arguments $args"
-	printf '%s\n' "$out" | grep -q "usage\|--changed" || fail "harness_mutate did not say why it refused $args: $out"
-	[ ! -e "$hs/made" ] || fail "harness_mutate made a worktree for the arguments $args"
-done
-fi
-
-if part harness_shards_cache; then
-shards_fixture
-printf '%s\n' 'if part z; then' '	grep -q KEEP6 j.txt' 'fi' >"$hs/z"
-cat "$hs/z" >>"$hs/src/scripts/test_hooks.sh" && cat "$hs/z" >>"$hs/repo/scripts/test_hooks.sh"
-printf 'KEEP6\n' >"$hs/src/j.txt" && printf 'KEEP6\n' >"$hs/repo/j.txt"
-git -C "$hs/repo" add -A && git -C "$hs/repo" commit -qm z
-plant_new_mutants # the sections before it left them in the copy
-# The verdicts' cache (Alexis, 2026-10-29): a killed mutant whose text, the sections that judge it, the suite's text
-# outside its sections, every file of the tree that text names, and harness_mutate's own runner are as they were is not
-# judged again; a survivor always is. It lives in ~/.cache/gnoworld-tools; the CI starts with none and judges all.
-# (Here section x keeps its own failure, which section z, last in the suite, would otherwise turn into a pass.)
-sed 's|^	grep -q KEEP1 g.txt \(.*\)$|	grep -q KEEP1 g.txt \1 \|\| exit 1|' "$hs/src/scripts/test_hooks.sh" >"$hs/s" && cp "$hs/s" "$hs/src/scripts/test_hooks.sh"
-python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("    \"planted keep2 #1\": \"a planted gap\",\n", ""))' "$hs/repo/harness_mutate.py"
-rm -rf "${hs:?}/home"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(verdicts "$out")" = 9 ] || fail "harness_mutate did not judge every mutant with no cache: $out"
-out=$(WARM=1 PROBED=1 shards 2) || :
-cached=$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)
-[ "$cached" = 7 ] || fail "harness_mutate took $cached of its 7 killed mutants from the cache: $out"
-printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare #1$" && printf '%s\n' "$out" | grep -q "^FAIL  survives: planted spare2 #1$" ||
-	fail "harness_mutate took a survivor from the cache instead of judging it again: $out"
-[ "$(count ran)" = 2 ] || fail "harness_mutate ran section x $(count ran) times with only its 2 survivors to judge: $out"
-[ "$(count probe_controls)" = 0 ] || fail "harness_mutate controlled the probe with none of its mutants to judge: $out"
-# A file the judging sections name, changed: their mutants are judged again; the probe block's, which does not name it, are not.
-printf 'KEEP4 SPARE2 MORE\n' >"$hs/src/h.txt"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)" = 2 ] && printf '%s\n' "$out" | grep -q "^ok    killed (cached): planted keep7 #1$" ||
-	fail "harness_mutate kept a cached verdict whose section names a file that changed, or dropped one that does not: $out"
-# A file nothing names, added: every cached verdict holds.
-printf 'x\n' >"$hs/src/unnamed.txt"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)" = 7 ] || fail "harness_mutate dropped cached verdicts for a file nothing names: $out"
-# Two blank lines in a suite, outside its sections and inside the one that judges: every verdict holds (they missed the
-# cache for 704 mutants). Comments do count: a `#` line in a heredoc or a multi-line string is text.
-printf '\n\n' >>"$hs/src/scripts/test_hooks.sh"
-awk '{ print } /^	pwd >>/ { print ""; print "" }' "$hs/src/scripts/test_hooks.sh" >"$hs/s" && cp "$hs/s" "$hs/src/scripts/test_hooks.sh"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)" = 7 ] || fail "harness_mutate dropped cached verdicts for blank lines in a suite: $out"
-# A blank line in a guard file keeps its own mutants' verdicts.
-printf '\n' >>"$hs/src/g.txt"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): planted keep[123] #1$" || :)" = 3 ] || fail "harness_mutate dropped its mutants' verdicts for a blank line in their file: $out"
-# A section that judges them, changed: judged again.
-sed 's|^	pwd >>"$SHARD_ROOT/ran"$|	pwd >>"$SHARD_ROOT/ran" # changed|' "$hs/src/scripts/test_hooks.sh" >"$hs/s" && cp "$hs/s" "$hs/src/scripts/test_hooks.sh"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :)" = 2 ] || fail "harness_mutate kept cached verdicts after the section that judges them changed: $out"
-# A cache it cannot read is no cache: every mutant is judged, nothing raises.
-printf 'not json' >"$hs/home/.cache/gnoworld-tools/harness-verdicts.json"
-out=$(WARM=1 PROBED=1 shards 2) || :
-[ "$(verdicts "$out")" = 9 ] && ! printf '%s\n' "$out" | grep -q Traceback || fail "harness_mutate did not judge every mutant beside a cache it cannot read: $out"
-# The tools' lockfile, the suite's text outside its sections, and the runner that judges: each changed, every verdict goes.
-printf 'lock 1\n' >"$hs/src/pnpm-lock.yaml"
-WARM=1 PROBED=1 shards 2 >/dev/null || :
-warm() { out=$(WARM=1 PROBED=1 shards 2) || :; printf '%s\n' "$out" | grep -c "^ok    killed (cached): " || :; }
-[ "$(warm)" = 7 ] || fail "harness_mutate did not keep its verdicts beside a lockfile that did not change: $out"
-printf 'lock 2\n' >"$hs/src/pnpm-lock.yaml"
-[ "$(warm)" = 0 ] || fail "harness_mutate kept cached verdicts after the tools' lockfile changed: $out"
-sed 's|^part() {|part() { # changed outside every section\n|' "$hs/src/scripts/test_hooks.sh" >"$hs/s" && cp "$hs/s" "$hs/src/scripts/test_hooks.sh"
-[ "$(warm)" = 2 ] || fail "harness_mutate kept the hooks' cached verdicts after their suite changed outside its sections: $out"
-python3 -I -c 'import sys; p = sys.argv[1]; s = open(p).read(); open(p, "w").write(s.replace("def judged(tree, label, path, mutated, test):\n", "def judged(tree, label, path, mutated, test):  # changed\n", 1))' "$hs/repo/harness_mutate.py"
-[ "$(warm)" = 0 ] || fail "harness_mutate kept cached verdicts after the runner that judges them changed: $out"
-rm -rf "${hs:?}/home"
 fi
 
 if part migrations; then
@@ -3877,7 +3578,7 @@ for path, sections in need.items():
     missing = sections - listed.get(path, set())
     if missing:
         problems.append(path + " is not mapped to " + ",".join(sorted(missing)) + ": removing its guard would run no test that sees it")
-whole = {"harness_shards": {"scripts/harness_mutate.py", "scripts/repo_files.py", "scripts/suite_parts.py", "scripts/test_hooks.sh"}}
+whole = {"harness_shards": {"scripts/harness_mutate.py", "scripts/repo_files.py", "scripts/test_hooks.sh"}}
 for family, owners in whole.items():
     members = {s for s in sizes if s.startswith(family)}
     if not any(members & l for l in listed.values()):
@@ -6428,70 +6129,6 @@ printf '%s\n' "$out" | grep -qF "a café bench [1 ms]: " || fail "bench.py did n
 rm -r "${b:?}/.git" "${b:?}/app" "${b:?}/node_modules/pkg" && rm "$b/.gitignore"
 fi
 
-if part mutant_scope; then
-# suite_parts.py: harness_mutate --changed judges the mutants that rewrite a changed line, not all of a file's or a suite's;
-# a verdict's key reads a suite by sections. A section of test_hooks.sh ends at the fi that closes it, nested ifs at the
-# margin counted; one of probe.py at the next line as little indented.
-python3 -I - "$here" <<'PY' || fail "suite_parts.py misread which sections a change touched (above)"
-import sys
-sys.dont_write_bytecode = True  # a mutant of the same size, written in the same second, would be read from its .pyc
-sys.path.insert(0, sys.argv[1])
-from suite_parts import code, parts, rewritten, select
-def touched(path, old, new):  # parts' reading of a change: the sections whose text differs, None outside them
-    (old_parts, old_outside), (new_parts, new_outside) = parts(path, old), parts(path, new)
-    return None if old_outside != new_outside else {name for name in old_parts.keys() | new_parts.keys() if old_parts.get(name) != new_parts.get(name)}
-sh = "pre\nif part a; then\nx\nif y; then\nz\nfi\nafter\nfi\nhelper() { :; }\nif part b; then\nw\nfi\n\nif part a; then\nv\nfi\ntrailer\n"
-cases = [
-    (sh, set(), "no change"),
-    (sh.replace("w\n", "w2\n"), {"b"}, "a line of b"),
-    (sh.replace("z\n", "z2\n"), {"a"}, "a line inside a's nested if"),
-    (sh.replace("after\n", "after2\n"), {"a"}, "a line after a's nested if"),
-    (sh.replace("v\n", "v2\n"), {"a"}, "a's second block"),
-    (sh.replace("helper", "helper2"), None, "a helper between sections"),
-    (sh.replace("pre", "pre2"), None, "the preamble"),
-    (sh.replace("trailer", "trailer2"), None, "the trailer"),
-    (sh.replace("helper() { :; }\n", "helper() { :; }\nif part c; then\nq\nfi\n"), {"c"}, "a new section"),
-]
-for new, want, what in cases:
-    got = touched("scripts/test_hooks.sh", sh, new)
-    assert got == want, f"test_hooks.sh, {what}: {got} for {want}"
-# A one-line `if ...; fi` at the margin opens nothing: the sections after it still end where they do (G9).
-oneline = sh.replace("x\n", "x\nif q; then r; fi\n")
-assert touched("scripts/test_hooks.sh", sh, oneline) == {"a"}, "a one-line if added to a"
-assert touched("scripts/test_hooks.sh", oneline, oneline.replace("w\n", "w2\n")) == {"b"}, "a one-line if swallowed the sections after it"
-py = 'def f():\n    pass\n\n\ntry:\n    if part("a"):\n        x\n        if y:\n            z\n\n    if part("b"):\n        w\nfinally:\n    pass\n'
-for new, want, what in [
-    (py.replace("        w", "        w2"), {"b"}, "a line of b"),
-    (py.replace("            z", "            z2"), {"a"}, "a's nested line"),
-    (py.replace("    pass\n\n\ntry", "    pass2\n\n\ntry"), None, "a helper"),
-    (py.replace("finally:\n    pass", "finally:\n    pass2"), None, "the end"),
-]:
-    got = touched("scripts/probe.py", py, new)
-    assert got == want, f"probe.py, {what}: {got} for {want}"
-text = "a\nb\nc\n"
-for new, want, what in [
-    ("a\nB\nc\n", {2}, "a line rewritten"),
-    ("a\nc\n", {2}, "a line removed"),
-    ("a\nb\nx\nc\n", {2, 3}, "a line added: the two beside it"),
-    ("x\n" + text, {0, 1}, "a line added before the first"),
-    ("A\nb\nC\n", {1, 2, 3}, "two lines: from the first to the last"),
-]:
-    assert rewritten(text, new) == want, f"{what}: {rewritten(text, new)} for {want}"
-assert rewritten("a\na\n", "a\na\na\n") == {2, 3}, "a line added among its like"
-assert rewritten("a\na\na\n", "a\na\n") == {3}, "a line removed among its like counts once, from one end"
-found = [("g1", "a.sh", "A\nb\nc\n", "hooks"), ("g2", "a.sh", "a\nb\nC\n", "hooks"), ("g3", "b.py", "x2\n", "probe"), ("g4", "a.sh", None, "hooks"), ("g5", "c.sh", None, "hooks")]
-original = {"a.sh": text, "b.py": "x\n"}.__getitem__
-labels = lambda chosen: [m[0] for m in chosen]
-assert labels(select(found, {"a.sh": {3}}, original)) == ["g2", "g4"], "a changed line asks for its mutants, and one with no text for its file"
-assert labels(select(found, {"a.sh": {1, 3}, "b.py": {1}}, original)) == ["g1", "g2", "g3", "g4"], "lines of two files"
-assert labels(select(found, {"a.sh": {2}}, original)) == ["g4"], "a changed line no mutant rewrites"
-assert labels(select(found, {"a.sh": set()}, original)) == ["g4"], "a file changed by no line"
-assert labels(select(found, {}, original)) == [], "nothing changed"
-assert code("a\n\n  \nb\n\n") == "a\nb\n", "a blank line runs nothing"
-assert code("a\n# b\n") == "a\n# b\n", "a comment stays: it may be a heredoc's text"
-PY
-fi
-
 if part workflow_branch; then
 # The Workflow branch (.claude/workflows/branch.js), run by Node with its globals stubbed: each agent answers as the case
 # says, and the loop's verdict must follow (the reviews of slice-5-loop). An agent that dies blocks the loop, never counts as
@@ -7079,7 +6716,7 @@ fi
 if part harness_timeout; then
 shards_fixture
 # F3382: a suite past its limit (600 s) counts as a caught mutant and its process group is stopped, TERM then KILL; the verdict won by time
-# is printed as such and not kept (the load can cause it); a control past the limit still fails the run, with a word and no traceback.
+# is printed as such (the load can cause it); a control past the limit still fails the run, with a word and no traceback.
 # The copy's limit is 2 s. The suite hangs on a mutant of KEEP1 (a child that outlives its parent, pid recorded) and on its control with HANG_CONTROL.
 python3 -I - "$hs/repo/harness_mutate.py" <<'PY'
 import re, sys
@@ -7107,10 +6744,6 @@ for p in $(cat "$hs/child.pid"); do
 	until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || { reap; fail "harness_mutate left the hung suite's child $p running: its process group was not stopped"; }; sleep 0.1; done
 done
 for k in keep2 keep3 keep4 keep5; do printf '%s\n' "$out" | grep -q "^ok    killed: planted $k #1" || { reap; fail "harness_mutate lost the verdict of planted $k after a hung suite: $out"; }; done
-# Not kept: the next run judges the hung mutant again, and takes the others from the cache.
-out=$(WARM=1 shards 1) || { reap; fail "harness_mutate failed on its second run: $out"; }
-printf '%s\n' "$out" | grep -q "killed (cached): planted keep1 #1" && { reap; fail "harness_mutate kept in its cache a verdict won by time: $out"; }
-printf '%s\n' "$out" | grep -q "killed (cached): planted keep2 #1" || { reap; fail "harness_mutate took no other verdict from the cache: $out"; }
 reap
 # A suite that traps TERM, as test suites do, and a child that ignores it too: only KILL stops them, and still no later than the others.
 rm -f "$hs/child.pid"
@@ -7131,90 +6764,6 @@ printf '%s\n' "$out" | grep -q "^ok    killed: " && { reap; fail "harness_mutate
 n=0
 for p in $(cat "$hs/child.pid" 2>/dev/null); do until ! kill -0 "$p" 2>/dev/null; do n=$((n + 1)); [ "$n" -lt 40 ] || { reap; fail "harness_mutate left the hung control's child running"; }; sleep 0.1; done; done
 reap
-fi
-
-if part harness_named_in; then
-# F3383: named_in names the files of the tree whose name a context holds, "more than it needs to, never less". A basename inside a longer
-# word is not that file's name (`server/src/config.ts` is not named by `vitest.config.ts`, which voided all 1,141 verdicts when the
-# recommendations changed it), a name with characters outside \w.- (React Router's `$id.tsx`, `[slug].tsx`, a space) still is, and the
-# context is cut into names once, not searched by one regex a file.
-python3 -I - "$here/harness_mutate.py" "$t/named" <<'PY' || fail "harness_mutate.py's named_in (F3383), above"
-import ast, os, sys
-
-path, tree_root = sys.argv[1], sys.argv[2]
-ns = {"__name__": "named_in_probe"}
-for node in ast.parse(open(path).read()).body:
-    if isinstance(node, (ast.Import, ast.ImportFrom, ast.FunctionDef, ast.ClassDef, ast.Assign)):
-        try:
-            exec(compile(ast.Module([node], []), path, "exec"), ns)
-        except Exception:
-            pass  # a definition that needs the run (its git, its own source) is none of named_in's
-assert "named_in" in ns and "ALWAYS" in ns, "named_in or ALWAYS is not defined at the top of harness_mutate.py"
-files = ["server/src/config.ts", "vitest.config.ts", "app/routes/$id.tsx", "app/routes/[slug].tsx", "docs/my file.md", "a.ts", "data.ts", "x.ts",
-         "pnpm-lock.yaml", ".node-version", "scripts/x.py", "node_modules/pkg/config.ts"]
-for f in files:
-    os.makedirs(os.path.dirname(os.path.join(tree_root, f)) or tree_root, exist_ok=True)
-    open(os.path.join(tree_root, f), "w").close()
-ns["WORKTREE"] = tree_root
-
-
-def named(context):
-    return set(ns["named_in"](context))
-
-
-got = named("run vitest.config.ts here")
-assert "vitest.config.ts" in got, got
-assert "server/src/config.ts" not in got, f"`vitest.config.ts` names server/src/config.ts: {got}"
-assert "server/src/config.ts" in named("see config.ts"), "config.ts as a word does not name server/src/config.ts"
-assert "server/src/config.ts" in named("'server/src/config.ts':12"), "a path with a colon after it does not name its file"
-assert "a.ts" not in named("data.ts"), "`data.ts` names a.ts"
-assert "data.ts" in named("(data.ts), x"), "a name in parentheses is not named"
-assert "x.ts" in named("a/x.ts, b") and "a.ts" not in named("a/x.ts, b"), "a name after a slash and before a comma"
-# "Never less": a name beside any punctuation of a sentence, a flag or a command is still named (a word cutter that keeps the full stop
-# in the word names LESS, and a verdict would be reused after the file changed).
-for context in ("edit scripts/x.py.", "see x.py.", "a=scripts/x.py;b", "--file=scripts/x.py", "x.py=1", "(scripts/x.py)", "scripts/x.py,", "'x.py'", "`x.py`", "x.py;", "x.py:3:1", "x.py\nnext", "-x.py", "run x.py!"):
-    assert "scripts/x.py" in named(context), f"{context!r} does not name scripts/x.py"
-assert "vitest.config.ts" in named("--config=vitest.config.ts") and "server/src/config.ts" not in named("--config=vitest.config.ts"), "a flag's value is not a name of its own"
-assert "a.ts" not in named("a.tsx") and "a.ts" not in named("a.ts.orig") and "a.ts" not in named("xa.ts") and "a.ts" not in named("a.ts-old"), "a name inside a longer one is named"
-assert "a.ts" in named("a.ts.") and "a.ts" in named("a.ts. Then b"), "a name that ends a sentence is not named"
-assert "app/routes/$id.tsx" in named('cat "app/routes/$id.tsx"'), "a name with $ is not named"
-assert "app/routes/[slug].tsx" in named("open app/routes/[slug].tsx now"), "a name with [] is not named"
-assert "docs/my file.md" in named("docs/my file.md changed"), "a name with a space is not named"
-assert "docs/my file.md" in named("'docs/my file.md'"), "a quoted name with a space is not named"
-assert "docs/my file.md" in named("see docs/my file.md."), "a name with a space that ends a sentence is not named"
-assert "docs/my file.md" not in named("xmy file.md") and "docs/my file.md" not in named("my file.md.orig") and "docs/my file.md" not in named("my file.mdx"), "a name with a space inside a longer one is named"
-assert {"pnpm-lock.yaml", ".node-version"} <= named(""), "the tools' versions are not always named"
-assert not [f for f in named("config.ts") if f.startswith("node_modules")], "node_modules is read"
-
-
-# The context is cut into names once: the calls to `re` do not grow with the files.
-class Counting:
-    def __init__(self, real):
-        self.real, self.calls = real, 0
-
-    def __getattr__(self, name):
-        attr = getattr(self.real, name)
-        if not callable(attr):
-            return attr
-
-        def counted(*a, **k):
-            self.calls += 1
-            return attr(*a, **k)
-
-        return counted
-
-
-many = os.path.join(tree_root, "many")
-os.makedirs(many)
-for i in range(300):
-    open(os.path.join(many, f"file{i}.ts"), "w").close()
-real_re = ns.get("re")
-if real_re is not None:
-    counter = ns["re"] = Counting(real_re)
-    ns["named_in"]("context with file7.ts and others, one more distinct context")
-    assert counter.calls <= 20, f"named_in made {counter.calls} calls to re for 300 files: one regex a file"
-    ns["re"] = real_re
-PY
 fi
 
 if part check_docs_cells; then
