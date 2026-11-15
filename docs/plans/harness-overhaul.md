@@ -71,7 +71,8 @@ run #31): one noted retry, never for a security test, each repaired. Next: deplo
    records.sh); check.sh cut; guard.py to its vital bans; CLAUDE.md and the rules (overnight/docs/rules-diff.md);
    the registers frozen; hooks on main's copy, key stores unreadable, the workshop's env an allowlist; the dream at a slice's end (D13182).
    The security reviewer rechecks the core's list first. Exit: tests 16-23; T1-T5 measured, faster than the table's medians.
-4. The pose and the cleanup (~3 days): /pose; knip per package; READMEs (overnight/readmes/); comments; the stale
+4. The pose and the cleanup (~3 days): /pose first (D13192); knip per package, the READMEs (overnight/readmes/), the comments
+   and phase 3's leftover cleanup go to the hygiene slice (D13170, D13192); the stale
    worktrees (15) and branches (133); the docs and docs/harness.png (overnight/harness-proposed.png). Exit: a day of
    ping-pong landed as several PRs, each in 30 min at most.
 Until the ruleset is on, the branch reaches main through today's way (/pre-merge, Alexis's merge and push).

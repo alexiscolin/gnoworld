@@ -1,15 +1,32 @@
 #!/bin/sh
-# pre-push (D13173): nothing leaves with a secret: one scan of the whole history, by the scan installed beside this hook, from main.
+# pre-push (D13173, D13184): nothing leaves with a secret: a scan of what the push sends, by the scan installed beside this hook, from
+# main.
 # main takes pull requests alone (D13165): a push of it, its deletion included, is refused here, before GitHub's ruleset would.
 # Nothing of the working tree runs (F076). Git sends one line per ref: <local ref> <local sha> <remote ref> <remote sha>.
 set -eu
+# A replace ref, which a session can write, would make a commit the remote holds read as another (the review of D13184, #1).
+export GIT_NO_REPLACE_OBJECTS=1
 zero=0000000000000000000000000000000000000000
-sending=false
+tips=""
 while read -r _ local_sha remote_ref _; do
 	if [ "$remote_ref" = refs/heads/main ]; then
 		echo "pre-push: main takes pull requests alone (D13165): push a branch and open one" >&2
 		exit 1
 	fi
-	[ "$local_sha" = "$zero" ] || sending=true # a deleted branch sends nothing
+	[ "$local_sha" = "$zero" ] && continue # a deleted branch sends nothing
+	# A blob or a tree pushed as a ref is sent but walked by no log: refused (the review of D13184, #6).
+	git cat-file -e "$local_sha^{commit}" 2>/dev/null || { echo "pre-push: what $remote_ref receives is no commit, which no scan reads" >&2; exit 1; }
+	tips="$tips $local_sha"
 done
-! $sending || sh "$(dirname "$0")/scan_secrets.sh"
+[ -n "$tips" ] || exit 0
+# What leaves is what the remote lacks: the commits its refs hold, read from the remote itself, are public already. A
+# remote-tracking ref is the local repository's word, which a session can write; a remote it cannot ask: the whole history.
+# The remote is asked with no configuration given on the command line, and only when its URL reads back as the push's:
+# an insteadOf would make ls-remote ask another repository than the push writes to (the review of D13184, #2).
+plain() { env -u GIT_CONFIG_PARAMETERS -u GIT_CONFIG_COUNT -u GIT_SSH -u GIT_SSH_COMMAND -u GIT_PROXY_COMMAND GIT_TERMINAL_PROMPT=0 git "$@"; }
+not=""
+if [ "$(plain ls-remote --get-url -- "$2" 2>/dev/null)" = "$2" ]; then
+	not=$(plain ls-remote -- "$2" 2>/dev/null | while read -r sha _; do printf '%s^{commit}\n' "$sha"; done |
+		git cat-file --batch-check='%(objectname)' 2>/dev/null | grep -v ' missing$' | sed 's/^/^/' | sort -u | tr '\n' ' ')
+fi
+sh "$(dirname "$0")/scan_secrets.sh" --range $tips $not

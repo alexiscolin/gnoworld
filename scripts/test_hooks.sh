@@ -4673,6 +4673,90 @@ printf "lockfileVersion: '10.0'\n\npackages:\n    \"lodash@4.17.20\":\n      res
 audit '{}' && fail "audit passed on a lockfile it read no package from"
 fi
 
+if part push_range; then
+# D13184: pre-push scans what the push sends: the commits of the refs it pushes that the remote, asked itself (git ls-remote),
+# does not hold. A remote-tracking ref, which a session can write, hides nothing; a remote it cannot ask scans the refs' whole
+# history. The real gitleaks, a throwaway repository and a bare remote; the hooks as installed.
+pr="$t/pushrange" && rh="$t/pushrange-hooks" && rr="$t/pushrange-remote.git"
+mkdir -p "$rh" && cp "$hooks"/* "$rh/" && secrets_into "$rh/"
+git init -q --bare "$rr" && git init -q "$pr" && git -C "$pr" remote add origin "$rr" && git -C "$pr" checkout -q -b trunk
+zero=0000000000000000000000000000000000000000
+commit() { printf '%s\n' "$2" >"$pr/$1" && git -C "$pr" add "$1" && git -C "$pr" commit -qm "$1"; }
+plain() { git -C "$pr" -c core.hooksPath="$t/no-hooks" push -q origin "$@"; } # the remote's state, set with no hook
+# $1: the branch pushed, as itself; $2: the remote's commit, none by default; $3: the remote's URL, the bare remote's by default.
+pushed() { printf 'refs/heads/%s %s refs/heads/%s %s\n' "$1" "$(git -C "$pr" rev-parse "$1")" "$1" "${2:-$zero}" | (cd "$pr" && sh "$rh/pre-push" origin "${3:-$rr}" >/dev/null 2>&1); }
+commit a.txt 'x = 1' && commit leak.txt "aws = \"$key\"" && plain trunk:refs/heads/published && commit b.txt 'y = 2'
+pushed trunk || fail "pre-push scanned again a key the remote already holds (D13184)"
+git -C "$pr" checkout -q -b side && commit side.txt "aws = \"$key\"" && git -C "$pr" checkout -q trunk
+pushed trunk || fail "pre-push refused a push for a key on another local branch, which it does not send (F13192, D13184)"
+git -C "$pr" checkout -q -b fresh trunk && commit fresh.txt "aws = \"$key\"" && git -C "$pr" checkout -q trunk
+pushed fresh && fail "pre-push let through a key in a commit the push sends"
+plain trunk:refs/heads/trunk && git -C "$pr" checkout -q -b grown trunk && commit grown.txt "aws = \"$key\"" && git -C "$pr" checkout -q trunk
+pushed grown "$(git -C "$pr" rev-parse trunk)" && fail "pre-push let through a key in an update of a branch the remote holds"
+# Several refs in one push: a key in any of them stops it, first or last; a deletion beside blocks nothing.
+two() { printf 'refs/heads/%s %s refs/heads/%s %s\nrefs/heads/%s %s refs/heads/%s %s\n' "$1" "$(git -C "$pr" rev-parse "$1")" "$1" "$zero" "$2" "$(git -C "$pr" rev-parse "$2")" "$2" "$zero" | (cd "$pr" && sh "$rh/pre-push" origin "$rr" >/dev/null 2>&1); }
+two fresh trunk && fail "pre-push let through a key in the first of two refs"
+two trunk fresh && fail "pre-push let through a key in the last of two refs"
+printf 'refs/heads/trunk %s refs/heads/trunk %s\nrefs/heads/gone %s refs/heads/gone %s\n' "$(git -C "$pr" rev-parse trunk)" "$zero" "$zero" "$(git -C "$pr" rev-parse trunk)" |
+	(cd "$pr" && sh "$rh/pre-push" origin "$rr" >/dev/null 2>&1) || fail "pre-push refused a clean push beside a deletion"
+# The remote holds a commit this repository lacks (a teammate's branch, a pull request's ref): a clean push passes, a key is refused.
+other="$t/pushrange-other" && git clone -q "$rr" "$other" && git -C "$other" checkout -q -b mate origin/published && printf 'm = 1\n' >"$other/m.txt" &&
+	git -C "$other" add m.txt && git -C "$other" commit -qm m && git -C "$other" -c core.hooksPath="$t/no-hooks" push -q origin mate
+pushed trunk || fail "pre-push refused a clean push while the remote holds a commit it lacks"
+pushed fresh && fail "pre-push let a key through while the remote holds a commit it lacks"
+# A remote-tracking ref pointing at the key's commit, as a session could write one, hides nothing.
+git -C "$pr" update-ref refs/remotes/origin/fake fresh
+pushed fresh && fail "pre-push took a remote-tracking ref for the remote, and sent a key unscanned"
+git -C "$pr" update-ref -d refs/remotes/origin/fake
+# A replace ref turning a tag the remote holds into one of the key's commit hides nothing (the review of D13184, #1): a tag's
+# peel follows the replacement, a commit's name does not.
+git -C "$pr" tag -a v1 -m v1 trunk && plain refs/tags/v1 && git -C "$pr" tag -a v1fake -m fake fresh
+git -C "$pr" replace -f "$(git -C "$pr" rev-parse v1)" "$(git -C "$pr" rev-parse v1fake)"
+pushed fresh && fail "pre-push read the remote's tag through a replace ref, and sent a key unscanned"
+git -C "$pr" replace -d "$(git -C "$pr" rev-parse v1)" && git -C "$pr" tag -d v1fake >/dev/null
+# An ssh command of the push's sends ls-remote to a decoy holding the key's commit while the URL reads back unchanged: by the
+# environment, then by -c core.sshCommand (#2 and the security review).
+printf '#!/bin/sh\nexec git upload-pack "%s"\n' "$t/pushrange-decoy.git" >"$t/fakessh" && chmod +x "$t/fakessh"
+# An insteadOf that makes ls-remote ask another repository, holding the key's commit, than the push writes to (#2): on the
+# command line, then in the repository's config.
+decoy="$t/pushrange-decoy.git" && git clone -q --bare "$pr" "$decoy" && git -C "$decoy" update-ref refs/heads/k "$(git -C "$pr" rev-parse fresh)"
+(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0="url.$decoy.insteadOf" GIT_CONFIG_VALUE_0="$rr" pushed fresh) && fail "pre-push asked the repository an insteadOf on the command line named, and sent a key unscanned"
+git -C "$pr" config "url.$decoy.insteadOf" "$rr"
+pushed fresh && fail "pre-push asked the repository a configured insteadOf named, and sent a key unscanned"
+git -C "$pr" config --unset "url.$decoy.insteadOf"
+pushed trunk || fail "pre-push refused a clean push once the insteadOf left"
+(GIT_SSH_COMMAND="$t/fakessh" pushed fresh "$zero" "ssh://pushrange.invalid/r.git") && fail "pre-push asked the remote through the push's GIT_SSH_COMMAND, and sent a key unscanned"
+(GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.sshCommand GIT_CONFIG_VALUE_0="$t/fakessh" pushed fresh "$zero" "ssh://pushrange.invalid/r.git") && fail "pre-push asked the remote through a -c core.sshCommand, and sent a key unscanned"
+# A blob pushed as a tag is sent and walked by no log: refused (#6).
+blob=$(printf 'aws = "%s"\n' "$key" | git -C "$pr" hash-object -w --stdin)
+printf 'refs/tags/b %s refs/tags/b %s\n' "$blob" "$zero" | (cd "$pr" && sh "$rh/pre-push" origin "$rr" >/dev/null 2>&1) && fail "pre-push let a blob through, which no scan reads"
+# A remote it cannot ask: the refs' whole history, the key the real remote holds included.
+pushed trunk "$zero" "$t/no-such-remote.git" && fail "pre-push scanned less than the whole history with a remote it could not ask"
+git -C "$pr" checkout -q --orphan clean && git -C "$pr" rm -rqf . && commit clean.txt 'c = 1' && git -C "$pr" checkout -q trunk
+pushed clean "$zero" "$t/no-such-remote.git" || fail "pre-push refused a clean history it could only scan whole"
+# scan_secrets.sh --range takes revisions alone, at least one to include: an option there would reach git log.
+sr() { (cd "$pr" && sh "$rh/scan_secrets.sh" --range "$@" >/dev/null 2>&1); }
+# A refusal says so: a scan that found the key fails too, so each case below reads the refusal's own words.
+refused() { out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --range "$@" 2>&1) && return 1; printf '%s\n' "$out" | grep -q "scan_secrets: --range takes commits"; }
+leak=$(git -C "$pr" rev-parse trunk~1) && top=$(git -C "$pr" rev-parse trunk)
+sr "$leak..$top" || fail "scan_secrets --range scanned beyond A..B"
+sr "$leak..HEAD" || fail "scan_secrets --range refused A..HEAD, the gate's form"
+sr "$top" "^$leak" || fail "scan_secrets --range scanned past an exclusion"
+sr "$top" && fail "scan_secrets --range missed a key in the history of a revision"
+sr "$(git -C "$pr" rev-parse fresh)" "^$top" && fail "scan_secrets --range missed a key in the range"
+sr "$top" "^$top" || fail "scan_secrets --range refused a range that is empty"
+git -C "$pr" checkout -q fresh && { sr "$top..HEAD" && fail "scan_secrets --range missed a key in A..HEAD, the gate's form"; git -C "$pr" checkout -q trunk; }
+short=$(printf '%s' "$top" | cut -c1-7) && upper=$(printf '%s' "$top" | tr a-f A-F)
+for args in "" "^$top" "--output=$t/out $top" "--all" "$top --not" "--not $top" "$top ^HEAD" "^trunk $top" "^--all $top" \
+	"${top}0" "$(printf '%s' "$top" | cut -c1-39)" "$short" "$upper" "dead" "beef" "$leak..trunk" "trunk..$top" "$leak...$top" "^$short $top"; do
+	# each case's words, split on purpose
+	refused $args || fail "scan_secrets --range did not refuse: --range $args"
+done
+[ ! -e "$t/out" ] || fail "scan_secrets --range let an option write a file"
+out=$(cd "$pr" && sh "$rh/scan_secrets.sh" --stagd 2>&1) && fail "scan_secrets took an unknown option for a whole-history scan"
+printf '%s\n' "$out" | grep -q "usage: scan_secrets.sh" || fail "scan_secrets refused an unknown option without its usage: $out"
+fi
+
 if part secrets; then
 # scan_secrets: a secret is found whatever the repository or the environment says to ignore.
 sc="$t/secrets"
@@ -7440,14 +7524,16 @@ for case in ('pull_request) BASE=$(git merge-base "origin/$BASE_REF" HEAD) ;;',
     assert case in ch, f"changes takes its base, or hands its flags, another way: {case}"
 BASE = '"$RUNNER_TEMP/base/scripts/'
 archive = 'git archive "$BASE" scripts docs/REVIEW.md .githooks | tar -x -C "$RUNNER_TEMP/base"'
-for job, script in (("changes", "ci_changes.sh"), ("gate-ok", "ci_gate_ok.py"), ("gate-ok", "ci_annotate.py"), ("regressions", "check_regressions.py"),
+for job, script in (("changes", "ci_changes.sh"), ("gate-ok", "ci_gate_ok.py"), ("gate-ok", "ci_annotate.py"), ("lint", "scan_secrets.sh"), ("regressions", "check_regressions.py"),
                     ("regressions", "check_migrations.py"), ("coverage", "patch_coverage.py"), ("risk", "stryker_lines.py")):
     assert BASE + script + '"' in J[job], f"gate.yml: {job} does not run the base's {script}"
     assert not re.search(r"(?<!base/)scripts/" + re.escape(script), J[job]), f"gate.yml: {job} runs the change's own {script}"
 assert archive in ch and gate.count(archive) == 2, "the judge is not read from the base"
 for job in ("lint", "coverage", "risk", "regressions", "gate-ok"):
     assert re.search(r"^      - \*base$", J[job], re.M) or archive in J[job], f"gate.yml: {job} reads no base"
-assert '--config "$RUNNER_TEMP/base/scripts/$config"' in J["lint"] and "--ignore-gitleaks-allow" in J["lint"] and "for config in gitleaks.toml gitleaks-private.toml; do" in J["lint"], "lint scans the change with its own rules"
+# D13190: the lint job scans the pull request with the base's scan_secrets.sh, the one the hooks run, never a loop of its own.
+assert re.search(r'^        run: sh "\$RUNNER_TEMP/base/scripts/scan_secrets\.sh" --range "\$BASE\.\.HEAD"$', J["lint"], re.M), "lint scans the change otherwise than with the base's scan_secrets.sh over its range"
+assert "gitleaks git" not in gate and "--ignore-gitleaks-allow" not in gate, "gate.yml holds a gitleaks run of its own beside scan_secrets.sh"
 z = J["zizmor"]
 assert re.search(r'echo "zizmor==[0-9.]+ --hash=sha256:[0-9a-f]{64}" >"\$RUNNER_TEMP/zizmor\.txt"', z), "zizmor is installed unpinned"
 assert re.search(r"^        run: \$RUNNER_TEMP/zizmor/bin/zizmor --offline --no-progress \.github/workflows$", z, re.M), "zizmor does not read every workflow"
@@ -7564,6 +7650,8 @@ CASES = [
     (O, "/scripts/ @alexiscolin\n", "", "a judge with no owner"),
     (O, "/deploy/ @alexiscolin\n", "/deploy/ @someone\n", "the deploy owned by another"),
     (K, '    "zizmor": [],\n', "", "a job ci_gate_ok.py does not judge"),
+    (G, 'sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range "$BASE..HEAD"', 'sh scripts/scan_secrets.sh --range "$BASE..HEAD"', "lint scanning with the change's own scan"),
+    (G, 'sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --range "$BASE..HEAD"', 'sh "$RUNNER_TEMP/base/scripts/scan_secrets.sh" --staged', "lint scanning the index, not the range"),
     (G, "        run: pnpm run format:check\n", "        env:\n          GH_TOKEN: ${{ github.token }}\n        run: pnpm run format:check\n", "the token handed to lint"),
     (G, "      actions: read\n", "      actions: read\n      checks: read\n", "gate-ok given another right"),
     (G, "    permissions:\n      contents: read\n      actions: read\n", "", "gate-ok without the right to read its run"),
