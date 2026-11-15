@@ -1035,6 +1035,7 @@ def mutants():
     yield from each("scripts/gitleaks-private.toml", "(?i)^/home/runner$", "(?i)/home/runner", "hooks", "the private scan lets only the CI runner's folder pass")
     yield from each(".githooks/records.sh", " app/tsconfig.json", "", "hooks", "the harness list holds every file harness_mutate guards (F124)")
     yield from each(".githooks/records.sh", " .mcp.json", "", "hooks", "the harness list holds what Claude Code starts (F129)")
+    yield from each(".githooks/records.sh", " CLAUDE.md", "", "hooks", "the harness list holds the instructions every session reads")
     for find, label in (
         (',\n        "~/.claude.json"', "a shell cannot read Claude Code's own config, which holds its tokens"),
         ('        "~/Library/Application Support/gno",\n', "a shell cannot read gno's key store"),

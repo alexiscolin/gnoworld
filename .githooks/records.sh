@@ -8,7 +8,7 @@ export GIT_NO_REPLACE_OBJECTS=1
 # GitHub's gate runs the harness's own tests when one changes, and the night mutates them (harness_mutate.py).
 # Case-blind, as this disk is: Scripts/guard.py is scripts/guard.py there (F151), and read as globs whatever a caller's
 # GIT_*_PATHSPECS say (one let a commit's hook read its * as a name, 9j's review). $@: git diff's options and commits.
-harness() ( env -u GIT_NOGLOB_PATHSPECS -u GIT_GLOB_PATHSPECS -u GIT_LITERAL_PATHSPECS GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
+harness() ( env -u GIT_NOGLOB_PATHSPECS -u GIT_GLOB_PATHSPECS -u GIT_LITERAL_PATHSPECS GIT_ICASE_PATHSPECS=1 git -c core.quotePath=false diff "$@" -- scripts .githooks .github .claude CLAUDE.md .mcp.json package.json app/package.json server/package.json server/tsconfig.json \
 	jarvis/package.json jarvis/tsconfig.json link-reader/package.json link-reader/tsconfig.json 'packages/*/package.json' 'packages/*/tsconfig.json' pnpm-workspace.yaml pnpm-lock.yaml .pnpmfile.cjs .pnpmfile.mjs evals/package.json evals/pnpm-workspace.yaml \
 	evals/pnpm-lock.yaml evals/tsconfig.json evals/.pnpmfile.cjs evals/.pnpmfile.mjs .node-version .nvmrc .npmrc '*.config.ts' tsconfig.json \
 	tsconfig.base.json app/tsconfig.json stryker.config.json stryker.all.config.json '*.gitattributes' knip.json .jscpd.json .prettierrc.json .prettierignore .gitignore app/tests/stories/pictures.spec.ts deploy/test.sh )

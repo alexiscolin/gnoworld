@@ -241,7 +241,7 @@ assert 'harness --ignore-submodules=all --name-only "$base"' in text(6), "worktr
 assert not [n for n in (1, 2, 3, 6, 7) if "pnpm-workspace.yaml" in text(n)], "a second harness list is left"
 assert '".githooks", "records.sh"' in text(7), "guard.py has its own harness list"
 listed = re.search(r'^harness\(\) \( [^\n]*?git .*? -- (.*?) \)$', text(4), re.S | re.M).group(1).replace("\\\n", " ").replace("'", "").split()
-assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs"
+assert {".mcp.json", ".pnpmfile.cjs", ".pnpmfile.mjs", "packages/*/package.json", "CLAUDE.md"} <= set(listed), "the harness list leaves out what Claude Code or pnpm runs, or the instructions every session reads (a nested one no commit may hold: check_docs refuses it)"
 # Every workspace pnpm installs (pnpm-workspace.yaml's packages): its package.json, which pnpm reads at Alexis's install, and its
 # tsconfig.json, which judges its types, are harness files (the coherence pass of phase 3: link-reader's were not).
 import glob, os
@@ -290,7 +290,7 @@ for d, dirs, files in os.walk(root):
     on_disk += [os.path.relpath(os.path.join(d, f), root) for f in files]
 specs = [s.lower() for s in listed if s != ".claude"]
 harnessed = sorted({f for f in on_disk if any(f.lower() == s or f.lower().startswith(s + "/") or fnmatch.fnmatchcase(f.lower(), s) for s in specs)}
-                   | {s for s in specs if "*" not in s}
+                   | {s for s in listed if "*" not in s and s != ".claude"}
                    | {".claude/" + p for p in ("CLAUDE.md", "settings.json", "settings.local.json", "agents/a.md", "commands/a.md", "skills/a/SKILL.md", "rules/a.md", "hooks/a.sh", "workflows/a.js")})
 open_ = [f for f in harnessed if not any(b.match(f) for b in bans)]
 assert not open_, f"the sandbox lets a shell write these harness files: {open_}"
@@ -2891,7 +2891,7 @@ fresh
 harnessed() { said "is committed in Alexis's Terminal alone"; }
 for f in 'scripts/my file.sh' Scripts/tool.sh .githooks/pre-push .github/workflows/gate.yml .claude/settings.json \
 	.claude/agents/new.md stryker.config.json app/vite.config.ts lint/shared.config.ts packages/core/package.json knip.json \
-	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts; do
+	pnpm-lock.yaml .gitignore deploy/test.sh app/tests/stories/pictures.spec.ts CLAUDE.md; do
 	mkdir -p "$c2/$(dirname "$f")" && echo '{}' >"$c2/$f" && git -C "$c2" reset -q && git -C "$c2" add -f "$f"
 	[ "$(git -C "$c2" diff --cached --name-only | wc -l | tr -d ' ')" = 1 ] || fail "the case of $f staged other than one path"
 	harnessed || fail "pre-commit let a staged $f, a harness file, through in the sandbox (D241)"
@@ -2911,7 +2911,7 @@ done
 # A name the index holds in another case than the disk's (git update-index takes any), which this case-blind disk reads as the
 # harness file it names (F151).
 blob=$(echo planted | git -C "$c2" hash-object -w --stdin)
-for f in Scripts/guard.py .Claude/settings.json; do
+for f in Scripts/guard.py .Claude/settings.json claude.md; do
 	git -C "$c2" update-index --add --cacheinfo "100644,$blob,$f"
 	harnessed || fail "pre-commit let $f, a harness file on a case-blind disk, through in the sandbox (F151, D241)"
 	git -C "$c2" update-index --force-remove "$f"
@@ -8172,7 +8172,7 @@ is "base=$base" "prose alone"
 for case in 'deploy/x:deploy=true gno=false' 'gno/r/x:gno=true deploy=false' 'scripts/new.py:harness=true product=false ts=false' \
 	'app/src/b.ts:product=true ts=true app=true nginx=true tier1=false ui=false' 'pnpm-lock.yaml:ts=true app=true nginx=true harness=true' \
 	'server/src/m.ts:migrations=true ts=true product=true app=false' 'packages/ui/x.ts:ui=true app=true' 'app/src/p.md:product=true' \
-	'.github/workflows/gate.yml:harness=true product=false' 'docs/rights.md:tier1=true product=false'; do
+	'.github/workflows/gate.yml:harness=true product=false' 'docs/rights.md:tier1=true product=false' 'CLAUDE.md:harness=true product=false'; do
 	path=${case%%:*}
 	change "mkdir -p '$(dirname "$path")' && printf 'y\n' >'$path'"
 	judge pull_request "$base" "$c/base"
