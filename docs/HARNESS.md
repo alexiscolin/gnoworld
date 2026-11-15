@@ -28,7 +28,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
 ## Who does what
 
 - **The owner** approves each slice's plan, reviews blind first, runs what the
-  sandbox refuses (the push, the merge into `main` on GitHub, `deploy/test.sh` by hand), and accepts or
+  sandbox refuses (the push, the merge into `main` on GitHub, `deploy/test.sh` by hand while F13163 keeps deploy-stack red on Linux, D13191), and accepts or
   refuses each rule the dream proposes.
 - **The chief session**, one per slice, plans it (`/slice-plan`), makes the slice's shared folder
   (`.claude/tmp/slice-<n>/` with `reports/`), cuts it into branches, sizes each before it starts, gives each branch its own range of finding numbers
@@ -95,8 +95,7 @@ node -e 'const { chromium } = require("./app/node_modules/@playwright/test"); ch
    by the `reviewer` agent (with the `security-reviewer` for a tier-1 file or the harness, the
    `gno-auditor` for a realm), each finding reproduced, high and medium fixed,
    low ones listed for the owner.
-8. **The owner reviews,** blind first, and merges on GitHub. `deploy/test.sh` is the gate's deploy-stack job on a change to `deploy/` (D13180); run by
-   hand to debug, it runs from a copy of the commit the owner reviewed
+8. **The owner reviews,** blind first, and merges on GitHub. `deploy/test.sh` is the gate's deploy-stack job on a change to `deploy/` or to what the services' images build from (D13180, D13203: `server/`, `jarvis/`, `link-reader/`, `packages/service|chain|schemas/`, `app/data/`, the root manifests); while F13163 keeps it red on Linux, a `deploy/` change also gets the owner's hand run and `--mutants` (D13191). Run by hand, for either, it runs from a copy of the commit the owner reviewed
    whose commit and files hash to its name (`docs/OPERATIONS.md`, "Run test.sh from the commit you reviewed"), never from a worktree. It takes a lock per Docker project
    (a folder in `~/.cache/gnoworld-tools` holding its pid): a second run, from another terminal or session, is
    refused while a first holds it; a project a Ctrl+C left up (`gnoworld-demo-mutant-<pid>`) is named with the
@@ -141,7 +140,7 @@ app/playwright.config.ts <spec>`).
 the base's rules); zizmor; Vitest in three shards with one retry; core's tests in Chromium and, for a change of the design system or the harness, the stories, never their pictures; the
 critical journeys; the build, the first screen's budget and nginx (`scripts/check_nginx.py`, for an app change alone), which a commit's gate does not build; gno, its mutants (`scripts/mutate.py`) and
 the coverage and the patch's (`scripts/patch_coverage.py`, from the base); StrykerJS on the changed tier-1 lines
-(`scripts/stryker_lines.py`, from the base; no job fails on its survivors yet); the regressions and the migrations (`scripts/check_regressions.py`,
+(`scripts/stryker_lines.py`, from the base; no job fails on its survivors, F13184 open: a survivor stays in the job's log); the regressions and the migrations (`scripts/check_regressions.py`,
 `scripts/check_migrations.py`, from the base); `deploy/test.sh` when `deploy/` changes; the harness's own `probe.py` and `test_hooks.sh`
 when the harness changes. `gate-ok` reads every job with the base's `scripts/ci_gate_ok.py`; after a failure, its last step writes
 each failed job's end as an annotation (the base's `scripts/ci_annotate.py`, D13177), which the public check-runs API serves with

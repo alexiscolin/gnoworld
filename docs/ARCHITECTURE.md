@@ -98,7 +98,7 @@ deploy/                      compose.yaml (the demo stack, the reference wiring 
                              and gnomcp's read-only profiles, jarvis-reader/ gnomcp's container, link-reader/ the reader's image,
                              egress/ one smokescreen list per way out (the server's, jarvis's, its reader's, the link reader's)
 admin/                       not built yet: the admin console, on its own origin (ADR-0002 §6), reusing ui and lib
-gno/r/                       the realms: `satellite` (the slot realm); hubs and profiles later (ADR-0001 §14)
+gno/r/                       the realms: `satellite` (the slot realm); the seal realm is out of the tree until the seal store lands (`docs/plans/seal-store.md`; a restore starts from e44037b8), hubs and profiles later (ADR-0001 §14)
 ```
 
 Inside a feature:
@@ -117,7 +117,7 @@ features/chat/
 Lint enforces it per folder, one part of `eslint.config.ts` per area in `lint/`: `core` (`lint/core.config.ts`), `app`'s folders, `sw`, `features`,
 `routes`, `lib`, `store` and the scene (`lint/app.config.ts`), `ui` (`lint/react.config.ts`), and `jarvis`, `service`, `link-reader` and `chain` (`lint/server.config.ts`,
 `lint/chain.config.ts`), each wall proven by `scripts/probe.py`'s `walls` block.
-The scene's folder is `space/`, but `lint/app.config.ts` names `app/src/scene`, so the `space` wall below is kept by review alone.
+The scene's folder is `space/`, but `lint/app.config.ts` names `app/src/scene`, so the `space` wall below is kept by review alone until it names `space/`.
 
 | Folder | May import | Never imports |
 |---|---|---|

@@ -129,10 +129,12 @@ keep it so.
 | Stop, with the profiles it ran with, so none outlives it | `docker compose -f deploy/compose.yaml --profile jarvis --profile links down` |
 | Remove it all, its volumes included | `docker compose -f deploy/compose.yaml --profile jarvis --profile links down -v` |
 
-GitHub's deploy-stack job runs `deploy/test.sh` on a pull request that changes `deploy/` (D13180); run it by hand to debug, and
-after a change to the link reader or what it fetches, which deploy-stack does not run. A
-pull request that changes `deploy/` also gets this hand run and its `--mutants`, from the reviewed commit (D13191). App code
-alone needs neither: GitHub's journeys test it.
+GitHub's deploy-stack job runs `deploy/test.sh` on a pull request that changes `deploy/` or what the services' images build from:
+`server/`, `jarvis/`, `link-reader/`, `packages/service|chain|schemas/`, `app/data/` and the root manifests (`package.json`,
+`pnpm-lock.yaml`, `pnpm-workspace.yaml`), not `packages/core/`, `packages/ui/` nor `app/src/` (D13180, D13203; `scripts/ci_changes.sh`). Run it by
+hand to debug. While F13163 keeps deploy-stack red on GitHub's Linux (two checks), a pull request that changes `deploy/` also gets this
+hand run and its `--mutants`, from the reviewed commit, and deploy-stack is read check by check: any red but F13163's two is a finding
+(D13191). App code alone needs neither: GitHub's journeys test it.
 
 The tests run on the host (macOS or Linux), outside Claude Code's sandbox, which refuses Docker's
 socket. Their output names the host's addresses and ports: never commit it, nor paste it in public.
@@ -189,7 +191,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
 - **A host whose own public address serves something.** The guard refuses private addresses,
   then lets out TCP 80 and 443 to the rest: on a host with a public address on an
   interface (a rented server), the proxies' network would reach that address's services.
-  `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office. The
+  `sh deploy/test.sh` fails there. Run the stack on a host behind a router, as at home or in an office, until the
   deploy part (D13172) builds a VM that refuses its own public address, proven on it.
 - **A restart of the whole host, or of Docker.** Docker restarts the containers itself,
   without Compose's order: for a moment, a proxy may run before the guard's rules are in, and
@@ -506,7 +508,7 @@ volumes (`ergo`, `server`, `jarvis`), which are not backed up (below). Clone it,
   password would work through `/ws` too: it is 48 random characters (Ergo's start refuses one under 32), and Ergo answers one OPER a connection every 10 seconds. A certificate for the bot alone would close it.
 - **One time for all history.** Ergo keeps rooms' and messages' history the same 90 days
   (`history.restrictions.expire-time`); decision 154's 30 days for direct messages cannot be set
-  apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`). History fills the `ergo` volume, which has no quota.
+  apart, so direct messages are not stored at all (`persistent.direct-messages: disabled`) until they are a product with a retention of their own. History fills the `ergo` volume, which has no quota.
 - **A thousand rooms a client, guests too.** Ergo has one `max-channels-per-client` for every client
   (its config.go:1937), and the bot needs 1,000: a guest may join every world's room and receive each one's
   names. Load, not a hole; k6's crowd measures it.

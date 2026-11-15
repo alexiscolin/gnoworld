@@ -61,7 +61,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
 "The gate"):
 
 1. **No tokens first.** check.sh on the committed tree, then GitHub's gate, StrykerJS on the changed tier-1 lines among
-   its jobs: a surviving mutant is a missing test, found without a model (it stays in its job's log).
+   its jobs: a surviving mutant is a missing test, found without a model. No job fails on a survivor (F13184, open): it stays in its job's log, and the reviewer reads it there.
 2. **The red pass, once per branch.** Before any code, the `test-auditor` reviews the branch's
    failing tests against the plan: complete, relevant, riskiest paths first, the threat model's
    abuse cases present. Tier-1 and harness code alone. A fixer's tests get none.
@@ -91,7 +91,7 @@ branch's Workflow loop runs it; GitHub's gate judges the pull request (`docs/HAR
    reconsider the approach.
 6. **Learn from it.** Every finding goes into [the findings ledger](review/findings.md), with its
    status and evidence, numbered in its slice's range (slice N: F N000 to N999, a hundred a
-   branch, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
+   part, `CLAUDE.md`). An agent greps it for its diff's paths and the ids it is given and reads those
    rows, never the file whole (1.2 MB, more than its run): no rejected claim raised again without new
    evidence, and a fixed one that comes back filed as a regression. A flaky test that passed on its
    second run is no ledger row; nothing records one that GitHub's retry passed (D13168). What the owner caught and missed
@@ -140,4 +140,4 @@ job refuses a harness file no commit declares on a line `Harness-changed: <path>
 
 The owner reads the diff in revdiff, beside the session, from the main checkout: `revdiff -o .claude/tmp/revdiff.md <base> <branch>` (the previous merge's branch, then this one). The notes land in that file, which git ignores; "read the review" asks Claude to read them and answer each one.
 
-The author gives only the review card's items 1–3, 7 and 8: what to read, what to skim, what to try, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.
+The author gives the whole review card, all 8 items (`CLAUDE.md`, "Review card (end of every change)"): what to read line by line, what to read and skim, what to try, what the tests prove, what not to trust, what changed, each realm function's card, the risk and its undo. The owner reviews and writes findings, then compares them with the author's and with a fresh-context reviewer's. Each comparison goes into [review-log.md](review-log.md): what was caught, what was missed, and why.
