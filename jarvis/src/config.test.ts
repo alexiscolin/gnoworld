@@ -1159,8 +1159,12 @@ describe("deploy/test.sh", () => {
       expect(script(), check).toContain(check);
     // A search of containers the start never names proves nothing.
     expect(script()).not.toContain("the demo starts no");
+    // The list is read once, Compose's refusal a fail: a project that does not load must not count as 0.
     expect(script()).toContain(
-      `config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0`,
+      `services=$(docker compose -p "$project" $files config --services) || fail "Compose refuses the stack's files"`,
+    );
+    expect(script()).toContain(
+      `"$(printf '%s\\n' "$services" | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0`,
     );
     expect(script()).toContain(`"$here/jarvis/Dockerfile"; do`);
     // Its stop takes jarvis's and links's profiles too, which a down of the default services alone leaves up.
