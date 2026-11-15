@@ -419,6 +419,7 @@ def mutants():
     # Every gate step's time, kept.
     sl = "scripts/stryker_lines.py"
     yield from each(sl, 'f":(glob,exclude){each}" if negated else ', "", "hooks", "stryker_lines.py keeps the config's negations")
+    yield from each(sl, "lines = {p: found & code[p] for p, found in lines.items()}", "lines = {p: found for p, found in lines.items()}", "hooks", "stryker_lines.py counts a changed line only when it holds code")
     yield from each(sl, 'for choice in found.group(1).split(",")', 'for choice in found.group(1).split(",")[:1]', "hooks", "stryker_lines.py expands every choice of a brace")
     yield from each(sl, "            if not PLAIN.fullmatch(each):\n                return None\n", "", "hooks", "stryker_lines.py refuses a pattern git does not read as minimatch does")
     yield from each(sl, "if out and line == out[-1][1] + 1:", "if out:", "hooks", "stryker_lines.py keeps apart the runs of lines a change breaks")

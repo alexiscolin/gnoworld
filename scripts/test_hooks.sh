@@ -3431,7 +3431,8 @@ if part stryker_lines; then
 # stryker_lines.py: the merge check's StrykerJS config, its `mutate` the code the branch changed since its base: each changed line widened
 # to the top-level statements it lies in (StrykerJS 10.0.0 mutates a node only inside one range: an `if (a &&\n b)` whose one line changed
 # keeps its mutants), as `path:from-to`, in the files the config's own `mutate` selects (braces and negations read as git's glob pathspecs,
-# a hidden part left out as minimatch leaves it), a new file whole, committed or not; a deletion or a comment touches no statement. Every
+# a hidden part left out as minimatch leaves it), a new file whole, committed or not; a deletion or a comment touches no statement, even
+# one inside a function, whose change would otherwise put the whole function under mutation. Every
 # other key is kept. No line: exit 3, nothing written; a config it cannot read or an odd pattern: exit 2; any other failure is no 0 nor 3.
 sl="$t/stryker_lines" && mkdir -p "$sl/scripts" "$sl/app/src/.cache" "$sl/server/src/testing" "$sl/docs"
 cp "$here/stryker_lines.py" "$here/repo_files.py" "$sl/scripts/" && ln -s "$(cd "$here/../node_modules" && pwd -P)" "$sl/node_modules"
@@ -3446,6 +3447,7 @@ printf 'node_modules\n' >"$sl/.gitignore"
 for n in one two three four five; do printf 'export const %s = 1;\n' "$n"; done >"$sl/app/src/a.ts"
 printf 'export function f(a: boolean, b: boolean): number {\n  if (\n    a &&\n    b\n  ) {\n    return 1;\n  }\n  return 0;\n}\nexport const apart = 0;\n' >"$sl/app/src/m.ts"
 printf '// a note\nexport const c = 1;\n' >"$sl/app/src/c.ts"
+printf 'export function k(): number {\n  // a reason\n  /* a note */\n  return 1;\n}\n' >"$sl/app/src/k.ts"
 printf 'export const x = 1;\nexport const y = 2;\nexport const z = 3;\n' >"$sl/app/src/b.tsx"
 for f in app/src/a.test.ts server/src/s.ts server/src/testing/t.ts docs/d.ts app/src/.h.ts app/src/.cache/x.ts app/src/gone.ts app/src/r.ts; do printf 'export const v = 1;\n' >"$sl/$f"; done
 git -C "$sl" init -q && git -C "$sl" add -A && git -C "$sl" commit -qm base && base=$(git -C "$sl" rev-parse HEAD)
@@ -3458,6 +3460,7 @@ exits() { # $1: the exit it must give; then stryker_lines.py's arguments. It wri
 exits 3 "$base" "$sl/out.json"
 for n in one two three four five six; do case $n in two) echo 'export const two = 22;' ;; three) echo 'export const three = 33;' ;; *) printf 'export const %s = 1;\n' "$n" ;; esac; done >"$sl/app/src/a.ts"
 sed 's/^    b$/    !b/' "$sl/app/src/m.ts" >"$sl/m" && mv "$sl/m" "$sl/app/src/m.ts"
+printf 'export function k(): number {\n  // a better reason\n  /* another note */\n  return 1;\n}\n' >"$sl/app/src/k.ts"
 printf '// another note\nexport const c = 1;\n' >"$sl/app/src/c.ts" && printf 'export const x = 1;\nexport const z = 3;\n' >"$sl/app/src/b.tsx"
 for f in app/src/a.test.ts server/src/s.ts server/src/testing/t.ts docs/d.ts app/src/.h.ts app/src/.cache/x.ts; do printf 'export const w = 2;\n' >"$sl/$f"; done
 printf 'export const added = 1;\nexport const more = 2;\n' >"$sl/app/src/added.ts" && git -C "$sl" rm -q app/src/gone.ts && git -C "$sl" mv app/src/r.ts app/src/r2.ts
