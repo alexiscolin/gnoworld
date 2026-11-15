@@ -24,8 +24,8 @@ function levelUp({ place, planet, seen, options: { events } }: Space): void {
 
 const AT: Vec = { x: 0, y: 0, z: 0 };
 
-// Whether a drag turns the planet, not the camera (D13011): on a generated world's page, drawn as itself and at rest. The Earth keeps its real
-// hour (D13947), and the system's and the galaxy's views have no page planet.
+// Whether a drag turns the planet, not the camera: on a generated world's page, drawn as itself and at rest. The Earth keeps its real
+// hour, and the system's and the galaxy's views have no page planet.
 function turns(space: Space): boolean {
   const { kept: planet, rig, place, neared, stage } = space;
   return (

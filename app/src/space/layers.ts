@@ -1,16 +1,13 @@
-// The layers of the home's first screen (D549, D551): the big, the mid and the small world, each at its own spot of the free room and its own
+// The layers of the home's first screen: the big, the mid and the small world, each at its own spot of the free room and its own
 // size, none touching another disc or name, and the worlds the first screen favours.
 import type { Circle } from "./goals.ts";
 import type { Planet } from "./layout.ts";
 
-// The worlds the first screen would favour beside the rest, which Alexis asked for: the DAO's and wugnot.
+// The worlds the first screen would favour beside the rest: the DAO's and wugnot.
 const SHOWN = new Set(["gov/dao", "gnoland/wugnot"]);
-// raw: where the big world stands, in shares of the screen, and its spread. "upper": between the hero's column and the Earth's limb, above
-// mid height; "lower": lower, nearer the hero's column. VARIANT picks the one in use (D542).
-const MIDDLES = { upper: { x: 0.4, y: 0.4, spread: 0.16 }, lower: { x: 0.37, y: 0.58, spread: 0.16 } } as const;
-const VARIANT: keyof typeof MIDDLES = "lower";
-const MIDDLE = MIDDLES[VARIANT];
-/** A world featured: how large its disc is drawn, as a share of the screen's height (its radius), its own size by its layer (D549). */
+// raw: where the big world stands, in shares of the screen, and its spread: lower, nearer the hero's column.
+const MIDDLE = { x: 0.37, y: 0.58, spread: 0.16 } as const;
+/** A world featured: how large its disc is drawn, as a share of the screen's height (its radius), its own size by its layer. */
 export interface Featured {
   readonly planet: Planet;
   readonly share: number;
@@ -40,7 +37,7 @@ export const HORIZON = 15;
 const MOST_BOOST = 8;
 
 // How near its own spot of the free room a layer's world stands (the big one's the middle, the mid one's upper left, the small one's high in
-// the middle, D551): 1 there, a gentle fall (a bell) toward the edges.
+// the middle): 1 there, a gentle fall (a bell) toward the edges.
 function centred(
   x: number,
   y: number,
@@ -52,7 +49,7 @@ function centred(
 }
 
 // Whether `c`, drawn `px` across its radius, stands in the free room: off the hero's words and the dock, and clear of the Earth's glow by half
-// its radius (D543, D549).
+// its radius.
 function fits(
   c: { readonly x: number; readonly y: number },
   px: number,
@@ -63,7 +60,7 @@ function fits(
   return room && !hero && Math.hypot(c.x - ex, c.y - ey) >= radius * 1.18 + px * 1.5;
 }
 
-// Whether the name under either disc (a box 160 by 44 px, 2 px under it) touches the other disc or the other's name (D549).
+// Whether the name under either disc (a box 160 by 44 px, 2 px under it) touches the other disc or the other's name.
 function tagsHit(a: Disc, b: Disc): boolean {
   const box = (d: Disc) => ({ left: d.x - 80, right: d.x + 80, top: d.y + d.px + 2, bottom: d.y + d.px + 46 });
   const onDisc = (r: ReturnType<typeof box>, d: Disc) =>

@@ -3,7 +3,7 @@ import { SHADOWS } from "./generatedShadows.ts";
 import { shadowMarch } from "./shadowMarch.ts";
 import { SURFACE_FRAGMENT } from "./surfaceShader.ts";
 
-// What the relief's shadows rest on, so a revert of the morning's fix (D13944, D13012) fails here: the march's far samples read blurred
+// What the relief's shadows rest on, so a revert of the fix fails here: the march's far samples read blurred
 // (a sample gap wider than a crater caught the wall in crescents that slid and popped as the sun turned), the soft edge widens with the
 // distance, and the work stays what it was: the same steps, the same reads. Meaning, not whole strings: a harmless edit keeps these green.
 const march = (source: string, name: string): string => {

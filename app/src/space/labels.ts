@@ -1,5 +1,5 @@
-// The names over the universe (D401, the demo's pills): far out the systems worth a name from where the eye stands, the planets of the system the camera is in
-// once it is large enough to tell them apart (all of them from above, the Map, D433), and no other system's then, which would pile up
+// The names over the universe (the demo's pills): far out the systems worth a name from where the eye stands, the planets of the system the camera is in
+// once it is large enough to tell them apart (all of them from above, the Map), and no other system's then, which would pile up
 // behind it; none on a page seen as it turns, where the Map names the page's world first. A fixed pool of buttons, moved by transform only; a click enters.
 import { systemName } from "../placeName.ts";
 import { isAddress } from "@gnoworld/core";
@@ -11,9 +11,9 @@ import { fillPill, midOf, tagOf, watchPill, type LabelHooks } from "./midWorlds.
 import styles from "./labels.module.css";
 
 const POOL = 36;
-// Far out, the heaviest few always named, and any other once its orbits span this many pixels (D455).
+// Far out, the heaviest few always named, and any other once its orbits span this many pixels.
 const ALWAYS = 6;
-// Inside a system, the few other systems named beside its planets, the heaviest in sight: a way out to them, drawn apart (D460).
+// Inside a system, the few other systems named beside its planets, the heaviest in sight: a way out to them, drawn apart.
 const OTHERS = 3;
 // raw: a system's orbits this wide on screen, where its name stops crowding the heavier ones'
 const NAMED_FROM_PX = 14;
@@ -48,7 +48,7 @@ export class Labels {
   readonly #farItems: System[] = [];
   readonly #inside: Item[] = [];
   #all: readonly System[] = [];
-  // What a lens lights (D425): the worlds by their ids, how many each system holds, and each system's lit planets by use.
+  // What a lens lights: the worlds by their ids, how many each system holds, and each system's lit planets by use.
   #only: ReadonlySet<string> | undefined;
   readonly #litIn = new Map<System, number>();
   #seen: Seen | undefined;
@@ -187,7 +187,7 @@ export class Labels {
     return inside;
   }
 
-  // Far out, by weight and the room its orbits take on screen (Alexis, 2026-11-09: "en fonction de là où on se situe et du zoom"): a heavy
+  // Far out, by weight and the room its orbits take on screen: a heavy
   // system far off and a light one near both earn a name as the view comes close; the heaviest few always, the faint never.
   #farOut(seen: Seen): readonly Item[] {
     for (const each of this.#far) {

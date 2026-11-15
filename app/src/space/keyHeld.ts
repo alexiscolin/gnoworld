@@ -1,4 +1,4 @@
-// A key a field or a dialog holds is theirs (7g's flights, 7v's views): V typed in the search, or Escape in a dialog, does nothing to space.
+// A key a field or a dialog holds is theirs: V typed in the search, or Escape in a dialog, does nothing to space.
 import { typedIn } from "@gnoworld/ui";
 
 const DIALOGS = "dialog[open], [role='dialog']";

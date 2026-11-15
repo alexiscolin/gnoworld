@@ -1,4 +1,4 @@
-// The arrival's scan (D401, the video's frames 20 to 22): as the flight to a page's planet nears its end, with the page, a glare sweeps
+// The arrival's scan (the video's frames 20 to 22): as the flight to a page's planet nears its end, with the page, a glare sweeps
 // it from its top to its bottom in 1.8 s and draws a grid of meridians and parallels behind it, whose lines then draw back along their
 // length till the planet is bare, 2.8 s on. A shell just over the planet, wherever it stands as the flight ends, so it fits whichever
 // body the page draws without touching it. None under reduced motion.

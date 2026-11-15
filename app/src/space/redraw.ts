@@ -1,4 +1,4 @@
-// Whether a frame would differ from the last one drawn (P102): the loop still moves the scene each frame, and draws it only when this
+// Whether a frame would differ from the last one drawn: the loop still moves the scene each frame, and draws it only when this
 // says so. "full": something moves by the hand, an ease or a change told; "ambient": only the camera's slow turn or a slow orbit has
 // crossed half a pixel; "none": nothing a pixel could show.
 export type Need = "full" | "ambient" | "none";

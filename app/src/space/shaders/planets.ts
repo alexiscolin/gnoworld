@@ -1,4 +1,4 @@
-// Every planet far out, as the demo draws them (D401): a quad turned to the eye, on which the GPU traces a true sphere, never under
+// Every planet far out: a quad turned to the eye, on which the GPU traces a true sphere, never under
 // 2.4 px across, on its orbit by the clock; its colours are its generated look's, graded as the generated planet is, so the hand-over
 // to the planet itself, once it is a few pixels across, shows nothing.
 import { INTRO } from "../intro.ts";
@@ -14,7 +14,7 @@ float vnoise(vec3 x) {
 float fbm(vec3 p) { float s = 0.0; float a = 0.5; for (int i = 0; i < 4; i++) { s += a * vnoise(p); p = p * 2.02 + vec3(1.7, 9.2, 3.1); a *= 0.5; } return s; }
 `;
 
-/** How far a lens dims a planet or a sun it does not light (D425), as its light comes (uLens, 0 to 1). */
+/** How far a lens dims a planet or a sun it does not light, as its light comes (uLens, 0 to 1). */
 export const LENS_DIM = "mix(1.0, 0.15, uLens * (1.0 - aLit))";
 
 /** How far a planet's system is open, 0 to 1, by the scene's clock (open.ts): in from the galaxy, or out to it, in one fade. */
@@ -49,7 +49,7 @@ void main() {
   // On a page its planet stands alone: every other one shrinks away as the page comes (uSolo, 0 to 1), the sphere with its quad, so it
   // stays round to the last; on the home only those large on screen (uSoloPx), the far ones behind the Earth as points till it is left (uSoloAll).
   // On the home's first screen up to three worlds are drawn larger, each its own size (uFeat: an index and a boost, three times; uBoost less 1
-  // the share shown), so the layers differ in size as in depth (D549).
+  // the share shown), so the layers differ in size as in depth.
   float boost = 1.0;
   for (int i = 0; i < 3; i++) if (abs(float(gl_InstanceID) - uFeat[i * 2]) < 0.5) boost = uFeat[i * 2 + 1];
   vScale = 1.0 + (boost - 1.0) * max(uBoost - 1.0, 0.0);
@@ -61,7 +61,7 @@ void main() {
   vIntro = ${INTRO_SHARE};
   float r = max(rad, 1.2 * uPxK * d) * alone * step(0.001, vOpen) * (0.35 + 0.65 * vIntro);
   // The quad stands square to the screen, never to the planet's own direction, and the sphere is traced straight on in it: a world far
-  // off the view's axis stays a round disc, where a ray through its pixel stretched it (D510).
+  // off the view's axis stays a round disc, where a ray through its pixel stretched it.
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 up = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
   vec3 w = c + (right * position.x + up * position.y) * r * 1.02 * aShown;
@@ -85,7 +85,7 @@ vec3 surface(vec3 lp, float seed, float kind) {
   }
   float f = fbm(lp * 2.4 + seed);
   if (kind < 0.5) {
-    // A gas giant as photographed (D513): many soft low-contrast bands of three widths, their edges rippled by turbulence, a fine streaked
+    // A gas giant as photographed: many soft low-contrast bands of three widths, their edges rippled by turbulence, a fine streaked
     // grain along them, the poles a little darker; never a few dark stripes.
     float lat = lp.y + (f - 0.5) * 0.09 + 0.025 * (vnoise(lp * vec3(3.0, 14.0, 3.0) + seed) - 0.5);
     float bands = 0.5 * sin(lat * 9.0 + seed) + 0.3 * sin(lat * 17.0 + seed * 2.0) + 0.2 * sin(lat * 31.0 + seed * 3.0);
@@ -106,8 +106,8 @@ void main() {
   float ndl = dot(n, normalize(vSun - hit));
   float cs = cos(vSpin); float sn = sin(vSpin); float px = dot(n, vAcross); float pz = dot(n, vAlong);
   vec3 lp = vec3(px * cs - pz * sn, dot(n, vAxis), px * sn + pz * cs);
-  // Drawn larger on the home's first screen (uBoost, D541), a world is shaded as the Earth is: a terminator that falls across the disc, the
-  // limb darker, the air a brighter rim (D543).
+  // Drawn larger on the home's first screen (uBoost), a world is shaded as the Earth is: a terminator that falls across the disc, the
+  // limb darker, the air a brighter rim.
   float rich = smoothstep(1.0, 1.4, vScale);
   float mu = max(dot(n, -rd), 0.0);
   vec3 lit = surface(lp, vLow.w * 37.0, vHigh.w) * (0.02 + 1.1 * mix(smoothstep(-0.04, 0.2, ndl), smoothstep(-0.25, 0.85, ndl), rich));

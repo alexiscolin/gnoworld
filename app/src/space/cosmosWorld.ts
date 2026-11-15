@@ -1,4 +1,4 @@
-// A world of the worlds' file as the cosmos reads it (slice 7, 7d2 and 7d5): its id, its namespace, and of its realms their callers, and
+// A world of the worlds' file as the cosmos reads it: its id, its namespace, and of its realms their callers, and
 // for the whole cosmos their paths, imports and calls where the file has them.
 import { callersIn } from "@gnoworld/core";
 
@@ -30,7 +30,7 @@ export function usesOf(worlds: readonly CosmosWorld[]): ReadonlyMap<string, Read
   return uses;
 }
 
-// How many other worlds are built on each world, by its id: all of them, and those of other namespaces (P1).
+// How many other worlds are built on each world, by its id: all of them, and those of other namespaces.
 function importersOf(worlds: readonly CosmosWorld[]): {
   all: ReadonlyMap<string, number>;
   across: ReadonlyMap<string, number>;

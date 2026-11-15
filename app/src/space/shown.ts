@@ -1,4 +1,4 @@
-// What the scene is drawn from, as numbers (P102): each part's visibility, each uniform that is a number, a vector or a colour, each
+// What the scene is drawn from, as numbers: each part's visibility, each uniform that is a number, a vector or a colour, each
 // texture's and buffer's version. The clocks are left out: the slow motions they drive are judged by their pixels (redraw.ts).
 import {
   BufferAttribute,
@@ -16,7 +16,7 @@ import {
   type Object3D,
 } from "three";
 
-// The clocks, the rings' clock, a planet's light direction (it turns with the orbit, a slow motion judged by its pixels, D13013: counted
+// The clocks, the rings' clock, a planet's light direction (it turns with the orbit, a slow motion judged by its pixels: counted
 // here it made every frame "full" and the loop never calm), and the dust's eye wrapped into its cell: it follows the camera, which the
 // frame weighs by its pixels.
 const CLOCKS = new Set(["uTime", "time", "cloudTime", "ringTime", "sun", "uEye"]);

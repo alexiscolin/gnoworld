@@ -1,4 +1,4 @@
-// The galaxy's body (Alexis, 2026-11-09, the artifact's look, finer), over the clean dark sky: one instanced draw of glows, each sun's
+// The galaxy's body (the artifact's look, finer), over the clean dark sky: one instanced draw of glows, each sun's
 // sized by its worlds and the heart's soft gold, and one draw of a fine dense field of grains (haze.ts). It belongs to the galaxy's view,
 // gone within the disc, and is drawn after the frame, never through the speed's pass, which grades the frame anew and would flash it.
 // Nothing of it moves on its own; it reads the stage's uniforms. Low draws a quarter of the grains.
@@ -32,7 +32,7 @@ const HEART_GLOW = { size: 0.45, light: 0.22 } as const;
 
 /** The uniforms the sky reads from the stage: the suns' gain, the dust's, a lens's light; the frame's pixels a unit at a unit's
  * distance, and the world units a pixel at that distance. */
-export interface SkyGains {
+interface SkyGains {
   readonly sun: { value: number };
   readonly dust: { value: number };
   readonly lens: { value: number };

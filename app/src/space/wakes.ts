@@ -1,4 +1,4 @@
-// What wakes a sleeping loop besides a call (P400): the reader's pointer, wheel, keys and touch and the window's size ask for a frame only,
+// What wakes a sleeping loop besides a call: the reader's pointer, wheel, keys and touch and the window's size ask for a frame only,
 // which the draw rule judges; the page showing again asks for a draw. All listeners go with `signal`.
 const INPUTS = ["pointermove", "pointerdown", "wheel", "keydown", "touchstart"] as const;
 

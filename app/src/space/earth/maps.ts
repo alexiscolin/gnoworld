@@ -17,7 +17,7 @@ export interface ReliefMaps {
   readonly moon: Texture;
 }
 
-/** The plan's size (section 4); the first frame is built from half of it, the files the page's HTML already asked for. */
+/** The full size; the first frame is built from half of it, the files the page's HTML already asked for. */
 const FULL = 4096;
 const HALF = FULL / 2;
 /** A moon of a few dozen pixels needs no more. */

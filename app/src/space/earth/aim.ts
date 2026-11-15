@@ -1,4 +1,4 @@
-// Which spin and which lean show a country where Alexis's frames keep it (D13916): the spins within half a turn of where the ground stands and
+// Which spin and which lean show a country where the page's free area keeps it: the spins within half a turn of where the ground stands and
 // the leans toward the eye within TILT are tried, and the pair that stands the country nearest the aim while it is well seen wins.
 interface Point {
   readonly x: number;

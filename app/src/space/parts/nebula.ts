@@ -1,6 +1,6 @@
-// The nebula (D510): the soft coloured clouds behind the stars, one sphere round the eye drawn first. A function of the direction alone: it
+// The nebula: the soft coloured clouds behind the stars, one sphere round the eye drawn first. A function of the direction alone: it
 // never jumps in a dive, and holds still whatever the motion setting says, so its noise is laid once on a cube map and a frame reads it
-// (baked again when a lost context comes back); where half floats cannot be drawn to, one pass of noise per pixel as before.
+// (baked again when a lost context comes back); where half floats cannot be drawn to, one pass of noise per pixel.
 import {
   BackSide,
   BoxGeometry,

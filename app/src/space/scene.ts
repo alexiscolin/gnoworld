@@ -1,4 +1,4 @@
-// The universe's engine (D401, docs/plans/dive.md): the dive's demo in the product, on the worlds' file. One renderer, one loop
+// The universe's engine, on the worlds' file. One renderer, one loop
 // (stopped while hidden or covered), one rig that alone moves the camera; a page asks a place and hands its circle, and hears when
 // the flight nears and lands; a click or a wheel asks a place back, which the page's address then asks of it.
 import { PerspectiveCamera, Vector3, type WebGLRenderer } from "three";
@@ -46,9 +46,9 @@ export class Space {
   readonly #trip = { dived: false, from: new Vector3() };
   /** Whether the flight to the page's planet passed its 68 %. */
   neared = false;
-  /** Whether space is seen from above (the Map, D433), at every level, or as it turns. */
+  /** Whether space is seen from above (the Map), at every level, or as it turns. */
   plan = false;
-  /** The worlds a lens lights, by their ids (D425); none, every world. */
+  /** The worlds a lens lights, by their ids; none, every world. */
   lens: ReadonlySet<string> | undefined;
   readonly #leaving = new AbortController();
   #covered = false;
@@ -93,7 +93,7 @@ export class Space {
     return universe;
   }
 
-  /** Lights the worlds `only` names, the rest dimming as the frame eases it (D425); none, every world. */
+  /** Lights the worlds `only` names, the rest dimming as the frame eases it; none, every world. */
   light(only: ReadonlySet<string> | undefined): void {
     this.touch();
     this.lens = only;
@@ -146,7 +146,7 @@ export class Space {
     return this.#lay().byId.get(id);
   }
 
-  /** Whether the home shows its first screen (D459): the Earth close, in the circle its page lays out, not its system. */
+  /** Whether the home shows its first screen: the Earth close, in the circle its page lays out, not its system. */
   get arrival(): boolean {
     return arrivalOf(this);
   }

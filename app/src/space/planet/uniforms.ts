@@ -84,7 +84,7 @@ export function sharedUniforms(look: PlanetLook, maps: MapSet): Uniforms {
   };
 }
 
-// No world starts with a light: a world at rest draws what it drew before any sign.
+// No world starts with a light: a world at rest draws no sign.
 export const noLights = (): Uniforms => ({
   settled: { value: 0 },
   lightLevel: { value: 0 },

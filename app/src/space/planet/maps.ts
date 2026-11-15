@@ -1,5 +1,5 @@
-// How a real map comes and goes: the Earth's, and the small set every world will share (ADR-0002 §3), one owner for them all once 7d draws
-// worlds. WebP, decoded by the browser off the main thread, so no page's CSP widens (the plan, section 3). A bitmap is closed once uploaded:
+// How a real map comes and goes: the Earth's, and the small set every world shares (ADR-0002 §3), one owner for them all.
+// WebP, decoded by the browser off the main thread, so no page's CSP widens. A bitmap is closed once uploaded:
 // its bytes would count twice.
 import {
   ClampToEdgeWrapping,

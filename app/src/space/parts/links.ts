@@ -1,4 +1,4 @@
-// The links between worlds, drawn while the Map shows a system, the home or a world (D433): a line from each world to those it is built on
+// The links between worlds, drawn while the Map shows a system, the home or a world: a line from each world to those it is built on
 // and those built on it, from the worlds' file's imports (cosmosWorld.ts's usesOf), the planets' ends following their orbits. One
 // preallocated, bounded buffer, written each frame; the orbits' colour, their faint strength for a system's own links, a world's brighter.
 import { damp } from "@gnoworld/core";
@@ -32,7 +32,7 @@ attribute float aTone; attribute float aLit; uniform float uLens; varying float 
 void main() { vTone = aTone * ${LENS_DIM}; gl_Position = projectionMatrix * viewMatrix * vec4(position, 1.0); }`;
 const FRAGMENT =
   "uniform vec3 uColour; uniform float uGain; varying float vTone; void main() { gl_FragColor = vec4(uColour * uGain * vTone, 1.0); }";
-/** What a frame says of the Map's links: the time, the lens (D425), and the screen and the reader's motion settings. */
+/** What a frame says of the Map's links: the time, the lens, and the screen and the reader's motion settings. */
 interface Tick {
   readonly seconds: number;
   readonly lens: ReadonlySet<string> | undefined;
@@ -158,7 +158,7 @@ export class Links {
     this.#light(lens);
   }
 
-  // A lens (D425) lights the links whose two worlds it lights, a hovered planet those it has; the shader eases the rest's dimming with the lens's own.
+  // A lens lights the links whose two worlds it lights, a hovered planet those it has; the shader eases the rest's dimming with the lens's own.
   #light(lens: ReadonlySet<string> | undefined): void {
     this.#lens = lens;
     this.#litFor = this.#held;

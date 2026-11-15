@@ -1,6 +1,6 @@
-// What the demo draws over the universe for the place the camera is at (D401): the orbits of the system it is in, faint, and on a
+// What the demo draws over the universe for the place the camera is at: the orbits of the system it is in, faint, and on a
 // page the plate's fill, behind the planet, as the video's frame 20 (the planet stands over the plate's right side); a planet framed
-// close wears one orbit (D458).
+// close wears one orbit.
 import { damp } from "@gnoworld/core";
 import {
   BufferGeometry,
@@ -83,7 +83,7 @@ export class Orbits {
   }
 }
 
-/** One orbit round the planet a page frames close (D458): thin and faint, the planet hiding it where it passes behind; its plane
+/** One orbit round the planet a page frames close: thin and faint, the planet hiding it where it passes behind; its plane
  * set by the eye as it shows, then held, so a drag turns round it as round any orbit. */
 export class Round {
   readonly gain = { value: 0 };
@@ -136,7 +136,7 @@ export class Round {
 }
 
 export class Plate {
-  /** Where it stands on the screen, shared with what keeps off its words (D490). */
+  /** Where it stands on the screen, shared with what keeps off its words. */
   readonly mask = newPlateMask();
   readonly shown = this.mask.uShown;
   readonly #box = this.mask.uBox;
@@ -167,7 +167,7 @@ export class Plate {
   constructor() {
     this.mesh.frustumCulled = false;
     // After the lights (additive, at 0), so the plate covers the far suns and dust behind the page's words; before a planet's air,
-    // ring and halo (1 to 3, planet/planet.ts), which stand over it (Alexis, 2026-11-08); the planets, opaque, in front by depth.
+    // ring and halo (1 to 3, planet/planet.ts), which stand over it; the planets, opaque, in front by depth.
     this.mesh.renderOrder = 0.5;
   }
 

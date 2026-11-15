@@ -1,7 +1,7 @@
 import { WANDER } from "./rig/free.ts";
 import type { Space } from "./scene.ts";
 
-// The slow turn at rest: none on a page, on the home's Earth (D459: it would turn its light away) or under reduced motion; far
+// The slow turn at rest: none on a page, on the home's Earth (it would turn its light away) or under reduced motion; far
 // out the galaxy's own (not the Map's); else the one near a system.
 function wanderOf(space: Space, still: boolean): (typeof WANDER)[keyof typeof WANDER] {
   if (still || space.place?.kind === "world" || space.arrival) return WANDER.none;

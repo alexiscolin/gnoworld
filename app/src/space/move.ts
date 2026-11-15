@@ -1,4 +1,4 @@
-// A frame's moves (D401): the rig and the page's hold, the level, the eased values, the names, the effects and the frame's last draw.
+// A frame's moves: the rig and the page's hold, the level, the eased values, the names, the effects and the frame's last draw.
 // Split from the loop (frame.ts), which decides whether the frame is drawn.
 import { damp } from "@gnoworld/core";
 import type { Space } from "./scene.ts";
@@ -100,7 +100,7 @@ function dim(space: Space, paged: boolean, delta: number): void {
   lighten(space, delta);
 }
 
-// A lens's, or a pointed planet's, light comes and goes over a moment, never at once (D425); at once under reduced motion.
+// A lens's, or a pointed planet's, light comes and goes over a moment, never at once; at once under reduced motion.
 function lighten(space: Space, delta: number): void {
   settleHover(space);
   const on = space.lens !== undefined || hoverLit(space) !== undefined;
@@ -113,7 +113,7 @@ function settle(space: Space): void {
   if (universe === undefined || place === undefined || place.kind === "world") return;
   const system = space.system;
   // The eye the pose has, not the camera's: on the frame after a jump the camera is aimed only below, and a small system opened at its
-  // address stood far from where it last was, which left it for the universe at once (D484).
+  // address stood far from where it last was, which left it for the universe at once.
   const eye = eyeOf(space.rig.pose, space.rig.eye);
   if (system !== undefined && distance(eye, system.place) > system.reach * LEAVE) {
     space.place = { kind: "universe" };
@@ -142,7 +142,7 @@ export function paint(space: Space, delta: number): void {
     close: closeUp(space),
     delta: delta / 1000,
     still: space.options.still(),
-    // How far the sun has gone dim for a page (its gain, eased): 0 where it is drawn, 1 on a page where it is not (D13002).
+    // How far the sun has gone dim for a page (its gain, eased): 0 where it is drawn, 1 on a page where it is not.
     page: Math.min(1, Math.max(0, (1 - stage.gains.sun.value) / (1 - PAGE.sun))),
   });
   space.labels.system = space.system;
@@ -154,7 +154,7 @@ export function paint(space: Space, delta: number): void {
   if (opened) rig.free.rouse();
   space.labels.plan = space.plan;
   space.labels.marked = space.planet;
-  // No name while a flight runs: they come as it lands, never popping in and out on the way (Alexis, 2026-11-09).
+  // No name while a flight runs: they come as it lands, never popping in and out on the way.
   space.labels.hidden = rig.flying || space.kept !== undefined;
   space.labels.arrival = space.arrival;
   space.labels.ready = stage.intro.ready;
@@ -182,11 +182,11 @@ export function present({ stage, renderer, camera }: Space): void {
   stage.sky?.draw(renderer, camera);
 }
 
-// The planet a page frames close (D458, D459): the home's Earth on its first screen, or a page's own; none from above.
+// The planet a page frames close: the home's Earth on its first screen, or a page's own; none from above.
 const closeUp = (space: Space): Planet | undefined =>
   space.arrival ? space.universe?.earth : space.circle?.close === true ? space.kept : undefined;
 
-// The orbit round a planet framed close comes once the flight has landed, as the page has; its moons stand round it as it comes (D463).
+// The orbit round a planet framed close comes once the flight has landed, as the page has; its moons stand round it as it comes.
 function round(space: Space, delta: number): void {
   const planet = closeUp(space);
   space.stage.round.follow(space.rig.flying ? undefined : planet, space.rig.pose, {

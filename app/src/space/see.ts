@@ -1,4 +1,4 @@
-// What the camera sees, for the names and the picks (D401): where a point stands on screen, how many world units a pixel is at a
+// What the camera sees, for the names and the picks: where a point stands on screen, how many world units a pixel is at a
 // distance of 1, and the screen's size, kept from the last resize.
 import { Vector3, type PerspectiveCamera } from "three";
 import type { Vec } from "./layout.ts";

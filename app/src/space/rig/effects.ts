@@ -1,4 +1,4 @@
-// The demo's effects on the scene (D401), drawn by one owner: speed (blur and dust) and the arrival's scan.
+// The demo's effects on the scene, drawn by one owner: speed (blur and dust) and the arrival's scan.
 import type { PerspectiveCamera, Quaternion, Scene, WebGLRenderer } from "three";
 import type { Disposer } from "../disposer.ts";
 import type { Rig } from "./rig.ts";

@@ -1,4 +1,4 @@
-// The reader's hand on a generated world (D13011): a drag turns the planet about its middle, round the screen's up and right, the camera and the
+// The reader's hand on a generated world: a drag turns the planet about its middle, round the screen's up and right, the camera and the
 // sun staying. The turn is a layer on top of the planet's own spin, which never stops: it is kept, never eased back. It follows the pointer
 // one to one (a surface's point moves as far as the pointer), and carries on after the release with the view's inertia (rig/free.ts).
 import { Quaternion, Vector3 } from "three";

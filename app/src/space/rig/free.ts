@@ -1,4 +1,4 @@
-// The reader's hand on the pose (D401): a drag turns the view round what it looks at, a wheel brings it nearer what the pointer is
+// The reader's hand on the pose: a drag turns the view round what it looks at, a wheel brings it nearer what the pointer is
 // over, both with the demo's inertia (0.32 s for a turn, 0.18 s for a zoom); still for 4 s, the view turns slowly on its own, and stops after a minute.
 import { damp, smoothstep } from "@gnoworld/core";
 import { Quaternion, Vector3 } from "three";
@@ -14,7 +14,7 @@ const PULL_TAU = 0.4;
 const ZOOM_PER_PIXEL = 0.012;
 const ZOOM_MOST = 6;
 // The slow turn once still, in radians a second and after how many seconds, reached over 3 s: near a system the prototype's 0.18 of
-// OrbitControls after 4 s; the galaxy turning as the artifact's did, a turn in 52 s, after a second (Alexis, 2026-11-09); none.
+// OrbitControls after 4 s; the galaxy turning as the artifact's did, a turn in 52 s, after a second; none.
 export const WANDER = {
   near: { speed: 0.019, after: 4 },
   galaxy: { speed: 0.12, after: 1 },

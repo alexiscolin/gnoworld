@@ -1,4 +1,4 @@
-// The featured worlds' boosts (D549, D551, D555): during the flight that lands on the home each is sized for its layer as the flight goes,
+// The featured worlds' boosts: during the flight that lands on the home each is sized for its layer as the flight goes,
 // grown in by the flight's own progress (framing.ts); once landed each keeps the boost it landed with, so at rest only the perspective
 // changes its size. Leaving the home they shrink with the frame's easing, never at once.
 import type { Space } from "./scene.ts";

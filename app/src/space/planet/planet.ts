@@ -48,7 +48,7 @@ export interface Planet {
   setTime(seconds: number, clouds?: number, still?: boolean): void;
   /** Gives the Earth or the Moon its real height, once it came: its relief, its sea, its shadows. Any other world ignores it. */
   setHeight(map: Texture): void;
-  /** Where its moons stand, each as world x, y, z and its radius: their shadows cross it (D13900). At most four; the rest, none. */
+  /** Where its moons stand, each as world x, y, z and its radius: their shadows cross it. At most four; the rest, none. */
   setMoons(shadows: readonly Vector4[]): void;
   /** Swaps the Earth's day, night and cloud maps for others of the same pictures at another size. */
   setEarthMaps(maps: { day: Texture; night: Texture; clouds: Texture }): void;
@@ -58,11 +58,11 @@ export interface Planet {
   setDepth(on: boolean): void;
   /** Lights the edge of its air by hand on the day side: the Earth's bright rim (frame 39), for scattering alone floods its seas first. */
   setLimb(light: number): void;
-  /** How dim it stands, 0 to 1: a world a lens leaves unlit (D502). */
+  /** How dim it stands, 0 to 1: a world a lens leaves unlit. */
   setFar(share: number): void;
-  /** How much a page that frames it close pushes its air's lit limb, 0 to 1 (D458). */
+  /** How much a page that frames it close pushes its air's lit limb, 0 to 1. */
   setClose(share: number): void;
-  /** Keeps its glare off the page's plate: the stage's plate uniforms (D490). */
+  /** Keeps its glare off the page's plate: the stage's plate uniforms. */
   setPlate(mask: PlateMask): void;
   /** Shows a world's stage. Its `size` is a factor for whoever scales the group: the view owns the group's scale. */
   setSigns(signs: WorldSigns): void;
@@ -207,7 +207,7 @@ class LivePlanet implements Planet {
     setUniform(halo.material.uniforms, "signal", signal);
   }
 
-  // Made for the worlds that need one: a world at rest keeps the meshes the lab drew. No sun reaches it, so it stays out of `#parts`.
+  // Made for the worlds that need one: a world at rest keeps the meshes it was made with. No sun reaches it, so it stays out of `#parts`.
   #addHalo(): Mesh<BufferGeometry, ShaderMaterial> {
     const halo = new Mesh(this.#sphere, this.#owner.add(haloMaterial()));
     halo.scale.setScalar(HALO_REACH);

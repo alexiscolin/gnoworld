@@ -29,7 +29,7 @@ describe("Redraw", () => {
     expect(redraw.check(moment({ seconds: 0.14 }))).toBe("ambient");
     expect(redraw.check(moment({ moving: true }))).toBe("full");
     redraw.live = false;
-    // The moving frame read no numbers: the one after it is drawn, and reads them (C5, slice 13).
+    // The moving frame read no numbers: the one after it is drawn, and reads them.
     expect(redraw.check(moment({ seconds: 0.2 }))).toBe("full");
     expect(redraw.check(moment({ seconds: 0.21 }))).toBe("none");
   });

@@ -1,6 +1,6 @@
-// A flight (D401): one move from the pose the camera has to the pose asked, along van Wijk and Nuij's path (core), so it goes
-// straight and never comes back; the way and the up turn together, as one frame, by one slerp the short way, never faster than 180° a second
-// (D13903); the field of view opens 5° mid-way (not on a turn). The goal is read each frame. Eased power2.inOut from rest, out when moving.
+// A flight: one move from the pose the camera has to the pose asked, along van Wijk and Nuij's path (core), so it goes
+// straight and never comes back; the way and the up turn together, as one frame, by one slerp the short way, never faster than 180° a second;
+// the field of view opens 5° mid-way (not on a turn). The goal is read each frame. Eased power2.inOut from rest, out when moving.
 import { glideAt, zoomPath, zoomSeconds, ZOOM_RHO, type ZoomPath, type ZoomStep } from "@gnoworld/core";
 import { Matrix4, Quaternion, Vector3 } from "three";
 import { blankPose, copyPose, type Pose } from "./pose.ts";

@@ -1,4 +1,4 @@
-// The reader's hand on space (D401, the demo's): a drag turns the view round what it looks at, with inertia; a wheel brings it nearer what
+// The reader's hand on space (the demo's): a drag turns the view round what it looks at, with inertia; a wheel brings it nearer what
 // the pointer is over far out (a system, its middle), and in a system a wheel in over a planet dives there in one move; a click enters what
 // it aims at; a wheel out on a page, or Escape, goes up a level. A trackpad's momentum after a dive is spent, never a second dive.
 import { holdsEscape } from "@gnoworld/ui";
@@ -6,7 +6,7 @@ import type { PerspectiveCamera } from "three";
 import type { Hit } from "./pick.ts";
 import type { Rig } from "./rig/rig.ts";
 
-/** What a drag turns instead of the camera (D13011): a generated world on its page. */
+/** What a drag turns instead of the camera: a generated world on its page. */
 export interface Turner {
   /** The pointer moved by `dx`, `dy` pixels, `seconds` after its last move. */
   readonly drag: (move: { dx: number; dy: number; seconds: number }) => void;

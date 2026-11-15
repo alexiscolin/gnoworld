@@ -1,4 +1,4 @@
-/* The universe's names (D401, the demo's pills): a pill per name, moved by transform; shown or not by `.on`. */
+/* The universe's names (the demo's pills): a pill per name, moved by transform; shown or not by `.on`. */
 @layer components {
   .pill {
     inset-block-start: 0;
@@ -18,7 +18,7 @@
       color calc(var(--motion-fast) * var(--motion-scale)) var(--ease-standard);
   }
 
-  /* On the home's first screen a world's name stands under its disc, centred, in the Earth tag's size and face (D543, D546, D549). */
+  /* On the home's first screen a world's name stands under its disc, centred, in the Earth tag's size and face. */
   .under {
     /* layout: a wider step between the name and the people here, as the Earth tag's */
     gap: var(--space-xs);
@@ -52,7 +52,7 @@
     border-color: var(--color-line-strong);
   }
 
-  /* Another system named from inside one (D460): no fill, a dashed edge and a sun's ring before it, in the quiet tone; it lights up as
+  /* Another system named from inside one: no fill, a dashed edge and a sun's ring before it, in the quiet tone; it lights up as
      it is pointed at. */
   .other {
     border-style: dashed;

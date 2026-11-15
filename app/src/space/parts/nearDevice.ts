@@ -10,8 +10,8 @@ export interface NearDevice {
   readonly camera: PerspectiveCamera;
   readonly maps: Maps;
   readonly planets: Planets;
-  /** The page's plate, which a world's glare keeps off (D490). */
+  /** The page's plate, which a world's glare keeps off. */
   readonly plate: PlateMask;
-  /** How far a lens dims what it does not light, 0 to 1, eased by the frame (D425). */
+  /** How far a lens dims what it does not light, 0 to 1, eased by the frame. */
   readonly lens: { readonly value: number };
 }

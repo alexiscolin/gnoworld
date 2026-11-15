@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { fillPill, tagOf } from "./midWorlds.ts";
 import type { Planet } from "./layout.ts";
 
-// P300: a pill's count is written only when it changes, so a drawn frame at rest leaves the document alone.
+// A pill's count is written only when it changes, so a drawn frame at rest leaves the document alone.
 const planet = { id: "w", radius: 1, index: 0 } as unknown as Planet;
 const place = (button: HTMLElement, fact: number | undefined) => {
   tagOf(button, {

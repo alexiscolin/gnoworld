@@ -1,4 +1,4 @@
-// The home's first screen follows its featured world (D520): the worlds orbit, so every couple of seconds the view is searched again near
+// The home's first screen follows its featured world: the worlds orbit, so every couple of seconds the view is searched again near
 // where it stands, and the eye eased round the Earth's light cone toward it, slow and never at a jump; a reader's drag or wheel wins and
 // the follow waits out a pause; none under reduced motion. The Earth keeps its place and its light.
 import { damp } from "@gnoworld/core";
@@ -65,7 +65,7 @@ class Follow {
   // Whether the reader's hand moved the pose since the last frame, or the follow waits out its pause after it.
   #waiting({ rig, seconds }: Space): boolean {
     const { way } = rig.pose;
-    // The first screen has just landed: no pause before its view and its featured worlds are chosen, once (D551).
+    // The first screen has just landed: no pause before its view and its featured worlds are chosen, once.
     if (!latch.frozen) {
       copySpot(way, this.#set);
       [this.#until, this.#wide] = [0, seconds + WIDE];
@@ -143,7 +143,7 @@ class Follow {
 
 const follow = new Follow();
 
-/** One frame of the home's first screen's follow of its featured worlds (D520): one first screen at a time. */
+/** One frame of the home's first screen's follow of its featured worlds: one first screen at a time. */
 export const followHome = (space: Space, delta: number): void => {
   shapeBoosts(space);
   follow.update(space, delta);

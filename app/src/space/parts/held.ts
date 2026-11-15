@@ -13,7 +13,7 @@ export interface Held extends Warming {
   /** Its maps not yet on the GPU. */
   readonly uploads: Texture[];
   shown: boolean;
-  /** No longer shown, its fade out still running: it stays drawn, its air with it, until it is gone, over the quad that took its place. */
+  /** Not shown, its fade out still running: it stays drawn, its air with it, until it is gone, over the quad that took its place. */
   leaving: boolean;
   /** Its quad stays drawn beneath while it comes in over it, hidden once it is whole: no bare skeleton stands between the two. */
   over: boolean;

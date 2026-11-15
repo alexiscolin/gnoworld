@@ -149,7 +149,7 @@ describe("EarthGround", () => {
     expect(g.lean).toBe(0);
   });
 
-  // D13946: the aim stays. A 40 N spot at the dock's edge needs the spin and a lean to stand at the aim; the planet's own spin then carries on.
+  // The aim stays: a 40 N spot at the dock's edge needs the spin and a lean to stand at the aim; the planet's own spin then carries on.
   const tilted = () => {
     const seen = { at: [0, 0, true] as [number, number, boolean] };
     const mark = {
@@ -246,7 +246,7 @@ describe("EarthGround", () => {
     expect(offsets.at(-1)).toBe(offsets.at(-300));
     expect(offsets.at(-1)).not.toBe(offsets[held]);
   });
-  // D13001: no aim on arrival. The Earth's own calm is 4 s after the planet first stands at rest; a message said before it never turns it.
+  // No aim on arrival: the Earth's own calm is 4 s after the planet first stands at rest; a message said before it never turns it.
   describe("the arrival's calm (D13001)", () => {
     const eyed = {
       eye: { x: 0, y: 0, z: 5 },

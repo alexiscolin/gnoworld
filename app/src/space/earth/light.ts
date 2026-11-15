@@ -1,4 +1,4 @@
-// The Earth's real hour (D13947): the sun stands over the ground where it is noon now, so its direction is fixed in the Earth's own frame and
+// The Earth's real hour: the sun stands over the ground where it is noon now, so its direction is fixed in the Earth's own frame and
 // turns with it, in both layers (the planet's never-stopping spin and the aim's lead and lean); the camera, the stars and the Moon stay.
 import { EARTH, groundDirection, subSolarPoint } from "@gnoworld/core";
 import { Quaternion, Vector3 } from "three";
@@ -30,8 +30,8 @@ let held = 0;
 export const kept = (): number => held;
 const wrap = (a: number): number => a - Math.PI * 2 * Math.round(a / (Math.PI * 2));
 
-/** The Earth's real day (D13947) on its page (`page` 1); where its star is drawn (`page` 0) the star lights it and its noon faces the star
- * (D13002), both blended between. `out`: the star's direction in, the Earth's sun out; the result is the time to turn the ground by. Any
+/** The Earth's real day on its page (`page` 1); where its star is drawn (`page` 0) the star lights it and its noon faces the star,
+ * both blended between. `out`: the star's direction in, the Earth's sun out; the result is the time to turn the ground by. Any
  * other world keeps its star and its time. */
 export function dayOf(
   drawn: Planet,
