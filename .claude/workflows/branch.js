@@ -141,6 +141,7 @@ const TIER1 = [
   "app/src/cspOrigins.ts",
   "app/src/cspForms.ts",
   "app/src/lib/chain/evalCall.ts",
+  "packages/schemas/src/realmPath.ts",
   "deploy/",
   "packages/core/src/markdown/",
   "packages/core/src/args/",
