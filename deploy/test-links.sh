@@ -20,7 +20,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "a port of the link reader published on the host" "link_reader binds a port on the host" compose 'services: { link_reader: { ports: ["127.0.0.1:18084:8084"] } }'
 	mutant "the link reader listening on all its addresses" "the link way out's network reaches no listener of the link reader's" compose 'services: { link_reader: { environment: { LINKS_LISTEN: "0.0.0.0:8084" } } }'
 	mutant "a container joined to the link reader's network" "the link reader's network holds the reader and the server alone" compose 'services: { web: { networks: { links: {} } } }'
-	mutant "the link reader back among the default services" "the default services hold no link reader, nor its way out" compose 'services: { link_reader: { profiles: !reset [] } }'
+	mutant "the link reader back among the default services" "the default services hold no link reader, nor its way out" compose 'services: { link_reader: { profiles: !reset [] }, egress_links: { profiles: !reset [] } }'
 	# The server's API bound to every address (reaching the link reader's network): the reader would then reach the server, which holds OpenAI's
 	# key. And a hole in both layers of the link way out for web's network (smokescreen's private-range refusal off, the guard's 172.16/12 narrowed).
 	mutant "the server listening on every address" "the link reader reaches no port of the server's" compose 'services: { server: { environment: { HOST: 0.0.0.0 } } }'
@@ -38,8 +38,9 @@ if [ "${1:-}" = --mutants ]; then
 fi
 
 # The default services hold neither the reader nor its way out: they are outside the stack's ceiling, as Jarvis.
+services=$(docker compose -p "$project" $files config --services) || fail "Compose refuses the stack's files"
 expect "the default services hold no link reader, nor its way out" \
-	"$(docker compose -p "$project" $files config --services | grep -c -E '^(link_reader|egress_links)$' || true)" 0
+	"$(printf '%s\n' "$services" | grep -c -E '^(link_reader|egress_links)$' || true)" 0
 
 # --no-deps: the default services, proven already, are neither rebuilt nor recreated under the checks.
 if ! docker compose -p "$project" $files --profile links up -d --build --wait --no-deps link_reader egress_links; then

@@ -348,7 +348,7 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "the guard lets UDP out after it refuses" "the guard lets nothing else out" \
 		guard awk '/--dports 80,443 -j ACCEPT/ { print; print "\techo \"-A OUTPUT -p udp -j ACCEPT\""; next } { print }'
 	mutant "the guard under a profile of its own" "the default services are web, Ergo, the server, the guard and the server's way out" \
-		compose 'services: { guard: { profiles: [guarded] } }'
+		compose 'services: { guard: { profiles: [guarded] }, egress: { profiles: [guarded] } }'
 	mutant "the guard lets its network start a connection to web" "the guard's network reaches neither web nor the server" \
 		guard awk '!done && /-A OUTPUT -o lo -j ACCEPT/ { print; print "\techo \"-A OUTPUT -o $inside -d $web -p tcp --dport 8080 -j ACCEPT\""; done = 1; next } { print }'
 	mutant "the guard lets every port out" "the guard lets out no other public port" \
@@ -900,10 +900,12 @@ PY
 	hardened "$egress" egress network
 	# jarvis, its reader and their ways out sit in a profile of their own: the default services hold none, and the server's name for
 	# jarvis answers nothing, so its door answers off, or not_ready when on.
+	# Read once, Compose's refusal of the project a fail: a count of 0 must not stand for a file that does not load.
+	services=$(docker compose -p "$project" $files config --services) || fail "Compose refuses the stack's files"
 	expect "the default services hold no jarvis, nor its reader, nor their ways out" \
-		"$(docker compose -p "$project" $files config --services | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
+		"$(printf '%s\n' "$services" | grep -cxE 'jarvis|egress_jarvis|jarvis_reader|egress_reader' || true)" 0
 	expect "the default services are web, Ergo, the server, the guard and the server's way out" \
-		"$(docker compose -p "$project" $files config --services | sort | tr '\n' ' ')" "egress ergo guard server web "
+		"$(printf '%s\n' "$services" | sort | tr '\n' ' ')" "egress ergo guard server web "
 	expect "the server finds no jarvis by default" "$(docker exec "$server" /nodejs/bin/node -e \
 		"fetch('http://jarvis:8081/budgets').then((r) => console.log(r.status), () => console.log('refused'))" 2>&1 || true)" refused
 	expect "Ergo sits on the internal network only" "$(networks_of "$ergo")" "$inside "

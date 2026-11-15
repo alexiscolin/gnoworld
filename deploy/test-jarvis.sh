@@ -49,9 +49,10 @@ if [ "${1:-}" = --mutants ]; then
 	mutant "jarvis's key given to the server" "the server holds no Anthropic key" compose 'services: { server: { secrets: [log_pepper, ergo_oper_password, openai_api_key, anthropic_api_key] } }'
 	mutant "jarvis killed before its drain ends" "jarvis waits 35 s for its drain" compose 'services: { jarvis: { stop_grace_period: 10s } }'
 	mutant "jarvis listening on all its networks" "jarvis's way out's network reaches no listener of jarvis's" compose 'services: { jarvis: { environment: { JARVIS_HOST: 0.0.0.0 } } }'
-	# `!reset []` empties the file's list: with no profile the service starts with the default ones.
-	mutant "jarvis back among the default services" "the default services hold no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis: { profiles: !reset [] } }'
-	mutant "the reader back among the default services" "the default services hold no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis_reader: { profiles: !reset [] } }'
+	# `!reset []` empties the file's list: with no profile the service starts with the default ones. A service and the way out it
+	# depends on go together: Compose refuses a project where one is left in a profile the other does not share.
+	mutant "jarvis back among the default services" "the default services hold no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis: { profiles: !reset [] }, egress_jarvis: { profiles: !reset [] }, jarvis_reader: { profiles: !reset [] }, egress_reader: { profiles: !reset [] } }'
+	mutant "the reader back among the default services" "the default services hold no jarvis, nor its reader, nor their ways out" compose 'services: { jarvis_reader: { profiles: !reset [] }, egress_reader: { profiles: !reset [] } }'
 	# The reader: its list widened to Anthropic or cut, its proxy open to others, its replies dropped, itself on the
 	# internal network, given a secret or a volume, root, writable, with jarvis's user, published on the host.
 	mutant "Anthropic's API let out by the reader" "the reader's way out lets four hosts out" reader_acl awk '{ print } /- rpc.gno.land/ { print "    - api.anthropic.com" }'
